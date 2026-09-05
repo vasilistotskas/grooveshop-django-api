@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 
 from user.services.gdpr import anonymise_and_delete_user
 
@@ -146,3 +147,71 @@ def test_a_failing_purge_is_not_reported_as_a_completed_erasure(
         anonymise_and_delete_user(subject)
 
     assert User.objects.filter(pk=subject.pk).exists()
+
+
+def test_export_bundles_do_not_outlive_the_account(subject, tmp_path):
+    """`UserDataExport.user` is CASCADE, so the rows go — the files did not.
+
+    A right-of-access bundle is the single most complete copy of the
+    subject's data the system produces. Deleting the account took the
+    row that named it and left the JSON on the private-media volume with
+    nothing pointing at it; the expiry sweep walks rows, so it would
+    never see the file again.
+    """
+    from unittest.mock import patch
+
+    from user.models.data_export import UserDataExport
+
+    bundle = tmp_path / "export.json"
+    bundle.write_text('{"email": "subject@example.gr"}', encoding="utf-8")
+    UserDataExport.objects.create(
+        user=subject,
+        status=UserDataExport.Status.READY,
+        file_path=bundle.name,
+        file_size=bundle.stat().st_size,
+        expires_at=timezone.now() + timezone.timedelta(days=7),
+    )
+
+    with patch(
+        "user.services.gdpr.get_export_location", return_value=str(tmp_path)
+    ):
+        counts = anonymise_and_delete_user(subject)
+
+    assert counts["export_files_deleted"] == 1
+    assert not bundle.exists()
+
+
+def test_a_bundle_that_will_not_delete_aborts_the_whole_erasure(
+    subject, tmp_path
+):
+    """No partial erasure: either the data is gone or nothing moved.
+
+    Raising rather than logging means the task retries, and the retry is
+    idempotent — a file already removed on the failed attempt is simply
+    not there the next time.
+    """
+    from unittest.mock import patch
+
+    from user.models.data_export import UserDataExport
+
+    bundle = tmp_path / "export.json"
+    bundle.write_text("{}", encoding="utf-8")
+    UserDataExport.objects.create(
+        user=subject,
+        status=UserDataExport.Status.READY,
+        file_path=bundle.name,
+        file_size=2,
+        expires_at=timezone.now() + timezone.timedelta(days=7),
+    )
+
+    with (
+        patch(
+            "user.services.gdpr.get_export_location", return_value=str(tmp_path)
+        ),
+        patch("os.remove", side_effect=OSError("read-only volume")),
+        pytest.raises(OSError),
+    ):
+        anonymise_and_delete_user(subject)
+
+    assert User.objects.filter(pk=subject.pk).exists()
+    assert bundle.exists()

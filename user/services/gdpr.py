@@ -397,6 +397,36 @@ def _scrub_carrier_shipment_pii(order_ids: list[int]) -> int:
     return scrubbed
 
 
+def _delete_export_files(user) -> int:
+    """Remove this user's GDPR export bundles from the private volume.
+
+    Raises on a removal failure so the caller's transaction rolls back
+    and the task retries, rather than committing a deletion that leaves
+    unreferenced personal data behind.
+    """
+    from user.models.data_export import UserDataExport
+
+    location = get_export_location()
+    removed = 0
+    for file_path in UserDataExport.objects.filter(user=user).values_list(
+        "file_path", flat=True
+    ):
+        if not file_path:
+            continue
+        abs_path = os.path.join(location, file_path)
+        if not os.path.exists(abs_path):
+            continue
+        os.remove(abs_path)
+        removed += 1
+
+    logger.info(
+        "GDPR erasure: removed %s export bundle(s) for user %s",
+        removed,
+        user.pk,
+    )
+    return removed
+
+
 @transaction.atomic
 def anonymise_and_delete_user(user) -> dict[str, int]:
     """Right-to-erasure. Anonymises orders, then deletes the user row.
@@ -515,6 +545,18 @@ def anonymise_and_delete_user(user) -> dict[str, int]:
     counts["giftcard_purchases_scrubbed"] = GiftCardPurchase.objects.filter(
         buyer=user
     ).update(buyer_email=placeholder_email, sender_name=placeholder_name)
+
+    # Right-of-access bundles are the single most complete copy of the
+    # subject's data the system produces, and UserDataExport.user is
+    # CASCADE — so deleting the account took the rows and left the JSON
+    # on the private-media PVC with nothing left pointing at it. The
+    # expiry sweep walks rows, so it would never see them again.
+    #
+    # Deleted before user.delete() cascades the rows, and a failure is
+    # raised rather than logged: the task retries, and the retry is
+    # idempotent because a file already removed on a failed attempt is
+    # simply not there the next time.
+    counts["export_files_deleted"] = _delete_export_files(user)
 
     # The one PROTECT FK to UserAccount, and the reason erasure was
     # impossible for anyone who had ever authored a post: user.delete()

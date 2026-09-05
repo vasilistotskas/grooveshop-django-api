@@ -753,10 +753,17 @@ class AcsService:
             # Release the claim so a retry can proceed without waiting out TTL.
             try:
                 with transaction.atomic():
-                    fresh = (
-                        AcsShipment.objects.select_for_update()
-                        .only("metadata")
-                        .get(pk=shipment.pk)
+                    # Full row fetch (no ``.only("metadata")``): see
+                    # ``_record_last_error`` for the rationale — the
+                    # deferred-field path raises ``KeyError: 'cod_amount'``
+                    # via django-money's descriptor inside simple-history's
+                    # post-save snapshot, and the bare ``except`` below
+                    # would swallow it as "failed to release cancel claim",
+                    # leaving the claim set so every retry for the next
+                    # ``_MINT_CLAIM_TTL_SECONDS`` raised AcsRetryableError
+                    # instead of re-attempting the cancel.
+                    fresh = AcsShipment.objects.select_for_update().get(
+                        pk=shipment.pk
                     )
                     m = fresh.metadata or {}
                     m.pop("cancel_started_at", None)
@@ -765,8 +772,9 @@ class AcsService:
             except Exception:
                 logger.exception(
                     "cancel_voucher: failed to release cancel claim for "
-                    "shipment=%s",
+                    "shipment=%s — retries will wait out the %ss TTL.",
                     shipment.pk,
+                    cls._MINT_CLAIM_TTL_SECONDS,
                 )
             raise
 

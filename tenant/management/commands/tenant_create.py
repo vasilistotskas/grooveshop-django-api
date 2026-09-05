@@ -188,7 +188,22 @@ class Command(BaseCommand):
             # opens its own ``schema_context`` internally.
             from tenant.provisioning import seed_tenant_defaults
 
-            seed_tenant_defaults(tenant)
+            seeding_failures = seed_tenant_defaults(tenant)
+
+        if seeding_failures:
+            # Not a failure of creation — the store exists and is
+            # usable. But reporting an unqualified success while its
+            # search is broken is how a half-seeded store reaches a
+            # merchant.
+            self.stdout.write(
+                self.style.WARNING(
+                    "These defaults did not seed: "
+                    + ", ".join(seeding_failures)
+                    + ". See the log for each; a missing Meilisearch "
+                    "index makes every search on this store fail until "
+                    "the nightly sync repairs it."
+                )
+            )
 
         self.stdout.write(
             self.style.SUCCESS(

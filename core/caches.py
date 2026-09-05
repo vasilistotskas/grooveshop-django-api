@@ -94,21 +94,24 @@ class CustomCache(RedisCache):
         (e.g. ``redis:1:views.decorators.cache…``).  Use
         :meth:`delete_raw_keys` to remove them — **not** the regular
         ``delete()`` method which would re-apply ``make_key()``.
+
+        Raises on a backend failure rather than returning ``[]``.
+        Swallowing it here made every caller read a Redis outage as
+        "nothing matched": ``CacheService._purge_surface`` wraps this
+        call in an ``except Exception`` written to record exactly that
+        failure, and the except could never fire, so the admin was told
+        it had successfully purged zero keys.
         """
-        try:
-            pattern = self._make_pattern(search)
-            raw_keys: list[str] = []
-            for key in self._cache.get_client().scan_iter(
-                match=pattern, count=_SCAN_BATCH_SIZE
-            ):
-                raw_keys.append(
-                    key.decode("utf-8") if isinstance(key, bytes) else key
-                )
-            raw_keys.sort()
-            return raw_keys
-        except Exception as exc:
-            logger.warning("Error getting cache keys: %s", str(exc))
-            return []
+        pattern = self._make_pattern(search)
+        raw_keys: list[str] = []
+        for key in self._cache.get_client().scan_iter(
+            match=pattern, count=_SCAN_BATCH_SIZE
+        ):
+            raw_keys.append(
+                key.decode("utf-8") if isinstance(key, bytes) else key
+            )
+        raw_keys.sort()
+        return raw_keys
 
     def delete_raw_keys(
         self, raw_keys: list[str]

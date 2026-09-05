@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from os import getenv
 
 from django.contrib import messages
@@ -14,6 +15,8 @@ from admin.mixins import AdminSiteLoginNextMixin
 from core.cache import CacheService
 from core.cache.nuxt import is_configured as nuxt_purge_configured
 from core.cache.registry import iter_surfaces
+
+logger = logging.getLogger(__name__)
 
 # Platform console identity. Deliberately NOT the UNFOLD_SITE_HEADER
 # defaults: those are tenant #1's ("Webside"), and the control plane must
@@ -205,7 +208,23 @@ class MyAdminSite(AdminSiteLoginNextMixin, UnfoldAdminSite):
         from core.cache.models import CachePurgeLog
 
         surfaces = iter_surfaces()
-        counts = CacheService.count(s.code for s in surfaces)
+        try:
+            counts = CacheService.count(s.code for s in surfaces)
+        except Exception as exc:
+            # ``keys()`` now raises instead of reporting an empty scan,
+            # so a Redis outage reaches here. Showing every surface at
+            # zero would read as "nothing to purge".
+            logger.warning("Cache surface counts unavailable: %s", exc)
+            messages.error(
+                request,
+                _(
+                    "Live key counts are unavailable — the cache backend"
+                    " did not answer (%(err)s). The figures below are not"
+                    " reliable."
+                )
+                % {"err": exc},
+            )
+            counts = {}
         groups: dict[str, list] = {}
         for surface in surfaces:
             groups.setdefault(surface.group, []).append(
@@ -235,7 +254,13 @@ class MyAdminSite(AdminSiteLoginNextMixin, UnfoldAdminSite):
         """Return live counts for a comma-separated list of surface codes."""
 
         codes = [c for c in request.GET.get("codes", "").split(",") if c]
-        counts = CacheService.count(codes)
+        try:
+            counts = CacheService.count(codes)
+        except Exception as exc:
+            logger.warning("Cache preview counts unavailable: %s", exc)
+            return JsonResponse(
+                {"error": str(exc), "counts": {}, "total": None}, status=503
+            )
         return JsonResponse({"counts": counts, "total": sum(counts.values())})
 
     def _handle_purge(self, request):
@@ -260,6 +285,14 @@ class MyAdminSite(AdminSiteLoginNextMixin, UnfoldAdminSite):
                 include_related=include_related,
             )
 
+        # ``*_headline``, not ``total_*``: a dry run deletes nothing, so
+        # the deleted totals are always 0 and every dry run reported
+        # "0 keys would be removed".
+        summary = {
+            "d": report.django_headline,
+            "n": report.nuxt_headline,
+            "s": len(report.surfaces),
+        }
         if dry_run:
             messages.info(
                 request,
@@ -267,11 +300,7 @@ class MyAdminSite(AdminSiteLoginNextMixin, UnfoldAdminSite):
                     "Dry run: %(d)s Django + %(n)s Nuxt keys would be"
                     " removed across %(s)s surface(s)."
                 )
-                % {
-                    "d": report.total_django,
-                    "n": report.total_nuxt,
-                    "s": len(report.surfaces),
-                },
+                % summary,
             )
         else:
             messages.success(
@@ -280,21 +309,34 @@ class MyAdminSite(AdminSiteLoginNextMixin, UnfoldAdminSite):
                     "Purged %(d)s Django + %(n)s Nuxt keys"
                     " across %(s)s surface(s)."
                 )
+                % summary,
+            )
+
+        # Django-side failures were never surfaced here at all, so a
+        # Redis outage rendered as a green "Purged 0 Django keys".
+        django_failures = [s for s in report.surfaces if s.django_error]
+        if django_failures:
+            messages.error(
+                request,
+                _(
+                    "Django cache purge FAILED for %(n)s surface(s):"
+                    " %(codes)s. Those keys are still cached — %(err)s"
+                )
                 % {
-                    "d": report.total_django,
-                    "n": report.total_nuxt,
-                    "s": len(report.surfaces),
+                    "n": len(django_failures),
+                    "codes": ", ".join(s.code for s in django_failures),
+                    "err": django_failures[0].django_error,
                 },
             )
-            errors = [s for s in report.surfaces if s.nuxt_error]
-            if errors:
-                messages.warning(
-                    request,
-                    _(
-                        "Nuxt purge unreachable for %(n)s surface(s)."
-                        " Check NUXT_INTERNAL_BASE_URL +"
-                        " NUXT_CACHE_PURGE_TOKEN."
-                    )
-                    % {"n": len(errors)},
+        nuxt_failures = [s for s in report.surfaces if s.nuxt_error]
+        if nuxt_failures:
+            messages.warning(
+                request,
+                _(
+                    "Nuxt purge unreachable for %(n)s surface(s)."
+                    " Check NUXT_INTERNAL_BASE_URL +"
+                    " NUXT_CACHE_PURGE_TOKEN."
                 )
+                % {"n": len(nuxt_failures)},
+            )
         return redirect("admin:clear-cache")

@@ -10,7 +10,7 @@ from product.enum.review import RateEnum
 from product.models.product import Product
 from product.models.review import ProductReview
 from product.serializers.product import ProductSerializer
-from user.serializers.account import UserDetailsSerializer
+from user.serializers.account import UserPublicSerializer
 
 User = get_user_model()
 
@@ -38,7 +38,9 @@ class ProductReviewSerializer(
     TranslatableModelSerializer, serializers.ModelSerializer[ProductReview]
 ):
     translations = TranslatedFieldsFieldExtend(shared_model=ProductReview)
-    user = UserDetailsSerializer(read_only=True)
+    # PUBLIC serializer: these endpoints serve anonymous readers, and
+    # the account serializer carries email/phone/address/birth_date.
+    user = UserPublicSerializer(read_only=True)
     product = ProductBriefSerializer(read_only=True)
 
     class Meta:
@@ -69,7 +71,9 @@ class ProductReviewDetailSerializer(
     TranslatableModelSerializer, serializers.ModelSerializer[ProductReview]
 ):
     translations = TranslatedFieldsFieldExtend(shared_model=ProductReview)
-    user = UserDetailsSerializer(read_only=True)
+    # PUBLIC serializer: these endpoints serve anonymous readers, and
+    # the account serializer carries email/phone/address/birth_date.
+    user = UserPublicSerializer(read_only=True)
     product = ProductSerializer(read_only=True)
 
     class Meta:

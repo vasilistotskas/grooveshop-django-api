@@ -9,7 +9,7 @@ from rest_framework.relations import PrimaryKeyRelatedField
 from blog.models.author import BlogAuthor
 from core.api.schema import generate_schema_multi_lang
 from core.utils.serializers import TranslatedFieldExtended
-from user.serializers.account import UserDetailsSerializer
+from user.serializers.account import UserPublicSerializer
 
 
 @extend_schema_field(generate_schema_multi_lang(BlogAuthor))
@@ -59,7 +59,9 @@ class BlogAuthorSerializer(
 
 
 class BlogAuthorDetailSerializer(BlogAuthorSerializer):
-    user = UserDetailsSerializer(read_only=True)
+    # PUBLIC serializer: these endpoints serve anonymous readers, and
+    # the account serializer carries email/phone/address/birth_date.
+    user = UserPublicSerializer(read_only=True)
     recent_posts = serializers.SerializerMethodField()
     top_posts = serializers.SerializerMethodField()
 

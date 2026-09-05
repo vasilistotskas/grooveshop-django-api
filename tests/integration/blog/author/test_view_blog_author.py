@@ -363,11 +363,18 @@ class BlogAuthorViewSetTestCase(TestURLFixerMixin, APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
+        # This route is anonymously readable, so the nested author is a
+        # BYLINE, not an account. It used to nest the account serializer
+        # and therefore published the author's email, phone, address and
+        # birth date to anyone — for blog authors that is store
+        # personnel. The old assertions here described that shape
+        # (`pk`, `email`); they were not a decision to publish it.
         user_data = response.data["user"]
         self.assertIsInstance(user_data, dict)
-        self.assertIn("pk", user_data)
-        self.assertIn("email", user_data)
-        self.assertEqual(user_data["pk"], self.author_user.id)
+        self.assertEqual(user_data["id"], self.author_user.id)
+        self.assertNotIn("email", user_data)
+        self.assertNotIn("phone", user_data)
+        self.assertNotIn("address", user_data)
 
     def test_consistency_with_manual_serializer_instantiation(self):
         url = self.get_blog_author_detail_url(self.blog_author.id)

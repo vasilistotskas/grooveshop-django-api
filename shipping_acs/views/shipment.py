@@ -77,6 +77,15 @@ class AcsLabelView(APIView):
 class AcsCancelView(APIView):
     """Cancel an ACS voucher (admin-only)."""
 
+    # `StoreStaffModelPermissions` is a `DjangoModelPermissions`
+    # subclass, and DRF's `_queryset(view)` asserts that the view has a
+    # `queryset` or `get_queryset()` — it needs the model to build the
+    # permission codename. On an `APIView` there is neither, so every
+    # AUTHENTICATED caller hit `AssertionError` and got a 500; an
+    # anonymous one was refused first, which is why the endpoint looked
+    # like it worked. `.none()` gives the permission its model without
+    # fetching a row, the same shape the viewsets in this codebase use.
+    queryset = AcsShipment.objects.none()
     permission_classes = [StoreStaffModelPermissions]
     serializer_class = AcsShipmentDetailSerializer
 

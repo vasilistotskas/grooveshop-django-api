@@ -1,6 +1,7 @@
 from unittest.mock import patch
 
 from django.core import mail
+from django.db import connection
 from django.test import TestCase, override_settings
 
 from contact.models import Feedback, FeedbackCategory
@@ -81,8 +82,9 @@ class TestFeedbackSignals(TestCase):
 
         with (
             patch(
-                "contact.tasks.send_feedback_notification_email_task.delay"
-            ) as mock_delay,
+                "contact.tasks.send_feedback_notification_email_task"
+                ".apply_async"
+            ) as mock_dispatch,
             override_settings(
                 INFO_EMAIL=_INFO_EMAIL,
                 DEFAULT_FROM_EMAIL="noreply@example.com",
@@ -92,7 +94,13 @@ class TestFeedbackSignals(TestCase):
                 sender=Feedback, instance=feedback, created=True
             )
 
-            mock_delay.assert_called_once_with(feedback.id)
+            # `apply_async`, not `delay`: see test_signals.py — the
+            # tenant schema is stamped at registration, not when the
+            # commit hook fires.
+            mock_dispatch.assert_called_once_with(
+                args=[feedback.id],
+                headers={"_schema_name": connection.schema_name},
+            )
 
     def test_signal_handler_not_created(self):
         feedback = Feedback.objects.create(**self.feedback_data)

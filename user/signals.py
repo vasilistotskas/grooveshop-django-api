@@ -16,7 +16,6 @@ from django.contrib.auth.signals import (
     user_logged_out,
     user_login_failed,
 )
-from django.db import transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.utils.crypto import get_random_string
@@ -203,7 +202,7 @@ def populate_profile(
 
     match provider:
         case "facebook":
-            picture_url = f"http://graph.facebook.com/{sociallogin.account.uid}/picture?type=large"
+            picture_url = f"https://graph.facebook.com/{sociallogin.account.uid}/picture?type=large"
         case "google":
             picture_url = sociallogin.account.extra_data.get("picture")
         case "discord":
@@ -225,12 +224,12 @@ def populate_profile(
         # always read the new user row.  (Social signups run inside an
         # atomic block; firing bare .delay() risks the task reading before
         # the INSERT is visible to the Celery worker's DB connection.)
+        from tenant.celery import dispatch_on_commit
         from user.tasks import download_social_avatar_task
 
-        transaction.on_commit(
-            lambda url=picture_url: download_social_avatar_task.delay(
-                user_id=user.pk, picture_url=url
-            )
+        dispatch_on_commit(
+            download_social_avatar_task,
+            kwargs={"user_id": user.pk, "picture_url": picture_url},
         )
 
 
@@ -259,10 +258,9 @@ def create_default_subscriptions(sender, instance, created, **kwargs):
                 subscription.save()
                 # Dispatch only after the outer transaction commits so the
                 # worker can't read the row before it's persisted.
+                from tenant.celery import dispatch_on_commit
                 from user.tasks import send_subscription_confirmation_email_task
 
-                transaction.on_commit(
-                    lambda s=subscription: (
-                        send_subscription_confirmation_email_task.delay(s.id)
-                    )
+                dispatch_on_commit(
+                    send_subscription_confirmation_email_task, [subscription.id]
                 )

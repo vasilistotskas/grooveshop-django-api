@@ -210,19 +210,21 @@ class MyAdminSite(AdminSiteLoginNextMixin, UnfoldAdminSite):
         surfaces = iter_surfaces()
         try:
             counts = CacheService.count(s.code for s in surfaces)
-        except Exception as exc:
+        except Exception:
             # ``keys()`` now raises instead of reporting an empty scan,
             # so a Redis outage reaches here. Showing every surface at
             # zero would read as "nothing to purge".
-            logger.warning("Cache surface counts unavailable: %s", exc)
+            # The exception text stays in the log, not in the page. A
+            # redis-py connection error carries the connection target,
+            # and the URL in this deployment carries the password.
+            logger.exception("Cache surface counts unavailable")
             messages.error(
                 request,
                 _(
                     "Live key counts are unavailable — the cache backend"
-                    " did not answer (%(err)s). The figures below are not"
-                    " reliable."
-                )
-                % {"err": exc},
+                    " did not answer. The figures below are not reliable;"
+                    " see the application log for the error."
+                ),
             )
             counts = {}
         groups: dict[str, list] = {}
@@ -256,10 +258,17 @@ class MyAdminSite(AdminSiteLoginNextMixin, UnfoldAdminSite):
         codes = [c for c in request.GET.get("codes", "").split(",") if c]
         try:
             counts = CacheService.count(codes)
-        except Exception as exc:
-            logger.warning("Cache preview counts unavailable: %s", exc)
+        except Exception:
+            # Same reasoning as clear_cache_view: the detail goes to the
+            # log, and the response says only that it is unavailable.
+            logger.exception("Cache preview counts unavailable")
             return JsonResponse(
-                {"error": str(exc), "counts": {}, "total": None}, status=503
+                {
+                    "error": "cache_unavailable",
+                    "counts": {},
+                    "total": None,
+                },
+                status=503,
             )
         return JsonResponse({"counts": counts, "total": sum(counts.values())})
 
@@ -320,12 +329,12 @@ class MyAdminSite(AdminSiteLoginNextMixin, UnfoldAdminSite):
                 request,
                 _(
                     "Django cache purge FAILED for %(n)s surface(s):"
-                    " %(codes)s. Those keys are still cached — %(err)s"
+                    " %(codes)s. Those keys are still cached — see the"
+                    " application log for the backend error."
                 )
                 % {
                     "n": len(django_failures),
                     "codes": ", ".join(s.code for s in django_failures),
-                    "err": django_failures[0].django_error,
                 },
             )
         nuxt_failures = [s for s in report.surfaces if s.nuxt_error]

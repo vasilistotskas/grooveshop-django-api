@@ -168,6 +168,44 @@ class CartServiceTest(TestCase):
         merged = self.cart.items.get(product=product)
         self.assertEqual(merged.quantity, 5)
 
+    def test_merge_carts_rehomes_the_guest_stock_holds(self):
+        """A guest's holds must follow the cart, not be orphaned by it.
+
+        Reservations are keyed by cart UUID, and `merge_carts` deletes
+        the source cart. Left behind, the guest's own holds became
+        unreachable AND kept counting against availability — so the
+        shopper who placed them was the one blocked from checking out,
+        by exactly their own quantity. `release_reservations` could not
+        clear them either: it matches on `reserved_by` (null for a
+        guest) or the CURRENT cart's uuid, and neither still applies.
+        """
+        from order.models.stock_reservation import StockReservation
+        from order.stock import StockManager
+
+        product = ProductFactory(num_images=0, num_reviews=0, stock=3)
+        guest_cart = CartFactory(user=None, num_cart_items=0)
+        CartItemFactory(cart=guest_cart, product=product, quantity=3)
+        StockManager.reserve_stock(
+            product_id=product.id,
+            quantity=3,
+            session_id=str(guest_cart.uuid),
+            user_id=None,
+        )
+
+        cart_service = CartService(request=self.request)
+        cart_service.merge_carts(guest_cart)
+
+        hold = StockReservation.objects.get(product=product, consumed=False)
+        self.assertEqual(hold.session_id, str(self.cart.uuid))
+        self.assertEqual(hold.reserved_by, self.cart.user)
+
+        # The point of the re-home: the shopper's own hold no longer
+        # blocks the shopper. Availability nets their hold back out.
+        available = StockManager.get_available_stock(
+            product.id, exclude_session_id=str(self.cart.uuid)
+        )
+        self.assertEqual(available, 3)
+
 
 class GuestCartServiceTest(TestCase):
     def setUp(self):

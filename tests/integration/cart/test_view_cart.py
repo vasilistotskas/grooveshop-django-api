@@ -91,6 +91,42 @@ class CartViewSetTest(TestURLFixerMixin, APITestCase):
         self.assertNotIsInstance(rendered["amount"], str)
         self.assertIsInstance(rendered["amount"], (int, float))
 
+    def test_create_payment_intent_refuses_an_inactive_pay_way(self):
+        """Never mint an intent order creation would then refuse.
+
+        The flow is confirm-THEN-create: the shopper confirms the card in
+        Stripe.js against this intent and only afterwards POSTs the
+        order. If `_validate_pay_way_for_order` rejects the pay-way at
+        that point the customer has been charged for an order that does
+        not exist, with nothing to refund against. So this endpoint has
+        to apply the same `active()` + carrier-exclusion gate.
+        """
+        from unittest.mock import MagicMock, patch
+
+        from pay_way.factories import PayWayFactory
+
+        pay_way = PayWayFactory.create_online_payment(
+            provider_code="stripe", active=False
+        )
+
+        provider = MagicMock()
+        url = reverse("cart-create-payment-intent")
+        with patch(
+            "pay_way.services.PayWayService.get_provider_for_pay_way",
+            return_value=provider,
+        ):
+            response = self.client.post(
+                url,
+                {"pay_way_id": pay_way.id, "shipping_kind": "home_delivery"},
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["reason"], "pay_way_unavailable")
+        # The decisive part: no intent was ever created, so there is
+        # nothing for the shopper to confirm.
+        provider.process_payment.assert_not_called()
+
     def test_retrieve_no_n_plus_one(self):
         """Cart-detail query count must not grow with the number of items
         nor re-run the total_* property queries per line (G0081)."""

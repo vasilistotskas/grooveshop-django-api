@@ -16,7 +16,13 @@ def _gateway_cart_ident(request) -> str | None:
     provided = request.headers.get("X-Internal-Gateway", "")
     if not secret or not provided:
         return None
-    if not hmac.compare_digest(provided, secret):
+    # Bytes, not str: `compare_digest` raises TypeError on non-ASCII
+    # str, and header bytes reach here latin-1-decoded, so a single
+    # high byte would 500 this request instead of throttling it.
+    if not hmac.compare_digest(
+        provided.encode("utf-8", "surrogateescape"),
+        secret.encode("utf-8", "surrogateescape"),
+    ):
         return None
     return request.headers.get("X-Cart-Id") or None
 

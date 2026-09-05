@@ -411,6 +411,25 @@ class PromotionEngine:
                 continue
             candidates.append((promotion, code))
 
+        # Expand every candidate's categories from ONE descendant query
+        # and hang the result on the instance. These Promotion objects
+        # are built fresh here for this evaluation, so the attributes
+        # cannot outlive it or cross a tenant.
+        root_category_ids: set[int] = set()
+        for promotion, _code in candidates:
+            root_category_ids.update(c.id for c in promotion.categories.all())
+            root_category_ids.update(
+                c.id for c in promotion.excluded_categories.all()
+            )
+        index = cls._descendant_index(root_category_ids)
+        for promotion, _code in candidates:
+            promotion._included_category_ids = cls._expand(
+                promotion.categories, index
+            )
+            promotion._excluded_category_ids = cls._expand(
+                promotion.excluded_categories, index
+            )
+
         return candidates, rejected
 
     @staticmethod
@@ -558,19 +577,72 @@ class PromotionEngine:
         return Money(_quantize(amount), currency)
 
     @classmethod
-    def _expanded_category_ids(cls, categories_qs) -> set[int]:
+    def _descendant_index(cls, root_ids: set[int]) -> dict[int, set[int]]:
+        """``category id -> its descendant ids``, for every root, in ONE query.
+
+        This used to be a per-call ``get_descendants`` inside
+        ``_expanded_category_ids``, and ``_matching_items`` calls that
+        for a category-scoped promotion's INCLUDED categories and for
+        every promotion's EXCLUDED ones — so the engine still grew with
+        the number of promotions carrying categories, which is the cost
+        this change set exists to remove. Measured before: 13 queries at
+        two category-scoped promotions, 25 at eight.
+
+        A memo keyed on the id set would not have helped, because
+        distinct promotions usually carry distinct categories. One query
+        over the union does: MPTT gives every row a ``tree_id`` and an
+        ``lft``/``rght`` range, so each root's descendants are
+        recoverable from the same result set in memory.
+        """
+        if not root_ids:
+            return {}
         from product.models.category import ProductCategory
 
-        # Same reason as above — iterate the prefetched rows rather
-        # than issuing a fresh values_list query per promotion.
+        rows = list(
+            ProductCategory.objects.filter(pk__in=root_ids)
+            .get_descendants(include_self=True)
+            .values("id", "tree_id", "lft", "rght")
+        )
+        roots = {row["id"]: row for row in rows if row["id"] in root_ids}
+        return {
+            root_id: {
+                row["id"]
+                for row in rows
+                if row["tree_id"] == root["tree_id"]
+                and root["lft"] <= row["lft"] <= root["rght"]
+            }
+            for root_id, root in roots.items()
+        }
+
+    @classmethod
+    def _category_ids(cls, promotion: Promotion, side: str) -> set[int]:
+        """The expanded category ids ``_collect_candidates`` attached.
+
+        Falls back to expanding on the spot for a Promotion that did not
+        come through candidate collection — the helper is also reachable
+        from tests and from any future caller, and a silently empty set
+        would quietly widen a promotion's scope rather than fail.
+        """
+        attr = f"_{side}_category_ids"
+        cached = getattr(promotion, attr, None)
+        if cached is not None:
+            return cached
+
+        source = (
+            promotion.categories
+            if side == "included"
+            else promotion.excluded_categories
+        )
+        ids = {category.id for category in source.all()}
+        return cls._expand(source, cls._descendant_index(ids))
+
+    @staticmethod
+    def _expand(categories_qs, index: dict[int, set[int]]) -> set[int]:
+        """Union the prefetched categories' descendants from the index."""
         ids = [category.id for category in categories_qs.all()]
         if not ids:
             return set()
-        return set(
-            ProductCategory.objects.filter(pk__in=ids)
-            .get_descendants(include_self=True)
-            .values_list("id", flat=True)
-        )
+        return set().union(*(index.get(cid, {cid}) for cid in ids))
 
     @classmethod
     def _matching_items(cls, promotion: Promotion, cart_items) -> list:
@@ -592,9 +664,7 @@ class PromotionEngine:
                 item for item in cart_items if item.product_id in include_ids
             ]
         elif promotion.target_scope == TargetScope.CATEGORIES:
-            include_categories = cls._expanded_category_ids(
-                promotion.categories
-            )
+            include_categories = cls._category_ids(promotion, "included")
             items = [
                 item
                 for item in cart_items
@@ -609,9 +679,7 @@ class PromotionEngine:
                 item for item in items if item.product_id not in excluded_ids
             ]
 
-        excluded_categories = cls._expanded_category_ids(
-            promotion.excluded_categories
-        )
+        excluded_categories = cls._category_ids(promotion, "excluded")
         if excluded_categories:
             items = [
                 item

@@ -100,3 +100,49 @@ def test_free_gift_promotions_do_not_each_cost_a_query(
         f"six more FREE_GIFT promotions — _gift_entitlement is "
         f"re-querying instead of reading the prefetched rows"
     )
+
+
+def _category_promotions(count):
+    """Category-scoped promotions, each with its OWN category.
+
+    Distinct categories on purpose: a memo keyed on the id set would
+    hide the cost, and the real catalogue has one promotion per
+    department rather than many sharing a set.
+    """
+    from product.factories.category import ProductCategoryFactory
+    from promotion.enum import TargetScope
+
+    for _ in range(count):
+        promotion = PromotionFactory(
+            trigger=PromotionTrigger.AUTOMATIC,
+            benefit_value=Decimal("1.0"),
+            stackable=True,
+            target_scope=TargetScope.CATEGORIES,
+        )
+        promotion.categories.add(ProductCategoryFactory())
+
+
+def test_category_scoped_promotions_do_not_each_cost_a_descendant_query(
+    enable_promotions, make_cart
+):
+    """MPTT descendant expansion must be batched across candidates.
+
+    `_matching_items` expands a category-scoped promotion's INCLUDED
+    categories and every promotion's EXCLUDED ones, and each expansion
+    was its own `get_descendants` query.
+    """
+    cart, _items = make_cart([(50, 1)])
+
+    _category_promotions(2)
+    with count_queries() as few:
+        PromotionEngine.evaluate(cart)
+
+    _category_promotions(6)
+    with count_queries() as many:
+        PromotionEngine.evaluate(cart)
+
+    assert many.count == few.count, (
+        f"evaluate() grew from {few.count} to {many.count} queries with "
+        f"six more category-scoped promotions — descendant expansion is "
+        f"still running once per promotion"
+    )

@@ -46,16 +46,28 @@ class CartItemSerializer(serializers.ModelSerializer[CartItem]):
             "required": ["unit_weight", "total_weight", "weight_unit"],
         }
     )
-    def get_weight_info(self, obj: CartItem) -> dict | None:
+    def get_weight_info(self, obj: CartItem) -> dict:
+        # Always an object. ``Product.weight`` is non-nullable with
+        # ``default=zero_weight``, so it is never None — but
+        # ``MeasureBase.__bool__`` is ``bool(self.standard)``, which makes
+        # a zero weight FALSY. The old ``if product.weight:`` therefore
+        # returned None for any product left at the default, while the
+        # schema above declares all three keys required and non-nullable.
+        # The generated client honours that: ``weightInfo`` is a bare
+        # ``z.object({...})`` in zod.gen.ts, so a null failed validation
+        # and ``parseDataAs`` rejected the WHOLE cart response — a 422 on
+        # add-to-cart for a product nobody had weighed yet.
+        #
+        # Zero is a legitimate weight, not an absence. Reporting 0.0 keeps
+        # the payload matching its declared contract; making the schema
+        # nullable instead would only move the failure into the shipping
+        # code that needs these numbers.
         product = obj.product
-        if product.weight:
-            total_weight = product.weight.value * obj.quantity
-            return {
-                "unit_weight": product.weight.value,
-                "total_weight": total_weight,
-                "weight_unit": product.weight.unit,
-            }
-        return None
+        return {
+            "unit_weight": product.weight.value,
+            "total_weight": product.weight.value * obj.quantity,
+            "weight_unit": product.weight.unit,
+        }
 
     class Meta:
         model = CartItem

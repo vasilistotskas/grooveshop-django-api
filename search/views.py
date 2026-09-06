@@ -41,6 +41,8 @@ from search.serializers import (
     SearchClickResponseSerializer,
     TrendingSearchResponseSerializer,
 )
+from tenant.membership import tenant_plan_allows
+from tenant.permissions import IsBlogEnabled
 
 logger = logging.getLogger(__name__)
 
@@ -206,6 +208,12 @@ def _relaxed_query(query: str) -> str | None:
     ],
 )
 @api_view(["GET"])
+# Every blog viewset chains `IsBlogEnabled`; this endpoint serves the
+# same content and did not, so a tenant whose plan has `blog_enabled`
+# off still published its posts through search. `meili_filter` gates
+# indexing on `is_published` only, never on the plan flag, so the
+# documents are in the index either way — the gate has to be here.
+@permission_classes([IsBlogEnabled])
 @throttle_classes([SearchThrottle, AnonRateThrottle, UserRateThrottle])
 def blog_post_meili_search(request):
     query = request.query_params.get("query")
@@ -380,6 +388,9 @@ def blog_post_meili_search(request):
     ],
 )
 @api_view(["GET"])
+# Explicit, per the project rule that an anonymous endpoint declares
+# itself rather than leaning on DEFAULT_PERMISSION_CLASSES.
+@permission_classes([AllowAny])
 @throttle_classes([SearchThrottle, AnonRateThrottle, UserRateThrottle])
 def product_meili_search(request):
     """Search products with advanced filtering via Meilisearch."""
@@ -563,6 +574,11 @@ def product_meili_search(request):
     ],
 )
 @api_view(["GET"])
+# NOT gated on `IsBlogEnabled`: this endpoint also searches products,
+# and 404-ing it for a blog-disabled tenant would take their product
+# search down with it. The blog INDEX is dropped from the federation
+# instead — see below.
+@permission_classes([AllowAny])
 @throttle_classes([SearchThrottle, AnonRateThrottle, UserRateThrottle])
 def federated_search(request):
     """
@@ -612,6 +628,36 @@ def federated_search(request):
     # Content filtering: exclude unpublished blog posts
     blog_filters.append("is_published = true")
 
+    # A tenant whose plan has `blog_enabled` off must not have its posts
+    # searchable. Indexing does not know about the flag —
+    # `BlogPostTranslation.meili_filter` gates on `is_published` alone —
+    # so the documents are there regardless, and the only place to stop
+    # them surfacing is here. Dropping the index rather than refusing
+    # the request keeps PRODUCT search working for that tenant.
+    queries = [
+        {
+            "indexUid": ProductTranslation.get_meili_index_name(),
+            "q": decoded_query,
+            "filter": product_filters,
+            "showMatchesPosition": True,
+            "showRankingScore": True,
+            "attributesToRetrieve": ["*"],
+            "federationOptions": {"weight": 1.0},
+        }
+    ]
+    if tenant_plan_allows("blog_enabled"):
+        queries.append(
+            {
+                "indexUid": BlogPostTranslation.get_meili_index_name(),
+                "q": decoded_query,
+                "filter": blog_filters,
+                "showMatchesPosition": True,
+                "showRankingScore": True,
+                "attributesToRetrieve": ["*"],
+                "federationOptions": {"weight": 0.7},
+            }
+        )
+
     # Build multi_search queries with federation
     try:
         multi_search_params = {
@@ -619,26 +665,7 @@ def federated_search(request):
                 "limit": limit,
                 "offset": offset,
             },
-            "queries": [
-                {
-                    "indexUid": ProductTranslation.get_meili_index_name(),
-                    "q": decoded_query,
-                    "filter": product_filters,
-                    "showMatchesPosition": True,
-                    "showRankingScore": True,
-                    "attributesToRetrieve": ["*"],
-                    "federationOptions": {"weight": 1.0},
-                },
-                {
-                    "indexUid": BlogPostTranslation.get_meili_index_name(),
-                    "q": decoded_query,
-                    "filter": blog_filters,
-                    "showMatchesPosition": True,
-                    "showRankingScore": True,
-                    "attributesToRetrieve": ["*"],
-                    "federationOptions": {"weight": 0.7},
-                },
-            ],
+            "queries": queries,
         }
 
         # Execute multi_search with federation via the read-only search
@@ -717,11 +744,14 @@ def federated_search(request):
             )
         }
     if blog_ids:
+        # Now that `BlogPostTranslation` defines the optimized
+        # queryset, use it rather than the hand-rolled select_related
+        # this call site had to carry.
         blog_map = {
             obj.pk: obj
-            for obj in BlogPostTranslation.objects.filter(
+            for obj in BlogPostTranslation.get_search_result_queryset().filter(
                 pk__in=blog_ids
-            ).select_related("master")
+            )
         }
 
     # Enrich results preserving original order

@@ -266,7 +266,13 @@ def is_meilisearch_available():
         config = django_settings.MEILISEARCH
         scheme = "https" if config.get("HTTPS") else "http"
         host = f"{scheme}://{config['HOST']}:{config['PORT']}"
-        client = meilisearch.Client(host, config.get("MASTER_KEY", ""))
+        # No API key: ``/health`` is a public route (verified against a
+        # key-protected engine — keyless ``health()`` returns
+        # ``{'status': 'available'}`` while ``get_indexes()`` on the same
+        # client is refused with ``invalid_api_key``), and the SDK would
+        # otherwise put the MASTER key in an ``Authorization`` header on
+        # a plain-HTTP request.
+        client = meilisearch.Client(host)
         client.health()
         return True
     except Exception:
@@ -276,11 +282,28 @@ def is_meilisearch_available():
 # Check Meilisearch availability once at module load
 MEILISEARCH_AVAILABLE = is_meilisearch_available()
 
-# Skip marker for tests requiring Meilisearch
-requires_meilisearch = pytest.mark.skipif(
+_meilisearch_unavailable = pytest.mark.skipif(
     not MEILISEARCH_AVAILABLE,
     reason="Meilisearch is not available",
 )
+
+
+def requires_meilisearch(obj):
+    """Mark a test or class as needing a live Meilisearch engine.
+
+    Skips when none is reachable, and — when one is — provisions the
+    indexes first. Those two belong together: the engine being *up* was
+    never enough. These suites query ``/api/v1/search/*``, which reads
+    real indexes, and every one of them assumed the developer's local
+    engine already held indexes left over from a dev run. Pointed at the
+    empty engine CI starts fresh for every job, product and blog search
+    returned HTTP 500 (``index_not_found``) and federated search HTTP
+    400 (a filter on an index with no ``filterableAttributes``) — 27
+    failures across two shards the first time the availability probe
+    stopped mis-reporting the engine as absent.
+    """
+    obj = pytest.mark.usefixtures("live_meilisearch_indexes")(obj)
+    return _meilisearch_unavailable(obj)
 
 
 def _reset_worker_cache():
@@ -896,6 +919,49 @@ def _widen_meilisearch_timeout():
                 object.__setattr__(st, "timeout", MEILI_TEST_TIMEOUT)
             except Exception:  # pragma: no cover - defensive
                 pass
+    yield
+
+
+def provision_meilisearch_indexes(attempts: int = 3) -> None:
+    """Create every ``IndexMixin`` index on the live engine, with settings.
+
+    ``update_meili_settings`` and not a bare ``create_index``, for the
+    reason ``tenant.provisioning._create_meili_indexes`` spells out: an
+    index created without settings has ``filterableAttributes = []``,
+    and every storefront search sends a filter, so the engine rejects
+    the query and the endpoint answers 400 rather than "no results".
+
+    Idempotent, and retried because it is not atomic: ``create_index``
+    reads the index list and then acts on it, so two xdist workers
+    starting together can both see an index missing and both enqueue the
+    create. The loser's task fails with ``index_already_exists`` and
+    ``update_meili_settings`` raises. On the retry the index exists,
+    ``create_index`` skips it, and only the (idempotent) settings task is
+    sent. ``flush_tasks`` clears the failed task off the process-wide
+    client first, or the retry would re-await it and re-raise.
+    """
+    from meili._client import client as meili_client
+    from meili.models import IndexMixin
+
+    for model in IndexMixin.__subclasses__():
+        for remaining in range(attempts - 1, -1, -1):
+            try:
+                model.update_meili_settings()
+                break
+            except Exception:
+                meili_client.flush_tasks()
+                if remaining == 0:
+                    raise
+
+
+@pytest.fixture(scope="session")
+def live_meilisearch_indexes():
+    """Provision the live engine's indexes once per session.
+
+    Pulled in by ``requires_meilisearch``; nothing else should need it.
+    """
+    if MEILISEARCH_AVAILABLE:
+        provision_meilisearch_indexes()
     yield
 
 

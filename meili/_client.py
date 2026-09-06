@@ -43,6 +43,11 @@ class Client:
     _TENANT_TOKEN_TTL_SECONDS = 3600
     _TENANT_CLIENT_REFRESH_SECONDS = 3000
 
+    # Page size for the paginated /indexes route. The engine's own
+    # default is 20; asking for more keeps the common case (one platform,
+    # a handful of stores) to a single round trip.
+    _INDEX_PAGE_SIZE = 100
+
     def search_client_for_schema(self, schema_name: str) -> _Client:
         """Read-only client whose key is SCOPED to one tenant's indexes.
 
@@ -202,8 +207,42 @@ class Client:
             task = self.client.wait_for_task(task_uid)
         return self._handle_sync(task)
 
-    def get_indexes(self):
-        return self.client.get_indexes()["results"]
+    def get_indexes(self) -> list:
+        """Every index on the engine, not just its first page.
+
+        Meilisearch paginates every GET route that returns a collection,
+        at 20 results by default
+        (https://www.meilisearch.com/docs/reference/api/pagination), and
+        the SDK sends no query parameters — so the previous
+        ``get_indexes()["results"]`` silently stopped at 20. Each tenant
+        owns one index per ``IndexMixin`` model plus the public schema's
+        unprefixed ones, so a platform passes that ceiling at ten stores,
+        after which indexes vanish from this list with no error, in three
+        places at once:
+
+        - ``purge_search_indexes`` leaves a departed tenant's documents
+          alive, so reusing the schema name hands a new store the
+          previous occupant's catalogue;
+        - ``meilisearch_drop`` skips the same indexes;
+        - ``create_index`` believes an existing index is missing and
+          enqueues a create whose task fails with
+          ``index_already_exists``, which ``update_meili_settings`` turns
+          into a raise — i.e. the PreSync hook starts failing every
+          deploy.
+        """
+        indexes: list = []
+        offset = 0
+        while True:
+            response = self.client.get_indexes(
+                {"limit": self._INDEX_PAGE_SIZE, "offset": offset}
+            )
+            results = response["results"]
+            indexes.extend(results)
+            offset += len(results)
+            # ``total`` is the engine's count of ALL indexes; its absence
+            # (a stubbed client) means one page is all there is.
+            if not results or offset >= response.get("total", offset):
+                return indexes
 
     def update_display(self, index_name: str, attributes: list | None) -> Self:
         if attributes is None:

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import re
 
 
 class BoxNowWebhookError(Exception):
@@ -139,9 +140,13 @@ def extract_data_substring(raw_body: bytes) -> bytes:
 # ---------------------------------------------------------------------------
 
 
+# SHA-256 hex-encoded, so exactly 64 lowercase-or-uppercase hex digits.
+_HEX_DIGEST_RE = re.compile(r"[0-9a-fA-F]{64}")
+
+
 def verify_signature(
     raw_data_bytes: bytes,
-    datasignature_hex: str,
+    datasignature_hex: object,
     secret: str,
 ) -> bool:
     """Verify the BoxNow HMAC-SHA256 datasignature.
@@ -149,23 +154,46 @@ def verify_signature(
     Uses :func:`hmac.compare_digest` for constant-time comparison to prevent
     timing-attack leakage.
 
+    Total by contract: ``datasignature_hex`` comes straight out of
+    ``json.loads`` on an unauthenticated body, so it is typed ``object``
+    rather than ``str`` and anything that is not an ASCII hex digest is
+    answered ``False``. ``compare_digest`` raises ``TypeError`` for every
+    other shape —
+
+        int:           unsupported operand types(s) ... 'str' and 'int'
+        dict:          unsupported operand types(s) ... 'str' and 'dict'
+        non-ascii str: comparing strings with non-ASCII characters is
+                       not supported
+
+    — which reached the client as HTTP 500 from a request anyone could
+    send, on an endpoint whose 5xx responses BoxNow retries.
+
+    Rejecting on shape returns earlier than a real comparison would,
+    which leaks only that the value was not 64 hex digits — the length
+    and alphabet of a SHA-256 digest are public. Every well-formed
+    candidate still goes through ``compare_digest``, so nothing about
+    the secret becomes timeable.
+
     Args:
         raw_data_bytes: The raw bytes of the ``data`` JSON object exactly as
             extracted from the request body (no normalisation).
-        datasignature_hex: The hex-encoded HMAC from the ``datasignature``
-            envelope field.
+        datasignature_hex: The ``datasignature`` envelope field, verbatim.
         secret: The partner webhook secret (plaintext).
 
     Returns:
         ``True`` if the signature is valid, ``False`` otherwise.
     """
     # The signature comes off an UNAUTHENTICATED JSON body, so its type
-    # is whatever the caller sent. `null`, a number, a list and an
-    # object all reached `.encode()` and raised AttributeError before
-    # the view's 401 path — a 500 on a public endpoint, from a
-    # one-character payload change. A non-string is simply not a valid
-    # signature.
-    if not isinstance(datasignature_hex, str):
+    # and its content are whatever the caller sent. `null`, a number, a
+    # list and an object all reached `.encode()` and raised
+    # AttributeError before the view's 401 path; a str carrying
+    # non-ASCII, or the wrong length, reached `hmac.compare_digest` and
+    # raised TypeError there instead. Both are a 500 on a public
+    # endpoint, from a one-character payload change. Anything that is
+    # not 64 hex digits is simply not a valid signature.
+    if not isinstance(datasignature_hex, str) or not _HEX_DIGEST_RE.fullmatch(
+        datasignature_hex
+    ):
         return False
 
     expected = hmac.new(

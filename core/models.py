@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import uuid
+import zlib
 from typing import Any
 
 from django.contrib.postgres.indexes import BTreeIndex, GinIndex
 from django.core.serializers.json import DjangoJSONEncoder
-from django.db import models, transaction
+from django.db import connection, models, transaction
 from django.db.models import F, Func, JSONField, Max, Q, Value
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -58,7 +59,9 @@ class SortableModel(models.Model):
     """
     Abstract model that adds a sort_order field and methods for moving items up/down.
 
-    Provides thread-safe ordering with database-level locking to prevent race conditions.
+    Concurrent appends are serialised with a transaction-scoped advisory
+    lock; ``_lock_ordering_scope`` records why the row lock that used to
+    stand there could not have worked.
     """
 
     sort_order = models.IntegerField(_("Sort Order"), null=True)
@@ -73,20 +76,56 @@ class SortableModel(models.Model):
         """
         Save the model instance, automatically assigning sort_order for new instances.
 
-        Uses database-level locking to prevent race conditions when multiple
-        instances are created simultaneously.
+        Concurrent appends are serialised; see ``_lock_ordering_scope``.
         """
         if self.pk is None:
             with transaction.atomic():
-                # Lock the table to prevent race conditions
-                qs = self.get_ordering_queryset().select_for_update()
-                existing_max = self.get_max_sort_order(qs)
+                self._lock_ordering_scope()
+                existing_max = self.get_max_sort_order(
+                    self.get_ordering_queryset()
+                )
                 self.sort_order = (
                     0 if existing_max is None else existing_max + 1
                 )
                 super().save(*args, **kwargs)
         else:
             super().save(*args, **kwargs)
+
+    def _lock_ordering_scope(self) -> None:
+        """Serialise concurrent appends to this model's ordering.
+
+        What stood here was ``get_ordering_queryset().select_for_update()``
+        under the comment "Lock the table to prevent race conditions",
+        and it locked nothing: Django DROPS the lock when the queryset
+        is consumed by ``aggregate()``. Measured on the same queryset —
+        listed, it emits ``... LIMIT 1 FOR UPDATE``; aggregated, it
+        emits ``SELECT MAX("sort_order") ... FROM ...`` with no
+        ``FOR UPDATE`` at all. Postgres forbids ``FOR UPDATE`` with an
+        aggregate, so no arrangement of that call could have locked.
+
+        Row locks would not have fixed it either: two concurrent creates
+        contend over a row that does not exist yet, which is a phantom,
+        and READ COMMITTED row locks do not prevent phantoms.
+        Reproduced against the real database with two threads —
+        ``sort_order`` came back ``[0, 0]`` on two runs out of three —
+        and the duplicate is not cosmetic: ``move_up`` then raises
+        ``MultipleObjectsReturned`` from its ``get()``.
+
+        A transaction-scoped advisory lock is the narrowest thing that
+        does work. It is released at COMMIT, so it can never be leaked
+        to a pooled connection; it blocks nothing except another append
+        to the same model; and the key carries the schema name because
+        advisory locks are per DATABASE while every tenant shares one.
+        The key is hashed in Python rather than with Postgres'
+        ``hashtext`` so the value does not depend on a function that is
+        an undocumented internal.
+        """
+        scope = f"{connection.schema_name}:{self._meta.label_lower}"
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT pg_advisory_xact_lock(%s)",
+                [zlib.crc32(scope.encode())],
+            )
 
     def get_ordering_queryset(self) -> models.QuerySet[SortableModel]:
         """
@@ -118,31 +157,51 @@ class SortableModel(models.Model):
         Move this item up in the sort order (decrease sort_order by 1).
 
         Swaps sort_order with the previous item in a transaction.
+
+        Picks the nearest preceding item rather than requiring exactly
+        one at ``sort_order - 1``. The old ``get()`` raised
+        ``MultipleObjectsReturned`` — a 500 on the admin's move-up
+        action — the moment two rows shared a position, which is what
+        the unlocked append produced, and repairing the append does not
+        repair rows already stored that way. It also skips a gap, which
+        ``delete()``'s renumbering is supposed to prevent but a raw
+        ``sort_order`` edit can still leave.
         """
         if self.sort_order is not None and self.sort_order > 0:
             with transaction.atomic():
                 qs = self.get_ordering_queryset().select_for_update()
-                try:
-                    prev_item = qs.get(sort_order=self.sort_order - 1)
+                prev_item = (
+                    qs.filter(sort_order__lt=self.sort_order)
+                    .order_by("-sort_order")
+                    .first()
+                )
+                if prev_item is not None:
                     prev_item.sort_order, self.sort_order = (
                         self.sort_order,
                         prev_item.sort_order,
                     )
                     prev_item.save(update_fields=["sort_order"])
                     self.save(update_fields=["sort_order"])
-                except self.__class__.DoesNotExist:
-                    pass
 
     def move_down(self) -> None:
         """
         Move this item down in the sort order (increase sort_order by 1).
 
         Swaps sort_order with the next item in a transaction.
+
+        Orders explicitly rather than leaning on the subclass's
+        ``Meta.ordering``: ``first()`` without it returns whichever row
+        the database felt like, which is only the nearest neighbour by
+        coincidence.
         """
         if self.sort_order is not None:
             with transaction.atomic():
                 qs = self.get_ordering_queryset().select_for_update()
-                next_item = qs.filter(sort_order__gt=self.sort_order).first()
+                next_item = (
+                    qs.filter(sort_order__gt=self.sort_order)
+                    .order_by("sort_order")
+                    .first()
+                )
                 if next_item:
                     next_item.sort_order, self.sort_order = (
                         self.sort_order,

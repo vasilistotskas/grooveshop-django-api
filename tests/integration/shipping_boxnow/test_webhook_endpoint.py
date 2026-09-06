@@ -438,3 +438,62 @@ class TestWebhookEndpoint:
             content_type="application/json",
         )
         assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
+@pytest.mark.django_db
+class TestAMalformedSignatureFieldIsRefusedNotA500:
+    """The signature is attacker-controlled JSON, not a hex string.
+
+    `datasignature: str = envelope.get("datasignature", "")` annotates a
+    value that comes straight out of `json.loads`, so it can be any JSON
+    type. `hmac.compare_digest` raises `TypeError` for every one of them
+    that is not an ASCII `str`:
+
+        int:           unsupported operand types(s) ... 'str' and 'int'
+        dict:          unsupported operand types(s) ... 'str' and 'dict'
+        non-ascii str: comparing strings with non-ASCII characters is
+                       not supported
+
+    On an unauthenticated endpoint that is a 500 anyone can produce at
+    will, and BoxNow retries 5xx — so it is also a self-amplifying one.
+    """
+
+    def _body_with_signature(self, signature) -> bytes:
+        data_str = '{"parcelId":"999","event":"new"}'
+        envelope = (
+            '{"specversion":"1.0",'
+            '"type":"gr.boxnow.parcel_event_change",'
+            '"source":"boxnow-stage",'
+            '"subject":"999",'
+            '"id":"msg-bad-sig",'
+            '"time":"2025-01-15T10:30:00Z",'
+            '"datacontenttype":"application/json",'
+            f'"datasignature":{json.dumps(signature)},'
+            f'"data":{data_str}'
+            "}"
+        )
+        return envelope.encode()
+
+    @pytest.mark.parametrize(
+        ("label", "signature"),
+        [
+            ("integer", 1234567890),
+            ("object", {"sig": "abc"}),
+            ("array", ["abc"]),
+            ("null", None),
+            ("non-ascii", "σ" * 64),
+        ],
+    )
+    def test_it_is_rejected(self, _tenant_setup, label, signature):
+        BoxNowShipmentFactory(parcel_id="999")
+
+        response = APIClient().post(
+            _webhook_url(),
+            data=self._body_with_signature(signature),
+            content_type="application/json",
+        )
+
+        assert response.status_code < 500, (
+            f"{label} signature produced {response.status_code}"
+        )
+        assert response.status_code in (400, 401), response.status_code

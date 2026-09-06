@@ -147,34 +147,43 @@ class TestValidateEnvelope:
             validate_envelope(env)
 
 
-class TestNonStringSignatures:
-    """The signature comes off an unauthenticated JSON body.
+class TestTheSignatureFieldIsUntrustedJson:
+    """``verify_signature`` must be total over whatever the body holds.
 
-    Its type is whatever the caller sent. `null`, a number, a list and
-    an object all reached `.encode()` and raised `AttributeError` before
-    the view's 401 path — a 500 on a public endpoint, from a
-    one-character payload change.
+    It is handed ``envelope.get("datasignature")`` straight out of
+    ``json.loads`` on an unauthenticated request. A non-string reached
+    ``.encode()`` and raised ``AttributeError``; an ASCII-violating or
+    wrong-length string reached ``hmac.compare_digest`` and raised
+    ``TypeError`` there instead. Both are a 500 on a public endpoint
+    whose 5xx responses BoxNow retries.
     """
 
     @pytest.mark.parametrize(
         "signature",
+        [1234567890, {"sig": "abc"}, ["abc"], None, True, 1.5],
+        ids=["int", "object", "array", "null", "bool", "float"],
+    )
+    def test_a_non_string_is_false_not_an_exception(self, signature):
+        assert verify_signature(b'{"x":1}', signature, "secret") is False
+
+    @pytest.mark.parametrize(
+        ("label", "signature"),
         [
-            pytest.param(None, id="null"),
-            pytest.param(7, id="number"),
-            pytest.param({}, id="object"),
-            pytest.param([], id="array"),
-            pytest.param(True, id="boolean"),
+            ("non-ascii", "σ" * 64),
+            ("too short", "ab" * 31),
+            ("too long", "ab" * 33),
+            ("not hex", "z" * 64),
+            ("empty", ""),
         ],
     )
-    def test_a_non_string_signature_is_simply_invalid(self, signature):
-        assert verify_signature(b'{"a": 1}', signature, "test-secret") is False
+    def test_a_malformed_string_is_false_not_an_exception(
+        self, label, signature
+    ):
+        assert verify_signature(b'{"x":1}', signature, "secret") is False
 
-    def test_a_correct_string_signature_still_verifies(self):
-        import hashlib
-        import hmac
-
-        body = b'{"a": 1}'
-        secret = "test-secret"
-        good = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
-
-        assert verify_signature(body, good, secret) is True
+    def test_a_well_formed_signature_still_verifies(self):
+        data = b'{"parcelId":"1"}'
+        assert (
+            verify_signature(data, _make_signature(data, "secret"), "secret")
+            is True
+        )

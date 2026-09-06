@@ -35,6 +35,8 @@ only ever in the surface path, which goes through the schema-scoped
 
 from __future__ import annotations
 
+import logging
+
 # The default backend is core.caches.CustomCache (see CACHES) —
 # the proxy delegates its raw-key helpers (keys/delete_raw_keys/
 # clear_by_prefixes) to it.
@@ -43,6 +45,8 @@ from django.core.management.base import BaseCommand, CommandError
 from django_tenants.utils import get_public_schema_name, schema_context
 
 from core.cache.service import CacheService
+
+logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
@@ -232,9 +236,24 @@ class Command(BaseCommand):
         )
         try:
             results = cache_instance.clear_by_prefixes(prefixes)
-            total = sum(results.values())
-            for prefix, count in results.items():
-                self.stdout.write(f"  {prefix}* -> {count} keys deleted")
-            self.stdout.write(self.style.SUCCESS(f"Cleared {total} keys"))
         except Exception as exc:
-            self.stderr.write(self.style.ERROR(f"Error: {exc!s}"))
+            # A CommandError, not a red line and exit 0. This is the
+            # disaster-recovery path: an operator reaches for it mid
+            # incident, and anything chaining on it (a shell `&&`, a
+            # Job's next step) treated the failed purge as done.
+            #
+            # The exception text stays in the log and out of the
+            # message, for the reason recorded at admin/admin.py's cache
+            # views: a redis-py connection error carries the connection
+            # target, and the URL in this deployment carries the
+            # password.
+            logger.exception("Raw prefix clear failed for %s", prefixes)
+            raise CommandError(
+                "Prefix clear failed — the cache backend did not answer. "
+                "Nothing was purged; see the application log."
+            ) from exc
+
+        total = sum(results.values())
+        for prefix, count in results.items():
+            self.stdout.write(f"  {prefix}* -> {count} keys deleted")
+        self.stdout.write(self.style.SUCCESS(f"Cleared {total} keys"))

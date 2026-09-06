@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, TypedDict
 
+from celery.exceptions import SoftTimeLimitExceeded
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core import management
@@ -102,13 +103,6 @@ def clear_expired_sessions_task():
             management.call_command("clearsessions", verbosity=0)
 
         return {"status": "success", "message": "All expired sessions deleted"}
-    except management.CommandError as e:
-        logger.error(f"Django command error in clear_expired_sessions: {e}")
-        return {
-            "status": "error",
-            "message": str(e),
-            "error_type": "CommandError",
-        }
     except Exception:
         logger.exception("Unexpected error in clear_expired_sessions")
         raise
@@ -132,13 +126,6 @@ def clear_all_cache_task():
         management.call_command("clear_cache", "--all", verbosity=0)
 
         return {"status": "success", "message": "Cache surfaces purged"}
-    except management.CommandError as e:
-        logger.error(f"Django command error in clear_cache: {e}")
-        return {
-            "status": "error",
-            "message": str(e),
-            "error_type": "CommandError",
-        }
     except Exception:
         logger.exception("Unexpected error in clear_cache")
         raise
@@ -193,13 +180,6 @@ def clear_duplicate_history_task(excluded_fields=None, minutes=None):
             },
         }
 
-    except management.CommandError as e:
-        logger.error(f"Django command error in clear_duplicate_history: {e}")
-        return {
-            "status": "error",
-            "message": str(e),
-            "error_type": "CommandError",
-        }
     except Exception:
         logger.exception("Unexpected error in clear_duplicate_history")
         raise
@@ -235,13 +215,6 @@ def clear_old_history_task(days=365):
             "message": f"Old history entries cleaned (older than {days} days)",
         }
 
-    except management.CommandError as e:
-        logger.error(f"Django command error in clear_old_history: {e}")
-        return {
-            "status": "error",
-            "message": str(e),
-            "error_type": "CommandError",
-        }
     except Exception:
         logger.exception("Unexpected error in clear_old_history")
         raise
@@ -267,15 +240,6 @@ def clear_expired_notifications_task(days=365):
 
         return {"status": "success", "message": "Expired notifications deleted"}
 
-    except management.CommandError as e:
-        logger.error(
-            f"Django command error in clear_expired_notifications: {e}"
-        )
-        return {
-            "status": "error",
-            "message": str(e),
-            "error_type": "CommandError",
-        }
     except Exception:
         logger.exception("Unexpected error in clear_expired_notifications")
         raise
@@ -505,6 +469,7 @@ def send_inactive_user_notifications() -> dict[str, Any]:
     success_count = 0
     failed_emails: list[dict[str, Any]] = []
     total_users = 0
+    timed_out = False
 
     logger.info("Starting to send emails to inactive users")
 
@@ -561,6 +526,32 @@ def send_inactive_user_notifications() -> dict[str, Any]:
             if success_count % 100 == 0:
                 logger.info(f"Sent {success_count} emails so far...")
 
+        except SoftTimeLimitExceeded:
+            # Caught BEFORE the generic arm, and it has to be: Celery
+            # raises this INSIDE the task at ``soft_time_limit``, it is
+            # an ordinary ``Exception`` subclass, and it is raised ONCE.
+            # Landing in the per-user handler below, it was recorded as
+            # "failed to send email to user X" and the loop carried on —
+            # so the soft limit bought nothing and the run continued to
+            # the hard ``time_limit``, where Celery kills the worker
+            # process outright. That is the outcome the soft limit
+            # exists to prevent, and the kill also loses the summary and
+            # the in-flight user's bookkeeping.
+            #
+            # Stopping is safe and self-resuming rather than a failure:
+            # every user emailed already has ``last_reengagement_email_at``
+            # set, so the next scheduled run excludes them by the
+            # cooldown and continues from here. Re-raising instead would
+            # hand ``autoretry_for=(Exception,)`` a full rescan that can
+            # only time out again.
+            timed_out = True
+            logger.error(
+                "Re-engagement run hit its soft time limit after %s users "
+                "(%s sent). The next scheduled run resumes from here.",
+                total_users,
+                success_count,
+            )
+            break
         except Exception as e:
             logger.error(
                 f"Failed to send email to user {user.pk}",
@@ -585,6 +576,7 @@ def send_inactive_user_notifications() -> dict[str, Any]:
             "total_users": total_users,
             "emails_sent": success_count,
             "failed_count": len(failed_emails),
+            "timed_out": timed_out,
         },
     )
 
@@ -595,6 +587,7 @@ def send_inactive_user_notifications() -> dict[str, Any]:
         "emails_sent": success_count,
         "failed": len(failed_emails),
         "failed_details": failed_emails[:10],
+        "timed_out": timed_out,
     }
 
 

@@ -8,6 +8,11 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import connections
 from django.utils import timezone
 
+# Ceiling for one pg_dump invocation. It is a ceiling, not an estimate:
+# the point is that a dump which stops making progress fails the task
+# instead of pinning a worker, which is what the nightly backup needs.
+PG_DUMP_TIMEOUT_SECONDS = 3600
+
 
 class Command(BaseCommand):
     help = "Create a PostgreSQL database backup"
@@ -46,7 +51,7 @@ class Command(BaseCommand):
             pg_dump_cmd = self._build_pg_dump_command(options, backup_path)
 
             self.stdout.write(f"Creating database backup: {backup_path}")
-            self._execute_backup(pg_dump_cmd, backup_path, options)
+            self._execute_backup(pg_dump_cmd)
             self._validate_backup(backup_path)
 
             self._report_success(backup_path)
@@ -86,12 +91,16 @@ class Command(BaseCommand):
         return output_dir / f"{filename}{extension}"
 
     def _get_file_extension(self, options: dict[str, Any]) -> str:
+        # `tar` used to fall through to the plain branch and be written
+        # as `.sql` — a tar archive named as SQL, which nothing but
+        # pg_restore could make sense of. `--compress` only ever reaches
+        # the file name for plain output; the archive formats carry
+        # their compression inside the container.
         if options["format"] == "custom":
             return ".dump"
-        elif options["compress"]:
-            return ".sql.gz"
-        else:
-            return ".sql"
+        if options["format"] == "tar":
+            return ".tar"
+        return ".sql.gz" if options["compress"] else ".sql"
 
     def _build_pg_dump_command(
         self, options: dict[str, Any], backup_path: Path
@@ -114,8 +123,29 @@ class Command(BaseCommand):
         if options["format"] != "plain":
             pg_dump_cmd.append(f"--format={options['format']}")
 
-        if options["format"] in ["custom", "tar"]:
-            pg_dump_cmd.append(f"--file={backup_path}")
+        # pg_dump writes the file itself for EVERY format, and compresses
+        # it itself when asked. What this replaced piped stdout into
+        # `gzip` for the plain+compress case, and that pipeline
+        # deadlocked: `--verbose` writes steadily to a stderr PIPE that
+        # nothing drains until after `gzip.communicate()` returns, and
+        # `gzip.communicate()` cannot return until pg_dump closes stdout.
+        # Once the stderr buffer fills, pg_dump blocks, gzip waits for
+        # input, and neither ever moves. Reproduced with the same process
+        # shape: 4 KiB of stderr completes, 8 KiB hangs. That path also
+        # carried no timeout, so it hung forever rather than raising.
+        #
+        # The plain-uncompressed case read the whole dump into memory and
+        # decoded it, falling back to latin-1 on failure — which would
+        # silently corrupt the SQL of any UTF-8 database.
+        #
+        # `--compress=METHOD` with plain output is verified against the
+        # deployed engine (pg_dump 18.6: `-Fp -Z gzip --file=x.sql.gz`
+        # produces a file `gzip -t` accepts and `gzip -dc` reads back as
+        # SQL). The client major tracks the server major, see Dockerfile.
+        if options["format"] == "plain" and options["compress"]:
+            pg_dump_cmd.append("--compress=gzip")
+
+        pg_dump_cmd.append(f"--file={backup_path}")
 
         return pg_dump_cmd
 
@@ -125,77 +155,19 @@ class Command(BaseCommand):
         env["PGPASSWORD"] = db_config["PASSWORD"]
         return env
 
-    def _execute_backup(
-        self, pg_dump_cmd: list[str], backup_path: Path, options: dict[str, Any]
-    ) -> None:
-        env = self._get_environment()
+    def _execute_backup(self, pg_dump_cmd: list[str]) -> None:
+        """One implementation for every format.
 
-        if options["compress"] and options["format"] == "plain":
-            self._execute_compressed_backup(pg_dump_cmd, backup_path, env)
-        elif options["format"] == "plain" and not options["compress"]:
-            self._execute_plain_backup(pg_dump_cmd, backup_path, env)
-        else:
-            self._execute_binary_backup(pg_dump_cmd, env)
-
-    def _execute_compressed_backup(
-        self, pg_dump_cmd: list[str], backup_path: Path, env: dict[str, str]
-    ) -> None:
-        with open(backup_path, "wb") as f:
-            pg_dump = subprocess.Popen(
-                pg_dump_cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                env=env,
-            )
-            gzip_process = subprocess.Popen(
-                ["gzip"],
-                stdin=pg_dump.stdout,
-                stdout=f,
-                stderr=subprocess.PIPE,
-            )
-            pg_dump.stdout.close()
-
-            _gzip_output, gzip_error = gzip_process.communicate()
-            _pg_dump_output, pg_dump_error = pg_dump.communicate()
-
-            if pg_dump.returncode != 0:
-                error_msg = pg_dump_error.decode("utf-8", errors="replace")
-                raise CommandError(f"pg_dump failed: {error_msg}")
-            if gzip_process.returncode != 0:
-                error_msg = gzip_error.decode("utf-8", errors="replace")
-                raise CommandError(f"gzip failed: {error_msg}")
-
-    def _execute_plain_backup(
-        self, pg_dump_cmd: list[str], backup_path: Path, env: dict[str, str]
-    ) -> None:
+        `pg_dump` owns the output file (`--file`), so nothing is piped
+        and nothing is buffered in this process. `subprocess.run` drains
+        stderr through `communicate()`, which reads both streams
+        concurrently — the property the hand-rolled pipeline lacked.
+        """
         result = subprocess.run(
             pg_dump_cmd,
-            env=env,
+            env=self._get_environment(),
             capture_output=True,
-            timeout=3600,
-            check=False,
-        )
-
-        if result.returncode != 0:
-            error_msg = result.stderr.decode("utf-8", errors="replace")
-            raise CommandError(f"pg_dump failed: {error_msg}")
-
-        try:
-            output_text = result.stdout.decode("utf-8")
-        except UnicodeDecodeError:
-            output_text = result.stdout.decode("latin-1")
-
-        with open(backup_path, "w", encoding="utf-8") as f:
-            f.write(output_text)
-
-    def _execute_binary_backup(
-        self, pg_dump_cmd: list[str], env: dict[str, str]
-    ) -> None:
-        result = subprocess.run(
-            pg_dump_cmd,
-            env=env,
-            capture_output=True,
-            timeout=3600,
+            timeout=PG_DUMP_TIMEOUT_SECONDS,
             check=False,
         )
 

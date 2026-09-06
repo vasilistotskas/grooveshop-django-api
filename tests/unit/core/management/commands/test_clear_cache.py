@@ -3,6 +3,9 @@ from __future__ import annotations
 from io import StringIO
 from unittest.mock import MagicMock, patch
 
+import pytest
+from django.core.management.base import CommandError
+
 from core.cache.service import PurgeReport, SurfaceResult
 from core.management.commands.clear_cache import Command
 
@@ -165,3 +168,39 @@ class TestClearCacheCommand:
         output = out.getvalue()
         assert "Cleared 3 keys" in output
         assert "Raw prefix mode" in output
+
+    @patch("core.management.commands.clear_cache.cache_instance")
+    def test_a_failed_raw_prefix_clear_fails_the_command(self, mock_cache):
+        """Disaster recovery must not exit 0 having purged nothing.
+
+        The failure was written to stderr and swallowed, so `handle`
+        returned normally: an operator saw a red line and a zero exit
+        status, and anything chaining on it (a shell `&&`, a Job's next
+        step) proceeded as though the cache had been cleared.
+        """
+        mock_cache.clear_by_prefixes.side_effect = ConnectionError(
+            "Error 111 connecting to redis://:hunter2@cache:6379"
+        )
+
+        command = Command()
+        command.stdout = StringIO()
+        command.stderr = StringIO()
+
+        with pytest.raises(CommandError) as excinfo:
+            command.handle(
+                surfaces=[],
+                all=False,
+                dry_run=False,
+                no_related=False,
+                prefixes=["custom:"],
+                schema=None,
+                public_only=False,
+            )
+
+        message = str(excinfo.value)
+        assert "Nothing was purged" in message
+        # The backend's own text stays in the log: a redis-py connection
+        # error carries the connection target, and the URL in this
+        # deployment carries the password.
+        assert "hunter2" not in message
+        assert "redis://" not in message

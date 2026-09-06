@@ -30,6 +30,7 @@ TTL behaviour:
 
 from __future__ import annotations
 
+import logging
 from datetime import timedelta
 from unittest.mock import patch
 
@@ -503,3 +504,52 @@ class TestCancelVoucherClaimPattern:
 
         shipment.refresh_from_db()
         assert shipment.shipment_state == AcsShipmentState.CANCELED
+
+    def test_cancel_voucher_releases_claim_when_the_api_call_fails(
+        self, monkeypatch, caplog
+    ):
+        """A failed ACS delete must drop ``cancel_started_at``.
+
+        This is the only path through the Phase-2 release block, and it
+        was fetching the row with ``.only("metadata")`` — the exact
+        shape ``_record_last_error`` and ``_release_mint_claim`` both
+        document as raising ``KeyError: 'cod_amount'`` on save.
+        Saving inside a bare ``except Exception`` meant the failure was
+        swallowed as "failed to release cancel claim", so the claim
+        survived and every retry for the next TTL window raised
+        ``AcsRetryableError`` instead of re-attempting the cancel.
+        """
+        from shipping_acs import services
+
+        order = OrderFactory(
+            status=OrderStatus.PROCESSING,
+            payment_status=PaymentStatus.COMPLETED,
+        )
+        shipment = AcsShipmentFactory(
+            order=order,
+            voucher_no="9001999003",
+            shipment_state=AcsShipmentState.NEW,
+        )
+
+        class _FailingClient:
+            billing_code = "TEST_BILLING"
+
+            def delete_voucher(self, voucher_no):
+                raise RuntimeError("ACS unavailable")
+
+        monkeypatch.setattr(services, "AcsClient", _FailingClient)
+
+        with caplog.at_level(logging.ERROR), pytest.raises(RuntimeError):
+            AcsService.cancel_voucher(shipment)
+
+        assert "failed to release cancel claim" not in caplog.text, (
+            "The claim release itself raised — see the log record above."
+        )
+
+        metadata = AcsShipment.objects.values("metadata").get(pk=shipment.pk)[
+            "metadata"
+        ]
+        assert "cancel_started_at" not in (metadata or {}), (
+            "A failed cancel must leave no claim behind, or the retry "
+            f"waits out the full TTL. metadata={metadata}"
+        )

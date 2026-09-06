@@ -3,6 +3,109 @@
 
 
 
+## v3.29.1 (2026-09-06)
+
+### Bug fixes
+
+* fix(api): six PDF downloads were declared as JSON, or as no body at all
+
+From CodeRabbit review on the storefront's schema regeneration. It named
+three endpoints; sweeping the generated schema for every operation whose
+name says label/manifest/pdf found three more, including two sitting in
+the same dict as the one that already had it right.
+
+`order/views/order.py`'s `shipment_label` carries the fix and the
+reasoning: the `(status, media_type)` key is what makes drf-spectacular
+say `application/pdf` instead of inheriting the view's JSON renderer. Its
+comment ends "verified against the generated output, not assumed" — which
+is what caught a mistake here. A first check reported two of the three as
+having no 200 body, and that was the CHECK's fault: `index("operationId:
+getAcsLabel")` matched `getAcsLabelForOrder`, a different endpoint. An
+exact-match sweep over every operation is what produced the real picture.
+
+Before, all streaming `content_type="application/pdf"` at runtime:
+
+getAcsLabel application/json
+getBoxNowLabel application/json
+getAcsPickupListManifest application/json
+getAcsLabelForOrder (no 200 body)
+getBoxNowLabelForOrder (no 200 body)
+downloadOrderInvoice (no 200 body)
+
+The last three are the worse half: `ActionConfig` with no `responses=`,
+and `responses={200: None}`, both of which declare a 200 with no content
+— so a generated client expected nothing back from a file download.
+
+`retrieveOrderInvoice` deliberately stays `application/json`: it returns
+`InvoiceDownloadResponseSerializer`, the invoice metadata plus a URL to
+the streaming endpoint, not the file.
+
+Verified against the regenerated `schema.yml`: all six now
+`application/pdf`, and the sweep's only remaining non-PDF hit is
+`retrieveOrderInvoice`. Suites: 1954 passed.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com> ([`6ab66b3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6ab66b3e40f0c92df4c347652007cca1a68af3fb))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.29.0 [skip ci] ([`f630724`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f6307242d700caf724302b89170996eefef451fb))
+
+### Testing
+
+* test(tenant): stop the admin-API tests replaying every migration per save
+
+Shard 3 of CI timed out twice after the audit merge. Not on a test —
+1525 passed and the 18-minute step wall killed it 0.85s later, with the
+other three shards finishing in 436/579/649s. My first response was a
+`.test_durations` refresh, and that treated a symptom: the real cause is
+one file taking 7m12s, and `--dist loadfile` pins a file to a single
+worker, so no rebalancing can help.
+
+Profiled: five tests at 82-87s each in the call phase, all five added by
+the tenant-lifecycle PR. Bisected to a plain `Tenant.objects.get()` +
+`.save()` — 94s with no HTTP involved at all, 0.12s under a class-level
+patch of `auto_create_schema`.
+
+The reason is a `TenantMixin.save` branch that is easy to miss, and which
+I had read past once already while asserting the opposite:
+
+elif not is_new and self.auto_create_schema \
+        and not schema_exists(self.schema_name):
+    self.create_schema(check_if_exists=True, verbosity=verbosity)
+
+It creates the schema on an UPDATE too, whenever the schema is absent.
+These tests deliberately make `Tenant` rows with no schema
+(`auto_create_schema = False` on the instance), so every later `.save()`
+replayed the entire migration history. Confirmed directly rather than
+inferred: `_state.adding` is False and `create_schema` is still called
+once, with `check_if_exists=True`.
+
+The fix is the cover the file's own `no_destroy_side_effects` fixture
+already gave the destroy tests — patch the CLASS attribute — extended to
+every test here as an autouse fixture. 7m12s -> 7.07s, 12/12 passing.
+Production is unaffected: there the schema exists, so `schema_exists()`
+short-circuits.
+
+`.test_durations` re-measured on top, since that file's recorded cost
+(8m15s) was now wrong by 32x. It records 15.4s for those 12 tests, and
+the estimated split over the same collection is:
+
+group 1 1630 tests 27.8 min spread 27.3-28.2 min
+group 2 1768 tests 27.8 min imbalance 1.03x
+group 3 2044 tests 28.2 min 0 unknown tests
+group 4 1836 tests 27.3 min
+
+Deliberately NOT touched: `test_tenant_create_command.py`'s 154s
+`test_duplicate_domain_leaves_no_orphaned_tenant`. Its docstring says
+`Tenant.objects.create()` "creates the Postgres schema and replays every
+migration inline" — that behaviour IS the subject, since the test checks
+the rollback of a genuinely migrated schema. Patching it off would make
+it vacuous.
+
+Refresh run green: 7267 passed, 11 skipped, in 11:22 (from 12:02).
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com> ([`c465dc6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c465dc6bf3f0b0f05879a7496d445f13ab7601cb))
+
 ## v3.29.0 (2026-09-06)
 
 ### Bug fixes

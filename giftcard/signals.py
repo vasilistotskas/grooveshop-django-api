@@ -9,11 +9,11 @@ remainder.
 import logging
 from typing import Any
 
-from django.db import connection, transaction
 from django.dispatch import receiver
 
 from order.models.order import Order
 from order.signals import order_canceled, order_refunded
+from tenant.celery import dispatch_on_commit
 
 logger = logging.getLogger(__name__)
 
@@ -24,14 +24,7 @@ def _queue_refund_credit(order: Order) -> None:
     from giftcard.tasks import credit_refund_to_gift_cards
 
     order_id = order.id
-    # Stamp the tenant schema NOW: on_commit fires after the request's
-    # schema context can unwind (loyalty/signals.py precedent).
-    schema = connection.schema_name
-    transaction.on_commit(
-        lambda: credit_refund_to_gift_cards.apply_async(
-            args=[order_id], headers={"_schema_name": schema}
-        )
-    )
+    dispatch_on_commit(credit_refund_to_gift_cards, [order_id])
 
 
 @receiver(

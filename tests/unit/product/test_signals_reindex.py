@@ -15,7 +15,7 @@ from django.test import override_settings
 from django.test.utils import CaptureQueriesContext
 
 from product.factories.product import ProductFactory
-from product.models.product import Product
+from product.models.product import Product, ProductTranslation
 from product.signals import reindex_product_translations
 
 
@@ -28,14 +28,35 @@ def test_async_reindex_collects_pks_without_aggregate_join():
         override_settings(
             MEILISEARCH={"OFFLINE": False, "ASYNC_INDEXING": True}
         ),
-        patch("meili.tasks.index_document_task.delay") as mock_dispatch,
+        patch("meili.tasks.index_document_task.apply_async") as mock_dispatch,
         CaptureQueriesContext(connection) as ctx,
     ):
         reindex_product_translations(sender=Product, instance=product)
 
     # The dispatch fired for the product's translations (proves we didn't
-    # early-return and actually walked the PK path).
-    assert mock_dispatch.called
+    # early-return and actually walked the PK path). `apply_async`, not
+    # `delay`: reindex goes through `dispatch_on_commit`, which stamps the
+    # tenant schema at registration rather than when the hook fires.
+    # Exactly one dispatch per translation row, identified by pk.
+    # Asserting only `called` let a regression through that dispatched
+    # one translation, or the same one repeatedly, and still passed. No
+    # ordering assertion: the queryset has no ordering contract.
+    expected_pks = set(
+        ProductTranslation.objects.filter(master=product).values_list(
+            "pk", flat=True
+        )
+    )
+    assert expected_pks, "the fixture produced no translations to dispatch"
+
+    dispatched_pks = [
+        call.kwargs["kwargs"]["pk"] for call in mock_dispatch.call_args_list
+    ]
+    assert len(dispatched_pks) == len(expected_pks)
+    assert set(dispatched_pks) == expected_pks
+    assert all(
+        call.kwargs["headers"] == {"_schema_name": connection.schema_name}
+        for call in mock_dispatch.call_args_list
+    )
 
     # No captured query may carry the review-average aggregate — that marker
     # is unique to get_meilisearch_queryset() and must not appear on the

@@ -33,6 +33,7 @@ from order.tasks import (
     send_order_confirmation_email,
     send_payment_failed_email,
 )
+from tenant.celery import dispatch_on_commit
 
 
 def _resolve_tenant_candidates(order_code: str) -> list:
@@ -1330,21 +1331,7 @@ def _handle_payment_created(order, event_data, transaction_id):
 
     publish_payment_status(order)
 
-    # Payment verified by Viva Wallet — send the confirmation email now.
-    # The task is idempotent (metadata reservation + row lock), so a
-    # duplicate webhook delivery or a retry will not resend.
-    # Wrapped in on_commit so the Celery worker always sees the committed
-    # payment_status / order.status rather than an in-flight row.
-    # ``_schema`` captured at lambda-build time; on_commit fires after the
-    # tenant ``schema_context`` exits, so it has to be pinned explicitly.
-    _schema = connection.schema_name
-    transaction.on_commit(
-        lambda oid=order.id, s=_schema: (
-            send_order_confirmation_email.apply_async(
-                args=[oid], headers={"_schema_name": s}
-            )
-        )
-    )
+    dispatch_on_commit(send_order_confirmation_email, [order.id])
 
     # Enqueue the carrier's delivery-request creation. Provider-agnostic
     # dispatch through the registry — Stripe's ``handle_payment_succeeded``
@@ -1412,15 +1399,7 @@ def _handle_payment_failed(order, event_data, transaction_id):
 
     publish_payment_status(order)
 
-    # Notify the customer so they can retry instead of silently sitting
-    # on a broken order.
-    # Wrapped in on_commit so the worker sees the committed payment_status.
-    _schema = connection.schema_name
-    transaction.on_commit(
-        lambda oid=order.id, s=_schema: send_payment_failed_email.apply_async(
-            args=[oid], headers={"_schema_name": s}
-        )
-    )
+    dispatch_on_commit(send_payment_failed_email, [order.id])
 
 
 def _handle_reversal_created(order, event_data, transaction_id):

@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from django.core.cache import cache
-from django.db import connection, transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
 from notification.models.user import NotificationUser
 from notification.tasks import send_notification_task
+from tenant.celery import dispatch_on_commit
 
 # Short TTL cache for serialized notification translations. When a
 # Notification fans out to N users (e.g. a system-wide announcement),
@@ -58,12 +58,4 @@ def handle_notification_created(
         "translations": _get_translations(instance.notification),
     }
 
-    # Stamp the tenant schema NOW: on_commit fires after the request's
-    # schema context can unwind, where TenantTask would default to
-    # public and the notification would target the wrong schema.
-    schema = connection.schema_name
-    transaction.on_commit(
-        lambda: send_notification_task.apply_async(
-            args=[data], headers={"_schema_name": schema}
-        )
-    )
+    dispatch_on_commit(send_notification_task, [data])

@@ -20,7 +20,7 @@ from datetime import timedelta
 from decimal import Decimal, InvalidOperation
 
 from django.conf import settings
-from django.db import connection, transaction
+from django.db import transaction
 from django.utils import timezone
 from djmoney.money import Money
 from extra_settings.models import Setting
@@ -29,6 +29,7 @@ from b2b.enum import BusinessProfileStatus, ViesStatus
 from b2b.models import BusinessProfile, CustomerGroup, PriceListItem
 from b2b.vies import ViesClient, ViesUnavailableError
 from product.models.product import _quantize_cents
+from tenant.celery import dispatch_on_commit
 
 logger = logging.getLogger(__name__)
 
@@ -335,13 +336,8 @@ class B2BService:
             send_business_profile_status_email,
         )
 
-        schema = connection.schema_name
         profile_id = profile.pk
-        transaction.on_commit(
-            lambda: send_business_profile_status_email.apply_async(
-                args=[profile_id], headers={"_schema_name": schema}
-            )
-        )
+        dispatch_on_commit(send_business_profile_status_email, [profile_id])
 
     @classmethod
     def import_price_lines(cls, group: CustomerGroup, text: str) -> dict:
@@ -402,13 +398,8 @@ class B2BService:
             send_admin_new_business_profile_email,
         )
 
-        schema = connection.schema_name
         profile_id = profile.pk
-        transaction.on_commit(
-            lambda: send_admin_new_business_profile_email.apply_async(
-                args=[profile_id], headers={"_schema_name": schema}
-            )
-        )
+        dispatch_on_commit(send_admin_new_business_profile_email, [profile_id])
 
 
 class B2BPricingService:

@@ -1999,10 +1999,9 @@ class AcsService:
             and old_state != AcsShipmentState.OUT_FOR_DELIVERY
         ):
             from shipping_acs.tasks import acs_send_arrival_notification
+            from tenant.celery import dispatch_on_commit
 
-            transaction.on_commit(
-                lambda: acs_send_arrival_notification.delay(shipment.id)
-            )
+            dispatch_on_commit(acs_send_arrival_notification, [shipment.id])
 
 
 def _to_decimal(value: Any) -> Decimal | None:

@@ -220,14 +220,13 @@ class SubscriptionTopicViewSet(BaseModelViewSet):
             # Queue it, don't block the request on SMTP — and dispatch
             # only after commit so the worker can't read the row before
             # it is persisted. Mirrors the signup path in user/signals.py.
+            from tenant.celery import dispatch_on_commit
             from user.tasks import (
                 send_subscription_confirmation_email_task,
             )
 
-            transaction.on_commit(
-                lambda s=subscription: (
-                    send_subscription_confirmation_email_task.delay(s.id)
-                )
+            dispatch_on_commit(
+                send_subscription_confirmation_email_task, [subscription.id]
             )
 
         response_serializer_class = self.get_response_serializer()

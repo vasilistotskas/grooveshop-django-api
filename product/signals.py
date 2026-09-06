@@ -9,6 +9,7 @@ from simple_history.signals import post_create_historical_record
 
 from product.models.product import Product, ProductTranslation
 from product.models.product_attribute import ProductAttribute
+from tenant.celery import dispatch_on_commit
 
 logger = logging.getLogger(__name__)
 
@@ -166,15 +167,15 @@ def reindex_product_translations(sender, instance, **kwargs):
             return
         logger.debug("Reindexing ProductTranslation Async")
 
-        def _dispatch_reindex(pks=translation_pks):
-            for pk in pks:
-                index_document_task.delay(
-                    app_label="product",
-                    model_name="producttranslation",
-                    pk=pk,
-                )
-
-        transaction.on_commit(_dispatch_reindex)
+        for pk in translation_pks:
+            dispatch_on_commit(
+                index_document_task,
+                kwargs={
+                    "app_label": "product",
+                    "model_name": "producttranslation",
+                    "pk": pk,
+                },
+            )
     else:
         # Sync path (DEBUG) serializes each document inline, so it needs the
         # optimized queryset with its counts/prefetches.
@@ -242,18 +243,17 @@ def notify_product_price_lowered(
     old_price_f = float(old_price)
     new_price_f = float(new_price)
 
-    transaction.on_commit(
-        lambda: send_price_drop_notifications.delay(
-            product_id=product_id,
-            old_price=old_price_f,
-            new_price=new_price_f,
-        )
+    dispatch_on_commit(
+        send_price_drop_notifications,
+        kwargs={
+            "product_id": product_id,
+            "old_price": old_price_f,
+            "new_price": new_price_f,
+        },
     )
-    transaction.on_commit(
-        lambda: send_product_alert_price_drop.delay(
-            product_id=product_id,
-            new_price=new_price_f,
-        )
+    dispatch_on_commit(
+        send_product_alert_price_drop,
+        kwargs={"product_id": product_id, "new_price": new_price_f},
     )
 
 
@@ -270,14 +270,12 @@ def notify_product_back_in_stock(sender, instance, **kwargs):
     product_id = instance.id
 
     # Explicit opt-in subscribers get an email (ProductAlert RESTOCK).
-    transaction.on_commit(
-        lambda: send_product_alert_restock.delay(product_id=product_id)
+    dispatch_on_commit(
+        send_product_alert_restock, kwargs={"product_id": product_id}
     )
     # Implicit interest (favouriters) gets a live in-app notification.
-    transaction.on_commit(
-        lambda: notify_back_in_stock_favourites_live.delay(
-            product_id=product_id
-        )
+    dispatch_on_commit(
+        notify_back_in_stock_favourites_live, kwargs={"product_id": product_id}
     )
 
 

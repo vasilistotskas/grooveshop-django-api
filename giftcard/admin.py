@@ -19,6 +19,7 @@ from admin.base import BaseModelAdmin
 from admin.export import ExportActionMixin
 from giftcard.enum import GiftCardStatus, GiftCardTransactionKind
 from giftcard.models import GiftCard, GiftCardPurchase, GiftCardTransaction
+from tenant.celery import dispatch_on_commit
 
 
 class AdjustBalanceForm(BaseDialogForm):
@@ -214,17 +215,11 @@ class GiftCardAdmin(BaseModelAdmin):
     def resend_delivery(
         self, request: HttpRequest, object_id: int
     ) -> HttpResponse:
-        from django.db import connection, transaction
 
         from giftcard.tasks import deliver_gift_card_email
 
         GiftCard.objects.filter(pk=object_id).update(delivered_at=None)
-        schema = connection.schema_name
-        transaction.on_commit(
-            lambda: deliver_gift_card_email.apply_async(
-                args=[object_id], headers={"_schema_name": schema}
-            )
-        )
+        dispatch_on_commit(deliver_gift_card_email, [object_id])
         self.message_user(
             request, _("Delivery email queued."), messages.SUCCESS
         )

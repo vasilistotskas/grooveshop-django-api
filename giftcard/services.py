@@ -29,6 +29,7 @@ from giftcard.enum import (
     GiftCardTransactionKind,
 )
 from giftcard.models import GiftCard, GiftCardPurchase, GiftCardTransaction
+from tenant.celery import dispatch_on_commit
 
 logger = logging.getLogger(__name__)
 
@@ -312,26 +313,15 @@ class GiftCardService:
             description=f"Purchase {purchase.uuid}",
         )
 
-        from django.db import connection, transaction
-
         from giftcard.tasks import (
             deliver_gift_card_email,
             send_gift_card_purchase_receipt,
         )
 
-        schema = connection.schema_name
         purchase_id = purchase.pk
-        transaction.on_commit(
-            lambda: send_gift_card_purchase_receipt.apply_async(
-                args=[purchase_id], headers={"_schema_name": schema}
-            )
-        )
+        dispatch_on_commit(send_gift_card_purchase_receipt, [purchase_id])
         if not purchase.deliver_at or purchase.deliver_at <= timezone.now():
-            transaction.on_commit(
-                lambda: deliver_gift_card_email.apply_async(
-                    args=[card.id], headers={"_schema_name": schema}
-                )
-            )
+            dispatch_on_commit(deliver_gift_card_email, [card.id])
         return card
 
     @classmethod

@@ -53,6 +53,7 @@ from product.models.product import Product
 from product.models.product_attribute import ProductAttribute
 from product.models.review import ProductReview
 from product.models.variant_group import ProductVariantGroup
+from product.signals import reindex_products_by_pk
 from tag.admin import TaggedItemInline
 
 # ── Local (single-app) TextChoices/synthetic-status variant maps ──────
@@ -1229,7 +1230,14 @@ class ProductAdmin(
         icon="check_circle",
     )
     def make_active(self, request, queryset):
+        # Collect BEFORE the update: after it, a filtered queryset would
+        # no longer match the rows it just changed.
+        changed_ids = list(queryset.values_list("pk", flat=True))
         updated = queryset.update(active=True)
+        # `update()` emits no post_save, so the Meilisearch documents
+        # would keep their old `active` value and the products stay
+        # searchable (or invisible) until the nightly sync.
+        reindex_products_by_pk(changed_ids)
         self.message_user(
             request,
             ngettext(
@@ -1247,7 +1255,14 @@ class ProductAdmin(
         icon="cancel",
     )
     def make_inactive(self, request, queryset):
+        # Collect BEFORE the update: after it, a filtered queryset would
+        # no longer match the rows it just changed.
+        changed_ids = list(queryset.values_list("pk", flat=True))
         updated = queryset.update(active=False)
+        # `update()` emits no post_save, so the Meilisearch documents
+        # would keep their old `active` value and the products stay
+        # searchable (or invisible) until the nightly sync.
+        reindex_products_by_pk(changed_ids)
         self.message_user(
             request,
             ngettext(

@@ -248,13 +248,25 @@ settings.DEBUG = False
 
 
 def is_meilisearch_available():
-    """Check if Meilisearch is available for testing."""
+    """Check if Meilisearch is available for testing.
+
+    Built from ``settings.MEILISEARCH`` — the same values the app
+    itself connects with — rather than from a separate env var. It read
+    ``MEILI_HTTP_ADDR``, which CI sets to ``meilisearch:7700``: no
+    scheme, so ``meilisearch.Client`` raises
+    ``MeilisearchCommunicationError`` and every ``@requires_meilisearch``
+    test was skipped on every CI run, while the workflow paid to start
+    a Meilisearch service for them. The app was fine throughout — it
+    reads ``MEILI_HOST``, which CI sets correctly.
+    """
     try:
         import meilisearch
+        from django.conf import settings as django_settings
 
-        host = os.environ.get("MEILI_HTTP_ADDR", "http://localhost:7700")
-        key = os.environ.get("MEILI_MASTER_KEY", "")
-        client = meilisearch.Client(host, key)
+        config = django_settings.MEILISEARCH
+        scheme = "https" if config.get("HTTPS") else "http"
+        host = f"{scheme}://{config['HOST']}:{config['PORT']}"
+        client = meilisearch.Client(host, config.get("MASTER_KEY", ""))
         client.health()
         return True
     except Exception:

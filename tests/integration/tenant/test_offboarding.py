@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import os
 from datetime import date, timedelta
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -346,3 +347,63 @@ class TestOneDestroyPath:
         assert "tenant.delete(force_drop=True)" not in source, (
             "admin still deletes inline; offboarding cleanup would be skipped"
         )
+
+
+class TestSearchIndexErasureActuallyDeletes:
+    """`meili_client` has no `delete_index`; the raw SDK client does.
+
+    The wrapper in `meili/_client.py` exposes create/get/get_search
+    index helpers and no `delete_index` — `meilisearch_drop.py` reaches
+    through to `client.client` for exactly that reason. So the call
+    raised `AttributeError` on the first index, the `except` swallowed
+    it, and offboarding reported a clean run having deleted nothing:
+    every `{schema}__*` index and all its documents stayed alive, so
+    reusing that schema name would hand a new store the previous
+    occupant's catalogue.
+
+    The existing tests here pass a bare `MagicMock()` as the client, on
+    which `delete_index` auto-exists — which is why they were green
+    throughout.
+    """
+
+    def _client_without_delete_index(self, uids):
+        """A stand-in shaped like the real wrapper: no `delete_index`."""
+        from meili._client import Client as MeiliWrapper
+
+        client = MagicMock(spec=MeiliWrapper)
+        client.get_indexes.return_value = [
+            SimpleNamespace(uid=uid) for uid in uids
+        ]
+        client.client = MagicMock()
+        client.client.delete_index.return_value = SimpleNamespace(task_uid=1)
+        return client
+
+    def test_it_calls_through_to_the_client_that_has_the_method(self):
+        client = self._client_without_delete_index(
+            ["acme__product", "acme__blog", "other__product"]
+        )
+        with (
+            override_settings(MEILISEARCH={"OFFLINE": False}),
+            patch.dict(
+                "sys.modules", {"meili._client": MagicMock(client=client)}
+            ),
+        ):
+            dropped = offboarding.purge_search_indexes("acme")
+
+        assert dropped == ["acme__product", "acme__blog"]
+        assert [
+            call.args[0] for call in client.client.delete_index.call_args_list
+        ] == ["acme__product", "acme__blog"]
+
+    def test_it_waits_for_each_deletion_task(self):
+        """A fire-and-forget delete can still be queued when we report."""
+        client = self._client_without_delete_index(["acme__product"])
+        with (
+            override_settings(MEILISEARCH={"OFFLINE": False}),
+            patch.dict(
+                "sys.modules", {"meili._client": MagicMock(client=client)}
+            ),
+        ):
+            offboarding.purge_search_indexes("acme")
+
+        client.wait_for_task.assert_called_once_with(1)

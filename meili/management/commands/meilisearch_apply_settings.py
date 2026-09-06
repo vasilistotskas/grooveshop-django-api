@@ -14,7 +14,7 @@ drift from the live indexes. A drifted sortable field once made every
 
 from contextlib import nullcontext as _nullcontext
 
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.utils.translation import gettext as _
 
 from blog.models.post import BlogPostTranslation
@@ -37,6 +37,7 @@ class Command(TenantCommandMixin, BaseCommand):
         self.add_tenant_arguments(parser)
 
     def handle(self, *args, **options):
+        self._failures: list[str] = []
         from django_tenants.utils import schema_context
 
         for schema in self.get_tenant_schemas(options):
@@ -69,6 +70,16 @@ class Command(TenantCommandMixin, BaseCommand):
             self._update_product_index()
             self._update_blog_index()
 
+        if self._failures:
+            # Not a success line and not exit 0. This command is the
+            # PreSync hook on every deploy, and its own docstring says it
+            # guards against the settings drift that "once made every
+            # ?sort= product query 500" — so announcing success after
+            # catching the failure defeated the reason it exists.
+            raise CommandError(
+                "Index settings NOT applied: " + "; ".join(self._failures)
+            )
+
         self.stdout.write(
             self.style.SUCCESS("\nAll index settings updated successfully!")
         )
@@ -100,6 +111,7 @@ class Command(TenantCommandMixin, BaseCommand):
                     f"✗ Failed to update ProductTranslation settings: {e!s}"
                 )
             )
+            self._failures.append(f"ProductTranslation: {e!s}")
 
     def _update_blog_index(self):
         """Update BlogPostTranslation index settings."""
@@ -127,3 +139,4 @@ class Command(TenantCommandMixin, BaseCommand):
                     f"✗ Failed to update BlogPostTranslation settings: {e!s}"
                 )
             )
+            self._failures.append(f"BlogPostTranslation: {e!s}")

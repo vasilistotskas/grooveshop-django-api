@@ -3,6 +3,133 @@
 
 
 
+## v3.29.2 (2026-09-06)
+
+### Bug fixes
+
+* fix(tenant): give "no active tenants" its own exit code, not a shared 1
+
+``--all-tenants`` matching zero schemas and ``--all-tenants`` failing
+outright both exited 1, so no caller could tell "there was nothing to
+do" from "the work was attempted and failed". A caller that needs to
+tolerate the first therefore had to tolerate both.
+
+That caller exists, in another repo: the grooveshop-infrastructure
+prepare-helm PreSync job runs meilisearch_apply_settings on every
+deploy, and had to write
+
+... --all-tenants || echo "step 3/3 skipped (no active tenants yet)"
+
+to keep a fresh bring-up, a rebuilt namespace or a DR restore
+deployable. The audit had just made that command exit non-zero on
+genuine failure so the failure would stop being silent — and this hook
+turned it back into a reassuring line attributing it to a cause that
+had nothing to do with what happened. Index settings drift is what
+"once made every ?sort= product query 500", and in the Argo sync log it
+looked identical to a healthy first deploy.
+
+So the ambiguity is fixed at the source rather than guessed at by the
+consumer. NO_ACTIVE_TENANTS_RETURNCODE = 3 is deliberately still
+non-zero: an operator who asked for every tenant and got none needs to
+know the run was vacuous. It just no longer collides with failure.
+
+The nine other TenantCommandMixin commands keep their behaviour
+exactly — the exit stays non-zero and the message only gains detail.
+Nothing branched on the old code; nothing asserted the old message.
+
+Two tests pin both halves of the contract, since the consumer lives in
+a repository that cannot fail this suite: zero tenants exits 3, and a
+genuine per-tenant failure still exits 1 and still names the cause.
+
+Verified that Django honours the parameter end to end rather than
+assuming it: CommandError(returncode=3) through manage.py gives shell
+exit 3, and the default gives 1 (Django 6.0.8, run_from_argv ->
+sys.exit(e.returncode)).
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01AT2qcFSFBVeA3s4VtmZTBz ([`df4000f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/df4000fa8c38b55a5c19d42f14cb66597d249d95))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.29.1 [skip ci] ([`95cf402`](https://github.com/vasilistotskas/grooveshop-django-api/commit/95cf402baf606fd952fa9e72c7972e78ec87de6f))
+
+### Testing
+
+* test(meili): establish the no-tenants precondition instead of asserting it
+
+The returncode contract test I added one commit ago failed on CI run
+34046677730 with ``assert not True``. My own bug, and an instructive
+one: the test asserted that no active tenant existed rather than making
+that true.
+
+assert not Tenant.objects.filter(is_active=True) \
+    .exclude(schema_name="public").exists()
+
+A freshly migrated test database is seeded with ``('webside', True)``,
+so that assertion is false on CI by construction. It passed locally only
+because the local test database predated the seed — the exact reason
+``--create-db`` after a branch switch is already written down as a
+lesson in this repo, and I skipped it.
+
+Reproduced before fixing rather than guessing from the traceback: with
+``--create-db`` the tenant table really does come up holding one active
+non-public row, and the whole file passes with the precondition
+established (7 passed, 2m35s including the migration run).
+
+``update()`` rather than ``save()`` is deliberate. ``TenantMixin.save()``
+creates the schema and replays every migration when the schema is
+absent — on UPDATE as well as INSERT, which is the same branch that made
+the tenant admin-API file take 7m12s. A queryset update never reaches
+it. The surrounding test transaction rolls the change back.
+
+The assertion stays, now as a post-condition on the setup with a message
+that says what it did, so a future seed that resists deactivation is
+still caught rather than silently turning this into a test of nothing.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01AT2qcFSFBVeA3s4VtmZTBz ([`8f4a23a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8f4a23abb403c4946e5636b637436fcef1fc1eae))
+
+* test(mt): pin the product active in the routing test, not to chance
+
+The multi-tenant lane failed on CI run 34046677730 with
+
+expected the tenant-resolved request to find product 2 in
+'mt_smoke', got 404
+
+and the accusation was false. Tenant resolution was fine. The product
+was inactive.
+
+``ProductFactory`` draws ``active`` from
+``pybool(truth_probability=85)``, and the product detail view applies
+``.active()`` to anyone who is not store staff — added by the audit,
+deliberately, because ``for_detail()`` does not filter on ``active`` and
+the ``AllowAny`` detail route was therefore serving unreleased drafts at
+a sequential id. That fix is correct and stays. What it also did was
+give this test a 15% chance of a 404 on every run, under an assertion
+message that points at the one thing that was not wrong.
+
+The main suite is unaffected: every other test that fetches
+``product-detail`` either passes ``active=True`` explicitly or
+authenticates as a superuser, which takes the staff branch. This lane's
+test is the only one issuing that request anonymously, and the only one
+that left ``active`` to the factory.
+
+So the fix is at the call site rather than in the factory. The 85/15
+draw is intentional test-data realism that other tests rely on; a test
+whose subject is schema binding just has no business depending on it.
+Pinning ``active=True`` removes every reason for a 404 except the one
+being measured.
+
+Swept the rest of tests_mt for the same shape. The other anonymous
+requests hit ``product-list`` and assert on status or CORS headers, not
+on a specific product being visible, and the isolation tests read
+through the ORM where ``active`` is not filtered. Nothing else to pin.
+
+MT lane green locally: 24 passed.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01AT2qcFSFBVeA3s4VtmZTBz ([`cd1fca9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cd1fca9fe6cb718e0ffaa97495083aa5bbdd676c))
+
 ## v3.29.1 (2026-09-06)
 
 ### Bug fixes

@@ -258,19 +258,42 @@ class BlogCommentWriteSerializer(
     )
     translations = TranslatedFieldsFieldExtend(shared_model=BlogComment)
 
-    def validate_parent(self, value: BlogComment) -> BlogComment:
-        if value:
-            post = self.initial_data.get("post")
-            if isinstance(post, int):
-                if value.post.id != post:
-                    raise serializers.ValidationError(
-                        _("Parent comment must belong to the same post.")
-                    )
-            elif post and value.post != post:
-                raise serializers.ValidationError(
-                    _("Parent comment must belong to the same post.")
-                )
-        return value
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Both relations are caller-supplied ids, so both are scoped to
+        # what this caller may see. Unscoped, `post` accepted a DRAFT
+        # (anyone could plant a comment on an unreleased post) and
+        # `parent` accepted a comment on one, which is the id a thread
+        # read-back needs. Staff keep the full set via `visible_to`.
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        visible_posts = BlogPost.objects.visible_to(user)
+        self.fields["post"].queryset = visible_posts
+        parent_queryset = BlogComment.objects.filter(post__in=visible_posts)
+        if not is_store_staff(user):
+            parent_queryset = parent_queryset.filter(approved=True)
+        self.fields["parent"].queryset = parent_queryset
+
+    def validate(self, attrs):
+        # Checked here and not in `validate_parent`, which read the post
+        # out of `initial_data`: on a PATCH that sent only `parent` there
+        # was no `post` key, both branches fell through, and the check
+        # silently passed — so a caller could re-parent their own public
+        # comment onto a comment on someone else's draft. `attrs` carries
+        # the resolved objects, and falling back to the instance means an
+        # update is checked against its EFFECTIVE post, whether or not
+        # the payload restated it.
+        parent = attrs.get("parent", getattr(self.instance, "parent", None))
+        post = attrs.get("post", getattr(self.instance, "post", None))
+        if (
+            parent is not None
+            and post is not None
+            and parent.post_id != post.pk
+        ):
+            raise serializers.ValidationError(
+                {"parent": _("Parent comment must belong to the same post.")}
+            )
+        return attrs
 
     def create(self, validated_data: Any) -> BlogComment:
         if "user" not in validated_data:

@@ -59,6 +59,22 @@ def test_anonymous_liked_posts_is_refused_not_a_500():
     assert response.status_code == 401, response.status_code
 
 
+def test_anonymous_liked_posts_is_refused_before_the_body_is_read():
+    """Authentication is decided before the payload, not after it.
+
+    The refusal used to live inside the action, below
+    `request_serializer.is_valid()`, so an anonymous caller who sent no
+    `postIds` got a 400 field error and was never told the endpoint
+    needs authentication at all. It is a permission class now, which
+    DRF runs before the handler.
+    """
+    response = APIClient().post(
+        reverse("blog-post-liked_posts"), {}, format="json"
+    )
+
+    assert response.status_code == 401, response.status_code
+
+
 def test_a_signed_in_caller_still_gets_their_likes():
     user = UserAccountFactory(num_addresses=0)
     liked = BlogPostFactory(is_published=True)
@@ -100,3 +116,73 @@ def test_the_public_tag_endpoints_still_hide_it():
     )
 
     assert response.status_code == 404
+
+
+def _tag_named(name: str, *, active: bool):
+    tag = BlogTagFactory(active=True)
+    tag.set_current_language("en")
+    tag.name = name
+    tag.save()
+    if not active:
+        # `update()`, not `save()`: `active` is not on the translation.
+        BlogTag.objects.filter(pk=tag.pk).update(active=False)
+    return tag
+
+
+def test_a_deactivated_tag_cannot_be_used_to_filter_posts_by_name():
+    """`active` hides a tag from the storefront; the filter must agree.
+
+    The tag endpoints serve `for_list()`/`for_detail()`, which are
+    active-only, and `filter_min_tags` counts active tags only — but
+    `tagName` filtered the raw `tags__translations__name`, so a caller
+    who knew a deactivated tag's label could still use it to slice the
+    published catalogue. Verified before the fix: 200 with the post.
+    """
+    post = BlogPostFactory(is_published=True)
+    post.tags.add(_tag_named("hidden-campaign", active=False))
+
+    response = APIClient().get(
+        reverse("blog-post-list"), {"tagName": "hidden-campaign"}
+    )
+
+    assert response.status_code == 200
+    assert response.data["results"] == []
+
+
+def test_a_deactivated_tag_id_is_not_a_valid_filter_choice():
+    """Same rule by id — and refused exactly like a nonexistent one.
+
+    Both answer 400 with django-filter's ``invalid_choice``, so the
+    refusal cannot be read as "this tag exists but is hidden". (The
+    rendered message quotes the id back, which is why the codes are what
+    get compared.)
+    """
+    post = BlogPostFactory(is_published=True)
+    hidden = _tag_named("hidden-by-id", active=False)
+    post.tags.add(hidden)
+
+    response = APIClient().get(reverse("blog-post-list"), {"tags": hidden.pk})
+    missing = APIClient().get(
+        reverse("blog-post-list"), {"tags": hidden.pk + 10_000}
+    )
+
+    assert response.status_code == 400, response.status_code
+    assert missing.status_code == 400
+    assert (
+        [d.code for d in response.data["tags"]]
+        == [d.code for d in missing.data["tags"]]
+        == ["invalid_choice"]
+    )
+
+
+def test_an_active_tag_id_still_filters():
+    """The narrowing must not have swallowed the feature."""
+    tagged = BlogPostFactory(is_published=True)
+    BlogPostFactory(is_published=True)
+    tag = _tag_named("live-campaign", active=True)
+    tagged.tags.add(tag)
+
+    response = APIClient().get(reverse("blog-post-list"), {"tags": tag.pk})
+
+    assert response.status_code == 200
+    assert [row["id"] for row in response.data["results"]] == [tagged.pk]

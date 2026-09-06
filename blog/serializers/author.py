@@ -70,9 +70,6 @@ class BlogAuthorDetailSerializer(BlogAuthorSerializer):
             "top_posts",
         )
 
-    @extend_schema_field(
-        lazy_serializer("blog.serializers.post.BlogPostSerializer")(many=True)
-    )
     def _visible_posts(self, obj: BlogAuthor):
         """The author's posts this caller may see.
 
@@ -88,6 +85,9 @@ class BlogAuthorDetailSerializer(BlogAuthorSerializer):
         request = self.context.get("request")
         return obj.blog_posts.visible_to(getattr(request, "user", None))
 
+    @extend_schema_field(
+        lazy_serializer("blog.serializers.post.BlogPostSerializer")(many=True)
+    )
     def get_recent_posts(self, obj: BlogAuthor):
         from blog.serializers.post import BlogPostSerializer
 

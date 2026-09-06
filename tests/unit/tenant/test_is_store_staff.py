@@ -118,9 +118,32 @@ def test_no_bound_tenant_grants_only_superusers(bind):
     assert is_store_staff(UserAccountFactory(is_superuser=True)) is True
 
 
-def test_superuser_passes_without_stamp(tenant, bind):
+def test_an_unstamped_superuser_is_refused_on_a_tenant(tenant, bind):
+    """`is_superuser` on a tenant-schema row is residue, like `is_staff`.
+
+    This test used to assert the opposite, and it was the last place
+    `is_superuser` was trusted on a tenant schema. `UserAccount` is
+    mirrored per schema and the cutover copied users id-preserving, so
+    the flag on a tenant row sits on a CUSTOMER record — the identical
+    argument this codebase already makes for `is_staff`, on the
+    identical rows.
+
+    A genuine platform superuser reaching a tenant host is always
+    stamped: the flag is only ever set by `PlatformStaffBackend`
+    (login, session restore) and `PlatformStaffTokenAuthentication`,
+    which are the only three places a platform identity is loaded.
+    """
     bind(tenant)
-    assert is_store_staff(UserAccountFactory(is_superuser=True)) is True
+
+    assert is_store_staff(UserAccountFactory(is_superuser=True)) is False
+
+
+def test_a_stamped_superuser_still_needs_no_membership(tenant, bind):
+    """The short-circuit's purpose survives: no membership row required."""
+    bind(tenant)
+    superuser = stamp_platform_identity(UserAccountFactory(is_superuser=True))
+
+    assert is_store_staff(superuser) is True
 
 
 def test_answer_is_cached_per_tenant(

@@ -26,7 +26,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
-from core.api.permissions import IsPlatformSuperuser
+from core.api.permissions import IsStoreStaff
 from core.api.serializers import (
     ErrorResponseSerializer,
     HealthCheckResponseSerializer,
@@ -504,7 +504,10 @@ def health_live(request):
     },
 )
 @api_view(["GET"])
-@permission_classes([IsPlatformSuperuser])
+# Per-store data, so the store's own staff may read it. It was
+# gated on IsPlatformSuperuser, which on a tenant host reads
+# is_superuser off a tenant-schema row — see is_platform_superuser.
+@permission_classes([IsStoreStaff])
 def list_settings(request):
     """List all available settings with their values."""
     try:

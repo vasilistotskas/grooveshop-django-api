@@ -3,6 +3,3144 @@
 
 
 
+## v3.29.0 (2026-09-06)
+
+### Bug fixes
+
+* fix(tenant): lifecycle state was a settings field, and a staff token was a customer
+
+Two defects on the platform control plane, both verified by execution.
+
+**`is_active` was writable through `TenantAdminSerializer`,** so a state
+change could skip every gate `tenant.lifecycle` exists to enforce.
+Measured against the live endpoint:
+
+PATCH {"isActive": false} -> 200
+  is_active: False suspended_at: None reason: ''
+  media flush dispatched: False
+  destroy_refusal: not_suspended
+
+PATCH {"isActive": true} -> 200
+  is_active: True suspended_at still: True reason: 'abuse'
+  after a fresh suspend, anchor age days: 30
+  destroy_refusal: None
+
+PROTECTED PATCH -> 200 is_active now: False
+
+Each line is a consequence. No `suspended_at` means the destroy gate
+reads the store as "not_suspended" forever, so a store suspended that way
+can never be destroyed through the gated path. No media flush means it
+keeps serving processed images for the cache TTL — up to 360 days — while
+the operator believes it is offline. And leaving the anchor on
+reactivation is the worst of the three: the NEXT genuine suspension keeps
+the stale `suspended_at`, so the 24h cooldown that makes a mistaken
+suspension reversible is already spent at the moment of suspension. The
+third line is a protected tenant moving, which both `suspend_tenant` and
+`activate_tenant` refuse outright.
+
+`is_active`, `suspended_at` and `suspended_reason` are read-only now, and
+the state changes live on `suspend`/`activate` actions that call the
+lifecycle functions — the same shape `destroy` already had, and for the
+same reason its docstring gives. The two companion fields are exposed
+read-only because without them the API cannot tell a lifecycle-suspended
+store from one that was never suspended, which is the confusion this
+fixes.
+
+**A `StaffBearer` token authenticated a customer of the store it dialled.**
+`tenant.membership`'s own docstring states the premise every ordinary
+authenticated endpoint leans on: "being authenticated in this schema IS
+the authorization". A staff token is the one identity for which that is
+false — it resolves the user against PUBLIC while the request runs in a
+tenant schema — and `Model.__eq__` compares concrete class and pk with no
+notion of schema:
+
+model __eq__ says equal: True
+IsOwnerOrAdmin grants: True
+
+for a public identity built with a tenant customer's pk. The queryset
+half is the same arithmetic: `filter(user=request.user)` becomes
+`WHERE user_id = <that pk>` against the tenant's own table.
+
+The authenticator now requires store staff rights whenever the request is
+on a tenant schema, which costs nothing legitimate — staff rights in that
+store are what the token is FOR, a platform superuser and a role-holding
+member both pass `is_store_staff`, and an operator with no role in a
+store had no business reading its customers' data through a pk
+coincidence. The public schema, where the token is minted and used
+against the control plane, has no tenant to be a customer of and is
+unaffected.
+
+**REFUTED, from the same batch: the membership admin's
+`self_service_tenant` predicate.** It returns `None` (i.e. unscoped) for
+`is_superuser` and on the public schema, and neither is reachable by a
+tenant-schema identity. `MyAdminSite.has_permission` checks
+`is_platform_staff_session` BEFORE reading `is_superuser`, so the flag is
+only ever read on a public identity; and on the public schema `admin/`
+resolves to `PlatformAdminSite` (mounted first in `urls_public`, shadowing
+the shared site), whose own `has_permission` requires `is_superuser`. A
+store ADMIN cannot reach either unscoped branch.
+
+Guards were run against the unfixed code first: "the field is still
+writable", two protected-tenant assertions, five `NoReverseMatch` for the
+routes that did not exist, and `DID NOT RAISE AuthenticationFailed`.
+
+No schema regeneration: `tenant/urls_public.py` is not under the schema's
+`ROOT_URLCONF`, so none of these routes appear in `schema.yml`.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`ff1ec9c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ff1ec9c0bf2635fab59adcbf582356a5e62eea83))
+
+* fix(core): the global language fallback read parler's settings blob, not its language list
+
+From CodeRabbit review on this PR, and correct: `PARLER_LANGUAGES` keys
+its global list under `None`, not under `"default"`. `"default"` holds a
+single settings MAPPING —
+
+'default' -> dict {'fallbacks': ['en'], 'hide_untranslated': False,
+                   'code': 'el'}
+
+— so iterating it yields KEYS and `entry["code"]` raises `TypeError:
+string indices must be integers`. Measured on django-parler 2.4, the
+pinned version. The fallback only fires for a `SITE_ID` parler has no
+entry for, but when it does it takes down every request that validates a
+language code: a translation payload or an `X-Language` header would 500.
+
+Also keyed on presence rather than truth, as the reviewer noted: `or`
+treats an explicitly empty per-site list as missing and silently
+substitutes the global one, which is a different answer from the one the
+configuration gave.
+
+Both guards fail against the previous version with the exact `TypeError`.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`a780c44`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a780c447170d7abfb2d64e02500782777b212e7b))
+
+* fix(core): the ordering lock was a no-op, and three inputs reached the database unchecked
+
+Four defects, each reproduced against the real database or the live
+endpoint before being touched.
+
+**`SortableModel` appended positions while holding no lock at all.**
+`save()` read the current maximum through
+`get_ordering_queryset().select_for_update()` under the comment "Lock the
+table to prevent race conditions". Django DROPS the lock when the
+queryset is consumed by `aggregate()` — Postgres forbids `FOR UPDATE`
+alongside an aggregate — so the statement that ran was a plain
+`SELECT MAX("sort_order")`. Measured on one queryset: listed it emits
+`... LIMIT 1 FOR UPDATE`, aggregated it emits no `FOR UPDATE` at all.
+
+Row locks could not have fixed it either: two concurrent creates contend
+over a row that does not exist yet, which is a phantom, and READ
+COMMITTED row locks do not prevent phantoms. Two threads against the
+real database:
+
+SORT ORDERS: [0, 0] DUPLICATE: True
+SORT ORDERS: [0, 1] DUPLICATE: False
+SORT ORDERS: [0, 0] DUPLICATE: True
+
+and the duplicate is not cosmetic — `move_up` looked its neighbour up
+with `get(sort_order=...)`, so a shared position raised
+`MultipleObjectsReturned`, i.e. a 500 on the admin's move-up action.
+
+A transaction-scoped advisory lock replaces it: released at COMMIT so it
+cannot leak to a pooled connection, blocking nothing but another append
+to the same model, keyed on `{schema}:{model}` because advisory locks are
+per DATABASE while every tenant shares one. Four runs of the threaded
+test now give `[0, 1]` every time.
+
+`move_up` also stops requiring exactly one row at `sort_order - 1`:
+repairing the append does not repair rows already stored with duplicates,
+and the old lookup additionally skipped nothing on a gap — it caught
+`DoesNotExist` and passed, so an item with a gap below it could never be
+moved up. `move_down` now orders explicitly instead of leaning on each
+subclass's `Meta.ordering`, without which `first()` returns whichever row
+the database felt like.
+
+**The BoxNow webhook 500'd on a malformed signature field.**
+`datasignature: str = envelope.get("datasignature", "")` annotates a
+value that comes straight out of `json.loads` on an unauthenticated body,
+and `hmac.compare_digest` raises `TypeError` for every shape that is not
+an ASCII `str`. All five reproduced through the endpoint (integer,
+object, array, null, non-ASCII string) — a 500 anyone can produce at
+will, on an endpoint whose 5xx responses BoxNow retries. `verify_signature`
+is now total: typed `object`, and anything that is not 64 hex digits is
+`False`. Every well-formed candidate still goes through
+`compare_digest`, so nothing about the secret becomes timeable.
+
+**`translations` reached the database unchecked.** Verified against
+`POST /api/v1/blog/comment`, which any signed-in customer can reach:
+
+* `translations=not-json{` in a multipart body raised
+  `json.JSONDecodeError` out of the serializer — HTTP 500.
+* `{"xx": {...}}` was accepted with 201 and stored a translation row no
+  read path can ever surface.
+* a 40-character code raised `DataError: value too long for type
+  character varying(15)` — another 500.
+
+Neither this override nor parler-rest's original looked at the keys.
+Both are validated now against a new `core.utils.i18n.
+available_language_codes()`, read from `PARLER_LANGUAGES` because the
+question is which TRANSLATION rows exist; `resolve_request_language` in
+the same module drops its own inline copy of the set.
+
+That validation caught a broken test in three files: `languages` is a
+list of CODES, and `language_code = language[0]` took the first
+CHARACTER, so blog-category, region and pay-way view tests had been
+posting translations under `"e"` and `"d"` — with `"e"` standing for both
+`el` and `en`, collapsing three languages into two. They passed only
+because nothing validated the keys.
+
+Guards were run against the unfixed code first: five sortable failures
+(`StopIteration`, `MultipleObjectsReturned`, `[0, 0] == [0, 1]`), twelve
+BoxNow failures, and six translation failures.
+
+Two items from the same review batch are NOT here, deliberately: a
+`.only()` said to omit `language_code`, and a `.txt` email template said
+to double-escape. Neither reproduces against the current tree — every
+`.only()` call site loads what it saves, and no `.txt` template renders a
+`*_text` field without `|safe`.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`2723444`](https://github.com/vasilistotskas/grooveshop-django-api/commit/272344415c08a6742b7d4f18d51f7b0b0d0e8059))
+
+* fix(core): five cleanup tasks reported success on failure, and the compressed backup deadlocked
+
+Four ops-facing defects with the same shape: something failed and
+nothing said so.
+
+**Five cleanup tasks turned a failed command into a successful task.**
+`clear_expired_sessions_task`, `clear_all_cache_task`,
+`clear_duplicate_history_task`, `clear_old_history_task` and
+`clear_expired_notifications_task` each caught `CommandError`, logged it
+and returned `{"status": "error"}`. Celery then recorded SUCCESS,
+`MonitoredTask.on_success` logged "completed successfully", and the
+`autoretry_for=(Exception,)` every one of them declares could never fire
+— for the single most likely failure a management-command wrapper has.
+
+That is exactly the defect `backup_database_task` carried in this same
+file until a pg_dump/server major mismatch went unnoticed for a week
+while the backup volume drained (2026-09-02); its fix is the precedent
+followed here, and `sync_meilisearch_indexes` already re-raised. The
+`except Exception: logger.exception(...); raise` arm underneath each of
+the five already said what the intent was. Dropping the CommandError arm
+removes five byte-identical blocks with it.
+
+Three existing tests asserted the swallow (`result["status"] == "error"`)
+— they encoded the defect, not an intention, and are inverted. A
+parametrised guard now covers the whole family so a sixth wrapper cannot
+be added with the old shape.
+
+**The soft time limit was recorded as one user's email failure.**
+`send_inactive_user_notifications` has `soft_time_limit=600`; Celery
+raises `SoftTimeLimitExceeded` INSIDE the task, it is an ordinary
+`Exception` subclass, and it is raised once. It landed in the per-user
+`except Exception`, was logged as "failed to send email to user X", and
+the loop carried on — so the soft limit bought nothing and the run
+continued to `time_limit=900`, where Celery kills the worker process
+outright. That is the outcome the soft limit exists to prevent, and the
+kill also loses the summary and the in-flight user's bookkeeping.
+
+It now breaks out and reports `timed_out`. Stopping is a partial
+completion, not a failure: everyone already emailed carries
+`last_reengagement_email_at`, so the next scheduled run excludes them by
+the cooldown and resumes from there. Re-raising would instead hand
+`autoretry_for=(Exception,)` a full rescan that can only time out again.
+Nothing else in the repo catches this exception, while a global
+`task_soft_time_limit=300` applies to every task.
+
+**`backup_database --compress` deadlocked, with no timeout to break it.**
+The plain+compress path piped pg_dump's stdout into `gzip` while its
+stderr went to a PIPE that nothing drained until after
+`gzip.communicate()` returned — and that call cannot return until pg_dump
+closes stdout. `--verbose` fills the stderr buffer, pg_dump blocks
+writing it, gzip waits for input that never comes. Reproduced with the
+identical process shape:
+
+stderr= 100 bytes -> ok
+stderr= 4096 bytes -> ok
+stderr= 8192 bytes -> DEADLOCK
+stderr= 262144 bytes -> DEADLOCK
+
+and that branch was the only one without a timeout, so it hung forever
+rather than raising `TimeoutExpired`. The plain-uncompressed branch had
+its own problem: it read the whole dump into memory and decoded it,
+falling back to `latin-1`, which would silently corrupt the SQL of any
+UTF-8 database.
+
+pg_dump writes and compresses the file itself, so all three branches
+collapse to one `subprocess.run` with `--file` and a named timeout —
+`communicate()` drains both streams concurrently, which is the property
+the hand-rolled pipeline lacked. `--compress=gzip` with plain output is
+verified against the deployed engine: pg_dump 18.6 `-Fp -Z gzip
+--file=x.sql.gz` produces a file `gzip -t` accepts and `gzip -dc` reads
+back as SQL. `--format=tar` also stops being written as `.sql`.
+
+**`clear_cache --prefixes` exited 0 having purged nothing.** The
+disaster-recovery path wrote the failure to stderr and returned, so an
+operator reaching for it mid incident got a red line and a zero exit
+status, and anything chaining on it treated the purge as done. It raises
+`CommandError` now, with the backend's text kept in the log rather than
+the message — a redis-py connection error carries the connection target,
+and the URL in this deployment carries the password (the reasoning
+already recorded at admin/admin.py's cache views).
+
+**The dev image could not back up the dev database at all.** It pins
+`postgresql-client-17` against `infra.compose.yml`'s 18.6 server, so
+pg_dump refused every run — the same drift the production Dockerfile
+documents and pins an ARG against. Proven in the running container:
+
+CommandError: Backup failed: pg_dump failed: pg_dump: error:
+aborting because of server version mismatch
+detail: server version: 18.6; pg_dump version: 17.10
+
+Now an ARG tracking the server major, verified by building the apt layer:
+`postgresql-client-18` on bookworm gives pg_dump 18.6.
+
+Every guard was run against the unfixed code first: ten `DID NOT RAISE
+CommandError` / `KeyError: 'timed_out'` failures, and the four backup
+guards fail on the pipe path.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`f2a3cbb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f2a3cbb69ca7c98964bfed7f4d041444aa0bb301))
+
+* fix(tenant): a suspended store kept serving its API in full
+
+`suspend_tenant` sets `is_active=False`, and five consumers honour it:
+`tenant/views.py` resolve 404s, the internal domains feed skips it, the
+WebSocket middleware closes 4004, the Celery fanout skips it, and the
+Viva webhook refuses it. The one path never covered was the one that
+serves the store — the tenant HTTP request itself.
+
+`django_tenants.middleware.main.TenantMainMiddleware.get_tenant`
+resolves the host with a bare `domain=hostname` lookup — no
+`is_active`, no `suspended_at` — and this project lists that class
+directly in MIDDLEWARE rather than a subclass. Measured in the MT lane:
+
+active tenant -> product-list: 200
+tenant is_active now: False
+SUSPENDED tenant -> product-list: 200
+
+So a merchant suspended for abuse or non-payment went dark on the
+storefront — whose SSR calls `resolve` first — while their API kept
+serving in full: catalogue reads, cart mutations, ORDER CREATION and
+payment-intent creation against their own live provider keys. Any client
+not going through the resolve path — the agent gateway with a warm
+config, a mobile client, an already-rendered session — transacted on a
+frozen store indefinitely.
+
+`SuspendedTenantMiddleware` sits immediately after tenant resolution and
+before anything that serves data. The public schema is exempt, so the
+platform control plane is unaffected, and the health probe already
+precedes tenant resolution so kubelet is untouched.
+
+503, not resolve's 404: the domain is known and the condition is
+temporary, which is what 503 means — and a 404 would tell a suspended
+merchant's customers the store never existed.
+
+The MT lane is the only place this can be tested; the main suite strips
+`TenantMainMiddleware` entirely. Four tests: an active tenant is still
+served, three routes refuse when suspended, the refusal carries a
+message, and reactivating restores service.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`6f5c52d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6f5c52daa9d8b36936dc63df3c2f691e196561ce))
+
+* fix(core): every Celery signal handler was dead, and one cleanup task did nothing
+
+**All six handlers in `create_celery_app()` were garbage-collected
+before a worker ever started.** They are closures defined inside that
+function, so under Celery's default weak references the only strong
+reference dies when it returns. Verified against the real module:
+
+before_task_publish has_listeners=False
+task_prerun has_listeners=False
+task_postrun has_listeners=False
+worker_process_init has_listeners=False
+worker_process_shutdown has_listeners=False
+
+A signal that never fires raises nothing, which is why this held. The
+consequences were silent:
+
+* `apply_db_overlay()` never ran at worker boot, so a worker only ever
+  saw the `.mo` values baked into the image and stayed blind to every
+  Rosetta save — exactly the "Order Received - #38 shipped in English"
+  failure the handler's own comment claims to have fixed.
+* Correlation ids were never stamped onto task messages nor restored in
+  worker logs, so nothing tied a task back to the request that queued
+  it.
+* Stale parent-process DB connections were never closed at fork.
+
+`meili/apps.py` documents the identical trap for its own closures, with
+a comment explaining why `weak=False` is required there. This module hit
+it and nothing noticed.
+
+`setup_logging` is module-level and was always fine; a test keeps it as
+the contrast.
+
+**`clear_duplicate_history_task` has never deleted a row.** It called
+`clean_duplicate_history` with neither a model name nor `--auto`, so
+simple-history's command falls through to printing "Please specify a
+model or use the --auto option". Measured: 0 queries against 4 with the
+flag. The task then logged "Successfully cleaned duplicate history
+entries" and returned success, so the daily per-tenant beat job has been
+green throughout.
+
+The sibling `clear_old_history_task` appends `--auto`, and its test
+asserts it — while this task's test pinned the argv WITHOUT the flag,
+locking the no-op in. Both assertions now match the working sibling.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`8ddb685`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8ddb6857349ea3c1ebe2b17b04bb207af772f0f4))
+
+* fix(core): a cached response was served to the next caller, whoever they were
+
+`cache_methods` chains `vary_on_headers("Authorization", "Cookie")` onto
+`cache_page` so the caller's identity enters the cache key. The ORDER
+was wrong, and the comment beside it asserted the wrong order was
+required:
+
+# vary_on_headers must wrap cache_page so the Vary header is set
+# before the cache layer reads it for key derivation.
+
+It is backwards. An outer decorator's post-processing runs AFTER the
+inner one's, and `UpdateCacheMiddleware.process_response` calls
+`learn_cache_key` — which reads the response's `Vary` — from inside
+`cache_page`. So the key was learned from an EMPTY header list and
+`Cookie` never entered it.
+
+Measured, populating the cache as one caller and reading it as another:
+
+vary OUTSIDE (before): keys differ by cookie : False
+                       anon HITS staff entry : True
+vary INSIDE (after): keys differ by cookie : True
+                       anon HITS staff entry : False
+
+`Authorization` was accidentally safe — Django patches that one itself
+inside `learn_cache_key` — so token auth segregated correctly and hid
+the defect. Session auth did not, and `SessionAuthentication` is in
+`DEFAULT_AUTHENTICATION_CLASSES`.
+
+Sixteen viewsets carry the decorator. `BlogPostViewSet` is one, and its
+`get_queryset()` returns `visible_to(request.user)`, which hands store
+staff the unpublished drafts — so one staff page view cached those
+drafts under a key any anonymous visitor then hit, for the full
+`DEFAULT_CACHE_TTL` of 7200 seconds. `PayWayViewSet` is another, and its
+detail serializer pops the `configuration` blob for non-staff.
+
+Two independent reviewers of different units reported this
+independently, which is what prompted measuring it rather than reasoning
+about decorator order.
+
+The module docstring said the chaining ensures "per-user (and
+per-session) segregation". It now says which order does that and why.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`97bb2bd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/97bb2bd7bb13d161992a1f39fbff81b405311883))
+
+* fix(product): the duplicate action always 500ed, and bulk discounts sent no alerts
+
+Three admin defects plus two N+1s and a mislabelled filter, each
+verified by execution.
+
+**"Duplicate as draft" has never worked.** It set `clone.uuid = None`
+under a comment reading "SoftDeleteModel/UUIDModel — regenerates".
+`UUIDModel.uuid` is `UUIDField(default=uuid4, unique=True)` with no
+`null=True`, and an explicit None OVERRIDES the default, so the INSERT
+sent NULL:
+
+IntegrityError: null value in column "uuid" of relation
+"product_product" violates not-null constraint
+
+Leaving the attribute alone would carry the original's uuid into a
+unique column, so the clone now gets a fresh `uuid4()`. No test called
+this action.
+
+**"Apply custom discount" acted on the wrong products.** It rebuilt its
+queryset from `request.session["selected_product_ids"]`, discarding the
+selection Django had already built from the POSTed `_selected_action`
+ids — which the template does re-post, one per product. The session is
+shared across TABS: open the action on three clearance SKUs in one tab,
+then on the whole catalogue in another, return to the first and submit
+70%, and the 70% lands on everything. The key was also deleted only on
+the success path, so an abandoned run left it armed for the next one.
+
+**Neither discount action sent a price-drop alert.** Both used
+`queryset.update()`, which emits no `post_save` — so simple-history
+wrote no row, `post_create_historical_record_callback` never ran,
+`product_price_lowered` was never sent, and not one alert reached the
+customers who explicitly subscribed. Measured: a bulk discount fires 0
+receivers where an instance save fires 1. `final_price` and
+`discount_percent` are also indexed Meilisearch fields, so search kept
+advertising the pre-discount price until an unrelated save. Both now
+save per row inside a transaction; the cost is bounded by the selection
+the action already renders on its confirmation page.
+
+Also: `ProductCategoryAdmin` queried an image per changelist row
+(6 queries for 6 rows) though every sibling admin carries the prefetch
+with a comment saying why; `AttributeValueInline.usage_count_display`
+counted per row where `AttributeValueAdmin` uses the annotation; and
+`PopularityFilter` offered "Well Reviewed (>4.0)" while filtering
+`review_average__gt: 7.0` — `RateEnum` is 1-10, so an admin picking it
+silently lost every product averaging 4.1 to 7.0.
+
+Deliberately NOT changed: the `.update()` in
+`activate_attributes`/`activate_values`/`approve_reviews`/
+`reject_reviews`. Those models carry no simple-history, have no
+`post_save` receiver anywhere in the repo, and the Meili attribute
+builders do not filter on `active` — so unlike the discount actions,
+they lose nothing relative to a normal save.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`1876bcf`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1876bcfc62b019196100af1481d2e67ccb8057b1))
+
+* fix(blog): the comment tree was an unguarded door to drafts, and three smaller defects
+
+From the CodeRabbit review on PR #64. Each finding was checked against the
+code and driven end to end before being accepted or refused.
+
+**A draft's comments were readable through anyone's own comment.**
+`get_queryset` gates the ROOT comment on `post__in=visible_to(user)`, but
+`replies()` and `thread()` walk MPTT — which orders by `tree_id`/`lft`
+and knows nothing about posts — and gated the relatives on `approved`
+alone. Nothing in the database ties a reply to its parent's post either.
+
+CodeRabbit reached that through the admin. It is reachable from the API,
+because the write serializer's same-post check had a hole: it read the
+post out of `initial_data`, so a PATCH carrying only `{"parent": ...}`
+had no `post` key, both branches fell through, and the check passed
+silently. Driven end to end:
+
+PATCH /blog/comment/<mine> {"parent": <comment on a draft>} -> 200
+GET /blog/comment/<mine>/thread -> 200
+  row 11 'Great insights! Very practical advice.' <- the draft's
+  row 12 'Thank you for addressing this...'
+GET /blog/comment/<the draft's comment> -> 404
+
+So the one route that refused the row was the only one asked. Closed in
+both layers, because the admin write remains possible: the tree
+endpoints now narrow relatives exactly as `get_queryset` narrows the
+root, and the serializer validates the parent against the EFFECTIVE post
+(payload's, else the instance's) in `validate`, where `attrs` already
+holds resolved objects.
+
+Both caller-supplied relations are scoped too: `post` accepted a DRAFT,
+so anyone could plant a comment on an unreleased post (verified: 201,
+row created), and `parent` accepted a comment on one — the id the
+read-back needs. Staff keep the full set through `visible_to`.
+
+**A deactivated tag still filtered the public catalogue.** `active` is
+what hides a tag from the storefront — the tag endpoints serve
+`for_list()`/`for_detail()`, which are active-only, and `filter_min_tags`
+three lines below counts active tags only — but `tagName` filtered the
+raw `tags__translations__name` and `tags` ran off `BlogTag.objects.all()`.
+Verified: with an inactive tag, both `?tagName=hidden` and `?tags=<id>`
+answered 200 with the post. An id outside the active set is now the same
+`invalid_choice` 400 as a nonexistent one, so the refusal is not an
+oracle for "exists but hidden", and the default manager stays unscoped
+for the admin, which has to be able to tick `active` back on.
+
+**`liked_posts` decided authentication after reading the body.** The
+guard sat below `is_valid()`, so an anonymous caller who sent no
+`postIds` got a 400 field error and was never told the call needs
+authentication. It is `IsAuthenticated` in `get_permissions` now, which
+DRF runs before the handler — and which also drops the anonymous `- {}`
+security option from the operation's contract.
+
+**`recentPosts` was published as a `string`.** The
+`@extend_schema_field` annotation landed on the `_visible_posts` helper
+rather than on `get_recent_posts`, so the method field went
+un-annotated and drf-spectacular inferred `string` while the runtime
+returns a list. Moved back; the helper needs no annotation.
+
+Regenerating the schema surfaced one more, fixed here because it stood
+in the way: the el `.po` entry for the Viva success-redirect description
+still carried the pre-`viva_order_codes` msgid, so the string no longer
+matched the source and the description fell back to English. The
+committed `schema.yml` only looked Greek because it predates that
+change. msgid and Greek plural corrected; the schema diff is now exactly
+the four intended changes and nothing else.
+
+Every guard was run against the unfixed code first: `assert 200 == 400`
+on the re-parent, `assert 201 == 400` on commenting on a draft, "the
+hidden comment came back as an ancestor", and the tag filters returning
+the post. One of them was vacuous at first — a `queryset.update()` of
+the MPTT columns leaves the tree inconsistent so `get_ancestors()` walks
+nothing; it now re-reads both rows (MPTT renumbers `tree_id` in SQL and
+leaves the in-memory instance stale) and moves the node with `save()`.
+
+Contract change for the Nuxt repo: `recentPosts` becomes an array of
+`BlogPost`, and `liked_posts` loses its anonymous security option.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`703ba38`](https://github.com/vasilistotskas/grooveshop-django-api/commit/703ba38bd1885b7b76138f1493f8cce1f84d8c5c))
+
+* fix(blog): drafts leaked through the author and comment routes, plus two 500s
+
+Five defects, each verified by execution before being touched.
+
+**An author page published that author's drafts.**
+`get_recent_posts` and `get_top_posts` listed `obj.blog_posts` — the raw
+reverse accessor, which bypasses `BlogPostQuerySet.visible_to` entirely.
+The manager's own docstring warns about exactly this. So an anonymous
+GET on an author returned their unpublished posts with full body, while
+`GET /blog/post/<draft>` correctly answered 404 for the same row. And
+`BlogPostDetailSerializer.get_author` embeds that serializer, so every
+PUBLISHED post leaked its author's drafts too.
+
+**A comment was a way to read the draft it was on.**
+`GET /blog/comment/<pk>/post` serialized `comment.post` with no gate:
+
+anon GET draft post: 404
+comment->post action on a DRAFT post: 200
+   draft body length leaked: 6541
+
+`BlogCommentDetailSerializer.get_post` did the same, and
+`?post__isPublished=false` on the anonymous comment list was the handle
+for finding those comments. Fixed at the QUERYSET rather than in each
+serializer, which closes all three doors at once — the action's
+`get_object()` now 404s, the serializer is only reachable through a
+visible comment, and the filter returns nothing.
+
+**`?tagName=` was an anonymous 500.** It filtered
+`tags__translations__label`, but `BlogTagTranslation` has `name` —
+`label` belongs to the unrelated `tag/` app. `FieldError: Unsupported
+lookup 'label__icontains'`, uncaught inside `filter_queryset`.
+
+**`liked_posts` was an anonymous 500.** The action is `AllowAny` and
+`likes=user` casts the user to its pk, so a valid body from an
+anonymous caller reached `TypeError: Field 'id' expected a number but
+got AnonymousUser`. The sibling `liked_comments` appends
+`IsOwnerOrAdmin()` for the same reason; this one did not. An empty body
+happened to 400 at validation first, which is why a casual probe misses
+it.
+
+**A deactivated tag could never be reactivated.** `active_only()` lived
+in `BlogTagManager.get_queryset`, making it the DEFAULT manager's
+behaviour and therefore `_default_manager`'s — so an inactive tag
+vanished from the admin changelist, and `BlogTagAdmin.list_editable`
+contains `active`. Verified: after flipping the flag,
+`BlogTag.objects.filter(pk=...).exists()` was False. It also silently
+narrowed `get_ordering_queryset()`, so `SortableModel.move_up`/
+`move_down` skipped inactive neighbours. The filter moves to
+`for_list()`, so the public endpoints behave exactly as before.
+
+Two existing filter tests built their second post as a draft and
+asserted its comment came back to an anonymous client — incidental
+fixture data for tests about CONTENT and USER filters, not a deliberate
+statement about visibility. That post is now published, and the
+visibility rule has its own test rather than being asserted by
+accident.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`b136ccf`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b136ccff5b0bfe24e010958d51ff226c4411000c))
+
+* fix(meili): the live-engine suites needed indexes, and the index list stopped at 20
+
+Three defects, all surfaced by the previous commit finally letting the
+`@requires_meilisearch` suites run in CI.
+
+**The live-engine suites had never been runnable against a real CI
+engine.** With the availability probe fixed, all seven suites ran for the
+first time and 27 tests failed across two shards: product and blog search
+with HTTP 500 (`index_not_found`), federated search with HTTP 400 (a
+filter against an index whose `filterableAttributes` is the default
+`[]`). They query `/api/v1/search/*`, which reads real indexes, and every
+one assumed the developer's local engine already held indexes left over
+from a dev run — `test_federated_search_integration`'s own docstring says
+"requires a running Meilisearch instance WITH PROPERLY CONFIGURED
+INDEXES" and nothing ever configured them.
+
+Reproduced locally against a throwaway `getmeili/meilisearch:v1.53.1`
+container on 7701: 23 failed, 13 passed. `requires_meilisearch` is now a
+decorator that pairs the skip with a session fixture provisioning every
+`IndexMixin` index — the two belong together, since "the engine is up"
+was never the precondition these tests actually have. Same run after:
+36 passed, and 539 passed under `-n 4` from a cold empty engine.
+
+`update_meili_settings` and not a bare `create_index`, for the reason
+`tenant.provisioning._create_meili_indexes` already spells out: an index
+created without settings has no filterable attributes and every
+storefront search sends a filter. The retry around it is not decoration —
+`create_index` reads the index list and then acts on it, so two xdist
+workers can both find an index missing and both enqueue the create; the
+loser's task fails with `index_already_exists`. `flush_tasks` must run
+before the retry or it re-awaits the same failed task.
+
+**`get_indexes()` returned only the engine's first page.** Meilisearch
+paginates every collection GET at 20 by default and the SDK sends no
+parameters. Each tenant owns one index per `IndexMixin` model, so a
+platform crosses 20 at ten stores — after which indexes vanish from the
+list with no error, in three places at once: `purge_search_indexes`
+leaves a departed tenant's documents alive (so reusing the schema name
+hands a new store the previous occupant's catalogue), `meilisearch_drop`
+skips the same indexes, and `create_index` re-creates an index it
+believes is missing, whose task fails and takes the PreSync hook's
+`update_meili_settings` down with it.
+
+Measured against the real engine, not argued: 33 indexes present, old
+code returned 20 and could not see `probe__idx_24`; the paginated version
+returned all 33.
+
+**The apply-settings command aborted on the first failing tenant.**
+`self._failures` is per-RUN but the raise sat in the per-schema handler,
+so one tenant's failure skipped every store after it — leaving them on
+the very settings drift the command exists to prevent — and, because the
+list is shared, tenant B raised on tenant A's entry even when B itself
+succeeded. The raise moved to `handle` after the loop, and each entry now
+names its schema so a multi-tenant failure says which store is still
+drifted. An unknown `--index` raises instead of printing "Unknown index"
+and exiting 0 having applied nothing.
+
+**The availability probe no longer sends the master key.** `/health` is
+public — verified against a key-protected engine: keyless `health()`
+returns `{'status': 'available'}` while `get_indexes()` on the same
+client is refused with `invalid_api_key` — and the SDK would otherwise
+put the master key in an `Authorization` header on a plain-HTTP request.
+
+Every new test was run against the unfixed code first: the three
+pagination tests fail with `Right contains 25 more items` / `assert [] ==
+['acme__ProductTranslation']`, the three command tests with `aborted
+before the second tenant was attempted` / `DID NOT RAISE`, and the
+provisioning tests with `assert 1 == 3` once the retry is removed.
+
+The last three findings came from CodeRabbit review on PR #63; each was
+verified against the code and against the engine before being accepted.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`d9b39c1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d9b39c11c200afb591e7a42aaee5c7c4d22fca68))
+
+* fix(meili): offboarding deleted nothing, bulk deactivate left products searchable
+
+Four defects in the search-index lifecycle, from the every-file review,
+each verified by execution.
+
+**Offboarding never deleted a departed tenant's indexes.**
+`purge_search_indexes` called `meili_client.delete_index(uid)`. The
+wrapper in `meili/_client.py` exposes create/get/get_search index
+helpers and no `delete_index` — the raw SDK client underneath has it,
+which is why `meilisearch_drop.py` reaches through to `client.client`.
+So the call raised `AttributeError` on the first index, the surrounding
+`except` swallowed it, and offboarding reported a clean run having
+deleted nothing. Every `{schema}__*` index and all its documents stayed
+alive, so reusing that schema name would hand a new store the previous
+occupant's catalogue.
+
+The existing tests passed a bare `MagicMock()` as the client, on which
+`delete_index` auto-exists — which is why they were green throughout.
+The new ones use `MagicMock(spec=...)` so a method the real wrapper does
+not have cannot be invented.
+
+The swallow itself stays, and `test_client_failure_does_not_raise`
+encodes why: `destroy_tenant` calls this AFTER
+`tenant.delete(force_drop=True)` and BEFORE purging the tenant's files
+and flushing its media. Raising would leave a store whose schema is
+already gone with its files still on disk. I had changed it to re-raise
+before reading that test and the caller; reverted.
+
+**Bulk deactivate left products fully searchable.**
+`queryset.update()` and `SoftDeleteQuerySet.delete()` are single SQL
+statements, so they emit no `post_save` and
+`reindex_product_translations` never runs. Measured with a spy receiver:
+
+bulk .update() -> post_save fired: 0
+instance .save() -> post_save fired: 1
+queryset .delete() -> post_save fired: 0
+
+`active` is an indexed filterable field and `search/views.py` filters
+the INDEXED value, so "Deactivate selected products" left every one of
+them searchable and buyable until the nightly sync, while the admin
+reported success. `reindex_products_by_pk` dispatches for rows changed
+without a save, and both product bulk actions now call it.
+
+**CI started Meilisearch and then skipped every test needing it.**
+`tests/conftest.py` probed `MEILI_HTTP_ADDR`, which CI sets to
+`meilisearch:7700` — no scheme, so `meilisearch.Client` raises
+`MeilisearchCommunicationError`, `MEILISEARCH_AVAILABLE` was False, and
+all seven `@requires_meilisearch` suites were skipped on every run. The
+app was fine throughout: it reads `MEILI_HOST`, which CI sets to
+`127.0.0.1`. The probe now builds its URL from `settings.MEILISEARCH` —
+the same values the app connects with — so the two cannot diverge again.
+The service containers keep `MEILI_HTTP_ADDR`: that is Meilisearch's own
+bind address and is correct there.
+
+**The PreSync settings command reported success after failing.** Both
+`_update_*_index` methods caught every exception, printed an error and
+returned, and the caller then printed "All index settings updated
+successfully!" and exited 0 — on the hook that runs on every deploy,
+whose own docstring says it guards the drift that "once made every
+`?sort=` product query 500". Failures are collected and raised as
+`CommandError`. Note the infra job masks the exit code with
+`|| echo "[prepare] step 3/3 skipped (no active tenants yet)"`, so the
+deploy still will not fail on this — that is a separate change in the
+infrastructure repo, flagged rather than silently assumed fixed.
+
+Test-performance note: the new bulk-reindex tests first ran in 260s
+because `@override_settings(MEILISEARCH={"OFFLINE": False})` on the
+function made every FACTORY save attempt a real Meilisearch call and
+wait out the 30s timeout. Fixtures are now built under the suite's
+default and the override wraps only the assertion. 6.7s.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`aaffc13`](https://github.com/vasilistotskas/grooveshop-django-api/commit/aaffc13e9617e4f2386e0d812644a186c0cfd578))
+
+* fix(admin): the platform host served the store admin, and 80 actions gated nothing
+
+**A locale prefix reached the store admin on the control-plane host.**
+`tenant/urls_public.py` mounts `platform_admin_site` at the UNPREFIXED
+`admin/` and lists it first so it shadows the shared one — but the store
+admin sat in `_shared_i18n_patterns`, which `public_shared_urlpatterns`
+includes, so the shadowing covered only that one path. Verified with
+`resolve(..., urlconf="tenant.urls_public")`:
+
+/admin/login/ -> PlatformAdminSite (superuser only)
+/en/admin/login/ -> MyAdminSite (any is_staff identity)
+/en/admin/clear-cache/ -> MyAdminSite.clear_cache_view
+
+`MyAdminSite.has_permission` admits any `is_staff` platform identity on
+the public schema. So a store owner could open the cache page there and
+POST `purge_all`: running on public, `_current_tenant_host()` returns
+None, so the Nuxt purge goes out with no host and flushes EVERY store's
+SSR cache.
+
+The store admin moves to the storefront-only group — after
+email-templates, because `AdminSite` ends its URLconf with
+`final_catch_all_view` and would otherwise answer
+`admin/email-templates/*` with a 404. Tenant-host routing is unchanged
+in both locales; the platform host now serves `platform_admin_site` and
+nothing else.
+
+The test is parametrised over every configured language because the
+defect was reachable only under a non-default one —
+`prefix_default_language=False` means the prefixed form exists for
+exactly those.
+
+**Eighty admin actions declared no permission.** Django and unfold both
+FAIL OPEN on one. Django's `_filter_actions_by_permissions` keeps it,
+and unfold's `_filter_unfold_actions_by_permissions` appends it
+unconditionally:
+
+if not hasattr(action.method, "allowed_permissions"):
+    filtered_actions.append(action)
+    continue
+
+So it reaches anyone who passes the admin site's own gate.
+`actions_detail` is worse: unfold registers those as real URLs wrapped
+only in `admin_site.admin_view` — active and `is_staff` — so a member
+with no model permissions could GET one directly and cancel a parcel,
+issue a voucher or purge a payout.
+
+`BaseModelAdmin` now defaults every declared action to the model's
+`change` permission. `change` rather than `view` is the restrictive
+direction and is right for the ones that matter; a genuinely read-only
+action declares `permissions=["view"]` and says so. Doing it in the base
+class rather than annotating 80 call sites also means the next action
+is covered by default — the mechanism was always available and simply
+unused.
+
+Third-party admins are untouched: 90 more undeclared actions belong to
+dj-stripe's own `*AdminOverride` classes, which do not subclass this
+base.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`035eae8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/035eae821fe8b0cce028fdb756aefb50cd17f83e))
+
+* fix(shipping): four carrier admin endpoints 500ed for every authenticated caller
+
+`StoreStaffModelPermissions` is a `DjangoModelPermissions` subclass, and
+DRF's `_queryset(view)` asserts that the view has a `queryset` or a
+`get_queryset()` — it needs the model to build the permission codename.
+Four `APIView`s set the permission and neither:
+
+AssertionError: Cannot apply StoreStaffModelPermissions on a view
+that does not set `.queryset` or have a `.get_queryset()` method.
+
+BoxNow cancel, ACS cancel, and both ACS pickup-list views. Every
+authenticated caller — including a store operator holding exactly the
+right model permission — got a 500, so the parcel was never cancelled
+and the pickup list never issued. These endpoints have never worked.
+
+An anonymous caller is refused by `has_permission` before the assert, so
+the endpoints looked healthy from outside, and no test reversed any of
+these route names.
+
+`Model.objects.none()` gives the permission its model without fetching a
+row — the same shape the viewsets in this codebase already use
+(`UserAccountViewSet.queryset = User.objects.none()`), and it keeps the
+model-permission semantics rather than swapping in a weaker predicate.
+
+Found by a reviewer of the BoxNow unit; the ACS twins were found by
+looking for the same shape rather than taking the one report at face
+value.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`c297f4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c297f4e42b98c2aa02b595447c6a3d2e31921bd5))
+
+* fix(core): OPTIONS answered 500 on every route this base class serves
+
+`ViewSetMixin.initialize_request` sets `action` to "metadata", which is
+never a key in `serializers_config`. So `get_serializer_class` fell
+through to its `ImproperlyConfigured` branch and every route on
+`BaseModelViewSet` — some thirty apps — answered **500** to an OPTIONS
+request:
+
+ImproperlyConfigured: No serializer found for action 'metadata' and
+no default serializer defined.
+
+It is reachable **anonymously** on every public read endpoint.
+`SimpleMetadata.determine_actions` clones the request per writable
+method and checks permissions inside a `try`, but calls
+`view.get_serializer()` OUTSIDE it — so an `AllowAny` viewset passes the
+check and reaches the raise. `product-list` and `blog-post-list` both
+500 with no credentials at all. On an `IsAuthenticated` route the
+anonymous caller gets a clean 401 instead, which is why CORS preflights
+never surfaced this.
+
+The metadata action now resolves a serializer instead of raising, and
+resolves the RIGHT one: DRF clones the request per method, so the cloned
+method is what the caller is actually asking about, and answering with
+that method's write serializer is what OPTIONS is for — the fields you
+may send. It falls back through create/update/retrieve/list to an empty
+`Serializer`, because a 500 is never the correct answer to a discovery
+request: a viewset with nothing writable simply has no fields to report.
+
+Non-vacuity: six of the eleven new tests fail against the previous code,
+including two anonymous ones.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`ab33941`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ab339411ad97c01c920524d8f70e585dfd9051c2))
+
+* fix(security): stop trusting is_superuser on a tenant-schema row
+
+`IsPlatformSuperuser`'s docstring spends thirty lines explaining why
+`is_staff` cannot be believed on a tenant-schema row — `UserAccount` is
+mirrored per schema, the cutover copied users id-preserving, so the flag
+sits on a CUSTOMER record — and then gated on `is_superuser`, which is
+the same column family on the same copied rows. `is_store_staff`
+short-circuited on it too, ahead of its own provenance check, so the gap
+was not confined to one permission class: it was under all 35 call
+sites of the `is_staff` sweep.
+
+`is_platform_superuser` honours the flag only when the identity provably
+came from the public schema — it carries `PLATFORM_IDENTITY_ATTR`
+(stamped by `PlatformStaffBackend` on login and session restore, and by
+`PlatformStaffTokenAuthentication`, which are the only three places a
+platform identity is ever loaded), or the connection is on the public
+schema, where `user_useraccount` IS the platform table. A tenant-schema
+customer with residual `is_superuser` and a plain Knox token satisfies
+neither.
+
+The short-circuit keeps its purpose: a stamped platform superuser still
+needs no membership row. A test pins that half too.
+
+**The four gated endpoints then split by what the data actually is.**
+`country` and `region` are SHARED_APPS — verified, `country_country`
+exists only in `public` — so a store operator editing a country was
+mutating global reference data for every store from their own host.
+Those keep `IsPlatformSuperuser`, now schema-aware, and remain reachable
+on the platform host where `core.urls.public_shared_urlpatterns` already
+routes them.
+
+`list_settings` and `search_analytics` are per-store data a store's own
+staff have a legitimate claim to, so they move to a new `IsStoreStaff`.
+`StoreStaffModelPermissions` could not be used: it is a
+`DjangoModelPermissions` subclass and both endpoints are function-based
+`@api_view`s with no queryset, which raises `AssertionError` and answers
+500 — the same defect this audit found in `BoxNowCancelView`.
+
+The main suite runs single-schema on `public`, so the predicate takes
+its public-schema branch there and every existing test keeps its
+superuser ergonomics. `tests_mt` is where the rule is real, and four
+tests there drive the actual router: residue refused, stamped identity
+trusted, public flag honoured, plain customer neither.
+
+Non-vacuity: restoring the old short-circuit fails
+`test_a_tenant_schema_superuser_is_not_a_platform_superuser` and
+`test_an_unstamped_superuser_is_refused_on_a_tenant`.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`d73ba86`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d73ba868aee1c2fd790415165a06cc5ed02f3210))
+
+* fix(product): the detail page published unreleased drafts and rejected reviews
+
+Two surfaces on the busiest page in the storefront disagreed with the
+dedicated endpoints beside them.
+
+**Rejected and pending reviews were public.** `GET /api/v1/product/{pk}/
+reviews` did `product.reviews...all()`, while `ProductReviewViewSet`
+filtered by status. Verified with one product carrying one review in
+each state:
+
+rows in DB: 3 by status: ['NEW', 'FALSE', 'TRUE']
+PDP /reviews count returned: 3
+dedicated /product/review count: 1
+
+So a review an admin had moderated to FALSE — rejected as spam — was
+served verbatim to anonymous callers on the product page, and moderating
+one did nothing there. The action also ran `get_object_or_404(Product,
+pk=pk)`, bypassing `get_queryset`, so it served the reviews of
+soft-deleted and inactive products too.
+
+The defect is divergence, so the fix is one rule rather than two:
+`ProductReviewQuerySet.visible_to(user)` now holds it — staff see
+everything, a signed-in customer additionally sees their own review
+whatever its status so a pending submission does not look lost, everyone
+else sees approved only — and both endpoints call it. A test pins that
+the two agree.
+
+**Every unreleased draft was readable.** `for_detail()` deliberately
+does not filter on `active` — its docstring says so, because staff must
+be able to open any product by id — and the view is `AllowAny`:
+
+anonymous GET inactive product: 200
+   leaked price: 427.74
+
+Name, price and SEO copy, at a sequential id. `for_list()` has always
+applied `.active()`; only the detail path was open, which is why nothing
+noticed. The admin's own "duplicate product" action creates exactly such
+drafts and describes them as out of the storefront. The view now scopes
+to active for non-staff callers, leaving the manager's stated contract
+intact.
+
+Non-vacuity, against the unfixed code:
+
+assert {691, 692, 693} == {691}
+assert 200 == 404
+
+Both findings came from two independent reviewers of different units. My
+first probe of the review one returned "1 of 3" and looked like a false
+positive — `ProductReviewFactory` reuses a user, so three bare calls
+collapsed to one row. Giving each review its own user showed the three.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`9737f08`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9737f088ffa1c1304044551f180c0e9207659187))
+
+* fix(test): drop an unused import that failed the Code Quality gate
+
+Caught by CodeRabbit on the PR. My own `ruff check` had run earlier in
+the session, before this file existed — the gate has to run immediately
+before the commit, not merely somewhere before it.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`9ba3049`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9ba3049f1be9baec2fc02c25bb152f291c037479))
+
+* fix(core): filter mixins declared filters that django-filter silently dropped
+
+`FilterSetMetaclass.get_declared_filters` collects a class's own `attrs`
+and then any base that already carries a `declared_filters` dict. A
+plain-class mixin has neither, so its `Filter` attributes are dropped —
+no error, no warning, the parameter simply never exists. Every mixin in
+`core/filters/core.py` was a plain class:
+
+BaseFullFilterSet declared: []
+ProductFilter has metadata_has_key: False
+ProductFilter has include_deleted: False
+
+So `?metadataHasKey=promo` answered 200 with the entire unfiltered list,
+and `schema.yml` carried zero occurrences of the affected names. The
+camel-case FilterSets appeared to work only because they restated the
+same four timestamp filters verbatim in their own class bodies — the
+duplication was load-bearing.
+
+The mixins now subclass `FilterSet`, and the camel-case classes compose
+them instead of restating them. The base_filters of every existing
+consumer are byte-identical before and after that collapse
+(BlogPostFilter 38, ProductReviewFilter 45, ProductFilter 65), and the
+schema diff is purely additive — nothing that worked stopped working.
+
+**Deleted rather than repaired, because the layer cannot express them.**
+`SoftDeleteFilterMixin`'s four filters run after the soft-delete
+managers have already excluded deleted rows in `get_queryset()`, so none
+of them can match. `filter_include_deleted` tried to widen with
+`queryset.model.objects.all_with_deleted()`, which discards every filter
+applied before it and does not exist on `ProductManager` — the only
+model that used the mixin — so it would have raised `AttributeError` for
+a staff caller the moment it went live. Which rows a soft-delete model
+exposes is a choice about the BASE queryset and belongs in the viewset.
+
+`PublishableFilterMixin` and the four `Base*FilterSet` classes had zero
+references outside the module, measured before removal. The mixin's
+`filter_currently_published` also diverged from the camel-case one that
+actually runs: it called `queryset.published()`, requiring a manager
+method the live version does not need.
+
+Two comments — `order/models/order.py` and the index invariant test I
+wrote earlier in this audit — justify skipping Order's
+`private_metadata` GIN index on the grounds that `MetaDataFilterMixin`
+"exposes the only lookup" and is not among `OrderFilter`'s bases. That
+reasoning was accidentally true (the mixin exposed nothing at all) and
+is now actually true.
+
+Non-vacuity: against the previous code the guard names all six mixins as
+plain classes, and the behavioural test reports "the filter was ignored
+and the whole list came back".
+
+`schema.yml` gains twelve query parameters. The Nuxt repo needs
+`pnpm openapi-ts && pnpm sync:schema`.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`30168c3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/30168c32f615261f23ef9ac0eec92d8b3f808bba))
+
+* fix(core): bound the idempotency cache, which anyone could fill
+
+The client chooses `Idempotency-Key`, so a fresh one on every request
+minted a new Redis entry — holding up to `MAX_CACHED_BODY_BYTES` for 24
+hours — with nothing bounding the count. The middleware runs before DRF
+reaches a throttle, so no per-endpoint budget could see it, and 4xx
+responses are cached too, meaning a request that is refused still buys
+the caller an entry.
+
+The deployed Redis is 614 MB on `allkeys-lru`, shared with sessions,
+carts, WebSocket tickets and the throttle counters themselves. Filling
+it does not fail the flood; it evicts everything else.
+
+Real usage is small, checked rather than assumed: the storefront mints
+one UUID per checkout attempt and reuses it across retries
+(`useCheckoutSubmit.ts`), and the agent gateway consumes the header in
+its own `claimIdem` rather than forwarding it. So a per-scope cap of 200
+is a hundredfold over normal use and still a bound.
+
+Over budget, the request runs normally, without a reservation and
+without caching the outcome. Skipping rather than refusing is
+deliberate: idempotency is a protection, not a gate, and answering 429
+would turn the flood bound into a denial of service against whoever
+tripped it. A backend failure while reading the counter also fails
+open — a cache blip must not become duplicate orders.
+
+Only a NEW key spends budget; a retry of one already stored replays as
+before, which is the entire purpose of the header. Keys longer than 255
+characters (Stripe's limit) are refused with 400.
+
+The bound is proven by making `_claim_budget` always allow:
+
+AssertionError: a key minted past the cap was stored anyway — the
+scope can still fill the cache without end
+
+Test-writing note: the first version of that assertion read locmem's
+internal dict, which is not there when another test in the run leaves
+the Redis backend bound. "Was it stored" is a question the middleware
+itself answers, by replaying or not.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`c440b08`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c440b0815dd2140bd82ef9426d979f778ba28318))
+
+* fix(shipping_acs): mark the arrival notification only after the publish lands
+
+From CodeRabbit's review, validated and then fixed differently from its
+suggestion.
+
+The finding holds: with the mark committed before the dispatch, a
+failure in the `on_commit` publish left `arrival_notified_at` set for a
+notification that was never sent, and the marker then stopped every
+later poll from trying again. `task_publish_retry` is on but its policy
+spends about 0.6 seconds, so a broker outage longer than that loses the
+message permanently.
+
+Its remedy — a transactional outbox — is not what this needs. A DB write
+and a broker publish cannot be made atomic without one, so a choice
+between two failures is unavoidable, and the two are not equal here:
+
+* mark first → a permanent SILENT MISS, the customer never told;
+* mark second → at most ONE duplicate, if the publish lands and the mark
+  then fails.
+
+`acs_send_arrival_notification` states in its own docstring that "both
+calls are idempotent enough for duplicate delivery to be acceptable".
+The bug this PR fixes was SYSTEMATIC duplication on every depot cycle,
+which is a different thing from tolerating one. So the dispatch runs
+first and the mark follows it, with an
+`arrival_notified_at__isnull=True` predicate keeping the update
+idempotent.
+
+Non-vacuity: restoring mark-before-dispatch fails the new test with "the
+customer was never told, so nothing may claim they were".
+
+CodeRabbit's second finding on this PR is REFUTED and left unchanged. It
+reported that `django_db` keeps an outer transaction open so the
+`on_commit` callbacks never run, and proposed `transaction=True`.
+`tests/conftest.py:370` is an autouse fixture that monkeypatches
+`transaction.on_commit` to execute immediately, precisely so dispatch
+assertions work under the default marker — which is also why the tests
+pass on the fix and fail on the unfixed code, impossible if the
+callbacks never ran. `transaction=True` would additionally reintroduce
+the cross-worker contamination this suite documents in
+`_reseed_extra_settings`.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`0d4115a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0d4115a40ec892abeb335468a163b968948f64a1))
+
+* fix(shipping_acs): the arrival notification fired again every time the parcel went back out
+
+`_maybe_notify_arrival` triggers on the `→ OUT_FOR_DELIVERY` edge, and
+`poll_shipment_tracking`'s docstring said the poll "only updates
+`shipment_state` on forward transitions". That was never true.
+`AcsShipmentState.from_tracking_summary` protects only the terminal
+states (DELIVERED / RETURNED / CANCELED / LOST); every other transition
+is a direct `shipment_status → state` lookup, because ACS reports the
+parcel's CURRENT leg rather than a monotonic sequence.
+
+So the ordinary overnight cycle — loaded on a vehicle (4), returned to
+the depot at end of shift (3), loaded again next morning (4) — walked
+OUT_FOR_DELIVERY → AT_DESTINATION → OUT_FOR_DELIVERY. Reproduced by
+driving exactly that sequence:
+
+state now: out_for_delivery
+state now: at_destination
+state now: out_for_delivery
+ARRIVAL NOTIFICATIONS SENT: 2
+
+Every failed delivery attempt re-sent "your parcel is arriving today",
+for as many days as the courier kept trying.
+
+`arrival_notified_at` records that the customer has been told. It is
+written under the same lock as the state change, with the dispatch
+registered on commit, so a rolled-back poll neither marks nor sends.
+
+The fix is deliberately on the notification and not on the state: a
+failed attempt genuinely does put the parcel back at the depot, and
+freezing `shipment_state` at OUT_FOR_DELIVERY to suppress the duplicate
+would make the admin and the customer's tracking page report something
+untrue. A test pins that the state still follows ACS backwards.
+
+The poll docstring is corrected rather than left claiming a guarantee it
+never provided — that claim is why the notification was written as an
+edge trigger in the first place.
+
+Migration 0010 is `ADD COLUMN timestamptz NULL` with no default: a
+catalog-only change on PostgreSQL 11+, so PreSync takes no meaningful
+lock and old pods ignore the column. `shipping_acs` is TENANT_APPS-only,
+so `sqlmigrate` on the public lane reports `(no-op)` — the migration was
+therefore EXECUTED against the three real tenant schemas instead of
+reviewed: the column is present and nullable in `dev`,
+`ekfyseosfyteias` and `webside`, absent from `public`, and the reverse
+unapplies cleanly.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`1fc97ca`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1fc97ca7318b5f3d6919acc6072288ae4bf7e20c))
+
+* fix(admin): keep the cache backend's exception text out of the response
+
+CodeQL flagged `py/stack-trace-exposure` at the new preview endpoint,
+and it is right for a reason worth stating: a redis-py connection error
+carries the connection target, and the URL in this deployment carries
+the password. The same text was going into two admin messages.
+
+The operator needs to know that the purge failed and which surfaces are
+still cached — that is the whole point of the change these lines belong
+to — not the backend's exception string. The detail moves to
+`logger.exception`, which the operator already has, and the response
+says only that it is unavailable.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`baf9faf`](https://github.com/vasilistotskas/grooveshop-django-api/commit/baf9faf2129e8a59280f8dfbfcb9c9158f72cbf5))
+
+* fix(core): a failed cache purge reported success, and every dry run reported zero
+
+Three defects that combined into a green "Purged 0 Django keys" while
+the cache was untouched.
+
+**`CustomCache.keys()` turned a Redis outage into "nothing matched".**
+It logged a warning and returned `[]` on any backend failure. Its one
+real caller, `CacheService._purge_surface`, wraps that call in an
+`except Exception` written to record exactly such a failure — and the
+except could never fire, because nothing ever reached it. Driving the
+whole chain with a broken scan produced:
+
+SurfaceResult(code='translations', django_matched=0,
+              django_deleted=0, django_error=None)
+
+A report with no error, no matches and no deletions is indistinguishable
+from a cache that was already clean. `keys()` now raises.
+
+**Every dry run reported zero.** `PurgeReport.total_django` sums
+`django_deleted`, which a dry run never increments — so "Dry run: 0
+Django + 0 Nuxt keys would be removed" was the answer to every dry run
+ever performed, defeating the only thing a dry run is for. The count it
+actually produced sat in `django_matched` and reached nobody outside the
+audit record's `detail` blob. `django_headline`/`nuxt_headline` pick
+matched under `dry_run` and deleted otherwise; the admin, the management
+command and `CachePurgeLog` all read those, and `dry_run` is stored
+alongside so which figure it is, is never ambiguous.
+
+**Django-side failures were never surfaced in the admin.** Only
+`nuxt_error` was, so a Redis failure showed as a green success message.
+There is now an `messages.error` naming the failed surfaces and saying
+the keys are still cached, and the two `CacheService.count()` call sites
+handle a scan failure rather than rendering every surface at zero — the
+preview endpoint answers 503 instead of a confident `{"total": 0}`.
+
+`clear_cache` no longer prints its headline in green when a surface
+failed, its per-surface lines show matched counts under `--dry-run`, and
+it exits non-zero via `CommandError`. It runs from cron and from deploy
+scripts, where the exit code is the only signal anything reads, and it
+was zero even when every surface had failed.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`8c6007c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8c6007cbaa69b139add7ddcb0058ecd87d25665a))
+
+* fix(b2b): a suspension could be lifted by the customer, and an override could be negative or in dollars
+
+**A merchant's suspension could be lifted by the customer's own edit.**
+
+`submit_profile` deliberately makes its VIES call *outside* the
+transaction — a five-second upstream timeout must not hold a row lock.
+It then took the lock and decided whether to reset the profile to
+PENDING from `previous_status` and `identity_changed`, both read
+*before* that call. Anything the merchant did during the window was
+invisible.
+
+So the docstring's own rule — "SUSPENDED stays SUSPENDED; leaving
+suspension is a merchant decision, not a self-service edit" — held only
+as long as nobody suspended while a submit was in flight, which is
+precisely when a merchant would be doing it. The mirror case is worse:
+an approval landing in the window made `previous_status` PENDING, and an
+identity change on a now-APPROVED profile skipped re-review entirely.
+
+Both values are now re-derived from the locked row. Driving a suspension
+into the VIES window shows the old behaviour plainly:
+
+AssertionError: the customer's own edit lifted a merchant suspension
+assert 'PENDING' == BusinessProfileStatus.SUSPENDED
+
+**A wholesale override could be negative, or in dollars.**
+
+`PriceListItem.net_price` had no validators while its sibling
+`CustomerGroup.discount_percent` in the same app has had
+`MinValueValidator(0)` all along, and `import_price_lines` already
+refuses a negative on the pasted-text path. `resolve` clamps a final
+price from above (at retail, so a wholesale tier cannot undercut a
+retail sale) and from nowhere else, so a negative net passed straight
+into the line total: adding the product made the order cheaper.
+
+The resolver also works entirely in `DEFAULT_CURRENCY` — it reads
+`product.price.amount` and stamps that currency on the result — while
+`settings.CURRENCY_CHOICES` offered USD in the admin's dropdown. A `$50`
+override became `€50`: the same silent 1:1 conversion fixed for gift
+cards in #40.
+
+The field now carries `MinMoneyValidator(0)` and offers only the
+currency the resolver can honour. Both are form-layer refusals —
+`objects.create` and `update_or_create` bypass validators entirely, and
+rows written before this are still on disk — so `_usable_override` is
+the enforcement point every read passes through: it skips a row that is
+negative or in another currency, logs which and why, and falls back to
+the group's discount percent.
+
+Not converting is deliberate. There is no FX rate anywhere in this
+codebase, so copying the amount across would ratify the mispricing, and
+deleting the row would discard a merchant's deliberate override. Skip,
+log, fall back, and leave the row visible in the admin.
+
+Migration 0003 emits no DDL: every attribute it changes (`validators`,
+`choices`, `currency_choices`) is in `Field.non_db_attrs`, django-money
+included, and `sqlmigrate` confirms `(no-op)` for both operations. `b2b`
+is TENANT_APPS-only, so the public `migrate --check` lane never sees it;
+the PreSync job runs `migrate_schemas`, which does.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`4e16d78`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4e16d78d9cd4fd6d68134d4f01fb7c90911ec622))
+
+* fix(security): every scoped throttle stopped existing when the caller signed in
+
+`AnonRateThrottle.get_cache_key` returns `None` for an authenticated
+request. That is its documented job, and it is the right base for the
+three `*AnonThrottle` classes, each of which has a `UserRateThrottle`
+sibling covering the other half of the traffic.
+
+It is the wrong base for a budget meant to bound an *endpoint*, and
+eleven of them were built on it. So "this endpoint must not be
+enumerable" (gift-card codes, whose docstring calls the code the bearer
+secret), "a brute-forceable code oracle" (coupon apply) and "a request
+amplifier against both our workers and VIES" (B2B submit) were all true
+of visitors only. Signing in was how you removed the limit.
+
+Five had no other throttle at all — B2B profile submit, the product
+view-count increment, the Viva return resolver, and the ACS and BoxNow
+proxies that forward synchronously to rate-limited partner APIs — so an
+authenticated caller was bounded by nothing whatsoever.
+
+`B2BProfileSubmitThrottle` was the starkest: its action is
+`IsAuthenticated`, and DRF checks permissions *before* throttles, so its
+`5/minute` budget could never apply to anybody. Verified by sending
+seven submits with a rate configured:
+
+Observed: [200, 200, 200, 200, 200, 200, 200]
+
+`UserOrIpRateThrottle` keys by user id when authenticated and by
+`get_ident` (the NUM_PROXIES-aware client IP) otherwise, so the budget
+follows the endpoint rather than the auth state. As a side effect two
+colleagues behind one office address stop sharing a bucket. The
+`*AnonThrottle` pairs are untouched, and a test pins that they stay
+anon-only so the deliberate design cannot drift into the accidental one.
+
+The bare `AnonRateThrottle()` in the B2B `get_throttles` list is removed
+as dead for the same permissions-before-throttles reason.
+
+The guard walks every scoped throttle this module defines and fails if
+one returns no cache key for an authenticated request — proven by
+re-basing `GiftCardCheckThrottle` and watching it get named.
+
+Test-writing note: the first version of the behavioural test configured
+the rate through the `settings` fixture, passed alone and failed in a
+full run. `SimpleRateThrottle.THROTTLE_RATES` is bound to the settings
+dict at import time and every rate resolves to `None` under `DEBUG`, so
+whether an override reaches the throttle depends on what else has
+already touched `api_settings`. It now sets `rate` on the class, the
+documented per-class escape hatch.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`200cd9c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/200cd9cc0004fcf0894c64da1df2614b4ffe6228))
+
+* fix(user): username changes bypassed every validator; expired exports could be stranded
+
+**`change_username` had no test and no validation.**
+
+Its request serializer was a bare `Serializer` with
+`CharField(max_length=150)` — five times the model's
+`ACCOUNT_USERNAME_MAX_LENGTH` — carrying none of the field's
+validators. The view assigns straight onto the instance and calls
+`save(update_fields=["username"])`, which runs no model validation, so
+whatever the serializer allowed was written verbatim:
+
+too long (40): RAISED DataError: value too long for
+                type character varying(30) -> 500
+spaces + html: status=200
+   stored: '<script>alert(1)</script>'
+
+The profile serializer has always run allauth's `clean_username`; this
+route was the way around it. The serializer now derives from
+`UserSerializer`, taking `max_length` and the
+`ExtendedUnicodeUsernameValidator` from the model field itself rather
+than a hardcoded number, and inheriting the `clean_username` call.
+
+Submitting the username you already hold is now a no-op instead of
+"already taken" — allauth's uniqueness lookup knows nothing about the
+row being edited, and a form that posts every field unchanged should
+not be an error. The `IntegrityError` → 409 branch stays: the
+serializer's check is not a lock, so two requests can both pass it and
+race on the constraint.
+
+**A failed removal orphaned the exported personal data.**
+
+`cleanup_expired_data_exports` blanked `file_path` whether or not the
+file went. An `OSError` from the private-media PVC was logged as a
+warning and then the only reference to that bundle was erased — the
+subject's complete personal data, past its TTL, with nothing left that
+could ever find it again, and no later run to retry because the row was
+already `EXPIRED`.
+
+The row now stays pending on failure so the next beat run finishes the
+job, the log is `exception` rather than `warning` (an undeleted export
+past expiry is a retention breach), and the task reports `stranded`
+alongside `expired` so the condition is visible without reading logs. A
+file already gone from disk still expires the row — that is success,
+not a strand.
+
+`schema.yml`: `UsernameUpdateRequest.username` drops from maxLength 150
+to 30 and gains the pattern. The Nuxt repo needs
+`pnpm openapi-ts && pnpm sync:schema`.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`5b49ccf`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5b49ccfd161230f4fe5fc1c86d807e7cf851328e))
+
+* fix(gdpr): export bundles outlived the account they belonged to
+
+`UserDataExport.user` is CASCADE, so erasing an account deleted the rows
+that named the right-of-access bundles — and left the JSON files on the
+private-media volume with nothing pointing at them. The expiry sweep
+walks rows, so it would never see those files again. A bundle is the
+single most complete copy of the subject's data the system produces, so
+this left behind exactly the artifact erasure exists to remove.
+
+The files are now deleted before `user.delete()` cascades the rows, and
+a removal failure is raised rather than logged: the task retries, the
+transaction rolls back, and nothing is half-erased. The retry is
+idempotent — a file already removed on the failed attempt is simply not
+there the next time.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`51de39f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/51de39f2a72049c525b1354d0a3c25b992e39745))
+
+* fix(gdpr): erasure was impossible for authors and incomplete for everyone
+
+`POST /api/v1/user/account/<pk>/delete_account` revokes the caller's
+Knox tokens synchronously, broadcasts a force-logout, answers 202 with
+"Your account is being deleted", and hands the scrub to
+`delete_user_account_task`. Two ways that promise did not hold.
+
+**Erasure was impossible for anyone who had ever authored a post.**
+`BlogAuthor.user` is the one `PROTECT` foreign key to `UserAccount`, so
+`user.delete()` raised:
+
+ProtectedError: Cannot delete some instances of model 'UserAccount'
+because they are referenced through protected foreign keys:
+'BlogAuthor.user'
+
+The function is atomic, so the rollback left the account completely
+intact — email, name, address, orders. The task retries twice and gives
+up. The person had already been logged out and told they were erased.
+`BlogPost.author` is `SET_NULL`, so deleting the author row leaves the
+articles published (they are the store's content) and takes the
+authorship identity, translated bio included.
+
+**Every other non-cascading FK is `SET_NULL`, which erases the link and
+nothing else.** Verified by execution — after a "successful" erasure:
+
+SearchQuery survives: embarrassing thing 1.2.3.4 UA sess
+
+Query text, IP address, user agent and session key, all still there.
+Now handled, each according to what the row is for: search history and
+Conversions-API logs are deleted outright (behavioural data with no
+retention duty; a Meta-hashed identifier is pseudonymised, not
+anonymous); order-history rows keep their audit value but lose
+`ip_address`/`user_agent`; promotion redemptions and assigned codes lose
+the denormalised address while the financial record stays.
+
+Gift cards are bearer instruments, so only the subject's own side is
+scrubbed — `issued_to` means the recipient fields are theirs, `buyer`
+means `buyer_email`/`sender_name` are theirs and the recipient fields
+belong to a third party still holding a live card. The balance and code
+always survive; erasing a buyer must not destroy a stranger's money.
+
+**The allauth purge swallowed its own failures.** `except Exception:
+logger.exception` sat three lines above a comment explaining why
+swallowing there is wrong — the two blocks below it had been fixed and
+this one had not — so a failed DELETE of the subject's email addresses
+still logged "GDPR deletion complete" and returned a tally. It also
+could not work: inside `transaction.atomic`, catching a database error
+without a savepoint only defers the failure to the next query.
+
+To stop the next model with a user FK leaking silently,
+`test_erasure_covers_every_user_relation.py` walks every relation to
+`UserAccount` and requires each non-CASCADE one to be either named in
+`anonymise_and_delete_user` — read out of that function's own source, so
+the two cannot drift — or listed with the reason it holds nothing about
+the subject. Eleven are exempt (staff FKs, published comments,
+dj-stripe's mirror); the reasons are in the test.
+
+All six new tests were run against the unfixed code first: the coverage
+guard listed seven undecided relations, the author test raised
+`ProtectedError`, and the swallow test reported `DID NOT RAISE`.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`5b12239`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5b122391254f894df74e9515a100b6f1ff0c4130))
+
+* fix(security): any shopper could register an account for any email address
+
+`POST /api/v1/user/account` answered **201** to any authenticated caller
+for any address they cared to name:
+
+POST status: 201
+row created: True is_active: True
+allauth EmailAddress rows: 0
+
+`UserAccountViewSet` is guarded by `IsOwnerOrAdmin`, whose
+`has_permission` asks only whether the caller is authenticated — the
+ownership test lives in `has_object_permission`, and a create action has
+no object for it to run against.
+
+The minted account was not directly loginable: the serializer declares
+no `password` field, so the row was written with an empty one. That is
+precisely why it went unnoticed, and it is not the damage.
+
+* **Squatting.** allauth refuses a signup whose email already exists, so
+  minting `victim@example.com` permanently locks that person out of
+  registering. There is no `EmailAddress` row either, so allauth's own
+  recovery flows have nothing to work from — the victim cannot reclaim
+  it themselves.
+* **Enumeration.** 201 versus 400 tells the caller whether an address is
+  already registered, over a route needing no more than any session.
+* **Relay.** Name, bio and social fields on the row reach real people
+  through notification and marketing mail.
+
+The fix is to delete the path, not to permission it. Registration is
+allauth headless (`/_allauth/app/v1/auth/signup`), which hashes the
+password, writes the `EmailAddress` row allauth treats as the source of
+truth, sends the verification mail and applies the signup rate limit.
+This was a second registration path that did none of that and could
+never produce a working account. Nothing calls it: no storefront route,
+no agent-gateway call, and the only two tests asserted bare status codes
+— one of them posting a `password` the serializer silently discards.
+
+With create unrouted, `UserWriteSerializer.__init__`'s
+`if self.instance is not None` could no longer be false, so `email`
+moves into `read_only_fields` and the override is gone. The sibling
+create routes were checked rather than assumed: `UserAddressViewSet` and
+`UserSubscriptionViewSet` both pin `serializer.save(user=request.user)`
+in `perform_create`.
+
+`schema.yml` regenerated: `createUserAccount` is gone and
+`UserWriteRequest` no longer carries `email`. The Nuxt repo needs
+`pnpm openapi-ts && pnpm sync:schema`.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`f03da6d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f03da6d06b60a87ad828aacfada9e4d71b59f33e))
+
+* fix(shipping_acs): failed voucher cancel could not release its own claim
+
+`cancel_voucher` claims the row with `metadata["cancel_started_at"]`
+before calling ACS, and releases the claim if the API call fails so a
+retry can start immediately instead of waiting out the TTL. The release
+fetched the row with `.only("metadata")` — and therefore never ran.
+
+Reproduced by driving a Phase-2 failure:
+
+File "simple_history/models.py", line 754, in create_historical_record
+    attrs[field.attname] = getattr(instance, field.attname)
+File "djmoney/models/fields.py", line 102, in __get__
+    if isinstance(data[self.field.name], BaseExpression):
+KeyError: 'cod_amount'
+
+django-money's `MoneyFieldProxy.__get__` reads `obj.__dict__[name]`
+directly rather than going through Django's `DeferredAttribute`, so a
+deferred amount is never lazy-loaded — it raises. simple-history's
+post_save hook then snapshots *every* field regardless of
+`update_fields`, so the two together make any save of a deferred row
+fatal. django-money 3.6.1 is the current release; there is no version to
+upgrade to.
+
+Because the release sits in a best-effort `except Exception:
+logger.exception`, the crash was swallowed as "failed to release cancel
+claim". The claim survived, and every retry for the next TTL window
+raised `AcsRetryableError` — so a transient ACS outage turned a
+cancellable voucher into one that could not be cancelled until the
+window elapsed, on an order the customer had already been told was
+cancelled.
+
+This module documents the same trap twice in prose (`_record_last_error`
+and `_release_mint_claim` both carry the rationale), and it came back
+anyway. So it is now a test rather than a third comment:
+`test_deferred_field_saves.py` derives the affected models from
+simple-history's own registry crossed with django-money's field class —
+AcsShipment, BoxNowShipment, Product today, automatically any future one
+— and fails if a function both defers one and saves.
+
+A repo-wide sweep found no other live instance: the other eight
+`.only()`/`.defer()` call sites are read-only lookups, which stay
+legitimate and are not flagged.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`8d05c89`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8d05c89bfc3ce1d2c54ee5d2f8db5a106f1c6122))
+
+* fix(security): any shopper could delete the store's newsletter topics
+
+Verified by executing it: a plain customer (`is_staff=False`,
+`is_superuser=False`) sent `DELETE /api/v1/user/subscription/topic/{id}`,
+received **204**, and every subscription to that topic was gone —
+`UserSubscription.topic` is `on_delete=CASCADE`, so one request took the
+store's entire subscriber list with it, unrecoverably.
+
+`SubscriptionTopicViewSet` carried `permission_classes =
+[IsAuthenticated]` while `create`, `update`, `partial_update` and
+`destroy` were all routed. `IsNewsletterEnabled` looks like a guard and
+is not one: it is a FEATURE gate that 404s when the merchant switches
+the feature off and otherwise returns True, contributing no
+authorization at all.
+
+Deleting the list is the loudest outcome, not the only one. A shopper
+could equally PATCH a topic to `isDefault: true,
+requiresConfirmation: false` — `create_default_subscriptions` then
+auto-subscribes every future registrant with status ACTIVE, quietly
+turning the store into a non-consented mailer — or POST a topic whose
+attacker-authored name is what recipients read in the confirmation
+email's subject line.
+
+A topic is store CONFIGURATION, not user data, so writes now take
+`StoreStaffModelPermissions`, the same predicate every other
+store-configuration viewset uses (`blog/views/author.py` is the pattern
+copied). Reads are untouched: customers still list topics to choose what
+to subscribe to.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`cc2c493`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cc2c493a1fbd07086daf81d87b11cabc9b4ceb7e))
+
+* fix(security): anonymous callers were served customers' contact records
+
+`GET /api/v1/product/review` — no credentials — returned this for every
+review, verified by executing it:
+
+{'email': 'victim@example.com', 'phone': '...', 'city': 'Athens',
+ 'zipcode': '11111', 'address': '1 Real Street',
+ 'birthDate': '2001-09-03', 'isStaff': False, 'isSuperuser': False}
+
+Thirteen PII fields per author, on three anonymous surfaces:
+`address`, `birthDate`, `city`, `country`, `email`, `isActive`,
+`isStaff`, `isSuperuser`, `phone`, `place`, `region`, `uuid`, `zipcode`.
+
+`UserDetailsSerializer` is the ACCOUNT serializer — the right shape for
+"my account" and catastrophic anywhere else. It was nested as the `user`
+field on product reviews (list and detail), blog comments (including
+parent and ancestor comments) and blog author detail. All of those serve
+anonymous readers, so walking a paginated list harvested a complete
+contact record — email, phone, postal address and date of birth — for
+every customer who had ever left a review or a comment. The blog-author
+route did the same for STORE PERSONNEL, publishing their home address
+and phone.
+
+`read_only_fields` gave no protection: it stops a field being WRITTEN,
+not rendered.
+
+`UserPublicSerializer` exposes what a byline needs and nothing else —
+id, username, first and last name, avatar path. That is exactly the set
+the storefront reads on these surfaces (`user.id`, `user.username`,
+`user.firstName`, `user.lastName`), so nothing renders differently.
+
+One existing test asserted `email` was present on the anonymous author
+detail. It described the serializer's shape; it was not a decision to
+publish a person's email, and it is updated rather than treated as
+intent — with the reason written next to it, since "a test pins this"
+is normally a signal to leave behavior alone.
+
+The new guard walks all three endpoints anonymously and fails on any
+forbidden field, and on any field outside the allowed byline set — so a
+future serializer swap cannot quietly reintroduce this. Confirmed to
+fail against the un-fixed serializers on all three surfaces.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`be81273`](https://github.com/vasilistotskas/grooveshop-django-api/commit/be81273e8a142679ed88b7b5d9aaac0bdfa030f6))
+
+* fix(search): blog search ignored the tenant's blog plan flag
+
+Every blog VIEWSET chains `IsBlogEnabled`, which 404s when the plan flag
+is off so the route is indistinguishable from one that does not exist.
+`blog_post_meili_search` and `federated_search` serve the same content
+and declared no permissions at all, so they fell through to
+`IsAuthenticatedOrReadOnly` — which admits anonymous GET unconditionally.
+
+Indexing does not know about the flag either:
+`BlogPostTranslation.meili_filter` gates on `is_published` alone. So the
+documents are in Meilisearch regardless of the plan, and search was
+simply the way around the gate. A store that never bought the blog
+feature, or downgraded away from it, still published its posts — titles,
+bodies, images — to anyone who asked.
+
+The two endpoints need different treatment:
+
+* `blog_post_meili_search` serves only blog, so it takes
+  `IsBlogEnabled` and 404s like its viewset siblings.
+* `federated_search` also searches PRODUCTS. Refusing it would take a
+  blog-disabled tenant's product search down with it, so the blog
+  INDEX is dropped from the federation instead and product results
+  keep flowing.
+
+`product_meili_search` now declares `AllowAny` explicitly rather than
+leaning on the default, per the project rule that an anonymous endpoint
+says so.
+
+Also fixed while here: `BlogPostTranslation` had no
+`get_search_result_queryset`. `meili/querysets.py::_enrich_results` looks
+that classmethod up with `getattr` and falls back to the plain manager,
+so every blog hit paid a query for `obj.master` in `get_slug` and again
+in `get_main_image_path`. `ProductTranslation` has had one for a while;
+`federated_search` had worked around the gap by hand-rolling
+`select_related("master")` at its own call site, which is why only the
+standalone blog endpoint was still paying. Defining it puts both indexed
+models on the same footing and lets that call site drop its workaround.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`d68ac3e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d68ac3e55bf1632d94f16bd11c98cc636797d50e))
+
+* fix(cart): the refusal named the wrong problem, and the test allowed the wrong success
+
+Two follow-up findings from CodeRabbit on this PR, both confirmed.
+
+**Every validation failure claimed the same cause.** The handler
+returned a fixed `"reservation_ids must be a list of integers"`, which
+became wrong the moment the field gained a `max_length`: a caller
+sending 101 valid integers was told their integers are not integers, and
+sent looking in the wrong place. The message is now the serializer's
+own, keeping the `{"detail": ...}` shape the rest of this action and the
+storefront use.
+
+**`!= 400` is not a success assertion.** It also passes on a 500 or a
+403, so it would hide a broken endpoint rather than catch one. The
+at-limit case now asserts 200 — ids matching nothing are not an error
+here; the action releases what the caller owns and reports the count.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`23c21da`](https://github.com/vasilistotskas/grooveshop-django-api/commit/23c21dad8c3454183ab861b0b9d935d10cef7479))
+
+* fix(order): the batching was inert, and the sweep reported work it had not done
+
+Four findings from CodeRabbit's review of this PR, each validated before
+being acted on. Three confirmed, one already handled.
+
+**The batching did nothing.** `cleanup_expired_reservations` carried
+`@transaction.atomic` while its loop opened `transaction.atomic()` per
+batch. Django opens a transaction at the OUTERMOST atomic block and
+inner blocks only create savepoints — `Atomic.__exit__` releases a
+savepoint while `connection.in_atomic_block` and calls
+`connection.commit()` only when it is not. So no batch committed on its
+own, every row lock was held until the method returned, and one late
+failure discarded all the earlier work. The comment above the loop
+claimed the opposite in eight lines of detail.
+
+Measured, with the third of six batches failing:
+
+with the decorator: 0 reservations survived
+without it: 4 reservations survived
+
+The caller adds no transaction and `ATOMIC_REQUESTS` is False, so
+removing the decorator is safe. The test needs
+`django_db(transaction=True)` and that is not incidental: under the
+default marker every test runs inside one transaction, so an inner
+`atomic()` is a savepoint either way and the two behaviours are
+indistinguishable.
+
+**The sweep counted and logged releases that never happened.** The batch
+is selected without a lock, so a reservation can be converted to a sale
+before the sweep reaches it. The conditional UPDATE correctly skipped
+such a row, but the audit log and the returned total were still built
+from the stale batch — `reported 3 releases for 2 reservations actually
+released`. I had noted this in a comment and judged it acceptable; it is
+not, because the task logs that total as work done, which is the exact
+class of dishonesty this audit keeps finding. The batch is now re-read
+under the product locks, `select_for_update` on the reservations too
+(products-then-reservations is `reserve_stock`'s own order, so it cannot
+deadlock against it), and everything downstream uses that set.
+
+**An unbounded id list.** `reservation_ids` accepted any length, one
+release attempt per id. Capped at 100 — `gift_card_codes` in the same
+module has been capped at 3 all along, so the convention was already
+there. `format_lazy` rather than an f-string inside `_()`, which would
+bake the number into the msgid (INT001).
+
+**A hard-deleted product could escape as a 500.** `StockReservation.
+product` is CASCADE, so a product deleted between the unlocked read and
+the lock takes the reservation with it and
+`Product.objects.select_for_update().get()` raises
+`Product.DoesNotExist`; the caller catches only `StockReservationError`.
+Now translated.
+
+Worth recording: I first supposed a SOFT delete would hit the same path,
+since the query string contained `is_deleted`. It does not —
+`Product.objects.all()` emits no WHERE clause at all and `ProductManager`
+is a `TranslatableOptimizedManager`, not a `SoftDeleteManager`. Verified
+by executing a release against a soft-deleted product: it succeeds. Only
+the hard-delete race is real.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`bec9c42`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bec9c42d402d3a19ea06cb6643f4e94febe525b3))
+
+* fix(cart): release-reservations 500'd on a malformed id
+
+The action DECLARES `ReleaseReservationsRequestSerializer` in
+`serializers_config` and never instantiated it. `request.data` went
+straight into `id__in`, so `{"reservationIds": ["abc"]}` raised
+`ValueError` — and `[{}]` a `TypeError` — during queryset evaluation.
+Unhandled: a 500 with a full traceback in the log, on an endpoint any
+anonymous visitor can reach. It also bounded nothing, so a single
+request could put an arbitrarily long `IN (...)` list on the database.
+
+The hand-rolled `isinstance(..., list)` check it had caught the shape but
+not the contents, which is the half that reaches the database.
+
+Validated through the serializer that was declared for it all along. The
+error body deliberately stays `{"detail": ...}` rather than DRF's
+field-keyed default: that is the shape every other error on this action
+returns, and two existing tests assert it — the status was already right
+under `raise_exception=True`, but the shape would have changed under the
+storefront.
+
+The ownership gate below was and remains correct: `Q(pk__in=[])` for an
+unidentified caller compiles to `EmptyResultSet`, which Django drops from
+an OR node, so nothing is released rather than everything.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`109e863`](https://github.com/vasilistotskas/grooveshop-django-api/commit/109e8639a19efdb7484c1b6114be75ea2c3cbf14))
+
+* fix(order): close the stock deadlock and bound the expiry sweep
+
+**The deadlock is real and was reproduced**, not argued: two connections
+driven by hand against a real database, PostgreSQL detected the cycle and
+aborted one side. Re-running the same script with the lock order fixed
+observes no deadlock.
+
+`release_reservation` carried a comment explaining that `of=("self",)`
+had been added to give the codebase ONE lock order. It did not. It stops
+Django locking the product through `select_related`, but the `StockLog`
+insert below it carries a real FK to `product`, and PostgreSQL takes
+`FOR KEY SHARE` on the referenced row for every such insert.
+`FOR KEY SHARE` conflicts with `FOR UPDATE`, so the product lock was
+taken anyway — just LAST, which is exactly the opposite order and
+exactly the cycle:
+
+T1 reserve_stock FOR UPDATE product, then waits on that
+                        product's reservation rows
+T2 release_reservation FOR UPDATE reservation, then the log insert
+                        waits for KEY SHARE on the product
+
+Product first, then the reservation — the order `reserve_stock`,
+`decrement_stock(respect_reservations=True)` and
+`convert_reservation_to_sale` already use. That last one had already
+worked this out and carries the pattern to copy: an unlocked read purely
+to learn WHICH product row to lock, then both locks in the canonical
+order, then every check that matters.
+
+Why it matters beyond one aborted transaction: the abort surfaces as
+`OperationalError`, and the cart's reserve loop catches only
+`InsufficientStockError`. So the loop dies half-done and the
+reservations it already committed are never released — they hold stock
+for the full TTL, on the product that was contended enough to deadlock
+in the first place.
+
+**The expiry sweep is now bounded.** It loaded every expired reservation
+in one `list()`, put every id into a single `id__in=[...]`, and built
+every `StockLog` in Python with that transaction still open. The
+connection carries `statement_timeout=30000` and
+`idle_in_transaction_session_timeout=10000`, so after an outage a large
+enough backlog either times out on the UPDATE or has its backend
+terminated mid-comprehension. Either way it rolls back, `consumed` stays
+False, and the next run faces the same larger batch — while the caller
+swallows the exception and logs a clean success, so the backlog never
+drains and nothing says so.
+
+It now works in batches of 500, each its own transaction, locking that
+batch's products first in id order — the bulk_create carries the same FK
+and would otherwise take its KEY SHARE locks after the reservation rows,
+reproducing the cycle above at scale.
+
+On the tests: the deadlock is proven by the reproduction script, not by
+the suite — the existing concurrency tests are deliberately sequential
+(see the module docstring in test_stock_locking_atomicity.py) and cannot
+observe it. The new tests pin the batching contract: with the batch size
+lowered to three, a backlog of seven still drains completely and every
+released reservation still gets its audit row.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`cd1f199`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cd1f1994ebbed47b7c90c1b3b64c301101ff0163))
+
+* fix(giftcard): a foreign-currency card settled 1:1, and refunds expired
+
+Two ways gift-card value could be created or destroyed. Both reachable
+without any concurrency, neither covered by a test.
+
+**A $100 card paid a EUR 100 order.** `plan_redemption` compares
+`Decimal(card.balance.amount)` against the order's remaining amount and
+never checks that the two are the same currency —
+`GiftCardTransaction.amount` is a bare `DecimalField` carrying no
+currency at all. `CURRENCIES` is `("EUR", "USD")` and `initial_value` is
+an admin-editable `MoneyField`, so issuing a dollar card is a few clicks
+in the gift-card admin. Redeeming it against a euro order extinguished
+EUR 100 of liability against roughly EUR 92 of instrument, silently,
+with a ledger that looks perfectly clean.
+
+There is no FX rate anywhere in this codebase to convert with, and
+inventing 1:1 is the worst of the available options — so the redemption
+is refused, naming the card and both currencies. It joins the
+`is_redeemable` check that already guards the same loop.
+
+**A refund landed on an expired card and was swept to zero within a
+day.** A card can lapse while its value is sitting on an order that is
+refunded later: at expiry the balance is 0, so `expire_cards` skips it
+and leaves it ACTIVE with a past `expires_at`. When the refund arrives,
+`credit_refund` never looked at the card's status, so the money landed
+on a card `plan_redemption` refuses AND `expire_cards` now matches —
+ACTIVE, past `expires_at`, balance positive. The next sweep wrote
+EXPIRE for the full amount.
+
+The customer's refund was destroyed inside 24 hours. The only trace was
+"Expired N gift cards", while the refund task had already reported
+`{"status": "success", "credited": "30"}`.
+
+Refunding money and then confiscating it is not defensible under any
+expiry policy, so a lapsed card that receives a refund gets the same
+window a newly issued one gets, counted from now, with a log line naming
+the old and new dates. A card still in date is untouched.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`ab630f1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ab630f13e81b74b57c86a8ba876c9194d6ba583e))
+
+* fix(giftcard): a partial refund put the WHOLE redemption back on the card
+
+A EUR 100 order settled with a EUR 60 gift card, then refunded EUR 5 as
+goodwill, credited the entire EUR 60 back — immediately spendable, while
+the shopper kept the goods. EUR 60 created out of nothing, once per
+order. Demonstrated end to end: the new signal test fails against the
+old code with `assert Decimal('60.00') == Decimal('5.00')`.
+
+`credit_refund` wrote `-redeem.amount` for every REDEEM row on the order
+— the whole redeemed value — with no reference to how much came back.
+Two senders reach it and both could be partial:
+
+* `OrderService.refund_order` has always sent `amount=` on
+  `order_refunded`. The gift-card handler dropped it into `**kwargs`.
+* The Viva reversal path verifies `PARTIALLY_REFUNDED` as a legitimate
+  outcome, then sets `payment_status = REFUNDED` and fires
+  `order_refunded` with no amount at all.
+
+Stripe was safe by construction — it only fires on `is_full_refund`.
+
+`amount=None` still means a full refund and still credits everything, so
+the Stripe and full-reversal paths are unchanged. A partial is shared
+across the order's cards in proportion to what each contributed, with
+the remainder absorbed by the last card so the parts sum to the whole
+rather than to a cent less.
+
+**The Viva partial reversal now credits ZERO, loudly.** That event
+carries no refund amount, and the Retrieve-Transaction response's sign
+for a reversal is still unconfirmed against the vendor docs (the open
+question from the September Viva validation pass), so this path cannot
+compute what came back. Under-crediting is visible and an operator can
+correct it from the admin; over-crediting is silent and cannot be
+undone. The log line names the order and the gift-card value so the
+correction is a lookup, not an investigation.
+
+To tell the two apart, `_verify_viva_terminal_transaction` now returns
+the status it CONFIRMED rather than `True`. A status is truthy and
+`None` falsy, so all four existing `if not verify(...)` callers are
+unaffected — but a caller that passes several expected statuses can now
+tell which one it got. Its docstring also lost a paragraph that had been
+duplicated verbatim, a merge artifact from combining the two earlier
+Viva branches.
+
+Idempotency is unchanged, and worth stating: the partial unique
+constraint on (gift_card, order) means a LATER, larger refund on the
+same order cannot top up a card already credited. An operator adjusts
+the balance directly for that.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`c343d62`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c343d62033734db5d00e068105a7f71854ecef59))
+
+* fix(promotion): a guest checkout followed by registering reset eligibility
+
+`first_order_only` and `usage_limit_per_customer` both branched on which
+identity signal was present instead of unioning them:
+
+if user is not None and user.is_authenticated:
+    has_orders = Order.objects.filter(user=user).exists()
+elif email:
+    has_orders = Order.objects.filter(email__iexact=email).exists()
+
+A guest checkout writes `user=None, email=...`, and nothing ever
+backfills the account onto that row when the shopper later registers. So
+the moment they are authenticated, the check looks ONLY at `user=` — and
+cannot see their own guest history, even though the very same call was
+handed their email.
+
+1. Shopper checks out as a guest with a first-order discount, or with
+   a `usage_limit_per_customer=1` coupon.
+2. They create an account with that same email.
+3. `Order.objects.filter(user=user)` finds nothing, and
+   `redemptions.filter(user=user)` counts zero.
+4. Both discounts are granted again.
+
+This is not a preview-only artifact: it is reached with `lock=True` from
+`order/services._evaluate_promotions`, the transaction that actually
+charges the customer and writes the redemption row — and that caller
+passes BOTH `user` and `email` together.
+
+`_is_code_owner`, twenty-five lines further down the same class, already
+gets this right — it builds a set of every known email and unions it
+with the account. These two were the sites that branched instead, so the
+fix is to give them the same predicate rather than a new rule:
+`_identity_q` returns a Q matching by account OR by any known email, and
+None when the shopper is anonymous with no email yet, so each caller
+keeps its own deliberate "identity unknown" behaviour (optimistic for an
+applied code, conservative for an automatic promotion).
+
+Neither case was covered. The existing `first_order_only` test creates
+the prior order with `user=` directly, and the per-customer-limit test
+only compares guest against guest with different emails — so no test
+ever crossed the guest-to-registered boundary that breaks it.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`b35171e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b35171e46520233289aefb6a5487f403b51c7412))
+
+* fix(tenant): report a half-seeded store instead of announcing success
+
+`seed_tenant_defaults` ran four best-effort steps, logged each failure
+as a warning, returned None — and `provision_tenant`'s summary carried
+no trace of any of it. So both callers reported unqualified success on a
+store that had not finished provisioning: the admin's "New Store" flow
+printed its cheerful API-domain and OWNER-membership lines, and the CLI
+printed "created successfully".
+
+The Meilisearch step is the one that hurts. Its own comment already
+spells out why: without the index, the engine rejects every filtered
+query and the search endpoint returns HTTP 400 for EVERY request on that
+tenant — until the nightly fanout sync or the next deploy repairs it,
+up to a day later. A merchant opening a brand-new store finds search
+broken and nothing anywhere said so.
+
+Each step now reports whether it succeeded, `seed_tenant_defaults`
+returns the list that failed, and `provision_tenant` carries it as
+`seeding_failures`. Both callers surface it — the admin as a WARNING
+alongside its existing per-problem messages, the CLI as a styled warning
+before the success line.
+
+What deliberately did NOT change: every step is still independently
+best-effort and `seed_tenant_defaults` still never raises. A page_config
+or Meilisearch hiccup must not block tenant creation, and a test pins
+that. The store is usable; the point is only that the operator is told
+it is incomplete, while they are still looking at the screen that
+created it.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`3f05682`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3f056820d6ab0963ca232b57a0d519ca3b6c77c2))
+
+* fix(tenant): roll back a failed tenant_create instead of orphaning a schema
+
+`Tenant.objects.create()` has `auto_create_schema=True`, so it creates
+the Postgres schema and replays the entire migration history inline.
+Nothing wrapped what came after it.
+
+`TenantDomain.objects.create()` on the very next line is not a
+get_or_create, and `domain` is unique. A typo — or a domain left behind
+by an earlier failed run — raised `IntegrityError` against an
+already-committed tenant, leaving a fully migrated schema with no
+domain, no owner membership and no seed data.
+
+The command's own up-front guard then refused the obvious retry:
+
+Tenant with schema 'acme' already exists.
+
+so an operator had to go and clean up by hand before they could try
+again — at the exact moment they were trying to bring a store online.
+
+One `transaction.atomic()` around the whole sequence fixes it. Postgres
+DDL is transactional, so the schema and its migration history roll back
+with everything else and a failed run leaves nothing behind. The admin
+path already had this property for free, because Django wraps changeform
+POSTs in `atomic` — which is precisely why it defers provisioning to
+`transaction.on_commit`.
+
+The existing tests covered only the fast-fail guards that run BEFORE any
+write. The new one drives a real failure mid-sequence and asserts no
+tenant survives it; it was confirmed to fail against the un-wrapped
+command.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`e54aacb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e54aacb346ba182f2f184d9a5b93cb0d920e31f1))
+
+* fix(core): stop the settings endpoint reading the Django settings module
+
+`GET /api/v1/settings/get?key=SECRET_KEY` returned the platform secret
+key to any store-staff caller.
+
+`Setting.get` is not a store-settings lookup. django-extra-settings
+defaults `EXTRA_SETTINGS_FALLBACK_TO_CONF_SETTINGS` to True and this
+project never overrides it, so on a miss the call degenerates to
+`getattr(django.conf.settings, name)` — and the name came straight off
+the query string. Verified by executing it: `Setting.get("SECRET_KEY")`,
+`("EMAIL_HOST_PASSWORD")` and `("DATABASES")` all return the real
+values, and the view renders them with `str()` (or `json.dumps`, for the
+dict-valued ones, so `DATABASES` comes back as parseable JSON carrying
+the database password).
+
+The reach is what makes it severe. `SECRET_KEY` plus session
+authentication lets the holder forge session cookies and any
+`django.core.signing` value — password-reset tokens included — for every
+user on every tenant. One store's operator became platform root. The
+same request also read `REDIS_URL`, `CELERY_BROKER_URL` (credentials in
+the URL) and `AGENT_GATEWAY_INTERNAL_SECRET`, the secret two other
+modules verify callers against. And because extra-settings caches what
+it resolves, one such call wrote the platform secret key into Redis.
+
+A key is servable now when the platform DECLARES it (it is in
+`EXTRA_SETTINGS_DEFAULTS`) or the tenant actually HAS it as a row —
+either way the value comes from the settings table. A name with neither
+is indistinguishable from one that does not exist, so the 404 says
+nothing either. A row named after a Django setting is no loophole:
+once the row exists, `Setting.get` returns the row.
+
+The anonymous arm was never exposed — every entry in
+`PUBLIC_SETTING_KEYS` was checked against `settings.py` and none
+collides with a sensitive name. This was the staff arm only.
+
+The existing test suite covered the staff arm exclusively via a key it
+had first created a row for, so the fallback path it opens was never
+exercised. The new test drives five real Django settings through the
+endpoint as a SUPERUSER — the most privileged caller it will ever
+serve — and was confirmed to return all five before this change.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`6b894e2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6b894e231d3babdf13faeda9c8e2175e71cf0492))
+
+* fix(shipping_boxnow): a non-string signature 500ed a public endpoint
+
+From CodeRabbit's review, confirmed by execution.
+
+`datasignature` comes off an UNAUTHENTICATED JSON body, so its type is
+whatever the caller sent. `null`, a number, a list and an object all
+reached `.encode()` and raised `AttributeError` before the view's 401
+path:
+
+sig=None: RAISED AttributeError
+sig=7: RAISED AttributeError
+sig={}: RAISED AttributeError
+sig=[]: RAISED AttributeError
+
+A 500 on a public webhook endpoint, from a one-character payload change.
+The comment beside it already records fixing the non-ASCII *string* case
+for the same reason — the type check was the missing half of that fix.
+
+A non-string is simply not a valid signature, so it returns False and
+the caller takes the 401 it was always meant to.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`c3692c7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c3692c7a28405393d59a5cff19ef7a460332b2f0))
+
+* fix(cart): hasDiscounts judged two items as if they were one
+
+Two findings from CodeRabbit's review of this PR, both confirmed.
+
+**`exclude()` does not keep the conditions on the same item.** The false
+branch used `exclude(items__product__discount_percent__gt=0,
+items__product__price__gt=0)`. Django documents that "the conditions in
+a single `exclude()` call will not necessarily refer to the same item"
+for a multi-valued relationship — only `filter()` guarantees that, and
+the docs prescribe exactly the `exclude(rel__in=...)` subquery used
+here.
+
+Verified with the mixed cart the finding describes — one item 10% off
+but priced 0, another priced 20 at 0% off:
+
+no item has a real discount: True
+cart appears in hasDiscounts=false: False
+
+`Product.price` defaults to zero and the pairing is not a database
+constraint, so that cart is reachable. Three tests now cover the mixed
+cart, a genuinely discounted one, and one with no discount at all.
+
+**Four `help_text` values still described a fixed window.** This PR made
+`abandoned_cutoff()` the single source of truth for
+`CART_ABANDONED_HOURS`, but the descriptions still said "30-day
+inactivity", "inactive for 30+ days", "abandoned carts (30+ days)" and
+"active carts (24hr)" — and `CamelCaseFilterExtension` publishes them
+into the OpenAPI schema, so the storefront's generated types carried
+numbers the code had stopped honouring. They now name the setting.
+
+Non-vacuity: restoring `exclude(**discounted)` fails with
+`assert 65 in set()`.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`32b439b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/32b439b682e97e360a90131e969e344e2e552cab))
+
+* fix(tenant): stop the admin promising credential fallbacks that were removed
+
+Twenty-one `Tenant` credential fields told the operator "Empty falls back
+to settings.X." Nineteen of those settings do not exist, and for Viva
+Wallet and ACS they were REMOVED on purpose when per-tenant credentials
+landed — `viva_wallet_credentials()` states the reason outright: "money
+must never silently route through env-var credentials the operator did
+not explicitly configure for THIS tenant."
+
+So the admin form was actively misleading on exactly the fields where
+being misled costs the most. An operator reading the help_text leaves
+`acs_company_password` blank expecting a platform default; what they get
+is `AcsClient.__init__` raising `AcsConfigError`, `is_kind_enabled`
+disabling both ACS kinds so checkout never offers the carrier, and the
+ACS fanout tasks skipping their store — none of which announces itself
+as "you left a field blank."
+
+The two accurate claims (`MFA_TOTP_ISSUER`, `INFO_EMAIL`) are unchanged;
+those settings exist and those helpers really do read them.
+
+The migration alters nothing — `help_text` is in `Field.non_db_attrs`,
+so `sqlmigrate` renders every operation `(no-op)`. It exists only to
+keep the migration state honest.
+
+The guard is the point. A help_text is prose, so nothing checked it;
+`test_help_text_settings_refs` now resolves every `settings.NAME` any
+first-party model mentions. It earned itself immediately: it caught two
+more false claims — `viva_wallet_webhook_verification_key` and
+`box_now_webhook_secret` — that a grep for the exact sentence had missed,
+because those two wrap the phrase across string literals.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`8bc531c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8bc531c51c47350f62b860f3fe5b26d610cfec51))
+
+* fix(cart): make the abandoned-cart filters obey the setting that defines it
+
+`CART_ABANDONED_HOURS` is the operator-facing knob, and it drives both
+the queryset API (`CartQuerySet.active()` / `.abandoned()`) and the
+cleanup task. Four filters on live endpoints ignored it and hardcoded
+their own thresholds — neither filter module even imported `Setting`:
+
+cart/filters/cart.py is_active / is_abandoned 30 days
+cart/filters/item.py in_active_carts 24 hours
+cart/filters/item.py in_abandoned_carts 30 days
+
+So an operator who changes the setting moves what gets cleaned up while
+the filters keep answering the old question. Worse, the item pair was
+internally inconsistent at any setting: with "active" at 24 hours and
+"abandoned" at 30 days, a cart idle for five days matched NEITHER, and
+nothing said so.
+
+All four now derive from one `abandoned_cutoff()` next to the querysets
+that already defined the concept — which also collapses the two-line
+`Setting.get` + `timedelta` pair that `active()` and `abandoned()` each
+carried a copy of.
+
+None of the four had a test. That is why a contradiction this plain sat
+in a live filter set.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`0d13ef0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0d13ef0c37dc8bfbe4e10d3f5d2b78f4eb3b7d22))
+
+* fix: compare shared secrets as bytes, so a malformed header cannot 500
+
+`secrets.compare_digest` raises `TypeError` when either `str` argument
+holds a non-ASCII character, and Django's ASGI handler decodes header
+bytes with latin-1 — so any byte >= 0x80 in a secret header arrived as
+exactly such a `str` and the comparison blew up.
+
+`GET /api/v1/tenant/internal/domains` with `X-Internal-Token: \xff`
+returned 500 where every other wrong token returns 404. That difference
+is an existence oracle for an endpoint whose stated design is to not
+advertise itself, and the middleware raises before any handler can catch
+it. The same byte on `tenant_resolve` turned the "public payload, secret
+withheld" branch into a 500 on the hottest endpoint in the stack, and on
+the gateway throttle bypass into a 500 instead of ordinary throttling.
+
+Four sites, all comparing something a caller controls:
+
+tenant/views.py X-Internal-Token
+tenant/internal.py X-Internal-Token (middleware twin)
+core/api/throttling.py X-Internal-Gateway
+shipping_boxnow/webhook.py the signature header
+
+Bytes have no such restriction, and `surrogateescape` round-trips
+whatever latin-1 produced. A malformed token now simply fails to match,
+which is what it always should have done.
+
+No secret was disclosed by any of this — the comparison never completed.
+The defect was availability and information disclosure by status code.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`a31349b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a31349bce244a9243cac080527f16a127e30b7c7))
+
+* fix(cart): a guest's stock holds must follow the cart they belong to
+
+Logging in during checkout could block the shopper's own checkout, with
+their own reservation, on the last units of a scarce product.
+
+`StockReservation` is keyed by cart UUID (`session_id`). `merge_carts`
+moves the line items and then deletes the source cart — and never
+touched the holds. Nothing else re-homes them either; `order/stock.py`
+is the only place that field is ever written.
+
+So: a guest adds the last 3 units, hits checkout, gets a hold for 3.
+They log in. The next cart request still carries `X-Cart-Id`, the merge
+runs, the guest cart is deleted. Order creation then looks for holds
+under the USER cart's uuid, finds none, and falls through to
+`decrement_stock(respect_reservations=True)` — which computes
+`available = stock - sum(active reservations)` and so subtracts the
+shopper's own orphaned hold. 3 - 3 = 0 available against a needed 3:
+`InsufficientStockError`, 400, whole order rolled back.
+
+The hold could not even be cleared. `release_reservations` matches on
+`reserved_by` — null, because it was placed as a guest — or on the
+CURRENT cart's uuid, which is now a different one. Neither still
+applies, so the frontend's abandon-checkout release silently lands in
+`failed_releases` and the stock stays locked for the full TTL.
+
+Unconsumed holds now move to the target cart's uuid and gain the owner
+they have just acquired, inside the same atomic block as the merge.
+
+The test asserts the consequence, not just the column: after merging,
+availability nets the shopper's own hold back out. Confirmed to fail
+against the un-fixed service.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`292d42a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/292d42a68697e8434c78a3eee3e494afb2f83d84))
+
+* fix(cart): stop leaking a Stripe client secret and minting doomed intents
+
+Three defects on the create-payment-intent endpoint, all on the path a
+shopper takes to pay.
+
+**A client secret was written to the log stream on every checkout.**
+`logger.info(f"...payment_data={payment_data}")` dumped the whole dict,
+and that dict carries `client_secret`. A client secret is a bearer
+credential: with the publishable key — which is public by design — it
+permits retrieve, confirm and cancel on that PaymentIntent. Anyone who
+can read the logs (operators, the aggregator, any third-party sink, or
+whoever gets a log dump) could cancel a customer's in-flight payment or
+confirm it with their own payment method. `order/payment.py` already
+logs only the intent id and status; this line was the outlier.
+
+**An intent was minted for a pay-way order creation would then refuse.**
+The endpoint resolved the pay-way by bare primary key and checked only
+`is_online_payment` and `provider_code == "stripe"` — never `active()`,
+never the admin-managed `PayWayShippingExclusion` rows for the carrier
+and kind, both of which it already had in hand from the same request.
+Order creation applies both and answers 400.
+
+The flow is confirm-THEN-create: the shopper confirms the card in
+Stripe.js against this intent and only afterwards POSTs the order. So
+deactivate a pay-way, or add an exclusion, while someone is on checkout
+and their next two requests are: 200 with a client secret, card
+confirmed — then 400, no order row, and nothing to refund against. The
+customer has paid for an order that does not exist. The B2B branch a few
+lines above already guards this exact sequence and says so; the pay-way
+gate was the one left out.
+
+**The provider's raw error text was echoed to the client.** It carries
+Stripe request ids and internal codes. It stays in the log now, and the
+caller gets a stable `reason` — the same rule the release-failure path
+in this file already follows for CodeQL's stack-trace-exposure check.
+
+The new test asserts the decisive part: `process_payment` is never
+called, so there is no intent for the shopper to confirm. Confirmed to
+fail against the un-fixed view.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`0d67522`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0d67522c9ac2da65a8d59d1ad433abea338ca06c))
+
+* fix(tenant): revoking platform staff must end the session, not just logins
+
+Three paths mint or restore a platform-staff identity. Two re-check
+`is_staff`; the third did not.
+
+`authenticate_staff` checks `is_active and is_staff`
+`PlatformStaffTokenAuthentication` checks it, with a comment saying
+    why: "an outstanding token must stop working the moment it does"
+`PlatformStaffBackend.get_user` checked neither — `ModelBackend`
+    applies only `is_active`
+
+That last one is session restore, and it unconditionally stamped the
+platform-identity attribute — which is the SOLE thing `is_store_staff`
+and `TenantRolePermissionBackend` consult. So the documented revocation
+(untick `is_staff`) closed the Django admin, which reads the flag
+directly, while leaving every store-staff API route open to the existing
+session cookie for the remainder of its 14-day life: the whole
+`StoreStaffModelPermissions` surface, and `IsOwnerOrAdmin` /
+`IsOwnerOrAdminOrGuest` handing over any customer's order, cart,
+notification and account.
+
+The admin locking them out is exactly what made this easy to miss — the
+revocation looked like it had worked.
+
+Only sessions this backend authenticated ever reach `get_user`, so
+refusing a non-staff user here cannot affect a customer login.
+`tenant/auth_backends.py` is on the sanctioned allowlist in
+`test_no_is_staff_gates`, because the public-schema auth layer is the one
+place the flag still means something.
+
+The existing tests covered a matching staff user and a missing pk. The
+revoked case is now covered and was confirmed to fail against the
+un-fixed backend; the inactive case passes either way, since
+`ModelBackend` already handled it.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`64fce6c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/64fce6cb5fe418fee72deb153e64c3fcf84193c1))
+
+* fix(cart): two filters that raised FieldError the moment anyone used them
+
+Both were written against something that is not a column, so neither
+could ever have run. Both were reachable from a live surface, and
+neither had a test that called it.
+
+`CartFilter.filter_has_discounts` filtered on
+`items__discount_value__gt=0`. `CartItem.discount_value` is a
+`@property`, so `?hasDiscounts=` on the cart list raised
+`FieldError: Unsupported lookup 'discount_value__gt'` — a 500. The
+property's retail branch is `product.discount_value`, i.e.
+`price * discount_percent / 100`, which is positive exactly when both of
+those columns are, and both ARE columns. The B2B branch resolves against
+a customer group's price list and has no SQL equivalent, so a wholesale
+cart whose only saving comes from group pricing does not match; that is
+written down in the docstring rather than left to be discovered.
+
+`TotalItemsFilter` in the cart admin filtered on
+`items__quantity__sum__gte`. `Sum` is an aggregate, not a lookup, so
+touching the "Total Items" range on the changelist raised
+`FieldError: Unsupported lookup 'sum__gte'`. It now annotates first —
+the same shape `CartFilter.filter_min_items` uses ten lines away.
+
+Neither was covered. `has_discounts` appeared nowhere in the test suite
+at all, and the admin filter's only test asserted its
+`parameter_name` — never calling `queryset()` with a value, which is
+precisely the call that fails. Both now have tests that assert WHICH
+carts come back, not merely that the request returned 200; both were
+confirmed to reproduce the original `FieldError` against the un-fixed
+code.
+
+Writing them turned up a trap worth recording: `CartFactory` declares
+`django_get_or_create = ("user",)` and defaults `user` to a shared
+get-or-create helper, so two bare `CartFactory()` calls collapse onto one
+row. The first draft of the test looked like it was comparing two carts
+and was comparing a cart with itself.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`7edb297`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7edb2977fcb698527a23f568275423b09cbbbb29))
+
+* fix: pin the tenant schema on thirteen dispatches that never did
+
+`TenantTask.apply_async` reads `connection.schema_name` when it runs.
+Inside a commit hook that is the wrong moment: the hook fires after the
+request's schema context can unwind, and by then the connection has
+usually snapped back to `public`. These thirteen sites registered
+`on_commit(lambda: task.delay(...))` with no capture at all, so each one
+is a task pointed at the wrong store whenever the atomic block outlives
+a `schema_context` — a webhook looping over tenants, a management
+command, allauth's signup, a Stripe replay.
+
+The failure is quiet in the worst way. The task does not crash on a
+missing row when a row with that id exists in `public` too — and after
+the id-preserving cutover, one usually does.
+
+contact/signals.py contact + feedback notification emails
+meta_capi/signals.py CompleteRegistration, dispatched from inside
+                         allauth's signup transaction
+product/signals.py search reindex, price-drop and restock alerts
+blog/signals.py search reindex
+meili/apps.py the index/delete pair behind every model save
+user/signals.py social-avatar download, subscription confirm
+user/views/subscription.py subscription confirmation
+shipping_acs/services.py arrival notification
+shipping_boxnow/services.py arrival notification, both call sites
+
+The two reindex loops now register one dispatch per pk rather than one
+callback that loops. Django runs commit hooks in registration order, so
+the dispatch order is unchanged, and each carries its own schema.
+
+Three tests moved from `.delay` to `.apply_async`. Each now asserts the
+schema header rather than merely that something was dispatched — a
+strictly stronger check than the one it replaces, and the one that would
+have caught this.
+
+Two things found while in these files:
+
+* `ty` cannot type a Celery task parameter. `task: Task` produced an
+  error at every call site, because `@shared_task` returns a Task at
+  RUNTIME while static analysis sees the undecorated function. It is
+  `Any` with a comment saying so — silencing the rule instead would
+  have hidden real argument errors across the helper.
+* `user/signals.py` built the Facebook avatar URL over plaintext
+  `http://`, three lines above a Discord one using `https://`. A
+  man-in-the-middle could serve any image for a new social signup's
+  profile picture, and the fetch happens server-side.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`1fa9bd4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1fa9bd42748dbc68c875dbd234fd45dcd8870a15))
+
+* fix: stop fourteen string columns spelling "no value" two ways
+
+Release ONE of the two the `DJ001` finding needs. It stops the columns
+PRODUCING NULL and backfills what is already stored; the `NOT NULL`
+constraint is the next release's job, because under the PreSync hook the
+ALTER lands BEFORE the new image rolls — it would run while pods that
+still write NULL are serving.
+
+The lever is `Field.get_default()`. For a string field with `null=True`
+and no `default`, it returns **None** — so every row written without an
+explicit value gets NULL. That is the whole mechanism behind seven NULL
+profile URLs on every account ever created, while the admin's own "clear
+socials" action wrote "" to the same columns.
+
+FOURTEEN sites, not the thirteen ruff reports. `DJ001` matches Django's
+own field classes, so `UserAccount.phone` — a `PhoneNumberField`, i.e. a
+`CharField` — was invisible to it, and it is the one field that chose
+`default=None` OUTRIGHT. The account filter has been paying for that
+ever since, spelling "has no phone" as `phone__isnull=True OR phone=""`
+on a column that is not even behind a join.
+
+Four sites were actively minting NULL, each the odd one out among its
+own siblings:
+
+* `request.GET.get("language_code")` — None whenever the storefront
+  omitted the parameter, right beside `request.GET.get("query", "")`.
+* `request.session.session_key` — None until Django first PERSISTS a
+  session, which an anonymous search never does. The common case for
+  that table wrote NULL.
+* `dest.get("imageUrl") or None` — the ONE field in a BoxNow dict
+  literal spelled with None while `title`, `name`, `address_line_1`,
+  `postal_code` and `note` all used `""`.
+* the retention scrubber, which wrote `""` to `user_agent` and NULL to
+  `session_key` in the same `.update()`. It also had a latent bug the
+  backfill would have triggered: its "already scrubbed" exclusion
+  tested `session_key__isnull=True`, so once the column held "" that
+  AND-clause could never be true, nothing would be excluded, and every
+  row past the cutoff would be re-scrubbed back to NULL each week.
+
+Two holes that a model default cannot close, both fixed here because
+both stay open after the migrations run:
+
+* **The Celery queue outlives the rollout.** The middleware sends "",
+  but a message queued by a pod that has not rolled yet is executed by
+  a NEW worker, and an explicit None beats the default. `save_search_
+  query` now normalises at the point of write, so it is null-proof
+  whoever produced the message.
+* **DRF derives `allow_null` from the model's `null=True`.** A
+  `PATCH {"website": null}` wrote NULL straight past the default. The
+  only client never sends it — the storefront does not write these
+  seven fields at all, and its `normalizeGreekPhone` returns `""`,
+  never null — so refusing null is the honest contract rather than a
+  breaking change. This is the one part of this release that moves
+  `schema.yml`: 24 `nullable: true` drop out, and the Nuxt repo wants
+  `pnpm openapi-ts && pnpm sync:schema` when this ships.
+
+Readers that keyed on NULL now accept BOTH spellings, because between
+the backfill and the last pod rolling over, a not-yet-rolled pod can
+still write one. They simplify in release two.
+
+Executed against the real four-schema database rather than reviewed:
+NULLs seeded into odd primary keys so the walk had to step over clean
+rows, then migrated. Tenant schemas end at zero NULLs; `user_useraccount`
+in `public` is backfilled because `user` is in SHARED_APPS; and public's
+pre-multi-tenant clone tables for the tenant-only apps are skipped by the
+router guard — which release two's `AlterField` will skip identically,
+so the constraint never reaches the debris.
+
+`test_nullable_string_fields` is the enforceable half of an invariant a
+lint rule cannot express. Its exemptions are structural and each has a
+reason: `unique=True` is Django's own documented exception, djmoney owns
+its `*_currency` companions, simple-history mirrors follow their source,
+and the venv lives INSIDE the repo so "under the repo root" alone would
+admit every installed package. The 21 parler translated fields are
+deferred WITH their reason: every reader reaches them through a LEFT
+JOIN, where `translations__name__isnull=True` means "no translation ROW"
+at least as often as "NULL column", so collapsing the column would leave
+~15 filters looking right and meaning something narrower. Checking that
+turned up a pre-existing disagreement for that PR to settle —
+`with_comments()` (`isnull=False`) and `without_comments()`
+(`isnull=True | exact=""`) both match a review whose comment is "".
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`890276c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/890276c65772153e27e6d8c51c903828ddc62f64))
+
+* fix(i18n): reattach the Greek translation a docstring edit orphaned
+
+Found while regenerating `schema.yml`: the Viva success-redirect
+description came out in English. The msgid in the Greek catalogue still
+said
+
+``s`` resolves via the ``viva_order_code`` stored at session creation
+
+while the source has said `viva_order_codes` **recorded** at session
+creation since 8b1d94ca normalised that metadata key to a list. gettext
+matches on the msgid, so the moment the docstring changed the Greek
+translation stopped being found and every Greek reader silently got the
+English fallback. Nothing failed; a translation simply went dark.
+
+The msgid now matches the source, and the Greek says the same thing the
+code does — plural key, plural verb.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`a1546d0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a1546d00424d79f301e2b9895e4f3395eb1ae96d))
+
+* fix(core): reversing AddIndexAdaptively added the index instead of dropping it
+
+From CodeRabbit's review, confirmed against Django 6.0.8's own source.
+
+The non-PostgreSQL branch of `database_backwards` delegated to
+`RemoveIndex.database_backwards`. Reversing a *removal* means adding, so
+Django implements that method as:
+
+def database_backwards(self, app_label, schema_editor, from_state, to_state):
+    ...
+    schema_editor.add_index(model, index)
+
+So the reverse of this operation would have CREATED the index it exists
+to drop, and failed with a duplicate name wherever it already existed.
+
+It now delegates to `AddIndex.database_backwards`, mirroring the
+`AddIndex.database_forwards` delegation the forward path already used —
+and that method takes the index object directly rather than looking it
+up in migration state, so there is no state-direction subtlety either.
+
+The PostgreSQL path is unaffected and was exercised for real against the
+three tenant schemas when migration 0053 landed. This is the branch that
+never runs in this project, which is why nothing had observed it. It is
+still worth being correct: `core/db/migration_operations.py` is
+documented as append-only shared infrastructure that four migrations
+already import.
+
+Non-vacuity: restoring the `RemoveIndex` delegation fails the new test
+with "reversal ADDED the index it was supposed to drop".
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`9f7c345`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9f7c3452141878eb9de73e8ea09290e6fb482da9))
+
+### Chores
+
+* chore(ci): refresh .test_durations — the shard split was working from 2026-09-02 data
+
+CI on main failed after the audit merge, and not on a test: shard 3 timed
+out at 96% with every dot green.
+
+##[error]The action 'Run Tests (shard)' has timed out after 18 minutes
+
+Shards 1, 2 and 4 finished in 9-11 minutes. The cause is the split, not
+the suite: `.test_durations` recorded 6129 tests and was last written on
+2026-09-02, while the merged tree has 7278. pytest-split assigns a test
+it has never seen the AVERAGE duration, so the 1149 new ones — many of
+them slow integration tests — were mis-weighted and clustered.
+
+Refreshed with the command the workflow's own comment prescribes,
+`HYPOTHESIS_PROFILE=ci uv run pytest --store-durations`, which also
+records that a CI-weighted refresh "is the only safe rebalancing lever"
+and that switching to `least_duration` was tried on 2026-08-29 and
+scattered a file across shards, causing worker-pollution failures. So
+neither the algorithm nor the 18-minute timeout is touched here.
+
+Measured before and after by summing each group's recorded durations
+over the same collection (`--collect-only --splits 4 --group N`):
+
+before 1258 of the current tests unknown imbalance 1.92x
+after 0 unknown imbalance 1.11x
+                                             25.2 - 28.0 min
+
+The refresh run itself was green: 7267 passed, 11 skipped.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com> ([`df7672f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/df7672f5309d7756e880369057d2d5d28e2cb7dd))
+
+* chore(core): drop three imports guarded against an ImportError that cannot happen
+
+`try: import X / except ImportError:` around a declared runtime
+dependency is dead code, and worse than merely dead: the `else` branch
+looks like a supported configuration. This codebase carried nine such
+guards — stub classes for mptt and parler, a `UNFOLD_AVAILABLE` flag,
+`celery_available` in three signal modules, "Wave 3 task not yet
+available" in a carrier — and the audit has removed them one at a time.
+These are the last three.
+
+`tenant/credentials.py` treated `extra_settings` as optional while 50
+other modules import it unguarded; if it really were absent, 49 of them
+would have failed first.
+
+`core/urls.py` guarded `debug_toolbar` and warned that "settings.py
+should already have warned the user about it". Under the same flag,
+`settings.py` does an unconditional `INSTALLED_APPS += ["debug_toolbar"]`,
+so a missing package raises during `apps.populate()` — long before this
+module is imported. The guard could not fire and the comment described
+behaviour settings.py does not have.
+
+`user/services/gdpr.py` guarded `allauth.mfa` and `allauth.usersessions`,
+both unconditionally in INSTALLED_APPS. The `else:` shape also hid the
+deletes a level deeper than the rest of the function. A DELETE failure
+still must not be swallowed: it propagates, the atomic rolls back, and
+the account stays intact — which is the property the surrounding comment
+was protecting all along.
+
+The class is now enforced rather than chased. The invariant is anchored
+on `pyproject.toml`'s `[project].dependencies`, because that is exactly
+what the production image installs — so a guard around a *dev*
+dependency stays legitimate and is not flagged, which is what
+`devtools/utils/profiler.py` needs for `psutil`. `manage.py` is exempt:
+its guard re-raises with an actionable message and is Django's own
+generated boilerplate.
+
+The detector found the two allauth guards on its first run, which is
+how they came to be in this commit at all.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`3ab580a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3ab580a220ce79a6dbeb9ba7614a2d4dc2f4d183))
+
+* chore(deps): sync uv.lock to 3.28.6 [skip ci] ([`9056e7c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9056e7cd8b5622dd50b3032b3f914c114c44b1a8))
+
+### Documentation
+
+* docs(core): correct why the soft-delete filters could never match
+
+The removal is right; one sentence of its justification was not. I wrote
+that "the soft-delete managers exclude deleted rows in get_queryset()",
+inferred from seeing `is_deleted` inside the query string. That was the
+column in the SELECT list, not a filter: `Product.objects.all()` emits
+no WHERE clause, and `ProductManager` is a
+`TranslatableOptimizedManager`, not a `SoftDeleteManager` — which is
+also why it has no `all_with_deleted`.
+
+What actually excludes the rows is the VIEW: `get_queryset` goes
+through `for_list()` (`.active()`) and `for_detail()`
+(`.exclude_deleted()`) before any filter runs. The conclusion is
+unchanged and the `all_with_deleted` AttributeError finding stands as
+measured.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`c58395f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c58395f1755b8322b427907a65bb32f23ceb3ee0))
+
+### Features
+
+* feat(tenant): add dispatch_on_commit, pinning the schema at registration
+
+`TenantTask.apply_async` falls back to `connection.schema_name`, which is
+the right answer everywhere except the one place it is most often called
+from: a commit hook. `transaction.on_commit` fires after the request's
+schema context can unwind — a Stripe replay, a management command, a
+webhook loop over tenants — and by then the connection has usually
+snapped back to `public`. The task then runs against the wrong schema and
+either dies on `DoesNotExist` or, worse, finds a same-named row in
+another store.
+
+Thirty-one call sites already work around this by hand, each capturing
+`schema = connection.schema_name` into a local and closing over it, with
+its own three-line comment explaining why. Thirteen more do not, and
+those are simply wrong.
+
+The fix cannot live inside `TenantTask`: by the time the hook runs the
+caller's frame is gone, and wrapping `on_commit` globally would break
+`captureOnCommitCallbacks` and every hook that is not a task dispatch. An
+explicit hand-off is the one supported idiom — this is it, in the module
+that already owns the `_schema_name` header contract and imports no
+models, so signal modules can import it during app-registry population.
+
+Two details that exist because the call sites do:
+
+* `args` and `kwargs` are OMITTED from the call when not given rather
+  than passed empty, because a dozen tests across the suite assert
+  `apply_async(args=[id], headers={...})` verbatim and an extra
+  `kwargs={}` is not the same call.
+* `transaction.on_commit` is reached through the module, never bound at
+  import — the suite has an autouse fixture that replaces it, and
+  binding would silently defeat every test that relies on that.
+
+That same fixture is why the central test does NOT use
+`captureOnCommitCallbacks`: it runs callbacks immediately, so the schema
+would still be the registration-time one however the helper was written,
+and the test would pass while proving nothing. Capturing the callback and
+running it after the connection has moved on is what separates "read now"
+from "read later" — verified by making the helper read late, which
+produces `public` and fails, exactly as production does.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`2df97cb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2df97cb035dc492627d90768fd5738a33038ac79))
+
+* feat(core): add a batched NULL-to-empty-string backfill operation
+
+Four migrations need the same backfill, so it goes next to
+`AddIndexAdaptively` rather than being copied four times — the module is
+append-only in spirit, because migrations import it.
+
+Written as a **pk-range walk**, not the usual
+`WHERE ctid IN (SELECT … LIMIT n)` loop. That idiom re-scans from the top
+on every batch, traversing every row it already fixed; on a table that
+grows it is quadratic. Walking the primary key uses its index, touches
+each row once, and bounds how many rows any one statement locks — which
+is what matters under the PreSync hook, where the old pods are still
+serving while this runs. `COALESCE` per column, so a multi-column
+backfill cannot blank a sibling that was already populated.
+
+Four things that are only obvious once you run it against real schemas:
+
+* **Raw SQL bypasses the router.** Django's own operations check
+  `allow_migrate_model`; doing it by hand is the price of raw SQL.
+  Without it the public schema's pre-multi-tenant clone tables get
+  rewritten on behalf of tenant-only apps.
+* **`search_path` is `"<schema>", public` while a tenant migrates**, so
+  an UNQUALIFIED table name falls through to public's copy whenever a
+  tenant lacks its own — silently rewriting the wrong rows, once per
+  tenant. The name is schema-qualified.
+* **`lock_timeout`**, because the connection carries
+  `statement_timeout=30000`: a batch colliding with a live UPDATE would
+  block that customer's request for the full thirty seconds. Failing
+  the batch fast is the better trade — the walk is idempotent and the
+  Job's own retry resumes it.
+* **`batch_size < 1` raises in `__init__`.** A zero step never advances
+  `start`, and the run time is inside the PreSync hook: the deploy
+  would die on `activeDeadlineSeconds` with no reason attached.
+
+Logging names the schema and the table and distinguishes the three
+outcomes — router declined, empty table, N rows across pk X..Y — so
+`migrate_schemas` no longer emits N indistinguishable lines.
+
+Documented, not left for the next reader to discover: this is NOT
+sufficient as the final sweep before `SET NOT NULL`. `MIN`/`MAX` are read
+once, so a row whose pk is below `MAX` but whose INSERT commits after the
+covering batch has passed is never visited — two writers drawing 100 and
+101 where 101 commits first. No lock closes that under READ COMMITTED.
+The docstring carries the ordering that does: `CHECK … NOT VALID` first
+(which stops every NULL writer), then sweep, then `VALIDATE`, then
+`SET NOT NULL`.
+
+Each guarded property was proven by breaking the code under it: the batch
+walk, the COALESCE isolation, the router check and the schema
+qualification each fail their OWN test and only their own.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`3439361`](https://github.com/vasilistotskas/grooveshop-django-api/commit/34393611674a4b433ceae778927c8e031f818982))
+
+### Performance improvements
+
+* perf(promotion): batch MPTT descendant expansion across candidates
+
+From CodeRabbit's review, confirmed by measurement.
+
+`_expanded_category_ids` issued its own `get_descendants` query per
+call, and `_matching_items` calls it for a category-scoped promotion's
+INCLUDED categories and for every promotion's EXCLUDED ones. So the
+engine still grew with the number of promotions carrying categories —
+the exact cost this change set exists to remove, one layer below the
+M2M prefetches it already fixed:
+
+2 category-scoped promotions: 13 queries
+8 category-scoped promotions: 25 queries
+
+A memo keyed on the id set would not have helped: distinct promotions
+usually carry distinct categories, which is what the new test builds.
+
+`_descendant_index` does it in ONE query over the union. MPTT gives
+every row a `tree_id` and an `lft`/`rght` range, so each root's
+descendants are recoverable from the same result set in memory.
+`_collect_candidates` builds the index once and hangs the expanded sets
+on each Promotion — those instances are constructed there for this
+evaluation, so the attributes cannot outlive it or cross a tenant.
+
+`_category_ids` falls back to expanding on the spot for a Promotion that
+did not come through candidate collection, because the helper is also
+reachable from tests and a silently empty set would quietly WIDEN a
+promotion's scope rather than fail.
+
+Non-vacuity: disabling the cached attribute reproduces the growth,
+`evaluate() grew from 15 to 27 queries`.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`1047d20`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1047d20b1a5a943def1b162f5ae2dba80100f7bb))
+
+* perf(promotion): read the prefetched gift rows instead of re-querying them
+
+From CodeRabbit's review, confirmed by measurement.
+
+`_collect_candidates` prefetches `get_products`, and `_matching_items`
+was changed in this same PR to read the cache with `.all()` — but
+`_gift_entitlement` still called
+`promotion.get_products.filter(active=True)`. A FILTERED
+related-manager query is not served by the prefetch cache: it builds a
+new queryset and always hits the database. Django's own documentation is
+explicit that a filtered prefetch is not available through the standard
+manager interface.
+
+So every eligible FREE_GIFT promotion cost one extra query, on a code
+path that runs on every cart read, on the payment-intent path, and twice
+more during order creation — the exact defect this change set exists to
+remove, missed twenty lines away in the same file.
+
+Measured, six more FREE_GIFT promotions:
+
+evaluate() grew from 11 to 17 queries
+
+`min` over the cached rows reproduces
+`.filter(active=True).order_by("pk").first()` exactly: lowest pk among
+the active ones, or None.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`5f4c3b7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5f4c3b70c8105d5fa280bee92d0266b6e8582285))
+
+* perf(promotion): stop the engine scaling with the number of live promotions
+
+**8 → 20 queries** for six more live promotions, measured. Two queries
+per candidate, on every cart read — and `evaluate()` also runs on the
+payment-intent path and twice more during order creation.
+
+`_collect_candidates` selected the candidates with no
+`prefetch_related`, and `_matching_items` then asked each promotion for
+its `products`, `categories`, `excluded_products` and
+`excluded_categories`. So the cost grew with how many promotions a store
+runs, not with cart size — a store with a dozen active automatics paid
+for all of them on every cart render.
+
+Two changes, and either alone would have been inert:
+
+* the candidate queryset prefetches the five relations the matching
+  pass walks;
+* the reads use `.all()` instead of `.values_list("id", flat=True)`.
+
+`values_list` builds a NEW queryset and always hits the database, so it
+walks straight past a prefetch — exactly the trap the cart's
+`get_applied_coupon_codes` fell into. Prefetching without changing the
+reads would have added queries and removed none.
+
+Writing the test needed one correction worth recording: the first
+version gave the promotions a `min_subtotal` above the cart total, so
+every one was rejected on eligibility before `_matching_items` ran and
+the test passed against the unfixed engine. The promotions have to be
+ELIGIBLE for the cost to exist at all.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`08291fd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/08291fd79ef7a64e9416534d21111aa1a4b6f9c3))
+
+* perf(cart): stop paying a query per recommended product on every render
+
+Three N+1s on the cart's hottest paths, each measured before and after.
+
+**Cart detail: 24 → 45 queries** when three more recommendable products
+exist. `get_recommendations` fed a bare `Product.objects.filter(...)`
+into `ProductSerializer`, which renders translations, the main image and
+the review/like counts — every one of which falls back to a per-instance
+query without `for_list()`'s prefetches. The cart's own line items were
+carefully optimised through `CartItem.objects.for_list()`; the
+recommendations beside them were not.
+
+**Cart item detail: 24 → 38 queries**, same cause. This one matters more
+than it looks: `CartItemDetailSerializer` is the response serializer for
+create, retrieve, update AND partial_update, so every add-to-cart and
+every quantity change paid it too, not just reads.
+
+**Applied coupon codes: 9 queries across 4 carts, now 0.** Two things
+were wrong here and fixing either alone would have done nothing.
+`for_list()`/`for_detail()` never prefetched `applied_codes`, and
+`get_applied_coupon_codes` called `.values_list("code__code")` — which
+builds a NEW queryset and always hits the database, walking straight
+past a prefetch even once one exists. It now prefetches
+`applied_codes__code` and iterates `.all()`, which uses the cache.
+
+Why the existing N+1 tests could not see any of this: they vary the
+number of CART ITEMS, and the recommendation set is capped independently
+of cart size, so the cost it adds is constant under that test. These
+vary the number of RECOMMENDATIONS instead.
+
+The coupon test measures the queryset rather than the endpoint,
+deliberately: the cart list also runs the promotion engine once per row
+— a separate finding — so an endpoint measurement would conflate the two
+and could pass for the wrong reason. It also has to clear the cache
+between measurements, since the category-to-IDs cache would otherwise
+hide the growth while serialization, which happens outside that cache,
+kept paying for it.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`e1141d4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e1141d40d57f9156e332c88a1659a71009a26744))
+
+* perf: index the timestamps that are actually queried, and share the operation
+
+Closes the `_KNOWN_DRIFT` list PR #30 opened. Eight models dropped
+`TimeStampMixinModel`'s created_at/updated_at pair because declaring
+`indexes` REPLACES the abstract parents' list rather than extending it.
+
+The obvious fix — splat the parent's pair into all eight — would have
+added SIXTEEN indexes. Checking what actually reads each column says
+FIVE, and 11 of the 16 would have been pure write cost:
+
+contact.Contact created_at + updated_at
+    orders and paginates by created_at, `date_hierarchy` range-scans
+    it, RecentContactFilter issues four `created_at__gte` variants,
+    and the admin exposes a RangeDateTimeFilter on updated_at too.
+contact.Feedback created_at
+promotion.CartPromotionCode created_at
+    both order by it with `date_hierarchy` on the same column;
+    updated_at is displayed and never sorted or filtered.
+meta_capi.MetaCapiEventLog -created_at (descending, matching the
+    ordering). It already carried `(event_name, -created_at)` and
+    `(status, -created_at)`, but both LEAD with another column, so
+    Postgres could use neither for the admin's plain ORDER BY. It is
+    also the fastest-growing table here — a row per dispatch attempt.
+
+tenant.Tenant / UserTenantMembership / TenantArchive,
+page_config.NavigationMenu — nothing.
+    Neither timestamp is ordered or filtered on any of them; the
+    archive sweeps by destroyed_at and retention date, both already
+    indexed. Each omission is recorded in `_DELIBERATE` with its
+    reason, so `_KNOWN_DRIFT` is now empty: every model is either
+    indexed or explained.
+
+The adaptive-index logic is EXTRACTED, not copied. Migration 0053
+hand-rolled the `in_atomic_block` branching, the `statement_timeout`
+lift and the invalid-index recovery; three more copies is how copies
+drift apart. It now lives in `core/db/migration_operations`, documented
+as append-only because migrations import it.
+
+Writing that operation surfaced a bug review would not have: raw SQL
+BYPASSES the database router, which Django's own operations guard with
+`allow_migrate_model`. Without it, migrating the public schema tried to
+index a tenant app's table — `relation "contact_feedback" does not
+exist`. Guarded in both directions.
+
+Verified by executing, not reviewing: all five exist and report
+indisvalid across every tenant schema, and the planner picks them for
+the contact list, the recent-contacts filter and the CAPI log.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`1a780b0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1a780b0f7a313d35fce5a722c78bf49fb34162ad))
+
+### Refactoring
+
+* refactor: collapse thirty-one hand-rolled schema captures onto the helper
+
+Pure consolidation — no behaviour change. The full suite reports exactly
+the same counts before and after (6917 passed, 12 skipped, 109 subtests),
+and not one test needed editing.
+
+Every one of these sites did the right thing, and each explained itself
+in its own three-line comment: capture `connection.schema_name` into a
+local, bind it into a lambda as a default argument, pass it back through
+`headers={"_schema_name": ...}`. Thirty-one copies of a correct idea is
+still thirty-one places to get it wrong — and the previous commit fixed
+thirteen places that already had.
+
+-304 lines, +45.
+
+The rewrite was AST-driven rather than textual. Earlier scripts in this
+audit mangled code by matching text: one deleted a decorator and left its
+body, another stripped the comma on both sides of an argument. Here the
+statement boundaries and the lambda's default-argument bindings both come
+from the parse tree, and the output is re-parsed before anything is
+written. That matters for the substitution: `args=[oid, s]` bound as
+`oid=order.id, s=new_status` becomes `[order.id, new_status]`, which the
+helper evaluates eagerly exactly as the default-argument binding did.
+
+Removing the now-dead `schema = connection.schema_name` lines needed
+per-FUNCTION liveness, not per-module. `order/signals/handlers.py` keeps
+one `_schema` that IS still read — by `with schema_context(_schema)` in a
+different handler — and a module-wide check spared all nine dead ones
+alongside it. Ruff would not have caught them either: `_schema` matches
+the default dummy-variable pattern, so F841 stays quiet.
+
+Four `_schema_name` sites remain, deliberately: the two carrier adapters
+thread the schema through their own API (`schema_name or
+connection.schema_name`), the BoxNow webhook view dispatches directly
+rather than on commit, and `shipping/interfaces.py` only documents the
+contract.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`3581b6a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3581b6a6ba14bbdc76fe34b6d3e5328187f0ef0e))
+
+### Testing
+
+* test(merge): reconcile the combined tree
+
+Not part of any PR — this is what the 40 branches need doing to them
+when they land together, recorded so the sequence is reproducible. ([`ecafb5e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ecafb5e8b4202fd997e0b035d991cf58437d8a84))
+
+* test: stop two files stranding the connection's schema, and instrument a flake
+
+`tests/unit/agent/test_agent_api.py` documents this trap at length,
+because it already cost ten errors once: `connection.tenant` and
+`connection.schema_name` are two INDEPENDENT attributes on
+django-tenants' `DatabaseWrapper`, kept in step only by `set_tenant()`.
+Assign the first directly and teardown restores `tenant` while
+`schema_name` stays pointed at that test's tenant for the rest of the
+worker's session — so later tests in that worker read and write a
+different schema's tables than they think.
+
+Two files still did exactly that:
+
+tests/unit/page_config/test_views.py
+tests/integration/shipping_boxnow/test_webhook_endpoint.py
+
+Both now use `set_tenant()` / `set_schema_to_public()`.
+
+**This is not claimed as the fix for the legal-identity flake.** That
+flake recurred in this session's full parallel run — all four failures in
+`test_legal_identity.py`, none of them related to the diff under test —
+and running the suspect file immediately before it does NOT reproduce it.
+Causation is still not established, which is exactly what the audit note
+about this flake already said.
+
+What is fixed is a documented hazard that was still present in two
+places. What is added is the diagnostic the audit note asked for next
+time: on failure the test now reports the row as stored, what the
+accessor returns, and which schema the connection is pointed at — the
+three facts that separate the remaining candidates. The next recurrence
+should be conclusive instead of opaque.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`6b06e89`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6b06e89fc2b9e1f72e5b21c455fe77f1996acb5e))
+
+* test(product): assert one reindex dispatch per translation pk
+
+From CodeRabbit's review. The test asserted only that `apply_async` was
+called at all, plus the schema header on each call — so a regression
+that dispatched one translation, or the same one repeatedly, passed. It
+now compares the dispatched pks against the expected set and asserts the
+count. No ordering assertion: the queryset has no ordering contract.
+
+Non-vacuity: dispatching only `translation_pks[:1]` fails it with
+`assert 1 == 3`.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`689a7b4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/689a7b4ccc94850a3e9427c22f03aae72792eda8))
+
 ## v3.28.6 (2026-09-04)
 
 ### Bug fixes

@@ -20,6 +20,7 @@ from rest_framework.test import APIClient
 
 from blog.factories.post import BlogPostFactory
 from blog.models.comment import BlogComment
+from core.utils.i18n import available_language_codes
 from user.factories.account import UserAccountFactory
 
 pytestmark = pytest.mark.django_db
@@ -94,3 +95,29 @@ def test_the_supported_set_comes_from_parler_not_a_literal():
     assert available_language_codes() == frozenset(
         entry["code"] for entry in settings.PARLER_LANGUAGES[settings.SITE_ID]
     )
+
+
+def test_the_global_fallback_is_parlers_none_bucket(settings):
+    """``PARLER_LANGUAGES["default"]`` is a mapping, not a language list.
+
+    It holds ``{'fallbacks': [...], 'hide_untranslated': ..., 'code': ...}``
+    — one settings blob — so iterating it yields KEYS and
+    ``entry["code"]`` raises ``TypeError: string indices must be
+    integers``. The global list lives under the ``None`` key, in the same
+    shape as the per-site one.
+    """
+    settings.SITE_ID = 999  # a site parler has no entry for
+
+    assert available_language_codes() == frozenset(
+        entry["code"] for entry in settings.PARLER_LANGUAGES[None]
+    )
+
+
+def test_an_explicitly_empty_site_list_is_not_the_global_one(settings):
+    """Keyed on presence, not truth: an empty list is an answer."""
+    settings.PARLER_LANGUAGES = {
+        **settings.PARLER_LANGUAGES,
+        settings.SITE_ID: (),
+    }
+
+    assert available_language_codes() == frozenset()

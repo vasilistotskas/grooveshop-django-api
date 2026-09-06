@@ -12,13 +12,22 @@ def available_language_codes() -> frozenset[str]:
     ``en``, ``de``); parler is the one that would still be right if a UI
     language were added without translated content behind it.
 
-    ``SITE_ID`` first, then parler's own ``default`` bucket — the same
-    order ``parler.utils.conf`` resolves in, so a per-site override does
-    not silently fall back to the global list.
+    ``SITE_ID`` first, then parler's global bucket — which is the
+    ``None`` key, NOT ``"default"``. Both hold the same shape (a tuple of
+    ``{"code": ..., "fallbacks": ..., ...}`` entries) while
+    ``PARLER_LANGUAGES["default"]`` is a single settings MAPPING —
+    ``{'fallbacks': ['en'], 'hide_untranslated': False, 'code': 'el'}`` —
+    so iterating it yields its keys and ``entry["code"]`` raises
+    ``TypeError: string indices must be integers``. Measured on
+    django-parler 2.4.
+
+    Keyed on presence rather than truth, so an explicitly empty
+    per-site list stays empty instead of silently inheriting the global
+    one.
     """
     per_site = settings.PARLER_LANGUAGES.get(
-        settings.SITE_ID
-    ) or settings.PARLER_LANGUAGES.get("default", ())
+        settings.SITE_ID, settings.PARLER_LANGUAGES.get(None, ())
+    )
     return frozenset(entry["code"] for entry in per_site)
 
 

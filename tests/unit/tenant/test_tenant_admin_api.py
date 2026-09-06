@@ -32,6 +32,32 @@ def _tenant(schema_name: str, **kwargs) -> Tenant:
     return tenant
 
 
+@pytest.fixture(autouse=True)
+def _no_schema_creation():
+    """Keep every ``Tenant.save()`` in this module off the schema path.
+
+    ``TenantMixin.save`` has a third branch that is easy to miss:
+
+        elif not is_new and self.auto_create_schema                 and not schema_exists(self.schema_name):
+            self.create_schema(check_if_exists=True, ...)
+
+    So it creates the schema on an UPDATE too, whenever the schema is
+    absent — and these tests deliberately make ``Tenant`` rows with no
+    schema (``auto_create_schema = False`` on the instance). Every later
+    ``.save()`` therefore replayed the ENTIRE migration history: profiled
+    at 82-87s per test, 7m12s for the file. With ``--dist loadfile``
+    pinning a file to one worker, that made this file the critical path
+    of its whole CI shard, which then timed out.
+
+    Patching the CLASS attribute is what the ``no_destroy_side_effects``
+    fixture below already did for the destroy tests; this extends the
+    same cover to every test here. Production is unaffected either way —
+    there the schema exists, so ``schema_exists()`` short-circuits.
+    """
+    with patch.object(Tenant, "auto_create_schema", False):
+        yield
+
+
 @pytest.fixture
 def operator_client():
     """A platform superuser whose session came from PlatformStaffBackend."""

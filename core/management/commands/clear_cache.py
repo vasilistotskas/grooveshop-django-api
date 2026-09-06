@@ -35,6 +35,8 @@ only ever in the surface path, which goes through the schema-scoped
 
 from __future__ import annotations
 
+import logging
+
 # The default backend is core.caches.CustomCache (see CACHES) —
 # the proxy delegates its raw-key helpers (keys/delete_raw_keys/
 # clear_by_prefixes) to it.
@@ -43,6 +45,8 @@ from django.core.management.base import BaseCommand, CommandError
 from django_tenants.utils import get_public_schema_name, schema_context
 
 from core.cache.service import CacheService
+
+logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
@@ -180,17 +184,35 @@ class Command(BaseCommand):
             )
 
         prefix = "[dry-run] " if report.dry_run else ""
+        # ``*_headline``, not ``total_*``: a dry run deletes nothing, so
+        # the deleted totals are always 0 and every dry run printed
+        # "[dry-run] Purged 0 Django".
+        headline = (
+            f"{prefix}Purged {report.django_headline} Django + "
+            f"{report.nuxt_headline} Nuxt + {report.total_gateway} feed "
+            f"keys across {len(report.surfaces)} surface(s)"
+        )
+        # A failed purge must not print in green. The per-surface lines
+        # below carry the error text; this is what a human reads first,
+        # and an exit code is what a cron job reads.
+        failed = report.failed_surfaces
         self.stdout.write(
-            self.style.SUCCESS(
-                f"{prefix}Purged {report.total_django} Django + "
-                f"{report.total_nuxt} Nuxt + {report.total_gateway} feed "
-                f"keys across {len(report.surfaces)} surface(s)"
-            )
+            self.style.ERROR(headline)
+            if failed
+            else self.style.SUCCESS(headline)
         )
         for surface in report.surfaces:
+            django_n = (
+                surface.django_matched
+                if report.dry_run
+                else surface.django_deleted
+            )
+            nuxt_n = (
+                surface.nuxt_matched if report.dry_run else surface.nuxt_deleted
+            )
             line = (
-                f"  {surface.code:25} django={surface.django_deleted}"
-                f" nuxt={surface.nuxt_deleted}"
+                f"  {surface.code:25} django={django_n}"
+                f" nuxt={nuxt_n}"
                 f" blocked={surface.django_blocked + surface.nuxt_blocked}"
             )
             if surface.gateway_removed or surface.gateway_error:
@@ -202,6 +224,16 @@ class Command(BaseCommand):
             if surface.gateway_error:
                 line += f" gateway_error={surface.gateway_error}"
             self.stdout.write(line)
+
+        if failed:
+            # Exit non-zero. This command is run from cron and from
+            # deploy scripts, where a zero exit is the only signal
+            # anything reads — and it used to be zero even when every
+            # surface had failed.
+            raise CommandError(
+                f"Cache purge failed for {len(failed)} surface(s): "
+                + ", ".join(s.code for s in failed)
+            )
 
     def _list_surfaces(self) -> None:
         from core.cache.registry import iter_surfaces
@@ -232,9 +264,24 @@ class Command(BaseCommand):
         )
         try:
             results = cache_instance.clear_by_prefixes(prefixes)
-            total = sum(results.values())
-            for prefix, count in results.items():
-                self.stdout.write(f"  {prefix}* -> {count} keys deleted")
-            self.stdout.write(self.style.SUCCESS(f"Cleared {total} keys"))
         except Exception as exc:
-            self.stderr.write(self.style.ERROR(f"Error: {exc!s}"))
+            # A CommandError, not a red line and exit 0. This is the
+            # disaster-recovery path: an operator reaches for it mid
+            # incident, and anything chaining on it (a shell `&&`, a
+            # Job's next step) treated the failed purge as done.
+            #
+            # The exception text stays in the log and out of the
+            # message, for the reason recorded at admin/admin.py's cache
+            # views: a redis-py connection error carries the connection
+            # target, and the URL in this deployment carries the
+            # password.
+            logger.exception("Raw prefix clear failed for %s", prefixes)
+            raise CommandError(
+                "Prefix clear failed — the cache backend did not answer. "
+                "Nothing was purged; see the application log."
+            ) from exc
+
+        total = sum(results.values())
+        for prefix, count in results.items():
+            self.stdout.write(f"  {prefix}* -> {count} keys deleted")
+        self.stdout.write(self.style.SUCCESS(f"Cleared {total} keys"))

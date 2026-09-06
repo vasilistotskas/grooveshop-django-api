@@ -15,7 +15,7 @@ from blog.models.post import BlogPost
 from core.api.schema import generate_schema_multi_lang
 from core.utils.serializers import TranslatedFieldExtended
 from tenant.membership import is_store_staff
-from user.serializers.account import UserDetailsSerializer
+from user.serializers.account import UserPublicSerializer
 
 User = get_user_model()
 
@@ -28,7 +28,9 @@ class TranslatedFieldsFieldExtend(TranslatedFieldExtended):
 class BlogCommentSerializer(
     TranslatableModelSerializer, serializers.ModelSerializer[BlogComment]
 ):
-    user = UserDetailsSerializer(read_only=True)
+    # PUBLIC serializer: these endpoints serve anonymous readers, and
+    # the account serializer carries email/phone/address/birth_date.
+    user = UserPublicSerializer(read_only=True)
     content_preview = serializers.SerializerMethodField(
         help_text=_("First 150 characters of the comment content")
     )
@@ -157,7 +159,7 @@ class BlogCommentDetailSerializer(BlogCommentSerializer):
             return {
                 "id": obj.parent.id,
                 "content_preview": self.get_content_preview(obj.parent),
-                "user": UserDetailsSerializer(obj.parent.user).data,
+                "user": UserPublicSerializer(obj.parent.user).data,
                 "created_at": obj.parent.created_at,
             }
         return None
@@ -207,7 +209,7 @@ class BlogCommentDetailSerializer(BlogCommentSerializer):
             {
                 "id": ancestor.id,
                 "content_preview": self.get_content_preview(ancestor),
-                "user": UserDetailsSerializer(ancestor.user).data,
+                "user": UserPublicSerializer(ancestor.user).data,
             }
             for ancestor in ancestors
         ]
@@ -258,19 +260,42 @@ class BlogCommentWriteSerializer(
     )
     translations = TranslatedFieldsFieldExtend(shared_model=BlogComment)
 
-    def validate_parent(self, value: BlogComment) -> BlogComment:
-        if value:
-            post = self.initial_data.get("post")
-            if isinstance(post, int):
-                if value.post.id != post:
-                    raise serializers.ValidationError(
-                        _("Parent comment must belong to the same post.")
-                    )
-            elif post and value.post != post:
-                raise serializers.ValidationError(
-                    _("Parent comment must belong to the same post.")
-                )
-        return value
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Both relations are caller-supplied ids, so both are scoped to
+        # what this caller may see. Unscoped, `post` accepted a DRAFT
+        # (anyone could plant a comment on an unreleased post) and
+        # `parent` accepted a comment on one, which is the id a thread
+        # read-back needs. Staff keep the full set via `visible_to`.
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        visible_posts = BlogPost.objects.visible_to(user)
+        self.fields["post"].queryset = visible_posts
+        parent_queryset = BlogComment.objects.filter(post__in=visible_posts)
+        if not is_store_staff(user):
+            parent_queryset = parent_queryset.filter(approved=True)
+        self.fields["parent"].queryset = parent_queryset
+
+    def validate(self, attrs):
+        # Checked here and not in `validate_parent`, which read the post
+        # out of `initial_data`: on a PATCH that sent only `parent` there
+        # was no `post` key, both branches fell through, and the check
+        # silently passed — so a caller could re-parent their own public
+        # comment onto a comment on someone else's draft. `attrs` carries
+        # the resolved objects, and falling back to the instance means an
+        # update is checked against its EFFECTIVE post, whether or not
+        # the payload restated it.
+        parent = attrs.get("parent", getattr(self.instance, "parent", None))
+        post = attrs.get("post", getattr(self.instance, "post", None))
+        if (
+            parent is not None
+            and post is not None
+            and parent.post_id != post.pk
+        ):
+            raise serializers.ValidationError(
+                {"parent": _("Parent comment must belong to the same post.")}
+            )
+        return attrs
 
     def create(self, validated_data: Any) -> BlogComment:
         if "user" not in validated_data:

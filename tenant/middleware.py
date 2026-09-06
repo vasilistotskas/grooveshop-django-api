@@ -1,9 +1,15 @@
 from __future__ import annotations
 
+import logging
+
 from django.conf import settings
 from django.core.cache import cache
 from django.db import connection
+from django.http import JsonResponse
 from django.middleware.csrf import CsrfViewMiddleware
+from django.utils.translation import gettext_lazy as _
+
+logger = logging.getLogger(__name__)
 
 TENANT_DOMAINS_CACHE_TTL = 300  # 5 minutes
 
@@ -70,6 +76,67 @@ class TenantCsrfMiddleware(CsrfViewMiddleware):
             getattr(connection, "tenant", None),
             request.META.get("HTTP_ORIGIN", ""),
         )
+
+
+class SuspendedTenantMiddleware:
+    """Refuse every request for a suspended store.
+
+    ``suspend_tenant`` sets ``is_active=False``, and five consumers
+    honour it — ``tenant/views.py`` resolve 404s, the internal domains
+    feed skips it, the WebSocket middleware closes 4004, the Celery
+    fanout skips it, and the Viva webhook refuses it. The one path that
+    was never covered is the one that serves the store: the tenant HTTP
+    request itself.
+
+    ``django_tenants.middleware.main.TenantMainMiddleware.get_tenant``
+    resolves the host with a bare ``domain=hostname`` lookup — no
+    ``is_active``, no ``suspended_at`` — and this project uses that
+    class directly rather than a subclass. Measured in the MT lane: a
+    tenant flipped to ``is_active=False`` still answered
+    ``GET /api/v1/product/`` with **200**.
+
+    So a merchant suspended for abuse or non-payment went dark on the
+    storefront (whose SSR calls ``resolve`` first) while their API kept
+    serving in full — catalogue reads, cart mutations, ORDER CREATION
+    and payment-intent creation against their own live provider keys.
+    Any client that does not go through the resolve path — the agent
+    gateway with a warm config, a mobile client, an already-rendered
+    session — transacted on a frozen store indefinitely.
+
+    503 rather than resolve's 404: the domain is known and the condition
+    is temporary, which is what 503 means. A 404 would also tell a
+    suspended merchant's customers the store never existed.
+    """
+
+    #: Answered before tenant resolution, so they never reach this.
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        from django_tenants.utils import get_public_schema_name
+
+        tenant = getattr(connection, "tenant", None)
+        if (
+            tenant is not None
+            and getattr(tenant, "schema_name", None) != get_public_schema_name()
+            and getattr(tenant, "is_active", True) is False
+        ):
+            logger.warning(
+                "Refused a request for suspended tenant %s (%s %s)",
+                getattr(tenant, "schema_name", "?"),
+                request.method,
+                request.path,
+            )
+            return JsonResponse(
+                {
+                    "detail": _(
+                        "This store is temporarily unavailable. Please "
+                        "contact the store owner."
+                    )
+                },
+                status=503,
+            )
+        return self.get_response(request)
 
 
 class TenantCookieDomainMiddleware:

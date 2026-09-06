@@ -37,6 +37,7 @@ class BoxNowLocker(UUIDModel, TimeStampMixinModel):
         max_length=500,
         blank=True,
         null=True,
+        default="",
     )
     lat = models.DecimalField(
         _("Latitude"),

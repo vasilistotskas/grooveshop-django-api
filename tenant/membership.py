@@ -35,6 +35,7 @@ from __future__ import annotations
 from typing import Any
 
 from django.db import connection
+from django_tenants.utils import get_public_schema_name
 
 
 def get_current_tenant() -> Any | None:
@@ -108,6 +109,39 @@ def get_membership(user: Any, tenant: Any | None = None) -> Any | None:
     )
 
 
+def is_platform_superuser(user: Any) -> bool:
+    """True when *user*'s ``is_superuser`` flag can be believed.
+
+    The flag alone cannot be. ``UserAccount`` is mirrored per schema and
+    the cutover copied users id-preserving, so ``is_superuser`` on a
+    TENANT-schema row is residue on a CUSTOMER record — the identical
+    argument this codebase already makes about ``is_staff``, on the
+    identical rows. Trusting one while rejecting the other was the gap.
+
+    It is honoured only when the identity provably came from the public
+    schema, which is true in exactly two ways:
+
+    - the object carries ``PLATFORM_IDENTITY_ATTR``, stamped by
+      ``PlatformStaffBackend`` (login and session restore) and by
+      ``PlatformStaffTokenAuthentication`` — the only three places a
+      platform identity is ever loaded; or
+    - the connection is on the public schema, where
+      ``user_useraccount`` IS the platform table, so the flag means what
+      it says. That is the platform control-plane host, and also the
+      single-schema lane the main test suite runs in.
+
+    A tenant-schema customer holding residual ``is_superuser`` and a
+    plain Knox token satisfies neither, which is the whole point.
+    """
+    if user is None or not getattr(user, "is_superuser", False):
+        return False
+    from tenant.auth_backends import PLATFORM_IDENTITY_ATTR
+
+    if getattr(user, PLATFORM_IDENTITY_ATTR, False):
+        return True
+    return connection.schema_name == get_public_schema_name()
+
+
 def is_store_staff(user: Any) -> bool:
     """True when *user* may act as STAFF of the tenant on this connection.
 
@@ -135,7 +169,7 @@ def is_store_staff(user: Any) -> bool:
         return False
     if not getattr(user, "is_active", False):
         return False
-    if getattr(user, "is_superuser", False):
+    if is_platform_superuser(user):
         return True
 
     from tenant.auth_backends import PLATFORM_IDENTITY_ATTR

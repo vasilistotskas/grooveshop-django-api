@@ -168,7 +168,11 @@ class BoxNowWebhookView(APIView):
             # -------------------------------------------------------------- #
             # 4. Extract raw ``data`` bytes and the datasignature.            #
             # -------------------------------------------------------------- #
-            datasignature: str = envelope.get("datasignature", "")
+            # Deliberately not annotated ``str``: this is a value out of
+            # ``json.loads`` on an unauthenticated body, so it can be any
+            # JSON type. ``verify_signature`` is total over that and the
+            # log line below cannot assume a string either.
+            datasignature = envelope.get("datasignature", "")
             raw_data: bytes = extract_data_substring(raw_body)
 
         except BoxNowWebhookError as exc:
@@ -236,7 +240,9 @@ class BoxNowWebhookView(APIView):
                 " | datasignature_prefix=%s",
                 tenant_schema,
                 message_id,
-                datasignature[:8] if datasignature else "<empty>",
+                datasignature[:8]
+                if isinstance(datasignature, str) and datasignature
+                else f"<{type(datasignature).__name__}>",
             )
             return Response(status=401)
 

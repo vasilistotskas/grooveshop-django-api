@@ -622,7 +622,7 @@ msgid "Filter by minimum number of views"
 msgstr ""
 
 #: .\blog\filters\post.py:60
-msgid "Filter by tag label (case-insensitive)"
+msgid "Filter by active tag label (case-insensitive)"
 msgstr ""
 
 #: .\blog\filters\post.py:64
@@ -638,7 +638,7 @@ msgid "Filter by author ID"
 msgstr ""
 
 #: .\blog\filters\post.py:80
-msgid "Filter by tag IDs (comma-separated)"
+msgid "Filter by active tag IDs (comma-separated)"
 msgstr ""
 
 #: .\blog\filters\tag.py:15 .\pay_way\filters.py:28 .\tag\filters\tag.py:15

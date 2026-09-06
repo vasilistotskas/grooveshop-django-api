@@ -15,7 +15,10 @@ from user.views.subscription import (
 urlpatterns = [
     path(
         "user/account",
-        UserAccountViewSet.as_view({"get": "list", "post": "create"}),
+        # No "post": accounts are created by allauth's signup flow, not
+        # here. See the note beside ``serializers_config`` in
+        # ``user/views/account.py``.
+        UserAccountViewSet.as_view({"get": "list"}),
         name="user-account-list",
     ),
     path(

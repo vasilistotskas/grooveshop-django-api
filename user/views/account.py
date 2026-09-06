@@ -187,6 +187,17 @@ serializers_config: SerializersConfig = {
 }
 
 
+# ``crud_config`` emits a "create" entry because ``write=`` also drives
+# update/partial_update, which ARE routed. Creation is not: accounts are
+# made by allauth's headless signup (``/_allauth/app/v1/auth/signup``),
+# which hashes the password, writes the ``EmailAddress`` row allauth
+# treats as the source of truth for an address, sends the verification
+# mail and applies the signup rate limit. A second create path here did
+# none of that. Dropping the key keeps the OpenAPI schema honest about
+# an endpoint the URLconf does not route.
+del serializers_config["create"]
+
+
 @extend_schema_view(
     **create_schema_view_config(
         model_class=User,
@@ -453,11 +464,18 @@ class UserAccountViewSet(BaseModelViewSet):
         user = self.get_object()
 
         request_serializer_class = self.get_request_serializer()
-        request_serializer = request_serializer_class(data=request.data)
+        # ``instance=user`` so the uniqueness check excludes the caller's
+        # own row — re-submitting your current username is a no-op, not
+        # a collision with yourself.
+        request_serializer = request_serializer_class(
+            instance=user, data=request.data
+        )
         request_serializer.is_valid(raise_exception=True)
 
         new_username = request_serializer.validated_data["username"]
 
+        # The serializer's uniqueness check is not a lock: two requests
+        # can both pass it and then race on the DB constraint.
         try:
             user.username = new_username
             user.save(update_fields=["username"])

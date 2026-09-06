@@ -30,6 +30,38 @@ from django.db import models
 # Indexes a model drops ON PURPOSE, with the reason. Distinct from
 # _KNOWN_DRIFT below: nothing here is waiting to be fixed.
 _DELIBERATE: dict[str, str] = {
+    "contact.Feedback": (
+        "Takes created_at — the list orders by it and `date_hierarchy` "
+        "range-scans it — but not updated_at, which the admin displays "
+        "and never sorts or filters."
+    ),
+    "promotion.CartPromotionCode": (
+        "Takes created_at for `ordering` and `date_hierarchy`; nothing "
+        "reads updated_at."
+    ),
+    "meta_capi.MetaCapiEventLog": (
+        "Carries its own DESCENDING `-created_at` index to match the "
+        "ordering, rather than the parent's ascending one, and none on "
+        "updated_at: this is an append-only audit log with a row per "
+        "dispatch attempt, so every needless index is paid on write."
+    ),
+    "tenant.Tenant": (
+        "Neither timestamp is ordered or filtered on — the console lists "
+        "tenants by name and status — and tenants number in dozens."
+    ),
+    "tenant.UserTenantMembership": (
+        "Looked up by (tenant, user), both already indexed. Neither "
+        "timestamp is queried."
+    ),
+    "tenant.TenantArchive": (
+        "Orders by destroyed_at, which has its own index, and sweeps by "
+        "retention date via tenant_arch_ret_ix. created_at/updated_at are "
+        "never read."
+    ),
+    "page_config.NavigationMenu": (
+        "Ordered by `slot`; a handful of rows per tenant and neither "
+        "timestamp is queried."
+    ),
     "order.Order": (
         "Takes MetaDataModel's `metadata` GIN index explicitly but not "
         "its `private_metadata` one: no query reads that column on an "
@@ -39,28 +71,11 @@ _DELIBERATE: dict[str, str] = {
     ),
 }
 
-# Models that drop a parent's indexes TODAY without having decided to.
-# All eight lose ``TimeStampMixinModel``'s created_at/updated_at pair,
-# and five of them (Contact, Feedback, CartPromotionCode,
-# MetaCapiEventLog, and TenantArchive via destroyed_at) order every list
-# query by a timestamp column that is therefore unindexed.
-#
-# Recorded rather than fixed here because each belongs to a different app
-# — tenant, contact, promotion, page_config, meta_capi — and each needs
-# its own migration and its own "is this index worth its write cost on
-# this table" call. This list must only ever shrink.
-_KNOWN_DRIFT: frozenset[str] = frozenset(
-    {
-        "tenant.Tenant",
-        "tenant.UserTenantMembership",
-        "tenant.TenantArchive",
-        "contact.Contact",
-        "contact.Feedback",
-        "promotion.CartPromotionCode",
-        "page_config.NavigationMenu",
-        "meta_capi.MetaCapiEventLog",
-    }
-)
+# Empty, and it should stay that way: a model that drops a parent index
+# without a decision behind it belongs in the assertion, not here. The
+# eight that used to sit in this set were worked through one at a time —
+# four earned an index and got one, four did not and say why above.
+_KNOWN_DRIFT: frozenset[str] = frozenset()
 
 
 def _label(model: type[models.Model]) -> str:

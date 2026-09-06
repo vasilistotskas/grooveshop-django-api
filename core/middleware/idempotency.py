@@ -20,6 +20,10 @@ Design choices:
   ``Idempotency-Key`` on two different endpoints does not alias.
 * Keys are hashed (SHA-256, 32 hex chars) before Redis storage to bound
   key length and avoid logging sensitive client-chosen values.
+* Bounded per scope. The client picks the key, so without a cap this is
+  a 24-hour Redis write primitive anyone can drive, at the middleware
+  layer where no DRF throttle can see it. Over budget, the request runs
+  normally and is simply not cached.
 """
 
 from __future__ import annotations
@@ -47,6 +51,22 @@ _IN_FLIGHT_MARKER = "__idempotency_in_flight__"
 _IN_FLIGHT_TTL_SECONDS = 60
 MAX_CACHED_BODY_BYTES = 256 * 1024  # 256 KB — responses larger than this
 # (e.g. streaming file downloads) are not worth caching for idempotency.
+
+# The client chooses the key, so without a bound this middleware is a
+# 24-hour Redis write primitive that anyone can drive: a fresh
+# Idempotency-Key on every request mints a new entry holding up to
+# MAX_CACHED_BODY_BYTES, and it runs at the middleware layer — before
+# DRF ever reaches a throttle. The deployed Redis is 614 MB on
+# allkeys-lru, so filling it evicts the sessions, carts, WebSocket
+# tickets and throttle counters that share it.
+#
+# Real usage is small: the storefront mints one UUID per checkout
+# attempt and reuses it across retries (useCheckoutSubmit.ts), and the
+# agent gateway consumes the header itself rather than forwarding it.
+# A hundredfold headroom over that is still a bound.
+MAX_KEYS_PER_SCOPE = 200
+# Stripe's own limit, and long enough for any UUID scheme.
+MAX_KEY_LENGTH = 255
 
 
 def _get_real_ip(request: HttpRequest) -> str:
@@ -87,6 +107,48 @@ def _cache_key(request: HttpRequest, idempotency_key: str) -> str:
     return f"{KEY_NAMESPACE}:{digest}"
 
 
+def _budget_key(request: HttpRequest) -> str:
+    """Counter of distinct keys this scope has minted in the TTL window."""
+    digest = hashlib.sha256(_scope_id(request).encode("utf-8")).hexdigest()[:32]
+    return f"{KEY_NAMESPACE}:budget:{digest}"
+
+
+def _claim_budget(request: HttpRequest) -> bool:
+    """Charge one entry to this scope, or refuse when it is spent.
+
+    ``add`` then ``incr``: ``add`` initialises the counter and sets the
+    window exactly once, and Redis' ``INCR`` is atomic, so concurrent
+    requests cannot both see a stale count. The window is not sliding —
+    it starts at the scope's first key and lasts as long as the entries
+    it is counting, which is the property that matters.
+
+    A backend failure returns True. This is a flood bound, not a
+    security gate, and refusing to reserve because Redis hiccuped would
+    turn a cache blip into duplicate orders.
+    """
+    cache = caches[CACHE_ALIAS]
+    budget_key = _budget_key(request)
+    try:
+        cache.add(budget_key, 0, IDEMPOTENCY_TTL_SECONDS)
+        used = cache.incr(budget_key)
+    except Exception:
+        logger.warning("idempotency budget unavailable", exc_info=True)
+        return True
+
+    if used > MAX_KEYS_PER_SCOPE:
+        logger.warning(
+            "idempotency budget exhausted",
+            extra={
+                "scope": _scope_id(request),
+                "used": used,
+                "limit": MAX_KEYS_PER_SCOPE,
+                "path": request.path,
+            },
+        )
+        return False
+    return True
+
+
 class IdempotencyMiddleware(MiddlewareMixin):
     def process_request(self, request: HttpRequest) -> HttpResponse | None:
         if request.method not in IDEMPOTENT_METHODS:
@@ -95,6 +157,17 @@ class IdempotencyMiddleware(MiddlewareMixin):
         idempotency_key = request.META.get(IDEMPOTENCY_HEADER)
         if not idempotency_key:
             return None
+
+        if len(idempotency_key) > MAX_KEY_LENGTH:
+            return JsonResponse(
+                {
+                    "detail": (
+                        "Idempotency-Key must be at most "
+                        f"{MAX_KEY_LENGTH} characters."
+                    )
+                },
+                status=400,
+            )
 
         key = _cache_key(request, idempotency_key)
         cached = caches[CACHE_ALIAS].get(key)
@@ -114,6 +187,15 @@ class IdempotencyMiddleware(MiddlewareMixin):
             # executing (G0103). process_response replaces the marker with
             # the real outcome, or releases it if the response isn't
             # cacheable.
+            if not _claim_budget(request):
+                # Over budget: run the request normally, without a
+                # reservation and without caching the outcome. Skipping
+                # rather than refusing is deliberate — idempotency is a
+                # protection, not a gate, and answering 429 here would
+                # turn the flood bound into a denial of service against
+                # whoever tripped it.
+                return None
+
             reserved = caches[CACHE_ALIAS].add(
                 key, _IN_FLIGHT_MARKER, _IN_FLIGHT_TTL_SECONDS
             )

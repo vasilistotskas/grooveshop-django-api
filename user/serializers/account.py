@@ -38,7 +38,7 @@ class UserSerializer(serializers.ModelSerializer[User]):
 
 
 class UserWriteSerializer(UserSerializer):
-    phone = PhoneNumberField(required=False, allow_blank=True, allow_null=True)
+    phone = PhoneNumberField(required=False, allow_blank=True)
 
     class Meta(UserSerializer.Meta):
         # The base fields are spread in, so they are not repeated here —
@@ -66,22 +66,43 @@ class UserWriteSerializer(UserSerializer):
             "bio",
             "language_code",
         )
+        # "email" repeats the base class's entry because naming
+        # ``read_only_fields`` here REPLACES it rather than extending it.
+        # Changing the primary address must go through allauth's
+        # email-management flow, which sends a verification link and
+        # updates the ``EmailAddress`` table allauth treats as the
+        # source of truth; a profile PUT/PATCH must not silently change
+        # it. This used to be conditional on ``self.instance is None``
+        # so that the account-create endpoint could set it — that
+        # endpoint is gone (see ``user/views/account.py``), and this
+        # serializer only ever serves update/partial_update, so the
+        # condition could no longer be false.
         read_only_fields = (
+            "email",
             "created_at",
             "updated_at",
             "uuid",
         )
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Email is settable at registration (create) but read-only afterwards.
-        # Changing the primary email must go through allauth's email-management
-        # flow, which sends a verification link and updates the EmailAddress
-        # source-of-truth; a plain profile PUT/PATCH must not silently change
-        # it (that would bypass verification and desync allauth's EmailAddress
-        # table).
-        if self.instance is not None and "email" in self.fields:
-            self.fields["email"].read_only = True
+        # `null` is not a second way to say "no value" on these columns.
+        # DRF derives `allow_null` straight from the model's `null=True`
+        # (rest_framework/utils/field_mapping.py), so without this a
+        # `PATCH {"website": null}` writes NULL past the model's
+        # `default=""` — the one hole the backfill migrations cannot
+        # close, because it stays open after they have run. Clearing a
+        # value is spelled "", as it already is for `bio`, `city` and
+        # every other blankable string on this model.
+        extra_kwargs = {
+            field: {"allow_null": False}
+            for field in (
+                "twitter",
+                "linkedin",
+                "facebook",
+                "instagram",
+                "website",
+                "youtube",
+                "github",
+            )
+        }
 
     def validate_language_code(self, value: str) -> str:
         if not value:
@@ -103,7 +124,7 @@ class UserWriteSerializer(UserSerializer):
 
 
 class UserDetailsSerializer(UserSerializer):
-    phone = PhoneNumberField(required=False, allow_blank=True, allow_null=True)
+    phone = PhoneNumberField(required=False, allow_blank=True)
     twitter = serializers.SerializerMethodField()
     linkedin = serializers.SerializerMethodField()
     facebook = serializers.SerializerMethodField()
@@ -234,11 +255,85 @@ class UserDetailsSerializer(UserSerializer):
         )
 
 
-class UsernameUpdateSerializer(serializers.Serializer):
+# Comments, not a docstring: drf-spectacular publishes a serializer's
+# docstring as the schema component's description, so this rationale
+# would ship in the public OpenAPI contract and in the storefront's
+# generated types — a step-by-step account of a fixed vulnerability,
+# published. (Same mistake as the one caught on the order serializers.)
+#
+# `UserDetailsSerializer` is the ACCOUNT serializer — it carries
+# `email`, `phone`, `address`, `city`, `zipcode`, `birth_date` and the
+# privilege flags, which is right for "my account" and wrong anywhere
+# else. It was nested as the `user` field on product reviews, blog
+# comments (including parent and ancestor comments) and blog authors,
+# all of which serve anonymous readers.
+#
+# `read_only_fields` does not help: it stops a field being WRITTEN, not
+# rendered.
+#
+# This exposes only what a byline needs. The storefront reads exactly
+# `id`, `username`, `firstName` and `lastName` on these surfaces, so
+# nothing here is a display regression.
+class UserPublicSerializer(serializers.ModelSerializer):
+    """The author identity shown to anyone, including anonymous callers."""
+
+    main_image_path = serializers.SerializerMethodField()
+
+    @extend_schema_field(
+        {"type": "string", "description": _("Avatar path or empty string")}
+    )
+    def get_main_image_path(self, obj) -> str:
+        return getattr(obj, "main_image_path", "") or ""
+
+    class Meta:
+        model = User
+        fields = (
+            "id",
+            "username",
+            "first_name",
+            "last_name",
+            "main_image_path",
+        )
+        read_only_fields = fields
+
+
+# Comments rather than a docstring: drf-spectacular publishes a
+# serializer's docstring as the schema component's description, and the
+# storefront's generated types would carry this rationale.
+#
+# This was a bare ``Serializer`` with ``CharField(max_length=150)`` —
+# five times the model's ``ACCOUNT_USERNAME_MAX_LENGTH``, and carrying
+# none of the field's validators. The view assigns straight onto the
+# instance and calls ``save(update_fields=[...])``, which runs no model
+# validation, so anything the serializer let through was written: 31 to
+# 150 characters reached a ``varchar(30)`` column and came back as a
+# 500, and ``<script>alert(1)</script>`` was simply stored with a 200.
+#
+# Deriving from ``UserSerializer`` picks up the model field's
+# ``max_length``, its ``ExtendedUnicodeUsernameValidator`` and its
+# uniqueness check, plus the inherited ``validate_username`` that runs
+# allauth's ``clean_username`` (blocklist, minimum length) — the same
+# rules a profile update has always been held to.
+class UsernameUpdateSerializer(UserSerializer):
     username = serializers.CharField(
-        max_length=150,
+        max_length=User._meta.get_field("username").max_length,
+        validators=User._meta.get_field("username").validators,
         help_text=_("New username"),
     )
+
+    class Meta(UserSerializer.Meta):
+        fields = ("username",)
+        read_only_fields = ()
+
+    def validate_username(self, username: str) -> str:
+        # allauth's ``clean_username`` ends in a uniqueness lookup that
+        # knows nothing about the row being edited, so submitting the
+        # name you already hold matched yourself and came back "already
+        # taken". A form that posts every field unchanged should be a
+        # no-op, not an error.
+        if self.instance is not None and self.instance.username == username:
+            return username
+        return super().validate_username(username)
 
 
 class UsernameUpdateResponseSerializer(serializers.Serializer):

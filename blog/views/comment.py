@@ -10,6 +10,7 @@ from rest_framework.response import Response
 
 from blog.filters.comment import BlogCommentFilter
 from blog.models.comment import BlogComment
+from blog.models.post import BlogPost
 from blog.serializers.comment import (
     BlogCommentDetailSerializer,
     BlogCommentLikedCommentsRequestSerializer,
@@ -135,6 +136,20 @@ class BlogCommentViewSet(BaseModelViewSet):
 
         if not is_store_staff(self.request.user):
             queryset = queryset.filter(approved=True)
+            # A comment on a post the caller cannot see must not be
+            # reachable either. Gating here rather than in each
+            # serializer closes three doors at once: the `post` action
+            # (`get_object()` now 404s), `BlogCommentDetailSerializer.
+            # get_post` (only reachable through a visible comment), and
+            # the `?post__isPublished=false` filter, which was the
+            # enumeration handle.
+            #
+            # Verified before: `GET /blog/post/<draft>` answered 404
+            # while `GET /blog/comment/<pk>/post` answered 200 with 6541
+            # characters of the same draft's body.
+            queryset = queryset.filter(
+                post__in=BlogPost.objects.visible_to(self.request.user)
+            )
 
         return queryset.annotate(
             has_replies=Exists(
@@ -170,14 +185,34 @@ class BlogCommentViewSet(BaseModelViewSet):
             base.append(IsAuthenticated())
         return base
 
+    def _visible_relatives(self, queryset):
+        """Narrow a tree queryset the way ``get_queryset`` narrows the root.
+
+        MPTT walks the tree by ``tree_id``/``lft``, not by post, and
+        nothing in the database ties a reply to its parent's post — so
+        these relatives are NOT guaranteed to share the root's post and
+        must be gated on their own. That is reachable, not theoretical:
+        the write serializer's same-post check used to be skipped
+        whenever a PATCH omitted ``post``, so a caller could point their
+        own public comment's ``parent`` at a comment on someone's draft
+        and then read it back through ``thread``'s ancestors — verified,
+        200 with the hidden comment's content, while a direct GET on it
+        answered 404.
+        """
+        queryset = queryset.select_related("user", "post")
+        if is_store_staff(self.request.user):
+            return queryset
+        return queryset.filter(
+            approved=True,
+            post__in=BlogPost.objects.visible_to(self.request.user),
+        )
+
     @action(detail=True, methods=["GET"])
     def replies(self, request, pk=None):
         comment = self.get_object()
         queryset = (
-            comment.get_children()
-            .select_related("user", "post")
+            self._visible_relatives(comment.get_children())
             .prefetch_related("likes")
-            .filter(approved=True)
             .order_by("created_at")
         )
 
@@ -190,22 +225,8 @@ class BlogCommentViewSet(BaseModelViewSet):
     def thread(self, request, pk=None):
         comment = self.get_object()
 
-        if is_store_staff(self.request.user):
-            ancestors = comment.get_ancestors().select_related("user", "post")
-            descendants = comment.get_descendants().select_related(
-                "user", "post"
-            )
-        else:
-            ancestors = (
-                comment.get_ancestors()
-                .select_related("user", "post")
-                .filter(approved=True)
-            )
-            descendants = (
-                comment.get_descendants()
-                .select_related("user", "post")
-                .filter(approved=True)
-            )
+        ancestors = self._visible_relatives(comment.get_ancestors())
+        descendants = self._visible_relatives(comment.get_descendants())
 
         queryset = [*list(ancestors), comment, *list(descendants)]
         queryset = sorted(queryset, key=lambda x: x.created_at)

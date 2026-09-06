@@ -20,7 +20,6 @@ import logging
 from typing import Any
 
 from allauth.account.signals import user_signed_up
-from django.db import transaction
 from django.dispatch import receiver
 
 from meta_capi.tasks import (
@@ -116,13 +115,16 @@ def _on_user_signed_up(
     # The allauth signup flow runs inside an atomic block; dispatching
     # before commit means the worker can hit User.DoesNotExist on a
     # fast Celery node.
-    transaction.on_commit(
-        lambda: dispatch_complete_registration_event.delay(
-            user.id,
-            fbp=fbp or None,
-            fbc=fbc or None,
-            client_ip_address=ip_addr or None,
-            client_user_agent=ua or None,
-            event_source_url=event_source_url or None,
-        )
+    from tenant.celery import dispatch_on_commit
+
+    dispatch_on_commit(
+        dispatch_complete_registration_event,
+        [user.id],
+        {
+            "fbp": fbp or None,
+            "fbc": fbc or None,
+            "client_ip_address": ip_addr or None,
+            "client_user_agent": ua or None,
+            "event_source_url": event_source_url or None,
+        },
     )

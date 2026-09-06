@@ -496,16 +496,16 @@ class BlogCategoryViewSetTestCase(TestURLFixerMixin, APITestCase):
             "translations": {},
         }
 
-        for language in languages:
-            language_code = language[0]
-            language_name = language[1]
-
-            translation_payload = {
-                "name": f"New Category Name in {language_name}",
-                "description": f"New Category Description in {language_name}",
+        # ``languages`` is a list of CODES. Indexing into one gave the
+        # FIRST CHARACTER, so this posted translations under "e" and "d"
+        # — and "e" for both "el" and "en", collapsing three languages
+        # into two. It only ever passed because nothing validated the
+        # keys, and it wrote translation rows no reader can surface.
+        for language_code in languages:
+            payload["translations"][language_code] = {
+                "name": f"New Category Name in {language_code}",
+                "description": (f"New Category Description in {language_code}"),
             }
-
-            payload["translations"][language_code] = translation_payload
 
         url = self.get_category_list_url()
         response = self.client.post(url, data=payload, format="json")
@@ -551,16 +551,13 @@ class BlogCategoryViewSetTestCase(TestURLFixerMixin, APITestCase):
             "translations": {},
         }
 
-        for language in languages:
-            language_code = language[0]
-            language_name = language[1]
-
-            translation_payload = {
-                "name": f"Updated Category Name in {language_name}",
-                "description": f"Updated Category Description in {language_name}",
+        for language_code in languages:
+            payload["translations"][language_code] = {
+                "name": f"Updated Category Name in {language_code}",
+                "description": (
+                    f"Updated Category Description in {language_code}"
+                ),
             }
-
-            payload["translations"][language_code] = translation_payload
 
         url = self.get_category_detail_url(self.category.pk)
         response = self.client.put(url, data=payload, format="json")

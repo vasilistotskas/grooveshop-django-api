@@ -82,6 +82,7 @@ class PlatformStaffTokenAuthentication(BoundedTokenAuthentication):
     def authenticate_credentials(self, token):
         msg = _("Invalid staff token.")
         token = token.decode("utf-8")
+        authenticated = None
         with schema_context(get_public_schema_name()):
             for auth_token in self.token_model.objects.filter(
                 token_key=token[: CONSTANTS.TOKEN_KEY_LENGTH]
@@ -101,8 +102,47 @@ class PlatformStaffTokenAuthentication(BoundedTokenAuthentication):
                 user, auth_token = self.validate_user(auth_token)
                 self.enforce_absolute_age(auth_token)
                 setattr(user, PLATFORM_IDENTITY_ATTR, True)
-                return user, auth_token
-        raise exceptions.AuthenticationFailed(msg)
+                authenticated = (user, auth_token)
+                break
+        if authenticated is None:
+            raise exceptions.AuthenticationFailed(msg)
+        # Deliberately OUTSIDE the public-schema context: the question is
+        # about the tenant the REQUEST is on, and inside that block
+        # ``connection`` reports public.
+        self._require_store_access(authenticated[0])
+        return authenticated
+
+    def _require_store_access(self, user):
+        """A platform identity is never a CUSTOMER of the store it dials.
+
+        ``tenant.membership``'s own docstring states the rule every
+        ordinary authenticated endpoint relies on: "being authenticated
+        in this schema IS the authorization". A staff token breaks that
+        premise — it resolves the user against PUBLIC while the request
+        runs in a tenant schema — and Django's ``Model.__eq__`` compares
+        concrete class and pk with no notion of schema. So a public user
+        whose id happens to match a tenant customer's satisfies every
+        ownership check there is: measured, ``staff_identity ==
+        customer`` is ``True`` and ``IsOwnerOrAdmin`` grants on it. The
+        queryset half is the same arithmetic — ``filter(user=request.user)``
+        becomes ``WHERE user_id = <that pk>`` against the tenant's table.
+
+        Staff rights in the store are what the token is FOR, so requiring
+        them costs nothing legitimate: a platform superuser and a member
+        with a staff role both pass ``is_store_staff``, and an operator
+        with no role in this store had no business reading its customers'
+        data through a pk coincidence. On the public schema (the platform
+        control plane, where the token is minted and used) there is no
+        tenant to be a customer of, and the check does not apply.
+        """
+        from tenant.membership import get_current_tenant, is_store_staff
+
+        if get_current_tenant() is None:
+            return
+        if not is_store_staff(user):
+            raise exceptions.AuthenticationFailed(
+                _("This staff token grants no access to this store.")
+            )
 
     def validate_user(self, auth_token):
         user, auth_token = super().validate_user(auth_token)

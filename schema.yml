@@ -2034,7 +2034,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items created after this date
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν μετά από αυτή την ημερομηνία
       - in: query
         name: createdAt_Date
         schema:
@@ -2055,7 +2055,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items created before this date
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν πριν από αυτή την ημερομηνία
       - in: query
         name: cursor
         schema:
@@ -2444,7 +2444,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items updated after this date
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν μετά από αυτή την ημερομηνία
       - in: query
         name: updatedAt_Date
         schema:
@@ -2465,7 +2465,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items updated before this date
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν πριν από αυτή την ημερομηνία
       - in: query
         name: user
         schema:
@@ -2508,6 +2508,7 @@ paths:
         schema:
           type: string
           format: uuid
+        description: Φίλτρο ανά ακριβές UUID
       tags:
       - Blog Comments
       security:
@@ -2965,7 +2966,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items created after this date
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν μετά από αυτή την ημερομηνία
       - in: query
         name: createdAt_Date
         schema:
@@ -2986,7 +2987,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items created before this date
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν πριν από αυτή την ημερομηνία
       - in: query
         name: cursor
         schema:
@@ -3382,7 +3383,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items updated after this date
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν μετά από αυτή την ημερομηνία
       - in: query
         name: updatedAt_Date
         schema:
@@ -3403,7 +3404,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items updated before this date
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν πριν από αυτή την ημερομηνία
       - in: query
         name: user
         schema:
@@ -3446,6 +3447,7 @@ paths:
         schema:
           type: string
           format: uuid
+        description: Φίλτρο ανά ακριβές UUID
       tags:
       - Blog Comments
       security:
@@ -3532,7 +3534,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items created after this date
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν μετά από αυτή την ημερομηνία
       - in: query
         name: createdAt_Date
         schema:
@@ -3553,7 +3555,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items created before this date
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν πριν από αυτή την ημερομηνία
       - in: query
         name: cursor
         schema:
@@ -3949,7 +3951,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items updated after this date
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν μετά από αυτή την ημερομηνία
       - in: query
         name: updatedAt_Date
         schema:
@@ -3970,7 +3972,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items updated before this date
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν πριν από αυτή την ημερομηνία
       - in: query
         name: user
         schema:
@@ -4013,6 +4015,7 @@ paths:
         schema:
           type: string
           format: uuid
+        description: Φίλτρο ανά ακριβές UUID
       tags:
       - Blog Comments
       security:
@@ -4212,7 +4215,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items created after this date
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν μετά από αυτή την ημερομηνία
       - in: query
         name: createdAt_Date
         schema:
@@ -4233,7 +4236,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items created before this date
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν πριν από αυτή την ημερομηνία
       - in: query
         name: cursor
         schema:
@@ -4621,7 +4624,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items updated after this date
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν μετά από αυτή την ημερομηνία
       - in: query
         name: updatedAt_Date
         schema:
@@ -4642,7 +4645,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items updated before this date
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν πριν από αυτή την ημερομηνία
       - in: query
         name: user
         schema:
@@ -4685,6 +4688,7 @@ paths:
         schema:
           type: string
           format: uuid
+        description: Φίλτρο ανά ακριβές UUID
       tags:
       - Blog Comments
       security:
@@ -4986,7 +4990,7 @@ paths:
         name: tagName
         schema:
           type: string
-        description: Φίλτρο ανά ετικέτα (χωρίς διάκριση πεζών/κεφαλαίων)
+        description: Φίλτρο ανά ενεργή ετικέτα (χωρίς διάκριση πεζών/κεφαλαίων)
       - in: query
         name: tags
         schema:
@@ -4996,7 +5000,7 @@ paths:
           - type: array
             items:
               type: integer
-        description: Φίλτρο ανά ID ετικετών (διαχωρισμένα με κόμμα)
+        description: Φίλτρο ανά ID ενεργών ετικετών (διαχωρισμένα με κόμμα)
         explode: true
         style: form
       - in: query
@@ -5036,6 +5040,7 @@ paths:
         schema:
           type: string
           format: uuid
+        description: Φίλτρο ανά ακριβές UUID
       - in: query
         name: viewCount
         schema:
@@ -5739,7 +5744,7 @@ paths:
         name: tagName
         schema:
           type: string
-        description: Φίλτρο ανά ετικέτα (χωρίς διάκριση πεζών/κεφαλαίων)
+        description: Φίλτρο ανά ενεργή ετικέτα (χωρίς διάκριση πεζών/κεφαλαίων)
       - in: query
         name: tags
         schema:
@@ -5749,7 +5754,7 @@ paths:
           - type: array
             items:
               type: integer
-        description: Φίλτρο ανά ID ετικετών (διαχωρισμένα με κόμμα)
+        description: Φίλτρο ανά ID ενεργών ετικετών (διαχωρισμένα με κόμμα)
         explode: true
         style: form
       - in: query
@@ -5789,6 +5794,7 @@ paths:
         schema:
           type: string
           format: uuid
+        description: Φίλτρο ανά ακριβές UUID
       - in: query
         name: viewCount
         schema:
@@ -6225,7 +6231,7 @@ paths:
         name: tagName
         schema:
           type: string
-        description: Φίλτρο ανά ετικέτα (χωρίς διάκριση πεζών/κεφαλαίων)
+        description: Φίλτρο ανά ενεργή ετικέτα (χωρίς διάκριση πεζών/κεφαλαίων)
       - in: query
         name: tags
         schema:
@@ -6235,7 +6241,7 @@ paths:
           - type: array
             items:
               type: integer
-        description: Φίλτρο ανά ID ετικετών (διαχωρισμένα με κόμμα)
+        description: Φίλτρο ανά ID ενεργών ετικετών (διαχωρισμένα με κόμμα)
         explode: true
         style: form
       - in: query
@@ -6275,6 +6281,7 @@ paths:
         schema:
           type: string
           format: uuid
+        description: Φίλτρο ανά ακριβές UUID
       - in: query
         name: viewCount
         schema:
@@ -6359,7 +6366,6 @@ paths:
         required: true
       security:
       - cookieAuth: []
-      - {}
       responses:
         '400':
           content:
@@ -6655,7 +6661,7 @@ paths:
         name: tagName
         schema:
           type: string
-        description: Φίλτρο ανά ετικέτα (χωρίς διάκριση πεζών/κεφαλαίων)
+        description: Φίλτρο ανά ενεργή ετικέτα (χωρίς διάκριση πεζών/κεφαλαίων)
       - in: query
         name: tags
         schema:
@@ -6665,7 +6671,7 @@ paths:
           - type: array
             items:
               type: integer
-        description: Φίλτρο ανά ID ετικετών (διαχωρισμένα με κόμμα)
+        description: Φίλτρο ανά ID ενεργών ετικετών (διαχωρισμένα με κόμμα)
         explode: true
         style: form
       - in: query
@@ -6705,6 +6711,7 @@ paths:
         schema:
           type: string
           format: uuid
+        description: Φίλτρο ανά ακριβές UUID
       - in: query
         name: viewCount
         schema:
@@ -7002,7 +7009,7 @@ paths:
         name: tagName
         schema:
           type: string
-        description: Φίλτρο ανά ετικέτα (χωρίς διάκριση πεζών/κεφαλαίων)
+        description: Φίλτρο ανά ενεργή ετικέτα (χωρίς διάκριση πεζών/κεφαλαίων)
       - in: query
         name: tags
         schema:
@@ -7012,7 +7019,7 @@ paths:
           - type: array
             items:
               type: integer
-        description: Φίλτρο ανά ID ετικετών (διαχωρισμένα με κόμμα)
+        description: Φίλτρο ανά ID ενεργών ετικετών (διαχωρισμένα με κόμμα)
         explode: true
         style: form
       - in: query
@@ -7052,6 +7059,7 @@ paths:
         schema:
           type: string
           format: uuid
+        description: Φίλτρο ανά ακριβές UUID
       - in: query
         name: viewCount
         schema:
@@ -7140,7 +7148,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items created after this date
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν μετά από αυτή την ημερομηνία
       - in: query
         name: createdAt_Date
         schema:
@@ -7161,7 +7169,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items created before this date
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν πριν από αυτή την ημερομηνία
       - in: query
         name: cursor
         schema:
@@ -7392,6 +7400,7 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+        description: Φίλτρο ανά ακριβή σειρά
       - in: query
         name: sortOrder_Gte
         schema:
@@ -7406,6 +7415,22 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+      - in: query
+        name: sortOrderMax
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+        description: Φίλτρο αντικειμένων με σειρά ταξινόμησης μικρότερη ή ίση με
+      - in: query
+        name: sortOrderMin
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+        description: Φίλτρο αντικειμένων με σειρά ταξινόμησης μεγαλύτερη ή ίση με
       - in: query
         name: translations_Name
         schema:
@@ -7435,7 +7460,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items updated after this date
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν μετά από αυτή την ημερομηνία
       - in: query
         name: updatedAt_Date
         schema:
@@ -7456,12 +7481,13 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items updated before this date
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν πριν από αυτή την ημερομηνία
       - in: query
         name: uuid
         schema:
           type: string
           format: uuid
+        description: Φίλτρο ανά ακριβές UUID
       tags:
       - Blog Tags
       security:
@@ -8292,7 +8318,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items created after this date
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν μετά από αυτή την ημερομηνία
       - in: query
         name: createdAt_Date
         schema:
@@ -8313,7 +8339,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items created before this date
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν πριν από αυτή την ημερομηνία
       - in: query
         name: id
         schema:
@@ -8344,7 +8370,8 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Φίλτρο ειδών σε εγκαταλελειμμένα καλάθια (30+ ημέρες)
+        description: Filter items in abandoned carts — idle longer than the CART_ABANDONED_HOURS
+          store setting.
       - in: query
         name: inActiveCarts
         schema:
@@ -8356,7 +8383,8 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Φίλτρο ειδών σε ενεργά καλάθια (24ωρο)
+        description: Filter items in active carts — idle no longer than the CART_ABANDONED_HOURS
+          store setting.
       - in: query
         name: maxDiscountPercent
         schema:
@@ -8531,7 +8559,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items updated after this date
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν μετά από αυτή την ημερομηνία
       - in: query
         name: updatedAt_Date
         schema:
@@ -8552,12 +8580,13 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items updated before this date
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν πριν από αυτή την ημερομηνία
       - in: query
         name: uuid
         schema:
           type: string
           format: uuid
+        description: Φίλτρο ανά ακριβές UUID
       - in: query
         name: withDiscounts
         schema:
@@ -8982,7 +9011,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items created after this date
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν μετά από αυτή την ημερομηνία
       - in: query
         name: createdAt_Date
         schema:
@@ -9003,7 +9032,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items created before this date
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν πριν από αυτή την ημερομηνία
       - in: query
         name: cursor
         schema:
@@ -9071,7 +9100,8 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Φίλτρο εγκαταλελειμμένων καλαθιών (αδρανή για 30+ ημέρες)
+        description: Filter abandoned carts — idle longer than the CART_ABANDONED_HOURS
+          store setting.
       - in: query
         name: isActive
         schema:
@@ -9083,7 +9113,8 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Φίλτρο ενεργών/εγκαταλελειμμένων καλαθιών (βάσει 30 ημερών αδράνειας)
+        description: Filter active/abandoned carts. The window is the CART_ABANDONED_HOURS
+          store setting, not a fixed period.
       - in: query
         name: isGuest
         schema:
@@ -9246,7 +9277,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items updated after this date
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν μετά από αυτή την ημερομηνία
       - in: query
         name: updatedAt_Date
         schema:
@@ -9267,7 +9298,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items updated before this date
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν πριν από αυτή την ημερομηνία
       - in: query
         name: user
         schema:
@@ -9315,6 +9346,7 @@ paths:
         schema:
           type: string
           format: uuid
+        description: Φίλτρο ανά ακριβές UUID
       tags:
       - Cart
       security:
@@ -10028,7 +10060,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items created after this date
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν μετά από αυτή την ημερομηνία
       - in: query
         name: createdAt_Date
         schema:
@@ -10049,7 +10081,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items created before this date
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν πριν από αυτή την ημερομηνία
       - in: query
         name: cursor
         schema:
@@ -10318,6 +10350,7 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+        description: Φίλτρο ανά ακριβή σειρά
       - in: query
         name: sortOrder_Gte
         schema:
@@ -10333,11 +10366,27 @@ paths:
             pattern: ^-?\d+$
           - type: integer
       - in: query
+        name: sortOrderMax
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+        description: Φίλτρο αντικειμένων με σειρά ταξινόμησης μικρότερη ή ίση με
+      - in: query
+        name: sortOrderMin
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+        description: Φίλτρο αντικειμένων με σειρά ταξινόμησης μεγαλύτερη ή ίση με
+      - in: query
         name: updatedAfter
         schema:
           type: string
           format: date-time
-        description: Filter items updated after this date
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν μετά από αυτή την ημερομηνία
       - in: query
         name: updatedAt_Date
         schema:
@@ -10358,12 +10407,13 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items updated before this date
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν πριν από αυτή την ημερομηνία
       - in: query
         name: uuid
         schema:
           type: string
           format: uuid
+        description: Φίλτρο ανά ακριβές UUID
       tags:
       - Countries
       security:
@@ -11438,7 +11488,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items created after this date
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν μετά από αυτή την ημερομηνία
       - in: query
         name: createdAt_Date
         schema:
@@ -11459,7 +11509,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items created before this date
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν πριν από αυτή την ημερομηνία
       - in: query
         name: cursor
         schema:
@@ -11730,7 +11780,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items updated after this date
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν μετά από αυτή την ημερομηνία
       - in: query
         name: updatedAt_Date
         schema:
@@ -11751,7 +11801,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items updated before this date
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν πριν από αυτή την ημερομηνία
       - in: query
         name: user
         schema:
@@ -11809,6 +11859,7 @@ paths:
         schema:
           type: string
           format: uuid
+        description: Φίλτρο ανά ακριβές UUID
       tags:
       - Notification Users
       security:
@@ -12408,7 +12459,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items created after this date
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν μετά από αυτή την ημερομηνία
       - in: query
         name: createdAt_Date
         schema:
@@ -12429,7 +12480,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items created before this date
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν πριν από αυτή την ημερομηνία
       - in: query
         name: cursor
         schema:
@@ -12979,7 +13030,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items updated after this date
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν μετά από αυτή την ημερομηνία
       - in: query
         name: updatedAt_Date
         schema:
@@ -13000,7 +13051,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items updated before this date
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν πριν από αυτή την ημερομηνία
       - in: query
         name: user
         schema:
@@ -13046,6 +13097,7 @@ paths:
         schema:
           type: string
           format: uuid
+        description: Φίλτρο ανά ακριβές UUID
       - in: query
         name: zipcode
         schema:
@@ -13185,7 +13237,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items created after this date
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν μετά από αυτή την ημερομηνία
       - in: query
         name: createdAt_Date
         schema:
@@ -13206,7 +13258,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items created before this date
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν πριν από αυτή την ημερομηνία
       - in: query
         name: cursor
         schema:
@@ -13729,7 +13781,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items updated after this date
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν μετά από αυτή την ημερομηνία
       - in: query
         name: updatedAt_Date
         schema:
@@ -13750,12 +13802,13 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items updated before this date
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν πριν από αυτή την ημερομηνία
       - in: query
         name: uuid
         schema:
           type: string
           format: uuid
+        description: Φίλτρο ανά ακριβές UUID
       tags:
       - Order Items
       security:
@@ -15487,7 +15540,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items created after this date
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν μετά από αυτή την ημερομηνία
       - in: query
         name: createdAt_Date
         schema:
@@ -15508,7 +15561,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items created before this date
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν πριν από αυτή την ημερομηνία
       - in: query
         name: cursor
         schema:
@@ -16057,7 +16110,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items updated after this date
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν μετά από αυτή την ημερομηνία
       - in: query
         name: updatedAt_Date
         schema:
@@ -16078,7 +16131,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items updated before this date
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν πριν από αυτή την ημερομηνία
       - in: query
         name: user
         schema:
@@ -16124,6 +16177,7 @@ paths:
         schema:
           type: string
           format: uuid
+        description: Φίλτρο ανά ακριβές UUID
       - in: query
         name: zipcode
         schema:
@@ -16233,8 +16287,8 @@ paths:
         αυτές τις παραμέτρους στο UUID της παραγγελίας ώστε το κατάστημα να μπορεί
         να προωθήσει τον πελάτη στη διαδρομή ``/checkout/success/{uuid}``. Το ``t``
         επιλύεται μέσω του ``payment_id`` (ορίζεται από το webhook, ενδέχεται να καθυστερεί
-        σε σχέση με την ανακατεύθυνση)· το ``s`` επιλύεται μέσω του ``viva_order_code``
-        που αποθηκεύεται κατά τη δημιουργία της συνεδρίας, οπότε λειτουργεί και κατά
+        σε σχέση με την ανακατεύθυνση)· το ``s`` επιλύεται μέσω των ``viva_order_codes``
+        που αποθηκεύονται κατά τη δημιουργία της συνεδρίας, οπότε λειτουργεί και κατά
         τη διάρκεια της κούρσας με το webhook. Η πρόσβαση είναι ανοιχτή επειδή και
         τα δύο κλειδιά είναι μη μαντέψιμα αναγνωριστικά που παράγει το Viva και η
         απόκριση δεν φέρει προσωπικά δεδομένα — μόνο το UUID, το δημόσιο id, την κατάσταση
@@ -16856,6 +16910,18 @@ paths:
           - type: number
         description: Φίλτρο ανά ελάχιστο κόστος
       - in: query
+        name: createdAfter
+        schema:
+          type: string
+          format: date-time
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν μετά από αυτή την ημερομηνία
+      - in: query
+        name: createdBefore
+        schema:
+          type: string
+          format: date-time
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν πριν από αυτή την ημερομηνία
+      - in: query
         name: cursor
         schema:
           type: string
@@ -17050,6 +17116,7 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+        description: Φίλτρο ανά ακριβή σειρά
       - in: query
         name: sortOrder_Gte
         schema:
@@ -17065,10 +17132,39 @@ paths:
             pattern: ^-?\d+$
           - type: integer
       - in: query
+        name: sortOrderMax
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+        description: Φίλτρο αντικειμένων με σειρά ταξινόμησης μικρότερη ή ίση με
+      - in: query
+        name: sortOrderMin
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+        description: Φίλτρο αντικειμένων με σειρά ταξινόμησης μεγαλύτερη ή ίση με
+      - in: query
+        name: updatedAfter
+        schema:
+          type: string
+          format: date-time
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν μετά από αυτή την ημερομηνία
+      - in: query
+        name: updatedBefore
+        schema:
+          type: string
+          format: date-time
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν πριν από αυτή την ημερομηνία
+      - in: query
         name: uuid
         schema:
           type: string
           format: uuid
+        description: Φίλτρο ανά ακριβές UUID
       tags:
       - Payment methods
       security:
@@ -17493,7 +17589,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items created after this date
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν μετά από αυτή την ημερομηνία
       - in: query
         name: createdAt_Date
         schema:
@@ -17514,7 +17610,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items created before this date
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν πριν από αυτή την ημερομηνία
       - in: query
         name: cursor
         schema:
@@ -17681,6 +17777,30 @@ paths:
           - type: number
         description: Maximum weight
       - in: query
+        name: metadataContains
+        schema:
+          type: string
+        description: Φίλτρο αντικειμένων όπου τα metadata περιέχουν το καθορισμένο
+          JSON (ως συμβολοσειρά)
+      - in: query
+        name: metadataHasAnyKeys
+        schema:
+          type: string
+        description: Φίλτρο αντικειμένων όπου τα metadata περιέχουν οποιοδήποτε από
+          τα καθορισμένα κλειδιά (διαχωρισμένα με κόμμα)
+      - in: query
+        name: metadataHasKey
+        schema:
+          type: string
+        description: Φίλτρο αντικειμένων όπου τα metadata περιέχουν το καθορισμένο
+          κλειδί
+      - in: query
+        name: metadataHasKeys
+        schema:
+          type: string
+        description: Φίλτρο αντικειμένων όπου τα metadata περιέχουν όλα τα καθορισμένα
+          κλειδιά (διαχωρισμένα με κόμμα)
+      - in: query
         name: minDiscount
         schema:
           oneOf:
@@ -17819,6 +17939,12 @@ paths:
           - type: string
             pattern: ^-?\d+(\.\d+)?$
           - type: number
+      - in: query
+        name: privateMetadataHasKey
+        schema:
+          type: string
+        description: Φίλτρο αντικειμένων όπου τα ιδιωτικά metadata περιέχουν το καθορισμένο
+          κλειδί (μόνο για προσωπικό)
       - name: search
         required: false
         in: query
@@ -17859,7 +17985,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items updated after this date
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν μετά από αυτή την ημερομηνία
       - in: query
         name: updatedAt_Date
         schema:
@@ -17880,12 +18006,13 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items updated before this date
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν πριν από αυτή την ημερομηνία
       - in: query
         name: uuid
         schema:
           type: string
           format: uuid
+        description: Φίλτρο ανά ακριβές UUID
       - in: query
         name: viewCount
         schema:
@@ -19013,7 +19140,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items created after this date
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν μετά από αυτή την ημερομηνία
       - in: query
         name: createdAt_Date
         schema:
@@ -19034,7 +19161,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items created before this date
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν πριν από αυτή την ημερομηνία
       - in: query
         name: cursor
         schema:
@@ -19164,7 +19291,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items updated after this date
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν μετά από αυτή την ημερομηνία
       - in: query
         name: updatedAt_Date
         schema:
@@ -19185,12 +19312,13 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items updated before this date
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν πριν από αυτή την ημερομηνία
       - in: query
         name: uuid
         schema:
           type: string
           format: uuid
+        description: Φίλτρο ανά ακριβές UUID
       tags:
       - Product Attributes
       security:
@@ -19556,7 +19684,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items created after this date
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν μετά από αυτή την ημερομηνία
       - in: query
         name: createdAt_Date
         schema:
@@ -19577,7 +19705,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items created before this date
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν πριν από αυτή την ημερομηνία
       - in: query
         name: cursor
         schema:
@@ -19693,7 +19821,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items updated after this date
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν μετά από αυτή την ημερομηνία
       - in: query
         name: updatedAt_Date
         schema:
@@ -19714,12 +19842,13 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items updated before this date
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν πριν από αυτή την ημερομηνία
       - in: query
         name: uuid
         schema:
           type: string
           format: uuid
+        description: Φίλτρο ανά ακριβές UUID
       - in: query
         name: value
         schema:
@@ -20078,7 +20207,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items created after this date
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν μετά από αυτή την ημερομηνία
       - in: query
         name: createdAt_Date
         schema:
@@ -20099,7 +20228,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items created before this date
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν πριν από αυτή την ημερομηνία
       - in: query
         name: cursor
         schema:
@@ -20354,7 +20483,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items updated after this date
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν μετά από αυτή την ημερομηνία
       - in: query
         name: updatedAt_Date
         schema:
@@ -20375,12 +20504,13 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items updated before this date
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν πριν από αυτή την ημερομηνία
       - in: query
         name: uuid
         schema:
           type: string
           format: uuid
+        description: Φίλτρο ανά ακριβές UUID
       tags:
       - Product Categories
       security:
@@ -20771,7 +20901,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items created after this date
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν μετά από αυτή την ημερομηνία
       - in: query
         name: createdAt_Date
         schema:
@@ -20792,7 +20922,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items created before this date
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν πριν από αυτή την ημερομηνία
       - in: query
         name: descendantOf
         schema:
@@ -20996,7 +21126,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items updated after this date
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν μετά από αυτή την ημερομηνία
       - in: query
         name: updatedAt_Date
         schema:
@@ -21017,12 +21147,13 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items updated before this date
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν πριν από αυτή την ημερομηνία
       - in: query
         name: uuid
         schema:
           type: string
           format: uuid
+        description: Φίλτρο ανά ακριβές UUID
       tags:
       - Product Categories
       security:
@@ -21880,13 +22011,13 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items created after this date
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν μετά από αυτή την ημερομηνία
       - in: query
         name: createdBefore
         schema:
           type: string
           format: date-time
-        description: Filter items created before this date
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν πριν από αυτή την ημερομηνία
       - in: query
         name: cursor
         schema:
@@ -21976,17 +22107,41 @@ paths:
         schema:
           type: string
       - in: query
+        name: sortOrder
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+(\.\d+)?$
+          - type: number
+        description: Φίλτρο ανά ακριβή σειρά
+      - in: query
+        name: sortOrderMax
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+(\.\d+)?$
+          - type: number
+        description: Φίλτρο αντικειμένων με σειρά ταξινόμησης μικρότερη ή ίση με
+      - in: query
+        name: sortOrderMin
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+(\.\d+)?$
+          - type: number
+        description: Φίλτρο αντικειμένων με σειρά ταξινόμησης μεγαλύτερη ή ίση με
+      - in: query
         name: updatedAfter
         schema:
           type: string
           format: date-time
-        description: Filter items updated after this date
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν μετά από αυτή την ημερομηνία
       - in: query
         name: updatedBefore
         schema:
           type: string
           format: date-time
-        description: Filter items updated before this date
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν πριν από αυτή την ημερομηνία
       - in: query
         name: user
         schema:
@@ -22415,13 +22570,13 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items created after this date
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν μετά από αυτή την ημερομηνία
       - in: query
         name: createdBefore
         schema:
           type: string
           format: date-time
-        description: Filter items created before this date
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν πριν από αυτή την ημερομηνία
       - in: query
         name: id
         schema:
@@ -22460,17 +22615,41 @@ paths:
         schema:
           type: string
       - in: query
+        name: sortOrder
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+(\.\d+)?$
+          - type: number
+        description: Φίλτρο ανά ακριβή σειρά
+      - in: query
+        name: sortOrderMax
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+(\.\d+)?$
+          - type: number
+        description: Φίλτρο αντικειμένων με σειρά ταξινόμησης μικρότερη ή ίση με
+      - in: query
+        name: sortOrderMin
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+(\.\d+)?$
+          - type: number
+        description: Φίλτρο αντικειμένων με σειρά ταξινόμησης μεγαλύτερη ή ίση με
+      - in: query
         name: updatedAfter
         schema:
           type: string
           format: date-time
-        description: Filter items updated after this date
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν μετά από αυτή την ημερομηνία
       - in: query
         name: updatedBefore
         schema:
           type: string
           format: date-time
-        description: Filter items updated before this date
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν πριν από αυτή την ημερομηνία
       - in: query
         name: user
         schema:
@@ -23426,6 +23605,7 @@ paths:
         schema:
           type: string
           format: uuid
+        description: Φίλτρο ανά ακριβές UUID
       - in: query
         name: verifiedPurchase
         schema:
@@ -23970,13 +24150,13 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items created after this date
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν μετά από αυτή την ημερομηνία
       - in: query
         name: createdBefore
         schema:
           type: string
           format: date-time
-        description: Filter items created before this date
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν πριν από αυτή την ημερομηνία
       - in: query
         name: cursor
         schema:
@@ -24055,6 +24235,7 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+        description: Φίλτρο ανά ακριβή σειρά
       - in: query
         name: sortOrder_Gte
         schema:
@@ -24070,22 +24251,39 @@ paths:
             pattern: ^-?\d+$
           - type: integer
       - in: query
+        name: sortOrderMax
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+        description: Φίλτρο αντικειμένων με σειρά ταξινόμησης μικρότερη ή ίση με
+      - in: query
+        name: sortOrderMin
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+        description: Φίλτρο αντικειμένων με σειρά ταξινόμησης μεγαλύτερη ή ίση με
+      - in: query
         name: updatedAfter
         schema:
           type: string
           format: date-time
-        description: Filter items updated after this date
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν μετά από αυτή την ημερομηνία
       - in: query
         name: updatedBefore
         schema:
           type: string
           format: date-time
-        description: Filter items updated before this date
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν πριν από αυτή την ημερομηνία
       - in: query
         name: uuid
         schema:
           type: string
           format: uuid
+        description: Φίλτρο ανά ακριβές UUID
       tags:
       - Regions
       security:
@@ -24484,13 +24682,13 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items created after this date
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν μετά από αυτή την ημερομηνία
       - in: query
         name: createdBefore
         schema:
           type: string
           format: date-time
-        description: Filter items created before this date
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν πριν από αυτή την ημερομηνία
       - in: query
         name: languageCode
         schema:
@@ -24546,6 +24744,7 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+        description: Φίλτρο ανά ακριβή σειρά
       - in: query
         name: sortOrder_Gte
         schema:
@@ -24561,22 +24760,39 @@ paths:
             pattern: ^-?\d+$
           - type: integer
       - in: query
+        name: sortOrderMax
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+        description: Φίλτρο αντικειμένων με σειρά ταξινόμησης μικρότερη ή ίση με
+      - in: query
+        name: sortOrderMin
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+        description: Φίλτρο αντικειμένων με σειρά ταξινόμησης μεγαλύτερη ή ίση με
+      - in: query
         name: updatedAfter
         schema:
           type: string
           format: date-time
-        description: Filter items updated after this date
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν μετά από αυτή την ημερομηνία
       - in: query
         name: updatedBefore
         schema:
           type: string
           format: date-time
-        description: Filter items updated before this date
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν πριν από αυτή την ημερομηνία
       - in: query
         name: uuid
         schema:
           type: string
           format: uuid
+        description: Φίλτρο ανά ακριβές UUID
       tags:
       - Geography
       security:
@@ -24704,7 +24920,6 @@ paths:
       - Search
       security:
       - cookieAuth: []
-      - {}
       responses:
         '200':
           content:
@@ -25728,7 +25943,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items created after this date
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν μετά από αυτή την ημερομηνία
       - in: query
         name: createdAt_Date
         schema:
@@ -25749,7 +25964,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items created before this date
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν πριν από αυτή την ημερομηνία
       - in: query
         name: cursor
         schema:
@@ -25918,6 +26133,7 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+        description: Φίλτρο ανά ακριβή σειρά
       - in: query
         name: sortOrder_Gte
         schema:
@@ -25932,6 +26148,22 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+      - in: query
+        name: sortOrderMax
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+        description: Φίλτρο αντικειμένων με σειρά ταξινόμησης μικρότερη ή ίση με
+      - in: query
+        name: sortOrderMin
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+        description: Φίλτρο αντικειμένων με σειρά ταξινόμησης μεγαλύτερη ή ίση με
       - in: query
         name: translations_Label
         schema:
@@ -25961,7 +26193,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items updated after this date
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν μετά από αυτή την ημερομηνία
       - in: query
         name: updatedAt_Date
         schema:
@@ -25982,12 +26214,13 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items updated before this date
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν πριν από αυτή την ημερομηνία
       - in: query
         name: uuid
         schema:
           type: string
           format: uuid
+        description: Φίλτρο ανά ακριβές UUID
       tags:
       - Tags
       security:
@@ -26370,7 +26603,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items created after this date
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν μετά από αυτή την ημερομηνία
       - in: query
         name: createdAt_Date
         schema:
@@ -26391,7 +26624,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items created before this date
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν πριν από αυτή την ημερομηνία
       - in: query
         name: cursor
         schema:
@@ -26530,7 +26763,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items updated after this date
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν μετά από αυτή την ημερομηνία
       - in: query
         name: updatedAt_Date
         schema:
@@ -26551,12 +26784,13 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items updated before this date
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν πριν από αυτή την ημερομηνία
       - in: query
         name: uuid
         schema:
           type: string
           format: uuid
+        description: Φίλτρο ανά ακριβές UUID
       tags:
       - Tagged Items
       security:
@@ -27116,74 +27350,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedUserDetailsList'
           description: ''
-    post:
-      operationId: createUserAccount
-      description: Δημιουργία νέου Λογαριασμός Χρήστη. Απαιτεί ταυτοποίηση.
-      summary: Δημιουργία Λογαριασμός Χρήστη
-      parameters:
-      - in: query
-        name: languageCode
-        schema:
-          type: string
-          enum:
-          - de
-          - el
-          - en
-          default: el
-        description: Κωδικός γλώσσας για μεταφράσεις (el, en, de)
-      tags:
-      - User Accounts
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/UserWriteRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/UserWriteRequest'
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UserWriteRequest'
-        required: true
-      security:
-      - cookieAuth: []
-      responses:
-        '400':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-        '401':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-        '403':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-        '404':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-        '500':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-        '201':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/UserDetails'
-          description: ''
   /api/v1/user/account/{id}:
     get:
       operationId: retrieveUserAccount
@@ -27279,7 +27445,6 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/UserWriteRequest'
-        required: true
       security:
       - cookieAuth: []
       responses:
@@ -28575,7 +28740,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items created after this date
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν μετά από αυτή την ημερομηνία
       - in: query
         name: createdAt_Date
         schema:
@@ -28596,7 +28761,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items created before this date
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν πριν από αυτή την ημερομηνία
       - in: query
         name: cursor
         schema:
@@ -28816,7 +28981,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items updated after this date
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν μετά από αυτή την ημερομηνία
       - in: query
         name: updatedAt_Date
         schema:
@@ -28837,12 +29002,13 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items updated before this date
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν πριν από αυτή την ημερομηνία
       - in: query
         name: uuid
         schema:
           type: string
           format: uuid
+        description: Φίλτρο ανά ακριβές UUID
       - in: query
         name: zipcode
         schema:
@@ -29306,7 +29472,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items created after this date
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν μετά από αυτή την ημερομηνία
       - in: query
         name: createdAt_Date
         schema:
@@ -29327,7 +29493,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items created before this date
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν πριν από αυτή την ημερομηνία
       - in: query
         name: cursor
         schema:
@@ -29565,7 +29731,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items updated after this date
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν μετά από αυτή την ημερομηνία
       - in: query
         name: updatedAt_Date
         schema:
@@ -29586,12 +29752,13 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items updated before this date
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν πριν από αυτή την ημερομηνία
       - in: query
         name: uuid
         schema:
           type: string
           format: uuid
+        description: Φίλτρο ανά ακριβές UUID
       tags:
       - User Subscription
       security:
@@ -30164,7 +30331,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items created after this date
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν μετά από αυτή την ημερομηνία
       - in: query
         name: createdAt_Date
         schema:
@@ -30185,7 +30352,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items created before this date
+        description: Φίλτρο αντικειμένων που δημιουργήθηκαν πριν από αυτή την ημερομηνία
       - in: query
         name: cursor
         schema:
@@ -30349,7 +30516,7 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items updated after this date
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν μετά από αυτή την ημερομηνία
       - in: query
         name: updatedAt_Date
         schema:
@@ -30370,12 +30537,13 @@ paths:
         schema:
           type: string
           format: date-time
-        description: Filter items updated before this date
+        description: Φίλτρο αντικειμένων που ενημερώθηκαν πριν από αυτή την ημερομηνία
       - in: query
         name: uuid
         schema:
           type: string
           format: uuid
+        description: Φίλτρο ανά ακριβές UUID
       tags:
       - Subscription Topics
       security:
@@ -31997,7 +32165,7 @@ components:
           readOnly: true
         user:
           allOf:
-          - $ref: '#/components/schemas/UserDetails'
+          - $ref: '#/components/schemas/UserPublic'
           readOnly: true
         website:
           type: string
@@ -32392,7 +32560,7 @@ components:
                   type: string
         user:
           allOf:
-          - $ref: '#/components/schemas/UserDetails'
+          - $ref: '#/components/schemas/UserPublic'
           readOnly: true
         contentPreview:
           type: string
@@ -32486,7 +32654,7 @@ components:
                   type: string
         user:
           allOf:
-          - $ref: '#/components/schemas/UserDetails'
+          - $ref: '#/components/schemas/UserPublic'
           readOnly: true
         contentPreview:
           type: string
@@ -40881,12 +41049,6 @@ components:
     PatchedUserWriteRequest:
       type: object
       properties:
-        email:
-          type: string
-          format: email
-          minLength: 1
-          title: Διεύθυνση Email
-          maxLength: 254
         firstName:
           type: string
           title: Όνομα
@@ -40898,7 +41060,7 @@ components:
         username:
           nullable: true
           title: Όνομα χρήστη
-          description: Required. 30 characters or fewer.Letters, digits and @/./+/-/_
+          description: Required. 30 characters or fewer. Letters, digits and @/./+/-/_
             only.
           oneOf:
           - type: string
@@ -40913,7 +41075,6 @@ components:
           title: Εικόνα
         phone:
           type: string
-          nullable: true
         city:
           type: string
           title: Πόλη
@@ -40946,7 +41107,6 @@ components:
           nullable: true
           title: Ημ/νία γέννησης
         twitter:
-          nullable: true
           title: Προφίλ Twitter
           oneOf:
           - type: string
@@ -40955,7 +41115,6 @@ components:
           - type: string
             maxLength: 0
         linkedin:
-          nullable: true
           title: Προφίλ LinkedIn
           oneOf:
           - type: string
@@ -40964,7 +41123,6 @@ components:
           - type: string
             maxLength: 0
         facebook:
-          nullable: true
           title: Προφίλ Facebook
           oneOf:
           - type: string
@@ -40973,7 +41131,6 @@ components:
           - type: string
             maxLength: 0
         instagram:
-          nullable: true
           title: Προφίλ Instagram
           oneOf:
           - type: string
@@ -40982,7 +41139,6 @@ components:
           - type: string
             maxLength: 0
         website:
-          nullable: true
           title: Ιστότοπος
           oneOf:
           - type: string
@@ -40991,7 +41147,6 @@ components:
           - type: string
             maxLength: 0
         youtube:
-          nullable: true
           title: Προφίλ Youtube
           oneOf:
           - type: string
@@ -41000,7 +41155,6 @@ components:
           - type: string
             maxLength: 0
         github:
-          nullable: true
           title: Προφίλ Github
           oneOf:
           - type: string
@@ -43176,7 +43330,7 @@ components:
           readOnly: true
         user:
           allOf:
-          - $ref: '#/components/schemas/UserDetails'
+          - $ref: '#/components/schemas/UserPublic'
           readOnly: true
         rate:
           allOf:
@@ -43252,7 +43406,7 @@ components:
           readOnly: true
         user:
           allOf:
-          - $ref: '#/components/schemas/UserDetails'
+          - $ref: '#/components/schemas/UserPublic'
           readOnly: true
         rate:
           allOf:
@@ -43977,7 +44131,8 @@ components:
           type: array
           items:
             type: integer
-          description: Λίστα ID δεσμεύσεων προς απελευθέρωση
+          description: List of reservation IDs to release (at most 100)
+          maxItems: 100
       required:
       - reservationIds
     ReleaseReservationsResponse:
@@ -45620,7 +45775,7 @@ components:
         username:
           nullable: true
           title: Όνομα χρήστη
-          description: Required. 30 characters or fewer.Letters, digits and @/./+/-/_
+          description: Required. 30 characters or fewer. Letters, digits and @/./+/-/_
             only.
           oneOf:
           - type: string
@@ -45630,7 +45785,6 @@ components:
             maxLength: 0
         phone:
           type: string
-          nullable: true
         city:
           type: string
           title: Πόλη
@@ -45759,6 +45913,38 @@ components:
       - uuid
       - website
       - youtube
+    UserPublic:
+      type: object
+      description: The author identity shown to anyone, including anonymous callers.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        username:
+          type: string
+          readOnly: true
+          nullable: true
+          title: Όνομα χρήστη
+          description: Required. 30 characters or fewer. Letters, digits and @/./+/-/_
+            only.
+        firstName:
+          type: string
+          readOnly: true
+          title: Όνομα
+        lastName:
+          type: string
+          readOnly: true
+          title: Επώνυμο
+        mainImagePath:
+          type: string
+          description: Avatar path or empty string
+          readOnly: true
+      required:
+      - firstName
+      - id
+      - lastName
+      - mainImagePath
+      - username
     UserSubscription:
       type: object
       properties:
@@ -45878,12 +46064,6 @@ components:
     UserWriteRequest:
       type: object
       properties:
-        email:
-          type: string
-          format: email
-          minLength: 1
-          title: Διεύθυνση Email
-          maxLength: 254
         firstName:
           type: string
           title: Όνομα
@@ -45895,7 +46075,7 @@ components:
         username:
           nullable: true
           title: Όνομα χρήστη
-          description: Required. 30 characters or fewer.Letters, digits and @/./+/-/_
+          description: Required. 30 characters or fewer. Letters, digits and @/./+/-/_
             only.
           oneOf:
           - type: string
@@ -45910,7 +46090,6 @@ components:
           title: Εικόνα
         phone:
           type: string
-          nullable: true
         city:
           type: string
           title: Πόλη
@@ -45943,7 +46122,6 @@ components:
           nullable: true
           title: Ημ/νία γέννησης
         twitter:
-          nullable: true
           title: Προφίλ Twitter
           oneOf:
           - type: string
@@ -45952,7 +46130,6 @@ components:
           - type: string
             maxLength: 0
         linkedin:
-          nullable: true
           title: Προφίλ LinkedIn
           oneOf:
           - type: string
@@ -45961,7 +46138,6 @@ components:
           - type: string
             maxLength: 0
         facebook:
-          nullable: true
           title: Προφίλ Facebook
           oneOf:
           - type: string
@@ -45970,7 +46146,6 @@ components:
           - type: string
             maxLength: 0
         instagram:
-          nullable: true
           title: Προφίλ Instagram
           oneOf:
           - type: string
@@ -45979,7 +46154,6 @@ components:
           - type: string
             maxLength: 0
         website:
-          nullable: true
           title: Ιστότοπος
           oneOf:
           - type: string
@@ -45988,7 +46162,6 @@ components:
           - type: string
             maxLength: 0
         youtube:
-          nullable: true
           title: Προφίλ Youtube
           oneOf:
           - type: string
@@ -45997,7 +46170,6 @@ components:
           - type: string
             maxLength: 0
         github:
-          nullable: true
           title: Προφίλ Github
           oneOf:
           - type: string
@@ -46014,8 +46186,6 @@ components:
           title: Γλώσσα
           description: Προτιμώμενη γλώσσα για emails και μηνύματα διεπαφής.
           maxLength: 10
-      required:
-      - email
     UsernameUpdateRequest:
       type: object
       properties:
@@ -46023,7 +46193,8 @@ components:
           type: string
           minLength: 1
           description: Νέο όνομα χρήστη
-          maxLength: 150
+          pattern: ^[\w.@+#-]+$
+          maxLength: 30
       required:
       - username
     UsernameUpdateResponse:

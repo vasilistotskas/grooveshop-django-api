@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.utils.text import format_lazy
 from django.utils.translation import gettext_lazy as _
 from djmoney.contrib.django_rest_framework import MoneyField
 from drf_spectacular.helpers import lazy_serializer
@@ -141,7 +142,11 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
 
     @extend_schema_field(serializers.ListField(child=serializers.CharField()))
     def get_applied_coupon_codes(self, obj: Cart) -> list[str]:
-        return list(obj.applied_codes.values_list("code__code", flat=True))
+        # `.all()`, not `.values_list()`: values_list builds a NEW
+        # queryset and always hits the database, so it walks straight
+        # past the `applied_codes__code` prefetch and costs a query per
+        # cart on the staff list. Iterating the prefetched rows uses it.
+        return [row.code.code for row in obj.applied_codes.all()]
 
     @extend_schema_field(
         {
@@ -281,8 +286,14 @@ class CartDetailSerializer(CartSerializer):
         if categories:
             from product.models.product import Product
 
+            # `for_list()` carries the prefetches ProductSerializer
+            # needs — translations, main image, review and like counts.
+            # A bare queryset here cost a query PER recommended product
+            # for each of those, on the primary "view cart" response.
+            # It already filters to active, non-deleted products.
             recommendations = (
-                Product.objects.filter(category__in=categories, active=True)
+                Product.objects.for_list()
+                .filter(category__in=categories)
                 .exclude(id__in=obj.items.values_list("product_id", flat=True))
                 .order_by("-view_count")[:4]
             )
@@ -299,13 +310,29 @@ class CartDetailSerializer(CartSerializer):
         )
 
 
+# A reservation exists per cart line, and this endpoint does database
+# work plus one release attempt per id. Unbounded, that is a cheap way
+# for any caller to buy an arbitrarily long request. A hundred is far
+# above any real cart — `gift_card_codes` in this same file has been
+# capped at 3 all along, so the convention was already here.
+MAX_RELEASE_RESERVATION_IDS = 100
+
+
 class ReleaseReservationsRequestSerializer(serializers.Serializer):
     """Serializer for releasing stock reservations."""
 
     reservation_ids = serializers.ListField(
         child=serializers.IntegerField(),
         required=True,
-        help_text=_("List of reservation IDs to release"),
+        max_length=MAX_RELEASE_RESERVATION_IDS,
+        # `format_lazy`, not an f-string inside `_()`: the f-string is
+        # resolved before `_()` sees it, so the msgid would carry the
+        # actual number and never match the catalogue (INT001, and the
+        # same trap `UserAccount.username`'s help_text documents).
+        help_text=format_lazy(
+            _("List of reservation IDs to release (at most {max})"),
+            max=MAX_RELEASE_RESERVATION_IDS,
+        ),
     )
 
 

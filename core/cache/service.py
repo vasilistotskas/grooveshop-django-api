@@ -70,6 +70,41 @@ class PurgeReport:
     def total_blocked(self) -> int:
         return sum(s.django_blocked + s.nuxt_blocked for s in self.surfaces)
 
+    @property
+    def total_django_matched(self) -> int:
+        return sum(s.django_matched for s in self.surfaces)
+
+    @property
+    def total_nuxt_matched(self) -> int:
+        return sum(s.nuxt_matched for s in self.surfaces)
+
+    @property
+    def django_headline(self) -> int:
+        """The Django figure to show the operator.
+
+        A dry run deletes nothing, so ``django_deleted`` is always 0 —
+        which made "Dry run: 0 Django keys would be removed" the answer
+        to every dry run ever performed, defeating the only thing a dry
+        run is for. The count it actually produced was sitting in
+        ``django_matched`` and reached nobody outside the audit
+        record's ``detail`` blob.
+        """
+        return self.total_django_matched if self.dry_run else self.total_django
+
+    @property
+    def nuxt_headline(self) -> int:
+        """The Nuxt figure to show the operator — see django_headline."""
+        return self.total_nuxt_matched if self.dry_run else self.total_nuxt
+
+    @property
+    def failed_surfaces(self) -> list[SurfaceResult]:
+        """Surfaces where some backend refused, in any tier."""
+        return [
+            s
+            for s in self.surfaces
+            if s.django_error or s.nuxt_error or s.gateway_error
+        ]
+
 
 class CacheService:
     """Top-level cache management API used by admin views, management
@@ -201,8 +236,12 @@ class CacheService:
                 actor=actor if actor and actor.is_authenticated else None,
                 surfaces=[s.code for s in report.surfaces],
                 dry_run=report.dry_run,
-                total_django=report.total_django,
-                total_nuxt=report.total_nuxt,
+                # The operator-facing figures: what a real run removed,
+                # or what a dry run would have. ``dry_run`` sits beside
+                # them, so which one this is, is never ambiguous — and
+                # a dry-run row of all zeroes told nobody anything.
+                total_django=report.django_headline,
+                total_nuxt=report.nuxt_headline,
                 total_blocked=report.total_blocked,
                 detail=[
                     {

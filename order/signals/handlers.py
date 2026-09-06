@@ -51,6 +51,7 @@ from order.tasks import (
     send_refund_confirmation_email,
     send_shipping_notification_email,
 )
+from tenant.celery import dispatch_on_commit
 
 logger = logging.getLogger(__name__)
 
@@ -174,20 +175,7 @@ def handle_order_post_save(
     if settings.AGENT_GATEWAY_INTERNAL_URL and (
         status_changed or payment_status_changed or tracking_dispatched
     ):
-        # ``_schema`` was captured at the top of this function and is
-        # bound into the lambda below as a default — by the time
-        # on_commit fires the schema context has exited and TenantTask
-        # would stamp the public schema (same contract as every other
-        # dispatch in this module). It is NOT re-read here: the three
-        # closures above reference ``_schema`` as a free variable, so
-        # rebinding the name would retroactively change what they see.
-        transaction.on_commit(
-            lambda oid=instance.id, s=_schema: (
-                push_order_event_to_gateway.apply_async(
-                    args=[oid], headers={"_schema_name": s}
-                )
-            )
-        )
+        dispatch_on_commit(push_order_event_to_gateway, [instance.id])
 
 
 def _cart_for_order(order: Order):
@@ -296,18 +284,8 @@ def handle_order_created(
 
     # Live in-app notification for authenticated shoppers. The task
     # itself drops guests silently, so there's no is_guest check here.
-    # ``_schema`` is captured at lambda-build time (inside the active
-    # schema_context); by the time on_commit fires the context has
-    # exited and TenantTask would stamp the public schema.
     if order.user_id:
-        _schema = connection.schema_name
-        transaction.on_commit(
-            lambda oid=order.id, s=_schema: (
-                notify_order_created_live.apply_async(
-                    args=[oid], headers={"_schema_name": s}
-                )
-            )
-        )
+        dispatch_on_commit(notify_order_created_live, [order.id])
 
     # Clear the cart — but NOT while the shopper still owes an online
     # payment. See ``Order.awaits_online_payment``.
@@ -344,40 +322,15 @@ def handle_order_status_changed(
         and order.metadata.get(f"suppress_status_ws_{new_status}")
     )
 
-    # Customer email dispatch policy — single source of truth.
-    #   • PENDING / PROCESSING are internal milestones (covered by the
-    #     order-received and payment-confirmed notifications) and never
-    #     get their own email.
-    #   • SHIPPED is owned by the dedicated shipping-notification email,
-    #     which carries the tracking number and only sends once the
-    #     parcel is genuinely in transit (the task self-gates on
-    #     status == SHIPPED + tracking present, so an early fire at
-    #     voucher-mint harmlessly defers).
-    #   • Everything else (DELIVERED, CANCELED, COMPLETED, REFUNDED,
-    #     RETURNED) uses the generic status-update template.
-    # ``_schema`` captured at lambda-build time — on_commit fires after
-    # any enclosing schema_context has exited (see the refund handler).
-    _schema = connection.schema_name
-
     if not suppress_customer:
         if new_status == OrderStatus.SHIPPED.value:
-            transaction.on_commit(
-                lambda oid=order.id, sc=_schema: (
-                    send_shipping_notification_email.apply_async(
-                        args=[oid], headers={"_schema_name": sc}
-                    )
-                )
-            )
+            dispatch_on_commit(send_shipping_notification_email, [order.id])
         elif new_status not in (
             OrderStatus.PENDING.value,
             OrderStatus.PROCESSING.value,
         ):
-            transaction.on_commit(
-                lambda oid=order.id, s=new_status, sc=_schema: (
-                    send_order_status_update_email.apply_async(
-                        args=[oid, s], headers={"_schema_name": sc}
-                    )
-                )
+            dispatch_on_commit(
+                send_order_status_update_email, [order.id, new_status]
             )
 
     # Live in-app notification. ``notify_order_status_changed_live``
@@ -386,12 +339,8 @@ def handle_order_status_changed(
     # dispatching unconditionally is safe and centralises the policy in
     # one place (``order/notifications.py::_ORDER_STATUS_COPY``).
     if order.user_id and not suppress_customer:
-        transaction.on_commit(
-            lambda oid=order.id, s=new_status, sc=_schema: (
-                notify_order_status_changed_live.apply_async(
-                    args=[oid, s], headers={"_schema_name": sc}
-                )
-            )
+        dispatch_on_commit(
+            notify_order_status_changed_live, [order.id, new_status]
         )
 
     if new_status == OrderStatus.SHIPPED.value:
@@ -450,14 +399,7 @@ def email_shipment_dispatched(
     ``transaction.on_commit`` so the worker sees the persisted
     tracking_number.
     """
-    _schema = connection.schema_name
-    transaction.on_commit(
-        lambda oid=order.id, s=_schema: (
-            send_shipping_notification_email.apply_async(
-                args=[oid], headers={"_schema_name": s}
-            )
-        )
-    )
+    dispatch_on_commit(send_shipping_notification_email, [order.id])
 
 
 @receiver(
@@ -718,18 +660,7 @@ def handle_order_completed(
     """Handle order completed signal."""
     try:
         if order.document_type == OrderDocumentTypeEnum.INVOICE.value:
-            # Generate the PDF invoice asynchronously. ``generate_order_invoice``
-            # is idempotent via ``order.invoicing.generate_invoice`` — calling
-            # twice returns the existing Invoice row, so the fact that
-            # ``order_completed`` might fire again on a re-save is safe.
-            _schema = connection.schema_name
-            transaction.on_commit(
-                lambda oid=order.id, s=_schema: (
-                    generate_order_invoice.apply_async(
-                        args=[oid], headers={"_schema_name": s}
-                    )
-                )
-            )
+            dispatch_on_commit(generate_order_invoice, [order.id])
 
         OrderHistory.log_note(order=order, note="Order completed")
 
@@ -758,27 +689,11 @@ def handle_order_refunded(
             },
         )
 
-        # Capture the active tenant schema BEFORE the on_commit lambdas.
-        # The Stripe charge.refunded handler dispatches order_refunded.send
-        # synchronously inside @with_tenant_schema_from_event's
-        # schema_context; by the time these lambdas fire post-COMMIT, the
-        # schema_context has exited and connection.schema_name is back
-        # to public. Without explicit capture, TenantTask.apply_async
-        # would stamp _schema_name=public on the email + live-notification
-        # tasks and the worker would run against the wrong schema.
-        _schema = connection.schema_name
-
         # Live notification so the shopper learns about the refund without
         # having to check email. ``notify_order_refunded_live`` silently
         # drops guest orders.
         if order.user_id:
-            transaction.on_commit(
-                lambda oid=order.id, s=_schema: (
-                    notify_order_refunded_live.apply_async(
-                        args=[oid], headers={"_schema_name": s}
-                    )
-                )
-            )
+            dispatch_on_commit(notify_order_refunded_live, [order.id])
 
         # Email confirmation. Idempotent via the
         # ``refund_confirmation_email_sent`` reservation flag, so the
@@ -788,13 +703,7 @@ def handle_order_refunded(
         # email the customer. Guest orders DO get the email — unlike
         # the live notification which is account-bound, the email
         # uses ``order.email`` as the recipient.
-        transaction.on_commit(
-            lambda oid=order.id, s=_schema: (
-                send_refund_confirmation_email.apply_async(
-                    args=[oid], headers={"_schema_name": s}
-                )
-            )
-        )
+        dispatch_on_commit(send_refund_confirmation_email, [order.id])
 
         logger.info("Order %s refunded", order.id)
 
@@ -926,29 +835,9 @@ def handle_stripe_payment_succeeded(sender, **kwargs):
                 "payment_id": payment_intent_id,
             },
         )
-        # Payment is confirmed — dispatch the confirmation email and live
-        # toast on commit (G0230). Both fire only if dj-stripe's outer
-        # transaction commits, so a later rollback discards them; the
-        # worker also sees the committed row. Each task is independently
-        # idempotent (metadata reservation / event-level guard).
-        # ``_schema`` captured at lambda-build time: on_commit fires
-        # after @with_tenant_schema_from_event's schema_context exits.
-        _schema = connection.schema_name
-        transaction.on_commit(
-            lambda oid=order.id, s=_schema: (
-                send_order_confirmation_email.apply_async(
-                    args=[oid], headers={"_schema_name": s}
-                )
-            )
-        )
+        dispatch_on_commit(send_order_confirmation_email, [order.id])
         if order.user_id:
-            transaction.on_commit(
-                lambda oid=order.id, s=_schema: (
-                    notify_payment_confirmed_live.apply_async(
-                        args=[oid], headers={"_schema_name": s}
-                    )
-                )
-            )
+            dispatch_on_commit(notify_payment_confirmed_live, [order.id])
 
 
 @djstripe_receiver("payment_intent.payment_failed")
@@ -1021,34 +910,13 @@ def handle_stripe_payment_failed(sender, **kwargs):
                     "payment_id": payment_intent_id,
                 },
             )
-            # Notify the customer so they can retry instead of silently
-            # sitting on a broken order.
-            # Wrapped in on_commit: handle_payment_failed runs inside
-            # @transaction.atomic; the worker must see the committed row.
-            # ``_schema`` is captured at lambda-build time so the task is
-            # enqueued against the tenant schema this handler entered via
-            # @with_tenant_schema_from_event — by the time on_commit fires,
-            # connection.schema_name has reverted to public.
-            _schema = connection.schema_name
-            transaction.on_commit(
-                lambda oid=order.id, s=_schema: (
-                    send_payment_failed_email.apply_async(
-                        args=[oid], headers={"_schema_name": s}
-                    )
-                )
-            )
+            dispatch_on_commit(send_payment_failed_email, [order.id])
 
             # Parallel live notification — same idempotency story as
             # the succeeded branch above (guarded by the event-level
             # metadata flag).
             if order.user_id:
-                transaction.on_commit(
-                    lambda oid=order.id, s=_schema: (
-                        notify_payment_failed_live.apply_async(
-                            args=[oid], headers={"_schema_name": s}
-                        )
-                    )
-                )
+                dispatch_on_commit(notify_payment_failed_live, [order.id])
 
     except KeyError, TypeError:
         # Malformed payload only — see charge.refunded above. A failure in
@@ -1376,18 +1244,8 @@ def handle_stripe_dispute_created(sender, **kwargs):
             },
         )
 
-        # Capture the active tenant schema BEFORE the lambda is queued.
-        # ``transaction.on_commit`` fires after the surrounding
-        # @with_tenant_schema_from_event schema_context has exited, so
-        # without capture the dispatcher would stamp _schema_name=public
-        # and the worker would run against the wrong schema.
-        _schema = connection.schema_name
-        transaction.on_commit(
-            lambda oid=order.id, did=dispute_id, s=_schema: (
-                send_dispute_notification_email.apply_async(
-                    args=[oid, did], headers={"_schema_name": s}
-                )
-            )
+        dispatch_on_commit(
+            send_dispute_notification_email, [order.id, dispute_id]
         )
 
     except KeyError, TypeError:
@@ -1554,18 +1412,7 @@ def handle_stripe_checkout_completed(sender, **kwargs):
                 session_id,
             )
 
-            # Payment confirmed via Stripe Checkout — send the
-            # confirmation email now (idempotent).
-            # ``_schema`` captured at lambda-build time, or the
-            # worker would run against the wrong schema.
-            _schema = connection.schema_name
-            transaction.on_commit(
-                lambda oid=order.id, s=_schema: (
-                    send_order_confirmation_email.apply_async(
-                        args=[oid], headers={"_schema_name": s}
-                    )
-                )
-            )
+            dispatch_on_commit(send_order_confirmation_email, [order.id])
 
         elif payment_status == "unpaid":
             # The same settled-state guard the "paid" arm carries, and

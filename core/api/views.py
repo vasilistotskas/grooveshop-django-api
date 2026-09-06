@@ -13,7 +13,7 @@ from drf_spectacular.utils import (
     extend_schema_view,
 )
 from redis import Redis, RedisError
-from rest_framework import status
+from rest_framework import serializers, status
 from rest_framework.decorators import (
     action,
     api_view,
@@ -26,7 +26,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
-from core.api.permissions import IsPlatformSuperuser
+from core.api.permissions import IsStoreStaff
 from core.api.serializers import (
     ErrorResponseSerializer,
     HealthCheckResponseSerializer,
@@ -125,6 +125,9 @@ class RequestResponseSerializerMixin:
                 "Ensure the view has a valid action or define serializer_class."
             )
 
+        if current_action == "metadata":
+            return self._metadata_serializer_class()
+
         cfg = self.serializers_config.get(current_action)
         if cfg:
             if cfg.response is not None:
@@ -140,6 +143,57 @@ class RequestResponseSerializerMixin:
             f"Define {self.__class__.__name__}.serializers_config['{current_action}'] or set {self.__class__.__name__}.serializer_class, "
             f"or override {self.__class__.__name__}.get_serializer_class()."
         )
+
+    # OPTIONS. ``ViewSetMixin.initialize_request`` sets ``action`` to
+    # "metadata", which is never a key in ``serializers_config`` — so
+    # the lookup below fell through to ``ImproperlyConfigured`` and every
+    # route this base class serves answered **500** to an authenticated
+    # OPTIONS request. Anonymous callers saw a clean 200 because DRF's
+    # permission check on the cloned request fails first and is caught,
+    # which is why CORS preflights never surfaced it.
+    #
+    # ``SimpleMetadata.determine_actions`` clones the request once per
+    # writable method and calls ``view.get_serializer()`` OUTSIDE its
+    # ``try``, so the cloned method is what the caller is really asking
+    # about — and answering with that method's WRITE serializer is what
+    # OPTIONS is for: the fields you may send.
+    _METADATA_METHOD_ACTIONS = {
+        "POST": "create",
+        "PUT": "update",
+        "PATCH": "partial_update",
+    }
+
+    def _metadata_serializer_class(self):
+        """The serializer OPTIONS should describe. Never raises.
+
+        A 500 is never the right answer to OPTIONS: it is a discovery
+        request, and a viewset with nothing writable simply has no
+        fields to report.
+        """
+        method = getattr(getattr(self, "request", None), "method", None)
+        candidates = [
+            self._METADATA_METHOD_ACTIONS.get(method),
+            "create",
+            "update",
+            "retrieve",
+            "list",
+        ]
+        for candidate in candidates:
+            cfg = self.serializers_config.get(candidate) if candidate else None
+            if cfg is None:
+                continue
+            if cfg.request is not None:
+                return cfg.request
+            if cfg.response is not None:
+                return cfg.response
+
+        if (
+            hasattr(self, "serializer_class")
+            and self.serializer_class is not None
+        ):
+            return self.serializer_class
+
+        return serializers.Serializer
 
     def get_request_serializer(self, *args, **kwargs):
         """
@@ -504,7 +558,10 @@ def health_live(request):
     },
 )
 @api_view(["GET"])
-@permission_classes([IsPlatformSuperuser])
+# Per-store data, so the store's own staff may read it. It was
+# gated on IsPlatformSuperuser, which on a tenant host reads
+# is_superuser off a tenant-schema row — see is_platform_superuser.
+@permission_classes([IsStoreStaff])
 def list_settings(request):
     """List all available settings with their values."""
     try:
@@ -534,6 +591,16 @@ def list_settings(request):
             {"detail": _("Failed to retrieve settings")},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
+
+
+# Every key this API will resolve at all — the names the platform
+# declares as store settings. `Setting.get` falls through to
+# `django.conf.settings` for anything else (django-extra-settings'
+# `EXTRA_SETTINGS_FALLBACK_TO_CONF_SETTINGS`, on by default), so an
+# unbounded key is a read of the Django settings module.
+STORE_SETTING_KEYS = frozenset(
+    entry["name"] for entry in settings.EXTRA_SETTINGS_DEFAULTS
+)
 
 
 PUBLIC_SETTING_KEYS = frozenset(
@@ -643,6 +710,32 @@ def get_setting_by_key(request):
             return Response(
                 error_data,
                 status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # This endpoint serves STORE settings. `Setting.get` is not a
+        # store-settings lookup: django-extra-settings defaults
+        # `EXTRA_SETTINGS_FALLBACK_TO_CONF_SETTINGS` to True, so on a
+        # miss it degenerates to `getattr(django.conf.settings, key)` —
+        # and `key` comes straight off the query string. Any staff token
+        # could read `SECRET_KEY`, `EMAIL_HOST_PASSWORD`, `DATABASES`
+        # (which carries the DB password) or the gateway's internal
+        # secret. `SECRET_KEY` alone lets the holder forge sessions and
+        # any `django.core.signing` value for every user on every
+        # tenant, so one store's operator became platform root.
+        #
+        # A key is servable when the platform DECLARES it or the tenant
+        # actually HAS it as a row; either way the value comes from the
+        # settings table, never from the fallback. A name with neither is
+        # now indistinguishable from one that does not exist. (A row
+        # named after a Django setting is no loophole: once the row
+        # exists, `Setting.get` returns the ROW.)
+        if (
+            key not in STORE_SETTING_KEYS
+            and not Setting.objects.filter(name=key).exists()
+        ):
+            return Response(
+                {"detail": _("Setting not found or access denied.")},
+                status=status.HTTP_404_NOT_FOUND,
             )
 
         if (key not in PUBLIC_SETTING_KEYS) and (

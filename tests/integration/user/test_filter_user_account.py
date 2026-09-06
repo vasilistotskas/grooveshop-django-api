@@ -66,7 +66,7 @@ def test_data(db, auth_user):
         region=region_berlin,
         city="Berlin",
         zipcode="54321",
-        phone=None,
+        phone="",
         twitter="",
         linkedin="",
         birth_date=None,

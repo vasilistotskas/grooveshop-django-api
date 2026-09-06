@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, Mock, mock_open, patch
 
 import pytest
+from celery.exceptions import SoftTimeLimitExceeded
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.core.management import CommandError
@@ -82,16 +83,11 @@ class TestClearExpiredSessionsTask:
         mock_logger.info.assert_any_call("Starting expired sessions cleanup")
 
     @patch("core.tasks.management.call_command")
-    @patch("core.tasks.logger")
-    def test_command_error_handling(self, mock_logger, mock_call_command):
+    def test_command_error_fails_the_task(self, mock_call_command):
         mock_call_command.side_effect = CommandError("Command failed")
 
-        result = clear_expired_sessions_task()
-
-        assert result["status"] == "error"
-        assert result["error_type"] == "CommandError"
-        assert "Command failed" in result["message"]
-        mock_logger.error.assert_called()
+        with pytest.raises(CommandError, match="Command failed"):
+            clear_expired_sessions_task()
 
     @patch("core.tasks.management.call_command")
     @patch("core.tasks.logger")
@@ -128,13 +124,13 @@ class TestClearAllCacheTask:
         assert result["message"] == "Cache surfaces purged"
 
     @patch("core.tasks.management.call_command")
-    def test_cache_cleanup_command_error(self, mock_call_command):
+    def test_cache_cleanup_command_error_fails_the_task(
+        self, mock_call_command
+    ):
         mock_call_command.side_effect = CommandError("Cache error")
 
-        result = clear_all_cache_task()
-
-        assert result["status"] == "error"
-        assert result["error_type"] == "CommandError"
+        with pytest.raises(CommandError, match="Cache error"):
+            clear_all_cache_task()
 
 
 @pytest.mark.django_db
@@ -146,7 +142,15 @@ class TestClearDuplicateHistoryTask:
     ):
         result = clear_duplicate_history_task()
 
-        mock_call_command.assert_called_once_with("clean_duplicate_history")
+        # `--auto` is not optional. Without a model name or this flag,
+        # simple-history's command prints "Please specify a model or use
+        # the --auto option" and issues ZERO queries, while the task
+        # goes on to report success. This assertion used to pin the
+        # argv WITHOUT it, locking the no-op in; the sibling
+        # `clear_old_history_task` test has always asserted `--auto`.
+        mock_call_command.assert_called_once_with(
+            "clean_duplicate_history", "--auto"
+        )
         assert result["status"] == "success"
         assert "Duplicate history entries cleaned" in result["message"]
 
@@ -161,6 +165,7 @@ class TestClearDuplicateHistoryTask:
 
         mock_call_command.assert_called_once_with(
             "clean_duplicate_history",
+            "--auto",
             "-m",
             "30",
             "--excluded_fields",
@@ -172,13 +177,13 @@ class TestClearDuplicateHistoryTask:
         assert result["parameters"]["minutes"] == minutes
 
     @patch("core.tasks.management.call_command")
-    def test_duplicate_history_cleanup_command_error(self, mock_call_command):
+    def test_duplicate_history_cleanup_command_error_fails_the_task(
+        self, mock_call_command
+    ):
         mock_call_command.side_effect = CommandError("History error")
 
-        result = clear_duplicate_history_task()
-
-        assert result["status"] == "error"
-        assert result["error_type"] == "CommandError"
+        with pytest.raises(CommandError, match="History error"):
+            clear_duplicate_history_task()
 
 
 @pytest.mark.django_db
@@ -232,6 +237,43 @@ class TestClearExpiredNotificationsTask:
             "expire_notifications", "--days", "365"
         )
         assert result["status"] == "success"
+
+
+@pytest.mark.django_db
+class TestACommandFailureIsATaskFailure:
+    """None of the cleanup tasks may report success on a failed command.
+
+    Each caught `CommandError`, logged it and returned
+    `{"status": "error"}`. Celery therefore recorded SUCCESS,
+    `MonitoredTask.on_success` logged "completed successfully", and the
+    `autoretry_for=(Exception,)` on every one of them could never fire —
+    for the single most likely failure a management-command wrapper has.
+    That is the same defect `backup_database_task` carried until a
+    pg_dump/server major mismatch went unnoticed for a week while the
+    backup volume drained (2026-09-02); the fix there is the precedent
+    this follows, and `sync_meilisearch_indexes` already re-raised.
+
+    Parametrised over the whole family so a sixth wrapper cannot be
+    added with the old shape.
+    """
+
+    @pytest.mark.parametrize(
+        "task",
+        [
+            clear_expired_sessions_task,
+            clear_all_cache_task,
+            clear_duplicate_history_task,
+            clear_old_history_task,
+            clear_expired_notifications_task,
+        ],
+        ids=lambda t: t.__name__,
+    )
+    @patch("core.tasks.management.call_command")
+    def test_command_error_propagates(self, mock_call_command, task):
+        mock_call_command.side_effect = CommandError("the command failed")
+
+        with pytest.raises(CommandError, match="the command failed"):
+            task()
 
 
 @pytest.mark.django_db(transaction=True)
@@ -682,6 +724,51 @@ class TestSendInactiveUserNotificationsTask:
         mock_logger.error.assert_any_call(
             "Too many email failures, stopping task"
         )
+
+    @patch("core.tasks.EmailMultiAlternatives")
+    @patch("core.tasks.render_to_string")
+    def test_the_soft_time_limit_stops_the_run(
+        self, mock_render, mock_email_cls, db
+    ):
+        """Celery raises the soft limit INSIDE the task, exactly once.
+
+        `SoftTimeLimitExceeded` is an ordinary `Exception` subclass, so
+        it landed in the per-user handler, was recorded as "failed to
+        send email to user X", and the loop carried on. The soft limit
+        therefore bought nothing: the run continued to the hard
+        `time_limit`, where Celery kills the worker process outright —
+        the very outcome the soft limit exists to avoid, and one that
+        also loses the summary and the in-flight user's bookkeeping.
+
+        Stopping is a partial COMPLETION, not a failure: everyone
+        already emailed carries `last_reengagement_email_at`, so the
+        next scheduled run excludes them by the cooldown and continues
+        from here. Re-raising would instead hand
+        `autoretry_for=(Exception,)` a full rescan that can only time
+        out again.
+        """
+        for i in range(3):
+            UserAccountFactory(
+                last_login=timezone.now() - timedelta(days=70),
+                is_active=True,
+                email=f"slow{i}@example.com",
+            )
+
+        mock_render.return_value = "<html>Test email</html>"
+        first_msg = MagicMock()
+        timed_out_msg = MagicMock()
+        timed_out_msg.send.side_effect = SoftTimeLimitExceeded()
+        never_reached = MagicMock()
+        mock_email_cls.side_effect = [first_msg, timed_out_msg, never_reached]
+
+        result = send_inactive_user_notifications()
+
+        assert result["timed_out"] is True
+        assert result["emails_sent"] == 1
+        assert result["failed"] == 0, (
+            "the time limit was recorded as an email failure"
+        )
+        assert not never_reached.send.called, "the loop kept going"
 
 
 @pytest.mark.django_db

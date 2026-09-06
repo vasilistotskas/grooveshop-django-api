@@ -787,8 +787,10 @@ class BoxNowService:
         data: dict = envelope["data"]
         message_id: str = envelope["id"]
         # SHA-256 of the HMAC-signed ``data`` bytes, stamped by the webhook
-        # view. Absent only for events queued before this field shipped.
-        data_fingerprint: str | None = envelope.get("_data_fingerprint")
+        # view. Absent only for events queued before this field shipped;
+        # "" rather than None so the stored column has one spelling for
+        # "no fingerprint" — every use below already tests it for truth.
+        data_fingerprint: str = envelope.get("_data_fingerprint") or ""
 
         # --- Idempotency check (outside transaction) ----------------------
         # Dedup on the message id (BoxNow retries reuse it) AND on the
@@ -970,17 +972,16 @@ class BoxNowService:
                 from shipping_boxnow.tasks import (
                     boxnow_send_arrival_notification,
                 )
+                from tenant.celery import dispatch_on_commit
 
-                # Defer to on_commit — we're inside ``transaction.atomic``
+                # Deferred to on_commit — we're inside ``transaction.atomic``
                 # and Celery dispatched mid-transaction can deliver to a
                 # worker that races the COMMIT, causing
-                # ``BoxNowParcelEvent.DoesNotExist``. Mirrors the
-                # ShippingService.dispatch_create_shipment_task pattern.
-                transaction.on_commit(
-                    lambda eid=event.id: boxnow_send_arrival_notification.delay(
-                        eid
-                    )
-                )
+                # ``BoxNowParcelEvent.DoesNotExist``. The schema is stamped
+                # at registration for the same reason it is everywhere
+                # else: this webhook loops over tenants, so by the time the
+                # hook fires the connection may be on another one.
+                dispatch_on_commit(boxnow_send_arrival_notification, [event.id])
 
             # --- Inline WebSocket notification on parcel delivery ---------
             # No email here — the customer already gets order-status emails
@@ -1272,11 +1273,10 @@ class BoxNowService:
                 from shipping_boxnow.tasks import (
                     boxnow_send_arrival_notification,
                 )
+                from tenant.celery import dispatch_on_commit
 
-                transaction.on_commit(
-                    lambda eid=new_event.id: (
-                        boxnow_send_arrival_notification.delay(eid)
-                    )
+                dispatch_on_commit(
+                    boxnow_send_arrival_notification, [new_event.id]
                 )
             elif mapped_state == BoxNowParcelState.DELIVERED:
                 cls._dispatch_delivered_notification(locked)
@@ -1655,7 +1655,7 @@ class BoxNowService:
         # postal-code filtering and the admin display.
         return {
             "type": locker_type,
-            "image_url": dest.get("imageUrl") or None,
+            "image_url": dest.get("imageUrl") or "",
             "lat": dest.get("lat", 0),
             "lng": dest.get("lng", 0),
             "title": dest.get("title", ""),

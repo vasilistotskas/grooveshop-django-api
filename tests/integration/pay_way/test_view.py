@@ -78,14 +78,12 @@ class PayWayViewSetTestCase(APITestCase):
             "translations": {},
         }
 
-        for language in languages:
-            language_code = language[0]
-
-            translation_payload = {
+        # See the note in the blog-category view tests: indexing a code
+        # string yielded its first character, so this posted "e" and "d".
+        for language_code in languages:
+            payload["translations"][language_code] = {
                 "name": PayWayEnum.CREDIT_CARD,
             }
-
-            payload["translations"][language_code] = translation_payload
 
         url = self.get_pay_way_list_url()
         response = self.client.post(url, data=payload, format="json")
@@ -162,14 +160,10 @@ class PayWayViewSetTestCase(APITestCase):
             "translations": {},
         }
 
-        for language in languages:
-            language_code = language[0]
-
-            translation_payload = {
+        for language_code in languages:
+            payload["translations"][language_code] = {
                 "name": PayWayEnum.PAY_ON_STORE,
             }
-
-            payload["translations"][language_code] = translation_payload
 
         url = self.get_pay_way_detail_url(self.pay_way.pk)
         response = self.client.put(url, data=payload, format="json")

@@ -1,3 +1,4 @@
+from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
@@ -30,6 +31,14 @@ class CartPromotionCode(TimeStampMixinModel):
         verbose_name_plural = _("Cart Promotion Codes")
         ordering = ["-created_at"]
         db_table = "promotion_cart_code"
+        indexes = [
+            # The list orders by created_at and `date_hierarchy`
+            # range-scans it. updated_at is never sorted or filtered, so
+            # it stays unindexed rather than costing a write per row.
+            BTreeIndex(
+                fields=["created_at"], name="cartpromotioncode_created_at_ix"
+            ),
+        ]
         constraints = [
             models.UniqueConstraint(
                 fields=["cart", "code"],

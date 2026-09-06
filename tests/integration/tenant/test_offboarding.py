@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import os
 from datetime import date, timedelta
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -345,4 +346,128 @@ class TestOneDestroyPath:
         assert "destroy_tenant(" in source
         assert "tenant.delete(force_drop=True)" not in source, (
             "admin still deletes inline; offboarding cleanup would be skipped"
+        )
+
+
+class TestSearchIndexErasureActuallyDeletes:
+    """`meili_client` has no `delete_index`; the raw SDK client does.
+
+    The wrapper in `meili/_client.py` exposes create/get/get_search
+    index helpers and no `delete_index` — `meilisearch_drop.py` reaches
+    through to `client.client` for exactly that reason. So the call
+    raised `AttributeError` on the first index, the `except` swallowed
+    it, and offboarding reported a clean run having deleted nothing:
+    every `{schema}__*` index and all its documents stayed alive, so
+    reusing that schema name would hand a new store the previous
+    occupant's catalogue.
+
+    The existing tests here pass a bare `MagicMock()` as the client, on
+    which `delete_index` auto-exists — which is why they were green
+    throughout.
+    """
+
+    def _client_without_delete_index(self, uids):
+        """A stand-in shaped like the real wrapper: no `delete_index`."""
+        from meili._client import Client as MeiliWrapper
+
+        client = MagicMock(spec=MeiliWrapper)
+        client.get_indexes.return_value = [
+            SimpleNamespace(uid=uid) for uid in uids
+        ]
+        client.client = MagicMock()
+        client.client.delete_index.return_value = SimpleNamespace(task_uid=1)
+        return client
+
+    def test_it_calls_through_to_the_client_that_has_the_method(self):
+        client = self._client_without_delete_index(
+            ["acme__product", "acme__blog", "other__product"]
+        )
+        with (
+            override_settings(MEILISEARCH={"OFFLINE": False}),
+            patch.dict(
+                "sys.modules", {"meili._client": MagicMock(client=client)}
+            ),
+        ):
+            dropped = offboarding.purge_search_indexes("acme")
+
+        assert dropped == ["acme__product", "acme__blog"]
+        assert [
+            call.args[0] for call in client.client.delete_index.call_args_list
+        ] == ["acme__product", "acme__blog"]
+
+    def test_it_waits_for_each_deletion_task(self):
+        """A fire-and-forget delete can still be queued when we report."""
+        client = self._client_without_delete_index(["acme__product"])
+        with (
+            override_settings(MEILISEARCH={"OFFLINE": False}),
+            patch.dict(
+                "sys.modules", {"meili._client": MagicMock(client=client)}
+            ),
+        ):
+            offboarding.purge_search_indexes("acme")
+
+        client.wait_for_task.assert_called_once_with(1)
+
+    def test_a_tenant_index_past_the_first_page_is_still_dropped(self):
+        """Offboarding must see the whole engine, not its first page.
+
+        Meilisearch paginates ``GET /indexes`` at 20 by default and the
+        SDK sends no parameters, so the wrapper used to stop there. Each
+        tenant owns one index per ``IndexMixin`` model, so the platform
+        crosses 20 at ten stores — and from then on a departing store's
+        indexes could sit past the cut and survive offboarding with all
+        their documents, ready to be handed to whoever next takes that
+        schema name.
+
+        Uses the REAL wrapper over a paging SDK stub: the bug lived in
+        ``Client.get_indexes``, so a ``MagicMock`` wrapper cannot show it.
+        """
+        from meili._client import Client as MeiliWrapper
+        from meili._settings import _MeiliSettings
+
+        uids = [f"store{i:02d}__ProductTranslation" for i in range(30)]
+        uids.append("acme__ProductTranslation")
+
+        sdk = MagicMock()
+
+        def paged(parameters=None):
+            # Mirrors the engine: no parameters means offset 0, limit 20.
+            parameters = parameters or {}
+            offset = parameters.get("offset", 0)
+            limit = parameters.get("limit", 20)
+            return {
+                "results": [
+                    SimpleNamespace(uid=uid)
+                    for uid in uids[offset : offset + limit]
+                ],
+                "total": len(uids),
+            }
+
+        sdk.get_indexes.side_effect = paged
+        sdk.delete_index.return_value = SimpleNamespace(task_uid=7)
+
+        with patch("meili._client._Client", return_value=sdk):
+            wrapper = MeiliWrapper(
+                _MeiliSettings(
+                    host="localhost",
+                    port=7700,
+                    https=False,
+                    master_key="k",
+                    search_key="k",
+                    timeout=10,
+                    sync=False,
+                )
+            )
+        wrapper.wait_for_task = MagicMock()
+
+        with (
+            override_settings(MEILISEARCH={"OFFLINE": False}),
+            patch.dict(
+                "sys.modules", {"meili._client": MagicMock(client=wrapper)}
+            ),
+        ):
+            dropped = offboarding.purge_search_indexes("acme")
+
+        assert dropped == ["acme__ProductTranslation"], (
+            "the tenant's index sits at position 31 and was not seen"
         )

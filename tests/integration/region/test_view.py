@@ -48,15 +48,12 @@ class RegionViewSetTestCase(APITestCase):
             "country": self.region.country.pk,
             "translations": {},
         }
-        for language in languages:
-            language_code = language[0]
-            language_name = language[1]
-
-            translation_payload = {
-                "name": f"New Region name in {language_name}",
+        # See the note in the blog-category view tests: indexing a code
+        # string yielded its first character, so this posted "e" and "d".
+        for language_code in languages:
+            payload["translations"][language_code] = {
+                "name": f"New Region name in {language_code}",
             }
-
-            payload["translations"][language_code] = translation_payload
 
         url = self.get_region_list_url()
         response = self.client.post(url, data=payload, format="json")
@@ -100,15 +97,10 @@ class RegionViewSetTestCase(APITestCase):
             "country": self.region.country.pk,
             "translations": {},
         }
-        for language in languages:
-            language_code = language[0]
-            language_name = language[1]
-
-            translation_payload = {
-                "name": f"Updated Region name in {language_name}",
+        for language_code in languages:
+            payload["translations"][language_code] = {
+                "name": f"Updated Region name in {language_code}",
             }
-
-            payload["translations"][language_code] = translation_payload
 
         url = self.get_region_detail_url(self.region.pk)
         response = self.client.put(url, data=payload, format="json")

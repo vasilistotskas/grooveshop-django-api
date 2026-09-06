@@ -103,6 +103,25 @@ class TestGetUser:
         backend = PlatformStaffBackend()
         assert backend.get_user(999_999_999) is None
 
+    def test_revoked_staff_no_longer_restores(self):
+        """Unticking is_staff must end the SESSION, not just the login.
+
+        The stamp this method applies is the only thing `is_store_staff`
+        and `TenantRolePermissionBackend` look at, so a restored session
+        for a revoked account kept full store-staff API access for the
+        cookie's remaining life — while the admin UI, which reads the
+        flag directly, correctly locked them out and made the revocation
+        look like it had worked.
+        """
+        revoked = UserAccountFactory(is_staff=False)
+        backend = PlatformStaffBackend()
+        assert backend.get_user(revoked.pk) is None
+
+    def test_inactive_staff_no_longer_restores(self):
+        inactive = UserAccountFactory(is_staff=True, is_active=False)
+        backend = PlatformStaffBackend()
+        assert backend.get_user(inactive.pk) is None
+
 
 class TestIsPlatformStaffSession:
     def test_true_when_backend_matches(self):

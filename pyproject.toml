@@ -344,22 +344,22 @@ ignore = [
     # remainder is not worth its suppressions.
     "ERA001",
     # DJ001 (nullable CharField/TextField/URLField) is a REAL finding on
-    # all 13 sites and is deliberately deferred, not dismissed. Making a
-    # string column NOT NULL is a two-RELEASE change under the Argo CD
-    # PreSync hook, because migrations run before the new image: the
-    # ALTER lands while pods that still write NULL are serving, so the
-    # first release has to stop writing NULL and backfill, and only the
-    # second may add the constraint. That sequencing belongs in its own
-    # change with the migration-safety review, not folded into a lint
-    # pass. The 13:
-    #   order.Order.payment_id          — the worst: `null=True` AND
-    #                                     `default=""`, so "no payment
-    #                                     id" has two spellings
-    #   search.SearchQuery              — language_code, session_key,
-    #                                     user_agent
-    #   shipping_boxnow                 — BoxNowLocker.image_url,
-    #                                     BoxNowParcelEvent.data_fingerprint
-    #   user.UserAccount                — seven social profile URLs
+    # all 13 sites, deferred rather than dismissed, and release ONE of
+    # the two it needs has now shipped. Making a string column NOT NULL
+    # is a two-RELEASE change under the Argo CD PreSync hook, because
+    # migrations run before the new image: the ALTER lands while pods
+    # that still write NULL are serving. So the first release stops
+    # PRODUCING NULL and backfills what is stored (migrations
+    # order/0054, search/0004, shipping_boxnow/0007, user/0028), and the
+    # second adds the constraint — at which point this entry goes.
+    #
+    # Until then the enforceable half lives in
+    # tests/unit/core/test_nullable_string_fields.py, which asserts that
+    # every nullable string field defaults to "". That test also covers
+    # what this rule structurally cannot: DJ001 matches Django's own
+    # field classes, so `UserAccount.phone` — a PhoneNumberField, i.e. a
+    # CharField, and the one field here that chose `default=None`
+    # outright — was invisible to it. Fourteen sites, not thirteen.
     "DJ001",
 ]
 

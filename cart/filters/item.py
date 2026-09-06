@@ -1,10 +1,8 @@
-from datetime import timedelta
-
 from django.db.models import F, Q
-from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
 
+from cart.managers.cart import abandoned_cutoff
 from cart.models import CartItem
 from core.filters.camel_case_filters import CamelCaseTimeStampFilterSet
 from core.filters.core import UUIDFilterMixin
@@ -122,11 +120,17 @@ class CartItemFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
 
     in_active_carts = filters.BooleanFilter(
         method="filter_active_carts",
-        help_text=_("Filter items in active carts (24hr)"),
+        help_text=_(
+            "Filter items in active carts — idle no longer than the "
+            "CART_ABANDONED_HOURS store setting."
+        ),
     )
     in_abandoned_carts = filters.BooleanFilter(
         method="filter_abandoned_carts",
-        help_text=_("Filter items in abandoned carts (30+ days)"),
+        help_text=_(
+            "Filter items in abandoned carts — idle longer than the "
+            "CART_ABANDONED_HOURS store setting."
+        ),
     )
     cart_last_activity_after = filters.DateTimeFilter(
         field_name="cart__last_activity",
@@ -198,8 +202,8 @@ class CartItemFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
         return queryset
 
     def filter_active_carts(self, queryset, name, value):
-        """Filter items in active carts (activity within 24 hours)."""
-        cutoff_time = timezone.now() - timedelta(hours=24)
+        """Filter items in carts active within ``CART_ABANDONED_HOURS``."""
+        cutoff_time = abandoned_cutoff()
         if value is True:
             return queryset.filter(cart__last_activity__gte=cutoff_time)
         elif value is False:
@@ -207,8 +211,8 @@ class CartItemFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
         return queryset
 
     def filter_abandoned_carts(self, queryset, name, value):
-        """Filter items in abandoned carts (inactive 30+ days)."""
-        cutoff_time = timezone.now() - timedelta(days=30)
+        """Filter items in carts idle beyond ``CART_ABANDONED_HOURS``."""
+        cutoff_time = abandoned_cutoff()
         if value is True:
             return queryset.filter(cart__last_activity__lt=cutoff_time)
         elif value is False:

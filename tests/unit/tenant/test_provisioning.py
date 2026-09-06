@@ -174,6 +174,50 @@ class TestProvisionOwnerMembership:
 
 
 class TestSeedTenantDefaults:
+    def test_reports_the_steps_that_failed(self, tenant_factory, monkeypatch):
+        """A half-seeded store must not report as a clean one.
+
+        Every step is deliberately best-effort and still never raises —
+        but swallowing SILENTLY meant the admin's "New Store" flow and
+        the CLI both reported unqualified success. Worst for
+        Meilisearch: without its index the engine rejects every filtered
+        query, so search returns an error for EVERY request on that
+        tenant until the nightly fanout sync repairs it.
+        """
+        from tenant import provisioning
+
+        tenant = tenant_factory("seed-defaults-reports")
+        monkeypatch.setattr(
+            provisioning, "_seed_page_layouts", lambda _t: False
+        )
+        monkeypatch.setattr(
+            provisioning, "_create_meili_indexes", lambda _t: False
+        )
+        monkeypatch.setattr(
+            provisioning, "_seed_extra_settings", lambda _t: True
+        )
+        monkeypatch.setattr(
+            provisioning, "_seed_content_pages", lambda _t: True
+        )
+
+        failed = provisioning.seed_tenant_defaults(tenant)
+
+        assert failed == ["page layouts", "Meilisearch indexes"]
+
+    def test_a_clean_seed_reports_nothing(self, tenant_factory, monkeypatch):
+        from tenant import provisioning
+
+        tenant = tenant_factory("seed-defaults-clean")
+        for name in (
+            "_seed_extra_settings",
+            "_seed_page_layouts",
+            "_seed_content_pages",
+            "_create_meili_indexes",
+        ):
+            monkeypatch.setattr(provisioning, name, lambda _t: True)
+
+        assert provisioning.seed_tenant_defaults(tenant) == []
+
     def test_never_raises_even_without_a_real_schema(self, tenant_factory):
         """Every step inside is independently best-effort — a tenant
         whose Postgres schema was never created (``auto_create_schema

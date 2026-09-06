@@ -88,3 +88,47 @@ def test_unknown_plan_is_rejected_via_call_command_kwargs():
             plan="gold",
         )
     assert not Tenant.objects.filter(schema_name="bad_plan_kw_store").exists()
+
+
+def test_duplicate_domain_leaves_no_orphaned_tenant():
+    """A failure mid-sequence must roll the whole tenant back.
+
+    `Tenant.objects.create()` has `auto_create_schema=True`, so it
+    creates the Postgres schema and replays every migration inline. The
+    `TenantDomain.objects.create()` on the very next line is NOT a
+    get_or_create and `domain` is unique — so a typo, or a domain left
+    behind by an earlier failed run, raised `IntegrityError` against an
+    already-committed tenant.
+
+    That left a fully migrated schema with no domain, no owner and no
+    seed data. And the command's own up-front guard then refused the
+    obvious retry with the same schema name, so an operator had to clean
+    up by hand before they could try again.
+    """
+    from django.db.utils import IntegrityError
+
+    from tenant.models import TenantDomain
+
+    taken = "already-taken.example.com"
+    first = Tenant.objects.create(
+        schema_name="first_store",
+        name="First Store",
+        slug="first-store",
+        owner_email="owner@first-store.example.com",
+    )
+    TenantDomain.objects.create(domain=taken, tenant=first, is_primary=True)
+
+    with pytest.raises(IntegrityError):
+        call_command(
+            "tenant_create",
+            name="Second Store",
+            slug="second-store",
+            schema_name="second_store",
+            domain=taken,
+            owner_email="owner@second-store.example.com",
+        )
+
+    assert not Tenant.objects.filter(schema_name="second_store").exists(), (
+        "the failed run left an orphaned tenant behind — and the "
+        "command's own guard would then refuse to let it be retried"
+    )

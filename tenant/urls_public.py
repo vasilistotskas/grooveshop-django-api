@@ -45,6 +45,13 @@ _admin_detail = TenantAdminViewSet.as_view(
         "delete": "destroy",
     }
 )
+# Lifecycle state is not a settings field. ``is_active`` used to be
+# writable through the serializer, and that write set no
+# ``suspended_at``, flushed no media and skipped the protected-tenant
+# refusal — so these two routes are the only way to move a store, the
+# same shape ``destroy`` already had.
+_admin_suspend = TenantAdminViewSet.as_view({"post": "suspend"})
+_admin_activate = TenantAdminViewSet.as_view({"post": "activate"})
 
 urlpatterns = [
     # The control-plane admin. Listed BEFORE ``public_shared_urlpatterns`` so it
@@ -73,5 +80,15 @@ urlpatterns = [
         "api/v1/tenant/admin/<int:pk>/",
         _admin_detail,
         name="tenant-admin-detail",
+    ),
+    path(
+        "api/v1/tenant/admin/<int:pk>/suspend/",
+        _admin_suspend,
+        name="tenant-admin-suspend",
+    ),
+    path(
+        "api/v1/tenant/admin/<int:pk>/activate/",
+        _admin_activate,
+        name="tenant-admin-activate",
     ),
 ] + public_shared_urlpatterns

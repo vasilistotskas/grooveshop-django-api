@@ -255,7 +255,10 @@ class TenantAdminSerializer(serializers.ModelSerializer):
             "name",
             "slug",
             "owner_email",
+            # --- Lifecycle state (read-only; see read_only_fields) ---
             "is_active",
+            "suspended_at",
+            "suspended_reason",
             # --- Plan & Billing (excluded from public serializer) ---
             "plan",
             "paid_until",
@@ -345,7 +348,68 @@ class TenantAdminSerializer(serializers.ModelSerializer):
             # --- Related ---
             "domains",
         ]
-        read_only_fields = ["schema_name", "uuid", "created_at", "updated_at"]
+        # ``is_active`` and its two companions are lifecycle STATE, not
+        # settings: writing them through this serializer bypassed every
+        # gate ``tenant.lifecycle`` exists to enforce. Verified against
+        # the live endpoint:
+        #
+        # * ``PATCH {"isActive": false}`` answered 200 leaving
+        #   ``suspended_at`` NULL and dispatching no media flush, so the
+        #   store kept serving processed images for the cache TTL (up to
+        #   360 days) and ``destroy_refusal`` answered "not_suspended" —
+        #   a store suspended that way can never be destroyed through the
+        #   gated path.
+        # * ``PATCH {"isActive": true}`` answered 200 leaving
+        #   ``suspended_at`` and ``suspended_reason`` in place, so the
+        #   NEXT genuine suspension kept the stale anchor: measured, a
+        #   freshly suspended store reported a 30-day-old anchor and
+        #   ``destroy_refusal`` of ``None``. The 24h cooldown that makes
+        #   a mistaken suspension reversible was already spent.
+        # * a PROTECTED tenant flipped to inactive, which both
+        #   ``suspend_tenant`` and ``activate_tenant`` refuse.
+        #
+        # The state changes live on the viewset's ``suspend``/``activate``
+        # actions, which call the lifecycle functions — the same shape
+        # ``destroy`` already had.
+        read_only_fields = [
+            "schema_name",
+            "uuid",
+            "created_at",
+            "updated_at",
+            "is_active",
+            "suspended_at",
+            "suspended_reason",
+        ]
+
+
+class TenantSuspendRequestSerializer(serializers.Serializer):
+    """Why a store is being taken offline.
+
+    Required, not optional: ``suspended_reason`` is the one record of
+    whether a suspension was billing, abuse or an operator mistake, and
+    ``suspend_tenant`` deliberately refuses to relabel it on a second
+    call — so an empty first reason can never be corrected.
+    """
+
+    reason = serializers.CharField(max_length=255, allow_blank=False)
+
+
+class TenantLifecycleStateSerializer(serializers.Serializer):
+    """The lifecycle state after a suspend/activate call.
+
+    ``changed`` distinguishes "this call moved the store" from "it was
+    already there", which is what the lifecycle functions return and
+    what an operator retrying a request needs to know.
+    """
+
+    changed = serializers.BooleanField(read_only=True)
+    is_active = serializers.BooleanField(source="tenant.is_active")
+    suspended_at = serializers.DateTimeField(
+        source="tenant.suspended_at", allow_null=True
+    )
+    suspended_reason = serializers.CharField(
+        source="tenant.suspended_reason", allow_blank=True
+    )
 
 
 class MerchantLegalIdentitySerializer(serializers.Serializer):

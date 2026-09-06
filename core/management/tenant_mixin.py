@@ -8,9 +8,31 @@ schema at all (notifications, orders, …) should additionally set
 connection context would either crash (fresh database: the table does
 not exist in public) or, worse, silently act on pre-multi-tenant
 legacy rows left in public by the production clone.
+
+``--all-tenants`` with zero active tenants exits
+``NO_ACTIVE_TENANTS_RETURNCODE`` rather than the default 1, so a script
+can distinguish "nothing to do" from "the work failed" without parsing
+stderr.
 """
 
 from django.core.management.base import CommandError
+
+#: Exit code for ``--all-tenants`` matching zero active tenants.
+#:
+#: Distinct from the default 1 so a CALLER can tell "there was nothing
+#: to do" apart from "the work was attempted and failed" — the two are
+#: not the same operational event, and a shell can only see the exit
+#: code. It stays non-zero: an operator who asked for every tenant and
+#: got none needs to know the run was vacuous.
+#:
+#: CROSS-REPO CONSUMER - the grooveshop-infrastructure prepare-helm
+#: PreSync job branches on this value
+#: (manifests/app-constructs/grooveshop/prepare-helm/templates/job.yaml)
+#: to let a fresh bring-up, a rebuilt namespace or a DR restore deploy
+#: with no tenants yet, while still surfacing real failures instead of
+#: reporting them as "no tenants". Changing the number means changing
+#: that job in the same release.
+NO_ACTIVE_TENANTS_RETURNCODE = 3
 
 
 class TenantCommandMixin:
@@ -47,7 +69,13 @@ class TenantCommandMixin:
                 .values_list("schema_name", flat=True)
             )
             if not schemas:
-                raise CommandError("No active tenants found.")
+                raise CommandError(
+                    "No active tenants found: --all-tenants matched zero "
+                    "schemas, so nothing was applied. This is not a "
+                    "failure of the work itself; see "
+                    "NO_ACTIVE_TENANTS_RETURNCODE.",
+                    returncode=NO_ACTIVE_TENANTS_RETURNCODE,
+                )
             return schemas
         elif options.get("tenant"):
             schema = options["tenant"]

@@ -153,3 +153,60 @@ def test_an_unknown_index_argument_fails_the_command():
 
     assert not product_update.called
     assert not blog_update.called
+
+
+def test_no_active_tenants_exits_with_its_own_returncode(db):
+    """``--all-tenants`` with no tenants is "nothing to do", not "failed".
+
+    The grooveshop-infrastructure PreSync job branches on this exact
+    code to keep a fresh bring-up, a rebuilt namespace or a DR restore
+    deployable while still surfacing genuine Meilisearch failures. Both
+    conditions used to exit 1, so the job could only guess — and it
+    guessed "no active tenants yet", printing that reassuring line over
+    real errors. Pinned here because the consumer is in another repo and
+    cannot fail this suite.
+    """
+    import pytest
+    from django.core.management.base import CommandError
+
+    from core.management.tenant_mixin import NO_ACTIVE_TENANTS_RETURNCODE
+    from tenant.models import Tenant
+
+    assert (
+        not Tenant.objects.filter(is_active=True)
+        .exclude(schema_name="public")
+        .exists()
+    )
+
+    with pytest.raises(CommandError) as excinfo:
+        call_command("meilisearch_apply_settings", "--all-tenants")
+
+    assert excinfo.value.returncode == NO_ACTIVE_TENANTS_RETURNCODE
+    assert excinfo.value.returncode != 1, (
+        "must stay distinguishable from a genuine failure"
+    )
+
+
+def test_genuine_failure_keeps_the_default_returncode(db):
+    """The other half of the contract: a real failure must NOT borrow
+    the no-tenants code, or the PreSync job would swallow it."""
+    import pytest
+    from django.core.management.base import CommandError
+
+    from core.management.tenant_mixin import NO_ACTIVE_TENANTS_RETURNCODE
+
+    with (
+        patch(
+            "product.models.product.ProductTranslation.update_meili_settings",
+            side_effect=RuntimeError("meili unreachable"),
+        ),
+        patch(
+            "blog.models.post.BlogPostTranslation.update_meili_settings",
+        ),
+        pytest.raises(CommandError) as excinfo,
+    ):
+        call_command("meilisearch_apply_settings")
+
+    assert excinfo.value.returncode == 1
+    assert excinfo.value.returncode != NO_ACTIVE_TENANTS_RETURNCODE
+    assert "meili unreachable" in str(excinfo.value)

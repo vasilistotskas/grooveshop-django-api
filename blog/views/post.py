@@ -15,7 +15,7 @@ from drf_spectacular.utils import (
 )
 from rest_framework import status
 from rest_framework.decorators import action
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from blog.filters.comment import BlogCommentFilter
@@ -193,6 +193,13 @@ class BlogPostViewSet(BaseModelViewSet):
             "destroy",
         ):
             return [IsBlogEnabled(), StoreStaffModelPermissions()]
+        if self.action == "liked_posts":
+            # Enforced by the permission layer, which runs BEFORE the
+            # handler. The equivalent check used to sit inside the
+            # action, AFTER request-body validation, so an anonymous
+            # caller who sent no or malformed `postIds` was told 400 and
+            # never learned the call needed authentication at all.
+            return [IsBlogEnabled(), IsAuthenticated()]
         return [IsBlogEnabled(), AllowAny()]
 
     search_fields = [
@@ -303,6 +310,10 @@ class BlogPostViewSet(BaseModelViewSet):
 
     @action(detail=False, methods=["POST"])
     def liked_posts(self, request, *args, **kwargs):
+        # Authentication is a permission-class concern (see
+        # get_permissions): `likes=user` casts the user to its pk, so an
+        # AnonymousUser raised `TypeError: Field 'id' expected a number`
+        # - a 500 on what was an AllowAny action.
         request_serializer_class = self.get_request_serializer()
         request_serializer = request_serializer_class(data=request.data)
         if not request_serializer.is_valid():

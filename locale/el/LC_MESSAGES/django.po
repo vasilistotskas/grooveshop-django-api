@@ -1369,8 +1369,8 @@ msgid "Filter by minimum number of views"
 msgstr "Φίλτρο ανά ελάχιστο αριθμό προβολών"
 
 #: .\blog\filters\post.py:60
-msgid "Filter by tag label (case-insensitive)"
-msgstr "Φίλτρο ανά ετικέτα (χωρίς διάκριση πεζών/κεφαλαίων)"
+msgid "Filter by active tag label (case-insensitive)"
+msgstr "Φίλτρο ανά ενεργή ετικέτα (χωρίς διάκριση πεζών/κεφαλαίων)"
 
 #: .\blog\filters\post.py:64
 msgid "Filter by author full name (case-insensitive)"
@@ -1385,8 +1385,8 @@ msgid "Filter by author ID"
 msgstr "Φίλτρο ανά ID συντάκτη"
 
 #: .\blog\filters\post.py:80
-msgid "Filter by tag IDs (comma-separated)"
-msgstr "Φίλτρο ανά ID ετικετών (διαχωρισμένα με κόμμα)"
+msgid "Filter by active tag IDs (comma-separated)"
+msgstr "Φίλτρο ανά ID ενεργών ετικετών (διαχωρισμένα με κόμμα)"
 
 #: .\blog\filters\tag.py:15 .\pay_way\filters.py:28 .\tag\filters\tag.py:15
 #: .\user\filters\account.py:52 .\user\filters\subscription.py:15

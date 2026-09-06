@@ -55,9 +55,9 @@ class BlogPostFilter(
         help_text=_("Filter by category name (case-insensitive)"),
     )
     tag_name = filters.CharFilter(
-        field_name="tags__translations__label",
-        lookup_expr="icontains",
-        help_text=_("Filter by tag label (case-insensitive)"),
+        method="filter_tag_name",
+        label="Tag Name",
+        help_text=_("Filter by active tag label (case-insensitive)"),
     )
     author_name = filters.CharFilter(
         method="filter_author_name",
@@ -77,7 +77,7 @@ class BlogPostFilter(
     tags = filters.ModelMultipleChoiceFilter(
         field_name="tags",
         queryset=None,
-        help_text=_("Filter by tag IDs (comma-separated)"),
+        help_text=_("Filter by active tag IDs (comma-separated)"),
     )
 
     class Meta:
@@ -103,7 +103,34 @@ class BlogPostFilter(
 
         self.filters["category"].queryset = BlogCategory.objects.all()
         self.filters["author"].queryset = BlogAuthor.objects.all()
-        self.filters["tags"].queryset = BlogTag.objects.all()
+        # Active tags only. Every route that mounts this FilterSet is a
+        # public one (post list, an author's posts, a category's posts, a
+        # user's liked posts), and `active` is what hides a tag from the
+        # storefront: the tag endpoints serve `for_list()`/`for_detail()`,
+        # which are active-only, and `filter_min_tags` right below counts
+        # active tags only. Leaving the whole table here let a caller
+        # filter by a tag the merchant had deactivated — verified: with
+        # an inactive tag, `?tags=<id>` answered 200 with the post. An id
+        # outside this queryset is now the same 400 as a nonexistent one,
+        # so the refusal is not an oracle for "this tag exists but is
+        # hidden". The default manager stays unscoped for the admin,
+        # which needs to tick `active` back on (see BlogTagQuerySet).
+        self.filters["tags"].queryset = BlogTag.objects.active_only()
+
+    def filter_tag_name(self, queryset, name, value):
+        """Filter posts by ACTIVE tag label (case-insensitive).
+
+        Both conditions sit in one ``filter()`` call on purpose: for a
+        multi-valued relation that is what binds them to the SAME joined
+        tag, so the match is "has an active tag whose name matches"
+        rather than "has an active tag AND has a matching tag".
+        """
+        if not value:
+            return queryset
+        return queryset.filter(
+            tags__active=True,
+            tags__translations__name__icontains=value,
+        )
 
     def filter_author_name(self, queryset, name, value):
         """Filter posts by author full name (case-insensitive)."""

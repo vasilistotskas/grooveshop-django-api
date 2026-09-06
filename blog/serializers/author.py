@@ -72,13 +72,28 @@ class BlogAuthorDetailSerializer(BlogAuthorSerializer):
             "top_posts",
         )
 
+    def _visible_posts(self, obj: BlogAuthor):
+        """The author's posts this caller may see.
+
+        ``obj.blog_posts`` is the raw reverse accessor, which bypasses
+        ``BlogPostQuerySet.visible_to`` entirely — the manager's own
+        docstring warns about exactly this. Both methods below listed it
+        unfiltered, so an anonymous GET on an author returned that
+        author's DRAFTS with their full body, while the post detail
+        route correctly 404s for the same id. And because
+        ``BlogPostDetailSerializer.get_author`` embeds this serializer,
+        every published post leaked its author's drafts too.
+        """
+        request = self.context.get("request")
+        return obj.blog_posts.visible_to(getattr(request, "user", None))
+
     @extend_schema_field(
         lazy_serializer("blog.serializers.post.BlogPostSerializer")(many=True)
     )
     def get_recent_posts(self, obj: BlogAuthor):
         from blog.serializers.post import BlogPostSerializer
 
-        recent_posts = obj.blog_posts.order_by("-created_at")[:3]
+        recent_posts = self._visible_posts(obj).order_by("-created_at")[:3]
         return BlogPostSerializer(
             recent_posts, many=True, context=self.context
         ).data
@@ -89,9 +104,11 @@ class BlogAuthorDetailSerializer(BlogAuthorSerializer):
     def get_top_posts(self, obj: BlogAuthor):
         from blog.serializers.post import BlogPostSerializer
 
-        top_posts = obj.blog_posts.annotate(
-            likes_count_field=models.Count("likes")
-        ).order_by("-view_count", "-likes_count_field")[:3]
+        top_posts = (
+            self._visible_posts(obj)
+            .annotate(likes_count_field=models.Count("likes"))
+            .order_by("-view_count", "-likes_count_field")[:3]
+        )
         return BlogPostSerializer(
             top_posts, many=True, context=self.context
         ).data

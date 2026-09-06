@@ -4990,7 +4990,7 @@ paths:
         name: tagName
         schema:
           type: string
-        description: Φίλτρο ανά ετικέτα (χωρίς διάκριση πεζών/κεφαλαίων)
+        description: Φίλτρο ανά ενεργή ετικέτα (χωρίς διάκριση πεζών/κεφαλαίων)
       - in: query
         name: tags
         schema:
@@ -5000,7 +5000,7 @@ paths:
           - type: array
             items:
               type: integer
-        description: Φίλτρο ανά ID ετικετών (διαχωρισμένα με κόμμα)
+        description: Φίλτρο ανά ID ενεργών ετικετών (διαχωρισμένα με κόμμα)
         explode: true
         style: form
       - in: query
@@ -5744,7 +5744,7 @@ paths:
         name: tagName
         schema:
           type: string
-        description: Φίλτρο ανά ετικέτα (χωρίς διάκριση πεζών/κεφαλαίων)
+        description: Φίλτρο ανά ενεργή ετικέτα (χωρίς διάκριση πεζών/κεφαλαίων)
       - in: query
         name: tags
         schema:
@@ -5754,7 +5754,7 @@ paths:
           - type: array
             items:
               type: integer
-        description: Φίλτρο ανά ID ετικετών (διαχωρισμένα με κόμμα)
+        description: Φίλτρο ανά ID ενεργών ετικετών (διαχωρισμένα με κόμμα)
         explode: true
         style: form
       - in: query
@@ -6231,7 +6231,7 @@ paths:
         name: tagName
         schema:
           type: string
-        description: Φίλτρο ανά ετικέτα (χωρίς διάκριση πεζών/κεφαλαίων)
+        description: Φίλτρο ανά ενεργή ετικέτα (χωρίς διάκριση πεζών/κεφαλαίων)
       - in: query
         name: tags
         schema:
@@ -6241,7 +6241,7 @@ paths:
           - type: array
             items:
               type: integer
-        description: Φίλτρο ανά ID ετικετών (διαχωρισμένα με κόμμα)
+        description: Φίλτρο ανά ID ενεργών ετικετών (διαχωρισμένα με κόμμα)
         explode: true
         style: form
       - in: query
@@ -6366,7 +6366,6 @@ paths:
         required: true
       security:
       - cookieAuth: []
-      - {}
       responses:
         '400':
           content:
@@ -6662,7 +6661,7 @@ paths:
         name: tagName
         schema:
           type: string
-        description: Φίλτρο ανά ετικέτα (χωρίς διάκριση πεζών/κεφαλαίων)
+        description: Φίλτρο ανά ενεργή ετικέτα (χωρίς διάκριση πεζών/κεφαλαίων)
       - in: query
         name: tags
         schema:
@@ -6672,7 +6671,7 @@ paths:
           - type: array
             items:
               type: integer
-        description: Φίλτρο ανά ID ετικετών (διαχωρισμένα με κόμμα)
+        description: Φίλτρο ανά ID ενεργών ετικετών (διαχωρισμένα με κόμμα)
         explode: true
         style: form
       - in: query
@@ -7010,7 +7009,7 @@ paths:
         name: tagName
         schema:
           type: string
-        description: Φίλτρο ανά ετικέτα (χωρίς διάκριση πεζών/κεφαλαίων)
+        description: Φίλτρο ανά ενεργή ετικέτα (χωρίς διάκριση πεζών/κεφαλαίων)
       - in: query
         name: tags
         schema:
@@ -7020,7 +7019,7 @@ paths:
           - type: array
             items:
               type: integer
-        description: Φίλτρο ανά ID ετικετών (διαχωρισμένα με κόμμα)
+        description: Φίλτρο ανά ID ενεργών ετικετών (διαχωρισμένα με κόμμα)
         explode: true
         style: form
       - in: query

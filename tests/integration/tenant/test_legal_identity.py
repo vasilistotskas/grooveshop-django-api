@@ -60,6 +60,39 @@ def _set(key: str, value, type_="string"):
     )
 
 
+def _state(key: str) -> str:
+    """What the DB, the accessor and the connection say, right now.
+
+    These tests have failed in a full parallel run with the endpoint
+    publishing the seeded blank instead of the value `_set` wrote and
+    read back — and the mechanism was never established. The settings
+    cache is inert under the test cache config, each xdist worker has
+    its own database, and nothing re-seeds during a request, so the
+    obvious explanations are ruled out.
+
+    Rather than guess again, a failure now reports the three things that
+    separate the remaining candidates: the row as stored, what the
+    accessor returns, and which schema the connection is pointed at (a
+    test that assigns `connection.tenant` directly instead of calling
+    `set_tenant()` strands `schema_name`, and later reads then land in a
+    different schema's table).
+    """
+    from django.db import connection
+
+    row = (
+        Setting.objects.filter(name=key)
+        .values_list("value_string", "value_bool", "value_type")
+        .first()
+    )
+    tenant = getattr(connection, "tenant", None)
+    return (
+        f"{key}: row={row!r} "
+        f"accessor={Setting.get(key, default=None)!r} "
+        f"schema={getattr(connection, 'schema_name', '?')!r} "
+        f"tenant={getattr(tenant, 'schema_name', None)!r}"
+    )
+
+
 @pytest.mark.django_db
 class TestOneDefinition:
     """Invoice and storefront must never name a different seller."""
@@ -179,7 +212,7 @@ class TestEndpoint:
 
         body = client.get(reverse("tenant:tenant-legal-identity")).json()
 
-        assert body["name"] == "Acme MON IKE"
+        assert body["name"] == "Acme MON IKE", _state("INVOICE_SELLER_NAME")
         assert body.get("legalForm", body.get("legal_form")) == "ΙΚΕ"
         assert (
             body.get("registrationNumber", body.get("registration_number"))

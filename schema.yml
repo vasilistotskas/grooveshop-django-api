@@ -43973,7 +43973,8 @@ components:
           type: array
           items:
             type: integer
-          description: Λίστα ID δεσμεύσεων προς απελευθέρωση
+          description: List of reservation IDs to release (at most 100)
+          maxItems: 100
       required:
       - reservationIds
     ReleaseReservationsResponse:

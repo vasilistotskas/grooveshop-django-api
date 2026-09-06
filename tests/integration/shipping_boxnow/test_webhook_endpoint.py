@@ -119,11 +119,17 @@ def _noop_tenant_context(tenant):
     from django.db import connection
 
     previous = getattr(connection, "tenant", None)
-    connection.tenant = tenant
+    # `set_tenant()` keeps `schema_name` in step with `tenant`;
+    # assigning the attribute alone strands `schema_name` on this
+    # tenant for the rest of the worker's session.
+    connection.set_tenant(tenant)
     try:
         yield
     finally:
-        connection.tenant = previous
+        if previous is not None:
+            connection.set_tenant(previous)
+        else:
+            connection.set_schema_to_public()
 
 
 @pytest.fixture

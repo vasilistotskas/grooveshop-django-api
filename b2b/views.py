@@ -8,7 +8,7 @@ from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
+from rest_framework.throttling import UserRateThrottle
 
 from b2b.models import BusinessProfile
 from b2b.serializers import (
@@ -93,9 +93,11 @@ class B2BViewSet(BaseModelViewSet):
         if self.action == "submit_profile":
             # Each submit can trigger an outbound VIES HTTP check —
             # budget it tightly on top of the global daily caps.
+            # No AnonRateThrottle: DRF checks permissions before
+            # throttles and this action is IsAuthenticated, so an
+            # anonymous caller is turned away before any throttle runs.
             return [
                 B2BProfileSubmitThrottle(),
-                AnonRateThrottle(),
                 UserRateThrottle(),
             ]
         return super().get_throttles()

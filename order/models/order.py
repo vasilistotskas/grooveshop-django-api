@@ -434,11 +434,12 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         return f"Order {self.id} - {self.first_name} {self.last_name}"
 
     def save(self, *args: Any, **kwargs: Any) -> None:
-        if (
+        status_changed = bool(
             self.pk
             and hasattr(self, "_original_status")
             and self.status != self._original_status
-        ):
+        )
+        if status_changed:
             self.status_updated_at = timezone.now()
 
         if (
@@ -448,6 +449,36 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
             and self.user is not None
         ):
             self.email = self.user.email
+
+        # Django writes an ``auto_now`` column only when it appears in
+        # ``update_fields``, so every partial save left ``updated_at``
+        # holding the creation timestamp. Production order 264 ran
+        # PENDING -> PROCESSING -> SHIPPED across two days and still
+        # reported ``updated_at`` equal to its ``created_at``.
+        #
+        # That is not cosmetic. ``updated_at`` is a documented API filter
+        # (order/filters.py exposes gte/lte/date), so "orders changed
+        # since X" silently omitted every status change. Worse,
+        # ``auto_cancel_stuck_pending_orders`` selects the FAILED-payment
+        # bucket with ``updated_at__lt=now - GRACE``, intending a retry
+        # window measured from the failure; measured from creation
+        # instead, any payment failing more than GRACE after checkout was
+        # cancellable on the very next run, with no grace at all.
+        #
+        # Fixed here rather than at ~35 call sites so it cannot be missed
+        # again — order/stock.py and the shipping services already pass
+        # "updated_at" by hand, which is the convention Order's own saves
+        # simply never followed. ``status_updated_at`` gets the same
+        # treatment: this method ASSIGNS it above, and a caller passing
+        # update_fields=["status"] would otherwise drop that write while
+        # ``_original_status`` below still consumed the transition.
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None:
+            fields = set(update_fields)
+            fields.add("updated_at")
+            if status_changed:
+                fields.add("status_updated_at")
+            kwargs["update_fields"] = fields
 
         super().save(*args, **kwargs)
         self._original_status = self.status

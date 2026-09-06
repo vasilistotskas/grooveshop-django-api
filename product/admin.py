@@ -1,8 +1,11 @@
 from datetime import timedelta
 from decimal import Decimal
+from uuid import uuid4
 
 import admin_thumbnails
 from django.contrib import admin, messages
+from django.contrib.admin import helpers
+from django.db import transaction
 from django.db.models import Count, F, Prefetch, Q, Sum
 from django.db.models.functions import TruncDay
 from django.http import Http404, HttpResponseRedirect
@@ -191,7 +194,11 @@ class PopularityFilter(DropdownFilter):
         return [
             ("trending", _("Trending (High Views)")),
             ("loved", _("Loved (High Likes)")),
-            ("well_reviewed", _("Well Reviewed (>4.0)")),
+            # 7.0, not 4.0. `RateEnum` is 1-10 and `rating_display`
+            # renders "x/10", so both numbers are on the same scale and
+            # the label was simply wrong: an admin picking ">4.0" lost
+            # every product averaging 4.1-7.0 without being told.
+            ("well_reviewed", _("Well Reviewed (>7.0)")),
             ("new_arrivals", _("New Arrivals (Last 30 days)")),
         ]
 
@@ -341,10 +348,20 @@ class AttributeValueInline(TabularInline):
             "Unnamed"
         )
 
+    def get_queryset(self, request):
+        # ``usage_count_display`` below counted per row — 6 COUNT queries
+        # for 6 values on the Attribute change page. ``AttributeValueAdmin``
+        # solves the same problem with the same annotation; the inline
+        # was missed.
+        return super().get_queryset(request).with_usage_count()
+
     @admin.display(description=_("Usage"))
     def usage_count_display(self, obj):
         if not obj.pk:
             return "-"
+        annotated = getattr(obj, "usage_count", None)
+        if annotated is not None:
+            return annotated
         return obj.product_attributes.count()
 
 
@@ -1318,7 +1335,16 @@ class ProductAdmin(
             return render(request, "admin/product/apply_discount.html", context)
 
         if is_form_post:
-            selected_ids = request.session.get("selected_product_ids", [])
+            # The POSTed selection, not `request.session`. The template
+            # re-posts one `_selected_action` per product, so Django has
+            # already built the right queryset — and it was thrown away
+            # in favour of a session key that is shared across TABS.
+            # Open the action on three clearance SKUs in one tab, then
+            # on the whole catalogue in another, come back to the first
+            # and submit: the discount landed on everything. The key was
+            # also only deleted on the success path, so an abandoned run
+            # left it armed for the next one.
+            selected_ids = request.POST.getlist(helpers.ACTION_CHECKBOX_NAME)
 
             if selected_ids:
                 queryset = Product.objects.filter(id__in=selected_ids)
@@ -1339,7 +1365,25 @@ class ProductAdmin(
                 if not apply_to_inactive:
                     queryset = queryset.filter(active=True)
 
-                updated = queryset.update(discount_percent=discount_percent)
+                # Saved one at a time, not `queryset.update()`. A bulk
+                # UPDATE emits no `post_save`, so simple-history writes
+                # no row, `post_create_historical_record_callback` never
+                # runs, `product_price_lowered` is never sent, and NOT
+                # ONE price-drop alert reaches the customers who
+                # explicitly subscribed to it. Measured: a bulk discount
+                # fires 0 post_save receivers where an instance save
+                # fires 1. `final_price` and `discount_percent` are also
+                # indexed Meilisearch fields, so search kept the
+                # pre-discount price until an unrelated save.
+                #
+                # The cost is bounded by the operator's selection, which
+                # this action already renders on a confirmation page.
+                updated = 0
+                with transaction.atomic():
+                    for product in queryset.select_for_update():
+                        product.discount_percent = discount_percent
+                        product.save(update_fields=["discount_percent"])
+                        updated += 1
 
                 if "selected_product_ids" in request.session:
                     del request.session["selected_product_ids"]
@@ -1400,7 +1444,17 @@ class ProductAdmin(
         icon="cancel",
     )
     def clear_discount(self, request, queryset):
-        updated = queryset.update(discount_percent=Decimal("0.0"))
+        # Saved individually for the same reason as
+        # `apply_custom_discount` — see the comment there. Clearing a
+        # discount RAISES the price, so no alert is due, but
+        # `final_price` is an indexed Meilisearch field and search would
+        # otherwise keep advertising the discounted one.
+        updated = 0
+        with transaction.atomic():
+            for product in queryset.select_for_update():
+                product.discount_percent = Decimal("0.0")
+                product.save(update_fields=["discount_percent"])
+                updated += 1
         self.message_user(
             request,
             ngettext(
@@ -1436,7 +1490,16 @@ class ProductAdmin(
         clone = Product.objects.get(pk=object_id)
         clone.pk = None
         clone.id = None
-        clone.uuid = None  # SoftDeleteModel/UUIDModel — regenerates
+        # `uuid` is deliberately NOT touched. The comment here used to
+        # say "regenerates", but `UUIDModel.uuid` is
+        # `UUIDField(default=uuid4, unique=True)` with no `null=True` —
+        # an explicit None OVERRIDES the default, so the INSERT sent
+        # NULL and every use of this action died with
+        # `IntegrityError: null value in column "uuid"`. Leaving the
+        # attribute alone is what actually regenerates it: with `pk`
+        # cleared the row is an insert, and `uuid` already holds the
+        # original's value, so it must be reset to a fresh one.
+        clone.uuid = uuid4()
         clone.active = False
         clone.stock = 0
         clone.view_count = 0
@@ -1685,7 +1748,13 @@ class ProductCategoryAdmin(BaseTranslatableAdmin):
         )
         # Direct child count via annotation instead of a per-row
         # ``get_children().count()`` query.
-        return qs.annotate(children_count=Count("children", distinct=True))
+        qs = qs.annotate(children_count=Count("children", distinct=True))
+        # ``image_preview`` reads ``instance.main_image``, which only
+        # uses a cache when the queryset supplied one — otherwise it is
+        # one query per row. Measured: 6 queries for 6 rows. The sibling
+        # admins all carry this prefetch with a comment saying why; this
+        # one was missed.
+        return qs.with_main_image()
 
     def get_prepopulated_fields(self, request, obj=None):
         return {"slug": ("name",)}

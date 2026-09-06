@@ -41,6 +41,11 @@ _FONT_ALLOWLIST = {
     "manrope",
     "playfair-display",
     "source-serif-4",
+    # Engineered/technical pairing — both ship a Greek subset, which
+    # most technical faces do not (IBM Plex Mono and Plex Condensed
+    # have none). Mirrored in shared/theme/constants.ts.
+    "ibm-plex-sans",
+    "jetbrains-mono",
 }
 
 _CONTAINER_ALLOWLIST = {"narrow", "default", "wide"}
@@ -105,7 +110,7 @@ def validate_theme_metadata(value: object) -> None:
                 errors.append(
                     f"radius: must be one of {sorted(_RADIUS_ALLOWLIST)}"
                 )
-        elif key in ("fontSans", "fontDisplay"):
+        elif key in ("fontSans", "fontDisplay", "fontMono"):
             if entry not in _FONT_ALLOWLIST:
                 errors.append(
                     f"{key}: must be one of {sorted(_FONT_ALLOWLIST)}"

@@ -599,3 +599,19 @@ def test_theme_metadata_bad_font_display_raises():
     t = _unsaved_tenant(theme_metadata={"fontDisplay": "comic-sans"})
     with pytest.raises(ValidationError):
         t.clean()
+
+
+def test_theme_metadata_font_mono_is_valid():
+    t = _unsaved_tenant(
+        theme_metadata={
+            "fontSans": "ibm-plex-sans",
+            "fontMono": "jetbrains-mono",
+        }
+    )
+    t.clean()  # must not raise
+
+
+def test_theme_metadata_bad_font_mono_raises():
+    t = _unsaved_tenant(theme_metadata={"fontMono": "comic-sans"})
+    with pytest.raises(ValidationError):
+        t.clean()

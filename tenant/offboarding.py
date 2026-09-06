@@ -139,13 +139,35 @@ def purge_search_indexes(schema_name: str) -> list[str]:
         from meili._client import client as meili_client
 
         for index in meili_client.get_indexes():
-            if index.uid.startswith(prefix):
-                meili_client.delete_index(index.uid)
-                deleted.append(index.uid)
+            if not index.uid.startswith(prefix):
+                continue
+            # ``meili_client.client``, not ``meili_client``. The wrapper
+            # in ``meili/_client.py`` exposes create/get/get_search
+            # index helpers and NO ``delete_index`` — the raw SDK client
+            # underneath is what has it, which is why
+            # ``meilisearch_drop.py`` reaches through in exactly this
+            # way. The call raised ``AttributeError`` on the first
+            # index, the ``except`` below swallowed it, and offboarding
+            # reported a clean run having deleted nothing: every
+            # ``{schema}__*`` index and all its documents stayed alive,
+            # so reusing that schema name would hand a new store the
+            # previous occupant's catalogue.
+            task = meili_client.client.delete_index(index.uid)
+            meili_client.wait_for_task(task.task_uid)
+            deleted.append(index.uid)
     except Exception:
+        # Swallowed on purpose, and `test_client_failure_does_not_raise`
+        # encodes that: `destroy_tenant` calls this AFTER
+        # `tenant.delete(force_drop=True)` and BEFORE purging the tenant's
+        # files and flushing its media. Raising here would leave a store
+        # whose schema is already gone with its files still on disk. The
+        # partial result is returned so the caller's report says what was
+        # actually dropped, and the failure is logged at exception level.
         logger.exception(
-            "Offboarding: failed to drop Meilisearch indexes for tenant %s",
+            "Offboarding: failed to drop Meilisearch indexes for tenant %s "
+            "(dropped %s before failing)",
             schema_name,
+            deleted,
         )
         return deleted
     if deleted:

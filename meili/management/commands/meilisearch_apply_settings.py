@@ -14,7 +14,7 @@ drift from the live indexes. A drifted sortable field once made every
 
 from contextlib import nullcontext as _nullcontext
 
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.utils.translation import gettext as _
 
 from blog.models.post import BlogPostTranslation
@@ -37,6 +37,7 @@ class Command(TenantCommandMixin, BaseCommand):
         self.add_tenant_arguments(parser)
 
     def handle(self, *args, **options):
+        self._failures: list[str] = []
         from django_tenants.utils import schema_context
 
         for schema in self.get_tenant_schemas(options):
@@ -46,6 +47,22 @@ class Command(TenantCommandMixin, BaseCommand):
                 )
             with schema_context(schema) if schema else _nullcontext():
                 self._handle_for_schema(*args, **options)
+
+        # Raised after EVERY schema has been attempted, never inside the
+        # loop. This is the PreSync hook on every deploy: aborting on the
+        # first failing tenant would leave every store after it on the
+        # settings drift the command exists to prevent, the drift that
+        # "once made every ?sort= product query 500". Exiting non-zero is
+        # still non-negotiable; announcing success after catching a
+        # failure is what this replaced.
+        if self._failures:
+            raise CommandError(
+                "Index settings NOT applied: " + "; ".join(self._failures)
+            )
+
+        self.stdout.write(
+            self.style.SUCCESS("\nAll index settings updated successfully!")
+        )
 
     def _handle_for_schema(self, *args, **options):
         index_name = options.get("index")
@@ -57,21 +74,29 @@ class Command(TenantCommandMixin, BaseCommand):
             elif index_name == "BlogPostTranslation":
                 self._update_blog_index()
             else:
-                self.stdout.write(
-                    self.style.ERROR(
-                        f"Unknown index: {index_name}. "
-                        "Valid options: ProductTranslation, BlogPostTranslation"
-                    )
+                # A CommandError, not an error line and exit 0: a typo in
+                # --index otherwise reported "unknown" and then still
+                # succeeded, having applied nothing.
+                raise CommandError(
+                    f"Unknown index: {index_name}. "
+                    "Valid options: ProductTranslation, BlogPostTranslation"
                 )
-                return
         else:
             # Update all indexes
             self._update_product_index()
             self._update_blog_index()
 
-        self.stdout.write(
-            self.style.SUCCESS("\nAll index settings updated successfully!")
-        )
+    def _record_failure(self, index_name: str, exc: Exception) -> None:
+        """Record a failure against the schema it happened in.
+
+        The run continues to the remaining tenants, so an entry naming
+        only the index would not say WHICH store is still drifted.
+        ``connection.schema_name`` is read here rather than threaded
+        through because every caller runs inside ``schema_context``.
+        """
+        from django.db import connection
+
+        self._failures.append(f"{connection.schema_name}/{index_name}: {exc!s}")
 
     def _update_product_index(self):
         """Update ProductTranslation index settings."""
@@ -100,6 +125,7 @@ class Command(TenantCommandMixin, BaseCommand):
                     f"✗ Failed to update ProductTranslation settings: {e!s}"
                 )
             )
+            self._record_failure("ProductTranslation", e)
 
     def _update_blog_index(self):
         """Update BlogPostTranslation index settings."""
@@ -127,3 +153,4 @@ class Command(TenantCommandMixin, BaseCommand):
                     f"✗ Failed to update BlogPostTranslation settings: {e!s}"
                 )
             )
+            self._record_failure("BlogPostTranslation", e)

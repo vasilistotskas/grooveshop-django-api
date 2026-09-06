@@ -403,6 +403,72 @@ class TestMeiliClient:
         mock_client_instance.get_indexes.assert_called_once()
 
     @patch("meili._client._Client")
+    def test_get_indexes_enumerates_every_page(self, mock_client_class):
+        """A tenant index past the engine's page size must still be listed.
+
+        Meilisearch paginates ``GET /indexes`` (20 by default) and the
+        SDK sends no parameters, so the previous single-call
+        implementation stopped at the first page. Two indexes per tenant
+        means the platform crosses that at ten stores, after which
+        offboarding silently leaves a departed tenant's documents alive.
+        """
+        mock_client_instance = MagicMock()
+        mock_client_class.return_value = mock_client_instance
+        all_indexes = [{"uid": f"tenant{i:02d}__Product"} for i in range(45)]
+
+        def paged(parameters=None):
+            # Mirrors the engine: no parameters means offset 0, limit 20.
+            parameters = parameters or {}
+            offset = parameters.get("offset", 0)
+            limit = parameters.get("limit", 20)
+            return {
+                "results": all_indexes[offset : offset + limit],
+                "total": len(all_indexes),
+                "offset": offset,
+                "limit": limit,
+            }
+
+        mock_client_instance.get_indexes.side_effect = paged
+
+        client = Client(self.settings)
+
+        result = client.get_indexes()
+
+        assert result == all_indexes
+        assert {"uid": "tenant44__Product"} in result
+        # 45 indexes fit in one 100-wide page, and ``total`` says so, so
+        # exhaustion costs no extra round trip.
+        assert mock_client_instance.get_indexes.call_count == 1
+
+    @patch("meili._client._Client")
+    def test_get_indexes_pages_until_total_is_reached(self, mock_client_class):
+        """Pagination is driven by ``total``, not by a single fetch."""
+        mock_client_instance = MagicMock()
+        mock_client_class.return_value = mock_client_instance
+        all_indexes = [{"uid": f"idx{i:03d}"} for i in range(250)]
+
+        def paged(parameters=None):
+            # Mirrors the engine: no parameters means offset 0, limit 20.
+            parameters = parameters or {}
+            offset = parameters.get("offset", 0)
+            limit = parameters.get("limit", 20)
+            return {
+                "results": all_indexes[offset : offset + limit],
+                "total": len(all_indexes),
+                "offset": offset,
+                "limit": limit,
+            }
+
+        mock_client_instance.get_indexes.side_effect = paged
+
+        client = Client(self.settings)
+
+        result = client.get_indexes()
+
+        assert result == all_indexes
+        assert mock_client_instance.get_indexes.call_count == 3
+
+    @patch("meili._client._Client")
     def test_update_display_attributes(self, mock_client_class):
         mock_client_instance = MagicMock()
         mock_index = MagicMock()

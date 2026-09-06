@@ -124,6 +124,54 @@ def post_create_historical_record_callback(
         )
 
 
+def reindex_products_by_pk(product_ids) -> int:
+    """Reindex the translations of products changed WITHOUT a save().
+
+    ``queryset.update()`` and ``SoftDeleteQuerySet.delete()`` are single
+    SQL statements: they emit no ``post_save``, so
+    ``reindex_product_translations`` below never runs and the
+    Meilisearch documents keep their old ``active`` / ``is_deleted``
+    values. Measured: a bulk update fires **0** post_save receivers
+    where an instance save fires 1.
+
+    Both flags are indexed and filtered on — ``search/views.py`` filters
+    the INDEXED ``active`` — so bulk-deactivating products left them
+    fully searchable and buyable until the nightly sync. The admin
+    reported success either way.
+
+    Returns the number of translation documents dispatched.
+    """
+    if settings.MEILISEARCH.get("OFFLINE", False):
+        return 0
+
+    product_ids = list(product_ids)
+    if not product_ids:
+        return 0
+
+    from meili.tasks import index_document_task
+
+    translation_pks = list(
+        ProductTranslation.objects.filter(
+            master_id__in=product_ids
+        ).values_list("pk", flat=True)
+    )
+    if not translation_pks:
+        return 0
+
+    # Same dispatch shape as ``reindex_product_translations`` below —
+    # on commit, by pk, with the task re-loading each row.
+    def _dispatch_reindex(pks=translation_pks):
+        for pk in pks:
+            index_document_task.delay(
+                app_label="product",
+                model_name="producttranslation",
+                pk=pk,
+            )
+
+    transaction.on_commit(_dispatch_reindex)
+    return len(translation_pks)
+
+
 @receiver(
     post_save,
     sender=Product,

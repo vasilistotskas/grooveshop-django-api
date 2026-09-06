@@ -397,6 +397,36 @@ def _scrub_carrier_shipment_pii(order_ids: list[int]) -> int:
     return scrubbed
 
 
+def _delete_export_files(user) -> int:
+    """Remove this user's GDPR export bundles from the private volume.
+
+    Raises on a removal failure so the caller's transaction rolls back
+    and the task retries, rather than committing a deletion that leaves
+    unreferenced personal data behind.
+    """
+    from user.models.data_export import UserDataExport
+
+    location = get_export_location()
+    removed = 0
+    for file_path in UserDataExport.objects.filter(user=user).values_list(
+        "file_path", flat=True
+    ):
+        if not file_path:
+            continue
+        abs_path = os.path.join(location, file_path)
+        if not os.path.exists(abs_path):
+            continue
+        os.remove(abs_path)
+        removed += 1
+
+    logger.info(
+        "GDPR erasure: removed %s export bundle(s) for user %s",
+        removed,
+        user.pk,
+    )
+    return removed
+
+
 @transaction.atomic
 def anonymise_and_delete_user(user) -> dict[str, int]:
     """Right-to-erasure. Anonymises orders, then deletes the user row.
@@ -418,8 +448,15 @@ def anonymise_and_delete_user(user) -> dict[str, int]:
     """
     from knox.models import AuthToken
 
+    from blog.models.author import BlogAuthor
+    from giftcard.models import GiftCard, GiftCardPurchase
+    from meta_capi.models import MetaCapiEventLog
+    from order.models.history import OrderHistory
     from order.models.order import Order
     from product.models.alert import ProductAlert
+    from promotion.models.code import PromotionCode
+    from promotion.models.redemption import PromotionRedemption
+    from search.models import SearchQuery
 
     counts: dict[str, int] = {}
 
@@ -452,26 +489,86 @@ def anonymise_and_delete_user(user) -> dict[str, int]:
     # metadata is non-personal operational data and is retained.
     counts["carrier_pii_scrubbed"] = _scrub_carrier_shipment_pii(order_ids)
 
+    # Order history rows document the state transitions of an order we
+    # are legally required to keep, so the rows stay — but the request
+    # metadata on them is the subject's own network identity, which has
+    # no place in a retained financial record.
+    counts["order_history_scrubbed"] = OrderHistory.objects.filter(
+        user=user
+    ).update(ip_address=None, user_agent="")
+
     # Product alerts are single-shot opt-ins — just delete them, no
     # historical value to preserve.
     counts["product_alerts"] = ProductAlert.objects.filter(user=user).delete()[
         0
     ]
 
+    # Search history is behavioural data about the subject and nothing
+    # else: the query text is theirs, and the row also carries the IP,
+    # user agent and session key it was made from. Nulling the FK — all
+    # SET_NULL does on its own — leaves every one of those in place.
+    # Analytics aggregates recompute without them.
+    counts["search_queries"] = SearchQuery.objects.filter(user=user).delete()[0]
+
+    # Conversions-API logs hold a payload of identifiers hashed for
+    # Meta's matching. Hashing here is pseudonymisation, not anonymity —
+    # a stable hash exists precisely so the subject can be recognised —
+    # and these rows are replay aids for incident debugging with no
+    # retention duty behind them.
+    counts["meta_capi_events"] = MetaCapiEventLog.objects.filter(
+        user=user
+    ).delete()[0]
+
+    # Redemptions hang off a retained order, so the row stays and only
+    # the denormalised address goes.
+    counts["promotion_redemptions_scrubbed"] = (
+        PromotionRedemption.objects.filter(user=user).update(email="")
+    )
+    counts["promotion_codes_scrubbed"] = PromotionCode.objects.filter(
+        assigned_to=user
+    ).update(assigned_to_email="")
+
+    # Gift cards are bearer instruments: the balance and the code must
+    # survive, or erasing a buyer would destroy a stranger's money. Only
+    # the SUBJECT's side of each row is scrubbed, and which side that is
+    # depends on which FK points at them:
+    #
+    #   issued_to == subject → they are the recipient, so
+    #                          recipient_email/recipient_name are theirs.
+    #   buyer == subject     → they are the purchaser, so
+    #                          buyer_email/sender_name are theirs, while
+    #                          the recipient fields belong to a third
+    #                          party still holding a live card.
+    counts["giftcards_scrubbed"] = GiftCard.objects.filter(
+        issued_to=user
+    ).update(recipient_email="", recipient_name=placeholder_name)
+    counts["giftcard_purchases_scrubbed"] = GiftCardPurchase.objects.filter(
+        buyer=user
+    ).update(buyer_email=placeholder_email, sender_name=placeholder_name)
+
+    # Right-of-access bundles are the single most complete copy of the
+    # subject's data the system produces, and UserDataExport.user is
+    # CASCADE — so deleting the account took the rows and left the JSON
+    # on the private-media PVC with nothing left pointing at it. The
+    # expiry sweep walks rows, so it would never see them again.
+    #
+    # Deleted before user.delete() cascades the rows, and a failure is
+    # raised rather than logged: the task retries, and the retry is
+    # idempotent because a file already removed on a failed attempt is
+    # simply not there the next time.
+    counts["export_files_deleted"] = _delete_export_files(user)
+
+    # The one PROTECT FK to UserAccount, and the reason erasure was
+    # impossible for anyone who had ever authored a post: user.delete()
+    # raised ProtectedError, the atomic rolled everything back, and the
+    # account stayed exactly as it was — after the endpoint had already
+    # revoked the caller's tokens and told them they were being deleted.
+    # BlogPost.author is SET_NULL, so the articles stay published (they
+    # are the store's content) while the authorship identity, including
+    # the translated bio, goes with the row.
+    counts["blog_authors"] = BlogAuthor.objects.filter(user=user).delete()[0]
+
     counts["knox_tokens"] = AuthToken.objects.filter(user=user).delete()[0]
-
-    try:
-        from allauth.account.models import EmailAddress
-        from allauth.socialaccount.models import SocialAccount
-
-        counts["email_addresses"] = EmailAddress.objects.filter(
-            user=user
-        ).delete()[0]
-        counts["social_accounts"] = SocialAccount.objects.filter(
-            user=user
-        ).delete()[0]
-    except Exception:
-        logger.exception("Failed to purge allauth records for user %s", user.pk)
 
     # Only ImportError is tolerated: it means the optional allauth app is
     # not installed, so there is nothing of that kind to erase. A failure
@@ -479,6 +576,19 @@ def anonymise_and_delete_user(user) -> dict[str, int]:
     # that "a failure halfway through leaves the user intact", and it goes
     # on to log "GDPR deletion complete". Swallowing turned that line into
     # a claim of erasure for records that are still there.
+    try:
+        from allauth.account.models import EmailAddress
+        from allauth.socialaccount.models import SocialAccount
+    except ImportError:
+        logger.debug("allauth.account not installed — no addresses to erase")
+    else:
+        counts["email_addresses"] = EmailAddress.objects.filter(
+            user=user
+        ).delete()[0]
+        counts["social_accounts"] = SocialAccount.objects.filter(
+            user=user
+        ).delete()[0]
+
     try:
         from allauth.mfa.models import Authenticator
     except ImportError:

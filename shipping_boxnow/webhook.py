@@ -159,12 +159,27 @@ def verify_signature(
     Returns:
         ``True`` if the signature is valid, ``False`` otherwise.
     """
+    # The signature comes off an UNAUTHENTICATED JSON body, so its type
+    # is whatever the caller sent. `null`, a number, a list and an
+    # object all reached `.encode()` and raised AttributeError before
+    # the view's 401 path — a 500 on a public endpoint, from a
+    # one-character payload change. A non-string is simply not a valid
+    # signature.
+    if not isinstance(datasignature_hex, str):
+        return False
+
     expected = hmac.new(
         secret.encode(),
         raw_data_bytes,
         hashlib.sha256,
     ).hexdigest()
-    return hmac.compare_digest(expected, datasignature_hex)
+    # Bytes, not str: a signature header carrying a non-ASCII
+    # character would raise TypeError out of `compare_digest` rather
+    # than simply failing verification.
+    return hmac.compare_digest(
+        expected.encode("ascii"),
+        datasignature_hex.encode("utf-8", "surrogateescape"),
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -25,7 +25,16 @@ def is_internal_caller(token: str) -> bool:
     """Constant-time check of the internal-services token (the same
     secret the agent gateway presents on tenant resolve)."""
     secret = settings.AGENT_GATEWAY_INTERNAL_SECRET
-    return bool(secret) and compare_digest(token or "", secret)
+    # Compare BYTES, not str: `compare_digest` raises TypeError on a
+    # str containing a non-ASCII character, and Django decodes header
+    # bytes with latin-1 — so any byte >= 0x80 in the header turned a
+    # "withhold and 404" into an unhandled 500, which is both an
+    # existence oracle for an endpoint that deliberately hides itself
+    # and a stream of fake incidents in the error tracker.
+    return bool(secret) and compare_digest(
+        (token or "").encode("utf-8", "surrogateescape"),
+        secret.encode("utf-8", "surrogateescape"),
+    )
 
 
 def build_domains_payload() -> dict:

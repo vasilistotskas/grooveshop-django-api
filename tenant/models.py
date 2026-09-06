@@ -514,7 +514,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         help_text=_(
             "BoxNow partner identifier (digits only). "
             "Used by the storefront BoxNow widget. "
-            "Empty falls back to settings.BOXNOW_PARTNER_ID."
+            "No platform fallback — empty disables BoxNow."
         ),
     )
 
@@ -557,7 +557,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         help_text=_(
             "Meta Conversions API system user access token. "
             "Secret — never expose to the browser. "
-            "Empty falls back to settings.META_CAPI_ACCESS_TOKEN."
+            "No platform fallback — empty disables Meta CAPI."
         ),
     )
     meta_capi_dataset_id = models.CharField(
@@ -568,7 +568,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         help_text=_(
             "Meta Conversions API dataset (pixel) ID used for "
             "server-side event deduplication. "
-            "Empty falls back to settings.META_PIXEL_ID."
+            "No platform fallback — empty disables Meta CAPI."
         ),
     )
 
@@ -581,7 +581,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         default="",
         help_text=_(
             "Viva Wallet merchant ID. "
-            "Empty falls back to settings.VIVA_WALLET_MERCHANT_ID."
+            "No platform fallback — empty disables Viva Wallet."
         ),
     )
     viva_wallet_api_key = models.CharField(
@@ -591,7 +591,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         default="",
         help_text=_(
             "Viva Wallet API key (classic auth). "
-            "Empty falls back to settings.VIVA_WALLET_API_KEY."
+            "No platform fallback — empty disables Viva Wallet."
         ),
     )
     viva_wallet_client_id = models.CharField(
@@ -601,7 +601,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         default="",
         help_text=_(
             "Viva Wallet OAuth2 client ID. "
-            "Empty falls back to settings.VIVA_WALLET_CLIENT_ID."
+            "No platform fallback — empty disables Viva Wallet."
         ),
     )
     viva_wallet_client_secret = models.CharField(
@@ -611,7 +611,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         default="",
         help_text=_(
             "Viva Wallet OAuth2 client secret. "
-            "Empty falls back to settings.VIVA_WALLET_CLIENT_SECRET."
+            "No platform fallback — empty disables Viva Wallet."
         ),
     )
     viva_wallet_webhook_verification_key = models.CharField(
@@ -621,8 +621,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         default="",
         help_text=_(
             "Viva Wallet webhook verification key for HMAC validation. "
-            "Empty falls back to "
-            "settings.VIVA_WALLET_WEBHOOK_VERIFICATION_KEY."
+            "No platform fallback — empty disables Viva Wallet."
         ),
     )
     viva_wallet_source_code = models.CharField(
@@ -633,7 +632,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         help_text=_(
             "Viva Wallet Smart Checkout payment source code — a "
             "per-merchant identifier, so each tenant needs their own. "
-            "Empty falls back to settings.VIVA_WALLET_SOURCE_CODE."
+            "No platform fallback — empty disables Viva Wallet."
         ),
     )
     viva_wallet_live_mode = models.BooleanField(
@@ -657,7 +656,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         blank=True,
         default="",
         help_text=_(
-            "ACS courier API key. Empty falls back to settings.ACS_API_KEY."
+            "ACS courier API key. No platform fallback — empty disables ACS."
         ),
     )
     acs_company_id = models.CharField(
@@ -666,8 +665,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         blank=True,
         default="",
         help_text=_(
-            "ACS company identifier. "
-            "Empty falls back to settings.ACS_COMPANY_ID."
+            "ACS company identifier. No platform fallback — empty disables ACS."
         ),
     )
     acs_company_password = models.CharField(
@@ -676,8 +674,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         blank=True,
         default="",
         help_text=_(
-            "ACS company password. "
-            "Empty falls back to settings.ACS_COMPANY_PASSWORD."
+            "ACS company password. No platform fallback — empty disables ACS."
         ),
     )
     acs_user_id = models.CharField(
@@ -686,7 +683,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         blank=True,
         default="",
         help_text=_(
-            "ACS API user identifier. Empty falls back to settings.ACS_USER_ID."
+            "ACS API user identifier. No platform fallback — empty disables ACS."
         ),
     )
     acs_user_password = models.CharField(
@@ -695,8 +692,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         blank=True,
         default="",
         help_text=_(
-            "ACS API user password. "
-            "Empty falls back to settings.ACS_USER_PASSWORD."
+            "ACS API user password. No platform fallback — empty disables ACS."
         ),
     )
     acs_billing_code = models.CharField(
@@ -706,7 +702,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         default="",
         help_text=_(
             "ACS billing code (e.g. 'ΑΚ12345678'). "
-            "Empty falls back to settings.ACS_BILLING_CODE."
+            "No platform fallback — empty disables ACS."
         ),
     )
     acs_station_origin = models.CharField(
@@ -716,7 +712,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         default="",
         help_text=_(
             "ACS origin station code (up to 8 chars). "
-            "Empty falls back to settings.ACS_STATION_ORIGIN."
+            "No platform fallback — empty disables ACS."
         ),
     )
 
@@ -729,7 +725,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         default="",
         help_text=_(
             "BoxNow OAuth2 client ID. "
-            "Empty falls back to settings.BOXNOW_CLIENT_ID."
+            "No platform fallback — empty disables BoxNow."
         ),
     )
     box_now_client_secret = models.CharField(
@@ -739,7 +735,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         default="",
         help_text=_(
             "BoxNow OAuth2 client secret. "
-            "Empty falls back to settings.BOXNOW_CLIENT_SECRET."
+            "No platform fallback — empty disables BoxNow."
         ),
     )
     box_now_warehouse_id = models.CharField(
@@ -749,7 +745,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         default="",
         help_text=_(
             "BoxNow warehouse identifier. "
-            "Empty falls back to settings.BOXNOW_WAREHOUSE_ID."
+            "No platform fallback — empty disables BoxNow."
         ),
     )
     box_now_notify_phone = models.CharField(
@@ -759,7 +755,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         default="",
         help_text=_(
             "Phone number for BoxNow shipment notifications. "
-            "Empty falls back to settings.BOXNOW_NOTIFY_PHONE."
+            "No platform fallback — empty disables BoxNow."
         ),
     )
     box_now_webhook_secret = models.CharField(
@@ -770,8 +766,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         help_text=_(
             "HMAC secret for verifying BoxNow webhook deliveries — "
             "per-tenant, since each tenant holds their own BoxNow "
-            "contract. Empty falls back to "
-            "settings.BOXNOW_WEBHOOK_SECRET."
+            "contract. No platform fallback — empty disables BoxNow."
         ),
     )
 

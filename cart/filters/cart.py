@@ -6,7 +6,9 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
 
+from cart.managers.cart import abandoned_cutoff
 from cart.models import Cart
+from cart.models.item import CartItem
 from core.filters.camel_case_filters import CamelCaseTimeStampFilterSet
 from core.filters.core import UUIDFilterMixin
 
@@ -67,12 +69,16 @@ class CartFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
     is_active = filters.BooleanFilter(
         method="filter_is_active",
         help_text=_(
-            "Filter active/abandoned carts (based on 30-day inactivity)"
+            "Filter active/abandoned carts. The window is the "
+            "CART_ABANDONED_HOURS store setting, not a fixed period."
         ),
     )
     is_abandoned = filters.BooleanFilter(
         method="filter_is_abandoned",
-        help_text=_("Filter abandoned carts (inactive for 30+ days)"),
+        help_text=_(
+            "Filter abandoned carts — idle longer than the "
+            "CART_ABANDONED_HOURS store setting."
+        ),
     )
     days_inactive = filters.NumberFilter(
         method="filter_days_inactive",
@@ -150,8 +156,8 @@ class CartFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
         return queryset
 
     def filter_is_active(self, queryset, name, value):
-        """Filter active carts (activity within 30 days)."""
-        cutoff = timezone.now() - timedelta(days=30)
+        """Filter carts active within ``CART_ABANDONED_HOURS``."""
+        cutoff = abandoned_cutoff()
         if value is True:
             return queryset.filter(last_activity__gte=cutoff)
         elif value is False:
@@ -159,8 +165,8 @@ class CartFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
         return queryset
 
     def filter_is_abandoned(self, queryset, name, value):
-        """Filter abandoned carts (inactive 30+ days)."""
-        cutoff = timezone.now() - timedelta(days=30)
+        """Filter carts idle beyond ``CART_ABANDONED_HOURS``."""
+        cutoff = abandoned_cutoff()
         if value is True:
             return queryset.filter(last_activity__lt=cutoff)
         elif value is False:
@@ -249,9 +255,37 @@ class CartFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
         return queryset
 
     def filter_has_discounts(self, queryset, name, value):
-        """Filter carts with discounted items."""
-        if value is True:
-            return queryset.filter(items__discount_value__gt=0).distinct()
-        elif value is False:
-            return queryset.exclude(items__discount_value__gt=0).distinct()
-        return queryset
+        """Filter carts holding at least one discounted item.
+
+        ``CartItem.discount_value`` is a PROPERTY, not a column, so it
+        cannot appear in a lookup — `?hasDiscounts=` raised
+        ``FieldError`` and returned 500. Its retail branch is
+        ``product.discount_value``, which is
+        ``price * discount_percent / 100``, so it is positive exactly
+        when both of those columns are, and both ARE columns.
+
+        The B2B branch resolves against a customer group's price list
+        and has no SQL equivalent, so a wholesale cart whose only saving
+        comes from group pricing does not match here. Filtering is a
+        catalogue-level question; the per-line value stays on the
+        serialized item.
+        """
+        if value is None:
+            return queryset
+        # A subquery, not `exclude(**discounted)`. Django documents that
+        # "the conditions in a single exclude() call will not
+        # necessarily refer to the same item" for a multi-valued
+        # relationship — only `filter()` guarantees that. So a cart with
+        # one item priced 0 at 10% off and another priced 20 at 0% off
+        # satisfied both conditions across DIFFERENT items and was
+        # excluded, though no single item is actually discounted.
+        # Verified: the cart above does not appear in
+        # `?hasDiscounts=false`. `Product.price` defaults to zero and
+        # the pairing is not a database constraint, so the mixed cart is
+        # reachable.
+        discounted_items = CartItem.objects.filter(
+            product__discount_percent__gt=0, product__price__gt=0
+        )
+        if value:
+            return queryset.filter(items__in=discounted_items).distinct()
+        return queryset.exclude(items__in=discounted_items).distinct()

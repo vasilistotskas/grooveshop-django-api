@@ -44,7 +44,16 @@ def _is_gateway(request: Request) -> bool:
     """
     secret = settings.AGENT_GATEWAY_INTERNAL_SECRET
     token = request.headers.get("X-Internal-Token", "")
-    return bool(secret) and compare_digest(token, secret)
+    # Compare BYTES, not str: `compare_digest` raises TypeError on a
+    # str containing a non-ASCII character, and Django decodes header
+    # bytes with latin-1 — so any byte >= 0x80 in the header turned a
+    # "withhold and 404" into an unhandled 500, which is both an
+    # existence oracle for an endpoint that deliberately hides itself
+    # and a stream of fake incidents in the error tracker.
+    return bool(secret) and compare_digest(
+        token.encode("utf-8", "surrogateescape"),
+        secret.encode("utf-8", "surrogateescape"),
+    )
 
 
 # `@extend_schema` over `@api_view` is drf-spectacular's own documented

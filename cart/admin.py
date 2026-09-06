@@ -2,7 +2,8 @@ from datetime import timedelta
 
 from django.contrib import admin
 from django.db import transaction
-from django.db.models import F
+from django.db.models import F, Sum
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import TabularInline
@@ -65,13 +66,21 @@ class TotalItemsFilter(RangeNumericListFilter):
 
         value_from = self.used_parameters.get(f"{self.parameter_name}_from")
         if value_from and value_from != "":
-            filters["items__quantity__sum__gte"] = value_from
+            filters["items_quantity_total__gte"] = value_from
 
         value_to = self.used_parameters.get(f"{self.parameter_name}_to")
         if value_to and value_to != "":
-            filters["items__quantity__sum__lte"] = value_to
+            filters["items_quantity_total__lte"] = value_to
 
-        return queryset.filter(**filters) if filters else queryset
+        if not filters:
+            return queryset
+        # `Sum` is an aggregate, not a lookup: the previous
+        # `items__quantity__sum__gte` raised `FieldError` and 500'd the
+        # changelist the moment anyone touched this filter. Annotate
+        # first, exactly as `CartFilter.filter_min_items` does.
+        return queryset.annotate(
+            items_quantity_total=Coalesce(Sum("items__quantity"), 0)
+        ).filter(**filters)
 
     def expected_parameters(self):
         return [

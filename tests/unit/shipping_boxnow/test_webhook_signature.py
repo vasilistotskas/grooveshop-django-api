@@ -145,3 +145,36 @@ class TestValidateEnvelope:
         del env["specversion"]
         with pytest.raises(BoxNowWebhookError, match="specversion"):
             validate_envelope(env)
+
+
+class TestNonStringSignatures:
+    """The signature comes off an unauthenticated JSON body.
+
+    Its type is whatever the caller sent. `null`, a number, a list and
+    an object all reached `.encode()` and raised `AttributeError` before
+    the view's 401 path — a 500 on a public endpoint, from a
+    one-character payload change.
+    """
+
+    @pytest.mark.parametrize(
+        "signature",
+        [
+            pytest.param(None, id="null"),
+            pytest.param(7, id="number"),
+            pytest.param({}, id="object"),
+            pytest.param([], id="array"),
+            pytest.param(True, id="boolean"),
+        ],
+    )
+    def test_a_non_string_signature_is_simply_invalid(self, signature):
+        assert verify_signature(b'{"a": 1}', signature, "test-secret") is False
+
+    def test_a_correct_string_signature_still_verifies(self):
+        import hashlib
+        import hmac
+
+        body = b'{"a": 1}'
+        secret = "test-secret"
+        good = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+
+        assert verify_signature(body, good, secret) is True

@@ -8344,7 +8344,8 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Φίλτρο ειδών σε εγκαταλελειμμένα καλάθια (30+ ημέρες)
+        description: Filter items in abandoned carts — idle longer than the CART_ABANDONED_HOURS
+          store setting.
       - in: query
         name: inActiveCarts
         schema:
@@ -8356,7 +8357,8 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Φίλτρο ειδών σε ενεργά καλάθια (24ωρο)
+        description: Filter items in active carts — idle no longer than the CART_ABANDONED_HOURS
+          store setting.
       - in: query
         name: maxDiscountPercent
         schema:
@@ -9071,7 +9073,8 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Φίλτρο εγκαταλελειμμένων καλαθιών (αδρανή για 30+ ημέρες)
+        description: Filter abandoned carts — idle longer than the CART_ABANDONED_HOURS
+          store setting.
       - in: query
         name: isActive
         schema:
@@ -9083,7 +9086,8 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Φίλτρο ενεργών/εγκαταλελειμμένων καλαθιών (βάσει 30 ημερών αδράνειας)
+        description: Filter active/abandoned carts. The window is the CART_ABANDONED_HOURS
+          store setting, not a fixed period.
       - in: query
         name: isGuest
         schema:

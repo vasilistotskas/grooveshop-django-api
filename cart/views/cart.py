@@ -720,6 +720,41 @@ class CartViewSet(BaseModelViewSet):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
+        # The same two runtime-configurable layers order creation
+        # applies (`OrderViewSet._validate_pay_way_for_order`): the
+        # `active` master switch, and the admin-managed
+        # `PayWayShippingExclusion` rows for this carrier + kind. Minting
+        # an intent without them means the shopper CONFIRMS the card in
+        # Stripe.js and only then gets a 400 from order creation — money
+        # taken, no order, nothing to refund against. The B2B branch
+        # above already guards for exactly this reason.
+        allowed = PayWayService.filter_by_carrier(
+            PayWay.objects.active(),
+            provider_code=shipping_provider_code,
+            shipping_kind=shipping_kind,
+        )
+        if not allowed.filter(id=pay_way.id).exists():
+            logger.info(
+                "Payment intent refused: pay_way=%s (provider=%s, "
+                "active=%s) not available for shipping_provider_code=%s "
+                "shipping_kind=%s",
+                pay_way.id,
+                pay_way.provider_code,
+                pay_way.active,
+                shipping_provider_code,
+                shipping_kind,
+            )
+            return Response(
+                {
+                    "detail": _(
+                        "The selected payment method is not available "
+                        "for this order."
+                    ),
+                    "reason": "pay_way_unavailable",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         # Validate it's an online payment method (Stripe)
         if not pay_way.is_online_payment or pay_way.provider_code != "stripe":
             logger.error(
@@ -892,18 +927,35 @@ class CartViewSet(BaseModelViewSet):
                 },
             )
 
+            # NEVER log `payment_data` whole: it carries
+            # `client_secret`, which is a bearer credential — with the
+            # (public) publishable key it permits retrieve, confirm and
+            # cancel on that PaymentIntent. Anyone able to read the log
+            # stream could cancel a customer's in-flight payment or
+            # confirm it with their own payment method. `order/payment.py`
+            # is already careful to log only the id and status.
             logger.info(
-                f"Payment intent creation result: success={success}, payment_data={payment_data}"
+                "Payment intent creation result: success=%s, intent=%s, "
+                "status=%s",
+                success,
+                payment_data.get("payment_id", "<none>"),
+                payment_data.get("status", "<none>"),
             )
 
             if not success:
+                # The provider's own message carries Stripe request ids
+                # and internal codes; it stays in the log, and the client
+                # gets a stable reason instead (same rule as the
+                # release-failure path above).
                 logger.error(
-                    f"Failed to create payment intent: {payment_data.get('error', 'Unknown error')}"
+                    "Failed to create payment intent for cart %s: %s",
+                    cart.uuid,
+                    payment_data.get("error", "Unknown error"),
                 )
                 return Response(
                     {
-                        "detail": "Failed to create payment intent",
-                        "error": payment_data.get("error", "Unknown error"),
+                        "detail": _("Failed to create payment intent."),
+                        "reason": "payment_intent_failed",
                     },
                     status=status.HTTP_400_BAD_REQUEST,
                 )

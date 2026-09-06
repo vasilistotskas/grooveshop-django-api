@@ -102,6 +102,40 @@ class TestTotalItemsFilter:
         )
         assert filter_instance.parameter_name == "total_items"
 
+    def _filtered(self, admin_request, params):
+        filter_instance = TotalItemsFilter(
+            admin_request, {}, Cart, CartAdmin(Cart, AdminSite())
+        )
+        filter_instance.used_parameters = params
+        return filter_instance.queryset(admin_request, Cart.objects.all())
+
+    def test_range_bounds_actually_run(self, admin_request):
+        """The filter used to raise FieldError the moment it was used.
+
+        `Sum` is an aggregate, not a lookup, so `items__quantity__sum__gte`
+        never resolved — and the only test here checked the parameter
+        NAME, so nothing ever called `queryset()` with a value.
+        """
+        small = CartFactory(user=UserAccountFactory())
+        CartItemFactory(cart=small, product=ProductFactory(), quantity=1)
+        big = CartFactory(user=UserAccountFactory())
+        CartItemFactory(cart=big, product=ProductFactory(), quantity=9)
+
+        at_least_five = self._filtered(admin_request, {"total_items_from": "5"})
+        assert big in at_least_five
+        assert small not in at_least_five
+
+        at_most_four = self._filtered(admin_request, {"total_items_to": "4"})
+        assert small in at_most_four
+        assert big not in at_most_four
+
+    def test_no_bounds_leaves_the_queryset_alone(self, admin_request):
+        cart = CartFactory(user=UserAccountFactory())
+        assert cart in self._filtered(admin_request, {})
+        assert cart in self._filtered(
+            admin_request, {"total_items_from": "", "total_items_to": ""}
+        )
+
 
 @pytest.mark.django_db
 class TestCartAdmin:

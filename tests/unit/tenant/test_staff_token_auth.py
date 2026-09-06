@@ -20,6 +20,12 @@ from core.api.tokens import KNOX_ABSOLUTE_MAX_AGE
 from tenant.api_tokens import PlatformStaffTokenAuthentication
 from tenant.auth_backends import PLATFORM_IDENTITY_ATTR
 from tenant.models import PlatformStaffToken
+from tests.utils.staff import (
+    bind_store_tenant,
+    store_staff,
+    store_tenant,
+    unbind_store_tenant,
+)
 from user.factories.account import UserAccountFactory
 
 
@@ -162,3 +168,64 @@ class TestSchemaResidence:
         field = PlatformStaffToken._meta.get_field("user")
         assert field.related_model._meta.label == "user.UserAccount"
         assert field.remote_field.related_name == "platform_staff_tokens"
+
+
+@pytest.mark.django_db
+class TestAStaffTokenIsNotACustomerOfTheStoreItDials:
+    """The token resolves a PUBLIC identity while the request runs in a
+    tenant schema, and `Model.__eq__` compares concrete class and pk with
+    no notion of schema. Measured: a public user built with a tenant
+    customer's pk is `==` to that customer, and `IsOwnerOrAdmin` grants
+    on it. The queryset half is the same arithmetic —
+    `filter(user=request.user)` becomes `WHERE user_id = <that pk>`
+    against the tenant's own table.
+
+    `tenant.membership`'s docstring states the premise every ordinary
+    authenticated endpoint leans on: "being authenticated in this schema
+    IS the authorization". A staff token is the one identity for which
+    that is false, so it has to carry store staff rights or none at all.
+    """
+
+    def test_a_token_without_a_role_in_this_store_is_refused(self):
+        tenant = store_tenant("staff_token_no_role")
+        user = UserAccountFactory(is_staff=True)
+        _, token = _mint(user)
+
+        previous = bind_store_tenant(tenant)
+        try:
+            with pytest.raises(exceptions.AuthenticationFailed) as excinfo:
+                PlatformStaffTokenAuthentication().authenticate(
+                    _request(f"StaffBearer {token}")
+                )
+        finally:
+            unbind_store_tenant(previous)
+
+        assert "no access to this store" in str(excinfo.value)
+
+    def test_a_staff_member_of_this_store_still_authenticates(self):
+        tenant = store_tenant("staff_token_with_role")
+        user = store_staff(tenant)
+        _, token = _mint(user)
+
+        previous = bind_store_tenant(tenant)
+        try:
+            result = PlatformStaffTokenAuthentication().authenticate(
+                _request(f"StaffBearer {token}")
+            )
+        finally:
+            unbind_store_tenant(previous)
+
+        assert result is not None
+        assert result[0].pk == user.pk
+
+    def test_the_platform_control_plane_is_unaffected(self):
+        """No tenant on the connection means no store to be a customer of."""
+        user = UserAccountFactory(is_staff=True)
+        _, token = _mint(user)
+
+        result = PlatformStaffTokenAuthentication().authenticate(
+            _request(f"StaffBearer {token}")
+        )
+
+        assert result is not None
+        assert result[0].pk == user.pk

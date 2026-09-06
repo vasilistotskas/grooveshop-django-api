@@ -11,6 +11,7 @@ from django.utils.cache import patch_vary_headers
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import status, viewsets
 from rest_framework.decorators import (
+    action,
     api_view,
     permission_classes,
 )
@@ -24,13 +25,20 @@ from tenant.legal_identity import (
     merchant_legal_identity,
     missing_disclosure_fields,
 )
-from tenant.lifecycle import destroy_tenant
+from tenant.lifecycle import (
+    activate_tenant,
+    destroy_tenant,
+    is_protected_tenant,
+    suspend_tenant,
+)
 from tenant.membership import get_current_tenant
 from tenant.models import Tenant, TenantDomain, UserTenantMembership
 from tenant.serializers import (
     MerchantLegalIdentitySerializer,
     TenantAdminSerializer,
     TenantConfigSerializer,
+    TenantLifecycleStateSerializer,
+    TenantSuspendRequestSerializer,
 )
 
 logger = logging.getLogger(__name__)
@@ -321,6 +329,85 @@ class TenantAdminViewSet(viewsets.ModelViewSet):
                 "retentionUntil": result["retention_until"],
                 "indexesDropped": result["indexes_dropped"],
             },
+            status=status.HTTP_200_OK,
+        )
+
+    @extend_schema(
+        request=TenantSuspendRequestSerializer,
+        responses=TenantLifecycleStateSerializer,
+        summary="Suspend a store",
+        description=(
+            "Take a store offline through the lifecycle path: records"
+            " `suspendedAt` (the anchor for the destroy cooldown) and"
+            " `suspendedReason`, and flushes the store's processed images"
+            " from the media cache. Refused for protected tenants."
+        ),
+    )
+    @action(detail=True, methods=["POST"])
+    def suspend(self, request, pk=None):
+        """Suspend through ``lifecycle.suspend_tenant``, never by field write.
+
+        This exists because ``is_active`` used to be writable on the
+        serializer, and that write did none of what suspension means:
+        no ``suspended_at``, so the destroy gate read the store as
+        "not_suspended" forever; no media flush, so it kept serving
+        images for the cache TTL; and no protected-tenant refusal.
+        """
+        self._require_public_schema()
+        tenant = self.get_object()
+        request_serializer = TenantSuspendRequestSerializer(data=request.data)
+        request_serializer.is_valid(raise_exception=True)
+
+        changed = suspend_tenant(
+            tenant, reason=request_serializer.validated_data["reason"]
+        )
+        if not changed and is_protected_tenant(tenant):
+            raise ValidationError(
+                {"detail": "This tenant is protected and cannot be suspended."}
+            )
+        tenant.refresh_from_db()
+        return Response(
+            TenantLifecycleStateSerializer(
+                {"changed": changed, "tenant": tenant}
+            ).data,
+            status=status.HTTP_200_OK,
+        )
+
+    @extend_schema(
+        request=None,
+        responses=TenantLifecycleStateSerializer,
+        summary="Reactivate a suspended store",
+        description=(
+            "Bring a store back online through the lifecycle path:"
+            " clears `suspendedAt` and `suspendedReason` together, so the"
+            " destroy cooldown is not left anchored in the past. Refused"
+            " for protected tenants."
+        ),
+    )
+    @action(detail=True, methods=["POST"])
+    def activate(self, request, pk=None):
+        """Reactivate through ``lifecycle.activate_tenant``.
+
+        Clearing the anchor is the half a bare ``is_active = True`` left
+        undone: a later genuine suspension then kept the OLD
+        ``suspended_at``, so the 24h cooldown that makes a mistaken
+        suspension reversible was already spent at the moment of
+        suspension (measured: a 30-day-old anchor, ``destroy_refusal``
+        of ``None``).
+        """
+        self._require_public_schema()
+        tenant = self.get_object()
+
+        changed = activate_tenant(tenant)
+        if not changed:
+            raise ValidationError(
+                {"detail": "This tenant is protected and cannot be activated."}
+            )
+        tenant.refresh_from_db()
+        return Response(
+            TenantLifecycleStateSerializer(
+                {"changed": changed, "tenant": tenant}
+            ).data,
             status=status.HTTP_200_OK,
         )
 

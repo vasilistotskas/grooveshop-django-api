@@ -172,11 +172,22 @@ def test_no_active_tenants_exits_with_its_own_returncode(db):
     from core.management.tenant_mixin import NO_ACTIVE_TENANTS_RETURNCODE
     from tenant.models import Tenant
 
+    # ESTABLISH the precondition; do not assert it. Asserting it is what
+    # failed on CI run 34046677730: this test DB is seeded with an active
+    # tenant, and a local DB that predated that seed passed happily.
+    #
+    # ``update()`` deliberately, not ``save()`` — ``TenantMixin.save()``
+    # creates the schema and replays every migration when the schema is
+    # absent, on UPDATE as well as on insert. A queryset update never
+    # reaches it. The surrounding test transaction rolls this back.
+    deactivated = Tenant.objects.exclude(schema_name="public").update(
+        is_active=False
+    )
     assert (
         not Tenant.objects.filter(is_active=True)
         .exclude(schema_name="public")
         .exists()
-    )
+    ), f"deactivated {deactivated}, yet an active tenant remains"
 
     with pytest.raises(CommandError) as excinfo:
         call_command("meilisearch_apply_settings", "--all-tenants")

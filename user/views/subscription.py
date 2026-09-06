@@ -12,7 +12,10 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from core.api.permissions import IsOwnerOrAdmin
+from core.api.permissions import (
+    IsOwnerOrAdmin,
+    StoreStaffModelPermissions,
+)
 from core.api.serializers import DetailSerializer, ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
@@ -129,6 +132,18 @@ class SubscriptionTopicViewSet(BaseModelViewSet):
         # disabled). The token-based confirm/unsubscribe views below
         # are deliberately NOT gated: links in already-sent emails
         # must keep working after the feature is turned off.
+        #
+        # A topic is STORE configuration, not user data. `IsAuthenticated`
+        # alone let any registered shopper POST, PUT, PATCH and DELETE
+        # them — and `UserSubscription.topic` is `on_delete=CASCADE`, so
+        # one DELETE took the store's entire subscriber list with it,
+        # unrecoverably. `IsNewsletterEnabled` could not help: it is a
+        # FEATURE gate that 404s when the merchant switches the feature
+        # off and otherwise returns True, contributing no authorization.
+        # Writes take the same predicate every other store-configuration
+        # viewset uses.
+        if self.action in ("create", "update", "partial_update", "destroy"):
+            return [IsNewsletterEnabled(), StoreStaffModelPermissions()]
         return [IsNewsletterEnabled(), *super().get_permissions()]
 
     filterset_class = SubscriptionTopicFilter

@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import timedelta
 from typing import TYPE_CHECKING
 
+from django.db import models
 from django.db.models import Count, Q
 from django.utils import timezone
 
@@ -57,6 +58,32 @@ class ProductReviewQuerySet(TranslatableOptimizedQuerySet):
         Includes everything from for_list() plus product images.
         """
         return self.for_list().with_product_images()
+
+    def visible_to(self, user):
+        """Reviews this caller is allowed to see.
+
+        The single definition of that rule. It used to live inline in
+        ``ProductReviewViewSet.get_queryset`` while the product detail
+        page's own ``reviews`` action did ``product.reviews.all()`` — so
+        the two endpoints serving the same reviews disagreed, and the
+        one on the storefront's busiest page was the permissive one. It
+        returned reviews an admin had moderated to ``FALSE`` (spam) and
+        reviews never approved at all, to anonymous callers.
+
+        Store staff see everything (they moderate). A signed-in customer
+        additionally sees their own review whatever its status, so a
+        pending submission does not look lost. Everyone else sees
+        approved reviews only.
+        """
+        from tenant.membership import is_store_staff
+
+        if is_store_staff(user):
+            return self
+        if user is not None and getattr(user, "is_authenticated", False):
+            return self.filter(
+                models.Q(status=ReviewStatus.TRUE) | models.Q(user=user)
+            )
+        return self.filter(status=ReviewStatus.TRUE)
 
     def approved(self):
         return self.filter(status=ReviewStatus.TRUE)

@@ -21,6 +21,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 from djmoney.money import Money
 from extra_settings.models import Setting
@@ -444,10 +445,9 @@ class PromotionEngine:
         if promotion.first_order_only:
             from order.models.order import Order
 
-            if user is not None and getattr(user, "is_authenticated", False):
-                has_orders = Order.objects.filter(user=user).exists()
-            elif email:
-                has_orders = Order.objects.filter(email__iexact=email).exists()
+            identity = cls._identity_q(user, email)
+            if identity is not None:
+                has_orders = Order.objects.filter(identity).exists()
             else:
                 # Identity unknown (anonymous cart stage). An applied
                 # CODE is accepted optimistically — checkout always
@@ -467,12 +467,12 @@ class PromotionEngine:
             return str(CouponRejectionReason.USAGE_LIMIT_REACHED)
 
         if promotion.usage_limit_per_customer is not None:
-            if user is not None and getattr(user, "is_authenticated", False):
-                used = redemptions.filter(user=user).count()
-            elif email:
-                used = redemptions.filter(email__iexact=email).count()
-            else:
-                used = 0
+            identity = cls._identity_q(user, email)
+            used = (
+                redemptions.filter(identity).count()
+                if identity is not None
+                else 0
+            )
             if used >= promotion.usage_limit_per_customer:
                 return str(CouponRejectionReason.USAGE_LIMIT_REACHED)
 
@@ -484,6 +484,53 @@ class PromotionEngine:
             return str(CouponRejectionReason.USAGE_LIMIT_REACHED)
 
         return None
+
+    @staticmethod
+    def _identity_q(
+        user,
+        email: str | None,
+        *,
+        user_field: str = "user",
+        email_field: str = "email",
+    ):
+        """Match rows belonging to this shopper, by account OR by email.
+
+        Both signals have to be UNIONED, never chosen between. A guest
+        checkout writes `user=None, email=...`, and nothing backfills the
+        account onto that row when the shopper later registers — so a
+        check that looks only at `user=` once someone is authenticated
+        cannot see their own guest history, and `first_order_only` and
+        `usage_limit_per_customer` each hand the discount out a second
+        time. `_is_code_owner` below already unions the two; these were
+        the sites that branched instead.
+
+        Returns None when the shopper is anonymous and no email is known
+        yet, so callers take their own "identity unknown" branch rather
+        than silently matching everything.
+        """
+        authenticated = user is not None and getattr(
+            user, "is_authenticated", False
+        )
+        emails = set()
+        if authenticated and user.email:
+            emails.add(user.email.lower())
+        if email:
+            emails.add(email.lower())
+
+        clauses = []
+        if authenticated:
+            clauses.append(Q(**{user_field: user}))
+        clauses.extend(
+            Q(**{f"{email_field}__iexact": address})
+            for address in sorted(emails)
+        )
+        if not clauses:
+            return None
+
+        predicate = clauses[0]
+        for extra in clauses[1:]:
+            predicate |= extra
+        return predicate
 
     @staticmethod
     def _is_code_owner(code: PromotionCode, user, email: str) -> bool:

@@ -214,7 +214,7 @@ class TestSearchAnalyticsMiddleware:
 
         search_query = SearchQuery.objects.latest("timestamp")
         assert search_query.query == "laptop"
-        assert search_query.language_code is None
+        assert search_query.language_code == ""
 
     def test_ignores_non_search_endpoints(self, request_factory):
         """Test that non-search endpoints are not tracked."""
@@ -403,7 +403,7 @@ class TestSearchAnalyticsMiddlewareEdgeCases:
         middleware(request)
 
         search_query = SearchQuery.objects.latest("timestamp")
-        assert search_query.session_key is None
+        assert search_query.session_key == ""
 
     def test_handles_missing_user_agent(self, request_factory):
         """Test that requests without user agent are handled."""

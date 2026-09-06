@@ -90,7 +90,7 @@ class SearchAnalyticsMiddleware(MiddlewareMixin):
 
             # Extract query parameters
             query = request.GET.get("query", "")
-            language_code = request.GET.get("language_code")
+            language_code = request.GET.get("language_code", "")
 
             # Determine content type from endpoint path
             content_type = self._determine_content_type(request.path)
@@ -124,11 +124,12 @@ class SearchAnalyticsMiddleware(MiddlewareMixin):
 
             # Extract user information
             user = request.user if request.user.is_authenticated else None
-            session_key = (
-                request.session.session_key
-                if hasattr(request, "session")
-                else None
-            )
+            # `session_key` is None until Django first PERSISTS the
+            # session, which an anonymous search never does — so the
+            # common case here is "no key", spelled "" like every other
+            # absent string on the row.
+            session = getattr(request, "session", None)
+            session_key = getattr(session, "session_key", None) or ""
             ip_address = self._get_client_ip(request)
             user_agent = request.META.get("HTTP_USER_AGENT", "")
 

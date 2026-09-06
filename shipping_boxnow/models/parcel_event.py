@@ -43,6 +43,7 @@ class BoxNowParcelEvent(TimeStampMixinModel):
         max_length=64,
         null=True,
         blank=True,
+        default="",
         db_index=True,
         help_text=_(
             "SHA-256 of the HMAC-signed 'data' bytes. The signature covers "

@@ -446,6 +446,8 @@ def anonymise_and_delete_user(user) -> dict[str, int]:
     its ``buyer_snapshot`` — that snapshot is a legal document and
     cannot be scrubbed retroactively without invalidating the invoice.
     """
+    from allauth.mfa.models import Authenticator
+    from allauth.usersessions.models import UserSession
     from knox.models import AuthToken
 
     from blog.models.author import BlogAuthor
@@ -570,44 +572,32 @@ def anonymise_and_delete_user(user) -> dict[str, int]:
 
     counts["knox_tokens"] = AuthToken.objects.filter(user=user).delete()[0]
 
-    # Only ImportError is tolerated: it means the optional allauth app is
-    # not installed, so there is nothing of that kind to erase. A failure
-    # of the DELETE itself must NOT be swallowed — this function documents
-    # that "a failure halfway through leaves the user intact", and it goes
-    # on to log "GDPR deletion complete". Swallowing turned that line into
-    # a claim of erasure for records that are still there.
-    try:
-        from allauth.account.models import EmailAddress
-        from allauth.socialaccount.models import SocialAccount
-    except ImportError:
-        logger.debug("allauth.account not installed — no addresses to erase")
-    else:
-        counts["email_addresses"] = EmailAddress.objects.filter(
-            user=user
-        ).delete()[0]
-        counts["social_accounts"] = SocialAccount.objects.filter(
-            user=user
-        ).delete()[0]
+    # allauth is a declared runtime dependency and all four of its apps
+    # (account, socialaccount, mfa, usersessions) are unconditionally in
+    # INSTALLED_APPS, so these imports cannot fail — the process would
+    # not have started. The ImportError guards that stood here described
+    # a supported configuration that does not exist, and their `else:`
+    # shape hid the deletes one level deeper than the rest of the
+    # function.
+    #
+    # There is no `except` of any kind, and that is the other half: a
+    # broad one used to swallow DELETE failures, and this function
+    # documents that "a failure halfway through leaves the user intact"
+    # before going on to log "GDPR deletion complete". A failure now
+    # propagates, the atomic rolls back, and the claim stays true.
+    from allauth.account.models import EmailAddress
+    from allauth.socialaccount.models import SocialAccount
 
-    try:
-        from allauth.mfa.models import Authenticator
-    except ImportError:
-        logger.debug("allauth.mfa not installed — no authenticators to erase")
-    else:
-        counts["authenticators"] = Authenticator.objects.filter(
-            user=user
-        ).delete()[0]
-
-    try:
-        from allauth.usersessions.models import UserSession
-    except ImportError:
-        logger.debug(
-            "allauth.usersessions not installed — no sessions to erase"
-        )
-    else:
-        counts["user_sessions"] = UserSession.objects.filter(
-            user=user
-        ).delete()[0]
+    counts["email_addresses"] = EmailAddress.objects.filter(user=user).delete()[
+        0
+    ]
+    counts["social_accounts"] = SocialAccount.objects.filter(
+        user=user
+    ).delete()[0]
+    counts["authenticators"] = Authenticator.objects.filter(user=user).delete()[
+        0
+    ]
+    counts["user_sessions"] = UserSession.objects.filter(user=user).delete()[0]
 
     user_id = user.id
     user.delete()

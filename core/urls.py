@@ -198,20 +198,17 @@ urlpatterns = (
 )
 
 if bool(settings.ENABLE_DEBUG_TOOLBAR):
-    import warnings
+    # No import guard: under the same flag, ``settings.py`` does an
+    # unconditional ``INSTALLED_APPS += ["debug_toolbar"]``, so a missing
+    # package raises during ``apps.populate()`` — long before this module
+    # is imported. The guard that stood here could not fire, and its
+    # warning claimed settings.py "should already have warned the user",
+    # which settings.py does not do.
+    import debug_toolbar
 
-    try:
-        import debug_toolbar
-    except ImportError:
-        warnings.warn(
-            "The debug toolbar was not installed. Ignore the error. \
-            settings.py should already have warned the user about it.",
-            stacklevel=2,
-        )
-    else:
-        urlpatterns += [
-            path("__debug__/", include(debug_toolbar.urls)),
-        ]
+    urlpatterns += [
+        path("__debug__/", include(debug_toolbar.urls)),
+    ]
 
 if bool(settings.DEBUG) or settings.SYSTEM_ENV in ["dev", "ci"]:
     # ``MEDIA_URL`` is absolute in every environment (so DRF

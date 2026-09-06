@@ -255,26 +255,27 @@ class UserDetailsSerializer(UserSerializer):
         )
 
 
+# Comments, not a docstring: drf-spectacular publishes a serializer's
+# docstring as the schema component's description, so this rationale
+# would ship in the public OpenAPI contract and in the storefront's
+# generated types — a step-by-step account of a fixed vulnerability,
+# published. (Same mistake as the one caught on the order serializers.)
+#
+# `UserDetailsSerializer` is the ACCOUNT serializer — it carries
+# `email`, `phone`, `address`, `city`, `zipcode`, `birth_date` and the
+# privilege flags, which is right for "my account" and wrong anywhere
+# else. It was nested as the `user` field on product reviews, blog
+# comments (including parent and ancestor comments) and blog authors,
+# all of which serve anonymous readers.
+#
+# `read_only_fields` does not help: it stops a field being WRITTEN, not
+# rendered.
+#
+# This exposes only what a byline needs. The storefront reads exactly
+# `id`, `username`, `firstName` and `lastName` on these surfaces, so
+# nothing here is a display regression.
 class UserPublicSerializer(serializers.ModelSerializer):
-    """The author identity shown to anyone, including anonymous callers.
-
-    `UserDetailsSerializer` is the ACCOUNT serializer — it carries
-    `email`, `phone`, `address`, `city`, `zipcode`, `birth_date` and the
-    privilege flags, which is right for "my account" and catastrophic
-    anywhere else. It was nested as the `user` field on product reviews,
-    blog comments (including parent and ancestor comments) and blog
-    authors, all of which serve anonymous readers — so an unauthenticated
-    walk of `/api/v1/product/review` returned a full contact record for
-    every customer who had ever left one, and the blog-author route did
-    the same for store personnel.
-
-    `read_only_fields` does not help: it stops a field being WRITTEN, not
-    rendered.
-
-    This exposes only what a byline needs. The storefront reads exactly
-    `id`, `username`, `firstName` and `lastName` on these surfaces, so
-    nothing here is a display regression.
-    """
+    """The author identity shown to anyone, including anonymous callers."""
 
     main_image_path = serializers.SerializerMethodField()
 

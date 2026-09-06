@@ -24920,7 +24920,6 @@ paths:
       - Search
       security:
       - cookieAuth: []
-      - {}
       responses:
         '200':
           content:
@@ -32166,7 +32165,7 @@ components:
           readOnly: true
         user:
           allOf:
-          - $ref: '#/components/schemas/UserDetails'
+          - $ref: '#/components/schemas/UserPublic'
           readOnly: true
         website:
           type: string
@@ -32561,7 +32560,7 @@ components:
                   type: string
         user:
           allOf:
-          - $ref: '#/components/schemas/UserDetails'
+          - $ref: '#/components/schemas/UserPublic'
           readOnly: true
         contentPreview:
           type: string
@@ -32655,7 +32654,7 @@ components:
                   type: string
         user:
           allOf:
-          - $ref: '#/components/schemas/UserDetails'
+          - $ref: '#/components/schemas/UserPublic'
           readOnly: true
         contentPreview:
           type: string
@@ -43331,7 +43330,7 @@ components:
           readOnly: true
         user:
           allOf:
-          - $ref: '#/components/schemas/UserDetails'
+          - $ref: '#/components/schemas/UserPublic'
           readOnly: true
         rate:
           allOf:
@@ -43407,7 +43406,7 @@ components:
           readOnly: true
         user:
           allOf:
-          - $ref: '#/components/schemas/UserDetails'
+          - $ref: '#/components/schemas/UserPublic'
           readOnly: true
         rate:
           allOf:
@@ -45914,6 +45913,38 @@ components:
       - uuid
       - website
       - youtube
+    UserPublic:
+      type: object
+      description: The author identity shown to anyone, including anonymous callers.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        username:
+          type: string
+          readOnly: true
+          nullable: true
+          title: Όνομα χρήστη
+          description: Required. 30 characters or fewer. Letters, digits and @/./+/-/_
+            only.
+        firstName:
+          type: string
+          readOnly: true
+          title: Όνομα
+        lastName:
+          type: string
+          readOnly: true
+          title: Επώνυμο
+        mainImagePath:
+          type: string
+          description: Avatar path or empty string
+          readOnly: true
+      required:
+      - firstName
+      - id
+      - lastName
+      - mainImagePath
+      - username
     UserSubscription:
       type: object
       properties:

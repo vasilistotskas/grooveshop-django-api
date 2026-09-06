@@ -23,6 +23,7 @@ from __future__ import annotations
 from unittest.mock import patch
 
 import pytest
+from django.db import connection
 
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
@@ -55,6 +56,11 @@ def _client_returning(statuses):
     return _Client
 
 
+# The main lane runs single-schema on `public`; the dispatch pins
+# whatever `connection.schema_name` is at registration.
+SCHEMA = connection.schema_name
+
+
 @pytest.fixture
 def shipment(db):
     order = OrderFactory(
@@ -73,7 +79,7 @@ def test_the_overnight_depot_cycle_notifies_once(shipment, monkeypatch):
     )
 
     with patch(
-        "shipping_acs.tasks.acs_send_arrival_notification.delay"
+        "shipping_acs.tasks.acs_send_arrival_notification.apply_async"
     ) as notify:
         for _ in range(3):
             AcsService.poll_shipment_tracking(shipment)
@@ -88,18 +94,20 @@ def test_the_first_arrival_still_notifies(shipment, monkeypatch):
     monkeypatch.setattr(services, "AcsClient", _client_returning(["4"]))
 
     with patch(
-        "shipping_acs.tasks.acs_send_arrival_notification.delay"
+        "shipping_acs.tasks.acs_send_arrival_notification.apply_async"
     ) as notify:
         AcsService.poll_shipment_tracking(shipment)
 
-    notify.assert_called_once_with(shipment.id)
+    notify.assert_called_once_with(
+        args=[shipment.id], headers={"_schema_name": SCHEMA}
+    )
 
 
 def test_a_parcel_that_never_goes_out_is_never_notified(shipment, monkeypatch):
     monkeypatch.setattr(services, "AcsClient", _client_returning(["2", "3"]))
 
     with patch(
-        "shipping_acs.tasks.acs_send_arrival_notification.delay"
+        "shipping_acs.tasks.acs_send_arrival_notification.apply_async"
     ) as notify:
         for _ in range(2):
             AcsService.poll_shipment_tracking(shipment)
@@ -119,7 +127,7 @@ def test_the_state_still_follows_acs_backwards(shipment, monkeypatch):
     """
     monkeypatch.setattr(services, "AcsClient", _client_returning(["4", "3"]))
 
-    with patch("shipping_acs.tasks.acs_send_arrival_notification.delay"):
+    with patch("shipping_acs.tasks.acs_send_arrival_notification.apply_async"):
         for _ in range(2):
             AcsService.poll_shipment_tracking(shipment)
 
@@ -156,7 +164,7 @@ def test_a_failed_broker_handoff_leaves_the_notification_retryable(
     # swallows their exceptions, mirroring `on_commit(robust=True)`, so
     # the OSError is not observable here — the marker is.
     with patch(
-        "shipping_acs.tasks.acs_send_arrival_notification.delay",
+        "shipping_acs.tasks.acs_send_arrival_notification.apply_async",
         side_effect=_broker_down,
     ):
         AcsService.poll_shipment_tracking(shipment)
@@ -168,9 +176,11 @@ def test_a_failed_broker_handoff_leaves_the_notification_retryable(
 
     # The next depot cycle back out for delivery still notifies.
     with patch(
-        "shipping_acs.tasks.acs_send_arrival_notification.delay"
+        "shipping_acs.tasks.acs_send_arrival_notification.apply_async"
     ) as notify:
         for _ in range(2):
             AcsService.poll_shipment_tracking(shipment)
 
-    notify.assert_called_once_with(shipment.id)
+    notify.assert_called_once_with(
+        args=[shipment.id], headers={"_schema_name": SCHEMA}
+    )

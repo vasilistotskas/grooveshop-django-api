@@ -22,7 +22,7 @@ and a dry run useless:
 
 from __future__ import annotations
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -55,10 +55,34 @@ def test_a_scan_failure_is_raised_not_reported_as_an_empty_match():
         cache.keys("anything:*")
 
 
+def _cache_raising(exc):
+    """A stand-in for the cache proxy whose ``keys()`` raises."""
+    stub = MagicMock()
+    stub.keys.side_effect = exc
+    return stub
+
+
+def _cache_returning(keys):
+    """A stand-in whose ``keys()`` returns *keys* and deletes them all."""
+    stub = MagicMock()
+    stub.keys.return_value = keys
+    stub.delete_raw_keys.side_effect = lambda found: len(found)
+    return stub
+
+
 @pytest.mark.django_db
 def test_a_backend_failure_lands_on_the_report(a_surface):
+    # The MODULE attribute, not an attribute ON the proxy object.
+    # ``cache_service.cache_instance`` is Django's ``ConnectionProxy``,
+    # and ``patch.object`` resolves ``keys`` through it at patch time —
+    # so this raised ``AttributeError: ConnectionProxy does not have the
+    # attribute 'keys'`` whenever an earlier test on the same xdist
+    # worker had left the LocMem backend bound (see the
+    # ``_restore_default_cache_backend`` fixture's note). Replacing the
+    # module reference makes the test independent of which backend the
+    # registry currently holds.
     with patch.object(
-        cache_service.cache_instance, "keys", side_effect=_Boom("redis is down")
+        cache_service, "cache_instance", _cache_raising(_Boom("redis is down"))
     ):
         report = CacheService.purge([a_surface], include_related=False)
 
@@ -73,9 +97,7 @@ def test_a_backend_failure_lands_on_the_report(a_surface):
 def test_a_dry_run_reports_what_it_would_remove(a_surface):
     """The whole point of a dry run is the number it produces."""
     with patch.object(
-        cache_service.cache_instance,
-        "keys",
-        return_value=["k1", "k2", "k3"],
+        cache_service, "cache_instance", _cache_returning(["k1", "k2", "k3"])
     ):
         report = CacheService.purge(
             [a_surface], dry_run=True, include_related=False

@@ -1297,7 +1297,18 @@ class OrderService:
                     "total_price": str(cart.total_price.amount),
                     "currency": str(cart.total_price.currency),
                 },
-                "payment_type": "offline",
+                # Derived, not hardcoded. The ``is_online_payment`` guard
+                # further up governs only ``payment_id``; this dict was
+                # assigned unconditionally, so every card order recorded
+                # itself as offline — 78 of them in production, including
+                # Viva charges carrying a real provider payment_id.
+                # Nothing reads the key (myDATA's ``_pick_payment_type``
+                # works off the invoice's payment_id and pay_way), so it
+                # misled no logic — it misled whoever reads order
+                # metadata to diagnose a payment.
+                "payment_type": (
+                    "online" if pay_way.is_online_payment else "offline"
+                ),
             }
             # Wholesale audit: which group priced this order. The line
             # prices are already snapshotted on OrderItem rows — this
@@ -2173,7 +2184,16 @@ class OrderService:
                         product_id=product_id,
                         quantity=quantity,
                         order_id=order.id,
-                        reason=f"Order {order.id} canceled: {reason}",
+                        # ``reason`` defaults to "", and the bare f-string
+                        # left "Order 270 canceled:" in the stock log —
+                        # a dangling colon that reads as a truncated
+                        # message when you are chasing a stock movement.
+                        # Same shape the refund call below already uses.
+                        reason=(
+                            f"Order {order.id} canceled: {reason}"
+                            if reason
+                            else f"Order {order.id} canceled"
+                        ),
                     )
                     logger.info(
                         "Restored stock for product %s: +%s (order %s canceled)",

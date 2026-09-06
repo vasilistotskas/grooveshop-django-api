@@ -310,6 +310,16 @@ class BlogPostViewSet(BaseModelViewSet):
                 request_serializer.errors, status=status.HTTP_400_BAD_REQUEST
             )
 
+        # `likes=user` casts the user to its pk, so an AnonymousUser
+        # raised `TypeError: Field 'id' expected a number` — a 500 on an
+        # AllowAny action. The sibling `liked_comments` appends
+        # `IsOwnerOrAdmin()` for the same reason; this one did not.
+        if not request.user.is_authenticated:
+            return Response(
+                {"detail": _("Authentication required.")},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
         user = request.user
         post_ids = request_serializer.validated_data["post_ids"]
 

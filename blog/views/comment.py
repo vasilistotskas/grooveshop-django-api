@@ -10,6 +10,7 @@ from rest_framework.response import Response
 
 from blog.filters.comment import BlogCommentFilter
 from blog.models.comment import BlogComment
+from blog.models.post import BlogPost
 from blog.serializers.comment import (
     BlogCommentDetailSerializer,
     BlogCommentLikedCommentsRequestSerializer,
@@ -135,6 +136,20 @@ class BlogCommentViewSet(BaseModelViewSet):
 
         if not is_store_staff(self.request.user):
             queryset = queryset.filter(approved=True)
+            # A comment on a post the caller cannot see must not be
+            # reachable either. Gating here rather than in each
+            # serializer closes three doors at once: the `post` action
+            # (`get_object()` now 404s), `BlogCommentDetailSerializer.
+            # get_post` (only reachable through a visible comment), and
+            # the `?post__isPublished=false` filter, which was the
+            # enumeration handle.
+            #
+            # Verified before: `GET /blog/post/<draft>` answered 404
+            # while `GET /blog/comment/<pk>/post` answered 200 with 6541
+            # characters of the same draft's body.
+            queryset = queryset.filter(
+                post__in=BlogPost.objects.visible_to(self.request.user)
+            )
 
         return queryset.annotate(
             has_replies=Exists(

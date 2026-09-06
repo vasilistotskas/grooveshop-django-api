@@ -55,7 +55,7 @@ class BlogPostFilter(
         help_text=_("Filter by category name (case-insensitive)"),
     )
     tag_name = filters.CharFilter(
-        field_name="tags__translations__label",
+        field_name="tags__translations__name",
         lookup_expr="icontains",
         help_text=_("Filter by tag label (case-insensitive)"),
     )

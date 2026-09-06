@@ -77,14 +77,20 @@ class BlogCommentFilterTest(APITestCase):
         self.post1.title = f"First Blog Post {unique_id}"
         self.post1.save()
 
+        # Published. These tests exercise CONTENT and USER filters, and
+        # the second post's publication state is incidental to them —
+        # but this client is anonymous, and a comment on an unpublished
+        # post is no longer returned to one. That visibility rule has
+        # its own test in test_view_blog_comment.py rather than being
+        # asserted here by accident.
         self.post2 = BlogPostFactory(
             category=self.category,
             author=self.author,
-            is_published=False,
-            slug=f"draft-post-{unique_id}",
+            is_published=True,
+            slug=f"second-post-{unique_id}",
         )
         self.post2.set_current_language("en")
-        self.post2.title = f"Draft Blog Post {unique_id}"
+        self.post2.title = f"Second Blog Post {unique_id}"
         self.post2.save()
 
         self.comment1 = BlogCommentFactory(

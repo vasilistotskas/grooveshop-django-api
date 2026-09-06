@@ -31,9 +31,22 @@ class BlogTagQuerySet(TranslatableOptimizedQuerySet):
         """
         Optimized queryset for list views.
 
-        Includes translations.
+        Includes translations, and ACTIVE tags only — the public read
+        paths are the ones that should hide a deactivated tag. The
+        filter used to live in ``BlogTagManager.get_queryset``, which
+        made it the DEFAULT manager's behaviour and therefore
+        ``_default_manager``'s: an inactive tag vanished from the admin
+        changelist too, and since ``BlogTagAdmin.list_editable``
+        contains ``active``, a merchant who unticked it could never tick
+        it back without database access. Verified: after flipping
+        ``active`` to False, ``BlogTag.objects.filter(pk=...).exists()``
+        was False.
+
+        It also silently narrowed ``get_ordering_queryset()``, so
+        ``SortableModel.move_up``/``move_down`` skipped inactive
+        neighbours and produced gaps.
         """
-        return self.with_translations()
+        return self.active_only().with_translations()
 
     def for_detail(self) -> Self:
         """
@@ -58,4 +71,6 @@ class BlogTagManager(TranslatableOptimizedManager):
     queryset_class = BlogTagQuerySet
 
     def get_queryset(self) -> BlogTagQuerySet:
-        return BlogTagQuerySet(self.model, using=self._db).active_only()
+        # No ``active_only()`` here — see ``for_list``. A default manager
+        # that hides rows hides them from the admin as well.
+        return BlogTagQuerySet(self.model, using=self._db)

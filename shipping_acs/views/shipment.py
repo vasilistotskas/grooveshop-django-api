@@ -13,6 +13,7 @@ import io
 import logging
 
 from django.http import FileResponse
+from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema
 from rest_framework.exceptions import NotFound
 from rest_framework.request import Request
@@ -49,7 +50,17 @@ class AcsLabelView(APIView):
             " owner, staff, or a guest with the order UUID."
         ),
         tags=["ACS shipments"],
-        responses={200: bytes, 403: None, 404: None},
+        # The ``(status, media_type)`` key, not a bare ``200``: these
+        # views stream ``content_type="application/pdf"``, but a bare
+        # key inherits the view's JSON renderer and put an
+        # ``application/json`` 200 in the schema. Same correction, and
+        # the same reasoning, as ``getShipmentLabelForOrder`` in
+        # ``order/views/order.py``.
+        responses={
+            (200, "application/pdf"): OpenApiTypes.BINARY,
+            403: None,
+            404: None,
+        },
     )
     def get(self, request: Request, voucher_no: str) -> FileResponse:
         from shipping_acs.services import AcsService

@@ -235,6 +235,11 @@ serializers_config: SerializersConfig = {
         tags=["Orders"],
     ),
     "boxnow_label": ActionConfig(
+        # Same (status, media_type) key as ``shipment_label`` above:
+        # this streams a PDF, and without it the schema declared a 200
+        # with NO body at all, so a generated client expected nothing
+        # back from a file download.
+        responses={(200, "application/pdf"): OpenApiTypes.BINARY},
         operation_id="getBoxNowLabelForOrder",
         summary=_("Download the BoxNow parcel label PDF for an order"),
         description=_(
@@ -256,6 +261,11 @@ serializers_config: SerializersConfig = {
         tags=["Orders"],
     ),
     "acs_label": ActionConfig(
+        # Same (status, media_type) key as ``shipment_label`` above:
+        # this streams a PDF, and without it the schema declared a 200
+        # with NO body at all, so a generated client expected nothing
+        # back from a file download.
+        responses={(200, "application/pdf"): OpenApiTypes.BINARY},
         operation_id="getAcsLabelForOrder",
         summary=_("Download the ACS voucher label PDF for an order"),
         description=_(
@@ -1880,7 +1890,11 @@ class OrderViewSet(BaseModelViewSet):
             "stream on prod and a filesystem stream in dev without "
             "exposing the storage URL to the client."
         ),
-        responses={200: None, 404: None},
+        # ``200: None`` declared a 200 with no body for a PDF stream.
+        responses={
+            (200, "application/pdf"): OpenApiTypes.BINARY,
+            404: None,
+        },
     )
     @action(detail=True, methods=["GET"], url_path="invoice/download")
     def invoice_download(self, request, *args, **kwargs):

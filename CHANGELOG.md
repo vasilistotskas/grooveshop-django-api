@@ -3,6 +3,163 @@
 
 
 
+## v3.29.3 (2026-09-06)
+
+### Bug fixes
+
+* fix(order): record the payment type that was actually used
+
+``metadata["payment_type"]`` was the literal ``"offline"``. The
+``is_online_payment`` guard a few lines above governs only
+``payment_id``; the metadata dict is assigned unconditionally, so every
+card order recorded itself as offline — 78 of them in production,
+including Viva charges carrying a real provider payment id. Online
+REDIRECT providers reach this path precisely because the order is
+created first and paid afterwards on the hosted page.
+
+Nothing consumes the key — myDATA's ``_pick_payment_type`` derives from
+the invoice's ``payment_id`` and ``pay_way`` — so no logic was wrong.
+The audit trail was: anyone opening order metadata to work out how a
+payment was taken was told "offline" for a card charge. Derived now
+rather than deleted, because that is what the key is for.
+
+Also drops a dangling colon from the stock log. ``cancel_order`` takes
+``reason: str = ""`` and the stock-restore call interpolated it
+unconditionally, so a cancellation with no reason — the normal case from
+the admin — wrote "Order 270 canceled:" into the log, which reads as a
+truncated message exactly when someone is chasing why stock moved.
+Production order 270 carries it. The refund call below already guarded
+this; the stock call simply never did, and now uses the same shape.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01AT2qcFSFBVeA3s4VtmZTBz ([`cbf0231`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cbf023158129c413d95dcbdfd1908866fcf2cdf2))
+
+* fix(order): keep updated_at honest across partial saves
+
+Django writes an ``auto_now`` column only when it appears in
+``update_fields``. Every Order transition saves a narrow list —
+``["payment_status"]``, ``["status", "status_updated_at"]``, some 35 of
+them across services, signals, tasks, views and pay_way — so
+``updated_at`` kept the creation timestamp for the life of the order.
+Production order 264 ran PENDING -> PROCESSING -> SHIPPED across two
+days and still reported ``updated_at == created_at``; order 259 is
+stale by 26 hours.
+
+Two things read it, and both were wrong:
+
+* ``auto_cancel_stuck_pending_orders`` selects the FAILED-payment
+  bucket with ``updated_at__lt=now - GRACE``, intending a retry window
+  measured from the failure. Measured from checkout instead, a payment
+  failing more than GRACE (default 30 min) after the order was placed
+  was cancellable on the very next 15-minute run — no grace at all.
+  Stock released and a cancellation email sent while the customer was
+  still re-entering their card.
+* ``order/filters.py`` exposes ``updated_at`` as a client-facing
+  filter (gte/lte/date), so "orders changed since X" silently omitted
+  every status change.
+
+A ``payment_status_updated_at`` field was the other option. Not taken:
+``updated_at`` is ``auto_now``, so it already MEANS "last write" and the
+bug is that it was never written. Restoring that meaning fixes the
+filters too, where a new field fixes only the bucket and leaves them
+lying.
+
+Fixed in ``Order.save()`` rather than at ~35 call sites, so the next
+transition added cannot miss it — and because order/stock.py and the
+shipping services already pass "updated_at" by hand, which is the
+convention Order's own saves never followed.
+
+``status_updated_at`` gets the same treatment: ``save()`` ASSIGNS it,
+and a caller passing ``update_fields=["status"]`` would drop that write
+while ``_original_status`` at the end of the method still consumed the
+transition, so it could never be written afterwards.
+
+Verified rather than reasoned. A real round-trip shows
+``save(update_fields=["iso_cc"])`` leaving ``updated_at`` untouched
+while a full save and an explicit include both move it. The new tests
+drive ``handle_payment_failed`` — the actual service call — because the
+existing suite cannot catch this: ``_create_stuck_order`` backdates the
+column with ``Order.objects.filter(...).update()`` and says outright it
+is bypassing ``save()``, proving the task's FILTER works on a value
+nothing was ever shown to set.
+
+Blast radius checked before touching a core model: no signal receiver
+inspects ``update_fields``, and adding a timestamp to the write set
+cannot clobber a concurrent business-field update.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01AT2qcFSFBVeA3s4VtmZTBz ([`bcea8c7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bcea8c78b9fc1f2d5943c527c52cc5a26cadf532))
+
+* fix(cart): a zero weight is a weight, not a missing one
+
+``get_weight_info`` returned None when ``product.weight`` was falsy,
+under an ``@extend_schema_field`` declaring all three keys required and
+the parent schema listing ``weightInfo`` itself as required.
+
+``Product.weight`` is non-nullable with ``default=zero_weight``, so it is
+never None — but ``MeasureBase.__bool__`` is ``bool(self.standard)``,
+which makes a ZERO weight falsy. Every product left at the default
+therefore serialised ``weight_info: null`` against a contract that says
+it cannot be. The generated client honours that contract literally:
+``shared/openapi/zod.gen.ts`` has ``weightInfo: z.object({...})`` with no
+``.nullable()``, so ``parseDataAs`` rejected the ENTIRE cart response
+rather than one field — a 422 on add-to-cart for any product nobody had
+weighed yet.
+
+Zero is a legitimate weight. Returning 0.0 makes the payload match its
+declared shape; making the schema nullable instead would only move the
+crash into the shipping code that needs the numbers.
+
+No cross-service regeneration needed, contrary to how this looks: the
+decorator already declared the object non-nullable, so only the runtime
+was violating it. Confirmed by regenerating schema.yml and diffing —
+zero content difference — rather than assuming.
+
+The test is mutation-checked: restore the ``if`` and it fails with
+"null violates the declared schema".
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01AT2qcFSFBVeA3s4VtmZTBz ([`e35ce56`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e35ce56f100af6aa0619a09aef63e1d2f4958695))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.29.2 [skip ci] ([`e2029bf`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e2029bf73d7345a7251123de541d199b1ea3ac75))
+
+### Testing
+
+* test(b2b): stop the submit-throttle sharing Redis with other xdist workers
+
+The throttle test failed a full run with seven 200s and passed on its
+own. Not ordering luck — a genuine cross-worker collision.
+
+``SimpleRateThrottle.cache`` follows ``caches['default']``, which the
+suite's ``_restore_default_cache_backend`` fixture restores to the real
+Redis instance after every test. Redis is shared by every xdist worker,
+while each worker owns a separate database with its own pk sequence — so
+two workers both mint ``UserAccountFactory()`` as pk 1 and derive the
+SAME key, ``throttle_b2b_profile_submit_user:1``. A sibling worker
+entering this fixture then calls ``cache.clear()`` in the middle of our
+request loop, the history resets, and the budget never binds.
+
+``--dist loadfile`` does not help: it keeps a FILE on one worker, but the
+cache is shared across all of them.
+
+Bucketing the key per worker would only narrow the window, so the shared
+resource goes instead — the throttle counts in a private LocMemCache
+owned by the test, which nothing outside can reset.
+
+Pinned by a guard test that clears the default cache between requests
+and still expects a 429. Remove the private cache and that guard
+reproduces the original failure deterministically — seven 200s — while
+the two tests above keep passing whenever they happen to run without a
+concurrent sibling. That asymmetry is what let the flake hide: it only
+ever appeared in full runs and never on a rerun of the file.
+
+Full suite green afterwards: 7281 passed, 11 skipped.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01AT2qcFSFBVeA3s4VtmZTBz ([`e817c77`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e817c77594bd49a84284c8c33710251d950dcc74))
+
 ## v3.29.2 (2026-09-06)
 
 ### Bug fixes

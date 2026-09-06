@@ -145,3 +145,44 @@ class TestValidateEnvelope:
         del env["specversion"]
         with pytest.raises(BoxNowWebhookError, match="specversion"):
             validate_envelope(env)
+
+
+class TestTheSignatureFieldIsUntrustedJson:
+    """``verify_signature`` must be total over whatever the body holds.
+
+    It is handed ``envelope.get("datasignature")`` straight out of
+    ``json.loads`` on an unauthenticated request, and
+    ``hmac.compare_digest`` raises ``TypeError`` for every shape that is
+    not an ASCII ``str`` — which reached the caller as HTTP 500 on an
+    endpoint whose 5xx responses BoxNow retries.
+    """
+
+    @pytest.mark.parametrize(
+        "signature",
+        [1234567890, {"sig": "abc"}, ["abc"], None, True, 1.5],
+        ids=["int", "object", "array", "null", "bool", "float"],
+    )
+    def test_a_non_string_is_false_not_an_exception(self, signature):
+        assert verify_signature(b'{"x":1}', signature, "secret") is False
+
+    @pytest.mark.parametrize(
+        ("label", "signature"),
+        [
+            ("non-ascii", "σ" * 64),
+            ("too short", "ab" * 31),
+            ("too long", "ab" * 33),
+            ("not hex", "z" * 64),
+            ("empty", ""),
+        ],
+    )
+    def test_a_malformed_string_is_false_not_an_exception(
+        self, label, signature
+    ):
+        assert verify_signature(b'{"x":1}', signature, "secret") is False
+
+    def test_a_well_formed_signature_still_verifies(self):
+        data = b'{"parcelId":"1"}'
+        assert (
+            verify_signature(data, _make_signature(data, "secret"), "secret")
+            is True
+        )

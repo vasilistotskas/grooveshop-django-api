@@ -12,8 +12,10 @@ an outbound VIES call with a 5-second timeout.
 
 from __future__ import annotations
 
+from uuid import uuid4
+
 import pytest
-from django.core.cache import cache
+from django.core.cache.backends.locmem import LocMemCache
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
@@ -53,9 +55,29 @@ def throttled_rate(monkeypatch):
     monkeypatch.setattr(
         B2BProfileSubmitThrottle, "rate", f"{RATE}/minute", raising=False
     )
-    cache.clear()
+    # A PRIVATE cache, not the default one.
+    #
+    # ``SimpleRateThrottle.cache`` follows ``caches['default']``, which
+    # the suite's ``_restore_default_cache_backend`` fixture restores to
+    # the real Redis instance after every test. Redis is shared by every
+    # xdist worker, while each worker owns a separate database with its
+    # own pk sequence — so two workers both mint ``UserAccountFactory()``
+    # as pk 1 and derive the SAME key,
+    # ``throttle_b2b_profile_submit_user:1``. A sibling worker entering
+    # this fixture then calls ``cache.clear()`` in the middle of our
+    # request loop, the history resets, the budget never binds, and the
+    # run fails with seven 200s while passing alone. Observed 2026-09-06.
+    #
+    # Bucketing per worker would only narrow the window. This removes
+    # the shared resource: the throttle counts in memory owned by this
+    # test, so nothing outside it can reset the history.
+    monkeypatch.setattr(
+        B2BProfileSubmitThrottle,
+        "cache",
+        LocMemCache(f"b2b-throttle-{uuid4()}", {}),
+        raising=False,
+    )
     yield
-    cache.clear()
 
 
 def test_a_signed_in_caller_runs_out_of_submits(
@@ -96,3 +118,32 @@ def test_two_callers_do_not_share_one_budget(
     response = second.put(reverse("b2b:b2b-profile"), PAYLOAD, format="json")
 
     assert response.status_code != status.HTTP_429_TOO_MANY_REQUESTS
+
+
+def test_budget_survives_a_foreign_cache_clear(
+    b2b_tenant, enable_wholesale, throttled_rate, mock_vies
+):
+    """The budget must not be resettable from outside this test.
+
+    Guards the isolation in ``throttled_rate``. Drop that private cache
+    and this reproduces the original flake exactly — seven 200s — while
+    the two tests above keep passing whenever they happen to run without
+    a concurrent sibling. That asymmetry is what made the failure show
+    up only in full runs and never on a rerun of the file, so the guard
+    has to be explicit rather than left to scheduling luck.
+    """
+    from django.core.cache import cache as default_cache
+
+    client = APIClient()
+    client.force_authenticate(user=UserAccountFactory())
+    statuses = []
+    for _ in range(RATE + 2):
+        statuses.append(
+            client.put(
+                reverse("b2b:b2b-profile"), PAYLOAD, format="json"
+            ).status_code
+        )
+        default_cache.clear()
+    assert status.HTTP_429_TOO_MANY_REQUESTS in statuses, (
+        f"a foreign cache.clear() still resets the budget: {statuses}"
+    )

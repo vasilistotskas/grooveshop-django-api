@@ -22,7 +22,15 @@ def test_tenant_client_request_binds_schema_and_sees_tenant_data(mt_tenant):
     from product.factories.product import ProductFactory
 
     with schema_context(mt_tenant.schema_name):
-        product = ProductFactory()
+        # active=True is load-bearing, not decoration. ``ProductFactory``
+        # draws ``active`` from ``pybool(truth_probability=85)``, and the
+        # detail view applies ``.active()`` for anyone who is not store
+        # staff — this request is anonymous. Left to the factory, the
+        # assertion below failed on roughly one run in seven with a 404
+        # that blamed tenant resolution for a product that had simply
+        # rolled inactive (CI run 34046677730). The subject here is
+        # schema binding, so every other reason for a 404 is pinned out.
+        product = ProductFactory(active=True)
         product_id = product.id
 
     client = TenantClient(mt_tenant)

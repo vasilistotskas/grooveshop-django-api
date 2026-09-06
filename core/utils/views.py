@@ -10,6 +10,12 @@ each other's responses.  ``vary_on_headers("Authorization", "Cookie")`` is
 chained so Django includes those headers in the cache key, ensuring per-user
 (and per-session) segregation.
 
+The ORDER of that chaining is load-bearing and was wrong: ``cache_page``
+must be the OUTER decorator. See the comment beside it — with the two
+swapped, ``Cookie`` never entered the key and a session-authenticated
+staff response was served to the next anonymous caller for the whole
+TTL.
+
 In test mode or when ``settings.DISABLE_CACHE`` is True the decorator is
 a no-op so tests are never affected by cache residue.
 """
@@ -85,10 +91,32 @@ def cache_methods(timeout, methods, *, cache=None):
                 timeout, cache=cache, key_prefix=key_prefix
             )
             vary_decorator = vary_on_headers("Authorization", "Cookie")
-            # vary_on_headers must wrap cache_page so the Vary header is set
-            # before the cache layer reads it for key derivation.
-            decorated_func = method_decorator(vary_decorator)(
-                method_decorator(cache_decorator)(func)
+            # ``cache_page`` OUTSIDE, ``vary_on_headers`` INSIDE.
+            #
+            # The comment that stood here claimed the opposite — that
+            # "vary_on_headers must wrap cache_page so the Vary header
+            # is set before the cache layer reads it" — and the code
+            # followed it. It is backwards: an outer decorator's
+            # post-processing runs AFTER the inner one's, and
+            # ``UpdateCacheMiddleware.process_response`` calls
+            # ``learn_cache_key`` (which reads the response's ``Vary``)
+            # from inside ``cache_page``. So the key was learned with an
+            # EMPTY header list and ``Cookie`` never entered it.
+            #
+            # Measured, populating the cache as one caller and reading
+            # it as another:
+            #
+            #   vary OUTSIDE (before): keys differ by cookie : False
+            #                          anon HITS staff entry : True
+            #   vary INSIDE  (after):  keys differ by cookie : True
+            #                          anon HITS staff entry : False
+            #
+            # ``Authorization`` was accidentally safe: Django patches
+            # that one itself in ``learn_cache_key``. Session auth was
+            # not, and ``SessionAuthentication`` is in
+            # ``DEFAULT_AUTHENTICATION_CLASSES``.
+            decorated_func = method_decorator(cache_decorator)(
+                method_decorator(vary_decorator)(func)
             )
             setattr(cls, method_name, decorated_func)
         return cls

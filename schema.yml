@@ -27120,74 +27120,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedUserDetailsList'
           description: ''
-    post:
-      operationId: createUserAccount
-      description: Δημιουργία νέου Λογαριασμός Χρήστη. Απαιτεί ταυτοποίηση.
-      summary: Δημιουργία Λογαριασμός Χρήστη
-      parameters:
-      - in: query
-        name: languageCode
-        schema:
-          type: string
-          enum:
-          - de
-          - el
-          - en
-          default: el
-        description: Κωδικός γλώσσας για μεταφράσεις (el, en, de)
-      tags:
-      - User Accounts
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/UserWriteRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/UserWriteRequest'
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UserWriteRequest'
-        required: true
-      security:
-      - cookieAuth: []
-      responses:
-        '400':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-        '401':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-        '403':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-        '404':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-        '500':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-        '201':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/UserDetails'
-          description: ''
   /api/v1/user/account/{id}:
     get:
       operationId: retrieveUserAccount
@@ -27283,7 +27215,6 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/UserWriteRequest'
-        required: true
       security:
       - cookieAuth: []
       responses:
@@ -40885,12 +40816,6 @@ components:
     PatchedUserWriteRequest:
       type: object
       properties:
-        email:
-          type: string
-          format: email
-          minLength: 1
-          title: Διεύθυνση Email
-          maxLength: 254
         firstName:
           type: string
           title: Όνομα
@@ -45874,12 +45799,6 @@ components:
     UserWriteRequest:
       type: object
       properties:
-        email:
-          type: string
-          format: email
-          minLength: 1
-          title: Διεύθυνση Email
-          maxLength: 254
         firstName:
           type: string
           title: Όνομα
@@ -46002,8 +45921,6 @@ components:
           title: Γλώσσα
           description: Προτιμώμενη γλώσσα για emails και μηνύματα διεπαφής.
           maxLength: 10
-      required:
-      - email
     UsernameUpdateRequest:
       type: object
       properties:

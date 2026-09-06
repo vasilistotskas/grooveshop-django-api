@@ -44,25 +44,26 @@ class UserAccountViewSetTestCase(TestURLFixerMixin, APITestCase):
             )
             self.assertEqual(response.data, serializer.data)
 
-    def test_create_valid(self):
-        payload = {
-            "email": "test2@test.com",
-            "password": "test12345@!",
-        }
-        url = self.get_user_account_list_url()
-        response = self.client.post(url, data=payload, format="json")
+    def test_accounts_cannot_be_created_through_the_api(self):
+        """Registration belongs to allauth, and only to allauth.
 
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        This endpoint used to answer 201 to any authenticated caller for
+        any email address. The two tests that stood here asserted only
+        that it answered 201 and 400 — including one that posted a
+        "password" the serializer does not even declare, so the account
+        it made had no usable password, no ``EmailAddress`` row and no
+        verification mail. What it did have was the victim's address,
+        which is enough to stop the victim ever registering it.
+        """
+        payload = {"email": "test2@test.com", "password": "test12345@!"}
+        response = self.client.post(
+            self.get_user_account_list_url(), data=payload, format="json"
+        )
 
-    def test_create_invalid(self):
-        payload = {
-            "email": "invalid_email",
-            "password": "test12345@!",
-        }
-        url = self.get_user_account_list_url()
-        response = self.client.post(url, data=payload, format="json")
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED
+        )
+        self.assertFalse(User.objects.filter(email="test2@test.com").exists())
 
     def test_retrieve_valid(self):
         url = self.get_user_account_detail_url(self.user.id)

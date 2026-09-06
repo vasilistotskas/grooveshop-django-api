@@ -173,7 +173,15 @@ def clear_duplicate_history_task(excluded_fields=None, minutes=None):
             extra={"excluded_fields": excluded_fields, "minutes": minutes},
         )
 
-        command_args = ["clean_duplicate_history"]
+        # ``--auto``, like the sibling ``clear_old_history_task``.
+        # Without a model name or this flag, simple-history's command
+        # falls through to printing "Please specify a model or use the
+        # --auto option" and does nothing — measured: 0 queries against
+        # 4 with the flag — while this task went on to log "Successfully
+        # cleaned duplicate history entries" and return success. The
+        # daily per-tenant beat job has therefore never removed a
+        # duplicate historical row, in any tenant.
+        command_args = ["clean_duplicate_history", "--auto"]
 
         if minutes is not None:
             command_args.extend(["-m", str(minutes)])

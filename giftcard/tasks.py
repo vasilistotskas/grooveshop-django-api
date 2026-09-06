@@ -255,9 +255,16 @@ def expire_gift_cards(self) -> dict:
     retry_backoff=True,
     retry_jitter=True,
 )
-def credit_refund_to_gift_cards(self, order_id: int) -> dict:
-    """Return the gift-card-settled portion of a refunded order to the
-    source card(s)."""
+def credit_refund_to_gift_cards(
+    self, order_id: int, amount: str | None = None
+) -> dict:
+    """Return the refunded gift-card value to the source card(s).
+
+    *amount* is a decimal STRING (or None for a full refund) because a
+    Celery argument has to survive JSON — `Money` and `Decimal` do not.
+    """
+    from decimal import Decimal, InvalidOperation
+
     from giftcard.services import GiftCardService
     from order.models.order import Order
 
@@ -267,5 +274,20 @@ def credit_refund_to_gift_cards(self, order_id: int) -> dict:
         logger.error("Order %s not found for gift-card refund", order_id)
         return {"status": "error", "reason": "order_not_found"}
 
-    credited = GiftCardService.credit_refund(order)
+    refunded = None
+    if amount is not None:
+        try:
+            refunded = Decimal(amount)
+        except InvalidOperation, TypeError, ValueError:
+            # Crediting the full redemption on an unreadable amount is
+            # how money gets created; refuse instead.
+            logger.error(
+                "Gift-card refund for order %s carries an unreadable "
+                "amount %r — refusing to credit rather than guessing",
+                order_id,
+                amount,
+            )
+            return {"status": "error", "reason": "bad_amount"}
+
+    credited = GiftCardService.credit_refund(order, refunded)
     return {"status": "success", "credited": str(credited)}

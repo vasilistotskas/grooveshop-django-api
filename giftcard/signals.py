@@ -18,13 +18,23 @@ from tenant.celery import dispatch_on_commit
 logger = logging.getLogger(__name__)
 
 
-def _queue_refund_credit(order: Order) -> None:
+def _queue_refund_credit(order: Order, amount=None) -> None:
+    """Queue the gift-card credit for a refunded/canceled order.
+
+    *amount* is how much was actually refunded; ``None`` means the whole
+    order. Passing it matters: crediting the full redemption for a
+    PARTIAL refund puts money on the card that was never returned.
+    """
     if not (order.gift_card_amount and order.gift_card_amount.amount > 0):
         return
     from giftcard.tasks import credit_refund_to_gift_cards
 
     order_id = order.id
-    dispatch_on_commit(credit_refund_to_gift_cards, [order_id])
+    # A Celery argument has to survive JSON, and `Money` does not.
+    refunded = (
+        None if amount is None else str(getattr(amount, "amount", amount))
+    )
+    dispatch_on_commit(credit_refund_to_gift_cards, [order_id, refunded])
 
 
 @receiver(
@@ -33,8 +43,11 @@ def _queue_refund_credit(order: Order) -> None:
 def handle_order_refunded_giftcard(
     sender: type[Order], order: Order, **kwargs: Any
 ) -> None:
+    # `amount` is part of the `order_refunded` contract: absent means a
+    # FULL refund. Dropping it here is what credited the whole
+    # redemption back for a five-euro goodwill refund.
     try:
-        _queue_refund_credit(order)
+        _queue_refund_credit(order, kwargs.get("amount"))
     except Exception:
         logger.exception(
             "Failed to queue gift-card refund credit for order %s", order.id

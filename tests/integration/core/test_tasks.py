@@ -146,7 +146,15 @@ class TestClearDuplicateHistoryTask:
     ):
         result = clear_duplicate_history_task()
 
-        mock_call_command.assert_called_once_with("clean_duplicate_history")
+        # `--auto` is not optional. Without a model name or this flag,
+        # simple-history's command prints "Please specify a model or use
+        # the --auto option" and issues ZERO queries, while the task
+        # goes on to report success. This assertion used to pin the
+        # argv WITHOUT it, locking the no-op in; the sibling
+        # `clear_old_history_task` test has always asserted `--auto`.
+        mock_call_command.assert_called_once_with(
+            "clean_duplicate_history", "--auto"
+        )
         assert result["status"] == "success"
         assert "Duplicate history entries cleaned" in result["message"]
 
@@ -161,6 +169,7 @@ class TestClearDuplicateHistoryTask:
 
         mock_call_command.assert_called_once_with(
             "clean_duplicate_history",
+            "--auto",
             "-m",
             "30",
             "--excluded_fields",

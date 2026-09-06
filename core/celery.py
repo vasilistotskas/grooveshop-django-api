@@ -54,7 +54,18 @@ def create_celery_app():
     # Minimal connection management - let Django handle most of it
     from celery.signals import worker_process_shutdown
 
-    @worker_process_init.connect
+    # ``weak=False`` on every handler below. They are closures defined
+    # inside this function, so under Celery's default weak references the
+    # only strong reference dies when ``create_celery_app`` returns and
+    # every receiver is garbage-collected. Verified against the real
+    # module: all six reported ``has_listeners=False``.
+    #
+    # A signal that never fires raises nothing, which is why this held
+    # for so long — and why the comment below claiming the overlay fixed
+    # "Order Received - #38 shipped in English" described something that
+    # was not happening. ``meili/apps.py`` documents the identical trap
+    # for its own closures.
+    @worker_process_init.connect(weak=False)
     def init_worker_process(**kwargs):
         """Initialize worker process with clean connections + translations."""
         from django.db import close_old_connections
@@ -79,7 +90,7 @@ def create_celery_app():
 
         logger.info("Worker process initialized")
 
-    @task_prerun.connect
+    @task_prerun.connect(weak=False)
     def refresh_translations_if_bumped(**kwargs):
         """Re-apply the DB overlay when another pod bumped the version tick.
 
@@ -129,7 +140,7 @@ def create_celery_app():
             remote_version,
         )
 
-    @worker_process_shutdown.connect
+    @worker_process_shutdown.connect(weak=False)
     def shutdown_worker_process(**kwargs):
         """Clean up when worker shuts down."""
         from django.db import close_old_connections
@@ -146,7 +157,7 @@ def create_celery_app():
     # records emitted during the task carry the same correlation_id that
     # the originating HTTP request had.
     @before_task_publish.connect(
-        dispatch_uid="core.celery.inject_correlation_id"
+        dispatch_uid="core.celery.inject_correlation_id", weak=False
     )
     def inject_correlation_id(headers: dict, **kwargs) -> None:
         """Stamp the outgoing task message with the current correlation id."""
@@ -159,7 +170,9 @@ def create_celery_app():
     # Maps task_id → ContextVar token so we can reset after the task.
     _cid_tokens: dict = {}
 
-    @task_prerun.connect(dispatch_uid="core.celery.restore_correlation_id")
+    @task_prerun.connect(
+        dispatch_uid="core.celery.restore_correlation_id", weak=False
+    )
     def restore_correlation_id(task_id: str, task, **kwargs) -> None:
         """Restore correlation id from task headers into the worker context.
 
@@ -181,7 +194,9 @@ def create_celery_app():
             token = set_correlation_id(cid)
             _cid_tokens[task_id] = token
 
-    @task_postrun.connect(dispatch_uid="core.celery.cleanup_correlation_id")
+    @task_postrun.connect(
+        dispatch_uid="core.celery.cleanup_correlation_id", weak=False
+    )
     def cleanup_correlation_id(task_id: str, **kwargs) -> None:
         """Reset the correlation id ContextVar after the task completes.
 

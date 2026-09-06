@@ -15,7 +15,7 @@ from blog.models.post import BlogPost
 from core.api.schema import generate_schema_multi_lang
 from core.utils.serializers import TranslatedFieldExtended
 from tenant.membership import is_store_staff
-from user.serializers.account import UserDetailsSerializer
+from user.serializers.account import UserPublicSerializer
 
 User = get_user_model()
 
@@ -28,7 +28,9 @@ class TranslatedFieldsFieldExtend(TranslatedFieldExtended):
 class BlogCommentSerializer(
     TranslatableModelSerializer, serializers.ModelSerializer[BlogComment]
 ):
-    user = UserDetailsSerializer(read_only=True)
+    # PUBLIC serializer: these endpoints serve anonymous readers, and
+    # the account serializer carries email/phone/address/birth_date.
+    user = UserPublicSerializer(read_only=True)
     content_preview = serializers.SerializerMethodField(
         help_text=_("First 150 characters of the comment content")
     )
@@ -157,7 +159,7 @@ class BlogCommentDetailSerializer(BlogCommentSerializer):
             return {
                 "id": obj.parent.id,
                 "content_preview": self.get_content_preview(obj.parent),
-                "user": UserDetailsSerializer(obj.parent.user).data,
+                "user": UserPublicSerializer(obj.parent.user).data,
                 "created_at": obj.parent.created_at,
             }
         return None
@@ -207,7 +209,7 @@ class BlogCommentDetailSerializer(BlogCommentSerializer):
             {
                 "id": ancestor.id,
                 "content_preview": self.get_content_preview(ancestor),
-                "user": UserDetailsSerializer(ancestor.user).data,
+                "user": UserPublicSerializer(ancestor.user).data,
             }
             for ancestor in ancestors
         ]

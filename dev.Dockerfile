@@ -8,6 +8,13 @@ FROM python:${PYTHON_VERSION}-slim-bookworm AS base
 ARG UID=1000
 ARG GID=1000
 ARG APP_PATH=/home/app
+# PostgreSQL major of the client tools, for the same reason the
+# production Dockerfile pins one: pg_dump refuses to dump a server NEWER
+# than itself, so this must track infra.compose.yml's server image.
+# It sat at 17 against an 18.6 server, and `manage.py backup_database`
+# inside this image failed every time with "aborting because of server
+# version mismatch".
+ARG POSTGRES_MAJOR=18
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -23,8 +30,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $VERSION_CODENAME-pgdg main" > /etc/apt/sources.list.d/pgdg.list \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
-    postgresql-client-17 \
-    postgresql-17 \
+    postgresql-client-${POSTGRES_MAJOR} \
+    postgresql-${POSTGRES_MAJOR} \
     gzip \
     # gettext tools (msgfmt / xgettext) for `makemessages` +
     # `compilemessages`. Prod Alpine ships these via apk `gettext`;

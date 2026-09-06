@@ -108,7 +108,6 @@ _root_storefront_patterns = [
 # (country/region, tenant resolve + memberships, health, settings, schema).
 _shared_i18n_patterns = [
     path("", HomeView.as_view(), name="home"),
-    path(_("admin/"), admin.site.urls),
     path("upload_image", upload_image, name="upload_image"),
     path("accounts/", include("allauth.urls")),
     # Our DBBackedTranslationFormView overrides the same URL that rosetta.urls
@@ -153,6 +152,30 @@ _storefront_admin_i18n_patterns = [
         _("admin/email-templates/"),
         include("core.email.urls", namespace="email_templates"),
     ),
+    # The STORE admin, and storefront-only. It used to sit in
+    # ``_shared_i18n_patterns``, which put it on the platform host as
+    # well — and ``tenant/urls_public.py`` shadows only the UNPREFIXED
+    # ``admin/`` with the control-plane site. So on the platform host
+    # ``/admin/login/`` reached ``PlatformAdminSite`` (superuser only)
+    # while ``/en/admin/login/`` reached ``MyAdminSite``, whose
+    # ``has_permission`` admits any ``is_staff`` platform identity.
+    # Verified with ``resolve(..., urlconf="tenant.urls_public")``:
+    #
+    #   /admin/login/     -> site=PlatformAdminSite
+    #   /en/admin/login/  -> site=MyAdminSite
+    #   /en/admin/clear-cache/ -> MyAdminSite.clear_cache_view
+    #
+    # A store owner could open the cache page there and purge globally:
+    # on the public schema ``_current_tenant_host()`` is None, so the
+    # Nuxt purge goes out with no host and flushes every store's SSR
+    # cache. The platform host now serves ``platform_admin_site`` and
+    # nothing else.
+    #
+    # After email-templates, not before: ``AdminSite`` ends its URLconf
+    # with ``final_catch_all_view``, which would answer
+    # ``admin/email-templates/*`` with a 404 instead of letting
+    # resolution fall through.
+    path(_("admin/"), admin.site.urls),
 ]
 
 # Locale-prefixed, STOREFRONT only: the merchant storefront/commerce API.

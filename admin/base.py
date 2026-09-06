@@ -59,6 +59,54 @@ class BaseModelAdmin(ModelAdmin):
         will have 1000s). Override per-admin where needed.
     """
 
+    # Every admin action here requires the model's `change` permission
+    # unless it declares its own.
+    #
+    # Django and unfold both FAIL OPEN on an action with no
+    # `allowed_permissions`: Django's `_filter_actions_by_permissions`
+    # keeps it, and unfold's `_filter_unfold_actions_by_permissions`
+    # appends it unconditionally —
+    #
+    #     if not hasattr(action.method, "allowed_permissions"):
+    #         filtered_actions.append(action)
+    #         continue
+    #
+    # — so an undeclared action is offered to anyone who passes the
+    # admin site's own gate. Worse for `actions_detail`, which unfold
+    # registers as real URLs wrapped only in `admin_site.admin_view`
+    # (active + staff), so a member with no model permissions at all
+    # could GET one directly. 80 actions across this codebase declared
+    # nothing; the mechanism was available and simply unused.
+    #
+    # `change` rather than `view` is deliberate: it is the restrictive
+    # direction, and it is right for the ones that matter (cancel a
+    # parcel, publish a post, purge a payout). A genuinely read-only
+    # action declares `permissions=["view"]` and says so.
+    _DEFAULT_ACTION_PERMISSIONS = ("change",)
+
+    _ACTION_ATTRIBUTES = (
+        "actions",
+        "actions_list",
+        "actions_detail",
+        "actions_row",
+        "actions_submit_line",
+    )
+
+    def __init_subclass__(cls, **kwargs) -> None:
+        super().__init_subclass__(**kwargs)
+        for attribute in cls._ACTION_ATTRIBUTES:
+            for name in getattr(cls, attribute, None) or []:
+                if not isinstance(name, str):
+                    continue
+                method = getattr(cls, name, None)
+                if method is None or getattr(
+                    method, "allowed_permissions", None
+                ):
+                    continue
+                method.allowed_permissions = list(
+                    cls._DEFAULT_ACTION_PERMISSIONS
+                )
+
     def _withheld_on_public(self, request) -> bool:
         """True when this tenant-only model has no table in this schema.
 

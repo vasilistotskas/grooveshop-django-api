@@ -270,6 +270,10 @@ MIDDLEWARE = [
     # must answer BEFORE tenant resolution.
     "tenant.internal.InternalDomainsMiddleware",
     "django_tenants.middleware.main.TenantMainMiddleware",
+    # Immediately after tenant resolution and before anything that
+    # serves data: django_tenants resolves a host without looking at
+    # ``is_active``, so a SUSPENDED store kept answering its API in full.
+    "tenant.middleware.SuspendedTenantMiddleware",
     # Response phase runs in reverse: placed here, it rewrites the
     # session/CSRF cookie Domain AFTER Session/Csrf middleware set them
     # — the static *_COOKIE_DOMAIN settings only fit the platform apex.

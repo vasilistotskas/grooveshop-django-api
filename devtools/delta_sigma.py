@@ -31,9 +31,13 @@ Two things worth knowing before editing:
   together, and see the tests in
   ``tests/unit/devtools/test_delta_sigma_content.py``, which fail on a
   Greek string that reaches an English field.
-* Prices, the founding year, and the ODOT partnership scope are the
-  three facts the public site does not state. They are left at zero or
-  bracketed rather than invented.
+* **The DeSET prices are the only fact still missing.** They are
+  quote-only and never in version control, so the three products carry
+  ``price = 0``. The legal identity, the founding date and the ODOT
+  relationship all came from primary sources in the end — the ΓΕΜΗ
+  publicity record for the first two, and ``odot.gr`` for the third
+  (Δelta Σigma is Odot Automation's official reseller in Greece, which
+  is why a bare logo sat on the partners page).
 
 Colour ramps: the primary scale is derived from the teal in the
 company's own logo (``#009999``, sampled from LOGO1.png). It is split
@@ -182,17 +186,48 @@ OFFICES = [
 CONTACT_EMAIL = "contact@delta-sigma.gr"
 GEMH = "156013906000"
 
-# extra_settings rows filled from the published facts above. Rows are
-# never created here — `Setting.set_defaults_from_settings()` provisions
-# all 91 during tenant creation, so a missing row means the schema is
-# under-provisioned and is reported rather than papered over.
+# --- Legal identity, from the ΓΕΜΗ registry record ------------------------
 #
-# Deliberately NOT set, because delta-sigma.gr does not publish them and
-# guessing an invoicing identity or a shop's coordinates is worse than
-# leaving the field empty: INVOICE_SELLER_VAT_ID (ΑΦΜ),
-# INVOICE_SELLER_TAX_OFFICE (ΔΟΥ), INVOICE_SELLER_LEGAL_FORM,
-# INVOICE_SELLER_BUSINESS_ACTIVITY, STORE_GEO_LAT / STORE_GEO_LNG and
-# BUSINESS_HOURS.
+# delta-sigma.gr publishes only the Γ.Ε.ΜΗ. number, so the rest comes
+# from the register that number addresses — the official publicity
+# record at publicity.businessportal.gr/company/156013906000, read
+# 2026-09-07. Recording the source matters: N. 4919/2022 art. 22 §4
+# makes these fields a legal obligation on the storefront, so a wrong
+# value is worse than an empty one.
+LEGAL_NAME = "ΑΙΚ. ΔΗΜΟΠΟΥΛΟΥ - Μ. ΣΦΗΚΑΣ Ο.Ε."
+LEGAL_FORM = "ΟΕ"
+VAT_ID = "801400345"
+# The taxpayer's own naming, confirmed by the operator. ΤΚ 55131/55132
+# (Καλαμαριά) is the ΔΟΥ Καλαμαριάς catchment; AADE renamed that unit
+# the 20ή Υ.Φ.Ε. on 27/07/2026 and moved registry duties to ΚΕΦΟΔΕ
+# Θεσσαλονίκης, but the legacy name is what the invoice prints.
+TAX_OFFICE = "ΔΟΥ Καλαμαριάς"
+# Κύριος ΚΑΔ 71121000.
+BUSINESS_ACTIVITY = "Υπηρεσίες μηχανικών"
+# The REGISTERED SEAT, which is not the address the site publishes: the
+# public pages give Γ. Ρίτσου 7 (the office a customer visits) while
+# ΓΕΜΗ records Δαβάκη 19. A Greek invoice carries the seat, so the two
+# are deliberately different here — the contact page and the map keep
+# using OFFICES[0].
+SEAT = {
+    "street": "Δαβάκη 19",
+    "area": "Καλαμαριά",
+    "postal": "551 32",
+    "city": "Θεσσαλονίκη",
+}
+FOUNDED = "26/08/2020"
+
+# Γ. Ρίτσου 7 resolves to 7 Γιάννη Ρίτσου, Δήμος Καλαμαριάς — geocoded
+# and reverse-verified against OpenStreetMap, whose postcode (551 32)
+# matches the one the site publishes. Strings, not floats: that is the
+# extra_setting's declared type.
+STORE_GEO_LAT = "40.5764063"
+STORE_GEO_LNG = "22.9591870"
+
+# extra_settings rows filled from the facts above. Rows are never
+# created here — `Setting.set_defaults_from_settings()` provisions all
+# 91 during tenant creation, so a missing row means the schema is
+# under-provisioned and is reported rather than papered over.
 SETTINGS = {
     # Quote-only: delta-sigma.gr publishes no prices anywhere, and the
     # three DeSET systems are priced on request. Shop-dark turns off the
@@ -207,15 +242,39 @@ SETTINGS = {
     # the price surfaces.
     "CART_ENABLED": "False",
     "CONTACT_EMAIL": CONTACT_EMAIL,
-    "INVOICE_SELLER_NAME": "Δelta Σigma",
-    "INVOICE_SELLER_ADDRESS_LINE_1": OFFICES[0]["street"],
-    "INVOICE_SELLER_ADDRESS_LINE_2": OFFICES[0]["area"],
-    "INVOICE_SELLER_POSTAL_CODE": OFFICES[0]["postal"],
-    "INVOICE_SELLER_CITY": OFFICES[0]["city"],
+    # The LEGAL name, not the trade name: this is what heads an invoice
+    # and the storefront's merchant-identity block. "Δelta Σigma" is the
+    # διακριτικός τίτλος and stays the brand everywhere else.
+    "INVOICE_SELLER_NAME": LEGAL_NAME,
+    "INVOICE_SELLER_LEGAL_FORM": LEGAL_FORM,
+    "INVOICE_SELLER_VAT_ID": VAT_ID,
+    "INVOICE_SELLER_TAX_OFFICE": TAX_OFFICE,
+    "INVOICE_SELLER_BUSINESS_ACTIVITY": BUSINESS_ACTIVITY,
+    "INVOICE_SELLER_ADDRESS_LINE_1": SEAT["street"],
+    "INVOICE_SELLER_ADDRESS_LINE_2": SEAT["area"],
+    "INVOICE_SELLER_POSTAL_CODE": SEAT["postal"],
+    "INVOICE_SELLER_CITY": SEAT["city"],
     "INVOICE_SELLER_COUNTRY": "GR",
     "INVOICE_SELLER_EMAIL": CONTACT_EMAIL,
     "INVOICE_SELLER_PHONE": OFFICES[0]["phones"][0],
     "INVOICE_SELLER_REGISTRATION_NUMBER": GEMH,
+    "STORE_GEO_LAT": STORE_GEO_LAT,
+    "STORE_GEO_LNG": STORE_GEO_LNG,
+    # Mon-Fri 09:00-17:00, as the operator confirmed — the hours are
+    # published nowhere (site, odot.gr, ΓΕΜΗ, LinkedIn, directories),
+    # so they come from them rather than from a source.
+    "BUSINESS_HOURS": {
+        "timezone": "Europe/Athens",
+        "schedule": {
+            "mon": {"opens": "09:00", "closes": "17:00"},
+            "tue": {"opens": "09:00", "closes": "17:00"},
+            "wed": {"opens": "09:00", "closes": "17:00"},
+            "thu": {"opens": "09:00", "closes": "17:00"},
+            "fri": {"opens": "09:00", "closes": "17:00"},
+            "sat": None,
+            "sun": None,
+        },
+    },
 }
 
 
@@ -1675,12 +1734,22 @@ CONTENT_PAGES = {
             "βιομηχανικό Internet of Things.</p>"
             "<h3>Aviat Networks</h3><p>Ασύρματες ζεύξεις για "
             "εγκαταστάσεις διάσπαρτες σε δεκάδες χιλιόμετρα.</p>"
-            "<h3>ODOT</h3><p>[ΠΡΟΣ ΕΠΙΒΕΒΑΙΩΣΗ — το λογότυπο "
-            "εμφανίζεται στη σελίδα συνεργατών του υπάρχοντος site "
-            "χωρίς περιγραφή.]</p>"
+            "<h3>INVT</h3><p>Ελεγκτές και ρυθμιστές στροφών. Το "
+            "Σύστημα DeSET 02 βασίζεται στο PLC INVT TM750.</p>"
+            "<h3>Advantech</h3><p>Βιομηχανικοί υπολογιστές και "
+            "gateways πρωτοκόλλων — το gateway IEC-104 του Συστήματος "
+            "DeSET 02 είναι Advantech.</p>"
+            "<h3>ODOT Automation</h3><p>Είμαστε επίσημοι μεταπωλητές "
+            "στην Ελλάδα: κάρτες απομακρυσμένων εισόδων/εξόδων "
+            "(Remote I/O) και κάρτες επικοινωνιών, άμεσα διαθέσιμες "
+            "από το απόθεμά μας, με πιστοποίηση CE. Ο ελεγκτής C3351 "
+            "(Modbus TCP/RTU, CODESYS V3.5) και οι προσαρμογείς της "
+            "σειράς CN-80xx καλύπτουν Modbus RTU &amp; TCP, "
+            "Profibus-DP, CANopen, PROFINET, EtherCAT και "
+            'Ethernet/IP. <a href="https://www.odot.gr/">odot.gr</a>'
+            "</p>"
             "<p>Επιπλέον εργαζόμαστε σε πλατφόρμες Siemens (Simatic "
-            "Step 5 / Step 7, SCADA WinCC), WAGO, INVT και "
-            "Advantech.</p>",
+            "Step 5 / Step 7, SCADA WinCC) και WAGO.</p>",
         },
         "en": {
             "title": "Partners",
@@ -1694,11 +1763,21 @@ CONTENT_PAGES = {
             "industrial Internet of Things.</p>"
             "<h3>Aviat Networks</h3><p>Wireless links for "
             "installations spread over tens of kilometres.</p>"
-            "<h3>ODOT</h3><p>[TO BE CONFIRMED — the logo appears on "
-            "the partners page of the existing site with no "
-            "description.]</p>"
+            "<h3>INVT</h3><p>Controllers and variable-speed drives. "
+            "DeSET System 02 is built on the INVT TM750 PLC.</p>"
+            "<h3>Advantech</h3><p>Industrial computers and protocol "
+            "gateways — the IEC-104 gateway in DeSET System 02 is an "
+            "Advantech.</p>"
+            "<h3>ODOT Automation</h3><p>We are the official reseller "
+            "in Greece: remote I/O cards and communication cards, "
+            "available straight from our stock and CE certified. The "
+            "C3351 controller (Modbus TCP/RTU, CODESYS V3.5) and the "
+            "CN-80xx adapter range cover Modbus RTU &amp; TCP, "
+            "Profibus-DP, CANopen, PROFINET, EtherCAT and "
+            'Ethernet/IP. <a href="https://www.odot.gr/">odot.gr</a>'
+            "</p>"
             "<p>We also work on Siemens platforms (Simatic Step 5 / "
-            "Step 7, SCADA WinCC), WAGO, INVT and Advantech.</p>",
+            "Step 7, SCADA WinCC) and WAGO.</p>",
         },
     },
 }

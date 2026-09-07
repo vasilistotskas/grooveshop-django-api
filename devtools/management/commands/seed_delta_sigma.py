@@ -130,12 +130,7 @@ class Command(BaseCommand):
                 "\nNOT set by this command, deliberately:\n"
                 "  * DeSET prices — quote-only, never in version control. "
                 "The three products carry price 0, and the storefront has "
-                "no zero-price branch, so they render as 0,00 €.\n"
-                "  * The ODOT partnership scope — the public site shows the "
-                "logo with no description.\n"
-                "  * ΑΦΜ / ΔΟΥ / legal form / business activity, the store "
-                "coordinates and the business hours — delta-sigma.gr "
-                "publishes none of them."
+                "no zero-price branch, so they render as 0,00 €."
             )
         )
 

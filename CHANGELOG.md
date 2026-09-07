@@ -3,6 +3,45 @@
 
 
 
+## v3.39.1 (2026-09-07)
+
+### Bug fixes
+
+* fix(devtools): --overwrite could not move a band or change a menu
+
+Two convergence holes the first real re-seed found, both the same
+shape: `--overwrite` says "take my version", and two things it could
+not take.
+
+A band the plan ADDS landed last, however the plan reads. The partner
+strip, the pull quote and the reference cards all appeared after the
+closing CTA on the one store this pack exists for. `SortableModel.save`
+overwrites `sort_order` on every insert (`if self.pk is None` →
+`max(siblings) + 1`), so passing it to `create` is silently ignored —
+appending is right only while a store is being seeded from nothing,
+where creation order IS the plan's order. It now places each new row
+with a `queryset.update`, which does not go through the model's save,
+and the `--overwrite` reorder pass no longer has to cover for it.
+
+The NAVIGATION items were never rewritten. The footer columns kept
+their first shape through three re-seeds because only the English
+overlay was ever refilled. `items` is merchant content, so a plain
+re-run still leaves it alone.
+
+And the DeSET cards take the artboard's own abbreviations
+("IEC 104 ενσωμ.", "8 DI + 8 DO") — which moved the drift guard from
+every token to every FIGURE. That is what it was always for: a card
+claiming 16 MB where the spec says 8. A word is display text, not a
+claim, and an industrial card is allowed to write "DI" where the spec
+says "ψηφιακές είσοδοι".
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018CiyyCqkXd9a1FM5hsrPFZ ([`48f016d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/48f016dc046648342983f84be581a8e83ea0be7c))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.39.0 [skip ci] ([`9beb656`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9beb6562deafcad8933ed3a7c0e9ac83ac19c4da))
+
 ## v3.39.0 (2026-09-07)
 
 ### Chores

@@ -215,6 +215,60 @@ def test_hero_banner_stats_errors_name_their_own_key():
         validate_section_props("hero_banner", {"stats": "48"})
 
 
+def test_page_hero_props():
+    """The top of every inner page."""
+    validate_section_props(
+        "page_hero",
+        {
+            "eyebrow": "Delta Sigma Energy Telecontrol",
+            "heading": "DeSET",
+            "standfirst": "Telemetry for renewable plants.",
+            "body": "In full compliance with HEDNO's specifications.",
+            "cta_text": "Request a quote",
+            "cta_link": "/contact",
+            "secondary_cta_text": "Compare the systems",
+            "secondary_cta_link": "/deset",
+            "stats": [{"value": "48", "label": "projects"}],
+            "callout": {
+                "tone": "warning",
+                "title": "Regulatory obligation",
+                "text": "Every plant above 400 kW must report.",
+                "note": "Law 5106/2024",
+            },
+            "facts": [
+                {"label": "Protocol", "value": "IEC 60870-5-104"},
+                {"label": "Threshold", "value": "> 400 kW"},
+            ],
+        },
+    )
+
+
+def test_page_hero_callout_tone_is_an_enum_not_a_colour():
+    """A merchant cannot author a hex into a page."""
+    with pytest.raises(ValidationError):
+        validate_section_props(
+            "page_hero",
+            {"callout": {"tone": "#ff0000", "title": "x"}},
+        )
+    with pytest.raises(ValidationError):
+        validate_section_props("page_hero", {"callout": {"text": "no title"}})
+    with pytest.raises(ValidationError):
+        validate_section_props(
+            "page_hero", {"callout": {"title": "x", "colour": "red"}}
+        )
+    with pytest.raises(ValidationError):
+        validate_section_props("page_hero", {"callout": [{"title": "x"}]})
+
+
+def test_page_hero_facts_are_bounded_and_named():
+    with pytest.raises(ValidationError, match="facts"):
+        validate_section_props("page_hero", {"facts": [{"label": "x"}]})
+    with pytest.raises(ValidationError):
+        validate_section_props(
+            "page_hero", {"facts": [{"label": "x", "value": "y"}] * 7}
+        )
+
+
 def test_partner_strip_props():
     validate_section_props(
         "partner_strip",

@@ -78,6 +78,30 @@ def _check_items(
     return None
 
 
+def _check_callout(value) -> str | None:
+    """A boxed aside beside a page hero.
+
+    ``tone`` is an enum, not a colour: the storefront decides what
+    "warning" looks like from its own tokens, so a merchant cannot
+    author a hex into a page.
+    """
+    if not isinstance(value, dict):
+        return "callout: must be an object"
+    callout = {str(k): v for k, v in value.items()}
+    if callout.get("tone") not in (None, "info", "warning", "success"):
+        return "callout.tone: one of info/warning/success"
+    if not callout.get("title") or not _is_str(callout.get("title"), 100):
+        return "callout.title: required string (max 100)"
+    for key, max_length in (("text", 400), ("note", 160)):
+        entry = callout.get(key)
+        if entry is not None and not _is_str(entry, max_length):
+            return f"callout.{key}: must be a string (max {max_length})"
+    unknown = set(callout) - {"tone", "title", "text", "note"}
+    if unknown:
+        return f"callout: unknown keys {sorted(unknown)}"
+    return None
+
+
 def _check_prompt(value) -> str | None:
     """The "did not find yours?" card a grid can end with.
 
@@ -328,6 +352,44 @@ _VALIDATORS: dict[str, dict] = {
             required={"name": 60},
             optional={"href": 1000},
             link_keys=frozenset({"href"}),
+        ),
+    },
+    "page_hero": {
+        # The top of an inner page: what every one of them opens with.
+        # A band, not a page template — the same shape serves a product
+        # page's hero, a register's, and a contact page's.
+        "eyebrow": lambda v: None if _is_str(v, 100) else "string ≤100",
+        "heading": lambda v: None if _is_str(v, 200) else "string ≤200",
+        "standfirst": lambda v: None if _is_str(v, 300) else "string ≤300",
+        "body": lambda v: None if _is_str(v, 1000) else "string ≤1000",
+        "cta_text": lambda v: None if _is_str(v, 100) else "string ≤100",
+        "cta_link": lambda v: (
+            None
+            if _is_str(v, 1000) and _LINK_RE.match(v)
+            else "internal path or https URL"
+        ),
+        "secondary_cta_text": lambda v: (
+            None if _is_str(v, 100) else "string ≤100"
+        ),
+        "secondary_cta_link": lambda v: (
+            None
+            if _is_str(v, 1000) and _LINK_RE.match(v)
+            else "internal path or https URL"
+        ),
+        "stats": lambda v: _check_items(
+            v,
+            max_items=4,
+            required={"value": 12, "label": 80},
+            optional={},
+            name="stats",
+        ),
+        "callout": _check_callout,
+        "facts": lambda v: _check_items(
+            v,
+            max_items=6,
+            required={"label": 40, "value": 60},
+            optional={},
+            name="facts",
         ),
     },
     "reference_cards": {

@@ -1459,6 +1459,117 @@ SPECIALIZATION_PROMPT_EN = {
     "cta_link": "/contact",
 }
 
+# The top of each inner page. One shape, six pages — see the
+# ``page_hero`` band. Only DeSET carries a callout and fact tiles; the
+# rest open on copy alone, which is what the artboards show.
+PAGE_HEROES = {
+    "deset": {
+        "el": {
+            "eyebrow": "Delta Sigma Energy Telecontrol",
+            "heading": "DeSET",
+            "standfirst": "Συστήματα τηλεποπτείας σταθμών παραγωγής "
+            "ηλεκτρικής ενέργειας από ανανεώσιμες πηγές.",
+            "cta_text": "Ζητήστε προσφορά",
+            "secondary_cta_text": "Σύγκριση συστημάτων",
+            "callout": {
+                "tone": "warning",
+                "title": "Ρυθμιστική υποχρέωση",
+                "text": "Κάθε σταθμός ΑΠΕ ή ΣΗΘΥΑ με εγκατεστημένη ισχύ "
+                "άνω των 400 kW, συνδεδεμένος στο Ε.Δ.Δ.Η.Ε., οφείλει να "
+                "διαθέτει σύστημα τηλε-εποπτείας και εφαρμογής εντολών "
+                "ελέγχου.",
+                "note": "ν. 5106/2024 — ΦΕΚ Α΄ 63 / 01.05.2024",
+            },
+            "facts": [
+                {"label": "Πρωτόκολλο", "value": "IEC 60870-5-104"},
+                {"label": "Κατώφλι ισχύος", "value": "> 400 kW"},
+                {"label": "Επιλογές", "value": "3 συστήματα"},
+                {"label": "Βάση", "value": "PLC, όχι PC"},
+            ],
+        },
+        "en": {
+            "eyebrow": "Delta Sigma Energy Telecontrol",
+            "heading": "DeSET",
+            "standfirst": "Supervision systems for renewable "
+            "electricity generating plants.",
+            "cta_text": "Request a quote",
+            "secondary_cta_text": "Compare the systems",
+            "callout": {
+                "tone": "warning",
+                "title": "Regulatory obligation",
+                "text": "Every renewable or high-efficiency CHP plant "
+                "above 400 kW connected to the Greek distribution "
+                "network must carry a system that reports supervisory "
+                "signals and applies control commands.",
+                "note": "Law 5106/2024 — Gazette A' 63 / 01.05.2024",
+            },
+            "facts": [
+                {"label": "Protocol", "value": "IEC 60870-5-104"},
+                {"label": "Power threshold", "value": "> 400 kW"},
+                {"label": "Options", "value": "3 systems"},
+                {"label": "Base", "value": "A PLC, not a PC"},
+            ],
+        },
+    },
+    "eidikefsi": {
+        "el": {
+            "eyebrow": "Ειδίκευση",
+            "heading": "Ειδίκευση σε επτά πεδία",
+            "body": "Ένας ανάδοχος για ολόκληρη την αλυσίδα — από τη "
+            "μελέτη και την προμήθεια ως τον προγραμματισμό, τη θέση σε "
+            "λειτουργία και τη συντήρηση.",
+        },
+        "en": {
+            "eyebrow": "Specialization",
+            "heading": "Seven fields of expertise",
+            "body": "One contractor for the whole chain — from the study "
+            "and the procurement through to programming, commissioning "
+            "and maintenance.",
+        },
+    },
+    "drastiriotites": {
+        "el": {
+            "eyebrow": "Δραστηριότητες",
+            "heading": "Οκτώ φάσεις, ένας υπεύθυνος",
+            "body": "Αναλαμβάνουμε ολόκληρη την αλυσίδα. Κάθε φάση "
+            "παραδίδεται τεκμηριωμένη.",
+        },
+        "en": {
+            "eyebrow": "Activities",
+            "heading": "Eight phases, one party responsible",
+            "body": "We take on the whole chain. Every phase is handed "
+            "over documented.",
+        },
+    },
+    "synergates": {
+        "el": {
+            "eyebrow": "Συνεργάτες",
+            "heading": "Ο εξοπλισμός που εμπιστευόμαστε",
+            "body": "Επιλέγουμε κατασκευαστές με αποδεδειγμένη "
+            "αξιοπιστία σε βιομηχανικό περιβάλλον και διαθεσιμότητα "
+            "ανταλλακτικών στον χρόνο ζωής της εγκατάστασης.",
+        },
+        "en": {
+            "eyebrow": "Partners",
+            "heading": "The equipment we trust",
+            "body": "We choose manufacturers with proven reliability in "
+            "an industrial environment and spare-part availability "
+            "across the installation's life.",
+        },
+    },
+}
+
+
+def _page_hero(page: str, *, locale: str = "el") -> dict:
+    """The ``page_hero`` props for one page, in one language."""
+    hero = dict(PAGE_HEROES[page][locale])
+    if "cta_text" in hero:
+        hero["cta_link"] = "/contact"
+    if "secondary_cta_text" in hero:
+        hero["secondary_cta_link"] = PAGE_DESET
+    return hero
+
+
 ACTIVITIES = [
     {
         "title": "Μελέτη & σχεδιασμός",
@@ -1585,23 +1696,16 @@ _PROVISIONING_HOME_SECTIONS = frozenset(
 )
 
 
-def _deset_link() -> str:
-    """Deep link to the DeSET category listing.
-
-    The storefront route is ``/products/category/[id]/[slug]`` and the
-    page fetches ``/api/products/categories/{id}``, so the link needs
-    the DB-assigned id — it can never be a constant. Falls back to the
-    catalogue root when the category has not been seeded yet (``--only
-    layouts`` before ``--only products``), which keeps the link valid
-    rather than emitting a 404.
-    """
-    from product.models import ProductCategory
-
-    slug = DESET_CATEGORY[0]
-    category = ProductCategory.objects.filter(slug=slug).only("id").first()
-    return (
-        f"/products/category/{category.id}/{slug}" if category else "/products"
-    )
+# The redesign's own pages, each a ``PageLayout`` whose ``page_type``
+# IS the slug — which is what ``pages/[slug].vue`` resolves, the same
+# way ``/contact`` already worked. No platform change was needed for
+# them, and they replace the ``/info/<slug>`` prose pages: the
+# artboards give these four a composition of bands, not an article.
+PAGE_DESET = "/deset"
+PAGE_EIDIKEFSI = "/eidikefsi"
+PAGE_DRASTIRIOTITES = "/drastiriotites"
+PAGE_SYNERGATES = "/synergates"
+PAGE_REGISTER = "/blog"
 
 
 def _layout_plan() -> dict:
@@ -1613,7 +1717,6 @@ def _layout_plan() -> dict:
     drift apart on layout. The exception is ``items`` — a list prop is
     overridden whole, because a merge cannot reach into its elements.
     """
-    deset_link = _deset_link()
     return {
         "home": [
             {
@@ -1634,7 +1737,7 @@ def _layout_plan() -> dict:
                     "cta_text": "Ζητήστε προσφορά",
                     "cta_link": "/contact",
                     "secondary_cta_text": "Το σύστημα DeSET",
-                    "secondary_cta_link": deset_link,
+                    "secondary_cta_link": PAGE_DESET,
                     "decor": "gradient",
                     "stats": HERO_STATS,
                 },
@@ -1835,9 +1938,34 @@ def _layout_plan() -> dict:
         # layout the page shows only the bare form, no addresses.
         "contact": [
             {
+                "component_type": "page_hero",
+                "title": "Επικοινωνία",
+                "sort_order": 0,
+                "props": {
+                    "eyebrow": "Επικοινωνία",
+                    "heading": "Πείτε μας τι πρέπει να λειτουργήσει.",
+                    "body": "Στείλτε μας την περιγραφή ή τα τεύχη "
+                    "δημοπράτησης. Απαντάμε με προτεινόμενη λύση, "
+                    "κατάλογο υλικών και χρονοδιάγραμμα.",
+                },
+                "i18n": {
+                    "en": {
+                        "title": "Contact",
+                        "props": {
+                            "eyebrow": "Contact",
+                            "heading": "Tell us what has to work.",
+                            "body": "Send us the description or the "
+                            "tender documents. We reply with a proposed "
+                            "solution, a bill of materials and a "
+                            "schedule.",
+                        },
+                    }
+                },
+            },
+            {
                 "component_type": "rich_text",
                 "title": "Στοιχεία επικοινωνίας",
-                "sort_order": 0,
+                "sort_order": 1,
                 "props": {"content": _contact_html()},
                 "i18n": {
                     "en": {
@@ -1847,16 +1975,138 @@ def _layout_plan() -> dict:
                 },
             },
         ],
+        # The four pages the artboards draw as a composition of bands.
+        # ``page_type`` IS the slug, which is what ``pages/[slug].vue``
+        # resolves — the same seam ``/contact`` already used, so these
+        # needed no platform change. Their heroes land first; the bands
+        # under each follow as their types are built.
+        "deset": [
+            {
+                "component_type": "page_hero",
+                "title": "DeSET",
+                "sort_order": 0,
+                "props": _page_hero("deset"),
+                "i18n": {
+                    "en": {
+                        "title": "DeSET",
+                        "props": _page_hero("deset", locale="en"),
+                    }
+                },
+            },
+        ],
+        "eidikefsi": [
+            {
+                "component_type": "page_hero",
+                "title": "Ειδίκευση",
+                "sort_order": 0,
+                "props": _page_hero("eidikefsi"),
+                "i18n": {
+                    "en": {
+                        "title": "Specialization",
+                        "props": _page_hero("eidikefsi", locale="en"),
+                    }
+                },
+            },
+            {
+                "component_type": "features_grid",
+                "title": "Πεδία",
+                "sort_order": 1,
+                "props": {
+                    "heading": "Επτά πεδία, ένας ανάδοχος",
+                    "columns": 4,
+                    "items": SPECIALIZATIONS,
+                    "prompt": SPECIALIZATION_PROMPT,
+                },
+                "i18n": {
+                    "en": {
+                        "title": "Fields",
+                        "props": {
+                            "heading": "Seven fields, one contractor",
+                            "items": SPECIALIZATIONS_EN,
+                            "prompt": SPECIALIZATION_PROMPT_EN,
+                        },
+                    }
+                },
+            },
+        ],
+        "drastiriotites": [
+            {
+                "component_type": "page_hero",
+                "title": "Δραστηριότητες",
+                "sort_order": 0,
+                "props": _page_hero("drastiriotites"),
+                "i18n": {
+                    "en": {
+                        "title": "Activities",
+                        "props": _page_hero("drastiriotites", locale="en"),
+                    }
+                },
+            },
+            {
+                "component_type": "story_timeline",
+                "title": "Φάσεις",
+                "sort_order": 1,
+                "props": {
+                    "heading": "Από τη μελέτη ως το συμβόλαιο υποστήριξης",
+                    "items": ACTIVITIES,
+                },
+                "i18n": {
+                    "en": {
+                        "title": "Phases",
+                        "props": {
+                            "heading": "From the study to the support contract",
+                            "items": ACTIVITIES_EN,
+                        },
+                    }
+                },
+            },
+        ],
+        "synergates": [
+            {
+                "component_type": "page_hero",
+                "title": "Συνεργάτες",
+                "sort_order": 0,
+                "props": _page_hero("synergates"),
+                "i18n": {
+                    "en": {
+                        "title": "Partners",
+                        "props": _page_hero("synergates", locale="en"),
+                    }
+                },
+            },
+            {
+                "component_type": "partner_strip",
+                "title": "Συνεργασίες",
+                "sort_order": 1,
+                "props": {
+                    "label": "Συνεργαζόμαστε με",
+                    "items": PARTNER_BRANDS,
+                },
+                "i18n": {
+                    "en": {
+                        "title": "Partnerships",
+                        "props": {"label": "We work with"},
+                    }
+                },
+            },
+        ],
     }
 
 
 def _nav_header() -> list[dict]:
+    """The six entries the artboards' header carries.
+
+    Every one points at a page the redesign DRAWS. DeSET used to point
+    at the product category listing and Ειδίκευση/Δραστηριότητες/
+    Συνεργάτες at ``/info/<slug>`` prose pages — a catalogue and three
+    articles, none of which is in the design.
+    """
     return [
-        {"label": "DeSET", "to": _deset_link()},
-        {"label": "Ειδίκευση", "to": "/info/eidikefsi"},
-        {"label": "Δραστηριότητες", "to": "/info/drastiriotites"},
-        {"label": "Εμπειρία", "to": "/blog"},
-        {"label": "Συνεργάτες", "to": "/info/synergates"},
+        {"label": "DeSET", "to": PAGE_DESET},
+        {"label": "Ειδίκευση", "to": PAGE_EIDIKEFSI},
+        {"label": "Δραστηριότητες", "to": PAGE_DRASTIRIOTITES},
+        {"label": "Εμπειρία", "to": PAGE_REGISTER},
+        {"label": "Συνεργάτες", "to": PAGE_SYNERGATES},
         {"label": "Επικοινωνία", "to": "/contact"},
     ]
 
@@ -1884,26 +2134,25 @@ def _nav_footer() -> list[dict]:
     artboard lists them separately: a visitor scanning a footer for
     "BMS" finds it.
     """
-    eidikefsi = "/info/eidikefsi"
     return [
         {
             "label": "Εταιρεία",
             "children": [
                 {"label": "Αρχική", "to": "/"},
-                {"label": "Ειδίκευση", "to": eidikefsi},
-                {"label": "Δραστηριότητες", "to": "/info/drastiriotites"},
-                {"label": "Εμπειρία", "to": "/blog"},
-                {"label": "Συνεργάτες", "to": "/info/synergates"},
+                {"label": "Ειδίκευση", "to": PAGE_EIDIKEFSI},
+                {"label": "Δραστηριότητες", "to": PAGE_DRASTIRIOTITES},
+                {"label": "Εμπειρία", "to": PAGE_REGISTER},
+                {"label": "Συνεργάτες", "to": PAGE_SYNERGATES},
             ],
         },
         {
             "label": "Λύσεις",
             "children": [
-                {"label": "DeSET — Τηλεποπτεία ΑΠΕ", "to": _deset_link()},
-                {"label": "PLC & SCADA", "to": eidikefsi},
-                {"label": "BMS", "to": eidikefsi},
-                {"label": "Τηλεπικοινωνίες", "to": eidikefsi},
-                {"label": "Συστήματα κυκλοφορίας", "to": eidikefsi},
+                {"label": "DeSET — Τηλεποπτεία ΑΠΕ", "to": PAGE_DESET},
+                {"label": "PLC & SCADA", "to": PAGE_EIDIKEFSI},
+                {"label": "BMS", "to": PAGE_EIDIKEFSI},
+                {"label": "Τηλεπικοινωνίες", "to": PAGE_EIDIKEFSI},
+                {"label": "Συστήματα κυκλοφορίας", "to": PAGE_EIDIKEFSI},
             ],
         },
     ]
@@ -1916,11 +2165,11 @@ def _nav_footer() -> list[dict]:
 # the storefront's i18n router, not here.
 def _nav_header_en() -> list[dict]:
     return [
-        {"label": "DeSET", "to": _deset_link()},
-        {"label": "Specialization", "to": "/info/eidikefsi"},
-        {"label": "Activities", "to": "/info/drastiriotites"},
-        {"label": "Experience", "to": "/blog"},
-        {"label": "Partners", "to": "/info/synergates"},
+        {"label": "DeSET", "to": PAGE_DESET},
+        {"label": "Specialization", "to": PAGE_EIDIKEFSI},
+        {"label": "Activities", "to": PAGE_DRASTIRIOTITES},
+        {"label": "Experience", "to": PAGE_REGISTER},
+        {"label": "Partners", "to": PAGE_SYNERGATES},
         {"label": "Contact", "to": "/contact"},
     ]
 
@@ -1931,16 +2180,15 @@ def _nav_mobile_en() -> list[dict]:
 
 def _nav_footer_en() -> list[dict]:
     """The English twin of :func:`_nav_footer` — same paths, same shape."""
-    eidikefsi = "/info/eidikefsi"
     return [
         {
             "label": "Company",
             "children": [
                 {"label": "Home", "to": "/"},
-                {"label": "Specialization", "to": eidikefsi},
-                {"label": "Activities", "to": "/info/drastiriotites"},
-                {"label": "Experience", "to": "/blog"},
-                {"label": "Partners", "to": "/info/synergates"},
+                {"label": "Specialization", "to": PAGE_EIDIKEFSI},
+                {"label": "Activities", "to": PAGE_DRASTIRIOTITES},
+                {"label": "Experience", "to": PAGE_REGISTER},
+                {"label": "Partners", "to": PAGE_SYNERGATES},
             ],
         },
         {
@@ -1948,12 +2196,12 @@ def _nav_footer_en() -> list[dict]:
             "children": [
                 {
                     "label": "DeSET — renewable plant supervision",
-                    "to": _deset_link(),
+                    "to": PAGE_DESET,
                 },
-                {"label": "PLC & SCADA", "to": eidikefsi},
-                {"label": "BMS", "to": eidikefsi},
-                {"label": "Telecommunications", "to": eidikefsi},
-                {"label": "Traffic management", "to": eidikefsi},
+                {"label": "PLC & SCADA", "to": PAGE_EIDIKEFSI},
+                {"label": "BMS", "to": PAGE_EIDIKEFSI},
+                {"label": "Telecommunications", "to": PAGE_EIDIKEFSI},
+                {"label": "Traffic management", "to": PAGE_EIDIKEFSI},
             ],
         },
     ]

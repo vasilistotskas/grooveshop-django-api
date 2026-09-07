@@ -98,6 +98,7 @@ class ComponentType(models.TextChoices):
     PARTNER_STRIP = "partner_strip", _("Partner Strip")
     PULL_QUOTE = "pull_quote", _("Pull Quote")
     REFERENCE_CARDS = "reference_cards", _("Reference Cards")
+    PAGE_HERO = "page_hero", _("Page Hero")
 
 
 class PageLayout(

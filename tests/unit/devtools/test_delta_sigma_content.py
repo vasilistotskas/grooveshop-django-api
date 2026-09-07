@@ -193,14 +193,20 @@ class TestTheSeedStepsWriteBothLocales:
 
         delta_sigma.seed_layouts()
 
-        cta = PageSection.objects.get(component_type="cta_banner")
+        # Scoped to the HOME layout: the same component types now
+        # appear on the inner pages too (features_grid on /eidikefsi,
+        # story_timeline on /drastiriotites), so a bare `get` by type
+        # matches more than one row.
+        home = PageSection.objects.filter(layout__page_type="home")
+
+        cta = home.get(component_type="cta_banner")
         title, props = cta.localized("en")
         assert props["heading"] == "Tell us what has to work."
         # Structural props survive the partial merge.
         assert props["button_link"] == "/contact"
         assert title == cta.title
 
-        grid = PageSection.objects.get(component_type="features_grid")
+        grid = home.get(component_type="features_grid")
         assert grid.localized("en")[0] == "Specialization"
 
     def test_menus_carry_their_english_labels(self):

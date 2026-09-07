@@ -22,8 +22,8 @@ class TestComponentType(TestCase):
         # what-is-microlearning/why-microlearning) + 2 store presence
         # (business_hours/location_map) + 7 generic marketing blocks
         # (features_grid/media_text/image_gallery/story_timeline/faq/
-        # partner_strip/pull_quote/reference_cards).
-        assert len(ComponentType.choices) == 33
+        # partner_strip/pull_quote/reference_cards/page_hero).
+        assert len(ComponentType.choices) == 34
 
 
 class TestPageLayout(TestCase):

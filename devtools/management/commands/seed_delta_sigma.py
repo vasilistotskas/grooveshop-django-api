@@ -23,6 +23,7 @@ from devtools import delta_sigma
 # look right), then catalogue, then the pages that link to it.
 STEPS: tuple[tuple[str, str], ...] = (
     ("theme", "Brand theme on the Tenant row (public schema)"),
+    ("settings", "extra_settings the published contact facts cover"),
     ("products", "DeSET category + the three systems"),
     ("projects", "Sector categories + the 48 reference projects"),
     ("content_pages", "Ειδίκευση / Δραστηριότητες / Συνεργάτες (el + en)"),
@@ -74,6 +75,7 @@ class Command(BaseCommand):
         schema_steps = [name for name in steps if name != "theme"]
         if schema_steps:
             runners = {
+                "settings": delta_sigma.seed_settings,
                 "products": delta_sigma.seed_deset_products,
                 "projects": delta_sigma.seed_project_posts,
                 "content_pages": delta_sigma.seed_content_pages,

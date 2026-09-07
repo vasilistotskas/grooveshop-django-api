@@ -82,19 +82,27 @@ _PRIMARY_LIGHT = {
 
 # Dark ramp. Shade 100 is the accent the design uses on near-black
 # (#5BC4C4, 9.74:1 on slate-950) because main.css resolves the dark
-# --ui-primary through --color-primary-100. Every other shade is a
-# dark-surface-tuned step of the same hue.
+# --ui-primary through --color-primary-100.
+#
+# The DEEP end is deliberately near-neutral. In dark mode the platform
+# paints SURFACES with these shades — the sticky header and every
+# FeaturesGrid card are `dark:bg-primary-900`, borders are
+# `dark:border-primary-800`, badges are `dark:bg-primary-700`. A
+# saturated 900 washed the whole page teal instead of the intended
+# slate near-black, so chroma tapers to ~0.02 below shade 700 while the
+# mid/light shades stay vivid for text and icons.
 _PRIMARY_DARK = {
+    "50": "#EBFBFB",
     "100": "#5BC4C4",
-    "200": "#37B3B2",
-    "300": "#16A0A0",
-    "400": "#008D8D",
-    "500": "#007A7A",
-    "600": "#006768",
-    "700": "#005556",
-    "800": "#004545",
-    "900": "#003838",
-    "950": "#002526",
+    "200": "#44B1B1",
+    "300": "#2C9F9E",
+    "400": "#118C8C",
+    "500": "#007676",
+    "600": "#006060",
+    "700": "#153E3E",
+    "800": "#142928",
+    "900": "#0D1C1C",
+    "950": "#071010",
 }
 
 THEME = {
@@ -115,6 +123,79 @@ THEME = {
         "darkColors": {"primaryScale": _PRIMARY_DARK},
     },
 }
+
+
+# ---------------------------------------------------------------------------
+# Contact — every value here is published on delta-sigma.gr
+# ---------------------------------------------------------------------------
+
+OFFICES = [
+    {
+        "label": "Θεσσαλονίκη",
+        "street": "Γ. Ρίτσου 7",
+        "area": "Καλαμαριά",
+        "postal": "551 32",
+        "city": "Θεσσαλονίκη",
+        "phones": ["2310 924 440", "2310 934 169"],
+    },
+    {
+        "label": "Αττική",
+        "street": "Ιλισίων 23",
+        "area": "Ζωγράφου",
+        "postal": "157 71",
+        "city": "Αττική",
+        "phones": ["2311 820 329"],
+    },
+]
+
+CONTACT_EMAIL = "contact@delta-sigma.gr"
+GEMH = "156013906000"
+
+# extra_settings rows filled from the published facts above. Rows are
+# never created here — `Setting.set_defaults_from_settings()` provisions
+# all 91 during tenant creation, so a missing row means the schema is
+# under-provisioned and is reported rather than papered over.
+#
+# Deliberately NOT set, because delta-sigma.gr does not publish them and
+# guessing an invoicing identity or a shop's coordinates is worse than
+# leaving the field empty: INVOICE_SELLER_VAT_ID (ΑΦΜ),
+# INVOICE_SELLER_TAX_OFFICE (ΔΟΥ), INVOICE_SELLER_LEGAL_FORM,
+# INVOICE_SELLER_BUSINESS_ACTIVITY, STORE_GEO_LAT / STORE_GEO_LNG and
+# BUSINESS_HOURS.
+SETTINGS = {
+    "CONTACT_EMAIL": CONTACT_EMAIL,
+    "INVOICE_SELLER_NAME": "Δelta Σigma",
+    "INVOICE_SELLER_ADDRESS_LINE_1": OFFICES[0]["street"],
+    "INVOICE_SELLER_ADDRESS_LINE_2": OFFICES[0]["area"],
+    "INVOICE_SELLER_POSTAL_CODE": OFFICES[0]["postal"],
+    "INVOICE_SELLER_CITY": OFFICES[0]["city"],
+    "INVOICE_SELLER_COUNTRY": "GR",
+    "INVOICE_SELLER_EMAIL": CONTACT_EMAIL,
+    "INVOICE_SELLER_PHONE": OFFICES[0]["phones"][0],
+    "INVOICE_SELLER_REGISTRATION_NUMBER": GEMH,
+}
+
+
+def _contact_html() -> str:
+    """The contact block for the `contact` page layout."""
+    blocks = []
+    for office in OFFICES:
+        phones = " · ".join(office["phones"])
+        blocks.append(
+            f"<h3>{office['label']}</h3>"
+            f"<p>{office['street']}, {office['area']} {office['postal']}, "
+            f"{office['city']}<br>"
+            f"Τηλ: {phones}</p>"
+        )
+    return (
+        "<h2>Επικοινωνία</h2>"
+        "<p>Στείλτε μας την περιγραφή του έργου ή τα τεύχη δημοπράτησης. "
+        "Απαντάμε με προτεινόμενη λύση, κατάλογο υλικών και "
+        "χρονοδιάγραμμα.</p>"
+        + "".join(blocks)
+        + f'<p>Email: <a href="mailto:{CONTACT_EMAIL}">{CONTACT_EMAIL}</a>'
+        f"<br>Γ.Ε.ΜΗ.: {GEMH}</p>"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -851,6 +932,16 @@ def _layout_plan() -> dict:
                 },
             },
         ],
+        # contact.vue renders usePageConfig('contact') — without a
+        # layout the page shows only the bare form, no addresses.
+        "contact": [
+            {
+                "component_type": "rich_text",
+                "title": "Στοιχεία επικοινωνίας",
+                "sort_order": 0,
+                "props": {"content": _contact_html()},
+            },
+        ],
     }
 
 
@@ -997,6 +1088,33 @@ def apply_theme(tenant) -> dict[str, int]:
     return report
 
 
+def seed_settings() -> dict[str, int]:
+    """Fill the extra_settings rows the published facts cover.
+
+    Writes through `Setting.validate()` before saving: `save()` never
+    calls `clean()`, so a bare ORM write would store a value the
+    storefront then rejects at render time, leaving the feature
+    silently blank.
+    """
+    from extra_settings.models import Setting
+
+    report: dict[str, int] = {}
+    for name, value in SETTINGS.items():
+        setting = Setting.objects.filter(name=name).first()
+        if setting is None:
+            logger.warning("Setting row %s is missing from this schema", name)
+            _bump(report, "missing")
+            continue
+        if setting.value == value:
+            _bump(report, "unchanged")
+            continue
+        setting.value = value
+        setting.validate()
+        setting.save()
+        _bump(report, "updated")
+    return report
+
+
 def seed_deset_products() -> dict[str, int]:
     """Create the DeSET category and its three systems."""
     from product.models import Product, ProductCategory
@@ -1132,7 +1250,12 @@ def seed_layouts() -> dict[str, int]:
     for page_type, sections in _layout_plan().items():
         layout, created = PageLayout.objects.get_or_create(
             page_type=page_type,
-            defaults={"title": "Αρχική", "is_published": True},
+            defaults={
+                "title": {"home": "Αρχική", "contact": "Επικοινωνία"}.get(
+                    page_type, page_type.title()
+                ),
+                "is_published": True,
+            },
         )
         if created:
             _bump(report, "layouts_created")

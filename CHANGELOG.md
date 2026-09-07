@@ -3,6 +3,41 @@
 
 
 
+## v3.40.0 (2026-09-07)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.39.1 [skip ci] ([`0308dcd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0308dcd7734f9941e119a91a51c4b73f5edc980f))
+
+### Features
+
+* feat(page_config): page_hero, and the four pages the artboards draw
+
+The redesign gives this company six pages. `/contact` was already a
+`PageLayout`, and `pages/[slug].vue` already resolves a layout whose
+`page_type` IS the slug — so `/deset`, `/eidikefsi`,
+`/drastiriotites` and `/synergates` needed no platform change at all,
+only the layouts. They replace the `/info/<slug>` prose pages: the
+artboards give these four a composition of bands, not an article.
+
+`page_hero` is the band every one of them opens with — eyebrow,
+display title, standfirst, body, two CTAs, and whichever of a stat
+row, a bordered callout and a grid of fact tiles that page needs. One
+type, six pages, because the artboards open them all the same way.
+
+`callout.tone` is an ENUM — info/warning/success — resolved to tokens
+in the storefront. A merchant authoring a page cannot put a hex into
+it, and the three tones follow the theme in both colour modes.
+
+The nav and footer now point at these pages. DeSET pointed at the
+product CATEGORY listing and the other three at prose articles — a
+catalogue and three pages that are nowhere in the design, and the
+first thing anyone clicking the header would have found. Which left
+`_deset_link()` unreferenced, so it is gone.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018CiyyCqkXd9a1FM5hsrPFZ ([`2d3af98`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2d3af98c50e4414f62a83117f8d877a79b17d456))
+
 ## v3.39.1 (2026-09-07)
 
 ### Bug fixes

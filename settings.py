@@ -1609,6 +1609,24 @@ EXTRA_SETTINGS_DEFAULTS = [
         ),
     },
     {
+        "name": "STORE_OFFICES",
+        "type": "json",
+        "value": [],
+        "validator": "tenant.validators.validate_store_offices_setting",
+        "description": (
+            "Public office/branch addresses as JSON: "
+            '[{"label", "street", "area", "postal", "city", '
+            '"phones": [..], "i18n": {"<locale>": {"label", "street", '
+            '"area", "city"}}}]. Distinct from the INVOICE_SELLER_* '
+            "seat, which is the REGISTERED address a legal notice goes "
+            "to — a merchant's public offices are often neither the "
+            "same place nor a single place. Drives the storefront "
+            "footer's contact column and the contact page. Empty [] = "
+            "feature off. ``i18n`` carries the transliterated forms; "
+            "the numbers and the postcode are locale-independent."
+        ),
+    },
+    {
         "name": "STORE_GEO_LAT",
         "type": "string",
         "value": "",

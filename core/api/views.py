@@ -645,6 +645,11 @@ PUBLIC_SETTING_KEYS = frozenset(
         "BUSINESS_HOURS",
         "STORE_GEO_LAT",
         "STORE_GEO_LNG",
+        # Public offices — the footer's contact column and the contact
+        # page. Public by definition: these are the addresses the
+        # merchant publishes for customers to visit, which is why they
+        # are here and the INVOICE_SELLER_* seat is not.
+        "STORE_OFFICES",
         # Merchant feature toggles the storefront gates UI on (the
         # endpoints themselves are ALSO gated server-side via
         # tenant.permissions.IsSettingEnabled subclasses).

@@ -131,6 +131,8 @@ THEME = {
     "default_locale": "el",
     "available_locales": ["el", "en"],
     # accent_hex maps to --ui-secondary. The exact logo teal.
+    # The only social presence the site links.
+    "socials_linkedin": "https://www.linkedin.com/company/%CE%B4elta-sigma",
     "accent_hex": "#009999",
     "theme_preset": "custom",
     "theme_metadata": {
@@ -258,6 +260,21 @@ SETTINGS = {
     "INVOICE_SELLER_EMAIL": CONTACT_EMAIL,
     "INVOICE_SELLER_PHONE": OFFICES[0]["phones"][0],
     "INVOICE_SELLER_REGISTRATION_NUMBER": GEMH,
+    # The PUBLIC offices — deliberately not the invoice seat above.
+    # The i18n overlay carries only the transliterated text; the
+    # postcode and the phone numbers are the same in any language.
+    "STORE_OFFICES": [
+        {
+            "label": office["label"],
+            "street": office["street"],
+            "area": office["area"],
+            "postal": office["postal"],
+            "city": office["city"],
+            "phones": office["phones"],
+            "i18n": {"en": office["en"]},
+        }
+        for office in OFFICES
+    ],
     "STORE_GEO_LAT": STORE_GEO_LAT,
     "STORE_GEO_LNG": STORE_GEO_LNG,
     # Mon-Fri 09:00-17:00, as the operator confirmed — the hours are

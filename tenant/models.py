@@ -499,6 +499,18 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
             "Empty → link hidden in storefront footer."
         ),
     )
+    # LinkedIn was the conspicuous omission in a set of eight consumer
+    # networks: it is the ONLY social presence a B2B engineering
+    # practice keeps, and Δelta Σigma's own site links nothing else.
+    socials_linkedin = models.URLField(
+        _("LinkedIn URL"),
+        blank=True,
+        default="",
+        help_text=_(
+            "LinkedIn company page URL. Must use https://. "
+            "Empty → link hidden in storefront footer."
+        ),
+    )
     socials_twitter = models.URLField(
         _("Twitter / X URL"),
         blank=True,
@@ -1103,6 +1115,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         "socials_facebook",
         "socials_instagram",
         "socials_pinterest",
+        "socials_linkedin",
         "socials_reddit",
         "socials_tiktok",
         "socials_twitter",

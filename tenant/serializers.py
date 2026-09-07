@@ -207,6 +207,7 @@ class TenantConfigSerializer(serializers.Serializer):
     socials_pinterest = serializers.CharField(read_only=True, allow_blank=True)
     socials_reddit = serializers.CharField(read_only=True, allow_blank=True)
     socials_tiktok = serializers.CharField(read_only=True, allow_blank=True)
+    socials_linkedin = serializers.CharField(read_only=True, allow_blank=True)
     socials_twitter = serializers.CharField(read_only=True, allow_blank=True)
     socials_youtube = serializers.CharField(read_only=True, allow_blank=True)
 
@@ -338,6 +339,7 @@ class TenantAdminSerializer(serializers.ModelSerializer):
             "socials_pinterest",
             "socials_reddit",
             "socials_tiktok",
+            "socials_linkedin",
             "socials_twitter",
             "socials_youtube",
             # --- Email ---

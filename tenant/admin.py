@@ -592,6 +592,7 @@ class TenantAdmin(ModelAdmin):
                     "socials_discord",
                     "socials_facebook",
                     "socials_instagram",
+                    "socials_linkedin",
                     "socials_pinterest",
                     "socials_reddit",
                     "socials_tiktok",

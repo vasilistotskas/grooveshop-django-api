@@ -240,6 +240,77 @@ def validate_business_hours_setting(value: object) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# STORE_OFFICES extra_setting
+# ---------------------------------------------------------------------------
+
+_OFFICE_TEXT_KEYS = ("label", "street", "area", "city")
+_OFFICE_KEYS = {*_OFFICE_TEXT_KEYS, "postal", "phones", "i18n"}
+
+
+def validate_store_offices_setting(value: object) -> bool:
+    """django-extra-settings validator for ``STORE_OFFICES``.
+
+    Returns a BOOLEAN, like every extra_settings validator —
+    ``Setting.validate()`` wraps a falsy result in its own
+    ``ValidationError``.
+
+    Shape: a list of at most 10 offices, each
+    ``{"label", "street", "area", "postal", "city", "phones": [...],
+    "i18n": {"<locale>": {"label"?, "street"?, "area"?, "city"?}}}``.
+    ``label`` and ``street`` are required; the rest are optional.
+
+    ``i18n`` is a PARTIAL per-locale override of the text keys only,
+    the same shape and the same reasoning as ``PageSection.i18n``: a
+    postcode and a phone number are the same in every language, so
+    duplicating them per locale would only invite drift. The default
+    locale is not a valid key — those values ARE the entry's own.
+    """
+    if value in (None, "", []):
+        return True
+    if not isinstance(value, list) or len(value) > 10:
+        return False
+
+    from core.utils.i18n import available_language_codes
+
+    codes = available_language_codes()
+    default = settings.PARLER_DEFAULT_LANGUAGE_CODE
+
+    for raw in value:
+        if not isinstance(raw, dict):
+            return False
+        office = {str(k): v for k, v in raw.items()}
+        if set(office) - _OFFICE_KEYS:
+            return False
+        for key in ("label", "street"):
+            if not isinstance(office.get(key), str) or not office[key].strip():
+                return False
+        for key in ("area", "postal", "city"):
+            entry = office.get(key)
+            if entry is not None and not isinstance(entry, str):
+                return False
+        phones = office.get("phones", [])
+        if not isinstance(phones, list) or len(phones) > 6:
+            return False
+        if any(not isinstance(p, str) or not p.strip() for p in phones):
+            return False
+
+        i18n = office.get("i18n", {})
+        if not isinstance(i18n, dict):
+            return False
+        for code, override in i18n.items():
+            if code not in codes or code == default:
+                return False
+            if not isinstance(override, dict):
+                return False
+            if set(override) - set(_OFFICE_TEXT_KEYS):
+                return False
+            if any(not isinstance(v, str) for v in override.values()):
+                return False
+
+    return True
+
+
+# ---------------------------------------------------------------------------
 # SOCIAL_LOGIN_PROVIDERS extra_setting
 # ---------------------------------------------------------------------------
 

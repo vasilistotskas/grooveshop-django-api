@@ -31,6 +31,11 @@ STEPS: tuple[tuple[str, str], ...] = (
     ("navigation", "Header / mobile / footer menus"),
 )
 
+# Re-running is how a store seeded before the English copy existed picks
+# it up: each step fills a MISSING parler translation or an empty
+# ``i18n`` override and leaves anything authored alone, so a second run
+# converges the locale without touching the merchant's content.
+
 STEP_NAMES = tuple(name for name, _ in STEPS)
 
 
@@ -90,12 +95,13 @@ class Command(BaseCommand):
             self.style.WARNING(
                 "\nNOT set by this command, deliberately:\n"
                 "  * DeSET prices — quote-only, never in version control. "
-                "The three products carry price 0.\n"
+                "The three products carry price 0, and the storefront has "
+                "no zero-price branch, so they render as 0,00 €.\n"
                 "  * The ODOT partnership scope — the public site shows the "
                 "logo with no description.\n"
-                "  * Section copy is Greek only: PageSection.props is a "
-                "plain JSONField, so sections are not translatable. Only "
-                "ContentPage carries el + en."
+                "  * ΑΦΜ / ΔΟΥ / legal form / business activity, the store "
+                "coordinates and the business hours — delta-sigma.gr "
+                "publishes none of them."
             )
         )
 

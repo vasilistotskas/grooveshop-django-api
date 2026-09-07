@@ -3,6 +3,36 @@
 
 
 
+## v3.42.0 (2026-09-07)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.41.0 [skip ci] ([`3591d7e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3591d7e278da147a6d04a5366983ec6576a8cf94))
+
+### Features
+
+* feat(settings): CATALOGUE_ENABLED, so a store can publish without selling
+
+The redesign has no listing page and no product page, and the nav now
+points at the DeSET page instead — but /products/**, /products/2/... and
+/search stayed reachable and offered "Εξαντλημένο", "Μή Διαθέσιμο" and
+a price of 0,00 € for systems that are quoted per project, not bought.
+
+`CATALOGUE_ENABLED` is the gate: off makes the listings, the product
+pages and search 404, so a visitor cannot land on a shop this company
+does not run. Deliberately DISTINCT from `CART_ENABLED`, which leaves
+the catalogue browsable and only removes the buying — the two answer
+different questions, and this store needs the first.
+
+The three DeSET systems stay real products with real attribute tables.
+Nothing about the model changes; only the storefront stops serving it
+as a shop.
+
+Seeded off for delta_sigma. Fails OPEN like every other setting gate.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018CiyyCqkXd9a1FM5hsrPFZ ([`4b8af92`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4b8af920221492063070c39f85787c9ea27a2f85))
+
 ## v3.41.0 (2026-09-07)
 
 ### Chores

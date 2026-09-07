@@ -3,6 +3,58 @@
 
 
 
+## v3.30.0 (2026-09-07)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.29.3 [skip ci] ([`dbda1f1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/dbda1f1dfb30960fc23112402025647397b5c2c9))
+
+### Features
+
+* feat(devtools): seed the Δelta Σigma tenant theme and content
+
+`manage.py seed_delta_sigma --schema delta_sigma` — companion to
+`seed_demo_store`, same step/report shape.
+
+Δelta Σigma is an industrial automation firm, not a retailer, so the
+mapping onto the commerce models is documented rather than inferred:
+the three DeSET systems are Products (quote-only, price 0) and the 48
+reference projects are BlogPosts with the sector as BlogCategory.
+
+Notes for whoever edits this next:
+
+* `BlogPost.author` is nullable in Django but REQUIRED in the
+  storefront contract (`author: z.int()`), so an authorless post makes
+  the whole /api/blog/posts list fail parseDataAs with a 422 and the
+  register renders empty with no error. `_ensure_author()` exists for
+  that reason.
+* `PageSection.props` is a plain JSONField, so sections are NOT
+  translatable — section copy is Greek only and the bilingual copy
+  lives in ContentPage.
+* The primary scale is split light/dark because the platform maps
+  --ui-primary to shade 500 in light and, via --color-primary-100 in
+  main.css, to shade 100 in dark. Light 500 is #007F7F rather than the
+  brand #009999, which only reaches 3.49:1 with white text.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018CiyyCqkXd9a1FM5hsrPFZ ([`1e1098c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1e1098c388fa98e06c7ee0900eb3f4da0db8a5eb))
+
+* feat(tenant): accept a fontMono theme token and the IBM Plex/JetBrains faces
+
+Adds `fontMono` alongside `fontSans`/`fontDisplay` in
+`validate_theme_metadata`, and adds `ibm-plex-sans` + `jetbrains-mono`
+to the font allowlist.
+
+Both faces ship a Greek subset, which most technical faces do not —
+IBM Plex Mono and IBM Plex Sans Condensed have none, which is why the
+mono half of the pairing is JetBrains Mono rather than Plex's own.
+
+The allowlist mirrors `shared/theme/constants.ts` in the storefront
+repo; the two must stay in sync.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018CiyyCqkXd9a1FM5hsrPFZ ([`6d6234b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6d6234bcd766adb88f4a0102387eec16588edc33))
+
 ## v3.29.3 (2026-09-06)
 
 ### Bug fixes

@@ -3,6 +3,42 @@
 
 
 
+## v3.39.0 (2026-09-07)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.38.0 [skip ci] ([`3486577`](https://github.com/vasilistotskas/grooveshop-django-api/commit/34865770cec76ae868f09f9dc93b2c088cf82c00))
+
+### Features
+
+* feat(page_config): reference cards for the Εμπειρία band
+
+The redesign's Εμπειρία band is three hand-picked projects with a link
+to all 48, not a blog grid — which is why the blog grid rendered it
+wrong in every way the operator listed: placeholder images, truncated
+titles, "0 0" like and comment counts, and eight pages of pagination
+under a band the artboard shows as a closed set of three.
+
+`reference_cards` is that shape, and generic: a curated few of
+something a longer page lists in full, each card a label, a title, a
+line about it, and one attribution whose LABEL belongs to the band
+("Για λογαριασμό") and whose value belongs to the card.
+
+The three cards are PROJECTED from `PROJECTS`, so the band cannot
+describe a project differently from its own page. Only the label is
+curation — a short sector word plus the technology that makes the job
+recognisable, which is what the artboard prints over each.
+
+Which surfaced a real gap: `CLIENTS_EN` had no entry for two of the
+three clients, so the English band would have shown their Greek
+names. A Greek company's name is transliterated, not translated — the
+legal entity is the same one in both languages, so an English reader
+needs to be able to say it. The parity guard caught this, which is
+what it is for.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018CiyyCqkXd9a1FM5hsrPFZ ([`202b02a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/202b02af0edadc2237b1c11817188df7de855b80))
+
 ## v3.38.0 (2026-09-07)
 
 ### Chores

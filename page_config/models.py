@@ -97,6 +97,7 @@ class ComponentType(models.TextChoices):
     FAQ = "faq", _("FAQ Accordion")
     PARTNER_STRIP = "partner_strip", _("Partner Strip")
     PULL_QUOTE = "pull_quote", _("Pull Quote")
+    REFERENCE_CARDS = "reference_cards", _("Reference Cards")
 
 
 class PageLayout(

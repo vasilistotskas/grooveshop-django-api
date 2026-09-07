@@ -35227,6 +35227,7 @@ components:
       - faq
       - partner_strip
       - pull_quote
+      - reference_cards
       type: string
       description: |-
         * `hero_banner` - Hero Banner
@@ -35261,6 +35262,7 @@ components:
         * `faq` - FAQ Accordion
         * `partner_strip` - Partner Strip
         * `pull_quote` - Pull Quote
+        * `reference_cards` - Reference Cards
     ConfirmAgentPaymentRequestRequest:
       type: object
       properties:

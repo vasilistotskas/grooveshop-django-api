@@ -589,6 +589,37 @@ class TestTheSeedStepsConvergeOnExistingRows:
                             f"{system['sku']} {key} {label}: {token!r}"
                         )
 
+    def test_the_reference_showcase_reads_the_project_register(self):
+        """The band cannot describe a project differently from its page."""
+        register = {
+            slug: (title, tech, client)
+            for _, slug, title, tech, client in delta_sigma.PROJECTS
+        }
+        cards = delta_sigma._reference_cards()
+
+        assert len(cards) == len(delta_sigma.REFERENCE_SHOWCASE)
+        for card, (slug, label, _) in zip(
+            cards, delta_sigma.REFERENCE_SHOWCASE, strict=True
+        ):
+            title, tech, client = register[slug]
+            assert card["label"] == label
+            assert card["title"] == title
+            assert card["text"] == tech
+            assert card["meta"] == client
+
+    def test_the_reference_showcase_is_translated(self):
+        english = delta_sigma._reference_cards(locale="en")
+
+        assert len(english) == len(delta_sigma.REFERENCE_SHOWCASE)
+        for card, (slug, _, label_en) in zip(
+            english, delta_sigma.REFERENCE_SHOWCASE, strict=True
+        ):
+            title_en, tech_en = delta_sigma.PROJECTS_EN[slug]
+            assert card["label"] == label_en
+            assert card["title"] == title_en
+            assert card["text"] == tech_en
+            assert not (GREEK & set(card["text"]))
+
     def test_the_deset_cards_head_with_the_brand(self):
         cards = delta_sigma._deset_cards()
 

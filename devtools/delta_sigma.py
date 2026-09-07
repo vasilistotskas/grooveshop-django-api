@@ -600,6 +600,48 @@ DESET_BULLETS_EN = [
 ]
 
 
+# The three projects the home band showcases, in the artboard's order,
+# with the label it prints over each. The label is curation — a short
+# sector word plus the technology that makes the job recognisable —
+# and the rest is READ from the project register, so the band cannot
+# describe a project differently from its own page.
+REFERENCE_SHOWCASE = [
+    ("vk-mykonou", "Περιβάλλον · MBR", "Environment · MBR"),
+    ("oryktovamvakas-terpni", "Βιομηχανία · Profibus", "Industry · Profibus"),
+    ("antliostasia-zambia", "Ύδρευση · Διεθνή", "Water · International"),
+]
+
+
+def _reference_cards(*, locale: str = "el") -> list[dict]:
+    """The showcase, projected from ``PROJECTS``."""
+    by_slug = {slug: (title, tech) for _, slug, title, tech, _ in PROJECTS}
+    clients = {slug: client for _, slug, _, _, client in PROJECTS}
+    cards = []
+    for slug, label_el, label_en in REFERENCE_SHOWCASE:
+        title, tech = by_slug[slug]
+        client = clients[slug]
+        if locale == "el":
+            cards.append(
+                {
+                    "label": label_el,
+                    "title": title,
+                    "text": tech,
+                    "meta": client,
+                }
+            )
+            continue
+        title_en, tech_en = PROJECTS_EN[slug]
+        cards.append(
+            {
+                "label": label_en,
+                "title": title_en,
+                "text": tech_en,
+                "meta": CLIENTS_EN.get(client, client),
+            }
+        )
+    return cards
+
+
 def _deset_cards(*, locale: str = "el") -> list[dict]:
     """The three comparison cards, projected from ``DESET_SYSTEMS``.
 
@@ -1249,10 +1291,18 @@ PROJECTS_EN = {
 # Only the client entries that are DESCRIPTIONS or bodies with a
 # published English name. Everything absent here is a registered
 # company name and is reproduced verbatim in both languages.
+# A Greek company's own name is not translated, it is TRANSLITERATED —
+# the legal entity is the same one in both languages, so an English
+# reader needs to be able to say it, not to be told what it means.
+# ``Α.Ε.``/``Ε.Π.Ε.``/``Ο.Ε.`` become S.A./Ltd/G.P., the closest
+# recognisable forms. A client absent from this map falls through to
+# its Greek name, which the English-override parity guard then catches.
 CLIENTS_EN = {
     "Ιδιωτικό έργο": "Private project",
     "Δήμος Αγίου Βασιλείου": "Municipality of Agios Vasileios",
     "ΔΕΥΑ Καστοριάς": "Kastoria Water & Sewerage Company",
+    "ΜΕΣΟΓΕΙΟΣ Α.Ε.": "MESOGEIOS S.A.",
+    "ΣΥΣΤΗΜΑΤΑ ΤΟΜΗ Ε.Π.Ε.": "SYSTIMATA TOMI Ltd",
 }
 
 # ---------------------------------------------------------------------------
@@ -1706,11 +1756,27 @@ def _layout_plan() -> dict:
                 },
             },
             {
-                "component_type": "blog_posts_grid",
+                "component_type": "reference_cards",
                 "title": "Εμπειρία",
                 "sort_order": 5,
-                "props": {"count": 6},
-                "i18n": {"en": {"title": "Experience"}},
+                "props": {
+                    "heading": "Έργα σε λειτουργία, όχι σε παρουσίαση",
+                    "meta_label": "Για λογαριασμό",
+                    "cta_text": "Πλήρες μητρώο έργων",
+                    "cta_link": "/blog",
+                    "items": _reference_cards(),
+                },
+                "i18n": {
+                    "en": {
+                        "title": "Experience",
+                        "props": {
+                            "heading": "Plants running, not slideware",
+                            "meta_label": "On behalf of",
+                            "cta_text": "The full project register",
+                            "items": _reference_cards(locale="en"),
+                        },
+                    }
+                },
             },
             {
                 "component_type": "pull_quote",

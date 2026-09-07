@@ -330,6 +330,26 @@ _VALIDATORS: dict[str, dict] = {
             link_keys=frozenset({"href"}),
         ),
     },
+    "reference_cards": {
+        # A curated few of something a longer page lists in full: each
+        # card is a label, a title, a line about it, and one
+        # attribution whose LABEL is shared by the band ("On behalf
+        # of", "Client", "Year") and whose value is per card.
+        "heading": lambda v: None if _is_str(v, 200) else "string ≤200",
+        "meta_label": lambda v: None if _is_str(v, 40) else "string ≤40",
+        "cta_text": lambda v: None if _is_str(v, 100) else "string ≤100",
+        "cta_link": lambda v: (
+            None
+            if _is_str(v, 1000) and _LINK_RE.match(v)
+            else "internal path or https URL"
+        ),
+        "items": lambda v: _check_items(
+            v,
+            max_items=6,
+            required={"title": 160},
+            optional={"label": 60, "text": 300, "meta": 80},
+        ),
+    },
     "pull_quote": {
         # A stated principle with the reason under it — not a
         # testimonial, which is somebody else's words and needs an

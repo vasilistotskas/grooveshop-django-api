@@ -3,6 +3,46 @@
 
 
 
+## v3.31.0 (2026-09-07)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.30.2 [skip ci] ([`5c9ea29`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5c9ea29e195dd70ac534ca6534af6542e4435edd))
+
+### Features
+
+* feat(tenant): per-tenant available_locales, so a platform locale is opt-in
+
+The storefront generates i18n routes at BUILD time from a platform-wide
+locale list, so every locale exists as a route for every tenant. Adding
+`en` to that list would therefore have exposed `/en/**` on every store
+at once — English chrome around untranslated Greek content, and a second
+indexable URL for every page on tenants that never asked for it.
+
+`Tenant.available_locales` is the allow-list that makes a locale
+reachable. Empty means single-language on `default_locale`, which is the
+default, so every existing tenant keeps exactly the behaviour it had and
+no data migration is needed. `clean()` additionally requires the list to
+contain `default_locale` — otherwise a tenant would 404 its own site.
+
+The serializer field is deliberately NOT `read_only`: drf-spectacular
+puts every read-only field in the response `required` set, which made
+the storefront's generated Zod schema REJECT any response from a backend
+that predates the field. Since Argo rolls the frontend and backend as
+separate Deployments, a new frontend pod can briefly talk to an old
+backend pod, and a required field there failed tenant-config validation
+for EVERY tenant and 503'd the whole platform — reproduced locally
+against a pre-field backend before fixing it. `required=False` on a
+writable declaration emits an optional field; the serializer is
+output-only, `/tenant/resolve` never deserialises it.
+
+Also seeds Δelta Σigma as el+en and turns CART_ENABLED off: the company
+publishes no prices anywhere and DeSET is quote-only, so shop-dark is
+the honest configuration.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018CiyyCqkXd9a1FM5hsrPFZ ([`b408154`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b408154bbb8f2d9afaeb06d0e1b3119c392bc960))
+
 ## v3.30.2 (2026-09-07)
 
 ### Bug fixes

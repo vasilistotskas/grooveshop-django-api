@@ -243,6 +243,10 @@ SETTINGS = {
     # Pending: either the real prices, or a "price on request" branch in
     # the price surfaces.
     "CART_ENABLED": "False",
+    # No bottom tab bar on mobile: it carries the shop's
+    # affordances (catalogue, favourites, cart, account), and the
+    # redesign's mobile header is a burger and the locale code.
+    "MOBILE_BOTTOM_NAV_ENABLED": "False",
     "CONTACT_EMAIL": CONTACT_EMAIL,
     # The LEGAL name, not the trade name: this is what heads an invoice
     # and the storefront's merchant-identity block. "Δelta Σigma" is the
@@ -1630,21 +1634,22 @@ def _nav_mobile() -> list[dict]:
 
 
 def _nav_footer() -> list[dict]:
+    """The ONE link column the redesign's footer carries.
+
+    The artboard's footer is a four-row ``ΕΤΑΙΡΕΙΑ`` column beside the
+    contact column, not the six links over two columns this menu used
+    to hold — and the contact column is not a menu at all: the storefront
+    variant builds it from ``STORE_OFFICES`` and the merchant identity,
+    so a second "Επικοινωνία" row here would render the heading twice.
+    """
     return [
         {
             "label": "Εταιρεία",
             "children": [
+                {"label": "Αρχική", "to": "/"},
+                {"label": "DeSET", "to": _deset_link()},
                 {"label": "Ειδίκευση", "to": "/info/eidikefsi"},
-                {"label": "Δραστηριότητες", "to": "/info/drastiriotites"},
                 {"label": "Εμπειρία", "to": "/blog"},
-                {"label": "Συνεργάτες", "to": "/info/synergates"},
-            ],
-        },
-        {
-            "label": "Λύσεις",
-            "children": [
-                {"label": "DeSET — Τηλεποπτεία ΑΠΕ", "to": _deset_link()},
-                {"label": "Επικοινωνία", "to": "/contact"},
             ],
         },
     ]
@@ -1671,24 +1676,15 @@ def _nav_mobile_en() -> list[dict]:
 
 
 def _nav_footer_en() -> list[dict]:
+    """The English twin of :func:`_nav_footer` — same paths, same shape."""
     return [
         {
             "label": "Company",
             "children": [
+                {"label": "Home", "to": "/"},
+                {"label": "DeSET", "to": _deset_link()},
                 {"label": "Specialization", "to": "/info/eidikefsi"},
-                {"label": "Activities", "to": "/info/drastiriotites"},
                 {"label": "Experience", "to": "/blog"},
-                {"label": "Partners", "to": "/info/synergates"},
-            ],
-        },
-        {
-            "label": "Solutions",
-            "children": [
-                {
-                    "label": "DeSET — renewable plant supervision",
-                    "to": _deset_link(),
-                },
-                {"label": "Contact", "to": "/contact"},
             ],
         },
     ]

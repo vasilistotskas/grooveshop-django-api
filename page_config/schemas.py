@@ -78,6 +78,48 @@ def _check_items(
     return None
 
 
+def _check_spec_cards(value) -> str | None:
+    """The comparison cards a ``media_text`` band shows beside its copy.
+
+    One card per option (``name`` plus an optional model line), each
+    holding a short table of label/value rows — the shape a merchant
+    uses to put two or three product tiers side by side. Bounded twice
+    over, cards and rows, because this is admin-authored JSON.
+    """
+    if not isinstance(value, list) or len(value) > 4:
+        return "specs: must be a list of at most 4 cards"
+    for i, raw in enumerate(value):
+        if not isinstance(raw, dict):
+            return f"specs[{i}]: must be an object"
+        card = {str(k): v for k, v in raw.items()}
+        if not _is_str(card.get("name", ""), 60) or not card.get("name"):
+            return f"specs[{i}].name: required string (max 60)"
+        for key, max_length in (("label", 40), ("subtitle", 120)):
+            entry = card.get(key)
+            if entry is not None and not _is_str(entry, max_length):
+                return f"specs[{i}].{key}: must be a string (max {max_length})"
+        rows = card.get("rows", [])
+        if not isinstance(rows, list) or len(rows) > 8:
+            return f"specs[{i}].rows: must be a list of at most 8 rows"
+        for j, row_raw in enumerate(rows):
+            if not isinstance(row_raw, dict):
+                return f"specs[{i}].rows[{j}]: must be an object"
+            row = {str(k): v for k, v in row_raw.items()}
+            for key, max_length in (("label", 40), ("value", 80)):
+                if not row.get(key) or not _is_str(row.get(key), max_length):
+                    return (
+                        f"specs[{i}].rows[{j}].{key}: "
+                        f"required string (max {max_length})"
+                    )
+            unknown = set(row) - {"label", "value"}
+            if unknown:
+                return f"specs[{i}].rows[{j}]: unknown keys {sorted(unknown)}"
+        unknown = set(card) - {"label", "name", "subtitle", "rows"}
+        if unknown:
+            return f"specs[{i}]: unknown keys {sorted(unknown)}"
+    return None
+
+
 def _check_testimonial_items(value) -> str | None:
     if not isinstance(value, list) or len(value) > 20:
         return "items: must be a list of at most 20 entries"
@@ -281,6 +323,24 @@ _VALIDATORS: dict[str, dict] = {
     "media_text": {
         "heading": lambda v: None if _is_str(v, 200) else "string ≤200",
         "body": lambda v: None if _is_str(v, 5000) else "string ≤5000",
+        # A label above the heading, a footnote under the body, a
+        # checklist, and comparison cards for the side of the band that
+        # carries no image — the four things a "text plus something
+        # beside it" band needs and had no shape for.
+        "eyebrow": lambda v: None if _is_str(v, 100) else "string ≤100",
+        "note": lambda v: None if _is_str(v, 200) else "string ≤200",
+        # One phrase inside ``body`` to set in the emphasis weight. A
+        # SUBSTRING, not markup: ``body`` renders as text, and an HTML
+        # prop would be an injection surface for one bold phrase.
+        "emphasis": lambda v: None if _is_str(v, 120) else "string ≤120",
+        "bullets": lambda v: _check_items(
+            v,
+            max_items=6,
+            required={"text": 300},
+            optional={},
+            name="bullets",
+        ),
+        "specs": _check_spec_cards,
         "image_url": lambda v: None if _is_str(v, 1000) else "string ≤1000",
         "image_position": lambda v: (
             None if v in ("left", "right") else "one of left/right"

@@ -267,6 +267,65 @@ def test_features_grid_items_shape():
         )
 
 
+def test_media_text_band_extras():
+    """Eyebrow, footnote, checklist and comparison cards."""
+    validate_section_props(
+        "media_text",
+        {
+            "eyebrow": "Mandatory above 400 kW",
+            "heading": "DeSET",
+            "body": "The Delta Sigma systems comply.",
+            "emphasis": "Delta Sigma",
+            "note": "Law 5106/2024",
+            "bullets": [{"text": "Industrial-grade hardware."}],
+            "specs": [
+                {
+                    "label": "System 01",
+                    "name": "ABB",
+                    "subtitle": "PM5072-2ETH",
+                    "rows": [{"label": "Memory", "value": "8 MB"}],
+                }
+            ],
+        },
+    )
+
+
+def test_media_text_specs_are_bounded_and_typed():
+    with pytest.raises(ValidationError):
+        # A card without a name has nothing to head the column with.
+        validate_section_props("media_text", {"specs": [{"label": "01"}]})
+    with pytest.raises(ValidationError):
+        validate_section_props(
+            "media_text", {"specs": [{"name": "ABB", "logo": "abb.svg"}]}
+        )
+    with pytest.raises(ValidationError):
+        validate_section_props(
+            "media_text",
+            {"specs": [{"name": "ABB", "rows": [{"label": "Memory"}]}]},
+        )
+    with pytest.raises(ValidationError):
+        validate_section_props(
+            "media_text",
+            {
+                "specs": [
+                    {
+                        "name": "ABB",
+                        "rows": [{"label": "x", "value": "y"}] * 9,
+                    }
+                ]
+            },
+        )
+    with pytest.raises(ValidationError):
+        validate_section_props("media_text", {"specs": [{"name": "ABB"}] * 5})
+    with pytest.raises(ValidationError):
+        validate_section_props("media_text", {"specs": {"name": "ABB"}})
+
+
+def test_media_text_bullets_errors_name_their_own_key():
+    with pytest.raises(ValidationError, match="bullets"):
+        validate_section_props("media_text", {"bullets": [{"title": "x"}]})
+
+
 def test_media_text_props():
     validate_section_props(
         "media_text",

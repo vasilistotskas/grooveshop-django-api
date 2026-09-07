@@ -6,6 +6,8 @@ the per-locale override contracts are only enforced where it calls them
 string where an English one belongs.
 """
 
+import re
+
 import pytest
 
 from core.utils.sanitize import sanitize_html
@@ -518,6 +520,53 @@ class TestTheSeedStepsConvergeOnExistingRows:
 
         hero.refresh_from_db()
         assert hero.props["heading"] == "Κάτι άλλο"
+
+    def test_the_deset_cards_abbreviate_real_specs(self):
+        """A comparison card may shorten a spec, never invent one.
+
+        The home band's cards are projected from `DESET_SYSTEMS` so the
+        band and the product page cannot contradict each other. Both
+        the labels and the values are abbreviated to fit a 183px column
+        ("RS485 / RTU" for "1 × RS485 Modbus RTU (TA5142-RS485I)"), so
+        the guard is at the TOKEN level: every word and figure a card
+        prints has to appear somewhere in what that system publishes.
+        That is what catches the failure worth catching — a card
+        claiming 16 MB where the spec says 8.
+        """
+        word = re.compile(r"[0-9A-Za-zͰ-Ͽ]+")
+        for system in delta_sigma.DESET_SYSTEMS:
+            for key, spec_key in (
+                ("card_specs", "specs"),
+                ("card_specs_en", "specs_en"),
+            ):
+                published = " ".join(
+                    value for _, value in system[spec_key]
+                ).casefold()
+                for label, value in system[key]:
+                    for token in word.findall(value):
+                        assert token.casefold() in published, (
+                            f"{system['sku']} {key} {label}: {token!r}"
+                        )
+
+    def test_the_deset_cards_head_with_the_brand(self):
+        cards = delta_sigma._deset_cards()
+
+        assert [card["name"] for card in cards] == ["ABB", "INVT", "WAGO"]
+        assert [card["label"] for card in cards] == [
+            "Σύστημα 01",
+            "Σύστημα 02",
+            "Σύστημα 03",
+        ]
+        # brand + model are the halves of the product name, so a rename
+        # of either cannot silently drift from the catalogue.
+        for card, system in zip(cards, delta_sigma.DESET_SYSTEMS, strict=True):
+            assert card["name"] in system["name"]
+            assert card["subtitle"] in system["name"]
+
+    def test_the_deset_band_emphasises_a_phrase_its_body_contains(self):
+        """`emphasis` is a substring of `body`, not markup."""
+        assert delta_sigma.DESET_PRODUCT_LINE in delta_sigma.DESET_BODY
+        assert delta_sigma.DESET_PRODUCT_LINE in delta_sigma.DESET_BODY_EN
 
     def test_the_hero_proof_row_counts_the_content(self):
         """Derived, not typed — see HERO_STATS."""

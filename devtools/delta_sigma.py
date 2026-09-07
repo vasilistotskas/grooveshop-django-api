@@ -360,6 +360,12 @@ DESET_SYSTEMS = [
         "slug": "deset-abb-pm5072-2eth",
         "sku": "DESET-01-ABB",
         "name": "DeSET 01 — PLC ABB PM5072-2ETH",
+        # The manufacturer and the model as their own fields, because
+        # the home band's comparison card heads each column with the
+        # brand and prints the model beneath it — and parsing them back
+        # out of ``name`` would break the first time one is renamed.
+        "brand": "ABB",
+        "model": "PM5072-2ETH",
         "summary": (
             "Η βασική, δοκιμασμένη επιλογή. Δώδεκα ψηφιακές είσοδοι — οι "
             "περισσότερες από τα τρία συστήματα — όταν η εγκατάσταση "
@@ -373,6 +379,26 @@ DESET_SYSTEMS = [
             ("Ψηφιακές έξοδοι", "8"),
             ("Θύρες Ethernet", "2 × Modbus TCP, OPC UA"),
             ("Σειριακή θύρα", "1 × RS485 Modbus RTU (TA5142-RS485I)"),
+            ("Firmware", "CODESYS"),
+        ],
+        # The six rows the home band's card shows, abbreviated to fit a
+        # 183px column. Every value is a prefix of the full spec above
+        # it — ``test_the_deset_cards_abbreviate_real_specs`` holds
+        # that, so a card can never state something the system does not.
+        "card_specs": [
+            ("Μνήμη", "8 MB"),
+            ("Ψηφ. είσοδοι", "12"),
+            ("Ψηφ. έξοδοι", "8"),
+            ("Ethernet", "2 × Modbus TCP"),
+            ("Σειριακή", "RS485 / RTU"),
+            ("Firmware", "CODESYS"),
+        ],
+        "card_specs_en": [
+            ("Memory", "8 MB"),
+            ("Digital in", "12"),
+            ("Digital out", "8"),
+            ("Ethernet", "2 × Modbus TCP"),
+            ("Serial", "RS485 / RTU"),
             ("Firmware", "CODESYS"),
         ],
         "name_en": "DeSET 01 — ABB PM5072-2ETH PLC",
@@ -396,6 +422,8 @@ DESET_SYSTEMS = [
         "slug": "deset-invt-tm750",
         "sku": "DESET-02-INVT",
         "name": "DeSET 02 — PLC INVT TM750 + Advantech gateway",
+        "brand": "INVT",
+        "model": "TM750 + Advantech gateway",
         "summary": (
             "Η επιλογή με τη μεγαλύτερη εφεδρεία σε μνήμη και δικτύωση. "
             "Το ξεχωριστό gateway αναλαμβάνει τη μετάφραση πρωτοκόλλων, "
@@ -413,6 +441,22 @@ DESET_SYSTEMS = [
             ("Gateway", "TI Cortex A8 600 MHz, 256 MB DDR3L, IEC-104 M/S"),
             ("Θερμοκρασία gateway", "-40 °C … 70 °C"),
             ("Firmware", "CODESYS"),
+        ],
+        "card_specs": [
+            ("Μνήμη", "20 MB"),
+            ("Ψηφ. είσοδοι", "8"),
+            ("Ψηφ. έξοδοι", "8"),
+            ("Ethernet", "2 × Modbus TCP"),
+            ("Σειριακές", "2 × RS485"),
+            ("Gateway", "IEC-104 M/S"),
+        ],
+        "card_specs_en": [
+            ("Memory", "20 MB"),
+            ("Digital in", "8"),
+            ("Digital out", "8"),
+            ("Ethernet", "2 × Modbus TCP"),
+            ("Serial", "2 × RS485"),
+            ("Gateway", "IEC-104 M/S"),
         ],
         "name_en": "DeSET 02 — INVT TM750 PLC + Advantech gateway",
         "summary_en": (
@@ -438,6 +482,8 @@ DESET_SYSTEMS = [
         "slug": "deset-wago-pfc200-g2",
         "sku": "DESET-03-WAGO",
         "name": "DeSET 03 — PLC WAGO PFC200 G2 2ETH RS Tele T ECO",
+        "brand": "WAGO",
+        "model": "PFC200 G2 2ETH RS Tele T ECO",
         "summary": (
             "Η επιλογή με ενσωματωμένο IEC 104 — χωρίς ξεχωριστό gateway. "
             "Real-time Linux με τη μεγαλύτερη μνήμη και επεκτάσιμες "
@@ -453,6 +499,22 @@ DESET_SYSTEMS = [
             ("Θύρες Ethernet", "2 × ανεξάρτητες, Modbus TCP"),
             ("Σειριακή θύρα", "RS485 Modbus RTU"),
             ("Πρόσθετες κάρτες", "8 ψηφ. εισόδων + 8 ψηφ. εξόδων"),
+        ],
+        "card_specs": [
+            ("Πλατφόρμα", "Real-time Linux"),
+            ("RAM", "512 MB"),
+            ("Πρωτόκολλο", "IEC 104 ενσωματωμένο"),
+            ("Ethernet", "2 × ανεξάρτητες"),
+            ("Σειριακή", "RS485 Modbus RTU"),
+            ("Κάρτες I/O", "8 ψηφ. εισόδων"),
+        ],
+        "card_specs_en": [
+            ("Platform", "Real-time Linux"),
+            ("RAM", "512 MB"),
+            ("Protocol", "IEC 104 built in"),
+            ("Ethernet", "2 × independent"),
+            ("Serial", "RS485 Modbus RTU"),
+            ("I/O cards", "8 digital inputs"),
         ],
         "name_en": ("DeSET 03 — WAGO PFC200 G2 2ETH RS Tele T ECO PLC"),
         "summary_en": (
@@ -473,6 +535,89 @@ DESET_SYSTEMS = [
         ],
     },
 ]
+
+# The obligation the band leads with, as its own line: the artboard
+# lifts it out of the compliance sentence into a pill, because ">400 kW"
+# is the fact that tells a plant operator whether any of this applies to
+# them.
+DESET_PRODUCT_LINE = "Delta Sigma Energy Telecontrol"
+
+DESET_BODY = (
+    "Οι λύσεις Delta Sigma Energy Telecontrol είναι σε απόλυτη "
+    "συμμόρφωση με τις τεχνικές προδιαγραφές του ΔΕΔΔΗΕ για τη σύνδεση "
+    "σταθμών ΑΠΕ & ΣΗΘΥΑ με το Σύστημα Τηλε-ελέγχου και Διαχείρισης "
+    "του Δικτύου Διανομής, για τη λήψη σημάτων τηλε-εποπτείας και την "
+    "εφαρμογή εντολών ελέγχου."
+)
+
+DESET_BODY_EN = (
+    "The Delta Sigma Energy Telecontrol systems are in full compliance "
+    "with HEDNO's technical specifications for connecting renewable "
+    "and high-efficiency CHP plants to the Distribution Network "
+    "Telecontrol and Management System, for reporting supervisory "
+    "signals and applying control commands."
+)
+
+DESET_OBLIGATION = "Υποχρεωτικό για σταθμούς > 400 kW"
+DESET_OBLIGATION_EN = "Mandatory for plants above 400 kW"
+
+# ...and the citation, as its own line for the same reason.
+DESET_LAW = "ν. 5106/2024 — ΦΕΚ Α΄ 63/01.05.2024"
+DESET_LAW_EN = "Law 5106/2024 — Gazette A' 63/01.05.2024"
+
+DESET_BULLETS = [
+    {
+        "text": "Στιβαρός εξοπλισμός βιομηχανικής ποιότητας — PLC, όχι "
+        "απλώς ανθεκτικά υπολογιστικά συστήματα."
+    },
+    {
+        "text": "Πλήρως προσαρμόσιμη τοπική λογική με αυτόνομο έλεγχο "
+        "και παρακολούθηση τιμών σε πραγματικό χρόνο."
+    },
+    {
+        "text": "Αμφίδρομη επικοινωνία: λαμβάνει εντολές και μεταδίδει "
+        "όλες τις απαιτούμενες μετρήσεις και καταστάσεις."
+    },
+]
+
+DESET_BULLETS_EN = [
+    {
+        "text": "Industrial-grade hardware — a PLC, not merely a rugged "
+        "computer."
+    },
+    {
+        "text": "Fully customisable local logic with autonomous control "
+        "and real-time monitoring of every value."
+    },
+    {
+        "text": "Two-way communication: it accepts commands and reports "
+        "every required measurement and status."
+    },
+]
+
+
+def _deset_cards(*, locale: str = "el") -> list[dict]:
+    """The three comparison cards, projected from ``DESET_SYSTEMS``.
+
+    One source of truth: the systems already carry the brand, the model
+    and the specs, so the band cannot state a figure the product page
+    contradicts.
+    """
+    rows_key = "card_specs" if locale == "el" else "card_specs_en"
+    label = "Σύστημα" if locale == "el" else "System"
+    return [
+        {
+            "label": f"{label} {index:02d}",
+            "name": system["brand"],
+            "subtitle": system["model"],
+            "rows": [
+                {"label": row_label, "value": row_value}
+                for row_label, row_value in system[rows_key]
+            ],
+        }
+        for index, system in enumerate(DESET_SYSTEMS, start=1)
+    ]
+
 
 DESET_COMPLIANCE = (
     "Σε απόλυτη συμμόρφωση με τις τεχνικές προδιαγραφές του ΔΕΔΔΗΕ για "
@@ -1563,20 +1708,30 @@ def _layout_plan() -> dict:
                 "title": "DeSET",
                 "sort_order": 2,
                 "props": {
+                    "eyebrow": DESET_OBLIGATION,
                     "heading": "DeSET — τηλεποπτεία σταθμών ΑΠΕ",
-                    "body": DESET_COMPLIANCE,
+                    "body": DESET_BODY,
+                    "emphasis": DESET_PRODUCT_LINE,
+                    "note": DESET_LAW,
+                    "bullets": DESET_BULLETS,
+                    "specs": _deset_cards(),
                     "image_position": "right",
-                    "cta_text": "Δείτε τα τρία συστήματα",
-                    "cta_link": deset_link,
+                    "cta_text": "Ζητήστε προσφορά για DeSET",
+                    "cta_link": "/contact",
                     "decor": "orbs",
                 },
                 "i18n": {
                     "en": {
                         "props": {
+                            "eyebrow": DESET_OBLIGATION_EN,
                             "heading": "DeSET — remote supervision of "
                             "renewable plants",
-                            "body": DESET_COMPLIANCE_EN,
-                            "cta_text": "See the three systems",
+                            "body": DESET_BODY_EN,
+                            "emphasis": DESET_PRODUCT_LINE,
+                            "note": DESET_LAW_EN,
+                            "bullets": DESET_BULLETS_EN,
+                            "specs": _deset_cards(locale="en"),
+                            "cta_text": "Request a DeSET quote",
                         }
                     }
                 },

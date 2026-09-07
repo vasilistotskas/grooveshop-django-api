@@ -259,3 +259,119 @@ class TestTheSeedStepsWriteBothLocales:
             private.safe_translation_getter("subtitle", language_code="en")
             == "Private project"
         )
+
+
+@pytest.mark.django_db
+class TestTheSeedStepsConvergeOnExistingRows:
+    """A store seeded before ``i18n`` existed must pick the copy up.
+
+    ``seed_layouts`` skips a section whose component type is already
+    present and ``seed_navigation`` is a ``get_or_create`` — both on
+    purpose, because those rows are the merchant's content. But that
+    also meant a re-run wrote no translations at all, so every store
+    seeded earlier stayed Greek on ``/en`` however often the command
+    ran.
+    """
+
+    def test_a_rerun_fills_the_overrides_it_skipped(self):
+        from page_config.models import NavigationMenu, PageSection
+
+        delta_sigma.seed_layouts()
+        delta_sigma.seed_navigation()
+        PageSection.objects.update(i18n={})
+        NavigationMenu.objects.update(i18n={})
+
+        layouts = delta_sigma.seed_layouts()
+        menus = delta_sigma.seed_navigation()
+
+        assert layouts["sections_localized"] == PageSection.objects.count()
+        assert menus["localized"] == NavigationMenu.objects.count()
+        assert not PageSection.objects.filter(i18n={}).exists()
+        cta = PageSection.objects.get(component_type="cta_banner")
+        assert cta.localized("en")[1]["heading"] == (
+            "Tell us what has to work."
+        )
+
+    def test_a_rerun_leaves_an_authored_override_alone(self):
+        """Empty is the signal, not "differs from the pack".
+
+        A merchant translation is exactly what a converge step must not
+        overwrite, and empty is the one state that cannot be one.
+        """
+        from page_config.models import PageSection
+
+        delta_sigma.seed_layouts()
+        cta = PageSection.objects.get(component_type="cta_banner")
+        cta.i18n = {"en": {"props": {"heading": "Their own words."}}}
+        cta.save(update_fields=["i18n"])
+
+        delta_sigma.seed_layouts()
+
+        cta.refresh_from_db()
+        assert cta.localized("en")[1]["heading"] == "Their own words."
+
+    def test_a_rerun_never_rewrites_the_props(self):
+        from page_config.models import PageSection
+
+        delta_sigma.seed_layouts()
+        cta = PageSection.objects.get(component_type="cta_banner")
+        cta.props = {**cta.props, "heading": "Edited by the merchant."}
+        cta.i18n = {}
+        cta.save(update_fields=["props", "i18n"])
+
+        delta_sigma.seed_layouts()
+
+        cta.refresh_from_db()
+        assert cta.props["heading"] == "Edited by the merchant."
+        assert cta.i18n
+
+    def test_a_rerun_fills_a_missing_english_translation(self):
+        """The parler rows have the same history as ``i18n``.
+
+        Every step skips a row whose slug already exists, so a store
+        seeded before the English copy was written kept Greek-only
+        products, posts and pages no matter how often the command ran.
+        """
+        from blog.models.post import BlogPost
+        from page_config.models import ContentPage
+        from product.models import Product
+
+        delta_sigma.seed_deset_products()
+        delta_sigma.seed_project_posts()
+        delta_sigma.seed_content_pages()
+        for model in (Product, BlogPost, ContentPage):
+            # Through parler's translation model, so the rows really go
+            # away rather than being detached from a cached instance.
+            model._parler_meta.root_model.objects.filter(
+                language_code="en"
+            ).delete()
+
+        products = delta_sigma.seed_deset_products()
+        posts = delta_sigma.seed_project_posts()
+        pages = delta_sigma.seed_content_pages()
+
+        assert products["products_localized"] == len(delta_sigma.DESET_SYSTEMS)
+        assert posts["posts_localized"] == len(delta_sigma.PROJECTS)
+        assert pages["localized"] == len(delta_sigma.CONTENT_PAGES)
+        assert Product.objects.get(
+            slug="deset-wago-pfc200-g2"
+        ).safe_translation_getter(
+            "name", language_code="en", any_language=False
+        )
+
+    def test_a_rerun_leaves_an_authored_translation_alone(self):
+        from page_config.models import ContentPage
+
+        delta_sigma.seed_content_pages()
+        page = ContentPage.objects.get(slug="eidikefsi")
+        page.set_current_language("en")
+        page.title = "Their own title"
+        page.save()
+
+        delta_sigma.seed_content_pages()
+
+        page.refresh_from_db()
+        assert (
+            page.safe_translation_getter("title", language_code="en")
+            == "Their own title"
+        )

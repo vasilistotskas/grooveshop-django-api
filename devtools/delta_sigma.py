@@ -40,6 +40,7 @@ from __future__ import annotations
 
 import logging
 from decimal import Decimal
+from functools import partial
 
 logger = logging.getLogger(__name__)
 
@@ -1751,6 +1752,26 @@ def seed_settings() -> dict[str, int]:
     return report
 
 
+def _deset_description(system: dict, *, locale: str) -> str:
+    """The PDP body for one system, in ``locale``."""
+    if locale == "el":
+        specs = system["specs"]
+        summary = system["summary"]
+        heading = "Τεχνικά χαρακτηριστικά"
+        compliance = DESET_COMPLIANCE
+    else:
+        specs = system["specs_en"]
+        summary = system["summary_en"]
+        heading = "Technical specifications"
+        compliance = DESET_COMPLIANCE_EN
+    rows = "".join(
+        f"<li><strong>{key}:</strong> {value}</li>" for key, value in specs
+    )
+    return (
+        f"<p>{summary}</p><h3>{heading}</h3><ul>{rows}</ul><p>{compliance}</p>"
+    )
+
+
 def seed_deset_products() -> dict[str, int]:
     """Create the DeSET category and its three systems."""
     from product.models import Product, ProductCategory
@@ -1767,23 +1788,28 @@ def seed_deset_products() -> dict[str, int]:
         )
         category.save()
         _bump(report, "category_created")
+    elif _fill_missing_translation(
+        category, "en", name=name_en, description=DESET_COMPLIANCE_EN
+    ):
+        _bump(report, "category_localized")
     else:
         _bump(report, "category_unchanged")
 
     vat = Vat.objects.filter(value=Decimal("24.0")).first()
 
     for system in DESET_SYSTEMS:
-        if Product.objects.filter(slug=system["slug"]).exists():
-            _bump(report, "products_unchanged")
+        existing = Product.objects.filter(slug=system["slug"]).first()
+        if existing is not None:
+            if _fill_missing_translation(
+                existing,
+                "en",
+                name=system["name_en"],
+                description=_deset_description(system, locale="en"),
+            ):
+                _bump(report, "products_localized")
+            else:
+                _bump(report, "products_unchanged")
             continue
-        specs = "".join(
-            f"<li><strong>{key}:</strong> {value}</li>"
-            for key, value in system["specs"]
-        )
-        specs_en = "".join(
-            f"<li><strong>{key}:</strong> {value}</li>"
-            for key, value in system["specs_en"]
-        )
         product = Product(
             slug=system["slug"],
             sku=system["sku"],
@@ -1801,21 +1827,13 @@ def seed_deset_products() -> dict[str, int]:
         _translate(
             product,
             name=system["name"],
-            description=(
-                f"<p>{system['summary']}</p>"
-                f"<h3>Τεχνικά χαρακτηριστικά</h3><ul>{specs}</ul>"
-                f"<p>{DESET_COMPLIANCE}</p>"
-            ),
+            description=_deset_description(system, locale="el"),
         )
         _translate(
             product,
             "en",
             name=system["name_en"],
-            description=(
-                f"<p>{system['summary_en']}</p>"
-                f"<h3>Technical specifications</h3><ul>{specs_en}</ul>"
-                f"<p>{DESET_COMPLIANCE_EN}</p>"
-            ),
+            description=_deset_description(system, locale="en"),
         )
         product.save()
         _bump(report, "products_created")
@@ -1862,13 +1880,32 @@ def seed_project_posts() -> dict[str, int]:
             _translate(category, "en", name=name_en, description=name_en)
             category.save()
             _bump(report, "categories_created")
+        elif _fill_missing_translation(
+            category, "en", name=name_en, description=name_en
+        ):
+            _bump(report, "categories_localized")
         else:
             _bump(report, "categories_unchanged")
         categories[slug] = category
 
     for sector, slug, title, tech, client in PROJECTS:
-        if BlogPost.objects.filter(slug=slug).exists():
-            _bump(report, "posts_unchanged")
+        title_en, tech_en = PROJECTS_EN[slug]
+        client_en = CLIENTS_EN.get(client, client)
+        body_en = (
+            f"<p>{tech_en}</p><p><strong>On behalf of:</strong> {client_en}</p>"
+        )
+        existing = BlogPost.objects.filter(slug=slug).first()
+        if existing is not None:
+            if _fill_missing_translation(
+                existing,
+                "en",
+                title=title_en,
+                subtitle=client_en,
+                body=body_en,
+            ):
+                _bump(report, "posts_localized")
+            else:
+                _bump(report, "posts_unchanged")
             continue
         post = BlogPost(
             slug=slug,
@@ -1884,21 +1921,62 @@ def seed_project_posts() -> dict[str, int]:
                 f"<p>{tech}</p><p><strong>Για λογαριασμό:</strong> {client}</p>"
             ),
         )
-        title_en, tech_en = PROJECTS_EN[slug]
-        client_en = CLIENTS_EN.get(client, client)
         _translate(
             post,
             "en",
             title=title_en,
             subtitle=client_en,
-            body=(
-                f"<p>{tech_en}</p>"
-                f"<p><strong>On behalf of:</strong> {client_en}</p>"
-            ),
+            body=body_en,
         )
         post.save()
         _bump(report, "posts_created")
     return report
+
+
+def _fill_missing_translation(instance, language_code: str, **fields) -> bool:
+    """Add a translation ONLY when the row has none. ``True`` if added.
+
+    Every ``seed_*`` step below skips a row that already exists, on
+    purpose: it is the merchant's content and a re-run must not
+    overwrite an edit. But the ``en`` rows were added after the Greek
+    ones had already been seeded, so "skip the whole row" also meant
+    the English translation could never land. An ABSENT translation is
+    the one state that cannot be an operator's work, so filling just
+    that converges an old store without touching anything authored.
+    """
+    # The translation TABLE, not ``has_translation``: parler answers
+    # that from its own cache backend first, and a cached row for a
+    # language whose rows have since gone would make this step decide
+    # "already translated" and leave the store Greek forever. A converge
+    # step has to read the database it is converging.
+    translations = instance._parler_meta.root_model
+    if translations.objects.filter(
+        master=instance, language_code=language_code
+    ).exists():
+        return False
+    _translate(instance, language_code, **fields)
+    instance.save()
+    return True
+
+
+def _fill_missing_i18n(queryset, i18n: dict, *, validate) -> int:
+    """Write ``i18n`` onto rows that carry none. Returns how many.
+
+    Empty is the signal: it is the default every row predating the
+    field reports, and the one state that cannot be an operator's
+    translation. A row that already has one is left alone.
+    """
+    if not i18n:
+        return 0
+    validate(i18n)
+    filled = 0
+    for row in queryset:
+        if row.i18n:
+            continue
+        row.i18n = i18n
+        row.save(update_fields=["i18n"])
+        filled += 1
+    return filled
 
 
 def seed_layouts() -> dict[str, int]:
@@ -1908,6 +1986,13 @@ def seed_layouts() -> dict[str, int]:
     that validation is wired into the admin and serializers but NOT the
     model, so a direct ORM write would otherwise store a prop the Nuxt
     proxy silently strips.
+
+    A section that already exists keeps its props: they are the
+    merchant's content and a re-run must not overwrite an edit. Its
+    ``i18n`` is filled in ONLY while still empty — that is what proves
+    nobody has authored a translation, and without this step every
+    store seeded before the field existed would stay Greek on ``/en``
+    no matter how often the command runs.
     """
     from page_config.models import PageLayout, PageSection
     from page_config.schemas import (
@@ -1938,17 +2023,27 @@ def seed_layouts() -> dict[str, int]:
         # CREATION order determines where each band lands.
         for section in sorted(sections, key=lambda item: item["sort_order"]):
             component_type = section["component_type"]
+            i18n = section.get("i18n", {})
             if component_type in present:
-                _bump(report, "sections_unchanged")
+                filled = _fill_missing_i18n(
+                    layout.sections.filter(component_type=component_type),
+                    i18n,
+                    validate=partial(validate_section_i18n, component_type),
+                )
+                _bump(
+                    report,
+                    "sections_localized" if filled else "sections_unchanged",
+                    filled or 1,
+                )
                 continue
             validate_section_props(component_type, section["props"])
-            validate_section_i18n(component_type, section.get("i18n", {}))
+            validate_section_i18n(component_type, i18n)
             PageSection.objects.create(
                 layout=layout,
                 component_type=component_type,
                 title=section["title"],
                 props=section["props"],
-                i18n=section.get("i18n", {}),
+                i18n=i18n,
                 is_visible=True,
             )
             _bump(report, "sections_created")
@@ -1997,10 +2092,18 @@ def seed_navigation() -> dict[str, int]:
         i18n = {"en": items_en}
         validate_navigation_items(slot, items)
         validate_navigation_i18n(slot, i18n)
-        _, created = NavigationMenu.objects.get_or_create(
+        menu, created = NavigationMenu.objects.get_or_create(
             slot=slot, defaults={"items": items, "i18n": i18n}
         )
-        _bump(report, "created" if created else "unchanged")
+        if created:
+            _bump(report, "created")
+            continue
+        filled = _fill_missing_i18n(
+            NavigationMenu.objects.filter(pk=menu.pk),
+            i18n,
+            validate=partial(validate_navigation_i18n, slot),
+        )
+        _bump(report, "localized" if filled else "unchanged", filled or 1)
     return report
 
 
@@ -2029,6 +2132,13 @@ def seed_content_pages() -> dict[str, int]:
                 )
             page.save()
             _bump(report, "created")
+        elif _fill_missing_translation(
+            page,
+            "en",
+            title=locales["en"]["title"],
+            body=locales["en"]["body"],
+        ):
+            _bump(report, "localized")
         else:
             _bump(report, "unchanged")
     return report

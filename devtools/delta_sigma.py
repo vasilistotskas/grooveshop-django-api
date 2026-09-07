@@ -1464,7 +1464,10 @@ def _layout_plan() -> dict:
             {
                 "component_type": "features_grid",
                 "title": "Ειδίκευση",
-                "sort_order": 1,
+                # 2, not 1: the artboards lead with DeSET straight after
+                # the hero — it is the product the redesign is built
+                # around — and put the seven fields under it.
+                "sort_order": 2,
                 "props": {
                     "heading": "Επτά πεδία, ένας ανάδοχος",
                     "columns": 4,
@@ -1484,7 +1487,7 @@ def _layout_plan() -> dict:
             {
                 "component_type": "media_text",
                 "title": "DeSET",
-                "sort_order": 2,
+                "sort_order": 1,
                 "props": {
                     "heading": "DeSET — τηλεποπτεία σταθμών ΑΠΕ",
                     "body": DESET_COMPLIANCE,
@@ -2153,6 +2156,21 @@ def seed_layouts(*, overwrite: bool = False) -> dict[str, int]:
                     validate=partial(validate_section_i18n, component_type),
                     overwrite=overwrite,
                 )
+                # ORDER is merchant content too — the page builder's
+                # drag-drop writes exactly this column — so the plan's
+                # order is only re-imposed under ``--overwrite``.
+                # Without this a reordering of the plan could never
+                # reach a store that already had the sections: the
+                # resequencing pass below only compacts the order that
+                # is already there, it does not change it.
+                if overwrite:
+                    moved = (
+                        layout.sections.filter(component_type=component_type)
+                        .exclude(sort_order=section["sort_order"])
+                        .update(sort_order=section["sort_order"])
+                    )
+                    if moved:
+                        _bump(report, "sections_reordered", moved)
                 _bump(
                     report,
                     "sections_localized" if filled else "sections_unchanged",

@@ -435,3 +435,43 @@ class TestTheSeedStepsConvergeOnExistingRows:
 
         assert report.get("sections_localized", 0) == 0
         assert report["sections_unchanged"] == PageSection.objects.count()
+
+    def test_overwrite_reimposes_the_planned_section_order(self):
+        """The artboards lead with DeSET; a reorder has to reach a
+        store that already has the sections.
+
+        `seed_layouts` skips a section whose component type is present,
+        and the resequencing pass only compacts the order already in
+        the table — so changing the plan's order was invisible to every
+        seeded store. Order is merchant content (the page builder's
+        drag-drop writes this column), hence `--overwrite` only.
+        """
+        from page_config.models import PageSection
+
+        delta_sigma.seed_layouts()
+        home = PageSection.objects.filter(layout__page_type="home")
+        # Scramble: put the seven-fields grid where DeSET belongs.
+        home.filter(component_type="media_text").update(sort_order=90)
+        home.filter(component_type="features_grid").update(sort_order=1)
+
+        report = delta_sigma.seed_layouts(overwrite=True)
+
+        assert report.get("sections_reordered", 0) >= 1
+        order = list(
+            home.order_by("sort_order").values_list("component_type", flat=True)
+        )
+        assert order[:3] == ["hero_banner", "media_text", "features_grid"]
+
+    def test_a_rerun_without_overwrite_keeps_a_merchant_reorder(self):
+        from page_config.models import PageSection
+
+        delta_sigma.seed_layouts()
+        home = PageSection.objects.filter(layout__page_type="home")
+        home.filter(component_type="faq").update(sort_order=1)
+
+        delta_sigma.seed_layouts()
+
+        assert (
+            home.get(component_type="faq").sort_order
+            < home.get(component_type="features_grid").sort_order
+        )

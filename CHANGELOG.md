@@ -3,6 +3,47 @@
 
 
 
+## v3.37.0 (2026-09-07)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.36.0 [skip ci] ([`eccddbf`](https://github.com/vasilistotskas/grooveshop-django-api/commit/eccddbf9d272b3b10301df62ce29fdce6e0ef513))
+
+### Features
+
+* feat(page_config): the DeSET band's shape — eyebrow, footnote, bullets, specs
+
+The redesign's DeSET section is a `media_text` band, and four of the
+things the artboard puts in it had no shape: the ">400 kW" obligation
+as a pill above the heading, the law citation as a footnote behind a
+rule, three ticked bullets, and the three-system comparison cards
+where a band with no image has room.
+
+All four are generic — a label, a footnote, a checklist, and cards for
+the side of a "text plus something beside it" band — so they go on
+`media_text` rather than into a tenant-specific type. Both card and row
+counts are bounded: this is admin-authored JSON.
+
+`emphasis` is the odd one and deliberately so: the artboard sets
+"Delta Sigma Energy Telecontrol" in the emphasis weight mid-sentence,
+and `media_text` body renders as TEXT. Rather than turn `body` into an
+HTML prop — an injection surface for one bold phrase — `emphasis`
+names a SUBSTRING of it, and the storefront splits the string into
+three text nodes. The worst a bad value can do is fail to match.
+
+The cards are PROJECTED from `DESET_SYSTEMS`, which already carries
+each system's specs for the product page — so the band cannot state a
+figure the catalogue contradicts. `brand` and `model` become their own
+fields (the card heads a column with the manufacturer and prints the
+model under it, and parsing them back out of `name` would break on the
+first rename), and the six abbreviated card rows are guarded at the
+token level: every word and figure a card prints has to appear in what
+that system publishes, which is what catches a card claiming 16 MB
+where the spec says 8.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018CiyyCqkXd9a1FM5hsrPFZ ([`dd9a871`](https://github.com/vasilistotskas/grooveshop-django-api/commit/dd9a871377d93411c74574bb5a8eb872c15e7260))
+
 ## v3.36.0 (2026-09-07)
 
 ### Chores

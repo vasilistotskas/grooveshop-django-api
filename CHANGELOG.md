@@ -3,6 +3,75 @@
 
 
 
+## v3.32.1 (2026-09-07)
+
+### Bug fixes
+
+* fix(delta-sigma): converge the English copy onto rows that already exist
+
+Every seed step skips a row whose slug or component type is already
+there, on purpose — those rows are the merchant's content and a re-run
+must not overwrite an edit. But the English copy was written after the
+Greek rows had already been seeded, so "skip the whole row" also meant
+the translations could never land: re-running the command against the
+live store reported `sections_unchanged` / `posts_unchanged` for
+everything and left `/en` in Greek.
+
+Fill only what is ABSENT. An empty `i18n` and a missing parler
+translation are the two states that cannot be an operator's work, so
+writing those converges a store seeded earlier while leaving authored
+props, items and translations alone — asserted from both directions.
+
+`_fill_missing_translation` reads the translation TABLE rather than
+asking `has_translation`: parler answers that from its own cache backend
+first, and a cached row for a language whose rows have since gone made
+the step decide "already translated" and skip. Reproduced in the test
+before switching — a converge step has to read the database it is
+converging.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018CiyyCqkXd9a1FM5hsrPFZ ([`0a20cd2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0a20cd23e19e7c229b3807f86acb0b0863f51102))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.32.0 [skip ci] ([`cabe7c9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cabe7c9dfe5e18118dc74ba69a899bebf58727b5))
+
+### Documentation
+
+* docs(delta-sigma): the module docstring said sections are untranslatable
+
+It still described the state before `PageSection.i18n`. Replaced with
+where the two halves of the bilingual content actually live — parler
+rows for the models, per-locale overrides for the JSON — and why an
+override is a partial merge.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018CiyyCqkXd9a1FM5hsrPFZ ([`57fca68`](https://github.com/vasilistotskas/grooveshop-django-api/commit/57fca68016d578bbe559a47bd3ce2d6c0d936955))
+
+* docs(delta-sigma): the seed command no longer says sections are Greek-only
+
+`PageSection.i18n` made them translatable, and the pack now ships the
+English overrides — so the closing note was reporting the opposite of
+what the command had just written. Replaced with what IS still missing
+(the invoicing identity, coordinates and hours delta-sigma.gr does not
+publish) and a note on why a second run is the way an already-seeded
+store picks the English up.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018CiyyCqkXd9a1FM5hsrPFZ ([`829ee31`](https://github.com/vasilistotskas/grooveshop-django-api/commit/829ee3177f14271f470168bdf5d84fc49677a4cd))
+
+* docs(delta-sigma): the storefront has no zero-price branch
+
+Both comments claimed a quote CTA renders instead of a price for the
+three quote-only DeSET systems. It does not: `formatProductPrice` in
+`pages/products/[id]/[slug].vue` is `n(price || 0, 'currency')`, and
+Product/Card.vue and Product/RecentlyViewed.vue format the same way, so
+a zero price renders "0,00 €" — which reads as free. Say so, and name
+the two ways out.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018CiyyCqkXd9a1FM5hsrPFZ ([`7ed6485`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7ed64854fde21ae45ad6d08d5cbbc0a3b558f3c8))
+
 ## v3.32.0 (2026-09-07)
 
 ### Bug fixes

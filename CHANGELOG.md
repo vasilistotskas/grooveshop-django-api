@@ -3,6 +3,48 @@
 
 
 
+## v3.38.0 (2026-09-07)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.37.0 [skip ci] ([`d73a7f9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d73a7f96d639280dcd88a2f44484e7d18da17cda))
+
+### Features
+
+* feat(page_config): the redesign's remaining home bands
+
+Three shapes the artboards need and the platform had none for.
+
+`features_grid` gains the band's own link — the artboards put "all of
+them →" on the heading's baseline, not under the grid — and `prompt`,
+the cell that answers "what if mine is not one of these?" inside the
+grid rather than below it.
+
+`story_timeline` gains a standfirst, because the Δραστηριότητες band
+has one.
+
+`pull_quote` is a new type: a stated principle with the reason under
+it. Deliberately not `testimonials` — a testimonial is somebody else's
+words and needs an attribution to mean anything, and this band is the
+company's own.
+
+The FAQ accordion goes. It is in no artboard, and its content with it
+rather than sitting in the pack unused. Which surfaced the gap that
+mattered more: `--overwrite` could re-impose props, order and i18n but
+could not REMOVE a band, so no number of re-runs could take the FAQ
+off the store that already had it. It now drops any band the plan no
+longer carries — destructive by definition, hence the flag that
+already discards local edits and says so.
+
+And the footer menu goes back to two columns. I cut it to one after
+reading a later inner-page artboard that shows a single column and no
+standfirst; the HOME board has ΕΤΑΙΡΕΙΑ beside ΛΥΣΕΙΣ and the
+standfirst under the lockup. A footer is global, so the fuller board is
+the one that can be built.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018CiyyCqkXd9a1FM5hsrPFZ ([`6c59886`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6c5988623251e9a24c52721b4826349936e984db))
+
 ## v3.37.0 (2026-09-07)
 
 ### Chores

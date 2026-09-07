@@ -16,12 +16,21 @@ deliberate and documented here rather than inferred:
   each with its actual contracting company. BlogCategory carries the
   sector, which is what drives the storefront's filter.
 
-Two limits worth knowing before editing:
+Two things worth knowing before editing:
 
-* ``PageSection.props`` is a plain JSONField — **sections are not
-  translatable**. Every heading and item below is Greek, the primary
-  audience. Only ``ContentPage`` is a TranslatableModel, so the
-  bilingual copy lives there.
+* **The store is bilingual, and the two halves live in two different
+  places.** ``ContentPage``, ``Product``, ``BlogPost`` and the
+  categories are parler models, so their English is a second
+  translation row. Section titles, section props and navigation labels
+  are JSON, so their English is a per-locale OVERRIDE — ``i18n`` on
+  ``PageSection`` / ``NavigationMenu``, resolved server-side from
+  ``?locale=`` (see ``page_config/localization.py``). An override is a
+  partial merge, so the links, column counts and decor stay in
+  ``props`` and cannot drift between languages; only the copy is
+  per-locale. Everything below has an ``_EN`` twin — keep them
+  together, and see the tests in
+  ``tests/unit/devtools/test_delta_sigma_content.py``, which fail on a
+  Greek string that reaches an English field.
 * Prices, the founding year, and the ODOT partnership scope are the
   three facts the public site does not state. They are left at zero or
   bracketed rather than invented.

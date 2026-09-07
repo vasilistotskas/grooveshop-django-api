@@ -3,6 +3,47 @@
 
 
 
+## v3.36.0 (2026-09-07)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.35.1 [skip ci] ([`b96bf76`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b96bf76629ef36531eeb11ece4c5ec6c6f952342))
+
+### Features
+
+* feat(page_config): partner strip section and a hero proof row
+
+The Δelta Σigma artboards put two things under the hero that the
+platform had no shape for: a row of "48 documented projects / 7
+fields / 2 offices" beside the copy, and a band of manufacturer names
+between the hero and the DeSET section.
+
+`stats` on `hero_banner` covers the first — `value` is TEXT, not a
+number, because the row prints "50+" as readily as a bare integer.
+`partner_strip` covers the second as its own bounded section type
+(label + up to twelve names, each optionally linked); it earns a type
+rather than markup because the names are merchant content the operator
+will add to.
+
+Both numbers in the seeded proof row are DERIVED from the content
+already in the pack — `len(PROJECTS)`, `len(SPECIALIZATIONS)`,
+`len(OFFICES)`. The desktop artboard rounds the project count to "50+"
+and the mobile one prints "48"; a hand-written figure is the one that
+goes stale the first time a project lands, so the pack counts.
+
+`--overwrite` now re-imposes section PROPS as well as order and
+i18n. Props are merchant content, so a plain re-run still leaves them
+alone — but without this the flag could not do the one job it exists
+for: a change to the plan's copy could never reach the store the plan
+was written for, because the section already existed and the seeder
+skipped it.
+
+Also gives `_check_items` a `name`, so a prop that is not called
+`items` reports errors under its own key.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018CiyyCqkXd9a1FM5hsrPFZ ([`82f77f3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/82f77f3580ba49c03c43ae56e1b693d628093981))
+
 ## v3.35.1 (2026-09-07)
 
 ### Bug fixes

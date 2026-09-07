@@ -3,6 +3,52 @@
 
 
 
+## v3.41.0 (2026-09-07)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.40.0 [skip ci] ([`cdfed37`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cdfed376caa11961f1501019c8e5c25d0bad523e))
+
+### Features
+
+* feat(page_config): the DeSET page, composed
+
+Five bands under the hero, all props-driven and all four new types
+generic rather than tenant-shaped:
+
+feature_lists two or three cards, each an icon, a title and a
+                   checklist, with one shared footnote — how a
+                   product page says what a thing IS and what it
+                   DOES.
+option_selector pick one of a few options and see it in detail:
+                   the shape a product FAMILY needs when the choice
+                   between its members is the point of the page.
+comparison_table a characteristic × option matrix. A ragged row is
+                   REFUSED rather than padded — a table whose rows
+                   disagree about how many columns there are prints
+                   a value under the wrong heading, which is worse
+                   than not printing it.
+flow_steps numbered steps with their own list of lines.
+
+`_check_nested_lines` carries the three of them that need one level of
+nesting; `_check_items` could not, because its values are scalars.
+Bounded at both levels, like everything else here.
+
+The selector's options and spec tables are PROJECTED from
+`DESET_SYSTEMS`, so the page cannot describe a system differently from
+its product page or the home band. The comparison matrix is its own
+data and says so: the artboard normalises the three onto one set of
+characteristics, while each system publishes its specs under its own
+labels — and a dash where a system lacks a feature is a comparison's
+most useful cell, which no projection would produce.
+
+Four test assertions move to the home layout: `cta_banner`,
+`features_grid` and `story_timeline` now appear on an inner page too,
+so a bare `get` by component type matched more than one row.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018CiyyCqkXd9a1FM5hsrPFZ ([`10265fc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/10265fc937af7d218733d8a4cde3b24406f32f11))
+
 ## v3.40.0 (2026-09-07)
 
 ### Chores

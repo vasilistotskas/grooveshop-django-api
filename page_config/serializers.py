@@ -34,6 +34,22 @@ class PageSectionSerializer(serializers.ModelSerializer):
         # prevents schema drift in the generated OpenAPI contract.
         read_only_fields = ("sort_order",)
 
+    def to_representation(self, instance):
+        """Answer in the locale the request asked for.
+
+        ``i18n`` is resolved HERE rather than exposed, so ``title`` and
+        ``props`` keep the shape the storefront's per-component zod
+        contracts already parse — one flat props object per section, no
+        change to a single section component. The locale rides the
+        serializer context (see ``page_config.views``); without one the
+        section answers in the store's default language.
+        """
+        data = super().to_representation(instance)
+        locale = self.context.get("locale")
+        if locale:
+            data["title"], data["props"] = instance.localized(locale)
+        return data
+
 
 class PageLayoutSerializer(serializers.ModelSerializer):
     sections = PageSectionSerializer(many=True, read_only=True)
@@ -61,6 +77,7 @@ class PageSectionWriteSerializer(serializers.ModelSerializer):
             "title",
             "is_visible",
             "props",
+            "i18n",
         )
 
     def validate(self, attrs):
@@ -72,14 +89,20 @@ class PageSectionWriteSerializer(serializers.ModelSerializer):
             ValidationError as DjangoValidationError,
         )
 
-        from page_config.schemas import validate_section_props
+        from page_config.schemas import (
+            validate_section_i18n,
+            validate_section_props,
+        )
 
+        component_type = attrs.get("component_type", "")
         try:
-            validate_section_props(
-                attrs.get("component_type", ""), attrs.get("props")
-            )
+            validate_section_props(component_type, attrs.get("props"))
         except DjangoValidationError as exc:
             raise serializers.ValidationError({"props": exc.messages}) from exc
+        try:
+            validate_section_i18n(component_type, attrs.get("i18n"))
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError({"i18n": exc.messages}) from exc
         return attrs
 
 
@@ -125,7 +148,7 @@ class PageLayoutAdminSerializer(serializers.ModelSerializer):
 class NavigationMenuSerializer(serializers.ModelSerializer):
     class Meta:
         model = NavigationMenu
-        fields = ("slot", "items")
+        fields = ("slot", "items", "i18n")
 
     def validate(self, attrs):
         from django.core.exceptions import (
@@ -133,16 +156,19 @@ class NavigationMenuSerializer(serializers.ModelSerializer):
         )
 
         from page_config.schemas import (
+            validate_navigation_i18n,
             validate_navigation_items,
         )
 
+        slot = attrs.get("slot", getattr(self.instance, "slot", ""))
         try:
-            validate_navigation_items(
-                attrs.get("slot", getattr(self.instance, "slot", "")),
-                attrs.get("items"),
-            )
+            validate_navigation_items(slot, attrs.get("items"))
         except DjangoValidationError as exc:
             raise serializers.ValidationError({"items": exc.messages}) from exc
+        try:
+            validate_navigation_i18n(slot, attrs.get("i18n"))
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError({"i18n": exc.messages}) from exc
         return attrs
 
 

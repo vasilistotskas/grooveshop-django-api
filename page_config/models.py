@@ -167,6 +167,18 @@ class PageSection(
         encoder=DjangoJSONEncoder,
         help_text=_("Component-specific configuration as JSON."),
     )
+    i18n = models.JSONField(
+        _("Locale Overrides"),
+        blank=True,
+        default=dict,
+        encoder=DjangoJSONEncoder,
+        help_text=_(
+            'Per-locale overrides, e.g. {"en": {"title": "Hero", '
+            '"props": {"heading": "..."}}}. Only the keys that differ; '
+            "everything else falls back to the fields above. The default "
+            "locale is not a valid key — those ARE the fields above."
+        ),
+    )
 
     class Meta(TypedModelMeta):
         verbose_name = _("Page Section")
@@ -183,6 +195,23 @@ class PageSection(
 
     def get_ordering_queryset(self):
         return PageSection.objects.filter(layout=self.layout)
+
+    def localized(self, locale: str) -> tuple[str, dict]:
+        """``(title, props)`` as ``locale`` should render them.
+
+        The override is a PARTIAL merge over ``props`` rather than a
+        replacement, so the structural props (``columns``, ``count``,
+        ``cta_link``) stay single-sourced and cannot drift between
+        languages — only the copy is per-locale. That is also why this
+        is a JSON overlay and not a parler translation: parler
+        translates FIELDS, and ``props`` is one field holding both
+        layout configuration and customer-facing text.
+        """
+        override = (self.i18n or {}).get(locale) or {}
+        return (
+            override.get("title") or self.title,
+            {**(self.props or {}), **(override.get("props") or {})},
+        )
 
 
 class NavigationSlot(models.TextChoices):
@@ -203,6 +232,11 @@ class NavigationMenu(TimeStampMixinModel, UUIDModel):
     ``items`` shape per slot (validated in ``page_config/schemas.py``):
     - header/mobile: ``[{label, to|href, icon?}]``
     - footer: ``[{label, icon?, children: [{label, to|href}]}]``
+
+    ``i18n`` holds the same shape per non-default locale. Labels are
+    operator content, not translation keys, so a multilingual store
+    supplies its own menu per language; the storefront's navigation
+    route resolves it and keys its cache on the locale.
     """
 
     slot = models.CharField(
@@ -223,6 +257,19 @@ class NavigationMenu(TimeStampMixinModel, UUIDModel):
             "an https URL."
         ),
     )
+    i18n = models.JSONField(
+        _("Locale Overrides"),
+        blank=True,
+        default=dict,
+        encoder=DjangoJSONEncoder,
+        help_text=_(
+            'Per-locale menus, e.g. {"en": [...]}, in the same shape as '
+            "Items. A menu is translated whole rather than per item, "
+            "because an index-keyed overlay would retarget every label "
+            "the first time the menu is reordered. Locales with no entry "
+            "here get the menu above."
+        ),
+    )
 
     class Meta(TypedModelMeta):
         verbose_name = _("Navigation Menu")
@@ -231,6 +278,10 @@ class NavigationMenu(TimeStampMixinModel, UUIDModel):
 
     def __str__(self) -> str:
         return f"{self.get_slot_display()} navigation"
+
+    def localized(self, locale: str) -> list:
+        """The menu as ``locale`` should render it."""
+        return (self.i18n or {}).get(locale) or self.items
 
 
 class ContentPageQuerySet(TranslatableOptimizedQuerySet):

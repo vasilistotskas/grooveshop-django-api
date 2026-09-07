@@ -15,7 +15,10 @@ from __future__ import annotations
 
 import re
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
+
+from core.utils.i18n import available_language_codes
 
 _HEX_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 _LINK_RE = re.compile(r"^(/|https://)")
@@ -406,3 +409,83 @@ def validate_navigation_items(slot: str, items: object) -> None:
         raise ValidationError(
             f"Invalid {slot} navigation: " + "; ".join(errors)
         )
+
+
+def _check_locale_keys(i18n: object, label: str) -> dict:
+    """Shared shape check for the two per-locale override fields.
+
+    The default locale is NOT a valid key: its values are the columns
+    above the override (``props``/``items``), so accepting it here would
+    give one locale two sources of truth and no rule for which wins.
+    """
+    if not isinstance(i18n, dict):
+        raise ValidationError(f"{label} must be a JSON object.")
+
+    codes = available_language_codes()
+    default = settings.PARLER_DEFAULT_LANGUAGE_CODE
+    errors: list[str] = []
+    for code in i18n:
+        if not isinstance(code, str) or code not in codes:
+            errors.append(f"{code!r}: not a language this store serves")
+        elif code == default:
+            errors.append(
+                f"{code!r}: is the default locale — edit the fields "
+                "themselves rather than overriding them"
+            )
+    if errors:
+        raise ValidationError(f"Invalid {label}: " + "; ".join(errors))
+    return {str(k): v for k, v in i18n.items()}
+
+
+def validate_section_i18n(component_type: str, i18n: object) -> None:
+    """Raise ``ValidationError`` when a section's per-locale overrides
+    don't fit ``{"<locale>": {"title": str, "props": {...}}}``.
+
+    ``props`` here is a PARTIAL override merged over the section's own
+    props at render time, so every key is optional and each is checked
+    against the same per-component contract
+    (``validate_section_props``) — a locale cannot introduce a prop the
+    component does not have.
+    """
+    if i18n in (None, {}):
+        return
+
+    for code, override in _check_locale_keys(i18n, "i18n").items():
+        if not isinstance(override, dict):
+            raise ValidationError(f"i18n.{code}: must be a JSON object.")
+        unknown = set(override) - {"title", "props"}
+        if unknown:
+            raise ValidationError(
+                f"i18n.{code}: unknown keys {sorted(unknown)} "
+                "(only 'title' and 'props')"
+            )
+        title = override.get("title")
+        if title is not None and not _is_str(title, 200):
+            raise ValidationError(f"i18n.{code}.title: string ≤200 required")
+        if "props" in override:
+            try:
+                validate_section_props(component_type, override["props"])
+            except ValidationError as exc:
+                raise ValidationError(
+                    f"i18n.{code}.props: " + "; ".join(exc.messages)
+                ) from exc
+
+
+def validate_navigation_i18n(slot: str, i18n: object) -> None:
+    """Raise ``ValidationError`` when a menu's per-locale overrides
+    don't fit ``{"<locale>": [...items...]}``.
+
+    A menu is translated WHOLE rather than per-item: the items are a
+    list, so an index-keyed overlay would silently retarget every label
+    the first time an operator reorders the menu.
+    """
+    if i18n in (None, {}):
+        return
+
+    for code, items in _check_locale_keys(i18n, "i18n").items():
+        try:
+            validate_navigation_items(slot, items)
+        except ValidationError as exc:
+            raise ValidationError(
+                f"i18n.{code}: " + "; ".join(exc.messages)
+            ) from exc

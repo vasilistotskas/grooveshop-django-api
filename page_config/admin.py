@@ -20,6 +20,7 @@ class PageSectionInline(TabularInline):
         "title",
         "is_visible",
         "props",
+        "i18n",
         "sort_order",
     )
     readonly_fields = ("sort_order",)
@@ -81,15 +82,17 @@ class NavigationMenuAdmin(BaseModelAdmin):
     compressed_fields = True
     warn_unsaved_form = True
     list_display = ("slot", "updated_at")
-    fields = ("slot", "items")
+    fields = ("slot", "items", "i18n")
 
     def save_model(self, request, obj, form, change):
         # Field-level JSON validation mirrors the storefront contract.
         from page_config.schemas import (
+            validate_navigation_i18n,
             validate_navigation_items,
         )
 
         validate_navigation_items(obj.slot, obj.items)
+        validate_navigation_i18n(obj.slot, obj.i18n)
         super().save_model(request, obj, form, change)
 
 

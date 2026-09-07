@@ -135,6 +135,9 @@ THEME = {
 # Contact — every value here is published on delta-sigma.gr
 # ---------------------------------------------------------------------------
 
+# ``en`` transliterates the address rather than translating it: the
+# street line has to stay usable by a Greek courier or a map search, so
+# it is the Latin spelling of the same address, not an English rewrite.
 OFFICES = [
     {
         "label": "Θεσσαλονίκη",
@@ -143,6 +146,12 @@ OFFICES = [
         "postal": "551 32",
         "city": "Θεσσαλονίκη",
         "phones": ["2310 924 440", "2310 934 169"],
+        "en": {
+            "label": "Thessaloniki",
+            "street": "7 G. Ritsou St.",
+            "area": "Kalamaria",
+            "city": "Thessaloniki",
+        },
     },
     {
         "label": "Αττική",
@@ -151,6 +160,12 @@ OFFICES = [
         "postal": "157 71",
         "city": "Αττική",
         "phones": ["2311 820 329"],
+        "en": {
+            "label": "Attica",
+            "street": "23 Ilision St.",
+            "area": "Zografou",
+            "city": "Attica",
+        },
     },
 ]
 
@@ -188,25 +203,46 @@ SETTINGS = {
 }
 
 
+def _office_block(office: dict, *, locale: str = "el") -> str:
+    fields = office if locale == "el" else {**office, **office["en"]}
+    phone_label = "Τηλ" if locale == "el" else "Tel"
+    phones = " · ".join(office["phones"])
+    return (
+        f"<h3>{fields['label']}</h3>"
+        f"<p>{fields['street']}, {fields['area']} {office['postal']}, "
+        f"{fields['city']}<br>"
+        f"{phone_label}: {phones}</p>"
+    )
+
+
 def _contact_html() -> str:
     """The contact block for the `contact` page layout."""
-    blocks = []
-    for office in OFFICES:
-        phones = " · ".join(office["phones"])
-        blocks.append(
-            f"<h3>{office['label']}</h3>"
-            f"<p>{office['street']}, {office['area']} {office['postal']}, "
-            f"{office['city']}<br>"
-            f"Τηλ: {phones}</p>"
-        )
     return (
         "<h2>Επικοινωνία</h2>"
         "<p>Στείλτε μας την περιγραφή του έργου ή τα τεύχη δημοπράτησης. "
         "Απαντάμε με προτεινόμενη λύση, κατάλογο υλικών και "
         "χρονοδιάγραμμα.</p>"
-        + "".join(blocks)
+        + "".join(_office_block(office) for office in OFFICES)
         + f'<p>Email: <a href="mailto:{CONTACT_EMAIL}">{CONTACT_EMAIL}</a>'
         f"<br>Γ.Ε.ΜΗ.: {GEMH}</p>"
+    )
+
+
+def _contact_html_en() -> str:
+    """The same block in English.
+
+    ``Γ.Ε.ΜΗ.`` is the Greek commercial registry; "General Commercial
+    Registry (GEMI)" is its own published English name, so the number
+    stays labelled rather than transliterated.
+    """
+    return (
+        "<h2>Contact</h2>"
+        "<p>Send us the project description or the tender documents. We "
+        "reply with a proposed solution, a bill of materials and a "
+        "schedule.</p>"
+        + "".join(_office_block(office, locale="en") for office in OFFICES)
+        + f'<p>Email: <a href="mailto:{CONTACT_EMAIL}">{CONTACT_EMAIL}</a>'
+        f"<br>General Commercial Registry (GEMI): {GEMH}</p>"
     )
 
 
@@ -216,7 +252,11 @@ def _contact_html() -> str:
 
 # price is 0: DeSET is quote-only and the real figures are not public.
 # The storefront shows a "request a quote" CTA for zero-priced rows.
-DESET_CATEGORY = ("deset", "DeSET — Τηλεποπτεία σταθμών ΑΠΕ")
+DESET_CATEGORY = (
+    "deset",
+    "DeSET — Τηλεποπτεία σταθμών ΑΠΕ",
+    "DeSET — Remote supervision of renewable plants",
+)
 
 DESET_SYSTEMS = [
     {
@@ -236,6 +276,22 @@ DESET_SYSTEMS = [
             ("Ψηφιακές έξοδοι", "8"),
             ("Θύρες Ethernet", "2 × Modbus TCP, OPC UA"),
             ("Σειριακή θύρα", "1 × RS485 Modbus RTU (TA5142-RS485I)"),
+            ("Firmware", "CODESYS"),
+        ],
+        "name_en": "DeSET 01 — ABB PM5072-2ETH PLC",
+        "summary_en": (
+            "The baseline, field-proven option. Twelve digital inputs — "
+            "the most of the three systems — for an installation with "
+            "many status contacts and no way to collect the data over "
+            "the network."
+        ),
+        "specs_en": [
+            ("Memory", "8 MB"),
+            ("SD card", "up to 32 GB"),
+            ("Digital inputs", "12"),
+            ("Digital outputs", "8"),
+            ("Ethernet ports", "2 × Modbus TCP, OPC UA"),
+            ("Serial port", "1 × RS485 Modbus RTU (TA5142-RS485I)"),
             ("Firmware", "CODESYS"),
         ],
     },
@@ -261,6 +317,25 @@ DESET_SYSTEMS = [
             ("Θερμοκρασία gateway", "-40 °C … 70 °C"),
             ("Firmware", "CODESYS"),
         ],
+        "name_en": "DeSET 02 — INVT TM750 PLC + Advantech gateway",
+        "summary_en": (
+            "The option with the most headroom in memory and "
+            "networking. A separate gateway handles protocol "
+            "translation, with EtherCAT and a second serial port for "
+            "complex field installations."
+        ),
+        "specs_en": [
+            ("Memory", "20 MB"),
+            ("SD card", "up to 32 GB"),
+            ("Digital inputs", "8"),
+            ("Digital outputs", "8"),
+            ("Ethernet ports", "2 × Modbus TCP, OPC UA"),
+            ("EtherCAT port", "yes"),
+            ("Serial ports", "2 × RS485 Modbus RTU"),
+            ("Gateway", "TI Cortex A8 600 MHz, 256 MB DDR3L, IEC-104 M/S"),
+            ("Gateway temperature range", "-40 °C … 70 °C"),
+            ("Firmware", "CODESYS"),
+        ],
     },
     {
         "slug": "deset-wago-pfc200-g2",
@@ -282,6 +357,23 @@ DESET_SYSTEMS = [
             ("Σειριακή θύρα", "RS485 Modbus RTU"),
             ("Πρόσθετες κάρτες", "8 ψηφ. εισόδων + 8 ψηφ. εξόδων"),
         ],
+        "name_en": ("DeSET 03 — WAGO PFC200 G2 2ETH RS Tele T ECO PLC"),
+        "summary_en": (
+            "The option with IEC 104 built in — no separate gateway. "
+            "Real-time Linux with the largest memory and expandable I/O "
+            "cards, for when a simple cabinet is the priority."
+        ),
+        "specs_en": [
+            ("Platform", "Real-time Linux"),
+            ("CPU", "Cortex A8, 1 GHz"),
+            ("RAM", "512 MB"),
+            ("Flash", "4096 MB"),
+            ("SD card", "up to 32 GB"),
+            ("Protocol", "IEC 104 built in"),
+            ("Ethernet ports", "2 × independent, Modbus TCP"),
+            ("Serial port", "RS485 Modbus RTU"),
+            ("Add-on cards", "8 digital inputs + 8 digital outputs"),
+        ],
     },
 ]
 
@@ -293,19 +385,33 @@ DESET_COMPLIANCE = (
     "ν. 5106/2024 (ΦΕΚ Α΄ 63/01.05.2024)."
 )
 
+DESET_COMPLIANCE_EN = (
+    "In full compliance with HEDNO's technical specifications for "
+    "connecting renewable and high-efficiency CHP plants with an "
+    "installed capacity above four hundred kilowatts (400 kW) to the "
+    "Distribution Network Telecontrol and Management System (HEDNO "
+    "SCADA/DMS) — Law 5106/2024 (Government Gazette A' "
+    "63/01.05.2024)."
+)
+
 
 # ---------------------------------------------------------------------------
 # Project register — real reference list from delta-sigma.gr/εμπειρία
 # ---------------------------------------------------------------------------
 
+# (slug, Greek name, English name)
 SECTORS = [
-    ("viologikoi", "Βιολογικοί καθαρισμοί"),
-    ("antliostasia", "Αντλιοστάσια & ύδρευση"),
-    ("energeia", "Ενέργεια & ΑΠΕ"),
-    ("viomichania", "Βιομηχανία"),
-    ("ktiriaka", "Κτιριακά (BMS)"),
-    ("aporrimmata", "Απορρίμματα"),
-    ("kykloforia", "Διαχείριση κυκλοφορίας"),
+    ("viologikoi", "Βιολογικοί καθαρισμοί", "Wastewater treatment"),
+    (
+        "antliostasia",
+        "Αντλιοστάσια & ύδρευση",
+        "Pumping stations & water supply",
+    ),
+    ("energeia", "Ενέργεια & ΑΠΕ", "Energy & renewables"),
+    ("viomichania", "Βιομηχανία", "Industry"),
+    ("ktiriaka", "Κτιριακά (BMS)", "Buildings (BMS)"),
+    ("aporrimmata", "Απορρίμματα", "Waste management"),
+    ("kykloforia", "Διαχείριση κυκλοφορίας", "Traffic management"),
 ]
 
 # (sector, slug, title, technical note, contracting company)
@@ -673,9 +779,246 @@ PROJECTS = [
 ]
 
 
+# English titles and technical notes for the register above, keyed by
+# slug. Client names stay verbatim: they are registered legal entities,
+# not phrases to translate — only the two that are descriptions rather
+# than names ("Ιδιωτικό έργο", and the municipal water utilities that
+# publish their own English name) are carried here.
+PROJECTS_EN = {
+    "anemogennitries-karystos": (
+        "Monitoring of thirteen wind turbines, Karystos, Evia",
+        "Study, construction, programming and commissioning.",
+    ),
+    "vioaerio-ampelonas": (
+        "Biogas power generation plant, Ampelonas, Larissa",
+        "Programming and commissioning into automatic operation.",
+    ),
+    "vioaerio-nea-tenedos": (
+        "Biogas power generation plant, Nea Tenedos, Chalkidiki",
+        "Programming and commissioning into automatic operation.",
+    ),
+    "vioaerio-farsala": (
+        "Biogas power generation plant, Farsala",
+        "Programming and commissioning into automatic operation.",
+    ),
+    "ydrostrovilos-naousa": (
+        "Private hydro-turbine power plant, Naousa, Imathia",
+        "Study, construction, programming and commissioning.",
+    ),
+    "geranogefyra-mea-tripolis": (
+        "Waste-handling overhead crane, Tripoli treatment plant",
+        ("Analysis, programming and commissioning into automatic operation."),
+    ),
+    "xyta-amariou-rethymnou": (
+        "Supervision automation, Amari landfill, Rethymno",
+        "Simatic Step 7-300 & SCADA WinCC flexible.",
+    ),
+    "xyta-tagaradon": (
+        "Operation automation & SCADA, Tagarades landfill, Thessaloniki",
+        "Four Simatic Step 7-200 on Profibus & SCADA WinCC flexible.",
+    ),
+    "oryktovamvakas-terpni": (
+        "Mineral wool production plant, Terpni, Serres",
+        "Four Simatic Step 7-300 on Profibus & SCADA WinCC.",
+    ),
+    "peristrofiko-armektirio": (
+        "Rotary milking parlour machine",
+        ("Analysis, programming and commissioning into automatic operation."),
+    ),
+    "skyrodema-ellinikos-chrysos": (
+        "Concrete production complex, Hellas Gold mines",
+        "Simatic Step 7-300 & SCADA ProTool.",
+    ),
+    "vk-mykonou": (
+        "Mykonos wastewater treatment plant extension",
+        "MANN+HUMMEL membranes — study, programming, commissioning.",
+    ),
+    "vk-volou": (
+        "Volos wastewater treatment plant extension",
+        "KOCH membranes — study, programming, commissioning.",
+    ),
+    "vk-georgioupolis": (
+        "Georgioupoli wastewater treatment plant, Crete",
+        "Study, programming and commissioning into automatic operation.",
+    ),
+    "vk-krania-elassonas": (
+        "Krania wastewater treatment plant, Elassona",
+        "Study, programming and commissioning into automatic operation.",
+    ),
+    "vk-porto-karras": (
+        ("Wastewater treatment plant for the Porto Carras resort, Chalkidiki"),
+        "Study, construction, programming and commissioning.",
+    ),
+    "vk-xytu-artas": (
+        "Wastewater treatment plant, Arta landfill",
+        "Study, programming and commissioning into automatic operation.",
+    ),
+    "vk-xytu-alexandroupolis": (
+        "Wastewater treatment plant, Alexandroupoli landfill",
+        "Study, programming and commissioning into automatic operation.",
+    ),
+    "scada-vk-kastorias": (
+        "SCADA for the Kastoria wastewater treatment plant",
+        "Supervisory control and data acquisition.",
+    ),
+    "vk-doxato-dramas": (
+        (
+            "Doxato wastewater treatment plant, Drama, and ten satellite "
+            "pumping stations"
+        ),
+        "Study, programming and commissioning into automatic operation.",
+    ),
+    "vk-dimos-pangaiou": (
+        "Wastewater treatment plant, Municipality of Pangaio",
+        "Study, development and delivery.",
+    ),
+    "vk-orfani-pangaiou": (
+        "Wastewater treatment plant at Orfani, Municipality of Pangaio",
+        "Study, development and delivery.",
+    ),
+    "eel-eleftherios-venizelos": (
+        'Athens "Eleftherios Venizelos" airport WWTP — second phase',
+        "Three Simatic Step 7-300 programmable logic controllers.",
+    ),
+    "eel-dimou-xanthis": (
+        "Municipality of Xanthi WWTP",
+        "Operation automation and SCADA.",
+    ),
+    "eel-patras": (
+        "Patras WWTP",
+        (
+            "Fourteen Step 7 controllers on Profibus, a radio network and a "
+            "dual SCADA for added redundancy."
+        ),
+    ),
+    "eel-thessalonikis": (
+        "Thessaloniki WWTP",
+        (
+            "Eight plus seventeen Step 5 controllers, a fibre-optic Ethernet "
+            "backbone and local Profibus islands."
+        ),
+    ),
+    "eel-ioanninon": (
+        "Ioannina WWTP",
+        (
+            "Eight Step 7 controllers on an optical Profibus network, triple "
+            "SCADA station."
+        ),
+    ),
+    "psyttaleia-eydap": (
+        "Psyttaleia wastewater pre-treatment facilities",
+        "Among the first ASI installations in Greece; dual SCADA WinCC.",
+    ),
+    "eel-rethymno-volos-veroia": (
+        "WWTPs of Rethymno, Volos, Veria, Agrinio and Chania",
+        (
+            "Networked Siemens Step 5 / Step 7 on SinecL1 and Profibus; a "
+            "15-kilometre optical link at Agrinio."
+        ),
+    ),
+    "nato-soudas": (
+        "Support facilities for the NATO naval base at Souda",
+        ("Four Step 5 controllers on SinecL2 (Profibus), SCADA WinCC station."),
+    ),
+    "eel-oinopoiia-tsantali": (
+        "Tsantali winery WWTP",
+        "Siemens Step 5 programmable logic controller.",
+    ),
+    "antliostasia-zambia": (
+        "Seven irrigation pumping stations, Zambia",
+        (
+            "Analysis, programming and commissioning into automatic "
+            "operation; World Bank funded."
+        ),
+    ),
+    "costa-navarino": (
+        "Costa Navarino resort, Pylos, Messinia",
+        (
+            "Four Step 7-300, two S7-200 and five S7-1200 controllers on "
+            "Optical Ethernet, GSM & SCADA WinCC."
+        ),
+    ),
+    "antliostasia-kastorias": (
+        "Seven pumping stations, Kastoria",
+        "Study, programming and commissioning into automatic operation.",
+    ),
+    "kentriko-antliostasio-kavalas": (
+        "Main pumping station, Kavala water utility",
+        "Study, construction, programming and commissioning.",
+    ),
+    "antliostasia-dimou-pylou": (
+        "Two main pumping stations, Municipality of Pylos",
+        "Study, programming and commissioning into automatic operation.",
+    ),
+    "kentriko-antliostasio-deyam-volou": (
+        "Main pumping station, Volos water utility",
+        "Study, programming and commissioning into automatic operation.",
+    ),
+    "antliostasia-agiou-vasileiou": (
+        "Ten pumping stations, Municipality of Agios Vasileios, Crete",
+        "Study, construction, programming and commissioning.",
+    ),
+    "antliostasia-chanion": (
+        "Sewage pumping stations & WWTP extension, Chania tourist area",
+        ("Six Simatic Step 7-200 and two Step 7-300 controllers, SCADA WinCC."),
+    ),
+    "ktirio-grafeion-athina": (
+        "Nine-storey office building in central Athens",
+        "Building management system — in service with PPC.",
+    ),
+    "ktirio-stathmefsis-volos": (
+        "Fifteen-storey car park building, Volos",
+        "Study, design, construction, programming and commissioning.",
+    ),
+    "novacert-psyxi-thermansi": (
+        "Cooling and heating management system",
+        "Study, design, programming and commissioning.",
+    ),
+    "kentro-diadosis-epistimon": (
+        "Thessaloniki Science Center & Technology Museum",
+        "Building facilities management system.",
+    ),
+    "klliniki-genesis": (
+        "Genesis private clinic",
+        "Siemens Building Technologies BMS.",
+    ),
+    "kaftanzoglio": (
+        "Kaftanzoglio National Stadium",
+        "Simatic Step 7-300 on Ethernet.",
+    ),
+    "stadio-aris-vikelidis": (
+        "Aris stadium — Kleanthis Vikelidis",
+        "Simatic Step 7-300.",
+    ),
+    "parking-veroias": (
+        "Veria municipal car park",
+        "Simatic Step 7-300.",
+    ),
+    "siragges-asprovaltas": (
+        "Traffic management system, Asprovalta tunnels",
+        "Simatic Step 7-300.",
+    ),
+}
+
+# Only the client entries that are DESCRIPTIONS or bodies with a
+# published English name. Everything absent here is a registered
+# company name and is reproduced verbatim in both languages.
+CLIENTS_EN = {
+    "Ιδιωτικό έργο": "Private project",
+    "Δήμος Αγίου Βασιλείου": "Municipality of Agios Vasileios",
+    "ΔΕΥΑ Καστοριάς": "Kastoria Water & Sewerage Company",
+}
+
 # ---------------------------------------------------------------------------
-# Marketing content — Greek only (PageSection.props is not translatable)
+# Marketing content
 # ---------------------------------------------------------------------------
+#
+# Each block below has an ``_EN`` twin, and the two are wired together in
+# ``_layout_plan`` through ``PageSection.i18n`` — the per-locale override
+# map Django resolves for ``?locale=`` (see
+# ``page_config/localization.py``). A list-valued prop such as ``items``
+# is overridden WHOLE, so the English list repeats the icons: a partial
+# merge cannot reach into a list element.
 
 SPECIALIZATIONS = [
     {
@@ -719,6 +1062,51 @@ SPECIALIZATIONS = [
         "icon": "i-lucide-traffic-cone",
         "text": "Κέντρα ελέγχου, VMS, VSLS, LCS, μετεωρολογικοί σταθμοί, "
         "ανιχνευτές οχημάτων.",
+    },
+]
+
+SPECIALIZATIONS_EN = [
+    {
+        "title": "Automation systems",
+        "icon": "i-lucide-cpu",
+        "text": "Study, supply, programming and commissioning of PLC, "
+        "DCS and SCADA systems.",
+    },
+    {
+        "title": "Measurement & control systems",
+        "icon": "i-lucide-gauge",
+        "text": "Supply, installation, calibration, training and "
+        "service — including explosive atmospheres.",
+    },
+    {
+        "title": "Building facilities management",
+        "icon": "i-lucide-building-2",
+        "text": "BMS, SCADA visualisation, car-park automation, KNX, "
+        "CCTV and access control.",
+    },
+    {
+        "title": "Electromechanical installations",
+        "icon": "i-lucide-zap",
+        "text": "From study to maintenance: cabling, soft starters, "
+        "variable-speed drives and motor control panels.",
+    },
+    {
+        "title": "Energy projects",
+        "icon": "i-lucide-battery-charging",
+        "text": "Data acquisition, measurement analysis and energy "
+        "efficiency interventions.",
+    },
+    {
+        "title": "Telecommunications",
+        "icon": "i-lucide-radio",
+        "text": "Industrial networks, wireless Wi-Fi / UHF / LoRaWAN / "
+        "5G links and telemetry.",
+    },
+    {
+        "title": "Traffic management systems",
+        "icon": "i-lucide-traffic-cone",
+        "text": "Control centres, VMS, VSLS, LCS, weather stations and "
+        "vehicle detectors.",
     },
 ]
 
@@ -779,6 +1167,61 @@ ACTIVITIES = [
     },
 ]
 
+ACTIVITIES_EN = [
+    {
+        "title": "Study & design",
+        "date": "01",
+        "icon": "i-lucide-drafting-compass",
+        "text": "Construction drawings, itemised bills of materials, "
+        "flow diagrams, costings and schedules.",
+    },
+    {
+        "title": "Supply",
+        "date": "02",
+        "icon": "i-lucide-package",
+        "text": "Radio links, IoT, process automation and BMS — with "
+        "pre-sales support and parameterisation.",
+    },
+    {
+        "title": "Installation",
+        "date": "03",
+        "icon": "i-lucide-hard-hat",
+        "text": "Trained crews; handover with a test report and "
+        "as-built drawings.",
+    },
+    {
+        "title": "Programming",
+        "date": "04",
+        "icon": "i-lucide-code",
+        "text": "PLC, SCADA and applications in Python, C++, C, "
+        "JavaScript and Java — with a user manual.",
+    },
+    {
+        "title": "Calibration & commissioning",
+        "date": "05",
+        "icon": "i-lucide-sliders-horizontal",
+        "text": "Parameter settings with a full record and a change log.",
+    },
+    {
+        "title": "Training",
+        "date": "06",
+        "icon": "i-lucide-graduation-cap",
+        "text": "Training for the owner's own staff, plus documentation.",
+    },
+    {
+        "title": "Repairs & support",
+        "date": "07",
+        "icon": "i-lucide-wrench",
+        "text": "Debugging installations — ours or anyone else's.",
+    },
+    {
+        "title": "Support contracts",
+        "date": "08",
+        "icon": "i-lucide-shield-check",
+        "text": "Six months of free support, then a maintenance contract.",
+    },
+]
+
 FAQ_ITEMS = [
     {
         "question": "Ποιοι σταθμοί υποχρεούνται να εγκαταστήσουν DeSET;",
@@ -820,6 +1263,45 @@ FAQ_ITEMS = [
 ]
 
 
+FAQ_ITEMS_EN = [
+    {
+        "question": "Which plants are required to install DeSET?",
+        "answer": "Every renewable or high-efficiency CHP plant with an "
+        "installed capacity above 400 kW connected to the Greek "
+        "distribution network must have remote supervision and "
+        "control-command capability — Law 5106/2024 (Government "
+        "Gazette A' 63/01.05.2024).",
+    },
+    {
+        "question": "What is the difference between the three DeSET systems?",
+        "answer": "All three meet HEDNO's current specifications. They "
+        "differ in the headroom they leave for future needs: the ABB "
+        "PM5072 has the most digital inputs (12), the INVT TM750 the "
+        "widest networking with EtherCAT and a separate gateway, and "
+        "the WAGO PFC200 has IEC 104 built in with no gateway at all.",
+    },
+    {
+        "question": "Do you take on projects someone else started?",
+        "answer": "Yes. We step in to debug installations completed "
+        "either by us or by others. After a short intervention an "
+        "installation usually runs again with the intended results.",
+    },
+    {
+        "question": "What support is provided after handover?",
+        "answer": "Every installation we complete comes with six "
+        "months of free support, after which we propose a sensible "
+        "maintenance contract so that operation stays assured for the "
+        "whole of its life cycle.",
+    },
+    {
+        "question": "Which languages do you program in?",
+        "answer": "PLC and SCADA, plus PC applications in Python, C++, "
+        "C, JavaScript and Java. Every program is exercised by our "
+        "test staff and delivered with a user manual.",
+    },
+]
+
+
 # The four sections ``page_config.defaults`` seeds onto every new
 # tenant's ``home``. Δelta Σigma's homepage replaces all four — leaving
 # them in place opens the site on an empty hero carousel and a blog
@@ -854,7 +1336,14 @@ def _deset_link() -> str:
 
 
 def _layout_plan() -> dict:
-    """Build LAYOUT_PLAN lazily so the props stay in one place."""
+    """Build LAYOUT_PLAN lazily so the props stay in one place.
+
+    ``i18n`` is the per-locale override map ``PageSection`` resolves for
+    ``?locale=``. It carries ONLY the copy: the links, column counts and
+    decor stay in ``props``, single-sourced, so the two languages cannot
+    drift apart on layout. The exception is ``items`` — a list prop is
+    overridden whole, because a merge cannot reach into its elements.
+    """
     deset_link = _deset_link()
     return {
         "home": [
@@ -879,6 +1368,22 @@ def _layout_plan() -> dict:
                     "secondary_cta_link": deset_link,
                     "decor": "gradient",
                 },
+                "i18n": {
+                    "en": {
+                        "props": {
+                            "eyebrow": "Industrial computing · Automation",
+                            "heading": "Turnkey automation and telemetry "
+                            "systems.",
+                            "subheading": "We study, build, program and "
+                            "commission networked PLC and SCADA "
+                            "systems, along with complex "
+                            "electromechanical works — and we support "
+                            "them across their whole life cycle.",
+                            "cta_text": "Request a quote",
+                            "secondary_cta_text": "The DeSET system",
+                        }
+                    }
+                },
             },
             {
                 "component_type": "features_grid",
@@ -889,6 +1394,15 @@ def _layout_plan() -> dict:
                     "columns": 4,
                     "decor": "gradient_tiles",
                     "items": SPECIALIZATIONS,
+                },
+                "i18n": {
+                    "en": {
+                        "title": "Specialization",
+                        "props": {
+                            "heading": "Seven fields, one contractor",
+                            "items": SPECIALIZATIONS_EN,
+                        },
+                    }
                 },
             },
             {
@@ -903,6 +1417,16 @@ def _layout_plan() -> dict:
                     "cta_link": deset_link,
                     "decor": "orbs",
                 },
+                "i18n": {
+                    "en": {
+                        "props": {
+                            "heading": "DeSET — remote supervision of "
+                            "renewable plants",
+                            "body": DESET_COMPLIANCE_EN,
+                            "cta_text": "See the three systems",
+                        }
+                    }
+                },
             },
             {
                 "component_type": "story_timeline",
@@ -912,12 +1436,22 @@ def _layout_plan() -> dict:
                     "heading": "Από τη μελέτη ως το συμβόλαιο υποστήριξης",
                     "items": ACTIVITIES,
                 },
+                "i18n": {
+                    "en": {
+                        "title": "Activities",
+                        "props": {
+                            "heading": "From the study to the support contract",
+                            "items": ACTIVITIES_EN,
+                        },
+                    }
+                },
             },
             {
                 "component_type": "blog_posts_grid",
                 "title": "Εμπειρία",
                 "sort_order": 4,
                 "props": {"count": 6},
+                "i18n": {"en": {"title": "Experience"}},
             },
             {
                 "component_type": "faq",
@@ -927,6 +1461,15 @@ def _layout_plan() -> dict:
                     "heading": "Συχνές ερωτήσεις",
                     "multiple": True,
                     "items": FAQ_ITEMS,
+                },
+                "i18n": {
+                    "en": {
+                        "title": "Frequently asked questions",
+                        "props": {
+                            "heading": "Frequently asked questions",
+                            "items": FAQ_ITEMS_EN,
+                        },
+                    }
                 },
             },
             {
@@ -942,6 +1485,18 @@ def _layout_plan() -> dict:
                     "button_text": "Ζητήστε προσφορά",
                     "button_link": "/contact",
                 },
+                "i18n": {
+                    "en": {
+                        "props": {
+                            "heading": "Tell us what has to work.",
+                            "description": "Send us the description or "
+                            "the tender documents. We reply with a "
+                            "proposed solution, a bill of materials and "
+                            "a schedule.",
+                            "button_text": "Request a quote",
+                        }
+                    }
+                },
             },
         ],
         # contact.vue renders usePageConfig('contact') — without a
@@ -952,6 +1507,12 @@ def _layout_plan() -> dict:
                 "title": "Στοιχεία επικοινωνίας",
                 "sort_order": 0,
                 "props": {"content": _contact_html()},
+                "i18n": {
+                    "en": {
+                        "title": "Contact details",
+                        "props": {"content": _contact_html_en()},
+                    }
+                },
             },
         ],
     }
@@ -993,6 +1554,50 @@ def _nav_footer() -> list[dict]:
     ]
 
 
+# The English menus keep the SAME paths: the ContentPage slugs are the
+# published Greek ones and stay that way in both languages — renaming
+# them per locale would fork the URL space and break every existing
+# link. Only the labels are translated. The ``/en`` prefix is added by
+# the storefront's i18n router, not here.
+def _nav_header_en() -> list[dict]:
+    return [
+        {"label": "DeSET", "to": _deset_link()},
+        {"label": "Specialization", "to": "/info/eidikefsi"},
+        {"label": "Activities", "to": "/info/drastiriotites"},
+        {"label": "Experience", "to": "/blog"},
+        {"label": "Partners", "to": "/info/synergates"},
+        {"label": "Contact", "to": "/contact"},
+    ]
+
+
+def _nav_mobile_en() -> list[dict]:
+    return [{"label": "Home", "to": "/"}, *_nav_header_en()]
+
+
+def _nav_footer_en() -> list[dict]:
+    return [
+        {
+            "label": "Company",
+            "children": [
+                {"label": "Specialization", "to": "/info/eidikefsi"},
+                {"label": "Activities", "to": "/info/drastiriotites"},
+                {"label": "Experience", "to": "/blog"},
+                {"label": "Partners", "to": "/info/synergates"},
+            ],
+        },
+        {
+            "label": "Solutions",
+            "children": [
+                {
+                    "label": "DeSET — renewable plant supervision",
+                    "to": _deset_link(),
+                },
+                {"label": "Contact", "to": "/contact"},
+            ],
+        },
+    ]
+
+
 CONTENT_PAGES = {
     "eidikefsi": {
         "el": {
@@ -1010,8 +1615,11 @@ CONTENT_PAGES = {
             "title": "Specialization",
             "body": "<h2>Seven fields, one contractor</h2><p>One contractor "
             "for the whole chain — from study and procurement "
-            "through programming, commissioning and maintenance."
-            "</p>",
+            "through programming, commissioning and maintenance.</p>"
+            + "".join(
+                f"<h3>{s['title']}</h3><p>{s['text']}</p>"
+                for s in SPECIALIZATIONS_EN
+            ),
         },
     },
     "drastiriotites": {
@@ -1029,7 +1637,11 @@ CONTENT_PAGES = {
             "title": "Activities",
             "body": "<h2>Eight phases, one responsible party</h2><p>Every "
             "phase has a defined deliverable, and the last one lasts "
-            "as long as the installation's life cycle.</p>",
+            "as long as the installation's life cycle.</p>"
+            + "".join(
+                f"<h3>{a['date']}. {a['title']}</h3><p>{a['text']}</p>"
+                for a in ACTIVITIES_EN
+            ),
         },
     },
     "synergates": {
@@ -1057,7 +1669,19 @@ CONTENT_PAGES = {
             "title": "Partners",
             "body": "<h2>The equipment we trust</h2><p>We are not tied to a "
             "single manufacturer. We choose per project — and we are "
-            "the first line of repair for everything we supply.</p>",
+            "the first line of repair for everything we supply.</p>"
+            "<h3>ABB</h3><p>Controllers, variable-speed drives and "
+            "automation equipment. DeSET System 01 is built on the ABB "
+            "PM5072-2ETH PLC.</p>"
+            "<h3>Milesight</h3><p>Sensors and gateways for the "
+            "industrial Internet of Things.</p>"
+            "<h3>Aviat Networks</h3><p>Wireless links for "
+            "installations spread over tens of kilometres.</p>"
+            "<h3>ODOT</h3><p>[TO BE CONFIRMED — the logo appears on "
+            "the partners page of the existing site with no "
+            "description.]</p>"
+            "<p>We also work on Siemens platforms (Simatic Step 5 / "
+            "Step 7, SCADA WinCC), WAGO, INVT and Advantech.</p>",
         },
     },
 }
@@ -1133,11 +1757,14 @@ def seed_deset_products() -> dict[str, int]:
     from vat.models import Vat
 
     report: dict[str, int] = {}
-    slug, name = DESET_CATEGORY
+    slug, name, name_en = DESET_CATEGORY
     category = ProductCategory.objects.filter(slug=slug).first()
     if category is None:
         category = ProductCategory(slug=slug, active=True, seo_title=name[:70])
         _translate(category, name=name, description=DESET_COMPLIANCE)
+        _translate(
+            category, "en", name=name_en, description=DESET_COMPLIANCE_EN
+        )
         category.save()
         _bump(report, "category_created")
     else:
@@ -1152,6 +1779,10 @@ def seed_deset_products() -> dict[str, int]:
         specs = "".join(
             f"<li><strong>{key}:</strong> {value}</li>"
             for key, value in system["specs"]
+        )
+        specs_en = "".join(
+            f"<li><strong>{key}:</strong> {value}</li>"
+            for key, value in system["specs_en"]
         )
         product = Product(
             slug=system["slug"],
@@ -1174,6 +1805,16 @@ def seed_deset_products() -> dict[str, int]:
                 f"<p>{system['summary']}</p>"
                 f"<h3>Τεχνικά χαρακτηριστικά</h3><ul>{specs}</ul>"
                 f"<p>{DESET_COMPLIANCE}</p>"
+            ),
+        )
+        _translate(
+            product,
+            "en",
+            name=system["name_en"],
+            description=(
+                f"<p>{system['summary_en']}</p>"
+                f"<h3>Technical specifications</h3><ul>{specs_en}</ul>"
+                f"<p>{DESET_COMPLIANCE_EN}</p>"
             ),
         )
         product.save()
@@ -1213,11 +1854,12 @@ def seed_project_posts() -> dict[str, int]:
     report: dict[str, int] = {}
     author = _ensure_author()
     categories: dict[str, BlogCategory] = {}
-    for slug, name in SECTORS:
+    for slug, name, name_en in SECTORS:
         category = BlogCategory.objects.filter(slug=slug).first()
         if category is None:
             category = BlogCategory(slug=slug)
             _translate(category, name=name, description=name)
+            _translate(category, "en", name=name_en, description=name_en)
             category.save()
             _bump(report, "categories_created")
         else:
@@ -1242,6 +1884,18 @@ def seed_project_posts() -> dict[str, int]:
                 f"<p>{tech}</p><p><strong>Για λογαριασμό:</strong> {client}</p>"
             ),
         )
+        title_en, tech_en = PROJECTS_EN[slug]
+        client_en = CLIENTS_EN.get(client, client)
+        _translate(
+            post,
+            "en",
+            title=title_en,
+            subtitle=client_en,
+            body=(
+                f"<p>{tech_en}</p>"
+                f"<p><strong>On behalf of:</strong> {client_en}</p>"
+            ),
+        )
         post.save()
         _bump(report, "posts_created")
     return report
@@ -1256,7 +1910,10 @@ def seed_layouts() -> dict[str, int]:
     proxy silently strips.
     """
     from page_config.models import PageLayout, PageSection
-    from page_config.schemas import validate_section_props
+    from page_config.schemas import (
+        validate_section_i18n,
+        validate_section_props,
+    )
 
     report: dict[str, int] = {}
     for page_type, sections in _layout_plan().items():
@@ -1285,11 +1942,13 @@ def seed_layouts() -> dict[str, int]:
                 _bump(report, "sections_unchanged")
                 continue
             validate_section_props(component_type, section["props"])
+            validate_section_i18n(component_type, section.get("i18n", {}))
             PageSection.objects.create(
                 layout=layout,
                 component_type=component_type,
                 title=section["title"],
                 props=section["props"],
+                i18n=section.get("i18n", {}),
                 is_visible=True,
             )
             _bump(report, "sections_created")
@@ -1323,29 +1982,30 @@ def seed_navigation() -> dict[str, int]:
     IS the merchant's content and a re-run must not overwrite an edit.
     """
     from page_config.models import NavigationMenu, NavigationSlot
-    from page_config.schemas import validate_navigation_items
+    from page_config.schemas import (
+        validate_navigation_i18n,
+        validate_navigation_items,
+    )
 
     report: dict[str, int] = {}
     payloads = {
-        NavigationSlot.HEADER: _nav_header(),
-        NavigationSlot.MOBILE: _nav_mobile(),
-        NavigationSlot.FOOTER: _nav_footer(),
+        NavigationSlot.HEADER: (_nav_header(), _nav_header_en()),
+        NavigationSlot.MOBILE: (_nav_mobile(), _nav_mobile_en()),
+        NavigationSlot.FOOTER: (_nav_footer(), _nav_footer_en()),
     }
-    for slot, items in payloads.items():
+    for slot, (items, items_en) in payloads.items():
+        i18n = {"en": items_en}
         validate_navigation_items(slot, items)
+        validate_navigation_i18n(slot, i18n)
         _, created = NavigationMenu.objects.get_or_create(
-            slot=slot, defaults={"items": items}
+            slot=slot, defaults={"items": items, "i18n": i18n}
         )
         _bump(report, "created" if created else "unchanged")
     return report
 
 
 def seed_content_pages() -> dict[str, int]:
-    """Create the three service pages, bilingually.
-
-    ContentPage is the only translatable page model, so this is where
-    the el/en split actually lives — page SECTIONS are single-language.
-    """
+    """Create the three service pages, bilingually."""
     from django.utils import timezone
 
     from page_config.models import ContentPage

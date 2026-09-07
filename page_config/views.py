@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from django.db.models import Prefetch
 from django.shortcuts import get_object_or_404
-from drf_spectacular.utils import extend_schema, extend_schema_view
+from drf_spectacular.utils import (
+    OpenApiParameter,
+    extend_schema,
+    extend_schema_view,
+)
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -16,6 +20,7 @@ from core.utils.serializers import (
     create_schema_view_config,
     crud_config,
 )
+from page_config.localization import LOCALE_PARAM, requested_locale
 from page_config.models import (
     ContentPage,
     NavigationMenu,
@@ -32,7 +37,6 @@ from page_config.serializers import (
 )
 from tenant.membership import is_store_staff
 
-
 # `@extend_schema` over `@api_view` is drf-spectacular's own documented
 # pattern (see its FAQ). The suppressions on the decorators below are a ty
 # limitation, not a defect here: `djangorestframework-stubs` declares
@@ -44,8 +48,24 @@ from tenant.membership import is_store_staff
 # Upstream master still declares it the same way, so a stubs bump does
 # not help. Suppressed per line rather than per file so real
 # argument-type errors in these modules are still reported.
+_LOCALE_PARAMETER = OpenApiParameter(
+    name=LOCALE_PARAM,
+    location=OpenApiParameter.QUERY,
+    required=False,
+    type=str,
+    description=(
+        "Language to answer operator-authored copy in. Section titles, "
+        "section props and navigation labels are JSON held per store, "
+        "not parler translations, so they are resolved here rather than "
+        "shipped per locale. Unknown or omitted means the store's "
+        "default language."
+    ),
+)
+
+
 @extend_schema(  # ty: ignore[invalid-argument-type]
     responses=PageLayoutSerializer,
+    parameters=[_LOCALE_PARAMETER],
     tags=["Page Config"],
 )
 @api_view(["GET"])
@@ -62,7 +82,9 @@ def public_page_config(request, page_type):
         ),
         page_type=page_type,
     )
-    serializer = PageLayoutSerializer(layout)
+    serializer = PageLayoutSerializer(
+        layout, context={"locale": requested_locale(request)}
+    )
     return Response(serializer.data)
 
 
@@ -76,6 +98,7 @@ def public_page_config(request, page_type):
             "storefront's built-in menu'.",
         }
     },
+    parameters=[_LOCALE_PARAMETER],
     tags=["Page Config"],
 )
 @api_view(["GET"])
@@ -84,14 +107,18 @@ def public_navigation(request):
     """All configured navigation menus for the current tenant, keyed by
     slot. Slots without a row are OMITTED — the storefront renders its
     code-level menus for those, so an unconfigured tenant keeps the
-    platform chrome untouched."""
-    return Response(
-        {
-            menu.slot: menu.items
-            for menu in NavigationMenu.objects.all()
-            if menu.items
-        }
-    )
+    platform chrome untouched.
+
+    A slot whose ``i18n`` has no entry for the requested locale answers
+    with its default-locale menu, so a partially translated store keeps
+    a working header rather than losing one."""
+    locale = requested_locale(request)
+    menus = {}
+    for menu in NavigationMenu.objects.all():
+        items = menu.localized(locale)
+        if items:
+            menus[menu.slot] = items
+    return Response(menus)
 
 
 class NavigationMenuAdminViewSet(BaseModelViewSet):

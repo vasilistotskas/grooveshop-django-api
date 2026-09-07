@@ -3,6 +3,36 @@
 
 
 
+## v3.33.0 (2026-09-07)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.32.1 [skip ci] ([`f4607e2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f4607e2f347206b920451e616cfe3171a86e986e))
+
+### Features
+
+* feat(delta-sigma): --overwrite, for when the pack's copy CHANGES
+
+Converging on what is ABSENT is only half the problem. The three service
+pages already carry `en` rows on production — the two-sentence stubs the
+first version of this pack shipped — so once the real bodies were
+written, no amount of re-running could replace them: the rows existed,
+and every run reported `unchanged`. Measured on the live tenant, 154-165
+characters against the pack's 700-1001.
+
+`--overwrite` rewrites the translations and locale overrides this pack
+owns even where they already exist. It discards local edits by
+definition, which is why it is opt-in per run, prints a warning, and is
+never the default — the safe path stays "fill only what is missing".
+
+`_fill_missing_i18n` skips a row whose override already equals the
+pack's, so a second `--overwrite` run reports no work rather than
+rewriting every section to the same value. Asserted, along with both
+replacement paths.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018CiyyCqkXd9a1FM5hsrPFZ ([`0c853a2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0c853a24ae37563d0e0a951063c221d5a24c24e1))
+
 ## v3.32.1 (2026-09-07)
 
 ### Bug fixes

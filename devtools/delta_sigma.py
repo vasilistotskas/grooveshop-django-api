@@ -187,9 +187,15 @@ GEMH = "156013906000"
 SETTINGS = {
     # Quote-only: delta-sigma.gr publishes no prices anywhere, and the
     # three DeSET systems are priced on request. Shop-dark turns off the
-    # cart chrome so the storefront reads as a catalogue, and the PDP
-    # renders a quote CTA instead of a price (see the zero-price branch
-    # in the storefront's price component).
+    # cart chrome so the storefront reads as a catalogue.
+    #
+    # It does NOT hide the figure. There is no zero-price branch
+    # anywhere in the storefront — `formatProductPrice` in
+    # `pages/products/[id]/[slug].vue` is `n(price || 0, 'currency')`,
+    # so a quote-only system renders "0,00 €", which reads as free.
+    # Product/Card.vue and Product/RecentlyViewed.vue do the same.
+    # Pending: either the real prices, or a "price on request" branch in
+    # the price surfaces.
     "CART_ENABLED": "False",
     "CONTACT_EMAIL": CONTACT_EMAIL,
     "INVOICE_SELLER_NAME": "Δelta Σigma",
@@ -252,7 +258,8 @@ def _contact_html_en() -> str:
 # ---------------------------------------------------------------------------
 
 # price is 0: DeSET is quote-only and the real figures are not public.
-# The storefront shows a "request a quote" CTA for zero-priced rows.
+# The storefront has no zero-price branch, so this currently renders as
+# "0,00 €" — see the note on CART_ENABLED above.
 DESET_CATEGORY = (
     "deset",
     "DeSET — Τηλεποπτεία σταθμών ΑΠΕ",

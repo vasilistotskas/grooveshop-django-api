@@ -11,6 +11,7 @@ from .core import (
     TimeStampFilterMixin,
     UUIDFilterMixin,
 )
+from .translations import any_translation
 
 __all__ = [
     # CamelCase filter utilities
@@ -23,5 +24,7 @@ __all__ = [
     "SortableFilterMixin",
     "TimeStampFilterMixin",
     "UUIDFilterMixin",
+    # Translated-field predicates
+    "any_translation",
     "snake_to_camel",
 ]

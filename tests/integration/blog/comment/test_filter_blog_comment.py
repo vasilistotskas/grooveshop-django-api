@@ -169,9 +169,14 @@ class BlogCommentFilterTest(APITestCase):
         )
         self.comment4.created_at = self.now - timedelta(days=1)
         self.comment4.save()
-        self.comment4.set_current_language("en")
-        self.comment4.content = ""
-        self.comment4.save()
+        # This is the fixture's contentless comment, so it has to be
+        # contentless in EVERY language: the factory writes one
+        # translation per active language, and `hasContent=false` asks
+        # whether the comment has any content at all. Blanking only the
+        # English row left the Greek and German ones populated, which
+        # made the same comment answer true to both sides of that
+        # filter.
+        self.comment4.translations.update(content="")
 
         BlogComment.objects.rebuild()
 
@@ -237,6 +242,29 @@ class BlogCommentFilterTest(APITestCase):
         self.assertEqual(response.status_code, 200)
         result_ids = [r["id"] for r in response.data["results"]]
         self.assertIn(self.comment4.id, result_ids)
+
+    def test_a_translated_filter_returns_each_comment_once(self):
+        """`translations__content` is one row per LANGUAGE, not per comment.
+
+        Filtering or annotating through the join multiplied the result:
+        every comment here carries an el, en and de translation, so
+        `minContentLength` returned each of them three times and the
+        paginated `count` agreed. `Length()` in the SELECT list also
+        defeats `distinct` — the three rows differ. The predicates are
+        `EXISTS` subqueries over the translation model now, see
+        `core.filters.translations`.
+        """
+        url = reverse("blog-comment-list")
+
+        response = self.client.get(
+            url, {"minContentLength": 1, "post": self.post1.id}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        result_ids = [r["id"] for r in response.data["results"]]
+        self.assertEqual(sorted(result_ids), sorted(set(result_ids)))
+        self.assertEqual(response.data["count"], len(result_ids))
+        self.assertIn(self.comment1.id, result_ids)
 
     def test_post_relationship_filters(self):
         url = reverse("blog-comment-list")
@@ -409,7 +437,18 @@ class BlogCommentFilterTest(APITestCase):
     def test_camel_case_filters(self):
         url = reverse("blog-comment-list")
 
-        created_after = self.now - timedelta(days=7)
+        # The window has to reach back past `reply1_1` (now - 8 days),
+        # the only comment that satisfies all three filters at once: it
+        # is the sole liked comment with a content length over 10 that
+        # is not `comment1` (liked, 40 characters, but now - 10 days).
+        # A 7-day window excludes every candidate and the filter can
+        # only answer with an empty list -- which this asserted against
+        # `reply1_1` and still passed, because `BlogCommentFactory` had
+        # `django_get_or_create = ("user", "post")` and so collapsed
+        # `reply1_1`, `reply1_2` and `comment2` (all `user2` on `post1`)
+        # into one row whose `created_at` the last of the three moved
+        # inside the window.
+        created_after = self.now - timedelta(days=9)
         response = self.client.get(
             url,
             {
@@ -421,7 +460,7 @@ class BlogCommentFilterTest(APITestCase):
         self.assertEqual(response.status_code, 200)
 
         result_ids = [r["id"] for r in response.data["results"]]
-        self.assertIn(self.reply1_1.id, result_ids)
+        self.assertEqual(result_ids, [self.reply1_1.id])
 
         response = self.client.get(url, {"parentIsnull": "true"})
         self.assertEqual(response.status_code, 200)

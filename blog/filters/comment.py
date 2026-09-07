@@ -1,10 +1,12 @@
 from django.db.models import Count, Q
+from django.db.models.functions import Length
 from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
 
 from blog.models.comment import BlogComment
 from core.filters.camel_case_filters import CamelCaseTimeStampFilterSet
 from core.filters.core import UUIDFilterMixin
+from core.filters.translations import any_translation
 
 
 class BlogCommentFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
@@ -19,6 +21,10 @@ class BlogCommentFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
     content = filters.CharFilter(
         field_name="translations__content",
         lookup_expr="icontains",
+        # One row per language behind ``translations``: without this a
+        # comment whose Greek AND English text both contain the term
+        # comes back once per match.
+        distinct=True,
         help_text=_("Filter by comment content (case-insensitive)"),
     )
     content_length = filters.NumberFilter(
@@ -43,6 +49,7 @@ class BlogCommentFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
     post__title = filters.CharFilter(
         field_name="post__translations__title",
         lookup_expr="icontains",
+        distinct=True,
         help_text=_("Filter by blog post title"),
     )
     post__is_published = filters.BooleanFilter(
@@ -195,48 +202,67 @@ class BlogCommentFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
             "parent": ["exact", "isnull"],
         }
 
+    @staticmethod
+    def _content(queryset, **lookups):
+        """A comment with a translation whose content matches ``lookups``.
+
+        ``EXISTS`` rather than a join on ``translations__content``,
+        which returns the comment once per matching language — measured
+        three times over for one comment on el/en/de. See
+        ``core.filters.translations``.
+        """
+        return any_translation(queryset.model, "content", **lookups)
+
     def filter_has_content(self, queryset, name, value):
         """Filter comments based on whether they have content."""
+        # "Has content" is a question about the comment, so it is
+        # EXISTS/NOT EXISTS over its translations. Asking it as
+        # ``content=""`` instead meant "some language is blank", and a
+        # comment written in Greek but not German answered true to both
+        # sides of this filter.
+        has_content = self._content(
+            queryset, content__isnull=False
+        ) & self._content(queryset, content__gt="")
         if value is True:
-            return queryset.exclude(
-                Q(translations__content__isnull=True)
-                | Q(translations__content__exact="")
-            )
+            return queryset.filter(has_content)
         elif value is False:
-            return queryset.filter(
-                Q(translations__content__isnull=True)
-                | Q(translations__content__exact="")
-            )
+            return queryset.filter(~has_content)
         return queryset
 
     def filter_content_length(self, queryset, name, value):
         """Filter by exact content length."""
         if value is not None:
-            from django.db.models.functions import Length
-
-            return queryset.annotate(
-                content_len=Length("translations__content")
-            ).filter(content_len=value)
+            return queryset.filter(
+                self._content(
+                    queryset,
+                    annotate={"content_len": Length("content")},
+                    content_len=value,
+                )
+            )
         return queryset
 
     def filter_min_content_length(self, queryset, name, value):
         """Filter by minimum content length."""
         if value is not None:
-            from django.db.models.functions import Length
-
-            return queryset.annotate(
-                content_len=Length("translations__content")
-            ).filter(content_len__gte=value)
+            return queryset.filter(
+                self._content(
+                    queryset,
+                    annotate={"content_len": Length("content")},
+                    content_len__gte=value,
+                )
+            )
         return queryset
 
     def filter_max_content_length(self, queryset, name, value):
         """Filter by maximum content length."""
         if value is not None:
-            from django.db.models.functions import Length
-
-            return queryset.annotate(
-                content_len=Length("translations__content")
-            ).filter(content_len__lte=value)
+            return queryset.filter(
+                self._content(
+                    queryset,
+                    annotate={"content_len": Length("content")},
+                    content_len__lte=value,
+                )
+            )
         return queryset
 
     def filter_is_anonymous(self, queryset, name, value):

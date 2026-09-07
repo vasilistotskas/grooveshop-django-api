@@ -82,7 +82,17 @@ class BlogCommentFactory(factory.django.DjangoModelFactory):
 
     class Meta:
         model = BlogComment
-        django_get_or_create = ("user", "post")
+        # No ``django_get_or_create``: a comment has no natural key.
+        # ``("user", "post")`` used to be one, which is not a constraint
+        # the model has — threads are MPTT trees, so one person may
+        # comment many times on one post, and a reply's author often
+        # already has a comment there. ``get_or_create`` then returned
+        # the EXISTING row and silently discarded every other kwarg, so
+        # ``BlogCommentFactory(post=p, user=u, parent=first)`` handed
+        # back ``first`` itself (measured: same pk, one row, zero
+        # children) and ``BlogPostFactory(num_comments=5)`` produced two
+        # comments, because ``get_or_create_user`` draws at random from
+        # the users that already exist.
         skip_postgeneration_save = True
 
     @factory.post_generation

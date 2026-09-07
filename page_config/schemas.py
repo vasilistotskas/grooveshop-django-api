@@ -78,6 +78,153 @@ def _check_items(
     return None
 
 
+def _check_nested_lines(
+    value,
+    *,
+    name: str,
+    max_items: int,
+    required: dict[str, int],
+    optional: dict[str, int],
+    lines_key: str,
+    max_lines: int,
+    line_length: int,
+    icon_keys: frozenset[str] = frozenset(),
+) -> str | None:
+    """List of objects where each carries its own list of LINES.
+
+    ``_check_items`` cannot express this: its values are scalars, and
+    three of the redesign's bands need one level of nesting — a card
+    with bullet points, a step with a list of protocols. Bounded at
+    both levels, because this is admin-authored JSON.
+    """
+    if not isinstance(value, list) or len(value) > max_items:
+        return f"{name}: must be a list of at most {max_items} entries"
+    for i, raw in enumerate(value):
+        if not isinstance(raw, dict):
+            return f"{name}[{i}]: must be an object"
+        item = {str(k): v for k, v in raw.items()}
+        for key, max_length in required.items():
+            entry = item.get(key)
+            if not entry or not _is_str(entry, max_length):
+                return f"{name}[{i}].{key}: required string (max {max_length})"
+        for key, max_length in optional.items():
+            entry = item.get(key)
+            if entry is not None and not _is_str(entry, max_length):
+                return f"{name}[{i}].{key}: must be a string (max {max_length})"
+        for key in icon_keys:
+            entry = item.get(key)
+            if entry is not None and not _ICON_RE.match(str(entry)):
+                return f"{name}[{i}].{key}: must be an i-* icon name"
+        lines = item.get(lines_key, [])
+        if not isinstance(lines, list) or len(lines) > max_lines:
+            return (
+                f"{name}[{i}].{lines_key}: must be a list of at most "
+                f"{max_lines} entries"
+            )
+        for j, line in enumerate(lines):
+            if not line or not _is_str(line, line_length):
+                return (
+                    f"{name}[{i}].{lines_key}[{j}]: required string "
+                    f"(max {line_length})"
+                )
+        unknown = set(item) - set(required) - set(optional) - {lines_key}
+        if unknown:
+            return f"{name}[{i}]: unknown keys {sorted(unknown)}"
+    return None
+
+
+_OPTION_TEXT = (
+    ("label", 40),
+    ("model", 120),
+    ("title", 120),
+    ("rationale", 600),
+    ("note", 400),
+    ("cta_text", 100),
+)
+
+
+def _check_options(value) -> str | None:
+    """The options an ``option_selector`` switches between."""
+    if not isinstance(value, list) or len(value) > 4:
+        return "options: must be a list of at most 4 entries"
+    for i, raw in enumerate(value):
+        if not isinstance(raw, dict):
+            return f"options[{i}]: must be an object"
+        option = {str(k): v for k, v in raw.items()}
+        if not option.get("name") or not _is_str(option.get("name"), 60):
+            return f"options[{i}].name: required string (max 60)"
+        for key, max_length in _OPTION_TEXT:
+            entry = option.get(key)
+            if entry is not None and not _is_str(entry, max_length):
+                return (
+                    f"options[{i}].{key}: must be a string (max {max_length})"
+                )
+        link = option.get("cta_link")
+        if link is not None and not (
+            _is_str(link, 1000) and _LINK_RE.match(link)
+        ):
+            return f"options[{i}].cta_link: internal path or https URL"
+        rows = option.get("rows", [])
+        if not isinstance(rows, list) or len(rows) > 12:
+            return f"options[{i}].rows: must be a list of at most 12 rows"
+        for j, row_raw in enumerate(rows):
+            if not isinstance(row_raw, dict):
+                return f"options[{i}].rows[{j}]: must be an object"
+            row = {str(k): v for k, v in row_raw.items()}
+            for key, max_length in (("label", 60), ("value", 120)):
+                if not row.get(key) or not _is_str(row.get(key), max_length):
+                    return (
+                        f"options[{i}].rows[{j}].{key}: required string "
+                        f"(max {max_length})"
+                    )
+            unknown = set(row) - {"label", "value"}
+            if unknown:
+                return f"options[{i}].rows[{j}]: unknown keys {sorted(unknown)}"
+        unknown = (
+            set(option)
+            - {"name", "cta_link", "rows"}
+            - {key for key, _ in _OPTION_TEXT}
+        )
+        if unknown:
+            return f"options[{i}]: unknown keys {sorted(unknown)}"
+    return None
+
+
+def _check_matrix_rows(value) -> str | None:
+    """``label`` plus one value PER COLUMN of a comparison table.
+
+    A ragged row is refused rather than padded: a table whose rows
+    disagree about how many columns there are prints a value under the
+    wrong heading, which is worse than not printing it.
+    """
+    if not isinstance(value, list) or len(value) > 24:
+        return "rows: must be a list of at most 24 entries"
+    width = None
+    for i, raw in enumerate(value):
+        if not isinstance(raw, dict):
+            return f"rows[{i}]: must be an object"
+        row = {str(k): v for k, v in raw.items()}
+        if not row.get("label") or not _is_str(row.get("label"), 60):
+            return f"rows[{i}].label: required string (max 60)"
+        values = row.get("values")
+        if not isinstance(values, list) or not 1 <= len(values) <= 4:
+            return f"rows[{i}].values: must be a list of 1-4 values"
+        if width is None:
+            width = len(values)
+        elif len(values) != width:
+            return (
+                f"rows[{i}].values: {len(values)} values where the first "
+                f"row has {width} - every row spans the same columns"
+            )
+        for j, cell in enumerate(values):
+            if not _is_str(cell, 120):
+                return f"rows[{i}].values[{j}]: must be a string (max 120)"
+        unknown = set(row) - {"label", "values"}
+        if unknown:
+            return f"rows[{i}]: unknown keys {sorted(unknown)}"
+    return None
+
+
 def _check_callout(value) -> str | None:
     """A boxed aside beside a page hero.
 
@@ -390,6 +537,64 @@ _VALIDATORS: dict[str, dict] = {
             required={"label": 40, "value": 60},
             optional={},
             name="facts",
+        ),
+    },
+    "feature_lists": {
+        # Two or three cards, each an icon, a title and a checklist —
+        # what a product page uses to say what a thing is and what it
+        # does, with one shared footnote under them.
+        "heading": lambda v: None if _is_str(v, 200) else "string \u2264200",
+        "note": lambda v: None if _is_str(v, 1000) else "string \u22641000",
+        "emphasis": lambda v: None if _is_str(v, 120) else "string \u2264120",
+        "items": lambda v: _check_nested_lines(
+            v,
+            name="items",
+            max_items=4,
+            required={"title": 100},
+            optional={"icon": 100},
+            lines_key="bullets",
+            max_lines=8,
+            line_length=300,
+            icon_keys=frozenset({"icon"}),
+        ),
+    },
+    "option_selector": {
+        # Pick one of a few options and see it in detail — the shape a
+        # product FAMILY needs when the choice between its members is
+        # the whole point of the page.
+        "heading": lambda v: None if _is_str(v, 200) else "string \u2264200",
+        "standfirst": lambda v: None if _is_str(v, 400) else "string \u2264400",
+        "rows_label": lambda v: None if _is_str(v, 60) else "string \u226460",
+        "rationale_label": lambda v: (
+            None if _is_str(v, 60) else "string \u226460"
+        ),
+        "options": _check_options,
+    },
+    "comparison_table": {
+        "heading": lambda v: None if _is_str(v, 200) else "string \u2264200",
+        "row_label": lambda v: None if _is_str(v, 60) else "string \u226460",
+        "note": lambda v: None if _is_str(v, 600) else "string \u2264600",
+        "columns": lambda v: (
+            None
+            if isinstance(v, list)
+            and 1 <= len(v) <= 4
+            and all(c and _is_str(c, 60) for c in v)
+            else "columns: 1-4 non-empty strings \u226460"
+        ),
+        "rows": _check_matrix_rows,
+    },
+    "flow_steps": {
+        "heading": lambda v: None if _is_str(v, 200) else "string \u2264200",
+        "body": lambda v: None if _is_str(v, 600) else "string \u2264600",
+        "items": lambda v: _check_nested_lines(
+            v,
+            name="items",
+            max_items=4,
+            required={"title": 100},
+            optional={"label": 60},
+            lines_key="lines",
+            max_lines=8,
+            line_length=120,
         ),
     },
     "reference_cards": {

@@ -296,7 +296,11 @@ class TestTheSeedStepsConvergeOnExistingRows:
         assert layouts["sections_localized"] == PageSection.objects.count()
         assert menus["localized"] == NavigationMenu.objects.count()
         assert not PageSection.objects.filter(i18n={}).exists()
-        cta = PageSection.objects.get(component_type="cta_banner")
+        # Scoped to HOME: the closing band is on the DeSET page too,
+        # so a bare `get` by component type matches both.
+        cta = PageSection.objects.get(
+            layout__page_type="home", component_type="cta_banner"
+        )
         assert cta.localized("en")[1]["heading"] == (
             "Tell us what has to work."
         )
@@ -310,7 +314,11 @@ class TestTheSeedStepsConvergeOnExistingRows:
         from page_config.models import PageSection
 
         delta_sigma.seed_layouts()
-        cta = PageSection.objects.get(component_type="cta_banner")
+        # Scoped to HOME: the closing band is on the DeSET page too,
+        # so a bare `get` by component type matches both.
+        cta = PageSection.objects.get(
+            layout__page_type="home", component_type="cta_banner"
+        )
         cta.i18n = {"en": {"props": {"heading": "Their own words."}}}
         cta.save(update_fields=["i18n"])
 
@@ -323,7 +331,11 @@ class TestTheSeedStepsConvergeOnExistingRows:
         from page_config.models import PageSection
 
         delta_sigma.seed_layouts()
-        cta = PageSection.objects.get(component_type="cta_banner")
+        # Scoped to HOME: the closing band is on the DeSET page too,
+        # so a bare `get` by component type matches both.
+        cta = PageSection.objects.get(
+            layout__page_type="home", component_type="cta_banner"
+        )
         cta.props = {**cta.props, "heading": "Edited by the merchant."}
         cta.i18n = {}
         cta.save(update_fields=["props", "i18n"])
@@ -421,7 +433,11 @@ class TestTheSeedStepsConvergeOnExistingRows:
         from page_config.models import PageSection
 
         delta_sigma.seed_layouts()
-        cta = PageSection.objects.get(component_type="cta_banner")
+        # Scoped to HOME: the closing band is on the DeSET page too,
+        # so a bare `get` by component type matches both.
+        cta = PageSection.objects.get(
+            layout__page_type="home", component_type="cta_banner"
+        )
         cta.i18n = {"en": {"props": {"heading": "Stale."}}}
         cta.save(update_fields=["i18n"])
 

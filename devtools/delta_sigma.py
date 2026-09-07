@@ -1570,6 +1570,303 @@ def _page_hero(page: str, *, locale: str = "el") -> dict:
     return hero
 
 
+# --- The DeSET page's bands ------------------------------------------
+#
+# What the system IS and what it DOES, as two checklists. The bullets
+# are the ones the artboard prints; the shared footnote under them is
+# the I/O-cards paragraph.
+DESET_CAPABILITIES = [
+    {
+        "title": "Εξοπλισμός",
+        "icon": "i-lucide-cpu",
+        "bullets": [
+            (
+                "Στιβαρός, βιομηχανικής ποιότητας, σχεδιασμένος για "
+                "λειτουργία σε βιομηχανικό περιβάλλον."
+            ),
+            (
+                "Χρήση Προγραμματιζόμενων Λογικών Ελεγκτών (PLC) ώστε να "
+                "αντέχουν σε βιομηχανικό περιβάλλον, αντί για απλώς "
+                "ανθεκτικά υπολογιστικά συστήματα."
+            ),
+            (
+                "Υποστήριξη των απαραίτητων πρωτοκόλλων για σύνδεση με τις "
+                "πιο αναγνωρισμένες συσκευές πεδίου."
+            ),
+            (
+                "Εύκολα επεκτάσιμος με εσωτερικές και εξωτερικές μονάδες "
+                "επέκτασης, σύμφωνα με τις απαιτήσεις του ΔΕΔΔΗΕ."
+            ),
+        ],
+    },
+    {
+        "title": "Λογισμικό",
+        "icon": "i-lucide-code",
+        "bullets": [
+            (
+                "Πλήρως προσαρμόσιμη τοπική λογική που προσφέρει αυτόνομο "
+                "έλεγχο."
+            ),
+            ("Παρακολούθηση τρεχουσών τιμών σε πραγματικό χρόνο (real time)."),
+            "Σταθερή και ασφαλή επικοινωνία και επικύρωση δεδομένων.",
+        ],
+    },
+]
+
+DESET_CAPABILITIES_EN = [
+    {
+        "title": "Hardware",
+        "icon": "i-lucide-cpu",
+        "bullets": [
+            (
+                "Rugged, industrial grade, designed to run in an "
+                "industrial environment."
+            ),
+            (
+                "Built on Programmable Logic Controllers so they withstand "
+                "an industrial environment, rather than merely rugged "
+                "computers."
+            ),
+            (
+                "Support for the protocols needed to talk to the most "
+                "widely recognised field devices."
+            ),
+            (
+                "Readily extended with internal and external expansion "
+                "modules, per HEDNO's requirements."
+            ),
+        ],
+    },
+    {
+        "title": "Software",
+        "icon": "i-lucide-code",
+        "bullets": [
+            ("Fully customisable local logic offering autonomous control."),
+            "Real-time monitoring of every current value.",
+            "Stable, secure communication with data validation.",
+        ],
+    },
+]
+
+DESET_CARDS_NOTE = (
+    "Για ακόμη πιο ολοκληρωμένες επιλογές καλωδίωσης, κάθε Σύστημα "
+    "DeSET περιλαμβάνει κάρτες εισόδων και εξόδων. Οι κάρτες "
+    "διευκολύνουν τον έλεγχο, επιτρέποντας στο Σύστημα να "
+    "ανταποκρίνεται σε εντολές από τα Συστήματα SCADA/DMS του ΔΕΔΔΗΕ. "
+    "Αυτή η αμφίδρομη επικοινωνία επιτρέπει στο Σύστημα όχι μόνο να "
+    "λαμβάνει εντολές, αλλά και να μεταδίδει όλες τις απαιτούμενες "
+    "μετρήσεις και καταστάσεις."
+)
+
+DESET_CARDS_NOTE_EN = (
+    "For even more complete wiring options, every DeSET system "
+    "includes input and output cards. The cards make control easier by "
+    "letting the system respond to commands from HEDNO's SCADA/DMS. "
+    "That two-way communication lets the system not only accept "
+    "commands but also report every required measurement and status."
+)
+
+DESET_CARDS_EMPHASIS = "κάρτες εισόδων και εξόδων"
+DESET_CARDS_EMPHASIS_EN = "input and output cards"
+
+# The comparison matrix. Its OWN data, not a projection: the artboard
+# normalises the three systems onto one set of characteristics, and
+# each system publishes its specs under its own labels ("Πλατφόρμα"
+# where another says "Μνήμη"). A dash means the system does not have
+# the feature, which is a comparison's most useful cell.
+DESET_COMPARISON = {
+    "el": {
+        "row_label": "Χαρακτηριστικό",
+        "columns": ["ABB PM5072", "INVT TM750", "WAGO PFC200"],
+        "rows": [
+            ("Μνήμη προγράμματος", ["8 MB", "20 MB", "512 MB RAM"]),
+            ("Ψηφιακές είσοδοι", ["12", "8", "8 (κάρτα)"]),
+            ("Ψηφιακές έξοδοι", ["8", "8", "8 (κάρτα)"]),
+            ("Θύρες Ethernet", ["2", "2", "2"]),
+            ("Σειριακές RS485", ["1", "2", "1"]),
+            ("EtherCAT", ["—", "ναι", "—"]),
+            (
+                "IEC 104",
+                [
+                    "μέσω λογισμικού",
+                    "μέσω gateway",
+                    "ενσωματωμένο",
+                ],
+            ),
+            ("OPC UA", ["ναι", "ναι", "—"]),
+            (
+                "Firmware / OS",
+                [
+                    "CODESYS",
+                    "CODESYS + Linux",
+                    "Real-time Linux",
+                ],
+            ),
+            ("SD card", ["έως 32 GB", "έως 32 GB", "έως 32 GB"]),
+        ],
+        "note": "Κάθε σύστημα συνδυάζεται με το λογισμικό που έχουμε "
+        "αναπτύξει και έχει την εφεδρεία για να καλύψει μελλοντικές "
+        "ανάγκες της εγκατάστασης — π.χ. λογισμικό για αποθήκευση σε "
+        "μπαταρίες, χωρίς να περιλαμβάνεται στην αξία του συστήματος "
+        "DeSET.",
+    },
+    "en": {
+        "row_label": "Characteristic",
+        "columns": ["ABB PM5072", "INVT TM750", "WAGO PFC200"],
+        "rows": [
+            ("Program memory", ["8 MB", "20 MB", "512 MB RAM"]),
+            ("Digital inputs", ["12", "8", "8 (card)"]),
+            ("Digital outputs", ["8", "8", "8 (card)"]),
+            ("Ethernet ports", ["2", "2", "2"]),
+            ("RS485 serial", ["1", "2", "1"]),
+            ("EtherCAT", ["—", "yes", "—"]),
+            ("IEC 104", ["in software", "via gateway", "built in"]),
+            ("OPC UA", ["yes", "yes", "—"]),
+            (
+                "Firmware / OS",
+                [
+                    "CODESYS",
+                    "CODESYS + Linux",
+                    "Real-time Linux",
+                ],
+            ),
+            ("SD card", ["up to 32 GB", "up to 32 GB", "up to 32 GB"]),
+        ],
+        "note": "Each system pairs with the software we have written "
+        "and carries the headroom to cover the installation's future "
+        "needs — battery-storage software, for instance — without "
+        "that being part of the DeSET system's price.",
+    },
+}
+
+# Where DeSET sits: between the plant's field equipment and HEDNO's
+# SCADA/DMS, translating in both directions.
+DESET_FLOW = {
+    "el": {
+        "heading": "Πώς συνδέεται",
+        "body": "Το DeSET κάθεται ανάμεσα στον εξοπλισμό πεδίου του "
+        "σταθμού και στο SCADA/DMS του ΔΕΔΔΗΕ, μεταφράζοντας και προς "
+        "τις δύο κατευθύνσεις.",
+        "items": [
+            {
+                "label": "01 · Πεδίο",
+                "title": "Εξοπλισμός σταθμού",
+                "lines": [
+                    "Μετρητές ενέργειας",
+                    "Ρελέ προστασίας",
+                    "Inverters / ανεμογεννήτριες",
+                    "Επαφές κατάστασης",
+                ],
+            },
+            {
+                "label": "02 · DeSET",
+                "title": "PLC + τοπική λογική",
+                "lines": [
+                    "Modbus TCP / RTU",
+                    "OPC UA",
+                    "Τοπική λογική & επικύρωση",
+                    "Κάρτες DI / DO",
+                ],
+            },
+            {
+                "label": "03 · Διαχειριστής",
+                "title": "SCADA/DMS ΔΕΔΔΗΕ",
+                "lines": [
+                    "IEC 60870-5-104",
+                    "Σήματα τηλε-εποπτείας",
+                    "Εντολές ελέγχου",
+                    "Όριο ενεργού ισχύος",
+                ],
+            },
+        ],
+    },
+    "en": {
+        "heading": "How it connects",
+        "body": "DeSET sits between the plant's field equipment and "
+        "HEDNO's SCADA/DMS, translating in both directions.",
+        "items": [
+            {
+                "label": "01 · Field",
+                "title": "Plant equipment",
+                "lines": [
+                    "Energy meters",
+                    "Protection relays",
+                    "Inverters / wind turbines",
+                    "Status contacts",
+                ],
+            },
+            {
+                "label": "02 · DeSET",
+                "title": "PLC + local logic",
+                "lines": [
+                    "Modbus TCP / RTU",
+                    "OPC UA",
+                    "Local logic & validation",
+                    "DI / DO cards",
+                ],
+            },
+            {
+                "label": "03 · Operator",
+                "title": "HEDNO SCADA/DMS",
+                "lines": [
+                    "IEC 60870-5-104",
+                    "Supervisory signals",
+                    "Control commands",
+                    "Active-power limit",
+                ],
+            },
+        ],
+    },
+}
+
+
+def _deset_options(*, locale: str = "el") -> list[dict]:
+    """The three systems as selectable options, from ``DESET_SYSTEMS``.
+
+    Full spec tables and the "when we choose it" rationale, both read
+    from the system's own record — so the page cannot describe a
+    system differently from its product page or the home band.
+    """
+    greek = locale == "el"
+    label = "Σύστημα" if greek else "System"
+    for index, system in enumerate(DESET_SYSTEMS, start=1):
+        specs = system["specs" if greek else "specs_en"]
+        yield {
+            "label": f"{label} {index:02d}",
+            "name": system["brand"],
+            "model": system["model"],
+            "title": system["name" if greek else "name_en"],
+            "rationale": system["summary" if greek else "summary_en"],
+            "cta_text": (
+                f"Ζητήστε προσφορά για {system['brand']}"
+                if greek
+                else f"Request a quote for {system['brand']}"
+            ),
+            "cta_link": "/contact",
+            "rows": [
+                {"label": row_label, "value": row_value}
+                for row_label, row_value in specs
+            ],
+        }
+
+
+def _deset_comparison(*, locale: str = "el") -> dict:
+    """``comparison_table`` props for one language."""
+    data = DESET_COMPARISON[locale]
+    return {
+        "heading": "Συγκριτικός πίνακας"
+        if locale == "el"
+        else "Comparison table",
+        "row_label": data["row_label"],
+        "columns": list(data["columns"]),
+        "rows": [
+            {"label": label, "values": list(values)}
+            for label, values in data["rows"]
+        ],
+        "note": data["note"],
+    }
+
+
 ACTIVITIES = [
     {
         "title": "Μελέτη & σχεδιασμός",
@@ -1990,6 +2287,107 @@ def _layout_plan() -> dict:
                     "en": {
                         "title": "DeSET",
                         "props": _page_hero("deset", locale="en"),
+                    }
+                },
+            },
+            {
+                "component_type": "feature_lists",
+                "title": "Χαρακτηριστικά",
+                "sort_order": 1,
+                "props": {
+                    "heading": "Τι κάνει ένα σύστημα DeSET",
+                    "items": DESET_CAPABILITIES,
+                    "note": DESET_CARDS_NOTE,
+                    "emphasis": DESET_CARDS_EMPHASIS,
+                },
+                "i18n": {
+                    "en": {
+                        "title": "Capabilities",
+                        "props": {
+                            "heading": "What a DeSET system does",
+                            "items": DESET_CAPABILITIES_EN,
+                            "note": DESET_CARDS_NOTE_EN,
+                            "emphasis": DESET_CARDS_EMPHASIS_EN,
+                        },
+                    }
+                },
+            },
+            {
+                "component_type": "option_selector",
+                "title": "Επιλογή εξοπλισμού",
+                "sort_order": 2,
+                "props": {
+                    "heading": "Τα τρία συστήματα DeSET",
+                    "standfirst": "Και τα τρία καλύπτουν τις τρέχουσες "
+                    "προδιαγραφές του ΔΕΔΔΗΕ. Διαφέρουν στην εφεδρεία "
+                    "για μελλοντικές ανάγκες της εγκατάστασης.",
+                    "rows_label": "Τεχνικά χαρακτηριστικά",
+                    "rationale_label": "Πότε το επιλέγουμε",
+                    "options": list(_deset_options()),
+                },
+                "i18n": {
+                    "en": {
+                        "title": "Choosing the equipment",
+                        "props": {
+                            "heading": "The three DeSET systems",
+                            "standfirst": "All three meet HEDNO's "
+                            "current specifications. They differ in the "
+                            "headroom they leave for the "
+                            "installation's future needs.",
+                            "rows_label": "Technical specifications",
+                            "rationale_label": "When we choose it",
+                            "options": list(_deset_options(locale="en")),
+                        },
+                    }
+                },
+            },
+            {
+                "component_type": "comparison_table",
+                "title": "Σύγκριση",
+                "sort_order": 3,
+                "props": _deset_comparison(),
+                "i18n": {
+                    "en": {
+                        "title": "Comparison",
+                        "props": _deset_comparison(locale="en"),
+                    }
+                },
+            },
+            {
+                "component_type": "flow_steps",
+                "title": "Αρχιτεκτονική",
+                "sort_order": 4,
+                "props": DESET_FLOW["el"],
+                "i18n": {
+                    "en": {
+                        "title": "Architecture",
+                        "props": DESET_FLOW["en"],
+                    }
+                },
+            },
+            {
+                "component_type": "cta_banner",
+                "title": "CTA",
+                "sort_order": 5,
+                "props": {
+                    "heading": "Στείλτε μας τα στοιχεία του σταθμού.",
+                    "description": "Ισχύς, τύπος σταθμού και υπάρχων "
+                    "εξοπλισμός πεδίου. Προτείνουμε το κατάλληλο "
+                    "σύστημα DeSET με κατάλογο υλικών και "
+                    "χρονοδιάγραμμα.",
+                    "button_text": "Ζητήστε προσφορά",
+                    "button_link": "/contact",
+                },
+                "i18n": {
+                    "en": {
+                        "props": {
+                            "heading": "Send us the plant's details.",
+                            "description": "Capacity, plant type and "
+                            "the field equipment already installed. We "
+                            "propose the right DeSET system with a bill "
+                            "of materials and a schedule.",
+                            "button_text": "Request a quote",
+                        }
                     }
                 },
             },

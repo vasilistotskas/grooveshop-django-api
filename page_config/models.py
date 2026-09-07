@@ -99,6 +99,10 @@ class ComponentType(models.TextChoices):
     PULL_QUOTE = "pull_quote", _("Pull Quote")
     REFERENCE_CARDS = "reference_cards", _("Reference Cards")
     PAGE_HERO = "page_hero", _("Page Hero")
+    FEATURE_LISTS = "feature_lists", _("Feature Lists")
+    OPTION_SELECTOR = "option_selector", _("Option Selector")
+    COMPARISON_TABLE = "comparison_table", _("Comparison Table")
+    FLOW_STEPS = "flow_steps", _("Flow Steps")
 
 
 class PageLayout(

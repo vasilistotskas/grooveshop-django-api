@@ -483,6 +483,38 @@ class TestTheSeedStepsConvergeOnExistingRows:
             < home.get(component_type="features_grid").sort_order
         )
 
+    def test_a_band_ADDED_to_the_plan_lands_where_the_plan_puts_it(self):
+        """Not appended after the bands that were already there.
+
+        `SortableModel` assigns `max(siblings) + 1`, which is right only
+        while a store is being seeded from nothing and creation order
+        IS the plan's order. On a store that already had the other
+        bands, the partner strip, the pull quote and the reference cards
+        all landed after the closing CTA — and the `--overwrite` reorder
+        pass could not save them, because it only runs for a component
+        type that is already present.
+        """
+        from page_config.models import PageSection
+
+        delta_sigma.seed_layouts()
+        home = PageSection.objects.filter(layout__page_type="home")
+        # An older store: seeded before these three bands existed.
+        home.filter(component_type__in=("partner_strip", "pull_quote")).delete()
+
+        delta_sigma.seed_layouts()
+
+        order = list(
+            home.order_by("sort_order").values_list("component_type", flat=True)
+        )
+        planned = [
+            section["component_type"]
+            for section in sorted(
+                delta_sigma._layout_plan()["home"],
+                key=lambda item: item["sort_order"],
+            )
+        ]
+        assert order == planned
+
     def test_overwrite_drops_a_band_the_plan_no_longer_carries(self):
         """A redesign has to be able to REMOVE a band, not only add one.
 
@@ -523,6 +555,40 @@ class TestTheSeedStepsConvergeOnExistingRows:
         delta_sigma.seed_layouts()
 
         assert layout.sections.filter(component_type="faq").exists()
+
+    def test_overwrite_rewrites_the_navigation_items(self):
+        """A change to the plan's MENU has to reach a seeded store.
+
+        The footer columns kept their first shape through three
+        re-seeds because only the English overlay was ever refilled —
+        `items` is the merchant's content, so a plain re-run leaves it
+        alone, and nothing lifted that under `--overwrite`.
+        """
+        from page_config.models import NavigationMenu, NavigationSlot
+
+        delta_sigma.seed_navigation()
+        menu = NavigationMenu.objects.get(slot=NavigationSlot.FOOTER)
+        menu.items = [{"label": "Παλιό", "children": []}]
+        menu.save(update_fields=["items"])
+
+        report = delta_sigma.seed_navigation(overwrite=True)
+
+        menu.refresh_from_db()
+        assert report.get("rewritten", 0) >= 1
+        assert menu.items == delta_sigma._nav_footer()
+
+    def test_a_rerun_without_overwrite_keeps_an_edited_menu(self):
+        from page_config.models import NavigationMenu, NavigationSlot
+
+        delta_sigma.seed_navigation()
+        menu = NavigationMenu.objects.get(slot=NavigationSlot.FOOTER)
+        menu.items = [{"label": "Δικό μου", "children": []}]
+        menu.save(update_fields=["items"])
+
+        delta_sigma.seed_navigation()
+
+        menu.refresh_from_db()
+        assert menu.items == [{"label": "Δικό μου", "children": []}]
 
     def test_overwrite_reimposes_the_planned_props(self):
         """A change to the plan's COPY has to reach a seeded store.
@@ -568,13 +634,18 @@ class TestTheSeedStepsConvergeOnExistingRows:
         The home band's cards are projected from `DESET_SYSTEMS` so the
         band and the product page cannot contradict each other. Both
         the labels and the values are abbreviated to fit a 183px column
-        ("RS485 / RTU" for "1 × RS485 Modbus RTU (TA5142-RS485I)"), so
-        the guard is at the TOKEN level: every word and figure a card
-        prints has to appear somewhere in what that system publishes.
-        That is what catches the failure worth catching — a card
-        claiming 16 MB where the spec says 8.
+        ("RS485 / RTU" for "1 × RS485 Modbus RTU (TA5142-RS485I)",
+        "8 DI + 8 DO" for "8 ψηφ. εισόδων + 8 ψηφ. εξόδων"), so the
+        guard is on the FIGURES: every token carrying a digit has to
+        appear in what that system publishes. That is the failure worth
+        catching — a card claiming 16 MB where the spec says 8. A word
+        is display text, not a claim, and an industrial card is allowed
+        to write "DI" where the spec says "ψηφιακές είσοδοι".
         """
-        word = re.compile(r"[0-9A-Za-zͰ-Ͽ]+")
+        figure = re.compile(
+            r"[0-9A-Za-zͰ-Ͽ]*[0-9]"
+            r"[0-9A-Za-zͰ-Ͽ]*"
+        )
         for system in delta_sigma.DESET_SYSTEMS:
             for key, spec_key in (
                 ("card_specs", "specs"),
@@ -584,7 +655,7 @@ class TestTheSeedStepsConvergeOnExistingRows:
                     value for _, value in system[spec_key]
                 ).casefold()
                 for label, value in system[key]:
-                    for token in word.findall(value):
+                    for token in figure.findall(value):
                         assert token.casefold() in published, (
                             f"{system['sku']} {key} {label}: {token!r}"
                         )

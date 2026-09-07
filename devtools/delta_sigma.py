@@ -507,18 +507,18 @@ DESET_SYSTEMS = [
         "card_specs": [
             ("Πλατφόρμα", "Real-time Linux"),
             ("RAM", "512 MB"),
-            ("Πρωτόκολλο", "IEC 104 ενσωματωμένο"),
-            ("Ethernet", "2 × ανεξάρτητες"),
-            ("Σειριακή", "RS485 Modbus RTU"),
-            ("Κάρτες I/O", "8 ψηφ. εισόδων"),
+            ("Πρωτόκολλο", "IEC 104 ενσωμ."),
+            ("Ethernet", "2 × Modbus TCP"),
+            ("Σειριακή", "RS485 / RTU"),
+            ("Κάρτες I/O", "8 DI + 8 DO"),
         ],
         "card_specs_en": [
             ("Platform", "Real-time Linux"),
             ("RAM", "512 MB"),
             ("Protocol", "IEC 104 built in"),
-            ("Ethernet", "2 × independent"),
-            ("Serial", "RS485 Modbus RTU"),
-            ("I/O cards", "8 digital inputs"),
+            ("Ethernet", "2 × Modbus TCP"),
+            ("Serial", "RS485 / RTU"),
+            ("I/O cards", "8 DI + 8 DO"),
         ],
         "name_en": ("DeSET 03 — WAGO PFC200 G2 2ETH RS Tele T ECO PLC"),
         "summary_en": (
@@ -2432,8 +2432,6 @@ def seed_layouts(*, overwrite: bool = False) -> dict[str, int]:
             _bump(report, "layouts_published")
 
         present = set(layout.sections.values_list("component_type", flat=True))
-        # SortableModel assigns sort_order from max(siblings) + 1, so
-        # CREATION order determines where each band lands.
         for section in sorted(sections, key=lambda item: item["sort_order"]):
             component_type = section["component_type"]
             i18n = section.get("i18n", {})
@@ -2483,13 +2481,32 @@ def seed_layouts(*, overwrite: bool = False) -> dict[str, int]:
                 continue
             validate_section_props(component_type, section["props"])
             validate_section_i18n(component_type, i18n)
-            PageSection.objects.create(
+            row = PageSection.objects.create(
                 layout=layout,
                 component_type=component_type,
                 title=section["title"],
                 props=section["props"],
                 i18n=i18n,
                 is_visible=True,
+            )
+            # Then place it, because ``SortableModel.save`` OVERWRITES
+            # ``sort_order`` on every insert (``if self.pk is None`` →
+            # ``max(siblings) + 1``), so passing it to ``create`` is
+            # silently ignored. Appending is right only on a store being
+            # seeded from nothing, where creation order IS the plan's
+            # order. Add a band to a store that already has the others
+            # and it appends however the plan reads — the partner strip,
+            # the pull quote and the reference cards all landed after
+            # the closing CTA on the one store this pack exists for, and
+            # the reorder pass above could not save them because it only
+            # runs for a component type already present.
+            #
+            # ``queryset.update`` rather than ``row.save`` for the same
+            # reason: it does not go through the model's save. The
+            # resequencing pass below compacts whatever collisions the
+            # provisioning defaults leave behind.
+            PageSection.objects.filter(pk=row.pk).update(
+                sort_order=section["sort_order"]
             )
             _bump(report, "sections_created")
 
@@ -2535,7 +2552,14 @@ def seed_navigation(*, overwrite: bool = False) -> dict[str, int]:
     """Create the three NavigationMenu slots.
 
     ``get_or_create``, never ``update_or_create``: a NavigationMenu row
-    IS the merchant's content and a re-run must not overwrite an edit.
+    IS the merchant's content — the page builder's own editor writes
+    exactly this column — so a re-run must not overwrite an edit.
+
+    ``overwrite`` rewrites ``items`` as well as ``i18n``, for the same
+    reason it rewrites section props: without it a change to the plan's
+    MENU could never reach a store that already had one. The footer
+    columns kept their first shape through three re-seeds because only
+    the English overlay was ever refilled.
     """
     from page_config.models import NavigationMenu, NavigationSlot
     from page_config.schemas import (
@@ -2559,13 +2583,25 @@ def seed_navigation(*, overwrite: bool = False) -> dict[str, int]:
         if created:
             _bump(report, "created")
             continue
+        rewritten = 0
+        if overwrite:
+            rewritten = (
+                NavigationMenu.objects.filter(pk=menu.pk)
+                .exclude(items=items)
+                .update(items=items)
+            )
+            if rewritten:
+                _bump(report, "rewritten", rewritten)
         filled = _fill_missing_i18n(
             NavigationMenu.objects.filter(pk=menu.pk),
             i18n,
             validate=partial(validate_navigation_i18n, slot),
             overwrite=overwrite,
         )
-        _bump(report, "localized" if filled else "unchanged", filled or 1)
+        if filled:
+            _bump(report, "localized", filled)
+        elif not rewritten:
+            _bump(report, "unchanged", 1)
     return report
 
 

@@ -3,6 +3,42 @@
 
 
 
+## v3.30.2 (2026-09-07)
+
+### Bug fixes
+
+* fix(devtools): de-saturate the dark ramp's deep end, seed contact details
+
+Three defects found by scanning the rendered site.
+
+1. The whole page rendered teal instead of slate near-black. In dark
+   mode the platform paints SURFACES from the primary scale — the
+   sticky header and every FeaturesGrid card are `dark:bg-primary-900`,
+   borders `dark:border-primary-800`, badges `dark:bg-primary-700`.
+   With a stock palette shade 900 is near-neutral; the first cut put a
+   saturated #003838 there and it washed everything. Chroma now tapers
+   to ~0.02 below shade 700 (900 = #0D1C1C) while 100 keeps the #5BC4C4
+   accent. Verified: slate-200 on the new 900 is 14.2:1, the accent on
+   it 8.5:1, and the ramp stays monotonic in lightness.
+
+2. /contact showed no phone, address or email. contact.vue renders
+   `usePageConfig('contact')` and there was no `contact` layout, so
+   only the bare form appeared. Adds one.
+
+3. The extra_settings contact rows were all empty. Fills the ten the
+   published facts cover, via `Setting.validate()`.
+
+ΑΦΜ, ΔΟΥ, legal form, business activity, store coordinates and business
+hours stay empty on purpose — delta-sigma.gr does not publish them, and
+a guessed invoicing identity is worse than a blank field.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018CiyyCqkXd9a1FM5hsrPFZ ([`65ac77b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/65ac77bf723ab0fd790fe67084f1579873ff9c8c))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.30.1 [skip ci] ([`3c004ac`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3c004ac4ad5ec66396fa3f4dd011cda610ee2ece))
+
 ## v3.30.1 (2026-09-07)
 
 ### Bug fixes

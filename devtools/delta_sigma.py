@@ -741,8 +741,28 @@ _PROVISIONING_HOME_SECTIONS = frozenset(
 )
 
 
+def _deset_link() -> str:
+    """Deep link to the DeSET category listing.
+
+    The storefront route is ``/products/category/[id]/[slug]`` and the
+    page fetches ``/api/products/categories/{id}``, so the link needs
+    the DB-assigned id — it can never be a constant. Falls back to the
+    catalogue root when the category has not been seeded yet (``--only
+    layouts`` before ``--only products``), which keeps the link valid
+    rather than emitting a 404.
+    """
+    from product.models import ProductCategory
+
+    slug = DESET_CATEGORY[0]
+    category = ProductCategory.objects.filter(slug=slug).only("id").first()
+    return (
+        f"/products/category/{category.id}/{slug}" if category else "/products"
+    )
+
+
 def _layout_plan() -> dict:
     """Build LAYOUT_PLAN lazily so the props stay in one place."""
+    deset_link = _deset_link()
     return {
         "home": [
             {
@@ -763,7 +783,7 @@ def _layout_plan() -> dict:
                     "cta_text": "Ζητήστε προσφορά",
                     "cta_link": "/contact",
                     "secondary_cta_text": "Το σύστημα DeSET",
-                    "secondary_cta_link": "/products/category/deset",
+                    "secondary_cta_link": deset_link,
                     "decor": "gradient",
                 },
             },
@@ -787,7 +807,7 @@ def _layout_plan() -> dict:
                     "body": DESET_COMPLIANCE,
                     "image_position": "right",
                     "cta_text": "Δείτε τα τρία συστήματα",
-                    "cta_link": "/products/category/deset",
+                    "cta_link": deset_link,
                     "decor": "orbs",
                 },
             },
@@ -834,38 +854,40 @@ def _layout_plan() -> dict:
     }
 
 
-NAV_HEADER = [
-    {"label": "DeSET", "to": "/products/category/deset"},
-    {"label": "Ειδίκευση", "to": "/info/eidikefsi"},
-    {"label": "Δραστηριότητες", "to": "/info/drastiriotites"},
-    {"label": "Εμπειρία", "to": "/blog"},
-    {"label": "Συνεργάτες", "to": "/info/synergates"},
-    {"label": "Επικοινωνία", "to": "/contact"},
-]
+def _nav_header() -> list[dict]:
+    return [
+        {"label": "DeSET", "to": _deset_link()},
+        {"label": "Ειδίκευση", "to": "/info/eidikefsi"},
+        {"label": "Δραστηριότητες", "to": "/info/drastiriotites"},
+        {"label": "Εμπειρία", "to": "/blog"},
+        {"label": "Συνεργάτες", "to": "/info/synergates"},
+        {"label": "Επικοινωνία", "to": "/contact"},
+    ]
 
-NAV_MOBILE = [{"label": "Αρχική", "to": "/"}, *NAV_HEADER]
 
-NAV_FOOTER = [
-    {
-        "label": "Εταιρεία",
-        "children": [
-            {"label": "Ειδίκευση", "to": "/info/eidikefsi"},
-            {"label": "Δραστηριότητες", "to": "/info/drastiriotites"},
-            {"label": "Εμπειρία", "to": "/blog"},
-            {"label": "Συνεργάτες", "to": "/info/synergates"},
-        ],
-    },
-    {
-        "label": "Λύσεις",
-        "children": [
-            {
-                "label": "DeSET — Τηλεποπτεία ΑΠΕ",
-                "to": "/products/category/deset",
-            },
-            {"label": "Επικοινωνία", "to": "/contact"},
-        ],
-    },
-]
+def _nav_mobile() -> list[dict]:
+    return [{"label": "Αρχική", "to": "/"}, *_nav_header()]
+
+
+def _nav_footer() -> list[dict]:
+    return [
+        {
+            "label": "Εταιρεία",
+            "children": [
+                {"label": "Ειδίκευση", "to": "/info/eidikefsi"},
+                {"label": "Δραστηριότητες", "to": "/info/drastiriotites"},
+                {"label": "Εμπειρία", "to": "/blog"},
+                {"label": "Συνεργάτες", "to": "/info/synergates"},
+            ],
+        },
+        {
+            "label": "Λύσεις",
+            "children": [
+                {"label": "DeSET — Τηλεποπτεία ΑΠΕ", "to": _deset_link()},
+                {"label": "Επικοινωνία", "to": "/contact"},
+            ],
+        },
+    ]
 
 
 CONTENT_PAGES = {
@@ -1170,9 +1192,9 @@ def seed_navigation() -> dict[str, int]:
 
     report: dict[str, int] = {}
     payloads = {
-        NavigationSlot.HEADER: NAV_HEADER,
-        NavigationSlot.MOBILE: NAV_MOBILE,
-        NavigationSlot.FOOTER: NAV_FOOTER,
+        NavigationSlot.HEADER: _nav_header(),
+        NavigationSlot.MOBILE: _nav_mobile(),
+        NavigationSlot.FOOTER: _nav_footer(),
     }
     for slot, items in payloads.items():
         validate_navigation_items(slot, items)

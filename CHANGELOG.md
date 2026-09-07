@@ -3,6 +3,40 @@
 
 
 
+## v3.35.0 (2026-09-07)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.34.0 [skip ci] ([`6658898`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6658898a564bbf2a6e2dc9961283aceafd78cf1a))
+
+### Features
+
+* feat(tenant): LinkedIn and public office addresses
+
+Two things the Δelta Σigma design needs that the platform could not
+express, both found by building its footer to the artboards.
+
+`Tenant.socials_linkedin` — LinkedIn was the conspicuous omission in a
+set of eight consumer networks. It is the only social presence a B2B
+engineering practice keeps, and this company links nothing else.
+
+`STORE_OFFICES` — the platform modelled ONE address per store, the
+`INVOICE_SELLER_*` registered seat, and that is not what a storefront
+publishes. The seat is where a legal notice goes; the offices are where
+a customer visits, and they are often neither the same place nor a
+single place. Δelta Σigma has two offices and a seat at a third address,
+so the footer's contact column and the contact page had nowhere to read
+from — the addresses were baked into a rich_text HTML blob.
+
+The entries carry an `i18n` overlay of the TEXT keys only, the same
+shape and the same reasoning as `PageSection.i18n`: a postcode and a
+phone number read the same in every language, so letting a locale
+override them would only invite drift. Asserted from both directions,
+along with the required/optional split and the bounded list.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018CiyyCqkXd9a1FM5hsrPFZ ([`ca69db0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ca69db0104b2ee6e4039ba79cb027bafc3537c11))
+
 ## v3.34.0 (2026-09-07)
 
 ### Bug fixes

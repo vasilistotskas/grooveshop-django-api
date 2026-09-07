@@ -3,6 +3,100 @@
 
 
 
+## v3.32.0 (2026-09-07)
+
+### Bug fixes
+
+* fix(blog): stop the comment filters returning one comment per language
+
+`BlogCommentFactory` carried `django_get_or_create = ("user", "post")`,
+a natural key the model does not have. Threads are MPTT trees, so one
+person may comment many times on one post and a reply's author usually
+already has a comment there — `get_or_create` then returned the
+EXISTING row and silently discarded every other kwarg. Measured:
+`BlogCommentFactory(post=p, user=u, parent=first)` handed back `first`
+itself (same pk, one row, zero children), and
+`BlogPostFactory(num_comments=5)` produced two comments, because
+`get_or_create_user` draws at random from the users that already exist.
+That is the mechanism behind the intermittent
+`test_a_reply_on_a_visible_post_still_comes_back` failure — the reply
+collapsed into its own parent, so `replies` answered `[]`.
+
+Removing it exposed two real defects the collapse had been hiding in
+`BlogCommentFilter`:
+
+* `translations__content` is one row per LANGUAGE. Filtering and
+  annotating through the join multiplied the result — one comment came
+  back three times from `?minContentLength=10` on el/en/de, with the
+  paginated `count` inflated to match. `distinct=True` is
+  django-filter's documented answer while a predicate only adds a
+  WHERE clause, but `Length("translations__content")` lands in the
+  SELECT list with a different value per language, so DISTINCT keeps
+  all three rows. The content predicates are correlated `EXISTS`
+  subqueries over the translation model now (`core.filters.
+  translations.any_translation`); the two plain `icontains` lookups
+  that span the relation on their own take `distinct=True`.
+
+* `hasContent` asked `translations__content=""`, which means "SOME
+  language is blank" — a comment written in Greek but not German
+  answered true to BOTH sides of the filter. It is EXISTS/NOT EXISTS
+  over the translations now.
+
+The filter tests moved with them: `test_camel_case_filters` asserted
+`reply1_1` (created 8 days back) against a 7-day window and passed only
+because the collapse had moved that row's `created_at` inside it, and
+the fixture's "contentless" comment was blanked in English alone while
+Greek and German stayed populated.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018CiyyCqkXd9a1FM5hsrPFZ ([`222a998`](https://github.com/vasilistotskas/grooveshop-django-api/commit/222a9981e5e79abef537788cfdd5fb5ef8c32e07))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.31.0 [skip ci] ([`890ac02`](https://github.com/vasilistotskas/grooveshop-django-api/commit/890ac022d1bc171bd4a33f17d9361dab9d852ebc))
+
+### Features
+
+* feat(page-config): per-locale section copy and menus, and ship the English pack
+
+Δelta Σigma serves `el` and `en`, but its homepage copy lived in
+`PageSection.props` and its menu labels in `NavigationMenu.items` —
+plain JSON, so `/en` rendered the Greek hero, the Greek timeline and a
+Greek header. Only ContentPage, Product and BlogPost were translatable,
+and their English rows were either missing or two-sentence stubs.
+
+`PageSection.i18n` / `NavigationMenu.i18n` are per-locale OVERRIDE maps,
+not parler translations, because `props` is one field carrying both
+layout configuration and customer-facing text: translating the field
+would duplicate `columns`, `count` and `cta_link` per language and let
+them drift. A section's override is a PARTIAL merge, so only the copy is
+per-locale; a menu is replaced whole, since an index-keyed overlay would
+retarget every label the first time an operator reorders it. The default
+locale is not a valid key — those values ARE the columns.
+
+Resolution is server-side from an explicit `?locale=`, not
+`Accept-Language`: the storefront proxies these routes and already knows
+the locale it is rendering, but it forwards only its own `X-Language`
+header, which nothing in the request path activates — a header-based
+answer would silently serve Greek. An explicit parameter also keeps both
+caches honest, and it means `props` reaches the Renderer in exactly the
+shape the per-component zod contracts already parse: no section
+component and no generated type learns about locales. The public read
+schema is unchanged; `i18n` is additive and optional on the admin write
+path.
+
+The content pack now carries English for all of it: the seven
+specialisations, the eight activity phases, the five FAQ entries, the
+hero/media/CTA copy, the contact block (address transliterated, not
+translated — a courier has to be able to read it), the three DeSET
+systems with their spec tables, all 48 register entries and the seven
+sector categories, and the three service pages are at parity with the
+Greek instead of stubs. Client names stay verbatim in both languages;
+they are registered entities, not phrases.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018CiyyCqkXd9a1FM5hsrPFZ ([`d8ecfea`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d8ecfea9a6a69d70fb8e7056e66488dba77dc209))
+
 ## v3.31.0 (2026-09-07)
 
 ### Chores

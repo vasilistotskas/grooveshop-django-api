@@ -3,6 +3,72 @@
 
 
 
+## v3.34.0 (2026-09-07)
+
+### Bug fixes
+
+* fix(delta-sigma): lead the home page with DeSET, as the artboards do
+
+The design puts DeSET immediately after the hero — it is the product the
+redesign is built around — with the seven specialisation fields under
+it. The seeded layout had them the other way round.
+
+Reordering the plan alone could not reach an already-seeded store:
+`seed_layouts` skips a section whose component type is present, and the
+resequencing pass only COMPACTS the order already in the table rather
+than changing it. So the order now converges too — under `--overwrite`
+only, because `sort_order` is merchant content: it is the column the
+page builder's drag-drop writes, and a re-run must not undo a
+deliberate reorder. Both directions asserted.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018CiyyCqkXd9a1FM5hsrPFZ ([`bea0c02`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bea0c02f404a695f28aad841fdc58f7e9138c8be))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.33.0 [skip ci] ([`c0e6fa2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c0e6fa23b767f7e5f3d44715f1fbcb15f7163324))
+
+### Features
+
+* feat(delta-sigma): the legal identity, from the ΓΕΜΗ record
+
+delta-sigma.gr publishes only the Γ.Ε.ΜΗ. number, so the rest came from
+the register that number addresses — the official publicity record at
+publicity.businessportal.gr/company/156013906000, read 2026-09-07:
+
+ΑΙΚ. ΔΗΜΟΠΟΥΛΟΥ - Μ. ΣΦΗΚΑΣ Ο.Ε. (trade name ΔΕΛΤΑ ΣΙΓΜΑ Ο.Ε.)
+ΑΦΜ 801400345 · νομική μορφή ΟΕ · κύριος ΚΑΔ 71121000 ΥΠΗΡΕΣΙΕΣ
+ΜΗΧΑΝΙΚΩΝ · σύσταση 26/08/2020 · έδρα ΔΑΒΑΚΗ 19, ΚΑΛΑΜΑΡΙΑ 55132
+
+Three of those need saying out loud:
+
+* `INVOICE_SELLER_NAME` is now the LEGAL name. "Δelta Σigma" is the
+  διακριτικός τίτλος and stays the brand everywhere else.
+* The invoice address is the REGISTERED SEAT (Δαβάκη 19), which is not
+  the address the site publishes (Γ. Ρίτσου 7). A Greek invoice carries
+  the seat; the contact page and the map keep the office. Confirmed with
+  the operator before switching.
+* `ΔΟΥ Καλαμαριάς` is the operator's own naming. ΤΚ 55131/55132 is that
+  catchment, but AADE renamed the unit the 20ή Υ.Φ.Ε. on 27/07/2026 and
+  moved registry duties to ΚΕΦΟΔΕ Θεσσαλονίκης — so the string was asked
+  rather than picked.
+
+Coordinates are geocoded and reverse-verified against OpenStreetMap:
+Γ. Ρίτσου 7 resolves to 7 Γιάννη Ρίτσου, Δήμος Καλαμαριάς, whose
+postcode (551 32) matches the published one. Business hours are Mon-Fri
+09:00-17:00 per the operator — they are published nowhere.
+
+ODOT is no longer a bracketed placeholder. odot.gr says it verbatim:
+"Είμαστε επίσημοι μεταπωλητές … της εταιρίας Odot" — Δelta Σigma is Odot
+Automation's official Greek reseller, running that channel on its own
+domain from the same two offices, which is why a logo with no
+description sat on the partners page. INVT and Advantech get their own
+entries too: they carry logos with equal billing on the live page and
+had only a trailing mention here.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018CiyyCqkXd9a1FM5hsrPFZ ([`5e81462`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5e8146241a492ae877463c8a2901e0e716c77c5e))
+
 ## v3.33.0 (2026-09-07)
 
 ### Chores

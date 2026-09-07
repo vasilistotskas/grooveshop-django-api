@@ -178,6 +178,66 @@ def test_business_hours_carries_no_props():
         validate_section_props("business_hours", {"schedule": {}})
 
 
+def test_hero_banner_stats_shape():
+    """The proof row under the hero copy."""
+    validate_section_props(
+        "hero_banner",
+        {
+            "heading": "Turnkey automation",
+            "stats": [
+                {"value": "48", "label": "documented projects"},
+                {"value": "7", "label": "fields of expertise"},
+            ],
+        },
+    )
+    with pytest.raises(ValidationError):
+        # A number, not a string: the row prints "50+" and "1.842" as
+        # often as a bare integer, so the prop is text.
+        validate_section_props("hero_banner", {"stats": [{"value": 48}]})
+    with pytest.raises(ValidationError):
+        validate_section_props(
+            "hero_banner", {"stats": [{"value": "48", "label": ""}]}
+        )
+    with pytest.raises(ValidationError):
+        validate_section_props(
+            "hero_banner",
+            {"stats": [{"value": "48", "label": "x", "note": "y"}]},
+        )
+    with pytest.raises(ValidationError):
+        validate_section_props(
+            "hero_banner", {"stats": [{"value": "1", "label": "x"}] * 5}
+        )
+
+
+def test_hero_banner_stats_errors_name_their_own_key():
+    """Not "items" — the shared checker is told which prop it is."""
+    with pytest.raises(ValidationError, match="stats"):
+        validate_section_props("hero_banner", {"stats": "48"})
+
+
+def test_partner_strip_props():
+    validate_section_props(
+        "partner_strip",
+        {
+            "label": "We work with",
+            "items": [{"name": "ABB"}, {"name": "ODOT", "href": "/info/x"}],
+        },
+    )
+    with pytest.raises(ValidationError):
+        validate_section_props("partner_strip", {"items": [{"name": ""}]})
+    with pytest.raises(ValidationError):
+        validate_section_props(
+            "partner_strip",
+            {"items": [{"name": "ABB", "href": "javascript:alert(1)"}]},
+        )
+    with pytest.raises(ValidationError):
+        validate_section_props(
+            "partner_strip", {"items": [{"name": "ABB", "logo": "x.svg"}]}
+        )
+    with pytest.raises(ValidationError):
+        validate_section_props("partner_strip", {"heading": "We work with"})
+
+
 def test_features_grid_items_shape():
     validate_section_props(
         "features_grid",

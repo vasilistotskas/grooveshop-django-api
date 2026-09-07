@@ -44,35 +44,37 @@ def _check_items(
     optional: dict[str, int],
     link_keys: frozenset[str] = frozenset(),
     icon_keys: frozenset[str] = frozenset(),
+    name: str = "items",
 ) -> str | None:
     """Shared list-of-objects checker: ``required``/``optional`` map key
     -> max string length; ``icon_keys`` must additionally match the
-    ``i-*`` icon pattern."""
+    ``i-*`` icon pattern. ``name`` heads the error messages, so a prop
+    called something other than ``items`` reports its own key."""
     if not isinstance(value, list) or len(value) > max_items:
-        return f"items: must be a list of at most {max_items} entries"
+        return f"{name}: must be a list of at most {max_items} entries"
     for i, raw in enumerate(value):
         if not isinstance(raw, dict):
-            return f"items[{i}]: must be an object"
+            return f"{name}[{i}]: must be an object"
         item = {str(k): v for k, v in raw.items()}
         for key, max_length in required.items():
             entry = item.get(key)
             if not entry or not _is_str(entry, max_length):
-                return f"items[{i}].{key}: required string (max {max_length})"
+                return f"{name}[{i}].{key}: required string (max {max_length})"
         for key, max_length in optional.items():
             entry = item.get(key)
             if entry is not None and not _is_str(entry, max_length):
-                return f"items[{i}].{key}: must be a string (max {max_length})"
+                return f"{name}[{i}].{key}: must be a string (max {max_length})"
         for key in icon_keys:
             entry = item.get(key)
             if entry is not None and not _ICON_RE.match(str(entry)):
-                return f"items[{i}].{key}: must be an i-* icon name"
+                return f"{name}[{i}].{key}: must be an i-* icon name"
         for key in link_keys:
             entry = item.get(key)
             if entry is not None and not _LINK_RE.match(str(entry)):
-                return f"items[{i}].{key}: internal path or https URL"
+                return f"{name}[{i}].{key}: internal path or https URL"
         unknown = set(item) - set(required) - set(optional)
         if unknown:
-            return f"items[{i}]: unknown keys {sorted(unknown)}"
+            return f"{name}[{i}]: unknown keys {sorted(unknown)}"
     return None
 
 
@@ -100,6 +102,16 @@ def _check_testimonial_items(value) -> str | None:
 _VALIDATORS: dict[str, dict] = {
     "hero_banner": {
         "heading": lambda v: None if _is_str(v, 200) else "string ≤200",
+        # The proof row under the copy — "50+ documented projects",
+        # "7 fields", "2 offices". Merchant facts that change as the
+        # business grows, so props rather than markup.
+        "stats": lambda v: _check_items(
+            v,
+            max_items=4,
+            required={"value": 12, "label": 80},
+            optional={},
+            name="stats",
+        ),
         "subheading": lambda v: None if _is_str(v, 500) else "string ≤500",
         "eyebrow": lambda v: None if _is_str(v, 100) else "string ≤100",
         "image_url": lambda v: None if _is_str(v, 1000) else "string ≤1000",
@@ -239,6 +251,16 @@ _VALIDATORS: dict[str, dict] = {
             else "number between -180 and 180"
         ),
         "address": lambda v: None if _is_str(v, 300) else "string ≤300",
+    },
+    "partner_strip": {
+        "label": lambda v: None if _is_str(v, 80) else "string ≤80",
+        "items": lambda v: _check_items(
+            v,
+            max_items=12,
+            required={"name": 60},
+            optional={"href": 1000},
+            link_keys=frozenset({"href"}),
+        ),
     },
     "features_grid": {
         "heading": lambda v: None if _is_str(v, 200) else "string ≤200",

@@ -460,7 +460,12 @@ class TestTheSeedStepsConvergeOnExistingRows:
         order = list(
             home.order_by("sort_order").values_list("component_type", flat=True)
         )
-        assert order[:3] == ["hero_banner", "media_text", "features_grid"]
+        assert order[:4] == [
+            "hero_banner",
+            "partner_strip",
+            "media_text",
+            "features_grid",
+        ]
 
     def test_a_rerun_without_overwrite_keeps_a_merchant_reorder(self):
         from page_config.models import PageSection
@@ -475,3 +480,52 @@ class TestTheSeedStepsConvergeOnExistingRows:
             home.get(component_type="faq").sort_order
             < home.get(component_type="features_grid").sort_order
         )
+
+    def test_overwrite_reimposes_the_planned_props(self):
+        """A change to the plan's COPY has to reach a seeded store.
+
+        Props are merchant content, so a plain re-run leaves them
+        alone. Without this under `--overwrite` the redesign's own text
+        could never reach the one store it was written for: the section
+        already existed, so the seeder skipped it.
+        """
+        from page_config.models import PageSection
+
+        delta_sigma.seed_layouts()
+        hero = PageSection.objects.get(
+            layout__page_type="home", component_type="hero_banner"
+        )
+        hero.props = {**hero.props, "heading": "Κάτι άλλο"}
+        hero.save(update_fields=["props"])
+
+        report = delta_sigma.seed_layouts(overwrite=True)
+
+        hero.refresh_from_db()
+        assert report.get("sections_rewritten", 0) >= 1
+        assert hero.props["heading"].startswith("Συστήματα αυτοματισμού")
+
+    def test_a_rerun_without_overwrite_keeps_a_merchant_edit(self):
+        from page_config.models import PageSection
+
+        delta_sigma.seed_layouts()
+        hero = PageSection.objects.get(
+            layout__page_type="home", component_type="hero_banner"
+        )
+        hero.props = {**hero.props, "heading": "Κάτι άλλο"}
+        hero.save(update_fields=["props"])
+
+        delta_sigma.seed_layouts()
+
+        hero.refresh_from_db()
+        assert hero.props["heading"] == "Κάτι άλλο"
+
+    def test_the_hero_proof_row_counts_the_content(self):
+        """Derived, not typed — see HERO_STATS."""
+        values = [entry["value"] for entry in delta_sigma.HERO_STATS]
+
+        assert values == [
+            str(len(delta_sigma.PROJECTS)),
+            str(len(delta_sigma.SPECIALIZATIONS)),
+            str(len(delta_sigma.OFFICES)),
+        ]
+        assert [entry["value"] for entry in delta_sigma.HERO_STATS_EN] == values

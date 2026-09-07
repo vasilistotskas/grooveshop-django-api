@@ -95,6 +95,7 @@ class ComponentType(models.TextChoices):
     IMAGE_GALLERY = "image_gallery", _("Image Gallery")
     STORY_TIMELINE = "story_timeline", _("Story Timeline")
     FAQ = "faq", _("FAQ Accordion")
+    PARTNER_STRIP = "partner_strip", _("Partner Strip")
 
 
 class PageLayout(

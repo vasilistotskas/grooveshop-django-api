@@ -1207,6 +1207,41 @@ SPECIALIZATIONS_EN = [
     },
 ]
 
+# The hero's proof row. Every number is DERIVED from the content above
+# rather than typed: the desktop artboard rounds the project count to
+# "50+" while the mobile one prints "48", and a hand-written figure is
+# the one that goes stale the first time a project is added.
+HERO_STATS = [
+    {"value": str(len(PROJECTS)), "label": "τεκμηριωμένα έργα"},
+    {"value": str(len(SPECIALIZATIONS)), "label": "πεδία ειδίκευσης"},
+    {
+        "value": str(len(OFFICES)),
+        "label": "γραφεία, Θεσ/νίκη & Αττική",
+    },
+]
+
+HERO_STATS_EN = [
+    {"value": str(len(PROJECTS)), "label": "documented projects"},
+    {"value": str(len(SPECIALIZATIONS)), "label": "fields of expertise"},
+    {
+        "value": str(len(OFFICES)),
+        "label": "offices, Thessaloniki & Attica",
+    },
+]
+
+# The four names the artboard's strip carries, in its order. The
+# synergates page lists two more (INVT, Advantech) with a paragraph
+# each; the strip is a glance, not the roster, and the design keeps it
+# to four. Untranslated on purpose — a manufacturer's name is the same
+# in both languages, which is why the English overlay carries only the
+# label.
+PARTNER_BRANDS = [
+    {"name": "ABB"},
+    {"name": "Milesight"},
+    {"name": "Aviat Networks"},
+    {"name": "ODOT"},
+]
+
 ACTIVITIES = [
     {
         "title": "Μελέτη & σχεδιασμός",
@@ -1464,6 +1499,7 @@ def _layout_plan() -> dict:
                     "secondary_cta_text": "Το σύστημα DeSET",
                     "secondary_cta_link": deset_link,
                     "decor": "gradient",
+                    "stats": HERO_STATS,
                 },
                 "i18n": {
                     "en": {
@@ -1478,17 +1514,34 @@ def _layout_plan() -> dict:
                             "them across their whole life cycle.",
                             "cta_text": "Request a quote",
                             "secondary_cta_text": "The DeSET system",
+                            "stats": HERO_STATS_EN,
                         }
+                    }
+                },
+            },
+            {
+                "component_type": "partner_strip",
+                "title": "Συνεργασίες",
+                "sort_order": 1,
+                "props": {
+                    "label": "Συνεργαζόμαστε με",
+                    "items": PARTNER_BRANDS,
+                },
+                "i18n": {
+                    "en": {
+                        "title": "Partnerships",
+                        "props": {"label": "We work with"},
                     }
                 },
             },
             {
                 "component_type": "features_grid",
                 "title": "Ειδίκευση",
-                # 2, not 1: the artboards lead with DeSET straight after
-                # the hero — it is the product the redesign is built
-                # around — and put the seven fields under it.
-                "sort_order": 2,
+                # Under DeSET, not above it: the artboards lead with
+                # DeSET straight after the hero and the partner strip —
+                # it is the product the redesign is built around — and
+                # put the seven fields below it.
+                "sort_order": 3,
                 "props": {
                     "heading": "Επτά πεδία, ένας ανάδοχος",
                     "columns": 4,
@@ -1508,7 +1561,7 @@ def _layout_plan() -> dict:
             {
                 "component_type": "media_text",
                 "title": "DeSET",
-                "sort_order": 1,
+                "sort_order": 2,
                 "props": {
                     "heading": "DeSET — τηλεποπτεία σταθμών ΑΠΕ",
                     "body": DESET_COMPLIANCE,
@@ -1531,7 +1584,7 @@ def _layout_plan() -> dict:
             {
                 "component_type": "story_timeline",
                 "title": "Δραστηριότητες",
-                "sort_order": 3,
+                "sort_order": 4,
                 "props": {
                     "heading": "Από τη μελέτη ως το συμβόλαιο υποστήριξης",
                     "items": ACTIVITIES,
@@ -1549,14 +1602,14 @@ def _layout_plan() -> dict:
             {
                 "component_type": "blog_posts_grid",
                 "title": "Εμπειρία",
-                "sort_order": 4,
+                "sort_order": 5,
                 "props": {"count": 6},
                 "i18n": {"en": {"title": "Experience"}},
             },
             {
                 "component_type": "faq",
                 "title": "Συχνές ερωτήσεις",
-                "sort_order": 5,
+                "sort_order": 6,
                 "props": {
                     "heading": "Συχνές ερωτήσεις",
                     "multiple": True,
@@ -1575,7 +1628,7 @@ def _layout_plan() -> dict:
             {
                 "component_type": "cta_banner",
                 "title": "CTA",
-                "sort_order": 6,
+                "sort_order": 7,
                 "props": {
                     "heading": "Πείτε μας τι πρέπει να λειτουργήσει.",
                     "description": "Στείλτε μας την περιγραφή ή τα τεύχη "
@@ -2131,6 +2184,11 @@ def seed_layouts(*, overwrite: bool = False) -> dict[str, int]:
     nobody has authored a translation, and without this step every
     store seeded before the field existed would stay Greek on ``/en``
     no matter how often the command runs.
+
+    ``overwrite`` lifts all three of those: props, ``i18n`` and
+    ``sort_order`` are re-imposed from the plan. That is the flag's
+    whole purpose — it is how a change to this file reaches a store
+    that was seeded from an earlier version of it.
     """
     from page_config.models import PageLayout, PageSection
     from page_config.schemas import (
@@ -2163,6 +2221,22 @@ def seed_layouts(*, overwrite: bool = False) -> dict[str, int]:
             component_type = section["component_type"]
             i18n = section.get("i18n", {})
             if component_type in present:
+                # PROPS are merchant content, so a plain re-run leaves
+                # them alone (an operator's edit must survive it). But
+                # ``--overwrite`` is the "take my version" flag, and
+                # without this the plan's copy could never reach a
+                # store that already had the section — which is how a
+                # redesign's own text stayed invisible on the one store
+                # it was written for.
+                if overwrite:
+                    validate_section_props(component_type, section["props"])
+                    rewritten = (
+                        layout.sections.filter(component_type=component_type)
+                        .exclude(props=section["props"])
+                        .update(props=section["props"])
+                    )
+                    if rewritten:
+                        _bump(report, "sections_rewritten", rewritten)
                 filled = _fill_missing_i18n(
                     layout.sections.filter(component_type=component_type),
                     i18n,

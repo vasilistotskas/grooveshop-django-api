@@ -35225,6 +35225,7 @@ components:
       - image_gallery
       - story_timeline
       - faq
+      - partner_strip
       type: string
       description: |-
         * `hero_banner` - Hero Banner
@@ -35257,6 +35258,7 @@ components:
         * `image_gallery` - Image Gallery
         * `story_timeline` - Story Timeline
         * `faq` - FAQ Accordion
+        * `partner_strip` - Partner Strip
     ConfirmAgentPaymentRequestRequest:
       type: object
       properties:

@@ -1773,6 +1773,21 @@ EXTRA_SETTINGS_DEFAULTS = [
         ),
     },
     {
+        "name": "CATALOGUE_ENABLED",
+        "type": "bool",
+        "value": True,
+        "description": (
+            "Serve the product catalogue: the listings, the product "
+            "pages and search. OFF makes every one of them 404, for a "
+            "store that publishes work rather than selling goods — an "
+            "engineering contractor quoting per project has a product "
+            "MODEL (its systems carry real specs) and no shop. Distinct "
+            "from CART_ENABLED, which leaves the catalogue browsable "
+            "and only removes the buying. The storefront fails OPEN if "
+            "this setting cannot be fetched."
+        ),
+    },
+    {
         "name": "MOBILE_BOTTOM_NAV_ENABLED",
         "type": "bool",
         "value": True,

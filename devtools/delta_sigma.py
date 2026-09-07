@@ -243,6 +243,14 @@ SETTINGS = {
     # Pending: either the real prices, or a "price on request" branch in
     # the price surfaces.
     "CART_ENABLED": "False",
+    # No catalogue at all, not merely no cart: the redesign has no
+    # listing page and no product page, and the nav points at the DeSET
+    # page instead. The three systems stay real products with real
+    # attribute tables — the storefront simply stops serving a shop
+    # this company does not run, so a visitor cannot land on
+    # "Εξαντλημένο / Μή Διαθέσιμο / 0,00 €" for something quoted per
+    # project.
+    "CATALOGUE_ENABLED": "False",
     # No bottom tab bar on mobile: it carries the shop's
     # affordances (catalogue, favourites, cart, account), and the
     # redesign's mobile header is a burger and the locale code.

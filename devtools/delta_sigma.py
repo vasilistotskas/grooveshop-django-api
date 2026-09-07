@@ -1788,7 +1788,7 @@ def _deset_description(system: dict, *, locale: str) -> str:
     )
 
 
-def seed_deset_products() -> dict[str, int]:
+def seed_deset_products(*, overwrite: bool = False) -> dict[str, int]:
     """Create the DeSET category and its three systems."""
     from product.models import Product, ProductCategory
     from vat.models import Vat
@@ -1805,7 +1805,11 @@ def seed_deset_products() -> dict[str, int]:
         category.save()
         _bump(report, "category_created")
     elif _fill_missing_translation(
-        category, "en", name=name_en, description=DESET_COMPLIANCE_EN
+        category,
+        "en",
+        overwrite=overwrite,
+        name=name_en,
+        description=DESET_COMPLIANCE_EN,
     ):
         _bump(report, "category_localized")
     else:
@@ -1819,6 +1823,7 @@ def seed_deset_products() -> dict[str, int]:
             if _fill_missing_translation(
                 existing,
                 "en",
+                overwrite=overwrite,
                 name=system["name_en"],
                 description=_deset_description(system, locale="en"),
             ):
@@ -1880,7 +1885,7 @@ def _ensure_author():
     return author
 
 
-def seed_project_posts() -> dict[str, int]:
+def seed_project_posts(*, overwrite: bool = False) -> dict[str, int]:
     """Create the sector categories and the 48 reference projects."""
     from blog.models.category import BlogCategory
     from blog.models.post import BlogPost
@@ -1897,7 +1902,11 @@ def seed_project_posts() -> dict[str, int]:
             category.save()
             _bump(report, "categories_created")
         elif _fill_missing_translation(
-            category, "en", name=name_en, description=name_en
+            category,
+            "en",
+            overwrite=overwrite,
+            name=name_en,
+            description=name_en,
         ):
             _bump(report, "categories_localized")
         else:
@@ -1915,6 +1924,7 @@ def seed_project_posts() -> dict[str, int]:
             if _fill_missing_translation(
                 existing,
                 "en",
+                overwrite=overwrite,
                 title=title_en,
                 subtitle=client_en,
                 body=body_en,
@@ -1949,8 +1959,10 @@ def seed_project_posts() -> dict[str, int]:
     return report
 
 
-def _fill_missing_translation(instance, language_code: str, **fields) -> bool:
-    """Add a translation ONLY when the row has none. ``True`` if added.
+def _fill_missing_translation(
+    instance, language_code: str, *, overwrite: bool = False, **fields
+) -> bool:
+    """Add a translation when the row has none. ``True`` if written.
 
     Every ``seed_*`` step below skips a row that already exists, on
     purpose: it is the merchant's content and a re-run must not
@@ -1959,6 +1971,14 @@ def _fill_missing_translation(instance, language_code: str, **fields) -> bool:
     the English translation could never land. An ABSENT translation is
     the one state that cannot be an operator's work, so filling just
     that converges an old store without touching anything authored.
+
+    ``overwrite`` rewrites a translation that IS there. It exists
+    because "absent" is not the only way this pack falls behind: the
+    first English bodies shipped as two-sentence stubs, and once the
+    real copy was written no amount of re-running could replace them —
+    the rows existed, so every run reported ``unchanged``. It discards
+    local edits by definition, which is why it is opt-in per run
+    (``--overwrite``) and never the default.
     """
     # The translation TABLE, not ``has_translation``: parler answers
     # that from its own cache backend first, and a cached row for a
@@ -1966,28 +1986,35 @@ def _fill_missing_translation(instance, language_code: str, **fields) -> bool:
     # "already translated" and leave the store Greek forever. A converge
     # step has to read the database it is converging.
     translations = instance._parler_meta.root_model
-    if translations.objects.filter(
+    exists = translations.objects.filter(
         master=instance, language_code=language_code
-    ).exists():
+    ).exists()
+    if exists and not overwrite:
         return False
     _translate(instance, language_code, **fields)
     instance.save()
     return True
 
 
-def _fill_missing_i18n(queryset, i18n: dict, *, validate) -> int:
+def _fill_missing_i18n(
+    queryset, i18n: dict, *, validate, overwrite: bool = False
+) -> int:
     """Write ``i18n`` onto rows that carry none. Returns how many.
 
     Empty is the signal: it is the default every row predating the
     field reports, and the one state that cannot be an operator's
-    translation. A row that already has one is left alone.
+    translation. A row that already has one is left alone unless
+    ``overwrite`` says otherwise — same opt-in as
+    ``_fill_missing_translation``.
     """
     if not i18n:
         return 0
     validate(i18n)
     filled = 0
     for row in queryset:
-        if row.i18n:
+        if row.i18n and not overwrite:
+            continue
+        if row.i18n == i18n:
             continue
         row.i18n = i18n
         row.save(update_fields=["i18n"])
@@ -1995,7 +2022,7 @@ def _fill_missing_i18n(queryset, i18n: dict, *, validate) -> int:
     return filled
 
 
-def seed_layouts() -> dict[str, int]:
+def seed_layouts(*, overwrite: bool = False) -> dict[str, int]:
     """Apply the home layout.
 
     Props go through ``validate_section_props`` before every write —
@@ -2045,6 +2072,7 @@ def seed_layouts() -> dict[str, int]:
                     layout.sections.filter(component_type=component_type),
                     i18n,
                     validate=partial(validate_section_i18n, component_type),
+                    overwrite=overwrite,
                 )
                 _bump(
                     report,
@@ -2086,7 +2114,7 @@ def seed_layouts() -> dict[str, int]:
     return report
 
 
-def seed_navigation() -> dict[str, int]:
+def seed_navigation(*, overwrite: bool = False) -> dict[str, int]:
     """Create the three NavigationMenu slots.
 
     ``get_or_create``, never ``update_or_create``: a NavigationMenu row
@@ -2118,12 +2146,13 @@ def seed_navigation() -> dict[str, int]:
             NavigationMenu.objects.filter(pk=menu.pk),
             i18n,
             validate=partial(validate_navigation_i18n, slot),
+            overwrite=overwrite,
         )
         _bump(report, "localized" if filled else "unchanged", filled or 1)
     return report
 
 
-def seed_content_pages() -> dict[str, int]:
+def seed_content_pages(*, overwrite: bool = False) -> dict[str, int]:
     """Create the three service pages, bilingually."""
     from django.utils import timezone
 
@@ -2151,6 +2180,7 @@ def seed_content_pages() -> dict[str, int]:
         elif _fill_missing_translation(
             page,
             "en",
+            overwrite=overwrite,
             title=locales["en"]["title"],
             body=locales["en"]["body"],
         ):

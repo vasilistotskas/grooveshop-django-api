@@ -14,6 +14,8 @@ every other step runs inside the tenant schema.
 
 from __future__ import annotations
 
+from functools import partial
+
 from django.core.management.base import BaseCommand, CommandError
 from django_tenants.utils import schema_context
 
@@ -59,6 +61,17 @@ class Command(BaseCommand):
             "--skip",
             help="Skip these steps (comma-separated).",
         )
+        parser.add_argument(
+            "--overwrite",
+            action="store_true",
+            help=(
+                "Rewrite the translations and locale overrides this pack "
+                "owns even where they already exist. DISCARDS local edits "
+                "to them. Needed when the pack's copy CHANGES rather than "
+                "appears: the first English bodies shipped as stubs, and "
+                "with rows present every re-run reported 'unchanged'."
+            ),
+        )
 
     def handle(self, *args, **options):
         from tenant.models import Tenant
@@ -73,6 +86,15 @@ class Command(BaseCommand):
         # reported on its own rather than after half the seed ran.
         steps = self._resolve_steps(options)
 
+        overwrite = options["overwrite"]
+        if overwrite:
+            self.stdout.write(
+                self.style.WARNING(
+                    "--overwrite: rewriting this pack's translations and "
+                    "locale overrides, discarding local edits to them."
+                )
+            )
+
         if "theme" in steps:
             self._report("theme", delta_sigma.apply_theme(tenant))
 
@@ -80,12 +102,24 @@ class Command(BaseCommand):
         schema_steps = [name for name in steps if name != "theme"]
         if schema_steps:
             runners = {
+                # ``settings`` writes extra_settings values, which have
+                # no locale dimension — no ``overwrite`` to thread.
                 "settings": delta_sigma.seed_settings,
-                "products": delta_sigma.seed_deset_products,
-                "projects": delta_sigma.seed_project_posts,
-                "content_pages": delta_sigma.seed_content_pages,
-                "layouts": delta_sigma.seed_layouts,
-                "navigation": delta_sigma.seed_navigation,
+                "products": partial(
+                    delta_sigma.seed_deset_products, overwrite=overwrite
+                ),
+                "projects": partial(
+                    delta_sigma.seed_project_posts, overwrite=overwrite
+                ),
+                "content_pages": partial(
+                    delta_sigma.seed_content_pages, overwrite=overwrite
+                ),
+                "layouts": partial(
+                    delta_sigma.seed_layouts, overwrite=overwrite
+                ),
+                "navigation": partial(
+                    delta_sigma.seed_navigation, overwrite=overwrite
+                ),
             }
             with schema_context(schema):
                 for name in schema_steps:

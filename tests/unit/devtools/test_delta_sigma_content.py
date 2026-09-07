@@ -8,6 +8,7 @@ string where an English one belongs.
 
 import pytest
 
+from core.utils.sanitize import sanitize_html
 from devtools import delta_sigma
 from page_config.schemas import (
     validate_navigation_i18n,
@@ -375,3 +376,62 @@ class TestTheSeedStepsConvergeOnExistingRows:
             page.safe_translation_getter("title", language_code="en")
             == "Their own title"
         )
+
+    def test_overwrite_replaces_a_stale_translation(self):
+        """The other way this pack falls behind.
+
+        Missing is not the only failure mode: the first English bodies
+        shipped as two-sentence stubs, and once the real copy was
+        written no re-run could replace them — the rows existed, so
+        every run reported ``unchanged``. ``--overwrite`` is the opt-in
+        for exactly that, and it discards local edits by definition.
+        """
+        from page_config.models import ContentPage
+
+        delta_sigma.seed_content_pages()
+        page = ContentPage.objects.get(slug="eidikefsi")
+        page.set_current_language("en")
+        page.body = "<p>stub</p>"
+        page.save()
+
+        report = delta_sigma.seed_content_pages(overwrite=True)
+
+        page.refresh_from_db()
+        assert report["localized"] == len(delta_sigma.CONTENT_PAGES)
+        body = ContentPage.objects.get(
+            slug="eidikefsi"
+        ).safe_translation_getter("body", language_code="en")
+        # Compared against the SANITIZED source: ``ContentPage.body`` is
+        # an HTMLField and the model escapes a bare ``&`` on save, so the
+        # stored copy is four characters longer than the pack's literal
+        # ("Measurement &amp; control systems").
+        assert body == sanitize_html(
+            delta_sigma.CONTENT_PAGES["eidikefsi"]["en"]["body"]
+        )
+
+    def test_overwrite_replaces_a_stale_locale_override(self):
+        from page_config.models import PageSection
+
+        delta_sigma.seed_layouts()
+        cta = PageSection.objects.get(component_type="cta_banner")
+        cta.i18n = {"en": {"props": {"heading": "Stale."}}}
+        cta.save(update_fields=["i18n"])
+
+        delta_sigma.seed_layouts(overwrite=True)
+
+        cta.refresh_from_db()
+        assert cta.localized("en")[1]["heading"] == (
+            "Tell us what has to work."
+        )
+
+    def test_overwrite_is_idempotent_on_an_unchanged_override(self):
+        """A second --overwrite run must not report work it did not do."""
+        from page_config.models import PageSection
+
+        delta_sigma.seed_layouts()
+        delta_sigma.seed_layouts(overwrite=True)
+
+        report = delta_sigma.seed_layouts(overwrite=True)
+
+        assert report.get("sections_localized", 0) == 0
+        assert report["sections_unchanged"] == PageSection.objects.count()

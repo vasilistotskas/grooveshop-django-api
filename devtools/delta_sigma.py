@@ -247,6 +247,10 @@ SETTINGS = {
     # affordances (catalogue, favourites, cart, account), and the
     # redesign's mobile header is a burger and the locale code.
     "MOBILE_BOTTOM_NAV_ENABLED": "False",
+    # Nor a shopping assistant: the widget launcher floats over every
+    # band, the redesign has no such control, and "βοηθός αγορών" is
+    # the wrong offer from an engineering contractor with no cart.
+    "CHAT_WIDGET_ENABLED": "False",
     "CONTACT_EMAIL": CONTACT_EMAIL,
     # The LEGAL name, not the trade name: this is what heads an invoice
     # and the storefront's merchant-identity block. "Δelta Σigma" is the
@@ -1387,6 +1391,24 @@ PARTNER_BRANDS = [
     {"name": "ODOT"},
 ]
 
+# The eighth cell of the seven-field grid: the artboards answer "what
+# if mine is not here?" inside the grid rather than under it.
+SPECIALIZATION_PROMPT = {
+    "title": "Δεν βρίσκετε το έργο σας;",
+    "text": "Περιγράψτε το και θα σας προτείνουμε τη λύση με το "
+    "χαμηλότερο κόστος κτήσης και χρήσης.",
+    "cta_text": "Επικοινωνία",
+    "cta_link": "/contact",
+}
+
+SPECIALIZATION_PROMPT_EN = {
+    "title": "Not seeing your project?",
+    "text": "Describe it and we will propose the solution with the "
+    "lowest cost of ownership and operation.",
+    "cta_text": "Contact us",
+    "cta_link": "/contact",
+}
+
 ACTIVITIES = [
     {
         "title": "Μελέτη & σχεδιασμός",
@@ -1499,86 +1521,6 @@ ACTIVITIES_EN = [
     },
 ]
 
-FAQ_ITEMS = [
-    {
-        "question": "Ποιοι σταθμοί υποχρεούνται να εγκαταστήσουν DeSET;",
-        "answer": "Κάθε σταθμός ΑΠΕ ή ΣΗΘΥΑ με εγκατεστημένη ισχύ μεγαλύτερη "
-        "των 400 kW, συνδεδεμένος στο Ε.Δ.Δ.Η.Ε., οφείλει να "
-        "διαθέτει σύστημα τηλε-εποπτείας και εφαρμογής εντολών "
-        "ελέγχου — ν. 5106/2024 (ΦΕΚ Α΄ 63/01.05.2024).",
-    },
-    {
-        "question": "Ποια είναι η διαφορά ανάμεσα στα τρία συστήματα DeSET;",
-        "answer": "Και τα τρία καλύπτουν τις τρέχουσες προδιαγραφές του "
-        "ΔΕΔΔΗΕ. Διαφέρουν στην εφεδρεία για μελλοντικές ανάγκες: "
-        "το ABB PM5072 έχει τις περισσότερες ψηφιακές εισόδους "
-        "(12), το INVT TM750 τη μεγαλύτερη δικτύωση με EtherCAT "
-        "και ξεχωριστό gateway, και το WAGO PFC200 ενσωματωμένο "
-        "IEC 104 χωρίς gateway.",
-    },
-    {
-        "question": "Αναλαμβάνετε έργα που ξεκίνησαν άλλοι;",
-        "answer": "Ναι. Επεμβαίνουμε ώστε να αποσφαλματώσουμε εγκαταστάσεις "
-        "που ολοκληρώθηκαν είτε από εμάς είτε από τρίτους. Συχνά "
-        "μετά από μικρή περίοδο επέμβασης η εγκατάσταση "
-        "επαναλειτουργεί με τα επιθυμητά αποτελέσματα.",
-    },
-    {
-        "question": "Τι υποστήριξη παρέχεται μετά την παράδοση;",
-        "answer": "Για κάθε εγκατάσταση που ολοκληρώνουμε παρέχουμε εξάμηνη "
-        "περίοδο δωρεάν υποστήριξης και στη συνέχεια προτείνουμε "
-        "λογικά συμβόλαια συντήρησης, ώστε να είναι διασφαλισμένη "
-        "η λειτουργία καθ’ όλη την περίοδο του κύκλου ζωής της.",
-    },
-    {
-        "question": "Σε ποιες γλώσσες προγραμματίζετε;",
-        "answer": "PLC και SCADA, καθώς και εφαρμογές σε Python, C++, C, "
-        "JavaScript και Java για PC. Όλα τα προγράμματα "
-        "δοκιμάζονται από το προσωπικό δοκιμών και παραδίδονται "
-        "μαζί με εγχειρίδιο χρήσης.",
-    },
-]
-
-
-FAQ_ITEMS_EN = [
-    {
-        "question": "Which plants are required to install DeSET?",
-        "answer": "Every renewable or high-efficiency CHP plant with an "
-        "installed capacity above 400 kW connected to the Greek "
-        "distribution network must have remote supervision and "
-        "control-command capability — Law 5106/2024 (Government "
-        "Gazette A' 63/01.05.2024).",
-    },
-    {
-        "question": "What is the difference between the three DeSET systems?",
-        "answer": "All three meet HEDNO's current specifications. They "
-        "differ in the headroom they leave for future needs: the ABB "
-        "PM5072 has the most digital inputs (12), the INVT TM750 the "
-        "widest networking with EtherCAT and a separate gateway, and "
-        "the WAGO PFC200 has IEC 104 built in with no gateway at all.",
-    },
-    {
-        "question": "Do you take on projects someone else started?",
-        "answer": "Yes. We step in to debug installations completed "
-        "either by us or by others. After a short intervention an "
-        "installation usually runs again with the intended results.",
-    },
-    {
-        "question": "What support is provided after handover?",
-        "answer": "Every installation we complete comes with six "
-        "months of free support, after which we propose a sensible "
-        "maintenance contract so that operation stays assured for the "
-        "whole of its life cycle.",
-    },
-    {
-        "question": "Which languages do you program in?",
-        "answer": "PLC and SCADA, plus PC applications in Python, C++, "
-        "C, JavaScript and Java. Every program is exercised by our "
-        "test staff and delivered with a user manual.",
-    },
-]
-
-
 # The four sections ``page_config.defaults`` seeds onto every new
 # tenant's ``home``. Δelta Σigma's homepage replaces all four — leaving
 # them in place opens the site on an empty hero carousel and a blog
@@ -1650,8 +1592,8 @@ def _layout_plan() -> dict:
                     "en": {
                         "props": {
                             "eyebrow": "Industrial computing · Automation",
-                            "heading": "Turnkey automation and telemetry "
-                            "systems.",
+                            "heading": "Automation and telemetry "
+                            "systems, delivered turnkey.",
                             "subheading": "We study, build, program and "
                             "commission networked PLC and SCADA "
                             "systems, along with complex "
@@ -1692,6 +1634,9 @@ def _layout_plan() -> dict:
                     "columns": 4,
                     "decor": "gradient_tiles",
                     "items": SPECIALIZATIONS,
+                    "cta_text": "Όλες οι ειδικεύσεις",
+                    "cta_link": "/info/eidikefsi",
+                    "prompt": SPECIALIZATION_PROMPT,
                 },
                 "i18n": {
                     "en": {
@@ -1699,6 +1644,8 @@ def _layout_plan() -> dict:
                         "props": {
                             "heading": "Seven fields, one contractor",
                             "items": SPECIALIZATIONS_EN,
+                            "cta_text": "All the fields",
+                            "prompt": SPECIALIZATION_PROMPT_EN,
                         },
                     }
                 },
@@ -1742,6 +1689,8 @@ def _layout_plan() -> dict:
                 "sort_order": 4,
                 "props": {
                     "heading": "Από τη μελέτη ως το συμβόλαιο υποστήριξης",
+                    "subheading": "Αναλαμβάνουμε ολόκληρη την αλυσίδα. "
+                    "Κάθε φάση παραδίδεται τεκμηριωμένη.",
                     "items": ACTIVITIES,
                 },
                 "i18n": {
@@ -1749,6 +1698,8 @@ def _layout_plan() -> dict:
                         "title": "Activities",
                         "props": {
                             "heading": "From the study to the support contract",
+                            "subheading": "We take on the whole chain. Every "
+                            "phase is handed over documented.",
                             "items": ACTIVITIES_EN,
                         },
                     }
@@ -1762,20 +1713,27 @@ def _layout_plan() -> dict:
                 "i18n": {"en": {"title": "Experience"}},
             },
             {
-                "component_type": "faq",
-                "title": "Συχνές ερωτήσεις",
+                "component_type": "pull_quote",
+                "title": "Αρχή",
                 "sort_order": 6,
                 "props": {
-                    "heading": "Συχνές ερωτήσεις",
-                    "multiple": True,
-                    "items": FAQ_ITEMS,
+                    "quote": "«Οι πελάτες μας είναι συνεργάτες μας…»",
+                    "text": "Για κάθε εγκατάσταση που ολοκληρώνουμε "
+                    "παρέχουμε εξάμηνη περίοδο δωρεάν υποστήριξης και "
+                    "στη συνέχεια λογικά συμβόλαια συντήρησης, ώστε να "
+                    "είναι διασφαλισμένη η λειτουργία καθ’ όλη την "
+                    "περίοδο του κύκλου ζωής της.",
                 },
                 "i18n": {
                     "en": {
-                        "title": "Frequently asked questions",
+                        "title": "Principle",
                         "props": {
-                            "heading": "Frequently asked questions",
-                            "items": FAQ_ITEMS_EN,
+                            "quote": "“Our customers are our partners…”",
+                            "text": "Every installation we complete comes "
+                            "with six months of free support, and "
+                            "reasonable maintenance contracts after that, "
+                            "so that it keeps running for the whole of "
+                            "its life cycle.",
                         },
                     }
                 },
@@ -1842,22 +1800,44 @@ def _nav_mobile() -> list[dict]:
 
 
 def _nav_footer() -> list[dict]:
-    """The ONE link column the redesign's footer carries.
+    """The two link columns the redesign's footer carries.
 
-    The artboard's footer is a four-row ``ΕΤΑΙΡΕΙΑ`` column beside the
-    contact column, not the six links over two columns this menu used
-    to hold — and the contact column is not a menu at all: the storefront
-    variant builds it from ``STORE_OFFICES`` and the merchant identity,
-    so a second "Επικοινωνία" row here would render the heading twice.
+    Read off the HOME artboard: ``ΕΤΑΙΡΕΙΑ`` (the pages) beside
+    ``ΛΥΣΕΙΣ`` (what the company sells), with the contact column third.
+    A later inner-page board shows only one column and no standfirst;
+    the home one wins, because a footer is global and an inner page
+    cannot have a different one.
+
+    "Επικοινωνία" is deliberately NOT a row here: the contact column is
+    not a menu at all — the storefront variant builds it from
+    ``STORE_OFFICES`` and the merchant identity — so a row would render
+    the heading twice.
+
+    The four solution rows all point at the specialization page, which
+    is where each is described. They are separate rows because the
+    artboard lists them separately: a visitor scanning a footer for
+    "BMS" finds it.
     """
+    eidikefsi = "/info/eidikefsi"
     return [
         {
             "label": "Εταιρεία",
             "children": [
                 {"label": "Αρχική", "to": "/"},
-                {"label": "DeSET", "to": _deset_link()},
-                {"label": "Ειδίκευση", "to": "/info/eidikefsi"},
+                {"label": "Ειδίκευση", "to": eidikefsi},
+                {"label": "Δραστηριότητες", "to": "/info/drastiriotites"},
                 {"label": "Εμπειρία", "to": "/blog"},
+                {"label": "Συνεργάτες", "to": "/info/synergates"},
+            ],
+        },
+        {
+            "label": "Λύσεις",
+            "children": [
+                {"label": "DeSET — Τηλεποπτεία ΑΠΕ", "to": _deset_link()},
+                {"label": "PLC & SCADA", "to": eidikefsi},
+                {"label": "BMS", "to": eidikefsi},
+                {"label": "Τηλεπικοινωνίες", "to": eidikefsi},
+                {"label": "Συστήματα κυκλοφορίας", "to": eidikefsi},
             ],
         },
     ]
@@ -1885,14 +1865,29 @@ def _nav_mobile_en() -> list[dict]:
 
 def _nav_footer_en() -> list[dict]:
     """The English twin of :func:`_nav_footer` — same paths, same shape."""
+    eidikefsi = "/info/eidikefsi"
     return [
         {
             "label": "Company",
             "children": [
                 {"label": "Home", "to": "/"},
-                {"label": "DeSET", "to": _deset_link()},
-                {"label": "Specialization", "to": "/info/eidikefsi"},
+                {"label": "Specialization", "to": eidikefsi},
+                {"label": "Activities", "to": "/info/drastiriotites"},
                 {"label": "Experience", "to": "/blog"},
+                {"label": "Partners", "to": "/info/synergates"},
+            ],
+        },
+        {
+            "label": "Solutions",
+            "children": [
+                {
+                    "label": "DeSET — renewable plant supervision",
+                    "to": _deset_link(),
+                },
+                {"label": "PLC & SCADA", "to": eidikefsi},
+                {"label": "BMS", "to": eidikefsi},
+                {"label": "Telecommunications", "to": eidikefsi},
+                {"label": "Traffic management", "to": eidikefsi},
             ],
         },
     ]
@@ -2341,9 +2336,10 @@ def seed_layouts(*, overwrite: bool = False) -> dict[str, int]:
     no matter how often the command runs.
 
     ``overwrite`` lifts all three of those: props, ``i18n`` and
-    ``sort_order`` are re-imposed from the plan. That is the flag's
-    whole purpose — it is how a change to this file reaches a store
-    that was seeded from an earlier version of it.
+    ``sort_order`` are re-imposed from the plan, and a band the plan no
+    longer carries is removed. That is the flag's whole purpose — it is
+    how a change to this file reaches a store that was seeded from an
+    earlier version of it.
     """
     from page_config.models import PageLayout, PageSection
     from page_config.schemas import (
@@ -2430,6 +2426,22 @@ def seed_layouts(*, overwrite: bool = False) -> dict[str, int]:
                 is_visible=True,
             )
             _bump(report, "sections_created")
+
+        if overwrite:
+            # A band the plan DROPPED has to leave the page too, or a
+            # redesign can only ever add: the FAQ accordion the first
+            # cut of this pack seeded is in no artboard, and no number
+            # of re-runs could take it off a store that had it.
+            #
+            # Destructive by definition — it also removes a band an
+            # operator added — which is why it is ``--overwrite`` only,
+            # the flag that already discards local edits and says so.
+            planned = {section["component_type"] for section in sections}
+            extra = layout.sections.exclude(component_type__in=planned)
+            dropped = extra.count()
+            if dropped:
+                extra.delete()
+                _bump(report, "sections_dropped", dropped)
 
         if page_type == "home":
             # Only while props are still the empty provisioning default

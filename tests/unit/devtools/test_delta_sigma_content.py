@@ -474,14 +474,55 @@ class TestTheSeedStepsConvergeOnExistingRows:
 
         delta_sigma.seed_layouts()
         home = PageSection.objects.filter(layout__page_type="home")
-        home.filter(component_type="faq").update(sort_order=1)
+        home.filter(component_type="cta_banner").update(sort_order=1)
 
         delta_sigma.seed_layouts()
 
         assert (
-            home.get(component_type="faq").sort_order
+            home.get(component_type="cta_banner").sort_order
             < home.get(component_type="features_grid").sort_order
         )
+
+    def test_overwrite_drops_a_band_the_plan_no_longer_carries(self):
+        """A redesign has to be able to REMOVE a band, not only add one.
+
+        The first cut of this pack seeded an FAQ accordion that is in no
+        artboard. Without this, no number of re-runs could take it off
+        the store that already had it.
+        """
+        from page_config.models import PageLayout, PageSection
+
+        delta_sigma.seed_layouts()
+        layout = PageLayout.objects.get(page_type="home")
+        PageSection.objects.create(
+            layout=layout,
+            component_type="faq",
+            title="Συχνές ερωτήσεις",
+            props={"heading": "x"},
+            is_visible=True,
+        )
+
+        report = delta_sigma.seed_layouts(overwrite=True)
+
+        assert report.get("sections_dropped", 0) == 1
+        assert not layout.sections.filter(component_type="faq").exists()
+
+    def test_a_rerun_without_overwrite_keeps_a_band_the_operator_added(self):
+        from page_config.models import PageLayout, PageSection
+
+        delta_sigma.seed_layouts()
+        layout = PageLayout.objects.get(page_type="home")
+        PageSection.objects.create(
+            layout=layout,
+            component_type="faq",
+            title="Συχνές ερωτήσεις",
+            props={"heading": "x"},
+            is_visible=True,
+        )
+
+        delta_sigma.seed_layouts()
+
+        assert layout.sections.filter(component_type="faq").exists()
 
     def test_overwrite_reimposes_the_planned_props(self):
         """A change to the plan's COPY has to reach a seeded store.

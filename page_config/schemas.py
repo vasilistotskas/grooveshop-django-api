@@ -78,6 +78,32 @@ def _check_items(
     return None
 
 
+def _check_prompt(value) -> str | None:
+    """The "did not find yours?" card a grid can end with.
+
+    A grid of what a merchant offers invites the question of what it
+    does not, and the artboards answer it in the grid's last cell
+    rather than under it — so this is one cell's worth of copy, not a
+    section.
+    """
+    if not isinstance(value, dict):
+        return "prompt: must be an object"
+    prompt = {str(k): v for k, v in value.items()}
+    if not prompt.get("title") or not _is_str(prompt.get("title"), 100):
+        return "prompt.title: required string (max 100)"
+    for key, max_length in (("text", 300), ("cta_text", 100)):
+        entry = prompt.get(key)
+        if entry is not None and not _is_str(entry, max_length):
+            return f"prompt.{key}: must be a string (max {max_length})"
+    link = prompt.get("cta_link")
+    if link is not None and not (_is_str(link, 1000) and _LINK_RE.match(link)):
+        return "prompt.cta_link: internal path or https URL"
+    unknown = set(prompt) - {"title", "text", "cta_text", "cta_link"}
+    if unknown:
+        return f"prompt: unknown keys {sorted(unknown)}"
+    return None
+
+
 def _check_spec_cards(value) -> str | None:
     """The comparison cards a ``media_text`` band shows beside its copy.
 
@@ -304,6 +330,14 @@ _VALIDATORS: dict[str, dict] = {
             link_keys=frozenset({"href"}),
         ),
     },
+    "pull_quote": {
+        # A stated principle with the reason under it — not a
+        # testimonial, which is somebody else's words and needs an
+        # attribution to mean anything.
+        "quote": lambda v: None if _is_str(v, 300) else "string ≤300",
+        "text": lambda v: None if _is_str(v, 1000) else "string ≤1000",
+        "attribution": lambda v: None if _is_str(v, 120) else "string ≤120",
+    },
     "features_grid": {
         "heading": lambda v: None if _is_str(v, 200) else "string ≤200",
         "items": lambda v: _check_items(
@@ -319,6 +353,16 @@ _VALIDATORS: dict[str, dict] = {
             if v in ("none", "gradient_tiles")
             else "one of none/gradient_tiles"
         ),
+        # The band's own link, beside the heading rather than under the
+        # grid — the artboards put "all of them →" there on every band
+        # whose grid is a subset of a longer page.
+        "cta_text": lambda v: None if _is_str(v, 100) else "string ≤100",
+        "cta_link": lambda v: (
+            None
+            if _is_str(v, 1000) and _LINK_RE.match(v)
+            else "internal path or https URL"
+        ),
+        "prompt": _check_prompt,
     },
     "media_text": {
         "heading": lambda v: None if _is_str(v, 200) else "string ≤200",
@@ -368,6 +412,7 @@ _VALIDATORS: dict[str, dict] = {
     },
     "story_timeline": {
         "heading": lambda v: None if _is_str(v, 200) else "string ≤200",
+        "subheading": lambda v: None if _is_str(v, 500) else "string ≤500",
         "items": lambda v: _check_items(
             v,
             max_items=20,

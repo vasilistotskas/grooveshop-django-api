@@ -35226,6 +35226,7 @@ components:
       - story_timeline
       - faq
       - partner_strip
+      - pull_quote
       type: string
       description: |-
         * `hero_banner` - Hero Banner
@@ -35259,6 +35260,7 @@ components:
         * `story_timeline` - Story Timeline
         * `faq` - FAQ Accordion
         * `partner_strip` - Partner Strip
+        * `pull_quote` - Pull Quote
     ConfirmAgentPaymentRequestRequest:
       type: object
       properties:

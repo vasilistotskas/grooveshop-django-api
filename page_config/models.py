@@ -96,6 +96,7 @@ class ComponentType(models.TextChoices):
     STORY_TIMELINE = "story_timeline", _("Story Timeline")
     FAQ = "faq", _("FAQ Accordion")
     PARTNER_STRIP = "partner_strip", _("Partner Strip")
+    PULL_QUOTE = "pull_quote", _("Pull Quote")
 
 
 class PageLayout(

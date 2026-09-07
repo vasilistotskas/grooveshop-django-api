@@ -611,6 +611,43 @@ def test_theme_metadata_font_mono_is_valid():
     t.clean()  # must not raise
 
 
+def test_available_locales_empty_is_valid():
+    # Empty = single-language on default_locale, the pre-field default.
+    t = _unsaved_tenant(available_locales=[])
+    t.clean()  # must not raise
+
+
+def test_available_locales_accepts_configured_languages():
+    t = _unsaved_tenant(default_locale="el", available_locales=["el", "en"])
+    t.clean()  # must not raise
+
+
+def test_available_locales_rejects_unknown_language():
+    t = _unsaved_tenant(default_locale="el", available_locales=["el", "fr"])
+    with pytest.raises(ValidationError):
+        t.clean()
+
+
+def test_available_locales_rejects_duplicates():
+    t = _unsaved_tenant(default_locale="el", available_locales=["el", "el"])
+    with pytest.raises(ValidationError):
+        t.clean()
+
+
+def test_available_locales_must_contain_default_locale():
+    # Otherwise the storefront would 404 the tenant's own default
+    # language prefix.
+    t = _unsaved_tenant(default_locale="el", available_locales=["en"])
+    with pytest.raises(ValidationError):
+        t.clean()
+
+
+def test_available_locales_rejects_non_list():
+    t = _unsaved_tenant(available_locales="el,en")
+    with pytest.raises(ValidationError):
+        t.clean()
+
+
 def test_theme_metadata_bad_font_mono_raises():
     t = _unsaved_tenant(theme_metadata={"fontMono": "comic-sans"})
     with pytest.raises(ValidationError):

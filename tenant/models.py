@@ -13,6 +13,7 @@ from simple_history.models import HistoricalRecords
 
 from core.models import TimeStampMixinModel, UUIDModel
 from tenant.validators import (
+    validate_available_locales,
     validate_reserved_schema_name,
     validate_theme_metadata,
 )
@@ -178,6 +179,19 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
     )
     default_currency = models.CharField(
         _("Default Currency"), max_length=3, default="EUR"
+    )
+    available_locales = models.JSONField(
+        _("Available Locales"),
+        default=list,
+        blank=True,
+        validators=[validate_available_locales],
+        help_text=_(
+            'Locales this store serves, e.g. ["el", "en"]. Empty '
+            "means single-language on the default locale — the "
+            "storefront then 404s every other locale prefix and hides "
+            "it from the language switcher, hreflang set and sitemap. "
+            "Must contain default_locale when non-empty."
+        ),
     )
 
     # Assets
@@ -909,6 +923,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         self._validate_stripe_publishable_key()
         self._validate_stripe_secret_key()
         self._validate_theme_metadata()
+        self._validate_available_locales()
         self._validate_allowed_csp_sources()
         self._validate_meta_pixel_id()
         self._validate_tiktok_pixel_id()
@@ -924,6 +939,27 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
             validate_reserved_schema_name(self.schema_name)
         except ValidationError as exc:
             raise ValidationError({"schema_name": exc.messages}) from exc
+
+    def _validate_available_locales(self) -> None:
+        # Field validators only run in full_clean()/DRF; mirror the
+        # shape check here, then add the cross-field rule the field
+        # validator cannot see.
+        try:
+            validate_available_locales(self.available_locales)
+        except ValidationError as exc:
+            raise ValidationError({"available_locales": exc.messages}) from exc
+        locales = self.available_locales or []
+        if locales and self.default_locale not in locales:
+            raise ValidationError(
+                {
+                    "available_locales": _(
+                        "Must contain default_locale (%(locale)s) — the "
+                        "storefront would otherwise 404 the tenant's own "
+                        "default language."
+                    )
+                    % {"locale": self.default_locale}
+                }
+            )
 
     def _validate_stripe_publishable_key(self) -> None:
         key = self.stripe_publishable_key

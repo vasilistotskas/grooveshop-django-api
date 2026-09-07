@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import re
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 from django_tenants.utils import get_public_schema_name
@@ -142,6 +143,47 @@ def validate_theme_metadata(value: object) -> None:
 _DAY_KEYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
 
 _TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
+
+
+def validate_available_locales(value: object) -> None:
+    """JSONField validator for ``Tenant.available_locales``.
+
+    The storefront's i18n routes are generated at BUILD time from a
+    platform-wide locale list, so every locale exists as a route for
+    every tenant. This field is what makes a locale *reachable*: the
+    Nuxt side 404s a prefix the tenant does not list, and hides it from
+    the language switcher, the hreflang set and the sitemap.
+
+    Empty list = the tenant is single-language on ``default_locale``.
+    That is the default, so existing tenants keep exactly the behaviour
+    they had before the field existed — no data migration needed.
+    """
+    if value in (None, [], ()):
+        return
+    if not isinstance(value, list):
+        raise ValidationError(_("available_locales must be a JSON list."))
+
+    allowed = {code for code, _label in settings.LANGUAGES}
+    errors: list[str] = []
+    seen: set[str] = set()
+    for entry in value:
+        if not isinstance(entry, str):
+            errors.append(f"{entry!r}: must be a language code string")
+            continue
+        if entry not in allowed:
+            errors.append(
+                f"{entry!r}: not in settings.LANGUAGES "
+                f"({', '.join(sorted(allowed))})"
+            )
+        if entry in seen:
+            errors.append(f"{entry!r}: duplicated")
+        seen.add(entry)
+
+    if errors:
+        raise ValidationError(
+            _("Invalid available_locales: %(details)s"),
+            params={"details": "; ".join(errors)},
+        )
 
 
 def validate_business_hours_setting(value: object) -> bool:

@@ -110,6 +110,12 @@ THEME = {
     # custom scales below then override shade-for-shade.
     "primary_color": "teal",
     "neutral_color": "slate",
+    # delta-sigma.gr ships a Greek site plus a smaller English one
+    # (/en/home, /en/specialization, /en/experience, /en/contact-us).
+    # Greek stays the default; `en` is what makes the /en/ prefix
+    # reachable at all — see middleware/locale-available.global.ts.
+    "default_locale": "el",
+    "available_locales": ["el", "en"],
     # accent_hex maps to --ui-secondary. The exact logo teal.
     "accent_hex": "#009999",
     "theme_preset": "custom",
@@ -163,6 +169,12 @@ GEMH = "156013906000"
 # INVOICE_SELLER_BUSINESS_ACTIVITY, STORE_GEO_LAT / STORE_GEO_LNG and
 # BUSINESS_HOURS.
 SETTINGS = {
+    # Quote-only: delta-sigma.gr publishes no prices anywhere, and the
+    # three DeSET systems are priced on request. Shop-dark turns off the
+    # cart chrome so the storefront reads as a catalogue, and the PDP
+    # renders a quote CTA instead of a price (see the zero-price branch
+    # in the storefront's price component).
+    "CART_ENABLED": "False",
     "CONTACT_EMAIL": CONTACT_EMAIL,
     "INVOICE_SELLER_NAME": "Δelta Σigma",
     "INVOICE_SELLER_ADDRESS_LINE_1": OFFICES[0]["street"],

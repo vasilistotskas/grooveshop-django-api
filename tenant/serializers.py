@@ -37,6 +37,31 @@ class TenantConfigSerializer(serializers.Serializer):
 
     # --- Localisation ---
     default_locale = serializers.CharField(read_only=True)
+    # Locales the storefront may serve for this tenant. Empty = single
+    # language on default_locale (see Tenant.available_locales).
+    # ListField rather than JSONField so the generated OpenAPI type is
+    # ``string[]`` instead of ``unknown`` — the storefront narrows this
+    # without a cast.
+    # ``required=False`` so the generated contract marks it OPTIONAL.
+    # Without it the storefront's Zod schema rejects any response from a
+    # backend that predates the field — and since Argo rolls the
+    # frontend and backend independently, a frontend-first deploy would
+    # fail tenant-config validation for EVERY tenant and 503 the whole
+    # platform. Verified locally against a pre-field backend.
+    # NOT ``read_only``: drf-spectacular treats every read-only field
+    # as always present in the response and puts it in ``required``,
+    # which makes the storefront's generated Zod schema REJECT any
+    # response from a backend that predates the field. Argo rolls the
+    # frontend and backend as separate Deployments, so a new frontend
+    # pod can briefly talk to an old backend pod — and a required field
+    # there fails tenant-config validation for EVERY tenant and 503s
+    # the whole platform (observed locally against a pre-field
+    # backend). ``required=False`` on a writable declaration is what
+    # emits an OPTIONAL field. The serializer is output-only anyway:
+    # ``/tenant/resolve`` never deserialises it.
+    available_locales = serializers.ListField(
+        child=serializers.CharField(), required=False
+    )
     default_currency = serializers.CharField(read_only=True)
 
     # --- Domain ---
@@ -266,6 +291,7 @@ class TenantAdminSerializer(serializers.ModelSerializer):
             "store_name",
             "store_description",
             "default_locale",
+            "available_locales",
             "default_currency",
             # --- Assets ---
             "logo_light_url",

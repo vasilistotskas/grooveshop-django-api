@@ -3,6 +3,34 @@
 
 
 
+## v3.35.1 (2026-09-07)
+
+### Bug fixes
+
+* fix(devtools): seed the footer menu the redesign actually draws
+
+The artboard's footer carries ONE link column beside the contact
+column: ΕΤΑΙΡΕΙΑ with Αρχική, DeSET, Ειδίκευση, Εμπειρία. The seeded
+menu held six links over two columns, and its second column headed
+"Επικοινωνία" — which the storefront's chrome variant builds itself
+from STORE_OFFICES and the merchant identity, so that row rendered the
+heading twice.
+
+Also turns MOBILE_BOTTOM_NAV_ENABLED off. The bottom tab bar carries a
+shop's affordances (catalogue, favourites, cart, account); the
+redesign's mobile header is a burger and the locale code, and the cart
+is already off for this quote-only store.
+
+Both are data, not code: the storefront reads the menu rows and the
+setting, so neither shape is hardcoded in a component.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018CiyyCqkXd9a1FM5hsrPFZ ([`fd126b7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fd126b73d4779ebdd8aaaf3f06445a5cd8939a48))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.35.0 [skip ci] ([`754a763`](https://github.com/vasilistotskas/grooveshop-django-api/commit/754a76350837fc048eee737ca78dd082641671fe))
+
 ## v3.35.0 (2026-09-07)
 
 ### Chores

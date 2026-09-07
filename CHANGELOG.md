@@ -3,6 +3,30 @@
 
 
 
+## v3.30.1 (2026-09-07)
+
+### Bug fixes
+
+* fix(devtools): resolve the DeSET category link at seed time
+
+`/products/category/deset` was a 404 in six places (header, mobile and
+footer nav, the hero secondary CTA, and the DeSET block CTA). The
+storefront route is `/products/category/[id]/[slug]` and the page
+fetches `/api/products/categories/{id}`, so the link needs the
+DB-assigned id and can never be a constant.
+
+`_deset_link()` resolves it from the seeded category and falls back to
+`/products` when the category is absent (`--only layouts` before
+`--only products`), so the link is never a dead end. The NAV_* payloads
+become functions for the same reason.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018CiyyCqkXd9a1FM5hsrPFZ ([`fe0e9e0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fe0e9e055cd95cbbc4f69c8712b13115638e53a1))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.30.0 [skip ci] ([`95e532a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/95e532ac52715a0527ccd8d9a3ce7cfc90af34a5))
+
 ## v3.30.0 (2026-09-07)
 
 ### Chores

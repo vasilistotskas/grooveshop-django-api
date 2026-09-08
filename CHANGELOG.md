@@ -3,6 +3,59 @@
 
 
 
+## v3.44.0 (2026-09-08)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.43.0 [skip ci] ([`8773a51`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8773a515a31c85342b2b68a2f0237d00795aacec))
+
+### Features
+
+* feat(page_config): vendor_cards, contact_panel, and a contact form that asks who
+
+Two more bands the artboards draw, and the model change the second one
+needs.
+
+`vendor_cards` — a card per manufacturer: a category label, what the
+store does with it, and the part numbers, buses and protocols that
+make the work recognisable. Distinct from `partner_strip`, which is a
+row of names at a glance and says nothing about any of them. The four
+cards are the four brands the home strip names; INVT and Advantech
+stay in the note under them, where the artboard leaves them and where
+the DeSET page already explains both.
+
+`contact_panel` — the contact page as ONE band, because that is how it
+is drawn: the copy and the published offices on the left, the enquiry
+form on the right. It replaces the hero + prose-block pair, and with
+it the second copy of the addresses: the offices come from
+`STORE_OFFICES`, which the footer already reads, so the two cannot
+disagree. `_contact_html` and its office formatter are deleted with
+the section that called them, and `STORE_OFFICES` gains `role` — the
+word the card prints in its corner ("ΕΔΡΑ" / "ΓΡΑΦΕΙΟ"), an attribute
+of an office rather than copy in a page.
+
+`Contact` grows `company`, `phone` and `subject`. The platform's own
+form asks for none of the three, which is why all three are blank-able
+— but an engineering contractor quoting per project needs to know
+which utility is asking and how to phone back, and the enquiry's
+subject is the first thing it sorts by. `subject` is free text, not
+choices: the taxonomy belongs to the merchant's own form ("Προσφορά
+έργου", "DeSET / ΑΠΕ", "Υποστήριξη"), which is content in a section,
+not a platform-wide enum. `db_default`, not `default`, on all three —
+migrations land in a PreSync hook, so the column exists while the
+previous image is still INSERTing without it.
+
+Also: `features_grid` gains a standfirst and a `framed` decor (four
+cells in one frame, divided by rules — the parts of one promise, not a
+numbered sequence), and `cta_banner` gains `surface`, an enum naming
+WHICH of the two page surfaces it paints. A design that stacks
+full-width bands separates two of them by alternating ground and
+raised, and a CTA lands last on one page and after a raised band on
+another, so the choice belongs to the page.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018CiyyCqkXd9a1FM5hsrPFZ ([`5450eba`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5450eba06f5386bdd7674284984ee523f630b34e))
+
 ## v3.43.0 (2026-09-08)
 
 ### Chores

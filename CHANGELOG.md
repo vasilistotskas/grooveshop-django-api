@@ -3,6 +3,96 @@
 
 
 
+## v3.46.3 (2026-09-08)
+
+### Bug fixes
+
+* fix(acs): make COD money that goes missing announce itself
+
+Three blind spots, all at the same moment — a parcel turning terminal.
+Found while answering "what should we do with those orders' payment
+status" against production on 2026-09-08.
+
+**Delivered but never remitted had no watcher at all.**
+``poll_acs_tracking`` and ``check_stale_acs_shipments`` both exclude
+terminal shipment states, which is right for tracking and wrong for
+money: a COD parcel that was delivered and never paid out is precisely a
+delivered parcel, so it falls out of every existing watch the moment it
+matters. Order 73 sat that way for 108 days — delivered 2026-05-23, EUR
+24.48, and a day-by-day probe of ACS across 97 dates shows no payout for
+its voucher on any of them. New daily ``alert-unremitted-acs-cod``
+(03:00 Athens, after the 02:30 reconcile so an overnight payout is
+already recorded) names every parcel, its voucher and its amount, since
+"ACS owes you money" is only actionable with the numbers to quote.
+Threshold ``ACS_COD_REMITTANCE_ALERT_DAYS`` defaults to 10 against a
+measured remittance lag of ~4 days.
+
+**An unattributable payout was counted a success.**
+``_alert_admins_unmatched_payouts`` fired only on ``skipped``, and
+``skipped`` counts only rows whose voucher could not be READ at all. A
+row carrying a perfectly legible but unknown voucher was upserted with
+``shipment=None``, added to ``upserted``, and never mentioned again —
+production held two, EUR 49.46 total (2417791935 on 2026-06-11 and
+2431665832 on 2026-08-20), both on our own Customer_Code and evidently
+minted by hand in the ACS portal. Thirty days of logs contained not one
+unmatched-payout warning. Now counted as ``unmatched``, logged with
+everything that identifies the row (voucher, amount, cash/card split,
+receiver, sender, both refs, dates) and alerted on — the two kinds
+reported separately because they need different follow-up.
+
+**A stranded order status could never recover.** The transition is
+applied once, when the shipment turns terminal; if that single attempt
+fails the poll never looks again. Nine orders whose parcel came back
+months ago were still in PROCESSING (67, 68, 97, 98, 107, 120, 126, 135,
+156 — oldest returned 2026-05-29), all predating the SHIPPED-bridging
+fix that made PROCESSING -> RETURNED reachable. New
+``manage.py reconcile_acs_order_status`` replays them: dry run by
+default, ``--apply`` to write, ``--order`` to scope. It asks the SAME
+mapping the live poll uses — extracted as
+``AcsService.order_status_for_shipment_state`` rather than re-derived,
+because a replay that decides "returned means RETURNED" for itself is
+how the two drift apart. Customer mail is suppressed: these transitions
+are months late and "your order was returned" about a July parcel would
+confuse. Stock is untouched — a RETURNED transition never restored it
+(only ``cancel_order`` does) and the site owner confirmed stock is
+already correct for those nine.
+
+**And the alert path itself was broken for the platform fallback.**
+``tenant_admin_recipients`` unpacked each ``settings.ADMINS`` entry into
+``(_name, email)``. Django 6 made plain address strings the correct
+format — ``mail_admins`` warns ``RemovedInDjango70Warning`` on the old
+pairs — and this project builds the setting from ``ADMIN_EMAIL`` as bare
+strings, so unpacking walked the characters and raised ``ValueError: too
+many values to unpack``. All four production tenants have their own
+contact email and returned early, so only the platform path was hit, and
+every caller wraps this in try/except to keep a mail failure from
+masking the carrier error it reports — so the alert was swallowed rather
+than surfaced. Both new alerts depend on this function.
+
+Tests: 22 across ``test_cod_remittance_visibility.py`` and
+``test_admin_recipients_fallback.py``. Eight mutations checked — ignore
+the payout table, drop the COD filter, drop the non-zero-amount filter,
+stop counting unmatched, stop alerting on it, write during a dry run,
+email the customer on replay, and re-break the ADMINS unpack — every one
+caught. The COD-filter gate needed a prepaid fixture holding a STALE
+non-zero amount: with a zero amount the ``cod_amount__gt=0`` clause
+covered for it and the filter could be deleted with everything still
+green.
+
+One trap worth naming: the replay first read back with
+``refresh_from_db(fields=["status"])`` and blew the stack.
+``Order.__init__`` snapshots ``_original_status`` and friends, a partial
+refresh leaves those columns deferred, and each lazy load
+re-instantiates through the manager. ``maybe_advance_to_completed``
+already documents exactly this; the tests caught it.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01H6QHvSZHY35xi5VEvr5Au5 ([`b35016c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b35016c189a19c3a0537bfc16b4ccdc5e680b838))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.46.2 [skip ci] ([`5ff2919`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5ff291927da6ae46ed03da4dea1db1d6d5fe567d))
+
 ## v3.46.2 (2026-09-08)
 
 ### Bug fixes

@@ -3,6 +3,63 @@
 
 
 
+## v3.45.0 (2026-09-08)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.44.0 [skip ci] ([`0ac15a0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0ac15a09a1f3f49c311d52d730f5b95f5010724d))
+
+### Features
+
+* feat(devtools): no agentic commerce for a store that quotes
+
+`agent_commerce_enabled` gates the whole agent-gateway surface for a
+tenant — the MCP commerce tools, UCP/ACP agentic checkout, the catalog
+feeds and the chat backend — and it defaults ON because the surface
+predates the flag.
+
+Δelta Σigma has no cart (CART_ENABLED off), no catalogue
+(CATALOGUE_ENABLED off) and three products that carry `price = 0`
+because a DeSET system is quoted per project after a site visit. So
+every one of those surfaces was offering an agent three systems it
+cannot buy, at a price that is not a price. Off.
+
+This also carries the /info/* retirement into a released image: the
+previous commit is a `refactor`, which cuts no version, and the
+seeder runs from the image.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018CiyyCqkXd9a1FM5hsrPFZ ([`569db5f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/569db5fdb2d129dd9d6bd628062810df4ffef8c5))
+
+### Refactoring
+
+* refactor(devtools): retire the /info/* prose pages the band pages replaced
+
+`/eidikefsi`, `/drastiriotites` and `/synergates` are drawn by the
+artboards as compositions of bands, and the last fact only the prose
+still carried — the per-manufacturer descriptions — is now the
+`vendor_cards` band. Two copies of a description drift, and the nav
+has pointed at the new pages since they shipped, so the three
+`ContentPage` rows are unpublished rather than kept in sync.
+
+Unpublish, not delete, for the same reason as the project posts: a row
+is content and deleting is irreversible, while `is_published=False` is
+enough to take it off the only surface that serves it. The prose
+itself is in this file's history.
+
+The three URLs answered 200 for about a month, so a crawler may hold
+them; the platform has no redirect table, so they 404 rather than
+pointing at their replacements. Recorded in the step's docstring — it
+is a rule at the edge if the traffic turns out to matter, not
+something this pack can express.
+
+The two convergence tests that happened to use a ContentPage as their
+subject now use the parler model this pack still seeds (the DeSET
+products), which is what they were always about.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018CiyyCqkXd9a1FM5hsrPFZ ([`be47f4a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/be47f4afe4824ef2ebe844cff91ea29a780e1033))
+
 ## v3.44.0 (2026-09-08)
 
 ### Chores

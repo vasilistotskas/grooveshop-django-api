@@ -11,10 +11,18 @@ deliberate and documented here rather than inferred:
   Product row gives them a PDP, the agent-gateway feeds and search for
   free. They carry ``price = 0`` — see ``DESET_SYSTEMS`` — because the
   real prices are quote-only and are NOT in version control.
-* **The project register is BlogPosts.** The 48 rows in ``PROJECTS``
-  are the real reference list scraped from delta-sigma.gr/εμπειρία,
-  each with its actual contracting company. BlogCategory carries the
-  sector, which is what drives the storefront's filter.
+* **The project register is a page SECTION.** The 48 rows in
+  ``PROJECTS`` are the real reference list scraped from
+  delta-sigma.gr/εμπειρία, each with its actual contracting company,
+  and they render as the ``project_register`` band of ``/empeiria`` —
+  a flat, filterable table. They used to be ``BlogPost`` rows, one
+  per project, which bought a detail page per project and a
+  ``BlogCategory`` per sector. The redesign has neither: no project
+  page, no article, and a register row needs THREE strings (title,
+  technical note, contracting company) where a post offers title,
+  subtitle and an HTML body. ``retire_project_posts`` unpublishes
+  what the earlier shape created, and ``blog_enabled`` is off for the
+  tenant, so the whole blog surface 404s.
 
 Two things worth knowing before editing:
 
@@ -59,22 +67,6 @@ logger = logging.getLogger(__name__)
 
 MARKER = "delta-sigma"
 
-# Authorship for the project register. BlogPost.author is nullable in
-# Django but REQUIRED and non-nullable in the storefront's response
-# schema (``author: z.int()`` in shared/openapi/zod.gen.ts), so an
-# authorless post makes the whole /api/blog/posts list fail
-# ``parseDataAs`` with a 422 — the register renders empty with no error
-# in the UI. The account is created inactive: it exists to carry
-# authorship, not to log in.
-AUTHOR_EMAIL = "projects@delta-sigma.gr"
-AUTHOR_FIRST = "Δelta"
-AUTHOR_LAST = "Σigma"
-AUTHOR_BIO = (
-    "Μελέτη, κατασκευή, προγραμματισμός και θέση σε λειτουργία "
-    "συστημάτων αυτοματισμού και ηλεκτρομηχανολογικών έργων."
-)
-
-
 # ---------------------------------------------------------------------------
 # Theme
 # ---------------------------------------------------------------------------
@@ -117,6 +109,19 @@ _PRIMARY_DARK = {
     "800": "#142928",
     "900": "#0D1C1C",
     "950": "#071010",
+}
+
+# Tenant plan flags, written onto the same row as the theme.
+#
+# The platform already models "this store has no blog" as a plan flag
+# rather than a merchant setting: ``IsBlogEnabled`` guards the API and
+# ``middleware/blog-enabled.ts`` guards all four storefront routes, so
+# turning it off 404s the index, the category pages and every post
+# with no new code. Δelta Σigma publishes a project REGISTER, which
+# the redesign draws as a table on its own page — nothing on any
+# artboard is an article.
+TENANT_FLAGS = {
+    "blog_enabled": False,
 }
 
 THEME = {
@@ -695,19 +700,50 @@ DESET_COMPLIANCE_EN = (
 # Project register — real reference list from delta-sigma.gr/εμπειρία
 # ---------------------------------------------------------------------------
 
-# (slug, Greek name, English name)
+# (slug, Greek name, English name, short label, short label EN)
+#
+# The SHORT label is what the register prints, on a pill inside a
+# 175px column and on a filter chip beside six others: "Βιολογικοί",
+# not "Βιολογικοί καθαρισμοί". The long name stays because it is what
+# a sector is CALLED — the pill is an abbreviation of it, not a
+# rename, and the two must not drift.
+#
+# The order is load-bearing twice over: it is the chip order the
+# artboard prints, and the storefront takes each sector's pill colour
+# from its POSITION here (a categorical palette, so nothing in the
+# data names a colour).
 SECTORS = [
-    ("viologikoi", "Βιολογικοί καθαρισμοί", "Wastewater treatment"),
+    (
+        "viologikoi",
+        "Βιολογικοί καθαρισμοί",
+        "Wastewater treatment",
+        "Βιολογικοί",
+        "Wastewater",
+    ),
     (
         "antliostasia",
         "Αντλιοστάσια & ύδρευση",
         "Pumping stations & water supply",
+        "Αντλιοστάσια",
+        "Pumping",
     ),
-    ("energeia", "Ενέργεια & ΑΠΕ", "Energy & renewables"),
-    ("viomichania", "Βιομηχανία", "Industry"),
-    ("ktiriaka", "Κτιριακά (BMS)", "Buildings (BMS)"),
-    ("aporrimmata", "Απορρίμματα", "Waste management"),
-    ("kykloforia", "Διαχείριση κυκλοφορίας", "Traffic management"),
+    (
+        "energeia",
+        "Ενέργεια & ΑΠΕ",
+        "Energy & renewables",
+        "Ενέργεια/ΑΠΕ",
+        "Energy/RES",
+    ),
+    ("viomichania", "Βιομηχανία", "Industry", "Βιομηχανία", "Industry"),
+    ("ktiriaka", "Κτιριακά (BMS)", "Buildings (BMS)", "Κτιριακά", "Buildings"),
+    ("aporrimmata", "Απορρίμματα", "Waste management", "Απορρίμματα", "Waste"),
+    (
+        "kykloforia",
+        "Διαχείριση κυκλοφορίας",
+        "Traffic management",
+        "Κυκλοφορία",
+        "Traffic",
+    ),
 ]
 
 # (sector, slug, title, technical note, contracting company)
@@ -1296,22 +1332,134 @@ PROJECTS_EN = {
     ),
 }
 
-# Only the client entries that are DESCRIPTIONS or bodies with a
-# published English name. Everything absent here is a registered
-# company name and is reproduced verbatim in both languages.
+# Every contracting party in ``PROJECTS`` whose Greek spelling would
+# otherwise reach an English reader. Entries written in Latin script
+# already (``ENVICON A.T.E.E.``, ``FIBRAN A.E.``, ``TEDRA``) are absent
+# on purpose and fall through verbatim.
+#
 # A Greek company's own name is not translated, it is TRANSLITERATED —
 # the legal entity is the same one in both languages, so an English
 # reader needs to be able to say it, not to be told what it means.
-# ``Α.Ε.``/``Ε.Π.Ε.``/``Ο.Ε.`` become S.A./Ltd/G.P., the closest
-# recognisable forms. A client absent from this map falls through to
-# its Greek name, which the English-override parity guard then catches.
+# ``Α.Ε.``/``Ε.Π.Ε.``/``Ο.Ε.``/``Ε.Ε.`` become S.A./Ltd/G.P./L.P., the
+# closest recognisable forms, and ``Κ/Ξ`` (κοινοπραξία) becomes J/V.
+# Four of these have a PUBLISHED English name and it wins over any
+# transliteration: HELECTOR, J&P AVAX, EYDAP and Egnatia Odos.
+#
+# A client absent from this map falls through to its Greek name, which
+# the English-override parity guard then catches — and did: the whole
+# list below was invisible to it while these strings only reached
+# ``BlogPost.subtitle``, which no contract covers.
 CLIENTS_EN = {
     "Ιδιωτικό έργο": "Private project",
     "Δήμος Αγίου Βασιλείου": "Municipality of Agios Vasileios",
     "ΔΕΥΑ Καστοριάς": "Kastoria Water & Sewerage Company",
     "ΜΕΣΟΓΕΙΟΣ Α.Ε.": "MESOGEIOS S.A.",
     "ΣΥΣΤΗΜΑΤΑ ΤΟΜΗ Ε.Π.Ε.": "SYSTIMATA TOMI Ltd",
+    "ABB Α.Ε. / ΓΕΚ ΤΕΡΝΑ Α.Ε.": "ABB S.A. / GEK TERNA S.A.",
+    "BILFINGER BERGER / ΗΛΕΚΤΩΡ Α.Ε. / ΜΕΣΟΓΕΙΟΣ Α.Ε.": (
+        "BILFINGER BERGER / HELECTOR S.A. / MESOGEIOS S.A."
+    ),
+    "BIOGAS HOLDING Α.Ε.": "BIOGAS HOLDING S.A.",
+    "J&P ΑΒΑΞ Α.Τ.Ε.": "J&P AVAX S.A.",
+    "NOVACERT Ε.Π.Ε.": "NOVACERT Ltd",
+    "SYLCO HELLAS Α.Ε.": "SYLCO HELLAS S.A.",
+    "THALIS E.S. S.A. / ΝΑΟΥΜ Σ.Θ. ΑΤΕ": (
+        "THALIS E.S. S.A. / NAOUM S.TH. S.A."
+    ),
+    "ΑΚΤΩΡ Α.Ε.": "AKTOR S.A.",
+    # The same group under its technical-company form, kept distinct
+    # from the Α.Ε. above because the two rows name two entities.
+    "ΑΚΤΩΡ Α.Τ.Ε.": "AKTOR A.T.E.",
+    "ΔΥΝΑΜΙΚΗ ΕΡΓΩΝ Α.Ε.": "DYNAMIKI ERGON S.A.",
+    "Ε.ΥΔ.Α.Π. / ΘΕΜΕΛΙΟΔΟΜΗ Α.Ε.": "EYDAP / THEMELIODOMI S.A.",
+    "ΕΝΥΑ ΜΗΧΑΝΙΚΗ Ε.Ε.": "ENYA MICHANIKI L.P.",
+    "Εγνατία Οδός Α.Ε.": "Egnatia Odos S.A.",
+    "Εργοδομή Α.Ε.": "Ergodomi S.A.",
+    "ΘΕΜΕΛΙΟΔΟΜΗ Α.Ε.": "THEMELIODOMI S.A.",
+    "Κ/Ξ ΜΕ.ΚΟΝ. – ΔΟΜΙΚΗ ΞΑΝΘΗΣ – ΔΗΜΗΤΡΕΙΟΣ": (
+        "J/V ME.KON. – DOMIKI XANTHIS – DIMITREIOS"
+    ),
+    "ΜΕΔΟΥΣΑ Α.Ε.": "MEDOUSA S.A.",
+    "ΜΕΚΟΝ Α.Ε.": "MEKON S.A.",
+    "Μιχαήλ Τσόντος Α.Ε.": "Michail Tsontos S.A.",
+    "ΤΕΜΕΣ Α.Ε.": "TEMES S.A.",
 }
+
+# --- The register band ------------------------------------------------
+#
+# The whole reference list, as the redesign's own page prints it: a
+# numbered row per installation, filterable by sector, with the
+# contracting company on the right. Everything here is PROJECTED from
+# ``PROJECTS``/``SECTORS`` so the register cannot disagree with the
+# three projects the home page showcases from the same rows.
+REGISTER_META_LABEL = "Ανάδοχος / Πελάτης"
+REGISTER_META_LABEL_EN = "Contractor / Client"
+
+# The line the artboard prints under the table. Not a project — an
+# ongoing relationship, which is why it cannot be a row: there is no
+# single installation, no contracting company and no date to put in
+# one.
+REGISTER_NOTE = (
+    "Συνεχής υποστήριξη σε θέματα λειτουργίας και συντήρησης στις "
+    "εγκαταστάσεις επεξεργασίας λυμάτων των πόλεων Ξάνθης, Ιωαννίνων "
+    "και Βέροιας."
+)
+REGISTER_NOTE_EN = (
+    "Ongoing operation and maintenance support at the wastewater "
+    "treatment plants of Xanthi, Ioannina and Veroia."
+)
+
+
+def _register_sectors(*, locale: str = "el") -> list[dict]:
+    """The taxonomy the register filters by, in the artboard's order."""
+    return [
+        {"key": slug, "label": short_en if locale == "en" else short}
+        for slug, _, _, short, short_en in SECTORS
+    ]
+
+
+def _register_items(*, locale: str = "el") -> list[dict]:
+    """One row per project, in register order.
+
+    ``sector`` is the key into ``_register_sectors``; the storefront
+    resolves the pill colour from that sector's position, and
+    ``page_config.schemas`` refuses a key that is not declared.
+    """
+    rows = []
+    for sector, slug, title, tech, client in PROJECTS:
+        if locale == "en":
+            title_en, tech_en = PROJECTS_EN[slug]
+            rows.append(
+                {
+                    "sector": sector,
+                    "title": title_en,
+                    "note": tech_en,
+                    "meta": CLIENTS_EN.get(client, client),
+                }
+            )
+        else:
+            rows.append(
+                {
+                    "sector": sector,
+                    "title": title,
+                    "note": tech,
+                    "meta": client,
+                }
+            )
+    return rows
+
+
+def _register_props(*, locale: str = "el") -> dict:
+    """The ``project_register`` props for one language."""
+    return {
+        "meta_label": (
+            REGISTER_META_LABEL_EN if locale == "en" else REGISTER_META_LABEL
+        ),
+        "note": REGISTER_NOTE_EN if locale == "en" else REGISTER_NOTE,
+        "sectors": _register_sectors(locale=locale),
+        "items": _register_items(locale=locale),
+    }
+
 
 # ---------------------------------------------------------------------------
 # Marketing content
@@ -1547,6 +1695,35 @@ PAGE_HEROES = {
             "heading": "Eight phases, one party responsible",
             "body": "We take on the whole chain. Every phase is handed "
             "over documented.",
+        },
+    },
+    "empeiria": {
+        "el": {
+            "eyebrow": "Εμπειρία",
+            "heading": "Μητρώο έργων",
+            "body": "Εγκαταστάσεις που μελετήσαμε, κατασκευάσαμε, "
+            "προγραμματίσαμε και θέσαμε σε λειτουργία — από τα πρώτα "
+            "δίκτυα Siemens Step 5 μέχρι τα σημερινά συστήματα "
+            "τηλεποπτείας. Φιλτράρετε ανά τομέα.",
+            # Both DERIVED. The artboard prints a third, "4 χώρες",
+            # which nothing in the register evidences: only Greece and
+            # Zambia appear in the forty-eight titles, so the claim
+            # would be ours rather than the company's.
+            "stats": [
+                {"value": str(len(PROJECTS)), "label": "καταγεγραμμένα έργα"},
+                {"value": str(len(SECTORS)), "label": "τομείς"},
+            ],
+        },
+        "en": {
+            "eyebrow": "Experience",
+            "heading": "Project register",
+            "body": "Installations we studied, built, programmed and "
+            "commissioned — from the first Siemens Step 5 networks to "
+            "today's telemetry systems. Filter by sector.",
+            "stats": [
+                {"value": str(len(PROJECTS)), "label": "projects on record"},
+                {"value": str(len(SECTORS)), "label": "sectors"},
+            ],
         },
     },
     "synergates": {
@@ -2010,7 +2187,7 @@ PAGE_DESET = "/deset"
 PAGE_EIDIKEFSI = "/eidikefsi"
 PAGE_DRASTIRIOTITES = "/drastiriotites"
 PAGE_SYNERGATES = "/synergates"
-PAGE_REGISTER = "/blog"
+PAGE_REGISTER = "/empeiria"
 
 
 def _layout_plan() -> dict:
@@ -2171,7 +2348,7 @@ def _layout_plan() -> dict:
                     "heading": "Έργα σε λειτουργία, όχι σε παρουσίαση",
                     "meta_label": "Για λογαριασμό",
                     "cta_text": "Πλήρες μητρώο έργων",
-                    "cta_link": "/blog",
+                    "cta_link": PAGE_REGISTER,
                     "items": _reference_cards(),
                 },
                 "i18n": {
@@ -2467,6 +2644,57 @@ def _layout_plan() -> dict:
                 },
             },
         ],
+        "empeiria": [
+            {
+                "component_type": "page_hero",
+                "title": "Μητρώο έργων",
+                "sort_order": 0,
+                "props": _page_hero("empeiria"),
+                "i18n": {
+                    "en": {
+                        "title": "Project register",
+                        "props": _page_hero("empeiria", locale="en"),
+                    }
+                },
+            },
+            {
+                "component_type": "project_register",
+                "title": "Έργα",
+                "sort_order": 1,
+                "props": _register_props(),
+                "i18n": {
+                    "en": {
+                        "title": "Projects",
+                        "props": _register_props(locale="en"),
+                    }
+                },
+            },
+            {
+                "component_type": "cta_banner",
+                "title": "CTA",
+                "sort_order": 2,
+                "props": {
+                    "heading": "Ζητήστε αναφορές για έργο σαν το δικό σας.",
+                    "description": "Πείτε μας τον τομέα και θα σας "
+                    "συνδέσουμε με τον κύριο της αντίστοιχης "
+                    "εγκατάστασης.",
+                    "button_text": "Επικοινωνία",
+                    "button_link": "/contact",
+                },
+                "i18n": {
+                    "en": {
+                        "props": {
+                            "heading": "Ask for references on a project "
+                            "like yours.",
+                            "description": "Tell us the sector and we "
+                            "will put you in touch with whoever owns "
+                            "the corresponding installation.",
+                            "button_text": "Contact us",
+                        }
+                    }
+                },
+            },
+        ],
         "synergates": [
             {
                 "component_type": "page_hero",
@@ -2738,7 +2966,7 @@ def _translate(instance, language_code: str = "el", **fields) -> None:
 
 
 def apply_theme(tenant) -> dict[str, int]:
-    """Write the brand theme onto the ``Tenant`` row (public schema).
+    """Write the brand theme and plan flags onto the ``Tenant`` row.
 
     Runs OUTSIDE the tenant schema: ``Tenant`` lives in public.
     ``full_clean()`` first so an invalid ramp or font key is rejected
@@ -2746,7 +2974,7 @@ def apply_theme(tenant) -> dict[str, int]:
     """
     report: dict[str, int] = {}
     changed: list[str] = []
-    for field, value in THEME.items():
+    for field, value in {**THEME, **TENANT_FLAGS}.items():
         if getattr(tenant, field) != value:
             setattr(tenant, field, value)
             changed.append(field)
@@ -2879,101 +3107,39 @@ def seed_deset_products(*, overwrite: bool = False) -> dict[str, int]:
     return report
 
 
-def _ensure_author():
-    """Return the BlogAuthor every project post is attributed to."""
-    from django.contrib.auth import get_user_model
+def retire_project_posts() -> dict[str, int]:
+    """Unpublish the ``BlogPost`` rows the register used to be.
 
-    from blog.models.author import BlogAuthor
+    The 48 projects were one post each until the redesign gave them a
+    page of their own — see the module docstring. Two reasons the old
+    rows cannot simply be left alone:
 
-    user_model = get_user_model()
-    user, _ = user_model.objects.get_or_create(
-        email=AUTHOR_EMAIL,
-        defaults={
-            "first_name": AUTHOR_FIRST,
-            "last_name": AUTHOR_LAST,
-            # Authorship record only — never a login.
-            "is_active": False,
-        },
-    )
-    author = BlogAuthor.objects.filter(user=user).first()
-    if author is None:
-        author = BlogAuthor(user=user, website="https://delta-sigma.gr")
-        _translate(author, bio=AUTHOR_BIO)
-        author.save()
-    return author
+    * a published post still reaches Meilisearch and the agent feeds,
+      so it would keep answering searches with a link to a route that
+      now 404s (``blog_enabled`` is off for this tenant);
+    * the register is the single source of truth for a project, and two
+      copies of forty-eight rows drift.
 
+    Unpublish rather than DELETE: a row is content, deleting is
+    irreversible, and ``is_published=False`` is enough to take it off
+    every surface. Whoever wants them gone can delete them in the
+    admin, once.
 
-def seed_project_posts(*, overwrite: bool = False) -> dict[str, int]:
-    """Create the sector categories and the 48 reference projects."""
-    from blog.models.category import BlogCategory
+    Idempotent, and silent on a store that never had them.
+    """
     from blog.models.post import BlogPost
 
     report: dict[str, int] = {}
-    author = _ensure_author()
-    categories: dict[str, BlogCategory] = {}
-    for slug, name, name_en in SECTORS:
-        category = BlogCategory.objects.filter(slug=slug).first()
-        if category is None:
-            category = BlogCategory(slug=slug)
-            _translate(category, name=name, description=name)
-            _translate(category, "en", name=name_en, description=name_en)
-            category.save()
-            _bump(report, "categories_created")
-        elif _fill_missing_translation(
-            category,
-            "en",
-            overwrite=overwrite,
-            name=name_en,
-            description=name_en,
-        ):
-            _bump(report, "categories_localized")
-        else:
-            _bump(report, "categories_unchanged")
-        categories[slug] = category
-
-    for sector, slug, title, tech, client in PROJECTS:
-        title_en, tech_en = PROJECTS_EN[slug]
-        client_en = CLIENTS_EN.get(client, client)
-        body_en = (
-            f"<p>{tech_en}</p><p><strong>On behalf of:</strong> {client_en}</p>"
-        )
-        existing = BlogPost.objects.filter(slug=slug).first()
-        if existing is not None:
-            if _fill_missing_translation(
-                existing,
-                "en",
-                overwrite=overwrite,
-                title=title_en,
-                subtitle=client_en,
-                body=body_en,
-            ):
-                _bump(report, "posts_localized")
-            else:
-                _bump(report, "posts_unchanged")
-            continue
-        post = BlogPost(
-            slug=slug,
-            category=categories.get(sector),
-            author=author,
-            is_published=True,
-        )
-        _translate(
-            post,
-            title=title,
-            subtitle=client,
-            body=(
-                f"<p>{tech}</p><p><strong>Για λογαριασμό:</strong> {client}</p>"
-            ),
-        )
-        _translate(
-            post,
-            "en",
-            title=title_en,
-            subtitle=client_en,
-            body=body_en,
-        )
-        post.save()
-        _bump(report, "posts_created")
+    slugs = [slug for _, slug, _, _, _ in PROJECTS]
+    posts = BlogPost.objects.filter(slug__in=slugs)
+    retired = posts.filter(is_published=True).update(
+        is_published=False, published_at=None
+    )
+    if retired:
+        _bump(report, "posts_retired", retired)
+    remaining = posts.count() - retired
+    if remaining:
+        _bump(report, "posts_already_retired", remaining)
     return report
 
 
@@ -3040,6 +3206,19 @@ def _fill_missing_i18n(
     return filled
 
 
+# What the page builder calls each layout. Without these a page shows
+# up in the admin as "Empeiria" — the slug, title-cased.
+LAYOUT_TITLES = {
+    "home": "Αρχική",
+    "contact": "Επικοινωνία",
+    "deset": "DeSET",
+    "eidikefsi": "Ειδίκευση",
+    "drastiriotites": "Δραστηριότητες",
+    "empeiria": "Μητρώο έργων",
+    "synergates": "Συνεργάτες",
+}
+
+
 def seed_layouts(*, overwrite: bool = False) -> dict[str, int]:
     """Apply the home layout.
 
@@ -3072,9 +3251,7 @@ def seed_layouts(*, overwrite: bool = False) -> dict[str, int]:
         layout, created = PageLayout.objects.get_or_create(
             page_type=page_type,
             defaults={
-                "title": {"home": "Αρχική", "contact": "Επικοινωνία"}.get(
-                    page_type, page_type.title()
-                ),
+                "title": LAYOUT_TITLES.get(page_type, page_type.title()),
                 "is_published": True,
             },
         )

@@ -14,6 +14,7 @@ so keys here are snake_case.
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -617,6 +618,32 @@ _VALIDATORS: dict[str, dict] = {
             optional={"label": 60, "text": 300, "meta": 80},
         ),
     },
+    "project_register": {
+        # A register: one numbered row per installation, filterable by
+        # sector. ``items[].sector`` is a KEY into ``sectors`` — see
+        # ``_cross_check_project_register``, which is what makes the
+        # pill colour resolvable at render time.
+        #
+        # 200 rows because a reference list GROWS (48 today) and the
+        # storefront prints all of them at once — there is no
+        # pagination in the design and a register that silently stops
+        # at the fiftieth project would be worse than a long page.
+        "meta_label": lambda v: None if _is_str(v, 60) else "string \u226460",
+        "note": lambda v: None if _is_str(v, 400) else "string \u2264400",
+        "sectors": lambda v: _check_items(
+            v,
+            max_items=12,
+            required={"key": 40, "label": 40},
+            optional={},
+            name="sectors",
+        ),
+        "items": lambda v: _check_items(
+            v,
+            max_items=200,
+            required={"title": 200},
+            optional={"sector": 40, "note": 200, "meta": 120},
+        ),
+    },
     "pull_quote": {
         # A stated principle with the reason under it — not a
         # testimonial, which is somebody else's words and needs an
@@ -721,6 +748,46 @@ _VALIDATORS: dict[str, dict] = {
 }
 
 
+def _cross_check_project_register(props: dict) -> list[str]:
+    """Every row's sector must be one of the declared sectors.
+
+    The only check in this module that spans two props, because it is
+    the only place one prop is a KEY into another: the storefront
+    resolves a row's pill colour by the sector's POSITION in
+    ``sectors``, so a key that isn't there loses its colour silently.
+    Cheap to get wrong by hand in the admin, invisible afterwards.
+    """
+    declared = {
+        sector.get("key")
+        for sector in props.get("sectors") or []
+        if isinstance(sector, dict)
+    }
+    if not declared:
+        return []
+    unknown = sorted(
+        {
+            str(item.get("sector"))
+            for item in props.get("items") or []
+            if isinstance(item, dict)
+            # ``sector`` is optional: an unclassified row is a plain
+            # row, and only a stated sector can be a wrong one.
+            and item.get("sector")
+            and item.get("sector") not in declared
+        }
+    )
+    if not unknown:
+        return []
+    return [f"items: sector(s) not declared in sectors: {unknown}"]
+
+
+# Whole-props checks, run only once every per-key check has passed:
+# a cross-prop rule cannot say anything useful about a prop whose
+# SHAPE is already wrong.
+_CROSS_VALIDATORS: dict[str, Callable[[dict], list[str]]] = {
+    "project_register": _cross_check_project_register,
+}
+
+
 def validate_section_props(component_type: str, props: object) -> None:
     """Raise ``ValidationError`` when ``props`` doesn't fit the section
     contract. Unknown component types are the model field's problem
@@ -740,6 +807,10 @@ def validate_section_props(component_type: str, props: object) -> None:
         problem = check(value)
         if problem:
             errors.append(f"{key}: {problem}")
+
+    cross = _CROSS_VALIDATORS.get(component_type)
+    if not errors and cross is not None:
+        errors.extend(cross(props))
 
     if errors:
         raise ValidationError(

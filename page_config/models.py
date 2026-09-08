@@ -103,6 +103,7 @@ class ComponentType(models.TextChoices):
     OPTION_SELECTOR = "option_selector", _("Option Selector")
     COMPARISON_TABLE = "comparison_table", _("Comparison Table")
     FLOW_STEPS = "flow_steps", _("Flow Steps")
+    PROJECT_REGISTER = "project_register", _("Project Register")
 
 
 class PageLayout(

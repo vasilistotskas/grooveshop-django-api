@@ -251,23 +251,87 @@ class TestTheSeedStepsWriteBothLocales:
         assert "Technical specifications" in english
         assert "Real-time Linux" in english
 
-    def test_project_posts_carry_both_translations(self):
+    def test_the_register_band_carries_both_languages(self):
+        """The register itself, in the props of one section.
+
+        It used to be 48 ``BlogPost`` rows; the redesign prints it as a
+        table, so the copy lives where every other band's copy lives —
+        which is also what finally put the contracting companies under
+        the English-override parity guard.
+        """
+        register = self._register_section()
+        greek = register["props"]
+        english = register["i18n"]["en"]["props"]
+
+        assert len(greek["items"]) == len(delta_sigma.PROJECTS)
+        assert len(english["items"]) == len(delta_sigma.PROJECTS)
+        assert [row["sector"] for row in greek["items"]] == [
+            sector for sector, *_ in delta_sigma.PROJECTS
+        ]
+
+        first = greek["items"][0]
+        assert first["title"].startswith("Επιτήρηση δεκατριών")
+        assert first["meta"] == "ENVICON A.T.E.E."
+        assert english["items"][0]["title"].startswith("Monitoring of")
+
+    def test_every_register_row_names_a_declared_sector(self):
+        """The storefront colours a pill by the sector's POSITION."""
+        register = self._register_section()
+        for props in (
+            register["props"],
+            register["i18n"]["en"]["props"],
+        ):
+            declared = {sector["key"] for sector in props["sectors"]}
+            assert declared == {slug for slug, *_ in delta_sigma.SECTORS}
+            assert {row["sector"] for row in props["items"]} <= declared
+
+    def test_the_register_hero_derives_its_stats(self):
+        """Both numbers are counted, not typed."""
+        hero = next(
+            section
+            for section in delta_sigma._layout_plan()["empeiria"]
+            if section["component_type"] == "page_hero"
+        )
+        values = [stat["value"] for stat in hero["props"]["stats"]]
+        assert values == [
+            str(len(delta_sigma.PROJECTS)),
+            str(len(delta_sigma.SECTORS)),
+        ]
+
+    @staticmethod
+    def _register_section() -> dict:
+        return next(
+            section
+            for section in delta_sigma._layout_plan()["empeiria"]
+            if section["component_type"] == "project_register"
+        )
+
+    def test_retiring_the_posts_unpublishes_them_and_stays_idempotent(self):
+        """What a store seeded under the BlogPost shape converges to.
+
+        A published post still reaches Meilisearch and the agent feeds,
+        so it would keep answering searches with a link into a blog
+        surface this tenant no longer serves.
+        """
         from blog.models.post import BlogPost
 
-        delta_sigma.seed_project_posts()
+        slugs = [slug for _, slug, _, _, _ in delta_sigma.PROJECTS]
+        for slug in slugs[:3]:
+            BlogPost.objects.create(slug=slug, is_published=True)
+        keep = BlogPost.objects.create(
+            slug="a-post-somebody-wrote", is_published=True
+        )
 
-        post = BlogPost.objects.get(slug="kaftanzoglio")
-        assert post.safe_translation_getter("title", language_code="en") == (
-            "Kaftanzoglio National Stadium"
-        )
-        assert "On behalf of:" in post.safe_translation_getter(
-            "body", language_code="en"
-        )
-        private = BlogPost.objects.get(slug="ktirio-grafeion-athina")
-        assert (
-            private.safe_translation_getter("subtitle", language_code="en")
-            == "Private project"
-        )
+        first = delta_sigma.retire_project_posts()
+        second = delta_sigma.retire_project_posts()
+
+        assert first == {"posts_retired": 3}
+        assert second == {"posts_already_retired": 3}
+        assert not BlogPost.objects.filter(
+            slug__in=slugs, is_published=True
+        ).exists()
+        keep.refresh_from_db()
+        assert keep.is_published
 
 
 @pytest.mark.django_db
@@ -353,14 +417,12 @@ class TestTheSeedStepsConvergeOnExistingRows:
         seeded before the English copy was written kept Greek-only
         products, posts and pages no matter how often the command ran.
         """
-        from blog.models.post import BlogPost
         from page_config.models import ContentPage
         from product.models import Product
 
         delta_sigma.seed_deset_products()
-        delta_sigma.seed_project_posts()
         delta_sigma.seed_content_pages()
-        for model in (Product, BlogPost, ContentPage):
+        for model in (Product, ContentPage):
             # Through parler's translation model, so the rows really go
             # away rather than being detached from a cached instance.
             model._parler_meta.root_model.objects.filter(
@@ -368,11 +430,9 @@ class TestTheSeedStepsConvergeOnExistingRows:
             ).delete()
 
         products = delta_sigma.seed_deset_products()
-        posts = delta_sigma.seed_project_posts()
         pages = delta_sigma.seed_content_pages()
 
         assert products["products_localized"] == len(delta_sigma.DESET_SYSTEMS)
-        assert posts["posts_localized"] == len(delta_sigma.PROJECTS)
         assert pages["localized"] == len(delta_sigma.CONTENT_PAGES)
         assert Product.objects.get(
             slug="deset-wago-pfc200-g2"

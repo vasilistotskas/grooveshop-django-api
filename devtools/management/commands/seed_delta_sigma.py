@@ -27,7 +27,7 @@ STEPS: tuple[tuple[str, str], ...] = (
     ("theme", "Brand theme on the Tenant row (public schema)"),
     ("settings", "extra_settings the published contact facts cover"),
     ("products", "DeSET category + the three systems"),
-    ("projects", "Sector categories + the 48 reference projects"),
+    ("projects", "Retire the BlogPosts the project register replaced"),
     ("content_pages", "Ειδίκευση / Δραστηριότητες / Συνεργάτες (el + en)"),
     ("layouts", "Home page layout and its sections"),
     ("navigation", "Header / mobile / footer menus"),
@@ -108,9 +108,8 @@ class Command(BaseCommand):
                 "products": partial(
                     delta_sigma.seed_deset_products, overwrite=overwrite
                 ),
-                "projects": partial(
-                    delta_sigma.seed_project_posts, overwrite=overwrite
-                ),
+                # Nothing to overwrite: the step only unpublishes.
+                "projects": delta_sigma.retire_project_posts,
                 "content_pages": partial(
                     delta_sigma.seed_content_pages, overwrite=overwrite
                 ),

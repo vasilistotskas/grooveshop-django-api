@@ -482,3 +482,57 @@ def test_faq_items_shape():
         validate_section_props("faq", {"items": [{"question": "Πού;"}]})
     with pytest.raises(ValidationError):
         validate_section_props("faq", {"multiple": "yes"})
+
+
+def test_project_register_props():
+    """A register: rows plus the taxonomy they are filtered by."""
+    validate_section_props(
+        "project_register",
+        {
+            "meta_label": "Ανάδοχος / Πελάτης",
+            "note": "Συνεχής υποστήριξη σε τρεις εγκαταστάσεις.",
+            "sectors": [
+                {"key": "viologikoi", "label": "Βιολογικοί"},
+                {"key": "energeia", "label": "Ενέργεια/ΑΠΕ"},
+            ],
+            "items": [
+                {
+                    "sector": "energeia",
+                    "title": "Επιτήρηση δεκατριών ανεμογεννητριών",
+                    "note": "Μελέτη, κατασκευή, προγραμματισμός.",
+                    "meta": "ENVICON A.T.E.E.",
+                },
+                {"title": "Έργο χωρίς τομέα"},
+            ],
+        },
+    )
+    with pytest.raises(ValidationError, match="sectors"):
+        validate_section_props("project_register", {"sectors": [{"key": "x"}]})
+    with pytest.raises(ValidationError, match="items"):
+        validate_section_props("project_register", {"items": [{"note": "x"}]})
+    with pytest.raises(ValidationError):
+        validate_section_props(
+            "project_register", {"items": [{"title": "x"}] * 201}
+        )
+
+
+def test_project_register_rejects_a_sector_nothing_declares():
+    """The one cross-prop rule: a row's sector is a KEY into ``sectors``.
+
+    The storefront resolves the pill colour from the sector's POSITION
+    in ``sectors``, so a key that is not there loses its colour with no
+    other symptom — invisible in the admin, and easy to typo by hand.
+    """
+    with pytest.raises(ValidationError, match="not declared in sectors"):
+        validate_section_props(
+            "project_register",
+            {
+                "sectors": [{"key": "energeia", "label": "Ενέργεια"}],
+                "items": [{"sector": "viologikoi", "title": "Έργο"}],
+            },
+        )
+    # A register with no taxonomy at all is a plain list, not an error.
+    validate_section_props(
+        "project_register",
+        {"items": [{"sector": "energeia", "title": "Έργο"}]},
+    )

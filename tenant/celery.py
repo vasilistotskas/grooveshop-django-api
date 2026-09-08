@@ -73,7 +73,12 @@ class TenantTask(Task):
             return super().__call__(*args, **kwargs)
 
 
-def run_for_all_tenants(task_name: str, **kwargs: Any) -> list[dict[str, str]]:
+def run_for_all_tenants(
+    task_name: str,
+    *,
+    include_suspended: bool = False,
+    **kwargs: Any,
+) -> list[dict[str, str]]:
     """Fan-out a task to all active tenant schemas.
 
     Returns JSON-serializable dispatch records, NOT ``AsyncResult``
@@ -93,9 +98,22 @@ def run_for_all_tenants(task_name: str, **kwargs: Any) -> list[dict[str, str]]:
     # (poll carriers, reconcile payouts, sync lockers/stations) must not
     # fire: it would burn the carrier API budget and mutate a frozen
     # tenant's data. Mirrors the webhook resolvers' suspended_at filter.
-    for tenant in Tenant.objects.filter(
-        is_active=True, suspended_at__isnull=True
-    ).exclude(schema_name="public"):
+    #
+    # ``include_suspended`` is for RETENTION sweeps, and only those.
+    # The reasoning above is about work a frozen store should not pay
+    # for; it does not transfer to deleting data the platform promised
+    # to delete. A suspended tenant whose sweeps never ran would keep
+    # abandoned uploads and expired files indefinitely, which is a
+    # data-protection failure rather than a saving.
+    #
+    # ``is_active`` stays required either way: an inactive tenant may
+    # be mid-offboarding and its schema may already be gone.
+    tenants = Tenant.objects.filter(is_active=True).exclude(
+        schema_name="public"
+    )
+    if not include_suspended:
+        tenants = tenants.filter(suspended_at__isnull=True)
+    for tenant in tenants:
         from core import celery_app
 
         result = celery_app.send_task(

@@ -40,6 +40,8 @@ class TestContactWriteSerializer(TestCase):
             "company",
             "phone",
             "subject",
+            # Write-only: uploads are claimed by id, never echoed.
+            "attachment_ids",
             "created_at",
             "updated_at",
             "uuid",
@@ -49,6 +51,8 @@ class TestContactWriteSerializer(TestCase):
         read_only_fields = {"created_at", "updated_at", "uuid"}
         for field_name in read_only_fields:
             assert serializer.fields[field_name].read_only
+
+        assert serializer.fields["attachment_ids"].write_only
 
     def test_the_optional_context_fields_are_optional(self):
         """The platform's own form asks for none of the three."""

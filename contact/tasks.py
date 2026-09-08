@@ -10,6 +10,7 @@ import logging
 
 from django.core.mail import send_mail
 
+from contact.scanners import INFECTED, AttachmentScannerError
 from core import celery_app
 from core.tasks import MonitoredTask
 from tenant.credentials import tenant_contact_email, tenant_from_email
@@ -78,6 +79,20 @@ def send_contact_notification_email_task(contact_id: int) -> bool:
         f"Email: {contact.email}\n"
         f"Message: {contact.message}"
     )
+    # ``contact`` here is the row, not the package: the FK's
+    # related_name. Files are never sent as mail attachments - the
+    # bytes are anonymous uploads and may be unscanned, so they stay
+    # in the private tree and staff fetch them from the admin. The
+    # email only has to say they exist, or nobody looks.
+    files = list(contact.attachments.all())
+    if files:
+        listed = "\n".join(
+            f"  - {f.original_name} ({f.size} B, {f.get_scan_status_display()})"
+            for f in files
+        )
+        message += (
+            f"\n\nAttachments ({len(files)}) - download in the admin:\n{listed}"
+        )
 
     send_mail(
         subject=subject,
@@ -173,3 +188,155 @@ def send_feedback_notification_email_task(feedback_id: int) -> bool:
         extra={"feedback_id": feedback_id},
     )
     return True
+
+
+@celery_app.task(
+    base=MonitoredTask,
+    bind=True,
+    max_retries=5,
+    autoretry_for=(AttachmentScannerError,),
+    retry_backoff=True,
+    retry_jitter=True,
+)
+def scan_contact_attachment(self, attachment_id: int) -> str:
+    """Run the configured scanner over one uploaded attachment.
+
+    Off the request path on purpose: an engine takes seconds and holds
+    memory, and a visitor waiting on a progress bar must not be
+    waiting on a signature database.
+
+    Retries only ``AttachmentScannerError`` — a transport failure is
+    worth trying again, a verdict is not.
+
+    The last attempt records ``ERROR`` and returns instead of
+    re-raising, and that early return is the whole point: with
+    ``exc`` supplied, ``Task.retry`` re-raises the ORIGINAL exception
+    once the limit is passed rather than raising
+    ``MaxRetriesExceededError``, so without this the run would end as
+    a plain task failure and the row would sit on ``PENDING`` forever.
+    ``ERROR`` is not downloadable either — a scan that never completed
+    is not a clean one — but it SAYS so, in the admin, next to the
+    file.
+    """
+    from contact.models import ContactAttachment
+    from contact.scanners import ERROR, get_scanner
+
+    attachment = ContactAttachment.objects.filter(pk=attachment_id).first()
+    if attachment is None or not attachment.file:
+        # Reaped or deleted between upload and scan — not an error.
+        return "missing"
+
+    scanner = get_scanner()
+    try:
+        with attachment.file.open("rb") as stream:
+            verdict, detail = scanner.scan(stream, size=attachment.size)
+    except AttachmentScannerError as exc:
+        logger.warning(
+            "Attachment %s scan failed on %s (attempt %s of %s): %s",
+            attachment.uuid,
+            scanner.code,
+            self.request.retries + 1,
+            self.max_retries + 1,
+            exc,
+        )
+        if self.request.retries >= self.max_retries:
+            _record_scan(attachment, ERROR, str(exc)[:255])
+            return ERROR
+        # Back to ``autoretry_for``, which owns the backoff.
+        raise
+
+    if verdict == INFECTED:
+        # Keep the ROW as the audit record; drop the bytes. Nobody
+        # needs a copy of malware in the private tree to know an
+        # infected file was sent, and staff must not be able to
+        # retrieve it by any later mistake.
+        attachment.file.delete(save=False)
+    _record_scan(attachment, verdict, detail[:255])
+    return verdict
+
+
+def _record_scan(attachment, verdict: str, detail: str) -> None:
+    from django.utils import timezone
+
+    attachment.scan_status = verdict
+    attachment.scan_detail = detail
+    attachment.scanned_at = timezone.now()
+    attachment.save(
+        update_fields=["scan_status", "scan_detail", "scanned_at", "file"]
+    )
+
+
+@celery_app.task(
+    base=MonitoredTask,
+    max_retries=3,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+)
+def reap_unclaimed_attachments() -> int:
+    """Delete uploads that were never attached to an enquiry.
+
+    The two-step flow means a visitor can upload three files and close
+    the tab. Those rows have ``contact=None`` and a
+    ``claim_deadline``; past it they are abandoned bytes, and the
+    private tree must not accumulate them.
+
+    The bytes go with the row through
+    ``contact.signals.delete_attachment_file``, so this only has to
+    decide WHICH rows are abandoned.
+    """
+    from django.utils import timezone
+
+    from contact.models import ContactAttachment
+
+    stale = ContactAttachment.objects.filter(
+        contact__isnull=True, claim_deadline__lt=timezone.now()
+    )
+    reaped = 0
+    for attachment in stale.iterator():
+        attachment.delete()
+        reaped += 1
+    if reaped:
+        logger.info("Reaped %s unclaimed contact attachments", reaped)
+    return reaped
+
+
+@celery_app.task(
+    base=MonitoredTask,
+    max_retries=3,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+)
+def purge_expired_attachment_files() -> int:
+    """Drop the BYTES of attachments past the merchant's window.
+
+    The row survives with its name, size, checksum and scan verdict —
+    an enquiry stays legible, and an operator can still see that three
+    drawings came with it — while the storage it costs goes to zero.
+    That is storage limitation (GDPR art. 5(1)(e)) without destroying
+    the business record.
+
+    The window is a merchant setting, so a store that must keep tender
+    documents for a year says so without a deploy.
+    """
+    from datetime import timedelta
+
+    from django.utils import timezone
+    from extra_settings.models import Setting
+
+    from contact.models import ContactAttachment
+
+    days = int(Setting.get("CONTACT_ATTACHMENTS_RETENTION_DAYS", default=90))
+    if days <= 0:
+        return 0
+    cutoff = timezone.now() - timedelta(days=days)
+    expired = ContactAttachment.objects.filter(
+        contact__isnull=False, created_at__lt=cutoff
+    ).exclude(file="")
+    purged = 0
+    for attachment in expired.iterator():
+        attachment.file.delete(save=False)
+        attachment.save(update_fields=["file"])
+        purged += 1
+    if purged:
+        logger.info("Purged bytes of %s expired contact attachments", purged)
+    return purged

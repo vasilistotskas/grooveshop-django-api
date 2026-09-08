@@ -172,6 +172,19 @@ class IsFeedbackEnabled(IsSettingEnabled):
     setting_key = "FEEDBACK_ENABLED"
 
 
+class IsContactAttachmentsEnabled(IsSettingEnabled):
+    """404 when the store does not accept contact-form attachments.
+
+    Fails CLOSED (``default=False``): this is the platform's only
+    anonymous upload endpoint, so a store that has never thought about
+    it must not be hosting one — including on the public/control plane,
+    where the fail-open gates deliberately let everything through.
+    """
+
+    setting_key = "CONTACT_ATTACHMENTS_ENABLED"
+    default = False
+
+
 class IsProductAlertsEnabled(IsSettingEnabled):
     """404 when the merchant has turned product alerts off."""
 

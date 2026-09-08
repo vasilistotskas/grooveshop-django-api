@@ -153,6 +153,25 @@ def fanout_update_click_scores():
     return run_for_all_tenants("search.tasks.update_click_scores")
 
 
+# Both reach SUSPENDED tenants: these are retention sweeps, and an
+# upload past its claim window or a file past the store's retention
+# window is data the platform promised to delete. Freezing a store's
+# billing does not freeze that promise.
+@celery_app.task(base=TenantTask)
+def fanout_reap_unclaimed_attachments():
+    return run_for_all_tenants(
+        "contact.tasks.reap_unclaimed_attachments", include_suspended=True
+    )
+
+
+@celery_app.task(base=TenantTask)
+def fanout_purge_expired_attachment_files():
+    return run_for_all_tenants(
+        "contact.tasks.purge_expired_attachment_files",
+        include_suspended=True,
+    )
+
+
 @celery_app.task(base=TenantTask)
 def fanout_cleanup_expired_data_exports():
     return run_for_all_tenants("user.tasks.cleanup_expired_data_exports")

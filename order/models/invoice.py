@@ -21,20 +21,22 @@ provides:
 
 from __future__ import annotations
 
-import os
 from decimal import Decimal
 from typing import Any
 
 from django.conf import settings
 from django.contrib.postgres.indexes import BTreeIndex
-from django.core.files.storage import FileSystemStorage
-from django.db import connection, models, transaction
+from django.db import models, transaction
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from djmoney.models.fields import MoneyField
 
 from core.models import TimeStampMixinModel, UUIDModel
+from tenant.storage import (
+    TenantPrivateFileSystemStorage,
+    private_media_root,
+)
 
 INVOICE_NUMBER_FORMAT = "INV-{year}-{number:06d}"
 
@@ -62,44 +64,20 @@ class MyDataStatus(models.TextChoices):
     CANCELED = "CANCELED", _("Canceled in myDATA")
 
 
-def _private_media_root() -> str:
-    base = getattr(settings, "PRIVATE_MEDIA_ROOT", None)
-    if not base:
-        base = (
-            settings.MEDIA_ROOT + "_private"
-            if getattr(settings, "MEDIA_ROOT", None)
-            else "private_media"
-        )
-    return base
+# The private tree and its per-tenant storage are shared with every
+# other private FileField (contact attachments today) — see
+# ``tenant.storage``. Both names are kept here because this module's
+# own tests and three migrations reference them.
+_private_media_root = private_media_root
 
 
-class TenantPrivateInvoiceStorage(FileSystemStorage):
-    """Per-tenant private storage whose location resolves at ACCESS time.
+class TenantPrivateInvoiceStorage(TenantPrivateFileSystemStorage):
+    """The shared per-tenant private storage, under its old name.
 
-    ``base_location`` / ``location`` are PROPERTIES (mirroring
-    ``tenant.storage.TenantFileSystemStorage``), so every read/write
-    re-reads ``connection.schema_name`` and lands the file under
-    ``{PRIVATE_MEDIA_ROOT}/{schema}/``. A storage that captured the
-    schema eagerly would freeze to whatever schema was active when the
-    ``FileField`` first evaluated its storage — which is model-class
-    definition time, when no tenant is bound (i.e. ``public``) — sending
-    every tenant's invoices into one directory. Never used directly:
-    obtained through ``_private_invoice_storage`` so the field's
-    deconstructed storage reference (and therefore the migration state)
-    stays unchanged.
+    Kept as a distinct class only so the migrations that named it, and
+    the tests that import it, keep resolving. Everything it does is in
+    ``tenant.storage.TenantPrivateFileSystemStorage``.
     """
-
-    def _tenant_location(self) -> str:
-        schema = getattr(connection, "schema_name", "public") or "public"
-        return os.path.join(_private_media_root(), schema)
-
-    @property
-    def base_location(self) -> str:
-        return self._tenant_location()
-
-    @property
-    def location(self) -> str:
-        return self._tenant_location()
 
 
 def _private_invoice_storage() -> Any:

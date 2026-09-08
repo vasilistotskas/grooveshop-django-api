@@ -1,9 +1,15 @@
 from datetime import timedelta
 
 from django.contrib import admin
+from django.core.exceptions import PermissionDenied
 from django.db.models.functions import Length
+from django.http import FileResponse, Http404
+from django.template.defaultfilters import filesizeformat
+from django.urls import path, reverse
 from django.utils import timezone
+from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
+from unfold.admin import TabularInline
 from unfold.contrib.filters.admin import (
     DropdownFilter,
     FieldTextFilter,
@@ -13,7 +19,7 @@ from unfold.decorators import display
 
 from admin.displays import format_dt, header_two_line, relative_time
 from admin.export import ExportModelAdmin
-from contact.models import Contact, Feedback
+from contact.models import Contact, ContactAttachment, Feedback
 
 FEEDBACK_RATING_VARIANT: dict[str, str] = {
     "5": "success",
@@ -28,6 +34,17 @@ CONTACT_PRIORITY_VARIANT: dict[str, str] = {
     "high": "warning",
     "medium": "info",
     "low": "success",
+}
+
+#: Unfold label colours for a scan verdict. SKIPPED is deliberately
+#: neutral rather than green: no engine looked at the file, and the
+#: admin must not imply one did.
+ATTACHMENT_SCAN_VARIANT: dict[str, str] = {
+    "CLEAN": "success",
+    "SKIPPED": "info",
+    "PENDING": "warning",
+    "ERROR": "warning",
+    "INFECTED": "danger",
 }
 
 
@@ -82,6 +99,58 @@ class RecentContactFilter(DropdownFilter):
         elif self.value() == "quarter":
             return queryset.filter(created_at__gte=now - timedelta(days=90))
         return queryset
+
+
+class ContactAttachmentInline(TabularInline):
+    """The files that came with an enquiry, and the way to read them.
+
+    Read-only apart from delete: nothing about an upload is editable -
+    the name, size, checksum and verdict are all statements of what
+    arrived - and staff CAN remove one, which drops the bytes through
+    ``contact.signals.delete_attachment_file``.
+    """
+
+    model = ContactAttachment
+    extra = 0
+    max_num = 0
+    can_delete = True
+    tab = True
+    fields = (
+        "download",
+        "content_type",
+        "size_display",
+        "scan_state",
+        "created_at",
+    )
+    readonly_fields = fields
+
+    def has_add_permission(self, request, obj=None):
+        # Uploads arrive through the public endpoint, which pairs each
+        # file with a checksum and a scan verdict. A file hand-added
+        # here would have neither.
+        return False
+
+    @admin.display(description=_("File"))
+    def download(self, obj):
+        if not obj or not obj.pk:
+            return "—"
+        if not obj.file:
+            return _("%(name)s (bytes deleted)") % {"name": obj.original_name}
+        if not obj.is_downloadable():
+            return _("%(name)s (withheld)") % {"name": obj.original_name}
+        return format_html(
+            '<a href="{url}" rel="noopener">{label}</a>',
+            url=reverse("admin:contact_attachment_download", args=[obj.uuid]),
+            label=obj.original_name,
+        )
+
+    @admin.display(description=_("Size"))
+    def size_display(self, obj):
+        return filesizeformat(obj.size) if obj else "—"
+
+    @display(description=_("Scan"), label=ATTACHMENT_SCAN_VARIANT)
+    def scan_state(self, obj):
+        return obj.scan_status, obj.get_scan_status_display()
 
 
 @admin.register(Contact)
@@ -143,6 +212,63 @@ class ContactAdmin(ExportModelAdmin):
             },
         ),
     )
+
+    inlines = [ContactAttachmentInline]
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom = [
+            path(
+                "attachment/<uuid:attachment_uuid>/download/",
+                self.admin_site.admin_view(self.attachment_download_view),
+                name="contact_attachment_download",
+            ),
+        ]
+        return custom + urls
+
+    def attachment_download_view(self, request, attachment_uuid):
+        """The ONLY reader of an attachment's bytes.
+
+        There is no public URL, signed or otherwise: the file lives in
+        a private per-tenant tree no web server serves
+        (``contact.storage``), and this view is what an authorised
+        reader goes through instead. Three things it insists on:
+
+        * ``admin_view`` plus the model's ``view`` permission - the
+          admin login is membership-gated per tenant
+          (``admin.admin.MyAdminSite.has_permission``), and reading an
+          anonymous upload is staff activity like any other, so it is
+          not enough to merely be logged in somewhere.
+        * ``is_downloadable()`` - PENDING and ERROR are withheld
+          because a verdict that never arrived is not a clean one, and
+          INFECTED never has bytes to serve.
+        * ``application/octet-stream`` with ``as_attachment`` and
+          ``nosniff`` - the stored type is recorded on the row for the
+          operator, but handing it back would invite a browser to
+          render an anonymous stranger's file in a staff session.
+        """
+        opts = ContactAttachment._meta
+        if not request.user.has_perm(
+            f"{opts.app_label}.view_{opts.model_name}"
+        ):
+            raise PermissionDenied
+        attachment = ContactAttachment.objects.filter(
+            uuid=attachment_uuid
+        ).first()
+        if attachment is None or not attachment.file:
+            raise Http404(_("Attachment not found."))
+        if not attachment.is_downloadable():
+            raise Http404(
+                _("This attachment is withheld pending its scan result.")
+            )
+        response = FileResponse(
+            attachment.file.open("rb"),
+            content_type="application/octet-stream",
+            as_attachment=True,
+            filename=attachment.original_name,
+        )
+        response["X-Content-Type-Options"] = "nosniff"
+        return response
 
     def get_ordering(self, request):
         return ["-created_at", "name"]

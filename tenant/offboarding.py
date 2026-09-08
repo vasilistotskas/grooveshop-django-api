@@ -44,6 +44,8 @@ from datetime import date
 from django.conf import settings
 from django.utils import timezone
 
+from tenant.storage import private_media_root
+
 logger = logging.getLogger(__name__)
 
 #: Recorded on ``TenantArchive.retention_basis`` so the reason a store's
@@ -53,20 +55,6 @@ INVOICE_RETENTION_BASIS = (
     "records retained for the statutory assessment period. GDPR art. "
     "17(3)(b) / 28(3)(g): erasure yields to a legal obligation."
 )
-
-
-def private_media_root() -> str:
-    """Root of the private tree (invoices, GDPR export bundles).
-
-    Mirrors ``order.models.invoice._private_media_root`` rather than
-    importing it: this module must keep working while the order app's
-    tables are being dropped out from under it.
-    """
-    base = getattr(settings, "PRIVATE_MEDIA_ROOT", None)
-    if base:
-        return base
-    media_root = getattr(settings, "MEDIA_ROOT", None)
-    return f"{media_root}_private" if media_root else "private_media"
 
 
 def tenant_media_dir(schema_name: str) -> str:

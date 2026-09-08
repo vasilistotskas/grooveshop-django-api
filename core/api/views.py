@@ -660,6 +660,15 @@ PUBLIC_SETTING_KEYS = frozenset(
         "NEWSLETTER_ENABLED",
         "FEEDBACK_ENABLED",
         "PRODUCT_ALERTS_ENABLED",
+        # The four the storefront needs to render the contact form's
+        # upload control and pre-check a file before spending a request
+        # on it. The server re-reads all four - a client is not a gate
+        # - and the retention window is deliberately NOT here: it is
+        # operator/legal policy, not something a visitor's form needs.
+        "CONTACT_ATTACHMENTS_ENABLED",
+        "CONTACT_ATTACHMENTS_MAX_COUNT",
+        "CONTACT_ATTACHMENTS_MAX_MB",
+        "CONTACT_ATTACHMENTS_TYPES",
         # Public contact email for storefront footer/contact page.
         # Falls back to Tenant.contact_email or settings.INFO_EMAIL.
         "CONTACT_EMAIL",

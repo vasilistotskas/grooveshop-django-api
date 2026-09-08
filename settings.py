@@ -453,6 +453,11 @@ REST_FRAMEWORK = {
         # apply on top.
         "contact": None if DEBUG else "5/minute",
         "feedback": None if DEBUG else "5/minute",
+        # One file per request, and each can be tens of megabytes on
+        # the pod's disk until it is claimed or reaped - so this is a
+        # bandwidth budget, not just an anti-spam one. Generous enough
+        # for a three-file enquiry plus retries on a bad connection.
+        "contact_attachment": None if DEBUG else "20/hour",
         "payment": None if DEBUG else "10/minute",
         "payment_anon": None if DEBUG else "5/minute",
         "cart_mutation": None if DEBUG else "60/minute",
@@ -933,6 +938,22 @@ def get_celery_beat_schedule():
             # kwargs (days=90) live in the wrapper body, not here.
             "task": "tenant.tasks.fanout_anonymize_old_search_queries",
             "schedule": SCHEDULE_PRESETS["weekly_sunday_3am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_hour"],
+        },
+        "reap-unclaimed-contact-attachments": {
+            # Fanout: ContactAttachment is per-tenant; beat fires in
+            # public. Uploads whose enquiry was never submitted - a
+            # closed tab - are bytes nobody asked us to keep, so this
+            # runs hourly rather than nightly.
+            "task": "tenant.tasks.fanout_reap_unclaimed_attachments",
+            "schedule": SCHEDULE_PRESETS["every_hour"],
+        },
+        "purge-expired-contact-attachment-files": {
+            # Fanout: drops the BYTES of claimed attachments past the
+            # store's retention window, keeping the rows.
+            "task": "tenant.tasks.fanout_purge_expired_attachment_files",
+            "schedule": SCHEDULE_PRESETS["daily_4am"]
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
         },
@@ -1731,6 +1752,65 @@ EXTRA_SETTINGS_DEFAULTS = [
         "value": True,
         "description": (
             "The storefront feedback page and its submission endpoint."
+        ),
+    },
+    {
+        "name": "CONTACT_ATTACHMENTS_ENABLED",
+        "type": "bool",
+        "value": False,
+        "description": (
+            "Let visitors attach files to the contact form. OFF by "
+            "default and 404s the upload endpoint when off: this is "
+            "the platform's only ANONYMOUS upload, so a store that "
+            "has never asked for one does not host one. Uploads land "
+            "in a PRIVATE per-tenant tree with no URL - the only "
+            "reader is the staff download in the admin."
+        ),
+    },
+    {
+        "name": "CONTACT_ATTACHMENTS_MAX_COUNT",
+        "type": "int",
+        "value": 3,
+        "description": (
+            "How many files one enquiry may carry. Enforced on the "
+            "submit, not just in the form."
+        ),
+    },
+    {
+        "name": "CONTACT_ATTACHMENTS_MAX_MB",
+        "type": "int",
+        "value": 10,
+        "description": (
+            "Per-file size limit in megabytes. Capped in code at 25 "
+            "(AttachmentPolicy.MAX_BYTES_CEILING) - the ingress, the "
+            "SSR proxy and the pod's ephemeral disk are the operator's "
+            "resources, so a store cannot raise this without one."
+        ),
+    },
+    {
+        "name": "CONTACT_ATTACHMENTS_TYPES",
+        "type": "string",
+        "value": "application/pdf",
+        "description": (
+            "Comma-separated MIME allow-list, matched against the type "
+            "the file's MAGIC BYTES say it is - never its extension or "
+            "the browser's declared Content-Type. Common values: "
+            "application/pdf, application/zip, image/vnd.dwg (AutoCAD "
+            "DWG), image/png, image/jpeg. A format with no magic "
+            "number cannot be confirmed and is always refused, so "
+            "plain text and ASCII DXF must arrive inside a ZIP."
+        ),
+    },
+    {
+        "name": "CONTACT_ATTACHMENTS_RETENTION_DAYS",
+        "type": "int",
+        "value": 90,
+        "description": (
+            "Days after which an attachment's BYTES are deleted while "
+            "the enquiry and the file's name, size and checksum stay "
+            "(GDPR art. 5(1)(e) storage limitation without destroying "
+            "the business record). 0 keeps files indefinitely. Raise "
+            "it for a store that must retain tender documents."
         ),
     },
     {
@@ -3868,6 +3948,48 @@ TINYMCE_DEFAULT_CONFIG = {
 TINYMCE_COMPRESSOR = False
 
 FILE_UPLOAD_MAX_MEMORY_SIZE = 2621440
+
+# --------------------------------------------------------------------------
+# Contact-attachment malware scanning (contact/scanners.py)
+# --------------------------------------------------------------------------
+# Which engine the CLUSTER runs, not what a store wants: a tenant cannot
+# conjure a ClamAV deployment by ticking a box, so this is env, not an
+# extra-setting. "null" records SKIPPED and relies on containment (a
+# private tree with no URL, a staff-only streamed download, a magic-byte
+# allow-list, and nothing on the server parsing the bytes) - which is the
+# guarantee either way. "clamav" adds detection on top and needs a clamd
+# reachable at CLAMAV_HOST; budget ~1.6 GB resident for its signatures
+# and ~2.4 GB while it reloads them before enabling it.
+# Per-tenant ceilings on attachment storage — see
+# ``contact.attachments.storage_pressure``. The per-caller throttle is
+# a REQUEST budget and bounds one visitor; these bound all of them at
+# once, in BYTES, because the private tree is a shared volume that
+# also holds invoice PDFs and filling it would take invoicing down as
+# collateral.
+#
+# UNCLAIMED bounds abandoned uploads and is the alarm for a reaper
+# that stopped: 512 MB fits a tenant's in-flight enquiries (20 x 25
+# MB) comfortably.
+#
+# INTAKE bounds a FLOOD, over a rolling 24 hours and regardless of
+# whether the uploads were claimed — claiming one exempts it from the
+# reaper, so without this a caller who submits one enquiry per batch
+# keeps every byte for the store's whole retention window. 1 GB/day is
+# forty 25 MB tenders, which is a great deal more tenders than a
+# quote-on-specification business receives in a day.
+#
+# Either at 0 disables that ceiling.
+CONTACT_ATTACHMENTS_UNCLAIMED_BUDGET_MB = int(
+    getenv("CONTACT_ATTACHMENTS_UNCLAIMED_BUDGET_MB", "512")
+)
+CONTACT_ATTACHMENTS_INTAKE_BUDGET_MB = int(
+    getenv("CONTACT_ATTACHMENTS_INTAKE_BUDGET_MB", "1024")
+)
+
+CONTACT_ATTACHMENT_SCANNER = getenv("CONTACT_ATTACHMENT_SCANNER", "null")
+CLAMAV_HOST = getenv("CLAMAV_HOST", "clamav")
+CLAMAV_PORT = int(getenv("CLAMAV_PORT", "3310"))
+CLAMAV_TIMEOUT = float(getenv("CLAMAV_TIMEOUT", "30"))
 
 BLOG_COMMENT_AUTO_APPROVE = (
     getenv("BLOG_COMMENT_AUTO_APPROVE", "True") == "True"

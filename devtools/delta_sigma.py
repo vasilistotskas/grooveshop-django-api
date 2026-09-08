@@ -315,6 +315,29 @@ SETTINGS = {
     ],
     "STORE_GEO_LAT": STORE_GEO_LAT,
     "STORE_GEO_LNG": STORE_GEO_LNG,
+    # The contact form accepts attachments. The redesign's contact
+    # artboard draws a dropzone for tender documents, and this is the
+    # store it is drawn for: every enquiry Delta Sigma answers is a
+    # quote against a specification, and the specification arrives as
+    # a PDF tender or a set of drawings.
+    #
+    # Three files at 25 MB is the platform ceiling
+    # (`AttachmentPolicy.MAX_BYTES_CEILING`) — a tender volume with
+    # scanned drawings routinely passes 10.
+    "CONTACT_ATTACHMENTS_ENABLED": "True",
+    "CONTACT_ATTACHMENTS_MAX_COUNT": "3",
+    "CONTACT_ATTACHMENTS_MAX_MB": "25",
+    # PDF for the tender itself, DWG for drawings, ZIP for a set of
+    # them. Every one of the three has a magic number the server can
+    # confirm; an ASCII DXF does not, which is why it travels in the
+    # ZIP (and why the setting's own help text says so).
+    "CONTACT_ATTACHMENTS_TYPES": (
+        "application/pdf,image/vnd.dwg,application/zip"
+    ),
+    # A tender's documents outlive the quote: a year keeps them
+    # available while the award is decided, and the sweep drops the
+    # bytes afterwards while the enquiry itself stays.
+    "CONTACT_ATTACHMENTS_RETENTION_DAYS": "365",
     # Mon-Fri 09:00-17:00, as the operator confirmed — the hours are
     # published nowhere (site, odot.gr, ΓΕΜΗ, LinkedIn, directories),
     # so they come from them rather than from a source.

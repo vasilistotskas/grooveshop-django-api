@@ -37,6 +37,7 @@ dependencies = [
   "djangorestframework-camel-case==1.4.2",
   "drf-spectacular==0.30.0",
   "fido2==2.2.1",
+  "filetype==1.2.0",
   "flower==2.1.0",
   "gunicorn==26.2.0",
   "measurement==3.2.2",

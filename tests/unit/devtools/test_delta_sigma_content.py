@@ -819,3 +819,30 @@ class TestTheSeedStepsConvergeOnExistingRows:
             str(len(delta_sigma.OFFICES)),
         ]
         assert [entry["value"] for entry in delta_sigma.HERO_STATS_EN] == values
+
+
+@pytest.mark.django_db
+def test_overwrite_renames_a_layout_that_predates_its_own_title():
+    """Only ``defaults`` set the title, so old pages read as slugs.
+
+    A layout created before ``LAYOUT_TITLES`` existed shows up in the
+    page builder as "Eidikefsi" — the slug, title-cased. Renaming a
+    layout is the operator's call, so it converges under the same flag
+    as the props.
+    """
+    from page_config.models import PageLayout
+
+    delta_sigma.seed_layouts()
+    PageLayout.objects.filter(page_type="eidikefsi").update(title="Eidikefsi")
+
+    plain = delta_sigma.seed_layouts()
+    assert "layouts_renamed" not in plain
+    assert PageLayout.objects.get(page_type="eidikefsi").title == "Eidikefsi"
+
+    report = delta_sigma.seed_layouts(overwrite=True)
+
+    assert report["layouts_renamed"] >= 1
+    assert (
+        PageLayout.objects.get(page_type="eidikefsi").title
+        == (delta_sigma.LAYOUT_TITLES["eidikefsi"])
+    )

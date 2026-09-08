@@ -3669,6 +3669,17 @@ def seed_layouts(*, overwrite: bool = False) -> dict[str, int]:
             layout.save(update_fields=["is_published"])
             _bump(report, "layouts_published")
 
+        # The TITLE is the admin's label for the layout, and only the
+        # ``defaults`` above set it — so every page created before
+        # ``LAYOUT_TITLES`` existed still reads as its slug,
+        # title-cased ("Eidikefsi"). Renaming it is the operator's
+        # call, so it converges under ``--overwrite`` like the props.
+        planned_title = LAYOUT_TITLES.get(page_type)
+        if overwrite and planned_title and layout.title != planned_title:
+            layout.title = planned_title
+            layout.save(update_fields=["title"])
+            _bump(report, "layouts_renamed")
+
         present = set(layout.sections.values_list("component_type", flat=True))
         for section in sorted(sections, key=lambda item: item["sort_order"]):
             component_type = section["component_type"]

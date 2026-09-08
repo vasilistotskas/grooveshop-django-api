@@ -1661,14 +1661,16 @@ PAGE_HEROES = {
         "el": {
             "eyebrow": "Δραστηριότητες",
             "heading": "Οκτώ φάσεις, ένας υπεύθυνος",
-            "body": "Αναλαμβάνουμε ολόκληρη την αλυσίδα. Κάθε φάση "
-            "παραδίδεται τεκμηριωμένη.",
+            "body": "Δεν παραδίδουμε ένα κομμάτι και φεύγουμε. Κάθε "
+            "φάση έχει συγκεκριμένο παραδοτέο, και η τελευταία διαρκεί "
+            "όσο και ο κύκλος ζωής της εγκατάστασης.",
         },
         "en": {
             "eyebrow": "Activities",
             "heading": "Eight phases, one party responsible",
-            "body": "We take on the whole chain. Every phase is handed "
-            "over documented.",
+            "body": "We do not hand over one piece and leave. Every "
+            "phase has a defined deliverable, and the last one lasts "
+            "as long as the installation's life cycle.",
         },
     },
     "empeiria": {
@@ -1730,6 +1732,244 @@ def _page_hero(page: str, *, locale: str = "el") -> dict:
     if "secondary_cta_text" in hero:
         hero["secondary_cta_link"] = PAGE_DESET
     return hero
+
+
+# --- What each field and each phase concretely covers ------------------
+#
+# The boards draw both inner pages as a SELECTOR: pick a field (or a
+# phase) from the rail and read what it covers. Each panel needs a list
+# where ``SPECIALIZATIONS``/``ACTIVITIES`` carry one line, so the lists
+# below are that line DECOMPOSED — the same facts, itemised. Nothing
+# here is a new claim: read each against its ``text`` above.
+#
+# The boards also print a paragraph of their own in each panel, longer
+# than the sourced line and saying more than it. That copy has no
+# source, so the panel prints the list instead of inventing a lead for
+# it.
+SPECIALIZATION_ITEMS = {
+    "Συστήματα αυτοματισμού": [
+        "Programmable Logic Controllers (PLC)",
+        "Distributed Control Systems (DCS)",
+        "Supervisory Control And Data Acquisition (SCADA)",
+        "Μελέτη και προμήθεια",
+        "Προγραμματισμός και θέση σε λειτουργία",
+    ],
+    "Συστήματα μέτρησης & ελέγχου": [
+        "Προμήθεια και εγκατάσταση",
+        "Ρύθμιση και βαθμονόμηση",
+        "Εκπαίδευση προσωπικού",
+        "Service",
+        "Εμπειρία σε εκρηκτικό περιβάλλον",
+    ],
+    "Διαχείριση κτιριακών εγκαταστάσεων": [
+        "BMS",
+        "Οπτικοποίηση SCADA",
+        "Αυτοματισμοί πάρκινγκ",
+        "KNX",
+        "CCTV",
+        "Access control",
+    ],
+    "Ηλεκτρομηχανολογικές εγκαταστάσεις": [
+        "Καλωδιώσεις",
+        "Ομαλοί εκκινητές",
+        "Ρυθμιστές στροφών",
+        "Πίνακες κίνησης",
+        "Από τη μελέτη ως τη συντήρηση",
+    ],
+    "Ενεργειακά έργα": [
+        "Συλλογή δεδομένων",
+        "Ανάλυση μετρήσεων",
+        "Επεμβάσεις εξοικονόμησης ενέργειας",
+    ],
+    "Τηλεπικοινωνίες": [
+        "Βιομηχανικά δίκτυα",
+        "Εναέριες συνδέσεις Wi-Fi / UHF / LoRaWAN / 5G",
+        "Τηλεμετρία",
+    ],
+    "Συστήματα διαχείρισης κυκλοφορίας": [
+        "Κέντρα ελέγχου",
+        "VMS",
+        "VSLS",
+        "LCS",
+        "Μετεωρολογικοί σταθμοί",
+        "Ανιχνευτές οχημάτων",
+    ],
+}
+
+SPECIALIZATION_ITEMS_EN = {
+    "Automation systems": [
+        "Programmable Logic Controllers (PLC)",
+        "Distributed Control Systems (DCS)",
+        "Supervisory Control And Data Acquisition (SCADA)",
+        "Study and supply",
+        "Programming and commissioning",
+    ],
+    "Measurement & control systems": [
+        "Supply and installation",
+        "Calibration",
+        "Staff training",
+        "Service",
+        "Experience in explosive atmospheres",
+    ],
+    "Building facilities management": [
+        "BMS",
+        "SCADA visualisation",
+        "Car-park automation",
+        "KNX",
+        "CCTV",
+        "Access control",
+    ],
+    "Electromechanical installations": [
+        "Cabling",
+        "Soft starters",
+        "Variable-speed drives",
+        "Motor control panels",
+        "From the study to the maintenance",
+    ],
+    "Energy projects": [
+        "Data acquisition",
+        "Measurement analysis",
+        "Energy efficiency interventions",
+    ],
+    "Telecommunications": [
+        "Industrial networks",
+        "Wireless Wi-Fi / UHF / LoRaWAN / 5G links",
+        "Telemetry",
+    ],
+    "Traffic management systems": [
+        "Control centres",
+        "VMS",
+        "VSLS",
+        "LCS",
+        "Weather stations",
+        "Vehicle detectors",
+    ],
+}
+
+# What each phase HANDS OVER — the board labels this column ΠΑΡΑΔΟΤΕΑ,
+# which is the promise the page is making: every phase has one.
+PHASE_DELIVERABLES = {
+    "01": [
+        "Κατασκευαστικά σχέδια",
+        "Αναλυτικοί κατάλογοι υλικών",
+        "Διαγράμματα ροής",
+        "Κοστολογήσεις",
+        "Χρονοδιαγράμματα",
+    ],
+    "02": [
+        "Ραδιοσυνδέσεις",
+        "IoT",
+        "Αυτοματισμός διεργασιών",
+        "BMS",
+        "Υποστήριξη κατά την πώληση",
+        "Παραμετροποίηση",
+    ],
+    "03": [
+        "Εκπαιδευμένα συνεργεία",
+        "Τεύχος δοκιμών",
+        "Σχέδια «ως κατασκευάσθη»",
+    ],
+    "04": [
+        "PLC",
+        "SCADA",
+        "Εφαρμογές σε Python, C++, C, JavaScript, Java",
+        "Εγχειρίδιο χρήσης",
+    ],
+    "05": [
+        "Παραμετροποιήσεις",
+        "Πλήρες αρχείο παραμέτρων",
+        "Ημερολόγιο αλλαγών",
+    ],
+    "06": [
+        "Εκπαίδευση του προσωπικού του κυρίου της εγκατάστασης",
+        "Τεύχη τεκμηρίωσης",
+    ],
+    "07": [
+        "Αποσφαλμάτωση εγκαταστάσεων",
+        "Δικών μας ή τρίτων",
+    ],
+    "08": [
+        "Εξάμηνη περίοδος δωρεάν υποστήριξης",
+        "Συμβόλαια συντήρησης",
+    ],
+}
+
+PHASE_DELIVERABLES_EN = {
+    "01": [
+        "Construction drawings",
+        "Itemised bills of materials",
+        "Flow diagrams",
+        "Costings",
+        "Schedules",
+    ],
+    "02": [
+        "Radio links",
+        "IoT",
+        "Process automation",
+        "BMS",
+        "Pre-sales support",
+        "Parameterisation",
+    ],
+    "03": [
+        "Trained crews",
+        "A test report",
+        "As-built drawings",
+    ],
+    "04": [
+        "PLC",
+        "SCADA",
+        "Applications in Python, C++, C, JavaScript, Java",
+        "A user manual",
+    ],
+    "05": [
+        "Parameter settings",
+        "A full parameter record",
+        "A change log",
+    ],
+    "06": [
+        "Training for the owner's own staff",
+        "Documentation",
+    ],
+    "07": [
+        "Debugging installations",
+        "Ours or anyone else's",
+    ],
+    "08": [
+        "Six months of free support",
+        "Maintenance contracts",
+    ],
+}
+
+
+def _field_options(*, locale: str = "el") -> list[dict]:
+    """The seven fields, as the rail's options."""
+    fields = SPECIALIZATIONS_EN if locale == "en" else SPECIALIZATIONS
+    items = SPECIALIZATION_ITEMS_EN if locale == "en" else SPECIALIZATION_ITEMS
+    return [
+        {
+            "name": field["title"],
+            "title": field["title"],
+            "rationale": field["text"],
+            "bullets": items[field["title"]],
+        }
+        for field in fields
+    ]
+
+
+def _phase_options(*, locale: str = "el") -> list[dict]:
+    """The eight phases, as the strip's options."""
+    phases = ACTIVITIES_EN if locale == "en" else ACTIVITIES
+    items = PHASE_DELIVERABLES_EN if locale == "en" else PHASE_DELIVERABLES
+    return [
+        {
+            "name": phase["title"],
+            "label": phase["date"],
+            "title": phase["title"],
+            "rationale": phase["text"],
+            "bullets": items[phase["date"]],
+        }
+        for phase in phases
+    ]
 
 
 # --- The συνεργάτες page's bands --------------------------------------
@@ -2710,6 +2950,9 @@ def _layout_plan() -> dict:
                     "χρονοδιάγραμμα.",
                     "button_text": "Ζητήστε προσφορά",
                     "button_link": "/contact",
+                    # The flow band above it runs on the page's ground,
+                    # so this one is raised — as on the register.
+                    "surface": "muted",
                 },
                 "i18n": {
                     "en": {
@@ -2739,21 +2982,24 @@ def _layout_plan() -> dict:
                 },
             },
             {
-                "component_type": "features_grid",
+                # The board draws this page as a SELECTOR, not a grid:
+                # the seven fields in a rail, and what the chosen one
+                # covers beside it. The four-across grid stays on the
+                # home page, where the board puts it — there it is a
+                # glance at the seven, here they are the subject.
+                "component_type": "option_selector",
                 "title": "Πεδία",
                 "sort_order": 1,
                 "props": {
-                    "heading": "Επτά πεδία, ένας ανάδοχος",
-                    "columns": 4,
-                    "items": SPECIALIZATIONS,
+                    "layout": "rail",
+                    "options": _field_options(),
                     "prompt": SPECIALIZATION_PROMPT,
                 },
                 "i18n": {
                     "en": {
                         "title": "Fields",
                         "props": {
-                            "heading": "Seven fields, one contractor",
-                            "items": SPECIALIZATIONS_EN,
+                            "options": _field_options(locale="en"),
                             "prompt": SPECIALIZATION_PROMPT_EN,
                         },
                     }
@@ -2774,20 +3020,76 @@ def _layout_plan() -> dict:
                 },
             },
             {
-                "component_type": "story_timeline",
+                # Eight underlined tabs over one panel: the ordinal
+                # leads each tab because the phases are a SEQUENCE, and
+                # the panel answers the page's promise — every phase
+                # hands something over.
+                "component_type": "option_selector",
                 "title": "Φάσεις",
                 "sort_order": 1,
                 "props": {
-                    "heading": "Από τη μελέτη ως το συμβόλαιο υποστήριξης",
-                    "items": ACTIVITIES,
+                    "layout": "strip",
+                    "bullets_label": "Παραδοτέα",
+                    "options": _phase_options(),
                 },
                 "i18n": {
                     "en": {
                         "title": "Phases",
                         "props": {
+                            "bullets_label": "Deliverables",
+                            "options": _phase_options(locale="en"),
+                        },
+                    }
+                },
+            },
+            {
+                # All eight at once under the selector, which is what
+                # the board shows: the strip is for choosing, the grid
+                # is for reading the whole chain at a glance.
+                "component_type": "story_timeline",
+                "title": "Η αλυσίδα",
+                "sort_order": 2,
+                "props": {
+                    "heading": "Από τη μελέτη ως το συμβόλαιο υποστήριξης",
+                    "items": ACTIVITIES,
+                    # The band above it is the page's ground, and the
+                    # board keeps this one on it too.
+                    "surface": "default",
+                },
+                "i18n": {
+                    "en": {
+                        "title": "The chain",
+                        "props": {
                             "heading": "From the study to the support contract",
                             "items": ACTIVITIES_EN,
                         },
+                    }
+                },
+            },
+            {
+                "component_type": "cta_banner",
+                "title": "CTA",
+                "sort_order": 3,
+                "props": {
+                    "heading": "Εξάμηνη δωρεάν υποστήριξη σε κάθε εγκατάσταση.",
+                    "description": "Και στη συνέχεια λογικά συμβόλαια "
+                    "συντήρησης, ώστε να είναι διασφαλισμένη η "
+                    "λειτουργία καθ’ όλη την περίοδο του κύκλου ζωής "
+                    "της.",
+                    "button_text": "Ζητήστε προσφορά",
+                    "button_link": "/contact",
+                    "surface": "muted",
+                },
+                "i18n": {
+                    "en": {
+                        "props": {
+                            "heading": "Six months of free support on "
+                            "every installation.",
+                            "description": "And reasonable maintenance "
+                            "contracts after that, so that it keeps "
+                            "running for the whole of its life cycle.",
+                            "button_text": "Request a quote",
+                        }
                     }
                 },
             },

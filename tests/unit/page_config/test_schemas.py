@@ -617,3 +617,61 @@ def test_features_grid_can_be_framed_with_a_standfirst():
     )
     with pytest.raises(ValidationError):
         validate_section_props("features_grid", {"decor": "boxed"})
+
+
+def test_option_selector_layouts_and_bullets():
+    """Three ways to offer the options, and a list per option."""
+    for layout in ("cards", "strip", "rail"):
+        validate_section_props(
+            "option_selector",
+            {
+                "layout": layout,
+                "bullets_label": "Παραδοτέα",
+                "options": [
+                    {
+                        "name": "Μελέτη & σχεδιασμός",
+                        "label": "01",
+                        "title": "Μελέτη & σχεδιασμός",
+                        "rationale": "Κατασκευαστικά σχέδια και σχέδια ροής.",
+                        "bullets": ["Κατασκευαστικά σχέδια", "Κοστολογήσεις"],
+                    }
+                ],
+                "prompt": {
+                    "title": "Ενδιαφέρεστε για κάτι άλλο;",
+                    "text": "Ρωτήστε μας.",
+                    "cta_text": "Επικοινωνία",
+                    "cta_link": "/contact",
+                },
+            },
+        )
+    with pytest.raises(ValidationError):
+        validate_section_props("option_selector", {"layout": "grid"})
+    with pytest.raises(ValidationError, match="bullets"):
+        validate_section_props(
+            "option_selector",
+            {"options": [{"name": "x", "bullets": [""]}]},
+        )
+    with pytest.raises(ValidationError, match="bullets"):
+        validate_section_props(
+            "option_selector",
+            {"options": [{"name": "x", "bullets": ["y"] * 11}]},
+        )
+
+
+def test_option_selector_takes_a_whole_list_not_just_a_family():
+    """Eight options: a page whose subject IS the list needs them all."""
+    validate_section_props(
+        "option_selector",
+        {"options": [{"name": f"Φάση {i}"} for i in range(8)]},
+    )
+    with pytest.raises(ValidationError, match="options"):
+        validate_section_props(
+            "option_selector",
+            {"options": [{"name": f"Φάση {i}"} for i in range(9)]},
+        )
+
+
+def test_story_timeline_surface_is_an_enum():
+    validate_section_props("story_timeline", {"surface": "default"})
+    with pytest.raises(ValidationError):
+        validate_section_props("story_timeline", {"surface": "raised"})

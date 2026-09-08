@@ -145,9 +145,15 @@ _OPTION_TEXT = (
 
 
 def _check_options(value) -> str | None:
-    """The options an ``option_selector`` switches between."""
-    if not isinstance(value, list) or len(value) > 4:
-        return "options: must be a list of at most 4 entries"
+    """The options an ``option_selector`` switches between.
+
+    Eight of them, because a page whose SUBJECT is a list — seven
+    fields of expertise, eight phases of a project — puts every one in
+    the rail. Three variants of one product was only the first band
+    that needed this shape.
+    """
+    if not isinstance(value, list) or len(value) > 8:
+        return "options: must be a list of at most 8 entries"
     for i, raw in enumerate(value):
         if not isinstance(raw, dict):
             return f"options[{i}]: must be an object"
@@ -165,6 +171,12 @@ def _check_options(value) -> str | None:
             _is_str(link, 1000) and _LINK_RE.match(link)
         ):
             return f"options[{i}].cta_link: internal path or https URL"
+        bullets = option.get("bullets", [])
+        if not isinstance(bullets, list) or len(bullets) > 10:
+            return f"options[{i}].bullets: must be a list of at most 10 entries"
+        for j, bullet in enumerate(bullets):
+            if not bullet or not _is_str(bullet, 200):
+                return f"options[{i}].bullets[{j}]: required string (max 200)"
         rows = option.get("rows", [])
         if not isinstance(rows, list) or len(rows) > 12:
             return f"options[{i}].rows: must be a list of at most 12 rows"
@@ -183,7 +195,7 @@ def _check_options(value) -> str | None:
                 return f"options[{i}].rows[{j}]: unknown keys {sorted(unknown)}"
         unknown = (
             set(option)
-            - {"name", "cta_link", "rows"}
+            - {"name", "cta_link", "rows", "bullets"}
             - {key for key, _ in _OPTION_TEXT}
         )
         if unknown:
@@ -578,6 +590,29 @@ _VALIDATORS: dict[str, dict] = {
         "rationale_label": lambda v: (
             None if _is_str(v, 60) else "string \u226460"
         ),
+        "bullets_label": lambda v: (
+            None if _is_str(v, 60) else "string \u226460"
+        ),
+        # HOW the options are offered, and therefore where the panel
+        # goes. Not decoration: each of the three is what a different
+        # kind of list needs, and the artboards use all three.
+        #
+        #   cards  three variants of one product, as boxed tabs over
+        #          the panel — each carrying its own model number.
+        #   strip  a numbered SEQUENCE, as eight underlined tabs over
+        #          the panel: the ordinals are the point, so they lead.
+        #   rail   a list that IS the page's subject (seven fields of
+        #          expertise), beside the panel rather than above it,
+        #          because seven boxed tabs across a track do not read.
+        "layout": lambda v: (
+            None
+            if v in ("cards", "strip", "rail")
+            else "one of cards/strip/rail"
+        ),
+        # The cell that answers "what if mine is not one of these?" —
+        # the same shape ``features_grid`` carries, because it is the
+        # same question at the end of the same kind of list.
+        "prompt": _check_prompt,
         "options": _check_options,
     },
     "comparison_table": {
@@ -790,6 +825,12 @@ _VALIDATORS: dict[str, dict] = {
             required={"title": 100},
             optional={"date": 50, "text": 500, "icon": 100},
             icon_keys=frozenset({"icon"}),
+        ),
+        # Same enum, same reason as ``cta_banner``: this band is raised
+        # on the page that shows it among others and grounded on the
+        # page it belongs to, and only the page knows which.
+        "surface": lambda v: (
+            None if v in ("default", "muted") else "one of default/muted"
         ),
     },
     "faq": {

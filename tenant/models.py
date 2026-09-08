@@ -416,6 +416,18 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
             "Empty → TikTok pixel is disabled for this tenant."
         ),
     )
+    openai_pixel_id = models.CharField(
+        _("ChatGPT Ads Pixel ID"),
+        max_length=64,
+        blank=True,
+        default="",
+        help_text=_(
+            "OpenAI / ChatGPT Ads conversion pixel ID (e.g. "
+            "'8MktrqpXN1MRdD2NUfkXmU'). Alphanumeric only. "
+            "Empty → the ChatGPT Ads pixel is disabled for this tenant, "
+            "and its origin is left out of the CSP."
+        ),
+    )
 
     ga_tracking_id = models.CharField(
         _("Google Analytics Tracking ID"),
@@ -939,6 +951,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         self._validate_allowed_csp_sources()
         self._validate_meta_pixel_id()
         self._validate_tiktok_pixel_id()
+        self._validate_openai_pixel_id()
         self._validate_ga_tracking_id()
         self._validate_social_urls()
         self._validate_box_now_partner_id()
@@ -1091,6 +1104,30 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
                     "tiktok_pixel_id": _(
                         "TikTok Pixel ID must be alphanumeric "
                         "(e.g. 'C0ABCDEFGH123')."
+                    )
+                }
+            )
+
+    def _validate_openai_pixel_id(self) -> None:
+        """ChatGPT Ads pixel IDs are alphanumeric strings only.
+
+        Mirrors the TikTok rule above. It matters more here than it
+        looks: the value the site owner supplied was pasted out of
+        OpenAI's snippet as
+        ``https://bzrcdn.openai.com/sdk/oaiq.min.js^`` — a stray
+        trailing character rode along with it. A malformed id silently
+        stops conversions being attributed rather than failing loudly,
+        so reject it at the edge.
+        """
+        value = self.openai_pixel_id
+        if not value:
+            return
+        if not re.fullmatch(r"[A-Za-z0-9]+", value):
+            raise ValidationError(
+                {
+                    "openai_pixel_id": _(
+                        "ChatGPT Ads Pixel ID must be alphanumeric "
+                        "(e.g. '8MktrqpXN1MRdD2NUfkXmU')."
                     )
                 }
             )

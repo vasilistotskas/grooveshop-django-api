@@ -205,6 +205,16 @@ class TenantConfigSerializer(serializers.Serializer):
     # --- Analytics (public IDs only) ---
     meta_pixel_id = serializers.CharField(read_only=True)
     tiktok_pixel_id = serializers.CharField(read_only=True)
+    # ``required=False``, NOT ``read_only=True`` like the two pixel
+    # fields above — see the ``available_locales`` note. A read-only
+    # field is emitted as REQUIRED in the schema, so the storefront's
+    # generated Zod would reject any response from a backend that
+    # predates it. Argo rolls the frontend and backend as separate
+    # Deployments, so a frontend-first deploy would fail tenant-config
+    # validation for EVERY tenant and 503 the whole platform. The two
+    # existing pixel fields are safe only because they are already in
+    # the contract on both sides.
+    openai_pixel_id = serializers.CharField(required=False)
     ga_tracking_id = serializers.CharField(read_only=True)
 
     # --- Authentication ---
@@ -331,6 +341,7 @@ class TenantAdminSerializer(serializers.ModelSerializer):
             # --- Analytics ---
             "meta_pixel_id",
             "tiktok_pixel_id",
+            "openai_pixel_id",
             "ga_tracking_id",
             "meta_capi_access_token",
             "meta_capi_dataset_id",

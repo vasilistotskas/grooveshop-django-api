@@ -3,6 +3,82 @@
 
 
 
+## v3.46.1 (2026-09-08)
+
+### Bug fixes
+
+* fix(acs): skip a tenant with no ACS credentials instead of aborting the run
+
+``--all-tenants`` targets every ACTIVE tenant, not every tenant that ships
+through ACS, and ``reconcile_acs_cod`` called straight into
+``AcsService.reconcile_cod_payouts`` with no guard. Production on
+2026-09-08 has four active tenants and only one of them configured:
+
+delta_sigma acs_configured=False
+demo acs_configured=False
+ekfyseosfyteias acs_configured=False
+webside acs_configured=True
+
+``delta_sigma`` sorts first, so ``AcsClient.__init__`` would raise
+``AcsConfigError`` on the first schema and abort the whole run before ever
+reaching ``webside`` — the only tenant with payouts to reconcile. Making
+the credentials reachable (previous commit) was necessary but not
+sufficient.
+
+Skips cleanly and says which schema and why, matching the beat task's
+``_skip_if_acs_unconfigured``. Covered by
+``tests/unit/shipping_acs/test_reconcile_cod_command.py``, which also pins
+the rest of the contract the command had no tests for at all: oldest date
+first (payment flips must replay chronologically), ``--silent`` forwarded
+(a weeks-old delivery must not suddenly email the customer — site-owner
+decision 2026-07-11), ``--days 0`` rejected before any API call, and an
+unknown ``--tenant`` named rather than silently skipped.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01H6QHvSZHY35xi5VEvr5Au5 ([`14e3e55`](https://github.com/vasilistotskas/grooveshop-django-api/commit/14e3e55d314614168db6ece55dcf683c6e86ec66))
+
+* fix(commands): give tenant-scoped commands the real Tenant, not a FakeTenant
+
+``manage.py reconcile_acs_cod`` — the only way to replay a COD payout date
+the nightly beat task missed — could not run at all. It entered
+``schema_context(schema)``, which sets the connection's search path but
+leaves ``connection.tenant`` a ``FakeTenant`` carrying nothing but a name.
+Every per-tenant credential is read off exactly that attribute
+(``tenant/credentials.py:_get_tenant_field``), so ``acs_credentials()``
+returned empty strings and ``AcsClient.__init__`` raised
+``AcsConfigError`` for every schema. There is no ``is_configured()`` guard
+in front of it, so the command died rather than skipping.
+
+Verified in the production shell 2026-09-08:
+
+schema_context('webside') connection.tenant=FakeTenant is_configured=False
+tenant_context(tenant) connection.tenant=Tenant is_configured=True
+
+``tenant_context`` is a strict superset — same ``set_tenant`` on exit, and
+django-tenants' own ``get_current_tenant`` docstring says to use it "when
+you need the model instance" — so it is correct for every caller, not just
+this one.
+
+Fixed in the mixin rather than in the one broken command. The six-line
+loop was copy-pasted byte-identically into ten commands; nine of them are
+ORM-only and could not tell the two context managers apart, which is why
+only one had to be wrong for the mistake to stay invisible for as long as
+it did. ``iter_tenant_contexts`` now owns the loop and the per-tenant
+heading, and ``get_tenant_schemas`` becomes ``get_target_tenants``,
+returning rows instead of names.
+
+Nothing needs backfilling today: a read-only probe of
+``ACS_COD_Beneficiary_Info`` across 2026-08-25..09-08 shows ACS reported
+payouts on one date only, and the beat task captured both rows. The
+command matters the next time a night is missed.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01H6QHvSZHY35xi5VEvr5Au5 ([`e3438a1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e3438a1ef502d4dbc2e02a1c7dd0f1a7917b0993))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.46.0 [skip ci] ([`58dd479`](https://github.com/vasilistotskas/grooveshop-django-api/commit/58dd479c71576053cd6018461c961f56a5d48f28))
+
 ## v3.46.0 (2026-09-08)
 
 ### Chores

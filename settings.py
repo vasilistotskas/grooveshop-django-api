@@ -1164,6 +1164,17 @@ def get_celery_beat_schedule():
             else SCHEDULE_PRESETS["every_hour"],
             "options": {"queue": "celery", "expires": 300},
         },
+        # Half an hour after the reconcile, so a payout that landed
+        # overnight is already recorded and cannot be reported overdue.
+        # Once a day is right for money that is already days late —
+        # anything more often just repeats the same list.
+        "alert-unremitted-acs-cod": {
+            "task": "tenant.tasks.fanout_alert_unremitted_cod_payouts",
+            "schedule": crontab(hour="3", minute="0")
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_hour"],
+            "options": {"queue": "celery", "expires": 300},
+        },
     }
 
     if path.exists("/.dockerenv") and not getenv("KUBERNETES_SERVICE_HOST"):
@@ -4126,6 +4137,14 @@ ACS_HTTP_TIMEOUT = int(getenv("ACS_HTTP_TIMEOUT", "15"))
 # Days without a tracking event before a non-terminal shipment is
 # reported to ADMINS by check_stale_acs_shipments.
 ACS_STALE_SHIPMENT_DAYS = int(getenv("ACS_STALE_SHIPMENT_DAYS", "3"))
+# Days after a COD parcel is DELIVERED before an absent ACS payout is
+# reported as overdue. The measured remittance lag is ~4 days, so 10
+# leaves headroom and fires only on genuinely stuck money. Nothing else
+# watches these: the tracking poll and the stale-shipment alert both
+# exclude terminal shipment states, which a delivered parcel is.
+ACS_COD_REMITTANCE_ALERT_DAYS = int(
+    getenv("ACS_COD_REMITTANCE_ALERT_DAYS", "10")
+)
 ACS_PICKUP_LIST_TIMEZONE = getenv("ACS_PICKUP_LIST_TIMEZONE", "Europe/Athens")
 ACS_SUPPORTED_COUNTRIES = [
     code.strip().upper()

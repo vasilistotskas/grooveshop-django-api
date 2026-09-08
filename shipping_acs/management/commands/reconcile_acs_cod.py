@@ -91,7 +91,15 @@ class Command(TenantCommandMixin, BaseCommand):
             return
 
         yesterday = (timezone.localtime() - timedelta(days=1)).date()
-        totals = {"upserted": 0, "linked": 0, "skipped": 0, "rows": 0}
+        # Keys drive the accumulation below, so a counter missing here is
+        # silently dropped from the summary.
+        totals = {
+            "upserted": 0,
+            "linked": 0,
+            "unmatched": 0,
+            "skipped": 0,
+            "rows": 0,
+        }
 
         # Oldest first so payment flips replay in chronological order.
         for offset in range(days - 1, -1, -1):
@@ -102,11 +110,28 @@ class Command(TenantCommandMixin, BaseCommand):
             )
             for key in totals:
                 totals[key] += result.get(key, 0)
+            # Either kind of unattributable row is money we received and
+            # cannot tie to an order — the operator needs to SEE that in
+            # the run output, not just in the alert email.
             style = (
                 self.style.WARNING
-                if result.get("skipped")
+                if result.get("skipped") or result.get("unmatched")
                 else self.style.SUCCESS
             )
             self.stdout.write(style(f"{payment_date}: {result}"))
 
-        self.stdout.write(self.style.SUCCESS(f"Totals: {totals}"))
+        style = (
+            self.style.WARNING
+            if totals["skipped"] or totals["unmatched"]
+            else self.style.SUCCESS
+        )
+        self.stdout.write(style(f"Totals: {totals}"))
+        if totals["unmatched"] or totals["skipped"]:
+            self.stdout.write(
+                self.style.WARNING(
+                    "Unattributable payout rows were persisted but not tied "
+                    "to an order. Grep the worker log for "
+                    "'payout matches no shipment' for each row's voucher, "
+                    "amount and receiver."
+                )
+            )

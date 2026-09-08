@@ -1642,6 +1642,9 @@ class AcsService:
         upserted = 0
         linked = 0
         skipped = 0
+        # Distinct from ``skipped``: the voucher was readable, we just do
+        # not know it. Money we cannot attribute, not money we cannot see.
+        unmatched = 0
         for row in rows:
             # ``POD`` carries the voucher number on the wire (ACS PDF,
             # ACS_COD_Beneficiary_Info Table_Data schema).
@@ -1745,46 +1748,118 @@ class AcsService:
                 cls._mark_cod_order_paid_if_pending(
                     shipment, silent_for_customer=silent_for_customer
                 )
+            else:
+                # ACS remitted money for a voucher that is not ours to
+                # recognise. The row IS persisted (it is real money, and
+                # the raw payload is the only record of it), but nothing
+                # here can attribute it, so it needs a human.
+                #
+                # This used to be invisible: ``skipped`` counts only rows
+                # whose voucher could not be READ at all, so a row with a
+                # perfectly legible but unknown voucher was upserted,
+                # counted as a success, and never alerted. Production
+                # 2026-09-08 held two of them — 2417791935 (2026-06-11,
+                # EUR 24.49) and 2431665832 (2026-08-20, EUR 24.97), both
+                # on our own Customer_Code, both hand-made in the ACS
+                # portal rather than minted by the shop — and 30 days of
+                # logs contained not one unmatched-payout warning.
+                unmatched += 1
+                logger.warning(
+                    "reconcile_cod_payouts: payout matches no shipment — "
+                    "voucher=%r customer_code=%r amount=%r cash=%r card=%r "
+                    "delivered=%r picked_up=%r receiver=%r sender=%r "
+                    "ref1=%r ref2=%r cod_payment_date=%r",
+                    voucher_no,
+                    row.get("Customer_Code"),
+                    row.get("Parcel_COD_Amount"),
+                    row.get("COD_Amount_Cach"),
+                    row.get("COD_Amount_CreditCard"),
+                    row.get("Parcel_Delivery_Date"),
+                    row.get("Parcel_Pickup_Date"),
+                    row.get("Parcel_Receiver"),
+                    row.get("Parcel_Sender"),
+                    row.get("Customer_RefNo_1"),
+                    row.get("Customer_RefNo_2"),
+                    payment_date_only,
+                )
 
-        if skipped:
+        if skipped or unmatched:
             cls._alert_admins_unmatched_payouts(
-                skipped=skipped, cod_payment_date=cod_payment_date
+                skipped=skipped,
+                unmatched=unmatched,
+                cod_payment_date=cod_payment_date,
             )
+
+        logger.info(
+            "reconcile_cod_payouts: cod_payment_date=%s rows=%s upserted=%s "
+            "linked=%s unmatched=%s unreadable=%s",
+            cod_payment_date,
+            len(rows),
+            upserted,
+            linked,
+            unmatched,
+            skipped,
+        )
 
         return {
             "upserted": upserted,
             "linked": linked,
             "skipped": skipped,
+            "unmatched": unmatched,
             "rows": len(rows),
         }
 
     @staticmethod
     def _alert_admins_unmatched_payouts(
-        *, skipped: int, cod_payment_date: date | None
+        *,
+        skipped: int,
+        unmatched: int = 0,
+        cod_payment_date: date | None,
     ) -> None:
         """Email the tenant's operators about unattributable payout rows.
 
-        Unmatched rows mean ACS remitted COD money we can't tie to an
+        Either kind means ACS remitted COD money we can't tie to an
         order — silently dropping them is how the original Voucher_No
-        mapping bug went unnoticed for 10 weeks. Best-effort: an SMTP
-        failure must not fail the reconcile itself (the payout rows
-        that did match are already persisted).
+        mapping bug went unnoticed for 10 weeks. The two are reported
+        separately because they need different follow-up:
+
+        * ``unmatched`` — the voucher was legible, we just don't know
+          it. In practice a voucher created by hand in the ACS portal
+          rather than minted by the shop, so the money is real and the
+          parcel simply never existed here. Reconcile it as an
+          off-system sale.
+        * ``skipped`` — no voucher could be read at all (empty ``POD``
+          and neither ``Customer_RefNo`` matched). Nothing identifies
+          the row; it needs the ACS beneficiary report to interpret.
+
+        Best-effort: an SMTP failure must not fail the reconcile itself
+        (the payout rows that did match are already persisted).
         """
         from shipping.alerts import send_ops_alert
+
+        parts = []
+        if unmatched:
+            parts.append(f"{unmatched} for a voucher we don't recognise")
+        if skipped:
+            parts.append(f"{skipped} with no readable voucher")
+        total = unmatched + skipped
 
         try:
             sent = send_ops_alert(
                 subject=(
-                    f"ACS COD reconcile: {skipped} unmatched payout row(s)"
+                    f"ACS COD reconcile: {total} unattributable payout row(s)"
                 ),
                 message=(
-                    f"{skipped} payout row(s) for COD_Payment_Date="
+                    f"{total} payout row(s) for COD_Payment_Date="
                     f"{cod_payment_date or 'unspecified'} could not be "
-                    "matched to any AcsShipment (no POD voucher match and "
-                    "no Customer_RefNo_1/2 order match). See the "
-                    "celery-worker logs (reconcile_cod_payouts warnings) "
-                    "for the row details and reconcile manually against "
-                    "the ACS COD beneficiary report."
+                    f"tied to an order — {', '.join(parts)}.\n\n"
+                    "The rows ARE persisted as AcsCodPayout (it is real "
+                    "money), they are just not attributed. The "
+                    "celery-worker logs carry each row's voucher, amount, "
+                    "receiver and delivery date under "
+                    "'reconcile_cod_payouts: payout matches no shipment'; "
+                    "reconcile those against the ACS COD beneficiary "
+                    "report."
                 ),
             )
             if not sent:
@@ -1846,21 +1921,26 @@ class AcsService:
     # Private helpers — order status
     # ------------------------------------------------------------------
 
-    @classmethod
-    def _apply_order_status_transition(
-        cls, order: Order, mapped_state: AcsShipmentState
-    ) -> None:
-        """Advance the Order's status based on the ACS shipment state.
+    @staticmethod
+    def order_status_for_shipment_state(
+        mapped_state: AcsShipmentState, current_status: str
+    ) -> str | None:
+        """The order status a shipment state implies, or ``None``.
 
-        Mirrors ``BoxNowService._apply_order_status_transition`` —
-        same rules, different vocabulary.
+        ``None`` means "leave the order alone": it is already in a
+        terminal status, already where this state would put it, or the
+        state carries no order-level meaning (``new``, and an in-transit
+        state for an order that is already past SHIPPED).
+
+        Public and side-effect free because two callers need the same
+        answer — the live poll, which then performs the transition, and
+        ``manage.py reconcile_acs_order_status``, which needs to report
+        the drift it is about to repair without writing anything. Having
+        the replay re-derive "returned means RETURNED" for itself is
+        exactly how the two would drift apart.
         """
-        from order.exceptions import InvalidStatusTransitionError
-        from order.services import OrderService
-
-        current_status: str = order.status
         if current_status in _TERMINAL_ORDER_STATUSES:
-            return
+            return None
 
         new_status: str | None = None
         if mapped_state in _SHIPPED_STATES:
@@ -1876,7 +1956,37 @@ class AcsService:
         elif mapped_state == AcsShipmentState.CANCELED:
             new_status = "CANCELED"
 
-        if new_status is None or new_status == current_status:
+        if new_status == current_status:
+            return None
+        return new_status
+
+    @classmethod
+    def _apply_order_status_transition(
+        cls,
+        order: Order,
+        mapped_state: AcsShipmentState,
+        *,
+        silent_for_customer: bool = False,
+    ) -> None:
+        """Advance the Order's status based on the ACS shipment state.
+
+        Mirrors ``BoxNowService._apply_order_status_transition`` —
+        same rules, different vocabulary.
+
+        ``silent_for_customer`` exists for REPLAYS, where the carrier
+        event is historic and the customer has long since moved on:
+        emailing "your order was returned" about a July parcel in
+        September is worse than saying nothing. The live poll leaves it
+        ``False`` and behaves exactly as before.
+        """
+        from order.exceptions import InvalidStatusTransitionError
+        from order.services import OrderService
+
+        current_status: str = order.status
+        new_status = cls.order_status_for_shipment_state(
+            mapped_state, current_status
+        )
+        if new_status is None:
             return
 
         # ACS occasionally jumps a parcel straight to DELIVERED between
@@ -1909,7 +2019,9 @@ class AcsService:
                 OrderService.update_order_status(
                     order,
                     "SHIPPED",
-                    silent_for_customer=new_status == "RETURNED",
+                    silent_for_customer=(
+                        silent_for_customer or new_status == "RETURNED"
+                    ),
                 )
             except InvalidStatusTransitionError as exc:
                 logger.warning(
@@ -1932,7 +2044,9 @@ class AcsService:
             )
 
         try:
-            OrderService.update_order_status(order, new_status)
+            OrderService.update_order_status(
+                order, new_status, silent_for_customer=silent_for_customer
+            )
         except InvalidStatusTransitionError as exc:
             logger.warning(
                 "ACS poll: invalid order-status transition for order=%s "

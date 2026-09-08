@@ -7,6 +7,9 @@ Schedule (registered in ``settings.CELERY_BEAT_SCHEDULE``):
 * ``warn-unprinted-acs-vouchers`` — Mon–Fri 15:45 Europe/Athens, 45
   minutes ahead of the manifest so there is time to act on it.
 * ``poll-acs-tracking`` — every 15 minutes.
+* ``reconcile-acs-cod-payouts`` — daily 02:30 Europe/Athens.
+* ``alert-unremitted-acs-cod`` — daily 03:00 Europe/Athens, after the
+  reconcile so an overnight payout is already recorded.
 
 Idempotency:
 * ``create_acs_voucher_for_order`` — service method returns the
@@ -301,6 +304,134 @@ def _alert_unprinted_vouchers(
         len(rows),
     )
     return {"alerted": len(rows)}
+
+
+def _unremitted_cod_rows(older_than_days: int) -> list[dict]:
+    """COD parcels ACS delivered but never remitted the cash for.
+
+    Nothing else looks for these. ``poll_acs_tracking`` and
+    ``check_stale_acs_shipments`` both EXCLUDE terminal shipment states,
+    so once a parcel reaches ``delivered`` it drops out of every existing
+    watch — and a COD parcel that is delivered but never paid out is
+    precisely a delivered parcel. Production order 73 sat that way for
+    108 days (delivered 2026-05-23, EUR 24.48, no payout row on any date
+    ACS reports) and no alert had anywhere to come from.
+
+    Keyed on the payout table rather than ``payment_status`` because the
+    payout row IS the evidence: ``AcsCodPayout`` exists only once ACS
+    reports having remitted, and writing it is what flips the order paid.
+    """
+    from shipping_acs.enum.charge_type import AcsChargeType
+    from shipping_acs.enum.shipment_state import AcsShipmentState
+    from shipping_acs.models import AcsCodPayout, AcsShipment
+
+    cutoff = timezone.now() - timedelta(days=older_than_days)
+    remitted = set(AcsCodPayout.objects.values_list("voucher_no", flat=True))
+
+    rows = []
+    candidates = (
+        AcsShipment.objects.filter(
+            voucher_no__isnull=False,
+            shipment_state=AcsShipmentState.DELIVERED,
+            charge_type=AcsChargeType.COD,
+            cod_amount__gt=0,
+            delivery_date__lt=cutoff,
+        )
+        .select_related("order")
+        .order_by("delivery_date")
+    )
+    for shipment in candidates:
+        if shipment.voucher_no in remitted:
+            continue
+        order = shipment.order
+        rows.append(
+            {
+                "order_id": shipment.order_id,
+                "voucher_no": shipment.voucher_no,
+                "cod_amount": str(shipment.cod_amount),
+                "delivered_on": shipment.delivery_date.date().isoformat(),
+                "days_since_delivery": (
+                    timezone.now() - shipment.delivery_date
+                ).days,
+                "order_status": getattr(order, "status", None),
+                "payment_status": getattr(order, "payment_status", None),
+            }
+        )
+    return rows
+
+
+@shared_task(bind=True, base=TenantTask)
+def alert_unremitted_cod_payouts(self) -> dict[str, Any]:
+    """Report COD money ACS delivered against but never paid out.
+
+    The measured ACS remittance lag is ~4 days (vouchers 9803465770 and
+    9803475172, both delivered 2026-09-03 and remitted 2026-09-07), so
+    the default threshold leaves headroom and fires only on genuinely
+    overdue money rather than on the normal wait.
+    """
+    if _skip_if_acs_unconfigured("alert_unremitted_cod_payouts"):
+        return {"status": "skipped_unconfigured"}
+
+    older_than_days = int(
+        getattr(settings, "ACS_COD_REMITTANCE_ALERT_DAYS", 10)
+    )
+    rows = _unremitted_cod_rows(older_than_days)
+    if not rows:
+        logger.info(
+            "alert_unremitted_cod_payouts: every COD parcel delivered more "
+            "than %s day(s) ago has been remitted",
+            older_than_days,
+        )
+        return {"status": "ok", "unremitted": 0}
+
+    # One structured line naming every parcel: the whole point is that
+    # "ACS owes you money" is only actionable with the voucher numbers.
+    logger.warning(
+        "alert_unremitted_cod_payouts: %s COD parcel(s) delivered over %s "
+        "day(s) ago with no ACS payout — %s",
+        len(rows),
+        older_than_days,
+        rows,
+    )
+
+    lines = "\n".join(
+        f"  order {r['order_id']}  voucher {r['voucher_no']}  "
+        f"{r['cod_amount']}  delivered {r['delivered_on']} "
+        f"({r['days_since_delivery']} days ago)"
+        for r in rows
+    )
+    from shipping.alerts import send_ops_alert
+
+    try:
+        sent = send_ops_alert(
+            subject=(
+                f"ACS COD: {len(rows)} delivered parcel(s) never remitted"
+            ),
+            message=(
+                f"{len(rows)} COD parcel(s) were delivered more than "
+                f"{older_than_days} days ago and ACS has still not "
+                f"reported a payout for them:\n\n{lines}\n\n"
+                "Give ACS the voucher numbers and ask for the COD "
+                "remittance status. If a payout HAS been made on a date "
+                "the nightly reconcile never queried, replay it with "
+                "`manage.py reconcile_acs_cod --days N --silent "
+                "--tenant <schema>` — it is idempotent."
+            ),
+        )
+    except Exception as exc:
+        logger.error(
+            "alert_unremitted_cod_payouts: failed to send the alert for %s "
+            "parcel(s): %s",
+            len(rows),
+            exc,
+        )
+        return {"status": "ok", "unremitted": len(rows), "alerted": 0}
+
+    return {
+        "status": "ok",
+        "unremitted": len(rows),
+        "alerted": len(rows) if sent else 0,
+    }
 
 
 @shared_task(bind=True, base=TenantTask)

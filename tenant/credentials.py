@@ -155,6 +155,19 @@ def tenant_admin_recipients() -> list[str]:
       1. ``Tenant.contact_email`` + ``Tenant.owner_email`` (deduped)
       2. ``settings.ADMINS`` addresses — platform fallback, which is
          also the public-schema / no-tenant behaviour.
+
+    ``ADMINS`` holds plain address strings. That is Django 6's format —
+    ``mail_admins`` warns ``RemovedInDjango70Warning`` on the old
+    ``(name, address)`` pairs and this project's setting is built as
+    ``[email for email in [getenv("ADMIN_EMAIL", "")] if email]``. The
+    fallback used to unpack each entry into ``(_name, email)``, which
+    walks the CHARACTERS of a string and raised ``ValueError: too many
+    values to unpack`` for any address longer than two characters.
+    Verified in production 2026-09-08: all four tenants have their own
+    contact/owner email and returned early, so only the platform
+    fallback was affected — and every caller wraps this in try/except to
+    keep a mail failure from masking the carrier error it was reporting,
+    so the alert was swallowed rather than surfaced.
     """
     recipients: list[str] = []
     for field in ("contact_email", "owner_email"):
@@ -163,7 +176,7 @@ def tenant_admin_recipients() -> list[str]:
             recipients.append(value)
     if recipients:
         return recipients
-    return [email for _name, email in getattr(settings, "ADMINS", [])]
+    return [str(address) for address in getattr(settings, "ADMINS", [])]
 
 
 def tenant_site_name() -> str:

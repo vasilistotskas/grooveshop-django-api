@@ -133,6 +133,15 @@ def fanout_warn_unprinted_acs_vouchers():
 
 
 @celery_app.task(base=TenantTask)
+def fanout_alert_unremitted_cod_payouts():
+    # AcsShipment and AcsCodPayout are tenant-scoped, so beat must
+    # dispatch per-schema or the check runs against an empty public one.
+    return run_for_all_tenants(
+        "shipping_acs.tasks.alert_unremitted_cod_payouts"
+    )
+
+
+@celery_app.task(base=TenantTask)
 def fanout_anonymize_old_search_queries():
     return run_for_all_tenants(
         "search.tasks.anonymize_old_search_queries", days=90

@@ -56,7 +56,13 @@ def test_reconcile_matches_shipment_by_pod_voucher():
 
     result = _reconcile([_BASE_ROW])
 
-    assert result == {"upserted": 1, "linked": 1, "skipped": 0, "rows": 1}
+    assert result == {
+        "upserted": 1,
+        "linked": 1,
+        "skipped": 0,
+        "unmatched": 0,
+        "rows": 1,
+    }
     payout = AcsCodPayout.objects.get(voucher_no="7227891234")
     assert payout.shipment_id == shipment.id
     assert payout.cod_amount_total.amount == Decimal("120.30")
@@ -78,7 +84,13 @@ def test_reconcile_falls_back_to_customer_ref_order_id():
     row = {**_BASE_ROW, "POD": "", "Customer_RefNo_1": str(order.id)}
     result = _reconcile([row])
 
-    assert result == {"upserted": 1, "linked": 1, "skipped": 0, "rows": 1}
+    assert result == {
+        "upserted": 1,
+        "linked": 1,
+        "skipped": 0,
+        "unmatched": 0,
+        "rows": 1,
+    }
     payout = AcsCodPayout.objects.get(voucher_no="7227895678")
     assert payout.shipment_id == shipment.id
     order.refresh_from_db()
@@ -113,7 +125,15 @@ def test_reconcile_creates_orphan_row_when_shipment_missing():
     those still need to be persisted, just without a FK link."""
     result = _reconcile([{**_BASE_ROW, "POD": "9999000111"}])
 
-    assert result == {"upserted": 1, "linked": 0, "skipped": 0, "rows": 1}
+    assert result == {
+        "upserted": 1,
+        "linked": 0,
+        "skipped": 0,
+        # A readable voucher we do not know: real money, unattributable.
+        # It used to be counted a plain success and never alerted.
+        "unmatched": 1,
+        "rows": 1,
+    }
     payout = AcsCodPayout.objects.get(voucher_no="9999000111")
     assert payout.shipment_id is None
 

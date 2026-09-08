@@ -122,6 +122,14 @@ _PRIMARY_DARK = {
 # artboard is an article.
 TENANT_FLAGS = {
     "blog_enabled": False,
+    # No agentic commerce either, for the same reason there is no cart
+    # and no catalogue: this store QUOTES. The flag gates the whole
+    # agent-gateway surface — the MCP commerce tools, UCP/ACP checkout,
+    # the catalog feeds and the chat backend — and every one of them
+    # would be advertising three systems at ``price = 0`` that are sold
+    # per project after a site visit. An agent cannot buy a DeSET
+    # system, so the honest answer is not to offer it one.
+    "agent_commerce_enabled": False,
 }
 
 THEME = {

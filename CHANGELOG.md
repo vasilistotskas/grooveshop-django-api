@@ -3,6 +3,91 @@
 
 
 
+## v3.47.0 (2026-09-08)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.46.3 [skip ci] ([`35100d3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/35100d3da70eb877eeb5100ef9409fdbd4f635ec))
+
+### Features
+
+* feat(contact): accept tender documents on the contact form
+
+Δelta Σigma's contact artboard draws a dropzone for tender documents,
+and every enquiry that store answers is a quote against a
+specification that arrives as a PDF or a set of drawings. The row was
+rendered as "email them to us" because the platform had no anonymous
+upload; it has one now, per-tenant and off by default.
+
+It is the platform's only ANONYMOUS upload, so containment — not
+detection — is the guarantee:
+
+* `contact/storage.py` — a PRIVATE per-tenant tree that no web server
+  serves. `TenantPrivateFileSystemStorage.base_url` now returns None,
+  so `url()` RAISES instead of advertising a `/media/<path>` that
+  nothing serves (it inherited MEDIA_URL before, one line of config
+  away from a real leak). The stored path is derived from the row's
+  UUID: the uploader's filename never reaches the filesystem.
+* `ContactAdmin.attachment_download_view` — the ONLY reader, gated on
+  the admin login AND `view_contactattachment`, streamed as
+  octet-stream with `attachment` + `nosniff`. No API route, no signed
+  URL.
+* `contact/attachments.py` — the gate. Per-tenant limits (count, size,
+  types) from `extra_settings`, a MAGIC-BYTE sniff (`filetype`) rather
+  than the extension or the declared Content-Type, and 25 MB / 20
+  files code ceilings a merchant cannot raise. A format with no
+  signature (ASCII DXF, plain text) is refused rather than trusted.
+* `contact/scanners.py` — an optional engine behind the house
+  ABC+registry seam (`shipping/interfaces.py`'s shape). Default is
+  null, which records SKIPPED and says so, because ClamAV needs
+  ~1.6 GB resident and this cluster does not have it. `ClamAvScanner`
+  speaks clamd INSTREAM directly; a `z`-prefixed command gets a
+  NUL-terminated reply, and an unparsable one RAISES rather than
+  reading as CLEAN.
+
+The upload is a two-step handover: a file is uploaded on its own and
+its uuid is a capability the enquiry spends once, via a conditional
+UPDATE inside the insert's transaction. So a slow 20 MB drawing is not
+something the visitor waits on before typing, a failed third file does
+not re-send the first two, and every "not claimable" reason collapses
+to one message so an id cannot be probed.
+
+Bounded on three axes, because a throttle alone is not enough — it is
+a REQUEST budget, it is per caller, and it says nothing about bytes:
+
+* Per caller: a `contact_attachment` throttle scope.
+* Per tenant, UNCLAIMED bytes: bounds abandoned uploads, and is the
+  alarm for a reaper that stopped running.
+* Per tenant, INTAKE bytes over a rolling 24 hours regardless of
+  claim state: this is the one that bounds a flood. Claiming an
+  upload exempts it from the reaper, so a caller who submits one
+  enquiry per batch keeps every byte for the store's whole retention
+  window — 500 MB/hour at the throttle's own ceiling, on a volume
+  that also holds the invoices, so invoicing would go down with it.
+
+Both ceilings and a hard `Content-Length` check run BEFORE
+`request.data`, because touching it runs Django's multipart parser and
+that writes a second copy of the body to the pod's disk: a refusal
+that arrives afterwards has already cost what accepting would have.
+
+Two beat sweeps keep the tree flat: unclaimed rows reaped hourly,
+claimed ones' BYTES dropped after the retention window while the
+enquiry, its name, size and checksum stay (GDPR art. 5(1)(e) without
+destroying the record). Both reach SUSPENDED tenants — freezing a
+store's billing does not freeze a promise to delete data — via a new
+`include_suspended` on `run_for_all_tenants`, whose existing
+exclusion is about not burning a frozen store's carrier budget and
+does not transfer to a retention sweep.
+
+Also deduplicates the private storage: `order/models/invoice.py` had
+its own copy of what is now `tenant.storage.private_media_root` /
+`TenantPrivateFileSystemStorage`, as did `tenant/offboarding.py`.
+
+Seeded for delta_sigma: on, 3 x 25 MB, PDF/DWG/ZIP, 365-day retention.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018CiyyCqkXd9a1FM5hsrPFZ ([`d615813`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d6158130ab393e209d820c3a6f7c79780a86d5c8))
+
 ## v3.46.3 (2026-09-08)
 
 ### Bug fixes

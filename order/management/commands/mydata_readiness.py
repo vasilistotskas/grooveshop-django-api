@@ -23,8 +23,6 @@ follows the same ``--tenant``/``--all-tenants`` contract as
 
 from __future__ import annotations
 
-from contextlib import nullcontext as _nullcontext
-
 from django.core.management.base import BaseCommand, CommandError
 from django.db.models import Count
 
@@ -45,17 +43,11 @@ class Command(TenantCommandMixin, BaseCommand):
         self.add_tenant_arguments(parser)
 
     def handle(self, *args, **options):
-        from django_tenants.utils import schema_context
-
         total_unmapped = 0
         total_null_vat = 0
 
-        for schema in self.get_tenant_schemas(options):
-            if schema:
-                self.stdout.write(
-                    self.style.MIGRATE_HEADING(f"\n>>> Tenant: {schema}")
-                )
-            with schema_context(schema) if schema else _nullcontext():
+        for ctx in self.iter_tenant_contexts(options):
+            with ctx:
                 unmapped, null_vat = self._report_for_schema()
                 total_unmapped += unmapped
                 total_null_vat += null_vat

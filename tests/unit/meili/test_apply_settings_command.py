@@ -5,9 +5,43 @@ only consumer lives in another repository - which broke the deploy
 pipeline's prepare hook.
 """
 
+from contextlib import contextmanager
+from dataclasses import dataclass
 from unittest.mock import patch
 
 from django.core.management import call_command
+
+
+@dataclass
+class _FakeTenant:
+    """Stand-in for a ``Tenant`` row.
+
+    The command now iterates tenant OBJECTS, not schema names, because
+    ``iter_tenant_contexts`` enters ``tenant_context`` — the only one of
+    the two django-tenants context managers that puts the real row on
+    ``connection.tenant``, which is where every per-tenant credential is
+    read from. A name is all these tests need off it.
+    """
+
+    schema_name: str
+
+
+@contextmanager
+def _fake_tenant_context(tenant):
+    """Swap ``connection.schema_name`` without touching the database.
+
+    Assigning it directly is only safe because every collaborator in
+    these tests is patched, so nothing re-enters a real context manager
+    and strands the value; it is restored either way.
+    """
+    from django.db import connection
+
+    previous = connection.schema_name
+    connection.schema_name = tenant.schema_name
+    try:
+        yield
+    finally:
+        connection.schema_name = previous
 
 
 def test_update_meili_settings_ensures_index_with_primary_key_first():
@@ -71,9 +105,10 @@ def test_a_failing_tenant_does_not_stop_the_remaining_ones():
     with (
         patch.object(
             meilisearch_apply_settings.Command,
-            "get_tenant_schemas",
-            return_value=["alpha", "beta"],
+            "get_target_tenants",
+            return_value=[_FakeTenant("alpha"), _FakeTenant("beta")],
         ),
+        patch("django_tenants.utils.tenant_context", _fake_tenant_context),
         patch(
             "product.models.product.ProductTranslation.update_meili_settings",
             side_effect=[RuntimeError("boom"), None],
@@ -94,33 +129,18 @@ def test_a_failing_tenant_does_not_stop_the_remaining_ones():
 
 def test_the_failure_names_the_schema_that_is_still_drifted():
     """An entry naming only the index does not say which store to fix."""
-    from contextlib import contextmanager
-
     import pytest
     from django.core.management.base import CommandError
-    from django.db import connection
 
     from meili.management.commands import meilisearch_apply_settings
-
-    @contextmanager
-    def fake_schema_context(schema):
-        # Assigning schema_name directly is only safe because every
-        # collaborator here is patched, so nothing re-enters a real
-        # schema_context and strands the value; it is restored either way.
-        previous = connection.schema_name
-        connection.schema_name = schema
-        try:
-            yield
-        finally:
-            connection.schema_name = previous
 
     with (
         patch.object(
             meilisearch_apply_settings.Command,
-            "get_tenant_schemas",
-            return_value=["alpha", "beta"],
+            "get_target_tenants",
+            return_value=[_FakeTenant("alpha"), _FakeTenant("beta")],
         ),
-        patch("django_tenants.utils.schema_context", fake_schema_context),
+        patch("django_tenants.utils.tenant_context", _fake_tenant_context),
         patch(
             "product.models.product.ProductTranslation.update_meili_settings",
             side_effect=RuntimeError("boom"),

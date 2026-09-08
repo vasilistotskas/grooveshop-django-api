@@ -15,6 +15,8 @@ can distinguish "nothing to do" from "the work failed" without parsing
 stderr.
 """
 
+from contextlib import nullcontext
+
 from django.core.management.base import CommandError
 
 #: Exit code for ``--all-tenants`` matching zero active tenants.
@@ -59,16 +61,63 @@ class TenantCommandMixin:
             help="Run for all active tenant schemas",
         )
 
-    def get_tenant_schemas(self, options):
+    def iter_tenant_contexts(self, options):
+        """Yield one context manager per tenant this invocation targets.
+
+        Enters ``tenant_context``, never ``schema_context``. Both switch
+        the connection's search path, but only ``tenant_context`` puts
+        the real ``Tenant`` row on ``connection.tenant``; ``schema_
+        context`` installs a ``FakeTenant`` that carries a schema name
+        and nothing else. Every per-tenant credential is read off
+        exactly that attribute (``tenant/credentials.py:
+        _get_tenant_field``), so under ``schema_context``
+        ``acs_credentials()`` and its siblings return empty strings —
+        and a command that talks to a carrier or a payment provider
+        dies with a config error while an ORM-only command appears to
+        work perfectly. That asymmetry is how ``reconcile_acs_cod``
+        shipped unusable: its ORM half was fine, its ACS client had no
+        API key. django-tenants says the same in
+        ``utils.get_current_tenant``'s own docstring.
+
+        Iterating contexts here rather than schema names also keeps the
+        loop in one place. It was copy-pasted into ten commands, which
+        is why only one of them had to be wrong for the mistake to be
+        invisible.
+
+        Writes the per-tenant heading as a side effect so every command
+        reports progress identically. A ``None`` target yields
+        ``nullcontext()``: the caller is already inside a tenant
+        context — the Celery fanout tasks ``call_command`` under
+        ``TenantTask`` — and re-entering would be redundant.
+        """
+        from django_tenants.utils import tenant_context
+
+        for tenant in self.get_target_tenants(options):
+            if tenant is None:
+                yield nullcontext()
+                continue
+            self.stdout.write(
+                self.style.MIGRATE_HEADING(
+                    f"\n>>> Tenant: {tenant.schema_name}"
+                )
+            )
+            yield tenant_context(tenant)
+
+    def get_target_tenants(self, options):
+        """Return the ``Tenant`` rows to act on, or ``[None]``.
+
+        ``[None]`` means "use the connection context the caller already
+        established" — see ``iter_tenant_contexts``.
+        """
         from tenant.models import Tenant
 
         if options.get("all_tenants"):
-            schemas = list(
-                Tenant.objects.filter(is_active=True)
-                .exclude(schema_name="public")
-                .values_list("schema_name", flat=True)
+            tenants = list(
+                Tenant.objects.filter(is_active=True).exclude(
+                    schema_name="public"
+                )
             )
-            if not schemas:
+            if not tenants:
                 raise CommandError(
                     "No active tenants found: --all-tenants matched zero "
                     "schemas, so nothing was applied. This is not a "
@@ -76,12 +125,13 @@ class TenantCommandMixin:
                     "NO_ACTIVE_TENANTS_RETURNCODE.",
                     returncode=NO_ACTIVE_TENANTS_RETURNCODE,
                 )
-            return schemas
+            return tenants
         elif options.get("tenant"):
             schema = options["tenant"]
-            if not Tenant.objects.filter(schema_name=schema).exists():
+            tenant = Tenant.objects.filter(schema_name=schema).first()
+            if tenant is None:
                 raise CommandError(f"Tenant schema '{schema}' not found.")
-            return [schema]
+            return [tenant]
 
         if self.require_tenant_scope:
             from django.db import connection

@@ -1,5 +1,4 @@
 import time
-from contextlib import nullcontext as _nullcontext
 
 from django.apps import apps
 from django.conf import settings
@@ -53,14 +52,8 @@ class Command(TenantCommandMixin, BaseCommand):
         self.add_tenant_arguments(parser)
 
     def handle(self, *args, **options):
-        from django_tenants.utils import schema_context
-
-        for schema in self.get_tenant_schemas(options):
-            if schema:
-                self.stdout.write(
-                    self.style.MIGRATE_HEADING(f"\n>>> Tenant: {schema}")
-                )
-            with schema_context(schema) if schema else _nullcontext():
+        for ctx in self.iter_tenant_contexts(options):
+            with ctx:
                 self._handle_for_schema(*args, **options)
 
     def _handle_for_schema(self, *args, **options):

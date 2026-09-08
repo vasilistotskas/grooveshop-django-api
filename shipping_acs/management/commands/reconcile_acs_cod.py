@@ -20,7 +20,6 @@ backfills, where the delivery happened weeks ago and a sudden
 state (order_paid signal, status transition, history) still flows.
 """
 
-from contextlib import nullcontext as _nullcontext
 from datetime import timedelta
 
 from django.core.management.base import BaseCommand
@@ -62,14 +61,8 @@ class Command(TenantCommandMixin, BaseCommand):
         self.add_tenant_arguments(parser)
 
     def handle(self, *args, **options):
-        from django_tenants.utils import schema_context
-
-        for schema in self.get_tenant_schemas(options):
-            if schema:
-                self.stdout.write(
-                    self.style.MIGRATE_HEADING(f"\n>>> Tenant: {schema}")
-                )
-            with schema_context(schema) if schema else _nullcontext():
+        for ctx in self.iter_tenant_contexts(options):
+            with ctx:
                 self._handle_for_schema(*args, **options)
 
     def _handle_for_schema(self, *args, **options):

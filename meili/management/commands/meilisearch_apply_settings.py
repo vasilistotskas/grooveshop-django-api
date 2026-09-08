@@ -12,8 +12,6 @@ drift from the live indexes. A drifted sortable field once made every
 ``?sort=`` product query 500.
 """
 
-from contextlib import nullcontext as _nullcontext
-
 from django.core.management.base import BaseCommand, CommandError
 from django.utils.translation import gettext as _
 
@@ -38,14 +36,8 @@ class Command(TenantCommandMixin, BaseCommand):
 
     def handle(self, *args, **options):
         self._failures: list[str] = []
-        from django_tenants.utils import schema_context
-
-        for schema in self.get_tenant_schemas(options):
-            if schema:
-                self.stdout.write(
-                    self.style.MIGRATE_HEADING(f"\n>>> Tenant: {schema}")
-                )
-            with schema_context(schema) if schema else _nullcontext():
+        for ctx in self.iter_tenant_contexts(options):
+            with ctx:
                 self._handle_for_schema(*args, **options)
 
         # Raised after EVERY schema has been attempted, never inside the
@@ -92,7 +84,7 @@ class Command(TenantCommandMixin, BaseCommand):
         The run continues to the remaining tenants, so an entry naming
         only the index would not say WHICH store is still drifted.
         ``connection.schema_name`` is read here rather than threaded
-        through because every caller runs inside ``schema_context``.
+        through because every caller runs inside ``tenant_context``.
         """
         from django.db import connection
 

@@ -3,6 +3,46 @@
 
 
 
+## v3.46.0 (2026-09-08)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.45.0 [skip ci] ([`b25bbed`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b25bbedd41744566a7e6b764ad923219f9c6b377))
+
+### Features
+
+* feat(page_config): the selector layouts, and the two pages drawn with them
+
+The ειδίκευση and δραστηριότητες boards draw their pages as selectors
+— pick a field, or a phase, and read what it covers — where this pack
+was seeding a card grid and a timeline. Both pages are recomposed:
+
+* `/eidikefsi` — `option_selector` with `layout: "rail"`: the seven
+  fields down the left, what the chosen one covers beside them, and
+  the "something else?" prompt under the rail. The four-across grid
+  stays on the HOME page, where the board puts it; there it is a
+  glance at the seven, here they are the subject.
+* `/drastiriotites` — `option_selector` with `layout: "strip"` over
+  the eight phases, then the whole chain at a glance (the timeline the
+  page already had, now on the page's own ground), then the CTA the
+  board closes it with.
+
+`option_selector` accordingly takes `layout`, a `bullets_label`, a
+`prompt`, up to eight options, and a `bullets` list per option; and
+`story_timeline` takes the same `surface` enum as `cta_banner`, since
+it is raised on the home page and grounded on the page it belongs to.
+
+The panel content is the sourced line DECOMPOSED — the same facts,
+itemised: each field's list and each phase's deliverables read back
+against the one-liner they came from. The boards also print a
+paragraph of their own in every panel, longer than the sourced line
+and saying more than it; that copy has no source, so the panel prints
+the list instead of inventing a lead for it. Same rule as the register
+hero's third stat.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018CiyyCqkXd9a1FM5hsrPFZ ([`b594a11`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b594a1112ae3fe1f8b5bc4f5f1169141ec97a36c))
+
 ## v3.45.0 (2026-09-08)
 
 ### Chores

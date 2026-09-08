@@ -8,7 +8,10 @@ from django.contrib.auth.models import User
 from django.test import RequestFactory, TestCase, override_settings
 from django.utils import timezone
 from django.utils.translation import gettext
-from unfold.contrib.filters.admin import RangeDateTimeFilter
+from unfold.contrib.filters.admin import (
+    FieldTextFilter,
+    RangeDateTimeFilter,
+)
 
 from contact.admin import ContactAdmin, MessageLengthFilter, RecentContactFilter
 from contact.models import Contact
@@ -309,6 +312,7 @@ class TestContactAdmin(TestCase):
     def test_list_display(self):
         expected_display = [
             "contact_info",
+            "enquiry_subject",
             "message_preview",
             "message_stats",
             "contact_timing",
@@ -317,7 +321,7 @@ class TestContactAdmin(TestCase):
         self.assertEqual(self.admin.list_display, expected_display)
 
     def test_search_fields(self):
-        expected_fields = ["name", "email", "message"]
+        expected_fields = ["name", "email", "message", "company", "phone"]
         self.assertEqual(self.admin.search_fields, expected_fields)
 
     def test_readonly_fields(self):
@@ -519,6 +523,7 @@ class TestContactAdminIntegration(TestCase):
         expected_filters = [
             RecentContactFilter,
             MessageLengthFilter,
+            ("subject", FieldTextFilter),
             ("created_at", RangeDateTimeFilter),
             ("updated_at", RangeDateTimeFilter),
         ]

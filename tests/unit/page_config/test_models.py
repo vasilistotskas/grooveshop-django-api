@@ -24,9 +24,10 @@ class TestComponentType(TestCase):
         # (features_grid/media_text/image_gallery/story_timeline/faq/
         # partner_strip/pull_quote/reference_cards) + 5 page-composition
         # blocks (page_hero/feature_lists/option_selector/
-        # comparison_table/flow_steps) + 1 data table
-        # (project_register).
-        assert len(ComponentType.choices) == 39
+        # comparison_table/flow_steps) + 3 for the pages a design
+        # composes rather than writes (project_register/vendor_cards/
+        # contact_panel).
+        assert len(ComponentType.choices) == 41
 
 
 class TestPageLayout(TestCase):

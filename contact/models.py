@@ -15,6 +15,34 @@ class Contact(
     name = models.CharField(_("Name"), max_length=100)
     email = models.EmailField(_("Email"))
     message = models.TextField(_("Message"))
+    # Optional context a B2B enquiry carries and a consumer one does
+    # not. All three are blank-able because the platform's own form
+    # asks for none of them: a merchant whose form does (an
+    # engineering contractor quoting per project needs to know which
+    # utility is asking, and to phone back) gets them structured
+    # rather than buried in the message body.
+    #
+    # ``db_default``, not ``default``: the deploy applies migrations in
+    # a PreSync hook, so the column exists while the PREVIOUS image is
+    # still serving — and that image's INSERT does not list it. A
+    # Django-level default is dropped from the DDL once the migration
+    # ends, which would make every contact submission in the rollout
+    # window a NOT NULL violation. Same reasoning as
+    # ``BlogPost.click_score``.
+    company = models.CharField(
+        _("Company"), max_length=150, blank=True, db_default=""
+    )
+    phone = models.CharField(
+        _("Phone"), max_length=30, blank=True, db_default=""
+    )
+    # FREE TEXT, not choices: the taxonomy belongs to the merchant's
+    # own form ("Προσφορά έργου", "DeSET / ΑΠΕ", "Υποστήριξη"), which
+    # is content in a page section, not a platform-wide enum. It is a
+    # self-declared label on an anonymous submission and never an
+    # authorization input.
+    subject = models.CharField(
+        _("Subject"), max_length=60, blank=True, db_default=""
+    )
 
     objects: ContactManager = ContactManager()
 

@@ -243,7 +243,10 @@ def validate_business_hours_setting(value: object) -> bool:
 # STORE_OFFICES extra_setting
 # ---------------------------------------------------------------------------
 
-_OFFICE_TEXT_KEYS = ("label", "street", "area", "city")
+# ``role`` is the short word a design prints BESIDE an office —
+# "ΕΔΡΑ" / "ΓΡΑΦΕΙΟ", "Head office" / "Branch". A text key, so the
+# i18n overlay translates it like the rest.
+_OFFICE_TEXT_KEYS = ("label", "street", "area", "city", "role")
 _OFFICE_KEYS = {*_OFFICE_TEXT_KEYS, "postal", "phones", "i18n"}
 
 
@@ -255,9 +258,10 @@ def validate_store_offices_setting(value: object) -> bool:
     ``ValidationError``.
 
     Shape: a list of at most 10 offices, each
-    ``{"label", "street", "area", "postal", "city", "phones": [...],
-    "i18n": {"<locale>": {"label"?, "street"?, "area"?, "city"?}}}``.
-    ``label`` and ``street`` are required; the rest are optional.
+    ``{"label", "street", "area", "postal", "city", "role",
+    "phones": [...], "i18n": {"<locale>": {"label"?, "street"?,
+    "area"?, "city"?, "role"?}}}``. ``label`` and ``street`` are
+    required; the rest are optional.
 
     ``i18n`` is a PARTIAL per-locale override of the text keys only,
     the same shape and the same reasoning as ``PageSection.i18n``: a
@@ -284,7 +288,7 @@ def validate_store_offices_setting(value: object) -> bool:
         for key in ("label", "street"):
             if not isinstance(office.get(key), str) or not office[key].strip():
                 return False
-        for key in ("area", "postal", "city"):
+        for key in ("area", "postal", "city", "role"):
             entry = office.get(key)
             if entry is not None and not isinstance(entry, str):
                 return False

@@ -37,6 +37,9 @@ class TestContactWriteSerializer(TestCase):
             "name",
             "email",
             "message",
+            "company",
+            "phone",
+            "subject",
             "created_at",
             "updated_at",
             "uuid",
@@ -46,6 +49,66 @@ class TestContactWriteSerializer(TestCase):
         read_only_fields = {"created_at", "updated_at", "uuid"}
         for field_name in read_only_fields:
             assert serializer.fields[field_name].read_only
+
+    def test_the_optional_context_fields_are_optional(self):
+        """The platform's own form asks for none of the three."""
+        serializer = ContactWriteSerializer(data=self.valid_data)
+
+        assert serializer.is_valid(), serializer.errors
+        contact = serializer.save()
+        assert contact.company == ""
+        assert contact.phone == ""
+        assert contact.subject == ""
+
+    def test_a_b2b_enquiry_keeps_its_context_structured(self):
+        serializer = ContactWriteSerializer(
+            data={
+                **self.valid_data,
+                "company": "ΔΕΥΑ Καστοριάς",
+                "phone": "+30 2310 924 440",
+                "subject": "Προσφορά έργου",
+            }
+        )
+
+        assert serializer.is_valid(), serializer.errors
+        contact = serializer.save()
+        assert contact.company == "ΔΕΥΑ Καστοριάς"
+        assert contact.phone == "+30 2310 924 440"
+        assert contact.subject == "Προσφορά έργου"
+
+    def test_the_phone_field_refuses_a_second_message(self):
+        """Digits and punctuation, in any country's format.
+
+        Not a format check — an office number, a mobile and an
+        international prefix are all valid, and the platform serves
+        more than one country. It only stops the field being used as
+        another free-text body.
+        """
+        for value in ("(0030) 2310-924.440", "2310 924 440", "+302310924440"):
+            serializer = ContactWriteSerializer(
+                data={**self.valid_data, "phone": value}
+            )
+            assert serializer.is_valid(), (value, serializer.errors)
+
+        serializer = ContactWriteSerializer(
+            data={**self.valid_data, "phone": "call me at the office please"}
+        )
+        assert not serializer.is_valid()
+        assert "phone" in serializer.errors
+
+    def test_the_context_fields_are_sanitized_like_the_message(self):
+        serializer = ContactWriteSerializer(
+            data={
+                **self.valid_data,
+                "company": "<b>ACME</b>   S.A.",
+                "subject": "<script>x</script>Υποστήριξη",
+            }
+        )
+
+        assert serializer.is_valid(), serializer.errors
+        contact = serializer.save()
+        assert contact.company == "ACME S.A."
+        assert "<" not in contact.subject
 
     def test_validate_name_valid(self):
         serializer = ContactWriteSerializer()

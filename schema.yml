@@ -35234,6 +35234,8 @@ components:
       - comparison_table
       - flow_steps
       - project_register
+      - vendor_cards
+      - contact_panel
       type: string
       description: |-
         * `hero_banner` - Hero Banner
@@ -35275,6 +35277,8 @@ components:
         * `comparison_table` - Comparison Table
         * `flow_steps` - Flow Steps
         * `project_register` - Project Register
+        * `vendor_cards` - Vendor Cards
+        * `contact_panel` - Contact Panel
     ConfirmAgentPaymentRequestRequest:
       type: object
       properties:
@@ -35347,6 +35351,17 @@ components:
         message:
           type: string
           title: Μήνυμα
+        company:
+          type: string
+          title: Επωνυμία
+          maxLength: 150
+        phone:
+          type: string
+          title: Τηλέφωνο
+          maxLength: 30
+        subject:
+          type: string
+          maxLength: 60
         createdAt:
           type: string
           format: date-time
@@ -35386,6 +35401,17 @@ components:
           type: string
           minLength: 1
           title: Μήνυμα
+        company:
+          type: string
+          title: Επωνυμία
+          maxLength: 150
+        phone:
+          type: string
+          title: Τηλέφωνο
+          maxLength: 30
+        subject:
+          type: string
+          maxLength: 60
       required:
       - email
       - message

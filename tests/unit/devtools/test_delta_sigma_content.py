@@ -167,16 +167,27 @@ def test_every_content_page_ships_both_locales():
         assert len(english["body"]) > len(locales["el"]["body"]) * 0.6, slug
 
 
-def test_the_contact_block_is_written_in_both_languages():
-    english = delta_sigma._contact_html_en()
+def test_the_offices_setting_carries_both_languages_and_both_roles():
+    """The contact page reads the OFFICES, so the setting is the copy.
 
-    assert "Contact" in english
-    assert "Thessaloniki" in english
-    assert "Attica" in english
-    # The phone numbers are the same in both.
-    for office in delta_sigma.OFFICES:
-        for phone in office["phones"]:
-            assert phone in english
+    It used to be an HTML block built for the page's ``rich_text``
+    section, which meant the addresses existed twice — once as prose
+    and once as the setting the footer reads. The panel reads the
+    setting, so the block is gone and this asserts what replaced it.
+    """
+    offices = delta_sigma.SETTINGS["STORE_OFFICES"]
+
+    assert len(offices) == len(delta_sigma.OFFICES)
+    for office in offices:
+        english = office["i18n"]["en"]
+        assert not _has_greek(english["label"])
+        assert not _has_greek(english["street"])
+        # The word the contact card prints in its corner, in both.
+        assert office["role"]
+        assert english["role"] and not _has_greek(english["role"])
+        # A postcode and a phone number read the same in every
+        # language, so the overlay must not carry them.
+        assert not {"postal", "phones"} & set(english)
 
 
 @pytest.mark.django_db

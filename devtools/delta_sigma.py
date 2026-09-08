@@ -162,6 +162,11 @@ THEME = {
 OFFICES = [
     {
         "label": "Θεσσαλονίκη",
+        # The word the contact artboard prints in the card's corner.
+        # An attribute of the OFFICE, so it travels with the setting
+        # rather than being copy in a section — the footer and the
+        # contact page then cannot disagree about which one is the seat.
+        "role": "ΕΔΡΑ",
         "street": "Γ. Ρίτσου 7",
         "area": "Καλαμαριά",
         "postal": "551 32",
@@ -172,10 +177,12 @@ OFFICES = [
             "street": "7 G. Ritsou St.",
             "area": "Kalamaria",
             "city": "Thessaloniki",
+            "role": "HEAD OFFICE",
         },
     },
     {
         "label": "Αττική",
+        "role": "ΓΡΑΦΕΙΟ",
         "street": "Ιλισίων 23",
         "area": "Ζωγράφου",
         "postal": "157 71",
@@ -186,6 +193,7 @@ OFFICES = [
             "street": "23 Ilision St.",
             "area": "Zografou",
             "city": "Attica",
+            "role": "OFFICE",
         },
     },
 ]
@@ -287,6 +295,7 @@ SETTINGS = {
     "STORE_OFFICES": [
         {
             "label": office["label"],
+            "role": office["role"],
             "street": office["street"],
             "area": office["area"],
             "postal": office["postal"],
@@ -314,49 +323,6 @@ SETTINGS = {
         },
     },
 }
-
-
-def _office_block(office: dict, *, locale: str = "el") -> str:
-    fields = office if locale == "el" else {**office, **office["en"]}
-    phone_label = "Τηλ" if locale == "el" else "Tel"
-    phones = " · ".join(office["phones"])
-    return (
-        f"<h3>{fields['label']}</h3>"
-        f"<p>{fields['street']}, {fields['area']} {office['postal']}, "
-        f"{fields['city']}<br>"
-        f"{phone_label}: {phones}</p>"
-    )
-
-
-def _contact_html() -> str:
-    """The contact block for the `contact` page layout."""
-    return (
-        "<h2>Επικοινωνία</h2>"
-        "<p>Στείλτε μας την περιγραφή του έργου ή τα τεύχη δημοπράτησης. "
-        "Απαντάμε με προτεινόμενη λύση, κατάλογο υλικών και "
-        "χρονοδιάγραμμα.</p>"
-        + "".join(_office_block(office) for office in OFFICES)
-        + f'<p>Email: <a href="mailto:{CONTACT_EMAIL}">{CONTACT_EMAIL}</a>'
-        f"<br>Γ.Ε.ΜΗ.: {GEMH}</p>"
-    )
-
-
-def _contact_html_en() -> str:
-    """The same block in English.
-
-    ``Γ.Ε.ΜΗ.`` is the Greek commercial registry; "General Commercial
-    Registry (GEMI)" is its own published English name, so the number
-    stays labelled rather than transliterated.
-    """
-    return (
-        "<h2>Contact</h2>"
-        "<p>Send us the project description or the tender documents. We "
-        "reply with a proposed solution, a bill of materials and a "
-        "schedule.</p>"
-        + "".join(_office_block(office, locale="en") for office in OFFICES)
-        + f'<p>Email: <a href="mailto:{CONTACT_EMAIL}">{CONTACT_EMAIL}</a>'
-        f"<br>General Commercial Registry (GEMI): {GEMH}</p>"
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -1730,16 +1696,19 @@ PAGE_HEROES = {
         "el": {
             "eyebrow": "Συνεργάτες",
             "heading": "Ο εξοπλισμός που εμπιστευόμαστε",
-            "body": "Επιλέγουμε κατασκευαστές με αποδεδειγμένη "
-            "αξιοπιστία σε βιομηχανικό περιβάλλον και διαθεσιμότητα "
-            "ανταλλακτικών στον χρόνο ζωής της εγκατάστασης.",
+            # The artboard's own words, and the ones that say what the
+            # page is FOR: not a list of brands but the promise behind
+            # choosing them per project.
+            "body": "Δεν είσαστε δεσμευμένοι σε έναν κατασκευαστή. "
+            "Επιλέγουμε ανά έργο — και είμαστε το πρώτο κλιμάκιο "
+            "επισκευής για ό,τι προμηθεύουμε.",
         },
         "en": {
             "eyebrow": "Partners",
             "heading": "The equipment we trust",
-            "body": "We choose manufacturers with proven reliability in "
-            "an industrial environment and spare-part availability "
-            "across the installation's life.",
+            "body": "You are not tied to a single manufacturer. We "
+            "choose per project — and we are the first line of repair "
+            "for everything we supply.",
         },
     },
 }
@@ -1753,6 +1722,196 @@ def _page_hero(page: str, *, locale: str = "el") -> dict:
     if "secondary_cta_text" in hero:
         hero["secondary_cta_link"] = PAGE_DESET
     return hero
+
+
+# --- The συνεργάτες page's bands --------------------------------------
+#
+# One card per manufacturer, in the artboard's order — the same four
+# ``PARTNER_BRANDS`` the home strip names, because the strip is the
+# glance and this is the explanation. INVT and Advantech are NOT cards
+# here (the artboard leaves them to the note below, and the DeSET page
+# explains both where they matter, on the system that uses them).
+#
+# Every claim is one the company publishes: the descriptions are the
+# ``/info/synergates`` prose, and the tags are part numbers, buses and
+# protocols that appear in ``DESET_SYSTEMS`` or in ODOT's own catalogue.
+# The artboard's ABB card adds "έργα με ABB PLC σε αντλιοστάσια Έβρου
+# και στην Αθηένου Κύπρου" — no source of ours evidences those two
+# installations (they are in neither the register nor the site), so
+# they are left out rather than asserted.
+VENDORS = [
+    {
+        "title": "ABB",
+        "label": "Αυτοματισμός & ελεγκτές",
+        "text": "Ελεγκτές, ρυθμιστές στροφών και εξοπλισμός "
+        "αυτοματισμού. Το Σύστημα DeSET 01 βασίζεται στο PLC ABB "
+        "PM5072-2ETH.",
+        "tags": ["PM5072-2ETH", "Modbus TCP", "CODESYS", "Ρυθμιστές στροφών"],
+    },
+    {
+        "title": "Milesight",
+        "label": "Industrial IoT",
+        "text": "Αισθητήρες και gateways για βιομηχανικό Internet of "
+        "Things — η υποδομή που στηρίζει την απομακρυσμένη συλλογή "
+        "μετρήσεων.",
+        "tags": ["IoT sensors", "LoRaWAN", "Gateways", "Τηλεμετρία"],
+    },
+    {
+        "title": "Aviat Networks",
+        "label": "Ραδιοζεύξεις & δίκτυα",
+        "text": "Ασύρματες ζεύξεις για εγκαταστάσεις διάσπαρτες σε "
+        "δεκάδες χιλιόμετρα — εκεί όπου η οπτική ίνα δεν είναι εφικτή "
+        "ή οικονομική.",
+        "tags": ["Μικροκυματικές ζεύξεις", "Backhaul", "Τηλεχειρισμοί"],
+    },
+    {
+        "title": "ODOT Automation",
+        "label": "Remote I/O & επικοινωνίες",
+        "text": "Είμαστε επίσημοι μεταπωλητές στην Ελλάδα: κάρτες "
+        "απομακρυσμένων εισόδων/εξόδων και κάρτες επικοινωνιών, άμεσα "
+        "διαθέσιμες από το απόθεμά μας, με πιστοποίηση CE.",
+        "tags": ["Remote I/O", "C3351", "Modbus RTU & TCP", "PROFINET"],
+    },
+]
+
+VENDORS_EN = [
+    {
+        "title": "ABB",
+        "label": "Automation & controllers",
+        "text": "Controllers, variable-speed drives and automation "
+        "equipment. DeSET System 01 is built on the ABB PM5072-2ETH "
+        "PLC.",
+        "tags": [
+            "PM5072-2ETH",
+            "Modbus TCP",
+            "CODESYS",
+            "Variable-speed drives",
+        ],
+    },
+    {
+        "title": "Milesight",
+        "label": "Industrial IoT",
+        "text": "Sensors and gateways for the industrial Internet of "
+        "Things — the infrastructure behind remote metering.",
+        "tags": ["IoT sensors", "LoRaWAN", "Gateways", "Telemetry"],
+    },
+    {
+        "title": "Aviat Networks",
+        "label": "Radio links & networks",
+        "text": "Wireless links for installations spread over tens of "
+        "kilometres — where fibre is neither feasible nor economic.",
+        "tags": ["Microwave links", "Backhaul", "Remote control"],
+    },
+    {
+        "title": "ODOT Automation",
+        "label": "Remote I/O & communications",
+        "text": "We are the official reseller in Greece: remote I/O "
+        "cards and communication cards, available straight from our "
+        "stock and CE certified.",
+        "tags": ["Remote I/O", "C3351", "Modbus RTU & TCP", "PROFINET"],
+    },
+]
+
+VENDORS_NOTE = (
+    "Επιπλέον εργαζόμαστε σε πλατφόρμες Siemens (Simatic Step 5 / "
+    "Step 7, SCADA WinCC), WAGO, INVT και Advantech — ανάλογα με τις "
+    "απαιτήσεις του έργου."
+)
+VENDORS_NOTE_EN = (
+    "We also work on Siemens platforms (Simatic Step 5 / Step 7, "
+    "SCADA WinCC), WAGO, INVT and Advantech — according to what the "
+    "project asks for."
+)
+
+# What a supply comes with, as the artboard's four framed cells.
+SUPPLY_HEADING = "Τι συνοδεύει κάθε προμήθεια"
+SUPPLY_HEADING_EN = "What every supply comes with"
+SUPPLY_BODY = "Η προμήθεια δεν τελειώνει με την παράδοση του κιβωτίου."
+SUPPLY_BODY_EN = "A supply does not end when the box is delivered."
+
+SUPPLY_INCLUDES = [
+    {
+        "title": "Υποστήριξη κατά την πώληση",
+        "text": "Επιλογή του σωστού μοντέλου για την εφαρμογή, πριν "
+        "την παραγγελία.",
+    },
+    {
+        "title": "Παραμετροποίηση",
+        "text": "Παραδίδουμε τη συσκευή ρυθμισμένη, με αρχείο παραμέτρων.",
+    },
+    {
+        "title": "Προγραμματισμός",
+        "text": "Υπηρεσίες προγραμματισμού για τις συσκευές που παρέχουμε.",
+    },
+    {
+        "title": "Πρώτο κλιμάκιο επισκευής",
+        "text": "Επισκευάζουμε ό,τι προμηθεύουμε, με συνέπεια.",
+    },
+]
+
+SUPPLY_INCLUDES_EN = [
+    {
+        "title": "Pre-sales support",
+        "text": "Choosing the right model for the application, before "
+        "the order.",
+    },
+    {
+        "title": "Parameterisation",
+        "text": "We hand the device over configured, with its parameter file.",
+    },
+    {
+        "title": "Programming",
+        "text": "Programming services for the devices we supply.",
+    },
+    {
+        "title": "First line of repair",
+        "text": "We repair what we supply, consistently.",
+    },
+]
+
+
+# --- The contact page -------------------------------------------------
+#
+# One band: the copy and the published offices on the left, the enquiry
+# form on the right. The subject list is what the artboard's chips say
+# — the four things this company is actually asked about — and it is
+# what lands in ``Contact.subject``.
+CONTACT_PANEL = {
+    "el": {
+        "eyebrow": "Επικοινωνία",
+        "heading": "Πείτε μας τι πρέπει να λειτουργήσει.",
+        "body": "Δύο γραφεία, Θεσσαλονίκη και Αττική. Απαντάμε σε κάθε "
+        "αίτημα με προτεινόμενη λύση, κατάλογο υλικών και "
+        "χρονοδιάγραμμα.",
+        "hint": "Όσο πιο συγκεκριμένη η περιγραφή, τόσο πιο ακριβής η "
+        "προσφορά. Αν έχετε τεύχη δημοπράτησης ή σχέδια, στείλτε τα "
+        "μαζί με το αίτημα.",
+        "response_time": "Απάντηση εντός 2 εργάσιμων ημερών",
+        "subjects": [
+            {"label": "Προσφορά έργου"},
+            {"label": "DeSET / ΑΠΕ"},
+            {"label": "Υποστήριξη"},
+            {"label": "Άλλο"},
+        ],
+    },
+    "en": {
+        "eyebrow": "Contact",
+        "heading": "Tell us what has to work.",
+        "body": "Two offices, Thessaloniki and Attica. We answer every "
+        "enquiry with a proposed solution, a bill of materials and a "
+        "schedule.",
+        "hint": "The more specific the description, the more accurate "
+        "the quote. If you have tender documents or drawings, send "
+        "them with the enquiry.",
+        "response_time": "An answer within 2 working days",
+        "subjects": [
+            {"label": "Project quote"},
+            {"label": "DeSET / renewables"},
+            {"label": "Support"},
+            {"label": "Other"},
+        ],
+    },
+}
 
 
 # --- The DeSET page's bands ------------------------------------------
@@ -2418,41 +2577,22 @@ def _layout_plan() -> dict:
         ],
         # contact.vue renders usePageConfig('contact') — without a
         # layout the page shows only the bare form, no addresses.
+        # ONE band, which is how the artboard draws it: the copy and
+        # the offices left, the enquiry form right. It replaces the
+        # hero + prose pair — a page whose form was under an article
+        # of addresses, when the design puts the two side by side and
+        # reads the addresses from ``STORE_OFFICES`` rather than from
+        # copy that could disagree with the footer.
         "contact": [
             {
-                "component_type": "page_hero",
+                "component_type": "contact_panel",
                 "title": "Επικοινωνία",
                 "sort_order": 0,
-                "props": {
-                    "eyebrow": "Επικοινωνία",
-                    "heading": "Πείτε μας τι πρέπει να λειτουργήσει.",
-                    "body": "Στείλτε μας την περιγραφή ή τα τεύχη "
-                    "δημοπράτησης. Απαντάμε με προτεινόμενη λύση, "
-                    "κατάλογο υλικών και χρονοδιάγραμμα.",
-                },
+                "props": CONTACT_PANEL["el"],
                 "i18n": {
                     "en": {
                         "title": "Contact",
-                        "props": {
-                            "eyebrow": "Contact",
-                            "heading": "Tell us what has to work.",
-                            "body": "Send us the description or the "
-                            "tender documents. We reply with a proposed "
-                            "solution, a bill of materials and a "
-                            "schedule.",
-                        },
-                    }
-                },
-            },
-            {
-                "component_type": "rich_text",
-                "title": "Στοιχεία επικοινωνίας",
-                "sort_order": 1,
-                "props": {"content": _contact_html()},
-                "i18n": {
-                    "en": {
-                        "title": "Contact details",
-                        "props": {"content": _contact_html_en()},
+                        "props": CONTACT_PANEL["en"],
                     }
                 },
             },
@@ -2709,17 +2849,69 @@ def _layout_plan() -> dict:
                 },
             },
             {
-                "component_type": "partner_strip",
-                "title": "Συνεργασίες",
+                "component_type": "vendor_cards",
+                "title": "Κατασκευαστές",
                 "sort_order": 1,
+                "props": {"items": VENDORS, "note": VENDORS_NOTE},
+                "i18n": {
+                    "en": {
+                        "title": "Manufacturers",
+                        "props": {
+                            "items": VENDORS_EN,
+                            "note": VENDORS_NOTE_EN,
+                        },
+                    }
+                },
+            },
+            {
+                "component_type": "features_grid",
+                "title": "Τι συνοδεύει κάθε προμήθεια",
+                "sort_order": 2,
                 "props": {
-                    "label": "Συνεργαζόμαστε με",
-                    "items": PARTNER_BRANDS,
+                    "heading": SUPPLY_HEADING,
+                    "body": SUPPLY_BODY,
+                    "items": SUPPLY_INCLUDES,
+                    "columns": 4,
+                    # Four cells in ONE frame, divided by rules — not
+                    # four cards, and no ordinals: these are the parts
+                    # of a single promise, not a numbered sequence.
+                    "decor": "framed",
                 },
                 "i18n": {
                     "en": {
-                        "title": "Partnerships",
-                        "props": {"label": "We work with"},
+                        "title": "What every supply comes with",
+                        "props": {
+                            "heading": SUPPLY_HEADING_EN,
+                            "body": SUPPLY_BODY_EN,
+                            "items": SUPPLY_INCLUDES_EN,
+                        },
+                    }
+                },
+            },
+            {
+                "component_type": "cta_banner",
+                "title": "CTA",
+                "sort_order": 3,
+                "props": {
+                    "heading": "Χρειάζεστε εξοπλισμό, όχι ολόκληρο έργο;",
+                    "description": "Προμηθεύουμε και υποστηρίζουμε "
+                    "μεμονωμένο εξοπλισμό με τον ίδιο τρόπο που "
+                    "παραδίδουμε ολόκληρη εγκατάσταση.",
+                    "button_text": "Ζητήστε προσφορά",
+                    "button_link": "/contact",
+                    # The band above it is the raised one, so this one
+                    # is the ground — see the prop's note.
+                    "surface": "default",
+                },
+                "i18n": {
+                    "en": {
+                        "props": {
+                            "heading": "Need equipment, not a whole project?",
+                            "description": "We supply and support "
+                            "single devices the same way we hand over "
+                            "a whole installation.",
+                            "button_text": "Request a quote",
+                        }
                     }
                 },
             },

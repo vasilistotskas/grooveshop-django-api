@@ -4,7 +4,11 @@ from django.contrib import admin
 from django.db.models.functions import Length
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
-from unfold.contrib.filters.admin import DropdownFilter, RangeDateTimeFilter
+from unfold.contrib.filters.admin import (
+    DropdownFilter,
+    FieldTextFilter,
+    RangeDateTimeFilter,
+)
 from unfold.decorators import display
 
 from admin.displays import format_dt, header_two_line, relative_time
@@ -90,6 +94,7 @@ class ContactAdmin(ExportModelAdmin):
 
     list_display = [
         "contact_info",
+        "enquiry_subject",
         "message_preview",
         "message_stats",
         "contact_timing",
@@ -98,10 +103,14 @@ class ContactAdmin(ExportModelAdmin):
     list_filter = [
         RecentContactFilter,
         MessageLengthFilter,
+        # A text search, not a dropdown: the values are the merchant's
+        # own (its form declares them, not a platform enum), so there
+        # is no choice list to populate one from.
+        ("subject", FieldTextFilter),
         ("created_at", RangeDateTimeFilter),
         ("updated_at", RangeDateTimeFilter),
     ]
-    search_fields = ["name", "email", "message"]
+    search_fields = ["name", "email", "message", "company", "phone"]
     readonly_fields = (
         "id",
         "uuid",
@@ -115,14 +124,14 @@ class ContactAdmin(ExportModelAdmin):
         (
             _("Contact Information"),
             {
-                "fields": ("name", "email"),
+                "fields": ("name", "email", "company", "phone"),
                 "classes": ("wide",),
             },
         ),
         (
             _("Message"),
             {
-                "fields": ("message",),
+                "fields": ("subject", "message"),
                 "classes": ("wide",),
             },
         ),
@@ -137,6 +146,19 @@ class ContactAdmin(ExportModelAdmin):
 
     def get_ordering(self, request):
         return ["-created_at", "name"]
+
+    @display(description=_("Subject"), ordering="subject")
+    def enquiry_subject(self, obj):
+        """What the sender said the enquiry is about, plus who they are.
+
+        Both halves are optional and usually absent — the platform's
+        own form asks for neither — so this renders an em dash rather
+        than an empty cell.
+        """
+        return (
+            " · ".join(part for part in (obj.subject, obj.company) if part)
+            or "—"
+        )
 
     @display(description=_("Contact"), header=True, ordering="name")
     def contact_info(self, obj):

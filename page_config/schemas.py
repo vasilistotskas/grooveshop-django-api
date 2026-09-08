@@ -440,6 +440,15 @@ _VALIDATORS: dict[str, dict] = {
         "background_color": lambda v: (
             None if isinstance(v, str) and _HEX_RE.match(v) else "#RRGGBB hex"
         ),
+        # WHICH of the two page surfaces this band paints — an enum, not
+        # a colour (that is ``background_color``, a platform-era prop).
+        # A design that stacks full-width bands separates two of them by
+        # alternating ground and raised; a CTA lands last on one page
+        # and after a raised band on another, so the choice belongs to
+        # the page rather than the component.
+        "surface": lambda v: (
+            None if v in ("default", "muted") else "one of default/muted"
+        ),
     },
     "newsletter_signup": {
         "heading": lambda v: None if _is_str(v, 200) else "string ≤200",
@@ -644,6 +653,51 @@ _VALIDATORS: dict[str, dict] = {
             optional={"sector": 40, "note": 200, "meta": 120},
         ),
     },
+    "vendor_cards": {
+        # One card per manufacturer or platform the store works with:
+        # what it is (a short category label), what the store does with
+        # it, and the models and protocols that make the work
+        # recognisable. The tags are CHIPS, not sentences — a part
+        # number, a bus, a band.
+        #
+        # Distinct from ``partner_strip``, which is a row of names at a
+        # glance and says nothing about any of them.
+        "note": lambda v: None if _is_str(v, 400) else "string ≤400",
+        "items": lambda v: _check_nested_lines(
+            v,
+            name="items",
+            max_items=8,
+            required={"title": 60},
+            optional={"label": 60, "text": 600},
+            lines_key="tags",
+            max_lines=8,
+            line_length=40,
+        ),
+    },
+    "contact_panel": {
+        # The contact page as ONE band: the copy and the published
+        # offices on the left, the enquiry form on the right. The
+        # offices are NOT props — they come from the STORE_OFFICES
+        # setting, so the page cannot disagree with the footer.
+        #
+        # The form's own field labels are not props either: they are
+        # UI, not merchant copy, and they live in the component. What
+        # IS here is what changes per store: the copy, the subject
+        # taxonomy its enquiries divide into, the hint above the form
+        # and the answer time it promises.
+        "eyebrow": lambda v: None if _is_str(v, 100) else "string ≤100",
+        "heading": lambda v: None if _is_str(v, 200) else "string ≤200",
+        "body": lambda v: None if _is_str(v, 600) else "string ≤600",
+        "hint": lambda v: None if _is_str(v, 400) else "string ≤400",
+        "response_time": lambda v: None if _is_str(v, 120) else "string ≤120",
+        "subjects": lambda v: _check_items(
+            v,
+            max_items=6,
+            required={"label": 40},
+            optional={},
+            name="subjects",
+        ),
+    },
     "pull_quote": {
         # A stated principle with the reason under it — not a
         # testimonial, which is somebody else's words and needs an
@@ -661,11 +715,14 @@ _VALIDATORS: dict[str, dict] = {
             optional={"text": 500, "icon": 100},
             icon_keys=frozenset({"icon"}),
         ),
+        # A line under the heading, for a grid whose cells are framed
+        # together rather than introduced one by one.
+        "body": lambda v: None if _is_str(v, 600) else "string ≤600",
         "columns": lambda v: None if _is_int(v, 1, 4) else "int 1–4",
         "decor": lambda v: (
             None
-            if v in ("none", "gradient_tiles")
-            else "one of none/gradient_tiles"
+            if v in ("none", "gradient_tiles", "framed")
+            else "one of none/gradient_tiles/framed"
         ),
         # The band's own link, beside the heading rather than under the
         # grid — the artboards put "all of them →" there on every band

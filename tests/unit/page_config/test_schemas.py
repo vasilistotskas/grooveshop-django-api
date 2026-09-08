@@ -536,3 +536,84 @@ def test_project_register_rejects_a_sector_nothing_declares():
         "project_register",
         {"items": [{"sector": "energeia", "title": "Έργο"}]},
     )
+
+
+def test_vendor_cards_props():
+    """A card per manufacturer: what it is, and the parts that prove it."""
+    validate_section_props(
+        "vendor_cards",
+        {
+            "note": "Επιπλέον εργαζόμαστε σε πλατφόρμες Siemens και WAGO.",
+            "items": [
+                {
+                    "title": "ABB",
+                    "label": "Αυτοματισμός & ελεγκτές",
+                    "text": "Ελεγκτές και ρυθμιστές στροφών.",
+                    "tags": ["PM5072-2ETH", "Modbus TCP"],
+                },
+                {"title": "ODOT Automation"},
+            ],
+        },
+    )
+    with pytest.raises(ValidationError, match="items"):
+        validate_section_props("vendor_cards", {"items": [{"label": "x"}]})
+    with pytest.raises(ValidationError):
+        validate_section_props(
+            "vendor_cards",
+            {"items": [{"title": "ABB", "tags": ["x"] * 9}]},
+        )
+    with pytest.raises(ValidationError):
+        validate_section_props(
+            "vendor_cards", {"items": [{"title": "ABB", "logo": "abb.svg"}]}
+        )
+
+
+def test_contact_panel_props():
+    """The copy and the enquiry taxonomy — not the offices, not the labels."""
+    validate_section_props(
+        "contact_panel",
+        {
+            "eyebrow": "Επικοινωνία",
+            "heading": "Πείτε μας τι πρέπει να λειτουργήσει.",
+            "body": "Δύο γραφεία, Θεσσαλονίκη και Αττική.",
+            "hint": "Όσο πιο συγκεκριμένη η περιγραφή, τόσο πιο ακριβής.",
+            "response_time": "Απάντηση εντός 2 εργάσιμων ημερών",
+            "subjects": [
+                {"label": "Προσφορά έργου"},
+                {"label": "Υποστήριξη"},
+            ],
+        },
+    )
+    with pytest.raises(ValidationError, match="subjects"):
+        validate_section_props(
+            "contact_panel", {"subjects": [{"name": "Προσφορά"}]}
+        )
+    # The addresses come from STORE_OFFICES; a page cannot carry a
+    # second copy of them.
+    with pytest.raises(ValidationError, match="unknown prop"):
+        validate_section_props(
+            "contact_panel", {"offices": [{"label": "Θεσσαλονίκη"}]}
+        )
+
+
+def test_cta_banner_surface_is_an_enum():
+    """WHICH page surface the band paints, not a colour."""
+    validate_section_props("cta_banner", {"surface": "default"})
+    validate_section_props("cta_banner", {"surface": "muted"})
+    with pytest.raises(ValidationError):
+        validate_section_props("cta_banner", {"surface": "#0F172A"})
+
+
+def test_features_grid_can_be_framed_with_a_standfirst():
+    validate_section_props(
+        "features_grid",
+        {
+            "heading": "Τι συνοδεύει κάθε προμήθεια",
+            "body": "Η προμήθεια δεν τελειώνει με την παράδοση.",
+            "items": [{"title": "Παραμετροποίηση", "text": "Ρυθμισμένη."}],
+            "columns": 4,
+            "decor": "framed",
+        },
+    )
+    with pytest.raises(ValidationError):
+        validate_section_props("features_grid", {"decor": "boxed"})

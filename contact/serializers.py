@@ -1,3 +1,5 @@
+import re
+
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
@@ -8,6 +10,11 @@ from contact.utils import (
     validate_feedback_content,
 )
 
+# Digits plus the punctuation phone numbers are written with, in any
+# country: `+30 2310 924 440`, `(0030) 2310-924440 ext. 12` is not
+# accepted — an extension goes in the message.
+_PHONE_RE = re.compile(r"[0-9+()\-.\s]{5,30}")
+
 
 class ContactWriteSerializer(serializers.ModelSerializer[Contact]):
     class Meta:
@@ -17,6 +24,9 @@ class ContactWriteSerializer(serializers.ModelSerializer[Contact]):
             "name",
             "email",
             "message",
+            "company",
+            "phone",
+            "subject",
             "created_at",
             "updated_at",
             "uuid",
@@ -54,6 +64,27 @@ class ContactWriteSerializer(serializers.ModelSerializer[Contact]):
                 _("Name must be at least 2 characters long.")
             )
         return value.strip()
+
+    def validate_company(self, value: str) -> str:
+        return sanitize_message(value)
+
+    def validate_phone(self, value: str) -> str:
+        """Digits and the punctuation a phone number is written with.
+
+        Not a format check: an office number, a mobile, an
+        international prefix and an extension are all valid here, and
+        the platform serves more than one country. This only refuses
+        the field being used as a second message body.
+        """
+        cleaned = sanitize_message(value)
+        if cleaned and not _PHONE_RE.fullmatch(cleaned):
+            raise serializers.ValidationError(
+                _("Enter a phone number, using digits and + ( ) - only.")
+            )
+        return cleaned
+
+    def validate_subject(self, value: str) -> str:
+        return sanitize_message(value)
 
     def validate_message(self, value: str) -> str:
         if len(value.strip()) < 10:

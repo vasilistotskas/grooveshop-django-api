@@ -104,6 +104,8 @@ class ComponentType(models.TextChoices):
     COMPARISON_TABLE = "comparison_table", _("Comparison Table")
     FLOW_STEPS = "flow_steps", _("Flow Steps")
     PROJECT_REGISTER = "project_register", _("Project Register")
+    VENDOR_CARDS = "vendor_cards", _("Vendor Cards")
+    CONTACT_PANEL = "contact_panel", _("Contact Panel")
 
 
 class PageLayout(

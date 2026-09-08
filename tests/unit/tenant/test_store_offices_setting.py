@@ -21,6 +21,7 @@ _VALID = [
         "area": "Καλαμαριά",
         "postal": "551 32",
         "city": "Θεσσαλονίκη",
+        "role": "ΕΔΡΑ",
         "phones": ["2310 924 440", "2310 934 169"],
         "i18n": {
             "en": {
@@ -28,6 +29,7 @@ _VALID = [
                 "street": "7 G. Ritsou St.",
                 "area": "Kalamaria",
                 "city": "Thessaloniki",
+                "role": "HEAD OFFICE",
             }
         },
     }

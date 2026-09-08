@@ -82,6 +82,21 @@ class OrderSerializer(serializers.ModelSerializer[Order]):
             "at checkout."
         ),
     )
+    is_collected_on_delivery = serializers.SerializerMethodField(
+        help_text=(
+            "True when the carrier collects the money from the shopper "
+            "on delivery — courier cash-on-delivery OR payment at a "
+            "carrier's locker terminal (BoxNow PAY ON THE GO). "
+            "``is_online_payment`` cannot answer this: it is false for "
+            "bank transfer too, where the shopper pays us directly and "
+            "nothing is owed on delivery. The storefront needs the "
+            "distinction to show a collect-on-delivery order a green "
+            "'your order is placed, pay on delivery' panel instead of "
+            "the amber 'payment is processing' warning, which would "
+            "otherwise sit there for days (measured ACS remittance lag "
+            "is ~4 days)."
+        ),
+    )
     can_be_canceled = serializers.BooleanField(read_only=True)
     is_paid = serializers.BooleanField(read_only=True)
 
@@ -97,6 +112,14 @@ class OrderSerializer(serializers.ModelSerializer[Order]):
     def get_is_online_payment(self, order: Order) -> bool:
         pay_way = getattr(order, "pay_way", None)
         return bool(pay_way and pay_way.is_online_payment)
+
+    @extend_schema_field({"type": "boolean"})
+    def get_is_collected_on_delivery(self, order: Order) -> bool:
+        # Delegates to the model property so the definition of "the
+        # carrier collects this" lives in exactly one place — the same
+        # place ACS and BoxNow read when deciding a voucher's amount.
+        pay_way = getattr(order, "pay_way", None)
+        return bool(pay_way and pay_way.is_collected_on_delivery)
 
     class Meta:
         model = Order
@@ -151,6 +174,7 @@ class OrderSerializer(serializers.ModelSerializer[Order]):
             "payment_status_display",
             "payment_method",
             "is_online_payment",
+            "is_collected_on_delivery",
             "can_be_canceled",
             "is_paid",
         )
@@ -180,6 +204,7 @@ class OrderSerializer(serializers.ModelSerializer[Order]):
             "can_be_canceled",
             "is_paid",
             "is_online_payment",
+            "is_collected_on_delivery",
         )
 
 

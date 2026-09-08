@@ -28,7 +28,7 @@ STEPS: tuple[tuple[str, str], ...] = (
     ("settings", "extra_settings the published contact facts cover"),
     ("products", "DeSET category + the three systems"),
     ("projects", "Retire the BlogPosts the project register replaced"),
-    ("content_pages", "Ειδίκευση / Δραστηριότητες / Συνεργάτες (el + en)"),
+    ("content_pages", "Retire the /info/* pages the band pages replaced"),
     ("layouts", "Home page layout and its sections"),
     ("navigation", "Header / mobile / footer menus"),
 )
@@ -110,9 +110,8 @@ class Command(BaseCommand):
                 ),
                 # Nothing to overwrite: the step only unpublishes.
                 "projects": delta_sigma.retire_project_posts,
-                "content_pages": partial(
-                    delta_sigma.seed_content_pages, overwrite=overwrite
-                ),
+                # Nothing to overwrite: the step only unpublishes.
+                "content_pages": delta_sigma.retire_content_pages,
                 "layouts": partial(
                     delta_sigma.seed_layouts, overwrite=overwrite
                 ),

@@ -2820,6 +2820,10 @@ def _layout_plan() -> dict:
                     "εγκατάστασης.",
                     "button_text": "Επικοινωνία",
                     "button_link": "/contact",
+                    # The register above it runs on the page's own
+                    # ground, so the closing band is the raised one —
+                    # two adjacent bands sharing a surface read as one.
+                    "surface": "muted",
                 },
                 "i18n": {
                     "en": {
@@ -2899,9 +2903,6 @@ def _layout_plan() -> dict:
                     "παραδίδουμε ολόκληρη εγκατάσταση.",
                     "button_text": "Ζητήστε προσφορά",
                     "button_link": "/contact",
-                    # The band above it is the raised one, so this one
-                    # is the ground — see the prop's note.
-                    "surface": "default",
                 },
                 "i18n": {
                     "en": {
@@ -3033,113 +3034,17 @@ def _nav_footer_en() -> list[dict]:
     ]
 
 
-CONTENT_PAGES = {
-    "eidikefsi": {
-        "el": {
-            "title": "Ειδίκευση",
-            "body": "<h2>Ειδίκευση σε επτά πεδία</h2><p>Ένας ανάδοχος για "
-            "ολόκληρη την αλυσίδα — από τη μελέτη και την προμήθεια "
-            "ως τον προγραμματισμό, τη θέση σε λειτουργία και τη "
-            "συντήρηση.</p>"
-            + "".join(
-                f"<h3>{s['title']}</h3><p>{s['text']}</p>"
-                for s in SPECIALIZATIONS
-            ),
-        },
-        "en": {
-            "title": "Specialization",
-            "body": "<h2>Seven fields, one contractor</h2><p>One contractor "
-            "for the whole chain — from study and procurement "
-            "through programming, commissioning and maintenance.</p>"
-            + "".join(
-                f"<h3>{s['title']}</h3><p>{s['text']}</p>"
-                for s in SPECIALIZATIONS_EN
-            ),
-        },
-    },
-    "drastiriotites": {
-        "el": {
-            "title": "Δραστηριότητες",
-            "body": "<h2>Οκτώ φάσεις, ένας υπεύθυνος</h2><p>Κάθε φάση έχει "
-            "συγκεκριμένο παραδοτέο, και η τελευταία διαρκεί όσο και "
-            "ο κύκλος ζωής της εγκατάστασης.</p>"
-            + "".join(
-                f"<h3>{a['date']}. {a['title']}</h3><p>{a['text']}</p>"
-                for a in ACTIVITIES
-            ),
-        },
-        "en": {
-            "title": "Activities",
-            "body": "<h2>Eight phases, one responsible party</h2><p>Every "
-            "phase has a defined deliverable, and the last one lasts "
-            "as long as the installation's life cycle.</p>"
-            + "".join(
-                f"<h3>{a['date']}. {a['title']}</h3><p>{a['text']}</p>"
-                for a in ACTIVITIES_EN
-            ),
-        },
-    },
-    "synergates": {
-        "el": {
-            "title": "Συνεργάτες",
-            "body": "<h2>Ο εξοπλισμός που εμπιστευόμαστε</h2><p>Δεν είμαστε "
-            "δεσμευμένοι σε έναν κατασκευαστή. Επιλέγουμε ανά έργο — "
-            "και είμαστε το πρώτο κλιμάκιο επισκευής για ό,τι "
-            "προμηθεύουμε.</p>"
-            "<h3>ABB</h3><p>Ελεγκτές, ρυθμιστές στροφών και "
-            "εξοπλισμός αυτοματισμού. Το Σύστημα DeSET 01 βασίζεται "
-            "στο PLC ABB PM5072-2ETH.</p>"
-            "<h3>Milesight</h3><p>Αισθητήρες και gateways για "
-            "βιομηχανικό Internet of Things.</p>"
-            "<h3>Aviat Networks</h3><p>Ασύρματες ζεύξεις για "
-            "εγκαταστάσεις διάσπαρτες σε δεκάδες χιλιόμετρα.</p>"
-            "<h3>INVT</h3><p>Ελεγκτές και ρυθμιστές στροφών. Το "
-            "Σύστημα DeSET 02 βασίζεται στο PLC INVT TM750.</p>"
-            "<h3>Advantech</h3><p>Βιομηχανικοί υπολογιστές και "
-            "gateways πρωτοκόλλων — το gateway IEC-104 του Συστήματος "
-            "DeSET 02 είναι Advantech.</p>"
-            "<h3>ODOT Automation</h3><p>Είμαστε επίσημοι μεταπωλητές "
-            "στην Ελλάδα: κάρτες απομακρυσμένων εισόδων/εξόδων "
-            "(Remote I/O) και κάρτες επικοινωνιών, άμεσα διαθέσιμες "
-            "από το απόθεμά μας, με πιστοποίηση CE. Ο ελεγκτής C3351 "
-            "(Modbus TCP/RTU, CODESYS V3.5) και οι προσαρμογείς της "
-            "σειράς CN-80xx καλύπτουν Modbus RTU &amp; TCP, "
-            "Profibus-DP, CANopen, PROFINET, EtherCAT και "
-            'Ethernet/IP. <a href="https://www.odot.gr/">odot.gr</a>'
-            "</p>"
-            "<p>Επιπλέον εργαζόμαστε σε πλατφόρμες Siemens (Simatic "
-            "Step 5 / Step 7, SCADA WinCC) και WAGO.</p>",
-        },
-        "en": {
-            "title": "Partners",
-            "body": "<h2>The equipment we trust</h2><p>We are not tied to a "
-            "single manufacturer. We choose per project — and we are "
-            "the first line of repair for everything we supply.</p>"
-            "<h3>ABB</h3><p>Controllers, variable-speed drives and "
-            "automation equipment. DeSET System 01 is built on the ABB "
-            "PM5072-2ETH PLC.</p>"
-            "<h3>Milesight</h3><p>Sensors and gateways for the "
-            "industrial Internet of Things.</p>"
-            "<h3>Aviat Networks</h3><p>Wireless links for "
-            "installations spread over tens of kilometres.</p>"
-            "<h3>INVT</h3><p>Controllers and variable-speed drives. "
-            "DeSET System 02 is built on the INVT TM750 PLC.</p>"
-            "<h3>Advantech</h3><p>Industrial computers and protocol "
-            "gateways — the IEC-104 gateway in DeSET System 02 is an "
-            "Advantech.</p>"
-            "<h3>ODOT Automation</h3><p>We are the official reseller "
-            "in Greece: remote I/O cards and communication cards, "
-            "available straight from our stock and CE certified. The "
-            "C3351 controller (Modbus TCP/RTU, CODESYS V3.5) and the "
-            "CN-80xx adapter range cover Modbus RTU &amp; TCP, "
-            "Profibus-DP, CANopen, PROFINET, EtherCAT and "
-            'Ethernet/IP. <a href="https://www.odot.gr/">odot.gr</a>'
-            "</p>"
-            "<p>We also work on Siemens platforms (Simatic Step 5 / "
-            "Step 7, SCADA WinCC) and WAGO.</p>",
-        },
-    },
-}
+# The three ``/info/<slug>`` prose pages this pack used to publish.
+#
+# Each has been replaced by a page the artboards actually draw —
+# ``/eidikefsi``, ``/drastiriotites`` and ``/synergates``, composed of
+# bands — and the last fact only the prose still carried (the
+# per-manufacturer descriptions) is now the ``vendor_cards`` band. Two
+# copies of a description drift, and the nav has pointed at the new
+# pages since they shipped, so the prose is retired rather than kept in
+# sync. ``retire_content_pages`` unpublishes them; the text itself is
+# in this file's history.
+RETIRED_CONTENT_PAGES = ("eidikefsi", "drastiriotites", "synergates")
 
 
 # ---------------------------------------------------------------------------
@@ -3628,39 +3533,32 @@ def seed_navigation(*, overwrite: bool = False) -> dict[str, int]:
     return report
 
 
-def seed_content_pages(*, overwrite: bool = False) -> dict[str, int]:
-    """Create the three service pages, bilingually."""
-    from django.utils import timezone
+def retire_content_pages() -> dict[str, int]:
+    """Unpublish the ``/info/<slug>`` pages the band pages replaced.
 
+    Unpublish rather than DELETE, for the same reason as
+    ``retire_project_posts``: a row is content and deleting is
+    irreversible, while ``is_published=False`` is enough to take it off
+    the only surface that serves it (``pages/info/[slug].vue`` 404s on
+    an unpublished page).
+
+    Note for whoever runs this: the three URLs answered 200 for about a
+    month, so a crawler may hold them. The platform has no redirect
+    table, so they 404 rather than pointing at their replacements —
+    worth a rule at the edge if the traffic turns out to matter.
+
+    Idempotent, and silent on a store that never had them.
+    """
     from page_config.models import ContentPage
 
     report: dict[str, int] = {}
-    for slug, locales in CONTENT_PAGES.items():
-        page = ContentPage.objects.filter(slug=slug).first()
-        if page is None:
-            page = ContentPage(
-                slug=slug,
-                is_published=True,
-                published_at=timezone.now(),
-                seo_title=locales["el"]["title"][:70],
-            )
-            for language_code, content in locales.items():
-                _translate(
-                    page,
-                    language_code,
-                    title=content["title"],
-                    body=content["body"],
-                )
-            page.save()
-            _bump(report, "created")
-        elif _fill_missing_translation(
-            page,
-            "en",
-            overwrite=overwrite,
-            title=locales["en"]["title"],
-            body=locales["en"]["body"],
-        ):
-            _bump(report, "localized")
-        else:
-            _bump(report, "unchanged")
+    pages = ContentPage.objects.filter(slug__in=RETIRED_CONTENT_PAGES)
+    retired = pages.filter(is_published=True).update(
+        is_published=False, published_at=None
+    )
+    if retired:
+        _bump(report, "pages_retired", retired)
+    remaining = pages.count() - retired
+    if remaining:
+        _bump(report, "pages_already_retired", remaining)
     return report

@@ -156,15 +156,19 @@ def test_every_deset_system_has_english_copy():
             assert not _has_greek(str(value)), (system["slug"], key)
 
 
-def test_every_content_page_ships_both_locales():
-    for slug, locales in delta_sigma.CONTENT_PAGES.items():
-        assert set(locales) == {"el", "en"}, slug
-        english = locales["en"]
-        assert not _has_greek(english["title"]), slug
-        assert not _has_greek(english["body"]), slug
-        # Parity, not word count: the English body used to be a two
-        # sentence stub next to a fully written Greek one.
-        assert len(english["body"]) > len(locales["el"]["body"]) * 0.6, slug
+def test_the_retired_pages_have_a_page_that_replaced_each():
+    """Nothing is retired without its replacement being drawn.
+
+    The three ``/info/<slug>`` prose pages are gone from this pack
+    because ``/eidikefsi``, ``/drastiriotites`` and ``/synergates``
+    exist as compositions of bands. If a slug were dropped from the
+    layout plan the prose would be the only copy left — and it is not
+    published any more, so the page would simply be missing.
+    """
+    plan = delta_sigma._layout_plan()
+
+    for slug in delta_sigma.RETIRED_CONTENT_PAGES:
+        assert plan.get(slug), slug
 
 
 def test_the_offices_setting_carries_both_languages_and_both_roles():
@@ -232,20 +236,26 @@ class TestTheSeedStepsWriteBothLocales:
         ]
         assert header.localized("el") == header.items
 
-    def test_content_pages_carry_both_translations(self):
+    def test_retiring_the_prose_pages_unpublishes_only_those_three(self):
+        """``/info/*`` is the only surface that served them.
+
+        ``ContentPage`` is also where the legal pages live, so the step
+        has to name its three slugs rather than take the app's word for
+        what a content page is.
+        """
         from page_config.models import ContentPage
 
-        delta_sigma.seed_content_pages()
+        for slug in delta_sigma.RETIRED_CONTENT_PAGES:
+            ContentPage.objects.create(slug=slug, is_published=True)
+        legal = ContentPage.objects.create(slug="privacy", is_published=True)
 
-        page = ContentPage.objects.get(slug="synergates")
-        assert page.safe_translation_getter("title", language_code="el") == (
-            "Συνεργάτες"
-        )
-        assert page.safe_translation_getter("title", language_code="en") == (
-            "Partners"
-        )
-        english = page.safe_translation_getter("body", language_code="en")
-        assert "Aviat Networks" in english
+        first = delta_sigma.retire_content_pages()
+        second = delta_sigma.retire_content_pages()
+
+        assert first == {"pages_retired": 3}
+        assert second == {"pages_already_retired": 3}
+        legal.refresh_from_db()
+        assert legal.is_published
 
     def test_products_carry_both_translations(self):
         from product.models import Product
@@ -428,23 +438,18 @@ class TestTheSeedStepsConvergeOnExistingRows:
         seeded before the English copy was written kept Greek-only
         products, posts and pages no matter how often the command ran.
         """
-        from page_config.models import ContentPage
         from product.models import Product
 
         delta_sigma.seed_deset_products()
-        delta_sigma.seed_content_pages()
-        for model in (Product, ContentPage):
-            # Through parler's translation model, so the rows really go
-            # away rather than being detached from a cached instance.
-            model._parler_meta.root_model.objects.filter(
-                language_code="en"
-            ).delete()
+        # Through parler's translation model, so the rows really go
+        # away rather than being detached from a cached instance.
+        Product._parler_meta.root_model.objects.filter(
+            language_code="en"
+        ).delete()
 
         products = delta_sigma.seed_deset_products()
-        pages = delta_sigma.seed_content_pages()
 
         assert products["products_localized"] == len(delta_sigma.DESET_SYSTEMS)
-        assert pages["localized"] == len(delta_sigma.CONTENT_PAGES)
         assert Product.objects.get(
             slug="deset-wago-pfc200-g2"
         ).safe_translation_getter(
@@ -452,20 +457,20 @@ class TestTheSeedStepsConvergeOnExistingRows:
         )
 
     def test_a_rerun_leaves_an_authored_translation_alone(self):
-        from page_config.models import ContentPage
+        from product.models import Product
 
-        delta_sigma.seed_content_pages()
-        page = ContentPage.objects.get(slug="eidikefsi")
-        page.set_current_language("en")
-        page.title = "Their own title"
-        page.save()
+        delta_sigma.seed_deset_products()
+        product = Product.objects.get(slug="deset-wago-pfc200-g2")
+        product.set_current_language("en")
+        product.name = "Their own name"
+        product.save()
 
-        delta_sigma.seed_content_pages()
+        delta_sigma.seed_deset_products()
 
-        page.refresh_from_db()
+        product.refresh_from_db()
         assert (
-            page.safe_translation_getter("title", language_code="en")
-            == "Their own title"
+            product.safe_translation_getter("name", language_code="en")
+            == "Their own name"
         )
 
     def test_overwrite_replaces_a_stale_translation(self):
@@ -477,27 +482,27 @@ class TestTheSeedStepsConvergeOnExistingRows:
         every run reported ``unchanged``. ``--overwrite`` is the opt-in
         for exactly that, and it discards local edits by definition.
         """
-        from page_config.models import ContentPage
+        from product.models import Product
 
-        delta_sigma.seed_content_pages()
-        page = ContentPage.objects.get(slug="eidikefsi")
-        page.set_current_language("en")
-        page.body = "<p>stub</p>"
-        page.save()
+        delta_sigma.seed_deset_products()
+        product = Product.objects.get(slug="deset-wago-pfc200-g2")
+        product.set_current_language("en")
+        product.description = "<p>stub</p>"
+        product.save()
 
-        report = delta_sigma.seed_content_pages(overwrite=True)
+        report = delta_sigma.seed_deset_products(overwrite=True)
 
-        page.refresh_from_db()
-        assert report["localized"] == len(delta_sigma.CONTENT_PAGES)
-        body = ContentPage.objects.get(
-            slug="eidikefsi"
-        ).safe_translation_getter("body", language_code="en")
-        # Compared against the SANITIZED source: ``ContentPage.body`` is
-        # an HTMLField and the model escapes a bare ``&`` on save, so the
-        # stored copy is four characters longer than the pack's literal
-        # ("Measurement &amp; control systems").
-        assert body == sanitize_html(
-            delta_sigma.CONTENT_PAGES["eidikefsi"]["en"]["body"]
+        assert report["products_localized"] == len(delta_sigma.DESET_SYSTEMS)
+        description = Product.objects.get(
+            slug="deset-wago-pfc200-g2"
+        ).safe_translation_getter("description", language_code="en")
+        # Compared against the SANITIZED source: the description is an
+        # HTMLField and the model escapes a bare ``&`` on save, so the
+        # stored copy is longer than the pack's literal.
+        assert description == sanitize_html(
+            delta_sigma._deset_description(
+                delta_sigma.DESET_SYSTEMS[2], locale="en"
+            )
         )
 
     def test_overwrite_replaces_a_stale_locale_override(self):

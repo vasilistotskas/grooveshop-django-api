@@ -15,6 +15,7 @@ from pay_way.admin import (
     PaymentTypeFilter,
     PayWayAdmin,
 )
+from pay_way.enum.settlement import PaySettlement
 from pay_way.models import PayWay
 
 pytestmark = pytest.mark.assert_english
@@ -146,15 +147,10 @@ class PaymentTypeFilterTestCase(TestCase):
         self.request = self.factory.get("/admin/pay_way/payway/")
         self.model_admin = Mock()
 
-        self.online_payment = PayWay.objects.create(
-            is_online_payment=True, requires_confirmation=False
-        )
-        self.offline_simple = PayWay.objects.create(
-            is_online_payment=False, requires_confirmation=False
-        )
-        self.offline_confirmation = PayWay.objects.create(
-            is_online_payment=False, requires_confirmation=True
-        )
+        self.by_settlement = {
+            settlement: PayWay.objects.create(settlement=settlement)
+            for settlement in PaySettlement
+        }
 
     def test_filter_title(self):
         filter_instance = PaymentTypeFilter(
@@ -174,42 +170,57 @@ class PaymentTypeFilterTestCase(TestCase):
         )
         lookups = filter_instance.lookups(self.request, self.model_admin)
 
-        expected_keys = ["online", "offline_simple", "offline_confirmation"]
+        # One lookup per settlement. The old three-way split could
+        # not name the locker-terminal case at all, which is how a
+        # courier-COD pay-way reached BoxNow lockers.
+        expected_keys = [
+            PaySettlement.ONLINE.value,
+            PaySettlement.COURIER_CASH.value,
+            PaySettlement.CARRIER_TERMINAL.value,
+            PaySettlement.OFFLINE_TRANSFER.value,
+        ]
         actual_keys = [lookup[0] for lookup in lookups]
         self.assertEqual(actual_keys, expected_keys)
 
-    def test_queryset_online_filter(self):
-        filter_instance = PaymentTypeFilter(
-            self.request, {"payment_type": "online"}, PayWay, self.model_admin
-        )
-        queryset = filter_instance.queryset(self.request, PayWay.objects.all())
+    def test_queryset_returns_exactly_the_selected_settlement(self):
+        # The predecessors of this test asserted ``count() >= 0``,
+        # which is true of every queryset ever built — they passed
+        # while the filter did nothing. Assert the actual rows.
+        for settlement, expected in self.by_settlement.items():
+            with self.subTest(settlement=settlement.value):
+                filter_instance = PaymentTypeFilter(
+                    self.request,
+                    {"payment_type": [settlement.value]},
+                    PayWay,
+                    self.model_admin,
+                )
+                queryset = filter_instance.queryset(
+                    self.request, PayWay.objects.all()
+                )
 
-        self.assertIsNotNone(queryset)
-        self.assertTrue(queryset.count() >= 0)
+                # Scope to this test's own rows: the seed migrations
+                # create pay-ways too, and an unscoped assertion would
+                # fail for reasons that have nothing to do with the
+                # filter.
+                mine = {p.id for p in self.by_settlement.values()}
+                got = set(queryset.values_list("id", flat=True)) & mine
+                self.assertEqual(got, {expected.id})
 
-    def test_queryset_offline_simple_filter(self):
+    def test_queryset_unknown_value_does_not_filter(self):
         filter_instance = PaymentTypeFilter(
             self.request,
-            {"payment_type": "offline_simple"},
+            {"payment_type": ["offline_simple"]},
             PayWay,
             self.model_admin,
         )
         queryset = filter_instance.queryset(self.request, PayWay.objects.all())
 
-        self.assertIsNotNone(queryset)
-        self.assertTrue(queryset.count() >= 0)
-
-    def test_queryset_offline_confirmation_filter(self):
-        filter_instance = PaymentTypeFilter(
-            self.request,
-            {"payment_type": "offline_confirmation"},
-            PayWay,
-            self.model_admin,
+        # A stale bookmark to a removed lookup must show everything
+        # rather than silently show nothing.
+        mine = {p.id for p in self.by_settlement.values()}
+        self.assertEqual(
+            set(queryset.values_list("id", flat=True)) & mine, mine
         )
-        queryset = filter_instance.queryset(self.request, PayWay.objects.all())
-
-        self.assertIsNotNone(queryset)
-        self.assertTrue(queryset.count() >= 0)
 
 
 class ConfigurationStatusFilterTestCase(TestCase):
@@ -219,14 +230,14 @@ class ConfigurationStatusFilterTestCase(TestCase):
         self.model_admin = Mock()
 
         self.configured_payment = PayWay.objects.create(
-            is_online_payment=True,
+            settlement=PaySettlement.ONLINE,
             configuration={"api_key": "test_key", "merchant_id": "123"},
         )
         self.not_configured_payment = PayWay.objects.create(
-            is_online_payment=True, configuration={}
+            settlement=PaySettlement.ONLINE, configuration={}
         )
         self.no_config_needed = PayWay.objects.create(
-            is_online_payment=False, configuration=None
+            settlement=PaySettlement.COURIER_CASH, configuration=None
         )
 
     def test_filter_title(self):
@@ -305,8 +316,7 @@ class PayWayAdminTestCase(TestCase):
         self.payway = PayWay.objects.create(
             cost=Decimal("5.00"),
             free_threshold=Decimal("50.00"),
-            is_online_payment=True,
-            requires_confirmation=False,
+            settlement=PaySettlement.ONLINE,
             active=True,
             sort_order=1,
             provider_code="PAYPAL",
@@ -402,26 +412,22 @@ class PayWayAdminTestCase(TestCase):
 
         self.assertEqual(result, "No provider")
 
-    def test_payment_type_display_online(self):
-        value, label = self.admin.payment_type_display(self.payway)
+    def test_payment_type_display_renders_each_settlement(self):
+        for settlement in PaySettlement:
+            with self.subTest(settlement=settlement.value):
+                self.payway.settlement = settlement
+                value, label = self.admin.payment_type_display(self.payway)
 
-        self.assertEqual(value, "online")
-        self.assertEqual(label, "Online")
+                self.assertEqual(value, settlement.value)
+                self.assertEqual(label, settlement.label)
 
-    def test_payment_type_display_offline_simple(self):
-        self.payway.is_online_payment = False
-        value, label = self.admin.payment_type_display(self.payway)
+    def test_every_settlement_has_a_display_variant(self):
+        # A missing key renders an unstyled chip rather than
+        # failing, so a new settlement would slip through silently.
+        from pay_way.admin import PAYMENT_TYPE_VARIANT
 
-        self.assertEqual(value, "offline_simple")
-        self.assertEqual(label, "Offline")
-
-    def test_payment_type_display_offline_confirmation(self):
-        self.payway.is_online_payment = False
-        self.payway.requires_confirmation = True
-        value, label = self.admin.payment_type_display(self.payway)
-
-        self.assertEqual(value, "offline_confirmation")
-        self.assertEqual(label, "Offline (Confirm)")
+        for settlement in PaySettlement:
+            self.assertIn(settlement.value, PAYMENT_TYPE_VARIANT)
 
     def test_cost_display(self):
         result = self.admin.cost_display(self.payway)
@@ -580,7 +586,7 @@ class PayWayAdminIntegrationTestCase(TestCase):
 
         self.online_payment = PayWay.objects.create(
             cost=Decimal("3.00"),
-            is_online_payment=True,
+            settlement=PaySettlement.ONLINE,
             active=True,
             configuration={"api_key": "test"},
         )
@@ -589,7 +595,9 @@ class PayWayAdminIntegrationTestCase(TestCase):
         self.online_payment.save()
 
         self.offline_payment = PayWay.objects.create(
-            cost=Decimal("0.00"), is_online_payment=False, active=True
+            cost=Decimal("0.00"),
+            settlement=PaySettlement.COURIER_CASH,
+            active=True,
         )
         self.offline_payment.set_current_language("en")
         self.offline_payment.name = "Cash on Delivery"

@@ -7,6 +7,7 @@ from rest_framework import serializers
 
 from core.api.schema import generate_schema_multi_lang
 from core.utils.serializers import TranslatedFieldExtended
+from pay_way.enum.settlement import PaySettlement
 from pay_way.models import PayWay
 from tenant.membership import is_store_staff
 
@@ -39,6 +40,10 @@ class PayWaySerializer(
             "uuid",
             "icon_filename",
             "provider_code",
+            "settlement",
+            # Deprecated mirrors of ``settlement``, still emitted for
+            # one release so the storefront can migrate off them
+            # separately from the column drop. Read ``settlement``.
             "is_online_payment",
             "requires_confirmation",
         )
@@ -90,7 +95,15 @@ class PayWayWriteSerializer(
         return value
 
     def validate(self, attrs):
-        if attrs.get("is_online_payment") and not attrs.get("provider_code"):
+        # ``settlement`` is the only writable truth; the two booleans
+        # are derived in ``PayWay.save()`` and are not accepted here.
+        settlement = attrs.get("settlement") or getattr(
+            self.instance, "settlement", None
+        )
+        if settlement == PaySettlement.ONLINE and not (
+            attrs.get("provider_code")
+            or getattr(self.instance, "provider_code", "")
+        ):
             raise serializers.ValidationError(
                 _("Online payment methods must have a provider code.")
             )
@@ -107,8 +120,7 @@ class PayWayWriteSerializer(
             "icon",
             "sort_order",
             "provider_code",
-            "is_online_payment",
-            "requires_confirmation",
+            "settlement",
             "configuration",
         )
         read_only_fields = ("sort_order",)

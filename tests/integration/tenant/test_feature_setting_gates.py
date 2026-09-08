@@ -15,6 +15,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
 
+from pay_way.enum.settlement import PaySettlement
 from user.factories.account import UserAccountFactory
 
 pytestmark = pytest.mark.django_db
@@ -197,25 +198,33 @@ class TestTenantConfigAgentFlags:
 
         PayWayFactory(
             active=True,
-            is_online_payment=False,
+            settlement=PaySettlement.COURIER_CASH,
             provider_code="cash_on_delivery",
         )
         # A second row sharing the code must still yield ONE instrument:
         # a merchant may offer cash on delivery through two carriers.
         PayWayFactory(
             active=True,
-            is_online_payment=False,
+            settlement=PaySettlement.COURIER_CASH,
             provider_code="cash_on_delivery",
         )
         PayWayFactory(
-            active=True, is_online_payment=True, provider_code="viva_wallet"
+            active=True,
+            settlement=PaySettlement.ONLINE,
+            provider_code="viva_wallet",
         )
         PayWayFactory(
-            active=False, is_online_payment=False, provider_code="bank_wire"
+            active=False,
+            settlement=PaySettlement.OFFLINE_TRANSFER,
+            provider_code="bank_wire",
         )
         # A provider-less row is unaddressable — an agent has nothing to
         # name when submitting the instrument.
-        PayWayFactory(active=True, is_online_payment=False, provider_code="")
+        PayWayFactory(
+            active=True,
+            settlement=PaySettlement.COURIER_CASH,
+            provider_code="",
+        )
 
         tenant = Tenant(
             schema_name="public", name="t", agent_commerce_enabled=True
@@ -238,7 +247,7 @@ class TestTenantConfigAgentFlags:
 
         PayWayFactory(
             active=True,
-            is_online_payment=False,
+            settlement=PaySettlement.COURIER_CASH,
             provider_code="cash_on_delivery",
         )
         serializer = TenantConfigSerializer()

@@ -19,6 +19,7 @@ from rest_framework.test import APIClient
 
 from b2b.factories import BusinessProfileFactory, CustomerGroupFactory
 from cart.factories import CartFactory, CartItemFactory
+from pay_way.enum.settlement import PaySettlement
 from product.factories import ProductFactory
 
 pytestmark = pytest.mark.django_db
@@ -169,7 +170,7 @@ class TestPaymentIntentBinding:
         user, _group = _wholesale_buyer(discount="10.00")
         _cart_with_line(user, "100.00")
         pay_way = PayWayFactory(
-            is_online_payment=True,
+            settlement=PaySettlement.ONLINE,
             provider_code="stripe",
             cost=Money(Decimal(0), "EUR"),
             free_threshold=Money(Decimal(0), "EUR"),
@@ -221,7 +222,7 @@ class TestPaymentIntentBinding:
         )
         _cart_with_line(user, "100.00")
         pay_way = PayWayFactory(
-            is_online_payment=True,
+            settlement=PaySettlement.ONLINE,
             provider_code="stripe",
             cost=Money(Decimal(0), "EUR"),
             free_threshold=Money(Decimal(0), "EUR"),

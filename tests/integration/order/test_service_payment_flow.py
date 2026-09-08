@@ -18,6 +18,7 @@ from order.exceptions import (
 from order.models.order import Order
 from order.models.stock_reservation import StockReservation
 from order.services import OrderService
+from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
 from user.factories.account import UserAccountFactory
@@ -269,10 +270,11 @@ class TestOrderServiceCreateOrderFromCart:
     def test_cart_clearing_for_offline_pay_way(self, mock_get_provider):
         """Cart clears at creation when nothing is owed online.
 
-        Pins ``is_online_payment=False`` deliberately. The pay-way
-        factory randomises that flag, and cart clearing now depends on
-        it (hosted flows keep the cart until ``order_paid``), so an
-        unpinned pay-way makes this assertion a coin flip.
+        Pins ``settlement`` deliberately. The pay-way factory
+        randomises it, and cart clearing depends on whether the shopper
+        still owes money online (hosted flows keep the cart until
+        ``order_paid``), so an unpinned pay-way makes this assertion a
+        coin flip.
         """
         # Mock payment provider
         mock_provider = Mock()
@@ -283,7 +285,8 @@ class TestOrderServiceCreateOrderFromCart:
         mock_get_provider.return_value = mock_provider
 
         offline_pay_way = PayWayFactory.create(
-            provider_code="cash_on_delivery", is_online_payment=False
+            provider_code="cash_on_delivery",
+            settlement=PaySettlement.COURIER_CASH,
         )
 
         # Verify cart has items before
@@ -322,7 +325,8 @@ class TestOrderServiceCreateOrderFromCart:
         mock_get_provider.return_value = mock_provider
 
         hosted_pay_way = PayWayFactory.create(
-            provider_code="viva_wallet", is_online_payment=True
+            provider_code="viva_wallet",
+            settlement=PaySettlement.ONLINE,
         )
 
         assert self.cart.items.count() == 2
@@ -353,7 +357,8 @@ class TestOrderServiceCreateOrderFromCart:
         mock_get_provider.return_value = mock_provider
 
         hosted_pay_way = PayWayFactory.create(
-            provider_code="viva_wallet", is_online_payment=True
+            provider_code="viva_wallet",
+            settlement=PaySettlement.ONLINE,
         )
         order = OrderService.create_order_from_cart(
             cart=self.cart,

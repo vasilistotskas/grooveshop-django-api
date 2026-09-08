@@ -6,6 +6,7 @@ from django.utils import timezone
 from djmoney.money import Money
 from rest_framework.test import APITestCase
 
+from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from pay_way.models import PayWay
 from user.factories.account import UserAccountFactory
@@ -75,8 +76,7 @@ class PayWayFilterTest(APITestCase):
             active=False,
             cost=Money(Decimal("0.00"), "EUR"),
             free_threshold=Money(Decimal("0.00"), "EUR"),
-            is_online_payment=False,
-            requires_confirmation=False,
+            settlement=PaySettlement.COURIER_CASH,
             configuration=None,
         )
         self.cash_payment.created_at = self.now - timedelta(days=60)
@@ -89,8 +89,7 @@ class PayWayFilterTest(APITestCase):
             active=True,
             cost=Money(Decimal("10.00"), "EUR"),
             free_threshold=Money(Decimal("200.00"), "EUR"),
-            is_online_payment=True,
-            requires_confirmation=False,
+            settlement=PaySettlement.ONLINE,
         )
         self.high_cost_payment.created_at = self.now - timedelta(hours=6)
         self.high_cost_payment.updated_at = self.now - timedelta(hours=1)

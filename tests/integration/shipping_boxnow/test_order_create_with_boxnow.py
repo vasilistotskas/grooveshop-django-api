@@ -24,6 +24,7 @@ from cart.factories.cart import CartFactory
 from cart.factories.item import CartItemFactory
 from country.factories import CountryFactory
 from order.enum.status import PaymentStatus
+from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
 from region.factories import RegionFactory
@@ -70,14 +71,16 @@ class TestOrderCreateWithBoxNow(APITestCase):
         self.region = RegionFactory(country=self.country)
         self.online_pay_way = PayWayFactory(
             provider_code="stripe",
-            is_online_payment=True,
-            requires_confirmation=False,
+            settlement=PaySettlement.ONLINE,
             active=True,
         )
-        self.cod_pay_way = PayWayFactory(
-            provider_code="cash",
-            is_online_payment=False,
-            requires_confirmation=False,
+        # BoxNow PAY ON THE GO — paid by card at the locker terminal.
+        # This is the ONLY collect-on-delivery product a locker can
+        # settle, and it is a pay-way of its own precisely so it stops
+        # being confused with courier cash-on-delivery.
+        self.pay_on_the_go_pay_way = PayWayFactory(
+            provider_code="boxnow_pay_on_the_go",
+            settlement=PaySettlement.CARRIER_TERMINAL,
             active=True,
         )
         self.product = ProductFactory(
@@ -181,9 +184,11 @@ class TestOrderCreateWithBoxNow(APITestCase):
         mock_validate_cart,
         mock_get_payment_provider,
     ):
-        # BoxNow PAY ON THE GO supports cash-on-delivery on lockers:
-        # the shipment row must be created with payment_mode=COD so the
-        # voucher prints "COD". ``amount_to_be_collected`` is set by
+        # BoxNow PAY ON THE GO is collected at the locker: the
+        # shipment row must be created with payment_mode=COD so the
+        # voucher prints "COD" — that wire value is correct for this
+        # product, the terminal simply takes a card rather than cash.
+        # ``amount_to_be_collected`` is set by
         # ``BoxNowService.create_shipment_for_order`` once items are
         # persisted (order.total_price is 0 at row-creation time).
         mock_validate_cart.return_value = {
@@ -197,7 +202,7 @@ class TestOrderCreateWithBoxNow(APITestCase):
         self.client.force_authenticate(user=self.user)
         response = self.client.post(
             self.create_url,
-            self._build_payload(pay_way_id=self.cod_pay_way.id),
+            self._build_payload(pay_way_id=self.pay_on_the_go_pay_way.id),
             format="json",
             HTTP_X_CART_ID=str(self.cart.uuid),
         )
@@ -212,6 +217,58 @@ class TestOrderCreateWithBoxNow(APITestCase):
         order = Order.objects.latest("id")
         shipment = BoxNowShipment.objects.get(order=order)
         assert shipment.payment_mode == BoxNowPaymentMode.COD.value
+
+    @patch("order.payment.get_payment_provider")
+    @patch("order.services.OrderService.validate_cart_for_checkout")
+    @patch("order.services.OrderService.validate_shipping_address")
+    def test_create_order_with_boxnow_rejects_courier_cod_payway(
+        self,
+        mock_validate_address,
+        mock_validate_cart,
+        mock_get_payment_provider,
+    ):
+        """The combination that mis-charged real customers.
+
+        A generic courier cash-on-delivery pay-way must be refused with
+        a BoxNow locker. Lockers have no POS and take no cash, so the
+        money could never be collected as described — and because the
+        courier pay-way carries a cash-handling surcharge, the shopper
+        was charged €1,99 for a courier who was never involved and then
+        paid by card at a machine.
+
+        Before ``PaySettlement`` this order was accepted and minted a
+        BoxNow COD voucher, silently, as the wrong commercial product.
+        A 400 here is the fix; if this test ever returns 201 again, the
+        defect is back.
+        """
+        mock_validate_cart.return_value = {
+            "valid": True,
+            "errors": [],
+            "warnings": [],
+        }
+        mock_validate_address.return_value = None
+        self._mock_payment_success(mock_get_payment_provider)
+
+        courier_cod = PayWayFactory(
+            provider_code="cash_on_delivery",
+            settlement=PaySettlement.COURIER_CASH,
+            active=True,
+        )
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.post(
+            self.create_url,
+            self._build_payload(pay_way_id=courier_cod.id),
+            format="json",
+            HTTP_X_CART_ID=str(self.cart.uuid),
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST, (
+            f"Courier COD must not be accepted on a locker: {response.json()}"
+        )
+        assert not BoxNowShipment.objects.exists(), (
+            "A rejected order must not leave a shipment row behind"
+        )
 
     @patch("order.payment.get_payment_provider")
     @patch("order.services.OrderService.validate_cart_for_checkout")

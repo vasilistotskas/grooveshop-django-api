@@ -21,6 +21,7 @@ import pytest
 from order.enum.status import SETTLED_PAYMENT_STATUSES, PaymentStatus
 from order.factories.order import OrderFactory
 from order.services import OrderService
+from pay_way.enum.settlement import PaySettlement
 
 pytestmark = pytest.mark.django_db
 
@@ -94,7 +95,7 @@ class TestPayWayServicePath:
         from pay_way.services import PayWayService
 
         order = _order(PaymentStatus.REFUNDED)
-        pay_way = Mock(is_online_payment=True)
+        pay_way = Mock(settlement=PaySettlement.ONLINE)
         provider = Mock()
         provider.get_payment_status.return_value = (
             PaymentStatus.COMPLETED,
@@ -114,7 +115,7 @@ class TestPayWayServicePath:
         from pay_way.services import PayWayService
 
         order = _order(PaymentStatus.PENDING)
-        pay_way = Mock(is_online_payment=True)
+        pay_way = Mock(settlement=PaySettlement.ONLINE)
         provider = Mock()
         provider.get_payment_status.return_value = (
             PaymentStatus.COMPLETED,

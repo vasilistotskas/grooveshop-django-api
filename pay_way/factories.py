@@ -7,6 +7,7 @@ from factory.fuzzy import FuzzyDecimal
 from faker import Faker
 
 from pay_way.enum.pay_way import PayWayEnum
+from pay_way.enum.settlement import PaySettlement
 from pay_way.models import PayWay, PayWayShippingExclusion
 from shipping.enum import ShippingKind
 
@@ -120,9 +121,15 @@ class PayWayFactory(factory.django.DjangoModelFactory):
     provider_code = factory.LazyAttribute(
         lambda o: o.provider_data["provider_code"]
     )
-    is_online_payment = False
-    requires_confirmation = factory.LazyAttribute(
-        lambda o: o.provider_data["requires_confirmation"]
+    # ``settlement`` is the only field set; ``PayWay.save()`` derives
+    # the two deprecated booleans from it, so setting those here would
+    # be overwritten and could hand out a self-contradicting row.
+    settlement = factory.LazyAttribute(
+        lambda o: (
+            PaySettlement.OFFLINE_TRANSFER.value
+            if o.provider_data["requires_confirmation"]
+            else PaySettlement.COURIER_CASH.value
+        )
     )
     configuration = factory.LazyAttribute(
         lambda o: o.provider_data["configuration"]
@@ -158,10 +165,9 @@ class PayWayFactory(factory.django.DjangoModelFactory):
             generate_stripe_config() if provider_code == "stripe" else None,
         )
         kwargs.setdefault("active", True)
-        kwargs.setdefault("requires_confirmation", False)
         return cls.create(
             provider_code=provider_code,
-            is_online_payment=True,
+            settlement=PaySettlement.ONLINE.value,
             **kwargs,
         )
 
@@ -176,10 +182,35 @@ class PayWayFactory(factory.django.DjangoModelFactory):
             else None,
         )
         kwargs.setdefault("active", True)
+        # ``requires_confirmation`` is kept as the parameter name so the
+        # existing call sites read unchanged, but it now selects a
+        # settlement: confirmation-style offline pay-ways are settled
+        # off-platform, the rest are collected by the courier.
         return cls.create(
             provider_code=provider_code,
-            is_online_payment=False,
-            requires_confirmation=requires_confirmation,
+            settlement=(
+                PaySettlement.OFFLINE_TRANSFER.value
+                if requires_confirmation
+                else PaySettlement.COURIER_CASH.value
+            ),
+            **kwargs,
+        )
+
+    @classmethod
+    def create_carrier_terminal_payment(
+        cls, provider_code="boxnow_pay_on_the_go", **kwargs
+    ):
+        """A BoxNow PAY ON THE GO pay-way — paid at the locker machine.
+
+        Distinct from ``create_offline_payment``: both are collected on
+        delivery, but only this one may ride a BoxNow locker voucher,
+        and only courier-cash may ride an ACS one.
+        """
+        kwargs.setdefault("active", True)
+        kwargs.setdefault("configuration", None)
+        return cls.create(
+            provider_code=provider_code,
+            settlement=PaySettlement.CARRIER_TERMINAL.value,
             **kwargs,
         )
 

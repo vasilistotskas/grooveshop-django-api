@@ -24,6 +24,7 @@ from order.enum.status import OrderStatus, PaymentStatus
 from order.models import Order, OrderHistory
 from order.models.order import AMOUNT_MISMATCH_FLAG
 from order.services import OrderService
+from pay_way.enum.settlement import PaySettlement
 from tenant.credentials import (
     tenant_contact_email,
     tenant_from_email,
@@ -1672,7 +1673,11 @@ def check_pending_orders() -> int:
             status=OrderStatus.PENDING,
             created_at__lt=one_day_ago,
             reminder_count__lt=max_reminders,
-            pay_way__is_online_payment=True,
+            # Only chase orders the shopper was meant to pay online.
+            # A collect-on-delivery order is not "unpaid", it is
+            # awaiting the carrier — reminding those would nag people
+            # who owe us nothing yet.
+            pay_way__settlement=PaySettlement.ONLINE,
         )
         .select_related("user", "pay_way")
         .with_total_amounts()
@@ -1833,7 +1838,11 @@ def auto_cancel_stuck_pending_orders() -> dict[str, int]:
         status=OrderStatus.PENDING,
         payment_status=PaymentStatus.PENDING,
         created_at__lt=pending_cutoff,
-        pay_way__is_online_payment=True,
+        # Auto-cancel only applies to online payments that never
+        # completed. Collect-on-delivery orders legitimately sit
+        # PENDING until the carrier remits (measured ACS lag ~4 days),
+        # so cancelling them would kill live orders.
+        pay_way__settlement=PaySettlement.ONLINE,
     )
 
     # Never auto-cancel an order Viva confirmed a charge for. The webhook

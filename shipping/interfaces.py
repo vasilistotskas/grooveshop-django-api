@@ -28,6 +28,7 @@ if TYPE_CHECKING:
     from decimal import Decimal
 
     from order.models.order import Order
+    from pay_way.enum.settlement import PaySettlement
     from shipping.enum import ShippingKind
 
 
@@ -204,20 +205,48 @@ class ShippingCarrierInterface(ABC):
         """
         return
 
+    def supported_settlements(
+        self, kind: ShippingKind
+    ) -> frozenset[PaySettlement] | None:
+        """Which settlements this carrier can physically perform.
+
+        ``None`` (the default) means "no protocol-level constraint" —
+        the carrier accepts anything the platform offers.
+
+        This is a *capability declaration*, not a preference. A courier
+        can take cash at a door; a locker terminal cannot. Getting this
+        wrong is not a styling bug — it mints a voucher for the wrong
+        commercial product, which is exactly what happened when
+        ``PayWay.is_cash_on_delivery`` was the only discriminator
+        available (see ``PaySettlement``).
+
+        Merchant *preferences* — "we have PAY ON THE GO but don't want
+        to offer it this month" — belong in ``PayWayShippingExclusion``
+        rows, which ``PayWayService.filter_by_carrier`` applies on top
+        of this. Do not encode preferences here; they would need a
+        redeploy to change.
+        """
+        return None
+
     def filter_pay_ways(self, queryset, *, kind: ShippingKind):
         """Return a PayWay queryset filtered by this carrier's rules.
 
-        Default: pass-through — the carrier accepts any pay-way the
-        platform offers. Override ONLY for a hard, protocol-level veto
-        the carrier itself enforces; merchant-level restrictions belong
-        in ``PayWayShippingExclusion`` rows (admin-managed, runtime
-        toggleable — e.g. blocking COD at BoxNow lockers when the
-        partner account lacks "pay on the go"), which
-        ``PayWayService.filter_by_carrier`` applies on top of this
-        hook. ``BoxNowCarrier`` deliberately does NOT override this
-        for exactly that reason.
+        Derived from :meth:`supported_settlements` — carriers declare
+        capability and this turns it into a queryset, so no carrier has
+        to hand-write queryset surgery.
+
+        Overriding this directly is almost always wrong: the previous
+        implementation of that idea excluded *all offline* pay-ways for
+        BoxNow, which broke PAY ON THE GO and had to be reverted
+        (``891d5663``). Declare settlements instead — "offline" is not
+        a carrier capability, it is three different ones.
         """
-        return queryset
+        supported = self.supported_settlements(kind)
+        if supported is None:
+            return queryset
+        return queryset.filter(
+            settlement__in=sorted(s.value for s in supported)
+        )
 
 
 # Module-level adapter registry. Populated by @register_provider at

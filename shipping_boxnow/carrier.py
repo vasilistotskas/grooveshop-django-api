@@ -12,8 +12,10 @@ from collections.abc import Mapping
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, ClassVar
 
+from pay_way.enum.settlement import PaySettlement
 from shipping.enum import ShippingKind
 from shipping.interfaces import ShippingCarrierInterface, register_provider
+from shipping_boxnow.exceptions import BoxNowUnsupportedSettlementError
 
 if TYPE_CHECKING:
     from order.models.order import Order
@@ -78,13 +80,37 @@ class BoxNowCarrier(ShippingCarrierInterface):
     # Validation (called by order/services._validate_address_data)
     # ------------------------------------------------------------------
 
-    # ``filter_pay_ways`` is intentionally NOT overridden — the base
-    # implementation (pass-through) is correct now that admin-level
-    # exclusions live in ``PayWayShippingExclusion``. Partners that
-    # don't yet have PAY ON THE GO active should add a
-    # ``PayWayShippingExclusion`` row for (boxnow, pickup_point,
-    # <cod-pay-way>) from the Django admin — runtime-toggleable, no
-    # redeploy required.
+    def supported_settlements(
+        self, kind: ShippingKind
+    ) -> frozenset[PaySettlement] | None:
+        """BoxNow lockers can take a card at the terminal, never cash.
+
+        There is no POS on a courier round for a locker parcel and the
+        machine accepts no notes, so ``COURIER_CASH`` is physically
+        impossible here — its money would simply never be collected.
+        ``CARRIER_TERMINAL`` (BoxNow PAY ON THE GO) is the locker's own
+        collect-on-pickup product and is the only one allowed.
+
+        This is BoxNow's own stated requirement: PAY ON THE GO must be
+        a distinct option, and traditional courier COD must not be
+        selectable when the delivery method is a locker.
+
+        Note what this replaces. Before ``settlement`` existed the only
+        discriminator was ``is_cash_on_delivery``, true for both
+        products — so a shopper picking the generic "Αντικαταβολή
+        (+1,99 €)" was minted as BoxNow COD *and* charged a
+        cash-handling surcharge, then paid by card at a terminal with
+        no cash and no courier involved.
+        """
+        if kind != ShippingKind.PICKUP_POINT:
+            return None
+        return frozenset(
+            {
+                PaySettlement.ONLINE,
+                PaySettlement.CARRIER_TERMINAL,
+                PaySettlement.OFFLINE_TRANSFER,
+            }
+        )
 
     # ------------------------------------------------------------------
     # Per-kind feature gating
@@ -174,13 +200,23 @@ class BoxNowCarrier(ShippingCarrierInterface):
             else None
         )
 
-        # Derive paymentMode from the order's pay-way.
-        # ``PayWay.is_cash_on_delivery`` is the canonical discriminator
-        # (see ``pay_way/models.py``): only true cash-on-delivery maps to
-        # BoxNow PAY ON THE GO COD. Bank-transfer-style offline pay-ways
-        # (``requires_confirmation=True``) are settled off-platform and
-        # must ship as PREPAID — otherwise BoxNow would double-collect at
-        # the locker.
+        # Derive paymentMode from the order's SETTLEMENT, not from a
+        # broad "is this offline?" boolean.
+        #
+        # BoxNow's wire enum has only ``prepaid`` and ``cod``, where
+        # ``cod`` means "collect at the locker" — the terminal takes a
+        # card. So ``cod`` IS the right wire value for PAY ON THE GO;
+        # the historical defect was never the enum, it was that two
+        # different commercial products both routed to it.
+        #
+        # Only ``CARRIER_TERMINAL`` may collect here. ``COURIER_CASH``
+        # cannot: no POS on a locker round, no cash accepted. It is
+        # filtered out of the checkout by ``supported_settlements``, so
+        # reaching this branch means the pay-way bypassed that gate —
+        # raise rather than quietly minting a voucher that charges a
+        # cash-handling fee for a courier who is not involved.
+        # ``OFFLINE_TRANSFER`` ships PREPAID: the shopper pays us
+        # directly, so BoxNow must collect nothing or it double-charges.
         #
         # ``amountToBeCollected`` is set lazily in
         # ``BoxNowService.create_shipment_for_order`` (Phase 1) once the
@@ -190,9 +226,20 @@ class BoxNowCarrier(ShippingCarrierInterface):
         from shipping_boxnow.enum.payment_mode import BoxNowPaymentMode
 
         pay_way = getattr(order, "pay_way", None)
-        is_cod = bool(pay_way and pay_way.is_cash_on_delivery)
+        settlement = (
+            PaySettlement(pay_way.settlement) if pay_way is not None else None
+        )
+
+        if settlement == PaySettlement.COURIER_CASH:
+            raise BoxNowUnsupportedSettlementError(
+                order_id=order.id,
+                settlement=settlement.value,
+            )
+
         payment_mode = (
-            BoxNowPaymentMode.COD if is_cod else BoxNowPaymentMode.PREPAID
+            BoxNowPaymentMode.COD
+            if settlement == PaySettlement.CARRIER_TERMINAL
+            else BoxNowPaymentMode.PREPAID
         )
 
         BoxNowShipment.objects.create(

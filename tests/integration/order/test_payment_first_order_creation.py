@@ -15,6 +15,7 @@ from order.exceptions import (
     InvalidOrderDataError,
     PaymentNotFoundError,
 )
+from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
 from region.factories import RegionFactory
@@ -54,8 +55,7 @@ class TestPaymentFirstOrderCreation(APITestCase):
         # Create payment method (online payment for Stripe)
         self.pay_way = PayWayFactory(
             provider_code="stripe",
-            is_online_payment=True,
-            requires_confirmation=False,
+            settlement=PaySettlement.ONLINE,
             active=True,
         )
 

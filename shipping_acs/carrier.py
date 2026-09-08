@@ -7,6 +7,7 @@ from collections.abc import Mapping
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, ClassVar
 
+from pay_way.enum.settlement import PaySettlement
 from shipping.enum import ShippingKind
 from shipping.interfaces import ShippingCarrierInterface, register_provider
 
@@ -96,6 +97,31 @@ class AcsCarrier(ShippingCarrierInterface):
     # Per-kind feature gating
     # ------------------------------------------------------------------
 
+    def supported_settlements(
+        self, kind: ShippingKind
+    ) -> frozenset[PaySettlement] | None:
+        """ACS collects at the door or its counter — never at a locker.
+
+        The courier carries cash and a POS, so ``COURIER_CASH`` is its
+        native collect-on-delivery product for both kinds. What ACS
+        cannot do is ``CARRIER_TERMINAL``: that is BoxNow's locker
+        machine, and putting such a pay-way on an ACS voucher would ask
+        a courier to collect money the shopper is meant to pay at a
+        different company's hardware.
+
+        The exclusion is the point of declaring this at all. Both
+        products used to look identical through
+        ``PayWay.is_cash_on_delivery``, so nothing stopped them
+        crossing carriers.
+        """
+        return frozenset(
+            {
+                PaySettlement.ONLINE,
+                PaySettlement.COURIER_CASH,
+                PaySettlement.OFFLINE_TRANSFER,
+            }
+        )
+
     def is_kind_enabled(self, kind: ShippingKind) -> bool:
         """Gate ACS availability on tenant credentials + per-kind flags.
 
@@ -168,7 +194,15 @@ class AcsCarrier(ShippingCarrierInterface):
         delivery_kind = order.shipping_kind or kind.value
 
         pay_way = getattr(order, "pay_way", None)
-        is_cod = bool(pay_way and pay_way.is_cash_on_delivery)
+        # ACS collects at the door, so ``COURIER_CASH`` is its COD case
+        # — and only its own. A ``CARRIER_TERMINAL`` pay-way (BoxNow PAY
+        # ON THE GO) is settled at a locker machine and must never put
+        # a COD amount on an ACS voucher; ``supported_settlements``
+        # keeps it out of an ACS checkout in the first place.
+        is_cod = bool(
+            pay_way
+            and PaySettlement(pay_way.settlement) == PaySettlement.COURIER_CASH
+        )
         # Default to COD because the contract is COD-only; admins can
         # still override per order via the ``acs_charge_type`` payload
         # key. ``Acs_Delivery_Products="COD"`` only goes on the voucher

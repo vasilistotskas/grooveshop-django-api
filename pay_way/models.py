@@ -13,6 +13,7 @@ from tinymce.models import HTMLField
 from core.fields.image import ImageAndSvgField
 from core.models import SortableModel, TimeStampMixinModel, UUIDModel
 from pay_way.enum.pay_way import PayWayEnum
+from pay_way.enum.settlement import PaySettlement
 from pay_way.managers import PayWayManager
 from shipping.enum import ShippingKind
 
@@ -59,16 +60,41 @@ class PayWay(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
             "Code used to identify the payment provider in the system (e.g., 'stripe', 'paypal')"
         ),
     )
+    settlement = models.CharField(
+        _("Settlement"),
+        max_length=32,
+        choices=PaySettlement,
+        default=PaySettlement.ONLINE,
+        help_text=_(
+            "How the money changes hands. This is the authoritative "
+            "discriminator for the shipping layer: a carrier declares "
+            "which settlements it can physically perform, and the "
+            "voucher's payment mode derives from it. Do not re-derive "
+            "it from the deprecated booleans below."
+        ),
+    )
+    # DEPRECATED — superseded by ``settlement``; kept for exactly one
+    # release so a PreSync migration can land while the previous pods
+    # are still serving (expand/contract; migrations must be
+    # backwards-compatible or split). ``save()`` keeps them in lockstep
+    # with ``settlement`` so nothing can drift in the meantime, and the
+    # follow-up migration drops the columns.
+    #
+    # Read ``settlement`` in new code. Nothing should WRITE these.
     is_online_payment = models.BooleanField(
         _("Is Online Payment"),
         default=False,
-        help_text=_("Whether this payment method is processed online"),
+        help_text=_(
+            "Deprecated mirror of ``settlement == ONLINE``. Dropped in "
+            "the release after settlement lands."
+        ),
     )
     requires_confirmation = models.BooleanField(
         _("Requires Confirmation"),
         default=False,
         help_text=_(
-            "Whether this payment method requires manual confirmation (e.g., bank transfer)"
+            "Deprecated mirror of ``settlement == OFFLINE_TRANSFER``. "
+            "Dropped in the release after settlement lands."
         ),
     )
     configuration = models.JSONField(
@@ -120,6 +146,7 @@ class PayWay(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
             ),
             BTreeIndex(fields=["provider_code"], name="pay_way_provider_ix"),
             BTreeIndex(fields=["is_online_payment"], name="pay_way_online_ix"),
+            BTreeIndex(fields=["settlement"], name="pay_way_settlement_ix"),
         ]
 
     def __str__(self):
@@ -152,19 +179,56 @@ class PayWay(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         return self.has_configuration
 
     @property
-    def is_cash_on_delivery(self) -> bool:
-        # Why: BoxNow's PAY ON THE GO product (and ACS Acs_Delivery_Products="COD")
-        # need to distinguish "courier collects cash/card at the door" from
-        # other offline pay-ways (e.g. bank transfer, where the customer pays
-        # us directly off-platform and the courier collects nothing).
-        # ``is_online_payment=False`` alone is too broad — bank transfer is
-        # also offline. The canonical COD case is offline AND not requiring
-        # off-platform confirmation: the money changes hands on delivery.
-        return not self.is_online_payment and not self.requires_confirmation
+    def is_collected_on_delivery(self) -> bool:
+        """The carrier collects money from the shopper on delivery.
+
+        True for BOTH courier cash-on-delivery and carrier-terminal
+        payment, so it answers "does the voucher need a non-zero
+        amount?" — and nothing else. It deliberately cannot tell the
+        two products apart; ask ``settlement`` for that.
+
+        Replaces the old ``is_cash_on_delivery``, which conflated them
+        and let a generic courier-COD pay-way mint a BoxNow locker
+        voucher (charging a cash-handling fee for a terminal that takes
+        no cash). See ``PaySettlement``.
+        """
+        return PaySettlement(self.settlement) in (
+            PaySettlement.collected_on_delivery()
+        )
 
     @property
     def effective_cost(self) -> float:
         return float(self.cost.amount) if self.cost else 0.0
+
+    def save(self, *args, **kwargs):
+        """Keep the deprecated boolean mirrors in lockstep.
+
+        ``settlement`` is the only stored truth. The two booleans still
+        exist for one release (expand/contract — the PreSync migration
+        lands while the previous pods are still reading them), so they
+        are derived here rather than set by hand. Without this, a row
+        edited after the migration would disagree with itself for as
+        long as the old pods served traffic.
+
+        Both are added to ``update_fields`` when a caller passed one,
+        or the mirrors silently stop tracking on partial saves — the
+        same trap ``Order.save()`` had to fix for ``updated_at``.
+        """
+        settlement = PaySettlement(self.settlement)
+        self.is_online_payment = settlement == PaySettlement.ONLINE
+        self.requires_confirmation = (
+            settlement == PaySettlement.OFFLINE_TRANSFER
+        )
+
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None:
+            kwargs["update_fields"] = {
+                *update_fields,
+                "is_online_payment",
+                "requires_confirmation",
+            }
+
+        super().save(*args, **kwargs)
 
     def clean(self) -> None:
         super().clean()

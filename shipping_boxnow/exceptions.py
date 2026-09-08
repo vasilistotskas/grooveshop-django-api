@@ -13,6 +13,38 @@ class BoxNowConfigError(BoxNowError):
     """Raised when required BoxNow credentials or settings are missing."""
 
 
+class BoxNowUnsupportedSettlementError(BoxNowError):
+    """A pay-way BoxNow cannot settle reached shipment creation.
+
+    Today that means ``COURIER_CASH``: a locker has no POS and takes no
+    cash, so a courier-COD pay-way can never be collected there.
+
+    This is a "should be unreachable" guard, and it is deliberately
+    loud. ``BoxNowCarrier.supported_settlements`` removes such pay-ways
+    from the checkout, so arriving here means something bypassed that
+    gate — a hand-built order, a direct service call, or a regression
+    in the pay-way filter. The predecessor of this code had no guard at
+    all and silently minted the wrong commercial product, charging a
+    cash-handling surcharge for a courier who was never involved.
+    Failing here strands one shipment and raises an ops alert, which is
+    strictly better than mis-charging a customer.
+
+    Attributes:
+        order_id:   The order whose shipment could not be created.
+        settlement: The offending ``PaySettlement`` value.
+    """
+
+    def __init__(self, *, order_id: int, settlement: str) -> None:
+        self.order_id = order_id
+        self.settlement = settlement
+        super().__init__(
+            f"BoxNow cannot settle pay-way settlement {settlement!r} "
+            f"(order {order_id}): a locker terminal accepts no cash. "
+            f"Expected 'carrier_terminal' (PAY ON THE GO), 'online', "
+            f"or 'offline_transfer'."
+        )
+
+
 class BoxNowAPIError(BoxNowError):
     """
     Raised for non-2xx HTTP responses from the BoxNow API.

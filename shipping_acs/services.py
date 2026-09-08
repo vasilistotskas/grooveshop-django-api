@@ -20,6 +20,7 @@ from django.db import connection, transaction
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
+from pay_way.enum.settlement import PaySettlement
 from shipping.enum import ShippingKind
 from shipping.services import DELIVERY_NOTES_MAX_LEN, sanitize_delivery_notes
 from shipping_acs.client import AcsClient
@@ -328,7 +329,15 @@ class AcsService:
             # Stripe) must keep ``cod_amount=0`` or the courier will
             # collect at the door a second time.
             pay_way = getattr(order, "pay_way", None)
-            is_cod_payway = bool(pay_way and pay_way.is_cash_on_delivery)
+            # ``COURIER_CASH`` only — see AcsCarrier.supported_settlements.
+            # A locker-terminal pay-way must not sync a cod_amount onto
+            # an ACS voucher; the money is collected by BoxNow, not by
+            # the ACS courier at the door.
+            is_cod_payway = bool(
+                pay_way
+                and PaySettlement(pay_way.settlement)
+                == PaySettlement.COURIER_CASH
+            )
             cod_synced = (
                 is_cod_payway
                 and shipment.charge_type == AcsChargeType.COD

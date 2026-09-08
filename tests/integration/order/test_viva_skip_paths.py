@@ -31,6 +31,7 @@ from order.views.viva_webhook import (
     AMOUNT_MISMATCH_FLAG,
     _handle_payment_created,
 )
+from pay_way.enum.settlement import PaySettlement
 
 pytestmark = pytest.mark.django_db
 
@@ -124,7 +125,7 @@ class TestChargedOrderIsNotAutoCancelled:
         from order.tasks import auto_cancel_stuck_pending_orders
         from pay_way.factories import PayWayFactory
 
-        pay_way = PayWayFactory(is_online_payment=True)
+        pay_way = PayWayFactory(settlement=PaySettlement.ONLINE)
         order = OrderFactory(num_order_items=0, pay_way=pay_way)
         Order.objects.filter(pk=order.pk).update(
             status=OrderStatus.PENDING,
@@ -148,7 +149,7 @@ class TestChargedOrderIsNotAutoCancelled:
         from order.tasks import auto_cancel_stuck_pending_orders
         from pay_way.factories import PayWayFactory
 
-        pay_way = PayWayFactory(is_online_payment=True)
+        pay_way = PayWayFactory(settlement=PaySettlement.ONLINE)
         order = OrderFactory(num_order_items=0, pay_way=pay_way)
         Order.objects.filter(pk=order.pk).update(
             status=OrderStatus.PENDING,

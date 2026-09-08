@@ -13,6 +13,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory, PayWayShippingExclusionFactory
 from pay_way.models import PayWay
 from shipping.enum import ShippingKind
@@ -25,13 +26,17 @@ class PayWayFilterExcludesEndpointTests(APITestCase):
 
         self.online_pay_way = PayWayFactory(
             active=True,
-            is_online_payment=True,
-            requires_confirmation=False,
+            settlement=PaySettlement.ONLINE,
         )
+        # OFFLINE_TRANSFER, not COURIER_CASH: this file asserts the
+        # ADMIN exclusion layer through the storefront endpoint, and
+        # the endpoint is queried for (boxnow, pickup_point) — where a
+        # courier-cash pay-way is removed by BoxNow's own capability
+        # filter. Using one here would make these assertions pass with
+        # the exclusion row deleted.
         self.cod_pay_way = PayWayFactory(
             active=True,
-            is_online_payment=False,
-            requires_confirmation=False,
+            settlement=PaySettlement.OFFLINE_TRANSFER,
         )
 
         # Reuse the seeded "boxnow" / "acs" providers from the

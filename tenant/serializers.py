@@ -167,8 +167,18 @@ class TenantConfigSerializer(serializers.Serializer):
             # list() forces evaluation INSIDE the schema context: a lazy
             # queryset would run its query after the context exits, against
             # whatever schema the connection happened to be left on.
+            # Everything an agent can complete WITHOUT redirecting the
+            # shopper to a hosted card page — i.e. every settlement
+            # except ONLINE. Reading ``settlement`` rather than the
+            # deprecated ``is_online_payment`` mirror also means the
+            # locker-terminal instrument (BoxNow PAY ON THE GO) is
+            # advertised correctly instead of being lumped in with
+            # courier cash-on-delivery.
+            from pay_way.enum.settlement import PaySettlement
+
             codes = list(
-                PayWay.objects.filter(active=True, is_online_payment=False)
+                PayWay.objects.filter(active=True)
+                .exclude(settlement=PaySettlement.ONLINE)
                 .exclude(provider_code="")
                 .order_by("sort_order", "id")
                 .values_list("provider_code", flat=True)

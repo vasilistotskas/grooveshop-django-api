@@ -8,6 +8,7 @@ from core.filters.core import (
     TimeStampFilterMixin,
     UUIDFilterMixin,
 )
+from pay_way.enum.settlement import PaySettlement
 from pay_way.models import PayWay
 
 
@@ -52,9 +53,17 @@ class PayWayFilter(
         lookup_expr="icontains",
         help_text=_("Filter by provider code (partial match)"),
     )
+    settlement = filters.ChoiceFilter(
+        field_name="settlement",
+        choices=PaySettlement.choices,
+        help_text=_("Filter by how the money changes hands"),
+    )
     is_online_payment = filters.BooleanFilter(
         field_name="is_online_payment",
-        help_text=_("Filter by online payment status"),
+        help_text=_(
+            "Deprecated — use ``settlement=online``. Removed with the "
+            "column in the release after settlement lands."
+        ),
     )
     requires_confirmation = filters.BooleanFilter(
         field_name="requires_confirmation",

@@ -22,6 +22,7 @@ from djmoney.money import Money
 from cart.factories import CartFactory, CartItemFactory
 from country.factories import CountryFactory
 from order.services import OrderService
+from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories import ProductFactory
 
@@ -57,7 +58,9 @@ def _cart():
 
 def _pay_way(*, online, provider_code=""):
     return PayWayFactory(
-        is_online_payment=online,
+        settlement=(
+            PaySettlement.ONLINE if online else PaySettlement.COURIER_CASH
+        ),
         provider_code=provider_code,
         active=True,
         cost=Money(Decimal(0), "EUR"),

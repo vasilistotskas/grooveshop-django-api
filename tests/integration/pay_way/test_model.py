@@ -2,6 +2,7 @@ from django.conf import settings
 from django.test import TransactionTestCase
 from djmoney.money import Money
 
+from pay_way.enum.settlement import PaySettlement
 from pay_way.models import PayWay
 
 
@@ -12,8 +13,7 @@ class PayWayModelTestCase(TransactionTestCase):
             cost=Money(0, settings.DEFAULT_CURRENCY),
             free_threshold=Money(100, settings.DEFAULT_CURRENCY),
             provider_code="stripe",
-            is_online_payment=True,
-            requires_confirmation=False,
+            settlement=PaySettlement.ONLINE,
             configuration={
                 "public_key": "pk_test_123",
                 "secret_key": "sk_test_123",
@@ -30,8 +30,7 @@ class PayWayModelTestCase(TransactionTestCase):
             cost=Money(0, settings.DEFAULT_CURRENCY),
             free_threshold=Money(0, settings.DEFAULT_CURRENCY),
             provider_code="",
-            is_online_payment=False,
-            requires_confirmation=True,
+            settlement=PaySettlement.OFFLINE_TRANSFER,
             sort_order=1,
         )
         self.bank_transfer.set_current_language("en")
@@ -45,8 +44,7 @@ class PayWayModelTestCase(TransactionTestCase):
             cost=Money(5, settings.DEFAULT_CURRENCY),
             free_threshold=Money(50, settings.DEFAULT_CURRENCY),
             provider_code="",
-            is_online_payment=False,
-            requires_confirmation=False,
+            settlement=PaySettlement.COURIER_CASH,
             sort_order=2,
         )
         self.pay_on_delivery.set_current_language("en")
@@ -86,7 +84,20 @@ class PayWayModelTestCase(TransactionTestCase):
             {"public_key": "pk_test_123", "secret_key": "sk_test_123"},
         )
 
-    def test_payment_type_properties(self):
+    def test_settlement_is_the_stored_truth(self):
+        self.assertEqual(self.credit_card.settlement, PaySettlement.ONLINE)
+        self.assertEqual(
+            self.bank_transfer.settlement, PaySettlement.OFFLINE_TRANSFER
+        )
+        self.assertEqual(
+            self.pay_on_delivery.settlement, PaySettlement.COURIER_CASH
+        )
+
+    def test_deprecated_booleans_track_settlement(self):
+        # The two columns survive for one release (expand/contract) and
+        # ``save()`` derives them, so a row can never disagree with
+        # itself while the previous pods still read them. Delete this
+        # test with the columns.
         self.assertTrue(self.credit_card.is_online_payment)
         self.assertFalse(self.credit_card.requires_confirmation)
 
@@ -95,3 +106,32 @@ class PayWayModelTestCase(TransactionTestCase):
 
         self.assertFalse(self.pay_on_delivery.is_online_payment)
         self.assertFalse(self.pay_on_delivery.requires_confirmation)
+
+    def test_deprecated_booleans_cannot_be_written_directly(self):
+        # Writing the mirror must not create a row that contradicts its
+        # settlement — that divergence is what let a courier-COD
+        # pay-way mint a BoxNow locker voucher.
+        self.pay_on_delivery.is_online_payment = True
+        self.pay_on_delivery.save()
+        self.pay_on_delivery.refresh_from_db()
+
+        self.assertFalse(self.pay_on_delivery.is_online_payment)
+        self.assertEqual(
+            self.pay_on_delivery.settlement, PaySettlement.COURIER_CASH
+        )
+
+    def test_is_collected_on_delivery_spans_both_products(self):
+        # Both COD-shaped settlements need a non-zero voucher amount,
+        # and this property must NOT distinguish them — that is what
+        # ``settlement`` is for.
+        self.assertTrue(self.pay_on_delivery.is_collected_on_delivery)
+        self.assertFalse(self.credit_card.is_collected_on_delivery)
+        self.assertFalse(self.bank_transfer.is_collected_on_delivery)
+
+        terminal = PayWay.objects.create(
+            active=True,
+            provider_code="boxnow_pay_on_the_go",
+            settlement=PaySettlement.CARRIER_TERMINAL,
+            sort_order=3,
+        )
+        self.assertTrue(terminal.is_collected_on_delivery)

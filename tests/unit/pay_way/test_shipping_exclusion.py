@@ -17,6 +17,7 @@ from __future__ import annotations
 from django.db import IntegrityError
 from django.test import TestCase
 
+from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory, PayWayShippingExclusionFactory
 from pay_way.models import PayWay, PayWayShippingExclusion
 from pay_way.services import PayWayService
@@ -82,13 +83,21 @@ class FilterByCarrierExclusionTests(TestCase):
     def setUp(self):
         self.online_pay_way = PayWayFactory(
             active=True,
-            is_online_payment=True,
-            requires_confirmation=False,
+            settlement=PaySettlement.ONLINE,
         )
-        self.cod_pay_way = PayWayFactory(
+        # These tests isolate **Layer 1** (admin exclusion rows), and
+        # they run against BOTH carriers, so every fixture here must be
+        # a settlement that Layer 2 permits everywhere — otherwise a
+        # carrier's capability filter removes the pay-way on its own and
+        # the assertions below pass without the exclusion row doing
+        # anything, silently gutting this file.
+        #
+        # ONLINE and OFFLINE_TRANSFER are the two both carriers accept.
+        # The capability filter itself is covered per carrier (BoxNow
+        # rejects COURIER_CASH, ACS rejects CARRIER_TERMINAL).
+        self.offline_pay_way = PayWayFactory(
             active=True,
-            is_online_payment=False,
-            requires_confirmation=False,
+            settlement=PaySettlement.OFFLINE_TRANSFER,
         )
 
     def _all(self):
@@ -105,12 +114,12 @@ class FilterByCarrierExclusionTests(TestCase):
         )
         ids = set(result.values_list("id", flat=True))
         self.assertIn(self.online_pay_way.id, ids)
-        self.assertIn(self.cod_pay_way.id, ids)
+        self.assertIn(self.offline_pay_way.id, ids)
 
     def test_exclusion_for_matching_combo_filters_pay_way_out(self):
         provider = ShippingProviderFactory(code="boxnow")
         PayWayShippingExclusionFactory(
-            pay_way=self.cod_pay_way,
+            pay_way=self.offline_pay_way,
             shipping_provider=provider,
             shipping_kind=ShippingKind.PICKUP_POINT.value,
         )
@@ -121,13 +130,13 @@ class FilterByCarrierExclusionTests(TestCase):
             shipping_kind=ShippingKind.PICKUP_POINT.value,
         )
         ids = set(result.values_list("id", flat=True))
-        self.assertNotIn(self.cod_pay_way.id, ids)
+        self.assertNotIn(self.offline_pay_way.id, ids)
         self.assertIn(self.online_pay_way.id, ids)
 
     def test_exclusion_isolated_to_its_kind(self):
         provider = ShippingProviderFactory(code="boxnow")
         PayWayShippingExclusionFactory(
-            pay_way=self.cod_pay_way,
+            pay_way=self.offline_pay_way,
             shipping_provider=provider,
             shipping_kind=ShippingKind.PICKUP_POINT.value,
         )
@@ -141,13 +150,13 @@ class FilterByCarrierExclusionTests(TestCase):
             shipping_kind=ShippingKind.HOME_DELIVERY.value,
         )
         ids = set(result.values_list("id", flat=True))
-        self.assertIn(self.cod_pay_way.id, ids)
+        self.assertIn(self.offline_pay_way.id, ids)
 
     def test_exclusion_isolated_to_its_provider(self):
         boxnow = ShippingProviderFactory(code="boxnow")
         ShippingProviderFactory(code="acs")
         PayWayShippingExclusionFactory(
-            pay_way=self.cod_pay_way,
+            pay_way=self.offline_pay_way,
             shipping_provider=boxnow,
             shipping_kind=ShippingKind.PICKUP_POINT.value,
         )
@@ -158,7 +167,7 @@ class FilterByCarrierExclusionTests(TestCase):
             shipping_kind=ShippingKind.PICKUP_POINT.value,
         )
         ids = set(result.values_list("id", flat=True))
-        self.assertIn(self.cod_pay_way.id, ids)
+        self.assertIn(self.offline_pay_way.id, ids)
 
     def test_missing_inputs_short_circuit_to_pass_through(self):
         # When the caller doesn't supply both inputs the service has
@@ -178,7 +187,7 @@ class FilterByCarrierExclusionTests(TestCase):
                     shipping_kind=shipping_kind,
                 )
                 ids = set(result.values_list("id", flat=True))
-                self.assertIn(self.cod_pay_way.id, ids)
+                self.assertIn(self.offline_pay_way.id, ids)
                 self.assertIn(self.online_pay_way.id, ids)
 
     def test_unregistered_provider_short_circuits(self):
@@ -192,7 +201,7 @@ class FilterByCarrierExclusionTests(TestCase):
             shipping_kind=ShippingKind.HOME_DELIVERY.value,
         )
         ids = set(result.values_list("id", flat=True))
-        self.assertIn(self.cod_pay_way.id, ids)
+        self.assertIn(self.offline_pay_way.id, ids)
         self.assertIn(self.online_pay_way.id, ids)
 
     def test_unknown_kind_short_circuits(self):
@@ -202,5 +211,5 @@ class FilterByCarrierExclusionTests(TestCase):
             shipping_kind="not-a-real-kind",
         )
         ids = set(result.values_list("id", flat=True))
-        self.assertIn(self.cod_pay_way.id, ids)
+        self.assertIn(self.offline_pay_way.id, ids)
         self.assertIn(self.online_pay_way.id, ids)

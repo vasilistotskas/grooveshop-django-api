@@ -12,12 +12,15 @@ from unfold.decorators import action, display
 from unfold.enums import ActionVariant
 
 from admin.base import BaseTranslatableAdmin
+from pay_way.enum.settlement import PaySettlement
 from pay_way.models import PayWay, PayWayShippingExclusion
 
 PAYMENT_TYPE_VARIANT: dict[str, str] = {
-    "online": "info",
-    "offline_confirmation": "warning",
-    "offline_simple": "default",
+    PaySettlement.ONLINE.value: "info",
+    PaySettlement.OFFLINE_TRANSFER.value: "warning",
+    PaySettlement.COURIER_CASH.value: "default",
+    # The one the old three-way split had no name for.
+    PaySettlement.CARRIER_TERMINAL.value: "success",
 }
 
 
@@ -93,23 +96,30 @@ class PaymentTypeFilter(DropdownFilter):
     parameter_name = "payment_type"
 
     def lookups(self, request, model_admin):
+        # One lookup per settlement. The old three-way split
+        # ("online" / "offline simple" / "offline requires confirmation")
+        # could not name the locker-terminal case at all, which is how a
+        # courier-COD pay-way ended up on BoxNow lockers.
         return [
-            ("online", _("Online Payment")),
-            ("offline_simple", _("Offline (Simple)")),
-            ("offline_confirmation", _("Offline (Requires Confirmation)")),
+            (PaySettlement.ONLINE.value, PaySettlement.ONLINE.label),
+            (
+                PaySettlement.COURIER_CASH.value,
+                PaySettlement.COURIER_CASH.label,
+            ),
+            (
+                PaySettlement.CARRIER_TERMINAL.value,
+                PaySettlement.CARRIER_TERMINAL.label,
+            ),
+            (
+                PaySettlement.OFFLINE_TRANSFER.value,
+                PaySettlement.OFFLINE_TRANSFER.label,
+            ),
         ]
 
     def queryset(self, request, queryset):
-        if self.value() == "online":
-            return queryset.filter(is_online_payment=True)
-        elif self.value() == "offline_simple":
-            return queryset.filter(
-                is_online_payment=False, requires_confirmation=False
-            )
-        elif self.value() == "offline_confirmation":
-            return queryset.filter(
-                is_online_payment=False, requires_confirmation=True
-            )
+        value = self.value()
+        if value in PaySettlement.values:
+            return queryset.filter(settlement=value)
         return queryset
 
 
@@ -125,16 +135,19 @@ class ConfigurationStatusFilter(DropdownFilter):
         ]
 
     def queryset(self, request, queryset):
+        # Only ONLINE settlement needs provider configuration — the
+        # other three collect money without us calling a PSP.
+        online = Q(settlement=PaySettlement.ONLINE.value)
         if self.value() == "configured":
-            return queryset.filter(
-                is_online_payment=True, configuration__isnull=False
-            ).exclude(configuration={})
+            return queryset.filter(online, configuration__isnull=False).exclude(
+                configuration={}
+            )
         elif self.value() == "not_configured":
-            return queryset.filter(is_online_payment=True).filter(
+            return queryset.filter(online).filter(
                 Q(configuration__isnull=True) | Q(configuration={})
             )
         elif self.value() == "no_config_needed":
-            return queryset.filter(is_online_payment=False)
+            return queryset.exclude(online)
         return queryset
 
 
@@ -154,8 +167,6 @@ class PayWayAdmin(BaseTranslatableAdmin):
         "active",
         PaymentTypeFilter,
         ConfigurationStatusFilter,
-        "is_online_payment",
-        "requires_confirmation",
         CostRangeFilter,
         FreeThresholdFilter,
         ("created_at", RangeDateTimeFilter),
@@ -218,8 +229,7 @@ class PayWayAdmin(BaseTranslatableAdmin):
             {
                 "fields": (
                     "provider_code",
-                    "is_online_payment",
-                    "requires_confirmation",
+                    "settlement",
                 ),
                 "classes": ("wide",),
             },
@@ -263,11 +273,8 @@ class PayWayAdmin(BaseTranslatableAdmin):
 
     @display(description=_("Type"), label=PAYMENT_TYPE_VARIANT)
     def payment_type_display(self, obj):
-        if obj.is_online_payment:
-            return "online", _("Online")
-        if obj.requires_confirmation:
-            return "offline_confirmation", _("Offline (Confirm)")
-        return "offline_simple", _("Offline")
+        settlement = PaySettlement(obj.settlement)
+        return settlement.value, settlement.label
 
     @admin.display(description=_("Cost"))
     def cost_display(self, obj):

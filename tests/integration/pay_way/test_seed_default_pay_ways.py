@@ -20,14 +20,31 @@ import importlib
 
 import pytest
 
+from pay_way.enum.settlement import PaySettlement
 from pay_way.models import PayWay
 
 MIGRATION = "pay_way.migrations.0019_seed_default_pay_ways"
+BACKFILL = (
+    "pay_way.migrations."
+    "0020_payway_settlement_alter_payway_is_online_payment_and_more"
+)
 
 
 @pytest.fixture
 def seed():
-    module = importlib.import_module(MIGRATION)
+    """Replay what a freshly provisioned tenant actually gets.
+
+    That is 0019 (the rows) AND 0020's backfill (their settlement) —
+    a fresh tenant runs both, in order, before serving a request.
+
+    Replaying 0019 alone would be a lie about production and would also
+    misfire here: these run against the CURRENT ``PayWay``, whose
+    ``save()`` derives the deprecated booleans from ``settlement``. With
+    no settlement set, every seeded row would come back claiming to be
+    paid online — including cash-on-delivery.
+    """
+    seeder = importlib.import_module(MIGRATION)
+    backfill = importlib.import_module(BACKFILL)
 
     class _SchemaEditor:
         class connection:
@@ -36,7 +53,29 @@ def seed():
     def _run():
         from django.apps import apps
 
-        module.seed_pay_ways(apps, _SchemaEditor)
+        seeder.seed_pay_ways(apps, _SchemaEditor)
+
+        # Re-assert what the HISTORICAL model would have written.
+        #
+        # A real fresh tenant runs 0019 against the model as it stood
+        # then: no ``settlement`` column and no custom ``save()``. Here
+        # 0019 runs against the current model, whose ``save()`` derives
+        # the booleans FROM ``settlement`` — which 0019 never sets, so
+        # it lands on the field default and every seeded row comes back
+        # claiming to be paid online. The backfill would then read those
+        # corrupted booleans and agree with them.
+        #
+        # ``.update()`` writes straight to SQL, bypassing ``save()``,
+        # which is exactly the historical behaviour we need before
+        # exercising the backfill on realistic input.
+        for code, _name, _active, is_online, _sort in seeder.DEFAULT_PAY_WAYS:
+            PayWay.objects.filter(provider_code=code).update(
+                is_online_payment=is_online,
+                requires_confirmation=False,
+                settlement="online",  # AddField's default, pre-backfill
+            )
+
+        backfill.backfill_settlement(apps, _SchemaEditor)
 
     return _run
 
@@ -67,9 +106,14 @@ class TestFreshTenantSeeding:
         assert by_code["viva_wallet"].active is False
         assert by_code["stripe"].active is False
 
-        assert by_code["cash_on_delivery"].is_online_payment is False
-        assert by_code["viva_wallet"].is_online_payment is True
-        assert by_code["stripe"].is_online_payment is True
+        # Settlement is the stored truth. COD is collected by the
+        # courier at the door — NOT at a carrier terminal, which is
+        # BoxNow PAY ON THE GO and is seeded separately in 0021.
+        assert by_code["cash_on_delivery"].settlement == (
+            PaySettlement.COURIER_CASH
+        )
+        assert by_code["viva_wallet"].settlement == PaySettlement.ONLINE
+        assert by_code["stripe"].settlement == PaySettlement.ONLINE
 
     def test_online_codes_match_the_payment_provider_registry(self, seed):
         """A code the registry does not know 500s mid-checkout.
@@ -86,7 +130,7 @@ class TestFreshTenantSeeding:
         PayWay.objects.all().delete()
         seed()
 
-        online = PayWay.objects.filter(is_online_payment=True)
+        online = PayWay.objects.filter(settlement=PaySettlement.ONLINE)
         assert online.count() == 2
         for pay_way in online:
             try:
@@ -127,7 +171,7 @@ class TestExistingTenantIsUntouched:
         live = PayWay.objects.create(
             provider_code="viva_wallet",
             active=True,
-            is_online_payment=True,
+            settlement=PaySettlement.ONLINE,
         )
         live.set_current_language("el")
         live.name = "CREDIT_CARD"
@@ -148,7 +192,7 @@ class TestExistingTenantIsUntouched:
         cod = PayWay.objects.create(
             provider_code="cash_on_delivery",
             active=False,
-            is_online_payment=False,
+            settlement=PaySettlement.COURIER_CASH,
         )
         # .update() bypasses SortableModel.save(), which reassigns
         # sort_order on every create.
@@ -176,7 +220,7 @@ class TestExistingTenantIsUntouched:
         PayWay.objects.create(
             provider_code="cash_on_delivery",
             active=True,
-            is_online_payment=False,
+            settlement=PaySettlement.COURIER_CASH,
         )
 
         seed()

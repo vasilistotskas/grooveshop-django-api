@@ -4,6 +4,7 @@ from django.test import TestCase
 
 from order.enum.status import PaymentStatus
 from order.factories import OrderFactory
+from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from pay_way.services import PayWayService
 
@@ -13,22 +14,19 @@ class PayWayServiceTestCase(TestCase):
         self.online_pay_way = PayWayFactory(
             active=True,
             provider_code="stripe",
-            is_online_payment=True,
-            requires_confirmation=False,
+            settlement=PaySettlement.ONLINE,
         )
 
         self.offline_pay_way_with_confirmation = PayWayFactory(
             active=True,
             provider_code="",
-            is_online_payment=False,
-            requires_confirmation=True,
+            settlement=PaySettlement.OFFLINE_TRANSFER,
         )
 
         self.offline_pay_way_without_confirmation = PayWayFactory(
             active=True,
             provider_code="",
-            is_online_payment=False,
-            requires_confirmation=False,
+            settlement=PaySettlement.COURIER_CASH,
         )
 
         self.order = OrderFactory(

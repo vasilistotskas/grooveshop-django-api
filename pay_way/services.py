@@ -12,6 +12,7 @@ from order.enum.status import (
 from order.models import Order
 from order.payment import get_payment_provider
 from order.signals import order_refunded
+from pay_way.enum.settlement import PaySettlement
 from pay_way.models import PayWay
 
 logger = logging.getLogger(__name__)
@@ -142,7 +143,7 @@ class PayWayService:
     def process_payment(
         pay_way: PayWay, order: Order, **kwargs
     ) -> tuple[bool, dict[str, Any]]:
-        if not pay_way.is_online_payment:
+        if PaySettlement(pay_way.settlement) != PaySettlement.ONLINE:
             # Amount owed, not the raw total: a loyalty redemption is
             # deducted by calculate_order_total_amount(). Cash on
             # delivery already collected the discounted figure via
@@ -157,7 +158,10 @@ class PayWayService:
                 "provider": pay_way.provider_code or "offline",
             }
 
-            if not pay_way.requires_confirmation:
+            if (
+                PaySettlement(pay_way.settlement)
+                != PaySettlement.OFFLINE_TRANSFER
+            ):
                 order.payment_method = (
                     pay_way.safe_translation_getter("name", any_language=True)
                     or ""
@@ -215,11 +219,14 @@ class PayWayService:
                 "error": _("No payment ID found for order")
             }
 
-        if not pay_way.is_online_payment:
+        if PaySettlement(pay_way.settlement) != PaySettlement.ONLINE:
             return order.payment_status, {
                 "status": order.payment_status,
                 "provider": "offline",
-                "manual_check_required": pay_way.requires_confirmation,
+                "manual_check_required": (
+                    PaySettlement(pay_way.settlement)
+                    == PaySettlement.OFFLINE_TRANSFER
+                ),
             }
 
         provider = PayWayService.get_provider_for_pay_way(pay_way)
@@ -275,7 +282,7 @@ class PayWayService:
         if not order.payment_id:
             return False, {"error": _("No payment ID found for order")}
 
-        if not pay_way.is_online_payment:
+        if PaySettlement(pay_way.settlement) != PaySettlement.ONLINE:
             if amount and amount.amount > 0:
                 refund_info = {
                     "refund_id": f"MANUAL_REFUND_{order.id}",

@@ -3,6 +3,58 @@
 
 
 
+## v3.43.0 (2026-09-08)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.42.0 [skip ci] ([`990b975`](https://github.com/vasilistotskas/grooveshop-django-api/commit/990b975a464b5f2172dbff2db25b5037ffbbe71a))
+
+### Features
+
+* feat(page_config): project_register, and the register page it composes
+
+The 48 reference projects were 48 ``BlogPost`` rows, one per project.
+The redesign draws them as a REGISTER — a flat numbered table on
+``/empeiria``, filterable by sector, no images, no pagination, no
+detail page — so the shape no longer fits:
+
+* a register row needs THREE strings (title, technical note,
+  contracting company) where a post offers title, subtitle and an HTML
+  body, and the note only ever existed inside that body's markup;
+* the artboards have no article anywhere, so the whole blog surface is
+  off for this tenant (``blog_enabled``, the plan flag the platform
+  already gates the API, the four routes, the nav, the sitemap and the
+  RSS feed on) — which would have left 48 published posts reachable
+  only through Meilisearch and the agent feeds.
+
+So the register becomes a section: ``project_register`` carries the
+rows and the sector taxonomy in ``props``, projected from the same
+``PROJECTS``/``SECTORS`` the home page's showcase reads, and
+``retire_project_posts`` unpublishes what the earlier shape created.
+Unpublish, not delete: a row is content and deleting is irreversible.
+
+Two things fall out of moving the rows under a props contract:
+
+* ``items[].sector`` is a KEY into ``sectors``, and the storefront
+  resolves a pill's colour from that sector's POSITION — a categorical
+  palette, so nothing in the data names a colour. A key that is not
+  declared loses its colour with no other symptom, so
+  ``validate_section_props`` grew its first cross-prop check to refuse
+  one.
+* every contracting company now passes the English-override parity
+  guard, which caught twenty Greek names the guard could never see
+  while they only reached ``BlogPost.subtitle``. They are
+  transliterated, not translated (a legal entity is the same one in
+  both languages), except the four with a published English name.
+
+The register hero prints two DERIVED stats. The artboard shows a
+third, "4 χώρες", which nothing in the register evidences — only
+Greece and Zambia appear in the forty-eight titles — so it is left
+out rather than asserted on the company's behalf.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018CiyyCqkXd9a1FM5hsrPFZ ([`5ca2554`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5ca25549783dca0bd38c7005077ea6152fcfd0be))
+
 ## v3.42.0 (2026-09-07)
 
 ### Chores

@@ -3,6 +3,25 @@
 
 
 
+## v3.46.2 (2026-09-08)
+
+### Bug fixes
+
+* fix(devtools): converge a layout title that predates its own naming
+
+`LAYOUT_TITLES` only reaches a layout through `get_or_create`'s
+`defaults`, so the four pages created before it existed still read as
+their slugs in the page builder — "Eidikefsi", "Synergates". Renaming
+a layout is the operator's call, so it converges under `--overwrite`,
+like the props and the locale overrides.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018CiyyCqkXd9a1FM5hsrPFZ ([`88cb148`](https://github.com/vasilistotskas/grooveshop-django-api/commit/88cb14811183770cde32569e5436c839f539939e))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.46.1 [skip ci] ([`19108c4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/19108c4dd28e50797511e2c4283e89ff307c71b8))
+
 ## v3.46.1 (2026-09-08)
 
 ### Bug fixes

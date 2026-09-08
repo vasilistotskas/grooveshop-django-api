@@ -23,9 +23,11 @@ state (order_paid signal, status transition, history) still flows.
 from datetime import timedelta
 
 from django.core.management.base import BaseCommand
+from django.db import connection
 from django.utils import timezone
 
 from core.management.tenant_mixin import TenantCommandMixin
+from shipping_acs.config import is_configured
 from shipping_acs.services import AcsService
 
 
@@ -70,6 +72,22 @@ class Command(TenantCommandMixin, BaseCommand):
         silent: bool = options["silent"]
         if days < 1:
             self.stderr.write(self.style.ERROR("--days must be >= 1"))
+            return
+
+        # ``--all-tenants`` targets every ACTIVE tenant, not every tenant
+        # that sells through ACS — 3 of the 4 in production have no ACS
+        # credentials at all. Without this guard the first of them raises
+        # ``AcsConfigError`` out of ``AcsClient.__init__`` and aborts the
+        # whole run before reaching the one tenant that needed
+        # reconciling. Skip cleanly and say so, exactly as the beat
+        # task's ``_skip_if_acs_unconfigured`` does.
+        if not is_configured():
+            self.stdout.write(
+                self.style.WARNING(
+                    f"ACS is not configured for schema "
+                    f"'{connection.schema_name}' — skipping."
+                )
+            )
             return
 
         yesterday = (timezone.localtime() - timedelta(days=1)).date()

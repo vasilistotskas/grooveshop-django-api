@@ -3,6 +3,57 @@
 
 
 
+## v3.48.3 (2026-09-09)
+
+### Bug fixes
+
+* fix(core): alert on any failed health check, and watch Redis persistence
+
+webside.gr served 503s for hours on 2026-09-09 while every check we had
+reported green. Three independent reasons, all fixed here.
+
+The gate only ever looked at the database. `critical_passed` was
+`health_checks["database"]`, so a failed cache or storage probe set the
+status to "degraded", mailed nobody and raised nothing. Redis is the
+cache, the Channels layer and the SSR store at once, and the media
+volume is where every upload lands — there is no failure among the
+three a human should not see. Any failed check now mails and raises,
+and the subject names which one, because an inbox full of identically
+titled alerts is how the ACS ones ended up filtered away unread.
+
+Nothing watched the failure that actually happened. Redis kept serving
+reads and writes from memory the entire time its volume was full, so
+the set/get round-trip passed throughout — the only thing that knew was
+Redis, which had been reporting aof_last_write_status:err since the
+first failed rewrite. CustomCache.failing_persistence_statuses() reads
+that, gated on aof_enabled so an RDB-only server is not judged by a
+subsystem it does not run, and reporting only fields the server
+actually sent so a version bump cannot invent a failure. This is a
+precursor check: it flips when the volume fills, hours before the
+crash loop that follows.
+
+It ran at 05:00 and no more, so a dependency could be down for 24 hours
+before anything looked. Now every 30 minutes. 30 rather than 5 is
+deliberate: the task mails from inside its own body and has nowhere to
+persist "already alerted" that survives Redis being down, so the
+interval is the throttle — two mails an hour during a sustained outage
+instead of twelve.
+
+Also drops autoretry_for=(Exception,), max_retries=5. A monitor that
+retries only re-asks the same question, and since this one mails per
+run, one outage became six identical alerts.
+
+Verified against production: Django's own cache client can run INFO
+persistence on the live Redis and reads all four fields, so no ACL
+stands between this check and the answer.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01WnK59xS5MBn65T5f6ZP7Xf ([`8d170f6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8d170f67906c59f34f80a1427284985bdf150d5d))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.48.2 [skip ci] ([`e2e810f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e2e810f0b690c513b3b2a70237427dfdf7110dc7))
+
 ## v3.48.2 (2026-09-09)
 
 ### Bug fixes

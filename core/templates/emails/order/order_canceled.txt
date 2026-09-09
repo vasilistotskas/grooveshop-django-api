@@ -6,7 +6,8 @@
 {% trans "Date Ordered" %}: {{ order.created_at|date:"SHORT_DATETIME_FORMAT" }}
 {% trans "Date Canceled" %}: {{ order.status_updated_at|date:"SHORT_DATETIME_FORMAT" }}
 
-{% if order.paid_amount %}
+{# See the .html template: paid_amount is the amount payable, not collected. #}
+{% if order.is_paid and order.paid_amount %}
 {% trans "Refund" %}: {% blocktrans with amount=order.paid_amount %}Your payment of {{ amount }} will be refunded to your original payment method within 3-5 business days.{% endblocktrans %}
 {% endif %}
 

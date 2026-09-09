@@ -18,7 +18,20 @@
         </span>
     </p>
 
-    {% if order.paid_amount %}
+    {% comment %}
+       paid_amount is what the order was WORTH, not what was collected:
+       OrderService sets it at creation from
+       calculate_order_total_amount(), before any money moves. Gating on
+       it alone promised a refund to every cancelled order, including
+       cash-on-delivery and BOX NOW Antikatavoli ones the shopper had
+       never paid for (order #274, 2026-09-10). is_paid is the
+       settlement authority - only mark_as_paid and the provider
+       webhooks set COMPLETED.
+
+       Django's hash comment is SINGLE-LINE only; a multi-line one
+       renders itself into the customer's email verbatim.
+    {% endcomment %}
+    {% if order.is_paid and order.paid_amount %}
     <p class="mt-2">
         <strong>{% trans "Refund" %}:</strong>
         {% blocktrans with amount=order.paid_amount %}Your payment of {{ amount }} will be refunded to your original payment method within 3-5 business days.{% endblocktrans %}

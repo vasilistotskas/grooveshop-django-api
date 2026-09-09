@@ -129,3 +129,132 @@ def test_options_rejects_absurd_weight():
         {"weight_grams": "1000000"},
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
+def _name_it(pay_way, enum_value: str):
+    """Write the enum key and hand back an instance that can see it.
+
+    ``.update()`` goes straight to SQL, past BOTH of parler's caches —
+    the per-instance one and the shared backend ``PARLER_ENABLE_CACHING``
+    fills on first read. Without the clear, every assertion here reads
+    whatever name the factory's Iterator happened to assign and the test
+    lies. Same trap as ``tests/integration/pay_way/test_display_name.py``.
+    """
+    from django.core.cache import cache
+
+    from pay_way.models import PayWay
+
+    pay_way.translations.update(name=enum_value)
+    cache.clear()
+    return PayWay.objects.get(pk=pay_way.pk)
+
+
+class TestPayWaysPerOption:
+    """Each option advertises what it can actually settle.
+
+    BOX NOW Αντικαταβολή is reachable ONLY through a BoxNow locker, and
+    the payment step is a step LATER — so a shopper who never picks one
+    has no way to learn the method exists. The delivery card can say
+    so, but only if the option carries the answer.
+
+    The rules are not restated here: ``available_options`` calls the
+    same ``PayWayService.filter_by_carrier`` the checkout calls, so a
+    delivery card cannot advertise something the payment step would
+    then refuse. These tests pin that they agree.
+    """
+
+    def test_each_option_lists_the_pay_ways_it_can_settle(
+        self, boxnow_configured_tenant
+    ):
+        from pay_way.enum.pay_way import PayWayEnum
+        from pay_way.enum.settlement import PaySettlement
+        from pay_way.factories import PayWayFactory
+
+        potg = PayWayFactory(
+            active=True,
+            provider_code="boxnow_pay_on_the_go",
+            settlement=PaySettlement.CARRIER_TERMINAL.value,
+        )
+        potg = _name_it(potg, PayWayEnum.BOX_NOW_PAY_ON_THE_GO.value)
+        ShippingProvider.objects.filter(code="boxnow").update(is_active=True)
+
+        client = APIClient()
+        response = client.get(reverse("shipping-options"), {"country_code": "GR"})
+
+        assert response.status_code == status.HTTP_200_OK
+        locker = next(
+            opt
+            for opt in response.json()
+            if opt["providerCode"] == "boxnow"
+            and opt["kind"] == "pickup_point"
+        )
+        assert PayWayEnum.BOX_NOW_PAY_ON_THE_GO.value in [
+            p["name"] for p in locker["payWays"]
+        ]
+
+    def test_a_courier_cash_pay_way_is_not_offered_on_a_locker(
+        self, boxnow_configured_tenant
+    ):
+        """The exact pairing the whole settlement split exists to stop:
+        a BoxNow locker cannot take cash from a courier who is never
+        there. If this ever passes, the delivery card is advertising a
+        combination the payment step refuses."""
+        from pay_way.enum.pay_way import PayWayEnum
+        from pay_way.enum.settlement import PaySettlement
+        from pay_way.factories import PayWayFactory
+
+        cod = PayWayFactory(
+            active=True,
+            provider_code="cash_on_delivery",
+            settlement=PaySettlement.COURIER_CASH.value,
+        )
+        cod = _name_it(cod, PayWayEnum.PAY_ON_DELIVERY.value)
+        ShippingProvider.objects.filter(code="boxnow").update(is_active=True)
+
+        client = APIClient()
+        response = client.get(reverse("shipping-options"), {"country_code": "GR"})
+
+        locker = next(
+            opt
+            for opt in response.json()
+            if opt["providerCode"] == "boxnow"
+            and opt["kind"] == "pickup_point"
+        )
+        assert PayWayEnum.PAY_ON_DELIVERY.value not in [
+            p["name"] for p in locker["payWays"]
+        ]
+
+    def test_an_inactive_pay_way_is_never_advertised(
+        self, boxnow_configured_tenant
+    ):
+        from pay_way.enum.pay_way import PayWayEnum
+        from pay_way.enum.settlement import PaySettlement
+        from pay_way.factories import PayWayFactory
+
+        hidden = PayWayFactory(
+            active=False,
+            provider_code="boxnow_pay_on_the_go",
+            settlement=PaySettlement.CARRIER_TERMINAL.value,
+        )
+        hidden = _name_it(hidden, PayWayEnum.BOX_NOW_PAY_ON_THE_GO.value)
+        ShippingProvider.objects.filter(code="boxnow").update(is_active=True)
+
+        client = APIClient()
+        response = client.get(reverse("shipping-options"), {"country_code": "GR"})
+
+        for opt in response.json():
+            assert PayWayEnum.BOX_NOW_PAY_ON_THE_GO.value not in [
+                p["name"] for p in opt["payWays"]
+            ]
+
+    def test_the_field_is_always_present(self, boxnow_configured_tenant):
+        """The storefront compares sets across rows; a missing key would
+        make it treat "no data" as "nothing available"."""
+        ShippingProvider.objects.filter(code="boxnow").update(is_active=True)
+
+        client = APIClient()
+        response = client.get(reverse("shipping-options"), {"country_code": "GR"})
+
+        assert response.json()
+        for opt in response.json():
+            assert isinstance(opt["payWays"], list)

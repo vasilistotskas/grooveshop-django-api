@@ -594,22 +594,25 @@ class CartViewSet(BaseModelViewSet):
         if cart_uuid:
             ownership |= Q(session_id=cart_uuid)
 
-        owned_ids = set(
+        # ``consumed`` comes along because it decides the outcome below,
+        # not just ownership.
+        owned_state = dict(
             StockReservation.objects.filter(
                 ownership, id__in=reservation_ids
-            ).values_list("id", flat=True)
+            ).values_list("id", "consumed")
         )
 
         released_count = 0
+        already_inactive_count = 0
         failed_releases = []
 
         for reservation_id in reservation_ids:
             try:
-                owned = int(reservation_id) in owned_ids
+                key = int(reservation_id)
             except TypeError, ValueError:
-                owned = False
+                key = None
 
-            if not owned:
+            if key is None or key not in owned_state:
                 failed_releases.append(
                     {
                         "reservation_id": reservation_id,
@@ -618,22 +621,51 @@ class CartViewSet(BaseModelViewSet):
                 )
                 continue
 
+            if owned_state[key]:
+                # Already consumed, which is the state this endpoint
+                # exists to reach — so it is a no-op, not a failure.
+                #
+                # Placing an order CONSUMES its reservations, and the
+                # checkout then releases the ids it was holding. That
+                # raced on every offline order: the backend answered 200
+                # carrying ``failed_releases``, the storefront read that
+                # as a failure and showed an error toast on top of the
+                # success one, and the shopper never reached the success
+                # page (order #274, 2026-09-10). Reporting "the stock is
+                # not held" as an error was the bug; the release itself
+                # had nothing left to do.
+                already_inactive_count += 1
+                released_count += 1
+                logger.info(
+                    "Stock reservation %s was already inactive "
+                    "(consumed by an order or a previous release) — "
+                    "nothing to release",
+                    key,
+                )
+                continue
+
             try:
                 StockManager.release_reservation(reservation_id)
                 released_count += 1
-            except StockReservationError:
-                # Track failed releases but continue processing others.
-                # Details go to the server log only — exception text must
-                # not reach the response body (CodeQL
-                # py/stack-trace-exposure).
+            except StockReservationError as exc:
+                # The reason goes in the MESSAGE, not just ``exc_info``:
+                # the production formatter builds its JSON from a format
+                # string, so a traceback is appended as separate,
+                # unparseable lines after the object and is lost to log
+                # shipping. "Failed to release stock reservation 282"
+                # with no reason is what made #274 take a log dive to
+                # explain.
                 logger.warning(
-                    "Failed to release stock reservation %s",
+                    "Failed to release stock reservation %s: %s",
                     reservation_id,
+                    exc,
                     exc_info=True,
                 )
                 failed_releases.append(
                     {
                         "reservation_id": reservation_id,
+                        # Never the exception text — CodeQL
+                        # py/stack-trace-exposure.
                         "error": _(
                             "Release failed — the reservation may already "
                             "be released or expired."

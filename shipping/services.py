@@ -311,11 +311,62 @@ class ShippingService:
                         "priority": provider.priority,
                         "logo_url": provider.logo_url_for_kind(kind.value),
                         "metadata": provider.metadata or {},
+                        "pay_ways": cls._pay_ways_for(provider.code, kind),
                     }
                 )
 
         options.sort(key=lambda opt: (opt["priority"], opt["provider_code"]))
         return options
+
+    @staticmethod
+    def _pay_ways_for(provider_code: str, kind: ShippingKind) -> list[dict]:
+        """Payment methods this (provider, kind) can actually settle.
+
+        Runs the pay-way rules rather than restating them: the same
+        ``PayWayService.filter_by_carrier`` the checkout calls, so the
+        delivery step can never advertise a method the payment step
+        would then refuse. Duplicating the logic here is how the two
+        drift.
+
+        One small query per option (the table holds a handful of rows
+        and both layers are indexed). Deliberately not hoisted into a
+        single pass: the exclusions are per (provider, kind) and the
+        carrier hook is a queryset filter, so there is no shared
+        result to reuse — and a hand-rolled bulk version would be a
+        second implementation of the rules.
+
+        Failure is contained. This is advertising copy on a delivery
+        card; if it raises, the shopper still gets every shipping
+        option and the payment step still filters correctly.
+        """
+        from pay_way.models import PayWay
+        from pay_way.services import PayWayService
+
+        try:
+            queryset = PayWayService.filter_by_carrier(
+                PayWay.objects.filter(active=True),
+                provider_code=provider_code,
+                shipping_kind=kind.value,
+            )
+            return [
+                {
+                    "id": pay_way.pk,
+                    # The KEY, not a label — see the serializer.
+                    "name": pay_way.safe_translation_getter(
+                        "name", any_language=True
+                    )
+                    or "",
+                }
+                for pay_way in queryset.order_by("sort_order", "id")
+            ]
+        except Exception:
+            logger.exception(
+                "Could not resolve pay ways for shipping option %s/%s — "
+                "the delivery card will advertise none",
+                provider_code,
+                kind.value,
+            )
+            return []
 
     # ------------------------------------------------------------------
     # Free-shipping advertising

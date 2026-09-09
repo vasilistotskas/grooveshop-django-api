@@ -56,20 +56,29 @@ class DisplayNameTests(TestCase):
         with translation.override("en"):
             self.assertEqual(self.pay_way.display_name, "Pay On Delivery")
 
-    def test_the_label_follows_the_active_language(self):
-        """The labels are ``gettext_lazy``; resolution happens on read.
+    def test_it_returns_the_label_not_the_stored_key(self):
+        """The whole point: the column holds a KEY, humans need a LABEL.
 
-        Greek is what every Django-rendered surface actually gets, since
-        the whole URL conf sits under ``i18n_patterns(
-        prefix_default_language=False)``.
+        Asserts against ``PayWayEnum.…label`` rather than a literal
+        Greek string. The labels are ``gettext_lazy``, so ``str()``
+        resolves them under whatever language is active — and CI has no
+        ``compilemessages`` step, so every catalog there falls back to
+        the English source while a dev machine has the compiled ``el``
+        ``.mo`` and returns Greek. An earlier version of this test
+        asserted the Greek wording and so passed locally and failed in
+        CI; ``tests/conftest.py::_assert_english_locale_if_marked``
+        documents the same trap in the opposite direction.
+
+        What matters is environment-independent: the resolved label is
+        never the raw key.
         """
         self.pay_way = _set_name(self.pay_way, PayWayEnum.PAY_ON_DELIVERY.value)
 
         with translation.override("el"):
-            greek = self.pay_way.display_name
+            resolved = self.pay_way.display_name
+            self.assertEqual(resolved, str(PayWayEnum.PAY_ON_DELIVERY.label))
 
-        self.assertNotEqual(greek, PayWayEnum.PAY_ON_DELIVERY.value)
-        self.assertNotEqual(greek, "Pay On Delivery")
+        self.assertNotEqual(resolved, PayWayEnum.PAY_ON_DELIVERY.value)
 
     def test_the_brand_name_is_not_translated(self):
         """BOX NOW requires its product name shown verbatim.

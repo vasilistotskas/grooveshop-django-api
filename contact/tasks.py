@@ -29,7 +29,11 @@ def send_contact_notification_email_task(contact_id: int) -> bool:
     """Send a contact-form notification email to site administrators.
 
     Loads the Contact row by PK, renders a plain-text notification, and
-    dispatches it to every address listed in ``settings.ADMINS``.
+    dispatches it to the active tenant's own contact inbox — NOT
+    ``settings.ADMINS``, which this docstring claimed for long enough to
+    nearly justify repointing ``ADMIN_EMAIL`` away from a merchant. The
+    routing is a few lines below and has been tenant-scoped since
+    multi-tenancy landed.
 
     Subject and name fields are CRLF-sanitised at write time (see
     ``contact/signals.py::_sanitize_header_value``) but we guard here

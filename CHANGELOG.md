@@ -3,6 +3,283 @@
 
 
 
+## v3.48.0 (2026-09-09)
+
+### Bug fixes
+
+* fix(tests): set settlement, not the derived booleans, and kill a flake
+
+Two problems, both surfaced by CI on 291c94a1.
+
+**The regression.** Shard 3 failed with `'6' != '3'` on
+`test_payment_type_cod_is_cash_code`. The test did
+`pay_way.is_online_payment = False` +
+`save(update_fields=["is_online_payment"])`, but `PayWay.save()` now
+DERIVES that field from `settlement`, so the write was silently
+discarded, the pay-way stayed ONLINE, and the myDATA builder emitted
+payment type 6 (card) instead of 3 (cash) — claiming a card capture
+happened on a cash-on-delivery order.
+
+I had seen this test in an earlier local failure list, run it in
+isolation, watched it pass, and filed it as ordering noise. It passed
+in isolation for unrelated fixture reasons. CI was right and I was
+wrong to dismiss it.
+
+Auditing for the pattern found the same latent hazard in 8 more files
+passing `is_online_payment=` / `requires_confirmation=` into PayWay
+constructors. Those happened to pass, but any test DEPENDING on the
+flag it set would fail the same silent way. All converted to
+`settlement=`.
+
+Deliberately left alone: two `PayWayFactory.create_offline_payment(
+requires_confirmation=...)` call sites, where the classmethod already
+maps the parameter onto a settlement; one `Mock(is_online_payment=...)`,
+which is not a model instance; and the `user/test_*subscription*`
+files, where `requires_confirmation` belongs to `SubscriptionTopic`.
+
+**The flake.** `test_legal_identity.py` wrote settings through
+`Setting.objects.update_or_create` and read them back through
+`Setting.get`. That round-trip flakes under `-n auto` — four tests
+failed on one worker with "INVOICE_SELLER_NAME was written as 'Acme
+MON IKE' but reads back as None" while the file passed 13/13 serially
+and the tenant directory passed 147/147.
+
+The cause is the autouse `_reseed_extra_settings` fixture rewriting
+every `EXTRA_SETTINGS_DEFAULTS` row for every DB test on every worker,
+against the same table these tests then write inside their own
+transaction. It is a known flake class here and was already fixed the
+same way twice — `test_b2b_invoicing_gate.py` and
+`test_smartpoint_gating.py` both patch the read site instead. A
+`seller_settings` fixture now stubs `Setting.get` via `patch.object`.
+
+Coverage is not weaker: everything under test reads through that one
+accessor, so the mapping, trimming, boolean typing and endpoint
+serialisation are all still exercised. The file's own helper carried a
+comment saying this had happened before and "the cause was never
+established" — a previous pass added diagnostics instead of removing
+the cause. Those diagnostics are gone.
+
+Mutation-checked per the project rule, and it found something worth
+recording: removing `.strip()` from `merchant_legal_identity` leaves
+the suite green, and so does removing it from
+`missing_disclosure_fields` — the two are redundant layers, and only
+removing BOTH fails the whole test. Single-point mutation would have
+reported a false pass.
+
+Verified: 123 tests across the 10 touched files pass; ruff, format and
+ty clean.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01VcYBYte3jMrpJUA2z6F6tm ([`459e8bd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/459e8bd2c1482606858653f0012a217b99fd375c))
+
+* fix(user): make the optional username actually optional
+
+The site owner could not add a blog author. `BlogAuthor.user` is a
+required OneToOne to `UserAccount`, so adding an author means adding a
+user first — and there was no working path through that form.
+
+`username` is `blank=True, null=True` and always has been. But:
+
+1. Its help text read **"Required.** 30 characters or fewer..." So he
+   read Required, typed the author's actual name ("Κωνσταντίνος
+   Βάσκος") into what is a machine handle, and
+   `ExtendedUnicodeUsernameValidator` rejected it — correctly, and on
+   the SPACE, not the Greek letters (`\w` is Unicode-aware).
+2. Leaving it blank instead raised `TypeError: object of type
+   'NoneType' has no len()`. Django's `UsernameField.to_python` does
+   `len(value)` with no None guard, which is safe for its own
+   `User.username` (never null) but not for this column.
+
+So obeying the label hit a validator and ignoring it hit a 500.
+
+Three small changes, no data migration:
+
+- Help text now says Optional, says it is a handle and NOT the person's
+  name, and says one is generated from the email if left blank.
+- `UserAccountCreationForm` declares `username` as a plain CharField
+  with `empty_value=""`, so a blank submission stays a string.
+- Blank now generates a handle via `UserNameGenerator`, matching what
+  `UserAccountManager.create_user` has always done for signups — the
+  admin bypassed it by building a plain ModelForm.
+
+The form also declares `Meta.model = UserAccount`. Django's
+`UserCreationForm.Meta.model` is the swapped `auth.User`, which only
+worked because `ModelAdmin.get_form` replaces it via
+`modelform_factory`; declaring it makes the form correct standalone and
+unit-testable.
+
+A display name typed into the field is still rejected, deliberately —
+the fix is not "allow spaces in usernames" (a handle with a space is
+not URL-safe), it is that nobody has to type one. A test pins that, and
+pins that Greek letters alone are still fine so nobody narrows the
+validator to ASCII.
+
+Note on scope: this replaces the standalone-blog-author change that was
+planned. That would have dropped `BlogAuthor.user`, moved name/image
+onto the author, and needed a two-release expand/contract with a
+backfill on live rows — for a bug whose cause was a wrong label. The
+byline never needed the handle: `full_name` reads first/last name.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01VcYBYte3jMrpJUA2z6F6tm ([`291c94a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/291c94a19c14d2719410025b069e970ab5230e23))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.47.0 [skip ci] ([`3a74a31`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3a74a3121aa607bc2d8e4ceb8a7ad4f3c8a73dda))
+
+### Features
+
+* feat(tenant): add the ChatGPT Ads pixel id, tenant-scoped like the others
+
+The site owner supplied an OpenAI / ChatGPT Ads conversion pixel to
+install. The id belongs on the tenant, not in env: every merchant
+provisions its own, and a shared id would mix ad accounts across
+stores — the same rule the Meta, TikTok and GA ids already follow.
+
+`_validate_openai_pixel_id` rejects anything non-alphanumeric, mirroring
+the TikTok validator. That matters more than it looks: the value arrived
+pasted out of OpenAI's own snippet, whose SDK URL carried a stray
+trailing character (`.../oaiq.min.js^`). A malformed pixel id fails
+silently — conversions just stop being attributed — so it is rejected at
+the edge.
+
+The serializer field is `required=False`, NOT `read_only=True` like the
+two pixel fields beside it. drf-spectacular marks every read-only field
+as `required`, so the storefront's generated Zod would reject a
+/tenant/resolve response from a backend that predates the field. Argo
+rolls the frontend and backend as separate Deployments, so a
+frontend-first deploy would fail tenant-config validation for EVERY
+tenant and 503 the whole storefront — the same failure shape as the
+stale-tenant-config incident on 2026-08-31. The regenerated type is
+`openaiPixelId?: string`, optional, which is the proof.
+
+The existing meta/tiktok fields stay read-only: they are already in the
+contract on both sides, so they cannot break a rolling deploy.
+
+Empty means disabled, and also keeps bzrcdn.openai.com out of that
+tenant's CSP entirely.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01VcYBYte3jMrpJUA2z6F6tm ([`c292066`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c292066b5731994673c5dc7eeecfeb719a387779))
+
+* feat(order): expose is_collected_on_delivery so COD stops looking broken
+
+A cash-on-delivery order sat on the checkout success page under an amber
+"Η πληρωμή επεξεργάζεται — η επιβεβαίωση πληρωμής μπορεί να
+καθυστερήσει λίγα λεπτά" alert. COD payment status stays PENDING by
+design until the carrier remits, and the measured ACS lag is about four
+days, so that "few minutes" warning was on screen for days — for an
+order the shopper has not been asked to pay for yet.
+
+The storefront had nothing to branch on. `pay_way` is serialized as a
+bare primary key, and while `is_online_payment` exists, its own
+help_text says it is false for bank transfer too — so its negation
+cannot mean "you will pay on delivery" without promising that to
+someone who owes us a bank transfer.
+
+`is_collected_on_delivery` answers exactly the question the UI asks:
+does the carrier collect money from this shopper at handover? True for
+courier cash-on-delivery AND for a card at a BoxNow locker terminal;
+false for online and for bank transfer.
+
+It delegates to `PayWay.is_collected_on_delivery`, so the definition of
+"the carrier collects this" lives in one place — the same property ACS
+and BoxNow read when deciding a voucher's amount. Deriving it in the
+storefront as `!isOnlinePayment && !requiresConfirmation` would have
+worked today and duplicated a rule the backend calls canonical.
+
+Added to both the list and detail field tuples: a success page reading
+`undefined` would fall through to the amber branch and the bug would
+look unfixed.
+
+`schema.yml` is regenerated here and carries both this field and the
+`PayWay.settlement` field from the previous commit — one artifact,
+regenerated once against the LOCAL schema.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01VcYBYte3jMrpJUA2z6F6tm ([`0e4fadf`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0e4fadfddb01e60d6aa4ace089e3b6e33adca74a))
+
+* feat(pay_way): model how money is settled, not whether it is "offline"
+
+A shopper choosing "Αντικαταβολή (+1,99 €)" with a BoxNow locker was
+minted as a BoxNow COD voucher AND charged the courier cash-handling
+surcharge, then paid by card at a terminal that accepts no cash and
+involves no courier. It did not error — it succeeded as the wrong
+commercial product.
+
+Root cause is an overloaded discriminator. `PayWay.is_cash_on_delivery`
+(offline AND not requiring confirmation) was true for two genuinely
+different products: a courier collecting at the door, and a customer
+paying at a locker machine. One boolean could not tell them apart, so
+`shipping_boxnow/carrier.py` mapped both to `BoxNowPaymentMode.COD`.
+
+This is also why 891d5663 / 8fb8dcbc (2026-05-01) left a hole. Those
+enabled PAY ON THE GO by deleting a filter that excluded *all offline*
+pay-ways — correct in intent, the product was live on the partner
+account — but "offline" is not one capability, it is three.
+
+Introduce `PaySettlement` as the single stored truth:
+
+ONLINE paid online at checkout
+COURIER_CASH cash/card to the courier at the door (ACS)
+CARRIER_TERMINAL card at the carrier's machine on pickup (BoxNow
+                  PAY ON THE GO)
+OFFLINE_TRANSFER settled off-platform, e.g. bank transfer
+
+Carriers now DECLARE what they can physically collect
+(`supported_settlements`) and the base `filter_pay_ways` derives the
+queryset from it, so no carrier hand-writes queryset surgery and adding
+one is a declaration rather than another `if`. BoxNow admits
+CARRIER_TERMINAL and never COURIER_CASH; ACS the reverse.
+
+This is a hard product constraint, not an operator preference, so it is
+NOT a seeded `PayWayShippingExclusion` row: a merchant cannot opt into
+collecting cash at a machine with no cash drawer. The admin-configurable
+exclusion layer stays for genuine preferences.
+
+`is_cash_on_delivery` is replaced by `is_collected_on_delivery`, which
+deliberately CANNOT distinguish the two products — it only answers "does
+the voucher need a non-zero amount?". Ask `settlement` for the rest.
+
+Expand/contract, because migrations run in an Argo PreSync job while the
+previous pods are still serving: `is_online_payment` and
+`requires_confirmation` stay for exactly one release as mirrors derived
+in `save()`, so a row cannot disagree with itself in the meantime. The
+follow-up migration drops the columns.
+
+Migration 0020 backfills in the same migration as the AddField, which
+matters: AddField stamps the model default (`online`) onto every
+existing row, so without it the seeded `cash_on_delivery` pay-way would
+come out claiming to be paid online and every COD order would mint a
+PREPAID voucher collecting nothing.
+
+Migration 0021 seeds `boxnow_pay_on_the_go` at cost 0 — the €1,99 pays
+for a courier handling cash and nothing here does (confirmed with the
+site owner) — and leaves it INACTIVE, because BoxNow returns P411 ("not
+eligible to use Cash-on-delivery payment type") until the product is
+activated on the partner account. Ops flips `active` in the admin.
+
+`BoxNowUnsupportedSettlementError` now raises if a courier-cash pay-way
+ever reaches shipment creation. Stranding one shipment and raising an
+ops alert is strictly better than silently mis-charging a customer.
+
+Also fixed while here:
+- `tenant/serializers.py` advertised agent payment instruments by
+  `is_online_payment=False`, which lumped the locker-terminal product in
+  with courier COD.
+- Three admin filter tests asserted `count() >= 0`, which is true of
+  every queryset ever built — they passed while the filter did nothing.
+  Django >=5 passes admin params as lists, so `self.value()` was always
+  None. Now they assert the actual rows.
+
+Verified: BoxNow docs confirm `paymentMode: "cod"` IS the correct wire
+value for PAY ON THE GO (the enum has only prepaid/cod; the terminal
+takes a card), so the enum was never the bug — two products routing to
+one value was.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01VcYBYte3jMrpJUA2z6F6tm ([`c8b7814`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c8b78147f67d365d4575779db2459d612b5dd7ad))
+
 ## v3.47.0 (2026-09-08)
 
 ### Chores

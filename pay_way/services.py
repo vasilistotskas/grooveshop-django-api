@@ -128,6 +128,79 @@ class PayWayService:
         return adapter.filter_pay_ways(queryset, kind=kind_enum)
 
     @staticmethod
+    def filter_by_shipping_kind(
+        queryset: QuerySet,
+        *,
+        shipping_kind: str | None,
+    ) -> QuerySet:
+        """Filter PayWays for a kind whose carrier is not yet known.
+
+        ``home_delivery`` is provider-agnostic in checkout: the
+        storefront cannot name a carrier because Django picks the
+        active home-delivery provider at order-creation time
+        (``carrierForMethod`` in ``shared/shipping/index.ts`` returns
+        null for it by design). Such a request therefore arrives with
+        ``shippingKind`` and no ``shippingProviderCode`` — and used to
+        fall straight through unfiltered, so BoxNow PAY ON THE GO, a
+        locker-terminal product, was selectable on courier home
+        delivery. Found on staging 2026-09-09.
+
+        Both layers are applied as an INTERSECTION over every candidate
+        carrier: a pay way survives only when no candidate excludes it
+        and every candidate can settle it. A union would offer a
+        settlement that one candidate cannot perform — the same class
+        of bug this exists to close, just narrower.
+
+        Candidates mirror ``ShippingService.available_options``: active
+        providers with a registered adapter that advertise the kind and
+        do not gate it behind their own per-kind flag. When nothing
+        serves the kind there is no shipping option to pair a payment
+        with, so the queryset passes through unchanged — same
+        short-circuit convention as :meth:`filter_by_carrier`.
+        """
+        if not shipping_kind:
+            return queryset
+
+        from pay_way.models import PayWayShippingExclusion
+        from shipping.enum import ShippingKind
+        from shipping.interfaces import get_provider, is_registered
+        from shipping.models import ShippingProvider
+
+        try:
+            kind_enum = ShippingKind(shipping_kind)
+        except ValueError:
+            return queryset
+
+        support_field = (
+            "supports_pickup_point"
+            if kind_enum == ShippingKind.PICKUP_POINT
+            else "supports_home_delivery"
+        )
+        candidates = []
+        for provider in ShippingProvider.objects.filter(
+            is_active=True, **{support_field: True}
+        ):
+            if not is_registered(provider.code):
+                continue
+            adapter = get_provider(provider.code)
+            if not adapter.is_kind_enabled(kind_enum):
+                continue
+            candidates.append((provider.code, adapter))
+
+        if not candidates:
+            return queryset
+
+        for code, adapter in candidates:
+            excluded_ids = PayWayShippingExclusion.objects.filter(
+                shipping_provider__code=code,
+                shipping_kind=kind_enum.value,
+            ).values("pay_way_id")
+            queryset = queryset.exclude(id__in=excluded_ids)
+            queryset = adapter.filter_pay_ways(queryset, kind=kind_enum)
+
+        return queryset
+
+    @staticmethod
     def get_provider_for_pay_way(pay_way: PayWay):
         if not pay_way.provider_code:
             logger.warning(f"PayWay {pay_way.id} has no provider_code defined")

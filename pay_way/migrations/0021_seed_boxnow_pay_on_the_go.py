@@ -5,6 +5,12 @@ from django.db import migrations
 SEED_LANGUAGE = "el"
 
 PROVIDER_CODE = "boxnow_pay_on_the_go"
+# Wrong: ``PAY_ON_DELIVERY`` is the courier-cash row's name token, so
+# the storefront rendered BOTH options as "Αντικαταβολή" — the exact
+# ambiguity the docstring below says this row exists to remove. Left
+# as-is because the migration is already applied; ``0022`` adds the
+# ``BOX_NOW_PAY_ON_THE_GO`` token and relabels the row, and runs
+# straight after this one on a fresh schema.
 ENUM_NAME = "PAY_ON_DELIVERY"
 
 

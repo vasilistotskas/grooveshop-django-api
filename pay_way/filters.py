@@ -93,17 +93,22 @@ class PayWayFilter(
         method="filter_carrier_compat",
         help_text=_(
             "Filter pay ways compatible with the given shipping carrier. "
-            "Each carrier owns its own compatibility rules — BoxNow "
-            "(``boxnow``) supports COD on lockers via PAY ON THE GO "
-            "and so passes through; ACS passes through unchanged. "
-            "Pair with ``shippingKind``."
+            "Each carrier declares which settlements it can physically "
+            "perform, per kind: a BoxNow locker takes a card at its "
+            "terminal (PAY ON THE GO) and never courier cash, while an "
+            "ACS courier is the exact opposite. Has no effect without "
+            "``shippingKind`` — the rules are per-kind, so a carrier "
+            "alone says nothing."
         ),
     )
     shipping_kind = filters.CharFilter(
         method="filter_carrier_compat",
         help_text=_(
-            "Pair with ``shippingProviderCode`` to filter pay ways by "
-            "the carrier's compatibility rules for that kind."
+            "Filter pay ways by the shipping kind. Pair with "
+            "``shippingProviderCode`` for one carrier's rules; on its "
+            "own it returns only the pay ways every carrier serving "
+            "that kind accepts, which is what a provider-agnostic "
+            "``home_delivery`` checkout needs."
         ),
     )
 
@@ -141,9 +146,18 @@ class PayWayFilter(
 
     def filter_carrier_compat(self, queryset, name, value):
         """Both ``shippingProviderCode`` and ``shippingKind`` route to
-        this method; we only filter when BOTH are provided so the API
-        stays predictable. ``self.data`` lets us read the sibling
-        param without binding the methods together at the field level.
+        this method. ``shippingKind`` is the required half: with a
+        provider code we apply that carrier's rules, without one we
+        apply the rules every carrier serving the kind agrees on.
+
+        A kind without a provider is not a caller mistake — checkout's
+        ``home_delivery`` is provider-agnostic and cannot name one.
+        Treating it as "no filter" left a locker-only pay-way
+        selectable on courier delivery, so it now routes to
+        ``filter_by_shipping_kind``.
+
+        ``self.data`` lets us read the sibling param without binding
+        the methods together at the field level.
         """
         from pay_way.services import PayWayService
 
@@ -151,8 +165,13 @@ class PayWayFilter(
         # so we read snake_case keys.
         provider_code = self.data.get("shipping_provider_code")
         shipping_kind = self.data.get("shipping_kind")
-        if not provider_code or not shipping_kind:
+        if not shipping_kind:
             return queryset
+        if not provider_code:
+            return PayWayService.filter_by_shipping_kind(
+                queryset,
+                shipping_kind=shipping_kind,
+            )
         return PayWayService.filter_by_carrier(
             queryset,
             provider_code=provider_code,

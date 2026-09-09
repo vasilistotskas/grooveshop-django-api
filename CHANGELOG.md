@@ -3,6 +3,55 @@
 
 
 
+## v3.48.1 (2026-09-09)
+
+### Bug fixes
+
+* fix(pay_way): keep PAY ON THE GO off courier delivery, and label it
+
+Two defects found by reading staging's rendered checkout rather than
+its API payload. Both are in the settlement work from this series.
+
+1. A shipping kind with no carrier named filtered nothing.
+
+Checkout's `home_delivery` is deliberately provider-agnostic — Django
+picks the active home-delivery provider at order-creation time, so
+`carrierForMethod` returns null and the storefront sends
+`?shippingKind=home_delivery` with no `shippingProviderCode`. The
+filter required both params and fell straight through, so BOX NOW PAY
+ON THE GO — a locker-terminal product — was selectable on courier home
+delivery. The paired query was correct all along, which is why the
+service tests passed.
+
+`filter_by_shipping_kind` applies both layers as an INTERSECTION over
+every carrier that could serve the kind: a pay-way survives only when
+no candidate excludes it and every candidate can settle it. A union
+would offer a settlement one candidate cannot perform, which is the
+same class of bug one step narrower. Candidates mirror
+`ShippingService.available_options`, so `is_kind_enabled` and the
+credential gates are honoured, not just `is_active`.
+
+2. The new row was labelled "Αντικαταβολή", same as courier cash.
+
+`0021` seeded it with the `PAY_ON_DELIVERY` name token. The storefront
+renders a pay-way as `payment_methods.<name>`, so checkout drew two
+radio buttons reading "Αντικαταβολή": €1,99 cash to a courier and €0
+by card at a locker. A distinct label is BoxNow's own requirement and
+the reason `0021` created a separate row at all. `0022` adds a
+`BOX_NOW_PAY_ON_THE_GO` token and relabels the row, skipping any row an
+operator has since renamed.
+
+RELEASE ORDER: the storefront's `payment_methods.BOX_NOW_PAY_ON_THE_GO`
+translation must be live BEFORE this migration runs, or the button
+renders the raw i18n key. The frontend half is inert until then.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01VcYBYte3jMrpJUA2z6F6tm ([`8b0193b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8b0193b79e11b3e30d46d57ae2ed40211f6cbab8))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.48.0 [skip ci] ([`1202cc1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1202cc1b96fa44d076c5356355f6dedf95b5ad77))
+
 ## v3.48.0 (2026-09-09)
 
 ### Bug fixes

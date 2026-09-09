@@ -37,8 +37,10 @@ from order.models.item import OrderItem
 from order.models.order import Order
 from order.models.stock_log import StockLog
 from order.models.stock_reservation import StockReservation
+from order.payment import provider_supports
 from order.signals import order_refunded
 from order.stock import StockManager
+from pay_way.enum.settlement import PaySettlement
 from promotion.services import CouponService, PromotionEngine
 
 logger = logging.getLogger(__name__)
@@ -51,11 +53,6 @@ logger = logging.getLogger(__name__)
 # Statuses for which a courier shipment is still meaningful. Anything
 # else has either not been paid for yet or is already done with its
 # voucher; see handle_payment_succeeded.
-# Online providers that settle by redirecting the shopper off-site: the
-# order is created BEFORE any money moves, so a partial deduction is not
-# the client error it is for the intent-first providers.
-_REDIRECT_PROVIDER_CODES: frozenset[str] = frozenset({"viva_wallet"})
-
 _SHIPMENT_DISPATCHABLE_STATUSES: frozenset[str] = frozenset(
     {
         OrderStatus.PENDING,
@@ -1270,10 +1267,10 @@ class OrderService:
 
             order = Order.objects.create(**order_data)
 
-            # Set payment_id for offline payments only.
-            # Online redirect providers (Viva Wallet) get payment_id
-            # from the webhook after payment completes.
-            if not pay_way.is_online_payment:
+            # Set payment_id for offline settlements only. Providers
+            # that settle by hosted redirect get their payment_id from
+            # the webhook once the shopper has actually paid.
+            if PaySettlement(pay_way.settlement) != PaySettlement.ONLINE:
                 order.payment_id = f"offline_{order.uuid}"
                 order.save(update_fields=["payment_id"])
 
@@ -1306,9 +1303,11 @@ class OrderService:
                 # works off the invoice's payment_id and pay_way), so it
                 # misled no logic — it misled whoever reads order
                 # metadata to diagnose a payment.
-                "payment_type": (
-                    "online" if pay_way.is_online_payment else "offline"
-                ),
+                # The settlement itself, not a two-way summary of
+                # it: "offline" could not tell cash to a courier
+                # from a card at a locker terminal, which is the
+                # distinction the whole shipping layer turns on.
+                "payment_type": pay_way.settlement,
             }
             # Wholesale audit: which group priced this order. The line
             # prices are already snapshotted on OrderItem rows — this
@@ -1511,9 +1510,10 @@ class OrderService:
                     payment_id=settle_id,
                     payment_method=settle_method,
                 )
-            elif (
-                pay_way.is_online_payment
-                and pay_way.provider_code not in _REDIRECT_PROVIDER_CODES
+            elif PaySettlement(
+                pay_way.settlement
+            ) == PaySettlement.ONLINE and provider_supports(
+                pay_way.provider_code, "supports_payment_intent"
             ):
                 if gift_card_codes:
                     raise InvalidGiftCardError(
@@ -1554,7 +1554,10 @@ class OrderService:
             # Online providers that route through this method (Viva
             # Wallet) defer dispatch to the payment webhook so the
             # courier voucher only mints after the shopper actually pays.
-            if not pay_way.is_online_payment or fully_covered:
+            if (
+                PaySettlement(pay_way.settlement) != PaySettlement.ONLINE
+                or fully_covered
+            ):
                 cls._dispatch_shipment_creation_task(order)
 
             # Step 9: Return order in PENDING status

@@ -88,8 +88,14 @@ class TestPaymentTypeMetadataFollowsThePayWay:
 
         assert order.metadata["payment_type"] == "online"
 
-    def test_offline_pay_way_still_records_offline(self):
-        """The other half, so the fix is not just a flipped literal."""
+    def test_it_records_the_settlement_not_a_two_way_summary(self):
+        """The other half, so the fix is not just a flipped literal.
+
+        It records the SETTLEMENT now, not "online"/"offline". The old
+        summary could not tell cash to a courier from a card at a
+        locker terminal — the distinction the whole shipping layer
+        turns on, and the one an auditor reading this key most needs.
+        """
         order = OrderService.create_order_from_cart_offline(
             cart=_cart(),
             shipping_address=_shipping_address(CountryFactory()),
@@ -97,4 +103,28 @@ class TestPaymentTypeMetadataFollowsThePayWay:
             user=None,
         )
 
-        assert order.metadata["payment_type"] == "offline"
+        assert (
+            order.metadata["payment_type"] == PaySettlement.COURIER_CASH.value
+        )
+        assert order.metadata["payment_type"] != "offline"
+
+    def test_a_locker_terminal_order_is_distinguishable_from_courier_cash(self):
+        """Both were "offline"; they ride different carriers."""
+        pay_way = PayWayFactory(
+            settlement=PaySettlement.CARRIER_TERMINAL,
+            provider_code="boxnow_pay_on_the_go",
+            active=True,
+            cost=Money(Decimal(0), "EUR"),
+            free_threshold=Money(Decimal(0), "EUR"),
+        )
+        order = OrderService.create_order_from_cart_offline(
+            cart=_cart(),
+            shipping_address=_shipping_address(CountryFactory()),
+            pay_way=pay_way,
+            user=None,
+        )
+
+        assert (
+            order.metadata["payment_type"]
+            == PaySettlement.CARRIER_TERMINAL.value
+        )

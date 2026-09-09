@@ -11,6 +11,7 @@ from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.status import OrderStatus, PaymentStatus
 from order.managers.order import OrderManager, OrderQuerySet
 from order.models.order import Order
+from pay_way.enum.settlement import PaySettlement
 
 
 class OrderModelTestCase(TestCase):
@@ -161,7 +162,10 @@ class OrderModelTestCase(TestCase):
         and let the checkout endpoints open a zero-amount session."""
         self.order.payment_status = PaymentStatus.COMPLETED
         self.order.paid_amount = Money("0.00", settings.DEFAULT_CURRENCY)
-        self.order.pay_way = Mock(is_online_payment=True)
+        # ``settlement``, not the deprecated mirror: a bare Mock
+        # attribute is not a valid PaySettlement and the property
+        # now raises on one.
+        self.order.pay_way = Mock(settlement=PaySettlement.ONLINE.value)
         # ``self.order`` is a Mock(spec=Order), which would hand back a
         # truthy stub for ``is_paid`` and make this assertion vacuous.
         # Feed it what the real property answers.

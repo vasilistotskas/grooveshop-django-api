@@ -25,6 +25,7 @@ from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.status import OrderStatus, PaymentStatus
 from order.managers.order import OrderManager
 from pay_way.enum.pay_way import PayWayEnum
+from pay_way.enum.settlement import PaySettlement
 from shipping.enum import ShippingKind
 
 # Stamped on ``Order.metadata`` when a provider confirms a charge whose
@@ -697,7 +698,10 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         so those carts still clear the moment the order is placed.
         """
         pay_way = self.pay_way
-        if pay_way is None or not pay_way.is_online_payment:
+        if (
+            pay_way is None
+            or PaySettlement(pay_way.settlement) != PaySettlement.ONLINE
+        ):
             return False
         return not self.is_paid
 

@@ -61,7 +61,11 @@ from order.exceptions import (
 from order.filters import OrderFilter
 from order.models.history import OrderHistory
 from order.models.order import Order
-from order.payment import get_payment_provider
+from order.payment import (
+    get_payment_provider,
+    provider_supports,
+    registered_provider_codes,
+)
 from order.serializers.invoice import InvoiceDownloadResponseSerializer
 from order.serializers.order import (
     AddTrackingSerializer,
@@ -82,6 +86,7 @@ from order.serializers.order import (
     VivaReturnLookupResponseSerializer,
 )
 from order.services import OrderService
+from pay_way.enum.settlement import PaySettlement
 from pay_way.models import PayWay
 from pay_way.services import PayWayService
 from tenant.membership import is_store_staff
@@ -648,9 +653,11 @@ class OrderViewSet(BaseModelViewSet):
 
             self._validate_pay_way_for_order(pay_way, validated_data)
 
-            # Step 2: Route to appropriate flow based on payment type
-            # Providers that use hosted redirect checkout (order-first, no payment intent)
-            redirect_checkout_providers = {"viva_wallet"}
+            # Step 2: route on what the pay way settles and what the
+            # provider can do — never on a provider name. This carried
+            # its own ``{"viva_wallet"}`` literal, a second copy of the
+            # one in order/services.py; both are now the provider's own
+            # ``supports_payment_intent`` declaration.
 
             # An intent-less submission on a non-redirect online pay
             # way routes ORDER-FIRST: deductions covering the FULL
@@ -661,8 +668,10 @@ class OrderViewSet(BaseModelViewSet):
             # old blanket "payment_intent_id required" 400, which
             # made zero-total checkouts impossible.
             if (
-                pay_way.is_online_payment
-                and pay_way.provider_code not in redirect_checkout_providers
+                PaySettlement(pay_way.settlement) == PaySettlement.ONLINE
+                and provider_supports(
+                    pay_way.provider_code, "supports_payment_intent"
+                )
                 and validated_data.get("payment_intent_id")
             ):
                 # Payment-first flow: Requires payment_intent_id (e.g. Stripe)
@@ -1136,7 +1145,16 @@ class OrderViewSet(BaseModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if not order.pay_way or order.pay_way.provider_code != "stripe":
+        if not order.pay_way or not provider_supports(
+            order.pay_way.provider_code, "supports_payment_intent"
+        ):
+            logger.info(
+                "Payment-intent endpoint refused: order=%s pay_way=%s "
+                "provider=%s cannot mint a client-confirmed intent",
+                order.id,
+                order.pay_way_id,
+                getattr(order.pay_way, "provider_code", None),
+            )
             return Response(
                 {
                     "detail": _(
@@ -1227,7 +1245,16 @@ class OrderViewSet(BaseModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if not order.pay_way or order.pay_way.provider_code != "stripe":
+        if not order.pay_way or not provider_supports(
+            order.pay_way.provider_code, "supports_payment_intent"
+        ):
+            logger.info(
+                "Payment-intent endpoint refused: order=%s pay_way=%s "
+                "provider=%s cannot mint a client-confirmed intent",
+                order.id,
+                order.pay_way_id,
+                getattr(order.pay_way, "provider_code", None),
+            )
             return Response(
                 {"detail": _("Retry is only supported for Stripe payments.")},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -1333,11 +1360,16 @@ class OrderViewSet(BaseModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        supported_providers = {"stripe", "viva_wallet"}
-        if (
-            not order.pay_way
-            or order.pay_way.provider_code not in supported_providers
+        if not order.pay_way or not provider_supports(
+            order.pay_way.provider_code, "supports_hosted_checkout"
         ):
+            logger.info(
+                "Checkout session refused: order=%s pay_way=%s "
+                "provider=%s does not support a hosted checkout session",
+                order.id,
+                order.pay_way_id,
+                getattr(order.pay_way, "provider_code", None),
+            )
             return Response(
                 {
                     "detail": _(
@@ -1394,8 +1426,9 @@ class OrderViewSet(BaseModelViewSet):
         # line-item breakdown on the checkout page.
         amount = order.calculate_order_total_amount()
 
-        if provider_code == "stripe":
-            checkout_params["shipping_price"] = order.shipping_price
+        # Provider-specific extras come from the provider, not from a
+        # branch here that every future PSP would have to find.
+        checkout_params.update(provider.checkout_session_params(order))
 
         success, checkout_response = provider.create_checkout_session(
             amount=amount,
@@ -1423,16 +1456,9 @@ class OrderViewSet(BaseModelViewSet):
         with transaction.atomic():
             locked = Order.objects.select_for_update().get(pk=order.pk)
             metadata = locked.metadata or {}
-            if provider_code == "viva_wallet":
-                new_code = str(checkout_response["session_id"])
-                codes = metadata.get("viva_order_codes") or []
-                if new_code not in codes:
-                    codes.append(new_code)
-                metadata["viva_order_codes"] = codes
-            else:
-                metadata["stripe_checkout_session_id"] = checkout_response[
-                    "session_id"
-                ]
+            provider.record_checkout_session(
+                metadata, str(checkout_response["session_id"])
+            )
             locked.metadata = metadata
             locked.save(update_fields=["metadata"])
             order = locked
@@ -1485,15 +1511,32 @@ class OrderViewSet(BaseModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # The SPT is granted against a specific merchant account, so it
-        # must be confirmed with THIS tenant's own Stripe identity.
+        # A Shared Payment Token is granted against a specific merchant
+        # account, so it must be confirmed with THIS tenant's own
+        # identity at the PSP that issued it.
         from pay_way.services import PayWayService
 
-        if not PayWayService.is_provider_configured("stripe"):
+        delegated = [
+            code
+            for code in registered_provider_codes()
+            if provider_supports(code, "supports_delegated_payment")
+            and PayWayService.is_provider_configured(code)
+        ]
+        if not delegated:
+            logger.info(
+                "Delegated payment refused: no configured provider on "
+                "this tenant declares supports_delegated_payment"
+            )
             return Response(
-                {"detail": _("Stripe is not configured for this store.")},
+                {
+                    "detail": _(
+                        "Delegated card payment is not configured for "
+                        "this store."
+                    )
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        delegated_provider_code = delegated[0]
 
         order = self.get_object()
 
@@ -1503,7 +1546,16 @@ class OrderViewSet(BaseModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if not order.pay_way or order.pay_way.provider_code != "stripe":
+        if not order.pay_way or not provider_supports(
+            order.pay_way.provider_code, "supports_payment_intent"
+        ):
+            logger.info(
+                "Payment-intent endpoint refused: order=%s pay_way=%s "
+                "provider=%s cannot mint a client-confirmed intent",
+                order.id,
+                order.pay_way_id,
+                getattr(order.pay_way, "provider_code", None),
+            )
             return Response(
                 {
                     "detail": _(
@@ -1517,7 +1569,7 @@ class OrderViewSet(BaseModelViewSet):
         request_serializer = request_serializer_class(data=request.data)
         request_serializer.is_valid(raise_exception=True)
 
-        provider = get_payment_provider("stripe")
+        provider = get_payment_provider(delegated_provider_code)
         # Amount owed, not the raw total — see create_checkout_session.
         success, payment_response = provider.confirm_delegated_payment(
             amount=order.calculate_order_total_amount(),

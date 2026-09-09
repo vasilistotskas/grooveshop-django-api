@@ -29,6 +29,7 @@ from meta_capi.tasks import (
     schedule_refund,
 )
 from order.signals import order_created, order_paid, order_refunded
+from pay_way.enum.settlement import PaySettlement
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +50,10 @@ def _on_order_created(sender: Any, order: Any, **kwargs: Any) -> None:
     # (``should_dispatch_for_order``), so admin-created orders and
     # consent-declined shoppers are excluded there.
     pay_way = getattr(order, "pay_way", None)
-    if pay_way is not None and not pay_way.is_online_payment:
+    if (
+        pay_way is not None
+        and PaySettlement(pay_way.settlement) != PaySettlement.ONLINE
+    ):
         logger.debug(
             "Scheduling offline-payway Purchase for order %s", order.id
         )

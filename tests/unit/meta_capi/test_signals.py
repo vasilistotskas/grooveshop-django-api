@@ -17,11 +17,20 @@ from unittest import mock
 import pytest
 
 from meta_capi.signals import _on_order_created, _on_order_paid
+from pay_way.enum.settlement import PaySettlement
 
 
 class _FakePayWay:
-    def __init__(self, is_online_payment: bool):
-        self.is_online_payment = is_online_payment
+    """Carries ``settlement``, which is what the policy actually reads.
+
+    It used to fake ``is_online_payment`` — a deprecated mirror the
+    signal no longer consults. A double that models a field production
+    has stopped reading passes while testing nothing, so the constructor
+    takes the settlement itself rather than a boolean summarising it.
+    """
+
+    def __init__(self, settlement: PaySettlement):
+        self.settlement = settlement.value
 
 
 class _FakeOrder:
@@ -44,7 +53,9 @@ class TestOrderCreatedDispatchPolicy:
         self, schedule_mocks
     ):
         purchase, ic = schedule_mocks
-        order = _FakeOrder(1, _FakePayWay(is_online_payment=False))
+        order = _FakeOrder(
+            1, _FakePayWay(settlement=PaySettlement.COURIER_CASH)
+        )
 
         _on_order_created(sender=None, order=order)
 
@@ -53,7 +64,7 @@ class TestOrderCreatedDispatchPolicy:
 
     def test_online_payway_does_not_schedule_purchase(self, schedule_mocks):
         purchase, ic = schedule_mocks
-        order = _FakeOrder(2, _FakePayWay(is_online_payment=True))
+        order = _FakeOrder(2, _FakePayWay(settlement=PaySettlement.ONLINE))
 
         _on_order_created(sender=None, order=order)
 
@@ -73,7 +84,7 @@ class TestOrderCreatedDispatchPolicy:
 class TestOrderPaidDispatch:
     def test_order_paid_schedules_purchase(self, schedule_mocks):
         purchase, _ic = schedule_mocks
-        order = _FakeOrder(4, _FakePayWay(is_online_payment=True))
+        order = _FakeOrder(4, _FakePayWay(settlement=PaySettlement.ONLINE))
 
         _on_order_paid(sender=None, order=order)
 

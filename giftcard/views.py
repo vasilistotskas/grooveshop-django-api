@@ -24,6 +24,7 @@ from core.utils.serializers import (
     create_schema_view_config,
 )
 from giftcard.models import GiftCard, GiftCardPurchase
+from giftcard.providers import DEFAULT_GIFT_CARD_PROVIDER
 from giftcard.serializers import (
     GiftCardCheckRequestSerializer,
     GiftCardCheckResponseSerializer,
@@ -34,6 +35,7 @@ from giftcard.serializers import (
     GiftCardSerializer,
 )
 from giftcard.services import GiftCardError, GiftCardService
+from order.payment import provider_supports
 from tenant.permissions import IsGiftCardsEnabled
 
 logger = logging.getLogger(__name__)
@@ -177,7 +179,9 @@ class GiftCardViewSet(BaseModelViewSet):
         serializer = request_serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
-        provider_code = data.get("payment_provider") or "stripe"
+        provider_code = (
+            data.get("payment_provider") or DEFAULT_GIFT_CARD_PROVIDER
+        )
 
         user = request.user if request.user.is_authenticated else None
         buyer_email = data.get("buyer_email") or (user.email if user else "")
@@ -230,7 +234,11 @@ class GiftCardViewSet(BaseModelViewSet):
             "currency": str(amount.currency),
         }
 
-        if provider_code == "viva_wallet":
+        # Hosted-redirect providers mint a checkout session; intent-first
+        # ones return a client secret the browser confirms. Asking the
+        # capability rather than the vendor name means a new PSP picks
+        # the right branch by declaring what it does.
+        if not provider_supports(provider_code, "supports_payment_intent"):
             # Hosted redirect: mint a Smart Checkout order. Its
             # orderCode is stored as payment_id — that is how BOTH the
             # webhook's gift-card branch and the viva_return resolver

@@ -183,7 +183,7 @@ def send_order_confirmation_email(self, order_id: int) -> bool:
         pay_way = order.pay_way
         is_paid = bool(
             pay_way
-            and pay_way.is_online_payment
+            and PaySettlement(pay_way.settlement) == PaySettlement.ONLINE
             and order.payment_status == PaymentStatus.COMPLETED
         )
 
@@ -201,7 +201,10 @@ def send_order_confirmation_email(self, order_id: int) -> bool:
 
             payment_instructions = ""
             payment_instructions_text = ""
-            if pay_way and not pay_way.is_online_payment:
+            if (
+                pay_way
+                and PaySettlement(pay_way.settlement) != PaySettlement.ONLINE
+            ):
                 payment_instructions = (
                     pay_way.safe_translation_getter(
                         "instructions", any_language=True

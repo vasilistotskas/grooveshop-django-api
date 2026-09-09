@@ -51,6 +51,7 @@ from order.tasks import (
     send_refund_confirmation_email,
     send_shipping_notification_email,
 )
+from pay_way.enum.settlement import PaySettlement
 from tenant.celery import dispatch_on_commit
 
 logger = logging.getLogger(__name__)
@@ -274,7 +275,7 @@ def handle_order_created(
     pay_way = order.pay_way
     is_online_pending = (
         pay_way is not None
-        and pay_way.is_online_payment
+        and PaySettlement(pay_way.settlement) == PaySettlement.ONLINE
         and order.payment_status != PaymentStatus.COMPLETED
     )
     if not is_online_pending:

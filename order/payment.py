@@ -1,6 +1,6 @@
 import logging
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, ClassVar
 
 import moneyed
 import stripe
@@ -15,6 +15,81 @@ logger = logging.getLogger(__name__)
 
 
 class PaymentProvider(ABC):
+    """A payment service provider, and what it can physically do.
+
+    The capabilities below exist because the payment paths used to ask
+    "is the provider code the string ``stripe``". That is a proxy: it
+    was right while there were two PSPs and silently becomes wrong the
+    moment a third is added, or the moment an existing one gains a flow
+    it does not have today. Nothing failed when the proxy was wrong —
+    the other branch was simply taken.
+
+    Declarations, not preferences. Whether a merchant *wants* to offer a
+    flow is a PayWay/tenant decision; whether the PSP can perform it at
+    all is this.
+
+    They are ``ClassVar`` on purpose: every gate that consults them runs
+    for tenants that may hold no credentials, and constructing a
+    provider raises ``ImproperlyConfigured`` in exactly that case. Read
+    them through :func:`get_payment_provider_class`, which never
+    instantiates.
+    """
+
+    #: Registry key. Matches ``PayWay.provider_code``.
+    code: ClassVar[str] = ""
+
+    #: Intent-first: an intent is minted before the order exists and the
+    #: shopper confirms it client-side. The order-creation path can then
+    #: demand a ``payment_intent_id``.
+    supports_payment_intent: ClassVar[bool] = False
+
+    #: Order-first: the shopper is redirected to a page the PSP hosts,
+    #: so the order must exist before any money moves and a partial
+    #: deduction is not a client error the way it is for intent-first.
+    supports_hosted_checkout: ClassVar[bool] = False
+
+    #: The PSP can confirm a payment the buyer authorised elsewhere and
+    #: delegated to this merchant — Stripe's Shared Payment Token, which
+    #: is how ACP agentic checkout pays. Only providers declaring this
+    #: implement ``confirm_delegated_payment``.
+    supports_delegated_payment: ClassVar[bool] = False
+
+    @classmethod
+    def is_configured_for_tenant(cls) -> bool:
+        """True when the ACTIVE tenant holds the credentials this PSP needs.
+
+        A classmethod, and on the provider, for two reasons. It must run
+        without constructing — the constructors raise precisely when
+        this would answer False — and the answer differs per PSP, which
+        is knowledge the PSP owns. It used to be an ``if code ==``
+        ladder in ``PayWayService``, a third place listing the vendors.
+
+        Default True: codes that need no credentials (offline
+        processors, an empty code) are configured by definition.
+        """
+        return True
+
+    def checkout_session_params(self, order) -> dict[str, Any]:
+        """Extra ``create_checkout_session`` kwargs this PSP wants.
+
+        Default empty. Overriding beats a ``if provider_code ==`` in the
+        view, which is where this lived and which every new PSP would
+        have had to find.
+        """
+        return {}
+
+    def record_checkout_session(
+        self, metadata: dict[str, Any], session_id: str
+    ) -> None:
+        """Persist a freshly created session reference onto the order.
+
+        Mutates ``metadata`` in place. PSPs differ in shape — one issued
+        code replaces the last, another accumulates because the shopper
+        may pay on any of them — so the shape belongs to the PSP rather
+        than to a branch in the checkout-session view.
+        """
+        return
+
     @abstractmethod
     def process_payment(
         self, amount: Money, order_id: str, **kwargs
@@ -51,6 +126,33 @@ class StripePaymentProvider(PaymentProvider):
     per-schema ``WebhookEndpoint`` row secret (see
     ``tenant/management/commands/bootstrap_stripe.py``).
     """
+
+    code: ClassVar[str] = "stripe"
+    # Both: PaymentIntents for the intent-first checkout, and hosted
+    # Checkout Sessions for the pay-later/retry links.
+    supports_payment_intent: ClassVar[bool] = True
+    supports_hosted_checkout: ClassVar[bool] = True
+    supports_delegated_payment: ClassVar[bool] = True
+
+    @classmethod
+    def is_configured_for_tenant(cls) -> bool:
+        from tenant.credentials import stripe_credentials
+
+        return bool(stripe_credentials()["secret_key"])
+
+    def checkout_session_params(self, order) -> dict[str, Any]:
+        """Stripe renders shipping as its own line on the hosted page.
+
+        Viva has no equivalent parameter, which is why this was a
+        ``if provider_code == "stripe"`` in the view.
+        """
+        return {"shipping_price": order.shipping_price}
+
+    def record_checkout_session(
+        self, metadata: dict[str, Any], session_id: str
+    ) -> None:
+        """One live session at a time; a new one replaces the last."""
+        metadata["stripe_checkout_session_id"] = session_id
 
     def __init__(self):
         from tenant.credentials import stripe_credentials
@@ -598,6 +700,36 @@ class VivaWalletPaymentProvider(PaymentProvider):
     DEMO_TRANSACTIONS_URL = "https://demo.vivapayments.com"
     LIVE_TRANSACTIONS_URL = "https://www.vivapayments.com"
 
+    code: ClassVar[str] = "viva_wallet"
+    # Hosted redirect only. ``process_payment`` below delegates straight
+    # to ``create_checkout_session`` — there is no intent to confirm, so
+    # an order using Viva is created BEFORE any money moves.
+    supports_payment_intent: ClassVar[bool] = False
+    supports_hosted_checkout: ClassVar[bool] = True
+
+    @classmethod
+    def is_configured_for_tenant(cls) -> bool:
+        from tenant.credentials import viva_wallet_credentials
+
+        creds = viva_wallet_credentials()
+        return bool(creds["client_id"] and creds["client_secret"])
+
+    def record_checkout_session(
+        self, metadata: dict[str, Any], session_id: str
+    ) -> None:
+        """Every issued orderCode must survive.
+
+        The shopper may complete payment on ANY session Viva has issued
+        for this order, and both the webhook and the return endpoint
+        resolve the order by whichever code was actually paid — from
+        this list (see ``viva_order_code_q``). Replacing the previous
+        code would strand a payment made on it.
+        """
+        codes = metadata.get("viva_order_codes") or []
+        if session_id not in codes:
+            codes.append(session_id)
+        metadata["viva_order_codes"] = codes
+
     def __init__(self):
         from tenant.credentials import viva_wallet_credentials
 
@@ -950,17 +1082,57 @@ class VivaWalletPaymentProvider(PaymentProvider):
             return PaymentStatus.FAILED, {"error": str(e)}
 
 
-def get_payment_provider(provider_name: str) -> PaymentProvider:
-    # Every code a PayWay row can carry that is NOT here — "paypal",
-    # "cash", "" — fails fast with "Unknown payment provider" instead of
-    # reaching a half-built charge path. Callers gate on
-    # PayWayService.is_provider_configured() before they get this far.
-    providers = {
-        "stripe": StripePaymentProvider,
-        "viva_wallet": VivaWalletPaymentProvider,
-    }
+# Every code a PayWay row can carry that is NOT registered — "paypal",
+# "cash", "" — fails fast instead of reaching a half-built charge path.
+_PROVIDERS: dict[str, type[PaymentProvider]] = {
+    cls.code: cls for cls in (StripePaymentProvider, VivaWalletPaymentProvider)
+}
 
-    provider_class = providers.get(provider_name.lower())
+
+def get_payment_provider_class(
+    provider_name: str,
+) -> type[PaymentProvider] | None:
+    """Look a provider up WITHOUT constructing it.
+
+    Capability gates run for tenants that may hold no credentials, and
+    every constructor raises ``ImproperlyConfigured`` in that case — so
+    a gate that instantiated would reject the tenant with a 500 instead
+    of the 400 it means. Returns None for an unknown or empty code so
+    callers can answer "no such capability" rather than branch on an
+    exception.
+    """
+    return _PROVIDERS.get((provider_name or "").lower())
+
+
+def provider_supports(provider_name: str, capability: str) -> bool:
+    """True when the named provider declares ``capability``.
+
+    Unknown provider, or a code the registry does not carry, answers
+    False — every caller is a gate, and an unknown PSP must fail closed
+    rather than be assumed capable.
+    """
+    provider_class = get_payment_provider_class(provider_name)
+    return bool(provider_class and getattr(provider_class, capability, False))
+
+
+def registered_provider_codes() -> frozenset[str]:
+    """Every provider code this deployment can actually charge through.
+
+    The one place that knows. Callers that used to carry their own
+    ``{"stripe", "viva_wallet"}`` literal ask here instead.
+    """
+    return frozenset(_PROVIDERS)
+
+
+def get_payment_provider(provider_name: str) -> PaymentProvider:
+    """Construct the named provider for the ACTIVE tenant.
+
+    Raises ``ValueError`` for an unknown code and — from the
+    constructor — ``ImproperlyConfigured`` when the tenant holds no
+    credentials. Callers gate on
+    ``PayWayService.is_provider_configured()`` before they get this far.
+    """
+    provider_class = get_payment_provider_class(provider_name)
     if not provider_class:
         raise ValueError(f"Unknown payment provider: {provider_name}")
 

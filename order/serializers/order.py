@@ -17,6 +17,7 @@ from order.serializers.item import (
     OrderItemDetailSerializer,
 )
 from pay_way.enum.pay_way import PayWayEnum
+from pay_way.enum.settlement import PaySettlement
 from pay_way.models import PayWay
 from region.models import Region
 from shipping_acs.serializers.shipment import AcsShipmentDetailSerializer
@@ -135,7 +136,10 @@ class OrderSerializer(serializers.ModelSerializer[Order]):
     @extend_schema_field({"type": "boolean"})
     def get_is_online_payment(self, order: Order) -> bool:
         pay_way = getattr(order, "pay_way", None)
-        return bool(pay_way and pay_way.is_online_payment)
+        return bool(
+            pay_way
+            and PaySettlement(pay_way.settlement) == PaySettlement.ONLINE
+        )
 
     @extend_schema_field({"type": "boolean"})
     def get_is_collected_on_delivery(self, order: Order) -> bool:

@@ -30,31 +30,24 @@ class PayWayService:
         gate keeps such providers out of the shopper-facing list AND
         blocks checkout-session creation for them.
 
-        Only the two credentialed charge providers are gated:
+        Which credentials a provider needs is the PROVIDER's knowledge,
+        so it answers for itself via ``is_configured_for_tenant()``.
+        This used to be an ``if code == "stripe" … elif "viva_wallet"``
+        ladder here — a third place that had to list every vendor, and
+        one more to find when adding a PSP.
 
-        - ``stripe``: requires ``stripe_credentials()["secret_key"]`` —
-          the tenant's own key. No platform-wide fallback.
-        - ``viva_wallet``: requires the Smart Checkout OAuth pair
-          (client id + secret).
-
-        Every other code passes through unchanged: ``""`` and offline
-        processors (``cash``, ``bank_transfer``) need no credentials,
-        and unregistered/unimplemented online codes keep their existing
-        behavior (listed, then rejected by the ``supported_providers``
-        check at checkout-session creation).
+        An unregistered code passes through as configured: ``""`` and
+        offline processors (``cash``, ``bank_transfer``) need no
+        credentials, and an online code with no adapter is caught later
+        by the hosted-checkout capability gate rather than being
+        silently hidden from the shopper here.
         """
-        from tenant.credentials import (
-            stripe_credentials,
-            viva_wallet_credentials,
-        )
+        from order.payment import get_payment_provider_class
 
-        code = (provider_code or "").lower()
-        if code == "stripe":
-            return bool(stripe_credentials()["secret_key"])
-        if code == "viva_wallet":
-            creds = viva_wallet_credentials()
-            return bool(creds["client_id"] and creds["client_secret"])
-        return True
+        provider_class = get_payment_provider_class(provider_code)
+        if provider_class is None:
+            return True
+        return provider_class.is_configured_for_tenant()
 
     @staticmethod
     def unconfigured_provider_codes(codes) -> set[str]:

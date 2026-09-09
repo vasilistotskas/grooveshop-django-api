@@ -210,7 +210,9 @@ class PayWay(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
 
     @property
     def is_configured(self) -> bool:
-        if not self.is_online_payment:
+        # Only a provider that actually charges needs credentials;
+        # a settlement collected later has nothing to configure.
+        if PaySettlement(self.settlement) != PaySettlement.ONLINE:
             return True
         return self.has_configuration
 

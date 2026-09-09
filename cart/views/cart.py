@@ -46,8 +46,10 @@ from core.utils.serializers import (
 )
 from order.exceptions import InsufficientStockError, StockReservationError
 from order.models import StockReservation
+from order.payment import provider_supports
 from order.services import OrderService
 from order.stock import StockManager
+from pay_way.enum.settlement import PaySettlement
 from tenant.membership import is_store_staff
 from tenant.permissions import IsPromotionsEnabled
 
@@ -733,7 +735,10 @@ class CartViewSet(BaseModelViewSet):
         try:
             pay_way = PayWay.objects.get(id=pay_way_id)
             logger.info(
-                f"Payment method found: {pay_way.name} (provider: {pay_way.provider_code}, is_online: {pay_way.is_online_payment})"
+                "Payment intent: pay_way=%s provider=%s settlement=%s",
+                pay_way.id,
+                pay_way.provider_code,
+                pay_way.settlement,
             )
         except PayWay.DoesNotExist:
             logger.error(f"Payment method with ID {pay_way_id} not found")
@@ -777,14 +782,32 @@ class CartViewSet(BaseModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Validate it's an online payment method (Stripe)
-        if not pay_way.is_online_payment or pay_way.provider_code != "stripe":
-            logger.error(
-                f"Invalid payment method: is_online={pay_way.is_online_payment}, provider={pay_way.provider_code}"
+        # Two separate questions, neither of which is a vendor name:
+        # is money taken at checkout (the PAY WAY's settlement), and can
+        # this PSP mint a client-confirmed intent (the PROVIDER's
+        # capability). This was ``provider_code != "stripe"``, which is
+        # a proxy for the second and silently wrong the day a third PSP
+        # arrives or Stripe gains a flow it lacks today.
+        settlement = PaySettlement(pay_way.settlement)
+        can_mint_intent = provider_supports(
+            pay_way.provider_code, "supports_payment_intent"
+        )
+        if settlement != PaySettlement.ONLINE or not can_mint_intent:
+            logger.info(
+                "Payment intent refused: pay_way=%s provider=%s "
+                "settlement=%s supports_payment_intent=%s",
+                pay_way.id,
+                pay_way.provider_code,
+                settlement.value,
+                can_mint_intent,
             )
             return Response(
                 {
-                    "detail": "This endpoint only supports Stripe payment methods"
+                    "detail": _(
+                        "The selected payment method cannot be paid "
+                        "with a card on this page."
+                    ),
+                    "reason": "pay_way_not_intent_capable",
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )

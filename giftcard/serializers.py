@@ -4,6 +4,8 @@ from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from giftcard.models import GiftCard, GiftCardTransaction
+from giftcard.providers import DEFAULT_GIFT_CARD_PROVIDER
+from order.payment import registered_provider_codes
 
 
 class GiftCardCheckRequestSerializer(serializers.Serializer):
@@ -61,12 +63,11 @@ class GiftCardPurchaseRequestSerializer(serializers.Serializer):
         allow_null=True,
         help_text=_("Empty means deliver right after payment"),
     )
+    # Choices come from the payment registry, not a literal pair kept
+    # in step by hand. A third PSP is registered once and appears here.
     payment_provider = serializers.ChoiceField(
-        choices=(
-            ("stripe", "stripe"),
-            ("viva_wallet", "viva_wallet"),
-        ),
-        default="stripe",
+        choices=[(code, code) for code in sorted(registered_provider_codes())],
+        default=DEFAULT_GIFT_CARD_PROVIDER,
         help_text=_(
             "stripe = inline card element (clientSecret in the "
             "response); viva_wallet = hosted Smart Checkout redirect "

@@ -39,10 +39,20 @@ class UserAccount(
         # field. `format_lazy` stays lazy until the text is read.
         # The missing space after "fewer." went with the f-string — the
         # two literals concatenated to "fewer.Letters".
+        # The help text said "Required." on a ``blank=True, null=True``
+        # field, and it cost the site owner an afternoon: trying to add
+        # a blog author, he read "Required", typed the person's actual
+        # name ("Κωνσταντίνος Βάσκος") into what is a machine handle,
+        # and the validator rejected the space. The label was the bug —
+        # nothing here ever needed filling in, and the display name
+        # lives in ``first_name``/``last_name`` (which is what
+        # ``full_name`` and every byline read).
         help_text=format_lazy(
             _(
-                "Required. {max} characters or fewer. "
-                "Letters, digits and @/./+/-/_ only."
+                "Optional login handle — NOT the person's name, which "
+                "belongs in First/Last name. Leave blank and one is "
+                "generated from the email. {max} characters or fewer; "
+                "letters, digits and @/./+/-/_ only (no spaces)."
             ),
             max=settings.ACCOUNT_USERNAME_MAX_LENGTH,
         ),

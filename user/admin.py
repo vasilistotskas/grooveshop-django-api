@@ -21,7 +21,6 @@ from unfold.enums import ActionVariant
 from unfold.forms import (
     AdminPasswordChangeForm,
     UserChangeForm,
-    UserCreationForm,
 )
 
 from admin.base import BaseModelAdmin, BaseTranslatableAdmin
@@ -36,6 +35,7 @@ from admin.mixins import IsSuperuserOnlyModelAdmin
 from loyalty.enum import TransactionType
 from loyalty.models.transaction import PointsTransaction
 from loyalty.services import LoyaltyService
+from user.forms import UserAccountCreationForm
 from user.models import UserAccount
 from user.models.address import UserAddress
 from user.models.data_export import UserDataExport
@@ -229,7 +229,10 @@ class UserAdmin(ExportActionMixin, BaseModelAdmin):
     actions = ["export_csv", "export_xml"]
 
     form = UserChangeForm
-    add_form = UserCreationForm
+    # Generates a handle when the operator leaves ``username``
+    # blank, matching what ``UserAccountManager.create_user``
+    # already does for signups. See ``user/forms.py``.
+    add_form = UserAccountCreationForm
     change_password_form = AdminPasswordChangeForm
 
     list_display = [

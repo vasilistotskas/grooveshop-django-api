@@ -3,6 +3,161 @@
 
 
 
+## v3.48.2 (2026-09-09)
+
+### Bug fixes
+
+* fix(tests): pin the label mechanism, not a locale CI does not have
+
+`test_the_label_follows_the_active_language` asserted the resolved
+label was not the English "Pay On Delivery" while `el` was active — a
+Greek translation existing. That passed on a dev machine and failed in
+CI, because `*.mo` is gitignored and no workflow runs `compilemessages`,
+so every catalog there falls back to the English source.
+
+`tests/conftest.py::_assert_english_locale_if_marked` documents this
+exact trap in the opposite direction; this is the mirror image and the
+same fix applies — do not assert on translated CONTENT.
+
+It now asserts against `PayWayEnum.…label` itself, which `str()`
+resolves under whichever language is active, plus the property that
+actually matters and holds in every environment: the resolved label is
+never the raw stored key.
+
+Verified by hiding the compiled catalogs and re-running: 10 passed with
+them and 10 without.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01WnK59xS5MBn65T5f6ZP7Xf ([`6082bbb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6082bbbb4ca5b933e4488f781dfb4b1c943affcb))
+
+* fix(pay_way): resolve the pay-way label, and stop myDATA reading a dead column
+
+A pay-way's name column stores a `PayWayEnum` KEY, deliberately — one
+shared vocabulary across the two repos, seedable by a migration without
+knowing a language. Nothing resolved it, so every Django-rendered
+surface printed the key at a human: "Method: PAY_ON_DELIVERY" on the
+invoice PDF (a Greek tax document), the merchant's new-order email, the
+admin list and every autocomplete label.
+
+`PayWay.display_name` is that resolver, and the only one. Resolution
+mirrors `get_FOO_display()`: a known member yields its localised label,
+anything else is passed through unchanged.
+
+It is deliberately NOT for storefront JSON. Every route lives under
+`i18n_patterns(prefix_default_language=False)`, and Django's
+`LocaleMiddleware` pins any path without a language prefix to
+`settings.LANGUAGE_CODE` — so `Accept-Language` and `X-Language` are
+both inert on the API (measured against staging three ways: external
+`content-language`, the in-pod middleware chain, and an `activate()`
+trace). A server-rendered label would lock the storefront to Greek
+forever. `payment_status_display` already has that property and its
+help_text claimed otherwise; corrected.
+
+The storefront instead gets `Order.pay_way_key` — a snapshot of the key
+the shopper chose, written by `Order.save()`. Snapshotted because
+`pay_way` is `SET_NULL`, so deleting the row erased the only record of
+the choice, and because renaming a key (migration `pay_way/0022` just
+renamed one) rewrote history. It is NOT `payment_method`: that column
+records the GATEWAY that took the money (`stripe`, `viva_wallet`,
+`acs_cod`), is written later by the payment handlers, and is matched on
+by the Viva webhook and the ACS COD reconcile. Two different questions.
+
+`allow_blank=True` on the serializer field is load-bearing: a read-only
+DRF ChoiceField does not inherit it, and the first generated client
+schema was a bare required enum with no blank arm — every order with no
+pay way would have failed `parseDataAs` and 422'd the order page.
+
+Separately, myDATA classified the AADE payment type from
+`getattr(pay_way, "is_online_payment", False)` — a DEPRECATED mirror of
+`settlement` scheduled for removal. On the day that column drops the
+`False` default would have filed every payment-id-less order as Cash (3)
+instead of Web Banking (6): a wrong tax classification submitted with no
+error anywhere. It reads `settlement` now, and a test pins that the
+mirror is no longer consulted at all.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01WnK59xS5MBn65T5f6ZP7Xf ([`a3374b3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a3374b3f009898b6b3dee0ab375505066c662074))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.48.1 [skip ci] ([`ebb1356`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ebb13565efb9d14eaf9140a4a7fc37b2a54a6df1))
+
+### Documentation
+
+* docs(contact): the notification goes to the tenant inbox, not ADMINS
+
+The docstring said it "dispatches it to every address listed in
+``settings.ADMINS``". The code a few lines below has routed to
+``tenant_contact_email()`` since multi-tenancy landed.
+
+Not a harmless inaccuracy: it was the stated reason to leave
+``ADMIN_EMAIL`` pointed at the store owner, and reading only the
+docstring would have meant either leaving platform alerts on his
+personal address or repointing the key and believing customer
+contact-form mail moved with it.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01WnK59xS5MBn65T5f6ZP7Xf ([`bc694c0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bc694c046075453ea7711b0cc764b729ad2afe45))
+
+### Refactoring
+
+* refactor(payment): providers declare what they can do, instead of being named
+
+Five facts about payment providers were written as twelve string
+literals across `cart/views`, `order/views`, `order/services`,
+`pay_way/services` and `giftcard/*`:
+
+if pay_way.provider_code != "stripe": # 4 copies
+redirect_checkout_providers = {"viva_wallet"} # 2 copies
+supported_providers = {"stripe", "viva_wallet"}
+if code == "stripe": return bool(stripe_credentials()[...])
+if provider_code == "viva_wallet": metadata[...] = ...
+
+Each was correct for two providers and silently wrong for a third —
+nothing raised, the other branch was simply taken. `order/services.py`
+had already NAMED the concept (`_REDIRECT_PROVIDER_CODES`, with a
+comment explaining why redirect providers are order-first); a second,
+independent copy had grown in a view since.
+
+`PaymentProvider` now declares `supports_payment_intent`,
+`supports_hosted_checkout` and `supports_delegated_payment`, owns its
+credential check via `is_configured_for_tenant()`, and owns its own
+request/metadata shape via `checkout_session_params()` and
+`record_checkout_session()` — the two `if provider_code ==` branches in
+the checkout-session view. Same pattern as `shipping/interfaces.py`,
+which solved this for couriers.
+
+Capabilities are ClassVar and read through `get_payment_provider_class`,
+which never constructs: every gate consulting them runs for tenants that
+may hold no credentials, and every constructor raises exactly then — a
+gate that instantiated would answer 500 where it means 400. Unknown
+codes report no capabilities, so gates fail closed.
+
+`cart/views/cart.py` was the line that prompted this. It asked two
+questions and answered both with a vendor name: whether money is taken
+at checkout (the PAY WAY's settlement) and whether the PSP can mint a
+client-confirmed intent (the PROVIDER's capability). It now asks both
+properly.
+
+Also completes release B of the `is_online_payment` retirement: every
+production reader now reads `settlement`. Only `PayWay.save()` still
+touches the mirrors, which IS the derivation and goes with the columns
+in release D. No schema change, no contract change — nothing observable
+moves.
+
+`metadata["payment_type"]` records the settlement rather than
+"online"/"offline"; the old summary could not tell cash to a courier
+from a card at a locker terminal, which is the distinction the shipping
+layer turns on and the one an auditor reading that key most needs.
+
+Logging: the two f-strings in the payment-intent path are structured now
+(they were unqueryable, and printed the deprecated mirror rather than
+the settlement), and the four capability refusals that returned a bare
+400 log which gate rejected the order and why.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01WnK59xS5MBn65T5f6ZP7Xf ([`8382bf0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8382bf0ef360e814c2c2588cb0e40f7071f2a8a4))
+
 ## v3.48.1 (2026-09-09)
 
 ### Bug fixes

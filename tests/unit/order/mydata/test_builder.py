@@ -248,6 +248,61 @@ class BuildInvoiceXmlTestCase(TestCase):
         ).text
         self.assertEqual(pay_type, "3")
 
+    def test_payment_type_online_without_a_charge_id_is_web_banking(self):
+        """The branch that was one column-drop away from filing wrong.
+
+        An ONLINE pay way with no ``payment_id`` is an anomaly (probably
+        mid-flow) and is filed as Web Banking (6), never Cash (3).
+
+        It used to read ``getattr(pay_way, "is_online_payment", False)``
+        — a DEPRECATED mirror of ``settlement`` that is scheduled to be
+        dropped. On the day the column went, that ``False`` default
+        would have flipped every order on this branch to Cash and
+        submitted the wrong classification to AADE with no error
+        anywhere. Asserting on ``settlement`` keeps the discriminator
+        where the authority is.
+        """
+        invoice = self._issued_invoice()
+        invoice.order.payment_id = ""
+        invoice.order.save(update_fields=["payment_id"])
+        self.assertIsNotNone(invoice.order.pay_way)
+        invoice.order.pay_way.settlement = PaySettlement.ONLINE
+        invoice.order.pay_way.save(update_fields=["settlement"])
+
+        built = self._build(invoice)
+        root = fromstring(built.xml_bytes)
+        pay_type = root.find(
+            _localise("invoice/paymentMethods/paymentMethodDetails/type")
+        ).text
+        self.assertEqual(pay_type, "6")
+
+    def test_payment_type_ignores_the_deprecated_mirror(self):
+        """Proves the mirror is no longer consulted at all.
+
+        ``PayWay.save()`` derives the booleans from ``settlement``, so
+        the only way to make them disagree is to write past ``save()``.
+        With ``is_online_payment`` forced True underneath a
+        COURIER_CASH settlement, the classification must still be Cash.
+        """
+        from pay_way.models import PayWay
+
+        invoice = self._issued_invoice()
+        invoice.order.payment_id = ""
+        invoice.order.save(update_fields=["payment_id"])
+        pay_way = invoice.order.pay_way
+        self.assertIsNotNone(pay_way)
+        pay_way.settlement = PaySettlement.COURIER_CASH
+        pay_way.save(update_fields=["settlement"])
+        PayWay.objects.filter(pk=pay_way.pk).update(is_online_payment=True)
+        invoice.order.refresh_from_db()
+
+        built = self._build(invoice)
+        root = fromstring(built.xml_bytes)
+        pay_type = root.find(
+            _localise("invoice/paymentMethods/paymentMethodDetails/type")
+        ).text
+        self.assertEqual(pay_type, "3")
+
     def test_unknown_vat_rate_raises_not_silently_remapped(self):
         """Regression: silent fallback to category 7 (0%) on unknown
         rates used to trigger AADE error 217 with a misleading

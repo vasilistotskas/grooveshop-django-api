@@ -24,6 +24,7 @@ from core.models import (
 from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.status import OrderStatus, PaymentStatus
 from order.managers.order import OrderManager
+from pay_way.enum.pay_way import PayWayEnum
 from shipping.enum import ShippingKind
 
 # Stamped on ``Order.metadata`` when a provider confirms a charge whose
@@ -220,6 +221,25 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
     )
     payment_method = models.CharField(
         _("Payment Method"), max_length=50, blank=True, default=""
+    )
+    pay_way_key = models.CharField(
+        _("Pay Way Key"),
+        max_length=50,
+        blank=True,
+        default="",
+        choices=PayWayEnum,
+        help_text=_(
+            "Snapshot of which payment method the shopper chose, as the "
+            "``PayWayEnum`` key. Distinct from ``payment_method``, which "
+            "records the gateway that processed the charge (``stripe``, "
+            "``viva_wallet``, ``acs_cod``) and is written later by the "
+            "payment-confirmation handlers — two different questions. "
+            "Snapshotted because ``pay_way`` is ``SET_NULL``: deleting "
+            "the row would otherwise erase what the customer picked, "
+            "and renaming its key would rewrite history. Also what the "
+            "storefront renders, since the API cannot localise (see "
+            "``PayWay.display_name``)."
+        ),
     )
     # ── B2B billing identity (snapshotted on the order) ──────────
     # Populated only when the buyer is issuing a proper ``Τιμολόγιο
@@ -429,6 +449,10 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         # and refreshed-from-DB ones without a second query.
         self._original_tracking_number = self.tracking_number
         self._original_shipping_carrier = self.shipping_carrier
+        # Lets ``save()`` tell "the pay way was just chosen/changed"
+        # from "it is unchanged", so the ``pay_way_key`` snapshot is
+        # taken once and never silently rewritten afterwards.
+        self._original_pay_way_id = self.pay_way_id
 
     def __str__(self) -> str:
         return f"Order {self.id} - {self.first_name} {self.last_name}"
@@ -449,6 +473,8 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
             and self.user is not None
         ):
             self.email = self.user.email
+
+        pay_way_key_changed = self._snapshot_pay_way_key()
 
         # Django writes an ``auto_now`` column only when it appears in
         # ``update_fields``, so every partial save left ``updated_at``
@@ -471,13 +497,16 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         # simply never followed. ``status_updated_at`` gets the same
         # treatment: this method ASSIGNS it above, and a caller passing
         # update_fields=["status"] would otherwise drop that write while
-        # ``_original_status`` below still consumed the transition.
+        # ``_original_status`` below still consumed the transition, and
+        # ``pay_way_key`` the same again.
         update_fields = kwargs.get("update_fields")
         if update_fields is not None:
             fields = set(update_fields)
             fields.add("updated_at")
             if status_changed:
                 fields.add("status_updated_at")
+            if pay_way_key_changed:
+                fields.add("pay_way_key")
             kwargs["update_fields"] = fields
 
         super().save(*args, **kwargs)
@@ -485,6 +514,47 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         self._original_payment_status = self.payment_status
         self._original_tracking_number = self.tracking_number
         self._original_shipping_carrier = self.shipping_carrier
+        self._original_pay_way_id = self.pay_way_id
+
+    def _snapshot_pay_way_key(self) -> bool:
+        """Freeze which payment method the shopper chose.
+
+        Done here, not at the order-creation call sites, because there
+        are several of them (cart checkout, the agent/UCP surface,
+        reorder) and a new one must not be able to forget. Same reason
+        ``updated_at`` is handled in this method rather than at ~35
+        call sites.
+
+        Written when the snapshot is empty or the pay way genuinely
+        changed — an operator re-pointing an order's ``pay_way`` in the
+        admin means the label should follow. Never rewritten otherwise,
+        so a later rename of the PayWay row (``pay_way`` migration 0022
+        renamed one) cannot retroactively change what a historical
+        order says the customer picked.
+
+        Returns True when the value changed, so ``save()`` can add the
+        column to a partial ``update_fields`` — without that, every
+        partial save would silently drop the write.
+        """
+        if self.pay_way_id is None:
+            return False
+
+        pay_way_changed = self.pay_way_id != getattr(
+            self, "_original_pay_way_id", None
+        )
+        if self.pay_way_key and not pay_way_changed:
+            return False
+
+        # ``self.pay_way`` is already loaded on every read path
+        # (``for_list``/``for_detail`` select_related it) and costs one
+        # query on a write path that only set ``pay_way_id``.
+        pay_way = self.pay_way
+        key = pay_way.safe_translation_getter("name", any_language=True) or ""
+        if key == self.pay_way_key:
+            return False
+
+        self.pay_way_key = key
+        return True
 
     def clean(self) -> None:
         errors: dict[str, list] = {}

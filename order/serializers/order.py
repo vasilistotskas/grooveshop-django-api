@@ -16,6 +16,7 @@ from order.serializers.item import (
     OrderItemCreateSerializer,
     OrderItemDetailSerializer,
 )
+from pay_way.enum.pay_way import PayWayEnum
 from pay_way.models import PayWay
 from region.models import Region
 from shipping_acs.serializers.shipment import AcsShipmentDetailSerializer
@@ -66,10 +67,33 @@ class OrderSerializer(serializers.ModelSerializer[Order]):
     payment_status_display = serializers.SerializerMethodField(
         "get_payment_status_display",
         help_text=(
-            "Localised label for ``payment_status`` (mirrors "
-            "``status_display``). Frontend renders this rather than the "
-            "raw enum value so Greek/English/German locales all work "
-            "without per-locale string maps in the UI."
+            "Label for ``payment_status`` (mirrors ``status_display``), "
+            "rendered by the frontend instead of the raw enum value. "
+            "ALWAYS GREEK, whatever the caller asks for: every route "
+            "lives under ``i18n_patterns(prefix_default_language="
+            "False)``, and Django's ``LocaleMiddleware`` pins any path "
+            "without a language prefix to ``settings.LANGUAGE_CODE`` — "
+            "so ``Accept-Language`` and ``X-Language`` are both inert "
+            "here (measured 2026-09-09). A second UI locale needs its "
+            "own client-side map, the way pay-way names already work; "
+            "do not add server-rendered labels expecting negotiation."
+        ),
+    )
+    pay_way_key = serializers.ChoiceField(
+        choices=PayWayEnum.choices,
+        allow_blank=True,
+        read_only=True,
+        help_text=(
+            "Which payment method the shopper chose, as the "
+            "``PayWayEnum`` key — the storefront's label for the order. "
+            "Deliberately the KEY and not a rendered string: the API "
+            "is pinned to Greek (see ``paymentStatusDisplay``), so a "
+            "server-rendered label would lock the storefront to one "
+            "locale. Snapshotted on the order, so it survives the "
+            "PayWay row being deleted (``SET_NULL``) or its key "
+            "renamed. EMPTY when the order has no pay way — "
+            "``allow_blank`` is load-bearing, without it the generated "
+            "client schema rejects those orders outright."
         ),
     )
     is_online_payment = serializers.SerializerMethodField(
@@ -173,6 +197,7 @@ class OrderSerializer(serializers.ModelSerializer[Order]):
             "payment_status",
             "payment_status_display",
             "payment_method",
+            "pay_way_key",
             "is_online_payment",
             "is_collected_on_delivery",
             "can_be_canceled",
@@ -205,6 +230,12 @@ class OrderSerializer(serializers.ModelSerializer[Order]):
             "is_paid",
             "is_online_payment",
             "is_collected_on_delivery",
+            # Derived: ``Order.save()`` owns this column. Writable
+            # would let a client pin a key that contradicts ``pay_way``
+            # — ``_snapshot_pay_way_key`` only rewrites a snapshot when
+            # the pay way itself changed, so a bogus value supplied
+            # alongside an unchanged pay way would survive.
+            "pay_way_key",
         )
 
 

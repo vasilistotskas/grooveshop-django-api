@@ -149,8 +149,44 @@ class PayWay(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
             BTreeIndex(fields=["settlement"], name="pay_way_settlement_ix"),
         ]
 
+    @property
+    def display_name(self) -> str:
+        """Human-readable label for this payment method.
+
+        ``PayWayTranslation.name`` deliberately stores a ``PayWayEnum``
+        KEY rather than a display string — one shared vocabulary across
+        the two repos, seedable by a migration without knowing a
+        language. The consequence is that every Django-rendered surface
+        that printed the raw column showed ``PAY_ON_DELIVERY``: the
+        invoice PDF's "Method" line, the admin order email, the admin
+        list and every autocomplete label. This is the one place that
+        resolves the key.
+
+        Resolution mirrors Django's ``get_FOO_display()``: a known
+        member yields its ``gettext_lazy`` label, anything else yields
+        the stored value unchanged. Blank stays blank so callers can
+        fall back.
+
+        NOT for storefront JSON. The API is pinned to ``el`` — every
+        route lives under ``i18n_patterns(prefix_default_language=
+        False)``, and Django's ``LocaleMiddleware`` forces
+        ``settings.LANGUAGE_CODE`` for any path without a language
+        prefix — so a label resolved here is always Greek regardless of
+        the caller's ``Accept-Language``. That is correct for the
+        surfaces above (staff and Greek customers) and wrong for a
+        storefront that translates client-side. The order serializer
+        exposes ``pay_way_key`` for that; see ``Order.pay_way_key``.
+        """
+        raw = self.safe_translation_getter("name", any_language=True) or ""
+        if not raw:
+            return ""
+        try:
+            return str(PayWayEnum(raw).label)
+        except ValueError:
+            return raw
+
     def __str__(self):
-        return self.safe_translation_getter("name", any_language=True) or ""
+        return self.display_name
 
     def get_ordering_queryset(self):
         return PayWay.objects.all()

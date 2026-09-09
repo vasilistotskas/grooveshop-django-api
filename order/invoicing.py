@@ -47,6 +47,7 @@ from core.utils.tenant_urls import get_tenant_frontend_url
 from order.discounts import discounted_line_gross, order_discount_total
 from order.models.invoice import Invoice, InvoiceCounter
 from order.models.order import Order
+from pay_way.enum.pay_way import PayWayEnum
 from tenant.credentials import tenant_contact_email, tenant_site_name
 
 logger = logging.getLogger(__name__)
@@ -209,16 +210,28 @@ def _order_totals(
 def _pay_way_display(order: Order) -> str:
     """Human-readable payment method label for the invoice.
 
-    Prefers the translated ``PayWay.name`` (structured choice), then
-    ``Order.payment_method`` (raw gateway code like ``stripe`` /
-    ``viva_wallet`` / ``offline_...``, written by the payment-
-    confirmation handlers), then an empty string.
+    Prefers ``PayWay.display_name`` — the resolved label, not the raw
+    ``PayWayEnum`` key the column stores. Reading the column directly
+    printed "Method: PAY_ON_DELIVERY" on a Greek tax document.
+
+    Falls back to the order's snapshot key (the pay-way row can be
+    deleted; the FK is ``SET_NULL``), then to ``Order.payment_method``
+    (raw gateway code like ``stripe`` / ``viva_wallet`` / ``acs_cod``,
+    written by the payment-confirmation handlers), then empty.
     """
     pay_way = getattr(order, "pay_way", None)
     if pay_way is not None:
-        name = pay_way.safe_translation_getter("name", any_language=True)
-        if name:
-            return name
+        label = pay_way.display_name
+        if label:
+            return label
+
+    snapshot = getattr(order, "pay_way_key", "") or ""
+    if snapshot:
+        try:
+            return str(PayWayEnum(snapshot).label)
+        except ValueError:
+            return snapshot
+
     return order.payment_method or ""
 
 

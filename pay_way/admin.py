@@ -263,9 +263,12 @@ class PayWayAdmin(BaseTranslatableAdmin):
 
     @admin.display(description=_("Name"))
     def name_display(self, obj):
-        return obj.safe_translation_getter("name", any_language=True) or _(
-            "Unnamed Payment Method"
-        )
+        # ``display_name``, not the raw translation: the column stores a
+        # PayWayEnum key, so this list showed "PAY_ON_DELIVERY". Note
+        # ``search_fields`` still queries ``translations__name`` — it is
+        # a DB lookup and cannot see a Python property, so staff search
+        # by key, not by label.
+        return obj.display_name or _("Unnamed Payment Method")
 
     @admin.display(description=_("Provider"))
     def provider_code_display(self, obj):

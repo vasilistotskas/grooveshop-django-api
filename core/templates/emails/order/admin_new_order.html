@@ -13,7 +13,7 @@
     <p><strong>Placed:</strong> {{ order.created_at|date:"SHORT_DATETIME_FORMAT" }}</p>
     <p><strong>Status:</strong> {{ order.status }}</p>
     <p><strong>Payment status:</strong> {{ order.payment_status }}</p>
-    {% if pay_way %}<p><strong>Payment method:</strong> {{ pay_way.name }}</p>{% endif %}
+    {% if pay_way %}<p><strong>Payment method:</strong> {{ pay_way.display_name }}</p>{% endif %}
     <p><strong>Total:</strong> {{ order.calculate_order_total_amount }}</p>
 </div>
 

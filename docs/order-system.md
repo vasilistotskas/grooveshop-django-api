@@ -15,7 +15,28 @@ Three orthogonal axes describe every order in the system:
 |---|---|---|
 | `Order.status` | `PENDING`, `PROCESSING`, `SHIPPED`, `DELIVERED`, `COMPLETED`, `CANCELED`, `RETURNED`, `REFUNDED` | The fulfilment state. |
 | `Order.payment_status` | `PENDING`, `PROCESSING`, `COMPLETED`, `FAILED`, `REFUNDED`, `PARTIALLY_REFUNDED`, `CANCELED` | The financial state. **Decoupled from `status`** — important for COD where the parcel can be SHIPPED while payment is still PENDING. |
-| `Order.pay_way.is_online_payment` | `True` / `False` | Drives which create path runs (online → online webhook completes payment, offline → COD). |
+| `Order.pay_way.settlement` | `online`, `courier_cash`, `carrier_terminal`, `offline_transfer` | How the money changes hands. Drives which create path runs (online → webhook completes payment; the rest → collected later) AND which carriers may serve the order — a carrier declares the settlements it can physically perform (`supported_settlements`). The `is_online_payment` / `requires_confirmation` booleans are DEPRECATED mirrors kept for one release; read `settlement`. |
+
+Two order columns look like "the payment method" and are not
+interchangeable:
+
+- **`Order.pay_way_key`** — a snapshot of the `PayWayEnum` key the
+  shopper chose, written by `Order.save()`. This is the customer-facing
+  label; the storefront maps it through `payment_methods.*`. It is
+  snapshotted because `pay_way` is `SET_NULL` and because renaming a
+  key must not rewrite history.
+- **`Order.payment_method`** — the GATEWAY that processed the charge
+  (`stripe`, `viva_wallet`, `acs_cod`), written later by the
+  payment-confirmation handlers and *matched on* by the Viva webhook
+  and the ACS COD reconcile. Never render it to a customer.
+
+Django-rendered surfaces (invoice PDF, merchant email, admin) use
+`PayWay.display_name`, which resolves the key to a localised label. The
+API cannot do that: every route sits under
+`i18n_patterns(prefix_default_language=False)`, so `LocaleMiddleware`
+pins responses to `settings.LANGUAGE_CODE` and `Accept-Language` is
+inert — which is why the storefront gets the key and translates it
+itself.
 
 Each shipping provider (ACS, BoxNow) is a `ShippingCarrier` adapter
 in `shipping/interfaces.py` registered through

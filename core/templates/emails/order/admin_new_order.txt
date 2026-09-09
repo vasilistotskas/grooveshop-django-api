@@ -7,7 +7,7 @@ ORDER
   Placed:          {{ order.created_at|date:"SHORT_DATETIME_FORMAT" }}
   Status:          {{ order.status }}
   Payment status:  {{ order.payment_status }}
-{% if pay_way %}  Payment method:  {{ pay_way.name }}
+{% if pay_way %}  Payment method:  {{ pay_way.display_name }}
 {% endif %}  Total:           {{ order.calculate_order_total_amount }}
 
 CUSTOMER

@@ -59,6 +59,7 @@ from order.mydata.types import (
     VAT_EXEMPTION_NO_VAT_ARTICLES,
 )
 from order.mydata.uid import build_uid
+from pay_way.enum.settlement import PaySettlement
 from vat.constants import MYDATA_SUPPORTED_VAT_RATES
 
 # VAT rate → AADE ``vatCategory``. Strict whitelist per v1.0.10 annex
@@ -308,12 +309,22 @@ def _pick_payment_type(invoice: Any) -> int:
     pay_way = getattr(invoice.order, "pay_way", None)
     if payment_id and not payment_id.startswith("GIFTCARD_"):
         return PAYMENT_METHOD_POS_CARD
-    # No transaction ID on file; lean on the PayWay flag when it
-    # exists — an "online" pay way without a payment_id is an
-    # anomaly (probably mid-flow) so we still pick POS; otherwise
-    # we treat as cash/COD.
-    if pay_way is not None and getattr(pay_way, "is_online_payment", False):
-        return PAYMENT_METHOD_WEB_BANKING
+    # No transaction ID on file; lean on the pay way's settlement when
+    # it exists — an ONLINE pay way without a payment_id is an anomaly
+    # (probably mid-flow) so we still pick POS; otherwise cash/COD.
+    #
+    # Reads ``settlement``, NOT the deprecated ``is_online_payment``
+    # mirror it used to, and NOT through ``getattr(..., False)``. That
+    # default is what made this dangerous: the mirror columns are
+    # scheduled to be dropped, and the moment they are, every
+    # payment-id-less order would have been filed to AADE as Cash (3)
+    # instead of Web Banking (6) — a wrong tax classification, silently,
+    # with no traceback anywhere. ``settlement`` is the authoritative
+    # discriminator and an unexpected value raises instead of guessing.
+    if pay_way is not None:
+        settlement = getattr(pay_way, "settlement", None)
+        if settlement and PaySettlement(settlement) == PaySettlement.ONLINE:
+            return PAYMENT_METHOD_WEB_BANKING
     return PAYMENT_METHOD_CASH
 
 

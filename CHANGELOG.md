@@ -3,6 +3,51 @@
 
 
 
+## v3.48.4 (2026-09-09)
+
+### Bug fixes
+
+* fix(pay_way): evict the label migration 0022 left in parler's cache
+
+Caught validating the v3.48.3 staging sync. Migration 0022 renamed the
+BOX NOW PAY ON THE GO translation with a queryset .update(), which is
+the right shape for a data migration but writes straight to SQL, past
+the shared cache PARLER_ENABLE_CACHING populates — parler invalidates
+on save(), through signals .update() never fires.
+
+So the column was correct the instant 0022 finished and the storefront
+kept rendering the old name. Measured across the three staging tenants:
+demo and ekfyseosfyteias served PAY_ON_DELIVERY while the database held
+BOX_NOW_PAY_ON_THE_GO; webside happened to be correct only because its
+entry had already been evicted.
+
+That is exactly the bug 0022 exists to fix — two checkout radios both
+labelled "Αντικαταβολή" — so without this the fix ships and appears not
+to work. It matters more in production than on staging, where webside
+has this pay way active.
+
+A migration rather than a documented post-deploy step, because the
+staleness is per-schema and invisible: nothing fails, a stale label
+just sits there until the entry happens to expire. The repair belongs
+next to the write that caused it. One-time and self-limiting — the
+database is already correct, so every later read repopulates correctly.
+
+Scoped to the rows 0022 touched, not every pay way: a blanket purge
+would also work and would quietly hide any other stale-label bug.
+A cache failure is logged at WARNING and does not fail the deploy;
+blocking a release on a cache eviction would be worse than the stale
+label it prevents.
+
+The test reproduces the staleness rather than asserting the migration
+ran — mutation-checked: removing the delete_many makes it fail.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01WnK59xS5MBn65T5f6ZP7Xf ([`985f0f1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/985f0f1f7751382190977fcd12d65ce21da73f60))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.48.3 [skip ci] ([`02b51e6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/02b51e646424dee42f11265bd97c2f6b6201cc81))
+
 ## v3.48.3 (2026-09-09)
 
 ### Bug fixes

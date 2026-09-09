@@ -21,6 +21,7 @@ from cart.factories.item import CartItemFactory
 from country.factories import CountryFactory
 from order.enum.status import OrderStatus, PaymentStatus
 from order.serializers.order import OrderCreateFromCartSerializer
+from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
 from region.factories import RegionFactory
@@ -38,7 +39,7 @@ class TestOrderCreateSerializerValidation(APITestCase):
         self.user = UserAccountFactory()
         self.pay_way = PayWayFactory(
             provider_code="stripe",
-            is_online_payment=True,
+            settlement=PaySettlement.ONLINE,
             active=True,
         )
         self.country = CountryFactory()
@@ -241,7 +242,7 @@ class TestOrderCreateBothFlowsViaSerializer(APITestCase):
         mock_get_provider.return_value = mock_provider
 
         pay_way = PayWayFactory(
-            provider_code="stripe", is_online_payment=True, active=True
+            provider_code="stripe", settlement=PaySettlement.ONLINE, active=True
         )
         data = {
             **self._base_address(),
@@ -272,7 +273,9 @@ class TestOrderCreateBothFlowsViaSerializer(APITestCase):
         mock_validate_address.return_value = None
 
         pay_way = PayWayFactory(
-            provider_code="cod", is_online_payment=False, active=True
+            provider_code="cod",
+            settlement=PaySettlement.COURIER_CASH,
+            active=True,
         )
         data = {
             **self._base_address(),
@@ -302,7 +305,9 @@ class TestOrderCreateBothFlowsViaSerializer(APITestCase):
         mock_validate_address.return_value = None
 
         pay_way = PayWayFactory(
-            provider_code="cod", is_online_payment=False, active=False
+            provider_code="cod",
+            settlement=PaySettlement.COURIER_CASH,
+            active=False,
         )
         data = {**self._base_address(), "pay_way_id": pay_way.id}
 
@@ -333,7 +338,7 @@ class TestOrderCreateBothFlowsViaSerializer(APITestCase):
 
         pay_way = PayWayFactory(
             provider_code="viva_wallet",
-            is_online_payment=True,
+            settlement=PaySettlement.ONLINE,
             active=True,
         )
         data = {**self._base_address(), "pay_way_id": pay_way.id}
@@ -364,7 +369,9 @@ class TestOrderCreateBothFlowsViaSerializer(APITestCase):
         boxnow.save(update_fields=["is_active"])
 
         pay_way = PayWayFactory(
-            provider_code="cod", is_online_payment=False, active=True
+            provider_code="cod",
+            settlement=PaySettlement.COURIER_CASH,
+            active=True,
         )
         PayWayShippingExclusionFactory(
             pay_way=pay_way,
@@ -414,7 +421,9 @@ class TestOrderCreateBothFlowsViaSerializer(APITestCase):
         from unittest.mock import patch
 
         pay_way = PayWayFactory(
-            provider_code="cod", is_online_payment=False, active=True
+            provider_code="cod",
+            settlement=PaySettlement.COURIER_CASH,
+            active=True,
         )
         data = {
             **self._base_address(),

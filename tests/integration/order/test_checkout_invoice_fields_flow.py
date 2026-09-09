@@ -14,6 +14,7 @@ from country.factories import CountryFactory
 from order.invoicing import _buyer_snapshot
 from order.serializers.order import OrderSerializer
 from order.services import OrderService
+from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories import ProductFactory
 from user.factories import UserAccountFactory
@@ -49,7 +50,7 @@ def checkout():
     )
     CartItemFactory(cart=cart, product=product, quantity=1)
     pay_way = PayWayFactory(
-        is_online_payment=False,
+        settlement=PaySettlement.COURIER_CASH,
         cost=Money(Decimal(0), "EUR"),
         free_threshold=Money(Decimal(0), "EUR"),
     )

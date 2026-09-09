@@ -36,6 +36,7 @@ from order.factories.order import OrderFactory
 from order.models.order import Order
 from order.services import OrderService
 from order.tasks import auto_cancel_stuck_pending_orders
+from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 
 
@@ -88,7 +89,7 @@ class TestFailedPaymentKeepsItsGraceWindow:
     """The bug that mattered, driven through the real service call."""
 
     def _order_placed_an_hour_ago(self):
-        pay_way = PayWayFactory(is_online_payment=True, active=True)
+        pay_way = PayWayFactory(settlement=PaySettlement.ONLINE, active=True)
         order = OrderFactory(
             status=OrderStatus.PENDING,
             payment_status=PaymentStatus.PENDING,

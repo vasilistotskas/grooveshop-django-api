@@ -25,6 +25,7 @@ from order.factories.item import OrderItemFactory
 from order.factories.order import OrderFactory
 from order.invoicing import generate_invoice
 from order.mydata.builder import build_invoice_xml
+from pay_way.enum.settlement import PaySettlement
 from product.factories.product import ProductFactory
 from vat.factories import VatFactory
 
@@ -231,8 +232,15 @@ class BuildInvoiceXmlTestCase(TestCase):
         invoice.order.payment_id = ""
         invoice.order.save(update_fields=["payment_id"])
         if invoice.order.pay_way is not None:
-            invoice.order.pay_way.is_online_payment = False
-            invoice.order.pay_way.save(update_fields=["is_online_payment"])
+            # Set ``settlement``, not ``is_online_payment``. The latter
+            # is now a derived mirror that ``PayWay.save()`` recomputes
+            # from settlement, so assigning it here was silently
+            # overwritten and the pay-way stayed ONLINE — the builder
+            # then emitted type 6 and this test failed with
+            # ``'6' != '3'``. Courier cash-on-delivery is what "COD"
+            # means for a myDATA cash payment method.
+            invoice.order.pay_way.settlement = PaySettlement.COURIER_CASH
+            invoice.order.pay_way.save(update_fields=["settlement"])
         built = self._build(invoice)
         root = fromstring(built.xml_bytes)
         pay_type = root.find(

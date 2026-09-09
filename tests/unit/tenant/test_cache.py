@@ -17,6 +17,7 @@ from unittest.mock import patch
 import pytest
 from django.core.cache import cache
 
+from pay_way.enum.settlement import PaySettlement
 from tenant.cache import (
     GLOBAL_CACHE_PREFIX,
     make_tenant_key,
@@ -252,7 +253,7 @@ class TestPayWayResolveInvalidation:
         with patch("tenant.signals._purge_resolve_for_current_schema") as purge:
             pay_way = PayWayFactory(
                 active=True,
-                is_online_payment=False,
+                settlement=PaySettlement.COURIER_CASH,
                 provider_code="cash_on_delivery",
             )
             assert purge.called, "post_save receiver not connected"

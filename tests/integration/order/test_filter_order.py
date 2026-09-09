@@ -10,6 +10,7 @@ from country.factories import CountryFactory
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
 from order.models.order import Order
+from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from region.factories import RegionFactory
 from user.factories.account import UserAccountFactory
@@ -55,8 +56,8 @@ class OrderFilterTest(APITestCase):
         self.region1 = RegionFactory(country=self.country1)
         self.region2 = RegionFactory(country=self.country2)
 
-        self.pay_way1 = PayWayFactory(is_online_payment=True)
-        self.pay_way2 = PayWayFactory(is_online_payment=False)
+        self.pay_way1 = PayWayFactory(settlement=PaySettlement.ONLINE)
+        self.pay_way2 = PayWayFactory(settlement=PaySettlement.COURIER_CASH)
 
         self.now = timezone.now()
 

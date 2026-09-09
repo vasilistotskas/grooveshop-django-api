@@ -20,6 +20,8 @@ the shared definition, and the fact that blanks stay visible.
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 import pytest
 from django.urls import reverse
 from extra_settings.models import Setting
@@ -34,63 +36,58 @@ from tenant.legal_identity import (
 )
 
 
-def _set(key: str, value, type_="string"):
-    """Write a setting and confirm it reads back through the same
-    accessor the endpoint uses.
+@pytest.fixture
+def seller_settings(request):
+    """Choose what ``Setting.get`` returns, without writing the table.
 
-    The read-back is not ceremony. These tests failed once in a full
-    parallel run with the endpoint publishing the seeded blank instead of
-    the value written here, and the cause was never established — the
-    settings cache is inert under the test cache config, each xdist
-    worker has its own database, and nothing re-seeds during a request.
-    Asserting at the write turns a recurrence into "the row did not
-    land", pointing at the writer, instead of an opaque empty string at
-    the assertion twenty lines later.
+    These tests used to write through ``Setting.objects.update_or_create``
+    and read back through ``Setting.get``. That round-trip flakes under
+    a parallel ``-n auto`` run and it flaked again on 2026-09-09:
+    four tests in this file failed on one worker with
+    ``INVOICE_SELLER_NAME was written as 'Acme MON IKE' but reads back
+    as None``, while the same file passed 13/13 in isolation and the
+    whole ``tests/integration/tenant`` directory passed 147/147.
+
+    The mechanism is the autouse ``_reseed_extra_settings`` fixture in
+    ``tests/conftest.py`` rewriting every ``EXTRA_SETTINGS_DEFAULTS``
+    row for every DB test on every worker, against a table these tests
+    then write to inside their own transaction. The resulting
+    savepoint-visibility interaction is documented as a known flake
+    class in this repo and was already fixed the same way elsewhere —
+    ``tests/unit/order/test_b2b_invoicing_gate.py`` and
+    ``tests/unit/shipping_acs/test_smartpoint_gating.py`` both patch
+    the read site rather than round-trip the row.
+
+    Everything under test reads through exactly one accessor
+    (``tenant/legal_identity.py`` calls ``Setting.get`` for each seller
+    key and for the liquidation flag), so stubbing that accessor
+    exercises the real code path — the mapping, the ``.strip()``, the
+    boolean typing, the endpoint serialisation — while removing the one
+    step that was never about this feature.
+
+    Falls through to ``default`` for any key the test did not set,
+    which is what a genuine cache miss on an unconfigured setting
+    returns. Deliberately NOT delegating to ``Setting.get.__func__``:
+    under xdist worker reuse a prior test's patch may not be fully
+    unwound, and the fall-through would re-enter it.
     """
-    Setting.objects.update_or_create(
-        name=key,
-        defaults={
-            "value_string" if type_ == "string" else "value_bool": value,
-            "value_type": type_,
-        },
-    )
-    readback = Setting.get(key, default=None)
-    assert readback == value, (
-        f"{key} was written as {value!r} but reads back as {readback!r}"
-    )
+    values: dict[str, object] = {}
 
+    def stub(cls, key, default=None):
+        return values.get(key, default)
 
-def _state(key: str) -> str:
-    """What the DB, the accessor and the connection say, right now.
+    patcher = patch.object(Setting, "get", classmethod(stub))
+    patcher.start()
+    request.addfinalizer(patcher.stop)
 
-    These tests have failed in a full parallel run with the endpoint
-    publishing the seeded blank instead of the value `_set` wrote and
-    read back — and the mechanism was never established. The settings
-    cache is inert under the test cache config, each xdist worker has
-    its own database, and nothing re-seeds during a request, so the
-    obvious explanations are ruled out.
+    def _set(key: str, value, type_="string"):
+        # ``type_`` is accepted so call sites read the same as before.
+        # It carries no behaviour now: the stub returns the object it
+        # was given, so a bool stays a bool — which is the property
+        # ``test_reads_as_a_real_boolean_not_a_string`` is pinning.
+        values[key] = value
 
-    Rather than guess again, a failure now reports the three things that
-    separate the remaining candidates: the row as stored, what the
-    accessor returns, and which schema the connection is pointed at (a
-    test that assigns `connection.tenant` directly instead of calling
-    `set_tenant()` strands `schema_name`, and later reads then land in a
-    different schema's table).
-    """
-    from django.db import connection
-
-    row = (
-        Setting.objects.filter(name=key)
-        .values_list("value_string", "value_bool", "value_type")
-        .first()
-    )
-    tenant = getattr(connection, "tenant", None)
-    return (
-        f"{key}: row={row!r} "
-        f"accessor={Setting.get(key, default=None)!r} "
-        f"schema={getattr(connection, 'schema_name', '?')!r} "
-        f"tenant={getattr(tenant, 'schema_name', None)!r}"
-    )
+    return _set
 
 
 @pytest.mark.django_db
@@ -146,15 +143,17 @@ class TestBlanksStayVisible:
         assert identity["name"] == ""
         assert identity["vat_id"] == ""
 
-    def test_completing_every_required_field_clears_the_gap(self):
+    def test_completing_every_required_field_clears_the_gap(
+        self, seller_settings
+    ):
         for field in REQUIRED_DISCLOSURE_FIELDS:
-            _set(SELLER_SETTING_KEYS[field], f"value-{field}")
+            seller_settings(SELLER_SETTING_KEYS[field], f"value-{field}")
         assert missing_disclosure_fields() == []
         assert is_disclosure_complete()
 
-    def test_whitespace_does_not_count_as_provided(self):
+    def test_whitespace_does_not_count_as_provided(self, seller_settings):
         for field in REQUIRED_DISCLOSURE_FIELDS:
-            _set(SELLER_SETTING_KEYS[field], "   ")
+            seller_settings(SELLER_SETTING_KEYS[field], "   ")
         assert set(missing_disclosure_fields()) == set(
             REQUIRED_DISCLOSURE_FIELDS
         )
@@ -165,9 +164,9 @@ class TestLiquidationFlag:
     def test_defaults_to_false(self):
         assert merchant_legal_identity()["in_liquidation"] is False
 
-    def test_reads_as_a_real_boolean_not_a_string(self):
+    def test_reads_as_a_real_boolean_not_a_string(self, seller_settings):
         """Folding it into the string map would yield 'False', truthy."""
-        _set(IN_LIQUIDATION_KEY, True, type_="bool")
+        seller_settings(IN_LIQUIDATION_KEY, True, type_="bool")
         value = merchant_legal_identity()["in_liquidation"]
         assert value is True
         assert not isinstance(value, str)
@@ -204,15 +203,15 @@ class TestEndpoint:
         assert complete is False
         assert set(missing) == set(REQUIRED_DISCLOSURE_FIELDS)
 
-    def test_publishes_what_the_merchant_set(self, client):
-        _set("INVOICE_SELLER_NAME", "Acme MON IKE")
-        _set("INVOICE_SELLER_LEGAL_FORM", "ΙΚΕ")
-        _set("INVOICE_SELLER_REGISTRATION_NUMBER", "123456789000")
-        _set("INVOICE_SELLER_VAT_ID", "EL999999999")
+    def test_publishes_what_the_merchant_set(self, client, seller_settings):
+        seller_settings("INVOICE_SELLER_NAME", "Acme MON IKE")
+        seller_settings("INVOICE_SELLER_LEGAL_FORM", "ΙΚΕ")
+        seller_settings("INVOICE_SELLER_REGISTRATION_NUMBER", "123456789000")
+        seller_settings("INVOICE_SELLER_VAT_ID", "EL999999999")
 
         body = client.get(reverse("tenant:tenant-legal-identity")).json()
 
-        assert body["name"] == "Acme MON IKE", _state("INVOICE_SELLER_NAME")
+        assert body["name"] == "Acme MON IKE"
         assert body.get("legalForm", body.get("legal_form")) == "ΙΚΕ"
         assert (
             body.get("registrationNumber", body.get("registration_number"))

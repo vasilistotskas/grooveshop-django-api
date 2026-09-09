@@ -19,6 +19,7 @@ from cart.factories import CartFactory, CartItemFactory
 from country.factories import CountryFactory
 from order.exceptions import InvalidCouponError
 from order.services import OrderService
+from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories import ProductFactory
 from promotion.enum import BenefitType, PromotionTrigger
@@ -54,7 +55,7 @@ def checkout():
     )
     CartItemFactory(cart=cart, product=product, quantity=1)
     pay_way = PayWayFactory(
-        is_online_payment=False,
+        settlement=PaySettlement.COURIER_CASH,
         cost=Money(Decimal(0), "EUR"),
         free_threshold=Money(Decimal(0), "EUR"),
     )

@@ -16,13 +16,30 @@ class PaySettlement(models.TextChoices):
       pay-way selectable on lockers.
     * The consequence: a shopper choosing "Αντικαταβολή (+1,99 €)" with
       a locker was minted as BoxNow COD **and** charged a cash-handling
-      surcharge, then paid by card at a terminal that accepts no cash
-      and involves no courier.
+      surcharge for a courier who was never involved.
 
     ``COURIER_CASH`` and ``CARRIER_TERMINAL`` are both "collected on
     delivery", which is why one boolean could not tell them apart. They
-    are not interchangeable: only a courier can take cash at a door,
-    and only a locker terminal can take a card at an APM.
+    are not interchangeable: a courier takes cash or card at the door,
+    while the carrier collects for an APM parcel without anyone
+    meeting the shopper.
+
+    **What CARRIER_TERMINAL actually is.** Read from BoxNow's own pages
+    on 2026-09-09 (boxnow.gr/antikatavoli/odigies), because the code
+    used to describe it as a card reader on the locker and that is
+    wrong — it misled a later change. BOX NOW Αντικαταβολή (marketed in
+    English as PAY ON THE GO) is an ONLINE payment the carrier
+    collects: BoxNow emails a Viva Wallet link when it picks the parcel
+    up, sends a Viber/SMS with an INACTIVE pickup PIN plus the link
+    once the parcel is in the compartment, and the PIN activates
+    automatically when the shopper pays — by card, Apple Pay, Google
+    Pay, IRIS or bank transfer, from wherever they happen to be. There
+    is no terminal and no cash.
+
+    The name and the wire value stay ``carrier_terminal`` regardless:
+    what the enum discriminates is WHO collects and WHEN — the carrier,
+    after dispatch — and that is unchanged. Renaming the value would be
+    a data migration for no behavioural gain.
     """
 
     ONLINE = "online", _("Paid online at checkout")

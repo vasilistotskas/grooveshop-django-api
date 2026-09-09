@@ -1,0 +1,76 @@
+# Prune published image tags.
+#
+# Every release pushes a tag to Docker Hub and GHCR and nothing ever
+# removed one, so gro0ve/grooveshop-django-api reached 718 tags going
+# back ~1160 days. Measured 2026-09-09: 550 of them are prunable under
+# the policy below, ~111.5 GB.
+#
+# What survives: the newest KEEP_TAGS, anything younger than
+# MIN_AGE_DAYS, and `latest`. Both rules apply, so a quiet release
+# period cannot age out a tag that is still in service. Deleting a tag
+# is not recoverable and rebuilding an old one is not guaranteed to
+# reproduce (dependencies drift), so the policy errs generous — at the
+# measured numbers it keeps 168 tags, not 100.
+#
+# The selection lives in .github/scripts/prune_dockerhub_tags.py so it
+# can be unit-tested (tests/unit/core/test_prune_dockerhub_tags.py)
+# rather than living as an untestable shell one-liner.
+name: Registry cleanup
+
+on:
+  schedule:
+    # Sundays 04:00 UTC.
+    - cron: '0 4 * * 0'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'List what would be deleted without deleting it'
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  dockerhub:
+    name: Prune Docker Hub tags
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Prune
+        env:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          # Needs Read & Delete scope if this is a PAT rather than a
+          # password.
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+        run: |
+          # A scheduled run has no inputs, so dry_run is empty there and
+          # --apply is passed: the schedule prunes, a manual run previews
+          # unless you clear the checkbox.
+          if [ "${{ github.event.inputs.dry_run }}" = "false" ] \
+             || [ "${{ github.event_name }}" = "schedule" ]; then
+            APPLY=--apply
+          else
+            APPLY=
+          fi
+          python3 .github/scripts/prune_dockerhub_tags.py \
+            --repo gro0ve/grooveshop-django-api \
+            --keep 100 --min-age-days 90 $APPLY
+
+  ghcr:
+    name: Prune GHCR versions
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # actions/delete-package-versions has no dry-run mode, so a preview
+    # skips it entirely rather than deleting a subset and calling that a
+    # preview.
+    if: github.event.inputs.dry_run != 'true'
+    permissions:
+      packages: write
+    steps:
+      # GitHub's own action — no third-party credential handling.
+      - uses: actions/delete-package-versions@v5
+        with:
+          package-name: grooveshop-django-api
+          package-type: container
+          min-versions-to-keep: 100

@@ -391,6 +391,10 @@ ignore = [
 "country/factories.py" = ["T201"]
 "region/factories.py" = ["T201"]
 "devtools/management/commands/seed_all.py" = ["T201"]
+# CI maintenance scripts run on a bare GitHub runner with no Django and
+# no logging config — stdout IS the interface, and the workflow log is
+# where an operator reads what a prune selected before it deletes it.
+".github/scripts/**" = ["T201"]
 
 [tool.ruff.lint.pylint]
 max-positional-args = 6

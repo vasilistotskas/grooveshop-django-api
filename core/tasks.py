@@ -599,14 +599,16 @@ def send_inactive_user_notifications() -> dict[str, Any]:
     }
 
 
-@celery_app.task(
-    base=MonitoredTask,
-    max_retries=5,
-    autoretry_for=(Exception,),
-    retry_backoff=True,
-    retry_jitter=True,
-)
+@celery_app.task(base=MonitoredTask)
 def monitor_system_health():
+    """Probe the dependencies a working store needs, and alert on any.
+
+    Deliberately has no ``autoretry_for``. A monitor that retries only
+    re-asks the same question, and this one emails on every failed
+    run — so the old ``max_retries=5`` turned a single outage into six
+    identical alerts. A genuinely transient blip is caught by the next
+    scheduled run instead.
+    """
     health_checks = {"database": False, "cache": False, "storage": False}
     errors = []
 
@@ -625,11 +627,24 @@ def monitor_system_health():
 
     try:
         cache.set("health_check", "ok", 30)
-        if cache.get("health_check") == "ok":
-            health_checks["cache"] = True
-            logger.debug("Cache health check passed")
-        else:
+        if cache.get("health_check") != "ok":
             raise HealthCheckFailed("cache", "read/write test failed")
+
+        # The round-trip above passes on a Redis that has already lost
+        # its disk — it is served from memory. Ask Redis directly
+        # whether it can still persist, because that failure arrives
+        # first and the crash loop it causes arrives later.
+        failing = cache.failing_persistence_statuses()
+        if failing:
+            raise HealthCheckFailed(
+                "cache",
+                "Redis cannot persist to disk ("
+                + ", ".join(f"{k}={v}" for k, v in sorted(failing.items()))
+                + ") — check free space on its volume",
+            )
+
+        health_checks["cache"] = True
+        logger.debug("Cache health check passed")
 
     except Exception as e:
         error_msg = f"Cache health check failed: {e}"
@@ -667,14 +682,25 @@ def monitor_system_health():
         errors.append(error_msg)
 
     all_passed = all(health_checks.values())
-    critical_passed = health_checks["database"]
+    database_up = health_checks["database"]
+    failed = sorted(name for name, ok in health_checks.items() if not ok)
 
-    if not critical_passed:
+    # Every check alerts, not just the database. Treating cache and
+    # storage as merely "degraded" is what kept this task silent while
+    # Redis crash-looped and the storefront served 503s on 2026-09-09:
+    # the database was fine, so nothing was sent and nothing was
+    # raised. There is no failure here a human should not see — Redis
+    # is the cache, the Channels layer and the SSR store at once, and
+    # a read-only media volume loses every upload.
+    if not all_passed:
         try:
             mail_admins(
-                subject="CRITICAL: System Health Check Failed",
-                message="Critical system components have failed health checks:\n\n"
-                + "\n".join(errors),
+                subject=(
+                    f"CRITICAL: System Health Check Failed "
+                    f"({', '.join(failed)})"
+                ),
+                message="These system components failed their health "
+                "checks:\n\n" + "\n".join(errors),
                 fail_silently=False,
             )
         except Exception as e:
@@ -683,20 +709,24 @@ def monitor_system_health():
     result = {
         "status": "healthy"
         if all_passed
-        else ("degraded" if critical_passed else "unhealthy"),
+        else ("degraded" if database_up else "unhealthy"),
         "timestamp": timezone.now().isoformat(),
         "checks": health_checks,
         "errors": errors,
     }
 
-    logger.info("System health check completed", extra=result)
+    if all_passed:
+        logger.info("System health check completed", extra=result)
+        return result
 
-    if not critical_passed:
-        raise HealthCheckFailed(
-            "system", "a critical component reported unhealthy"
-        )
-
-    return result
+    # Raise so the run is a FAILURE rather than a green task carrying a
+    # "degraded" payload nobody reads. ``MonitoredTask.on_failure``
+    # logs it, which puts the outage in VictoriaLogs as a second
+    # detection path independent of email.
+    logger.error("System health check failed", extra=result)
+    raise HealthCheckFailed(
+        "system", f"unhealthy component(s): {', '.join(failed)}"
+    )
 
 
 @celery_app.task(

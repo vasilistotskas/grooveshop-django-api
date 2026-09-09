@@ -787,6 +787,7 @@ class TestMonitorSystemHealthTask:
 
         mock_cache.set.return_value = None
         mock_cache.get.return_value = "ok"
+        mock_cache.failing_persistence_statuses.return_value = {}
 
         result = monitor_system_health()
 
@@ -820,69 +821,143 @@ class TestMonitorSystemHealthTask:
 
         mock_cache.set.return_value = None
         mock_cache.get.return_value = "ok"
+        mock_cache.failing_persistence_statuses.return_value = {}
 
         # Assert the TYPE, not a message substring: the point is that a
         # failed dependency is distinguishable from a bug in the task,
         # which `autoretry_for=(Exception,)` could not tell apart before.
-        with pytest.raises(
-            HealthCheckFailed, match="a critical component reported unhealthy"
-        ):
+        with pytest.raises(HealthCheckFailed, match="database"):
             monitor_system_health()
 
         mock_mail_admins.assert_called_once()
         call_args = mock_mail_admins.call_args[1]
         assert "CRITICAL: System Health Check Failed" in call_args["subject"]
+        # The subject names what broke. "System Health Check Failed"
+        # alone makes every alert look identical in an inbox, which is
+        # how the ACS ones ended up filtered away unread.
+        assert "database" in call_args["subject"]
 
     @patch("core.tasks.connections")
     @patch("core.tasks.cache")
     @patch("core.tasks.open", new_callable=mock_open)
     @patch("core.tasks.os.remove")
+    @patch("core.tasks.mail_admins")
     @patch("core.tasks.logger")
     @override_settings(MEDIA_ROOT="/tmp/media")
     def test_monitor_system_health_cache_failure(
-        self, mock_logger, mock_remove, mock_file, mock_cache, mock_connections
+        self,
+        mock_logger,
+        mock_mail_admins,
+        mock_remove,
+        mock_file,
+        mock_cache,
+        mock_connections,
     ):
+        """A cache failure alerts and fails the run.
+
+        It used to return "degraded" quietly: ``critical_passed`` read
+        only the database, so nothing was mailed and nothing raised.
+        Redis is the cache, the Channels layer and the SSR store at
+        once — there is no version of it being down that a human
+        should not hear about.
+        """
         mock_cursor = Mock()
         mock_connections.__getitem__.return_value.cursor.return_value.__enter__.return_value = mock_cursor
 
         mock_cache.set.side_effect = Exception("Cache error")
 
-        result = monitor_system_health()
+        with pytest.raises(HealthCheckFailed, match="cache"):
+            monitor_system_health()
 
-        assert result["status"] == "degraded"
-        assert result["checks"]["database"] is True
-        assert result["checks"]["cache"] is False
-        assert result["checks"]["storage"] is True
-        assert len(result["errors"]) > 0
+        mock_mail_admins.assert_called_once()
+        assert "cache" in mock_mail_admins.call_args[1]["subject"]
 
     @patch("core.tasks.connections")
     @patch("core.tasks.cache")
+    @patch("core.tasks.mail_admins")
     @patch("core.tasks.logger")
     @override_settings(MEDIA_ROOT="/tmp/media")
     def test_monitor_system_health_storage_failure(
-        self, mock_logger, mock_cache, mock_connections
+        self, mock_logger, mock_mail_admins, mock_cache, mock_connections
     ):
         mock_cursor = Mock()
         mock_connections.__getitem__.return_value.cursor.return_value.__enter__.return_value = mock_cursor
 
         mock_cache.set.return_value = None
         mock_cache.get.return_value = "ok"
+        mock_cache.failing_persistence_statuses.return_value = {}
 
         # The storage probe uses ``default_storage`` (django.core.files.storage)
         # rather than raw ``open(MEDIA_ROOT/...)`` so it exercises the same
         # backend the app writes to (the shared media PVC in prod).  Patch
         # ``save`` to surface an OSError matching the ``except Exception``
         # branch in the task.
-        with patch(
-            "django.core.files.storage.default_storage.save",
-            side_effect=OSError("Storage error"),
+        with (
+            patch(
+                "django.core.files.storage.default_storage.save",
+                side_effect=OSError("Storage error"),
+            ),
+            pytest.raises(HealthCheckFailed, match="storage"),
         ):
-            result = monitor_system_health()
+            monitor_system_health()
 
-        assert result["status"] == "degraded"
-        assert result["checks"]["database"] is True
-        assert result["checks"]["cache"] is True
-        assert result["checks"]["storage"] is False
+        mock_mail_admins.assert_called_once()
+        assert "storage" in mock_mail_admins.call_args[1]["subject"]
+
+    @patch("core.tasks.connections")
+    @patch("core.tasks.cache")
+    @patch("core.tasks.open", new_callable=mock_open)
+    @patch("core.tasks.os.remove")
+    @patch("core.tasks.mail_admins")
+    @patch("core.tasks.logger")
+    @override_settings(MEDIA_ROOT="/tmp/media")
+    def test_a_redis_that_answers_but_cannot_persist_is_unhealthy(
+        self,
+        mock_logger,
+        mock_mail_admins,
+        mock_remove,
+        mock_file,
+        mock_cache,
+        mock_connections,
+    ):
+        """The 2026-09-09 outage, as a regression test.
+
+        Redis kept serving reads and writes from memory the whole time
+        its volume was full, so the set/get round-trip below passes —
+        exactly as it did in production while every AOF rewrite failed
+        with "No space left on device" and the pod was killed 42 times.
+        The only thing that knew was Redis itself.
+
+        The alert has to name the failing field, because "cache is
+        down" sends someone to look at the wrong thing.
+        """
+        mock_cursor = Mock()
+        mock_connections.__getitem__.return_value.cursor.return_value.__enter__.return_value = mock_cursor
+
+        mock_cache.set.return_value = None
+        mock_cache.get.return_value = "ok"
+        mock_cache.failing_persistence_statuses.return_value = {
+            "aof_last_bgrewrite_status": "err",
+            "aof_last_write_status": "err",
+        }
+
+        with pytest.raises(HealthCheckFailed, match="cache"):
+            monitor_system_health()
+
+        body = mock_mail_admins.call_args[1]["message"]
+        assert "aof_last_write_status=err" in body
+        assert "aof_last_bgrewrite_status=err" in body
+        assert "free space" in body
+
+    def test_the_monitor_never_retries(self):
+        """Retrying a probe only re-asks the same question.
+
+        It used to carry ``autoretry_for=(Exception,), max_retries=5``,
+        and since the task emails from inside its own body, one outage
+        became six identical alerts. An alert nobody can stand to read
+        is the same as no alert — which is how we got here.
+        """
+        assert not getattr(monitor_system_health, "autoretry_for", ())
 
 
 @pytest.mark.django_db

@@ -879,8 +879,22 @@ TENANT_BILLING = {
 def get_celery_beat_schedule():
     base_schedule = {
         "monitor-system-health": {
+            # Every 30 minutes, not nightly. At daily_5am a dependency
+            # could be down for 24 hours before anything looked, and on
+            # 2026-09-09 one was: Redis crash-looped and webside.gr
+            # served 503s while the only check that would have noticed
+            # was waiting for 5am.
+            #
+            # 30 rather than 5 is a deliberate trade. The task emails
+            # on every failed run and has nowhere to persist "already
+            # alerted" that survives Redis being down, so the interval
+            # IS the throttle: a sustained outage costs two mails an
+            # hour instead of twelve. The precursor check inside
+            # (Redis persistence status) flips hours before a volume
+            # actually fills, so the extra latency is spent on warning
+            # time we did not have at all before.
             "task": "core.tasks.monitor_system_health",
-            "schedule": SCHEDULE_PRESETS["daily_5am"]
+            "schedule": SCHEDULE_PRESETS["every_30_min"]
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
         },

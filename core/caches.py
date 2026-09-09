@@ -14,6 +14,13 @@ logger = logging.getLogger(__name__)
 
 _SCAN_BATCH_SIZE = 500
 
+# ``INFO persistence`` reports each save path's outcome as a status
+# string that reads "ok" while healthy and "err" once the write failed.
+# Names are Redis's, not ours — see ``failing_persistence_statuses``.
+_STATUS_OK = "ok"
+_RDB_STATUS_FIELD = "rdb_last_bgsave_status"
+_AOF_STATUS_FIELDS = ("aof_last_write_status", "aof_last_bgrewrite_status")
+
 # redis-py ships every resilience feature OFF by default: the sync
 # Connection defaults are ``retry=None``, ``health_check_interval=0``
 # and ``socket_keepalive=False``. Django never overrides them, so a
@@ -187,6 +194,43 @@ class CustomCache(RedisCache):
             logger.info("Cleared %d keys with prefix '%s'", deleted, prefix)
 
         return results
+
+    def failing_persistence_statuses(self) -> dict[str, str]:
+        """Ask Redis whether it can still write its own data to disk.
+
+        A ``set``/``get`` round-trip only proves Redis is answering
+        from memory, and it keeps answering long after persistence has
+        broken — so a read/write probe cannot see a full volume. Redis
+        does report it: a failed ``BGSAVE`` or AOF write flips the
+        matching ``INFO persistence`` field from ``ok`` to ``err`` and
+        leaves it there until the next success.
+
+        That flip is the precursor to an outage rather than the outage
+        itself, which is the whole reason to watch it. On 2026-09-09
+        the Redis volume filled, every AOF rewrite failed with "No
+        space left on device", and only then did the liveness probe
+        start killing the pod — 42 times, until webside.gr 503'd.
+        Every check we had stayed green through all of it.
+
+        Returns only the fields that are not ``ok`` — empty while
+        healthy — so a caller can name the exact failure in an alert.
+        Fields absent from this server's INFO are not reported: that
+        is a Redis build difference, not a failure to persist.
+        """
+        info = self._cache.get_client().info("persistence")
+
+        fields = [_RDB_STATUS_FIELD]
+        # Redis reports the AOF pair whether or not AOF is on, so
+        # consulting them unconditionally would judge an RDB-only
+        # server by a subsystem it does not run.
+        if info.get("aof_enabled"):
+            fields.extend(_AOF_STATUS_FIELDS)
+
+        return {
+            field: str(info[field])
+            for field in fields
+            if field in info and str(info[field]) != _STATUS_OK
+        }
 
     def _make_pattern(self, search: str | None = None) -> str:
         """SCAN pattern scoped to this backend's key namespace.

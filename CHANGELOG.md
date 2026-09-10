@@ -3,6 +3,103 @@
 
 
 
+## v3.48.7 (2026-09-10)
+
+### Bug fixes
+
+* fix(cache): purge a surface when the data behind it changes
+
+``CacheService.purge`` had exactly two callers — the admin's Cache
+Management page and the ``clear_cache`` command. Nothing ran on a
+write, so every cached surface was purge-on-demand only and an
+operator's edit stayed invisible until the TTL expired.
+
+Observed in production on 2026-09-10: a corrected ``viva_wallet``
+description kept serving the previous English bank-transfer
+placeholder to a Greek storefront at checkout, hours after the
+database was right. Two tiers held it — Django's ``cache_page`` entry
+(``DEFAULT_CACHE_TTL``, 7200s) via ``@cache_methods`` on
+``PayWayViewSet``, and Nitro's own entry layered on top.
+
+Surfaces now declare ``invalidated_by`` model labels and purge
+themselves on save and delete.
+
+* Opt-in per surface. ``CacheService.purge`` SCANs Redis and POSTs to
+  the Nuxt purge endpoint, so wiring this to a high-volume model would
+  fire that per row of a catalogue import. ``pay_way`` qualifies:
+  operator-driven and rare.
+
+* ``PayWayTranslation`` is declared alongside ``PayWay``. parler keeps
+  each language in its own row, so a receiver bound only to the master
+  never fires for a translation-only write — precisely the edit that
+  goes stale. Worth stating because parler's ``save()`` DOES write the
+  master, which makes a naive test pass while proving nothing; the
+test here saves the translation row directly.
+
+* Cascades to ``shipping``: ``/api/v1/shipping/options`` embeds each
+  option's eligible pay-ways, rendered as badges on the delivery step.
+
+* Coalesced per transaction and deferred to ``on_commit``. Master plus
+  three translation rows is one logical edit, and purging inside the
+  transaction would evict a valid entry and re-populate it from
+  uncommitted state.
+
+* Never fatal. The write has already committed when the callback runs,
+  so an exception there has no caller; it is logged and swallowed.
+
+* Skipped when ``DISABLE_CACHE`` is set, matching ``cache_methods``.
+  Nothing is cached in the test suite, so connecting would make every
+  factory-built row reach for a Redis client that is not there.
+
+Known blind spot, tested and documented rather than assumed:
+``QuerySet.update()`` emits no ``post_save``, so a bulk translation
+rewrite does not auto-invalidate and must purge explicitly.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01WnK59xS5MBn65T5f6ZP7Xf ([`10dc356`](https://github.com/vasilistotskas/grooveshop-django-api/commit/10dc35676f400677d43d75d337c2704b1de0f5bd))
+
+* fix(logging): emit real JSON instead of a JSON-shaped format string
+
+The production ``json`` formatter was a format STRING that looked like
+JSON. ``logging.Formatter`` interpolates it and then, for a record
+carrying ``exc_info``, appends the traceback AFTER the closing brace —
+so all 17 ``exc_info=True`` call sites emitted one JSON object followed
+by N bare text lines, and the pipeline could neither parse them nor
+attach them to their event.
+
+Interpolation is also the wrong tool for the message field, and this
+half was worse because it fires without an exception. Nothing escapes
+the value, so:
+
+log.info('Upstream said: %s', '{"detail": "not found"}')
+
+closed the string early and produced INVALID JSON. Logging upstream
+error bodies is a standing rule in this codebase, so that shape is
+reached routinely. A message containing a newline split one event
+across several unparseable lines; a Windows path ate its backslashes.
+
+All three reproduced against the verbatim production format string
+before this change, and are covered by tests here.
+
+``json.dumps`` escapes correctly and the traceback moves INSIDE the
+object as an ``exception`` field, where it belongs to its event. Field
+names and types are deliberately unchanged — ``line`` stays a number,
+``process``/``thread`` stay strings — because the VictoriaLogs queries
+in the runbooks select on them. ``exception`` and ``stack`` are
+additive and appear only when the record carries them.
+
+Scope note: no orphaned traceback was found in the last 24h of
+production logs (149 JSON lines, all parsed). These pods are hours old
+and the shapes above had not been hit yet. This is a latent break that
+fires exactly when the logs matter most — during an error.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01WnK59xS5MBn65T5f6ZP7Xf ([`5d55641`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5d556417c57ebb20e688c830be89b6f1ec7a47e3))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.48.6 [skip ci] ([`87155f9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/87155f9421a5cb0248f27c606f3f5b2537872dc9))
+
 ## v3.48.6 (2026-09-10)
 
 ### Bug fixes

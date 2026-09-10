@@ -280,6 +280,21 @@ always happens outside the cache so pricing context and locale are
 applied fresh (keep the `cart/serializers/item.py:138` idiom). The cart
 surface is never Nitro-cached; its seed set is the session's cart.
 
+On the storefront, `app/components/Product/Suggestions.vue` is the one
+strip for every surface. The product page and the out-of-stock slot
+fetch through `server/api/products/[id]/recommendations.get.ts`, a
+Nitro-cached tenant proxy (`name: 'productRecommendations'`, 5-minute
+SWR, keyed by seed · surface · limit · locale — the `recommendations`
+cache surface purges it); the cart renders the basket-seeded list its
+own payload already carries. **The read endpoint writes no event.**
+`impressionId` is a correlation id; the strip posts the impression
+from its own `onMounted`, which under `hydrate-on-visible` fires when
+it scrolls into view — "shown", not "served" — and echoes the id on
+click through `server/api/analytics/recommendation-event.post.ts`,
+carrying the cart's identity headers so an `attach` can later be
+correlated against the same basket. Wholesale prices are swapped in
+client-side by `useB2BPricing`, never cached.
+
 ## 9. Common task playbook
 
 ### 9.1 Adding a strategy

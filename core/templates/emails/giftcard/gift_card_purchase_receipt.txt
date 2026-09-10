@@ -12,5 +12,5 @@
 {% trans "This confirmation is not a tax document. VAT is charged when the gift card is redeemed for goods." %}
 
 {{ SITE_NAME }}
-{{ INFO_EMAIL }}
-{{ SITE_URL }}
+{% if INFO_EMAIL %}{{ INFO_EMAIL }}
+{% endif %}{{ SITE_URL }}

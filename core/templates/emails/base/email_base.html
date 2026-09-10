@@ -344,12 +344,14 @@
             <div class="email-footer">
                 {% block email_footer %}
                 <p class="text-bold">{{ SITE_NAME }}</p>
+                {% if INFO_EMAIL %}
                 <p>
                     {% trans "Questions?" %}
                     <a href="mailto:{{ INFO_EMAIL }}">
                         {% trans "Contact us" %}
                     </a>
                 </p>
+                {% endif %}
                 <p class="text-muted">
                     &copy; {% now "Y" %} {{ SITE_NAME }}. {% trans "All rights reserved." %}
                 </p>

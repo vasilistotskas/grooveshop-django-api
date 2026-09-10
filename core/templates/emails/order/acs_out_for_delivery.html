@@ -48,10 +48,12 @@
 
 {% block email_footer %}
 <p class="text-bold">{{ SITE_NAME }}</p>
+{% if INFO_EMAIL %}
 <p>
     Ερωτήσεις;
-    <a href="mailto:{{ INFO_EMAIL|default:'' }}">Επικοινωνήστε μαζί μας</a>
+    <a href="mailto:{{ INFO_EMAIL }}">Επικοινωνήστε μαζί μας</a>
 </p>
+{% endif %}
 <p class="text-muted">
     &copy; {% now "Y" %} {{ SITE_NAME }}. Με επιφύλαξη παντός δικαιώματος.
 </p>

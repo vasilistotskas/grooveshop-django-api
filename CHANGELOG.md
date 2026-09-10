@@ -3,6 +3,41 @@
 
 
 
+## v3.52.0 (2026-09-10)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.51.1 [skip ci] ([`8d8efa1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8d8efa1e6b5e7e7b52acbc78bc5b8a2fad55efec))
+
+### Features
+
+* feat(recommendation): product recommendations engine, Free tier
+
+Typed, directional ProductRelation (similar / complementary / accessory /
+replacement / bundle) with a sortable inline on ProductAdmin, and a new
+`recommendation` tenant app: a strategy registry whose `is_available`
+lets a strategy decline rather than return noise, per-surface
+RecommendationSlot rows seeded from vertical presets, two-stage
+retrieval (cheap strategies run live through a batched
+`candidates_for`, expensive ones are precomputed into
+RecommendationCandidate), an online ranker (guard, slot weights, basket
+bonus, filler cap, category cap, min_fill), GET /api/v1/recommendations
+and POST /api/v1/recommendations/events behind
+Tenant.recommendations_enabled, and the impression/click event log.
+
+The cart's two ad-hoc same-category recommenders are replaced in place:
+field names unchanged, and the cost is now constant in basket size
+(measured 30 -> 42 queries per added line before; equal after).
+
+An unknown plan ranks as Free, never as nothing or everything. The
+per-tenant context reads the real Tenant row under a bare FakeTenant
+and joins content types so its query count does not depend on the
+ContentType cache django-tenants clears on every schema switch.
+
+Spec and playbook: docs/recommendations-engine.md.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com> ([`8c7a4ee`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8c7a4ee47461e5c5b13b71229f5bb1567af58357))
+
 ## v3.51.1 (2026-09-10)
 
 ### Bug fixes

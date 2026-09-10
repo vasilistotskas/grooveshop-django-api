@@ -79,9 +79,21 @@ def test_help_text_names_a_setting_that_exists(label, name):
     )
 
 
-def test_the_check_has_something_to_check():
-    """Guard against the parametrize list going quietly empty."""
-    assert _REFERENCES, (
-        "No help_text references a setting at all — either they were all "
-        "removed, or the scan stopped matching."
+def test_the_scan_still_matches_a_settings_reference():
+    """Guard against the scan going quietly blind.
+
+    The parametrize list is ALLOWED to be empty — since 2026-09-10 no
+    first-party help_text names a setting, because no store-facing
+    field falls back to a platform value any more. What must never
+    happen silently is the pattern ceasing to match, so it is exercised
+    on a synthetic help_text instead of on the live models.
+    """
+    assert _SETTING_REF.findall("Empty falls back to settings.INFO_EMAIL.") == [
+        "INFO_EMAIL"
+    ]
+    assert (
+        _SETTING_REF.findall(
+            "see settings.py and the settings module; settings.Foo is prose"
+        )
+        == []
     )

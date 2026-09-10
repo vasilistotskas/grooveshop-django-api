@@ -24231,8 +24231,9 @@ paths:
       description: Products to show beside the seed product(s) on a given surface
         (product page, cart, out-of-stock, empty cart). Each item carries the strategy
         that produced it and, for merchant-curated links, the relation type. An empty
-        list means the store has nothing worth showing here — render nothing. Echo
-        impression_id on click events.
+        list means the store has nothing worth showing here — render nothing. Report
+        an impression event with impression_id once the strip is shown, and echo it
+        on click events.
       summary: Suggested products for a surface
       parameters:
       - in: query

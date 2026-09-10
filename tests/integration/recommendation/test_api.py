@@ -63,7 +63,7 @@ class TestRecommendations:
         response = client.get(self.url, {"seed": seed.id, "limit": 99})
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
-    def test_curated_first_with_its_reason_and_an_impression(
+    def test_curated_first_with_its_reason_and_a_correlation_id(
         self, client, curated_seed
     ):
         seed, curated = curated_seed
@@ -84,12 +84,12 @@ class TestRecommendations:
         }
         assert seed.id not in [item["product"]["id"] for item in data["items"]]
 
-        impression = uuid.UUID(str(data["impression_id"]))
-        rows = RecommendationEvent.objects.filter(
-            impression_id=impression, kind=EventKind.IMPRESSION
-        )
-        assert rows.count() == len(data["items"])
-        assert rows.filter(product=curated, seed=seed, position=0).exists()
+        uuid.UUID(str(data["impression_id"]))
+        # The read path writes nothing: the impression is the client's
+        # to report once the strip is actually shown, so a cached or
+        # never-scrolled-to response cannot inflate a strategy's
+        # impression count.
+        assert not RecommendationEvent.objects.exists()
 
     def test_wire_shape_is_camel_case(self, client, curated_seed):
         seed, _ = curated_seed

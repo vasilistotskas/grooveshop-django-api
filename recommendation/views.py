@@ -5,12 +5,14 @@ anonymous endpoint declares itself — and both sit behind the tenant's
 ``recommendations_enabled`` plan flag, which answers 404 when off so
 the endpoint is indistinguishable from a route that does not exist.
 
-The read path is NOT ``cache_page``d: every response mints a fresh
-``impression_id`` that the client echoes on click, and a cached body
-would hand the same id to every viewer, which is exactly the attach
-attribution the id exists to make precise. What IS cached is the
-candidate layer underneath — per product, shared — so the request
-does a few-row read plus one ``for_list()`` hydration.
+The read path writes nothing. ``impression_id`` is a correlation id
+minted per response; the IMPRESSION itself is reported by the client
+through the events endpoint when the strip actually becomes visible,
+because "served" is not "shown" — a strip below the fold that nobody
+scrolls to must not count against a strategy's click-through. That
+also lets the storefront cache this body per (surface, seed) for a few
+minutes without the count meaning cache fills: attribution rows carry
+the viewer's session, so a shared correlation id is harmless.
 """
 
 from __future__ import annotations
@@ -32,7 +34,6 @@ from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 from core.api.serializers import ErrorResponseSerializer
 from core.api.throttling import RecommendationEventThrottle
 from recommendation.engine import SuggestionContext, suggest
-from recommendation.enum import EventKind
 from recommendation.hydrate import hydrate_pairs
 from recommendation.serializers import (
     RecommendationEventRequestSerializer,
@@ -62,8 +63,9 @@ def _user_id(request) -> int | None:
         "(product page, cart, out-of-stock, empty cart). Each item "
         "carries the strategy that produced it and, for merchant-curated "
         "links, the relation type. An empty list means the store has "
-        "nothing worth showing here — render nothing. Echo "
-        "impression_id on click events."
+        "nothing worth showing here — render nothing. Report an "
+        "impression event with impression_id once the strip is shown, "
+        "and echo it on click events."
     ),
     tags=["Recommendations"],
     parameters=[RecommendationQuerySerializer],
@@ -103,26 +105,6 @@ def recommendations(request):
         }
         for suggestion, product in pairs
     ]
-
-    if items:
-        from recommendation.tasks import record_recommendation_event
-
-        record_recommendation_event.delay(
-            kind=EventKind.IMPRESSION,
-            surface=data["surface"],
-            impression_id=str(impression_id),
-            items=[
-                {
-                    "product_id": suggestion.product_id,
-                    "strategy": suggestion.strategy,
-                    "position": position,
-                }
-                for position, (suggestion, _product) in enumerate(pairs)
-            ],
-            seed_id=data["seed_ids"][0] if data["seed_ids"] else None,
-            session_key=_session_key(request),
-            user_id=_user_id(request),
-        )
 
     return Response(
         {

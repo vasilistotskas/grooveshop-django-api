@@ -110,8 +110,11 @@ class OrderSerializer(serializers.ModelSerializer[Order]):
     is_collected_on_delivery = serializers.SerializerMethodField(
         help_text=(
             "True when the carrier collects the money from the shopper "
-            "on delivery — courier cash-on-delivery OR payment at a "
-            "carrier's locker terminal (BoxNow PAY ON THE GO). "
+            "rather than the store — cash or card to a courier at "
+            "the door, OR paid to the carrier before pickup (BOX "
+            "NOW Αντικαταβολή, marketed in English as PAY ON THE "
+            "GO, which sends a payment link once the parcel "
+            "reaches the locker). "
             "``is_online_payment`` cannot answer this: it is false for "
             "bank transfer too, where the shopper pays us directly and "
             "nothing is owed on delivery. The storefront needs the "

@@ -39,7 +39,8 @@ class BoxNowUnsupportedSettlementError(BoxNowError):
         self.settlement = settlement
         super().__init__(
             f"BoxNow cannot settle pay-way settlement {settlement!r} "
-            f"(order {order_id}): a locker terminal accepts no cash. "
+            f"(order {order_id}): nobody meets the shopper at a locker, "
+            f"so no cash can be collected. "
             f"Expected 'carrier_terminal' (PAY ON THE GO), 'online', "
             f"or 'offline_transfer'."
         )

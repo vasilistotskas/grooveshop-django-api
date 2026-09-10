@@ -83,13 +83,19 @@ class BoxNowCarrier(ShippingCarrierInterface):
     def supported_settlements(
         self, kind: ShippingKind
     ) -> frozenset[PaySettlement] | None:
-        """BoxNow lockers can take a card at the terminal, never cash.
+        """BoxNow collects for a locker parcel, but never cash.
 
-        There is no POS on a courier round for a locker parcel and the
-        machine accepts no notes, so ``COURIER_CASH`` is physically
-        impossible here — its money would simply never be collected.
-        ``CARRIER_TERMINAL`` (BoxNow PAY ON THE GO) is the locker's own
-        collect-on-pickup product and is the only one allowed.
+        Nobody meets the shopper: the parcel goes into a compartment
+        they open themselves. So ``COURIER_CASH`` is physically
+        impossible here — there is no courier to hand notes to and its
+        money would simply never be collected.
+
+        ``CARRIER_TERMINAL`` (BOX NOW Αντικαταβολή, marketed in English
+        as PAY ON THE GO) is the locker's own collect-before-pickup
+        product and is the only one allowed. Note it is NOT a card
+        reader on the locker, as this docstring used to claim: BoxNow
+        sends a Viva Wallet link after dispatch and activates the
+        pickup PIN once the payment clears.
 
         This is BoxNow's own stated requirement: PAY ON THE GO must be
         a distinct option, and traditional courier COD must not be

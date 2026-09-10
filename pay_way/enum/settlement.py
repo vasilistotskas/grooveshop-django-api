@@ -46,7 +46,12 @@ class PaySettlement(models.TextChoices):
     COURIER_CASH = "courier_cash", _("Cash or card to the courier on delivery")
     CARRIER_TERMINAL = (
         "carrier_terminal",
-        _("Card at the carrier's terminal on pickup"),
+        # NOT "card at a terminal": the carrier collects online after
+        # dispatch (BOX NOW sends a payment link and activates the
+        # pickup PIN once it clears). Kept broad enough to also cover a
+        # carrier that really does have a terminal, because what the
+        # member discriminates is who collects and when.
+        _("Paid to the carrier before pickup"),
     )
     OFFLINE_TRANSFER = (
         "offline_transfer",

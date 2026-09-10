@@ -214,8 +214,9 @@ class ShippingCarrierInterface(ABC):
         the carrier accepts anything the platform offers.
 
         This is a *capability declaration*, not a preference. A courier
-        can take cash at a door; a locker terminal cannot. Getting this
-        wrong is not a styling bug — it mints a voucher for the wrong
+        can take cash at a door; an unattended locker cannot, because
+        nobody is there to take it. Getting this wrong is not a styling
+        bug — it mints a voucher for the wrong
         commercial product, which is exactly what happened when
         ``PayWay.is_cash_on_delivery`` was the only discriminator
         available (see ``PaySettlement``).

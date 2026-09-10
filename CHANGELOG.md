@@ -3,6 +3,27 @@
 
 
 
+## v3.52.1 (2026-09-10)
+
+### Bug fixes
+
+* fix(recommendation): impressions are reported by the storefront when a strip is shown
+
+The read endpoint no longer writes an impression row per response.
+"Served" is not "shown": a strip below the fold that nobody scrolls to
+must not count against a strategy's click-through, and the storefront
+caches the body per (surface, seed) for a few minutes, which would have
+turned the count into cache fills. impression_id stays a correlation
+id minted per response; the strip posts the impression through the
+events endpoint from its own mount, which under lazy hydration fires
+when it scrolls into view.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com> ([`9338512`](https://github.com/vasilistotskas/grooveshop-django-api/commit/933851229ee388cbdf03feef9084fadac15fbdfa))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.52.0 [skip ci] ([`0a4a8a2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0a4a8a271d084c7a96a1b14b62ef68dc51430db0))
+
 ## v3.52.0 (2026-09-10)
 
 ### Chores

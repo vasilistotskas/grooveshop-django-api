@@ -4034,8 +4034,11 @@ if IS_KUBERNETES:
         "version": 1,
         "disable_existing_loggers": False,
         "formatters": {
+            # A real serialiser, not a format string that looks like
+            # JSON. The string version could not escape the message and
+            # appended tracebacks outside the object — see JsonFormatter.
             "json": {
-                "format": '{"timestamp": "%(asctime)s", "level": "%(levelname)s", "logger": "%(name)s", "module": "%(module)s", "function": "%(funcName)s", "line": %(lineno)d, "process": "%(process)d", "thread": "%(thread)d", "pod": "%(hostname)s", "correlation_id": "%(correlation_id)s", "schema": "%(schema_name)s", "domain": "%(domain_url)s", "message": "%(message)s"}',
+                "()": "core.logging.JsonFormatter",
                 "datefmt": "%Y-%m-%dT%H:%M:%S",
             },
             "console": {

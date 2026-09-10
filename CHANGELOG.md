@@ -3,6 +3,38 @@
 
 
 
+## v3.49.0 (2026-09-10)
+
+### Bug fixes
+
+* fix(admin): platform-neutral admin site defaults
+
+UNFOLD_SITE_TITLE / UNFOLD_SITE_HEADER fell back to tenant #1's name in code. The defaults are now the platform's; the env values still brand each deployment and the tenant host shows its own store name.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01BxzZJT7decDjzJT3kima2c ([`be505a7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/be505a7649502fd3fe8421023ae854efa77ecd10))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.48.7 [skip ci] ([`0875603`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0875603cb78c8ad242a3af70593293949471e943))
+
+### Features
+
+* feat(tenant): platform storefront flag and per-store SEO attribution on the Tenant row
+
+The platform's own storefront was recognised by comparing a tenant's primary domain with NUXT_BASE_URL (Django email branding) and NUXT_PUBLIC_BASE_URL (storefront), which forced a platform env value to carry tenant #1's hostname — and on the storefront that value rode into every tenant's serialized runtime config. The author and site-verification meta were platform env values for the same reason.
+
+- Tenant.is_platform_storefront (db_default False, DB-constrained to a single row): the ONE store that renders the brand assets bundled in the storefront image.
+- Tenant.seo_author / google_site_verification / pinterest_domain_verify: per-store SEO attribution, emitted only where set.
+- All four on TenantConfigSerializer as OPTIONAL fields (a read-only field is required in the generated schema and a frontend-first deploy would then reject every resolve), plus TenantAdminSerializer and the admin fieldsets.
+- 0035 derives the flag ONCE from the primary domain matching NUXT_BASE_URL's host, only when no row carries it — no store is named in code.
+- core.utils.email_context._is_platform_tenant reads the flag; the public schema and a missing tenant still count as platform.
+
+Deploy before the storefront release that reads isPlatformStorefront.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01BxzZJT7decDjzJT3kima2c ([`16c3d9d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/16c3d9d3f027f0850ae26bbe043bb7f5a1e645fd))
+
 ## v3.48.7 (2026-09-10)
 
 ### Bug fixes

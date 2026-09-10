@@ -2759,8 +2759,8 @@ UNFOLD_PLATFORM = {
 
 
 UNFOLD = {
-    "SITE_TITLE": getenv("UNFOLD_SITE_TITLE", "Webside Admin"),
-    "SITE_HEADER": getenv("UNFOLD_SITE_HEADER", "Webside"),
+    "SITE_TITLE": getenv("UNFOLD_SITE_TITLE", "GrooveShop Admin"),
+    "SITE_HEADER": getenv("UNFOLD_SITE_HEADER", "GrooveShop"),
     "SITE_SUBHEADER": getenv("UNFOLD_SITE_SUBHEADER", "Commerce control"),
     "SITE_SYMBOL": "storefront",
     "SITE_URL": "/",

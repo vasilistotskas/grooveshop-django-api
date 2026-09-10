@@ -19,7 +19,7 @@ from core.cache.registry import iter_surfaces
 logger = logging.getLogger(__name__)
 
 # Platform console identity. Deliberately NOT the UNFOLD_SITE_HEADER
-# defaults: those are tenant #1's ("Webside"), and the control plane must
+# values: in production those are tenant #1's, and the control plane must
 # not wear a merchant's name.
 PLATFORM_SITE_HEADER = "Grooveshop Platform"
 PLATFORM_SITE_TITLE = _("Platform Admin")
@@ -27,8 +27,8 @@ PLATFORM_SITE_SUBHEADER = _("Control plane")
 
 
 class MyAdminSite(AdminSiteLoginNextMixin, UnfoldAdminSite):
-    site_header = getenv("UNFOLD_SITE_HEADER", "Webside")
-    site_title = getenv("UNFOLD_SITE_TITLE", "Webside Admin")
+    site_header = getenv("UNFOLD_SITE_HEADER", "GrooveShop")
+    site_title = getenv("UNFOLD_SITE_TITLE", "GrooveShop Admin")
     index_title = _("Dashboard")
 
     # Admin sessions are platform-staff-only — no legacy tenant-schema
@@ -156,7 +156,7 @@ class MyAdminSite(AdminSiteLoginNextMixin, UnfoldAdminSite):
         - PLATFORM host (public schema): show the platform's own
           identity. ``get_current_tenant()`` returns None on public, so
           this used to fall through to the class attributes — which
-          default to ``UNFOLD_SITE_HEADER``/"Webside". The control plane
+          default to ``UNFOLD_SITE_HEADER`` (tenant #1's). The control plane
           therefore wore tenant #1's name and logo: the sidebar said
           "Webside" and the login page read "Welcome back to Webside
           Admin". Reported from production 2026-08-21.

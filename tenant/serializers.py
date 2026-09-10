@@ -106,6 +106,11 @@ class TenantConfigSerializer(serializers.Serializer):
     # /settings/get (the loyalty/gift-cards pattern). Folding is for
     # gateway-consumed values only, and the gateway stays retail-only.
     b2b_enabled = serializers.BooleanField(read_only=True)
+    # ``required=False``, NOT ``read_only=True`` — see the
+    # ``available_locales`` note: a read-only field is REQUIRED in the
+    # generated schema, and a frontend-first deploy would then reject
+    # every resolve from a backend that predates the field.
+    recommendations_enabled = serializers.BooleanField(required=False)
     agent_stripe_delegated_enabled = serializers.BooleanField(read_only=True)
     # EFFECTIVE agent-commerce gates, consumed by the agent gateway:
     # plan flag AND the tenant-schema extra-setting, folded here so
@@ -352,6 +357,7 @@ class TenantAdminSerializer(serializers.ModelSerializer):
             "blog_enabled",
             "promotions_enabled",
             "gift_cards_enabled",
+            "recommendations_enabled",
             # --- Payments (public keys) ---
             "stripe_connect_account_id",
             "stripe_publishable_key",

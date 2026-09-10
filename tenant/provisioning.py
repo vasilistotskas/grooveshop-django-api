@@ -329,6 +329,25 @@ def _seed_page_layouts(tenant: Tenant) -> bool:
         return False
 
 
+def _seed_recommendation_slots(tenant: Tenant) -> bool:
+    try:
+        from recommendation.presets import seed_recommendation_slots
+
+        # ``general`` preset; a vertical-specific one can be applied
+        # later with ``backfill_recommendation_slots --preset``. Never
+        # overwrites a slot the merchant has edited.
+        created = seed_recommendation_slots()
+        logger.info(
+            "Seeded %s recommendation slots for %s",
+            created,
+            tenant.schema_name,
+        )
+        return True
+    except Exception:
+        logger.warning("Could not seed recommendation slots", exc_info=True)
+        return False
+
+
 def _seed_content_pages(tenant: Tenant) -> bool:
     try:
         from page_config.defaults import seed_content_pages
@@ -403,6 +422,7 @@ def seed_tenant_defaults(tenant: Tenant) -> list[str]:
         ("extra settings", _seed_extra_settings),
         ("page layouts", _seed_page_layouts),
         ("content pages", _seed_content_pages),
+        ("recommendation slots", _seed_recommendation_slots),
         ("Meilisearch indexes", _create_meili_indexes),
     )
     with schema_context(tenant.schema_name):

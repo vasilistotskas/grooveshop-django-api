@@ -54,6 +54,7 @@ from product.models.favourite import ProductFavourite
 from product.models.image import ProductImage
 from product.models.product import Product
 from product.models.product_attribute import ProductAttribute
+from product.models.relation import ProductRelation
 from product.models.review import ProductReview
 from product.models.variant_group import ProductVariantGroup
 from product.signals import reindex_products_by_pk
@@ -810,6 +811,32 @@ class StockLogInline(TabularInline):
         return format_dt(obj.created_at, fmt="%d/%m %H:%M")
 
 
+class ProductRelationInline(TabularInline):
+    """Merchant-curated related products — the Free tier of the
+    recommendation engine (docs/recommendations-engine.md §2.1).
+
+    ``fk_name`` is required: ``ProductRelation`` has two FKs to
+    ``Product`` and Django cannot pick one (admin.E202). Drag-and-drop
+    ordering is per source product (``ProductRelation
+    .get_ordering_queryset``), which is what the merchant is arranging
+    here.
+    """
+
+    model = ProductRelation
+    fk_name = "from_product"
+    fields = ("to_product", "relation_type", "sort_order")
+    autocomplete_fields = ["to_product"]
+    ordering_field = "sort_order"
+    hide_ordering_field = True
+    extra = 0
+    tab = True
+    verbose_name = _("Related product")
+    verbose_name_plural = _("Related products")
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related("to_product")
+
+
 @admin.register(Product)
 class ProductAdmin(
     TranslatableAdmin, ExportActionMixin, SimpleHistoryAdmin, BaseModelAdmin
@@ -870,6 +897,7 @@ class ProductAdmin(
         StockReservationInline,
         StockLogInline,
         TaggedItemInline,
+        ProductRelationInline,
     ]
     readonly_fields = (
         "id",

@@ -17,7 +17,10 @@ add-to-cart and every quantity change paid this too.
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 from django.urls import reverse
+from djmoney.money import Money
 from rest_framework.test import APITestCase
 
 from cart.factories.cart import CartFactory
@@ -32,18 +35,28 @@ class CartRecommendationQueryBudgetTest(TestURLFixerMixin, APITestCase):
         self.user = UserAccountFactory(num_addresses=0)
         self.client.force_authenticate(user=self.user)
         self.cart = CartFactory(user=self.user, num_cart_items=0)
-        self.anchor = ProductFactory(active=True, num_images=0, num_reviews=0)
+        self.anchor = self._sellable()
         CartItemFactory(cart=self.cart, product=self.anchor, quantity=1)
         self.category = self.anchor.category
 
+    @staticmethod
+    def _sellable(**kwargs):
+        # Fixed price and stock: the cart slot drops candidates outside
+        # its price band and out of stock, and a random factory price
+        # would make "is there anything to cost" a coin toss.
+        return ProductFactory(
+            active=True,
+            stock=5,
+            price=Money(Decimal("50.00"), "EUR"),
+            discount_percent=Decimal(0),
+            num_images=0,
+            num_reviews=0,
+            **kwargs,
+        )
+
     def _add_recommendable(self, count):
         for _ in range(count):
-            ProductFactory(
-                active=True,
-                category=self.category,
-                num_images=0,
-                num_reviews=0,
-            )
+            self._sellable(category=self.category)
 
     def test_cart_detail_cost_does_not_grow_with_recommendations(self):
         url = reverse("cart-detail")
@@ -67,10 +80,10 @@ class CartRecommendationQueryBudgetTest(TestURLFixerMixin, APITestCase):
         item = self.cart.items.first()
         url = reverse("cart-item-detail", args=[item.id])
 
-        # The category -> product-ID list is cached, so without clearing
-        # it the second call reuses the FIRST list and the growth is
-        # hidden. Serialization happens outside that cache, which is
-        # exactly where the per-product cost lives.
+        # The engine caches only its per-tenant context; clearing before
+        # every call keeps both measured blocks identical in what they
+        # rebuild. Serialization is never cached, which is exactly where
+        # the per-product cost lives.
         self._add_recommendable(1)
         cache.clear()
         response = self.client.get(url)

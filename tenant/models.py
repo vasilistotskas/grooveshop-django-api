@@ -394,6 +394,15 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
     # checkout is NOT behind this — that stays a plain merchant setting
     # (B2B_INVOICING_ENABLED) available on every plan.
     b2b_enabled = models.BooleanField(_("B2B Enabled"), default=False)
+    # Plan gate for product suggestions (docs/recommendations-engine.md).
+    # The merchant runtime tier is the PRODUCT_SUGGESTIONS_ENABLED
+    # extra-setting; both must hold. Which STRATEGIES run is a further,
+    # finer gate on ``plan`` itself — see ``RecommendationStrategy
+    # .min_plan`` — so this flag is "the feature exists for this store"
+    # and the plan rank is "how smart it is allowed to be".
+    recommendations_enabled = models.BooleanField(
+        _("Recommendations Enabled"), default=False
+    )
 
     # Stripe Connect — dormant/reserved. The platform runs SEPARATE
     # Stripe accounts per tenant (``stripe_secret_key`` below), not

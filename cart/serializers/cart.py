@@ -9,7 +9,6 @@ from rest_framework import serializers
 
 from cart.models import Cart
 from cart.serializers.item import CartItemSerializer
-from product.serializers.product import ProductSerializer
 
 
 class CartWriteSerializer(serializers.ModelSerializer[Cart]):
@@ -278,30 +277,23 @@ class CartDetailSerializer(CartSerializer):
         )
     )
     def get_recommendations(self, obj: Cart):
-        categories = set()
-        for item in obj.items.all():
-            if item.product.category:
-                categories.add(item.product.category)
+        # The whole basket is the seed set, so the engine's basket
+        # bonus favours a product several lines point at — "complete
+        # the order", not "more of the same". Same field, same shape
+        # as before (plain products); only the source changed from an
+        # inline same-category query to the recommendation engine.
+        # See docs/recommendations-engine.md.
+        from recommendation.engine import SuggestionContext, suggest
+        from recommendation.enum import Surface
+        from recommendation.hydrate import hydrate_products
 
-        if categories:
-            from product.models.product import Product
-
-            # `for_list()` carries the prefetches ProductSerializer
-            # needs — translations, main image, review and like counts.
-            # A bare queryset here cost a query PER recommended product
-            # for each of those, on the primary "view cart" response.
-            # It already filters to active, non-deleted products.
-            recommendations = (
-                Product.objects.for_list()
-                .filter(category__in=categories)
-                .exclude(id__in=obj.items.values_list("product_id", flat=True))
-                .order_by("-view_count")[:4]
-            )
-
-            return ProductSerializer(
-                recommendations, many=True, context=self.context
-            ).data
-        return []
+        seed_ids = tuple(obj.items.values_list("product_id", flat=True))
+        if not seed_ids:
+            return []
+        suggestions = suggest(
+            SuggestionContext(surface=Surface.CART, seed_ids=seed_ids)
+        )
+        return hydrate_products(suggestions, context=self.context)
 
     class Meta(CartSerializer.Meta):
         fields = (

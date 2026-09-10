@@ -573,6 +573,7 @@ class TenantAdmin(ModelAdmin):
                     # could only be flipped from a shell — every other
                     # plan gate is here.
                     "b2b_enabled",
+                    "recommendations_enabled",
                 ]
             },
         ),

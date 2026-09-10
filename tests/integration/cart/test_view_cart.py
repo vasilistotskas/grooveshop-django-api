@@ -130,6 +130,11 @@ class CartViewSetTest(TestURLFixerMixin, APITestCase):
     def test_retrieve_no_n_plus_one(self):
         """Cart-detail query count must not grow with the number of items
         nor re-run the total_* property queries per line (G0081)."""
+        # The recommendation engine builds a per-tenant context on the
+        # first request and caches it for five minutes; this measures
+        # growth per item, not that one-off.
+        self.client.get(self.detail_url)
+
         with count_queries() as small:
             self.client.get(self.detail_url)
 

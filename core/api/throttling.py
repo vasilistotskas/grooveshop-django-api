@@ -185,3 +185,10 @@ class BoxNowNearestThrottle(UserOrIpRateThrottle):
     forwards synchronously to the BoxNow partner API (G0059)."""
 
     scope = "boxnow_nearest"
+
+
+class RecommendationEventThrottle(UserOrIpRateThrottle):
+    """Budget for suggestion-strip impression/click events. Its own
+    scope so a scripted client cannot starve the search allowance."""
+
+    scope = "recommendation_event"

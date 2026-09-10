@@ -101,6 +101,14 @@ class IsB2BEnabled(IsTenantFeatureEnabled):
     feature_flag = "b2b_enabled"
 
 
+class IsRecommendationsEnabled(IsTenantFeatureEnabled):
+    """Deny access with 404 when the tenant's recommendations plan flag
+    is off. The runtime half is the PRODUCT_SUGGESTIONS_ENABLED
+    extra-setting, read by the storefront via /settings/get."""
+
+    feature_flag = "recommendations_enabled"
+
+
 class IsAgentCommerceEnabled(IsTenantFeatureEnabled):
     """Deny access with 404 when the tenant's agent-commerce plan flag
     is off. The gateway enforces the folded TenantConfig value for its

@@ -187,6 +187,7 @@ _storefront_i18n_patterns = [
     path("api/v1/", include("blog.urls")),
     path("api/v1/", include("tag.urls")),
     path("api/v1/", include("pay_way.urls")),
+    path("api/v1/", include("recommendation.urls")),
     path("api/v1/", include("shipping.urls")),
     path("api/v1/", include("shipping_boxnow.urls")),
     path("api/v1/", include("shipping_acs.urls")),

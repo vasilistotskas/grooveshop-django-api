@@ -617,6 +617,9 @@ PUBLIC_SETTING_KEYS = frozenset(
         "ACS_SMARTPOINT_ENABLED",
         "LOYALTY_ENABLED",
         "PROMOTIONS_ENABLED",
+        # Runtime half of the recommendations gate — the storefront's
+        # ProductSuggestions strip reads it with useSettingFlag.
+        "PRODUCT_SUGGESTIONS_ENABLED",
         "GIFT_CARDS_ENABLED",
         # Purchase-form bounds for the storefront gift-card page.
         "GIFT_CARD_MIN_AMOUNT",

@@ -140,6 +140,42 @@ def register_default_surfaces() -> None:
 
     register_surface(
         CacheSurface(
+            code="recommendations",
+            label=_("Product recommendations"),
+            description=_(
+                "Suggested-product responses and the cached tenant facts"
+                " the strategies consult. Purges itself when a product,"
+                " a curated relation or a slot's configuration changes,"
+                " so a merchant's edit shows on the next request."
+            ),
+            # No ``*ViewSet_*`` pattern: the read endpoint is a function
+            # view that is deliberately NOT ``cache_page``d (every
+            # response mints its own impression id). What lives in
+            # Django's cache is the per-tenant context under ``recs:``.
+            django_patterns=("*recs:*",),
+            nuxt_patterns=_nuxt("productRecommendations"),
+            # Every OPERATOR write that changes what a strategy would
+            # answer. ``RecommendationCandidate`` is deliberately absent:
+            # its rows are rebuilt by queryset delete + bulk_create, and
+            # a post_delete receiver would make Django instantiate and
+            # signal every row — one purge per product across a nightly
+            # full pass. A per-product rebuild is already covered by the
+            # Product/ProductRelation write that triggered it; the full
+            # pass purges once, explicitly, when it finishes
+            # (``recommendation.tasks.recompute_all_candidates``).
+            invalidated_by=(
+                "product.Product",
+                "product.ProductCategory",
+                "product.ProductRelation",
+                "recommendation.RecommendationSlot",
+            ),
+            icon="recommend",
+            group="commerce",
+        )
+    )
+
+    register_surface(
+        CacheSurface(
             code="shipping",
             label=_("Shipping options"),
             description=_(

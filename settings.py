@@ -216,6 +216,9 @@ TENANT_APPS = [
     "admin.apps.MyAdminConfig",
     # Domain apps (store-specific data)
     "product",
+    # Reads product/order rows, writes only its own tables; after
+    # ``product`` because its models FK into it.
+    "recommendation",
     "order",
     "cart",
     "blog",
@@ -476,6 +479,10 @@ REST_FRAMEWORK = {
         # Clicks get their own budget - the anonymous click endpoint must
         # not be able to starve the search allowance for the same client.
         "search_click": None if DEBUG else "60/minute",
+        # Impression/click events from the suggestion strips. One
+        # impression per strip render plus clicks; generous, but a
+        # budget of its own so a scripted client cannot starve search.
+        "recommendation_event": None if DEBUG else "120/minute",
         "view_count": None if DEBUG else "60/hour",
         "viva_return": None if DEBUG else "30/minute",
         # Public proxies to rate-limited carrier partner APIs.
@@ -1970,6 +1977,20 @@ EXTRA_SETTINGS_DEFAULTS = [
         "name": "PROMOTIONS_ENABLED",
         "type": "bool",
         "value": False,
+    },
+    {
+        # Runtime half of the recommendations gate (plan half is
+        # Tenant.recommendations_enabled). Fails CLOSED like every
+        # commercial surface: a store opts in, it is never on by
+        # accident. See docs/recommendations-engine.md §7.
+        "name": "PRODUCT_SUGGESTIONS_ENABLED",
+        "type": "bool",
+        "value": False,
+        "description": (
+            "Show suggested-product strips on the storefront (product "
+            "page, cart, out-of-stock). Requires the tenant's "
+            "recommendations plan flag as well."
+        ),
     },
     {
         "name": "GIFT_CARDS_ENABLED",

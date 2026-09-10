@@ -1996,11 +1996,7 @@ def send_checkout_abandonment_emails() -> int:
                 generate_blanket_unsubscribe_link,
             )
 
-            unsubscribe_url = (
-                generate_blanket_unsubscribe_link(cart.user)
-                if getattr(settings, "API_BASE_URL", None)
-                else ""
-            )
+            unsubscribe_url = generate_blanket_unsubscribe_link(cart.user)
 
             context = build_email_context(
                 cart=cart,

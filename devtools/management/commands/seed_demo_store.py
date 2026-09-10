@@ -1,6 +1,6 @@
 """Seed a non-production tenant with demo content and configuration.
 
-    manage.py seed_demo_store --schema webside
+    manage.py seed_demo_store --schema demo
 
 Why this is code and not admin clicks: ``scripts/staging-refresh.sh``
 DROPS the staging database and restores production over it, so anything
@@ -93,7 +93,7 @@ class Command(BaseCommand):
         parser.add_argument(
             "--schema",
             required=True,
-            help="Tenant schema to seed (e.g. webside).",
+            help="Tenant schema to seed (e.g. demo).",
         )
         parser.add_argument(
             "--only",

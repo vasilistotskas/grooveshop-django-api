@@ -44,26 +44,34 @@ DEMO_MARKER = "demo"
 PLACEHOLDER_BODY_PREFIX = "<p>Προσθέστε εδώ"
 
 # ── media ────────────────────────────────────────────────────────────
-# Image paths are REUSED from rows the prod clone already brought in,
-# so the files are guaranteed to exist on the media PVC and render
-# through media-stream. Seeding fresh paths would give every demo
-# product a broken image.
+# The demo tenant's OWN files under ``media/demo/uploads/products/`` on
+# the media volume (``docs``: a fresh tenant has no media — these ten
+# are copied in when the demo schema is created). Seeding a path that
+# has no file gives every demo product a broken image.
 IMAGE_POOL: tuple[str, ...] = (
-    "uploads/products/webside_mini_powerbank_black_1_1.avif",
-    "uploads/products/webside_mini_powerbank_black_2_1.avif",
-    "uploads/products/webside_mini_powerbank_black_3_1.avif",
-    "uploads/products/webside_mini_powerbank_black_4_1.avif",
-    "uploads/products/webside_mini_powerbank_black_5_1.avif",
-    "uploads/products/webside_mini_powerbank_white_1.avif",
-    "uploads/products/webside_mini_powerbank_white_2.avif",
-    "uploads/products/webside_mini_powerbank_white_3.avif",
-    "uploads/products/webside_mini_powerbank_white_4.avif",
-    "uploads/products/webside_mini_powerbank_white_5.avif",
+    "uploads/products/demo_powerbank_black_1.avif",
+    "uploads/products/demo_powerbank_black_2.avif",
+    "uploads/products/demo_powerbank_black_3.avif",
+    "uploads/products/demo_powerbank_black_4.avif",
+    "uploads/products/demo_powerbank_black_5.avif",
+    "uploads/products/demo_powerbank_white_1.avif",
+    "uploads/products/demo_powerbank_white_2.avif",
+    "uploads/products/demo_powerbank_white_3.avif",
+    "uploads/products/demo_powerbank_white_4.avif",
+    "uploads/products/demo_powerbank_white_5.avif",
 )
 
 
 def _image(index: int) -> str:
     return IMAGE_POOL[index % len(IMAGE_POOL)]
+
+
+def _platform_contact_email() -> str:
+    """The platform operator's contact address, read when the seed
+    runs so no mailbox is written into the repository."""
+    from django.conf import settings
+
+    return settings.INFO_EMAIL
 
 
 # ── settings (extra_settings rows) ───────────────────────────────────
@@ -85,9 +93,10 @@ DEMO_SETTINGS: dict[str, Any] = {
     # when B2B_ALLOW_PROMOTIONS is false).
     "B2B_ALLOW_PROMOTIONS": True,
     "B2B_LOYALTY_ENABLED": True,
-    # Footer + contact page fall back to INFO_EMAIL, which is
-    # info@example.invalid on staging.
-    "CONTACT_EMAIL": "support@staging.webside.gr",
+    # Demo inquiries go to the platform operator: resolved at seed
+    # time from settings.INFO_EMAIL (a store's contact address never
+    # falls back to it on its own — see tenant_contact_email).
+    "CONTACT_EMAIL": _platform_contact_email,
     # Feeds the business_hours section, the footer open/closed badge and
     # the LocalBusiness schema.org block. Shape is validated by
     # tenant.validators.validate_business_hours_setting — exactly
@@ -110,7 +119,7 @@ DEMO_SETTINGS: dict[str, Any] = {
     "STORE_GEO_LNG": "22.9439",
     # Every B2B invoice is structurally incomplete without these; the
     # myDATA readiness check reads the same block.
-    "INVOICE_SELLER_NAME": "Webside Staging IKE",
+    "INVOICE_SELLER_NAME": "GrooveShop Demo",
     "INVOICE_SELLER_LEGAL_FORM": "ΙΚΕ",
     "INVOICE_SELLER_VAT_ID": "999999999",
     "INVOICE_SELLER_TAX_OFFICE": "ΔΟΥ Θεσσαλονίκης",
@@ -121,14 +130,14 @@ DEMO_SETTINGS: dict[str, Any] = {
     "INVOICE_SELLER_CITY": "Θεσσαλονίκη",
     "INVOICE_SELLER_POSTAL_CODE": "54622",
     "INVOICE_SELLER_COUNTRY": "GR",
-    "INVOICE_SELLER_EMAIL": "billing@staging.webside.gr",
+    "INVOICE_SELLER_EMAIL": _platform_contact_email,
     "INVOICE_SELLER_PHONE": "+302310000000",
 }
 
 # ── brands ───────────────────────────────────────────────────────────
 # Invented names on purpose: a demo catalogue that carries real
 # trademarks reads as a real listing of someone else's goods.
-BRANDS: tuple[str, ...] = ("Webside", "Voltra", "Kabelo", "Nexis")
+BRANDS: tuple[str, ...] = ("Groove", "Voltra", "Kabelo", "Nexis")
 
 # ── category tree ────────────────────────────────────────────────────
 # A NEW root with children and one grandchild. The two prod-cloned
@@ -297,7 +306,7 @@ PRODUCTS: tuple[tuple[str, str, str, str, str, int, str], ...] = (
         "27.90",
         "0",
         55,
-        "Webside",
+        "Groove",
     ),
     # Θήκες
     (
@@ -307,7 +316,7 @@ PRODUCTS: tuple[tuple[str, str, str, str, str, int, str], ...] = (
         "8.90",
         "0",
         260,
-        "Webside",
+        "Groove",
     ),
     (
         "demo-case-shockproof",
@@ -325,7 +334,7 @@ PRODUCTS: tuple[tuple[str, str, str, str, str, int, str], ...] = (
         "19.90",
         "0",
         85,
-        "Webside",
+        "Groove",
     ),
     (
         "demo-case-magsafe",
@@ -334,7 +343,7 @@ PRODUCTS: tuple[tuple[str, str, str, str, str, int, str], ...] = (
         "17.90",
         "25",
         90,
-        "Webside",
+        "Groove",
     ),
     (
         "demo-screen-glass",
@@ -361,7 +370,7 @@ PRODUCTS: tuple[tuple[str, str, str, str, str, int, str], ...] = (
         "9.90",
         "0",
         75,
-        "Webside",
+        "Groove",
     ),
     # Ήχος
     (
@@ -984,7 +993,7 @@ ABOUT_SECTIONS: tuple[dict[str, Any], ...] = (
         "component_type": "rich_text",
         "title": "",
         "props": {
-            "content": "<h2>Επικοινωνία</h2><p>Είμαστε στο <strong>support@staging.webside.gr</strong> για ό,τι χρειαστείς.</p>",
+            "content": "<h2>Επικοινωνία</h2><p>Στείλε μας μήνυμα από τη φόρμα επικοινωνίας για ό,τι χρειαστείς.</p>",
         },
         "sort_order": 8,
     },
@@ -1207,6 +1216,8 @@ def seed_settings() -> dict[str, int]:
 
     report: dict[str, int] = {}
     for name, value in DEMO_SETTINGS.items():
+        if callable(value):
+            value = value()
         try:
             setting = Setting.objects.get(name=name)
         except Setting.DoesNotExist:
@@ -1300,7 +1311,7 @@ def seed_brands() -> dict[str, int]:
 
     # Prod-cloned products carry no brand; give them the house brand so
     # the feed's non-fallback branch is covered for them too.
-    house = brands["Webside"]
+    house = brands["Groove"]
     for product in Product.objects.filter(brand__isnull=True):
         product.brand = house
         product.save(update_fields=["brand"])
@@ -1332,7 +1343,7 @@ def seed_categories() -> dict[str, int]:
             active=True,
             parent=by_slug.get(parent_slug) if parent_slug else None,
             seo_title=name[:70],
-            seo_description=f"{name} - Webside Staging.",
+            seo_description=f"{name} - GrooveShop Demo.",
         )
         _translate(
             category,

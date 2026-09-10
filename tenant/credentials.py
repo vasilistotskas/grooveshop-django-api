@@ -113,13 +113,30 @@ def tenant_from_email() -> str:
     return default
 
 
+def _in_tenant_schema() -> bool:
+    """True when a store's schema is active (not the public schema, not
+    a bare management/Celery context)."""
+    from django_tenants.utils import get_public_schema_name
+
+    schema = getattr(getattr(connection, "tenant", None), "schema_name", "")
+    return bool(schema) and schema != get_public_schema_name()
+
+
 def tenant_contact_email() -> str:
     """Return the public contact address for the active tenant.
 
     Priority:
       1. ``Tenant.contact_email``
       2. ``extra_settings`` key ``CONTACT_EMAIL``
-      3. ``settings.INFO_EMAIL``
+      3. In a store's schema: ``""`` — a store with no contact address
+         has none. Its outbound mail then carries no ``Reply-To`` and
+         contact-form submissions are skipped with a warning
+         (``contact/tasks.py``); it never borrows the platform's (or,
+         as ``settings.INFO_EMAIL`` was until 2026-09-10, the first
+         store's) address.
+      4. Public schema / no active tenant: ``settings.INFO_EMAIL`` — the
+         PLATFORM's own contact address, for platform-schema mail such
+         as billing notices to store owners.
     """
     tenant_email = _get_tenant_field("contact_email")
     if tenant_email:
@@ -129,19 +146,17 @@ def tenant_contact_email() -> str:
     try:
         setting_value = Setting.get("CONTACT_EMAIL", default="") or ""
     except Exception:
-        # This is a fallback CHAIN — tenant field, then the setting,
-        # then INFO_EMAIL — so a database blip should drop through to
-        # the next link rather than break every outbound email. What
-        # it must not do is drop through SILENTLY, which is what the
-        # bare `except Exception: pass` here used to do.
+        # A database blip must not break every outbound email, but it
+        # must not be swallowed silently either.
         logger.warning(
-            "Could not read the CONTACT_EMAIL setting; falling back "
-            "to INFO_EMAIL",
+            "Could not read the CONTACT_EMAIL setting",
             exc_info=True,
         )
     else:
         if setting_value:
             return setting_value
+    if _in_tenant_schema():
+        return ""
     return getattr(settings, "INFO_EMAIL", "") or ""
 
 
@@ -306,11 +321,15 @@ def tenant_email_theme() -> dict[str, str]:
 
 
 def tenant_totp_issuer() -> str:
-    """Return the TOTP issuer name for the active tenant.
+    """Return the TOTP issuer shown in authenticator apps.
 
-    Priority: ``Tenant.totp_issuer`` → ``settings.MFA_TOTP_ISSUER``.
+    ``Tenant.totp_issuer`` when set, otherwise the store's own display
+    name (``tenant_site_name``) — an authenticator entry is labelled
+    with the store the user enrolled on, never with a platform-wide
+    string. There is no settings knob: allauth's own fallback would be
+    the Site framework's current site, i.e. another store's name.
     """
-    return _get_tenant_field("totp_issuer", "MFA_TOTP_ISSUER")
+    return _get_tenant_field("totp_issuer") or tenant_site_name()
 
 
 # ---------------------------------------------------------------------------

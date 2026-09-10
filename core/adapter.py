@@ -2,7 +2,7 @@ from allauth.mfa.adapter import DefaultMFAAdapter
 from django.conf import settings
 from django.db import connection
 
-from tenant.credentials import tenant_totp_issuer
+from tenant.credentials import tenant_site_name, tenant_totp_issuer
 
 
 def _webauthn_rp_id() -> str:
@@ -34,21 +34,20 @@ def _webauthn_rp_id() -> str:
 
 
 class MFAAdapter(DefaultMFAAdapter):
+    """Tenant-scoped MFA identity.
+
+    Both the passkey relying-party name and the TOTP issuer are the
+    STORE the user enrolled on. allauth's defaults read the Site
+    framework's current site for both, which on a multi-tenant
+    deployment is whichever ``Site`` row ``SITE_ID`` points at — one
+    store's name shown to every other store's users.
+    """
+
     def get_public_key_credential_rp_entity(self):
-        name = self._get_site_name()
         return {
             "id": _webauthn_rp_id(),
-            "name": name,
+            "name": tenant_site_name(),
         }
 
     def get_totp_issuer(self) -> str:
-        """Return the per-tenant TOTP issuer, falling back to the global
-        ``settings.MFA_TOTP_ISSUER`` (or the site name when both are empty).
-        """
-        issuer = tenant_totp_issuer()
-        if issuer:
-            return issuer
-        # Fall back to the parent implementation which reads
-        # app_settings.TOTP_ISSUER (= settings.MFA_TOTP_ISSUER) and
-        # falls back further to the site name.
-        return super().get_totp_issuer()
+        return tenant_totp_issuer()

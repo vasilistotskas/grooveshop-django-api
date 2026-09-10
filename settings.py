@@ -66,7 +66,6 @@ if DEBUG:
 
 APP_MAIN_HOST_NAME = getenv("APP_MAIN_HOST_NAME", "localhost")
 NUXT_BASE_URL = getenv("NUXT_BASE_URL", "http://localhost:3000")
-NUXT_BASE_DOMAIN = getenv("NUXT_BASE_DOMAIN", "localhost:3000")
 MEDIA_STREAM_BASE_URL = getenv("MEDIA_STREAM_BASE_URL", "http://localhost:3003")
 # Cluster-internal base URL for media-stream ADMIN calls (per-tenant
 # cache flush on suspend/destroy). Defaults to the browser-facing base;
@@ -1283,14 +1282,13 @@ CORS_ALLOW_HEADERS = (
 CSRF_USE_SESSIONS = False
 CSRF_COOKIE_NAME = "csrftoken"
 CSRF_COOKIE_AGE = 60 * 60 * 24 * 7 * 52  # 1 year
-_csrf_cookie_domain = getenv("CSRF_COOKIE_DOMAIN", "") or None
-if SYSTEM_ENV == "production" and not _csrf_cookie_domain:
-    from django.core.exceptions import ImproperlyConfigured
-
-    raise ImproperlyConfigured(
-        "CSRF_COOKIE_DOMAIN must be set in production (e.g. .webside.gr)."
-    )
-CSRF_COOKIE_DOMAIN = _csrf_cookie_domain
+# No static cookie domain, and deliberately no env knob for one: the
+# ``Domain`` of the session and CSRF cookies is derived from the request
+# host on every response by ``tenant.middleware.TenantCookieDomainMiddleware``
+# (``api.acme.com`` → ``.acme.com``), so each store's cookies stay inside
+# its own registrable scope. A process-wide value could only ever be ONE
+# store's apex — and it was (``.webside.gr``), until 2026-09-10.
+CSRF_COOKIE_DOMAIN = None
 CSRF_COOKIE_PATH = "/"
 CSRF_COOKIE_SECURE = (
     not DEBUG
@@ -2316,10 +2314,9 @@ KNOX_TOKEN_MODEL = "knox.AuthToken"
 MEASUREMENT_BIDIMENSIONAL_SEPARATOR = "/"
 
 MFA_ADAPTER = "core.adapter.MFAAdapter"
-# Platform fallback for Tenant.totp_issuer (tenant/credentials.py::
-# tenant_totp_issuer). Empty means "no issuer branding" until a tenant
-# sets one.
-MFA_TOTP_ISSUER = getenv("MFA_TOTP_ISSUER", "")
+# No MFA_TOTP_ISSUER: the adapter labels authenticator entries with the
+# store's own name (Tenant.totp_issuer, else the store name) — a
+# platform-wide issuer would put one name on every store's users.
 MFA_RECOVERY_CODE_COUNT = 10
 MFA_TOTP_PERIOD = 30
 MFA_TOTP_DIGITS = 6
@@ -2609,8 +2606,8 @@ ROSETTA_STORAGE_CLASS = "core.rosetta_storage.CacheClearingRosettaStorage"
 # every tenant. django-tenants resolves /rosetta/... on ANY tenant
 # host, so without this the editor is reachable (and destructive) from
 # every tenant's own staff/superuser. Comma-separated schema allowlist;
-# at cutover set to "public,webside" so platform staff keep access via
-# the webside host during migration.
+# platform staff edit translations on the platform console host
+# (public schema), so production runs the default.
 ROSETTA_ALLOWED_SCHEMAS = getenv("ROSETTA_ALLOWED_SCHEMAS", "public")
 ROSETTA_ACCESS_CONTROL_FUNCTION = (
     "core.rosetta_access.tenant_scoped_rosetta_access"
@@ -3757,14 +3754,8 @@ UNFOLD = {
 SESSION_CACHE_ALIAS = "default"
 SESSION_COOKIE_NAME = "sessionid"
 SESSION_COOKIE_AGE = 60 * 60 * 24 * 7 * 2
-_session_cookie_domain = getenv("SESSION_COOKIE_DOMAIN", "") or None
-if SYSTEM_ENV == "production" and not _session_cookie_domain:
-    from django.core.exceptions import ImproperlyConfigured
-
-    raise ImproperlyConfigured(
-        "SESSION_COOKIE_DOMAIN must be set in production (e.g. .webside.gr)."
-    )
-SESSION_COOKIE_DOMAIN = _session_cookie_domain
+# See CSRF_COOKIE_DOMAIN: per-request, never a static apex.
+SESSION_COOKIE_DOMAIN = None
 SESSION_COOKIE_SECURE = not DEBUG
 SESSION_COOKIE_PATH = "/"
 SESSION_COOKIE_HTTPONLY = True

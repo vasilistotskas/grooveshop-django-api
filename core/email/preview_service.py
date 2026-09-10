@@ -10,6 +10,7 @@ from django.utils import timezone
 from core.email.config import EmailTemplateConfig
 from core.email.sample_data import SampleOrderDataGenerator
 from core.utils.email_context import build_email_context
+from core.utils.tenant_urls import get_tenant_base_url
 from order.models import Order
 from tenant.credentials import tenant_site_name
 
@@ -386,23 +387,23 @@ class EmailTemplatePreviewService:
                 "date_joined": timezone.now() - timedelta(days=180),
                 "last_login": timezone.now() - timedelta(days=45),
             },
-            "app_base_url": settings.NUXT_BASE_URL,
+            "app_base_url": get_tenant_base_url(),
             "week_start": timezone.now() - timedelta(days=7),
             "week_end": timezone.now(),
             "featured_articles": [
                 {
                     "title": "New Product Launch",
                     "summary": "Check out our latest products",
-                    "url": f"{settings.NUXT_BASE_URL}/blog/new-product-launch",
+                    "url": f"{get_tenant_base_url()}/blog/new-product-launch",
                 },
                 {
                     "title": "Customer Success Story",
                     "summary": "How our customers achieve their goals",
-                    "url": f"{settings.NUXT_BASE_URL}/blog/success-story",
+                    "url": f"{get_tenant_base_url()}/blog/success-story",
                 },
             ],
-            "unsubscribe_url": f"{settings.NUXT_BASE_URL}/unsubscribe",
-            "preferences_url": f"{settings.NUXT_BASE_URL}/preferences",
+            "unsubscribe_url": f"{get_tenant_base_url()}/unsubscribe",
+            "preferences_url": f"{get_tenant_base_url()}/preferences",
         }
 
     def _get_sample_subscription_context(self) -> dict:
@@ -424,7 +425,7 @@ class EmailTemplatePreviewService:
                 "billing_cycle": "monthly",
                 "amount": "€9.99",
             },
-            "app_base_url": settings.NUXT_BASE_URL,
+            "app_base_url": get_tenant_base_url(),
         }
 
     def _generate_subject(self, template_name: str, context: dict) -> str:

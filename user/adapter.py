@@ -8,6 +8,7 @@ from allauth.core.internal.httpkit import clean_client_ip
 from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
 from django.conf import settings
 from django.core.exceptions import PermissionDenied
+from django.db import connection
 from django.http import HttpRequest
 from django.utils import translation
 from django.utils.encoding import force_str
@@ -17,6 +18,7 @@ from core.utils.email_context import build_email_context
 from core.utils.i18n import resolve_request_language
 from core.utils.tenant_urls import get_tenant_frontend_url
 from tenant.credentials import tenant_from_email, tenant_site_name
+from tenant.middleware import tenant_domain_set
 
 if TYPE_CHECKING:  # pragma: no cover
     from allauth.socialaccount.models import SocialAccount
@@ -131,11 +133,16 @@ class SocialAccountAdapter(DefaultSocialAccountAdapter):
         return user
 
     def get_connect_redirect_url(self, request, socialaccount: SocialAccount):
+        """Honour ``next`` only when it stays on the ACTIVE store's own
+        hostnames (its ``TenantDomain`` rows); the platform host is the
+        allowed set only outside a store's schema. A static platform
+        allowlist would both reject every other store's legitimate
+        ``next`` and accept a redirect onto the first store's domain.
+        """
         url = request.POST.get("next") or request.GET.get("next")
-        allowed_hosts = {
-            settings.APP_MAIN_HOST_NAME,
-            settings.NUXT_BASE_DOMAIN,
-        }
+        allowed_hosts = tenant_domain_set(
+            getattr(connection, "tenant", None)
+        ) or {settings.APP_MAIN_HOST_NAME}
         if url and url_has_allowed_host_and_scheme(
             url, allowed_hosts=allowed_hosts
         ):

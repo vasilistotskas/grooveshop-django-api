@@ -510,7 +510,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         help_text=_(
             "Issuer name shown in authenticator apps when the user "
             "scans the TOTP QR code (e.g. 'MyShop'). "
-            "Empty falls back to settings.MFA_TOTP_ISSUER."
+            "Empty uses the store name."
         ),
     )
 
@@ -639,8 +639,9 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         default="",
         help_text=_(
             "Public contact email shown in storefront footer and "
-            "contact page. "
-            "Empty falls back to settings.INFO_EMAIL."
+            "contact page, and the inbox for contact-form submissions. "
+            "Empty means the store has no contact address: submissions "
+            "are not delivered and outbound mail carries no Reply-To."
         ),
     )
 

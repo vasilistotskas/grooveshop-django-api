@@ -465,9 +465,12 @@ class TestTenantContactEmail:
         )
         assert tenant_contact_email() == "extra@example.com"
 
-    def test_falls_back_to_info_email_when_extra_setting_empty(
+    def test_store_without_contact_address_has_none(
         self, bind_tenant, tenant_factory, settings, db
     ):
+        # A store never borrows the platform's address: until
+        # 2026-09-10 INFO_EMAIL was the first store's, so every other
+        # store's Reply-To and contact inbox silently pointed there.
         from extra_settings.models import Setting
 
         tenant = tenant_factory("contact-email-3")
@@ -476,9 +479,8 @@ class TestTenantContactEmail:
         bind_tenant(tenant)
         settings.INFO_EMAIL = "info@platform.com"
 
-        # Ensure CONTACT_EMAIL extra_setting is absent / empty
         Setting.objects.filter(name="CONTACT_EMAIL").delete()
-        assert tenant_contact_email() == "info@platform.com"
+        assert tenant_contact_email() == ""
 
     def test_no_tenant_uses_info_email_settings(
         self, monkeypatch, settings, db
@@ -490,15 +492,25 @@ class TestTenantContactEmail:
         Setting.objects.filter(name="CONTACT_EMAIL").delete()
         assert tenant_contact_email() == "info@global.com"
 
-    def test_webside_safety(self, bind_tenant, tenant_factory, settings, db):
-        """webside.gr: Tenant.contact_email is empty → falls back cleanly."""
+    def test_public_schema_uses_the_platform_address(
+        self, monkeypatch, settings, db
+    ):
+        # Platform-schema mail (billing notices) carries the PLATFORM's
+        # own contact address.
+        from types import SimpleNamespace
+
+        from django_tenants.utils import get_public_schema_name
         from extra_settings.models import Setting
 
-        tenant = tenant_factory("ws-contact-email")
-        bind_tenant(tenant)
-        settings.INFO_EMAIL = "info@webside.gr"
+        monkeypatch.setattr(
+            connection,
+            "tenant",
+            SimpleNamespace(schema_name=get_public_schema_name()),
+            raising=False,
+        )
+        settings.INFO_EMAIL = "info@platform.com"
         Setting.objects.filter(name="CONTACT_EMAIL").delete()
-        assert tenant_contact_email() == "info@webside.gr"
+        assert tenant_contact_email() == "info@platform.com"
 
 
 class TestTenantSiteName:
@@ -594,27 +606,22 @@ class TestTenantTotpIssuer:
         bind_tenant(tenant)
         assert tenant_totp_issuer() == "MyShop"
 
-    def test_falls_back_to_settings(
-        self, bind_tenant, tenant_factory, settings
+    def test_empty_issuer_uses_the_store_name(
+        self, bind_tenant, tenant_factory
     ):
+        # Never a platform-wide string: an authenticator entry is
+        # labelled with the store the user enrolled on.
         tenant = tenant_factory("totp-issuer-2")
         tenant.totp_issuer = ""
+        tenant.store_name = "Brand Shop"
         tenant.save()
         bind_tenant(tenant)
-        settings.MFA_TOTP_ISSUER = "Platform TOTP"
-        assert tenant_totp_issuer() == "Platform TOTP"
+        assert tenant_totp_issuer() == "Brand Shop"
 
-    def test_no_tenant_uses_settings(self, monkeypatch, settings):
+    def test_no_tenant_uses_the_platform_site_name(self, monkeypatch, settings):
         monkeypatch.setattr(connection, "tenant", None, raising=False)
-        settings.MFA_TOTP_ISSUER = "GlobalShop"
+        settings.SITE_NAME = "GlobalShop"
         assert tenant_totp_issuer() == "GlobalShop"
-
-    def test_webside_safety(self, bind_tenant, tenant_factory, settings):
-        """webside.gr: Tenant.totp_issuer empty → falls back to settings."""
-        tenant = tenant_factory("ws-totp")
-        bind_tenant(tenant)
-        settings.MFA_TOTP_ISSUER = "Webside"
-        assert tenant_totp_issuer() == "Webside"
 
 
 # ---------------------------------------------------------------------------
@@ -709,37 +716,38 @@ class TestMFAAdapterTotpIssuer:
         adapter = MFAAdapter()
         assert adapter.get_totp_issuer() == "BrandShop"
 
-    def test_falls_back_to_allauth_app_settings_when_tenant_field_empty(
-        self, bind_tenant, tenant_factory, monkeypatch, settings
+    def test_empty_tenant_field_uses_the_store_name_never_allauth_settings(
+        self, bind_tenant, tenant_factory, monkeypatch
     ):
+        # allauth's own chain (MFA_TOTP_ISSUER, then the Site
+        # framework's current site) must never be consulted: on a
+        # multi-tenant deployment both resolve to ONE store's name.
         import allauth.mfa.app_settings as allauth_mfa_settings
 
         from core.adapter import MFAAdapter
 
         tenant = tenant_factory("mfa-issuer-2")
         tenant.totp_issuer = ""
+        tenant.store_name = "Brand Shop"
         tenant.save()
         bind_tenant(tenant)
-
-        # The env-backed platform fallback must be EMPTY for the
-        # allauth app_settings fallback below to be reachable.
-        settings.MFA_TOTP_ISSUER = ""
         monkeypatch.setattr(
             allauth_mfa_settings, "TOTP_ISSUER", "PlatformIssuer"
         )
         adapter = MFAAdapter()
-        assert adapter.get_totp_issuer() == "PlatformIssuer"
+        assert adapter.get_totp_issuer() == "Brand Shop"
 
-    def test_no_tenant_uses_allauth_app_settings(self, monkeypatch, settings):
-        import allauth.mfa.app_settings as allauth_mfa_settings
-
+    def test_rp_entity_name_is_the_store_name(
+        self, bind_tenant, tenant_factory
+    ):
         from core.adapter import MFAAdapter
 
-        monkeypatch.setattr(connection, "tenant", None, raising=False)
-        settings.MFA_TOTP_ISSUER = ""
-        monkeypatch.setattr(allauth_mfa_settings, "TOTP_ISSUER", "FallbackSite")
-        adapter = MFAAdapter()
-        assert adapter.get_totp_issuer() == "FallbackSite"
+        tenant = tenant_factory("mfa-rp-name")
+        tenant.store_name = "Brand Shop"
+        tenant.save()
+        bind_tenant(tenant)
+        entity = MFAAdapter().get_public_key_credential_rp_entity()
+        assert entity["name"] == "Brand Shop"
 
 
 # ---------------------------------------------------------------------------

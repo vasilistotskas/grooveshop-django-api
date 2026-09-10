@@ -140,7 +140,13 @@ cart), merge candidates from each enabled strategy, then:
 2. **Score.** `score = Σ w[strategy] · candidate.score`, plus a basket
    bonus when a product is a candidate for more than one seed — this is
    what turns the cart surface into *complete the order* rather than
-   *more of the same*.
+   *more of the same*. Merchant intent is a **tier above** that
+   arithmetic: any candidate with a `curated` contribution sorts before
+   every candidate without one, and the blended score orders within
+   each tier. Blending is additive, so without the tier three inferred
+   strategies agreeing on one product out-sum a curated 1.0 — measured
+   on staging on the first read: `variant_group + category + popular`
+   came to 2.2 against the merchant's 1.5.
 3. **Diversify.** `popular` fills at most one slot (`engine.FILLER_CAP`)
    — a strip of four "popular" items under a specific product says
    nothing about it — and no single category may fill more than

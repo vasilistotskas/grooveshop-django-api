@@ -194,6 +194,28 @@ class TestRanking:
         out = _suggest([s1.id, s2.id], surface=Surface.CART)
         assert _ids(out)[0] == shared.id
 
+    def test_curated_outranks_any_stack_of_inferred_signals(self, stub):
+        """Blending is additive, so three inferred strategies agreeing
+        on one product can out-sum a single curated 1.0 (staging: 2.2
+        vs 1.5). Merchant intent is a tier above that arithmetic."""
+        seed, curated, agreed = _product(), _product(), _product()
+        ProductRelation.objects.create(from_product=seed, to_product=curated)
+        stub(StrategyCode.CO_PURCHASE, {seed.id: [Candidate(agreed.id, 1.0)]})
+        stub(StrategyCode.CO_VIEW, {seed.id: [Candidate(agreed.id, 1.0)]})
+        _slot(
+            chain=[
+                StrategyCode.CURATED,
+                StrategyCode.CO_PURCHASE,
+                StrategyCode.CO_VIEW,
+                StrategyCode.POPULAR,
+            ]
+        )
+
+        out = _suggest([seed.id])
+
+        assert _ids(out)[:2] == [curated.id, agreed.id]
+        assert out[1].score > out[0].score
+
     def test_reason_is_the_strongest_single_contribution(self, stub):
         seed, both = _product(), _product()
         ProductRelation.objects.create(

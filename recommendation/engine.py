@@ -77,6 +77,14 @@ class _Merged:
     strategy: str = ""
     strategy_score: float = 0.0
     relation_type: str | None = None
+    # Merchant intent is a TIER, not a score. Blending is additive, so
+    # a candidate three inferred strategies agree on can out-sum a
+    # curated one — measured on staging: variant_group + category +
+    # popular came to 2.2 against a curated 1.0 + 0.5. A merchant
+    # saying "show the pot with this plant" must not lose to that, so
+    # anything with a curated contribution sorts before anything
+    # without one, and the blended score orders within each tier.
+    curated: bool = False
 
 
 def _slot(surface: str) -> RecommendationSlot:
@@ -203,6 +211,8 @@ def suggest(ctx: SuggestionContext) -> list[Suggestion]:
         entry = merged[row.candidate_id]
         entry.score += weighted
         entry.seeds_hit.add(row.seed_id)
+        if row.strategy == StrategyCode.CURATED:
+            entry.curated = True
         # The reason shown is the strongest single contribution.
         if weighted > entry.strategy_score:
             entry.strategy_score = weighted
@@ -245,7 +255,7 @@ def suggest(ctx: SuggestionContext) -> list[Suggestion]:
 
     ranked = sorted(
         (pid for pid in merged if passes_guard(pid)),
-        key=lambda pid: (-merged[pid].score, pid),
+        key=lambda pid: (not merged[pid].curated, -merged[pid].score, pid),
     )
 
     # ---- diversify: filler capped, no single category dominating ----

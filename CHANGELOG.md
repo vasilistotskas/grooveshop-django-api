@@ -3,6 +3,33 @@
 
 
 
+## v3.52.2 (2026-09-10)
+
+### Bug fixes
+
+* fix(recommendation): merchant-curated candidates rank as a tier above blended scores
+
+Blending is additive, so a candidate that three inferred strategies
+agree on could out-sum a curated one. Measured on staging on the very
+first read: a variant sibling collected variant_group + category +
+popular = 2.2 and beat the merchant's curated relation at 1.5, which
+is the one thing the Free tier promises never happens. A candidate
+with a curated contribution now sorts before every candidate without
+one; the blended score orders within each tier, so learned weights and
+the basket bonus keep their meaning inside it.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com> ([`b2ec4e0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b2ec4e01392755879aacbe46b4cc743f5db63a73))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.52.1 [skip ci] ([`8cfe4e8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8cfe4e8c586c5009827c3e68994d4027d794cc02))
+
+### Documentation
+
+* docs(recommendation): record the storefront half — Nitro-cached strip proxy, client-reported impressions
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com> ([`5ef75de`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5ef75de0217b20578767d14775988caf6750963e))
+
 ## v3.52.1 (2026-09-10)
 
 ### Bug fixes

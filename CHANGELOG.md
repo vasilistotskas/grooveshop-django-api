@@ -3,6 +3,48 @@
 
 
 
+## v3.48.6 (2026-09-10)
+
+### Bug fixes
+
+* fix(pay_way): relabel CARRIER_TERMINAL as what it actually is
+
+The label read "Card at the carrier's terminal on pickup". BOX NOW
+Αντικαταβολή has no terminal and takes no card at the locker: BoxNow
+sends a Viva Wallet payment link after dispatch and activates the
+pickup PIN once it clears. The wrong wording was admin-visible, baked
+into schema.yml in six places, and had already misled a change of mine
+earlier — the docstring was corrected then, the label was not, because
+it needed a coordinated schema regen.
+
+"Paid to the carrier before pickup" now, kept broad enough to still fit
+a carrier that really does have a terminal, since what the member
+discriminates is who collects and when. The VALUE stays
+carrier_terminal — renaming it would be a data migration for no
+behavioural gain.
+
+Migration 0024 is choices-only: sqlmigrate reports (no-op), so there is
+nothing to lock and it is safe under the PreSync hook at any table
+size.
+
+The same wrong model is corrected in the three other places it had
+spread to: the is_collected_on_delivery API description (which ships to
+the storefront's generated types), BoxNowCarrier.supported_settlements,
+the carrier-interface capability docstring, and the
+BoxNowUnsupportedSettlementError message. All of them explained the
+right rule with the wrong reason — the real one is that nobody meets
+the shopper at a locker, so no cash can be collected.
+
+Schema regenerated: description text only, no enum values and no
+required fields changed.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01WnK59xS5MBn65T5f6ZP7Xf ([`770488e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/770488e848ca057a2e0d7056eace82a6f67abb24))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.48.5 [skip ci] ([`a2a6762`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a2a676214cdd5ae89ef4aa0c7634dc01b39c3569))
+
 ## v3.48.5 (2026-09-10)
 
 ### Bug fixes

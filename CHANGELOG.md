@@ -3,6 +3,137 @@
 
 
 
+## v3.48.5 (2026-09-10)
+
+### Bug fixes
+
+* fix(checkout): stop promising refunds on unpaid orders, and let delivery advertise its pay ways
+
+Three findings from order #274, plus the feature that makes BOX NOW
+PAY ON THE GO discoverable.
+
+**The cancellation email promised a refund nobody was owed.**
+``paid_amount`` reads like "what the customer paid" and is not:
+OrderService sets it at creation from calculate_order_total_amount(),
+before any money moves. The template gated on that field alone, so a
+cash-on-delivery or BOX NOW Αντικαταβολή order that had never been paid
+was told 26,98 € was on its way back within 3-5 business days. Gated on
+``is_paid`` now — the settlement authority — which also stays correct
+for an order settled entirely by gift card, where is_paid is true and
+there is genuinely nothing to return.
+
+**Releasing an already-consumed reservation was reported as a failure.**
+Placing an order consumes its reservations; the checkout then releases
+the ids it held. That raced on every offline order: 200 with
+``failed_releases``, which the storefront reads as an error, so the
+shopper got a success toast AND an error toast and never reached the
+success page. The postcondition — this reservation is not holding stock
+— was already satisfied, so it is a no-op, not a failure. The ownership
+gate is unchanged, so this cannot become an IDOR.
+
+**The log said what failed, never why.** "Failed to release stock
+reservation 282" with the reason only in exc_info — and the production
+formatter builds its JSON from a format string, so the traceback is
+appended as separate unparseable lines after the object and is lost to
+log shipping. Reading it took a pod-log dive. The reason is in the
+message now.
+
+**Feature:** /shipping/options carries the pay ways each (provider,
+kind) can settle, so the delivery step can advertise a carrier-only
+product. Facts per option rather than "exclusive to this row": the
+storefront collapses several carriers into one home-delivery card, so
+only it knows which rows it renders. Computed by calling the same
+PayWayService.filter_by_carrier checkout calls, so a delivery card can
+never advertise what the payment step would refuse. Verified against
+production: BoxNow locker uniquely unlocks BOX_NOW_PAY_ON_THE_GO, ACS
+home delivery uniquely unlocks PAY_ON_DELIVERY.
+
+All four mutation-checked. One was caught by its own test: the note
+above the refund gate was a multi-line {# #}, which Django only honours
+on a single line — it rendered itself into the customer's email.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01WnK59xS5MBn65T5f6ZP7Xf ([`b2bbdc8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b2bbdc80f313211d4b5a0c58a77bac68cbc98d65))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.48.4 [skip ci] ([`8e5a864`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8e5a8641c4fd1de0fe1da7c498f8bfc2a90fb2ce))
+
+### Code style
+
+* style: run ruff format on the new shipping options test
+
+CI enforces `ruff format --check` alongside `ruff check`, and I only ran
+the latter before pushing. Formatting only — no behaviour change.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01WnK59xS5MBn65T5f6ZP7Xf ([`40edd83`](https://github.com/vasilistotskas/grooveshop-django-api/commit/40edd832c033c846e2196323d2e6c93388184b3f))
+
+### Continuous integration
+
+* ci: prune published image tags on a schedule
+
+Every release pushes a tag to Docker Hub and GHCR and nothing ever
+removed one, so gro0ve/grooveshop-django-api holds 718 tags going back
+~1160 days. Measured against the live listing: 550 are prunable under
+the policy here, ~111.5 GB.
+
+Docker Hub's own Lifecycle Policies would do this natively but are a
+Pro/Team/Business feature, so this drives the first-party API rather
+than adding a third-party action. GHCR uses GitHub's own
+delete-package-versions, so neither half hands credentials to anyone
+else.
+
+A tag survives if it is among the newest 100, OR younger than 90 days,
+OR named `latest`. Both rules matter: keep-count alone would drop a
+live tag during a busy release week, and age alone would wipe the
+rollback target during a quiet month. At the measured numbers the pair
+keeps 168, not 100 — deleting a tag is irreversible and rebuilding an
+old one is not guaranteed to reproduce once dependencies drift, so the
+policy errs generous.
+
+The selection is a plain function in .github/scripts/ rather than a
+shell one-liner, because it decides what gets permanently deleted and
+that deserves tests. Ten of them, mutation-checked: dropping the age
+floor fails two, dropping the `latest` guard fails one. Verified
+end-to-end against the real 718-tag listing — v3.48.4 (live in
+production) and `latest` both survive, and the newest tag it would
+delete is 105 days old.
+
+Runs dry by default: a manual run previews, the Sunday schedule
+applies. The GHCR half has no dry-run mode, so a preview skips that job
+rather than deleting a subset and calling it a preview.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01WnK59xS5MBn65T5f6ZP7Xf ([`ebd795d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ebd795dd760386e21c2aaa855f72261315e1168a))
+
+### Documentation
+
+* docs(pay_way): describe CARRIER_TERMINAL as it actually works
+
+The enum said a locker terminal takes a card at an APM. It does not.
+Read from BoxNow first-party pages on 2026-09-09: BOX NOW Antikatavoli
+(marketed in English as PAY ON THE GO) is an ONLINE payment the carrier
+collects — a Viva Wallet link by email at pickup, then Viber/SMS with an
+INACTIVE PIN plus the link once the parcel is in the compartment, and
+the PIN activates when the shopper pays from wherever they are. No
+terminal, no cash.
+
+The wire value stays carrier_terminal: what the enum discriminates is
+WHO collects and WHEN, which is unchanged, and renaming it would be a
+data migration for no behavioural gain.
+
+Behaviour was always right — CARRIER_TERMINAL maps to BoxNow wire
+`cod`, COURIER_CASH is refused on lockers. Only the explanation was
+wrong, and it misled a later change today.
+
+The same wrong model still sits in the CARRIER_TERMINAL label, which is
+baked into schema.yml and so needs a coordinated schema regen across
+both repos.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01WnK59xS5MBn65T5f6ZP7Xf ([`da043ed`](https://github.com/vasilistotskas/grooveshop-django-api/commit/da043edd01b5213dfb3606fb4d2aee0b094596d9))
+
 ## v3.48.4 (2026-09-09)
 
 ### Bug fixes

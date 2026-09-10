@@ -3,6 +3,69 @@
 
 
 
+## v3.50.0 (2026-09-10)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.49.0 [skip ci] ([`a4760ed`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a4760edcd2ad6244e6d27e012e90806e77163384))
+
+### Features
+
+* feat(tenant): command to drop pre-cutover tenant tables from public
+
+Before multi-tenancy this database was a single schema, so every
+tenant-app table lived in ``public``. The cutover moved the data and
+``prune_public_legacy_data`` truncated the leftovers (145 tables,
+83,903 rows, 2026-08-22) — but it truncated ROWS. The tables stayed,
+and they can be neither maintained nor used:
+
+* ``TenantSyncRouter.allow_migrate`` returns False for every app not in
+  SHARED_APPS when the schema is ``public``. Django skips the operations
+  but still writes the django_migrations row, so the public ledger reads
+  exactly like a healthy tenant's while no DDL ever runs. Measured on
+  production: public.pay_way_payway is missing ``settlement``,
+  public.order_order is missing 12 columns, and 18 tables added since
+  the cutover were never created — with the ledger claiming all of it
+  applied. This is normal django-tenants behaviour, not corruption; the
+  residue is what makes it look like corruption.
+* Nothing reads them. Tenant models are served only inside a tenant
+  schema.
+
+Leaving them is not harmless: a tenant query running in a public
+context gets an EMPTY RESULT from a stale table rather than an error,
+and every audit of the database has to know to ignore 145 tables.
+
+Written first as a migration, which was wrong and is worth recording.
+The ``tests`` lane strips DATABASE_ROUTERS to keep the suite fast, so
+it is routerless and every table legitimately lives in ``public``
+there; with no router allow_migrate returns True, the migration ran
+during test-database setup and dropped the whole schema — 378 failures
+locally, and the same on every CI run. A cleanup that fires implicitly
+on every database forever, to fix one lineage once, is the wrong shape.
+
+Guards, all mutation-checked:
+* dry run by default, ``--yes`` to execute;
+* refuses without the django-tenants router — the exact trap above;
+* refuses off the public schema;
+* ONE ``DROP TABLE`` for the set with NO CASCADE, so a dependency from
+  outside the set aborts instead of cascading into shared data;
+* names only tables that exist, so it is a no-op post-cutover.
+
+``tenant_only_table_names`` uses ``include_auto_created=True``, which is
+load-bearing: without it the scan returns 138 tables and leaves 11
+implicit M2M through tables (blog_blogpost_tags,
+socialaccount_socialapp_sites, the djstripe *taxrate tables) outside
+the set holding FKs into it, and the no-CASCADE drop then fails. With
+it: 145 tables, zero inbound FKs from outside. Both measured against
+production.
+
+The tests_mt lane gains the invariant itself — no tenant-only table in
+the public schema — asserted about the schema rather than the command,
+so any future cause is caught too.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01WnK59xS5MBn65T5f6ZP7Xf ([`0d6b06a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0d6b06a7593c86235ca6a03cd74d2d977e9f23a3))
+
 ## v3.49.0 (2026-09-10)
 
 ### Bug fixes

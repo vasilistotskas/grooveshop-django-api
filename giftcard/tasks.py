@@ -14,8 +14,8 @@ from core.tasks import MonitoredTask
 from core.utils.email_context import build_email_context
 from core.utils.i18n import get_user_language
 from tenant.credentials import (
-    tenant_contact_email,
     tenant_from_email,
+    tenant_reply_to,
     tenant_site_name,
 )
 
@@ -63,7 +63,7 @@ def deliver_gift_card_email(self, gift_card_id: int) -> dict:
         text_content,
         tenant_from_email(),
         [card.recipient_email],
-        reply_to=[tenant_contact_email()],
+        reply_to=tenant_reply_to(),
     )
     msg.attach_alternative(html_content, "text/html")
     msg.send()
@@ -152,7 +152,7 @@ def send_gift_card_purchase_receipt(self, purchase_id: int) -> dict:
         text_content,
         tenant_from_email(),
         [purchase.buyer_email],
-        reply_to=[tenant_contact_email()],
+        reply_to=tenant_reply_to(),
     )
     msg.attach_alternative(html_content, "text/html")
     msg.send()
@@ -220,7 +220,7 @@ def send_gift_card_expiry_reminders(self) -> dict:
             text_content,
             tenant_from_email(),
             [card.recipient_email],
-            reply_to=[tenant_contact_email()],
+            reply_to=tenant_reply_to(),
         )
         msg.attach_alternative(html_content, "text/html")
         msg.send()

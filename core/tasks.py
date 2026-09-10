@@ -26,7 +26,10 @@ from core.exceptions import HealthCheckFailed, ManagementCommandFailed
 from core.utils.email_context import build_email_context
 from core.utils.i18n import get_user_language
 from tenant.celery import TenantTask
-from tenant.credentials import tenant_contact_email, tenant_from_email
+from tenant.credentials import (
+    tenant_from_email,
+    tenant_reply_to,
+)
 
 User = get_user_model()
 
@@ -516,7 +519,7 @@ def send_inactive_user_notifications() -> dict[str, Any]:
                 body=text_body,
                 from_email=tenant_from_email(),
                 to=[user.email],
-                reply_to=[tenant_contact_email()],
+                reply_to=tenant_reply_to(),
                 headers=build_list_unsubscribe_headers(
                     unsubscribe_url, list_id="reengagement"
                 ),

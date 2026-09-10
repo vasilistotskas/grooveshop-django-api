@@ -113,7 +113,10 @@ def export_user_data_task(self, export_id: int) -> dict:
     from core.utils.email_context import build_email_context
     from core.utils.i18n import get_user_language
     from core.utils.tenant_urls import get_tenant_frontend_url
-    from tenant.credentials import tenant_contact_email, tenant_from_email
+    from tenant.credentials import (
+        tenant_from_email,
+        tenant_reply_to,
+    )
     from user.models.data_export import UserDataExport
     from user.services.gdpr import (
         EXPORT_TTL,
@@ -193,7 +196,7 @@ def export_user_data_task(self, export_id: int) -> dict:
             body=text_body,
             from_email=tenant_from_email(),
             to=[user.email],
-            reply_to=[tenant_contact_email()],
+            reply_to=tenant_reply_to(),
         )
         msg.attach_alternative(html_body, "text/html")
         msg.send(fail_silently=False)

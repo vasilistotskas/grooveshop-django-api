@@ -28,6 +28,7 @@ from pay_way.enum.settlement import PaySettlement
 from tenant.credentials import (
     tenant_contact_email,
     tenant_from_email,
+    tenant_reply_to,
     tenant_site_name,
 )
 from user.utils.subscription import (
@@ -237,7 +238,7 @@ def send_order_confirmation_email(self, order_id: int) -> bool:
             text_content,
             tenant_from_email(),
             [order.email],
-            reply_to=[tenant_contact_email()],
+            reply_to=tenant_reply_to(),
             headers=build_transactional_list_headers(
                 list_id="order_confirmation"
             ),
@@ -593,7 +594,7 @@ def send_payment_failed_email(self, order_id: int) -> bool:
             text_content,
             tenant_from_email(),
             [order.email],
-            reply_to=[tenant_contact_email()],
+            reply_to=tenant_reply_to(),
             headers=build_transactional_list_headers(list_id="payment_failed"),
         )
         msg.attach_alternative(html_content, "text/html")
@@ -770,7 +771,7 @@ def send_refund_confirmation_email(self, order_id: int) -> bool:
             text_content,
             tenant_from_email(),
             [order.email],
-            reply_to=[tenant_contact_email()],
+            reply_to=tenant_reply_to(),
             headers=build_transactional_list_headers(
                 list_id="refund_confirmation"
             ),
@@ -934,7 +935,7 @@ def send_order_status_update_email(
             text_content,
             tenant_from_email(),
             [order.email],
-            reply_to=[tenant_contact_email()],
+            reply_to=tenant_reply_to(),
             headers=build_transactional_list_headers(list_id="order_status"),
         )
         msg.attach_alternative(html_content, "text/html")
@@ -1129,7 +1130,7 @@ def send_shipping_notification_email(self, order_id: int) -> bool:
             text_content,
             tenant_from_email(),
             [order.email],
-            reply_to=[tenant_contact_email()],
+            reply_to=tenant_reply_to(),
             headers=build_transactional_list_headers(
                 list_id="shipping_notification"
             ),
@@ -1360,7 +1361,7 @@ def send_invoice_email(self, order_id: int) -> bool:
             text_content,
             tenant_from_email(),
             [order.email],
-            reply_to=[tenant_contact_email()],
+            reply_to=tenant_reply_to(),
             headers=build_transactional_list_headers(list_id="order_invoice"),
         )
         msg.attach_alternative(html_content, "text/html")
@@ -1720,7 +1721,7 @@ def check_pending_orders() -> int:
                 text_content,
                 tenant_from_email(),
                 [order.email],
-                reply_to=[tenant_contact_email()],
+                reply_to=tenant_reply_to(),
             )
             msg.attach_alternative(html_content, "text/html")
 
@@ -2038,7 +2039,7 @@ def send_checkout_abandonment_emails() -> int:
                 text_content,
                 tenant_from_email(),
                 [cart.user.email],
-                reply_to=[tenant_contact_email()],
+                reply_to=tenant_reply_to(),
                 headers=headers,
             )
             msg.attach_alternative(html_content, "text/html")

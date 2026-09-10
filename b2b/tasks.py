@@ -15,6 +15,7 @@ from core.utils.i18n import get_user_language
 from tenant.credentials import (
     tenant_contact_email,
     tenant_from_email,
+    tenant_reply_to,
     tenant_site_name,
 )
 
@@ -76,7 +77,7 @@ def send_business_profile_status_email(self, profile_id: int) -> dict:
         text_content,
         tenant_from_email(),
         [recipient],
-        reply_to=[tenant_contact_email()],
+        reply_to=tenant_reply_to(),
     )
     msg.attach_alternative(html_content, "text/html")
     msg.send()

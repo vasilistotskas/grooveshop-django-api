@@ -35,6 +35,7 @@ from tenant.credentials import (
     tenant_meta_capi_access_token,
     tenant_meta_capi_dataset_id,
     tenant_meta_pixel_id,
+    tenant_reply_to,
     tenant_site_name,
     tenant_totp_issuer,
     viva_wallet_credentials,
@@ -511,6 +512,43 @@ class TestTenantContactEmail:
         settings.INFO_EMAIL = "info@platform.com"
         Setting.objects.filter(name="CONTACT_EMAIL").delete()
         assert tenant_contact_email() == "info@platform.com"
+
+
+class TestTenantReplyTo:
+    """``tenant_reply_to()`` — the ``Reply-To`` list for outbound mail."""
+
+    def test_store_with_contact_address(self, bind_tenant, tenant_factory):
+        tenant = tenant_factory("reply-to-1")
+        tenant.contact_email = "contact@shop.com"
+        tenant.save()
+        bind_tenant(tenant)
+        assert tenant_reply_to() == ["contact@shop.com"]
+
+    def test_store_without_contact_address_emits_no_header(
+        self, bind_tenant, tenant_factory, settings, db
+    ):
+        # ``EmailMessage`` joins the list verbatim, so ``[""]`` would put
+        # a literal empty ``Reply-To:`` header on the wire; ``[]`` emits
+        # none at all.
+        from django.core.mail import EmailMultiAlternatives
+        from extra_settings.models import Setting
+
+        tenant = tenant_factory("reply-to-2")
+        tenant.contact_email = ""
+        tenant.save()
+        bind_tenant(tenant)
+        settings.INFO_EMAIL = "info@platform.com"
+        Setting.objects.filter(name="CONTACT_EMAIL").delete()
+
+        assert tenant_reply_to() == []
+        message = EmailMultiAlternatives(
+            "s",
+            "b",
+            "from@example.com",
+            ["to@example.com"],
+            reply_to=tenant_reply_to(),
+        ).message()
+        assert "Reply-To" not in message
 
 
 class TestTenantSiteName:

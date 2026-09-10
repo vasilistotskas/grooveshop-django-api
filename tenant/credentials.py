@@ -160,6 +160,20 @@ def tenant_contact_email() -> str:
     return getattr(settings, "INFO_EMAIL", "") or ""
 
 
+def tenant_reply_to() -> list[str]:
+    """Return the ``Reply-To`` list for outbound mail from the active tenant.
+
+    ``[tenant_contact_email()]`` when the store has a contact address,
+    ``[]`` when it has none. ``EmailMessage`` joins whatever list it is
+    given, so ``[""]`` would put a literal empty ``Reply-To:`` header on
+    the wire — an RFC 5322 violation some receivers score as spam —
+    whereas an empty list emits no header at all and replies go to the
+    authenticated platform sender.
+    """
+    email = tenant_contact_email()
+    return [email] if email else []
+
+
 def tenant_admin_recipients() -> list[str]:
     """Return merchant-operations alert recipients for the active tenant.
 

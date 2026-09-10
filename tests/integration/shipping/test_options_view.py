@@ -179,14 +179,15 @@ class TestPayWaysPerOption:
         ShippingProvider.objects.filter(code="boxnow").update(is_active=True)
 
         client = APIClient()
-        response = client.get(reverse("shipping-options"), {"country_code": "GR"})
+        response = client.get(
+            reverse("shipping-options"), {"country_code": "GR"}
+        )
 
         assert response.status_code == status.HTTP_200_OK
         locker = next(
             opt
             for opt in response.json()
-            if opt["providerCode"] == "boxnow"
-            and opt["kind"] == "pickup_point"
+            if opt["providerCode"] == "boxnow" and opt["kind"] == "pickup_point"
         )
         assert PayWayEnum.BOX_NOW_PAY_ON_THE_GO.value in [
             p["name"] for p in locker["payWays"]
@@ -212,13 +213,14 @@ class TestPayWaysPerOption:
         ShippingProvider.objects.filter(code="boxnow").update(is_active=True)
 
         client = APIClient()
-        response = client.get(reverse("shipping-options"), {"country_code": "GR"})
+        response = client.get(
+            reverse("shipping-options"), {"country_code": "GR"}
+        )
 
         locker = next(
             opt
             for opt in response.json()
-            if opt["providerCode"] == "boxnow"
-            and opt["kind"] == "pickup_point"
+            if opt["providerCode"] == "boxnow" and opt["kind"] == "pickup_point"
         )
         assert PayWayEnum.PAY_ON_DELIVERY.value not in [
             p["name"] for p in locker["payWays"]
@@ -240,7 +242,9 @@ class TestPayWaysPerOption:
         ShippingProvider.objects.filter(code="boxnow").update(is_active=True)
 
         client = APIClient()
-        response = client.get(reverse("shipping-options"), {"country_code": "GR"})
+        response = client.get(
+            reverse("shipping-options"), {"country_code": "GR"}
+        )
 
         for opt in response.json():
             assert PayWayEnum.BOX_NOW_PAY_ON_THE_GO.value not in [
@@ -253,7 +257,9 @@ class TestPayWaysPerOption:
         ShippingProvider.objects.filter(code="boxnow").update(is_active=True)
 
         client = APIClient()
-        response = client.get(reverse("shipping-options"), {"country_code": "GR"})
+        response = client.get(
+            reverse("shipping-options"), {"country_code": "GR"}
+        )
 
         assert response.json()
         for opt in response.json():

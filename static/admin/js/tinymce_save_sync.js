@@ -1,5 +1,5 @@
 /**
- * TinyMCE save-on-submit safety net for the Webside admin.
+ * TinyMCE save-on-submit safety net for the admin.
  *
  * django-tinymce normally wires a form-submit handler so that
  * ``tinymce.triggerSave()`` copies the editor's iframe HTML back to
@@ -43,10 +43,10 @@
 	"use strict";
 
 	// Idempotent — admin includes can stack when SCRIPTS arrays grow.
-	if (window.__webside_tinymce_save_sync_loaded) {
+	if (window.__grooveshop_tinymce_save_sync_loaded) {
 		return;
 	}
-	window.__webside_tinymce_save_sync_loaded = true;
+	window.__grooveshop_tinymce_save_sync_loaded = true;
 
 	// True if the global TinyMCE namespace is loaded and usable.
 	function tinymceReady() {
@@ -76,15 +76,15 @@
 			editor.save();
 		} catch (e) {
 			// Never block submit on a sync error.
-			console.warn("[webside] editor.save() failed", e);
+			console.warn("[tinymce-save-sync] editor.save() failed", e);
 		}
 	}
 
 	// Wire continuous content sync on a single editor. Called on every
 	// editor we discover (current + future via AddEditor).
 	function bindEditorAutoSync(editor) {
-		if (!editor || editor.__webside_save_bound) return;
-		editor.__webside_save_bound = true;
+		if (!editor || editor.__grooveshop_save_bound) return;
+		editor.__grooveshop_save_bound = true;
 		// Cover every event TinyMCE 7/8 fires when content meaningfully
 		// changes:
 		//   input/keyup → typed-character changes (real-time)
@@ -125,8 +125,8 @@
 		var forms = document.querySelectorAll("form");
 		for (var i = 0; i < forms.length; i++) {
 			var form = forms[i];
-			if (form.__webside_save_bound) continue;
-			form.__webside_save_bound = true;
+			if (form.__grooveshop_save_bound) continue;
+			form.__grooveshop_save_bound = true;
 			form.addEventListener("submit", syncAll, true);
 		}
 	}
@@ -136,9 +136,9 @@
 	// any code that tries to bind there silently no-ops.
 	function bindAddEditorListener() {
 		if (!tinymceReady()) return;
-		if (window.__webside_addeditor_bound) return;
+		if (window.__grooveshop_addeditor_bound) return;
 		if (typeof window.tinymce.on !== "function") return;
-		window.__webside_addeditor_bound = true;
+		window.__grooveshop_addeditor_bound = true;
 		window.tinymce.on("AddEditor", function (e) {
 			if (e && e.editor) bindEditorAutoSync(e.editor);
 		});

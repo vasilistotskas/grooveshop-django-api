@@ -199,6 +199,65 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
     logo_dark_url = models.URLField(_("Logo (Dark)"), blank=True, default="")
     favicon_url = models.URLField(_("Favicon URL"), blank=True, default="")
 
+    # The platform's own storefront. At most one store carries this: it
+    # renders the brand assets bundled in the storefront image (navbar
+    # wordmark, favicon set, OG card, login mark) and the platform-only
+    # discovery surfaces (llms.txt); every other store renders exactly
+    # what its own rows carry. A ROW FLAG on purpose, never a hostname in
+    # env: the storefront used to recognise this tenant by comparing its
+    # primary domain with ``NUXT_PUBLIC_BASE_URL``, which put the first
+    # store's hostname into every tenant's serialized runtime config and
+    # Django's twin read ``NUXT_BASE_URL`` for the same comparison.
+    # ``db_default`` for the same reason as ``is_protected`` below.
+    is_platform_storefront = models.BooleanField(
+        _("Platform storefront"),
+        default=False,
+        db_default=False,
+        help_text=_(
+            "This store is the platform's own storefront: it renders the "
+            "brand assets bundled in the storefront image. At most one "
+            "tenant may carry this."
+        ),
+    )
+
+    # SEO attribution and site verification — per-store data, emitted
+    # only on the store that set it. These were platform env values
+    # (tenant #1's) until 2026-09-10, so every store's pages carried the
+    # first store's author and verification tokens in their payload.
+    seo_author = models.CharField(
+        _("SEO author"),
+        max_length=120,
+        blank=True,
+        default="",
+        db_default="",
+        help_text=_(
+            "Rendered as the storefront's author/creator/publisher meta "
+            "tags. Empty → the tags are not emitted."
+        ),
+    )
+    google_site_verification = models.CharField(
+        _("Google site verification"),
+        max_length=128,
+        blank=True,
+        default="",
+        db_default="",
+        help_text=_(
+            "Google Search Console verification token (the content of "
+            "the google-site-verification meta tag). Empty → not emitted."
+        ),
+    )
+    pinterest_domain_verify = models.CharField(
+        _("Pinterest domain verification"),
+        max_length=128,
+        blank=True,
+        default="",
+        db_default="",
+        help_text=_(
+            "Pinterest domain verification token (the content of the "
+            "p:domain_verify meta tag). Empty → not emitted."
+        ),
+    )
+
     # Theme (Nuxt UI v4 compatible)
     primary_color = models.CharField(
         _("Primary Color"),
@@ -937,6 +996,15 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
     class Meta:
         verbose_name = _("Tenant")
         verbose_name_plural = _("Tenants")
+        constraints = [
+            # Enforced by the database, not only by the admin form: two
+            # platform storefronts would both render the bundled brand.
+            models.UniqueConstraint(
+                fields=["is_platform_storefront"],
+                condition=models.Q(is_platform_storefront=True),
+                name="tenant_single_platform_storefront",
+            ),
+        ]
 
     def __str__(self):
         return self.name

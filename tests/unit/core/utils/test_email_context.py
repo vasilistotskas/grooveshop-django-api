@@ -30,6 +30,7 @@ def _fake_tenant(domain: str | None = None, **overrides):
         "name": "",
         "contact_email": "",
         "logo_light_url": "",
+        "is_platform_storefront": False,
     }
     defaults.update(overrides)
     tenant = SimpleNamespace(**defaults)
@@ -93,15 +94,34 @@ class TestBuildEmailContext:
 
         assert context["SITE_LOGO_URL"] == ""
 
-    def test_platform_tenant_falls_back_to_platform_logo(
+    def test_platform_tenant_falls_back_to_platform_logo(self, bind_tenant):
+        # The row flag is the ONLY thing that makes a store the platform
+        # storefront.
+        bind_tenant(
+            _fake_tenant(
+                domain="platform.example",
+                logo_light_url="",
+                is_platform_storefront=True,
+            )
+        )
+
+        context = build_email_context()
+
+        assert context["SITE_LOGO_URL"].endswith("/static/logo-dark.svg")
+
+    def test_matching_base_url_host_no_longer_makes_a_tenant_platform(
         self, bind_tenant, settings
     ):
+        # The old rule compared the primary domain with NUXT_BASE_URL's
+        # host, which forced a platform env value to carry a store's
+        # hostname. An unflagged store must not inherit the platform
+        # brand just because the env happens to name its domain.
         settings.NUXT_BASE_URL = "https://platform.example"
         bind_tenant(_fake_tenant(domain="platform.example", logo_light_url=""))
 
         context = build_email_context()
 
-        assert context["SITE_LOGO_URL"].endswith("/static/logo-dark.svg")
+        assert context["SITE_LOGO_URL"] == ""
 
     def test_no_active_tenant_counts_as_platform(self, bind_tenant):
         # Public-schema/admin contexts keep the platform logo.

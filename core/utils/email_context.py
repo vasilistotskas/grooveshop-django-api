@@ -15,10 +15,9 @@ need to be added in one place.
 from __future__ import annotations
 
 from typing import Any
-from urllib.parse import urlparse
 
-from django.conf import settings
 from django.db import connection
+from django_tenants.utils import get_public_schema_name
 
 from core.utils.tenant_urls import (
     get_tenant_base_url,
@@ -58,24 +57,18 @@ def build_email_context(**extra: Any) -> dict[str, Any]:
 def _is_platform_tenant() -> bool:
     """True when the active tenant IS the platform's own storefront.
 
-    Server-side twin of the Nuxt ``useIsPlatformTenant`` check: the
-    tenant whose primary domain equals the platform base URL's host is
-    the platform brand itself. Missing tenant/domain counts as platform
-    so single-tenant setups keep today's behaviour.
+    Server-side twin of the Nuxt ``useIsPlatformTenant`` check, and the
+    same source of truth: the ``Tenant.is_platform_storefront`` row
+    flag. No hostname comparison — the previous ``NUXT_BASE_URL`` match
+    made a platform env value carry tenant #1's domain. No tenant, or
+    the public schema (admin and platform contexts), counts as platform
+    so those emails keep the platform brand.
     """
     tenant = getattr(connection, "tenant", None)
-    domains_manager = getattr(tenant, "domains", None) if tenant else None
-    if domains_manager is None:
+    schema = getattr(tenant, "schema_name", "") if tenant else ""
+    if not schema or schema == get_public_schema_name():
         return True
-    try:
-        primary = domains_manager.filter(is_primary=True).first()
-    except Exception:
-        return True
-    if primary is None or not getattr(primary, "domain", ""):
-        return True
-    base = getattr(settings, "NUXT_BASE_URL", "") or ""
-    host = urlparse(base).hostname or ""
-    return bool(host) and primary.domain == host
+    return bool(getattr(tenant, "is_platform_storefront", False))
 
 
 def _email_logo_url() -> str:

@@ -42,6 +42,11 @@ class TestTenantConfigSerializer:
             # public-safe fields added for Nuxt consumers
             "stripe_publishable_key",
             "allowed_csp_sources",
+            # platform storefront flag + per-store SEO attribution
+            "is_platform_storefront",
+            "seo_author",
+            "google_site_verification",
+            "pinterest_domain_verify",
         }
         assert expected.issubset(set(serializer.fields.keys()))
 

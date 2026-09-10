@@ -508,6 +508,7 @@ class TenantAdmin(ModelAdmin):
                     # KIND of tenant this row is.
                     "is_demo",
                     "is_protected",
+                    "is_platform_storefront",
                     "suspended_at",
                     "suspended_reason",
                     "uuid",
@@ -537,6 +538,9 @@ class TenantAdmin(ModelAdmin):
                     "logo_light_url",
                     "logo_dark_url",
                     "favicon_url",
+                    "seo_author",
+                    "google_site_verification",
+                    "pinterest_domain_verify",
                 ]
             },
         ),

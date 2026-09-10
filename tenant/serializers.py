@@ -24,6 +24,20 @@ class TenantConfigSerializer(serializers.Serializer):
     logo_dark_url = serializers.CharField(read_only=True, allow_blank=True)
     favicon_url = serializers.CharField(read_only=True, allow_blank=True)
 
+    # --- Platform storefront + SEO attribution ---
+    # ``required=False``, NOT ``read_only=True`` — see the
+    # ``openai_pixel_id`` note below: a read-only field is REQUIRED in
+    # the generated schema, and a frontend-first deploy would then
+    # reject every resolve from a backend that predates the field.
+    is_platform_storefront = serializers.BooleanField(required=False)
+    seo_author = serializers.CharField(required=False, allow_blank=True)
+    google_site_verification = serializers.CharField(
+        required=False, allow_blank=True
+    )
+    pinterest_domain_verify = serializers.CharField(
+        required=False, allow_blank=True
+    )
+
     # --- Theme ---
     primary_color = serializers.CharField(read_only=True)
     neutral_color = serializers.CharField(read_only=True)
@@ -318,6 +332,11 @@ class TenantAdminSerializer(serializers.ModelSerializer):
             "logo_light_url",
             "logo_dark_url",
             "favicon_url",
+            # --- Platform storefront + SEO attribution ---
+            "is_platform_storefront",
+            "seo_author",
+            "google_site_verification",
+            "pinterest_domain_verify",
             # --- Theme ---
             "primary_color",
             "neutral_color",

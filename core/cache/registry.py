@@ -42,6 +42,17 @@ class CacheSurface:
     icon: str = "database"
     group: str = "general"
     danger: bool = False
+    # ``"app_label.ModelName"`` strings whose writes make this surface
+    # stale. Declaring them makes the surface purge ITSELF on save and
+    # delete — see ``core.cache.invalidation``. Without it a surface is
+    # purge-on-demand only: an operator's edit stays invisible for the
+    # full TTL, which is how a corrected PayWay description kept
+    # serving the old English copy on a Greek storefront.
+    #
+    # Opt-in per surface, because "purge on every write" is wrong for
+    # high-volume models — a catalogue import would SCAN Redis once per
+    # product. Declare it where writes are operator-driven and rare.
+    invalidated_by: tuple[str, ...] = ()
 
 
 _lock = threading.RLock()

@@ -21,6 +21,12 @@ class CoreConfig(AppConfig):
 
         register_default_surfaces()
 
+        # Must run AFTER the surfaces exist — it reads their
+        # ``invalidated_by`` declarations to decide what to connect.
+        from core.cache.invalidation import connect_surface_invalidation
+
+        connect_surface_invalidation()
+
         try:
             validate_task_configuration()
         except ImproperlyConfigured as e:

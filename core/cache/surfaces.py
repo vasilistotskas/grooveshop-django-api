@@ -117,6 +117,22 @@ def register_default_surfaces() -> None:
             ),
             django_patterns=("*PayWayViewSet_*",),
             nuxt_patterns=_nuxt("PayWayViewSet"),
+            # Operator-driven and rare, so purging on write is cheap —
+            # and necessary: the checkout renders the admin-authored
+            # description and instructions, which used to stay stale for
+            # hours after an edit. ``PayWayTranslation`` is listed
+            # separately because parler keeps each language in its own
+            # row, and editing the Greek copy touches only that row.
+            invalidated_by=(
+                "pay_way.PayWay",
+                "pay_way.PayWayTranslation",
+            ),
+            # ``/api/v1/shipping/options`` embeds each option's eligible
+            # pay-ways (id + name), which the checkout renders as badges
+            # on the delivery step. A PayWay edit makes that payload
+            # stale too, and it is cached under the ``shipping`` surface
+            # rather than this one.
+            related=("shipping",),
             icon="payments",
             group="commerce",
         )

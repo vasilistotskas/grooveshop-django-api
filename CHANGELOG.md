@@ -3,6 +3,33 @@
 
 
 
+## v3.51.1 (2026-09-10)
+
+### Bug fixes
+
+* fix(email): emit no Reply-To or mailto unsubscribe form for a store without a contact address
+
+Since a store's `tenant_contact_email()` became `""` instead of the
+platform mailbox, fourteen send sites still passed
+`reply_to=[tenant_contact_email()]`, and `EmailMessage` joins that
+list verbatim: the wire message carried a literal empty `Reply-To:`
+header. The List-Unsubscribe builders likewise rendered
+`<mailto:?subject=unsubscribe>`.
+
+`tenant_reply_to()` returns `[email]` or `[]`, so a store with no
+contact address emits no Reply-To header at all and replies reach the
+authenticated platform sender. The header builders drop the `mailto:`
+form in that case: marketing mail keeps the HTTPS one-click form RFC
+8058 requires, transactional mail (no HTTPS unsubscribe endpoint)
+emits only `List-ID`.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_012X8TF7Ym7hUuSU4pwu2aEr ([`9b687cf`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9b687cfc56965cc65d9b7750658b088d2865467c))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.51.0 [skip ci] ([`f5dcae1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f5dcae1556db2d2b93445e009fca076cdf730589))
+
 ## v3.51.0 (2026-09-10)
 
 ### Bug fixes

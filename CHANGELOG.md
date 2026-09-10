@@ -3,6 +3,56 @@
 
 
 
+## v3.51.0 (2026-09-10)
+
+### Bug fixes
+
+* fix(email): render the contact link only when the store has a contact address
+
+A store's contact address no longer falls back to the platform's, so the footers must not emit an empty mailto: link or a blank line when it is unset.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01BxzZJT7decDjzJT3kima2c ([`de8d0d1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/de8d0d1cd561bd181b7a6cd7b2e7da498db6e9c9))
+
+### Chores
+
+* chore(admin): platform-neutral identifiers in the TinyMCE save-sync script
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01BxzZJT7decDjzJT3kima2c ([`5f8caeb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5f8caebe554a33658ecb41c71863c507712420d9))
+
+* chore(env): drop retired NUXT_BASE_DOMAIN, cookie-domain and MFA_TOTP_ISSUER examples
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01BxzZJT7decDjzJT3kima2c ([`ff2b5f7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ff2b5f7c8e8714def4d772009318b773d1cd537e))
+
+* chore(deps): sync uv.lock to 3.50.0 [skip ci] ([`abbe085`](https://github.com/vasilistotskas/grooveshop-django-api/commit/abbe085906a3b04821e251522c3f1b542ca09bdb))
+
+### Features
+
+* feat(tenant): a store never falls back to platform identity values
+
+Every store-facing value now resolves from the store's own row and nothing else:
+
+- tenant_contact_email: Tenant.contact_email -> CONTACT_EMAIL setting -> empty inside a store's schema. settings.INFO_EMAIL is the PLATFORM's contact address and applies only on the public schema (billing notices). Until now INFO_EMAIL was tenant #1's address, so every store without its own inherited it as Reply-To and contact inbox.
+- tenant_totp_issuer: Tenant.totp_issuer -> the store name. MFA_TOTP_ISSUER is gone; allauth's own fallback (the Site framework's current site) is never consulted. The passkey relying-party name is the store name for the same reason.
+- Social-connect redirect hosts are the store's TenantDomain rows (platform host only outside a store), not a static platform pair; NUXT_BASE_DOMAIN is gone.
+- CSRF_COOKIE_DOMAIN / SESSION_COOKIE_DOMAIN are None with no env knob: TenantCookieDomainMiddleware derives the Domain per request, and a process-wide value could only ever be one store's apex.
+- Admin email previews build links on the active store's origin; the abandoned-cart unsubscribe link is always generated.
+- Demo seed: neutral fictional identity (GrooveShop Demo / Groove), image paths under the demo tenant's own media, contact addresses read from settings.INFO_EMAIL at seed time so no mailbox is written into the repository.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01BxzZJT7decDjzJT3kima2c ([`c7d0d62`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c7d0d62d1b53db43675b63ef92aa8a556efd39b3))
+
+### Testing
+
+* test(core): the help-text settings scan may legitimately find nothing
+
+No store-facing field falls back to a platform setting any more, so no help_text names one. The guard now proves the pattern still matches on a synthetic string instead of demanding a live reference.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_012X8TF7Ym7hUuSU4pwu2aEr ([`16321d4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/16321d48f1b7e6f2fd9a006460607cb93b0d1fda))
+
 ## v3.50.0 (2026-09-10)
 
 ### Chores

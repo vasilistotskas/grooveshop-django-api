@@ -3,6 +3,59 @@
 
 
 
+## v3.55.0 (2026-09-11)
+
+### Bug fixes
+
+* fix(recommendation): give the new attach match its admin pill
+
+AttachMatch.IMPRESSION had no entry in ATTACH_MATCH_VARIANT, so the
+event admin rendered the now-primary match type as an unstyled chip. A
+missing key degrades silently rather than failing, so guard all three
+variant maps against their enums the way pay_way already does.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com> ([`22f4e42`](https://github.com/vasilistotskas/grooveshop-django-api/commit/22f4e42c97fdcb109d69aeb524943db62306ebe8))
+
+* fix(recommendation): attach a carried impression only to the line that carries it
+
+One impression id covers a whole strip, so rows for the strip's other
+products share it. Matching the carried ids with a bare IN also swept
+those in: an order holding another of the strip's products for an
+unrelated reason got an attach row, labelled `user` (the else branch)
+even when the order had no user at all — corrupting the very label the
+two window definitions are meant to be compared on. Match each carried
+id together with its own product instead.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com> ([`f74e84e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f74e84eeb18b3e4c4b785d3b6f393a46982a2bab))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.54.0 [skip ci] ([`0467c72`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0467c72079ad1d6a95c11828815681e2b9a3ccb0))
+
+### Features
+
+* feat(recommendation): carry the strip impression from add-to-cart to the order line
+
+A first-visit guest has no cart when a suggestion strip is shown (the
+impression records no cart_uuid) and no customer, so neither attach
+window could ever tie their order back — 116 of 130 production events
+were unattributable. The storefront now sends the impression it
+remembered for the product on add-to-cart; CartItem stores it, both
+OrderService cart→order paths copy it onto the OrderItem, and
+record_attach_events matches it first (matched_by = impression), ahead
+of the cart and customer windows.
+
+- CartItem/OrderItem.recommendation_impression_id (nullable UUID)
+- CartItemCreateSerializer/UpdateSerializer accept
+  recommendationImpressionId; latest add wins on a stacked line
+- AttachMatch.IMPRESSION; matched_by widened to 12
+- tests: attach via carried id for an identity-less guest, window-free,
+  precedence over cart, other-product id attaches nothing; API stores
+  it on create/stack/update and rejects a malformed id; both checkout
+  paths copy it
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com> ([`ca0ac5d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ca0ac5de676c0d70045d80778fe760c10febe6fd))
+
 ## v3.54.0 (2026-09-11)
 
 ### Bug fixes

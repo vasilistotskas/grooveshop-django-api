@@ -3,6 +3,35 @@
 
 
 
+## v3.56.1 (2026-09-11)
+
+### Bug fixes
+
+* fix(boxnow): one unplaceable locker must not kill the catalogue sync
+
+Found while re-syncing staging after the deploy. BoxNow's stage
+catalogue serves a destination whose coordinates lost their decimal
+point (lat "96065874308606"). The column is Decimal(10, 7), so the
+INSERT raised NumericValueOutOfRange, the surrounding atomic batch
+rolled back and the ENTIRE sync died on that one row.
+
+The consequence was invisible and expensive: staging's locker table
+never updated, so it kept serving the 2572 lockers cloned from
+production while its own BoxNow account knows 43 — and every voucher it
+minted came back P402 "invalid locker". That is the failure seen on
+staging order 272 earlier today.
+
+Destinations are now checked against the real world (|lat| <= 90,
+|lng| <= 180) and a bad one is skipped with a warning naming it,
+exactly as a destination with no id already was. Production is exposed
+to the same crash the day its feed carries one bad row.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com> ([`c56456c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c56456c0a4521c90e186dd79f3ff6504f2011dbd))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.56.0 [skip ci] ([`a0e91f4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a0e91f46b3474d23bcb9d05fe8c1624b2be676a9))
+
 ## v3.56.0 (2026-09-11)
 
 ### Bug fixes

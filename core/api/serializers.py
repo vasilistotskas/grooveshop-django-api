@@ -268,3 +268,17 @@ class SettingSerializer(serializers.Serializer):
 class SettingDetailSerializer(serializers.Serializer):
     name = serializers.CharField()
     value = serializers.CharField()
+
+
+class PublicSettingsSerializer(serializers.Serializer):
+    """Every public store setting, keyed by name.
+
+    Values are strings in the same encoding ``SettingDetailSerializer``
+    uses (json-typed settings JSON-encoded, everything else ``str()``),
+    so a consumer parses one shape whichever endpoint it reads.
+    """
+
+    settings = serializers.DictField(
+        child=serializers.CharField(),
+        help_text=_("Setting values keyed by setting name."),
+    )

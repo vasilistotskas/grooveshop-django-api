@@ -462,7 +462,14 @@ def register_default_surfaces() -> None:
             # identity for the route's 30-minute maxAge, which for a
             # merchant who just corrected their GEMI number or address
             # means the wrong legal identity stays published.
-            nuxt_patterns=_nuxt("settings", "tenantLegalIdentity"),
+            #
+            # ``settingsPublic`` is the storefront's ONE settings read
+            # (server/api/settings/public.get.ts, tenant-cached for a
+            # minute). ``_nuxt`` needs the EXACT handler name — the
+            # ``"settings"`` that used to sit here matched no handler
+            # (the route was ``settingsGet``), so purging this surface
+            # never reached the storefront's settings cache.
+            nuxt_patterns=_nuxt("settingsPublic", "tenantLegalIdentity"),
             related=("pay_way", "shipping", "loyalty"),
             icon="tune",
             group="config",

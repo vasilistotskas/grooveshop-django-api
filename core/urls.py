@@ -17,6 +17,7 @@ from drf_spectacular.views import (
 import core.filters.camel_case_filters
 import core.filters.camel_case_ordering  # noqa
 from core.api.views import (
+    get_public_settings,
     get_setting_by_key,
     health_check,
     health_live,
@@ -127,6 +128,11 @@ _shared_i18n_patterns = [
     path("api/v1/health/live", health_live, name="api-health-live"),
     path("api/v1/settings", list_settings, name="api-settings-list"),
     path("api/v1/settings/get", get_setting_by_key, name="api-settings-get"),
+    path(
+        "api/v1/settings/public",
+        get_public_settings,
+        name="api-settings-public",
+    ),
     path("api/v1/schema", SpectacularAPIView.as_view(), name="schema"),
     path(
         "api/v1/schema/swagger-ui",

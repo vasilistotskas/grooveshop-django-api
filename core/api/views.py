@@ -30,6 +30,7 @@ from core.api.permissions import IsStoreStaff
 from core.api.serializers import (
     ErrorResponseSerializer,
     HealthCheckResponseSerializer,
+    PublicSettingsSerializer,
     SettingDetailSerializer,
     SettingSerializer,
 )
@@ -766,19 +767,10 @@ def get_setting_by_key(request):
 
         try:
             setting_value = Setting.get(key)
-            from core.api.serializers import SettingDetailSerializer
-
-            # json-typed settings hold dicts/lists — ``str()`` would
-            # produce a Python repr (single quotes) the storefront
-            # can't JSON.parse.
-            if isinstance(setting_value, (dict, list)):
-                serialized_value = json.dumps(setting_value)
-            else:
-                serialized_value = str(setting_value)
             serializer = SettingDetailSerializer(
                 {
                     "name": key,
-                    "value": serialized_value,
+                    "value": _serialize_setting_value(setting_value),
                 }
             )
             return Response(serializer.data, status=status.HTTP_200_OK)
@@ -798,5 +790,64 @@ def get_setting_by_key(request):
 
         return Response(
             {"detail": _("Failed to retrieve setting")},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+
+def _serialize_setting_value(value) -> str:
+    # json-typed settings hold dicts/lists — ``str()`` would produce a
+    # Python repr (single quotes) the storefront can't JSON.parse.
+    if isinstance(value, dict | list):
+        return json.dumps(value)
+    return str(value)
+
+
+@extend_schema(  # ty: ignore[invalid-argument-type]
+    summary=_("Get public settings"),
+    description=_(
+        "Retrieve every anonymously readable store setting in one call, "
+        "keyed by setting name. Only PUBLIC_SETTING_KEYS are ever "
+        "included; a key without a row (or with an empty value) is "
+        "omitted so the caller applies its own default."
+    ),
+    tags=["Settings"],
+    responses={
+        200: PublicSettingsSerializer,
+        500: ErrorResponseSerializer,
+    },
+)
+@api_view(["GET"])
+def get_public_settings(request):
+    """The storefront's ONE settings read per render.
+
+    Every server render used to fetch its feature flags and store
+    values one key at a time — around thirty ``settings/get`` round
+    trips per page — which is what saturated the storefront under a
+    crawler burst (Ahrefs, 2026-09-11). One query in the request's
+    tenant schema replaces them; the storefront caches the payload per
+    tenant.
+
+    No ``Setting.get``: that reads through django-extra-settings' own
+    cache and falls back to ``django.conf.settings`` on a miss, neither
+    of which a bulk read wants. The rows ARE the store's settings.
+    """
+    try:
+        from extra_settings.models import Setting
+
+        values: dict[str, str] = {}
+        for setting in Setting.objects.filter(name__in=PUBLIC_SETTING_KEYS):
+            value = setting.value
+            if value is None:
+                continue
+            values[setting.name] = _serialize_setting_value(value)
+
+        serializer = PublicSettingsSerializer({"settings": values})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    except Exception:
+        logger.exception("Error retrieving public settings")
+
+        return Response(
+            {"detail": _("Failed to retrieve settings")},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )

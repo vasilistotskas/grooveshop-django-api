@@ -188,7 +188,23 @@ class UserAccount(
         ]
 
     def __str__(self):
-        return self.username if self.username else self.email
+        """The person's name, because this is what STAFF read.
+
+        Every admin surface that renders a user through a relation —
+        the Blog Author page's ``user`` field, autocomplete results,
+        FK columns, log entries — calls this. Returning the username
+        showed an operator ``Paok1441`` where the account plainly holds
+        "Webside Admin", and the admin columns that matter had each
+        worked around it locally (``obj.user.full_name or
+        obj.user.username``, blog/admin.py and cart's admin). That
+        precedence belongs here, once, so a surface nobody has hand-
+        patched still reads as a person.
+
+        Username stays the fallback for an account with no name filled
+        in, and email the last resort: both are identifying, and a blank
+        label in a dropdown is unusable.
+        """
+        return self.full_name or self.username or self.email
 
     def get_full_name(self):
         return self.full_name

@@ -2686,32 +2686,41 @@ UNFOLD_PLATFORM = {
                     {
                         "title": _("Dashboard"),
                         "icon": "hub",
-                        "link": reverse_lazy("platform_admin:index"),
+                        "link": reverse_lazy(
+                            "platform_admin:index",
+                            urlconf=PUBLIC_SCHEMA_URLCONF,
+                        ),
                     },
                     {
                         "title": _("Tenants"),
                         "icon": "storefront",
                         "link": reverse_lazy(
-                            "platform_admin:tenant_tenant_changelist"
+                            "platform_admin:tenant_tenant_changelist",
+                            urlconf=PUBLIC_SCHEMA_URLCONF,
                         ),
                     },
                     {
                         "title": _("Plan & Billing"),
                         "icon": "payments",
-                        "link": reverse_lazy("platform_admin:plan_billing"),
+                        "link": reverse_lazy(
+                            "platform_admin:plan_billing",
+                            urlconf=PUBLIC_SCHEMA_URLCONF,
+                        ),
                     },
                     {
                         "title": _("Tenant Domains"),
                         "icon": "dns",
                         "link": reverse_lazy(
-                            "platform_admin:tenant_tenantdomain_changelist"
+                            "platform_admin:tenant_tenantdomain_changelist",
+                            urlconf=PUBLIC_SCHEMA_URLCONF,
                         ),
                     },
                     {
                         "title": _("Memberships"),
                         "icon": "badge",
                         "link": reverse_lazy(
-                            "platform_admin:tenant_usertenantmembership_changelist"
+                            "platform_admin:tenant_usertenantmembership_changelist",
+                            urlconf=PUBLIC_SCHEMA_URLCONF,
                         ),
                     },
                 ],
@@ -2724,14 +2733,16 @@ UNFOLD_PLATFORM = {
                         "title": _("Platform Staff"),
                         "icon": "manage_accounts",
                         "link": reverse_lazy(
-                            "platform_admin:user_useraccount_changelist"
+                            "platform_admin:user_useraccount_changelist",
+                            urlconf=PUBLIC_SCHEMA_URLCONF,
                         ),
                     },
                     {
                         "title": _("Groups"),
                         "icon": "group",
                         "link": reverse_lazy(
-                            "platform_admin:auth_group_changelist"
+                            "platform_admin:auth_group_changelist",
+                            urlconf=PUBLIC_SCHEMA_URLCONF,
                         ),
                     },
                 ],
@@ -2752,21 +2763,24 @@ UNFOLD_PLATFORM = {
                         "title": _("Scheduled Tasks"),
                         "icon": "schedule",
                         "link": reverse_lazy(
-                            "platform_admin:django_celery_beat_periodictask_changelist"
+                            "platform_admin:django_celery_beat_periodictask_changelist",
+                            urlconf=PUBLIC_SCHEMA_URLCONF,
                         ),
                     },
                     {
                         "title": _("Countries"),
                         "icon": "public",
                         "link": reverse_lazy(
-                            "platform_admin:country_country_changelist"
+                            "platform_admin:country_country_changelist",
+                            urlconf=PUBLIC_SCHEMA_URLCONF,
                         ),
                     },
                     {
                         "title": _("Regions"),
                         "icon": "map",
                         "link": reverse_lazy(
-                            "platform_admin:region_region_changelist"
+                            "platform_admin:region_region_changelist",
+                            urlconf=PUBLIC_SCHEMA_URLCONF,
                         ),
                     },
                 ],
@@ -2859,7 +2873,9 @@ UNFOLD = {
         "show_history": True,
     },
     "LOGIN": {
-        "redirect_after": lambda request: reverse_lazy("admin:index"),
+        "redirect_after": lambda request: reverse_lazy(
+            "admin:index", urlconf=ROOT_URLCONF
+        ),
     },
     "STYLES": [
         lambda request: static("css/styles.css"),
@@ -2895,7 +2911,9 @@ UNFOLD = {
                     {
                         "title": _("Dashboard"),
                         "icon": "dashboard",
-                        "link": reverse_lazy("admin:index"),
+                        "link": reverse_lazy(
+                            "admin:index", urlconf=ROOT_URLCONF
+                        ),
                     },
                 ],
             },
@@ -2912,7 +2930,8 @@ UNFOLD = {
                         "title": _("Products"),
                         "icon": "inventory_2",
                         "link": reverse_lazy(
-                            "admin:product_product_changelist"
+                            "admin:product_product_changelist",
+                            urlconf=ROOT_URLCONF,
                         ),
                         "badge": "admin.badges.low_stock_badge",
                         "badge_variant": "danger",
@@ -2921,14 +2940,16 @@ UNFOLD = {
                         "title": _("Categories"),
                         "icon": "category",
                         "link": reverse_lazy(
-                            "admin:product_productcategory_changelist"
+                            "admin:product_productcategory_changelist",
+                            urlconf=ROOT_URLCONF,
                         ),
                     },
                     {
                         "title": _("Reviews"),
                         "icon": "star_rate",
                         "link": reverse_lazy(
-                            "admin:product_productreview_changelist"
+                            "admin:product_productreview_changelist",
+                            urlconf=ROOT_URLCONF,
                         ),
                         "badge": "admin.badges.pending_reviews_badge",
                         "badge_variant": "info",
@@ -2936,27 +2957,32 @@ UNFOLD = {
                     {
                         "title": _("Tags"),
                         "icon": "label",
-                        "link": reverse_lazy("admin:tag_tag_changelist"),
+                        "link": reverse_lazy(
+                            "admin:tag_tag_changelist", urlconf=ROOT_URLCONF
+                        ),
                     },
                     {
                         "title": _("Attributes"),
                         "icon": "tune",
                         "link": reverse_lazy(
-                            "admin:product_attribute_changelist"
+                            "admin:product_attribute_changelist",
+                            urlconf=ROOT_URLCONF,
                         ),
                     },
                     {
                         "title": _("Attribute Values"),
                         "icon": "format_list_bulleted",
                         "link": reverse_lazy(
-                            "admin:product_attributevalue_changelist"
+                            "admin:product_attributevalue_changelist",
+                            urlconf=ROOT_URLCONF,
                         ),
                     },
                     {
                         "title": _("Variant Groups"),
                         "icon": "workspaces",
                         "link": reverse_lazy(
-                            "admin:product_productvariantgroup_changelist"
+                            "admin:product_productvariantgroup_changelist",
+                            urlconf=ROOT_URLCONF,
                         ),
                     },
                 ],
@@ -2973,7 +2999,10 @@ UNFOLD = {
                     {
                         "title": _("Blog Posts"),
                         "icon": "article",
-                        "link": reverse_lazy("admin:blog_blogpost_changelist"),
+                        "link": reverse_lazy(
+                            "admin:blog_blogpost_changelist",
+                            urlconf=ROOT_URLCONF,
+                        ),
                         "badge": "admin.badges.draft_blog_posts_badge",
                         "badge_variant": "warning",
                     },
@@ -2981,21 +3010,24 @@ UNFOLD = {
                         "title": _("Blog Categories"),
                         "icon": "folder_open",
                         "link": reverse_lazy(
-                            "admin:blog_blogcategory_changelist"
+                            "admin:blog_blogcategory_changelist",
+                            urlconf=ROOT_URLCONF,
                         ),
                     },
                     {
                         "title": _("Blog Authors"),
                         "icon": "edit_note",
                         "link": reverse_lazy(
-                            "admin:blog_blogauthor_changelist"
+                            "admin:blog_blogauthor_changelist",
+                            urlconf=ROOT_URLCONF,
                         ),
                     },
                     {
                         "title": _("Blog Comments"),
                         "icon": "chat_bubble",
                         "link": reverse_lazy(
-                            "admin:blog_blogcomment_changelist"
+                            "admin:blog_blogcomment_changelist",
+                            urlconf=ROOT_URLCONF,
                         ),
                         "badge": "admin.badges.pending_comments_badge",
                         "badge_variant": "info",
@@ -3003,7 +3035,10 @@ UNFOLD = {
                     {
                         "title": _("Blog Tags"),
                         "icon": "tag",
-                        "link": reverse_lazy("admin:blog_blogtag_changelist"),
+                        "link": reverse_lazy(
+                            "admin:blog_blogtag_changelist",
+                            urlconf=ROOT_URLCONF,
+                        ),
                     },
                 ],
             },
@@ -3019,32 +3054,43 @@ UNFOLD = {
                     {
                         "title": _("Orders"),
                         "icon": "receipt_long",
-                        "link": reverse_lazy("admin:order_order_changelist"),
+                        "link": reverse_lazy(
+                            "admin:order_order_changelist", urlconf=ROOT_URLCONF
+                        ),
                         "badge": "admin.badges.pending_orders_badge",
                         "badge_variant": "danger",
                     },
                     {
                         "title": _("Carts"),
                         "icon": "shopping_cart",
-                        "link": reverse_lazy("admin:cart_cart_changelist"),
+                        "link": reverse_lazy(
+                            "admin:cart_cart_changelist", urlconf=ROOT_URLCONF
+                        ),
                         "badge": "admin.badges.abandoned_carts_badge",
                         "badge_variant": "warning",
                     },
                     {
                         "title": _("Invoices"),
                         "icon": "receipt",
-                        "link": reverse_lazy("admin:order_invoice_changelist"),
+                        "link": reverse_lazy(
+                            "admin:order_invoice_changelist",
+                            urlconf=ROOT_URLCONF,
+                        ),
                     },
                     {
                         "title": _("Payment Methods"),
                         "icon": "payments",
-                        "link": reverse_lazy("admin:pay_way_payway_changelist"),
+                        "link": reverse_lazy(
+                            "admin:pay_way_payway_changelist",
+                            urlconf=ROOT_URLCONF,
+                        ),
                     },
                     {
                         "title": _("Promotions"),
                         "icon": "sell",
                         "link": reverse_lazy(
-                            "admin:promotion_promotion_changelist"
+                            "admin:promotion_promotion_changelist",
+                            urlconf=ROOT_URLCONF,
                         ),
                         "badge": "admin.badges.live_promotions_badge",
                         "badge_variant": "success",
@@ -3053,21 +3099,24 @@ UNFOLD = {
                         "title": _("Coupon Codes"),
                         "icon": "confirmation_number",
                         "link": reverse_lazy(
-                            "admin:promotion_promotioncode_changelist"
+                            "admin:promotion_promotioncode_changelist",
+                            urlconf=ROOT_URLCONF,
                         ),
                     },
                     {
                         "title": _("Gift Cards"),
                         "icon": "card_giftcard",
                         "link": reverse_lazy(
-                            "admin:giftcard_giftcard_changelist"
+                            "admin:giftcard_giftcard_changelist",
+                            urlconf=ROOT_URLCONF,
                         ),
                     },
                     {
                         "title": _("Business Customers"),
                         "icon": "business_center",
                         "link": reverse_lazy(
-                            "admin:b2b_businessprofile_changelist"
+                            "admin:b2b_businessprofile_changelist",
+                            urlconf=ROOT_URLCONF,
                         ),
                         "badge": "admin.badges.pending_business_profiles_badge",
                         "badge_variant": "warning",
@@ -3076,33 +3125,39 @@ UNFOLD = {
                         "title": _("Customer Groups"),
                         "icon": "group_work",
                         "link": reverse_lazy(
-                            "admin:b2b_customergroup_changelist"
+                            "admin:b2b_customergroup_changelist",
+                            urlconf=ROOT_URLCONF,
                         ),
                     },
                     {
                         "title": _("B2B Price Lists"),
                         "icon": "request_quote",
                         "link": reverse_lazy(
-                            "admin:b2b_pricelistitem_changelist"
+                            "admin:b2b_pricelistitem_changelist",
+                            urlconf=ROOT_URLCONF,
                         ),
                     },
                     {
                         "title": _("VAT Rates"),
                         "icon": "percent",
-                        "link": reverse_lazy("admin:vat_vat_changelist"),
+                        "link": reverse_lazy(
+                            "admin:vat_vat_changelist", urlconf=ROOT_URLCONF
+                        ),
                     },
                     {
                         "title": _("Notifications"),
                         "icon": "notifications_active",
                         "link": reverse_lazy(
-                            "admin:notification_notification_changelist"
+                            "admin:notification_notification_changelist",
+                            urlconf=ROOT_URLCONF,
                         ),
                     },
                     {
                         "title": _("Contact Messages"),
                         "icon": "contact_mail",
                         "link": reverse_lazy(
-                            "admin:contact_contact_changelist"
+                            "admin:contact_contact_changelist",
+                            urlconf=ROOT_URLCONF,
                         ),
                         "badge": "admin.badges.unread_messages_badge",
                         "badge_variant": "info",
@@ -3111,7 +3166,8 @@ UNFOLD = {
                         "title": _("Feedback"),
                         "icon": "reviews",
                         "link": reverse_lazy(
-                            "admin:contact_feedback_changelist"
+                            "admin:contact_feedback_changelist",
+                            urlconf=ROOT_URLCONF,
                         ),
                     },
                 ],
@@ -3129,35 +3185,40 @@ UNFOLD = {
                         "title": _("Shipping Providers"),
                         "icon": "local_shipping",
                         "link": reverse_lazy(
-                            "admin:shipping_shippingprovider_changelist"
+                            "admin:shipping_shippingprovider_changelist",
+                            urlconf=ROOT_URLCONF,
                         ),
                     },
                     {
                         "title": _("BoxNow Shipments"),
                         "icon": "package_2",
                         "link": reverse_lazy(
-                            "admin:shipping_boxnow_boxnowshipment_changelist"
+                            "admin:shipping_boxnow_boxnowshipment_changelist",
+                            urlconf=ROOT_URLCONF,
                         ),
                     },
                     {
                         "title": _("ACS Shipments"),
                         "icon": "local_post_office",
                         "link": reverse_lazy(
-                            "admin:shipping_acs_acsshipment_changelist"
+                            "admin:shipping_acs_acsshipment_changelist",
+                            urlconf=ROOT_URLCONF,
                         ),
                     },
                     {
                         "title": _("BoxNow Lockers"),
                         "icon": "lock",
                         "link": reverse_lazy(
-                            "admin:shipping_boxnow_boxnowlocker_changelist"
+                            "admin:shipping_boxnow_boxnowlocker_changelist",
+                            urlconf=ROOT_URLCONF,
                         ),
                     },
                     {
                         "title": _("ACS Stations"),
                         "icon": "store",
                         "link": reverse_lazy(
-                            "admin:shipping_acs_acsstation_changelist"
+                            "admin:shipping_acs_acsstation_changelist",
+                            urlconf=ROOT_URLCONF,
                         ),
                     },
                 ],
@@ -3172,21 +3233,24 @@ UNFOLD = {
                         "title": _("Users"),
                         "icon": "people",
                         "link": reverse_lazy(
-                            "admin:user_useraccount_changelist"
+                            "admin:user_useraccount_changelist",
+                            urlconf=ROOT_URLCONF,
                         ),
                     },
                     {
                         "title": _("User Addresses"),
                         "icon": "home",
                         "link": reverse_lazy(
-                            "admin:user_useraddress_changelist"
+                            "admin:user_useraddress_changelist",
+                            urlconf=ROOT_URLCONF,
                         ),
                     },
                     {
                         "title": _("Subscriptions"),
                         "icon": "mail",
                         "link": reverse_lazy(
-                            "admin:user_usersubscription_changelist"
+                            "admin:user_usersubscription_changelist",
+                            urlconf=ROOT_URLCONF,
                         ),
                     },
                 ],
@@ -3204,14 +3268,16 @@ UNFOLD = {
                         "title": _("Loyalty Tiers"),
                         "icon": "workspace_premium",
                         "link": reverse_lazy(
-                            "admin:loyalty_loyaltytier_changelist"
+                            "admin:loyalty_loyaltytier_changelist",
+                            urlconf=ROOT_URLCONF,
                         ),
                     },
                     {
                         "title": _("Points Transactions"),
                         "icon": "account_balance_wallet",
                         "link": reverse_lazy(
-                            "admin:loyalty_pointstransaction_changelist"
+                            "admin:loyalty_pointstransaction_changelist",
+                            urlconf=ROOT_URLCONF,
                         ),
                     },
                 ],
@@ -3233,27 +3299,34 @@ UNFOLD = {
                         "title": _("Countries"),
                         "icon": "public",
                         "link": reverse_lazy(
-                            "admin:country_country_changelist"
+                            "admin:country_country_changelist",
+                            urlconf=ROOT_URLCONF,
                         ),
                         "permission": "admin.permissions.is_staff",
                     },
                     {
                         "title": _("Regions"),
                         "icon": "map",
-                        "link": reverse_lazy("admin:region_region_changelist"),
+                        "link": reverse_lazy(
+                            "admin:region_region_changelist",
+                            urlconf=ROOT_URLCONF,
+                        ),
                         "permission": "admin.permissions.is_staff",
                     },
                     {
                         "title": _("Sites"),
                         "icon": "language",
-                        "link": reverse_lazy("admin:sites_site_changelist"),
+                        "link": reverse_lazy(
+                            "admin:sites_site_changelist", urlconf=ROOT_URLCONF
+                        ),
                         "permission": "admin.permissions.is_staff",
                     },
                     {
                         "title": _("Subscription Topics"),
                         "icon": "topic",
                         "link": reverse_lazy(
-                            "admin:user_subscriptiontopic_changelist"
+                            "admin:user_subscriptiontopic_changelist",
+                            urlconf=ROOT_URLCONF,
                         ),
                         "permission": "admin.permissions.is_staff",
                     },
@@ -3274,7 +3347,8 @@ UNFOLD = {
                         "title": _("Extra Settings"),
                         "icon": "settings",
                         "link": reverse_lazy(
-                            "admin:extra_settings_setting_changelist"
+                            "admin:extra_settings_setting_changelist",
+                            urlconf=ROOT_URLCONF,
                         ),
                         "permission": "admin.permissions.is_staff",
                     },
@@ -3305,7 +3379,8 @@ UNFOLD = {
                                 "title": _("Shipping Providers"),
                                 "icon": "local_shipping",
                                 "link": reverse_lazy(
-                                    "admin:shipping_shippingprovider_changelist"
+                                    "admin:shipping_shippingprovider_changelist",
+                                    urlconf=ROOT_URLCONF,
                                 ),
                                 "permission": "admin.permissions.is_superuser",
                             },
@@ -3313,7 +3388,8 @@ UNFOLD = {
                                 "title": _("Groups"),
                                 "icon": "shield_person",
                                 "link": reverse_lazy(
-                                    "admin:auth_group_changelist"
+                                    "admin:auth_group_changelist",
+                                    urlconf=ROOT_URLCONF,
                                 ),
                                 "permission": "admin.permissions.is_superuser",
                             },
@@ -3328,7 +3404,8 @@ UNFOLD = {
                                 "title": _("User Sessions"),
                                 "icon": "devices",
                                 "link": reverse_lazy(
-                                    "admin:usersessions_usersession_changelist"
+                                    "admin:usersessions_usersession_changelist",
+                                    urlconf=ROOT_URLCONF,
                                 ),
                                 "permission": "admin.permissions.is_superuser",
                             },
@@ -3336,7 +3413,8 @@ UNFOLD = {
                                 "title": _("MFA Authenticators"),
                                 "icon": "verified_user",
                                 "link": reverse_lazy(
-                                    "admin:mfa_authenticator_changelist"
+                                    "admin:mfa_authenticator_changelist",
+                                    urlconf=ROOT_URLCONF,
                                 ),
                                 "permission": "admin.permissions.is_superuser",
                             },
@@ -3344,7 +3422,8 @@ UNFOLD = {
                                 "title": _("Social Accounts"),
                                 "icon": "hub",
                                 "link": reverse_lazy(
-                                    "admin:socialaccount_socialaccount_changelist"
+                                    "admin:socialaccount_socialaccount_changelist",
+                                    urlconf=ROOT_URLCONF,
                                 ),
                                 "permission": "admin.permissions.is_superuser",
                             },
@@ -3352,7 +3431,8 @@ UNFOLD = {
                                 "title": _("Email Addresses"),
                                 "icon": "alternate_email",
                                 "link": reverse_lazy(
-                                    "admin:account_emailaddress_changelist"
+                                    "admin:account_emailaddress_changelist",
+                                    urlconf=ROOT_URLCONF,
                                 ),
                                 "permission": "admin.permissions.is_superuser",
                             },
@@ -3360,7 +3440,8 @@ UNFOLD = {
                                 "title": _("API Tokens"),
                                 "icon": "key",
                                 "link": reverse_lazy(
-                                    "admin:knox_authtoken_changelist"
+                                    "admin:knox_authtoken_changelist",
+                                    urlconf=ROOT_URLCONF,
                                 ),
                                 "permission": "admin.permissions.is_superuser",
                             },
@@ -3375,7 +3456,8 @@ UNFOLD = {
                                 "title": _("Stock Logs"),
                                 "icon": "inventory",
                                 "link": reverse_lazy(
-                                    "admin:order_stocklog_changelist"
+                                    "admin:order_stocklog_changelist",
+                                    urlconf=ROOT_URLCONF,
                                 ),
                                 "permission": "admin.permissions.is_superuser",
                             },
@@ -3383,7 +3465,8 @@ UNFOLD = {
                                 "title": _("Order History"),
                                 "icon": "history",
                                 "link": reverse_lazy(
-                                    "admin:order_orderhistory_changelist"
+                                    "admin:order_orderhistory_changelist",
+                                    urlconf=ROOT_URLCONF,
                                 ),
                                 "permission": "admin.permissions.is_superuser",
                             },
@@ -3391,7 +3474,8 @@ UNFOLD = {
                                 "title": _("Order Item History"),
                                 "icon": "manage_history",
                                 "link": reverse_lazy(
-                                    "admin:order_orderitemhistory_changelist"
+                                    "admin:order_orderitemhistory_changelist",
+                                    urlconf=ROOT_URLCONF,
                                 ),
                                 "permission": "admin.permissions.is_superuser",
                             },
@@ -3399,7 +3483,8 @@ UNFOLD = {
                                 "title": _("BoxNow Events"),
                                 "icon": "event_note",
                                 "link": reverse_lazy(
-                                    "admin:shipping_boxnow_boxnowparcelevent_changelist"
+                                    "admin:shipping_boxnow_boxnowparcelevent_changelist",
+                                    urlconf=ROOT_URLCONF,
                                 ),
                                 "permission": "admin.permissions.is_superuser",
                             },
@@ -3407,7 +3492,8 @@ UNFOLD = {
                                 "title": _("ACS Tracking Events"),
                                 "icon": "track_changes",
                                 "link": reverse_lazy(
-                                    "admin:shipping_acs_acstrackingevent_changelist"
+                                    "admin:shipping_acs_acstrackingevent_changelist",
+                                    urlconf=ROOT_URLCONF,
                                 ),
                                 "permission": "admin.permissions.is_superuser",
                             },
@@ -3415,7 +3501,8 @@ UNFOLD = {
                                 "title": _("Viva Webhook Events"),
                                 "icon": "webhook",
                                 "link": reverse_lazy(
-                                    "admin:order_vivawebhookevent_changelist"
+                                    "admin:order_vivawebhookevent_changelist",
+                                    urlconf=ROOT_URLCONF,
                                 ),
                                 "permission": "admin.permissions.is_superuser",
                             },
@@ -3423,7 +3510,8 @@ UNFOLD = {
                                 "title": _("Meta CAPI Event Log"),
                                 "icon": "share",
                                 "link": reverse_lazy(
-                                    "admin:meta_capi_metacapieventlog_changelist"
+                                    "admin:meta_capi_metacapieventlog_changelist",
+                                    urlconf=ROOT_URLCONF,
                                 ),
                                 "permission": "admin.permissions.is_superuser",
                             },
@@ -3431,7 +3519,8 @@ UNFOLD = {
                                 "title": _("Cache Purge Log"),
                                 "icon": "cleaning_services",
                                 "link": reverse_lazy(
-                                    "admin:core_cachepurgelog_changelist"
+                                    "admin:core_cachepurgelog_changelist",
+                                    urlconf=ROOT_URLCONF,
                                 ),
                                 "permission": "admin.permissions.is_superuser",
                             },
@@ -3439,7 +3528,8 @@ UNFOLD = {
                                 "title": _("User Data Exports"),
                                 "icon": "download",
                                 "link": reverse_lazy(
-                                    "admin:user_userdataexport_changelist"
+                                    "admin:user_userdataexport_changelist",
+                                    urlconf=ROOT_URLCONF,
                                 ),
                                 "permission": "admin.permissions.is_superuser",
                             },
@@ -3454,7 +3544,8 @@ UNFOLD = {
                                 "title": _("ACS Pickup Lists"),
                                 "icon": "assignment",
                                 "link": reverse_lazy(
-                                    "admin:shipping_acs_acspickuplist_changelist"
+                                    "admin:shipping_acs_acspickuplist_changelist",
+                                    urlconf=ROOT_URLCONF,
                                 ),
                                 "permission": "admin.permissions.is_superuser",
                             },
@@ -3462,7 +3553,8 @@ UNFOLD = {
                                 "title": _("ACS COD Payouts"),
                                 "icon": "account_balance",
                                 "link": reverse_lazy(
-                                    "admin:shipping_acs_acscodpayout_changelist"
+                                    "admin:shipping_acs_acscodpayout_changelist",
+                                    urlconf=ROOT_URLCONF,
                                 ),
                                 "permission": "admin.permissions.is_superuser",
                             },
@@ -3470,7 +3562,8 @@ UNFOLD = {
                                 "title": _("Invoice Counter"),
                                 "icon": "tag",
                                 "link": reverse_lazy(
-                                    "admin:order_invoicecounter_changelist"
+                                    "admin:order_invoicecounter_changelist",
+                                    urlconf=ROOT_URLCONF,
                                 ),
                                 "permission": "admin.permissions.is_superuser",
                             },
@@ -3485,7 +3578,8 @@ UNFOLD = {
                                 "title": _("Periodic Tasks"),
                                 "icon": "task_alt",
                                 "link": reverse_lazy(
-                                    "admin:django_celery_beat_periodictask_changelist"
+                                    "admin:django_celery_beat_periodictask_changelist",
+                                    urlconf=ROOT_URLCONF,
                                 ),
                                 "permission": "admin.permissions.is_superuser",
                             },
@@ -3493,7 +3587,8 @@ UNFOLD = {
                                 "title": _("Crontab Schedules"),
                                 "icon": "more_time",
                                 "link": reverse_lazy(
-                                    "admin:django_celery_beat_crontabschedule_changelist"
+                                    "admin:django_celery_beat_crontabschedule_changelist",
+                                    urlconf=ROOT_URLCONF,
                                 ),
                                 "permission": "admin.permissions.is_superuser",
                             },
@@ -3501,7 +3596,8 @@ UNFOLD = {
                                 "title": _("Interval Schedules"),
                                 "icon": "update",
                                 "link": reverse_lazy(
-                                    "admin:django_celery_beat_intervalschedule_changelist"
+                                    "admin:django_celery_beat_intervalschedule_changelist",
+                                    urlconf=ROOT_URLCONF,
                                 ),
                                 "permission": "admin.permissions.is_superuser",
                             },
@@ -3509,7 +3605,8 @@ UNFOLD = {
                                 "title": _("Clocked Schedules"),
                                 "icon": "alarm",
                                 "link": reverse_lazy(
-                                    "admin:django_celery_beat_clockedschedule_changelist"
+                                    "admin:django_celery_beat_clockedschedule_changelist",
+                                    urlconf=ROOT_URLCONF,
                                 ),
                                 "permission": "admin.permissions.is_superuser",
                             },
@@ -3517,7 +3614,8 @@ UNFOLD = {
                                 "title": _("Solar Schedules"),
                                 "icon": "wb_sunny",
                                 "link": reverse_lazy(
-                                    "admin:django_celery_beat_solarschedule_changelist"
+                                    "admin:django_celery_beat_solarschedule_changelist",
+                                    urlconf=ROOT_URLCONF,
                                 ),
                                 "permission": "admin.permissions.is_superuser",
                             },
@@ -3525,7 +3623,8 @@ UNFOLD = {
                                 "title": _("Task Results"),
                                 "icon": "checklist",
                                 "link": reverse_lazy(
-                                    "admin:django_celery_results_taskresult_changelist"
+                                    "admin:django_celery_results_taskresult_changelist",
+                                    urlconf=ROOT_URLCONF,
                                 ),
                                 "permission": "admin.permissions.is_superuser",
                             },
@@ -3533,7 +3632,8 @@ UNFOLD = {
                                 "title": _("Group Results"),
                                 "icon": "ballot",
                                 "link": reverse_lazy(
-                                    "admin:django_celery_results_groupresult_changelist"
+                                    "admin:django_celery_results_groupresult_changelist",
+                                    urlconf=ROOT_URLCONF,
                                 ),
                                 "permission": "admin.permissions.is_superuser",
                             },
@@ -3559,20 +3659,29 @@ UNFOLD = {
             "items": [
                 {
                     "title": _("Orders"),
-                    "link": reverse_lazy("admin:order_order_changelist"),
+                    "link": reverse_lazy(
+                        "admin:order_order_changelist", urlconf=ROOT_URLCONF
+                    ),
                 },
                 {
                     "title": _("Invoices"),
-                    "link": reverse_lazy("admin:order_invoice_changelist"),
+                    "link": reverse_lazy(
+                        "admin:order_invoice_changelist", urlconf=ROOT_URLCONF
+                    ),
                 },
                 {
                     "title": _("Stock Logs"),
-                    "link": reverse_lazy("admin:order_stocklog_changelist"),
+                    "link": reverse_lazy(
+                        "admin:order_stocklog_changelist", urlconf=ROOT_URLCONF
+                    ),
                     "permission": "admin.permissions.is_superuser",
                 },
                 {
                     "title": _("Order History"),
-                    "link": reverse_lazy("admin:order_orderhistory_changelist"),
+                    "link": reverse_lazy(
+                        "admin:order_orderhistory_changelist",
+                        urlconf=ROOT_URLCONF,
+                    ),
                     "permission": "admin.permissions.is_superuser",
                 },
             ],
@@ -3587,19 +3696,22 @@ UNFOLD = {
                 {
                     "title": _("BoxNow Shipments"),
                     "link": reverse_lazy(
-                        "admin:shipping_boxnow_boxnowshipment_changelist"
+                        "admin:shipping_boxnow_boxnowshipment_changelist",
+                        urlconf=ROOT_URLCONF,
                     ),
                 },
                 {
                     "title": _("BoxNow Lockers"),
                     "link": reverse_lazy(
-                        "admin:shipping_boxnow_boxnowlocker_changelist"
+                        "admin:shipping_boxnow_boxnowlocker_changelist",
+                        urlconf=ROOT_URLCONF,
                     ),
                 },
                 {
                     "title": _("BoxNow Events"),
                     "link": reverse_lazy(
-                        "admin:shipping_boxnow_boxnowparcelevent_changelist"
+                        "admin:shipping_boxnow_boxnowparcelevent_changelist",
+                        urlconf=ROOT_URLCONF,
                     ),
                     "permission": "admin.permissions.is_superuser",
                 },
@@ -3617,33 +3729,38 @@ UNFOLD = {
                 {
                     "title": _("ACS Shipments"),
                     "link": reverse_lazy(
-                        "admin:shipping_acs_acsshipment_changelist"
+                        "admin:shipping_acs_acsshipment_changelist",
+                        urlconf=ROOT_URLCONF,
                     ),
                 },
                 {
                     "title": _("ACS Stations"),
                     "link": reverse_lazy(
-                        "admin:shipping_acs_acsstation_changelist"
+                        "admin:shipping_acs_acsstation_changelist",
+                        urlconf=ROOT_URLCONF,
                     ),
                 },
                 {
                     "title": _("ACS Pickup Lists"),
                     "link": reverse_lazy(
-                        "admin:shipping_acs_acspickuplist_changelist"
+                        "admin:shipping_acs_acspickuplist_changelist",
+                        urlconf=ROOT_URLCONF,
                     ),
                     "permission": "admin.permissions.is_superuser",
                 },
                 {
                     "title": _("ACS COD Payouts"),
                     "link": reverse_lazy(
-                        "admin:shipping_acs_acscodpayout_changelist"
+                        "admin:shipping_acs_acscodpayout_changelist",
+                        urlconf=ROOT_URLCONF,
                     ),
                     "permission": "admin.permissions.is_superuser",
                 },
                 {
                     "title": _("ACS Tracking Events"),
                     "link": reverse_lazy(
-                        "admin:shipping_acs_acstrackingevent_changelist"
+                        "admin:shipping_acs_acstrackingevent_changelist",
+                        urlconf=ROOT_URLCONF,
                     ),
                     "permission": "admin.permissions.is_superuser",
                 },
@@ -3658,18 +3775,23 @@ UNFOLD = {
             "items": [
                 {
                     "title": _("Attributes"),
-                    "link": reverse_lazy("admin:product_attribute_changelist"),
+                    "link": reverse_lazy(
+                        "admin:product_attribute_changelist",
+                        urlconf=ROOT_URLCONF,
+                    ),
                 },
                 {
                     "title": _("Attribute Values"),
                     "link": reverse_lazy(
-                        "admin:product_attributevalue_changelist"
+                        "admin:product_attributevalue_changelist",
+                        urlconf=ROOT_URLCONF,
                     ),
                 },
                 {
                     "title": _("Variant Groups"),
                     "link": reverse_lazy(
-                        "admin:product_productvariantgroup_changelist"
+                        "admin:product_productvariantgroup_changelist",
+                        urlconf=ROOT_URLCONF,
                     ),
                 },
             ],
@@ -3685,23 +3807,35 @@ UNFOLD = {
             "items": [
                 {
                     "title": _("Blog Posts"),
-                    "link": reverse_lazy("admin:blog_blogpost_changelist"),
+                    "link": reverse_lazy(
+                        "admin:blog_blogpost_changelist", urlconf=ROOT_URLCONF
+                    ),
                 },
                 {
                     "title": _("Categories"),
-                    "link": reverse_lazy("admin:blog_blogcategory_changelist"),
+                    "link": reverse_lazy(
+                        "admin:blog_blogcategory_changelist",
+                        urlconf=ROOT_URLCONF,
+                    ),
                 },
                 {
                     "title": _("Authors"),
-                    "link": reverse_lazy("admin:blog_blogauthor_changelist"),
+                    "link": reverse_lazy(
+                        "admin:blog_blogauthor_changelist", urlconf=ROOT_URLCONF
+                    ),
                 },
                 {
                     "title": _("Comments"),
-                    "link": reverse_lazy("admin:blog_blogcomment_changelist"),
+                    "link": reverse_lazy(
+                        "admin:blog_blogcomment_changelist",
+                        urlconf=ROOT_URLCONF,
+                    ),
                 },
                 {
                     "title": _("Tags"),
-                    "link": reverse_lazy("admin:blog_blogtag_changelist"),
+                    "link": reverse_lazy(
+                        "admin:blog_blogtag_changelist", urlconf=ROOT_URLCONF
+                    ),
                 },
             ],
         },
@@ -3710,17 +3844,21 @@ UNFOLD = {
         {
             "icon": "translate",
             "title": _("Rosetta"),
-            "link": reverse_lazy("rosetta-file-list-redirect"),
+            "link": reverse_lazy(
+                "rosetta-file-list-redirect", urlconf=ROOT_URLCONF
+            ),
         },
         {
             "icon": "cached",
             "title": _("Cache"),
-            "link": reverse_lazy("admin:clear-cache"),
+            "link": reverse_lazy("admin:clear-cache", urlconf=ROOT_URLCONF),
         },
         {
             "icon": "email",
             "title": _("Email Templates"),
-            "link": reverse_lazy("email_templates:management"),
+            "link": reverse_lazy(
+                "email_templates:management", urlconf=ROOT_URLCONF
+            ),
         },
         # API Swagger always works — same Django process serves both
         # the admin and the schema, so reverse_lazy gives the right
@@ -3730,7 +3868,7 @@ UNFOLD = {
         {
             "icon": "schema",
             "title": _("API Swagger"),
-            "link": reverse_lazy("swagger-ui"),
+            "link": reverse_lazy("swagger-ui", urlconf=ROOT_URLCONF),
             "attrs": {"target": "_blank", "rel": "noopener"},
         },
         # Ops links — only render when the env var is explicitly set.

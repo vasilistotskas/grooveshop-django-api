@@ -20,7 +20,8 @@ of using ``include("core.urls")`` because that list contains
 an ``include()``.
 """
 
-from django.urls import path
+from django.conf import settings
+from django.urls import include, path
 
 from admin.platform_site import platform_admin_site
 from core.urls import public_shared_urlpatterns
@@ -92,3 +93,16 @@ urlpatterns = [
         name="tenant-admin-activate",
     ),
 ] + public_shared_urlpatterns
+
+if bool(settings.ENABLE_DEBUG_TOOLBAR):
+    # Same mount as ``core.urls``: the toolbar middleware is installed
+    # process-wide under this flag and reverses ``djdt:*`` on every
+    # request it decorates, so a urlconf without the routes answers
+    # 500 ("'djdt' is not a registered namespace") for EVERY request on
+    # the public host — the local platform host (``localhost``) was
+    # unusable with the toolbar on (2026-09-11).
+    import debug_toolbar
+
+    urlpatterns += [
+        path("__debug__/", include(debug_toolbar.urls)),
+    ]

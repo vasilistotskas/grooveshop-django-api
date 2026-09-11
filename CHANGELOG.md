@@ -3,6 +3,93 @@
 
 
 
+## v3.56.0 (2026-09-11)
+
+### Bug fixes
+
+* fix(user): render a user as the person, not the generated handle
+
+Usernames here are generated ({Adjective}{Noun}#{hash} from the email),
+so str(user) returning one showed staff "Paok1441" on the Blog Author
+admin page for an account plainly holding "Webside Admin". Every admin
+surface that renders a user through a relation goes through this — a
+user form field, autocomplete results, FK columns, log entries — and
+the columns that mattered had each worked around it locally
+(full_name or username, in blog/admin.py and again in cart's admin).
+
+That precedence now lives here, once. Username stays the fallback for
+an account with no name, and email the last resort: a dropdown entry
+with no label cannot be picked.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com> ([`e6b4d14`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e6b4d147048b845dd1f8d17f910a56673e4b64b1))
+
+* fix(boxnow): serialize a missing locker image as null, at the serializer
+
+Reworks the previous attempt, which CI caught. That commit made the
+COLUMN nullable-by-default, but nullable string columns here are
+mid-migration to NOT NULL and phase one is that nothing keeps minting
+NULLs — tests/unit/core/test_nullable_string_fields.py exists to guard
+exactly that, and it failed. The column and its migration are restored;
+the fix now lives where the contract is published.
+
+The published contract for imageUrl is "a URL or null" and the
+storefront validates it as exactly that. Every locker BoxNow supplies
+comes without an image, stored as "", which is neither. Because the
+order response embeds the locker, one blank image failed response
+validation for the WHOLE payload: the shopper saw an error while their
+order had already been created, stock decremented and emails sent.
+
+The serializer now maps the blank to null. The OpenAPI shape is
+unchanged beyond a description, so the storefront needs no regeneration
+of behaviour, and no migration is required at all.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com> ([`527a355`](https://github.com/vasilistotskas/grooveshop-django-api/commit/527a35521421bfea1aca0d0047ec20612a24a216))
+
+* fix(boxnow): store a missing locker image as NULL, not ""
+
+Every locker in BoxNow's catalogue comes without an image and the sync
+stored that as "". The field is declared nullable, so the published
+contract is "a URL or null" and the storefront validates it as
+z.url().nullable() — "" is neither. The order response embeds the
+locker, so one blank image failed response validation for the WHOLE
+payload: the shopper saw an error while their order had already been
+created, emails sent and stock decremented. Staging order 272 is the
+captured case (issues: boxnowShipment.locker.imageUrl "Invalid URL" →
+422); all 2572 lockers are blank on production too.
+
+Includes a data migration converting the existing rows. The OpenAPI
+schema is unchanged — the contract was always right, the data was not.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com> ([`0a0cb1a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0a0cb1abd9a5bf450da33d460b6c07460fcb63e6))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.55.0 [skip ci] ([`b48d6a6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b48d6a655c6df919730fb73b25fbb8a3ae0a88e7))
+
+### Features
+
+* feat(cart): expose which promotions applied, and log whose lockers we synced
+
+The cart returned one opaque `promotion_discount`, so a shopper could
+not tell which offers applied and the coupon row rendered the cart's
+whole discount as though the code had earned it — a real cart read
+"SAVE5 -39,98 €" when SAVE5 was worth 5,00 € and two automatic offers
+accounted for the rest. The per-offer breakdown already existed in the
+engine and was persisted onto the order; `applied_promotions` now
+serializes it on the cart, so a code that lost the stacking comparison
+contributes no entry and can no longer claim someone else's money. The
+amounts always sum to promotion_discount, because the engine clamps
+each entry.
+
+BoxNow logging: a locker id only means something to the partner that
+issued it, so the sync now names the partner on every run, reports how
+many destinations came back with a sample of ids, and WARNS when a run
+replaces most of the catalogue — the signature of a credentials/data
+mismatch. A rejected delivery request now says which locker it used,
+under which partner, and whether we hold that locker at all.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com> ([`d82d085`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d82d085d54b5119491c9fb89e89942c67884523b))
+
 ## v3.55.0 (2026-09-11)
 
 ### Bug fixes

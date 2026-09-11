@@ -70,6 +70,48 @@ def test_replacing_most_of_the_catalogue_warns_about_the_account(caplog):
     assert "10391" in message
 
 
+def test_one_unplaceable_locker_does_not_kill_the_catalogue(caplog):
+    """BoxNow's stage catalogue serves a locker whose coordinates lost
+    their decimal point. The column is Decimal(10, 7), so the INSERT
+    raised NumericValueOutOfRange, the batch rolled back and the whole
+    sync died on that one row — leaving staging serving production's
+    locker ids, which BoxNow then rejected as invalid on every voucher.
+    """
+    broken = _destination("47")
+    broken["lat"] = "96065874308606"
+    broken["lng"] = "63981753536723"
+
+    with caplog.at_level(logging.WARNING, logger="shipping_boxnow.services"):
+        stats = _run_sync([_destination("a"), broken, _destination("b")])
+
+    from shipping_boxnow.models import BoxNowLocker
+
+    assert stats["created"] == 2
+    assert BoxNowLocker.objects.filter(external_id="a").exists()
+    assert BoxNowLocker.objects.filter(external_id="b").exists()
+    assert not BoxNowLocker.objects.filter(external_id="47").exists()
+    assert "outside the world" in caplog.text
+
+
+def test_a_latitude_beyond_the_poles_is_refused(caplog):
+    beyond = _destination("48")
+    beyond["lat"] = "91.5"
+
+    with caplog.at_level(logging.WARNING, logger="shipping_boxnow.services"):
+        stats = _run_sync([_destination("a"), beyond])
+
+    assert stats["created"] == 1
+
+
+def test_an_unparseable_coordinate_is_refused():
+    junk = _destination("49")
+    junk["lat"] = "not-a-number"
+
+    stats = _run_sync([_destination("a"), junk])
+
+    assert stats["created"] == 1
+
+
 def test_a_normal_refresh_does_not_warn(caplog):
     for external_id in ("1", "2", "3", "4"):
         BoxNowLockerFactory(external_id=external_id, is_active=True)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import time
+from decimal import Decimal, InvalidOperation
 from typing import TYPE_CHECKING, Any
 
 from django.core.cache import cache
@@ -125,6 +126,31 @@ def _format_parcel_weight_kg(weight_grams: int | None) -> float:
         )
         return _BOXNOW_MAX_WEIGHT_KG
     return weight_kg
+
+
+def _coordinate(raw: Any) -> Decimal | None:
+    """A latitude/longitude we can actually store, or None.
+
+    Bounds are geographic, not column capacity: a latitude of 500 is
+    nonsense whatever the column allows, and checking the real range
+    also keeps the value inside ``Decimal(max_digits=10,
+    decimal_places=7)``.
+    """
+    try:
+        value = Decimal(str(raw))
+    except InvalidOperation, TypeError, ValueError:
+        return None
+    if not value.is_finite():
+        return None
+    return value
+
+
+def _has_usable_coordinates(dest: dict) -> bool:
+    lat = _coordinate(dest.get("lat"))
+    lng = _coordinate(dest.get("lng"))
+    if lat is None or lng is None:
+        return False
+    return abs(lat) <= 90 and abs(lng) <= 180
 
 
 def is_configured() -> bool:
@@ -1373,6 +1399,28 @@ class BoxNowService:
                             "sync_lockers: destination with no id — "
                             "skipping: %r",
                             dest,
+                        )
+                        continue
+
+                    # A destination we cannot place on a map is not a
+                    # destination. BoxNow's stage catalogue serves one
+                    # locker whose coordinates lost their decimal point
+                    # (lat "96065874308606"), and the column is
+                    # Decimal(10, 7) — so the INSERT raised
+                    # NumericValueOutOfRange, the batch rolled back and
+                    # the whole catalogue sync died on one bad row.
+                    # Staging therefore kept serving production's locker
+                    # ids and every voucher it minted came back P402
+                    # "invalid locker".
+                    if not _has_usable_coordinates(dest):
+                        logger.warning(
+                            "sync_lockers: destination %s has coordinates "
+                            "outside the world (lat=%r lng=%r) — skipping "
+                            "it rather than failing the whole sync",
+                            external_id,
+                            dest.get("lat"),
+                            dest.get("lng"),
+                            extra={"boxnow_locker_external_id": external_id},
                         )
                         continue
 

@@ -211,19 +211,30 @@ class CartItemCreateSerializer(serializers.ModelSerializer[CartItem]):
         # product both saw "no row" and both INSERTed, so the second 500'd on
         # the (cart, product) unique constraint. get_or_create absorbs that
         # collision and the F() increment adds the quantity race-free (G0091).
+        # The strip impression this add came from, if any. The latest
+        # add wins on an existing line: it is the action that carried it.
+        impression_id = validated_data.get("recommendation_impression_id")
         item, created = CartItem.objects.get_or_create(
-            cart=cart, product=product, defaults={"quantity": quantity}
+            cart=cart,
+            product=product,
+            defaults={
+                "quantity": quantity,
+                "recommendation_impression_id": impression_id,
+            },
         )
         if not created:
-            CartItem.objects.filter(pk=item.pk).update(
-                quantity=F("quantity") + quantity
+            stacked: dict = {"quantity": F("quantity") + quantity}
+            if impression_id is not None:
+                stacked["recommendation_impression_id"] = impression_id
+            CartItem.objects.filter(pk=item.pk).update(**stacked)
+            item.refresh_from_db(
+                fields=["quantity", "recommendation_impression_id"]
             )
-            item.refresh_from_db(fields=["quantity"])
         return item
 
     class Meta:
         model = CartItem
-        fields = ("product", "quantity")
+        fields = ("product", "quantity", "recommendation_impression_id")
 
 
 class CartItemUpdateSerializer(serializers.ModelSerializer[CartItem]):
@@ -259,9 +270,16 @@ class CartItemUpdateSerializer(serializers.ModelSerializer[CartItem]):
     def update(self, instance: CartItem, validated_data: dict) -> CartItem:
         quantity = validated_data.get("quantity", instance.quantity)
         instance.quantity = quantity
+        # A quantity bump that came from a strip carries its impression
+        # the same way an add does; an update without one leaves the
+        # line's attribution as it was.
+        if validated_data.get("recommendation_impression_id") is not None:
+            instance.recommendation_impression_id = validated_data[
+                "recommendation_impression_id"
+            ]
         instance.save()
         return instance
 
     class Meta:
         model = CartItem
-        fields = ("quantity",)
+        fields = ("quantity", "recommendation_impression_id")

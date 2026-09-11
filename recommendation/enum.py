@@ -49,12 +49,18 @@ class EventKind(models.TextChoices):
 
 class AttachMatch(models.TextChoices):
     """How an order line was tied back to the impression that showed
-    the product. Both are recorded so the two attribution windows can be
-    compared on data rather than chosen blind: ``cart`` is the same
-    basket within ``RECOMMENDATION_ATTACH_CART_WINDOW_HOURS`` (the one
-    shopping journey, guest or not); ``user`` is the same signed-in
-    customer within ``RECOMMENDATION_ATTACH_USER_WINDOW_DAYS`` (saw it on
-    the phone, bought on the laptop)."""
+    the product, in precedence order. ``impression`` is exact: the
+    storefront carried the impression id on add-to-cart and it rode the
+    cart line onto the order line — the only match that needs no cart
+    or customer identity at the time the strip was shown, which a guest
+    on their first visit has neither of. The two windows are recorded
+    too so they can be compared on data rather than chosen blind:
+    ``cart`` is the same basket within
+    ``RECOMMENDATION_ATTACH_CART_WINDOW_HOURS`` (the one shopping journey,
+    guest or not); ``user`` is the same signed-in customer within
+    ``RECOMMENDATION_ATTACH_USER_WINDOW_DAYS`` (saw it on the phone,
+    bought on the laptop)."""
 
+    IMPRESSION = "impression", _("Carried from add to cart")
     CART = "cart", _("Same cart")
     USER = "user", _("Same customer")

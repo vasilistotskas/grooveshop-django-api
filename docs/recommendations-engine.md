@@ -6,7 +6,7 @@ tier or the embedder changes. Cross-references are file paths + line
 anchors; the engine has enough "this is deliberate" pieces that drift
 here is expensive.
 
-Last refresh: 2026-09-10 (design record; research figures verified against Meilisearch v1.53 docs, HF TEI docs, arXiv 2607.21274 and the live cluster on this date). See git log for changes since.
+Last refresh: 2026-09-11 (design record; research figures verified against Meilisearch v1.53 docs, HF TEI docs, arXiv 2607.21274 and the live cluster on this date). See git log for changes since.
 
 ## 1. Overview
 
@@ -165,17 +165,32 @@ merchant can read.
 
 **Attach attribution** (`recommendation/events.py:record_attach_events`,
 dispatched from `order_created` by `recommendation/signals.py`): an order
-line attaches to every impression of that product shown before the
-order to the **same cart** within `RECOMMENDATION_ATTACH_CART_WINDOW_HOURS`
-(24) — the cart UUID the order snapshots in `metadata.cart_snapshot`,
-which the events endpoint records from the storefront's `X-Cart-Id` —
-or to the **same signed-in customer** within
-`RECOMMENDATION_ATTACH_USER_WINDOW_DAYS` (7). Both are recorded and
-labelled (`matched_by = cart | user`, cart taking precedence) so the two
-definitions can be compared on data instead of chosen blind; each attach
-row copies the impression's surface, strategy and position, which is
-what attach rate per strategy is computed from. One row per (order,
-product, impression) — a retried task is a no-op.
+line attaches to an impression of its product by three identities, in
+precedence order and all labelled (`matched_by`):
+
+1. **`impression`** — the impression id the line **carries**. When a
+   shopper follows a strip tile, the storefront remembers the
+   impression for that product (`useRecommendationAttribution`, per-tab
+   `sessionStorage`, one-hour TTL) and the next add-to-cart of it sends
+   `recommendationImpressionId`; `CartItem` stores it and `OrderService`
+   copies it onto the `OrderItem`. Exact, window-free, and the only
+   identity that exists for a first-visit guest: the strip is shown
+   before any cart exists (`GET /api/cart` returns nothing for a guest
+   without an id, so the impression has no `cart_uuid`), and there is
+   no customer. On production data before this path shipped, 116 of 130
+   events had neither identity.
+2. **`cart`** — the **same cart** within
+   `RECOMMENDATION_ATTACH_CART_WINDOW_HOURS` (24): the cart UUID the
+   order snapshots in `metadata.cart_snapshot`, which the events endpoint
+   records from the storefront's `X-Cart-Id`.
+3. **`user`** — the **same signed-in customer** within
+   `RECOMMENDATION_ATTACH_USER_WINDOW_DAYS` (7).
+
+All three are recorded so the definitions can be compared on data
+instead of chosen blind; each attach row copies the impression's
+surface, strategy and position, which is what attach rate per strategy
+is computed from. One row per (order, product, impression) — a retried
+task is a no-op.
 
 Every returned item carries `reason = (strategy, relation_type, score)`.
 The storefront renders it as a translated label keyed by the enum
@@ -265,6 +280,7 @@ every deploy. Enable `vectorStore` with the existing
 | `recommendation.RecommendationSlot` | `surface · strategy_chain[] · weights{} · limit · min_fill · price_band_ratio · enabled` | one row per surface; `strategy_chain` is `JSONField(default=list)` validated in `schemas.py` (the `page_config` idiom) |
 | `recommendation.RecommendationCandidate` | `product · candidate · strategy · score · relation_type · computed_at` | unique (product, candidate, strategy); indexed (product, strategy, -score) |
 | `recommendation.RecommendationEvent` | `surface · strategy · seed · product · position · kind · impression_id · session_key · cart_uuid · user · order · matched_by · created_at` | `impression | click` from the storefront; `attach` derived from `order_created` (unique per order · product · impression); `cart_uuid` is the journey identity, the cart row is a per-customer singleton |
+| `cart.CartItem.recommendation_impression_id` → `order.OrderItem.recommendation_impression_id` | nullable UUID on the line | the impression carried from add-to-cart (`CartItemCreateSerializer` / `CartItemUpdateSerializer`, latest add wins) and copied at checkout by both `OrderService` cart→order paths; read by `record_attach_events` as the first identity |
 
 Gating is two-tier like everything else: `Tenant.recommendations_enabled`
 (plan flag, beside `promotions_enabled`, `tenant/models.py:374-396`;
@@ -315,8 +331,12 @@ from its own `onMounted`, which under `hydrate-on-visible` fires when
 it scrolls into view — "shown", not "served" — and echoes the id on
 click through `server/api/analytics/recommendation-event.post.ts`,
 carrying the cart's identity headers so an `attach` can later be
-correlated against the same basket. Wholesale prices are swapped in
-client-side by `useB2BPricing`, never cached.
+correlated against the same basket. The click also remembers the
+impression for that product (`useRecommendationAttribution`), and the
+cart store's `createCartItem` / `updateCartItem` — the one choke point
+every add-to-cart goes through — sends it as `recommendationImpressionId`
+so the line carries it to the order (§5). Wholesale prices are swapped
+in client-side by `useB2BPricing`, never cached.
 
 ## 9. Common task playbook
 

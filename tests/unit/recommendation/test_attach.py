@@ -179,6 +179,61 @@ def test_an_order_with_no_cart_and_no_customer_attaches_nothing(product):
     assert record_attach_events(order.id) == 0
 
 
+def _carrying(order, product, impression_id):
+    """The storefront carried this impression onto the line at
+    add-to-cart; the order line inherited it at checkout."""
+    order.items.filter(product=product).update(
+        recommendation_impression_id=impression_id
+    )
+
+
+def test_a_carried_impression_attaches_a_guest_with_no_identity_at_all(
+    product,
+):
+    """The first-visit journey: the strip was shown before any cart
+    existed (no cart_uuid on the impression), the shopper is a guest,
+    and the order has no snapshot either. Only the carried id can tie
+    the line back — and it does."""
+    shown = _impression(product, age=timedelta(hours=2), cart_uuid=None)
+    order = _order(product, cart_uuid=None)
+    _carrying(order, product, shown.impression_id)
+
+    assert record_attach_events(order.id) == 1
+    row = _attaches(order).get()
+    assert row.matched_by == AttachMatch.IMPRESSION
+    assert row.impression_id == shown.impression_id
+
+
+def test_a_carried_impression_is_not_bound_by_the_windows(product):
+    shown = _impression(product, age=timedelta(days=30), cart_uuid=None)
+    order = _order(product, cart_uuid=None)
+    _carrying(order, product, shown.impression_id)
+
+    assert record_attach_events(order.id) == 1
+
+
+def test_a_carried_impression_takes_precedence_over_the_cart_window(
+    product,
+):
+    shown = _impression(product, age=timedelta(hours=1), cart_uuid=CART)
+    order = _order(product)
+    _carrying(order, product, shown.impression_id)
+
+    assert record_attach_events(order.id) == 1
+    assert _attaches(order).get().matched_by == AttachMatch.IMPRESSION
+
+
+def test_a_carried_impression_for_another_product_attaches_nothing(
+    product,
+):
+    other = ProductFactory(num_images=0, num_reviews=0)
+    shown = _impression(other, age=timedelta(hours=1), cart_uuid=None)
+    order = _order(product, cart_uuid=None)
+    _carrying(order, product, shown.impression_id)
+
+    assert record_attach_events(order.id) == 0
+
+
 def test_the_task_returns_the_count(product):
     _impression(product, age=timedelta(hours=1))
     order = _order(product)

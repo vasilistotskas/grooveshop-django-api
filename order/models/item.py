@@ -32,6 +32,13 @@ class OrderItem(TimeStampMixinModel, SortableModel, UUIDModel):
     is_refunded = models.BooleanField(_("Is Refunded"), default=False)
     refunded_quantity = models.IntegerField(_("Refunded Quantity"), default=0)
     notes = models.TextField(_("Notes"), blank=True, default="")
+    # Carried over from ``CartItem.recommendation_impression_id`` at
+    # checkout: the suggestion-strip impression this line was added
+    # from. What ``recommendation.events.record_attach_events`` matches
+    # first, before the cart and customer windows.
+    recommendation_impression_id = models.UUIDField(
+        _("Recommendation impression"), null=True, blank=True
+    )
 
     objects: OrderItemManager = OrderItemManager()
 

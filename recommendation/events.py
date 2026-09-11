@@ -113,9 +113,21 @@ def record_attach_events(order_id: int) -> int:
     if order is None:
         logger.warning("Attach skipped: order %s does not exist", order_id)
         return 0
-    product_ids = list(order.items.values_list("product_id", flat=True))
+    lines = list(
+        order.items.values_list("product_id", "recommendation_impression_id")
+    )
+    product_ids = [product_id for product_id, _ in lines]
     if not product_ids:
         return 0
+    # The impression each line was added from, when the storefront
+    # carried one (CartItem → OrderItem). Exact and identity-free: it is
+    # what attaches a guest's first-visit journey, where no cart existed
+    # when the strip was shown.
+    carried: dict[int, uuid.UUID] = {
+        product_id: impression_id
+        for product_id, impression_id in lines
+        if impression_id is not None
+    }
 
     snapshot = (order.metadata or {}).get("cart_snapshot") or {}
     cart_uuid = _as_uuid(snapshot.get("cart_uuid"))
@@ -128,13 +140,16 @@ def record_attach_events(order_id: int) -> int:
     )
 
     match = Q()
+    if carried:
+        match |= Q(impression_id__in=list(carried.values()))
     if cart_uuid is not None:
         match |= Q(cart_uuid=cart_uuid, created_at__gte=cart_since)
     if order.user_id is not None:
         match |= Q(user_id=order.user_id, created_at__gte=user_since)
     if not match:
-        # An order with neither identity (an agent-placed order with no
-        # cart, a guest whose snapshot is missing) has nothing to match.
+        # An order with no identity at all (an agent-placed order with no
+        # cart, a guest whose snapshot is missing, nothing carried) has
+        # nothing to match.
         return 0
 
     impressions = (
@@ -165,11 +180,20 @@ def record_attach_events(order_id: int) -> int:
         if key in seen:
             continue
         seen.add(key)
+        carried_here = (
+            carried.get(impression.product_id) == impression.impression_id
+        )
         same_cart = (
             cart_uuid is not None
             and impression.cart_uuid == cart_uuid
             and impression.created_at >= cart_since
         )
+        if carried_here:
+            matched_by = AttachMatch.IMPRESSION
+        elif same_cart:
+            matched_by = AttachMatch.CART
+        else:
+            matched_by = AttachMatch.USER
         rows.append(
             RecommendationEvent(
                 kind=EventKind.ATTACH,
@@ -183,7 +207,7 @@ def record_attach_events(order_id: int) -> int:
                 user_id=order.user_id,
                 cart_uuid=impression.cart_uuid,
                 order_id=order.id,
-                matched_by=AttachMatch.CART if same_cart else AttachMatch.USER,
+                matched_by=matched_by,
             )
         )
     if not rows:

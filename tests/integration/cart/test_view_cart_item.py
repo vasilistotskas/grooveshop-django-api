@@ -1,3 +1,5 @@
+import uuid
+
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from rest_framework import status
@@ -445,4 +447,110 @@ class CartItemViewSetTest(TestURLFixerMixin, APITestCase):
                 status.HTTP_400_BAD_REQUEST,
                 status.HTTP_201_CREATED,
             ],
+        )
+
+    # The storefront carries the suggestion-strip impression a product
+    # was reached from onto the add-to-cart; the line keeps it so the
+    # order line can inherit it and the engine can attach exactly.
+
+    def test_create_stores_the_recommendation_impression(self):
+        impression = uuid.uuid4()
+
+        response = self.client.post(
+            self.list_url,
+            {
+                "product": self.product2.pk,
+                "quantity": 1,
+                "recommendationImpressionId": str(impression),
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        line = CartItem.objects.get(cart=self.cart, product=self.product2)
+        self.assertEqual(line.recommendation_impression_id, impression)
+
+    def test_create_without_an_impression_leaves_the_line_unattributed(self):
+        response = self.client.post(
+            self.list_url,
+            {"product": self.product2.pk, "quantity": 1},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        line = CartItem.objects.get(cart=self.cart, product=self.product2)
+        self.assertIsNone(line.recommendation_impression_id)
+
+    def test_stacking_onto_a_line_carries_the_latest_impression(self):
+        # Cart holds 2 of product1 with no attribution; the shopper now
+        # reaches it through a strip and adds one more.
+        impression = uuid.uuid4()
+
+        response = self.client.post(
+            self.list_url,
+            {
+                "product": self.product1.pk,
+                "quantity": 1,
+                "recommendationImpressionId": str(impression),
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.cart_item.refresh_from_db()
+        self.assertEqual(self.cart_item.quantity, 3)
+        self.assertEqual(
+            self.cart_item.recommendation_impression_id, impression
+        )
+
+    def test_stacking_without_an_impression_keeps_the_existing_one(self):
+        impression = uuid.uuid4()
+        CartItem.objects.filter(pk=self.cart_item.pk).update(
+            recommendation_impression_id=impression
+        )
+
+        response = self.client.post(
+            self.list_url,
+            {"product": self.product1.pk, "quantity": 1},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.cart_item.refresh_from_db()
+        self.assertEqual(
+            self.cart_item.recommendation_impression_id, impression
+        )
+
+    def test_update_stores_the_recommendation_impression(self):
+        impression = uuid.uuid4()
+
+        response = self.client.patch(
+            self.detail_url,
+            {"quantity": 4, "recommendationImpressionId": str(impression)},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.cart_item.refresh_from_db()
+        self.assertEqual(self.cart_item.quantity, 4)
+        self.assertEqual(
+            self.cart_item.recommendation_impression_id, impression
+        )
+
+    def test_a_malformed_impression_id_is_rejected(self):
+        response = self.client.post(
+            self.list_url,
+            {
+                "product": self.product2.pk,
+                "quantity": 1,
+                "recommendationImpressionId": "not-a-uuid",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(
+            CartItem.objects.filter(
+                cart=self.cart, product=self.product2
+            ).exists()
         )

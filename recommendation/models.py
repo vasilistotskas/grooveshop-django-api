@@ -255,7 +255,7 @@ class RecommendationEvent(models.Model):
     )
     matched_by = models.CharField(
         _("Matched by"),
-        max_length=8,
+        max_length=12,
         choices=AttachMatch.choices,
         blank=True,
         default="",

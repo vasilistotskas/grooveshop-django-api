@@ -861,6 +861,9 @@ class OrderService:
                     product=product,
                     quantity=quantity,
                     price=item_price,
+                    recommendation_impression_id=(
+                        cart_item.recommendation_impression_id
+                    ),
                 )
 
             # Step 7: Reconcile reservations against the cart and decrement
@@ -1368,6 +1371,9 @@ class OrderService:
                     product=product,
                     quantity=quantity,
                     price=item_price,
+                    recommendation_impression_id=(
+                        cart_item.recommendation_impression_id
+                    ),
                 )
 
             # Step 6: Reconcile reservations against the cart and decrement

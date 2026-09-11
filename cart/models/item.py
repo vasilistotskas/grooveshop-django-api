@@ -31,6 +31,15 @@ class CartItem(TimeStampMixinModel, UUIDModel):
             "Price of the product when added to cart (for price change validation)"
         ),
     )
+    # The suggestion-strip impression this line was added from, when the
+    # shopper reached the product through one. Sent by the storefront on
+    # add-to-cart, copied onto the order line at checkout, and read by
+    # ``recommendation.events.record_attach_events``: it is the one
+    # identity that survives a guest having had no cart when the strip
+    # was shown (docs/recommendations-engine.md §5).
+    recommendation_impression_id = models.UUIDField(
+        _("Recommendation impression"), null=True, blank=True
+    )
 
     objects: CartItemManager = CartItemManager()
 

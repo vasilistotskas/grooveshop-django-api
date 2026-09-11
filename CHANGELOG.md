@@ -3,6 +3,34 @@
 
 
 
+## v3.54.0 (2026-09-11)
+
+### Bug fixes
+
+* fix(admin): pin Unfold links to their urlconf, mount debug toolbar on the public host
+
+Under django-tenants each host resolves against one urlconf, so a reverse_lazy for the other admin site could not be cast there. Django's technical 500 page casts every lazy in settings, which replaced every local error with NoReverseMatch ('platform_admin' / 'djdt' namespace, product_product_changelist) and hid the real cause. Every Unfold link is now reverse_lazy(name, urlconf=...) and a test casts all of them under both urlconfs and runs the debug page's settings dump. debug_toolbar.urls is mounted on the public urlconf under the same flag as core.urls, which is what actually 500'd the local platform host.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com> ([`9f62146`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9f62146e29b271f33a1d6106ca235dda2ed2ecf7))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.53.0 [skip ci] ([`2b6664b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2b6664bb0b8a4192717e7c64e80d05e406197bed))
+
+### Features
+
+* feat(page_config): operator SEO title and description on page layouts
+
+PageLayout now carries SeoModel (seo_title, seo_description, seo_keywords), exposed on the public and admin serializers and editable in the admin's SEO fieldset. The pages a layout drives (home, about, vision, contact, legal) had no description of their own and inherited the store-wide one, and the home page title was the bare store name (Ahrefs 'Meta description too short' / 'Title too short', 2026-09-11). schema.yml regenerated for this and the public settings endpoint.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com> ([`441aed7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/441aed7a241a0792cfcf8d345923c692a9964d3c))
+
+* feat(settings): serve every public store setting in one read
+
+GET /api/v1/settings/public returns all PUBLIC_SETTING_KEYS rows of the request's tenant schema in one query, encoded exactly like settings/get (json-typed rows JSON-encoded, null values omitted). The storefront read its flags one key at a time — about thirty round trips per render — which is the load that saturated it under a crawler burst (Ahrefs, 2026-09-11). The 'settings' cache surface now purges the storefront's settingsPublic handler; the previous 'settings' pattern matched no handler at all.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com> ([`8e46a42`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8e46a425eaf47766ed4d754410bf830aaad2b4f1))
+
 ## v3.53.0 (2026-09-11)
 
 ### Chores

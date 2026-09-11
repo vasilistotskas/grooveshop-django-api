@@ -39,6 +39,22 @@ def test_visit_counters_do_not():
     dispatch.assert_not_called()
 
 
+def test_a_new_order_schedules_attach_attribution():
+    from order.factories.order import OrderFactory
+    from order.models.order import Order
+    from order.signals import order_created
+
+    order = OrderFactory(num_order_items=0)
+
+    with patch("recommendation.signals.dispatch_on_commit") as dispatch:
+        order_created.send(sender=Order, order=order)
+
+    dispatch.assert_called_once()
+    task = dispatch.call_args.args[0]
+    assert task.name == "recommendation.tasks.record_recommendation_attach"
+    assert dispatch.call_args.kwargs["kwargs"] == {"order_id": order.pk}
+
+
 def test_relation_save_and_delete_schedule_the_source_product():
     source = ProductFactory(num_images=0, num_reviews=0)
     target = ProductFactory(num_images=0, num_reviews=0)

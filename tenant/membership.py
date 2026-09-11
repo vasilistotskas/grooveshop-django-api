@@ -52,6 +52,28 @@ def get_current_tenant() -> Any | None:
     return tenant
 
 
+def resolve_current_tenant() -> Any | None:
+    """The real ``Tenant`` row for the active schema, or None on public.
+
+    ``get_current_tenant`` hands back whatever django-tenants bound to
+    the connection, and under ``schema_context(name)`` — a management
+    command, a shell, a webhook loop — that is a bare ``FakeTenant``
+    carrying only ``schema_name``. Callers that need a real field
+    (``plan``, ``vertical``) use this instead: it upgrades a FakeTenant
+    to the row with one query, which is cheap for the rare paths that
+    hit it (``TenantTask`` binds the real row for Celery, and the HTTP
+    middleware always does).
+    """
+    from tenant.models import Tenant
+
+    tenant = get_current_tenant()
+    if tenant is None:
+        return None
+    if isinstance(tenant, Tenant):
+        return tenant
+    return Tenant.objects.filter(schema_name=tenant.schema_name).first()
+
+
 def tenant_plan_allows(flag: str) -> bool:
     """True when the active tenant's PLAN permits a feature.
 

@@ -26,6 +26,28 @@ class CartNotSetException(Exception):
     pass
 
 
+def cart_uuid_from_request(request: Request | HttpRequest) -> uuid.UUID | None:
+    """The cart the caller is addressing, from the ``X-Cart-Id`` header.
+
+    Carts are addressed by their unguessable UUID, never the sequential
+    PK — otherwise any anonymous caller could enumerate other guests'
+    carts by incrementing an integer header (IDOR). Anything that is
+    not a valid UUID reads as "no cart". The storefront proxy sends the
+    header on every cart-scoped call, including the recommendation
+    feedback events, so the same parse serves both.
+    """
+    if hasattr(request, "META"):
+        raw = request.META.get("HTTP_X_CART_ID")
+    else:
+        raw = request.headers.get("X-Cart-Id")
+    if not raw:
+        return None
+    try:
+        return uuid.UUID(str(raw))
+    except ValueError, TypeError, AttributeError:
+        return None
+
+
 class CartService:
     def __init__(self, request: Request | HttpRequest):
         if not request:
@@ -42,21 +64,7 @@ class CartService:
         self._initialize_cart()
 
     def _extract_cart_info(self):
-        if hasattr(self.request, "META"):
-            raw_cart_id = self.request.META.get("HTTP_X_CART_ID")
-        else:
-            raw_cart_id = self.request.headers.get("X-Cart-Id")
-
-        # Guest carts are addressed by their unguessable UUID, never the
-        # sequential PK — otherwise any anonymous caller can enumerate other
-        # guests' carts by incrementing an integer header (IDOR). Reject
-        # anything that is not a valid UUID.
-        self.cart_id: uuid.UUID | None = None
-        if raw_cart_id:
-            try:
-                self.cart_id = uuid.UUID(str(raw_cart_id))
-            except ValueError, TypeError, AttributeError:
-                self.cart_id = None
+        self.cart_id: uuid.UUID | None = cart_uuid_from_request(self.request)
 
     def __str__(self):
         return f"Cart {self.cart.user if self.cart and self.cart.user else 'Anonymous'}"

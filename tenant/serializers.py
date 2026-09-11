@@ -327,6 +327,7 @@ class TenantAdminSerializer(serializers.ModelSerializer):
             # --- Plan & Billing (excluded from public serializer) ---
             "plan",
             "paid_until",
+            "vertical",
             # --- Branding ---
             "store_name",
             "store_description",

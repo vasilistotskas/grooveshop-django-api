@@ -4308,6 +4308,21 @@ ACS_SUPPORTED_COUNTRIES = [
 # ShippingProvider.is_active flag, NOT a setting — see Phase 0
 # (shipping/migrations/0002_seed_providers.py).
 
+# ---------- Recommendations ----------
+# Attach attribution windows (docs/recommendations-engine.md §5). An
+# order line "attaches" to an impression of the same product when the
+# impression was shown to the SAME CART within this many hours (one
+# shopping journey, guest or signed in) or to the SAME SIGNED-IN
+# CUSTOMER within this many days (saw it on the phone, bought on the
+# laptop). Both matches are recorded, labelled by which window caught
+# them, so the two definitions can be compared on data.
+RECOMMENDATION_ATTACH_CART_WINDOW_HOURS = int(
+    getenv("RECOMMENDATION_ATTACH_CART_WINDOW_HOURS", "24")
+)
+RECOMMENDATION_ATTACH_USER_WINDOW_DAYS = int(
+    getenv("RECOMMENDATION_ATTACH_USER_WINDOW_DAYS", "7")
+)
+
 # ---------- Meta Conversions API ----------
 # Pixel ID / dataset ID and the access token are per-tenant secrets —
 # they live ONLY on the ``Tenant`` model (see ``tenant/credentials.py:

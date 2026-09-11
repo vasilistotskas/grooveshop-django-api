@@ -34,7 +34,7 @@ def test_slots_are_schema_local(mt_tenant):
     from recommendation.presets import seed_recommendation_slots
 
     with schema_context(mt_tenant.schema_name):
-        seed_recommendation_slots()
+        seed_recommendation_slots(mt_tenant.vertical)
         assert RecommendationSlot.objects.exists()
 
     with schema_context("public"):

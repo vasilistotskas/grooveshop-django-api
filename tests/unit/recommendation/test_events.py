@@ -41,6 +41,47 @@ def test_one_row_per_item_sharing_the_impression():
     assert all(len(r.session_key) == 40 for r in rows)
 
 
+def test_the_cart_identity_is_kept_and_a_bad_one_reads_as_none():
+    a = ProductFactory(num_images=0)
+    cart = uuid.uuid4()
+
+    record_events(
+        kind=EventKind.IMPRESSION,
+        surface=Surface.PDP,
+        impression_id=str(uuid.uuid4()),
+        items=_items(a),
+        cart_uuid=str(cart),
+    )
+    record_events(
+        kind=EventKind.CLICK,
+        surface=Surface.PDP,
+        impression_id=str(uuid.uuid4()),
+        items=_items(a),
+        cart_uuid="not-a-uuid",
+    )
+
+    stored = list(
+        RecommendationEvent.objects.order_by("id").values_list(
+            "cart_uuid", flat=True
+        )
+    )
+    assert stored == [cart, None]
+
+
+def test_attach_is_never_accepted_from_the_client_path():
+    a = ProductFactory(num_images=0)
+    assert (
+        record_events(
+            kind=EventKind.ATTACH,
+            surface=Surface.PDP,
+            impression_id=str(uuid.uuid4()),
+            items=_items(a),
+        )
+        == 0
+    )
+    assert not RecommendationEvent.objects.exists()
+
+
 def test_unknown_kind_or_surface_writes_nothing():
     a = ProductFactory(num_images=0)
     assert (

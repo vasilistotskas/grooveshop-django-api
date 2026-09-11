@@ -27,7 +27,7 @@ from decimal import Decimal
 from typing import NamedTuple
 
 from recommendation.candidates import compute_candidates_for_product
-from recommendation.context import tenant_context
+from recommendation.context import current_vertical, tenant_context
 from recommendation.enum import StrategyCode, Surface
 from recommendation.models import RecommendationCandidate, RecommendationSlot
 from recommendation.presets import slot_defaults
@@ -94,7 +94,7 @@ def _slot(surface: str) -> RecommendationSlot:
     # No row yet — a tenant provisioned before the engine existed and
     # not yet backfilled. The preset is the behaviour it would have
     # been seeded with; this is never persisted from here.
-    defaults = slot_defaults(surface)
+    defaults = slot_defaults(surface, current_vertical())
     return RecommendationSlot(surface=surface, **defaults)
 
 

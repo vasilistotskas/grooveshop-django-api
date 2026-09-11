@@ -26,29 +26,30 @@ _CACHE_TTL = 300
 
 
 def _current_plan() -> str:
-    from tenant.membership import get_current_tenant
+    from tenant.membership import get_current_tenant, resolve_current_tenant
 
-    tenant = get_current_tenant()
     # Public schema — the platform operator, never plan-gated; also
     # never serves a storefront, so the value is academic there.
-    if tenant is None:
+    if get_current_tenant() is None:
         return TenantPlan.ENTERPRISE
-    plan = getattr(tenant, "plan", None)
-    if plan is None:
-        # A bare ``FakeTenant`` — ``schema_context(name)`` from a
-        # management command or a shell carries only the schema name.
-        # ``TenantTask`` binds the real row for Celery, so this is the
-        # exception, and the row is one query the 5-minute cache pays.
-        # Unlike the boolean feature flags this cannot fail open: the
-        # Free tier is the honest answer for a schema with no row.
-        from tenant.models import Tenant
+    # Unlike the boolean feature flags this cannot fail open: the Free
+    # tier is the honest answer for a schema whose row cannot be read.
+    tenant = resolve_current_tenant()
+    return str(tenant.plan) if tenant is not None else TenantPlan.TRIAL
 
-        plan = (
-            Tenant.objects.filter(schema_name=tenant.schema_name)
-            .values_list("plan", flat=True)
-            .first()
-        )
-    return str(plan or TenantPlan.TRIAL)
+
+def current_vertical() -> str:
+    """The active store's ``StoreVertical`` — what its presets key on.
+
+    ``general`` on the public schema (nothing to reset there) and for a
+    schema without a row; otherwise the real ``Tenant`` row's value,
+    resolved even under a bare ``FakeTenant``.
+    """
+    from tenant.membership import resolve_current_tenant
+    from tenant.models import StoreVertical
+
+    tenant = resolve_current_tenant()
+    return str(tenant.vertical) if tenant is not None else StoreVertical.GENERAL
 
 
 def _semantic_available() -> bool:

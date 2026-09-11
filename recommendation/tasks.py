@@ -101,6 +101,7 @@ def record_recommendation_event(
     seed_id: int | None = None,
     session_key: str = "",
     user_id: int | None = None,
+    cart_uuid: str | None = None,
 ) -> dict[str, int]:
     """Persist impression/click rows off the request path.
 
@@ -118,5 +119,26 @@ def record_recommendation_event(
         seed_id=seed_id,
         session_key=session_key,
         user_id=user_id,
+        cart_uuid=cart_uuid,
     )
     return {"rows": rows}
+
+
+@celery_app.task(
+    base=MonitoredTask,
+    max_retries=3,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+)
+def record_recommendation_attach(order_id: int) -> dict[str, int]:
+    """Write ``attach`` rows for a newly created order.
+
+    Dispatched from ``recommendation.signals.on_order_created`` through
+    ``dispatch_on_commit`` so the schema travels with the message. Safe
+    to retry: the attach rows are unique per (order, product,
+    impression).
+    """
+    from recommendation.events import record_attach_events
+
+    rows = record_attach_events(order_id)
+    return {"order_id": order_id, "rows": rows}

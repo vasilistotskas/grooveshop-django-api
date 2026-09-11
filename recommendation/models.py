@@ -10,7 +10,7 @@ from django_stubs_ext.db.models import TypedModelMeta
 
 from core.models import TimeStampMixinModel
 from product.enum.relation import RelationType
-from recommendation.enum import EventKind, StrategyCode, Surface
+from recommendation.enum import AttachMatch, EventKind, StrategyCode, Surface
 
 
 class RecommendationSlot(TimeStampMixinModel):
@@ -186,11 +186,18 @@ class RecommendationEvent(models.Model):
     bought. Follows ``search.SearchClick``.
 
     ``impression_id`` ties the three together: the API mints one per
-    response, the client echoes it on click, and order completion
-    writes ``attach`` for any line whose product appeared under an
-    impression in the same session. Events are recorded on every plan
+    response, the client echoes it on impression and click, and order
+    creation writes ``attach`` for any line whose product appeared under
+    an impression shown to the same cart or the same signed-in customer
+    inside the attribution windows (``settings.RECOMMENDATION_ATTACH_*``,
+    ``events.record_attach_events``). Events are recorded on every plan
     — one insert — and only the REPORTING is plan-gated, so the
     platform learns vertical presets from Free stores too.
+
+    ``cart_uuid`` is the identity that spans the journey: the cart row
+    itself is a per-customer singleton whose lines are cleared at
+    checkout, so an ``attach`` is matched on the UUID the order snapshots
+    (``metadata.cart_snapshot.cart_uuid``), never on the row.
     """
 
     surface = models.CharField(
@@ -221,6 +228,9 @@ class RecommendationEvent(models.Model):
     session_key = models.CharField(
         _("Session key"), max_length=40, blank=True, db_index=True
     )
+    cart_uuid = models.UUIDField(
+        _("Cart"), null=True, blank=True, db_index=True
+    )
     # ORM-only: the user table is per-schema too, but the platform
     # rule for FKs to it is no database constraint (see
     # ``Product.changed_by``).
@@ -233,12 +243,38 @@ class RecommendationEvent(models.Model):
         related_name="+",
         verbose_name=_("User"),
     )
+    # ``attach`` rows only: the order the line landed in, and which
+    # window tied it back to the impression.
+    order = models.ForeignKey(
+        "order.Order",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="recommendation_events",
+        verbose_name=_("Order"),
+    )
+    matched_by = models.CharField(
+        _("Matched by"),
+        max_length=8,
+        choices=AttachMatch.choices,
+        blank=True,
+        default="",
+    )
     created_at = models.DateTimeField(_("Created at"), auto_now_add=True)
 
     class Meta(TypedModelMeta):
         verbose_name = _("Recommendation event")
         verbose_name_plural = _("Recommendation events")
         ordering = ["-created_at"]
+        constraints = [
+            # One attach per (order, product, impression): the task that
+            # writes them retries, and a retry must not double-count.
+            models.UniqueConstraint(
+                fields=["order", "product", "impression_id"],
+                condition=Q(kind="attach"),
+                name="rec_event_attach_unique",
+            ),
+        ]
         indexes = [
             BTreeIndex(fields=["created_at"], name="rec_event_created_ix"),
             BTreeIndex(

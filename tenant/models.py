@@ -26,6 +26,23 @@ class TenantPlan(models.TextChoices):
     ENTERPRISE = "enterprise", _("Enterprise")
 
 
+class StoreVertical(models.TextChoices):
+    """What kind of catalogue a store sells.
+
+    A platform-level fact about the tenant, set at onboarding, that
+    downstream features read to pick sensible defaults — today the
+    recommendation engine's per-surface strategy presets
+    (``recommendation/presets.py``), keyed by this enum. A store that
+    fits none of the specific verticals is ``general``.
+    """
+
+    GENERAL = "general", _("General")
+    FASHION = "fashion", _("Fashion & apparel")
+    PLANTS_GARDEN = "plants_garden", _("Plants & garden")
+    ELECTRONICS = "electronics", _("Electronics & gadgets")
+    FOOD = "food", _("Food & drink")
+
+
 class SuspendedReason(models.TextChoices):
     """Why a tenant is suspended — abuse and non-payment are different.
 
@@ -402,6 +419,20 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
     # and the plan rank is "how smart it is allowed to be".
     recommendations_enabled = models.BooleanField(
         _("Recommendations Enabled"), default=False
+    )
+    # Which vertical preset seeds this store's recommendation slots at
+    # provisioning and on every deploy (``backfill_recommendation_slots``
+    # in the PreSync job), and what "Reset to preset" in the slot admin
+    # resets to. Platform-set; a merchant edits the resulting slots.
+    vertical = models.CharField(
+        _("Store vertical"),
+        max_length=20,
+        choices=StoreVertical.choices,
+        default=StoreVertical.GENERAL,
+        help_text=_(
+            "What the store sells. Selects the recommendation preset the "
+            "store starts from; merchants can still edit every slot."
+        ),
     )
 
     # Stripe Connect — dormant/reserved. The platform runs SEPARATE

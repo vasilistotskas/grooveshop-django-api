@@ -45,3 +45,16 @@ class EventKind(models.TextChoices):
     IMPRESSION = "impression", _("Impression")
     CLICK = "click", _("Click")
     ATTACH = "attach", _("Attach")
+
+
+class AttachMatch(models.TextChoices):
+    """How an order line was tied back to the impression that showed
+    the product. Both are recorded so the two attribution windows can be
+    compared on data rather than chosen blind: ``cart`` is the same
+    basket within ``RECOMMENDATION_ATTACH_CART_WINDOW_HOURS`` (the one
+    shopping journey, guest or not); ``user`` is the same signed-in
+    customer within ``RECOMMENDATION_ATTACH_USER_WINDOW_DAYS`` (saw it on
+    the phone, bought on the laptop)."""
+
+    CART = "cart", _("Same cart")
+    USER = "user", _("Same customer")

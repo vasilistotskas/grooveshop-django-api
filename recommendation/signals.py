@@ -49,8 +49,27 @@ def on_relation_changed(sender, instance, raw=False, **kwargs):
     _schedule(instance.from_product_id)
 
 
+def on_order_created(sender, order, **kwargs):
+    # ``order_created`` is emitted from an on_commit hook inside the
+    # owning schema (order/signals/handlers.py), so the row is
+    # committed and the schema is right; the task then ties the
+    # order's lines back to the impressions that showed them.
+    from recommendation.tasks import record_recommendation_attach
+
+    dispatch_on_commit(
+        record_recommendation_attach, kwargs={"order_id": order.pk}
+    )
+
+
 def connect_signals() -> None:
+    from order.signals import order_created
     from product.models import Product, ProductRelation
+
+    order_created.connect(
+        on_order_created,
+        dispatch_uid="recommendation.on_order_created",
+        weak=False,
+    )
 
     post_save.connect(
         on_product_saved,

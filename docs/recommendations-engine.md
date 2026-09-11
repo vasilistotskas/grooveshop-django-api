@@ -118,8 +118,11 @@ are otherwise garbage-collected and the signal silently stops firing
 
 Chain order, weights, `limit`, `min_fill` and `price_band_ratio` are
 **data per tenant per surface** — a `RecommendationSlot` row — seeded
-from a vertical preset (`recommendation/presets.py`) at provisioning
-and editable in admin. `min_fill` matters: if the chain yields fewer
+from the store's vertical preset (`recommendation/presets.py`, keyed by
+`Tenant.vertical`, a `StoreVertical` the platform sets at onboarding) at
+provisioning and on every deploy, and editable in admin. Seeding never
+overwrites an edited row; the slot admin's **Reset to preset** actions
+(one slot, or all) are the explicit way back to the store's preset. `min_fill` matters: if the chain yields fewer
 items than it, the response is empty and the storefront hides the
 section. One lonely suggestion looks broken on a product page; the
 cart and out-of-stock presets ship with `min_fill = 1` because one
@@ -159,6 +162,20 @@ per strategy per tenant (exponentially weighted, floored at 0.05 so no
 strategy is starved of impressions). Deliberately a bandit-shaped loop
 and not a model: explainable, runs in SQL, and its output is a row a
 merchant can read.
+
+**Attach attribution** (`recommendation/events.py:record_attach_events`,
+dispatched from `order_created` by `recommendation/signals.py`): an order
+line attaches to every impression of that product shown before the
+order to the **same cart** within `RECOMMENDATION_ATTACH_CART_WINDOW_HOURS`
+(24) — the cart UUID the order snapshots in `metadata.cart_snapshot`,
+which the events endpoint records from the storefront's `X-Cart-Id` —
+or to the **same signed-in customer** within
+`RECOMMENDATION_ATTACH_USER_WINDOW_DAYS` (7). Both are recorded and
+labelled (`matched_by = cart | user`, cart taking precedence) so the two
+definitions can be compared on data instead of chosen blind; each attach
+row copies the impression's surface, strategy and position, which is
+what attach rate per strategy is computed from. One row per (order,
+product, impression) — a retried task is a no-op.
 
 Every returned item carries `reason = (strategy, relation_type, score)`.
 The storefront renders it as a translated label keyed by the enum
@@ -247,7 +264,7 @@ every deploy. Enable `vectorStore` with the existing
 | `product.ProductRelation` | `from_product · to_product · relation_type · sort_order` | unique (from, to, type); `from != to`; `SortableModel` scoped per `from_product` |
 | `recommendation.RecommendationSlot` | `surface · strategy_chain[] · weights{} · limit · min_fill · price_band_ratio · enabled` | one row per surface; `strategy_chain` is `JSONField(default=list)` validated in `schemas.py` (the `page_config` idiom) |
 | `recommendation.RecommendationCandidate` | `product · candidate · strategy · score · relation_type · computed_at` | unique (product, candidate, strategy); indexed (product, strategy, -score) |
-| `recommendation.RecommendationEvent` | `surface · strategy · seed · product · kind · session_key · user · impression_id · created_at` | `impression | click | attach`; attach written by order completion; follows `SearchClick` |
+| `recommendation.RecommendationEvent` | `surface · strategy · seed · product · position · kind · impression_id · session_key · cart_uuid · user · order · matched_by · created_at` | `impression | click` from the storefront; `attach` derived from `order_created` (unique per order · product · impression); `cart_uuid` is the journey identity, the cart row is a per-customer singleton |
 
 Gating is two-tier like everything else: `Tenant.recommendations_enabled`
 (plan flag, beside `promotions_enabled`, `tenant/models.py:374-396`;
@@ -332,12 +349,15 @@ bypass Nitro caching.
 
 ### 9.3 Adding a vertical preset
 
-`recommendation/presets.py`: chain + weights + `min_fill`; every preset
-must cover every `Surface` and pass `RecommendationSlot.clean()` —
-`tests/unit/recommendation/test_presets.py` checks both. Run
-`manage.py backfill_recommendation_slots [--schema <name>] [--preset
-<name>] [--dry-run]` to seed missing slots into every active tenant
-(never overwrites an edited row).
+Add the member to `tenant.models.StoreVertical` and its entry to
+`recommendation/presets.py:PRESETS` — the two are pinned to be the same
+set, and every preset must cover every `Surface` and pass
+`RecommendationSlot.clean()` (`tests/unit/recommendation/test_presets.py`).
+A store's vertical is set on the Tenant row in the platform admin; the
+PreSync job's `backfill_recommendation_slots [--schema <name>]
+[--vertical <name>] [--dry-run]` seeds missing slots from it on every
+deploy (never overwrites an edited row), and the slot admin's "Reset to
+preset" re-applies it over edits.
 
 ### 9.4 Switching or measuring the embedder
 
@@ -365,3 +385,10 @@ change plus the PreSync settings apply; pin `revision` either way.
 Events are collected on every tier — one insert — and only the
 reporting is gated. That is what lets the platform learn vertical
 presets from Free tenants too.
+
+**Curated relations are not capped on any tier.** Curation is the
+merchant's own labour and the thing that makes a small store's strips
+good; capping it would degrade the Free product to sell the ladder,
+which already sells the *inferred* strategies (attributes, semantic,
+co-purchase, learned weights). Decided 2026-09-11 against a proposed cap
+of 6 per product.

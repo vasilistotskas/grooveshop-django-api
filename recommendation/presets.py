@@ -1,9 +1,12 @@
 """Vertical presets: the slot configuration a store starts from.
 
-A preset is a per-surface chain + weights + limits. New tenants are
-seeded from ``general`` at provisioning; ``backfill_recommendation_slots``
-seeds any tenant that predates the engine. Presets never overwrite a
-row a merchant has edited — ``get_or_create`` only.
+A preset is a per-surface chain + weights + limits, keyed by
+``tenant.models.StoreVertical`` — the platform-level fact about what a
+store sells. Provisioning seeds the tenant's vertical; the PreSync job's
+``backfill_recommendation_slots`` seeds any tenant that has no slots
+yet; the slot admin's "Reset to preset" re-applies it on demand. Seeding
+never overwrites a row a merchant has edited — ``get_or_create`` only;
+only the explicit reset does.
 
 Every preset lists the Free-tier strategies first and the plan-gated
 ones after: the engine skips a strategy the plan does not allow, so a
@@ -20,12 +23,28 @@ cart suggestion at all.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from recommendation.enum import StrategyCode as S
 from recommendation.enum import Surface
+from tenant.models import StoreVertical
+
+if TYPE_CHECKING:
+    from recommendation.models import RecommendationSlot
 
 _FREE_CHAIN = [S.CURATED, S.VARIANT_GROUP, S.CATEGORY, S.POPULAR]
+
+# The slot fields a preset owns. ``reset_slot_to_preset`` writes exactly
+# these; anything else on the row (timestamps, the surface) is not the
+# preset's to touch.
+PRESET_FIELDS = (
+    "strategy_chain",
+    "weights",
+    "limit",
+    "min_fill",
+    "price_band_ratio",
+    "enabled",
+)
 
 
 def _slot(
@@ -70,7 +89,7 @@ def _preset(
 
 
 PRESETS: dict[str, dict[str, dict[str, Any]]] = {
-    "general": _preset(
+    StoreVertical.GENERAL: _preset(
         pdp=[
             S.CURATED,
             S.VARIANT_GROUP,
@@ -93,7 +112,7 @@ PRESETS: dict[str, dict[str, dict[str, Any]]] = {
     ),
     # Fashion: the same garment in other colours is the first thing a
     # shopper wants; then the look it goes with.
-    "fashion": _preset(
+    StoreVertical.FASHION: _preset(
         pdp=[
             S.VARIANT_GROUP,
             S.CURATED,
@@ -116,7 +135,7 @@ PRESETS: dict[str, dict[str, dict[str, Any]]] = {
     ),
     # Plants & garden: complements (pot, soil, feed) matter more than
     # look-alikes, so curated leads everywhere and category is last.
-    "plants_garden": _preset(
+    StoreVertical.PLANTS_GARDEN: _preset(
         pdp=[
             S.CURATED,
             S.CO_PURCHASE,
@@ -138,7 +157,7 @@ PRESETS: dict[str, dict[str, dict[str, Any]]] = {
     ),
     # Electronics: accessories and compatibility are curated facts;
     # semantic similarity is strong on spec-heavy descriptions.
-    "electronics": _preset(
+    StoreVertical.ELECTRONICS: _preset(
         pdp=[
             S.CURATED,
             S.SEMANTIC,
@@ -160,7 +179,7 @@ PRESETS: dict[str, dict[str, dict[str, Any]]] = {
     ),
     # Food & drink: pairs-with is curated; repeat purchase dominates,
     # and baskets are bigger, so the cart strip is wider.
-    "food": _preset(
+    StoreVertical.FOOD: _preset(
         pdp=[S.CURATED, S.CO_PURCHASE, S.CATEGORY, S.SEMANTIC, S.POPULAR],
         cart=[S.CURATED, S.CO_PURCHASE, S.CATEGORY, S.POPULAR],
         out_of_stock=[S.CURATED, S.CATEGORY, S.SEMANTIC, S.POPULAR],
@@ -170,31 +189,47 @@ PRESETS: dict[str, dict[str, dict[str, Any]]] = {
     ),
 }
 
-DEFAULT_PRESET = "general"
 
+def slot_defaults(surface: str, vertical: str) -> dict[str, Any]:
+    """The vertical's configuration for one surface, as model kwargs.
 
-def slot_defaults(surface: str, preset: str = DEFAULT_PRESET) -> dict[str, Any]:
-    """The preset's configuration for one surface, as model kwargs."""
+    Every ``StoreVertical`` has a preset (pinned by a test), so an
+    unknown vertical is a programming error, not a runtime case; an
+    unknown surface is the one thing an old preset can lack, and it gets
+    the Free-tier chain rather than an exception on a product page.
+    """
     try:
-        return dict(PRESETS[preset][surface])
+        return dict(PRESETS[vertical][surface])
     except KeyError:
-        # An unknown surface still gets a sane, Free-tier chain rather
-        # than an exception on a product page.
         return _slot(_FREE_CHAIN)
 
 
-def seed_recommendation_slots(preset: str = DEFAULT_PRESET) -> int:
-    """Create any missing slot rows from ``preset``; return how many.
+def seed_recommendation_slots(vertical: str) -> int:
+    """Create any missing slot rows from ``vertical``; return how many.
 
     Runs inside the tenant's schema context. Never overwrites: a slot
-    the merchant has edited is theirs.
+    the merchant has edited is theirs — ``reset_slot_to_preset`` is the
+    explicit way back.
     """
     from recommendation.models import RecommendationSlot
 
     created = 0
     for surface in Surface.values:
         _, was_created = RecommendationSlot.objects.get_or_create(
-            surface=surface, defaults=slot_defaults(surface, preset)
+            surface=surface, defaults=slot_defaults(surface, vertical)
         )
         created += int(was_created)
     return created
+
+
+def reset_slot_to_preset(slot: RecommendationSlot, vertical: str) -> None:
+    """Overwrite one slot's configuration with the vertical's preset.
+
+    The merchant-facing way to undo edits (the slot admin's "Reset to
+    preset"); ``clean()`` runs so a preset can never store what the
+    admin form would refuse.
+    """
+    for field, value in slot_defaults(slot.surface, vertical).items():
+        setattr(slot, field, value)
+    slot.clean()
+    slot.save(update_fields=[*PRESET_FIELDS, "updated_at"])

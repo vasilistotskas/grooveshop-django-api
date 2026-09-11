@@ -509,6 +509,9 @@ class TenantAdmin(ModelAdmin):
                     "is_demo",
                     "is_protected",
                     "is_platform_storefront",
+                    # What the store sells — selects the recommendation
+                    # preset it starts from.
+                    "vertical",
                     "suspended_at",
                     "suspended_reason",
                     "uuid",

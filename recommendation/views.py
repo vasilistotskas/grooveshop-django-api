@@ -141,8 +141,12 @@ def recommendation_event(request):
     serializer.is_valid(raise_exception=True)
     data = serializer.validated_data
 
+    from cart.services import cart_uuid_from_request
     from recommendation.tasks import record_recommendation_event
 
+    # The cart is the identity an ``attach`` is later matched on: the
+    # storefront proxy forwards the same X-Cart-Id the basket uses.
+    cart_uuid = cart_uuid_from_request(request)
     record_recommendation_event.delay(
         kind=data["kind"],
         surface=data["surface"],
@@ -158,5 +162,6 @@ def recommendation_event(request):
         seed_id=data.get("seed_id"),
         session_key=_session_key(request),
         user_id=_user_id(request),
+        cart_uuid=str(cart_uuid) if cart_uuid else None,
     )
     return Response({"detail": _("Accepted.")}, status=status.HTTP_202_ACCEPTED)

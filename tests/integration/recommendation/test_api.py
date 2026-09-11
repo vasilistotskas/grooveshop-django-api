@@ -184,6 +184,33 @@ class TestEvents:
         assert str(row.impression_id) == payload["impressionId"]
         assert row.position == 1
 
+    def test_the_cart_header_becomes_the_event_identity(self, client):
+        product = _product()
+        cart = uuid.uuid4()
+
+        response = client.post(
+            self.url,
+            self._payload(product),
+            format="json",
+            HTTP_X_CART_ID=str(cart),
+        )
+
+        assert response.status_code == status.HTTP_202_ACCEPTED
+        assert RecommendationEvent.objects.get().cart_uuid == cart
+
+    def test_a_forged_cart_header_reads_as_no_cart(self, client):
+        product = _product()
+
+        response = client.post(
+            self.url,
+            self._payload(product),
+            format="json",
+            HTTP_X_CART_ID="42",
+        )
+
+        assert response.status_code == status.HTTP_202_ACCEPTED
+        assert RecommendationEvent.objects.get().cart_uuid is None
+
     def test_attach_cannot_be_posted(self, client):
         product = _product()
         response = client.post(

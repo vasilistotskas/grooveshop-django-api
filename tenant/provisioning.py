@@ -181,11 +181,16 @@ def provision_stripe(
                 ),
             }
 
-        # Every tenant owns an ``api.<domain>`` subdomain (infra TEMPLATE
-        # contract) — that host routes straight into this tenant's
+        # The tenant's API host routes straight into this tenant's
         # schema, which is what makes the UUID lookup and row-secret
-        # verification per-tenant.
-        base_url = f"https://api.{primary.domain}"
+        # verification per-tenant. Resolve it the way the storefront
+        # does — explicit ``api*`` TenantDomain row first, derived
+        # ``api.<primary>`` otherwise: staging's host is
+        # ``api-staging.webside.gr``, and ``api.staging.webside.gr``
+        # registered a Stripe endpoint nothing serves (2026-09-11).
+        from core.utils.tenant_urls import resolve_tenant_api_domain
+
+        base_url = f"https://{resolve_tenant_api_domain(tenant)}"
 
         if dry_run:
             return {
@@ -333,10 +338,10 @@ def _seed_recommendation_slots(tenant: Tenant) -> bool:
     try:
         from recommendation.presets import seed_recommendation_slots
 
-        # ``general`` preset; a vertical-specific one can be applied
-        # later with ``backfill_recommendation_slots --preset``. Never
-        # overwrites a slot the merchant has edited.
-        created = seed_recommendation_slots()
+        # The tenant's vertical picks the preset; "Reset to preset" in
+        # the slot admin re-applies it later. Never overwrites a slot
+        # the merchant has edited.
+        created = seed_recommendation_slots(tenant.vertical)
         logger.info(
             "Seeded %s recommendation slots for %s",
             created,

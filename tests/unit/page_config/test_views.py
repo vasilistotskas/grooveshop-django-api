@@ -32,6 +32,8 @@ class TestPublicPageConfig(TestCase):
         self.layout = PageLayout.objects.create(
             page_type="home",
             title="Homepage",
+            seo_title="Webside | Μπες στο side της τεχνολογίας",
+            seo_description="Οδηγοί, άρθρα και προϊόντα τεχνολογίας.",
             is_published=True,
             published_at=timezone.now(),
         )
@@ -57,6 +59,18 @@ class TestPublicPageConfig(TestCase):
         assert data["title"] == "Homepage"
         assert data["isPublished"] is True
         assert len(data["sections"]) == 2
+
+    def test_public_layout_carries_the_operator_seo(self):
+        """The storefront reads <title> and the meta description for
+        the page off the layout; an unset field comes back as the empty
+        string so the storefront keeps its own default."""
+        response = self.client.get("/api/v1/page-config/home")
+        data = response.json()
+        assert data["seoTitle"] == "Webside | Μπες στο side της τεχνολογίας"
+        assert (
+            data["seoDescription"] == "Οδηγοί, άρθρα και προϊόντα τεχνολογίας."
+        )
+        assert data["seoKeywords"] == ""
 
     def test_sections_include_props(self):
         response = self.client.get("/api/v1/page-config/home")

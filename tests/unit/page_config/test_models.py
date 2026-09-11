@@ -42,6 +42,14 @@ class TestPageLayout(TestCase):
         assert layout.is_published is True
         assert layout.uuid is not None
 
+    def test_seo_fields_default_empty(self):
+        # SeoModel, as on ContentPage/Product/BlogPost: empty means "the
+        # storefront keeps its own default", never a null to special-case.
+        layout = PageLayout.objects.create(page_type="about", title="About")
+        assert layout.seo_title == ""
+        assert layout.seo_description == ""
+        assert layout.seo_keywords == ""
+
     def test_str(self):
         layout = PageLayout.objects.create(page_type="home", title="Homepage")
         assert str(layout) == "Homepage (home)"

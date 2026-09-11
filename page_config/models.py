@@ -109,6 +109,14 @@ class ComponentType(models.TextChoices):
 
 
 class PageLayout(
+    # ``SeoModel``: the operator's own <title> / meta description for the
+    # page this layout drives (home, about, vision, contact, ...). Those
+    # pages had no per-page description and inherited the store-wide
+    # one — Ahrefs "Meta description too short" on every static page,
+    # 2026-09-11 — and the homepage title was the bare store name. Same
+    # mixin ContentPage, Product and BlogPost use; the storefront applies
+    # the values over the page's code defaults when set.
+    SeoModel,
     PublishableModel,
     TimeStampMixinModel,
     UUIDModel,

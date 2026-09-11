@@ -54,6 +54,17 @@ class PageLayoutAdmin(BaseModelAdmin):
             {"fields": ("is_published",)},
         ),
         (
+            _("SEO"),
+            {
+                "fields": ("seo_title", "seo_description", "seo_keywords"),
+                "description": _(
+                    "The storefront's <title> and meta description for "
+                    "this page. Left empty, the page keeps its built-in "
+                    "title and the store description."
+                ),
+            },
+        ),
+        (
             _("Metadata"),
             {
                 "fields": ("metadata",),

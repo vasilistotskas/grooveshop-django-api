@@ -1655,7 +1655,10 @@ class BoxNowService:
         # postal-code filtering and the admin display.
         return {
             "type": locker_type,
-            "image_url": dest.get("imageUrl") or "",
+            # NULL when BoxNow sends no image — which is every locker in
+            # their catalogue today. "" would satisfy neither half of the
+            # nullable-URL contract the API publishes (see the model).
+            "image_url": dest.get("imageUrl") or None,
             "lat": dest.get("lat", 0),
             "lng": dest.get("lng", 0),
             "title": dest.get("title", ""),

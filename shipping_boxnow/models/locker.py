@@ -37,7 +37,13 @@ class BoxNowLocker(UUIDModel, TimeStampMixinModel):
         max_length=500,
         blank=True,
         null=True,
-        default="",
+        # NULL, never "": the field is declared nullable, so the OpenAPI
+        # contract is "a URL or null" and the storefront validates it as
+        # `z.url().nullable()`. An empty string is neither, and because
+        # the order response embeds the locker, one blank image failed
+        # response validation for the WHOLE payload — a 422 to a
+        # customer whose order had already been created.
+        default=None,
     )
     lat = models.DecimalField(
         _("Latitude"),

@@ -52,6 +52,15 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
             "the line prices"
         ),
     )
+    applied_promotions = serializers.SerializerMethodField(
+        help_text=_(
+            "Per-promotion breakdown of promotion_discount: one entry "
+            "per offer that actually took money off, with the coupon "
+            "code that earned it when there was one. The storefront "
+            "needs this to tell the shopper WHICH offers applied, and "
+            "to show a coupon its OWN amount instead of the cart total."
+        ),
+    )
     promotion_free_shipping = serializers.SerializerMethodField(
         help_text=_("Whether a live promotion waives the shipping cost"),
     )
@@ -155,6 +164,48 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
                 "properties": {
                     "promotionId": {"type": "integer"},
                     "name": {"type": "string"},
+                    "code": {"type": "string", "nullable": True},
+                    "amount": {"type": "number"},
+                },
+            },
+            "description": (
+                "One entry per promotion that took money off this "
+                "cart. ``amount`` values sum to promotion_discount; "
+                "``code`` is the coupon that earned the entry, or null "
+                "for an automatic promotion."
+            ),
+        }
+    )
+    def get_applied_promotions(self, obj: Cart) -> list[dict]:
+        # The engine already knows this — ``CartDiscountResult.applied``
+        # is what ``PromotionEngine.record`` writes onto the order as
+        # ``metadata["promotions"]``. Serializing it here is what lets
+        # the cart explain a discount instead of showing one opaque
+        # number, and what lets the coupon row show ITS OWN amount: a
+        # coupon that lost the stacking comparison contributes no entry
+        # at all, so it can no longer display an automatic promotion's
+        # money as though it had earned it.
+        return [
+            {
+                "promotionId": entry.promotion.id,
+                "name": entry.promotion.safe_translation_getter(
+                    "name", any_language=True
+                )
+                or "",
+                "code": entry.code.code if entry.code else None,
+                "amount": entry.amount.amount,
+            }
+            for entry in self._promotion_result(obj).applied
+        ]
+
+    @extend_schema_field(
+        {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "promotionId": {"type": "integer"},
+                    "name": {"type": "string"},
                     "productId": {"type": "integer"},
                     "productName": {"type": "string"},
                     "productImagePath": {"type": "string"},
@@ -236,6 +287,7 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
             "total_weight_grams",
             "currency",
             "promotion_discount",
+            "applied_promotions",
             "promotion_free_shipping",
             "applied_coupon_codes",
             "promotion_gift_items",
@@ -255,6 +307,7 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
             "total_items_unique",
             "total_weight_grams",
             "promotion_discount",
+            "applied_promotions",
             "promotion_free_shipping",
             "applied_coupon_codes",
             "promotion_gift_items",

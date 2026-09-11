@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from typing import TYPE_CHECKING, Any
 
 from django.core.cache import cache
@@ -429,14 +430,32 @@ class BoxNowService:
         try:
             response = BoxNowClient().create_delivery_request(payload)
         except BoxNowAPIError as exc:
+            # Say WHICH locker and WHOSE catalogue it came from. A
+            # rejected locker is almost always one of two things: an id
+            # we never synced, or an id synced from a different BoxNow
+            # account. Both are answerable here, and answering them in
+            # the log turns a support ticket into a glance.
+            known = (
+                BoxNowLocker.objects.filter(
+                    external_id=shipment.locker_external_id
+                )
+                .values("id", "is_active", "last_synced_at")
+                .first()
+            )
             logger.error(
-                "BoxNow API error creating delivery request for order %s: %s",
+                "BoxNow API error creating delivery request for order %s: %s "
+                "(locker=%s partner=%s known_locally=%s)",
                 order.id,
                 exc,
+                shipment.locker_external_id,
+                BoxNowClient().partner_id,
+                known or "NO — never synced under these credentials",
                 extra={
                     "order_id": order.id,
                     "boxnow_code": exc.code,
                     "boxnow_message": exc.message,
+                    "boxnow_locker_external_id": shipment.locker_external_id,
+                    "boxnow_locker_known_locally": bool(known),
                 },
             )
             cls._release_mint_claim(
@@ -1308,9 +1327,35 @@ class BoxNowService:
         Returns:
             ``{"created": N, "updated": M, "deactivated": K}``
         """
-        logger.info("sync_lockers: fetching all BoxNow APM destinations")
-        destinations: list[dict] = BoxNowClient().list_destinations(
-            location_type="apm"
+        started = time.monotonic()
+        client = BoxNowClient()
+        # The partner id IS the account identity: a catalogue fetched
+        # under one partner is meaningless to another. Staging spent an
+        # afternoon failing every voucher with "invalid locker" because
+        # its table held production's lockers while its credentials
+        # pointed at a different partner, and nothing in the logs said
+        # so. Always state whose catalogue this is.
+        logger.info(
+            "sync_lockers: fetching APM destinations for partner=%s",
+            client.partner_id,
+            extra={"boxnow_partner_id": client.partner_id},
+        )
+        destinations: list[dict] = client.list_destinations(location_type="apm")
+        known_before = BoxNowLocker.objects.count()
+        logger.info(
+            "sync_lockers: BoxNow returned %d destinations for partner=%s "
+            "in %.2fs (we currently hold %d) — sample ids: %s",
+            len(destinations),
+            client.partner_id,
+            time.monotonic() - started,
+            known_before,
+            # Enough to eyeball against a failing shipment's locker id.
+            [str(d.get("id", "")) for d in destinations[:5]],
+            extra={
+                "boxnow_partner_id": client.partner_id,
+                "boxnow_destinations": len(destinations),
+                "boxnow_known_before": known_before,
+            },
         )
 
         seen_external_ids: set[str] = set()
@@ -1350,6 +1395,25 @@ class BoxNowService:
             deactivated_count = BoxNowLocker.objects.exclude(
                 external_id__in=seen_external_ids
             ).update(is_active=False)
+            # Wholesale turnover means this catalogue belongs to a
+            # DIFFERENT partner than the rows we already had — the exact
+            # shape of a credentials/data mismatch, and the reason every
+            # subsequent voucher would fail with "invalid locker".
+            if known_before and deactivated_count > known_before / 2:
+                logger.warning(
+                    "sync_lockers: partner=%s deactivated %d of %d existing "
+                    "lockers — the local catalogue likely belonged to a "
+                    "different BoxNow account. Vouchers minted against the "
+                    "old ids will be rejected as invalid lockers.",
+                    client.partner_id,
+                    deactivated_count,
+                    known_before,
+                    extra={
+                        "boxnow_partner_id": client.partner_id,
+                        "boxnow_deactivated": deactivated_count,
+                        "boxnow_known_before": known_before,
+                    },
+                )
         else:
             # BoxNow returned an empty list — don't deactivate everything;
             # that's almost certainly an API error.  Log a warning and bail.
@@ -1359,10 +1423,20 @@ class BoxNowService:
             )
 
         logger.info(
-            "sync_lockers: created=%d updated=%d deactivated=%d",
+            "sync_lockers: partner=%s created=%d updated=%d deactivated=%d "
+            "active=%d in %.2fs",
+            client.partner_id,
             created_count,
             updated_count,
             deactivated_count,
+            BoxNowLocker.objects.filter(is_active=True).count(),
+            time.monotonic() - started,
+            extra={
+                "boxnow_partner_id": client.partner_id,
+                "boxnow_created": created_count,
+                "boxnow_updated": updated_count,
+                "boxnow_deactivated": deactivated_count,
+            },
         )
         return {
             "created": created_count,

@@ -3,6 +3,45 @@
 
 
 
+## v3.53.0 (2026-09-11)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.52.3 [skip ci] ([`1994211`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1994211dc9c44783fd9260ec79a6a891af9450b7))
+
+### Features
+
+* feat(recommendation): store vertical, attach attribution, reset-to-preset
+
+The three decisions the Free tier left open, resolved:
+
+Vertical presets. Tenant.vertical (StoreVertical: general, fashion,
+plants_garden, electronics, food) is a platform-set fact about the
+store; recommendation/presets.py is keyed by it and a test pins the two
+to be the same set. Provisioning and the PreSync backfill seed from it
+(the command's --preset became an optional --vertical override), and
+the slot admin gains "Reset to preset" for one slot or all, confirmed
+through a dialog, reading the store's own vertical. resolve_current_
+tenant() upgrades django-tenants' bare FakeTenant to the row so plan
+and vertical are readable under a shell or a command too.
+
+Attach attribution. On order_created, record_recommendation_attach ties
+each order line to the impressions of that product shown to the same
+cart (metadata.cart_snapshot.cart_uuid, recorded on events from the
+storefront's X-Cart-Id through cart.services.cart_uuid_from_request)
+within RECOMMENDATION_ATTACH_CART_WINDOW_HOURS, or to the same signed-in
+customer within RECOMMENDATION_ATTACH_USER_WINDOW_DAYS. Both are
+recorded and labelled (matched_by, cart first) so the two windows can
+be compared on data; one attach per (order, product, impression) makes
+a retried task a no-op. The order row is read in full: Order.__init__
+touches status, and a deferred field there re-fetches.
+
+Curated relations stay uncapped on every tier — curation is the
+merchant's own labour and the ladder sells the inferred strategies.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01BmTSHdGS9k8gHG126dzVWo ([`4aaadf7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4aaadf7c928422828283fbdd3621f6fa7f165afe))
+
 ## v3.52.3 (2026-09-11)
 
 ### Bug fixes

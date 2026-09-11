@@ -93,14 +93,25 @@ def record_events(
 def record_attach_events(order_id: int) -> int:
     """Tie a new order's lines back to the impressions that showed them.
 
-    For each line, every impression of that product shown before the
-    order to the SAME CART (``metadata.cart_snapshot.cart_uuid``) within
-    ``RECOMMENDATION_ATTACH_CART_WINDOW_HOURS``, or to the SAME SIGNED-IN
-    CUSTOMER within ``RECOMMENDATION_ATTACH_USER_WINDOW_DAYS``, yields one
-    ``attach`` row carrying the impression's surface, strategy and
-    position — that is what attach rate per strategy is computed from —
-    and ``matched_by`` says which window caught it, the cart taking
-    precedence when both do.
+    A line matches an impression of its product by three identities, in
+    precedence order, each recorded in ``matched_by``:
+
+    ``impression``
+        the impression id the LINE CARRIES — remembered by the
+        storefront when the shopper followed a strip tile, sent on
+        add-to-cart, copied ``CartItem`` → ``OrderItem``. Exact, so no
+        window applies, and the only identity a first-visit guest has:
+        no cart exists when the strip is shown, and there is no
+        customer.
+    ``cart``
+        the SAME CART (``metadata.cart_snapshot.cart_uuid``) within
+        ``RECOMMENDATION_ATTACH_CART_WINDOW_HOURS``.
+    ``user``
+        the SAME SIGNED-IN CUSTOMER within
+        ``RECOMMENDATION_ATTACH_USER_WINDOW_DAYS``.
+
+    Each row carries the impression's surface, strategy and position —
+    that is what attach rate per strategy is computed from.
 
     Idempotent: the unique constraint on (order, product, impression)
     makes a retried task a no-op. Returns the number of rows written.
@@ -140,8 +151,15 @@ def record_attach_events(order_id: int) -> int:
     )
 
     match = Q()
-    if carried:
-        match |= Q(impression_id__in=list(carried.values()))
+    for carried_product_id, carried_impression_id in carried.items():
+        # Exactly this line's impression FOR THIS PRODUCT. One
+        # impression id covers a whole strip, so a bare ``IN`` would
+        # also sweep in that strip's other products — which the order
+        # may hold for entirely unrelated reasons — and attach them on
+        # an identity they never matched.
+        match |= Q(
+            impression_id=carried_impression_id, product_id=carried_product_id
+        )
     if cart_uuid is not None:
         match |= Q(cart_uuid=cart_uuid, created_at__gte=cart_since)
     if order.user_id is not None:

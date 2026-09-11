@@ -223,6 +223,39 @@ def test_a_carried_impression_takes_precedence_over_the_cart_window(
     assert _attaches(order).get().matched_by == AttachMatch.IMPRESSION
 
 
+def test_a_carried_impression_attaches_only_the_line_that_carries_it(
+    product,
+):
+    """One impression id covers the whole strip, so the same id also
+    sits on rows for the strip's other products. Buying one of those
+    without carrying its id is not an attach on this identity — and
+    must never be written under a window the order never matched."""
+    also_shown = ProductFactory(num_images=0, num_reviews=0)
+    impression_id = uuid.uuid4()
+    shown = _impression(
+        product,
+        age=timedelta(hours=2),
+        cart_uuid=None,
+        impression_id=impression_id,
+        position=0,
+    )
+    _impression(
+        also_shown,
+        age=timedelta(hours=2),
+        cart_uuid=None,
+        impression_id=impression_id,
+        position=1,
+    )
+    order = _order(product, cart_uuid=None)
+    OrderItemFactory(order=order, product=also_shown, quantity=1)
+    _carrying(order, product, shown.impression_id)
+
+    assert record_attach_events(order.id) == 1
+    (row,) = _attaches(order)
+    assert row.product_id == product.id
+    assert row.matched_by == AttachMatch.IMPRESSION
+
+
 def test_a_carried_impression_for_another_product_attaches_nothing(
     product,
 ):

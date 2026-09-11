@@ -3,6 +3,24 @@
 
 
 
+## v3.52.3 (2026-09-11)
+
+### Bug fixes
+
+* fix(recommendation): an unweighted slot is a valid slot
+
+RecommendationSlot.weights defaults to {} — "unweighted" is the seeded,
+normal state — but the JSONField lacked blank=True, so the admin form
+and full_clean refused every slot a merchant had not weighted. Hit on
+the first production edit (lifting webside's cart price band):
+"This field cannot be blank."
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com> ([`f356a85`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f356a8576457d9eaa27764045f04bc7f62571fb7))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.52.2 [skip ci] ([`56a51c7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/56a51c75b2c42bb41c8235ddc3d5212dcf509309))
+
 ## v3.52.2 (2026-09-10)
 
 ### Bug fixes

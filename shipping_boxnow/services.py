@@ -1729,10 +1729,9 @@ class BoxNowService:
         # postal-code filtering and the admin display.
         return {
             "type": locker_type,
-            # NULL when BoxNow sends no image — which is every locker in
-            # their catalogue today. "" would satisfy neither half of the
-            # nullable-URL contract the API publishes (see the model).
-            "image_url": dest.get("imageUrl") or None,
+            # "" not NULL — see the model. The serializer is what turns
+            # a blank into the null the API contract publishes.
+            "image_url": dest.get("imageUrl") or "",
             "lat": dest.get("lat", 0),
             "lng": dest.get("lng", 0),
             "title": dest.get("title", ""),

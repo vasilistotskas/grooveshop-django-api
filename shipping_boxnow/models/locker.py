@@ -37,13 +37,13 @@ class BoxNowLocker(UUIDModel, TimeStampMixinModel):
         max_length=500,
         blank=True,
         null=True,
-        # NULL, never "": the field is declared nullable, so the OpenAPI
-        # contract is "a URL or null" and the storefront validates it as
-        # `z.url().nullable()`. An empty string is neither, and because
-        # the order response embeds the locker, one blank image failed
-        # response validation for the WHOLE payload — a 422 to a
-        # customer whose order had already been created.
-        default=None,
+        # "" and never NULL: nullable string columns are mid-migration
+        # to NOT NULL platform-wide, and phase one is that nothing keeps
+        # minting NULLs (tests/unit/core/test_nullable_string_fields.py).
+        # The API still publishes this as "a URL or null" — the
+        # serializer maps the blank to null, because "" is not a URL and
+        # the storefront validates it as one.
+        default="",
     )
     lat = models.DecimalField(
         _("Latitude"),

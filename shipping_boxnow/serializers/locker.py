@@ -1,4 +1,5 @@
 from django.utils.translation import gettext_lazy as _
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from shipping_boxnow.models.locker import BoxNowLocker
@@ -11,6 +12,27 @@ class BoxNowLockerSerializer(serializers.ModelSerializer[BoxNowLocker]):
     Lockers are populated exclusively via the ``sync_boxnow_lockers``
     Celery task — all fields are read-only.
     """
+
+    image_url = serializers.SerializerMethodField(
+        help_text=_("Locker photo, or null when BoxNow supplies none"),
+    )
+
+    @extend_schema_field({"type": "string", "format": "uri", "nullable": True})
+    def get_image_url(self, obj: BoxNowLocker) -> str | None:
+        """A blank column value is an ABSENT url, so serialize null.
+
+        The column stores "" (nullable string columns are mid-migration
+        to NOT NULL, and phase one is that nothing mints NULLs —
+        ``tests/unit/core/test_nullable_string_fields.py``), but the
+        published contract for this field is "a URL or null" and the
+        storefront validates it as exactly that. "" is neither, and
+        because the order response embeds the locker, one blank image
+        failed response validation for the WHOLE payload: the shopper
+        saw an error while their order had already been created, emails
+        sent and stock decremented. Every locker in BoxNow's catalogue
+        comes without an image, so this fired on every locker order.
+        """
+        return obj.image_url or None
 
     class Meta:
         model = BoxNowLocker

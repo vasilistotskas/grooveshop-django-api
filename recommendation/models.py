@@ -47,6 +47,9 @@ class RecommendationSlot(TimeStampMixinModel):
     weights = models.JSONField(
         _("Weights"),
         default=dict,
+        # An empty mapping is the normal state ("unweighted") — without
+        # ``blank`` the admin form and ``full_clean`` refuse it.
+        blank=True,
         encoder=DjangoJSONEncoder,
         help_text=_(
             "Strategy code → weight in 0..1. Missing codes default to "

@@ -68,6 +68,7 @@ EVENT_KIND_VARIANT: dict[str, str] = {
 }
 
 ATTACH_MATCH_VARIANT: dict[str, str] = {
+    AttachMatch.IMPRESSION: "primary",
     AttachMatch.CART: "success",
     AttachMatch.USER: "info",
 }

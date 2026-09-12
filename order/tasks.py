@@ -265,15 +265,27 @@ def send_order_confirmation_email(self, order_id: int) -> bool:
         # will short-circuit on the DB flag.
         _mark_confirmation_sent(order_id)
 
+        # The rendered subject goes into the log AND the order history:
+        # it is the one thing the customer quotes back ("I got an email
+        # saying delivered"), and it is what the translation overlay
+        # can silently change underneath the template.
         logger.info(
-            "Order confirmation email sent for order #%s",
+            "Order confirmation email sent for order #%s (%s): %r",
             order.id,
-            extra={"order_id": order.id, "email": order.email},
+            template_base,
+            subject,
+            extra={
+                "order_id": order.id,
+                "email": order.email,
+                "template": template_base,
+                "subject": subject,
+            },
         )
 
         OrderHistory.log_note(
             order=order,
-            note=f"Order confirmation email sent to {order.email}",
+            note=f"Order confirmation email sent to {order.email} — "
+            f"subject: {subject}",
         )
 
         return True
@@ -957,17 +969,25 @@ def send_order_status_update_email(
         email_sent = True
 
         logger.info(
-            f"Order status update email sent for order #{order.id} - Status: {status}",
+            "Order status update email sent for order #%s - Status: %s "
+            "(%s): %r",
+            order.id,
+            status,
+            template_base,
+            subject,
             extra={
                 "order_id": order.id,
                 "status": status,
                 "email": order.email,
+                "template": template_base,
+                "subject": subject,
             },
         )
 
         OrderHistory.log_note(
             order=order,
-            note=f"Status update email sent to {order.email} for {status} status",
+            note=f"Status update email sent to {order.email} for {status} "
+            f"status — subject: {subject}",
         )
 
         return True

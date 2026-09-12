@@ -288,6 +288,12 @@
             .email-card {
                 background-color: #1f2937;
                 border-color: #374151;
+                /* Text that is not in a <p> — the operator-authored
+                   payment instructions render inside a plain <div> —
+                   inherits the light-mode body colour and vanishes
+                   into this background. Colour the card itself so
+                   every descendant reads. */
+                color: #d1d5db;
             }
 
             .email-table th {

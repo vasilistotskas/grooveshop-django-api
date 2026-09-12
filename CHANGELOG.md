@@ -3,6 +3,42 @@
 
 
 
+## v3.56.5 (2026-09-12)
+
+### Bug fixes
+
+* fix(admin): move Groups and the Cache Purge Log to the control plane
+
+Both are PLATFORM_ONLY app labels (tenant/role_scopes.py) that the store
+console still linked, for two different reasons:
+
+`core.CachePurgeLog` is the same defect as Sites. `core` is
+SHARED_APPS-only, so `core_cachepurgelog` exists in the public schema
+alone and a tenant host's search path falls through to it — the section
+showed one merchant all 146 purge records from every store, actor column
+included. It moves to the control plane, where the app is already
+registered; the store keeps its own Cache Management view.
+
+`auth.Group` leaks nothing (`auth_group` exists per tenant), so this is a
+privilege surface rather than a data leak: no Group is created anywhere
+in the codebase — store access is derived from UserTenantMembership
+roles — so the section listed a table nothing reads while offering a
+store admin who reached it a way to mint themselves any permission. The
+control plane already links Groups, so the store entry is simply removed.
+
+The sidebar-split tests gain `auth` and `core`; verified by mutation that
+each still fails when a platform-only changelist is linked from the store
+sidebar, and when a registered one is dropped from the control plane.
+
+settings.py also carries an unrelated in-flight `_ADMIN_DOCS_LINKS`
+change from a concurrent session; only the hunks above are staged.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com> ([`b99c89e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b99c89ea5b71994d480f2d1569d822b10fc54a8b))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.56.4 [skip ci] ([`1d9587a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1d9587a200ce135eecc1cba17c02c1485e55772d))
+
 ## v3.56.4 (2026-09-12)
 
 ### Bug fixes

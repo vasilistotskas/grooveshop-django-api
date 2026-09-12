@@ -21,7 +21,10 @@ from extra_settings.models import Setting
 from unfold.admin import ModelAdmin
 from unfold.widgets import UnfoldAdminSelectWidget, UnfoldAdminTextInputWidget
 
-from admin.mixins import IsSuperuserOnlyModelAdmin
+from admin.mixins import (
+    IsSuperuserOnlyModelAdmin,
+    WithheldOnTenantHostModelAdmin,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -97,9 +100,12 @@ def override_third_party_admins():
 
         admin.site.unregister(model)
 
+        # The mixin goes FIRST so its permission overrides win the
+        # MRO: these are third-party admins (sites.Site,
+        # django_celery_results) that never reach BaseModelAdmin.
         new_admin_class = type(
             f"{model.__name__}AdminOverride",
-            (model_admin.__class__, ModelAdmin),
+            (WithheldOnTenantHostModelAdmin, model_admin.__class__, ModelAdmin),
             {},
         )
 
@@ -346,23 +352,29 @@ class SettingAdmin(ModelAdmin):
         return desc[:60] + "…" if len(desc) > 60 else desc
 
 
-class PeriodicTaskAdmin(BasePeriodicTaskAdmin, ModelAdmin):
+class PeriodicTaskAdmin(
+    WithheldOnTenantHostModelAdmin, BasePeriodicTaskAdmin, ModelAdmin
+):
     form = UnfoldPeriodicTaskForm
 
 
-class IntervalScheduleAdmin(ModelAdmin):
+class IntervalScheduleAdmin(WithheldOnTenantHostModelAdmin, ModelAdmin):
     pass
 
 
-class CrontabScheduleAdmin(BaseCrontabScheduleAdmin, ModelAdmin):
+class CrontabScheduleAdmin(
+    WithheldOnTenantHostModelAdmin, BaseCrontabScheduleAdmin, ModelAdmin
+):
     pass
 
 
-class SolarScheduleAdmin(ModelAdmin):
+class SolarScheduleAdmin(WithheldOnTenantHostModelAdmin, ModelAdmin):
     pass
 
 
-class ClockedScheduleAdmin(BaseClockedScheduleAdmin, ModelAdmin):
+class ClockedScheduleAdmin(
+    WithheldOnTenantHostModelAdmin, BaseClockedScheduleAdmin, ModelAdmin
+):
     pass
 
 
@@ -370,7 +382,9 @@ from core.cache.models import CachePurgeLog  # noqa: E402
 
 
 @admin.register(CachePurgeLog)
-class CachePurgeLogAdmin(IsSuperuserOnlyModelAdmin, ModelAdmin):
+class CachePurgeLogAdmin(
+    WithheldOnTenantHostModelAdmin, IsSuperuserOnlyModelAdmin, ModelAdmin
+):
     list_display = (
         "created_at",
         "actor",

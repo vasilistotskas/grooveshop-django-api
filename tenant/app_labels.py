@@ -28,6 +28,46 @@ def tenant_only_app_labels() -> list[str]:
     ]
 
 
+def shared_only_app_labels() -> list[str]:
+    """App labels whose tables live only in the public schema.
+
+    The mirror of ``tenant_only_app_labels``, and the answer to the
+    opposite question: which model pages must a TENANT host not offer,
+    because what they would show is the platform's own rows rather than
+    that store's. ``django_site`` holds one row per store domain;
+    ``core_cachepurgelog`` every purge across the estate;
+    ``django_celery_beat`` the schedule that drives every tenant.
+
+    Derived, not enumerated, and that matters here:
+    ``role_scopes.PLATFORM_ONLY_APP_LABELS`` looks like the same set but
+    is not — it also lists ``allauth_idp_oidc``, whose tables are
+    TENANT-only. Hiding that from a tenant host would remove the OIDC
+    clients a store genuinely owns. Membership of ``TENANT_APPS`` is the
+    honest test of "does this store have its own copy".
+
+    The comparison is on LABELS, not on raw ``INSTALLED_APPS`` entries.
+    Two entries can differ as strings and still name the same app label:
+    ``unfold.contrib.simple_history`` sits in SHARED_APPS and
+    ``simple_history`` in TENANT_APPS, and both reduce to
+    ``simple_history``. Comparing entries put that label in this set,
+    which would have withheld a genuinely per-tenant app's admin.
+    Collapsing to labels first also errs in the safe direction: if ANY
+    tenant entry yields a label, it is never withheld — the worst case
+    is a platform model staying visible, which is the status quo, rather
+    than a store model disappearing.
+    """
+
+    def label(entry: str) -> str:
+        return entry.split(".")[-1] if "." in entry else entry
+
+    tenant_labels = {label(app) for app in settings.TENANT_APPS}
+    return [
+        label(app)
+        for app in settings.SHARED_APPS
+        if label(app) not in tenant_labels
+    ]
+
+
 def tenant_only_table_names() -> set[str]:
     """Database tables owned by tenant-only apps.
 

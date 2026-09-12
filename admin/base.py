@@ -23,8 +23,10 @@ from tinymce.widgets import AdminTinyMCE
 from unfold.admin import BaseInlineMixin, ModelAdmin
 from unfold.mixins import FormFieldModelAdminMixin
 
+from admin.mixins import WithheldOnTenantHostModelAdmin
 
-class BaseModelAdmin(ModelAdmin):
+
+class BaseModelAdmin(WithheldOnTenantHostModelAdmin, ModelAdmin):
     """Project-wide defaults for unfold ModelAdmin.
 
     The values below are the consensus defaults seen across the 30+

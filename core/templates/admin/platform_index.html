@@ -99,6 +99,27 @@ emitted verbatim into the page. Use {% comment %} for prose like this.
             {% component "unfold/components/text.html" with class="mt-1" %}{% trans "Scheduled tasks" %}{% endcomponent %}
         {% endcomponent %}
 
+        {% comment %}
+        Only failures are stored at all, in one public-schema table, so
+        this covers every store. "—" means the table could not be read,
+        which is not the same as a clean 24 hours.
+        {% endcomment %}
+        {% component "unfold/components/card.html" %}
+            <div class="flex items-start justify-between">
+                <div class="flex h-10 w-10 items-center justify-center rounded-lg {% if platform_failed_tasks %}bg-red-50 dark:bg-red-950 text-red-600 dark:text-red-300{% else %}bg-green-50 dark:bg-green-950 text-green-600 dark:text-green-300{% endif %}">
+                    {% component "unfold/components/icon.html" %}{% if platform_failed_tasks %}error{% else %}check_circle{% endif %}{% endcomponent %}
+                </div>
+                {% url 'admin:django_celery_results_taskresult_changelist' as failed_tasks_url %}
+                {% if platform_failed_tasks and failed_tasks_url %}
+                    {% component "unfold/components/link.html" with href=failed_tasks_url|add:"?status__exact=FAILURE" class="text-sm font-medium underline" %}{% trans "Review" %}{% endcomponent %}
+                {% endif %}
+            </div>
+            <div class="font-semibold mt-4 text-2xl text-important">
+                {% if platform_failed_tasks is None %}—{% else %}{{ platform_failed_tasks }}{% endif %}
+            </div>
+            {% component "unfold/components/text.html" with class="mt-1" %}{% trans "Failed tasks (24h)" %}{% endcomponent %}
+        {% endcomponent %}
+
     </div>
 
     {# ────────────────────────────────────────────────────────────── #}

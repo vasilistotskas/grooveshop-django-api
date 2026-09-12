@@ -106,20 +106,12 @@
         {% endif %}
     {% endif %}
 
-    {# Failed Celery tasks last 24h #}
-    {% if failed_celery_count %}
-    <div class="rounded-default px-3 py-2.5 bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-400">
-        <div class="flex items-center justify-between gap-2 text-sm">
-            <div class="flex items-center gap-2">
-                {% component "unfold/components/icon.html" with class="text-base!" %}error{% endcomponent %}
-                <span>
-                    {% blocktrans count counter=failed_celery_count %}{{ counter }} background task failed in the last 24h{% plural %}{{ counter }} background tasks failed in the last 24h{% endblocktrans %}
-                </span>
-            </div>
-            {% component "unfold/components/link.html" with href="/admin/django_celery_results/taskresult/?status__exact=FAILURE" class="font-medium underline" %}{% trans "Review" %}{% endcomponent %}
-        </div>
-    </div>
-    {% endif %}
+    {% comment %}
+    The failed-background-task banner lives on the PLATFORM dashboard
+    now. Task results are public-schema only, so one table holds every
+    store's failures — counted here it would have blamed the whole
+    estate's failures on whichever merchant's console was open.
+    {% endcomment %}
 
     {% endif %}{# end is_superuser #}
 

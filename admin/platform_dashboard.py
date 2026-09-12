@@ -197,4 +197,35 @@ def dashboard_callback(request, context):
     except Exception:
         context["platform_periodic_tasks"] = None
 
+    context["platform_failed_tasks"] = _failed_tasks_last_24h()
+
     return context
+
+
+def _failed_tasks_last_24h() -> int | None:
+    """Celery tasks that failed in the last 24 hours, across every store.
+
+    Only failures reach ``django_celery_results`` at all
+    (``CELERY_TASK_IGNORE_RESULT`` + ``…STORE_ERRORS_EVEN_IF_IGNORED``),
+    and the table is public-schema only, so this one count covers the
+    whole estate. It used to sit on the store dashboard, where it
+    silently attributed every store's failures to whichever merchant
+    was open.
+
+    ``None`` rather than 0 when the table cannot be read, so the card
+    can show "—" instead of claiming a clean 24 hours it did not check.
+    """
+    from datetime import timedelta
+
+    from django.apps import apps
+    from django.utils import timezone
+
+    try:
+        TaskResult = apps.get_model("django_celery_results", "TaskResult")
+        return TaskResult.objects.filter(
+            status="FAILURE",
+            date_done__gte=timezone.now() - timedelta(hours=24),
+        ).count()
+    except Exception:
+        logger.exception("Could not read Celery task failures")
+        return None

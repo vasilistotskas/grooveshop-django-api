@@ -113,7 +113,6 @@ class DashboardCallbackCachingTests(TestCase):
         result = dashboard_callback(request, ctx)
         self.assertEqual(result["seller_config_warnings"], [])
         self.assertEqual(result["low_stock_products"], [])
-        self.assertEqual(result["failed_celery_count"], 0)
         self.assertFalse(result["is_superuser"])
 
     def test_zone_d_visible_for_superuser(self):
@@ -125,7 +124,15 @@ class DashboardCallbackCachingTests(TestCase):
         self.assertIn("seller_config_warnings", result)
         self.assertIn("mydata_warnings", result)
         self.assertIn("low_stock_products", result)
-        self.assertIn("failed_celery_count", result)
+
+    def test_celery_failures_are_not_counted_on_a_store_dashboard(self):
+        """Task results are public-schema only, so one table holds every
+        store's failures — counted here it would blame the whole
+        estate's failures on whichever merchant's console was open. The
+        count lives on the platform dashboard instead."""
+        request = self._make_request(superuser=True)
+        result = dashboard_callback(request, {})
+        self.assertNotIn("failed_celery_count", result)
 
 
 class RevenuePeriodsTests(TestCase):

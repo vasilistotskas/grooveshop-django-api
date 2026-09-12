@@ -93,7 +93,6 @@ def dashboard_callback(request, context):
             "environment": "",
         }
         context["low_stock_products"] = []
-        context["failed_celery_count"] = 0
     return context
 
 
@@ -105,7 +104,6 @@ def _build_zone_d() -> dict:
         "seller_config_warnings": _check_seller_config(),
         "mydata_warnings": _check_mydata_state(),
         "low_stock_products": _check_low_stock(),
-        "failed_celery_count": _check_failed_celery(),
     }
 
 
@@ -228,21 +226,12 @@ def _check_low_stock() -> list[dict]:
     return out
 
 
-def _check_failed_celery() -> int:
-    """Failed Celery tasks in the last 24h (best-effort).
-
-    ``django_celery_results`` is optional. If the app is not installed
-    we silently report zero so the Zone D banner just hides itself.
-    """
-
-    try:
-        TaskResult = apps.get_model("django_celery_results", "TaskResult")
-    except LookupError:
-        return 0
-    cutoff = timezone.now() - timedelta(hours=24)
-    return TaskResult.objects.filter(
-        status="FAILURE", date_done__gte=cutoff
-    ).count()
+# The failed-task count used to live here, in this store dashboard. It
+# moved to the platform dashboard when task results became
+# public-schema only: one table now holds every store's failures, so
+# counting it on a store's console would attribute the whole estate's
+# failures to whichever merchant happened to be open — the same reason
+# Sites and the Cache Purge Log left this console.
 
 
 # ── Zones A/B/C/E — cached payload ─────────────────────────────────────

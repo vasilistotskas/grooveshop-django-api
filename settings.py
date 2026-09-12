@@ -134,15 +134,16 @@ SHARED_APPS = [
     # Celery infrastructure — beat scheduler runs in public schema
     # (DatabaseScheduler reads PeriodicTask from public).
     #
-    # Task results: the DEFAULT below is "django-db", which writes into
-    # whichever schema the task ran in — hence django_celery_results is
-    # in TENANT_APPS too, so those tables exist per tenant. Production
-    # OVERRIDES this to a Redis backend (Redis DB 1) for throughput, so
-    # the per-schema tables stay empty there. Do not read task history
-    # out of django_celery_results without first checking which backend
-    # the environment actually uses; on 2026-08-21 an audit queried
-    # those tables in production, found 0 rows, and nearly concluded no
-    # tasks were running.
+    # Task results are PUBLIC-SCHEMA ONLY and deliberately not mirrored
+    # into TENANT_APPS. Only failures are ever written (see
+    # CELERY_TASK_IGNORE_RESULT below), and a failure is platform
+    # operations, not one store's data: it belongs where the control
+    # plane can read every store's in one list, and where
+    # ``celery.backend_cleanup`` — which beat dispatches with no tenant
+    # header, so it runs in public — can actually prune it. Per-tenant
+    # tables would be written by tenant-context tasks, invisible to the
+    # control plane, and never cleaned. tenant/migrations/0039 drops the
+    # ones an earlier TENANT_APPS entry created.
     "django_celery_beat",
     "django_celery_results",
     # Platform-wide Setting table — read by admin dashboard in public
@@ -248,10 +249,8 @@ TENANT_APPS = [
     "djmoney",
     "phonenumber_field",
     "tinymce",
-    # Task result storage — mirrored in SHARED_APPS. Kept here too so
-    # tasks running in a tenant schema can write their TaskResult rows
-    # to that tenant's schema rather than spilling into public.
-    "django_celery_results",
+    # ``django_celery_results`` is deliberately NOT here — task results
+    # are public-schema only. See the SHARED_APPS entry for why.
     # Per-tenant setting overrides — mirrored in SHARED_APPS.
     "extra_settings",
     "simple_history",
@@ -774,7 +773,46 @@ CELERY_TASK_ACKS_LATE = True
 CELERY_TASK_REJECT_ON_WORKER_LOST = True
 CELERY_TASK_SOFT_TIME_LIMIT = 1500
 CELERY_TASK_TIME_LIMIT = 1800
+
+# Store FAILURES ONLY.
+#
+# Nothing in this codebase reads a task's return value: there is no
+# AsyncResult, no .get(), no chord and no group. The one chain()
+# (core/tasks.py) links an immutable .si() signature, which celery
+# dispatches from ``task_request.chain`` before it ever touches the
+# backend (celery/app/trace.py). So every stored success was write
+# amplification nobody consumed — 2,937 keys a day in production,
+# sharing one 614 MiB ``allkeys-lru`` budget with the Django cache,
+# where a result could be evicted before it expired and the whole lot
+# vanished in the 2026-09-09 Redis outage.
+#
+# What IS worth keeping is the failures, durably and queryably: this
+# platform has no metrics or alerting stack, and a silent failure here
+# is an order confirmation nobody receives or a voucher that never
+# mints. ``task_store_errors_even_if_ignored`` is what makes the pair
+# work — celery/app/trace.py::handle_error_state falls back to it
+# precisely when a task is ignored — so successes write nothing while
+# failures and retries write a full row, with task name and arguments
+# (``result_extended``) for the admin.
+#
+# Consequences worth knowing before changing this:
+#   - A future chord() or group() DOES need results. Set
+#     ``ignore_result=False`` on that task rather than flipping this.
+#   - "Did the nightly task run at all?" is answered by
+#     ``PeriodicTask.last_run_at`` and by MonitoredTask's own success
+#     log line, not from this table.
+CELERY_TASK_IGNORE_RESULT = True
 CELERY_TASK_STORE_ERRORS_EVEN_IF_IGNORED = True
+
+# Retention for those failure rows. The name matters: the pre-4.0
+# ``CELERY_TASK_RESULT_EXPIRES`` that used to sit here is not a setting
+# any more, so under ``namespace="CELERY"`` it was silently ignored and
+# the app ran on celery's 1-day default. 30 days is affordable now that
+# only failures land here, and it is long enough to still find the row
+# behind a complaint that arrives a fortnight late. Beat's
+# DatabaseScheduler installs ``celery.backend_cleanup`` on its own
+# whenever this is set (django_celery_beat/schedulers.py).
+CELERY_RESULT_EXPIRES = datetime.timedelta(days=30)
 
 # Default retry policy for all tasks
 CELERY_TASK_AUTORETRY_FOR = (
@@ -826,7 +864,9 @@ CELERY_RESULT_BACKEND_ALWAYS_RETRY = True
 CELERY_RESULT_BACKEND_MAX_RETRIES = 3
 CELERY_RESULT_EXTENDED = True
 CELERY_RESULT_BACKEND_TRANSPORT_OPTIONS = {"retry_policy": {"timeout": 5.0}}
-CELERY_TASK_RESULT_EXPIRES = 3600  # Results expire after 1 hour
+# Retention lives with the ignore-result block above as
+# ``CELERY_RESULT_EXPIRES``; the pre-4.0 name that stood here was dead
+# configuration.
 CELERY_RESULT_PERSISTENT = False  # Don't persist to disk for better performance
 
 # Serialization

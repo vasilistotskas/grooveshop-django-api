@@ -30,10 +30,15 @@ DUAL_LISTED_REQUIRED = {
     "django.contrib.sessions",
     "user",
     "extra_settings",
-    "django_celery_results",
     "allauth.usersessions",
     "admin.apps.MyAdminConfig",
 }
+
+# Apps whose tables deliberately exist in ``public`` ONLY, even though
+# something in a tenant schema may write them. Falling through the
+# search_path is the intent here, not the bug — see the class below for
+# what has to be true before an app may be listed.
+SHARED_ONLY_BY_DESIGN = {"django_celery_results"}
 
 
 def _labels(app_entries):
@@ -55,6 +60,62 @@ class TestDualListedApps:
     def test_admin_is_dual_listed(self):
         assert "admin.apps.MyAdminConfig" in settings.SHARED_APPS
         assert "admin.apps.MyAdminConfig" in settings.TENANT_APPS
+
+
+class TestSharedOnlyByDesign:
+    """``django_celery_results`` is the deliberate exception to the rule
+    above, and it only holds because the hazard that rule guards does
+    not exist for it.
+
+    That hazard is an id resolved in one schema landing in a row stored
+    in another — ``django_admin_log`` writing a ``content_type_id`` from
+    the tenant's ``django_content_type`` into ``public``. The celery
+    result models carry NO relations at all: every column is a scalar
+    (``content_type`` there is the result's encoding, "application/json",
+    not a ContentType FK). A row is therefore self-contained and means
+    the same thing in any schema.
+
+    Public-only is also the requirement, not merely the tolerance: only
+    failures are stored, the control plane reads every store's in one
+    list, and ``celery.backend_cleanup`` is dispatched by beat with no
+    tenant header — so it runs in ``public`` and could never prune a
+    tenant-schema row.
+
+    Before adding anything to ``SHARED_ONLY_BY_DESIGN``, the relation
+    check below must hold for it too.
+    """
+
+    def test_listed_apps_are_shared_only(self):
+        for app in SHARED_ONLY_BY_DESIGN:
+            assert app in settings.SHARED_APPS, (
+                f"{app} dropped from SHARED_APPS"
+            )
+            assert app not in settings.TENANT_APPS, (
+                f"{app} is back in TENANT_APPS — its rows would be written "
+                "into whichever tenant schema the task ran in, where the "
+                "control plane cannot read them and backend_cleanup, which "
+                "runs in public, will never prune them"
+            )
+
+    def test_listed_apps_own_no_cross_schema_relations(self):
+        """The safety condition. A relation would make a row depend on
+        an id space that differs per schema, which is exactly the bug
+        ``DUAL_LISTED_REQUIRED`` exists to prevent."""
+        from django.apps import apps as django_apps
+
+        for app in SHARED_ONLY_BY_DESIGN:
+            config = django_apps.get_app_config(app.split(".")[-1])
+            for model in config.get_models():
+                relations = [
+                    field.name
+                    for field in model._meta.get_fields()
+                    if field.is_relation
+                ]
+                assert not relations, (
+                    f"{model._meta.label} has relations {relations} but is "
+                    "stored public-only — an id resolved in a tenant schema "
+                    "would be written against the public id space"
+                )
 
 
 class TestAdminLogRoutesPerSchema:

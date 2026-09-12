@@ -3,6 +3,53 @@
 
 
 
+## v3.56.3 (2026-09-12)
+
+### Bug fixes
+
+* fix(core): make the DB translation overlay auditable
+
+The order-confirmation email for order #281 went out titled
+"Η Παραγγελία Παραδόθηκε". django.po was correct; a `core.Translation`
+row from the April bulk import ('Order Received' → the delivered
+wording, msgstrs shifted between neighbouring msgids) was overlaid
+onto the catalog of every pod and worker, invisible on disk and to a
+fresh `manage.py shell`, which never applies the overlay.
+
+- `apply_db_overlay` now logs, per language, how many rows it applied
+  and how many override a DIFFERENT .po value — the number that would
+  have pointed at this in the first minute.
+- `translation_overlay_audit` lists every overriding row with both
+  values, `--prune`s the rows that equal the .po, and drops named
+  (`--drop-ids`) or dated (`--drop-before`) rows, bumping the version
+  key so no restart is needed. Custom rows are never deleted unnamed.
+- German catalogue: "Order Received" was a fuzzy copy of "Bestellung
+  Zugestellt" (delivered); now "Bestellung eingegangen".
+- Playbook 9.5 in docs/order-system.md.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01BA5q8Do7SitTSeu5pHP1t5 ([`df513f2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/df513f2ff631b8098afb4f972bc8669043a95a0d))
+
+* fix(email): record the sent subject, keep card text readable in dark mode
+
+The confirmation and status-update tasks now log the rendered subject
+and template (and write the subject into the order's history note), so
+"which email did the customer actually get" is answerable from the
+admin instead of from a screenshot — the overlay can change the
+subject underneath the template without any code changing.
+
+The payment-instructions block renders operator HTML inside a plain
+<div> in `.email-card`; in dark mode the card turned #1f2937 while the
+div kept the light-mode text colour, so "Μπορείτε να πληρώσετε σε
+μετρητά…" was near-invisible. The card now sets its own text colour.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01BA5q8Do7SitTSeu5pHP1t5 ([`6bfc214`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6bfc2140d4a12283ef54df4536bfc2bc9cca9beb))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.56.2 [skip ci] ([`1be2f3c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1be2f3c4b4ac324f19a8ba3957ab5797f602d496))
+
 ## v3.56.2 (2026-09-12)
 
 ### Bug fixes

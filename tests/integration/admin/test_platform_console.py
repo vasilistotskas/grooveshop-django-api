@@ -164,13 +164,26 @@ class TestAdminLoginRedirect(TestCase):
 
 
 class TestPlatformOnlySectionsLiveOnTheControlPlane(TestCase):
-    """Sites, Countries/Regions and the Celery schedule + result tables
-    are PUBLIC-schema data a store role never gets a permission on
-    (``tenant.role_scopes.PLATFORM_ONLY_APP_LABELS``). Linked from a
-    store's sidebar they 403'd for staff and showed a platform superuser
-    the platform's rows dressed as the store's — reported 2026-09-12
-    from ``api.webside.gr/admin`` ("should I see five Sites here?").
-    They are linked from the control plane instead, every model of them.
+    """Every app label in ``tenant.role_scopes.PLATFORM_ONLY_APP_LABELS``
+    that a sidebar can link belongs to the control plane, not to a
+    store's console. A store role never gets a permission on any of
+    them, so from a merchant's admin the links 403; for a platform
+    superuser they are worse than useless — reported 2026-09-12 from
+    ``api.webside.gr/admin`` ("should I see five Sites here?").
+
+    Two distinct failures hide behind the same symptom, and both are
+    covered here:
+
+    - **Public-schema data shown as the store's.** ``sites``,
+      ``country``, ``region``, ``core`` and the Celery tables live in
+      the public schema only, so a tenant host's search path falls
+      through to them. ``core.CachePurgeLog`` showed one merchant every
+      purge ever run across every store, actor column included.
+    - **Privilege surface.** ``auth_group`` does exist per tenant, so it
+      leaks nothing — but no Group is created anywhere in the codebase
+      (access is derived from ``UserTenantMembership`` roles), and a
+      store admin who reached the section could mint themselves any
+      permission. Group management is a control-plane concern.
     """
 
     INFRA_LABELS = frozenset(
@@ -180,6 +193,8 @@ class TestPlatformOnlySectionsLiveOnTheControlPlane(TestCase):
             "region",
             "django_celery_beat",
             "django_celery_results",
+            "auth",
+            "core",
         }
     )
 

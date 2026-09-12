@@ -2763,7 +2763,7 @@ UNFOLD_PLATFORM = {
                         "title": _("Countries"),
                         "icon": "public",
                         "link": reverse_lazy(
-                            "platform_admin:sites_site_changelist",
+                            "platform_admin:country_country_changelist",
                             urlconf=PUBLIC_SCHEMA_URLCONF,
                         ),
                     },
@@ -2775,6 +2775,16 @@ UNFOLD_PLATFORM = {
                             urlconf=PUBLIC_SCHEMA_URLCONF,
                         ),
                     },
+                    # One public-schema row per purge, across every
+                    # store — platform operations, not one merchant's.
+                    {
+                        "title": _("Cache Purge Log"),
+                        "icon": "cleaning_services",
+                        "link": reverse_lazy(
+                            "platform_admin:core_cachepurgelog_changelist",
+                            urlconf=PUBLIC_SCHEMA_URLCONF,
+                        ),
+                    },
                     # One ``django_site`` row per store domain (public
                     # schema, minted by ``tenant.provisioning.ensure_site``)
                     # — what allauth resolves a per-store SocialApp
@@ -2783,7 +2793,7 @@ UNFOLD_PLATFORM = {
                         "title": _("Sites"),
                         "icon": "language",
                         "link": reverse_lazy(
-                            "platform_admin:country_country_changelist",
+                            "platform_admin:sites_site_changelist",
                             urlconf=PUBLIC_SCHEMA_URLCONF,
                         ),
                     },
@@ -3431,15 +3441,16 @@ UNFOLD = {
                                 ),
                                 "permission": "admin.permissions.is_superuser",
                             },
-                            {
-                                "title": _("Groups"),
-                                "icon": "shield_person",
-                                "link": reverse_lazy(
-                                    "admin:auth_group_changelist",
-                                    urlconf=ROOT_URLCONF,
-                                ),
-                                "permission": "admin.permissions.is_superuser",
-                            },
+                            # ``auth.Group`` is deliberately NOT here. It
+                            # is a PLATFORM_ONLY app label
+                            # (tenant/role_scopes.py): store access is
+                            # derived from UserTenantMembership roles and
+                            # no Group is created anywhere in the
+                            # codebase, so the section listed a table
+                            # nothing reads — while offering a store
+                            # admin who reached it a way to mint
+                            # themselves any permission that exists.
+                            # Groups live on the control plane only.
                         ],
                     },
                     {
@@ -3562,15 +3573,16 @@ UNFOLD = {
                                 ),
                                 "permission": "admin.permissions.is_superuser",
                             },
-                            {
-                                "title": _("Cache Purge Log"),
-                                "icon": "cleaning_services",
-                                "link": reverse_lazy(
-                                    "admin:core_cachepurgelog_changelist",
-                                    urlconf=ROOT_URLCONF,
-                                ),
-                                "permission": "admin.permissions.is_superuser",
-                            },
+                            # ``core.CachePurgeLog`` is deliberately NOT
+                            # here. ``core`` is SHARED_APPS-only, so
+                            # ``core_cachepurgelog`` exists in the public
+                            # schema alone and a tenant host's search
+                            # path falls through to it: the section
+                            # showed one merchant every purge ever run
+                            # across every store, actor column included.
+                            # It belongs to the control plane, like
+                            # Sites. The store's own purge controls are
+                            # the Cache Management view, which stays.
                             {
                                 "title": _("User Data Exports"),
                                 "icon": "download",

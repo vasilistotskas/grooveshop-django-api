@@ -2760,18 +2760,10 @@ UNFOLD_PLATFORM = {
                     # public-schema rows and invited edits that
                     # silently change nothing for any store.
                     {
-                        "title": _("Scheduled Tasks"),
-                        "icon": "schedule",
-                        "link": reverse_lazy(
-                            "platform_admin:django_celery_beat_periodictask_changelist",
-                            urlconf=PUBLIC_SCHEMA_URLCONF,
-                        ),
-                    },
-                    {
                         "title": _("Countries"),
                         "icon": "public",
                         "link": reverse_lazy(
-                            "platform_admin:country_country_changelist",
+                            "platform_admin:sites_site_changelist",
                             urlconf=PUBLIC_SCHEMA_URLCONF,
                         ),
                     },
@@ -2780,6 +2772,86 @@ UNFOLD_PLATFORM = {
                         "icon": "map",
                         "link": reverse_lazy(
                             "platform_admin:region_region_changelist",
+                            urlconf=PUBLIC_SCHEMA_URLCONF,
+                        ),
+                    },
+                    # One ``django_site`` row per store domain (public
+                    # schema, minted by ``tenant.provisioning.ensure_site``)
+                    # — what allauth resolves a per-store SocialApp
+                    # against. Platform-global, so managed only here.
+                    {
+                        "title": _("Sites"),
+                        "icon": "language",
+                        "link": reverse_lazy(
+                            "platform_admin:country_country_changelist",
+                            urlconf=PUBLIC_SCHEMA_URLCONF,
+                        ),
+                    },
+                ],
+            },
+            # The Celery beat schedule and the task-result tables live in
+            # the PUBLIC schema and drive every store's fan-out tasks —
+            # platform operations, never a store's. (Task Results only
+            # fill up under the ``django-db`` result backend; production
+            # writes results to Redis, so the page is empty there.)
+            {
+                "title": _("Background Jobs"),
+                "separator": True,
+                "collapsible": True,
+                "items": [
+                    {
+                        "title": _("Periodic Tasks"),
+                        "icon": "task_alt",
+                        "link": reverse_lazy(
+                            "platform_admin:django_celery_beat_periodictask_changelist",
+                            urlconf=PUBLIC_SCHEMA_URLCONF,
+                        ),
+                    },
+                    {
+                        "title": _("Crontab Schedules"),
+                        "icon": "more_time",
+                        "link": reverse_lazy(
+                            "platform_admin:django_celery_beat_crontabschedule_changelist",
+                            urlconf=PUBLIC_SCHEMA_URLCONF,
+                        ),
+                    },
+                    {
+                        "title": _("Interval Schedules"),
+                        "icon": "update",
+                        "link": reverse_lazy(
+                            "platform_admin:django_celery_beat_intervalschedule_changelist",
+                            urlconf=PUBLIC_SCHEMA_URLCONF,
+                        ),
+                    },
+                    {
+                        "title": _("Clocked Schedules"),
+                        "icon": "alarm",
+                        "link": reverse_lazy(
+                            "platform_admin:django_celery_beat_clockedschedule_changelist",
+                            urlconf=PUBLIC_SCHEMA_URLCONF,
+                        ),
+                    },
+                    {
+                        "title": _("Solar Schedules"),
+                        "icon": "wb_sunny",
+                        "link": reverse_lazy(
+                            "platform_admin:django_celery_beat_solarschedule_changelist",
+                            urlconf=PUBLIC_SCHEMA_URLCONF,
+                        ),
+                    },
+                    {
+                        "title": _("Task Results"),
+                        "icon": "checklist",
+                        "link": reverse_lazy(
+                            "platform_admin:django_celery_results_taskresult_changelist",
+                            urlconf=PUBLIC_SCHEMA_URLCONF,
+                        ),
+                    },
+                    {
+                        "title": _("Group Results"),
+                        "icon": "ballot",
+                        "link": reverse_lazy(
+                            "platform_admin:django_celery_results_groupresult_changelist",
                             urlconf=PUBLIC_SCHEMA_URLCONF,
                         ),
                     },
@@ -3282,45 +3354,20 @@ UNFOLD = {
                     },
                 ],
             },
-            # ── Localization & Reference Data (staff-accessible) ────
-            # Reference data shop admins routinely need: reordering the
-            # Regions shown at checkout, toggling Countries, newsletter
-            # Subscription Topics. Previously these lived only inside the
-            # superuser-only System zone, so a non-superuser admin could
-            # not reach them at all — surfaced here as a top-level,
-            # staff-accessible group.
+            # ── Newsletter (staff-accessible) ────────────────────────
+            # Countries, Regions and Sites used to sit here too. They are
+            # PUBLIC-schema reference data shared by every store
+            # (``tenant.role_scopes.PLATFORM_ONLY_APP_LABELS``): a store
+            # role never gets a permission on them, so the links 403'd
+            # for staff, and for a platform superuser they showed the
+            # platform's rows dressed as the store's. They live on the
+            # control plane only (``UNFOLD_PLATFORM``).
             {
-                "title": _("Localization"),
+                "title": _("Newsletter"),
                 "separator": True,
                 "collapsible": True,
                 "permission": "admin.permissions.is_staff",
                 "items": [
-                    {
-                        "title": _("Countries"),
-                        "icon": "public",
-                        "link": reverse_lazy(
-                            "admin:country_country_changelist",
-                            urlconf=ROOT_URLCONF,
-                        ),
-                        "permission": "admin.permissions.is_staff",
-                    },
-                    {
-                        "title": _("Regions"),
-                        "icon": "map",
-                        "link": reverse_lazy(
-                            "admin:region_region_changelist",
-                            urlconf=ROOT_URLCONF,
-                        ),
-                        "permission": "admin.permissions.is_staff",
-                    },
-                    {
-                        "title": _("Sites"),
-                        "icon": "language",
-                        "link": reverse_lazy(
-                            "admin:sites_site_changelist", urlconf=ROOT_URLCONF
-                        ),
-                        "permission": "admin.permissions.is_staff",
-                    },
                     {
                         "title": _("Subscription Topics"),
                         "icon": "topic",
@@ -3569,76 +3616,12 @@ UNFOLD = {
                             },
                         ],
                     },
-                    {
-                        "title": _("Background Jobs"),
-                        "icon": "schedule",
-                        "permission": "admin.permissions.is_superuser",
-                        "items": [
-                            {
-                                "title": _("Periodic Tasks"),
-                                "icon": "task_alt",
-                                "link": reverse_lazy(
-                                    "admin:django_celery_beat_periodictask_changelist",
-                                    urlconf=ROOT_URLCONF,
-                                ),
-                                "permission": "admin.permissions.is_superuser",
-                            },
-                            {
-                                "title": _("Crontab Schedules"),
-                                "icon": "more_time",
-                                "link": reverse_lazy(
-                                    "admin:django_celery_beat_crontabschedule_changelist",
-                                    urlconf=ROOT_URLCONF,
-                                ),
-                                "permission": "admin.permissions.is_superuser",
-                            },
-                            {
-                                "title": _("Interval Schedules"),
-                                "icon": "update",
-                                "link": reverse_lazy(
-                                    "admin:django_celery_beat_intervalschedule_changelist",
-                                    urlconf=ROOT_URLCONF,
-                                ),
-                                "permission": "admin.permissions.is_superuser",
-                            },
-                            {
-                                "title": _("Clocked Schedules"),
-                                "icon": "alarm",
-                                "link": reverse_lazy(
-                                    "admin:django_celery_beat_clockedschedule_changelist",
-                                    urlconf=ROOT_URLCONF,
-                                ),
-                                "permission": "admin.permissions.is_superuser",
-                            },
-                            {
-                                "title": _("Solar Schedules"),
-                                "icon": "wb_sunny",
-                                "link": reverse_lazy(
-                                    "admin:django_celery_beat_solarschedule_changelist",
-                                    urlconf=ROOT_URLCONF,
-                                ),
-                                "permission": "admin.permissions.is_superuser",
-                            },
-                            {
-                                "title": _("Task Results"),
-                                "icon": "checklist",
-                                "link": reverse_lazy(
-                                    "admin:django_celery_results_taskresult_changelist",
-                                    urlconf=ROOT_URLCONF,
-                                ),
-                                "permission": "admin.permissions.is_superuser",
-                            },
-                            {
-                                "title": _("Group Results"),
-                                "icon": "ballot",
-                                "link": reverse_lazy(
-                                    "admin:django_celery_results_groupresult_changelist",
-                                    urlconf=ROOT_URLCONF,
-                                ),
-                                "permission": "admin.permissions.is_superuser",
-                            },
-                        ],
-                    },
+                    # Background Jobs (Celery beat schedules + task
+                    # results) are deliberately NOT here. The beat
+                    # schedule is one public-schema table that drives
+                    # every store's fan-out tasks, so it belongs to the
+                    # control plane (``UNFOLD_PLATFORM``), not to any
+                    # one store's console.
                 ],
             },
         ],

@@ -425,7 +425,7 @@ class TestPlatformDashboardPage(TestCase):
         """
         with translation.override("en"):
             html = self._render()
-        for label in ("Platform Staff", "Scheduled Tasks"):
+        for label in ("Platform Staff", "Background Jobs"):
             assert label in html, f"curated sidebar missing {label!r}"
 
     @override_settings(ROOT_URLCONF="tenant.urls_public")

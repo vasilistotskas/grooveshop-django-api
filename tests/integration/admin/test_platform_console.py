@@ -161,3 +161,66 @@ class TestAdminLoginRedirect(TestCase):
         assert response.status_code == 200, (
             "a login URL that already carries next must render, not redirect"
         )
+
+
+class TestPlatformOnlySectionsLiveOnTheControlPlane(TestCase):
+    """Sites, Countries/Regions and the Celery schedule + result tables
+    are PUBLIC-schema data a store role never gets a permission on
+    (``tenant.role_scopes.PLATFORM_ONLY_APP_LABELS``). Linked from a
+    store's sidebar they 403'd for staff and showed a platform superuser
+    the platform's rows dressed as the store's — reported 2026-09-12
+    from ``api.webside.gr/admin`` ("should I see five Sites here?").
+    They are linked from the control plane instead, every model of them.
+    """
+
+    INFRA_LABELS = frozenset(
+        {
+            "sites",
+            "country",
+            "region",
+            "django_celery_beat",
+            "django_celery_results",
+        }
+    )
+
+    @staticmethod
+    def _linked(navigation) -> set[tuple[str, str]]:
+        """(app_label, model_name) of every changelist a sidebar links,
+        nested groups included."""
+
+        def walk(items):
+            for item in items:
+                parts = [p for p in str(item.get("link", "")).split("/") if p]
+                if "admin" in parts:
+                    i = parts.index("admin")
+                    if len(parts) > i + 2:
+                        yield parts[i + 1], parts[i + 2]
+                yield from walk(item.get("items", []))
+
+        return set(walk(navigation))
+
+    def test_the_store_sidebar_links_none_of_them(self):
+        from django.conf import settings
+
+        linked = self._linked(settings.UNFOLD["SIDEBAR"]["navigation"])
+        stray = {pair for pair in linked if pair[0] in self.INFRA_LABELS}
+        assert not stray, (
+            f"platform-only sections in the store sidebar: {stray}"
+        )
+
+    def test_the_platform_sidebar_links_every_model_of_them(self):
+        from django.conf import settings
+
+        from admin.platform_site import platform_admin_site
+
+        registered = {
+            (model._meta.app_label, model._meta.model_name)
+            for model in platform_admin_site._registry
+            if model._meta.app_label in self.INFRA_LABELS
+        }
+        linked = self._linked(settings.UNFOLD_PLATFORM["SIDEBAR"]["navigation"])
+        assert registered, "the platform site registers none of these apps"
+        assert registered <= linked, (
+            "registered on the control plane but reachable only by URL: "
+            f"{registered - linked}"
+        )

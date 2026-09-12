@@ -104,9 +104,8 @@ Domain models compose multiple mixins, e.g. `Product(SoftDeleteModel, Translatab
 - ViewSets call `Model.objects.for_list()` or `.for_detail()` based on action
 
 **Composable FilterSets** (`core/filters/`):
-- Mixin-based: `TimeStampFilterMixin`, `PublishableFilterMixin`, `SoftDeleteFilterMixin`, `MetaDataFilterMixin`, `UUIDFilterMixin`, `SortableFilterMixin`
-- CamelCase variants: `CamelCaseFilterMixin` auto-converts query param names
-- Pre-built: `BaseFullFilterSet` (all mixins), `CamelCasePublishableTimeStampFilterSet`, etc.
+- Mixin-based (`core/filters/core.py`): `TimeStampFilterMixin`, `UUIDFilterMixin`, `SortableFilterMixin`, `MetaDataFilterMixin` — each a real `FilterSet` subclass, because plain-class mixins were silently dropped by django-filter (see the module docstring)
+- CamelCase variants (`core/filters/camel_case_filters.py`): `CamelCaseFilterMixin` auto-converts query param names; bases `CamelCaseTimeStampFilterSet` and `CamelCasePublishableTimeStampFilterSet`
 
 **Pagination** (`core/pagination/`): `PageNumberPaginator`, `CursorPaginator`, `LimitOffsetPaginator` — all return consistent envelope: `{links, count, total_pages, page_size, page_total_results, page, results}`
 
@@ -127,7 +126,7 @@ Domain models compose multiple mixins, e.g. `Product(SoftDeleteModel, Translatab
 - Request/response bodies use **camelCase** (auto-converted from snake_case via `djangorestframework-camel-case`)
 - Authentication: Knox token auth (`Bearer` prefix, 7-day TTL, auto-refresh after 1 day) + Django Allauth (account management, social providers: Google/Facebook/GitHub/Discord, MFA/WebAuthn/Passkeys) + Django session auth
 - `DEFAULT_PERMISSION_CLASSES` is `IsAuthenticatedOrReadOnly`. Any endpoint that requires anonymous POST access (e.g. guest checkout) must explicitly set `permission_classes = [AllowAny]`.
-- Payments: Stripe via dj-stripe
+- Payments: Viva Wallet (primary) and Stripe via dj-stripe (secondary), plus cash on delivery; per-tenant credentials via `tenant/credentials.py`
 - Default pagination: 12 items per page, max 100
 - OpenAPI docs at `/api/v1/schema/swagger-ui` and `/api/v1/schema/redoc`
 - Health check at `/api/v1/health` (checks DB, Redis, Celery)
@@ -137,6 +136,7 @@ Domain models compose multiple mixins, e.g. `Product(SoftDeleteModel, Translatab
 
 - **Order / payment / shipping / notification system**: see [`docs/order-system.md`](docs/order-system.md) for the full reference — state machines, creation paths, carrier integrations, email + WS dedup, critical invariants, common-task playbook. Read this first before changing anything in `order/`, `shipping_acs/`, `shipping_boxnow/`, or `pay_way/`.
 - **Product recommendations**: see [`docs/recommendations-engine.md`](docs/recommendations-engine.md) — typed `ProductRelation`, the strategy registry (`is_available` declines rather than returning noise), two-stage retrieval into `RecommendationCandidate`, the Greek embedding measurements and the TEI-vs-in-process decision, plan tiers, and the playbook for adding a strategy/surface/preset. Read it before touching `recommendation/`, `product/models/relation.py`, or the cart `recommendations` fields.
+- **Platform-wide documentation** lives in the sibling `grooveshop-docs/` repository (published at `docs.grooveshop.space`): architecture, multi-tenancy, end-to-end flows and operations under `src/dev/`, the bilingual tenant-admin guide under `src/admin/`. The files in this repo's `docs/` folder are copied into that site at build time, so keep editing them here. A behaviour change that a docs page describes ships with the doc change.
 - **Transactional email rendering (`core/templates/emails/**`)**: admin-authored WYSIWYG/HTML model fields (e.g. `PayWay.instructions` — a dedicated `tinymce.models.HTMLField`, picked up by `BaseModelAdmin.formfield_overrides` rather than a blanket `TextField`→`WysiwygWidget` override, so it holds HTML) must render as `{{ field|safe }}` in `.html` templates and `{{ field_text|safe }}` in `.txt` templates, where `field_text` is pre-built in the email task via `unescape(strip_tags(field))`. Django **autoescapes `.txt` templates too**, so the stripped plain text must be marked `|safe` or it re-encodes `& < >` back into entities. Escaping such a field (e.g. `|linebreaksbr`) renders literal `<div>` tags to the customer.
 - **Translations**: django-parler `TranslatableModel` on Product, BlogPost, Category, LoyaltyTier, etc. Languages: el (default), en, de. Factories create translations for all languages.
 - **Audit history**: django-simple-history on models

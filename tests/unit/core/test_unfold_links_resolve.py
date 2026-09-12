@@ -64,8 +64,14 @@ def test_every_unfold_link_casts_under_either_urlconf(
     assert links, f"{config_name} declares no links"
     for link in links:
         # Casting a lazy reverse is what the sidebar, the tabs and the
-        # debug page all do; a NoReverseMatch here is the defect.
-        assert str(link).startswith("/"), (config_name, active_urlconf, link)
+        # debug page all do; a NoReverseMatch here is the defect. The
+        # env-gated dropdown entries (docs site, Flower, Mailpit, …) are
+        # absolute URLs to other hosts and are legitimate as such.
+        assert str(link).startswith(("/", "https://", "http://")), (
+            config_name,
+            active_urlconf,
+            link,
+        )
 
 
 def test_debug_page_settings_dump_never_reverses_against_the_host(

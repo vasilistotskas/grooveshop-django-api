@@ -446,7 +446,7 @@ msgstr "Επωνυμία"
 #: .\b2b\admin.py:122 .\core\templates\admin\index.html:119
 #: .\notification\enum.py:31 .\product\admin.py:1797
 msgid "Review"
-msgstr "Εξέταση"
+msgstr "Κριτική"
 
 #: .\b2b\admin.py:135 .\b2b\admin.py:162
 #: .\core\templates\emails\b2b\admin_new_business_profile.html:17
@@ -2954,7 +2954,7 @@ msgstr "Υποβλήθηκε"
 #: .\contact\admin.py:229 .\contact\models.py:71 .\contact\models.py:72
 #: .\settings.py:2929
 msgid "Feedback"
-msgstr ""
+msgstr "Feedback"
 
 #: .\contact\admin.py:254 .\contact\models.py:54
 #: .\core\templates\admin\index.html:299 .\product\admin.py:1830
@@ -4122,7 +4122,7 @@ msgstr "Δείγμα δεδομένων"
 
 #: .\core\templates\admin\email_template_management.html:564
 msgid "Real Order"
-msgstr "Παραγγελία"
+msgstr "Πραγματική παραγγελία"
 
 #: .\core\templates\admin\email_template_management.html:569
 #: .\core\templates\admin\product\stock_history.html:105
@@ -6702,7 +6702,7 @@ msgstr "Ανάλυση ΦΠΑ"
 
 #: .\core\templates\invoices\invoice.html:293 .\product\models\review.py:27
 msgid "Rate"
-msgstr "Συντ."
+msgstr "Βαθμολογία"
 
 #: .\core\templates\invoices\invoice.html:294
 msgid "Net"
@@ -7270,10 +7270,8 @@ msgid "Gift Card"
 msgstr "Πιστωτική κάρτα"
 
 #: .\giftcard\models.py:170 .\settings.py:2878
-#, fuzzy
-#| msgid "Credit Card"
 msgid "Gift Cards"
-msgstr "Πιστωτική κάρτα"
+msgstr "Δωροκάρτες"
 
 #: .\giftcard\models.py:223 .\notification\admin.py:275
 #: .\notification\models\notification.py:26 .\product\models\alert.py:33
@@ -11305,13 +11303,13 @@ msgstr "Κεντρική εικόνα"
 #, fuzzy
 #| msgid "Hero Image"
 msgid "Hero Carousel"
-msgstr "Κεντρική εικόνα"
+msgstr "Καρουζέλ hero"
 
 #: .\page_config\models.py:39
 #, fuzzy
 #| msgid "Product alert"
 msgid "Products Slider"
-msgstr "Ειδοποίηση προϊόντος"
+msgstr "Slider προϊόντων"
 
 #: .\page_config\models.py:40
 #, fuzzy
@@ -11355,7 +11353,7 @@ msgstr "Άρθρα Blog"
 #, fuzzy
 #| msgid "Recently Created"
 msgid "Recently Viewed Rail"
-msgstr "Πρόσφατα δημιουργήθηκε"
+msgstr "Πρόσφατα προβληθέντα"
 
 #: .\page_config\models.py:60
 msgid "Rich Text Block"
@@ -11376,19 +11374,19 @@ msgstr "Newsletter"
 #, fuzzy
 #| msgid "Questions?"
 msgid "Testimonials"
-msgstr "Ερωτήσεις;"
+msgstr "Μαρτυρίες πελατών"
 
 #: .\page_config\models.py:71
 #, fuzzy
 #| msgid "Comment Content"
 msgid "About Content"
-msgstr "Περιεχόμενο Σχολίου"
+msgstr "Περιεχόμενο «Σχετικά με εμάς»"
 
 #: .\page_config\models.py:72
 #, fuzzy
 #| msgid "Notification Content"
 msgid "Vision Content"
-msgstr "Περιεχόμενο Ειδοποίησης"
+msgstr "Περιεχόμενο «Όραμα»"
 
 #: .\page_config\models.py:75
 #, fuzzy
@@ -11408,13 +11406,13 @@ msgstr ""
 #, fuzzy
 #| msgid "Provider"
 msgid "Divider"
-msgstr "Πάροχος"
+msgstr "Διαχωριστικό"
 
 #: .\page_config\models.py:84
 #, fuzzy
 #| msgid "Loyalty Tier"
 msgid "Loyalty Program Hero"
-msgstr "Επίπεδο Πιστότητας"
+msgstr "Hero προγράμματος επιβράβευσης"
 
 #: .\page_config\models.py:85
 msgid "Search Bar"
@@ -11428,7 +11426,7 @@ msgstr ""
 #, fuzzy
 #| msgid "Location Type"
 msgid "Location Map"
-msgstr "Τύπος τοποθεσίας"
+msgstr "Χάρτης τοποθεσίας"
 
 #: .\page_config\models.py:93
 #, fuzzy
@@ -11444,7 +11442,7 @@ msgstr ""
 #, fuzzy
 #| msgid "Image Flag"
 msgid "Image Gallery"
-msgstr "Εικόνα σημαίας"
+msgstr "Συλλογή εικόνων"
 
 #: .\page_config\models.py:96
 msgid "Story Timeline"
@@ -11458,7 +11456,7 @@ msgstr ""
 #, fuzzy
 #| msgid "Image Type"
 msgid "Page Type"
-msgstr "Τύπος εικόνας"
+msgstr "Τύπος σελίδας"
 
 #: .\page_config\models.py:110
 msgid "Identifier for the page (e.g. \"home\", \"products\", \"blog\")."
@@ -11506,7 +11504,7 @@ msgstr ""
 #, fuzzy
 #| msgid "User Sessions"
 msgid "Page Sections"
-msgstr "Συνεδρίες χρήστη"
+msgstr "Ενότητες σελίδας"
 
 #: .\page_config\models.py:189
 msgid "Header"
@@ -11547,13 +11545,13 @@ msgstr "Πλοήγηση"
 #, fuzzy
 #| msgid "Content Type"
 msgid "Content Page"
-msgstr "Τύπος Περιεχομένου"
+msgstr "Σελίδα περιεχομένου"
 
 #: .\page_config\models.py:296
 #, fuzzy
 #| msgid "Content Types"
 msgid "Content Pages"
-msgstr "Τύποι περιεχομένου"
+msgstr "Σελίδες περιεχομένου"
 
 #: .\page_config\models.py:327
 #, fuzzy
@@ -13319,10 +13317,8 @@ msgid "%(count)d promotions deactivated."
 msgstr "%(count)d ετικέτα απενεργοποιήθηκε."
 
 #: .\promotion\admin.py:256
-#, fuzzy
-#| msgid "Generate invoice"
 msgid "Generate codes"
-msgstr "Έκδοση τιμολογίου"
+msgstr "Δημιουργία κωδικών"
 
 #: .\promotion\admin.py:265
 msgid "Bulk-generate coupon codes"
@@ -14147,10 +14143,8 @@ msgid "Payment Methods"
 msgstr "Μέθοδοι Πληρωμής"
 
 #: .\settings.py:2871
-#, fuzzy
-#| msgid "Country Codes"
 msgid "Coupon Codes"
-msgstr "Κωδικοί χωρών"
+msgstr "Κωδικοί κουπονιών"
 
 # Greek translations added by fill_admin_greek_translations.py
 #: .\settings.py:2885
@@ -14333,6 +14327,9 @@ msgstr "Πρότυπα Email"
 #: .\settings.py:3550
 msgid "API Swagger"
 msgstr "API Swagger"
+
+msgid "Help & Guides"
+msgstr "Βοήθεια & Οδηγοί"
 
 #: .\settings.py:3569
 msgid "Flower (Celery)"
@@ -15454,11 +15451,11 @@ msgstr "Οποιοδήποτε APM"
 
 #: .\shipping_boxnow\enum\locker_type.py:8
 msgid "Warehouse"
-msgstr "Αποθήκη"
+msgstr "Αποθήκη (warehouse)"
 
 #: .\shipping_boxnow\enum\locker_type.py:9
 msgid "Depot"
-msgstr "Αποθήκη"
+msgstr "Κέντρο διανομής (depot)"
 
 #: .\shipping_boxnow\enum\parcel_state.py:8
 msgid "In depot"
@@ -17393,7 +17390,7 @@ msgstr ""
 
 #: .\user\admin.py:315
 msgid "Account Credentials"
-msgstr "Λογαριασμός Ανενεργός"
+msgstr "Διαπιστευτήρια λογαριασμού"
 
 #: .\user\admin.py:319
 msgid "Personal Information"
@@ -17885,7 +17882,7 @@ msgstr "Ενημερώσεις προϊόντων"
 
 #: .\user\models\subscription.py:19
 msgid "Account Updates"
-msgstr "Λογαριασμός Ανενεργός"
+msgstr "Ενημερώσεις λογαριασμού"
 
 #: .\user\models\subscription.py:22
 msgid "Promotional"

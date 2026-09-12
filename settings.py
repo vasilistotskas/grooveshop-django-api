@@ -2687,6 +2687,23 @@ ROSETTA_ACCESS_CONTROL_FUNCTION = (
 # #1's branding and a sidebar of per-store sections, neither of which
 # belongs on the control plane.
 # ─────────────────────────────────────────────────────────────────────
+
+# "Help & Guides" — the documentation site's tenant-admin guide, shown
+# in BOTH admin site dropdowns. Env-gated like the ops links below so a
+# local checkout renders no link at all rather than one to a site that
+# may not carry this build's pages yet; production sets the platform
+# docs host in backend-config.
+_ADMIN_DOCS_LINKS = [
+    {
+        "icon": "help",
+        "title": _("Help & Guides"),
+        "link": url,
+        "attrs": {"target": "_blank", "rel": "noopener"},
+    }
+    for url in [getenv("ADMIN_DOCS_URL", "").strip()]
+    if url
+]
+
 UNFOLD_PLATFORM = {
     "SITE_TITLE": _("Platform Admin"),
     "SITE_HEADER": "Grooveshop Platform",
@@ -2694,6 +2711,7 @@ UNFOLD_PLATFORM = {
     "SITE_SYMBOL": "hub",
     "SHOW_HISTORY": True,
     "SHOW_VIEW_ON_SITE": False,
+    "SITE_DROPDOWN": [*_ADMIN_DOCS_LINKS],
     "ENVIRONMENT": "admin.permissions.platform_environment",
     "DASHBOARD_CALLBACK": "admin.platform_dashboard.dashboard_callback",
     # ⌘K command palette. Without this block the palette falls back to
@@ -3919,6 +3937,7 @@ UNFOLD = {
                 "attrs": {"target": "_blank", "rel": "noopener"},
             }
             for entry in [
+                *_ADMIN_DOCS_LINKS,
                 {
                     "icon": "monitoring",
                     "title": _("Flower (Celery)"),

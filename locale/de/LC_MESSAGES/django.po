@@ -3501,10 +3501,8 @@ msgstr ""
 
 #: .\core\templates\emails\order\order_received.html:4
 #: .\core\templates\emails\order\order_received.html:7
-#, fuzzy
-#| msgid "Order Delivered"
 msgid "Order Received"
-msgstr "Bestellung Zugestellt"
+msgstr "Bestellung eingegangen"
 
 #: .\core\templates\emails\order\order_received.html:8
 #: .\core\templates\emails\order\order_received.txt:3
@@ -6222,10 +6220,9 @@ msgid "Payment Confirmed - Order #{order_id}"
 msgstr ""
 
 #: .\order\tasks.py:104
-#, fuzzy, python-brace-format
-#| msgid "Order Delivered"
+#, python-brace-format
 msgid "Order Received - #{order_id}"
-msgstr "Bestellung Zugestellt"
+msgstr "Bestellung eingegangen - #{order_id}"
 
 #: .\order\tasks.py:259
 #, python-brace-format

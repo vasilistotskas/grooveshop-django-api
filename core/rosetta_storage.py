@@ -99,6 +99,17 @@ def _overlay_rows(language_code: str) -> list[tuple[str, str, int, str]]:
         return []
 
 
+def overlay_key(
+    msgid: str, msgid_plural: str, plural_index: int
+) -> str | tuple[str, int]:
+    """The gettext catalog key a Translation row lands on.
+
+    Singular rows key on the plain msgid; plural rows on the
+    `(msgid, plural_index)` tuple stdlib gettext uses for ngettext.
+    """
+    return (msgid, plural_index) if msgid_plural else msgid
+
+
 def apply_db_overlay(language_code: str | None = None) -> None:
     """Overlay DB msgstrs onto Django's in-memory gettext catalog.
 
@@ -146,8 +157,17 @@ def apply_db_overlay(language_code: str | None = None) -> None:
             continue
 
         applied = 0
+        overriding = 0
         for msgid, msgid_plural, plural_index, msgstr in rows:
-            key = (msgid, plural_index) if msgid_plural else msgid
+            key = overlay_key(msgid, msgid_plural, plural_index)
+            # A row that disagrees with the compiled .po is the overlay
+            # doing real work — a deliberate Rosetta edit, or a stale
+            # import silently retitling emails (order #281, 2026-09-12:
+            # "Order Received" served as "Η Παραγγελία Παραδόθηκε" from
+            # an April row nobody knew was there). Count them so the
+            # number is in the logs of every pod that serves them.
+            if underlying.get(key) not in (None, msgstr):
+                overriding += 1
             # TranslationCatalog.__setitem__ writes to self._catalogs[0];
             # plain-dict _catalog (older Django) also supports subscript
             # assignment. Works for both.
@@ -155,6 +175,16 @@ def apply_db_overlay(language_code: str | None = None) -> None:
             applied += 1
 
         if applied:
-            logger.debug(
-                "Applied %d DB translations to catalog for %s", applied, lang
+            logger.info(
+                "Translation overlay applied for %s: %d rows, %d override "
+                "a different django.po value (translation_overlay_audit "
+                "lists them)",
+                lang,
+                applied,
+                overriding,
+                extra={
+                    "language": lang,
+                    "rows": applied,
+                    "overriding": overriding,
+                },
             )

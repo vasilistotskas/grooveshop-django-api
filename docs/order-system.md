@@ -457,6 +457,26 @@ Recover by:
 3. For voucher mint mishaps, follow the order-47 recovery script
    in `commit 05208050`.
 
+### 9.5 A customer email carries the wrong subject or wording
+
+Before touching a template, check the DB translation overlay. Every
+non-empty `core.Translation` row is written over the compiled `.po` in
+every pod and worker (`core/rosetta_storage.py:apply_db_overlay`), so a
+stale row wins over a correct catalogue with nothing on disk to show
+for it — order #281 (2026-09-12) got "Η Παραγγελία Παραδόθηκε" as its
+*order received* subject from an April import row. A fresh
+`manage.py shell` never applies the overlay, so it will insist the
+catalogue is fine.
+
+1. The rendered subject is in the worker log line
+   `Order confirmation email sent for order #N (<template>): '<subject>'`
+   and in the order's history note — confirm what was actually sent.
+2. `manage.py translation_overlay_audit -l el` lists every row that
+   overrides the `.po` (`custom`) with both values side by side.
+3. Drop the stale ones — `--drop-ids …` for a handful, `--drop-before
+   YYYY-MM-DD` for a bulk import — and `--prune` the rows that equal
+   the `.po`. Every write bumps the version key; no restart needed.
+
 ## 10. Audit history (PRs #1–#8)
 
 All landed 2026-04-30 → 2026-05-01.

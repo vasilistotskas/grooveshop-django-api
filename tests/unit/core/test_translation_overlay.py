@@ -243,3 +243,33 @@ def test_apply_db_overlay_tolerates_missing_translation_table():
         # Must not raise — exception handling inside _overlay_rows
         # returns an empty iterable and apply_db_overlay continues.
         apply_db_overlay("el")
+
+
+@pytest.mark.django_db
+def test_apply_db_overlay_logs_how_many_rows_override_the_catalog(caplog):
+    """The count of rows that DISAGREE with django.po is the number
+    that matters — it is how a stale import retitling emails shows up
+    in a pod's logs instead of in a customer's inbox."""
+    import logging
+
+    catalog = trans_real.translation("el")._catalog
+    catalog["Order Received"] = "Παραλάβαμε την παραγγελία σας"
+    catalog["Save"] = "Αποθήκευση"
+    Translation.objects.create(
+        language_code="el",
+        msgid="Order Received",
+        msgstr="Η Παραγγελία Παραδόθηκε",
+    )
+    Translation.objects.create(
+        language_code="el", msgid="Save", msgstr="Αποθήκευση"
+    )
+    Translation.objects.create(
+        language_code="el", msgid="Brand new", msgstr="Ολοκαίνουργιο"
+    )
+
+    with caplog.at_level(logging.INFO, logger="core.rosetta_storage"):
+        apply_db_overlay("el")
+
+    record = next(r for r in caplog.records if r.name == "core.rosetta_storage")
+    assert "3 rows, 1 override" in record.getMessage()
+    assert record.overriding == 1

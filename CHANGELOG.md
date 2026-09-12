@@ -3,6 +3,32 @@
 
 
 
+## v3.56.4 (2026-09-12)
+
+### Bug fixes
+
+* fix(admin): move Sites and Background Jobs to the control plane
+
+Sites, Countries, Regions and the Celery schedule/result tables are
+public-schema data a store role never gets a permission on
+(tenant.role_scopes.PLATFORM_ONLY_APP_LABELS). Linked from the store
+sidebar they 403'd for staff and showed a platform superuser the
+platform's five Site rows and the global beat schedule dressed as the
+store's own — asked about from api.webside.gr/admin on 2026-09-12.
+
+The store sidebar keeps a "Newsletter" group for Subscription Topics;
+the platform sidebar gains Sites under Platform and a full Background
+Jobs group (schedules + task results). Two tests pin the split: no
+platform-only changelist is linked from the store nav, and every
+model the control plane registers for those apps is linked there.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01BA5q8Do7SitTSeu5pHP1t5 ([`6f3e907`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6f3e907aa03c9971e29fdf312d39c5e9b8a5442d))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.56.3 [skip ci] ([`07c8368`](https://github.com/vasilistotskas/grooveshop-django-api/commit/07c83685eb7f455b5ef93d2fdace714e45198aa9))
+
 ## v3.56.3 (2026-09-12)
 
 ### Bug fixes

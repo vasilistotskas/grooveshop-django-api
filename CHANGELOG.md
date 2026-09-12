@@ -3,6 +3,31 @@
 
 
 
+## v3.56.2 (2026-09-12)
+
+### Bug fixes
+
+* fix(order): stop promising a payment-confirmation email that never comes
+
+The order-received email told EVERY customer "you will receive a second
+email as soon as we confirm your payment". For cash on delivery nobody
+keeps that promise: the carrier takes the money at the door, the order
+sits PENDING until the courier pays out days later, and no confirmation
+email is ever sent. Same for paying at a BoxNow locker. The store owner
+found it on his own COD test order (#281).
+
+The line now renders only when a second email genuinely follows — an
+online payment that has not completed, or a bank transfer we mark as
+received ourselves. `PayWay.is_collected_on_delivery` is the authority,
+which is exactly the question it exists to answer.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01BA5q8Do7SitTSeu5pHP1t5 ([`ef5203f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ef5203fea21859f9e583a0f21b8800e543479c3b))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.56.1 [skip ci] ([`1454230`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1454230658cf211ec4528be7545c391fd394cdf2))
+
 ## v3.56.1 (2026-09-11)
 
 ### Bug fixes

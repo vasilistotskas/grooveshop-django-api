@@ -166,6 +166,17 @@ Tasks are split by domain:
 - `blog/tasks.py` — comment liked notifications
 - `loyalty/tasks.py` — loyalty point award/expiry tasks (all use `MonitoredTask` base class)
 
+**Only task FAILURES are stored.** `CELERY_TASK_IGNORE_RESULT` is on, so a
+successful task writes nothing; `CELERY_TASK_STORE_ERRORS_EVEN_IF_IGNORED`
+keeps failures and retries, which land in `django_celery_results` in the
+**public schema only** (the app is in SHARED_APPS, deliberately not
+TENANT_APPS) and are surfaced by the platform dashboard and its Task
+Results page. Consequences: adding a `chord()` or `group()` — which do
+need results — means setting `ignore_result=False` on that task, not
+flipping the global; and "did the nightly task run?" is answered by
+`PeriodicTask.last_run_at` or `MonitoredTask`'s log line, never by that
+table. The reasoning is spelled out where the settings are defined.
+
 ### Factory / Test Data Pattern
 
 All factories extend `CustomDjangoModelFactory` from `devtools/factories.py`. Key features:

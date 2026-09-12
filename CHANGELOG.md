@@ -3,6 +3,64 @@
 
 
 
+## v3.57.0 (2026-09-12)
+
+### Bug fixes
+
+* fix(celery): carry ignore_result through the tenant fan-out
+
+Production stored 12 SUCCESS rows in the ten minutes after
+CELERY_TASK_IGNORE_RESULT went live — every one a fan-out subtask, four
+per task, one per tenant.
+
+`Task.apply_async` does `options.setdefault('ignore_result',
+self.ignore_result)`. `Celery.send_task` does not: it pops the option
+with a hard `False` default and never consults the task. The fan-out
+uses `send_task` because it is handed a task NAME rather than a task
+object, so every message went out carrying an explicit `False` — and the
+worker honours an explicit header over the task's own setting
+(`celery/worker/request.py`), which silently overrode the setting for
+the majority of scheduled work.
+
+Now the task is resolved from the registry and its own `ignore_result`
+travels with the message, so a task that opts out (a future chord or
+group member) keeps working and everything else stops writing rows
+nothing reads. This is the only raw `send_task` in the codebase;
+`dispatch_on_commit` already goes through `apply_async`.
+
+Mutation-checked: dropping the argument fails both new tests.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com> ([`64953c4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/64953c4cd701dfe17a3b440a63a0976ffaa0f160))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.56.6 [skip ci] ([`c99db93`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c99db93f0295ad97e35a0b8f2b6fd3c56562e75b))
+
+### Features
+
+* feat(admin): link the documentation site and fix two sidebar defects
+
+Adds an env-gated "Help & Guides" entry to both admin site dropdowns, pointing
+at the new documentation site (docs.grooveshop.space). It renders only when
+ADMIN_DOCS_URL is set, so a local checkout shows no link rather than one to a
+site that may not carry this build's pages; production sets it in the backend
+ConfigMap. UNFOLD_PLATFORM had no SITE_DROPDOWN at all, so it gains one.
+
+Two fixes found while documenting the panel:
+
+- The platform sidebar's "Countries" and "Sites" entries pointed at each
+  other's changelists.
+- Greek labels that were wrong on screen: "Coupon Codes" read as country
+  codes, "Gift Cards" as credit card, and a set of page-section and content
+  labels carried unrelated translations. Three were fuzzy, so the Greek admin
+  was showing English.
+
+The Unfold link test asserted every link starts with "/", which the env-gated
+dropdown entries (docs, Flower, Mailpit, Meilisearch, RabbitMQ) are not: they
+are absolute URLs to other hosts. It now accepts those.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com> ([`e962752`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e962752b8ed3a3f6cde95587bdd53f79c2d42161))
+
 ## v3.56.6 (2026-09-12)
 
 ### Chores

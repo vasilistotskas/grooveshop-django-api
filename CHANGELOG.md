@@ -3,6 +3,102 @@
 
 
 
+## v3.56.6 (2026-09-12)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.56.5 [skip ci] ([`1e8d92b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1e8d92baef6d28ec9b012d1976431063078d7ec2))
+
+### Documentation
+
+* docs(celery): note that only task failures are stored
+
+The settings carry the full reasoning; CLAUDE.md is what a contributor
+reads first, and the two consequences that bite are not guessable from
+the code: a chord() or group() needs `ignore_result=False` on that task
+rather than a global flip, and "did the nightly task run?" is answered
+by PeriodicTask.last_run_at, not by an empty results table.
+
+CLAUDE.md also carries unrelated in-flight edits from a concurrent
+session; only the hunk above is staged.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com> ([`c73361c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c73361c6acab6e0b208e648ad5a0c09896f6ca1f))
+
+### Performance improvements
+
+* perf(celery): store task failures only, in the public schema
+
+Nothing in this codebase reads a task's return value: no AsyncResult, no
+.get(), no chord, no group. The one chain() links an immutable .si()
+signature, which celery dispatches from `task_request.chain` before it
+ever touches the backend. Every stored success was therefore write
+amplification nobody consumed — 2,937 Redis keys a day in production,
+sharing one 614 MiB allkeys-lru budget with the Django cache, where a
+result could be evicted before it expired and the whole lot vanished in
+the 2026-09-09 Redis outage.
+
+The failures ARE worth keeping: there is no metrics or alerting stack,
+and a silent failure here is an order confirmation nobody receives or a
+courier voucher that never mints.
+
+`CELERY_TASK_IGNORE_RESULT` makes the worker call `mark_as_done` with
+`store_result=False` (`publish_result = not eager and not
+ignore_result`), while the failure path falls back to the already-set
+`CELERY_TASK_STORE_ERRORS_EVEN_IF_IGNORED` — so successes write nothing
+and failures write a full row, with task name and arguments. Writes drop
+from ~2,937/day to roughly zero, which is what makes the DB the right
+home for them; Redis DB 1 empties and the whole budget serves the cache.
+
+Task results are public-schema only now. `django_celery_results` leaves
+TENANT_APPS and tenant/migrations/0039 drops the copies it created:
+django-tenants puts the tenant schema first on the search path, so a
+failure recorded in tenant context landed in a table the control plane
+cannot read and `celery.backend_cleanup` — dispatched by beat with no
+tenant header, so it runs in public — could never prune. Every one of
+those tables was verified empty in production and staging first.
+
+Retention is now set under its post-4.0 name. `CELERY_TASK_RESULT_EXPIRES
+= 3600` was pre-4.0 spelling, silently ignored under the CELERY_
+namespace, so the app had been running on celery's 1-day default while
+settings.py claimed one hour; 30 days is affordable now that only
+failures land here.
+
+The failed-task count moves from the store dashboard to the platform
+one. With a single public table holding every store's failures, counting
+it on a merchant's console attributed the whole estate's failures to
+whichever store happened to be open — the same reason Sites and the
+Cache Purge Log left that console.
+
+Tests drive `build_tracer(eager=False)`, the worker's own path, because
+`Task.apply()` hard-codes `ignore_result: False` into the eager request
+and an eager test would pass whatever the settings said. Mutation-checked:
+turning either setting off, or restoring the dead retention name, fails
+them. The MT lane asserts a provisioned tenant grows no result tables.
+
+settings.py also carries an unrelated in-flight `_ADMIN_DOCS_LINKS`
+change from a concurrent session; only the hunks above are staged.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com> ([`61714e5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/61714e5809d9ff5314803a32734a6464668c58e1))
+
+### Testing
+
+* test(tenant): record why celery results are shared-only
+
+`DUAL_LISTED_REQUIRED` listed `django_celery_results`, so removing it
+from TENANT_APPS failed the invariant that every request-written shared
+app is also a tenant app. That rule is right, and it does not reach this
+app: the hazard it guards is an id resolved in one schema written into a
+row stored in another (`django_admin_log`'s `content_type_id`), and the
+three celery result models carry no relations at all — `content_type`
+there is the result's encoding string, not a ContentType FK. A row is
+self-contained and means the same thing in any schema.
+
+Moved to a new `SHARED_ONLY_BY_DESIGN` set with that reasoning, plus the
+safety condition as an executable test: anything listed there must own
+no relations. Mutation-checked — returning the app to TENANT_APPS fails.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com> ([`4ca60da`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4ca60da4e1137da35f5c2d1b3b5eac1f570a6873))
+
 ## v3.56.5 (2026-09-12)
 
 ### Bug fixes

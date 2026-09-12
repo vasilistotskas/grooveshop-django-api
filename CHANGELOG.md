@@ -3,6 +3,57 @@
 
 
 
+## v3.57.1 (2026-09-12)
+
+### Bug fixes
+
+* fix(admin): withhold platform-owned models from a store's admin
+
+`/admin/sites/site/` on api.webside.gr listed all five stores' domains,
+and `/admin/core/cachepurgelog/` all 146 purges across the estate, actor
+column included — the platform's own rows wearing a merchant's page.
+Removing the curated sidebar links closed the navigation but not the
+URL, and the app list still carried seven such labels: sites, core,
+country, region, tenant, django_celery_beat, django_celery_results.
+
+`WithheldOnTenantHostModelAdmin` is the mirror of the existing
+`BaseModelAdmin._withheld_on_public`, gated on `request.tenant` by the
+same positive-knowledge rule — it withholds only when it POSITIVELY
+knows a real tenant is being served, so it stays inert in tests,
+management commands and Celery work, which is what made the first
+attempt at the other direction deny 35 valid changelists.
+`has_module_permission` returning False is what makes one mechanism
+close both paths: Django's `_build_app_dict` drops the model from the
+app list, and the typed URL becomes a clean 403.
+
+The set is derived (`SHARED_APPS - TENANT_APPS`), not enumerated.
+`role_scopes.PLATFORM_ONLY_APP_LABELS` looks like the same thing and is
+not: it also names `allauth_idp_oidc`, whose tables are TENANT-only, so
+using it would have hidden OIDC clients a store genuinely owns. The
+comparison is on labels rather than raw entries because
+`unfold.contrib.simple_history` and `simple_history` sit in opposite
+lists and reduce to the same label — comparing entries put a per-tenant
+app in the withhold set. Collapsing to labels also errs safely: if any
+tenant entry yields a label it is never withheld.
+
+`tenant` is exempt. `TenantAdmin.get_queryset` scopes a store operator
+to their own row and `get_readonly_fields` allowlists
+`TENANT_SELF_EDITABLE_FIELDS` — branding, socials, pixels, carrier
+credentials. Hiding it would remove merchant self-service, not a leak.
+
+Coverage is proven, not assumed: the four application points
+(BaseModelAdmin, the celery-beat admins, the purge log, the third-party
+override factory) share no base class, so a test walks the live registry
+and asserts every shared-only model is refused on a tenant host, by both
+module and view permission. Mutation-checked on all three load-bearing
+parts.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com> ([`edfe7fd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/edfe7fde19c1dc3b81d4b16170ea96ca1986dd65))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.57.0 [skip ci] ([`dcb03ad`](https://github.com/vasilistotskas/grooveshop-django-api/commit/dcb03ad5ad6d5a87032b14a98b88f9e7db69046f))
+
 ## v3.57.0 (2026-09-12)
 
 ### Bug fixes

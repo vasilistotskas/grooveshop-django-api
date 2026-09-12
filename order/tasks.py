@@ -221,6 +221,18 @@ def send_order_confirmation_email(self, order_id: int) -> bool:
                     strip_tags(payment_instructions)
                 ).strip()
 
+            # Does a SECOND email actually follow this one? Only when
+            # the shopper still owes us a payment we will confirm
+            # ourselves — an online payment that has not completed, or a
+            # bank transfer we mark as received. Money the carrier
+            # collects at the door or at the locker is never confirmed
+            # by us (COD sits PENDING until the courier pays out, ~4
+            # days later), so promising a confirmation email there
+            # promises something that never arrives.
+            expects_payment_confirmation = bool(
+                pay_way and not is_paid and not pay_way.is_collected_on_delivery
+            )
+
             context = build_email_context(
                 order=order,
                 items=order.items.all(),
@@ -228,6 +240,7 @@ def send_order_confirmation_email(self, order_id: int) -> bool:
                 payment_instructions=payment_instructions,
                 payment_instructions_text=payment_instructions_text,
                 is_paid=is_paid,
+                expects_payment_confirmation=expects_payment_confirmation,
             )
 
             text_content = render_to_string(f"{template_base}.txt", context)

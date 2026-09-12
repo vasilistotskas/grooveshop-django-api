@@ -88,6 +88,6 @@
     <p class="text-bold"><strong>{% trans "Total" %}:</strong> {{ order.calculate_order_total_amount }}</p>
 </div>
 
-<p class="mt-3">{% trans "You will receive a second email as soon as we confirm your payment." %}</p>
+{% if expects_payment_confirmation %}<p class="mt-3">{% trans "You will receive a second email as soon as we confirm your payment." %}</p>{% endif %}
 <p>{% trans "If you have any questions, please contact our customer service." %}</p>
 {% endblock %}

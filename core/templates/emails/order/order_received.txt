@@ -35,7 +35,7 @@
 {% endif %}{% if order.gift_card_amount.amount > 0 %}{% trans "Gift card" %}: -{{ order.gift_card_amount }}
 {% endif %}{% trans "Total" %}: {{ order.calculate_order_total_amount }}
 
-{% trans "You will receive a second email as soon as we confirm your payment." %}
+{% if expects_payment_confirmation %}{% trans "You will receive a second email as soon as we confirm your payment." %}{% endif %}
 
 {{ SITE_NAME }}
 {{ INFO_EMAIL }}

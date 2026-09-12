@@ -116,10 +116,28 @@ def run_for_all_tenants(
     for tenant in tenants:
         from core import celery_app
 
+        # ``ignore_result`` has to be passed explicitly here.
+        # ``Task.apply_async`` does ``options.setdefault('ignore_result',
+        # self.ignore_result)``, but ``Celery.send_task`` — which this
+        # uses, because a fan-out is given a task NAME rather than a
+        # task object — defaults it to ``False`` and never consults the
+        # task. The message then carries an explicit False, and the
+        # worker honours an explicit header over the task's own setting,
+        # so every fanned-out task stored a SUCCESS row that nothing
+        # reads. Seen in production the hour CELERY_TASK_IGNORE_RESULT
+        # landed: 12 rows in ten minutes, all of them fan-out subtasks.
+        task = celery_app.tasks.get(task_name)
+        ignore_result = (
+            task.ignore_result
+            if task is not None
+            else celery_app.conf.task_ignore_result
+        )
+
         result = celery_app.send_task(
             task_name,
             kwargs=kwargs,
             headers={"_schema_name": tenant.schema_name},
+            ignore_result=ignore_result,
         )
         results.append(
             {"schema_name": tenant.schema_name, "task_id": str(result.id)}

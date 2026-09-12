@@ -273,3 +273,60 @@ class TestFanoutReturnIsSerializable:
             assert set(record) == {"schema_name", "task_id"}
             assert isinstance(record["schema_name"], str)
             assert isinstance(record["task_id"], str)
+
+
+class TestFanoutHonoursIgnoreResult:
+    """A fan-out must not store what a direct dispatch would not.
+
+    ``Task.apply_async`` does ``options.setdefault('ignore_result',
+    self.ignore_result)``; ``Celery.send_task`` — which the fan-out uses,
+    because it is handed a task NAME — defaults it to ``False`` and never
+    consults the task. The message then carried an explicit ``False``,
+    which the worker honours over the task's own setting, so every
+    fanned-out task wrote a SUCCESS row nothing reads. Caught in
+    production the hour CELERY_TASK_IGNORE_RESULT landed: 12 rows in ten
+    minutes, every one a fan-out subtask.
+    """
+
+    @pytest.mark.django_db
+    def test_every_dispatch_carries_the_tasks_own_ignore_result(
+        self, tenant_factory
+    ):
+        from core import celery_app
+
+        tenant_factory("fanout-ignore")
+        task_name = "order.tasks.check_pending_orders"
+        expected = celery_app.tasks[task_name].ignore_result
+
+        with patch("core.celery_app.send_task") as send:
+            run_for_all_tenants(task_name)
+
+        assert send.call_args_list, "nothing was dispatched"
+        for call in send.call_args_list:
+            assert call.kwargs["ignore_result"] == expected, (
+                "fan-out dispatched with an explicit ignore_result that "
+                "does not match the task's own — the worker honours the "
+                "header, so the task's setting is silently overridden"
+            )
+
+    @pytest.mark.django_db
+    def test_a_task_that_opts_out_is_respected(self, tenant_factory):
+        """A future chord/group member sets ``ignore_result=False`` on
+        itself; the fan-out must carry that, not the global default."""
+        from core import celery_app
+
+        tenant_factory("fanout-opt-out")
+        task_name = "order.tasks.check_pending_orders"
+        task = celery_app.tasks[task_name]
+        original = task.ignore_result
+        task.ignore_result = False
+        try:
+            with patch("core.celery_app.send_task") as send:
+                run_for_all_tenants(task_name)
+        finally:
+            task.ignore_result = original
+
+        assert all(
+            call.kwargs["ignore_result"] is False
+            for call in send.call_args_list
+        )

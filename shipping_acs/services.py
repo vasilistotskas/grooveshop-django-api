@@ -964,7 +964,7 @@ class AcsService:
                 voucher_no__isnull=False,
                 pickup_list__isnull=True,
                 shipment_state=AcsShipmentState.NEW,
-            ).values_list("id", "voucher_no", "label_printed_at")
+            ).values_list("id", "voucher_no", "label_printed_at", "order_id")
         )
         candidates = [row[0] for row in candidate_rows]
         if not candidates:
@@ -1030,12 +1030,23 @@ class AcsService:
             unprinted_count = result.get("Unprinted_Found")
             unprinted_vouchers = result.get("Unprinted_Vouchers") or []
             acs_message = (result.get("Error_Message") or "").strip()
+            # Name the candidates, don't just count them. ACS can refuse
+            # with Unprinted_Found=0 and an empty Error_Message — it did
+            # on 2026-09-10 and 09-11 — and then the count alone says
+            # nothing about WHICH parcel is holding up the manifest.
+            # Finding that out meant re-running this query by hand
+            # against production; the log should simply carry it.
+            blocked = [
+                f"{voucher_no} (order #{order_id})"
+                for _id, voucher_no, _printed, order_id in candidate_rows
+            ]
             logger.error(
                 "ACS_Issue_Pickup_List issued no list for date=%s with %s "
-                "candidate voucher(s): unprinted_found=%s "
+                "candidate voucher(s) %s: unprinted_found=%s "
                 "unprinted_vouchers=%s error_message=%r raw=%r",
                 the_date,
                 len(candidates),
+                blocked,
                 unprinted_count,
                 unprinted_vouchers,
                 acs_message,

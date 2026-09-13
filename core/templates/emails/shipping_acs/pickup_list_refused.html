@@ -1,0 +1,30 @@
+{% extends "emails/base/email_base.html" %}
+{% load i18n %}
+
+{% block email_title %}{% trans "ACS Pickup List Not Issued" %} - {{ SITE_NAME }}{% endblock %}
+
+{% block email_content %}
+<h1>{% trans "ACS Pickup List Not Issued" %}</h1>
+<p>{% blocktrans count counter=vouchers|length %}ACS rejected today's pickup list. Every label is printed, so this is not a printing problem. {{ counter }} voucher is still waiting to be collected:{% plural %}ACS rejected today's pickup list. Every label is printed, so this is not a printing problem. {{ counter }} vouchers are still waiting to be collected:{% endblocktrans %}</p>
+
+<table class="email-table">
+    <thead>
+        <tr>
+            <th>{% trans "Voucher" %}</th>
+            <th>{% trans "Order" %}</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for v in vouchers %}
+        <tr>
+            <td>{{ v.voucher_no }}</td>
+            <td>#{{ v.order_id }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% if acs_message %}<p class="mt-3"><strong>{% trans "ACS replied" %}:</strong> {{ acs_message }}</p>{% else %}<p class="mt-3">{% trans "ACS gave no reason for the refusal." %}</p>{% endif %}
+
+<p class="mt-3">{% trans "The usual cause is a voucher ACS will never collect — one minted days ago that their network has never scanned. It stays a candidate for every run, so the manifest keeps failing. Open the ACS shipments page in the admin, check which of the vouchers above has no tracking history, and use “Retire selected shipments” on it. Then run “Issue ACS pickup list now” rather than waiting for tomorrow." %}</p>
+{% endblock %}

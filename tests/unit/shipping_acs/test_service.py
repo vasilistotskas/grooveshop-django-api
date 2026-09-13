@@ -844,6 +844,43 @@ class TestIssueDailyPickupList:
         assert "no PickupList_No" in str(exc_info.value)
         assert "1 candidate voucher(s)" in str(exc_info.value)
 
+    def test_the_refusal_log_names_the_blocking_voucher_and_order(
+        self, monkeypatch, caplog
+    ):
+        """A count is not enough to act on.
+
+        ACS refused on 2026-09-10 and 09-11 with Unprinted_Found=0 and an
+        empty Error_Message. The log said "1 candidate voucher(s)" and
+        nothing more, so working out WHICH parcel was holding up the
+        manifest meant re-running the candidate query by hand against
+        production. The voucher and its order are right there in the
+        query the method already ran.
+        """
+        import logging
+
+        shipment = self._candidate("7227891111")
+        self._client_returning(
+            monkeypatch,
+            {"PickupList_No": None, "Unprinted_Found": 0, "Error_Message": ""},
+        )
+
+        with (
+            caplog.at_level(logging.ERROR, logger="shipping_acs.services"),
+            pytest.raises(AcsAPIError),
+        ):
+            AcsService.issue_daily_pickup_list()
+
+        logged = " | ".join(
+            r.getMessage()
+            for r in caplog.records
+            if r.name == "shipping_acs.services"
+        )
+        assert "7227891111" in logged, (
+            "the refusal log does not name the voucher that blocked the "
+            "manifest — the count alone cannot be acted on"
+        )
+        assert f"order #{shipment.order_id}" in logged
+
     def test_raises_with_acs_message_and_offending_voucher_numbers(
         self, monkeypatch
     ):

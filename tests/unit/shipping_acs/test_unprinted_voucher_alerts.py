@@ -199,3 +199,110 @@ class TestPickupListRefusalAlert:
 
         assert result["status"] == "ok"
         assert not mock_mail.called
+
+
+class TestRefusalWithNothingUnprinted:
+    """ACS can refuse while naming no unprinted voucher at all.
+
+    Production, 2026-09-10 and 09-11: ACS answered
+    ``PickupList_No: null`` with ``Unprinted_Found: 0``, an empty
+    ``Error_Message`` and an empty ``Unprinted_Vouchers`` — every label
+    printed. ``_unprinted_rows`` therefore found nothing, and
+    ``_alert_unprinted_vouchers`` returns early on an empty list, so NO
+    email was sent. The task failed loudly to Celery on two consecutive
+    business days and silently to every human; it surfaced three days
+    later only by reading logs.
+
+    The cause was a voucher ACS will never collect (minted 2026-09-01,
+    never scanned), which stays a candidate for every subsequent run.
+    """
+
+    @staticmethod
+    def _reasonless_refusal():
+        return AcsAPIError(
+            alias="ACS_Issue_Pickup_List",
+            error_message="",
+            raw={
+                "PickupList_No": None,
+                "Unprinted_Found": 0,
+                "Unprinted_Vouchers": [],
+            },
+        )
+
+    def _run(self):
+        with (
+            patch(
+                "shipping_acs.services.AcsService.issue_daily_pickup_list",
+                side_effect=self._reasonless_refusal(),
+            ),
+            patch("django.core.mail.send_mail") as mock_mail,
+            pytest.raises(AcsAPIError),
+        ):
+            issue_daily_acs_pickup_list.run()
+        return mock_mail
+
+    def test_the_merchant_is_told_even_though_nothing_is_unprinted(
+        self, acs_configured_tenant, admins_configured
+    ):
+        stuck = _candidate("9803334192", printed=True)
+
+        mock_mail = self._run()
+
+        assert mock_mail.called, (
+            "ACS refused and no email went out — this is the silence that "
+            "let the manifest fail for two business days unnoticed"
+        )
+        body = mock_mail.call_args.kwargs["message"]
+        assert "9803334192" in body
+        assert str(stuck.order_id) in body
+
+    def test_it_does_not_tell_them_to_print_an_already_printed_label(
+        self, acs_configured_tenant, admins_configured
+    ):
+        """The unprinted-voucher alert's advice would be wrong here, which
+        is why this is a separate template rather than a flag."""
+        _candidate("9803334192", printed=True)
+
+        body = self._run().call_args.kwargs["message"]
+
+        assert "no printed label" not in body
+        # It should point at the real remedy instead.
+        assert "Retire selected shipments" in body
+
+    def test_it_says_so_when_acs_gives_no_reason(
+        self, acs_configured_tenant, admins_configured
+    ):
+        _candidate("9803334192", printed=True)
+
+        body = self._run().call_args.kwargs["message"]
+
+        assert "ACS gave no reason" in body
+
+    def test_a_printing_refusal_still_uses_the_printing_alert(
+        self, acs_configured_tenant, admins_configured
+    ):
+        """The original path must not regress: when ACS DOES name an
+        unprinted voucher, the advice is still 'print the label'."""
+        _candidate("9800000001")
+
+        with (
+            patch(
+                "shipping_acs.services.AcsService.issue_daily_pickup_list",
+                side_effect=AcsAPIError(
+                    alias="ACS_Issue_Pickup_List",
+                    error_message="unprinted",
+                    raw={
+                        "PickupList_No": None,
+                        "Unprinted_Found": 1,
+                        "Unprinted_Vouchers": ["9800000001"],
+                    },
+                ),
+            ),
+            patch("django.core.mail.send_mail") as mock_mail,
+            pytest.raises(AcsAPIError),
+        ):
+            issue_daily_acs_pickup_list.run()
+
+        body = mock_mail.call_args.kwargs["message"]
+        assert "no printed label" in body
+        assert "Retire selected shipments" not in body

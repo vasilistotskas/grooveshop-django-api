@@ -3,6 +3,98 @@
 
 
 
+## v3.57.2 (2026-09-13)
+
+### Bug fixes
+
+* fix(acs): an empty pickup day is not a refusal, and needs no email
+
+ACS_Issue_Pickup_List takes a DATE and no voucher list — ACS chooses
+the vouchers itself, scoped by Pickup_Date. Phase 3 already recorded
+that vouchers minted on earlier days are not covered (2026-09-02: it
+listed 2 of 9 candidates); Phase 1 did not, so a stale local candidate
+made an empty day look like work was outstanding.
+
+On 2026-09-10 and 09-11 the only candidate was voucher 9803334192
+(order 248, minted 09-01, never scanned). ACS answered "nothing
+eligible" — null PickupList_No, Unprinted_Found 0, empty
+Error_Message, which is what the manual documents — and we raised.
+Two business days of failed tasks over a parcel that did not exist.
+
+So judge the response by whether anything is actually waiting: when
+every candidate has no tracking event at all and is older than
+ACS_STALE_SHIPMENT_DAYS, log the vouchers at WARNING and return None.
+One live candidate still makes a refusal a failure.
+
+Re-minted rows are excluded from that classification. created_at
+dates the ROW and reset_shipment_for_remint leaves it untouched, so a
+voucher issued today on a month-old row whose predecessor never
+scanned would read as dead on day one. The reset records
+metadata["previous_vouchers"], which identifies exactly those rows and
+needs no migration. A voucher_minted_at column is the honest model and
+would also fix the same created_at fallback in
+check_stale_acs_shipments — worth doing, not needed for this.
+
+That also removes the reason for the pickup_list_refused email added
+in 83917aa1. Its advice — find the dead voucher and retire it — is
+already check_stale_acs_shipments's job: it has run daily at 09:00
+since 4cd2987f (2026-07-11), its beat entry names dead vouchers
+explicitly, and voucher 9803334192 matched its filter from 09-04, six
+days before the manifest first failed. Production confirms it fired:
+that shipment carries stale_alert_sent=True, which is only left set
+when send_mail returns. A second alarm on a later schedule for a
+problem another task already reports is noise, so the helper and both
+templates go.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01HiNVpz9cGfnvaPNwKSKJKd ([`990b532`](https://github.com/vasilistotskas/grooveshop-django-api/commit/990b532ad6abe6aedd8e1c0255ead851c23c7290))
+
+* fix(acs): say which voucher blocked the manifest, and alert when ACS refuses
+
+The daily pickup list failed on 2026-09-10 and 09-11 and nobody was
+told. ACS answered `PickupList_No: null` with `Unprinted_Found: 0`, an
+empty `Error_Message` and an empty `Unprinted_Vouchers` — every label
+printed. The cause was one dead voucher (9803334192, order 248, minted
+09-01, never scanned by ACS) which stays a candidate for every run.
+
+Two gaps, both found while debugging it:
+
+1. The refusal logged `len(candidates)` and nothing else, so "1
+   candidate voucher(s)" was all there was to go on. Working out WHICH
+   parcel blocked the manifest meant re-running the candidate query by
+   hand against production. The voucher and its order were already in
+   the query the method had just run; the log now names them.
+
+2. The refusal alert is built from the vouchers ACS names, and
+   `_alert_unprinted_vouchers` returns early on an empty list — so with
+   nothing unprinted, NO email went out at all. The task failed loudly
+   to Celery on two consecutive business days and silently to every
+   human; it surfaced three days later only by reading VictoriaLogs.
+   `_alert_pickup_list_refused` now covers that case, naming every
+   candidate still waiting.
+
+It gets its own template rather than a flag on the existing one because
+the advice is different and the old wording would be actively wrong:
+"open each order and download its ACS label" is the wrong instruction
+when every label is already printed. The new copy points at the real
+remedy — find the voucher with no tracking history and retire it.
+
+Deliberately NOT changed: adding the tenant to these messages. The
+structured log already carries `schema` on every line, so it is a grep
+away and the message would only repeat it.
+
+Tests cover both, mutation-checked: dropping the voucher names from the
+log fails the service test, and routing the refusal back through the
+old alert fails three of the four task tests. The printing-refusal path
+is pinned separately so it cannot regress into the new wording.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01HiNVpz9cGfnvaPNwKSKJKd ([`83917aa`](https://github.com/vasilistotskas/grooveshop-django-api/commit/83917aa16824a0a0d88f0c0b8958f63d45cdb3b6))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.57.1 [skip ci] ([`8963704`](https://github.com/vasilistotskas/grooveshop-django-api/commit/89637047f43a2ba0062838a95dd773dd71b914aa))
+
 ## v3.57.1 (2026-09-12)
 
 ### Bug fixes

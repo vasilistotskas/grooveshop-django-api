@@ -204,79 +204,71 @@ class TestPickupListRefusalAlert:
 class TestRefusalWithNothingUnprinted:
     """ACS can refuse while naming no unprinted voucher at all.
 
-    Production, 2026-09-10 and 09-11: ACS answered
-    ``PickupList_No: null`` with ``Unprinted_Found: 0``, an empty
-    ``Error_Message`` and an empty ``Unprinted_Vouchers`` — every label
-    printed. ``_unprinted_rows`` therefore found nothing, and
-    ``_alert_unprinted_vouchers`` returns early on an empty list, so NO
-    email was sent. The task failed loudly to Celery on two consecutive
-    business days and silently to every human; it surfaced three days
-    later only by reading logs.
+    Production, 2026-09-10 and 09-11: ACS answered ``PickupList_No:
+    null`` with ``Unprinted_Found: 0``, an empty ``Error_Message`` and an
+    empty ``Unprinted_Vouchers`` — every label printed. The only
+    candidate was a voucher minted 2026-09-01 that ACS had never
+    scanned.
 
-    The cause was a voucher ACS will never collect (minted 2026-09-01,
-    never scanned), which stays a candidate for every subsequent run.
+    That is not a refusal, it is ACS correctly reporting that nothing is
+    eligible for the date, and the service now returns ``None`` for it
+    (see ``test_service.py``). No parcel is waiting, so there is nothing
+    to tell a human: a dead voucher is reported by
+    ``check_stale_acs_shipments``, which has owned that class of row
+    since 2026-07-11 and whose advice ("chase ACS or retire the row") is
+    already the right one. An email here would be a second alarm, on a
+    later schedule, for a problem another task already reported.
     """
 
-    @staticmethod
-    def _reasonless_refusal():
-        return AcsAPIError(
-            alias="ACS_Issue_Pickup_List",
-            error_message="",
-            raw={
-                "PickupList_No": None,
-                "Unprinted_Found": 0,
-                "Unprinted_Vouchers": [],
-            },
-        )
-
-    def _run(self):
+    def test_an_empty_day_neither_fails_nor_emails(
+        self, acs_configured_tenant, admins_configured
+    ):
         with (
             patch(
                 "shipping_acs.services.AcsService.issue_daily_pickup_list",
-                side_effect=self._reasonless_refusal(),
+                return_value=None,
+            ),
+            patch("django.core.mail.send_mail") as mock_mail,
+        ):
+            result = issue_daily_acs_pickup_list.run()
+
+        assert result["status"] == "noop"
+        assert not mock_mail.called, (
+            "nothing was waiting for collection, so nobody needs an email"
+        )
+
+    def test_a_refusal_with_nothing_unprinted_raises_without_emailing(
+        self, acs_configured_tenant, admins_configured
+    ):
+        """The residual case: a live parcel IS waiting and ACS still
+
+        refused, naming nothing unprinted. That has never been observed.
+        It stays a hard failure — the ERROR log in the service names the
+        vouchers and the task is recorded as failed — but it does not get
+        an email of its own, because there is no advice to give beyond
+        what the log already carries.
+        """
+        _candidate("9803334192", printed=True)
+
+        with (
+            patch(
+                "shipping_acs.services.AcsService.issue_daily_pickup_list",
+                side_effect=AcsAPIError(
+                    alias="ACS_Issue_Pickup_List",
+                    error_message="",
+                    raw={
+                        "PickupList_No": None,
+                        "Unprinted_Found": 0,
+                        "Unprinted_Vouchers": [],
+                    },
+                ),
             ),
             patch("django.core.mail.send_mail") as mock_mail,
             pytest.raises(AcsAPIError),
         ):
             issue_daily_acs_pickup_list.run()
-        return mock_mail
 
-    def test_the_merchant_is_told_even_though_nothing_is_unprinted(
-        self, acs_configured_tenant, admins_configured
-    ):
-        stuck = _candidate("9803334192", printed=True)
-
-        mock_mail = self._run()
-
-        assert mock_mail.called, (
-            "ACS refused and no email went out — this is the silence that "
-            "let the manifest fail for two business days unnoticed"
-        )
-        body = mock_mail.call_args.kwargs["message"]
-        assert "9803334192" in body
-        assert str(stuck.order_id) in body
-
-    def test_it_does_not_tell_them_to_print_an_already_printed_label(
-        self, acs_configured_tenant, admins_configured
-    ):
-        """The unprinted-voucher alert's advice would be wrong here, which
-        is why this is a separate template rather than a flag."""
-        _candidate("9803334192", printed=True)
-
-        body = self._run().call_args.kwargs["message"]
-
-        assert "no printed label" not in body
-        # It should point at the real remedy instead.
-        assert "Retire selected shipments" in body
-
-    def test_it_says_so_when_acs_gives_no_reason(
-        self, acs_configured_tenant, admins_configured
-    ):
-        _candidate("9803334192", printed=True)
-
-        body = self._run().call_args.kwargs["message"]
-
-        assert "ACS gave no reason" in body
+        assert not mock_mail.called
 
     def test_a_printing_refusal_still_uses_the_printing_alert(
         self, acs_configured_tenant, admins_configured

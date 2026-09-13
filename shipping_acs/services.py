@@ -11,10 +11,11 @@ from __future__ import annotations
 
 import hashlib
 import logging
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
+from django.conf import settings
 from django.core.cache import cache
 from django.db import connection, transaction
 from django.utils import timezone
@@ -964,7 +965,15 @@ class AcsService:
                 voucher_no__isnull=False,
                 pickup_list__isnull=True,
                 shipment_state=AcsShipmentState.NEW,
-            ).values_list("id", "voucher_no", "label_printed_at", "order_id")
+            ).values_list(
+                "id",
+                "voucher_no",
+                "label_printed_at",
+                "order_id",
+                "created_at",
+                "last_event_at",
+                "metadata",
+            )
         )
         candidates = [row[0] for row in candidate_rows]
         if not candidates:
@@ -1038,8 +1047,72 @@ class AcsService:
             # against production; the log should simply carry it.
             blocked = [
                 f"{voucher_no} (order #{order_id})"
-                for _id, voucher_no, _printed, order_id in candidate_rows
+                for _id, voucher_no, _printed, order_id, _at, _ev, _md in (
+                    candidate_rows
+                )
             ]
+
+            # An "empty day" is not a failure. This call takes a DATE and
+            # no voucher list — ACS picks the vouchers itself, scoped by
+            # Pickup_Date, so vouchers minted on earlier days are simply
+            # not eligible (Phase 3 below records the same finding: on
+            # 2026-09-02 it listed 2 of 9 candidates). The manual
+            # documents a null PickupList_No with Unprinted_Found=0 and
+            # an empty Error_Message as exactly that: nothing eligible
+            # for the date.
+            #
+            # Our candidate query is therefore only a pre-flight. When
+            # every row it returns is a voucher ACS will never collect —
+            # no tracking event at all, older than the staleness
+            # threshold — ACS is right and we have nothing to issue.
+            # Raising there cost two business days of red Celery tasks
+            # over a single dead voucher (#162, minted 2026-09-01) while
+            # no parcel was actually waiting. Those rows are already
+            # reported by ``check_stale_acs_shipments``, which is the
+            # task that owns them; this one just declines to duplicate
+            # the alarm. A single live candidate still makes it a
+            # failure, because then something WAS waiting.
+            #
+            # ``created_at`` dates the ROW, not the voucher, and
+            # ``reset_shipment_for_remint`` leaves it alone — so a
+            # cancelled order re-minted today keeps an old created_at,
+            # and if its previous voucher never scanned it would look
+            # dead the moment it was issued. That reset does record
+            # ``metadata["previous_vouchers"]``, so a re-minted row is
+            # never classified dead and its refusals stay loud. (The
+            # honest model is a voucher_minted_at column, which would
+            # also fix the same created_at fallback in
+            # check_stale_acs_shipments; this guard needs no migration
+            # and covers rows that were re-minted before it existed.)
+            stale_days = getattr(settings, "ACS_STALE_SHIPMENT_DAYS", 3)
+            stale_cutoff = timezone.now() - timedelta(days=stale_days)
+            dead = [
+                f"{voucher_no} (order #{order_id})"
+                for (
+                    _id,
+                    voucher_no,
+                    _printed,
+                    order_id,
+                    created_at,
+                    ev_at,
+                    metadata,
+                ) in candidate_rows
+                if ev_at is None
+                and created_at < stale_cutoff
+                and not (metadata or {}).get("previous_vouchers")
+            ]
+            if len(dead) == len(candidate_rows) and not unprinted_count:
+                logger.warning(
+                    "ACS_Issue_Pickup_List had nothing eligible for date=%s: "
+                    "all %s candidate voucher(s) %s are dead (no tracking "
+                    "event, older than %s days). Not a failure — no parcel "
+                    "is waiting. check_stale_acs_shipments reports these.",
+                    the_date,
+                    len(dead),
+                    dead,
+                    stale_days,
+                )
+                return None
             logger.error(
                 "ACS_Issue_Pickup_List issued no list for date=%s with %s "
                 "candidate voucher(s) %s: unprinted_found=%s "

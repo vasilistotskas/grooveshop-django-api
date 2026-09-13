@@ -232,92 +232,6 @@ def _unprinted_rows(voucher_numbers: list[str] | None = None) -> list[dict]:
     ]
 
 
-def _pickup_candidate_rows() -> list[dict]:
-    """Every voucher the next manifest would offer ACS.
-
-    The same filter :meth:`AcsService.issue_daily_pickup_list` uses for
-    its candidates, WITHOUT the ``label_printed_at`` narrowing that
-    :func:`_unprinted_rows` applies — because the case this exists for
-    is a refusal where nothing is unprinted.
-    """
-    from shipping_acs.enum.shipment_state import AcsShipmentState
-    from shipping_acs.models import AcsShipment
-
-    return [
-        {"voucher_no": s.voucher_no, "order_id": s.order_id}
-        for s in AcsShipment.objects.filter(
-            voucher_no__isnull=False,
-            pickup_list__isnull=True,
-            shipment_state=AcsShipmentState.NEW,
-        ).order_by("order_id")
-    ]
-
-
-def _alert_pickup_list_refused(
-    rows: list[dict], *, acs_message: str = ""
-) -> dict[str, Any]:
-    """Tell the merchant ACS refused, when no voucher needs printing.
-
-    The unprinted-voucher alert below cannot cover this: it is built
-    from the vouchers ACS named, and returns early when that list is
-    empty. ACS refused on 2026-09-10 and 09-11 with
-    ``Unprinted_Found=0`` and an empty ``Error_Message`` — every label
-    printed — so nothing was sent, the task failed twice in silence,
-    and it surfaced three days later by reading logs.
-
-    The advice differs too, which is why this is its own template
-    rather than a flag on the other one: "print the labels" is the
-    wrong instruction when they are already printed. The usual cause is
-    a voucher ACS will never collect — one minted days ago and never
-    scanned — which the merchant retires from the shipments admin.
-    """
-    from django.core.mail import send_mail
-    from django.template.loader import render_to_string
-    from django.utils.translation import gettext as _
-
-    from core.utils.email_context import build_email_context
-    from tenant.credentials import (
-        tenant_admin_recipients,
-        tenant_from_email,
-        tenant_site_name,
-    )
-
-    recipients = tenant_admin_recipients()
-    if not recipients:
-        logger.warning(
-            "ACS pickup-list refusal alert: no recipients configured — "
-            "%s voucher(s) are waiting on a manifest",
-            len(rows),
-        )
-        return {"alerted": 0, "reason": "no_recipients"}
-
-    context = build_email_context(vouchers=rows, acs_message=acs_message)
-    subject = _(
-        "ACS pickup list NOT issued — {n} voucher(s) still waiting"
-    ).format(n=len(rows))
-
-    try:
-        send_mail(
-            subject=f"[{tenant_site_name()}] {subject}",
-            message=render_to_string(
-                "emails/shipping_acs/pickup_list_refused.txt", context
-            ),
-            from_email=tenant_from_email() or None,
-            recipient_list=recipients,
-            html_message=render_to_string(
-                "emails/shipping_acs/pickup_list_refused.html", context
-            ),
-        )
-    except Exception as exc:
-        # Never let a mail failure mask the underlying problem: the
-        # caller still raises, and the ERROR log already names the
-        # vouchers.
-        logger.exception("ACS pickup-list refusal alert: failed to send")
-        return {"alerted": 0, "error": str(exc)}
-
-    return {"alerted": len(rows)}
-
-
 def _alert_unprinted_vouchers(
     rows: list[dict], *, blocked: bool, acs_message: str = ""
 ) -> dict[str, Any]:
@@ -569,28 +483,21 @@ def issue_daily_acs_pickup_list(self) -> dict[str, Any]:
     try:
         pickup_list = AcsService.issue_daily_pickup_list()
     except AcsAPIError as exc:
-        # The manifest did not go out. The service has already logged
-        # ACS's reason; turn it into something the merchant actually
-        # sees, naming the orders to print, then re-raise so the task
-        # still fails.
+        # The manifest did not go out AND a live parcel was waiting —
+        # the service returns None instead of raising when every
+        # candidate is a voucher ACS will never collect. The service has
+        # already logged ACS's reason and named the vouchers; the email
+        # exists only to add what a log cannot, which is the list of
+        # orders whose labels need printing. When ACS names nothing
+        # unprinted there is no such list and no email: the ERROR log
+        # and the failed task row are the record, and a dead voucher is
+        # reported by ``check_stale_acs_shipments``, not from here.
         unprinted = (exc.raw or {}).get("Unprinted_Vouchers") or []
-        rows = _unprinted_rows(unprinted)
-        if rows:
-            _alert_unprinted_vouchers(
-                rows,
-                blocked=True,
-                acs_message=exc.error_message,
-            )
-        else:
-            # ACS refused while naming no unprinted voucher, and none is
-            # unprinted locally either. The alert above returns early on
-            # an empty list, so this used to send nothing at all: the
-            # task failed on 2026-09-10 and 09-11 with every label
-            # printed and nobody was told.
-            _alert_pickup_list_refused(
-                _pickup_candidate_rows(),
-                acs_message=exc.error_message,
-            )
+        _alert_unprinted_vouchers(
+            _unprinted_rows(unprinted),
+            blocked=True,
+            acs_message=exc.error_message,
+        )
         raise
 
     if pickup_list is None:

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
+
 import pytest
 from django.utils import timezone
 
@@ -880,6 +882,116 @@ class TestIssueDailyPickupList:
             "manifest — the count alone cannot be acted on"
         )
         assert f"order #{shipment.order_id}" in logged
+
+    def test_a_day_of_only_dead_vouchers_is_a_noop_not_a_failure(
+        self, monkeypatch, caplog
+    ):
+        """ACS is right when it says nothing is eligible.
+
+        The call takes a DATE and no voucher list — ACS chooses the
+        vouchers, scoped by Pickup_Date. A voucher minted days ago and
+        never scanned is not eligible for today's list and never will
+        be, so a null PickupList_No with Unprinted_Found=0 is the
+        documented "nothing eligible" answer, not a refusal.
+
+        Production 2026-09-10 and 09-11: the only candidate was voucher
+        9803334192 (minted 09-01, never scanned). Treating that as a
+        failure produced two days of red Celery tasks and an alert email
+        over a parcel that did not exist. ``check_stale_acs_shipments``
+        already owns dead rows like it.
+        """
+        import logging
+
+        dead = self._candidate("9803334192", printed_at=timezone.now())
+        AcsShipment.objects.filter(pk=dead.pk).update(
+            created_at=timezone.now() - timedelta(days=9), last_event_at=None
+        )
+        self._client_returning(
+            monkeypatch,
+            {"PickupList_No": None, "Unprinted_Found": 0, "Error_Message": ""},
+        )
+
+        with caplog.at_level(logging.WARNING, logger="shipping_acs.services"):
+            result = AcsService.issue_daily_pickup_list()
+
+        assert result is None, (
+            "a day whose only candidate is a voucher ACS will never "
+            "collect raised instead of doing nothing"
+        )
+        logged = " | ".join(
+            r.getMessage()
+            for r in caplog.records
+            if r.name == "shipping_acs.services"
+        )
+        assert "9803334192" in logged, (
+            "the no-op has to name the dead voucher, or the reason the "
+            "manifest is empty is invisible"
+        )
+        assert f"order #{dead.order_id}" in logged
+
+    def test_a_reminted_voucher_is_never_treated_as_dead(self, monkeypatch):
+        """``created_at`` dates the row, not the voucher.
+
+        ``reset_shipment_for_remint`` clears ``voucher_no`` and leaves
+        ``created_at`` untouched, so an order cancelled weeks ago and
+        re-minted today carries an old row date. If its previous voucher
+        never scanned, ``last_event_at`` is still NULL — the brand-new
+        voucher would look dead on the day it was issued and its refusal
+        would be swallowed. The reset records the old number in
+        ``metadata["previous_vouchers"]``; that is the signal.
+        """
+        reminted = self._candidate("9806718073", printed_at=timezone.now())
+        AcsShipment.objects.filter(pk=reminted.pk).update(
+            created_at=timezone.now() - timedelta(days=30),
+            last_event_at=None,
+            metadata={"previous_vouchers": ["9803334192"]},
+        )
+        self._client_returning(
+            monkeypatch,
+            {"PickupList_No": None, "Unprinted_Found": 0, "Error_Message": ""},
+        )
+
+        with pytest.raises(AcsAPIError):
+            AcsService.issue_daily_pickup_list()
+
+    def test_one_live_candidate_still_makes_a_refusal_a_failure(
+        self, monkeypatch
+    ):
+        """The suppression above must not swallow a real problem.
+
+        A live voucher among the dead ones means a parcel IS waiting, so
+        ACS declining to issue is a failure that has to be raised.
+        """
+        dead = self._candidate("9803334192", printed_at=timezone.now())
+        AcsShipment.objects.filter(pk=dead.pk).update(
+            created_at=timezone.now() - timedelta(days=9), last_event_at=None
+        )
+        self._candidate("7227891111", printed_at=timezone.now())
+        self._client_returning(
+            monkeypatch,
+            {"PickupList_No": None, "Unprinted_Found": 0, "Error_Message": ""},
+        )
+
+        with pytest.raises(AcsAPIError):
+            AcsService.issue_daily_pickup_list()
+
+    def test_a_recent_voucher_with_no_tracking_yet_is_not_dead(
+        self, monkeypatch
+    ):
+        """Staleness is what makes a voucher dead, not a missing scan.
+
+        A voucher minted this morning has no tracking event either. If
+        that counted as dead, the very first refusal of a real parcel
+        would be silently swallowed.
+        """
+        self._candidate("7227891111", printed_at=timezone.now())
+        self._client_returning(
+            monkeypatch,
+            {"PickupList_No": None, "Unprinted_Found": 0, "Error_Message": ""},
+        )
+
+        with pytest.raises(AcsAPIError):
+            AcsService.issue_daily_pickup_list()
 
     def test_raises_with_acs_message_and_offending_voucher_numbers(
         self, monkeypatch

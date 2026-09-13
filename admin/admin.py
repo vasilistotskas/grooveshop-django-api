@@ -242,7 +242,15 @@ class MyAdminSite(AdminSiteLoginNextMixin, UnfoldAdminSite):
                     "nuxt_patterns": surface.nuxt_patterns,
                 }
             )
-        recent_logs = CachePurgeLog.objects.select_related("actor")[:20]
+        # Scoped to the store doing the reading. The table lives only in
+        # ``public``, so an unscoped query on a tenant host falls through and
+        # shows every store's activity — and, because ``actor`` is a
+        # cross-schema FK, credits it to whoever shares that id in the reading
+        # schema. Rows written before ``schema_name`` existed carry no owner,
+        # so they stay on the control plane rather than being shown to a store
+        # that may not have caused them. ``actor_email`` is read instead of the
+        # FK for the same reason.
+        recent_logs = CachePurgeLog.objects.visible_here()[:20]
         context = {
             **self.each_context(request),
             "groups": sorted(groups.items()),

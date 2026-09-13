@@ -385,19 +385,26 @@ from core.cache.models import CachePurgeLog  # noqa: E402
 class CachePurgeLogAdmin(
     WithheldOnTenantHostModelAdmin, IsSuperuserOnlyModelAdmin, ModelAdmin
 ):
+    # ``actor_email`` rather than ``actor``: this changelist is control-plane
+    # only, where the cross-schema FK does resolve correctly, but showing the
+    # stored string keeps one display that is right in every context and
+    # survives the user row being deleted.
     list_display = (
         "created_at",
-        "actor",
+        "actor_email",
+        "schema_name",
         "surface_summary",
         "total_django",
         "total_nuxt",
         "total_blocked",
         "dry_run",
     )
-    list_filter = ("dry_run", "created_at")
-    search_fields = ("actor__email", "actor__username")
+    list_filter = ("dry_run", "schema_name", "created_at")
+    search_fields = ("actor_email", "schema_name")
     readonly_fields = (
         "actor",
+        "actor_email",
+        "schema_name",
         "created_at",
         "surfaces",
         "dry_run",

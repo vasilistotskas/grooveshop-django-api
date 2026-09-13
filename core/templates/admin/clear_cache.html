@@ -171,7 +171,8 @@
                     {% for log in recent_logs %}
                     <tr>
                         <td class="px-4 py-2 text-gray-700 dark:text-gray-300 whitespace-nowrap">{{ log.created_at|date:"Y-m-d H:i:s" }}</td>
-                        <td class="px-4 py-2 text-gray-700 dark:text-gray-300">{{ log.actor|default:"—" }}</td>
+                        {# actor_email, never the FK: this table lives only in the public schema, so resolving `actor` from a tenant host names whoever shares that id there. #}
+                        <td class="px-4 py-2 text-gray-700 dark:text-gray-300">{{ log.actor_email|default:"—" }}</td>
                         <td class="px-4 py-2 text-gray-700 dark:text-gray-300">{{ log.surfaces|join:", " }}</td>
                         <td class="px-4 py-2 text-right text-gray-900 dark:text-white">{{ log.total_django }}</td>
                         <td class="px-4 py-2 text-right text-gray-900 dark:text-white">{{ log.total_nuxt }}</td>

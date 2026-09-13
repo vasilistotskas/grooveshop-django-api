@@ -231,9 +231,17 @@ class CacheService:
             from core.cache.models import CachePurgeLog
         except Exception:  # pragma: no cover — model unavailable
             return
+        from django.db import connection
+
+        resolved_actor = actor if actor and actor.is_authenticated else None
         try:
             CachePurgeLog.objects.create(
-                actor=actor if actor and actor.is_authenticated else None,
+                actor=resolved_actor,
+                # Captured now, while the identity and the schema are both
+                # unambiguous. Reading either back later is what produced
+                # cross-tenant rows attributed to the wrong person.
+                actor_email=getattr(resolved_actor, "email", "") or "",
+                schema_name=getattr(connection, "schema_name", "") or "",
                 surfaces=[s.code for s in report.surfaces],
                 dry_run=report.dry_run,
                 # The operator-facing figures: what a real run removed,

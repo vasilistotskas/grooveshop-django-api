@@ -3,6 +3,86 @@
 
 
 
+## v3.58.0 (2026-09-13)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.57.2 [skip ci] ([`d67a2ad`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d67a2ad29ebd478371c204f06ba8e025d1286794))
+
+### Features
+
+* feat(acs): print every outstanding label in one job
+
+ACS refuses the whole daily manifest while ANY voucher on it is
+unprinted and cannot issue a partial one, so the operation that
+unblocks a pickup list is "print everything outstanding". There was no
+way to do it: the only label download is a per-order button, so a
+merchant with eight waiting vouchers opens eight change pages and the
+one they miss blocks the other seven. That is how voucher 9803334192
+sat unprinted from 2026-09-01.
+
+AcsService.fetch_labels_pdf merges the labels into one document — ACS
+has no bulk print alias, ACS_Print_Voucher takes a single Voucher_No
+and no other alias in the manual prints more than one, so the
+concatenation is ours. One file is one print job on the thermal roll.
+Each call is already cached for an hour by fetch_label_bytes, and
+downloading stamps label_printed_at through that same choke point, so
+the 15:45 pre-flight and the 16:30 manifest see the same truth as the
+per-order button.
+
+A voucher that fails is collected and named, never raised: one bad row
+must not stop the rest from printing, which is the same all-or-nothing
+failure the manifest itself taught us. An empty merge returns no
+download rather than a valid PDF of nothing, which would read as a
+successful print.
+
+The changelist action pairs with the existing label_printed_at /
+EmptyFieldListFilter to select exactly the unprinted ones.
+
+Adds pypdf: WeasyPrint is already a dependency but renders HTML to PDF
+and cannot concatenate existing documents.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01HiNVpz9cGfnvaPNwKSKJKd ([`ac990fb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ac990fbefddc51564948bc7c4c520311b2be2380))
+
+* feat(tenant): per-tenant From address, gated on domain verification
+
+DEFAULT_FROM_EMAIL is the platform-wide sender, and tenant_from_email()
+builds "{store name}" <DEFAULT_FROM_EMAIL> for EVERY tenant. In
+production it was set to info@webside.gr — tenant #1's own address — so
+Εκ Φύσεως Φυτειάς, Demo and Delta Sigma all sent mail under tenant #1's
+domain, on a relay (smtp.gmail.com) that webside.gr authorises for
+neither SPF nor DKIM. Every tenant's mail failed DMARC, which is why
+order #286's confirmation never arrived and why the 2026-09-04 stale
+shipment digest was never seen.
+
+Tenant.from_email has existed all along, reserved for exactly this.
+Make it live, but only when the platform has confirmed the store's
+domain is authenticated on the relay:
+
+from_email + from_email_verified -> "Store" <orders@store.gr>
+anything else -> "Store" <DEFAULT_FROM_EMAIL>
+no tenant context -> DEFAULT_FROM_EMAIL
+
+The flag is the safety property, not bureaucracy: an address the relay
+holds no DKIM key for fails alignment on every message, silently, and
+looks like a platform bug. So it is platform-only — from_email stays in
+TENANT_SELF_EDITABLE_FIELDS (a merchant may propose an address) while
+from_email_verified is deliberately absent from it (only the platform
+may certify one). The allowlist makes that the default for new fields;
+the test pins it so a later edit cannot quietly grant it.
+
+Two existing tests encoded the old invariant on purpose and are
+rewritten rather than worked around: the "never uses a merchant
+address" case now pins the UNVERIFIED half, which is still true, and
+the help-text test now requires the text to name the gate.
+
+DEFAULT_FROM_EMAIL must now be a platform address. Changing it is an
+infrastructure change, not a code one.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01HiNVpz9cGfnvaPNwKSKJKd ([`80673b0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/80673b053a61ee513750e3b988f482481c751a54))
+
 ## v3.57.2 (2026-09-13)
 
 ### Bug fixes

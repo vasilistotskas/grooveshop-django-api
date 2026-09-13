@@ -3,6 +3,52 @@
 
 
 
+## v3.58.1 (2026-09-13)
+
+### Bug fixes
+
+* fix(admin): stop the cache panel showing one store another store's purges
+
+The Cache page's "recent purges" panel was unscoped, and the page is reachable
+by any store's Admin or Owner — it uses admin_view, not a superuser gate. The
+table lives only in public (core is SHARED_APPS), so a tenant host's search
+path fell through to it and every merchant saw every merchant's activity.
+
+The misattribution was the worse half. actor is a cross-schema FK, so reading
+it from a tenant schema resolves the id against THAT schema's user table.
+Measured in production: actor id 2 is the platform operator in public and an
+unrelated shopper (is_staff=False) in a tenant schema, so a merchant's audit
+panel credited its own customer with a purge it never made. An audit row that
+names the wrong person is worse than one that names nobody.
+
+Both halves are fixed at write time, because neither is recoverable at read
+time: schema_name records which store issued the purge, and actor_email records
+who, so the display never resolves the FK. CachePurgeLog.objects.visible_here()
+carries the rule, so the view and the tests exercise the same code. Rows
+predating the field have no recoverable owner and stay on the control plane
+rather than being shown to a store that may not have caused them.
+
+The changelist keeps the stored address too: it is control-plane only, where
+the FK does resolve, but one display that is right everywhere beats two.
+
+Both AddFields are additive with defaults and the backfill is elidable, so the
+old code keeps running against the new schema — required, since the PreSync
+hook migrates before the new image rolls.
+
+Purging itself was never affected: CustomCache._make_pattern builds the SCAN
+pattern through make_key, so it already embeds the active schema. Verified from
+two tenants in production.
+
+Tests mutation-tested: removing the scoping, the email capture, or the template
+change each fails a test.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01E49g57McYfMRwbDVyyxAvw ([`762d416`](https://github.com/vasilistotskas/grooveshop-django-api/commit/762d416cbce637385748fa30ce42e421a3321d6d))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.58.0 [skip ci] ([`b5cf5b0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b5cf5b02108c0f7f490633f6edaeb4721fba9d12))
+
 ## v3.58.0 (2026-09-13)
 
 ### Chores

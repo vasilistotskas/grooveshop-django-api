@@ -615,6 +615,7 @@ class TenantAdmin(ModelAdmin):
             {
                 "fields": [
                     "from_email",
+                    "from_email_verified",
                     "contact_email",
                 ],
                 "classes": ["collapse"],

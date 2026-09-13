@@ -395,14 +395,14 @@ class TestBoxNowCredentials:
 
 
 class TestTenantFromEmail:
-    def test_tenant_from_email_never_uses_merchant_address_as_from(
+    def test_an_unverified_merchant_address_is_never_used_as_from(
         self, bind_tenant, tenant_factory, settings
     ):
-        """DMARC safety: mail leaves through the platform relay, so a
-        merchant address in From would fail the merchant domain's
-        SPF/DKIM alignment. The tenant brand rides the DISPLAY NAME on
-        the platform-authenticated address; Tenant.from_email is
-        reserved for a future per-tenant transport."""
+        """DMARC safety: the relay can only sign for domains it has a
+        DKIM key for. An address the platform has not verified would
+        fail the merchant domain's alignment, so the tenant brand rides
+        the DISPLAY NAME on the platform-authenticated address instead.
+        Setting from_email alone must change nothing."""
         tenant = tenant_factory("email-from-1")
         tenant.from_email = "shop@brand.com"
         tenant.store_name = "Brand Shop"
@@ -411,6 +411,36 @@ class TestTenantFromEmail:
         settings.DEFAULT_FROM_EMAIL = "noreply@platform.com"
         assert tenant_from_email() == "Brand Shop <noreply@platform.com>"
         assert "shop@brand.com" not in tenant_from_email()
+
+    def test_a_verified_merchant_address_becomes_the_from(
+        self, bind_tenant, tenant_factory, settings
+    ):
+        """The white-label case. Once the platform has authenticated the
+        store's domain on the relay, the relay holds a DKIM key for it,
+        so the merchant's own address is both usable and preferable —
+        customers see the shop's domain, not the platform's."""
+        tenant = tenant_factory("email-from-verified")
+        tenant.from_email = "orders@brand.com"
+        tenant.from_email_verified = True
+        tenant.store_name = "Brand Shop"
+        tenant.save()
+        bind_tenant(tenant)
+        settings.DEFAULT_FROM_EMAIL = "noreply@platform.com"
+        assert tenant_from_email() == "Brand Shop <orders@brand.com>"
+
+    def test_the_flag_alone_does_nothing_without_an_address(
+        self, bind_tenant, tenant_factory, settings
+    ):
+        """Verified but blank must not produce "Store <>", which is not
+        a valid RFC 5322 address."""
+        tenant = tenant_factory("email-from-flag-only")
+        tenant.from_email = ""
+        tenant.from_email_verified = True
+        tenant.store_name = "Flag Only"
+        tenant.save()
+        bind_tenant(tenant)
+        settings.DEFAULT_FROM_EMAIL = "noreply@platform.com"
+        assert tenant_from_email() == "Flag Only <noreply@platform.com>"
 
     def test_falls_back_to_settings(
         self, bind_tenant, tenant_factory, settings

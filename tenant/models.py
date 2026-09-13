@@ -666,11 +666,25 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         blank=True,
         default="",
         help_text=_(
-            "Reserved for a future per-tenant SMTP transport — NOT "
-            "currently used. All mail is sent from the platform address "
-            "with your store name as the display name, which is what "
-            "keeps it DMARC-aligned. Set Contact Email instead: that is "
-            "the reply-to address customers actually reach you on."
+            "Your own sender address, e.g. orders@your-domain.gr. It "
+            "takes effect only once the platform ticks From Email "
+            "Verified, which happens after your domain is authenticated "
+            "on the mail relay. Until then mail goes out from the "
+            "platform address with your store name as the display name. "
+            "Set Contact Email too: that is the reply-to address "
+            "customers actually reach you on."
+        ),
+    )
+    from_email_verified = models.BooleanField(
+        _("From Email verified"),
+        default=False,
+        help_text=_(
+            "Tick ONLY once this store's sending domain is authenticated "
+            "on the platform mail relay — SPF and DKIM published and "
+            "confirmed by the relay. Until then From Email is ignored "
+            "and the platform address is used, because that is the only "
+            "domain the relay can sign for. Ticking this early makes "
+            "every message from this store fail DMARC and land in spam."
         ),
     )
     contact_email = models.EmailField(

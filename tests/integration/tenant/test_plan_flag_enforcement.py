@@ -146,8 +146,26 @@ class TestMerchantCannotSetDivergentFields:
 
         assert "default_currency" not in TENANT_SELF_EDITABLE_FIELDS
 
-    def test_from_email_help_text_does_not_promise_it_works(self):
+    def test_from_email_help_text_names_the_verification_gate(self):
+        """A merchant who sets From Email and sees nothing change needs
+        the help text to say why, or they will assume it is broken."""
         from tenant.models import Tenant
 
         help_text = str(Tenant._meta.get_field("from_email").help_text)
-        assert "NOT" in help_text or "not currently used" in help_text.lower()
+        assert "verified" in help_text.lower()
+
+    def test_the_from_email_verification_flag_is_platform_only(self):
+        """A store operator may PROPOSE a sender address but must not be
+        able to certify it.
+
+        ``from_email`` only takes effect once ``from_email_verified`` is
+        set, and that flag asserts something only the platform knows:
+        that the store's domain is authenticated on the mail relay. A
+        merchant who could tick it would send every message from a
+        domain the relay has no DKIM key for — failing DMARC on all of
+        it, silently, and looking like a platform bug.
+        """
+        from tenant.role_scopes import TENANT_SELF_EDITABLE_FIELDS
+
+        assert "from_email" in TENANT_SELF_EDITABLE_FIELDS
+        assert "from_email_verified" not in TENANT_SELF_EDITABLE_FIELDS

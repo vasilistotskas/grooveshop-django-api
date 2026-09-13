@@ -124,12 +124,12 @@ TENANT_SELF_EDITABLE_FIELDS: frozenset[str] = frozenset(
         "store_name",
         "store_description",
         "contact_email",
-        # Inert today — the platform relay always sends as
-        # DEFAULT_FROM_EMAIL with the store name as display name, for
-        # DMARC alignment (tenant/credentials.py). Kept editable so a
-        # merchant's value is already in place when the per-tenant
-        # transport it is reserved for lands; its help_text now says
-        # plainly that it does nothing yet.
+        # A merchant may PROPOSE their own sender address; only the
+        # platform can certify it. ``from_email`` takes effect solely
+        # when ``from_email_verified`` is set, and that flag is NOT in
+        # this allowlist — so a store operator cannot make their own
+        # mail go out from a domain the relay has no DKIM key for,
+        # which would fail DMARC on every message (tenant/credentials.py).
         "from_email",
         "default_locale",
         # ``default_currency`` is deliberately NOT merchant-editable.

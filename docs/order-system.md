@@ -269,6 +269,24 @@ Each carrier implements `ShippingCarrierInterface` in
   event arrives. Dead vouchers are retired by a human via the admin
   action "Retire selected shipments" (local CANCELED — stops the
   poller; does not call `ACS_Delete_Voucher`).
+- Manifest pre-flight: ACS refuses the whole pickup list while ANY
+  voucher on it is unprinted, so "print everything outstanding" is the
+  operation that unblocks it. The shipment changelist action "Print
+  labels for selected shipments" returns ONE merged PDF (ACS has no
+  bulk print alias — `ACS_Print_Voucher` takes a single `Voucher_No`,
+  so `AcsService.fetch_labels_pdf` concatenates them); pair it with the
+  `Label printed at` / empty filter. A voucher that fails is reported
+  and the rest still print. Downloading stamps `label_printed_at`
+  through the same `fetch_label_bytes` choke point as the per-order
+  button.
+- An "empty day" is not a refusal. `ACS_Issue_Pickup_List` takes a date
+  and no voucher list — ACS picks the vouchers, scoped by
+  `Pickup_Date` — so when every local candidate is a dead voucher (no
+  tracking event, older than `ACS_STALE_SHIPMENT_DAYS`, and not the
+  product of a re-mint) the service logs them at WARNING and returns
+  `None` instead of raising. One live candidate still makes a refusal a
+  failure. Those dead rows are reported by `check_stale_acs_shipments`,
+  which owns them; this path deliberately does not send a second alert.
 
 ### 5.2 BoxNow (`shipping_boxnow/`)
 

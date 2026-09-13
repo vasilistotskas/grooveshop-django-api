@@ -9,8 +9,10 @@ from __future__ import annotations
 import logging
 
 from django.contrib import admin, messages
+from django.http import HttpResponse
 from django.shortcuts import redirect
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import StackedInline, TabularInline
@@ -209,7 +211,11 @@ class AcsShipmentAdmin(BaseModelAdmin):
     # page they already work on, next to the "not printed" filter.
     actions_list = ["issue_pickup_list_now"]
     actions_row = ["repoll_tracking", "issue_voucher_now"]
-    actions = ["bulk_repoll_tracking", "retire_shipments"]
+    actions = [
+        "bulk_print_labels",
+        "bulk_repoll_tracking",
+        "retire_shipments",
+    ]
     list_select_related = ("order", "pickup_list")
 
     shipment_state_label = choice_label(
@@ -217,6 +223,72 @@ class AcsShipmentAdmin(BaseModelAdmin):
         variants=SHIPMENT_STATE_VARIANT,
         description=_("State"),
     )
+
+    @action(
+        description=str(_("Print labels for selected shipments")),
+        icon="print",
+        variant=ActionVariant.PRIMARY,
+    )
+    def bulk_print_labels(self, request, queryset):
+        """Download one merged PDF of the selected shipments' labels.
+
+        ACS refuses the whole daily manifest while any voucher on it is
+        unprinted, so the operation that unblocks a pickup list is
+        "print everything outstanding" — and until this action existed
+        that meant opening each order in turn, which is how a voucher
+        gets missed. Pair it with the ``Label printed at``/``empty``
+        filter on this changelist to select exactly the unprinted ones.
+
+        Downloading stamps ``label_printed_at`` through the same
+        ``fetch_label_bytes`` choke point as the per-order button, so
+        the pre-flight warning and the manifest see the same truth.
+        """
+        from shipping_acs.services import AcsService
+
+        shipments = list(queryset.order_by("order_id"))
+        pdf_bytes, failures = AcsService.fetch_labels_pdf(shipments)
+
+        for failure in failures:
+            self.message_user(
+                request,
+                _(
+                    "Could not print voucher %(voucher)s (order #%(order)s): "
+                    "%(error)s"
+                )
+                % {
+                    "voucher": failure["voucher_no"] or "—",
+                    "order": failure["order_id"],
+                    "error": failure["error"],
+                },
+                messages.ERROR,
+            )
+
+        if not pdf_bytes:
+            # Every selected voucher failed; the per-failure messages
+            # above already say which and why. Returning None leaves the
+            # admin on the changelist with those errors displayed.
+            return None
+
+        if failures:
+            self.message_user(
+                request,
+                _(
+                    "Printed %(ok)d of %(total)d selected label(s); "
+                    "%(failed)d could not be fetched."
+                )
+                % {
+                    "ok": len(shipments) - len(failures),
+                    "total": len(shipments),
+                    "failed": len(failures),
+                },
+                messages.WARNING,
+            )
+
+        filename = f"acs-labels-{timezone.localdate().isoformat()}.pdf"
+        response = HttpResponse(pdf_bytes, content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        response["Content-Length"] = str(len(pdf_bytes))
+        return response
 
     @action(
         description=str(_("Re-poll tracking for selected shipments")),

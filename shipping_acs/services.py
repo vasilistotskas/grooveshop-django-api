@@ -11,8 +11,10 @@ from __future__ import annotations
 
 import hashlib
 import logging
+from collections.abc import Iterable
 from datetime import date, datetime, timedelta
 from decimal import Decimal
+from io import BytesIO
 from typing import TYPE_CHECKING, Any
 
 from django.conf import settings
@@ -1653,6 +1655,76 @@ class AcsService:
             return
         shipment.label_printed_at = timezone.now()
         shipment.save(update_fields=["label_printed_at", "updated_at"])
+
+    @classmethod
+    def fetch_labels_pdf(
+        cls, shipments: Iterable[AcsShipment]
+    ) -> tuple[bytes, list[dict[str, Any]]]:
+        """Merge the labels for ``shipments`` into one printable PDF.
+
+        ACS has no bulk print — ``ACS_Print_Voucher`` takes a single
+        ``Voucher_No``, and no other alias in the manual prints more
+        than one — so this is N calls, each already cached for an hour
+        by :meth:`fetch_label_bytes`, concatenated on our side. One file
+        is one print job on the thermal roll, which is the point: ACS
+        refuses the daily manifest while ANY voucher on it is unprinted,
+        so "print everything outstanding" is the operation that actually
+        unblocks a pickup list, and doing it one order at a time is how
+        a voucher gets missed.
+
+        A voucher that fails is collected and reported, never raised.
+        One bad row must not stop the others from printing — that is the
+        exact failure shape this whole path exists to avoid. Returns
+        ``(pdf_bytes, failures)``; ``pdf_bytes`` is empty only when every
+        voucher failed.
+        """
+        from pypdf import PdfReader, PdfWriter
+
+        writer = PdfWriter()
+        failures: list[dict[str, Any]] = []
+
+        for shipment in shipments:
+            if not shipment.voucher_no:
+                failures.append(
+                    {
+                        "shipment_id": shipment.pk,
+                        "order_id": shipment.order_id,
+                        "voucher_no": "",
+                        "error": "no voucher minted yet",
+                    }
+                )
+                continue
+            try:
+                pdf = cls.fetch_label_bytes(shipment)
+                for page in PdfReader(BytesIO(pdf)).pages:
+                    writer.add_page(page)
+            except Exception as exc:
+                logger.exception(
+                    "fetch_labels_pdf: voucher %s (order #%s) could not be "
+                    "printed — continuing with the rest",
+                    shipment.voucher_no,
+                    shipment.order_id,
+                )
+                failures.append(
+                    {
+                        "shipment_id": shipment.pk,
+                        "order_id": shipment.order_id,
+                        "voucher_no": shipment.voucher_no,
+                        "error": str(exc),
+                    }
+                )
+
+        if not writer.pages:
+            return b"", failures
+
+        buffer = BytesIO()
+        writer.write(buffer)
+        logger.info(
+            "fetch_labels_pdf: merged %s label page(s), %s failure(s)",
+            len(writer.pages),
+            len(failures),
+        )
+        return buffer.getvalue(), failures
 
     @classmethod
     def fetch_pickup_list_pdf(cls, pickup_list: AcsPickupList) -> bytes:

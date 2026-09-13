@@ -63,6 +63,7 @@ dependencies = [
   "facebook-business==26.0.1",
   "uvicorn-worker>=0.4.0",
   "websockets>=17.0.1",
+  "pypdf>=6.0",
 ]
 
 [project.urls]

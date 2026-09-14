@@ -1,322 +1,105 @@
-# Email Template Management System
+# Email template preview
 
-A fully dynamic, configuration-driven email template management system for GrooveShop.
+The admin tool that renders any transactional email the platform ships, in
+any of the configured languages, against sample data or a real order.
 
-## Quick Start
+**Nothing in this package sends email.** Sending lives with the domain that
+owns the event — `order/notifications.py`, `order/tasks.py`, `b2b/tasks.py`,
+`giftcard/tasks.py`, `product/tasks.py`, `tenant/billing.py`,
+`shipping/alerts.py`, `shipping_acs/tasks.py`, `shipping_boxnow/tasks.py`,
+`contact/tasks.py`, `user/tasks.py`, `core/tasks.py` — each building its own
+subject and context. This package is read-only tooling for humans.
 
-### View Templates in Admin
+Mounted at `admin/email-templates/` (locale-prefixed) on a **store** admin
+host only; the views query `Order`, which lives in TENANT_APPS. Every view is
+wrapped in `admin.site.admin_view` — `urls.py`'s module docstring explains why
+`staff_member_required` is not enough here.
 
-Navigate to: `http://localhost:8000/admin/email-templates/management/`
+The merchant-facing guide to this page is published (both languages) at
+`docs.grooveshop.space/admin/storefront/email-templates`; it is the one to
+update when the page's behaviour changes.
 
-## Architecture
+## Files
 
-```
-core/email/
-├── config.py              # ⭐ Central configuration (START HERE)
-├── preview_service.py     # Template rendering service
-├── registry.py            # Template discovery
-├── sample_data.py         # Sample data generators
-├── admin_views.py         # Admin interface views
-├── urls.py               # URL routing
-├── CONFIGURATION_GUIDE.md # Complete guide for adding templates
-├── ADMIN_GUIDE.md         # Admin interface usage guide
-├── DOCUMENTATION_INDEX.md # Documentation map
-└── README.md             # This file
-```
+| File | Role |
+|---|---|
+| `registry.py` | Discovers templates by walking `core/templates/emails/`. |
+| `preview_service.py` | Renders one template against a context. |
+| `sample_data.py` | Made-up orders/users/subscriptions for previews. |
+| `config.py` | Optional per-template metadata for the preview list. |
+| `admin_views.py`, `urls.py` | The page and its AJAX endpoints. |
 
-## Key Features
+## Discovery follows the filesystem, not the config
 
-### ✅ Configuration-Driven
-- All template metadata in one place (`config.py`)
-- No hardcoded logic
-- Easy to extend
+Every `.html` under `core/templates/emails/` except `base/` (the shared
+layout) is treated as a sendable template and appears in the admin list. A
+template needs **no** entry in `config.py` to be discovered, previewed, or
+sent.
 
-### ✅ Multi-Category Support & Auto-Discovery
-- Order templates (`order/`)
-- Subscription templates (`subscription/`)
-- User management templates (`user/`)
-- Auto-discovers templates based on directory structure
-- Easy to add new categories
+`config.py` only supplies nicer metadata for the templates listed in it: a
+written description, an order-status association, and a preview subject.
+Anything absent falls back to its directory as the category, the description
+`"Email template"`, and `is_used=True` (see `registry.py`).
 
-### ✅ Dynamic Context Generation
-- Automatic context selection based on template
-- Sample data for previews
-- Real data support (e.g., actual orders)
+This is the part that has broken before. Discovery used to iterate the three
+*configured* categories while nine directories existed on disk, so whole
+categories were invisible in the admin UI, and preview resolution inferred a
+directory from the template *name*, which only works for `order_` and
+`subscription_` prefixes. `tests/integration/core/email/test_registry_alignment.py`
+now fails if any template on disk is not discovered.
 
-### ✅ Flexible Subject Lines
-- Template-based subjects with variable substitution
-- Example: `"Order #{order[id]} - {order[status]}"`
-- No hardcoded subject maps
+## `config.py` is preview-only
 
-### ✅ Admin Interface
-- Visual template preview
-- Search functionality (Ctrl+K)
-- Collapsible categories
-- Smart data source selection (Real Order only for order templates)
-- Real-time rendering
-- Sample and real data support
+`EmailTemplateConfig` is imported by `registry.py` and `preview_service.py`
+and nowhere else. In particular, `subject_template` is the subject the
+**preview** displays — never what a customer receives. Real subjects are
+built and translated by the sending task. Adding a template to `config.py`
+changes this admin page and nothing about the mail that goes out.
 
-## Adding a New Template
+## Adding a template
 
-### 1. Create Template Files
+1. Put `<name>.html` (and a `<name>.txt` twin) in the right directory under
+   `core/templates/emails/`. It is discoverable at the next process start.
+2. Send it from the task that owns the event, with its own subject and
+   context.
+3. Optionally add a `TemplateConfig` entry so the admin list shows a real
+   description and preview subject instead of the placeholder.
 
-```html
-<!-- core/templates/emails/user/welcome.html -->
-<!DOCTYPE html>
-<html>
-<body>
-    <h1>Welcome, {{ user.first_name }}!</h1>
-    <p>Thanks for joining!</p>
-</body>
-</html>
-```
+Autoescaping applies to `.txt` templates too: an admin-authored HTML field
+must be rendered `{{ field_text|safe }}` from a pre-stripped value, never
+escaped. See the root `CLAUDE.md` note on transactional email rendering.
 
-### 2. Add Configuration
+### Adding a directory
 
-Edit `config.py`:
+A new directory is picked up on its own and titled from its name
+(`shipping_acs` → "Shipping Acs"). Add a `TemplateCategory` to `CATEGORIES`
+only to give it a better display name or a different preview context
+generator. Generators are registered in `preview_service`'s `generator_map`,
+which today knows `generate_order_context`, `generate_subscription_context`
+and `generate_user_context`, and falls back to order context.
 
-```python
-# In EmailTemplateConfig.TEMPLATES dict:
+## Preview subject placeholders
 
-"welcome": TemplateConfig(
-    name="welcome",
-    category_name="User Management",
-    description="Welcome email for new users",
-    subject_template="Welcome, {user[first_name]}!",
-    is_used=True,
-    context_keys=["user"],
-    # order_statuses is optional - only needed for order templates
-),
-```
+`subject_template` substitutes `{key}` and `{key[subkey]}` from the preview
+context — `"Your Order #{order[id]} Has Shipped"`.
 
-### 3. Done!
+## Caching
 
-That's it! The template is now:
-- Discoverable in admin
-- Previewable with sample data
-- Has correct subject line
-- Uses appropriate context
+`EmailTemplateRegistry` discovers once per process and caches on the class. A
+template added by a release shows up after a restart, not immediately; tests
+call `EmailTemplateRegistry.clear_cache()`.
 
-## Configuration Structure
-
-### Template Configuration
-
-```python
-TemplateConfig(
-    name="template_name",  # File name without extension
-    category_name="Category Name",  # Display category
-    description="What this does",  # Description
-    subject_template="Subject {var}",  # Subject with variables
-    order_statuses=[],  # Related order statuses
-    is_used=True,  # Is actively used?
-    context_keys=["key1", "key2"],  # Required context variables
-)
-```
-
-### Category Configuration
-
-```python
-TemplateCategory(
-    name="Category Name",  # Display name
-    path="subdirectory",  # Path (empty for root)
-    context_generator="method_name",  # Context generator method
-    templates={},  # Auto-populated
-)
-```
-
-## Context Generators
-
-Available context generators:
-
-- `generate_order_context` - Order data (order, items, tracking)
-- `generate_subscription_context` - Subscription data
-- `generate_user_context` - User data
-
-### Adding a Custom Generator
-
-1. Add method to `preview_service.py`:
-
-```python
-def _get_sample_custom_context(self) -> dict:
-    return {
-        "custom_data": {...},
-        "user": {...},
-    }
-```
-
-2. Register in `_get_context_data_for_category`:
-
-```python
-generator_map = {
-    # ... existing generators
-    "generate_custom_context": lambda: (
-        self._get_sample_custom_context(),
-        True,
-    ),
-}
-```
-
-3. Use in category configuration:
-
-```python
-"custom": TemplateCategory(
-    name="Custom",
-    path="custom",
-    context_generator="generate_custom_context",
-    templates={},
-),
-```
-
-## Subject Line Variables
-
-Subject templates support variable substitution:
-
-### Simple Variables
-```python
-"Welcome, {user[first_name]}!"
-# → "Welcome, John!"
-```
-
-### Nested Access
-```python
-"Order #{order[id]} - {order[status]}"
-# → "Order #12345 - Shipped"
-```
-
-### Multiple Variables
-```python
-"{user[first_name]}, your {subscription[plan]} is active!"
-# → "John, your Premium is active!"
-```
-
-## Testing
+## Tests
 
 ```bash
-uv run pytest tests/unit/core/email/ tests/integration/core/email/
+uv run pytest tests/unit/core/email tests/integration/core/email
 ```
 
-- `tests/unit/core/email/test_registry.py` - template discovery/registry
-- `tests/unit/core/email/test_sample_data.py` - sample context generators
-- `tests/integration/core/email/test_preview_service.py` - preview rendering
-
-## Admin Interface
-
-### Features
-
-- **Template List** - All templates grouped by category
-- **Live Preview** - Real-time HTML/text preview
-- **Sample Data** - Preview with generated sample data
-- **Real Data** - Preview with actual order data
-- **Subject Preview** - See formatted subject lines
-- **Category Filter** - Filter by template category
-
-### URL Endpoints
-
-- `/admin/email-templates/management/` - Main interface
-- `/admin/email-templates/preview/` - AJAX preview endpoint
-- `/admin/email-templates/info/<name>/` - Template info
-- `/admin/email-templates/order/<id>/` - Order data
-
-## Directory Structure
-
-```
-core/templates/emails/
-├── base/
-│   └── email_base.html          # Base template
-├── order/
-│   ├── order_shipped.html
-│   ├── order_shipped.txt
-│   └── ...
-├── subscription/
-│   ├── confirmation.html
-│   └── ...
-├── user/
-│   ├── inactive_user_email_template.html
-│   └── ...
-└── ...
-```
-
-## Best Practices
-
-### 1. Naming Conventions
-- Template files: `snake_case.html`
-- Categories: `PascalCase` for display
-- Context generators: `generate_*_context`
-
-### 2. Context Keys
-Always document required context keys:
-```python
-context_keys = ["user", "order", "items"]
-```
-
-### 3. Subject Templates
-Keep subjects concise and use clear variable names:
-```python
-subject_template = "Order #{order[id]} Update"  # ✅ Good
-subject_template = (
-    "Your order {order[id]} has been {order[status]}"  # ❌ Too long
-)
-```
-
-### 4. Categories
-Group related templates logically:
-- Order lifecycle → "Order Lifecycle"
-- Shipping updates → "Shipping"
-- User actions → "User Management"
-
-### 5. Testing
-Always test new templates:
-```bash
-uv run pytest tests/unit/core/email/ tests/integration/core/email/
-```
-
-## Troubleshooting
-
-### Template not appearing
-- Check `config.py` has entry
-- Verify file exists in correct directory
-- Check category path matches directory
-
-### Wrong context
-- Verify `context_generator` in category config
-- Check generator method exists
-- Ensure generator is in `generator_map`
-
-### Subject not formatting
-- Check syntax: `{key[subkey]}`
-- Verify context has required keys
-- Check for typos
-
-### Preview errors
-- Check template syntax
-- Verify all context variables exist
-- Check template path in config
-
-## Documentation
-
-- **CONFIGURATION_GUIDE.md** - Complete guide for adding templates
-- **ADMIN_GUIDE.md** - Admin interface usage guide
-- **DOCUMENTATION_INDEX.md** - Documentation map
-
-## Support
-
-For issues or questions:
-1. Check documentation files
-2. Run test scripts
-3. Review configuration in `config.py`
-4. Check Django logs for errors
-
-## Version History
-
-### v2.0 (Current) - Configuration-Driven
-- ✅ Centralized configuration
-- ✅ Dynamic category system
-- ✅ Template-driven subjects
-- ✅ No hardcoded logic
-- ✅ Easy to extend
-
-### v1.0 (Legacy) - Hardcoded
-- ❌ Scattered configuration
-- ❌ Hardcoded categories
-- ❌ Hardcoded subjects
-- ❌ Difficult to maintain
+| Test | Covers |
+|---|---|
+| `unit/…/test_registry.py` | Discovery and lookup. |
+| `unit/…/test_sample_data.py` | Sample context generators. |
+| `integration/…/test_registry_alignment.py` | Every template on disk is visible. |
+| `integration/…/test_preview_service.py` | Rendering and category resolution. |
+| `integration/…/test_admin_access_control.py` | Per-tenant staff gating. |
+| `integration/…/test_email_theme.py` | Shared layout/theming. |

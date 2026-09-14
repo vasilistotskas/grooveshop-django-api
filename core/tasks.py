@@ -123,9 +123,21 @@ def clear_all_cache_task():
         # ``--all`` is REQUIRED: with no surfaces and no --all the command
         # falls through to its "list available surfaces" branch and purges
         # nothing, while this task still reported success.
-        # Stays a public-schema task (not a fanout) because surface
-        # patterns are raw wildcard scans (e.g. ``*PayWayViewSet_*``) that
-        # bypass the schema key prefix and so already span every tenant.
+        #
+        # SCOPE: this clears the PUBLIC schema only. Beat fires in public
+        # and surface patterns are built through ``make_key``, so
+        # ``CustomCache._make_pattern`` embeds the ACTIVE schema and the
+        # SCAN never leaves it (measured: from ``demo``,
+        # ``cache.keys("*ViewSet_*")`` returns only ``demo:`` keys). A
+        # comment here used to claim the opposite — that the wildcards
+        # bypass the schema prefix and so already span every tenant — and
+        # it was wrong in the direction that matters.
+        #
+        # Tenant caches are therefore NOT cleared by this job; they expire
+        # on DEFAULT_CACHE_TTL, and targeted invalidation goes through
+        # CacheService from the admin. Making this a fanout would start
+        # wiping every store's cache on a schedule, which is a behaviour
+        # change to decide deliberately rather than infer from the name.
         management.call_command("clear_cache", "--all", verbosity=0)
 
         return {"status": "success", "message": "Cache surfaces purged"}

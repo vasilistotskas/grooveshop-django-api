@@ -2,9 +2,10 @@
 
 **Reference for anyone (Claude included) building or operating product
 suggestions.** Keep this file synchronised when a strategy, surface,
-tier or the embedder changes. Cross-references are file paths + line
-anchors; the engine has enough "this is deliberate" pieces that drift
-here is expensive.
+tier or the embedder changes. Cross-references name **files and symbols,
+never line numbers** — the line anchors this file used to carry had all
+drifted by 40+ lines within weeks, pointing at unrelated code. The engine
+has enough "this is deliberate" pieces that drift here is expensive.
 
 Last refresh: 2026-09-11 (design record; research figures verified against Meilisearch v1.53 docs, HF TEI docs, arXiv 2607.21274 and the live cluster on this date). See git log for changes since.
 
@@ -28,7 +29,8 @@ treat **cold start as the normal state, not the edge case**.
 
 What existed before this design: two ad-hoc recommenders — *same
 category, ordered by `view_count`* — computed inline on every cart GET
-(`cart/serializers/cart.py:280`, `cart/serializers/item.py:123`) and
+(the `recommendations` SerializerMethodFields in `cart/serializers/cart.py`
+and `cart/serializers/item.py`) and
 rendered by nothing on the storefront. The engine replaces both **in
 place**, keeping the `recommendations` field names so the OpenAPI
 contract does not move.
@@ -47,7 +49,7 @@ Free tier on its own.
 
 ### 2.2 Strategies are a registry with capability advertising
 
-Mirrors `shipping/interfaces.py:253-283`: an ABC, a `@register_strategy`
+Mirrors the adapter registry in `shipping/interfaces.py`: an ABC, a `@register_strategy`
 class decorator, a module-level `_REGISTRY` populated in
 `AppConfig.ready()`. Every strategy answers `is_available(tenant_ctx)`
 **before** it is asked to suggest — co-purchase declines below a
@@ -76,6 +78,18 @@ by seeds or candidates — and why the executor behind a strategy can
 move ORM → Meilisearch → precomputed table without the contract
 changing. The candidate table is the seam.
 
+> **Status today: nothing is precomputed.** All four shipped strategies
+> (`curated`, `variant_group`, `category`, `popular`) leave `precompute` at
+> its `False` default, so `RecommendationCandidate` is neither written nor
+> read on any live request, and `recompute_all_candidates` — while it exists
+> and works — is **not** in `CELERY_BEAT_SCHEDULE`; there is no nightly pass.
+> The table, the task and the `precompute` branch in `engine.py` are the
+> extension point for the first expensive strategy (vector similarity,
+> order co-occurrence), kept deliberately rather than left behind by one.
+> Anything below describing the offline pass describes that seam, not work
+> the platform currently performs — and scheduling the task is part of
+> shipping such a strategy.
+
 ## 3. Pipeline
 
 ```
@@ -97,7 +111,7 @@ Dispatch is **always** `tenant.celery.dispatch_on_commit(task, kwargs={...})`,
 never a raw `transaction.on_commit`: it captures `connection.schema_name`
 at registration and stamps the `_schema_name` header, because by the
 time a commit hook fires the connection has usually snapped back to
-`public` (`product/signals.py:279-305` is the canonical call site).
+`public` (the `@receiver` in `product/signals.py` is the canonical call site).
 PKs only, kwargs only, primitives only. Receivers connected in
 `ready()` use explicit `dispatch_uid` and **`weak=False`** — closures
 are otherwise garbage-collected and the signal silently stops firing
@@ -105,16 +119,23 @@ are otherwise garbage-collected and the signal silently stops firing
 
 ## 4. Strategies
 
-| Code | Signal | Executor by scale | Declines when | Tier |
-|---|---|---|---|---|
-| `curated` | `ProductRelation` rows | ORM at any size | never — merchant intent always wins | Free |
-| `variant_group` | `Product.variant_group` | ORM | product has no group | Free |
+**Four of the eight are built.** `curated`, `variant_group`, `category` and
+`popular` exist in `recommendation/strategies/` and are the entire live
+engine. `attributes`, `semantic`, `co_purchase` and `co_view` are design, not
+code — there is no module for them, which is also why no strategy sets
+`precompute = True`: the precomputed ones are precisely the unbuilt ones. The
+Standard and Pro tiers therefore have nothing behind them yet.
+
+| Code | Signal | Executor by scale | Declines when | Tier | Status |
+|---|---|---|---|---|---|
+| `curated` | `ProductRelation` rows | ORM at any size | never — merchant intent always wins | Free | **shipped** |
+| `variant_group` | `Product.variant_group` | ORM | product has no group | Free | **shipped** |
 | `category` | same category (0.8), then sibling categories (0.6), then the parent's whole MPTT subtree (0.5); within a tier by `click_score`, `view_count` | ORM — exactly three queries whatever the seed count | product has no category | Free |
-| `popular` | `click_score`, `view_count`, `likes_count`, `discount_percent` | ORM / Meilisearch sort | never — last-resort filler, **capped at 1 slot** by the ranker | Free |
-| `attributes` | shared `attribute_values` ∪ tags ∪ brand (Jaccard) | ORM < 2k · Meilisearch above | tenant populates none of the three | Standard |
-| `semantic` | embedding similarity (§6) | Meilisearch `/similar` | no embedder on the index, or `OFFLINE` | Standard |
-| `co_purchase` | `OrderItem` pairs, 180-day window | SQL aggregation → table | pair count < 5 or < 50 multi-item orders | Pro |
-| `co_view` | same-session views/clicks from `RecommendationEvent` | SQL aggregation → table | fewer than N sessions with ≥ 2 views | Pro |
+| `popular` | `click_score`, `view_count`, `likes_count`, `discount_percent` | ORM / Meilisearch sort | never — last-resort filler, **capped at 1 slot** by the ranker | Free | **shipped** |
+| `attributes` | shared `attribute_values` ∪ tags ∪ brand (Jaccard) | ORM < 2k · Meilisearch above | tenant populates none of the three | Standard | design only |
+| `semantic` | embedding similarity (§6) | Meilisearch `/similar` | no embedder on the index, or `OFFLINE` | Standard | design only |
+| `co_purchase` | `OrderItem` pairs, 180-day window | SQL aggregation → table | pair count < 5 or < 50 multi-item orders | Pro | design only |
+| `co_view` | same-session views/clicks from `RecommendationEvent` | SQL aggregation → table | fewer than N sessions with ≥ 2 views | Pro | design only |
 
 Chain order, weights, `limit`, `min_fill` and `price_band_ratio` are
 **data per tenant per surface** — a `RecommendationSlot` row — seeded
@@ -217,9 +238,9 @@ records, 104 expert queries; arXiv 2607.21274). nDCG@9:
 
 Two consequences. Semantic is **one strategy in a chain**, never the
 only one. And the dataset is book descriptions, not product names —
-recall on **product names** must be measured on staging
-(`benchmark_embedder` command, §9.4) before `semantic` is enabled for
-any tenant.
+recall on **product names** must be measured on staging before `semantic` is
+enabled for any tenant — with the `benchmark_embedder` command specified in
+§9.4, which is not built yet (neither is `semantic`).
 
 ### 6.2 Where the model runs
 
@@ -239,10 +260,10 @@ Verified against Meilisearch v1.53 (the cluster runs v1.53.1):
   (`ghcr.io/huggingface/text-embeddings-inference:cpu-1.9`) runs every
   candidate above including the MoE one.
 - Indexes are per tenant (`{schema}__product`, scoped API keys via
-  `Client.search_client_for_schema`, `meili/_client.py:96`), so an
+  `Client.search_client_for_schema` in `meili/_client.py`), so an
   embedder is per tenant by construction.
 - **The index is on `ProductTranslation`, one document per language**
-  (`product/models/product.py:526`). Embedding cost is ×3 per product;
+  (the `MeiliMeta` block on `ProductTranslation`). Embedding cost is ×3 per product;
   the `/similar` seed is a translation document id; results must be
   filtered on `language_code` and deduplicated by `master_id`.
 
@@ -283,11 +304,11 @@ every deploy. Enable `vectorStore` with the existing
 | `cart.CartItem.recommendation_impression_id` → `order.OrderItem.recommendation_impression_id` | nullable UUID on the line | the impression carried from add-to-cart (`CartItemCreateSerializer` / `CartItemUpdateSerializer`, latest add wins) and copied at checkout by both `OrderService` cart→order paths; read by `record_attach_events` as the first identity |
 
 Gating is two-tier like everything else: `Tenant.recommendations_enabled`
-(plan flag, beside `promotions_enabled`, `tenant/models.py:374-396`;
+(plan flag, declared beside `promotions_enabled` on `Tenant`;
 `IsRecommendationsEnabled` in `tenant/permissions.py`) **and** the
 per-schema `PRODUCT_SUGGESTIONS_ENABLED` extra-setting
 (`EXTRA_SETTINGS_DEFAULTS`, listed in `PUBLIC_SETTING_KEYS`,
-`core/api/views.py:606`).
+`core/api/views.py`).
 
 ## 8. Caching — the 2026-09-10 lesson
 
@@ -316,7 +337,7 @@ read from the real `Tenant` row even under a bare `FakeTenant`
 (`schema_context` from a shell or command); an unknown plan ranks as
 Free — never as "nothing", never as "everything". Serialization
 always happens outside the cache so pricing context and locale are
-applied fresh (keep the `cart/serializers/item.py:138` idiom). The cart
+applied fresh (keep the `CartItemSerializer.Meta.fields` idiom). The cart
 surface is never Nitro-cached; its seed set is the session's cart.
 
 On the storefront, `app/components/Product/Suggestions.vue` is the one
@@ -381,8 +402,10 @@ preset" re-applies it over edits.
 
 ### 9.4 Switching or measuring the embedder
 
-`manage.py benchmark_embedder --tenant <schema> --embedder <name>`
-indexes the tenant twice, runs `/similar` for every product, writes
+`benchmark_embedder` **does not exist yet** — it is specified here, not built,
+and neither is the `semantic` strategy it would measure. As specified,
+`manage.py benchmark_embedder --tenant <schema> --embedder <name>` would index
+the tenant twice, runs `/similar` for every product, writes
 P@3 against a labelled pair file, and reports RSS of the embedder pod
 and index time. Decision rule recorded in the plan: TEI unless RSS >
 3 GiB or p95 `/similar` > 150 ms. Switching is a `MeiliMeta.embedders`

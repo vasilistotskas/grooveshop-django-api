@@ -11,7 +11,7 @@ tools: Read, Grep, Glob, Bash
 # Migration Safety Reviewer
 
 The grooveshop-django-api Argo CD application runs a **PreSync hook Job**
-(`backend-prepare-job.yaml`) that executes `migrate` *before* the new image
+(`grooveshop-infrastructure/manifests/app-constructs/grooveshop/prepare-helm/templates/job.yaml`) that executes `migrate` *before* the new image
 rolls out. While the new schema is being applied, the *old* application pods
 are still serving traffic.
 

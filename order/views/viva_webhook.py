@@ -220,10 +220,17 @@ def _webhook_get_rate_limit(request) -> bool:
     Fails open on cache errors so a Redis outage doesn't take down
     Viva's handshake.
 
-    TODO: replace with a strict Viva IP allowlist once the cluster's
-    externalTrafficPolicy is set to Local so REMOTE_ADDR carries the
-    real Viva IP (currently SNAT-ed to node IP by K3s/Flannel).
-    Reference: VIVA_WEBHOOK_IPS_PRODUCTION / VIVA_WEBHOOK_IPS_DEMO.
+    Deliberately NOT an IP allowlist, though one exists: ``_check_source_ip``
+    already resolves the real client IP by walking ``X-Forwarded-For`` (then
+    ``X-Real-IP``), so the old reason recorded here — that REMOTE_ADDR is
+    SNAT-ed to the node IP by K3s/Flannel and the cluster would first need
+    ``externalTrafficPolicy: Local`` — is no longer what stands in the way.
+
+    What stands in the way is failing CLOSED on the handshake: Viva's
+    published ranges (VIVA_WEBHOOK_IPS_PRODUCTION / _DEMO) are a hardcoded
+    list, and a range changing on Viva's side would silently break webhook
+    registration for every tenant. The rate limit degrades instead. Tighten
+    this only together with a way to notice that breakage.
     """
     ip = request.META.get("HTTP_X_REAL_IP", "").strip() or request.META.get(
         "REMOTE_ADDR", ""

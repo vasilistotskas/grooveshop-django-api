@@ -45,7 +45,7 @@ new couriers plug in without touching the order code.
 
 ## 2. State machines
 
-### 2.1 OrderStatus transitions (`order/services.py:1355-1376`)
+### 2.1 OrderStatus transitions (the `allowed_transitions` map in `OrderService.update_order_status`)
 
 ```
 PENDING → PROCESSING → SHIPPED → DELIVERED → COMPLETED
@@ -84,18 +84,18 @@ No explicit table — flips are direct assignments. Common paths:
 Two entry points in `order/services.py` (the legacy `OrderService.create_order`
 — dead code with zero production callers — was removed 2026-08-24):
 
-### 3.1 `create_order_from_cart` (`L189`) — payment-first / online
+### 3.1 `create_order_from_cart` — payment-first / online
 - **Caller**: Stripe Checkout flow.
 - Sets `status=PENDING`, `payment_status=<provider-returned>`.
 - **Does NOT** dispatch courier task here. Online payments defer
   the dispatch to the payment-success webhook (PR #1 commit
   `59527a87` — see `project_shipping_dispatch_on_commit.md`).
 
-### 3.2 `create_order_from_cart_offline` (`L709`) — order-first / COD / Viva
+### 3.2 `create_order_from_cart_offline` — order-first / COD / Viva
 - **Caller**: Nuxt checkout for offline pay-ways + Viva redirect flow.
 - Sets `status=PENDING`, `payment_status=PENDING`.
 - For **COD/offline**: dispatches courier task via
-  `_dispatch_shipment_creation_task` immediately at `L1069`. The
+  `_dispatch_shipment_creation_task` immediately. The
   dispatch is wrapped in `transaction.on_commit` inside
   `ShippingService.dispatch_create_shipment_task` so the worker
   only sees the order after the create transaction commits.
@@ -136,7 +136,7 @@ accounts:
 
 ### 4.1 Stripe online (`payment_intent.succeeded`)
 
-Webhook handler: `order/signals/handlers.py::handle_stripe_payment_succeeded` (`L822`).
+Webhook handler: `order/signals/handlers.py::handle_stripe_payment_succeeded`.
 
 ```
 charge.succeeded → handle_stripe_payment_succeeded
@@ -161,7 +161,7 @@ load-bearing: without it the customer receives both an
 
 ### 4.2 Stripe refund (`charge.refunded`)
 
-Webhook handler: `handle_stripe_charge_refunded` (`L1107`).
+Webhook handler: `handle_stripe_charge_refunded` (`order/signals/handlers.py`).
 
 - Full refund: `payment_status=REFUNDED`, fires `order_refunded.send`.
 - Partial refund: `payment_status=PARTIALLY_REFUNDED`, no signal fire.
@@ -169,11 +169,11 @@ Webhook handler: `handle_stripe_charge_refunded` (`L1107`).
 
 ### 4.3 Viva Wallet online
 
-Webhook handler: `order/views/viva_webhook.py::_handle_payment_created` (`L749`).
+Webhook handler: `order/views/viva_webhook.py::_handle_payment_created`.
 
 Differences from the Stripe path that are easy to miss:
 
-- **Row lock** is acquired at the entry-point (`L680`), not inside
+- **Row lock** is acquired at the entry-point (`_handle_webhook_event`), not inside
   a service method. The whole webhook body runs inside one
   ``select_for_update`` block.
 - **Idempotency** uses ``viva_webhook_{transaction_id}_{event_type_id}``
@@ -240,7 +240,7 @@ Each carrier implements `ShippingCarrierInterface` in
 
 - **REST API**, polling-based (no webhooks).
 - Voucher mint: 3-phase `claim → API → persist` design in
-  `AcsService.create_voucher_for_order` (`L229`). Survives
+  `AcsService.create_voucher_for_order`. Survives
   `idle_in_transaction_session_timeout` — see
   `project_acs_voucher_orphan_prevention.md`. **TTL 300s** (PR #6).
 - Polling: `poll_shipment_tracking` runs in two phases (read,

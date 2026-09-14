@@ -894,7 +894,11 @@ def search_analytics(request):
     - Zero-result queries (queries that never returned results)
     - Search volume by content_type and language
     - Average results count
-    - Average processing time
+    - Average processing time — ALWAYS 0.0. The analytics middleware
+      reads ``processingTimeMs`` off the search response body and no
+      search endpoint emits it (``meili/querysets.py`` drops the value
+      Meilisearch returns), so every row stores NULL and the aggregate
+      falls through to its ``or 0.0`` default.
     - Click-through rate (clicks / searches)
 
     Filters:

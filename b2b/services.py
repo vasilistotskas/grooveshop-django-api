@@ -438,8 +438,11 @@ class B2BPricingService:
 
         Rules: a fixed price-list override wins over the group percent;
         the retail ``discount_percent`` is NEVER stacked on top; the
-        result is floored at the retail final price so a retail sale
-        can't be undercut by its own wholesale tier.
+        result is capped at ``product.final_price`` (the VAT-inclusive
+        shelf price, retail discount already applied) so a wholesale
+        buyer never pays MORE than a walk-in customer. The clamp is
+        from above only — see ``_usable_override`` for why nothing
+        guards the bottom.
         """
         currency = settings.DEFAULT_CURRENCY
         if override_net is not None:

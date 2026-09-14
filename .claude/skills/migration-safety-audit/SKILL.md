@@ -10,7 +10,7 @@ description: >
 
 # Migration Safety Audit
 
-GrooveShop deploys via an Argo CD PreSync hook (`backend-prepare-job.yaml`) that runs `migrate` **before** the new image rolls. Old pods are still serving traffic when the new schema lands. Destructive migrations break those old pods.
+GrooveShop deploys via an Argo CD PreSync hook (the `prepare-helm` chart in grooveshop-infrastructure) that runs `migrate` **before** the new image rolls. Old pods are still serving traffic when the new schema lands. Destructive migrations break those old pods.
 
 This skill audits the latest migration (or a named one) for that hazard and prescribes the fix.
 

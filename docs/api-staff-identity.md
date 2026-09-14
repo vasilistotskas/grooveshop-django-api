@@ -14,11 +14,21 @@ doc.
 **Question it answers:** how does a *store operator* get programmatic
 (API) write access to their own store?
 
-Today the answer is "they don't" — administrative API routes are
-`IsPlatformSuperuser`. Store operators administer their store through
-the Django admin, where role-derived permissions apply properly
-(`tenant.auth_backends.TenantRolePermissionBackend`). This document
-describes what to build when that stops being enough.
+They do, via a platform-staff token. **This paragraph used to say the
+opposite** — that administrative API routes were all `IsPlatformSuperuser`
+and operators had to use the Django admin — which stopped being true when
+the design below shipped.
+
+What is live today: `StoreStaffModelPermissions` gates store-scoped write
+routes across 21 view modules (product, blog, order, cart, pay_way,
+page_config, shipping, tag, …), deriving permissions from the caller's role
+in the CURRENT tenant through the SAME
+`tenant.auth_backends.TenantRolePermissionBackend` policy the admin uses.
+`IsStoreStaff` covers the non-model routes (for example search analytics).
+`IsPlatformSuperuser` is now reserved for genuinely platform-wide surfaces,
+not for everything administrative.
+
+The rest of this document is the original design record.
 
 ## Why the obvious approaches do not work
 

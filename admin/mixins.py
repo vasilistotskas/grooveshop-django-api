@@ -92,6 +92,9 @@ class WithheldOnTenantHostModelAdmin:
     per tenant — dressed as that merchant's own page. Reported from
     production 2026-09-12. ``core_cachepurgelog`` is worse: 146 rows
     recording every purge across the estate, actor column included.
+    (The Cache page's embedded "recent activity" panel is separately
+    scoped by ``CachePurgeLog.objects.visible_here()``; this changelist
+    is NOT — it is withheld instead, which is why both exist.)
 
     Gated on ``request.tenant`` and it withholds only when it POSITIVELY
     knows a real tenant is being served — the same positive-knowledge

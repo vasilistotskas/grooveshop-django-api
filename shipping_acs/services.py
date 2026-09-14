@@ -1783,8 +1783,9 @@ class AcsService:
         flows: order_paid fires, history is logged, status advances.
 
         Returns a counters dict for the Celery task to log; ``skipped``
-        rows (no voucher and no reference match) additionally alert
-        ADMINS because unmatched payout money must be investigated.
+        rows (no voucher and no reference match) additionally alert the
+        store's operators because unmatched payout money must be
+        investigated.
         """
         # Lazy import — keeps service-module import cheap when COD is
         # not used and avoids forcing the full Money/decimal stack on

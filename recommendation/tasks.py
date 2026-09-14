@@ -3,8 +3,18 @@
 ``recompute_candidates_for_product`` runs per product after a save
 (dispatched through ``tenant.celery.dispatch_on_commit`` so the tenant
 schema travels with the message). ``recompute_all_candidates`` is the
-nightly full pass, reached through ``tenant.tasks.fanout_*`` because
+full pass, meant to be reached through ``tenant.tasks.fanout_*`` because
 beat runs in the public schema and this must run once per tenant.
+
+NOT CURRENTLY IN USE, and that is deliberate. Both tasks only write rows
+for strategies whose ``precompute`` is True, and no shipped strategy sets
+it — ``curated``, ``variant_group``, ``category`` and ``popular`` are all
+cheap enough to answer live. So these tasks write nothing today, and
+``recompute_all_candidates`` is intentionally absent from
+``CELERY_BEAT_SCHEDULE``: scheduling a nightly pass that produces no rows
+would be pure cost. Schedule it in the same change that ships the first
+``precompute = True`` strategy — not before, and do not delete this as
+dead code in the meantime.
 """
 
 from __future__ import annotations

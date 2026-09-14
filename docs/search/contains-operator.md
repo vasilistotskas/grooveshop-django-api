@@ -11,7 +11,7 @@ The CONTAINS operator is an **experimental Meilisearch feature** that enables su
 ### Using Management Command
 
 ```bash
-python manage.py meilisearch_enable_experimental --feature containsFilter
+uv run python manage.py meilisearch_enable_experimental --feature containsFilter
 ```
 
 ### Using Meilisearch API Directly
@@ -85,7 +85,7 @@ ProductTranslation.meilisearch.filter(name__contains="Laptop")
 
 ## Supported Field Types
 
-`_add_contains_filter` (`meili/querysets.py:307-315`) validates the **value**
+`_add_contains_filter` (`meili/querysets.py`) validates the **value**
 you pass, not the field it's applied to — any string value is accepted
 regardless of which field it's filtered against. Only a non-string value
 (e.g. an `int`, `bool`, or `None`) raises `TypeError` client-side.
@@ -249,7 +249,7 @@ except Exception as e:
 
 **Solution**: Enable the feature using the management command:
 ```bash
-python manage.py meilisearch_enable_experimental --feature containsFilter
+uv run python manage.py meilisearch_enable_experimental --feature containsFilter
 ```
 
 ## Comparison with Other Lookups
@@ -352,62 +352,17 @@ price__contains = 99
 
 ## Testing
 
-### Unit Tests
+The real coverage lives in `tests/unit/meili/test_contains_operator.py`, which
+drives `IndexQuerySet` against a mock model and asserts the generated filter
+string and the `TypeError` on non-string values. Run it with:
 
-```python
-import pytest
-from product.models import ProductTranslation
-
-
-def test_contains_filter_on_string_field():
-    """Test CONTAINS operator on string field."""
-    results = ProductTranslation.meilisearch.filter(name__contains="laptop")
-    assert all("laptop" in r.name.lower() for r in results)
-
-
-def test_contains_filter_case_insensitive():
-    """Test CONTAINS is case-insensitive."""
-    results_lower = ProductTranslation.meilisearch.filter(
-        name__contains="laptop"
-    )
-    results_upper = ProductTranslation.meilisearch.filter(
-        name__contains="LAPTOP"
-    )
-    assert list(results_lower) == list(results_upper)
-
-
-def test_contains_filter_on_non_string_value_raises_error():
-    """Test CONTAINS with a non-string VALUE raises TypeError.
-
-    A string value against a numeric field (e.g. ``final_price__contains="99"``)
-    does NOT raise — only a non-string value does, regardless of field.
-    """
-    with pytest.raises(TypeError, match="only supports string values"):
-        ProductTranslation.meilisearch.filter(final_price__contains=99)
+```bash
+uv run pytest tests/unit/meili/test_contains_operator.py
 ```
 
-### Integration Tests
-
-```python
-def test_contains_filter_with_real_data():
-    """Test CONTAINS filter with real Meilisearch data."""
-    # Create test products
-    ProductTranslation.objects.create(name="Laptop Pro 15", language_code="en")
-    ProductTranslation.objects.create(
-        name="Gaming Laptop X1", language_code="en"
-    )
-
-    # Sync to Meilisearch
-    ProductTranslation.meilisearch.sync()
-
-    # Test CONTAINS filter
-    results = ProductTranslation.meilisearch.filter(
-        name__contains="laptop", language_code="en"
-    )
-
-    assert len(results) == 2
-    assert all("laptop" in r.name.lower() for r in results)
-```
+This section used to carry invented example tests that were never in the
+repository — read the file above instead, it is the behaviour that is actually
+enforced.
 
 ## Troubleshooting
 
@@ -417,7 +372,7 @@ def test_contains_filter_with_real_data():
 
 **Solution**:
 ```bash
-python manage.py meilisearch_enable_experimental --feature containsFilter
+uv run python manage.py meilisearch_enable_experimental --feature containsFilter
 ```
 
 ### Type Error on Non-String Value
@@ -451,13 +406,7 @@ ProductTranslation.meilisearch.filter(final_price__gte=99, final_price__lte=999)
 
 - [Meilisearch CONTAINS Documentation](https://docs.meilisearch.com/learn/filtering_and_sorting/filter_expression_reference.html#contains)
 - [Experimental Features](https://docs.meilisearch.com/learn/experimental/overview.html)
-- [GrooveShop IndexQuerySet API](../meili/querysets.md)
+- `meili/querysets.py` — the `IndexQuerySet` implementation
 - [Search API Documentation](../api/search.md)
 
-## Support
-
-For questions or issues with the CONTAINS operator:
-
-- **GitHub Issues**: https://github.com/grooveshop/grooveshop-django-api/issues
-- **Meilisearch Discord**: https://discord.gg/meilisearch
-- **Email**: dev-support@grooveshop.com
+- [Meilisearch Discord](https://discord.gg/meilisearch) for engine-side questions

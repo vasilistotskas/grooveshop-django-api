@@ -8,7 +8,7 @@ notifications via Django Channels; each store is a django-tenants schema resolve
 the request host. Uses Knox + Django Allauth for authentication (token API + social/MFA),
 Celery with RabbitMQ broker for background tasks, PostgreSQL 18 for data storage, Redis
 for caching and Channels layer, and Meilisearch for federated search. Features include
-multi-language support (Greek, English, German), Stripe payments via dj-stripe,
+multi-language support (Greek, English, German), Viva Wallet and Stripe payments,
 comprehensive test coverage, and a Django Unfold admin panel.
 
 ## Project Structure
@@ -47,7 +47,8 @@ All Django apps live at the project root (flat structure, no `src/` directory):
 - **Authentication and User Management**: Knox token auth for API, Django Allauth for account management with social providers (Google, Facebook, GitHub, Discord), MFA/WebAuthn/Passkeys support
 - **Multi-Language Support**: django-parler translations for Greek (default), English, and German
 - **Advanced Search and Filtering**: Meilisearch-powered federated search with Greeklish support, instant search, and analytics tracking
-- **Payments**: Stripe integration via dj-stripe
+- **Payments**: Viva Wallet (primary) and Stripe via dj-stripe, plus offline
+  methods such as cash on delivery. Credentials are per-tenant
 - **Loyalty System**: Points, XP, tiers, and rewards
 - **Task Scheduling**: Celery with RabbitMQ for background task management (stock cleanup, cart expiry, notifications, Meilisearch sync)
 - **Real-time Notifications**: WebSocket via Django Channels with per-user and admin groups
@@ -66,7 +67,7 @@ All Django apps live at the project root (flat structure, no `src/` directory):
 - **Task Management**: Celery
 - **Message Broker**: RabbitMQ
 - **Search**: Meilisearch
-- **Payments**: Stripe (dj-stripe)
+- **Payments**: Viva Wallet (primary), Stripe (dj-stripe)
 - **Server**: Gunicorn process manager running Uvicorn ASGI workers (Daphne only serves `runserver`)
 - **Containerization**: Docker
 - **Package Management**: uv
@@ -80,7 +81,8 @@ All Django apps live at the project root (flat structure, no `src/` directory):
 - PostgreSQL 18
 - Redis
 - RabbitMQ
-- Meilisearch or higher
+- Meilisearch — the engine version is pinned and must match production;
+  take the tag from `infra.compose.yml`, never from a doc
 
 ### Meilisearch Setup
 
@@ -93,14 +95,14 @@ docker run -d \
   -p 7700:7700 \
   -e MEILI_MASTER_KEY=YOUR_MASTER_KEY \
   -v $(pwd)/meili_data:/meili_data \
-  getmeili/meilisearch:v1.53.1
+  getmeili/meilisearch:${MEILI_TAG}  # tag from infra.compose.yml
 ```
 
 **Using Docker Compose:**
 ```yaml
 services:
   meilisearch:
-    image: getmeili/meilisearch:v1.53.1
+    image: getmeili/meilisearch:${MEILI_TAG}  # tag from infra.compose.yml
     ports:
       - "7700:7700"
     environment:
@@ -121,7 +123,7 @@ MEILISEARCH_MASTER_KEY=YOUR_MASTER_KEY
 
 Enable the CONTAINS operator for substring matching:
 ```bash
-python manage.py meilisearch_enable_experimental --feature containsFilter
+uv run python manage.py meilisearch_enable_experimental --feature containsFilter
 ```
 
 #### Configure Index Settings
@@ -129,14 +131,14 @@ python manage.py meilisearch_enable_experimental --feature containsFilter
 Update index settings for optimal performance:
 ```bash
 # ProductTranslation index
-python manage.py meilisearch_update_index_settings \
+uv run python manage.py meilisearch_update_index_settings \
     --index ProductTranslation \
     --max-total-hits 50000 \
     --search-cutoff-ms 1500 \
     --max-values-per-facet 100
 
 # BlogPostTranslation index
-python manage.py meilisearch_update_index_settings \
+uv run python manage.py meilisearch_update_index_settings \
     --index BlogPostTranslation \
     --max-total-hits 50000 \
     --search-cutoff-ms 1500 \
@@ -148,12 +150,12 @@ python manage.py meilisearch_update_index_settings \
 Set up custom ranking rules for e-commerce:
 ```bash
 # Prioritize in-stock products and discounts
-python manage.py meilisearch_update_ranking \
+uv run python manage.py meilisearch_update_ranking \
     --index ProductTranslation \
     --rules "words,typo,proximity,attribute,sort,stock:desc,discount_percent:desc,exactness"
 
 # Prioritize popular blog posts
-python manage.py meilisearch_update_ranking \
+uv run python manage.py meilisearch_update_ranking \
     --index BlogPostTranslation \
     --rules "words,typo,proximity,attribute,sort,view_count:desc,exactness"
 ```
@@ -162,11 +164,11 @@ python manage.py meilisearch_update_ranking \
 
 ```bash
 # Sync all indexes
-python manage.py meilisearch_sync_all_indexes
+uv run python manage.py meilisearch_sync_all_indexes
 
 # Or sync specific indexes
-python manage.py meilisearch_sync_index product.ProductTranslation
-python manage.py meilisearch_sync_index blog.BlogPostTranslation
+uv run python manage.py meilisearch_sync_index product.ProductTranslation
+uv run python manage.py meilisearch_sync_index blog.BlogPostTranslation
 ```
 
 ### OpenAPI Schema Generation
@@ -226,31 +228,17 @@ celery -A core flower --broker=amqp://guest:guest@localhost:5672// --broker_api=
 docker compose up -d --build
 ```
 
-## Meilisearch Management
+## Meilisearch reference
 
-### Index Management
-```bash
-uv run python manage.py meilisearch_sync_all_indexes
-uv run python manage.py meilisearch_sync_index product.ProductTranslation
-uv run python manage.py meilisearch_drop --recreate
-uv run python manage.py meilisearch_inspect_index --index product --show-settings
-```
+The command set above is the first-time setup path. For the full option list
+of every `meilisearch_*` command — and the `--tenant <schema>` /
+`--all-tenants` flags each one accepts, without which a command runs against
+whatever schema is bound to the current connection — see the reference rather
+than a copy here:
 
-### Configuration
-```bash
-uv run python manage.py meilisearch_enable_experimental --feature containsFilter
-uv run python manage.py meilisearch_update_index_settings --index ProductTranslation --max-total-hits 50000 --search-cutoff-ms 1500
-uv run python manage.py meilisearch_update_ranking --index ProductTranslation --rules "words,typo,proximity,attribute,sort,stock:desc,discount_percent:desc,exactness"
-uv run python manage.py meilisearch_apply_settings
-```
-
-Every index command accepts `--tenant <schema>` or `--all-tenants`; without either it
-runs against the schema bound to the current connection.
-
-For detailed documentation, see:
+- [Management Commands Reference](docs/search/management-commands.md)
 - [Search API Documentation](docs/api/search.md)
 - [CONTAINS Operator Guide](docs/search/contains-operator.md)
-- [Management Commands Reference](docs/search/management-commands.md)
 
 ## License
 

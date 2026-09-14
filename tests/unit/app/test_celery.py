@@ -20,12 +20,48 @@ class CeleryConfigTestCase(TestCase):
         app = celery.create_celery_app()
 
         self.assertTrue(mock_celery.called)
-        # config_from_object is called first, then conf.update overrides
         mock_celery_instance.config_from_object.assert_called_once_with(
             "django.conf:settings", namespace="CELERY"
         )
-        mock_celery_instance.conf.update.assert_called_once()
         self.assertTrue(app.autodiscover_tasks.called)
+
+    @patch("core.celery.Celery")
+    def test_settings_are_the_only_config_source(self, mock_celery):
+        """No ``conf.update()`` in ``create_celery_app``, ever.
+
+        A key supplied by ``config_from_object`` is resolved from that
+        source on every read, so a literal passed to a later
+        ``conf.update()`` is shadowed rather than applied. This file used
+        to assert the opposite ("config_from_object is called first, then
+        conf.update overrides") and the block it was guarding shipped
+        ``task_ignore_result=False``, ``task_soft_time_limit=300`` and
+        ``task_time_limit=600`` — none of which were ever in effect.
+        Adding one back is silently a no-op, so fail loudly instead.
+        """
+        celery.create_celery_app()
+
+        mock_celery.return_value.conf.update.assert_not_called()
+
+    def test_effective_config_comes_from_django_settings(self):
+        """The values the workers actually run with.
+
+        Asserted against ``settings`` rather than literals so the test
+        cannot drift from the source of truth it is protecting.
+        """
+        conf = celery.celery_app.conf
+
+        self.assertEqual(
+            conf["task_soft_time_limit"], settings.CELERY_TASK_SOFT_TIME_LIMIT
+        )
+        self.assertEqual(
+            conf["task_time_limit"], settings.CELERY_TASK_TIME_LIMIT
+        )
+        self.assertEqual(
+            conf["task_ignore_result"], settings.CELERY_TASK_IGNORE_RESULT
+        )
+        self.assertEqual(
+            conf["worker_pool_restarts"], settings.CELERY_WORKER_POOL_RESTARTS
+        )
 
     def tearDown(self):
         celery.app = None

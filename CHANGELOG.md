@@ -3,6 +3,173 @@
 
 
 
+## v3.58.2 (2026-09-14)
+
+### Bug fixes
+
+* fix(search): record Meilisearch processing time in analytics
+
+`SearchQuery.processing_time_ms` has always been NULL, so the analytics
+endpoint's `performance.avgProcessingTimeMs` was pinned at 0.0 — a number
+that looked like a measurement and was not one. The middleware read
+`processingTimeMs` off the response body; `meili/querysets.py` dropped the
+value Meilisearch returns and no endpoint ever emitted it.
+
+Verified against the live engine before choosing an approach: both response
+shapes we use carry the field — a single-index search returns it top-level
+(measured 23 ms), and so does a federated `multi_search` (6 ms).
+
+Handed from view to middleware on the request rather than through the
+response body. No client needs the engine's timing, and putting it in the
+body would have meant an OpenAPI change plus a Nuxt `openapi-ts` +
+`sync:schema` round trip, purely so the middleware could re-parse a number
+the view already held. `manage.py spectacular` confirms the schema is
+byte-identical, so there is no contract drift and nothing to regenerate
+downstream.
+
+Accumulated, not assigned: a zero-result query is retried once with its
+leading word dropped, and the honest answer to "how long did the engine
+spend on this request" is both passes.
+
+The sharp edge, and why the tests dwell on it: `rest_framework.request.
+Request` defines `__getattr__` but not `__setattr__`, so stamping the DRF
+wrapper stores the value on the wrapper while middleware — handed the plain
+HttpRequest — reads nothing. The write succeeds and the read returns None,
+so the failure is completely silent. `_record_engine_time` writes through to
+`request._request`.
+
+Also fixes a latent bug in the body fallback, which is kept for a future
+endpoint: it used an `or` chain, so a legitimate 0 ms reading from a small
+index would have been discarded as falsy.
+
+Both behaviours are mutation-checked — stamping the wrapper and assigning
+instead of accumulating each fail the new tests.
+
+Docs updated: `avgProcessingTimeMs` is now documented as engine time rather
+than end-to-end latency, with the note that rows predating this store NULL
+and are excluded from the average.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01E49g57McYfMRwbDVyyxAvw ([`1a73742`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1a73742cd2f1f2b7d0f1086ee090ab7834ea3aa5))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.58.1 [skip ci] ([`ffda80c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ffda80c1706983c21e2f9eb52ae85715b0e66aa5))
+
+### Documentation
+
+* docs: correct drifted and fabricated documentation
+
+Every claim below was checked against the code before changing.
+
+core/email: 1143 lines of docs across four files reduced to one accurate
+README. ADMIN_GUIDE.md is superseded by the published bilingual page;
+CONFIGURATION_GUIDE.md referenced a `test_config.py` that has never
+existed, carried a broken two-`path=` example, and listed as a "future
+enhancement" the disk-driven discovery that already shipped;
+DOCUMENTATION_INDEX.md was a table of contents for its three siblings
+claiming 14 templates and 4 categories when there are 34 and 9. The
+rewrite corrects the cluster's central error: `config.py` is optional
+preview metadata read only by the admin preview UI, not the mandatory
+registry the old docs described, and its `subject_template` is never what
+a customer receives.
+
+docs/api/search.md rewritten (631 -> 231 lines). It documented a
+`processing_time_ms` response field the API has never returned, used
+snake_case throughout when the global renderer is CamelCaseJSONRenderer,
+omitted `queryId`/`relaxedQuery`, showed a result shape that does not
+match the serializers, said analytics requires a platform superuser when
+it is `IsStoreStaff`, and invented a rate-limit table and error-code
+envelope. Also records that `performance.avgProcessingTimeMs` is
+permanently 0.0, because nothing emits the value the middleware reads.
+
+docs/order-system.md: content verified sound; all nine line anchors were
+stale (`order/services.py:1355-1376` pointed at OrderItem creation, not
+the transition table) and now name symbols instead.
+
+docs/recommendations-engine.md: eight stale line anchors likewise. Marks
+which strategies exist — four of the eight documented are built, the
+Standard and Pro tiers have no module behind them, which is also why
+nothing sets `precompute = True`. `benchmark_embedder` is specified, not
+built, and neither is the `semantic` strategy it would gate.
+
+docs/search/contains-operator.md: replaced a Testing section of invented
+examples with a pointer to the real `tests/unit/meili/test_contains_operator.py`,
+removed a broken link and a fabricated support address and GitHub org.
+
+docs/api-staff-identity.md: the body still claimed in the present tense
+that operators have no API write access, contradicting its own
+"implemented" banner. `StoreStaffModelPermissions` gates 21 view modules.
+
+README.md: Viva Wallet, the primary payment provider, was missing;
+Meilisearch engine pins point at infra.compose.yml, since dev and prod
+must match; bare `python manage.py` normalised to `uv run`; dropped a
+duplicated Meilisearch command section in favour of the reference.
+
+Comment-only corrections: the cache-clearing task claimed surface
+patterns "bypass the schema key prefix and so span every tenant" — they
+do not, so that job clears the public schema only; `B2BPricingService.resolve`
+said "floored at the retail final price" for what is a cap from above;
+two ACS alert comments said ADMINS when delivery is to the store's
+operators; the Viva webhook TODO cited an obsolete blocker; the
+recommendation tasks now say why they are unscheduled; `meili/_client.py`
+notes that its typo-tolerance fallback silently breaks the
+federated-search invariant for a model that omits the key.
+
+.claude: the PreSync hook is a Helm chart, not `backend-prepare-job.yaml`.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01E49g57McYfMRwbDVyyxAvw ([`765a23b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/765a23bee5ff2d054ad886ca6bcddeaf3136b513))
+
+### Refactoring
+
+* refactor(core): remove config that never took effect
+
+`core/celery.py` carried a `conf.update()` block commented as taking
+"precedence over settings.py". It does not: a key supplied by
+`config_from_object` is resolved from that source on every read, so a
+later literal is shadowed. Resolved `celery_app.conf` at runtime to
+confirm — `task_ignore_result` was True (block said False),
+`task_soft_time_limit` 1500 (block said 300), `task_time_limit` 1800
+(block said 600). Every other key duplicated settings.py exactly.
+
+Only `worker_pool_restarts` was sourced here, so it moves to settings.py
+with the rest. Effective config verified byte-identical before and after.
+
+`core/email/config.py` loses two dead dataclass fields:
+`TemplateCategory.templates` was always `{}` and never read (its comment
+claimed "Populated below"), and `TemplateConfig.context_keys` was
+documented as "required context keys for validation" against validation
+that does not exist. Neither is referenced outside the file.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01E49g57McYfMRwbDVyyxAvw ([`b37496f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b37496f56d1db8f0cf577d239a16ede249e6c29e))
+
+### Testing
+
+* test(celery): assert the config source, not the removed override
+
+`test_create_celery_app` asserted `conf.update` was called once, with a
+comment repeating the very claim that turned out to be false —
+'config_from_object is called first, then conf.update overrides'. It
+guarded a block whose values were never in effect, so removing that block
+in b37496f5 broke the test. I missed it before pushing: my grep pattern
+matched `celery_app.conf`, not `mock_celery_instance.conf.update`.
+
+Replaced with two assertions that protect the real guarantee:
+
+- `conf.update` is never called, so re-adding a silently-shadowed
+  override fails loudly instead of shipping dead config.
+- the effective `celery_app.conf` matches the corresponding
+  `settings.CELERY_*` values, asserted against settings rather than
+  literals so the test cannot drift from its source of truth.
+
+Both mutation-checked: re-adding a `conf.update()` and pointing
+`config_from_object` at a wrong namespace each fail the suite.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01E49g57McYfMRwbDVyyxAvw ([`8f866fc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8f866fce61cc48f066dba6d5aa79ed997392914a))
+
 ## v3.58.1 (2026-09-13)
 
 ### Bug fixes

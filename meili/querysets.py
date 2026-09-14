@@ -375,6 +375,13 @@ class IndexQuerySet[T: Model]:
             "estimated_total_hits": results.get("estimatedTotalHits", 0),
             "offset": self._state.offset,
             "limit": self._state.limit,
+            # The engine's own timing, forwarded for search analytics.
+            # This dict is INTERNAL — views pick the fields they expose —
+            # so carrying it here costs nothing at the API surface. It
+            # used to be dropped, which left every ``SearchQuery`` row
+            # with a NULL ``processing_time_ms`` and pinned the analytics
+            # average at 0.0.
+            "processing_time_ms": results.get("processingTimeMs"),
         }
 
         if "facetDistribution" in results:

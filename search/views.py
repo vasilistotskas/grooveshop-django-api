@@ -128,6 +128,44 @@ def _parse_int_csv(value: str | None, name: str) -> list[int]:
         )
 
 
+def _record_engine_time(request, milliseconds) -> None:
+    """Accumulate Meilisearch's own processing time for this request.
+
+    Read back by ``SearchAnalyticsMiddleware`` and stored on
+    ``SearchQuery.processing_time_ms``. Handing it over on the request
+    rather than through the response body keeps it out of the public
+    OpenAPI contract: no client needs the engine's timing, and coupling
+    analytics to the response shape would mean the field could never be
+    removed again.
+
+    ACCUMULATED, not assigned. A query that returns nothing is retried
+    once with its leading word dropped (``_relaxed_query``), so the
+    honest answer to "how long did the engine spend on this request" is
+    every pass, not the last one.
+
+    Meilisearch reports whole milliseconds and commonly reports 0 for a
+    small index, so a falsy value is still a real measurement — only
+    ``None`` (the field absent) is skipped.
+
+    Written to the UNDERLYING ``HttpRequest``. DRF's ``Request`` proxies
+    attribute *reads* to it via ``__getattr__`` but does not override
+    ``__setattr__``, so stamping the wrapper would leave the value where
+    middleware — which is handed the plain ``HttpRequest`` — can never
+    see it. That failure is silent: the write succeeds and the read
+    returns nothing.
+    """
+    if milliseconds is None:
+        return
+    try:
+        total = int(milliseconds)
+    except TypeError, ValueError:
+        return
+    target = getattr(request, "_request", request)
+    target.search_processing_time_ms = (
+        getattr(target, "search_processing_time_ms", 0) or 0
+    ) + total
+
+
 def _validate_language_code(language_code: str | None) -> str | None:
     if language_code and language_code not in _VALID_LANGUAGE_CODES:
         raise ValidationError({"language_code": _("Invalid language code.")})
@@ -245,12 +283,14 @@ def blog_post_meili_search(request):
         search_qs = search_qs.locales(language_code)
 
     enriched_results = search_qs.search(q=decoded_query)
+    _record_engine_time(request, enriched_results.get("processing_time_ms"))
 
     relaxed_query = None
     if not enriched_results["results"] and (
         relaxed := _relaxed_query(decoded_query)
     ):
         enriched_results = search_qs.search(q=relaxed)
+        _record_engine_time(request, enriched_results.get("processing_time_ms"))
         if enriched_results["results"]:
             relaxed_query = relaxed
 
@@ -485,12 +525,14 @@ def product_meili_search(request):
         search_qs = search_qs.set_facets(*facets)
 
     enriched_results = search_qs.search(q=decoded_query)
+    _record_engine_time(request, enriched_results.get("processing_time_ms"))
 
     relaxed_query = None
     if not enriched_results["results"] and (
         relaxed := _relaxed_query(decoded_query)
     ):
         enriched_results = search_qs.search(q=relaxed)
+        _record_engine_time(request, enriched_results.get("processing_time_ms"))
         if enriched_results["results"]:
             relaxed_query = relaxed
 
@@ -681,6 +723,7 @@ def federated_search(request):
             queries=multi_search_params["queries"],
             federation=multi_search_params["federation"],
         )
+        _record_engine_time(request, results.get("processingTimeMs"))
 
         relaxed_query = None
         if not results.get("hits") and (
@@ -696,6 +739,7 @@ def federated_search(request):
                 queries=retry_queries,
                 federation=multi_search_params["federation"],
             )
+            _record_engine_time(request, results.get("processingTimeMs"))
             if results.get("hits"):
                 relaxed_query = relaxed
 
@@ -894,11 +938,11 @@ def search_analytics(request):
     - Zero-result queries (queries that never returned results)
     - Search volume by content_type and language
     - Average results count
-    - Average processing time — ALWAYS 0.0. The analytics middleware
-      reads ``processingTimeMs`` off the search response body and no
-      search endpoint emits it (``meili/querysets.py`` drops the value
-      Meilisearch returns), so every row stores NULL and the aggregate
-      falls through to its ``or 0.0`` default.
+    - Average Meilisearch processing time. Engine time only — not
+      end-to-end latency — summed across every engine call the request
+      made (a relaxed-query retry is a second call). Recorded via
+      ``_record_engine_time`` on the request; rows predating that store
+      NULL and are excluded from the average.
     - Click-through rate (clicks / searches)
 
     Filters:

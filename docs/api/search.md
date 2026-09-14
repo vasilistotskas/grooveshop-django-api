@@ -175,11 +175,17 @@ Returns `dateRange`, `topQueries` (top 20 with `count`, `avgResults`,
 (`total`, `byContentType`, `byLanguage`), `performance`, and an overall
 `clickThroughRate`.
 
-> **`performance.avgProcessingTimeMs` is always `0.0`.** The analytics
-> middleware reads `processingTimeMs` off the search response body, and no
-> search endpoint emits it, so every `SearchQuery` row stores `NULL` and the
-> average falls through to its `or 0.0` default. Treat the number as absent,
-> not as "searches take no time". `performance.avgResultsCount` is real.
+`performance.avgProcessingTimeMs` is Meilisearch's own engine time, in
+whole milliseconds, averaged over the rows in range. It is **not** end-to-end
+request latency: it excludes Django, serialization and the network. Where a
+zero-result query was retried with its leading word dropped, the row carries
+both passes summed.
+
+The engine's timing is deliberately **not** in any search response — it is
+handed from the view to the analytics middleware on the request object, so it
+never became part of this contract. Rows written before 2026-09-14 store
+`NULL` and are excluded from the average; a range covering only those reports
+`0.0`.
 
 ---
 

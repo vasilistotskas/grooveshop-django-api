@@ -110,9 +110,24 @@ class SearchAnalyticsMiddleware(MiddlewareMixin):
                     estimated_total_hits = response_data.get(
                         "estimatedTotalHits"
                     ) or response_data.get("estimated_total_hits", 0)
-                    processing_time_ms = response_data.get(
+                    # Body fallback only. No search endpoint puts the
+                    # engine's timing in its response — deliberately, it
+                    # is not part of the public contract — so in practice
+                    # the value comes from the request attribute below.
+                    # Kept because it costs nothing and a future endpoint
+                    # may expose it.
+                    # ``is not None`` rather than ``or``: 0 ms is a real
+                    # reading from a small index, and an ``or`` chain
+                    # would discard it as falsy.
+                    body_processing_time_ms = response_data.get(
                         "processingTimeMs"
-                    ) or response_data.get("processing_time_ms")
+                    )
+                    if body_processing_time_ms is None:
+                        body_processing_time_ms = response_data.get(
+                            "processing_time_ms"
+                        )
+                    if body_processing_time_ms is not None:
+                        processing_time_ms = body_processing_time_ms
                     # The view mints a query_id per search response; the
                     # stored row carries it so a later click submitted
                     # with that id can be attributed to this query.
@@ -121,6 +136,14 @@ class SearchAnalyticsMiddleware(MiddlewareMixin):
                     ) or response_data.get("query_id")
             except (json.JSONDecodeError, AttributeError, KeyError) as e:
                 logger.debug(f"Could not parse response data: {e!s}")
+
+            # The view stamps Meilisearch's own processing time here (see
+            # ``search.views._record_engine_time``), summed over every
+            # engine call the request made. It wins over the body: it is
+            # the real measurement, while the body has never carried one.
+            engine_ms = getattr(request, "search_processing_time_ms", None)
+            if engine_ms is not None:
+                processing_time_ms = engine_ms
 
             # Extract user information
             user = request.user if request.user.is_authenticated else None

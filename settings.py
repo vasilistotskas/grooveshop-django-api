@@ -859,6 +859,9 @@ CELERY_WORKER_MAX_TASKS_PER_CHILD = (
 CELERY_WORKER_MAX_MEMORY_PER_CHILD = 250000  # 250MB limit per worker
 CELERY_WORKER_DISABLE_RATE_LIMITS = False
 CELERY_WORKER_PREFETCH_MULTIPLIER = 1  # Fetch one task at a time
+# Allow ``app.control.pool_restart()`` to recycle worker child processes
+# without restarting the pod.
+CELERY_WORKER_POOL_RESTARTS = True
 
 CELERY_RESULT_BACKEND_ALWAYS_RETRY = True
 CELERY_RESULT_BACKEND_MAX_RETRIES = 3
@@ -1220,7 +1223,9 @@ def get_celery_beat_schedule():
         },
         # Surface non-terminal ACS shipments with no tracking movement
         # for ACS_STALE_SHIPMENT_DAYS days (stuck parcels, dead
-        # vouchers) to ADMINS. Daily at 09:00 Athens so the digest
+        # vouchers) to the owning store's operators via
+        # ``tenant_admin_recipients()`` — platform ``ADMINS`` is only the
+        # fallback. Daily at 09:00 Athens so the digest
         # lands at the start of the working day; the claim flag inside
         # the task dedupes re-alerts.
         "check-stale-acs-shipments": {
@@ -4478,7 +4483,8 @@ ACS_API_BASE_URL = getenv(
 )
 ACS_HTTP_TIMEOUT = int(getenv("ACS_HTTP_TIMEOUT", "15"))
 # Days without a tracking event before a non-terminal shipment is
-# reported to ADMINS by check_stale_acs_shipments.
+# reported by check_stale_acs_shipments to the store's operators
+# (platform ADMINS only as a fallback).
 ACS_STALE_SHIPMENT_DAYS = int(getenv("ACS_STALE_SHIPMENT_DAYS", "3"))
 # Days after a COD parcel is DELIVERED before an absent ACS payout is
 # reported as overdue. The measured remittance lag is ~4 days, so 10

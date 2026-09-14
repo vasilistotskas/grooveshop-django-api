@@ -1,4 +1,12 @@
-"""Configuration for email template management system."""
+"""Optional preview metadata for the admin email-template page.
+
+Read by ``registry.py`` and ``preview_service.py`` and by nothing else — no
+sending path imports this module. Templates are discovered from disk, so an
+entry here is never required for a template to exist, be listed, or be sent;
+it only replaces the fallback description and category with better ones and
+supplies the subject the PREVIEW renders. The subject a customer actually
+receives is built by the task that sends the mail.
+"""
 
 from dataclasses import dataclass
 
@@ -12,7 +20,6 @@ class TemplateCategory:
     name: str  # Category name for display
     path: str  # Subdirectory path (empty string for root level)
     context_generator: str  # Method name to generate context
-    templates: dict[str, TemplateConfig]  # Template configurations
 
 
 @dataclass
@@ -24,7 +31,6 @@ class TemplateConfig:
     description: str  # Template description
     subject_template: str  # Subject line template with {variables}
     is_used: bool  # Whether template is actively used
-    context_keys: list[str]  # Required context keys for validation
     order_statuses: list[OrderStatus] | None = (
         None  # Associated order statuses (optional, only for order templates)
     )
@@ -36,9 +42,10 @@ class TemplateConfig:
 
 
 class EmailTemplateConfig:
-    """
-    Centralized configuration for all email templates.
-    This makes the system fully dynamic and easy to extend.
+    """Metadata for the subset of templates worth describing by hand.
+
+    Covers 10 of the templates on disk; the rest fall back to their
+    directory and a placeholder description in ``registry.py``.
     """
 
     # Category configurations
@@ -47,19 +54,16 @@ class EmailTemplateConfig:
             name="Order Lifecycle",
             path="order",
             context_generator="generate_order_context",
-            templates={},  # Populated below
         ),
         "subscription": TemplateCategory(
             name="Subscription",
             path="subscription",
             context_generator="generate_subscription_context",
-            templates={},
         ),
         "user": TemplateCategory(
             name="User Management",
             path="user",
             context_generator="generate_user_context",
-            templates={},
         ),
     }
 
@@ -73,7 +77,6 @@ class EmailTemplateConfig:
             subject_template="Your Order #{order[id]} Has Shipped",
             order_statuses=[OrderStatus.SHIPPED],
             is_used=True,
-            context_keys=["order", "items", "tracking_number", "carrier"],
         ),
         "order_delivered": TemplateConfig(
             name="order_delivered",
@@ -82,7 +85,6 @@ class EmailTemplateConfig:
             subject_template="Your Order #{order[id]} Has Been Delivered",
             order_statuses=[OrderStatus.DELIVERED],
             is_used=True,
-            context_keys=["order", "items"],
         ),
         "order_canceled": TemplateConfig(
             name="order_canceled",
@@ -91,7 +93,6 @@ class EmailTemplateConfig:
             subject_template="Your Order #{order[id]} Has Been Canceled",
             order_statuses=[OrderStatus.CANCELED],
             is_used=True,
-            context_keys=["order", "items"],
         ),
         "order_pending_reminder": TemplateConfig(
             name="order_pending_reminder",
@@ -100,7 +101,6 @@ class EmailTemplateConfig:
             subject_template="Reminder: Complete Your Order #{order[id]}",
             order_statuses=[OrderStatus.PENDING],
             is_used=True,
-            context_keys=["order", "items"],
         ),
         "order_status_generic": TemplateConfig(
             name="order_status_generic",
@@ -109,7 +109,6 @@ class EmailTemplateConfig:
             subject_template="Order #{order[id]} Status Update",
             order_statuses=[],
             is_used=True,
-            context_keys=["order", "items"],
         ),
         "order_completed": TemplateConfig(
             name="order_completed",
@@ -118,7 +117,6 @@ class EmailTemplateConfig:
             subject_template="Order #{order[id]} - Completed",
             order_statuses=[OrderStatus.COMPLETED],
             is_used=True,
-            context_keys=["order", "items"],
         ),
         "order_refunded": TemplateConfig(
             name="order_refunded",
@@ -127,7 +125,6 @@ class EmailTemplateConfig:
             subject_template="Order #{order[id]} - Refunded",
             order_statuses=[OrderStatus.REFUNDED],
             is_used=True,
-            context_keys=["order", "items"],
         ),
         "order_returned": TemplateConfig(
             name="order_returned",
@@ -136,7 +133,6 @@ class EmailTemplateConfig:
             subject_template="Order #{order[id]} - Returned",
             order_statuses=[OrderStatus.RETURNED],
             is_used=True,
-            context_keys=["order", "items"],
         ),
         # Subscription templates
         "confirmation": TemplateConfig(
@@ -145,7 +141,6 @@ class EmailTemplateConfig:
             description="Subscription confirmation email",
             subject_template="Subscription Confirmed",
             is_used=True,
-            context_keys=["user", "subscription"],
         ),
         # User management templates
         "inactive_user_email_template": TemplateConfig(
@@ -154,7 +149,6 @@ class EmailTemplateConfig:
             description="Inactive user notification",
             subject_template="We Miss You, {user[first_name]}!",
             is_used=True,
-            context_keys=["user", "app_base_url"],
         ),
     }
 

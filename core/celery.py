@@ -28,26 +28,17 @@ def config_loggers(*args, **kwargs):
 def create_celery_app():
     tasker = Celery("core")
 
-    # Load Django settings first (CELERY_* namespace)
+    # Every Celery option lives in settings.py under the CELERY_ namespace.
+    #
+    # A ``conf.update()`` here does NOT win, whatever the call order: a key
+    # supplied by ``config_from_object`` is resolved from that source each
+    # time it is read, so a later literal is shadowed rather than applied.
+    # This block used to carry a comment claiming the opposite, and with it
+    # ``task_ignore_result=False``, ``task_soft_time_limit=300`` and
+    # ``task_time_limit=600`` — none of which were ever in effect (the real
+    # values are True, 1500 and 1800). Add options to settings.py and
+    # resolve ``celery_app.conf[...]`` to check one, never infer from here.
     tasker.config_from_object("django.conf:settings", namespace="CELERY")
-
-    # Override with explicit values AFTER config_from_object
-    # so these take precedence over settings.py
-    tasker.conf.update(
-        enable_utc=True,
-        timezone=os.getenv("TIME_ZONE", "Europe/Athens"),
-        # Close database connections after each task
-        worker_pool_restarts=True,
-        # Don't store task results in database to avoid connection issues
-        task_ignore_result=False,
-        # Acknowledge tasks after execution to prevent re-execution on connection errors
-        task_acks_late=True,
-        # Prefetch only 1 task at a time to reduce connection pool pressure
-        worker_prefetch_multiplier=1,
-        # Set reasonable time limits
-        task_soft_time_limit=300,  # 5 minutes
-        task_time_limit=600,  # 10 minutes
-    )
 
     tasker.autodiscover_tasks()
 

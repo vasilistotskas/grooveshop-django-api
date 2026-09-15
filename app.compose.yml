@@ -1,11 +1,28 @@
 x-common-envs: &common-envs
-  UVICORN_RELOAD: true
   DB_HOST: db
   REDIS_HOST: redis
   MEILI_HOST: meilisearch
   CELERY_BROKER_URL: amqp://guest:guest@rabbitmq:5672
 
 x-common-vols: &common-vols
+  # The dev containers run ``manage.py runserver``, whose autoreloader
+  # is the whole point of this stack — but with no source mount it
+  # watched the copy baked in by ``dev.Dockerfile``'s ``COPY . .``, so
+  # editing a file on the host changed nothing until a rebuild. This
+  # bind is what makes the reload real.
+  - type: bind
+    source: .
+    target: /home/app
+  # Anonymous volumes that SHADOW the bind above (Docker resolves
+  # nested mounts by path depth, so the longer path wins). Both are
+  # host-hostile: ``.venv`` on the host is a WINDOWS virtualenv and
+  # would put win32 binaries where Linux expects ELF, and ``.cache/uv``
+  # is uv's Linux download cache. Keeping the image's copies is what
+  # stops the bind from breaking the container it is meant to serve.
+  - type: volume
+    target: /home/app/.venv
+  - type: volume
+    target: /home/app/.cache
   - type: volume
     source: staticfiles
     target: /home/app/staticfiles

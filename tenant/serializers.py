@@ -121,9 +121,20 @@ class TenantConfigSerializer(serializers.Serializer):
     product_feeds_enabled = serializers.SerializerMethodField()
 
     def get_agent_commerce_enabled(self, obj) -> bool:
-        from django_tenants.utils import schema_context
+        from django_tenants.utils import get_public_schema_name, schema_context
         from extra_settings.models import Setting
 
+        # The control plane is not a store. It has no catalogue and no
+        # pay ways, so every agent surface below is false by
+        # construction — and saying so here is what keeps
+        # ``get_agent_payment_instruments`` from running a PayWay query
+        # in the public schema, where ``pay_way`` (TENANT_APPS only)
+        # has no table. ``agent_commerce_enabled`` defaults to True on
+        # the model, so the public Tenant row inherited it and
+        # ``/tenant/resolve?domain=<platform host>`` answered 500 in
+        # production until this guard existed.
+        if obj.schema_name == get_public_schema_name():
+            return False
         if not obj.agent_commerce_enabled:
             return False
         with schema_context(obj.schema_name):

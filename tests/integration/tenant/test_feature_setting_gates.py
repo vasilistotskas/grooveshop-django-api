@@ -158,7 +158,7 @@ class TestTenantConfigAgentFlags:
         from tenant.serializers import TenantConfigSerializer
 
         tenant = Tenant(
-            schema_name="public",
+            schema_name="acme",
             name="t",
             agent_commerce_enabled=True,
         )
@@ -227,7 +227,7 @@ class TestTenantConfigAgentFlags:
         )
 
         tenant = Tenant(
-            schema_name="public", name="t", agent_commerce_enabled=True
+            schema_name="acme", name="t", agent_commerce_enabled=True
         )
         serializer = TenantConfigSerializer()
 
@@ -253,15 +253,64 @@ class TestTenantConfigAgentFlags:
         serializer = TenantConfigSerializer()
 
         # Plan flag off.
-        off = Tenant(
-            schema_name="public", name="t", agent_commerce_enabled=False
-        )
+        off = Tenant(schema_name="acme", name="t", agent_commerce_enabled=False)
         assert serializer.get_agent_payment_instruments(off) == []
 
         # Plan flag on, merchant extra-setting off.
-        on = Tenant(schema_name="public", name="t", agent_commerce_enabled=True)
+        on = Tenant(schema_name="acme", name="t", agent_commerce_enabled=True)
         with _settings_off("AGENT_COMMERCE_ENABLED"):
             assert serializer.get_agent_payment_instruments(on) == []
+
+    def test_control_plane_advertises_no_agent_surface(self):
+        """The public schema is the control plane, not a store.
+
+        ``agent_commerce_enabled`` defaults to True on the model, so the
+        public Tenant row inherits it, and every agent field below the
+        gate then runs against the public schema. ``pay_way`` is
+        TENANT_APPS-only, so ``pay_way_payway`` does not exist there and
+        ``/tenant/resolve?domain=<platform host>`` answered 500 in
+        PRODUCTION (verified 2026-09-15: ProgrammingError, relation
+        "pay_way_payway" does not exist).
+
+        The differential below is the point: identical rows, identical
+        flags, and the only difference is the schema.
+        """
+        from django_tenants.utils import get_public_schema_name
+
+        from pay_way.factories import PayWayFactory
+        from pay_way.models import PayWay
+        from tenant.models import Tenant
+        from tenant.serializers import TenantConfigSerializer
+
+        PayWay.objects.all().delete()
+        PayWayFactory(
+            active=True,
+            settlement=PaySettlement.COURIER_CASH,
+            provider_code="cash_on_delivery",
+        )
+        serializer = TenantConfigSerializer()
+
+        store = Tenant(
+            schema_name="acme", name="t", agent_commerce_enabled=True
+        )
+        assert serializer.get_agent_commerce_enabled(store) is True
+        assert serializer.get_agent_payment_instruments(store) == [
+            "cash_on_delivery"
+        ]
+
+        control_plane = Tenant(
+            schema_name=get_public_schema_name(),
+            name="Public (Platform)",
+            agent_commerce_enabled=True,
+        )
+        assert serializer.get_agent_commerce_enabled(control_plane) is False
+        # Short-circuited BEFORE the PayWay query — this is what stops
+        # the 500, not an empty result set.
+        assert serializer.get_agent_payment_instruments(control_plane) == []
+        assert serializer.get_product_feeds_enabled(control_plane) is False
+        assert (
+            serializer.get_agent_hosted_payment_enabled(control_plane) is False
+        )
 
     def test_hosted_payment_gate_needs_both_tiers(self):
         """Either tier alone can withdraw the feature.
@@ -275,7 +324,7 @@ class TestTenantConfigAgentFlags:
 
         serializer = TenantConfigSerializer()
         on = Tenant(
-            schema_name="public",
+            schema_name="acme",
             name="t",
             agent_commerce_enabled=True,
             agent_hosted_payment_enabled=True,
@@ -288,7 +337,7 @@ class TestTenantConfigAgentFlags:
 
         # Platform tier off.
         platform_off = Tenant(
-            schema_name="public",
+            schema_name="acme",
             name="t",
             agent_commerce_enabled=True,
             agent_hosted_payment_enabled=False,
@@ -303,7 +352,7 @@ class TestTenantConfigAgentFlags:
             assert serializer.get_agent_hosted_payment_enabled(on) is False
 
         commerce_off = Tenant(
-            schema_name="public",
+            schema_name="acme",
             name="t",
             agent_commerce_enabled=False,
             agent_hosted_payment_enabled=True,

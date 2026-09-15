@@ -62,6 +62,23 @@ class CeleryConfigTestCase(TestCase):
         self.assertEqual(
             conf["worker_pool_restarts"], settings.CELERY_WORKER_POOL_RESTARTS
         )
+        # Celery's own default is 4.0s, which is not enough time for a
+        # forked child to import this Django app inside a CPU-limited
+        # container — production logged "Timed out waiting for UP
+        # message" twice in six hours. Asserting the RESOLVED value
+        # rather than the setting's existence is the point: a later
+        # conf.update() in core/celery.py would be silently inert, which
+        # is exactly how task_ignore_result once ended up not applying.
+        self.assertEqual(
+            conf["worker_proc_alive_timeout"],
+            settings.CELERY_WORKER_PROC_ALIVE_TIMEOUT,
+        )
+        self.assertGreater(
+            conf["worker_proc_alive_timeout"],
+            4.0,
+            "still at Celery's default — a slow fork will be killed "
+            "rather than waited for",
+        )
 
     def tearDown(self):
         celery.app = None

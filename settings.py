@@ -862,6 +862,21 @@ CELERY_WORKER_PREFETCH_MULTIPLIER = 1  # Fetch one task at a time
 # Allow ``app.control.pool_restart()`` to recycle worker child processes
 # without restarting the pod.
 CELERY_WORKER_POOL_RESTARTS = True
+# Celery's default is 4.0s: a freshly forked pool child must send its
+# "UP" message within that, or the parent kills it and logs
+# "Timed out waiting for UP message from <ForkProcess(...)>". Four
+# seconds is not a realistic budget for a child that has to import this
+# Django app (196 models) inside a CPU-limited container — production
+# hit it twice in six hours on 2026-09-15, both times on the hour when
+# scheduled tasks bunch up, with the worker measured at 285s spent
+# waiting on CPU quota against 128s of CPU actually used.
+#
+# The CPU ceiling is being raised alongside this (infrastructure), which
+# is the real fix; this is the belt to that braces. A fork that is
+# merely SLOW should be waited for, not killed and retried — the retry
+# forks again into the same contention, which is how the prefork pool
+# gets into a fork/SIGKILL loop that consumes no tasks at all.
+CELERY_WORKER_PROC_ALIVE_TIMEOUT = 30.0
 
 CELERY_RESULT_BACKEND_ALWAYS_RETRY = True
 CELERY_RESULT_BACKEND_MAX_RETRIES = 3

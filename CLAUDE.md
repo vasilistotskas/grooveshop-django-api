@@ -207,6 +207,28 @@ Tests in `tests/` with `unit/`, `integration/`, and `utils/` subdirectories. Key
 - `Dockerfile` — Multi-stage Alpine build (uv → tailwind CSS → Python deps → production)
 - `dev.Dockerfile` — Debian slim with full dev environment
 
+**The dev stack bind-mounts your working tree.** `app.compose.yml` mounts `.`
+over `/home/app`, so `manage.py runserver`'s autoreloader sees your edits and
+restarts — before 2026-09-15 it watched the copy baked in by `COPY . .`, and a
+host edit did nothing until a rebuild, which is a genuinely expensive way to
+lose an afternoon. Two consequences worth knowing:
+
+- **The virtualenv lives at `/opt/venv`, not `/home/app/.venv`**
+  (`UV_PROJECT_ENVIRONMENT`), with uv's cache at `/opt/uv-cache`. Both sit
+  outside the bind so the host's `.venv` — a *Windows* virtualenv on a Windows
+  host — cannot shadow the container's. Anonymous volumes over those paths
+  would also work, but compose REUSES anonymous volumes across recreates, so
+  the first dependency bump would leave a stale env masking the rebuilt image.
+- **Rebuild every app service together**, not just `backend`:
+  `docker compose build backend backend-init celery_worker celery_beat celery_flower`.
+  They share `dev.Dockerfile`, and a half-rebuilt stack fails in a way that
+  reads like a permissions bug (`backend-init` on the old image cannot write
+  `/home/app/.cache/uv`, which is now your host checkout).
+
+If the container seems to ignore a change, confirm it is actually running your
+code — `docker compose exec backend grep <something> path/to/file.py` — before
+debugging the code.
+
 ### CI/CD
 
 GitHub Actions (`.github/workflows/ci.yml`) jobs:

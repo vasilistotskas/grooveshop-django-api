@@ -48,6 +48,29 @@ Guards
   of quietly cascading into shared data.
 * Names only tables that actually exist, so it is a no-op on any
   database created after the cutover.
+
+Legacy inbound foreign keys
+---------------------------
+The no-CASCADE guard fires on a real database lineage, not a
+hypothetical one. ``UserAccount.loyalty_tier`` declares
+``db_constraint=False`` — UserAccount is SHARED, LoyaltyTier is TENANT,
+and PostgreSQL cannot enforce a cross-schema FK — but a pre-cutover
+database still carries the CONSTRAINT Django created back when both
+tables shared one schema. The drop then aborts with "constraint
+user_useraccount_loyalty_tier_id_... depends on table loyalty_tier",
+and the residue is unreachable.
+
+``prune_public_legacy_data`` handled this and was deleted with the rest
+of that command, so the repair disappeared from the repo while the
+databases that need it did not. It is back here: inbound FKs whose
+REFERENCING table sits outside the residue set are neutralised first —
+the column is NULLed and the constraint dropped — and only when every
+such column is nullable. A NOT NULL column means the reference is real
+and load-bearing, so the command aborts and says which one.
+
+Confined to constraints pointing INTO the residue from outside it.
+FKs wholly inside the set are dropped with their tables, which is why
+``DROP TABLE`` lists them all in one statement.
 """
 
 from __future__ import annotations
@@ -102,6 +125,20 @@ class Command(BaseCommand):
             line = f"  {table:52} rows={rows}"
             self.stdout.write(self.style.WARNING(line) if rows else line)
 
+        inbound = self._legacy_inbound_fks(public, residue)
+        if inbound:
+            self.stdout.write(
+                f"\n{len(inbound)} legacy inbound foreign key(s) point "
+                f"into the residue from outside it:"
+            )
+            for fk in inbound:
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"  {fk['table']}.{fk['column']} -> "
+                        f"{fk['references']}  ({fk['name']})"
+                    )
+                )
+
         if not options["yes"]:
             self.stdout.write(
                 self.style.WARNING(
@@ -109,6 +146,8 @@ class Command(BaseCommand):
                 )
             )
             return
+
+        self._neutralize_legacy_inbound_fks(inbound)
 
         quoted = ", ".join(f'{public}."{table}"' for table in residue)
         with connection.cursor() as cursor:
@@ -156,6 +195,92 @@ class Command(BaseCommand):
             )
             present = {row[0] for row in cursor.fetchall()}
         return sorted(present & expected)
+
+    @staticmethod
+    def _legacy_inbound_fks(public: str, residue: list[str]) -> list[dict]:
+        """FK constraints pointing INTO the residue from outside it.
+
+        These are the ones ``DROP TABLE`` without CASCADE refuses on.
+        Constraints wholly inside the residue are ignored: they go with
+        their tables in the same statement.
+        """
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                select con.conname,
+                       src.relname,
+                       att.attname,
+                       tgt.relname,
+                       att.attnotnull
+                  from pg_constraint con
+                  join pg_class src on src.oid = con.conrelid
+                  join pg_class tgt on tgt.oid = con.confrelid
+                  join pg_namespace ns on ns.oid = src.relnamespace
+                  join unnest(con.conkey) as k(attnum) on true
+                  join pg_attribute att
+                    on att.attrelid = con.conrelid
+                   and att.attnum = k.attnum
+                 where con.contype = 'f'
+                   and ns.nspname = %s
+                   and tgt.relname = any(%s)
+                   and src.relname <> all(%s)
+                 order by src.relname, con.conname
+                """,
+                [public, list(residue), list(residue)],
+            )
+            return [
+                {
+                    "name": name,
+                    "table": table,
+                    "column": column,
+                    "references": referenced,
+                    "not_null": not_null,
+                }
+                for name, table, column, referenced, not_null in (
+                    cursor.fetchall()
+                )
+            ]
+
+    def _neutralize_legacy_inbound_fks(self, inbound: list[dict]) -> None:
+        """NULL the referencing column and drop the debris constraint.
+
+        Aborts on a NOT NULL column rather than inventing a value: that
+        is a real reference the cutover did not sever, and dropping the
+        table it points at would be data loss, not cleanup.
+        """
+        if not inbound:
+            return
+
+        blocking = [fk for fk in inbound if fk["not_null"]]
+        if blocking:
+            detail = ", ".join(
+                f"{fk['table']}.{fk['column']}" for fk in blocking
+            )
+            raise CommandError(
+                f"Refusing to neutralize NOT NULL reference(s) into the "
+                f"residue: {detail}. A non-nullable column pointing at a "
+                f"tenant table means the cutover left a real dependency "
+                f"behind; resolve it deliberately before dropping."
+            )
+
+        with connection.cursor() as cursor:
+            for fk in inbound:
+                cursor.execute(
+                    f'update public."{fk["table"]}" '
+                    f'set "{fk["column"]}" = null '
+                    f'where "{fk["column"]}" is not null'
+                )
+                cleared = cursor.rowcount
+                cursor.execute(
+                    f'alter table public."{fk["table"]}" '
+                    f'drop constraint "{fk["name"]}"'
+                )
+                self.stdout.write(
+                    self.style.SUCCESS(
+                        f"  neutralized {fk['table']}.{fk['column']} "
+                        f"({cleared} row(s) cleared), dropped {fk['name']}"
+                    )
+                )
 
     @staticmethod
     def _row_counts(tables: list[str]) -> dict[str, int]:

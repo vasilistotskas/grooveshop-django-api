@@ -165,3 +165,97 @@ class TestExecution:
         output = _run(yes=True)
 
         assert "rows=3" in output
+
+
+@pytest.mark.django_db
+class TestLegacyInboundForeignKeys:
+    """The no-CASCADE guard fires on a real database lineage.
+
+    ``UserAccount.loyalty_tier`` declares ``db_constraint=False`` because
+    the two tables live in different schemas, but a pre-cutover database
+    still carries the constraint Django created when they shared one.
+    Without neutralization the drop aborts and the residue is
+    unreachable — which is exactly what a local pre-cutover database did
+    on 2026-09-15.
+    """
+
+    @staticmethod
+    def _setup(monkeypatch, settings, *, not_null: bool):
+        settings.DATABASE_ROUTERS = [ROUTER_PATH]
+        monkeypatch.setattr(
+            connection, "schema_name", get_public_schema_name(), raising=False
+        )
+        public = get_public_schema_name()
+        residue = "unit_lane_fake_tenant_table"
+        referrer = "unit_lane_shared_referrer"
+        monkeypatch.setattr(
+            "tenant.app_labels.tenant_only_table_names", lambda: {residue}
+        )
+
+        null_clause = "not null" if not_null else ""
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f'create table {public}."{residue}" (id serial primary key)'
+            )
+            cursor.execute(f'insert into {public}."{residue}" default values')
+            cursor.execute(
+                f'create table {public}."{referrer}" ('
+                f"  id serial primary key,"
+                f'  tier_id bigint {null_clause} references {public}."{residue}"(id)'
+                f")"
+            )
+            cursor.execute(
+                f'insert into {public}."{referrer}" (tier_id) values (1)'
+            )
+        return public, residue, referrer
+
+    def test_nullable_reference_is_neutralized_then_dropped(
+        self, settings, monkeypatch
+    ):
+        public, residue, referrer = self._setup(
+            monkeypatch, settings, not_null=False
+        )
+
+        output = _run(yes=True)
+
+        assert "neutralized" in output
+        assert "Dropped 1 table" in output
+        with connection.cursor() as cursor:
+            cursor.execute("select to_regclass(%s)", [f"{public}.{residue}"])
+            assert cursor.fetchone()[0] is None, "residue survived"
+            # The referring row stays; only the dangling pointer is cleared.
+            cursor.execute(
+                f'select count(*), count(tier_id) from {public}."{referrer}"'
+            )
+            total, non_null = cursor.fetchone()
+        assert (total, non_null) == (1, 0)
+
+    def test_not_null_reference_aborts_without_dropping(
+        self, settings, monkeypatch
+    ):
+        """A non-nullable pointer is a real dependency, not debris."""
+        public, residue, _referrer = self._setup(
+            monkeypatch, settings, not_null=True
+        )
+
+        with pytest.raises(CommandError, match="NOT NULL"):
+            _run(yes=True)
+
+        with connection.cursor() as cursor:
+            cursor.execute("select to_regclass(%s)", [f"{public}.{residue}"])
+            assert cursor.fetchone()[0] is not None, "residue was dropped"
+
+    def test_dry_run_reports_the_blocker_without_touching_it(
+        self, settings, monkeypatch
+    ):
+        public, _residue, referrer = self._setup(
+            monkeypatch, settings, not_null=False
+        )
+
+        output = _run()
+
+        assert "legacy inbound foreign key" in output
+        assert f"{referrer}.tier_id" in output
+        with connection.cursor() as cursor:
+            cursor.execute(f'select count(tier_id) from {public}."{referrer}"')
+            assert cursor.fetchone()[0] == 1, "dry run cleared a column"

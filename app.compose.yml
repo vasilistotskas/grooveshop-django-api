@@ -13,16 +13,11 @@ x-common-vols: &common-vols
   - type: bind
     source: .
     target: /home/app
-  # Anonymous volumes that SHADOW the bind above (Docker resolves
-  # nested mounts by path depth, so the longer path wins). Both are
-  # host-hostile: ``.venv`` on the host is a WINDOWS virtualenv and
-  # would put win32 binaries where Linux expects ELF, and ``.cache/uv``
-  # is uv's Linux download cache. Keeping the image's copies is what
-  # stops the bind from breaking the container it is meant to serve.
-  - type: volume
-    target: /home/app/.venv
-  - type: volume
-    target: /home/app/.cache
+  # No overlay is needed for the virtualenv: ``dev.Dockerfile`` builds
+  # it at /opt/venv (UV_PROJECT_ENVIRONMENT), outside the bind. An
+  # anonymous volume over /home/app/.venv would also work, but compose
+  # REUSES anonymous volumes across recreates, so the first dependency
+  # bump would leave a stale env shadowing the rebuilt image.
   - type: volume
     source: staticfiles
     target: /home/app/staticfiles

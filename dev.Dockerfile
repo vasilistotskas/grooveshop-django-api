@@ -70,17 +70,38 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY --chown=appuser:appgroup --from=uv /uv /uvx /bin/
 
+# The virtualenv and uv's cache live OUTSIDE ${APP_PATH} because the dev
+# compose stack bind-mounts the host source over it so runserver's
+# autoreloader sees real edits. A venv at ${APP_PATH}/.venv would be
+# shadowed by the host's — which on Windows is a win32 venv, i.e. the
+# wrong ABI entirely. Keeping it at /opt also avoids papering over the
+# bind with anonymous volumes, which compose REUSES across recreates and
+# which therefore go stale the first time someone bumps a dependency.
+ENV UV_PROJECT_ENVIRONMENT=/opt/venv \
+    UV_CACHE_DIR=/opt/uv-cache \
+    PATH=/opt/venv/bin:${PATH}
+
+RUN mkdir -p /opt/venv /opt/uv-cache \
+    && chown -R appuser:appgroup /opt/venv /opt/uv-cache
+
 WORKDIR ${APP_PATH}
 
 COPY --chown=appuser:appgroup pyproject.toml uv.lock ./
 
-RUN --mount=type=cache,target=${APP_PATH}/.cache/uv,uid=${UID},gid=${GID} \
+RUN --mount=type=cache,target=/opt/uv-cache,uid=${UID},gid=${GID} \
     uv sync --frozen --no-install-project --no-editable
 
 COPY --chown=appuser:appgroup . .
 
-RUN --mount=type=cache,target=${APP_PATH}/.cache/uv,uid=${UID},gid=${GID} \
+RUN --mount=type=cache,target=/opt/uv-cache,uid=${UID},gid=${GID} \
     uv sync --frozen --no-editable
+
+# The uv syncs above run as root (USER comes later), so anything they
+# leave outside the cache mount is root-owned and the app user cannot
+# write it at runtime — uv then fails with "Failed to initialize cache
+# at /opt/uv-cache". Re-assert ownership rather than relying on how
+# BuildKit happens to unmount a cache.
+RUN chown -R appuser:appgroup /opt/venv /opt/uv-cache
 
 FROM base AS default
 

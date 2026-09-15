@@ -1,4 +1,5 @@
 import logging
+import smtplib
 from tempfile import NamedTemporaryFile
 
 import requests
@@ -333,14 +334,66 @@ def cleanup_expired_data_exports(self) -> dict:
     return {"status": "success", "expired": expired, "stranded": stranded}
 
 
+def _smtp_codes(exc: BaseException) -> list[int]:
+    """Every SMTP status code carried by ``exc``, if any.
+
+    ``SMTPResponseException`` exposes one on ``smtp_code``.
+    ``SMTPRecipientsRefused`` is not one of those — it carries
+    ``{address: (code, message)}`` instead, and ``sendmail`` only raises
+    it when EVERY recipient was refused, so all of its codes matter.
+    A connection-level failure (a dropped socket, a TLS error, a DNS
+    failure) carries no code at all, which is itself the signal.
+    """
+    codes: list[int] = []
+    code = getattr(exc, "smtp_code", None)
+    if isinstance(code, int):
+        codes.append(code)
+    recipients = getattr(exc, "recipients", None)
+    if isinstance(recipients, dict):
+        codes.extend(
+            entry[0]
+            for entry in recipients.values()
+            if isinstance(entry, tuple) and isinstance(entry[0], int)
+        )
+    return codes
+
+
+def _is_permanent_smtp_failure(exc: BaseException) -> bool:
+    """Whether retrying ``exc`` could ever succeed.
+
+    RFC 5321 puts the answer in the CODE, not the exception class: 4xx
+    means "try again", 5xx means "do not". The class is a poor proxy —
+    ``SMTPConnectError(421)`` and ``SMTPAuthenticationError(535)`` are
+    both ``SMTPResponseException``, and only the first is worth a
+    retry. Retrying a 535 five times with backoff is how an account
+    gets locked by the provider.
+
+    No code means the SMTP conversation never got far enough to produce
+    one (socket, DNS, TLS) — transient by nature, so retry.
+    """
+    if isinstance(exc, smtplib.SMTPNotSupportedError):
+        # The server told us it cannot do what we asked. Another
+        # attempt asks the same question.
+        return True
+    codes = _smtp_codes(exc)
+    return bool(codes) and all(500 <= code < 600 for code in codes)
+
+
 @celery_app.task(
     base=MonitoredTask,
     bind=True,
-    autoretry_for=(OSError,),
+    # NOT ``autoretry_for``: it can only match on exception CLASS, and
+    # the retryable/permanent split here is by SMTP code. See
+    # ``_is_permanent_smtp_failure``.
     retry_backoff=True,
     retry_backoff_max=600,
     retry_jitter=True,
     max_retries=5,
+    # The rendered mail is the payload, and for a password reset or a
+    # login code that payload IS the secret. Without this, the one-time
+    # link lands in ``MonitoredTask.on_failure``'s ERROR log on exactly
+    # the failure the retry logic exists to handle.
+    sensitive_kwargs=frozenset({"body", "html_body"}),
 )
 def send_rendered_email_task(
     self,
@@ -380,7 +433,41 @@ def send_rendered_email_task(
     )
     if html_body:
         msg.attach_alternative(html_body, "text/html")
-    msg.send(fail_silently=False)
+
+    try:
+        msg.send(fail_silently=False)
+    except OSError as exc:
+        # ``OSError`` is the whole surface: every smtplib exception
+        # derives from it, and so do the socket/TLS failures that never
+        # reach a reply. What to DO about it is the code's business.
+        codes = _smtp_codes(exc)
+        reason = codes or type(exc).__name__
+        if _is_permanent_smtp_failure(exc):
+            # Re-raised, not retried: five attempts with backoff cannot
+            # fix a refused mailbox or a rejected credential, and they
+            # delay the failure record by ten minutes. The address is
+            # kept — it is the one thing that makes this actionable —
+            # while the body stays out of the log via
+            # ``sensitive_kwargs``.
+            logger.error(
+                "send_rendered_email_task: permanent SMTP failure %s for "
+                "%r to %s; not retrying",
+                reason,
+                subject,
+                ", ".join(to),
+                extra={"subject": subject, "smtp_codes": codes},
+            )
+            raise
+        logger.warning(
+            "send_rendered_email_task: transient SMTP failure %s for %r "
+            "(attempt %s/%s); retrying",
+            reason,
+            subject,
+            self.request.retries + 1,
+            self.max_retries,
+            extra={"subject": subject, "smtp_codes": codes},
+        )
+        raise self.retry(exc=exc) from exc
 
     logger.info(
         "send_rendered_email_task: delivered %r to %s recipient(s)",

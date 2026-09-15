@@ -57,6 +57,15 @@ def _safe_repr(value: Any, key: str | None = None) -> str:
 class MonitoredTask(TenantTask):
     """Base task with tenant context propagation and monitoring."""
 
+    #: Kwarg names whose VALUES must never reach the logs, whatever they
+    #: are called. ``_safe_repr`` masks by NAME — it catches ``token`` and
+    #: ``password`` — but a payload can carry a secret under an innocent
+    #: key. ``send_rendered_email_task`` is the case that forced this:
+    #: its ``body`` kwarg is a rendered password-reset mail, so the
+    #: one-time reset link landed in an ERROR log on the exact failure
+    #: this masking exists for.
+    sensitive_kwargs: frozenset[str] = frozenset()
+
     def on_success(self, retval, task_id, args, kwargs):
         logger.info(
             f"Task {self.name} completed successfully. Task ID: {task_id}"
@@ -64,8 +73,10 @@ class MonitoredTask(TenantTask):
 
     def on_failure(self, exc, task_id, args, kwargs, einfo):
         safe_args = [_safe_repr(a) for a in (args or [])]
+        sensitive = self.sensitive_kwargs
         safe_kwargs = {
-            k: _safe_repr(v, key=k) for k, v in (kwargs or {}).items()
+            k: ("***" if k in sensitive else _safe_repr(v, key=k))
+            for k, v in (kwargs or {}).items()
         }
         logger.error(
             "Task %s failed. Task ID: %s, Error: %s, args=%s, kwargs=%s",

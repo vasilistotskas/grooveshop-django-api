@@ -3,6 +3,52 @@
 
 
 
+## v3.59.0 (2026-09-15)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.58.2 [skip ci] ([`bf5c406`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bf5c4068348c9bf88d3256ac7312315d0bbf62c7))
+
+### Features
+
+* feat(promotion): per-product offers and a pre-judged checkout coupon picker
+
+Automatic promotions only reveal themselves once the cart already
+qualifies, and a coupon only once it is typed. Two new read surfaces
+close that gap, and both compose the SAME advertisability rule the
+offers page uses.
+
+* `GET /promotion/product/{productId}` — the live offers touching one
+  product, each tagged with the RELATION that makes it relevant
+  (PRODUCT / REWARD / CATEGORY / ORDER). Scope and exclusions resolve
+  with the same rules `PromotionEngine._matching_items` applies at cart
+  time, so an excluded product never advertises the offer that skips
+  it; exclusions constrain what must be BOUGHT, so they do not suppress
+  a REWARD claim. FREE_GIFT mirrors `_gift_entitlement` exactly.
+
+* `GET /cart/coupons` — the advertisable codes plus the signed-in
+  shopper's personal coupons, each carrying the verdict
+  `CouponService.apply` would give for the cart as it stands. `apply`
+  raises on ANY rejection the evaluation produces, COMBINATION_DISALLOWED
+  included, so a non-stackable coupon beaten by the automatic offers is
+  reported ineligible rather than as an enabled button that answers 400.
+  `discountAmount` is measured against the automatic offers alone,
+  because applying a coupon REPLACES the attached one.
+
+"May a shopper be told about this promotion?" moves into
+`PromotionQuerySet.publicly_listable`, so the three surfaces cannot
+drift apart. `evaluate()` is factored into `_classify`, `_amount_for`
+and a now non-mutating `_clamp` so the picker reuses the engine instead
+of re-implementing the rules — it costs ONE candidate-collection pass
+regardless of how many codes the store publishes.
+
+The `promotions` cache surface now also purges the product handler and
+the rendered /products routes: the product page renders offers, so a
+scope edit otherwise leaves every PDP advertising the old one.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013jg6hxtzpFpkLqiUBKPkQN ([`32ee24e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/32ee24ec18eddac15ec3891dcc10085d0b3f5616))
+
 ## v3.58.2 (2026-09-14)
 
 ### Bug fixes

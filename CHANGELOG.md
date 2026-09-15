@@ -3,6 +3,42 @@
 
 
 
+## v3.60.5 (2026-09-15)
+
+### Bug fixes
+
+* fix(celery): 4s is not enough time to fork a Django worker
+
+Celery kills a freshly forked pool child that has not sent its "UP"
+message within worker_proc_alive_timeout, default 4.0s. Production hit
+it twice in six hours — "Timed out waiting for UP message from
+<ForkProcess(ForkPoolWorker-N)>" — both times on the hour, when
+scheduled tasks bunch up and the pool is busiest.
+
+Four seconds is not a realistic budget for a child that has to import
+this application (196 models) inside a CPU-limited container. The
+worker was measured spending 285s waiting on CPU quota against 128s of
+CPU actually used, so a fork lands in contention by default.
+
+Raising the CPU ceiling is the real fix and ships separately in the
+infrastructure repo; this is the belt to that braces. A fork that is
+merely SLOW should be waited for, not killed — the kill forks again
+into the same contention, which is how Celery's prefork pool degrades
+into a fork/SIGKILL loop that consumes no tasks at all.
+
+The test asserts the RESOLVED app.conf value, not that the setting
+exists. That distinction has bitten this codebase before: a later
+conf.update() in core/celery.py is silently inert against a CELERY_*
+Django setting, which is how task_ignore_result once ended up not
+applying. Mutation-checked — restoring 4.0 fails it.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01HiNVpz9cGfnvaPNwKSKJKd ([`8acb430`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8acb43070e76a51ab87cb74b05cba4c233b5e627))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.60.4 [skip ci] ([`c641c84`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c641c84b086bd7f5dfb73ac9a159731d784d8a49))
+
 ## v3.60.4 (2026-09-15)
 
 ### Bug fixes

@@ -3,6 +3,47 @@
 
 
 
+## v3.60.3 (2026-09-15)
+
+### Bug fixes
+
+* fix(user): a busy mail server must not 500 the signup
+
+Production, 2026-09-15: smtp.gmail.com answered 421 "4.4.5 Server
+busy, try again later" and the smtplib.SMTPConnectError propagated
+straight out of /_allauth/app/v1/auth/signup as an Internal Server
+Error. A real person could not create an account because the mail
+provider was briefly rate limiting us.
+
+allauth sends its own mail synchronously inside the view, so every
+account email — signup confirmation, password reset, login code,
+email change — carried the mail provider's availability into the
+request's status code.
+
+Rendering stays in the request: it needs the active tenant, the user's
+language and allauth's own context. Only the SMTP conversation moves
+to Celery, where a 421 is a retry with backoff instead of a 500.
+OSError is the right net for autoretry_for — every smtplib exception
+derives from it.
+
+dispatch_on_commit rather than .delay(): a confirmation must not go
+out for a signup whose transaction then rolls back, and the schema has
+to be pinned at registration rather than read from a connection that
+has since snapped back to public.
+
+This is worth doing independently of which mail relay we end up on —
+any provider can return 421, and account creation should survive it.
+
+Four tests, all mutation-checked: reverting to allauth's synchronous
+send fails every one.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01HiNVpz9cGfnvaPNwKSKJKd ([`7a2387c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7a2387c151876a95907dc62ae6cd4c0e1dc7a46e))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.60.2 [skip ci] ([`e43c5fc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e43c5fcf29bbcdc291810c12eb8302089008d948))
+
 ## v3.60.2 (2026-09-15)
 
 ### Bug fixes

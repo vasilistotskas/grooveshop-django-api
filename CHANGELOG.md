@@ -3,6 +3,49 @@
 
 
 
+## v3.60.0 (2026-09-15)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.59.0 [skip ci] ([`3689f3c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3689f3cf472e47434c07e3fc9886d69646bcae29))
+
+### Features
+
+* feat(tenant): fail loudly when the platform sender is a tenant's domain
+
+DEFAULT_FROM_EMAIL is the platform-wide fallback that
+tenant_from_email() hands to every tenant without a verified domain of
+its own. Production has it set to info@webside.gr — tenant #1's address
+— so Εκ Φύσεως Φυτειάς, Demo and Delta Sigma all send under tenant #1's
+domain, on a relay that domain authorises for neither SPF nor DKIM.
+Nothing detected it for months; it surfaced only because a customer
+never received an order confirmation.
+
+Same class as the assets.webside.gr bug, and the lesson there was that
+the invariant has to be CHECKED rather than remembered. So:
+validate_platform_email resolves DEFAULT_FROM_EMAIL's domain against
+every TenantDomain and exits 1 when a tenant owns it.
+
+Matching is by registrable suffix, not equality: no-reply@mail.<tenant
+domain> is still that tenant's domain and its reputation, and an
+equality check waves it through. Display-name form is parsed, since
+DEFAULT_FROM_EMAIL may legitimately carry one. An unset sender is a
+warning (a different, louder-at-send-time problem), promoted to a
+failure by --strict.
+
+Verified against production data: exits 1 today, which is the point.
+
+Tests live in tests_mt/ because the check is only meaningful against
+real TenantDomain rows, which tests/conftest.py deliberately strips
+multi-tenancy away from. Five tests, all mutation-checked.
+
+Not wired into the PreSync hook yet: the value it rejects is the one
+production is running, so a fatal deploy-time check would block every
+deploy until a platform sending domain exists.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01HiNVpz9cGfnvaPNwKSKJKd ([`75406f4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/75406f489d62bd48e09b5663ac85b8c355a08031))
+
 ## v3.59.0 (2026-09-15)
 
 ### Chores

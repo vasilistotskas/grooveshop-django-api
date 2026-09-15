@@ -55,7 +55,42 @@ class UserAccountAdapter(DefaultAccountAdapter):
             **context,
         }
         with translation.override(language):
-            return super().send_mail(template_prefix, email, merged_context)
+            msg = self.render_mail(template_prefix, email, merged_context)
+
+        # Render here, SEND out of band. allauth's own send_mail talks
+        # SMTP inside the view, so on 2026-09-15 a transient
+        # smtp.gmail.com 421 ("Server busy") surfaced as a 500 from
+        # /_allauth/app/v1/auth/signup and a real person could not
+        # create an account. Rendering has to stay in the request — it
+        # needs the tenant, the language and allauth's context — but the
+        # SMTP conversation does not, and in a task a 421 is a retry.
+        #
+        # dispatch_on_commit, not .delay(): the confirmation must not go
+        # out for a signup whose transaction then rolls back, and the
+        # schema has to be pinned at registration rather than read from
+        # a connection that has since snapped back to public.
+        from tenant.celery import dispatch_on_commit
+        from user.tasks import send_rendered_email_task
+
+        html_body = next(
+            (
+                content
+                for content, mimetype in getattr(msg, "alternatives", [])
+                if mimetype == "text/html"
+            ),
+            None,
+        )
+        dispatch_on_commit(
+            send_rendered_email_task,
+            kwargs={
+                "subject": msg.subject,
+                "body": msg.body,
+                "from_email": msg.from_email,
+                "to": list(msg.to),
+                "html_body": html_body,
+                "reply_to": list(msg.reply_to or []),
+            },
+        )
 
     def format_email_subject(self, subject: str) -> str:
         """Prefix the subject with the active tenant's display name.

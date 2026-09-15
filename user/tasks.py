@@ -331,3 +331,61 @@ def cleanup_expired_data_exports(self) -> dict:
         stranded,
     )
     return {"status": "success", "expired": expired, "stranded": stranded}
+
+
+@celery_app.task(
+    base=MonitoredTask,
+    bind=True,
+    autoretry_for=(OSError,),
+    retry_backoff=True,
+    retry_backoff_max=600,
+    retry_jitter=True,
+    max_retries=5,
+)
+def send_rendered_email_task(
+    self,
+    *,
+    subject: str,
+    body: str,
+    from_email: str,
+    to: list[str],
+    html_body: str | None = None,
+    reply_to: list[str] | None = None,
+) -> dict[str, object]:
+    """Deliver an ALREADY-RENDERED message, out of the request path.
+
+    Exists because allauth sends its own mail synchronously inside the
+    view. On 2026-09-15 smtp.gmail.com answered 421 "Server busy" and
+    the ``smtplib.SMTPConnectError`` propagated straight out of
+    ``/_allauth/app/v1/auth/signup`` as a 500 — a real person could not
+    create an account because the mail provider was briefly rate
+    limiting us. A transient dependency must not fail account creation.
+
+    Rendering stays in the request (it needs the tenant, the language
+    and allauth's own context); only the SMTP conversation moves here,
+    where a 421 is a retry instead of a 500. ``OSError`` is the right
+    net: every ``smtplib`` exception derives from it.
+
+    Primitives only, per the Celery conventions — an ``EmailMessage``
+    does not belong on the wire.
+    """
+    from django.core.mail import EmailMultiAlternatives
+
+    msg = EmailMultiAlternatives(
+        subject=subject,
+        body=body,
+        from_email=from_email or None,
+        to=to,
+        reply_to=reply_to or None,
+    )
+    if html_body:
+        msg.attach_alternative(html_body, "text/html")
+    msg.send(fail_silently=False)
+
+    logger.info(
+        "send_rendered_email_task: delivered %r to %s recipient(s)",
+        subject,
+        len(to),
+        extra={"subject": subject, "recipients": len(to)},
+    )
+    return {"status": "sent", "recipients": len(to)}

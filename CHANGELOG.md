@@ -3,6 +3,61 @@
 
 
 
+## v3.60.1 (2026-09-15)
+
+### Bug fixes
+
+* fix(tenant): the control plane advertises no agent surface
+
+`/api/v1/tenant/resolve?domain=<platform host>` answered **500 in
+production**. `Tenant.agent_commerce_enabled` defaults to True, so the
+public row inherited it; `get_agent_payment_instruments` is subordinate
+to that gate, so it entered `schema_context("public")` and queried
+`pay_way_payway` — and `pay_way` is TENANT_APPS-only, so the table
+correctly does not exist in the public schema.
+
+Reproduced against the production database on 2026-09-15:
+ProgrammingError, relation "pay_way_payway" does not exist. Locally the
+same bug wore a different mask: that schema carries a STALE pre-cutover
+copy of the table, so it failed on the missing `settlement` column
+instead.
+
+The public schema is the control plane, not a store — no catalogue, no
+pay ways, no agent surface — so `get_agent_commerce_enabled` now says so
+directly. Every agent field (`product_feeds_enabled`,
+`agent_hosted_payment_enabled`, `agent_payment_instruments`) is already
+subordinate to it, so one guard short-circuits all of them BEFORE the
+PayWay query, which is what stops the 500 rather than returning an empty
+set from it.
+
+The platform tenant's flag is also being set to False by hand in every
+environment; this guard is what makes that belt-and-braces instead of
+load-bearing.
+
+The existing tests in TestTenantConfigAgentFlags built their fixtures
+with `schema_name="public"` incidentally — it is simply the schema that
+always exists in the stripped `tests/` lane. They describe a STORE, so
+they move to a store-shaped name, and the control plane gets its own
+differential test: identical rows and flags, only the schema differs.
+
+---
+
+Unrelated, same file-touch: `app.compose.yml` declared
+`UVICORN_RELOAD: true`, which nothing reads (one grep hit — its own
+declaration), while the dev containers run `manage.py runserver`, whose
+autoreloader IS the reload mechanism. It watched the copy baked in by
+`dev.Dockerfile`'s `COPY . .`, so a host edit did nothing until a
+rebuild. Binding the source makes the reload real; anonymous volumes
+shadow `.venv` (the host's is a WINDOWS virtualenv) and `.cache`.
+Verified: container picks up an uncommitted host edit and reloads.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013jg6hxtzpFpkLqiUBKPkQN ([`509719f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/509719fd69826114d617487724af94ec5f351d93))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.60.0 [skip ci] ([`11bbe3e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/11bbe3e1abcca221f414237a0f4949d07f18cff2))
+
 ## v3.60.0 (2026-09-15)
 
 ### Chores

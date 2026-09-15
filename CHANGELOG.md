@@ -3,6 +3,66 @@
 
 
 
+## v3.60.2 (2026-09-15)
+
+### Bug fixes
+
+* fix(tenant): restore FK neutralization to the public-residue drop
+
+`drop_public_tenant_residue` aborted on any database that still carries
+the pre-cutover constraint `user_useraccount_loyalty_tier_id_... ->
+loyalty_tier`. The model declares `db_constraint=False` (UserAccount is
+SHARED, LoyaltyTier is TENANT, and PostgreSQL cannot enforce an FK
+across schemas), but a database that predates the split still has the
+constraint Django created when both tables shared one schema. The
+no-CASCADE drop then refuses — correctly — and the residue becomes
+unreachable.
+
+`prune_public_legacy_data` handled exactly this and was deleted along
+with the rest of that command, so the repair left the repo while the
+databases needing it did not. Ported back, with its guards: only
+constraints pointing INTO the residue from outside it, only when every
+referencing column is nullable, and a loud abort naming the column when
+one is NOT NULL — a non-nullable pointer is a real dependency, and
+dropping its target would be data loss rather than cleanup.
+
+The dry run now reports the blockers it would neutralize, so the
+destructive step is visible before it is authorized.
+
+---
+
+Same commit, the dev stack that made this so slow to find.
+
+`app.compose.yml` now bind-mounts the working tree over /home/app, so
+`runserver`'s autoreloader watches real edits instead of the copy baked
+in by `COPY . .`. Verified: the container picks up an uncommitted host
+edit and Daphne restarts.
+
+`dev.Dockerfile` moves the virtualenv to /opt/venv
+(UV_PROJECT_ENVIRONMENT) and uv's cache to /opt/uv-cache, both outside
+the bind. A venv at /home/app/.venv would be shadowed by the host's,
+which on a Windows host is a win32 venv — the wrong ABI entirely.
+Anonymous volumes would also hide it, but compose REUSES anonymous
+volumes across recreates, so the first dependency bump would leave a
+stale env masking the rebuilt image.
+
+Two things the build got wrong on the way and now does not: the
+BuildKit cache mounts still pointed at the old `.cache/uv` path while
+UV_CACHE_DIR pointed at /opt, and the syncs run as root, so the cache
+ended up root-owned and unwritable by appuser at runtime. The mounts
+follow UV_CACHE_DIR and ownership is re-asserted after the syncs.
+
+CLAUDE.md records both, including that every app service must be
+rebuilt together — a half-rebuilt stack fails as a permissions error
+that reads nothing like a stale image.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013jg6hxtzpFpkLqiUBKPkQN ([`2ef8e4d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2ef8e4da6c7a006f01f50d153d0479d4ab8c63aa))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.60.1 [skip ci] ([`e0ec0e9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e0ec0e95718d4ff85d3e125ef03c824c4cbab95e))
+
 ## v3.60.1 (2026-09-15)
 
 ### Bug fixes

@@ -10,7 +10,7 @@ What must never appear in this payload:
   many redemptions are left invites a race and tells competitors the
   budget of a campaign.
 * ``PromotionCode.assigned_to`` / ``assigned_to_email`` — a personal
-  coupon's owner. The queryset in ``promotion/views.py`` already
+  coupon's owner. ``PromotionQuerySet.publicly_listable`` already
   excludes personal codes; the filter in ``get_code`` is the second
   line of defence, so a future queryset change cannot leak one.
 * ``priority`` and the exclusion M2Ms — internal engine mechanics with
@@ -33,9 +33,11 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
+from promotion.enum import ProductPromotionRelation
 from promotion.models import Promotion
 
 # A reward or eligibility pool bigger than this is a catalogue-wide
@@ -80,7 +82,8 @@ def _publishable(code) -> bool:
     advertisable, and neither is a single-use code: ``usage_limit=1``
     means a bulk code handed out individually (see the field's help
     text), not a first-come-first-served offer. See
-    ``promotion.views.publishable_code_q`` for the full reasoning.
+    ``promotion.managers.promotion.publishable_code_q`` for the
+    full reasoning.
     """
     return bool(
         code.is_active
@@ -222,3 +225,110 @@ class PublicPromotionSerializer(serializers.ModelSerializer):
         return list(
             PromotionCategoryRefSerializer(obj.categories.all(), many=True).data
         )
+
+
+class ProductPromotionSerializer(PublicPromotionSerializer):
+    """A public offer, plus why it is relevant to one product.
+
+    Everything the ``/offers`` card renders, so the storefront has ONE
+    offer shape and one headline/conditions formatter across the offers
+    page, the product panel and the checkout picker — plus ``relation``,
+    which the product panel needs to phrase the claim ("this product is
+    20% off" vs "buy two and this one is your gift").
+    """
+
+    relation = serializers.SerializerMethodField()
+
+    class Meta(PublicPromotionSerializer.Meta):
+        fields = (*PublicPromotionSerializer.Meta.fields, "relation")
+        read_only_fields = fields
+
+    @extend_schema_field(
+        serializers.ChoiceField(
+            choices=ProductPromotionRelation.choices,
+            help_text=(
+                "Why this offer is shown on the product: PRODUCT (the "
+                "promotion names it), REWARD (the shopper receives it), "
+                "CATEGORY (its category is targeted), ORDER (store-wide)."
+            ),
+        )
+    )
+    def get_relation(self, obj: Promotion) -> str:
+        """Attached per (promotion, product) pair by the view.
+
+        Defaults to ORDER rather than raising: a missing attribute can
+        only mean the row was serialized outside the product view, and
+        a store-wide claim is the one reading that is true of every
+        product.
+        """
+        return str(
+            getattr(obj, "_product_relation", ProductPromotionRelation.ORDER)
+        )
+
+
+class CartCouponSerializer(serializers.Serializer):
+    """One coupon the checkout picker offers, with its verdict.
+
+    The offer itself is NESTED rather than flattened: the storefront
+    renders the same card here, on ``/offers`` and on the product page,
+    so sharing the exact ``PublicPromotion`` shape is what lets one
+    component and one headline formatter serve all three. The five
+    fields beside it are the only cart-dependent part.
+
+    ``code`` is its own field, not the promotion's: a promotion can
+    carry many codes, and a personal coupon carries one that
+    ``PublicPromotionSerializer.get_code`` deliberately refuses to
+    publish. The picker is about a specific code.
+    """
+
+    promotion = PublicPromotionSerializer(read_only=True)
+    code = serializers.CharField(
+        source="code.code",
+        read_only=True,
+        help_text=_("The coupon code to apply."),
+    )
+    eligible = serializers.BooleanField(
+        read_only=True,
+        help_text=_(
+            "Whether applying this code to the cart as it stands would "
+            "succeed. False rows carry a machine-readable reason."
+        ),
+    )
+    reason = serializers.CharField(
+        read_only=True,
+        allow_null=True,
+        help_text=_(
+            "Why the code is refused, from the ACP discount vocabulary "
+            "(discount_code_expired, discount_code_minimum_not_met, …). "
+            "Null when the code is eligible."
+        ),
+    )
+    discount_amount = serializers.SerializerMethodField()
+    free_shipping = serializers.BooleanField(
+        read_only=True,
+        help_text=_(
+            "Whether applying this code would waive the shipping cost. "
+            "False when an automatic promotion already waives it — the "
+            "code adds nothing there."
+        ),
+    )
+    applied = serializers.BooleanField(
+        read_only=True,
+        help_text=_("Whether this code is the one currently on the cart."),
+    )
+
+    @extend_schema_field(
+        serializers.DecimalField(
+            max_digits=11,
+            decimal_places=2,
+            help_text=(
+                "What applying this code would take off the cart RIGHT "
+                "NOW, after stacking is resolved against the automatic "
+                "promotions. 0 is a legitimate answer for an eligible "
+                "code whose products are not in the cart, or one a "
+                "better automatic offer outranks."
+            ),
+        )
+    )
+    def get_discount_amount(self, obj) -> Decimal:
+        return obj.amount.amount

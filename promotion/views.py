@@ -1,22 +1,31 @@
-"""Public offers listing.
+"""Public promotion read surfaces.
 
 Automatic promotions are invisible until the cart applies them, so a
 shopper never learns that spending €80 earns a gift until they have
-already built an €80 cart. This endpoint is the discovery half: the
-storefront's ``/offers`` page reads it, and it is the only public read
-surface the ``promotion`` app has.
+already built an €80 cart. These endpoints are the discovery half:
 
-Gated on BOTH promotion tiers — the plan flag
+* ``PublicPromotionListView`` — the storefront's ``/offers`` page: what
+  is running, store-wide.
+* ``ProductPromotionListView`` — the same set narrowed to one product,
+  with the reason each offer is relevant to it, for the product page's
+  offer panel.
+
+Both are gated on BOTH promotion tiers — the plan flag
 (``IsPromotionsEnabled``) and the merchant's runtime setting
 (``IsPromotionsRuntimeEnabled``) — and both raise 404 rather than 403,
 so a store with promotions off is indistinguishable from one that never
 had the route. That matters more here than on the cart's coupon
-endpoint, because this page is crawlable.
+endpoint, because these pages are crawlable.
+
+"Which promotions may a shopper be told about" lives in ONE place —
+``PromotionQuerySet.publicly_listable`` — shared with the checkout
+coupon picker.
 """
 
 from __future__ import annotations
 
-from django.db.models import Count, F, Prefetch, Q
+from django.db.models import Prefetch
+from django.shortcuts import get_object_or_404
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
@@ -25,9 +34,14 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from core.api.serializers import ErrorResponseSerializer
-from promotion.enum import PromotionTrigger
+from product.models.product import Product
+from promotion.managers.promotion import publishable_code_q
 from promotion.models import Promotion, PromotionCode
-from promotion.serializers import PublicPromotionSerializer
+from promotion.serializers import (
+    ProductPromotionSerializer,
+    PublicPromotionSerializer,
+)
+from promotion.services import ProductPromotionService
 from tenant.permissions import IsPromotionsEnabled, IsPromotionsRuntimeEnabled
 
 # Guards the payload size on a store running a large campaign set. Far
@@ -36,43 +50,11 @@ from tenant.permissions import IsPromotionsEnabled, IsPromotionsRuntimeEnabled
 # offer list would be worse than one that shows all of them.
 MAX_OFFERS = 60
 
-
-def publishable_code_q(prefix: str = "") -> Q:
-    """Codes a shopper may be shown.
-
-    Excludes personal coupons (assigned to a user or an email) and
-    single-use codes. The ``usage_limit=1`` exclusion is about the
-    MECHANIC, not the remaining count: the field's own help text says
-    "1 for single-use bulk codes", i.e. codes minted in bulk and handed
-    out individually by email or print. Publishing any of those on a
-    crawlable page is wrong whether or not it has been redeemed yet.
-    A promotion-level ``usage_limit_total=1`` is the opposite case — a
-    genuine first-come-first-served offer — and stays listed until it is
-    actually taken, which the redemption filter below handles.
-
-    ``prefix`` exists because the same condition is needed in two
-    places with different anchors: a ``Count(filter=...)`` on
-    ``Promotion`` must name the relation (``codes__is_active``), while a
-    queryset on ``PromotionCode`` must not. Deriving both from one
-    function keeps them from drifting apart.
-
-    ``usage_limit`` is compared as ``IS NULL OR > 1`` rather than
-    ``~Q(usage_limit=1)`` on purpose: a negated equality is not
-    NULL-safe in SQL, and unlimited codes (the common case) carry NULL,
-    so the tidier-looking form would exclude exactly the codes most
-    worth advertising.
-    """
-    field = f"{prefix}__" if prefix else ""
-    return Q(
-        **{
-            f"{field}is_active": True,
-            f"{field}assigned_to__isnull": True,
-            f"{field}assigned_to_email": "",
-        }
-    ) & (
-        Q(**{f"{field}usage_limit__isnull": True})
-        | Q(**{f"{field}usage_limit__gt": 1})
-    )
+# The product panel is a sidebar, not a listing: past a handful of rows
+# it stops helping the purchase decision and starts burying the add-to-
+# cart button. ``ProductPromotionService`` sorts most-specific-first, so
+# the rows that survive the slice are the ones about THIS product.
+MAX_PRODUCT_OFFERS = 8
 
 
 class PublicPromotionListView(APIView):
@@ -109,45 +91,10 @@ class PublicPromotionListView(APIView):
     def _offers() -> list[Promotion]:
         queryset = (
             Promotion.objects.live()
+            .publicly_listable()
             .for_list()
-            .annotate(
-                # distinct=True on both: two Counts over different
-                # multi-valued relations fan the join out, and without
-                # it each count would be multiplied by the other's row
-                # count.
-                publishable_code_count=Count(
-                    "codes",
-                    filter=publishable_code_q("codes"),
-                    distinct=True,
-                ),
-                # ``usage_limit_total`` caps the ORDERS that used the
-                # promotion, which is what PromotionRedemption counts —
-                # matching PromotionEngine's own check so the page never
-                # advertises an offer the cart would refuse with
-                # USAGE_LIMIT_REACHED.
-                redemption_count=Count("redemptions", distinct=True),
-            )
-            .filter(
-                # AUTOMATIC needs no code; a CODE promotion is useless
-                # to a shopper without one they are allowed to see.
-                Q(trigger=PromotionTrigger.AUTOMATIC)
-                | Q(publishable_code_count__gt=0)
-            )
-            .filter(
-                # Written as an inclusive filter rather than exclude():
-                # exclude() on a nullable annotation comparison drops
-                # the unlimited rows too.
-                Q(usage_limit_total__isnull=True)
-                | Q(redemption_count__lt=F("usage_limit_total"))
-            )
             .prefetch_related(
-                Prefetch(
-                    "codes",
-                    queryset=PromotionCode.objects.filter(
-                        publishable_code_q()
-                    ).order_by("created_at"),
-                    to_attr="publishable_codes",
-                ),
+                _publishable_codes_prefetch(),
                 "products__translations",
                 "get_products__translations",
                 "categories__translations",
@@ -157,3 +104,66 @@ class PublicPromotionListView(APIView):
             .order_by("priority", "id")
         )
         return list(queryset[:MAX_OFFERS])
+
+
+class ProductPromotionListView(APIView):
+    """Live offers that apply to one product, most specific first."""
+
+    permission_classes = [
+        AllowAny,
+        IsPromotionsEnabled,
+        IsPromotionsRuntimeEnabled,
+    ]
+
+    @extend_schema(
+        operation_id="listProductPromotions",
+        summary=_("List the offers that apply to a product"),
+        description=_(
+            "Currently-live, publicly advertisable promotions that "
+            "touch this product, each carrying the RELATION that makes "
+            "it relevant: the promotion names the product (PRODUCT), "
+            "gives it away (REWARD), targets its category (CATEGORY), "
+            "or applies to any order (ORDER). Scope and exclusions are "
+            "resolved with the same rules the cart engine uses, so an "
+            "excluded product never advertises the offer that skips "
+            "it. Returns 404 when the store has promotions disabled at "
+            "either tier, or when the product does not exist."
+        ),
+        tags=["Promotions"],
+        # No explicit path parameter: spectacular derives ``productId``
+        # from the ``<int:product_id>`` converter, and declaring a
+        # second one by hand put BOTH in the generated client's path
+        # schema.
+        responses={
+            200: ProductPromotionSerializer(many=True),
+            404: ErrorResponseSerializer,
+        },
+    )
+    def get(self, request, product_id: int):
+        product = get_object_or_404(
+            Product.objects.filter(active=True), pk=product_id
+        )
+        offers = ProductPromotionService.for_product(product)[
+            :MAX_PRODUCT_OFFERS
+        ]
+        # The relation is a property of the (promotion, product) pair,
+        # not of the row, so it rides on the instance for the
+        # serializer to read — the same trick the engine uses for
+        # expanded category ids.
+        for offer in offers:
+            offer.promotion._product_relation = offer.relation
+        serializer = ProductPromotionSerializer(
+            [offer.promotion for offer in offers], many=True
+        )
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+def _publishable_codes_prefetch() -> Prefetch:
+    """The codes ``PublicPromotionSerializer.get_code`` may publish."""
+    return Prefetch(
+        "codes",
+        queryset=PromotionCode.objects.filter(publishable_code_q()).order_by(
+            "created_at"
+        ),
+        to_attr="publishable_codes",
+    )

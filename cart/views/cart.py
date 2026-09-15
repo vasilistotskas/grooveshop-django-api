@@ -50,6 +50,7 @@ from order.payment import provider_supports
 from order.services import OrderService
 from order.stock import StockManager
 from pay_way.enum.settlement import PaySettlement
+from promotion.serializers import CartCouponSerializer
 from tenant.membership import is_store_staff
 from tenant.permissions import IsPromotionsEnabled
 
@@ -189,6 +190,29 @@ serializers_config: SerializersConfig = {
         tags=["Cart"],
         parameters=GUEST_CART_HEADERS,
     ),
+    "list_coupons": ActionConfig(
+        response=CartCouponSerializer,
+        many=True,
+        # A deliberately unpaginated array: the picker is one modal of
+        # at most ``CouponPickerService.MAX_COUPONS`` rows, and a page
+        # boundary inside it would hide the coupon a shopper came for.
+        paginated=False,
+        operation_id="listCartCoupons",
+        summary=_("List the coupons available for this cart"),
+        description=_(
+            "Every coupon the shopper may be offered — the codes the "
+            "store advertises publicly, plus the personal coupons "
+            "assigned to the signed-in customer — each pre-judged "
+            "against the cart as it stands. ``eligible`` is exactly "
+            "what applying the code would do, so a disabled row and a "
+            "refusal at apply time can never disagree; ``reason`` "
+            "carries the ACP discount vocabulary and "
+            "``discountAmount`` what the code would take off right "
+            "now. Empty when the store has promotions disabled."
+        ),
+        tags=["Cart"],
+        parameters=GUEST_CART_HEADERS,
+    ),
 }
 
 
@@ -239,7 +263,11 @@ class CartViewSet(BaseModelViewSet):
     def get_permissions(self):
         if self.action == "list":
             self.permission_classes = [StoreStaffModelPermissions]
-        elif self.action in {"apply_coupon", "remove_coupon"}:
+        elif self.action in {
+            "apply_coupon",
+            "remove_coupon",
+            "list_coupons",
+        }:
             # Guest-capable like the rest of the cart surface, but 404s
             # when the tenant's promotions plan flag is off.
             self.permission_classes = [IsPromotionsEnabled]
@@ -426,6 +454,39 @@ class CartViewSet(BaseModelViewSet):
             )
         CouponService.remove(cart)
         return self._cart_detail_response(cart)
+
+    @action(
+        detail=False,
+        methods=["get"],
+        url_path="coupons",
+        # A bare array, not a page: ``pagination_class=None`` is the
+        # project's convention for saying so to the schema generator
+        # (core/api/schema.py), and ``filter_backends=[]`` stops the
+        # cart's admin FilterSet documenting query params this action
+        # never reads.
+        pagination_class=None,
+        filter_backends=[],
+    )
+    def list_coupons(self, request, *args, **kwargs):
+        """List the coupons this cart may use, each with its verdict.
+
+        A read, so it neither creates a cart nor 404s without one: a
+        shopper with no cart yet simply has no coupons to judge.
+        """
+        from promotion.services import CouponPickerService
+
+        cart = self.cart_service.get_existing_cart()
+        options = (
+            CouponPickerService.available(
+                cart,
+                user=request.user if request.user.is_authenticated else None,
+                email=getattr(request.user, "email", "") or "",
+            )
+            if cart
+            else []
+        )
+        serializer = CartCouponSerializer(options, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["post"], url_path="reserve-stock")
     def reserve_stock(self, request, *args, **kwargs):

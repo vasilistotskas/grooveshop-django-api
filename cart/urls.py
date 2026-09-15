@@ -45,6 +45,11 @@ urlpatterns = [
         name="cart-coupon",
     ),
     path(
+        "cart/coupons",
+        CartViewSet.as_view({"get": "list_coupons"}),
+        name="cart-coupons",
+    ),
+    path(
         "cart/item",
         CartItemViewSet.as_view({"get": "list", "post": "create"}),
         name="cart-item-list",

@@ -54,3 +54,20 @@ class CouponRejectionReason(models.TextChoices):
         "discount_code_user_ineligible",
         _("The customer is not eligible for this promotion"),
     )
+
+
+class ProductPromotionRelation(models.TextChoices):
+    """Why a promotion is shown on a given product's page.
+
+    The storefront phrases the offer differently for each — "this
+    product is 20% off" reads nothing like "buy two of these and this
+    one is your gift" — and ranks the specific relations above the
+    store-wide one, so the reason has to travel with the row rather
+    than be re-derived from ``target_scope`` (which cannot express
+    REWARD at all).
+    """
+
+    PRODUCT = "PRODUCT", _("Targets this product")
+    REWARD = "REWARD", _("This product is the reward")
+    CATEGORY = "CATEGORY", _("Targets this product's category")
+    ORDER = "ORDER", _("Applies to the whole order")

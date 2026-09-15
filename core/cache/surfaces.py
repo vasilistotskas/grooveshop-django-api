@@ -397,19 +397,26 @@ def register_default_surfaces() -> None:
             code="promotions",
             label=_("Promotions"),
             description=_(
-                "The public offers listing. An offer is a commercial"
-                " commitment with an end date, so a stale entry"
-                " advertises a discount the cart will refuse — purge"
-                " after editing a promotion, its codes, or its"
-                " schedule."
+                "The public offers listing and the per-product offer"
+                " panel. An offer is a commercial commitment with an"
+                " end date, so a stale entry advertises a discount the"
+                " cart will refuse — purge after editing a promotion,"
+                " its codes, its scope or its schedule."
             ),
-            # ``PublicPromotionListView`` is a plain APIView with no
+            # Both promotion views are plain APIViews with no
             # ``@cache_methods`` decorator, so there is no Django-side
-            # response cache to purge — only the Nuxt handler and the
-            # rendered /offers page.
+            # response cache to purge — only the Nuxt handlers and the
+            # rendered pages.
             django_patterns=(),
-            nuxt_patterns=_nuxt("PublicPromotionList")
-            + _nuxt_routes("/offers"),
+            # ``/products`` is here, not only in the ``products``
+            # surface: the product page now RENDERS the offers that
+            # apply to it, so a promotion edit that changes which
+            # products it targets leaves every product page's SSR
+            # cache advertising the old scope. Promotions are edited
+            # rarely; a stale offer panel would survive the whole
+            # SWR window.
+            nuxt_patterns=_nuxt("PublicPromotionList", "ProductPromotionList")
+            + _nuxt_routes("/offers", "/products"),
             icon="local_offer",
             group="commerce",
         )

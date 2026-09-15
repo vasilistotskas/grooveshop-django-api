@@ -3,6 +3,55 @@
 
 
 
+## v3.60.4 (2026-09-15)
+
+### Bug fixes
+
+* fix(user): retry mail only when a retry could work, and keep the body out of the logs
+
+Follow-up to 7a2387c1, which moved allauth's SMTP conversation into
+`send_rendered_email_task` so a transient 421 stops being a 500 on
+signup. Two things that move left open.
+
+**Retry policy.** `autoretry_for=(OSError,)` matches on exception
+CLASS, but RFC 5321 puts the answer in the CODE: 4xx means "try
+again", 5xx means "do not". The class is a poor proxy —
+`SMTPConnectError(421)` and `SMTPAuthenticationError(535)` are both
+`SMTPResponseException`, and only the first is worth retrying.
+Retrying a 535 five times with backoff is how a provider locks the
+account; retrying a 550 refused mailbox just delays the failure record
+by ten minutes.
+
+`_is_permanent_smtp_failure` reads the code instead. No code at all
+(dropped socket, TLS, DNS) means the conversation never reached a
+reply, which is transient by nature. `SMTPRecipientsRefused` carries
+its codes per address rather than on `smtp_code`, and `sendmail` only
+raises it when every recipient was refused, so all of them count.
+The retry is now an explicit `self.retry`, because `autoretry_for`
+cannot express a predicate.
+
+**The rendered body is a secret.** `MonitoredTask.on_failure` logs the
+task's kwargs, and `_safe_repr` masks by NAME — it catches `token` and
+`password`. This task's payload is a rendered email under the innocent
+key `body`, so a password-reset link or a login code landed in an
+ERROR log on exactly the failure the retry logic exists to handle.
+Verified before the fix: the log line contained the one-time URL.
+
+`MonitoredTask` grows an opt-in `sensitive_kwargs`; the task declares
+`body` and `html_body`. The recipient is deliberately NOT masked — it
+is the one field that makes a delivery failure actionable, and it is
+not a credential.
+
+Thirteen tests, each mutation-checked: reverting either change fails
+the test that covers it.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013jg6hxtzpFpkLqiUBKPkQN ([`5d25e1f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5d25e1f94a4b8c6b5a5092b2d82fa9e50a9718cb))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.60.3 [skip ci] ([`eb5bb91`](https://github.com/vasilistotskas/grooveshop-django-api/commit/eb5bb91c1eb1eadaeb7ea977b07db1a805140fe6))
+
 ## v3.60.3 (2026-09-15)
 
 ### Bug fixes

@@ -3,6 +3,51 @@
 
 
 
+## v3.60.6 (2026-09-16)
+
+### Bug fixes
+
+* fix(security): key anonymous throttles on the real client IP
+
+Proven in production on 2026-09-16: a tagged request sent from the
+public internet through Cloudflare was recorded by Django with
+ip_address 10.42.1.0 — k3s-agent1's Flannel gateway. The Traefik
+Service is externalTrafficPolicy: Cluster, so klipper-lb SNATs every
+inbound connection before Traefik sees it, and Traefik then writes that
+internal address into X-Forwarded-For and X-Real-IP.
+
+Every scoped throttle built on UserOrIpRateThrottle keys anonymous
+callers on that near-constant internal address, so budgets meant to be
+per caller are shared by the whole store: at order_create_anon 10/min a
+single client could lock every guest out of checkout, and search
+analytics recorded an internal IP on every row.
+
+Cloudflare's own CF-Connecting-IP is correct but cannot be believed on
+its own, because the origin still answers directly on its node IPs — so
+any caller could forge it and mint a fresh bucket per request, turning a
+denial-of-service into unlimited enumeration on endpoints like
+gift_card_check whose entire purpose is to stop code guessing.
+
+core/client_ip.py establishes the missing provenance: a Cloudflare
+Transform Rule stamps every request that transits the edge with
+X-Origin-Verify, compared here in constant time, and only then are the
+edge's client-IP headers believed. CF-Connecting-IP is preferred over
+X-Real-IP because Traefik sets the latter to the SNAT address on the
+direct path. Unproven requests fall back to get_ident(), which is coarse
+but cannot be forged.
+
+Fails safe: no secret, no Transform Rule, or any drift between them
+simply means nothing is trusted and behaviour is exactly as before. The
+helper returns None rather than REMOTE_ADDR on purpose — returning the
+SNAT address would silently reinstate the bug.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01HiNVpz9cGfnvaPNwKSKJKd ([`2aa50b4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2aa50b42fa1205f0d03f3a1c07f89fe7c0ccc3dc))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.60.5 [skip ci] ([`d75de6d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d75de6d73332680ed457ed5d1178765e1ff02d8d))
+
 ## v3.60.5 (2026-09-15)
 
 ### Bug fixes

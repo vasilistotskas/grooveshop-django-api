@@ -7,6 +7,8 @@ from rest_framework.throttling import (
     UserRateThrottle,
 )
 
+from core.client_ip import trusted_client_ip
+
 
 def _gateway_cart_ident(request) -> str | None:
     """Cart UUID to throttle on when the request is from the agent gateway.
@@ -46,19 +48,28 @@ class UserOrIpRateThrottle(SimpleRateThrottle):
     of these endpoints had no other throttle at all, which made logging
     in the way to remove the limit.
 
-    Keyed by user id when authenticated and by ``get_ident`` (the
-    NUM_PROXIES-aware client IP) otherwise, so one signed-in caller
-    cannot spend another's budget and a shared office IP no longer puts
-    every colleague in one bucket.
+    Keyed by user id when authenticated and by the real client IP
+    otherwise, so one signed-in caller cannot spend another's budget and
+    a shared office IP no longer puts every colleague in one bucket.
+
+    For anonymous callers the IP comes from ``core.client_ip``, NOT from
+    ``get_ident``. Behind k3s ServiceLB every inbound connection is SNATd
+    to the node's Flannel gateway before Traefik sees it, so the
+    NUM_PROXIES-aware rightmost X-Forwarded-For hop is an internal
+    ``10.42.x.x`` address — proven in production 2026-09-16. Keying on it
+    puts EVERY anonymous visitor in one bucket, which turns a per-caller
+    budget into a store-wide one: at ``order_create_anon`` 10/minute, a
+    single client could lock all guests out of checkout. ``get_ident``
+    remains the fallback for requests whose provenance cannot be proven,
+    because it is coarse but cannot be forged.
     """
 
     def get_cache_key(self, request, view):
         user = getattr(request, "user", None)
-        ident = (
-            f"user:{user.pk}"
-            if user is not None and user.is_authenticated
-            else self.get_ident(request)
-        )
+        if user is not None and user.is_authenticated:
+            ident = f"user:{user.pk}"
+        else:
+            ident = trusted_client_ip(request) or self.get_ident(request)
         return self.cache_format % {"scope": self.scope, "ident": ident}
 
 

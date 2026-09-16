@@ -16,6 +16,8 @@ from typing import cast
 from django.http import HttpRequest, HttpResponseBase
 from django.utils.deprecation import MiddlewareMixin
 
+from core.client_ip import trusted_client_ip
+
 logger = logging.getLogger(__name__)
 
 
@@ -228,6 +230,15 @@ class SearchAnalyticsMiddleware(MiddlewareMixin):
         Returns:
             Client IP address or None if not available
         """
+        # Preferred: the visitor Cloudflare reported, accepted only when
+        # the request provably came through our edge. Without this the
+        # value below is the k3s SNAT address (klipper-lb rewrites the
+        # source before Traefik sees it), so every row recorded the same
+        # internal 10.42.x.x and the field was useless for analytics.
+        edge_ip = trusted_client_ip(request)
+        if edge_ip:
+            return edge_ip
+
         remote_addr = request.META.get("REMOTE_ADDR", "")
 
         try:

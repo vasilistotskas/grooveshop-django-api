@@ -4569,6 +4569,15 @@ AGENT_GATEWAY_INTERNAL_URL = getenv("AGENT_GATEWAY_INTERNAL_URL", "")
 # the gateway's ``X-Internal-Gateway`` header on inbound cart mutations.
 # Must equal the gateway's ``INTERNAL_EVENTS_SECRET`` env value.
 AGENT_GATEWAY_INTERNAL_SECRET = getenv("AGENT_GATEWAY_INTERNAL_SECRET", "")
+# Shared secret stamped onto every request by a Cloudflare Transform Rule
+# (``X-Origin-Verify``). It is the ONLY thing that distinguishes traffic
+# that came through our edge from traffic sent straight to the origin's
+# node IPs, which stay publicly reachable. ``core.client_ip`` uses it to
+# decide whether Cloudflare's client-IP headers can be believed; see that
+# module for why the rightmost X-Forwarded-For hop is an internal address
+# here. Empty by default, which simply disables the trust and leaves the
+# previous (coarse but unspoofable) behaviour in place.
+ORIGIN_VERIFY_SECRET = getenv("ORIGIN_VERIFY_SECRET", "")
 # Per-request timeout for order-event pushes to the gateway.
 AGENT_GATEWAY_HTTP_TIMEOUT = int(getenv("AGENT_GATEWAY_HTTP_TIMEOUT", "5"))
 # Master flag for agent-delegated Stripe payments (the ACP/UCP tokenized

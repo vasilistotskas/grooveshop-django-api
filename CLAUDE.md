@@ -137,6 +137,22 @@ Domain models compose multiple mixins, e.g. `Product(SoftDeleteModel, Translatab
 - **Order / payment / shipping / notification system**: see [`docs/order-system.md`](docs/order-system.md) for the full reference — state machines, creation paths, carrier integrations, email + WS dedup, critical invariants, common-task playbook. Read this first before changing anything in `order/`, `shipping_acs/`, `shipping_boxnow/`, or `pay_way/`.
 - **Product recommendations**: see [`docs/recommendations-engine.md`](docs/recommendations-engine.md) — typed `ProductRelation`, the strategy registry (`is_available` declines rather than returning noise), two-stage retrieval into `RecommendationCandidate`, the Greek embedding measurements and the TEI-vs-in-process decision, plan tiers, and the playbook for adding a strategy/surface/preset. Read it before touching `recommendation/`, `product/models/relation.py`, or the cart `recommendations` fields.
 - **Platform-wide documentation** lives in the sibling `grooveshop-docs/` repository (published at `docs.grooveshop.space`): architecture, multi-tenancy, end-to-end flows and operations under `src/dev/`, the bilingual tenant-admin guide under `src/admin/`. The files in this repo's `docs/` folder are copied into that site at build time, so keep editing them here. A behaviour change that a docs page describes ships with the doc change.
+- **Client IP and throttle identity (`core/client_ip.py`)**: never read
+  `REMOTE_ADDR`, `X-Forwarded-For` or `X-Real-IP` directly to identify a
+  caller. k3s ServiceLB SNATs every inbound connection before Traefik sees
+  it, so all three resolve to an internal `10.42.x.x` for real external
+  traffic — proven in production 2026-09-16, where a request from the public
+  internet was recorded as `10.42.1.0`. Keying anonymous throttles on that
+  made every scoped budget store-wide rather than per caller
+  (`order_create_anon` at 10/minute meant one client could lock out every
+  guest checkout). Use `trusted_client_ip(request)`, which believes
+  Cloudflare's `CF-Connecting-IP`/`X-Real-IP` **only** when the request
+  carries the `X-Origin-Verify` secret a Cloudflare Transform Rule stamps at
+  the edge, and otherwise returns `None` so the caller falls back to
+  `get_ident()`. It deliberately never falls back to `REMOTE_ADDR` — that
+  would silently reinstate the bug. Operator-side detail, including the fact
+  that the secret lives in two separate Cloudflare accounts, is in the
+  infrastructure repo's `docs/edge-trust-boundary.md`.
 - **Transactional email rendering (`core/templates/emails/**`)**: admin-authored WYSIWYG/HTML model fields (e.g. `PayWay.instructions` — a dedicated `tinymce.models.HTMLField`, picked up by `BaseModelAdmin.formfield_overrides` rather than a blanket `TextField`→`WysiwygWidget` override, so it holds HTML) must render as `{{ field|safe }}` in `.html` templates and `{{ field_text|safe }}` in `.txt` templates, where `field_text` is pre-built in the email task via `unescape(strip_tags(field))`. Django **autoescapes `.txt` templates too**, so the stripped plain text must be marked `|safe` or it re-encodes `& < >` back into entities. Escaping such a field (e.g. `|linebreaksbr`) renders literal `<div>` tags to the customer.
 - **Translations**: django-parler `TranslatableModel` on Product, BlogPost, Category, LoyaltyTier, etc. Languages: el (default), en, de. Factories create translations for all languages.
 - **Audit history**: django-simple-history on models

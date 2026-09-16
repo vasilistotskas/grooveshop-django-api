@@ -2381,6 +2381,17 @@ if EMAIL_USE_TLS and EMAIL_USE_SSL:
         "EMAIL_USE_SSL for implicit TLS (port 465). Django would "
         "otherwise fail later, at the first send, rather than at boot."
     )
+# Django defaults EMAIL_TIMEOUT to None, which leaves the SMTP socket with
+# no timeout at all: against a relay that accepts the TCP connection and
+# then goes quiet — or a port silently dropped by the host's firewall — a
+# send blocks forever and pins the Celery worker that ran it. Mail is sent
+# from tasks, so the failure mode is a worker pool that drains to zero with
+# nothing in the logs. This is not hypothetical: Hetzner blocks outbound 465
+# from both nodes, and the first send against it hung indefinitely rather
+# than erroring. The value is a per-operation socket timeout, not a deadline
+# for the whole message, so it stays comfortable for large invoice-PDF
+# attachments.
+EMAIL_TIMEOUT = int(getenv("EMAIL_TIMEOUT", "20"))
 DEFAULT_FROM_EMAIL = getenv("DEFAULT_FROM_EMAIL", "localhost@gmail.com")
 INFO_EMAIL = getenv("INFO_EMAIL", "localhost@gmail.com")
 # Used by mail_admins() as the From: header for operational alerts

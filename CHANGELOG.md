@@ -3,6 +3,36 @@
 
 
 
+## v3.61.0 (2026-09-16)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.60.6 [skip ci] ([`5311db1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5311db188e1e5e313c7a087b111784b8d44e5dcd))
+
+### Features
+
+* feat(email): support implicit TLS so a port-465 relay can be configured
+
+settings.py exposed only EMAIL_USE_TLS, which is STARTTLS. Django treats
+STARTTLS and implicit TLS as mutually exclusive, so every relay that
+speaks SMTPS on port 465 was simply unconfigurable — Cloudflare Email
+Service (smtp.mx.cloudflare.net:465) and the :465 endpoints of Resend,
+Postmark and SES among them. That mattered because the platform still
+sends as info@webside.gr through Gmail, whose SPF (Cloudflare Email
+Routing only) does not authorise Gmail, so every transactional mail
+fails alignment.
+
+EMAIL_USE_SSL defaults to off, so existing STARTTLS behaviour is
+unchanged; this only unblocks the relay migration.
+
+The mutual-exclusion check fails at BOOT rather than at the first send.
+Without it Django raises on the first message, which on this platform
+means a customer's order confirmation is what discovers the
+misconfiguration.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01HiNVpz9cGfnvaPNwKSKJKd ([`f4fb3d1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f4fb3d111f64ef5d6a64179615a99578f2577de4))
+
 ## v3.60.6 (2026-09-16)
 
 ### Bug fixes

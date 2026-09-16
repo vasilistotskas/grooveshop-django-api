@@ -2362,7 +2362,25 @@ if EMAIL_HOST_PASSWORD == "changeme" and SYSTEM_ENV == "production":
         "EMAIL_HOST_PASSWORD must be set in production "
         "(current value is the insecure default 'changeme')."
     )
+# STARTTLS (upgrade a plaintext connection, conventionally port 587)
+# versus implicit TLS (the socket is encrypted from the first byte,
+# conventionally port 465). Django treats these as mutually exclusive and
+# raises ImproperlyConfigured if both are set, so exposing only
+# EMAIL_USE_TLS silently made every implicit-TLS relay unreachable —
+# Cloudflare Email Service (smtp.mx.cloudflare.net:465) and the :465
+# endpoints of Resend, Postmark and SES among them. Defaulting SSL to off
+# keeps the existing STARTTLS behaviour unchanged.
 EMAIL_USE_TLS = getenv("EMAIL_USE_TLS", "True") == "True"
+EMAIL_USE_SSL = getenv("EMAIL_USE_SSL", "False") == "True"
+if EMAIL_USE_TLS and EMAIL_USE_SSL:
+    from django.core.exceptions import ImproperlyConfigured
+
+    raise ImproperlyConfigured(
+        "EMAIL_USE_TLS and EMAIL_USE_SSL are mutually exclusive — set "
+        "exactly one. Use EMAIL_USE_TLS for STARTTLS (port 587) and "
+        "EMAIL_USE_SSL for implicit TLS (port 465). Django would "
+        "otherwise fail later, at the first send, rather than at boot."
+    )
 DEFAULT_FROM_EMAIL = getenv("DEFAULT_FROM_EMAIL", "localhost@gmail.com")
 INFO_EMAIL = getenv("INFO_EMAIL", "localhost@gmail.com")
 # Used by mail_admins() as the From: header for operational alerts

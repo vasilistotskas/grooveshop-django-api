@@ -3,6 +3,51 @@
 
 
 
+## v3.61.1 (2026-09-16)
+
+### Bug fixes
+
+* fix(mail): give the SMTP socket a timeout
+
+Django defaults EMAIL_TIMEOUT to None, which means no socket timeout at
+all. Mail is sent from Celery tasks, so a relay that accepts the TCP
+connection and then goes quiet — or a port silently dropped by the
+host's firewall — blocks that worker forever, with nothing in the logs
+and no failed task result to notice. The worker pool drains to zero and
+the platform looks healthy the whole way down.
+
+Found the hard way: Hetzner blocks outbound 465 from both cluster nodes,
+and the first send against the new Resend relay hung indefinitely
+instead of erroring.
+
+The default is 20 rather than None so dev, staging and any deployment
+that does not set the env var inherit a safe value. It is a
+per-operation socket timeout, not a deadline for the whole message, so
+it stays comfortable for large invoice-PDF attachments.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com> ([`2a32f37`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2a32f374031e5e9fedee2e7f3aa1e8c3b919a789))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.61.0 [skip ci] ([`34e8cf1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/34e8cf143309395a4245751fee1216ddcb1c03d0))
+
+### Documentation
+
+* docs(api): document the client-IP trust boundary
+
+core/client_ip.py shipped without a note in the repo guide, so the natural
+thing for the next person to do is read REMOTE_ADDR, X-Forwarded-For or
+X-Real-IP directly — all three of which resolve to an internal 10.42.x.x
+here, because k3s ServiceLB SNATs every inbound connection before Traefik
+sees it. That is exactly the bug trusted_client_ip() exists to prevent: it
+made every anonymous scoped throttle store-wide rather than per caller.
+
+Records why the helper returns None rather than falling back to
+REMOTE_ADDR, and points at the infrastructure repo's runbook for the
+operator-side detail.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com> ([`6fbffd0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6fbffd0276738e5460b1ec83b41696c474323300))
+
 ## v3.61.0 (2026-09-16)
 
 ### Chores

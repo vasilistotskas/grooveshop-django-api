@@ -2450,11 +2450,39 @@ _PARLER_LANG_TUPLE = (
         "name": "german",
     },
 )
+# Ordered fallback chain: the authoring language first, then every other
+# configured one. Derived, so adding a language to _PARLER_LANG_TUPLE
+# cannot forget to add it here.
+#
+# This carried ``["en"]``, which was a no-op for the reader who needed it
+# most. parler walks ``[active_language] + fallbacks`` and SKIPS the
+# active language (parler/models.py ``_get_translated_model``), so with
+# ``en`` active the only candidate was ``en`` itself and nothing was
+# tried at all — while ``de`` fell back to ``en``, which this platform's
+# Greek content does not have either. Both raised
+# TranslationDoesNotExist, and because that class deliberately inherits
+# AttributeError ("causes the templates to handle the missing attributes
+# silently" — its own docstring), Django templates swallowed it: order
+# emails to an English-speaking customer listed BLANK product names for
+# every Greek-only product. Verified against production data 2026-09-17.
+#
+# ``[PARLER_DEFAULT_LANGUAGE_CODE]`` is also what parler itself defaults
+# to (``appsettings.py`` ``setdefault("fallbacks", [...])``); the extra
+# languages after it mean a store that authors in something other than
+# Greek degrades to a language it HAS rather than to a blank string.
+_PARLER_FALLBACK_LANGUAGES = [
+    PARLER_DEFAULT_LANGUAGE_CODE,
+    *(
+        entry["code"]
+        for entry in _PARLER_LANG_TUPLE
+        if entry["code"] != PARLER_DEFAULT_LANGUAGE_CODE
+    ),
+]
 PARLER_LANGUAGES = {
     SITE_ID: _PARLER_LANG_TUPLE,
     None: _PARLER_LANG_TUPLE,
     "default": {
-        "fallbacks": ["en"],
+        "fallbacks": _PARLER_FALLBACK_LANGUAGES,
         "hide_untranslated": False,
     },
 }

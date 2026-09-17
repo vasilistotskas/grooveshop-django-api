@@ -135,22 +135,33 @@ class TestSeedBrandPagesFooter(TestCase):
     """
 
     def test_seeds_the_footer_navigation(self):
-        from page_config.defaults import seed_brand_pages
+        from page_config.defaults import seed_brand_pages, seed_content_pages
         from page_config.models import NavigationMenu, NavigationSlot
+        from settings import PARLER_DEFAULT_LANGUAGE_CODE
+
+        # `seed_brand_pages` is opt-in and runs AFTER provisioning, so
+        # the legal ContentPages its footer links already exist. Seeded
+        # here for the same reason: a link resolves to the row it points
+        # at, so without them those three links are skipped rather than
+        # stored as paths that could rot.
+        seed_content_pages()
 
         seed_brand_pages()
 
         menu = NavigationMenu.objects.get(slot=NavigationSlot.FOOTER)
-        labels = [column["label"] for column in menu.items]
+        rendered = menu.localized(PARLER_DEFAULT_LANGUAGE_CODE)
+        labels = [column["label"] for column in rendered]
         assert "Microlearning" in labels
 
         targets = [
-            child["to"] for column in menu.items for child in column["children"]
+            child["to"] for column in rendered for child in column["children"]
         ]
         # The links the universal fallback no longer carries.
         assert "/vision" in targets
         assert "/what-is-microlearning" in targets
         assert "/why-microlearning" in targets
+        # And the legal pages, resolved through their rows.
+        assert "/terms-of-use" in targets
 
     def test_footer_seed_is_idempotent(self):
         from page_config.defaults import seed_brand_pages

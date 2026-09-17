@@ -3833,6 +3833,7 @@ def seed_navigation(*, overwrite: bool = False) -> dict[str, int]:
     columns kept their first shape through three re-seeds because only
     the English overlay was ever refilled.
     """
+    from page_config.defaults import build_navigation_menu
     from page_config.models import NavigationMenu, NavigationSlot
     from page_config.schemas import (
         validate_navigation_i18n,
@@ -3849,21 +3850,23 @@ def seed_navigation(*, overwrite: bool = False) -> dict[str, int]:
         i18n = {"en": items_en}
         validate_navigation_items(slot, items)
         validate_navigation_i18n(slot, i18n)
-        menu, created = NavigationMenu.objects.get_or_create(
-            slot=slot, defaults={"items": items, "i18n": i18n}
-        )
+        menu, created = NavigationMenu.objects.get_or_create(slot=slot)
         if created:
+            # Rows, not the JSON this used to store — `localized()`
+            # builds the menu from columns and links now.
+            build_navigation_menu(menu, items, i18n)
             _bump(report, "created")
             continue
         rewritten = 0
         if overwrite:
-            rewritten = (
-                NavigationMenu.objects.filter(pk=menu.pk)
-                .exclude(items=items)
-                .update(items=items)
-            )
-            if rewritten:
-                _bump(report, "rewritten", rewritten)
+            # Rebuilt rather than patched: a menu is a tree of rows now,
+            # and reconciling one in place would have to guess which
+            # link in the spec is which row.
+            menu.columns.all().delete()
+            menu.links.all().delete()
+            build_navigation_menu(menu, items, i18n)
+            rewritten = 1
+            _bump(report, "rewritten", rewritten)
         filled = _fill_missing_i18n(
             NavigationMenu.objects.filter(pk=menu.pk),
             i18n,

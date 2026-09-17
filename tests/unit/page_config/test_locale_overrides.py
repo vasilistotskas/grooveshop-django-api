@@ -17,6 +17,8 @@ from rest_framework.test import APIClient
 
 from page_config.models import (
     ComponentType,
+    NavigationLink,
+    NavigationLinkTranslation,
     NavigationMenu,
     NavigationSlot,
     PageLayout,
@@ -160,16 +162,30 @@ class TestSectionI18nValidation(TestCase):
 
 
 class TestNavigationLocaleOverrides(TestCase):
+    """Per-locale labels, now that a menu is rows rather than a blob.
+
+    These used to build `items`/`i18n` JSON — two whole copies of the
+    same menu, which diverged the first time either was reordered. A
+    label is a parler translation on the link now, so a locale with no
+    row falls back to the default one instead of losing the slot.
+    """
+
     def setUp(self):
         self.client = APIClient()
-        NavigationMenu.objects.create(
-            slot=NavigationSlot.HEADER,
-            items=[{"label": "Επικοινωνία", "to": "/contact"}],
-            i18n={"en": [{"label": "Contact", "to": "/contact"}]},
+
+        header = NavigationMenu.objects.create(slot=NavigationSlot.HEADER)
+        contact = NavigationLink.objects.create(menu=header, route="/contact")
+        NavigationLinkTranslation.objects.create(
+            master=contact, language_code="el", label="Επικοινωνία"
         )
-        NavigationMenu.objects.create(
-            slot=NavigationSlot.MOBILE,
-            items=[{"label": "Αρχική", "to": "/"}],
+        NavigationLinkTranslation.objects.create(
+            master=contact, language_code="en", label="Contact"
+        )
+
+        mobile = NavigationMenu.objects.create(slot=NavigationSlot.MOBILE)
+        home = NavigationLink.objects.create(menu=mobile, route="/")
+        NavigationLinkTranslation.objects.create(
+            master=home, language_code="el", label="Αρχική"
         )
 
     def _menus(self, **query):
@@ -183,14 +199,15 @@ class TestNavigationLocaleOverrides(TestCase):
         menus = self._menus(locale="en")
 
         self.assertEqual(menus["header"][0]["label"], "Contact")
+        self.assertEqual(menus["header"][0]["to"], "/contact")
 
-    def test_the_default_locale_gets_the_items_themselves(self):
+    def test_the_default_locale_gets_its_own_label(self):
         menus = self._menus()
 
         self.assertEqual(menus["header"][0]["label"], "Επικοινωνία")
 
-    def test_a_slot_with_no_override_keeps_its_default_menu(self):
-        """A partially translated store keeps a working header rather
+    def test_an_untranslated_link_keeps_the_slot(self):
+        """A partially translated store keeps a working menu rather
         than losing the slot entirely."""
         menus = self._menus(locale="en")
 

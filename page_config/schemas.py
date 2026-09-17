@@ -919,6 +919,19 @@ def validate_section_props(component_type: str, props: object) -> None:
 _ICON_RE = re.compile(r"^i-[a-z0-9:-]+$")
 
 
+def validate_icon_name(value: str) -> None:
+    """Field validator for an ``@nuxt/icon`` name.
+
+    Same rule the JSON menus are checked against, exposed as a field
+    validator so the relational navigation models enforce it at the
+    model layer rather than re-implementing the regex.
+    """
+    if value and not _ICON_RE.match(value):
+        raise ValidationError(
+            f"{value!r} is not an icon name — expected i-<collection>-<name>."
+        )
+
+
 def _check_nav_link(prefix: str, item: object) -> list[str]:
     if not isinstance(item, dict):
         return [f"{prefix}: must be an object"]

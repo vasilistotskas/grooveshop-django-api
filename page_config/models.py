@@ -25,6 +25,8 @@ from core.models import (
     UUIDModel,
 )
 from core.utils.sanitize import sanitize_html
+from page_config.legal_documents import LEGAL_ROUTE_BY_SLUG
+from page_config.schemas import validate_icon_name
 
 if TYPE_CHECKING:
     from typing import Self
@@ -239,6 +241,26 @@ class NavigationSlot(models.TextChoices):
     MOBILE = "mobile", _("Mobile")
 
 
+class NavigationMenuQuerySet(models.QuerySet):
+    def with_entries(self):
+        """Every row ``localized()`` will touch, in one pass.
+
+        Building a menu walks columns → links → the page each link
+        points at, plus the translations of all three. Without this the
+        footer alone costs a query per link, on a route the storefront
+        hits for every page render.
+        """
+        return self.prefetch_related(
+            "columns__translations",
+            "columns__links__translations",
+            "columns__links__content_page__translations",
+            "columns__links__page_layout",
+            "links__translations",
+            "links__content_page__translations",
+            "links__page_layout",
+        )
+
+
 class NavigationMenu(TimeStampMixinModel, UUIDModel):
     """Per-tenant navigation for the app chrome (navbar/footer/mobile).
 
@@ -290,6 +312,8 @@ class NavigationMenu(TimeStampMixinModel, UUIDModel):
         ),
     )
 
+    objects = NavigationMenuQuerySet.as_manager()
+
     class Meta(TypedModelMeta):
         verbose_name = _("Navigation Menu")
         verbose_name_plural = _("Navigation Menus")
@@ -299,8 +323,376 @@ class NavigationMenu(TimeStampMixinModel, UUIDModel):
         return f"{self.get_slot_display()} navigation"
 
     def localized(self, locale: str) -> list:
-        """The menu as ``locale`` should render it."""
-        return (self.i18n or {}).get(locale) or self.items
+        """The menu as ``locale`` should render it.
+
+        Built from the related columns and links, in the same shape the
+        storefront has always received — ``[{label, to|href, icon?}]``
+        for header/mobile and ``[{label, icon?, children}]`` for the
+        footer — so the relational rewrite needed no storefront change.
+
+        A link whose target is unpublished is OMITTED rather than
+        rendered, and a column left with no visible links is dropped
+        with it: an empty heading is noise, and the storefront's own
+        contract requires ``children`` to be non-empty.
+        """
+        if self.slot == NavigationSlot.FOOTER:
+            return [
+                payload
+                for column in self.columns.all()
+                if (payload := column.localized(locale)) is not None
+            ]
+        return [
+            payload
+            for link in self.links.all()
+            if (payload := link.localized(locale)) is not None
+        ]
+
+
+class BuiltInRoute(models.TextChoices):
+    """Storefront routes that exist for every tenant, as paths.
+
+    The VALUE is the path, so resolving a link to a href needs no
+    name→path mapping that could drift from the storefront's router.
+    Feature-gated routes are here because an operator may legitimately
+    link them; the serializer omits the ones this tenant has switched
+    off, the same way the storefront gates its own default menu.
+
+    Deliberately excludes routes that carry ``robots: false`` or belong
+    to a session (``/search``, ``/cart``, ``/checkout``, ``/account``):
+    a navigation menu is public chrome, not a shortcut bar.
+    """
+
+    HOME = "/", _("Home")
+    PRODUCTS = "/products", _("Products")
+    BLOG = "/blog", _("Blog")
+    CONTACT = "/contact", _("Contact")
+    OFFERS = "/offers", _("Offers")
+    GIFT_CARDS = "/gift-cards", _("Gift cards")
+    LOYALTY_PROGRAM = "/loyalty-program", _("Loyalty program")
+    FEEDBACK = "/feedback", _("Feedback")
+
+
+class NavigationColumn(
+    TranslatableModel, SortableModel, TimeStampMixinModel, UUIDModel
+):
+    """A heading in the footer, with its own ordered links.
+
+    Only the footer groups its links; the header and the mobile bar are
+    flat lists whose links hang off the menu directly. That is why
+    ``NavigationLink`` has two possible parents rather than this model
+    being mandatory for every slot.
+    """
+
+    menu = models.ForeignKey(
+        "page_config.NavigationMenu",
+        on_delete=models.CASCADE,
+        related_name="columns",
+        verbose_name=_("Menu"),
+    )
+    icon = models.CharField(
+        _("Icon"),
+        max_length=64,
+        blank=True,
+        default="",
+        validators=[validate_icon_name],
+        help_text=_("An i-* icon name, e.g. i-heroicons-light-bulb."),
+    )
+
+    class Meta(TypedModelMeta):
+        verbose_name = _("Navigation Column")
+        verbose_name_plural = _("Navigation Columns")
+        ordering = ["sort_order"]
+        indexes = [*TimeStampMixinModel.Meta.indexes]
+
+    def get_ordering_queryset(self):
+        return NavigationColumn.objects.filter(menu=self.menu)
+
+    def localized(self, locale: str) -> dict | None:
+        """This column as ``locale`` should render it, or ``None``.
+
+        ``None`` when nothing inside it is visible — see
+        ``NavigationMenu.localized`` for why an empty column is dropped
+        rather than rendered as a bare heading.
+        """
+        children = [
+            payload
+            for link in self.links.all()
+            if (payload := link.localized(locale)) is not None
+        ]
+        if not children:
+            return None
+        label = self.safe_translation_getter(
+            "label", language_code=locale, any_language=True
+        )
+        payload: dict = {"label": label or "", "children": children}
+        if self.icon:
+            payload["icon"] = self.icon
+        return payload
+
+    def __str__(self) -> str:
+        label = self.safe_translation_getter("label", any_language=True)
+        return label or f"Column #{self.pk}"
+
+
+class NavigationColumnTranslation(TranslatedFieldsModel):
+    master = TranslationsForeignKey(
+        "page_config.NavigationColumn",
+        on_delete=models.CASCADE,
+        related_name="translations",
+        null=True,
+    )
+    label = models.CharField(_("Label"), max_length=100)
+
+    class Meta:
+        app_label = "page_config"
+        db_table = "page_config_navigationcolumn_translation"
+        unique_together = ("language_code", "master")
+        verbose_name = _("Navigation Column Translation")
+        verbose_name_plural = _("Navigation Column Translations")
+
+    def __str__(self) -> str:
+        return self.label
+
+
+class NavigationLink(
+    TranslatableModel, SortableModel, TimeStampMixinModel, UUIDModel
+):
+    """One entry in a menu, pointing at exactly one destination.
+
+    A link names WHAT it points at rather than carrying a typed path.
+    The path was the whole defect in the JSON menus it replaces: a
+    hand-typed ``/info/faq`` kept pointing at ``/info/faq`` after the
+    page was unpublished or its slug changed, so the footer advertised
+    a 404 and nothing in the system knew. A ``content_page`` link
+    resolves through the row, disappears when the row is unpublished,
+    and follows a slug change for free.
+
+    It also removes the translation burden: a page link takes its label
+    from the page's OWN translated title, so a bilingual store
+    translates the document once instead of once per menu per locale.
+    ``label`` here is an override for the cases that need one.
+    """
+
+    menu = models.ForeignKey(
+        "page_config.NavigationMenu",
+        on_delete=models.CASCADE,
+        related_name="links",
+        null=True,
+        blank=True,
+        verbose_name=_("Menu"),
+        help_text=_("Header and mobile links hang off the menu directly."),
+    )
+    column = models.ForeignKey(
+        "page_config.NavigationColumn",
+        on_delete=models.CASCADE,
+        related_name="links",
+        null=True,
+        blank=True,
+        verbose_name=_("Column"),
+        help_text=_("Footer links belong to a column."),
+    )
+
+    content_page = models.ForeignKey(
+        "page_config.ContentPage",
+        on_delete=models.CASCADE,
+        related_name="navigation_links",
+        null=True,
+        blank=True,
+        verbose_name=_("Content page"),
+    )
+    page_layout = models.ForeignKey(
+        "page_config.PageLayout",
+        on_delete=models.CASCADE,
+        related_name="navigation_links",
+        null=True,
+        blank=True,
+        verbose_name=_("Custom page"),
+    )
+    route = models.CharField(
+        _("Built-in page"),
+        max_length=64,
+        blank=True,
+        default="",
+        choices=BuiltInRoute.choices,
+    )
+    url = models.URLField(
+        _("External link"),
+        blank=True,
+        default="",
+        help_text=_("An absolute https URL on another site."),
+    )
+
+    class Meta(TypedModelMeta):
+        verbose_name = _("Navigation Link")
+        verbose_name_plural = _("Navigation Links")
+        ordering = ["sort_order"]
+        indexes = [*TimeStampMixinModel.Meta.indexes]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    Q(menu__isnull=False, column__isnull=True)
+                    | Q(menu__isnull=True, column__isnull=False)
+                ),
+                name="navigationlink_exactly_one_parent",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    Q(
+                        content_page__isnull=False,
+                        page_layout__isnull=True,
+                        route="",
+                        url="",
+                    )
+                    | Q(
+                        content_page__isnull=True,
+                        page_layout__isnull=False,
+                        route="",
+                        url="",
+                    )
+                    | Q(
+                        content_page__isnull=True,
+                        page_layout__isnull=True,
+                        url="",
+                    )
+                    & ~Q(route="")
+                    | Q(
+                        content_page__isnull=True,
+                        page_layout__isnull=True,
+                        route="",
+                    )
+                    & ~Q(url="")
+                ),
+                name="navigationlink_exactly_one_target",
+            ),
+        ]
+
+    def get_ordering_queryset(self):
+        if self.column_id is not None:
+            return NavigationLink.objects.filter(column=self.column_id)
+        return NavigationLink.objects.filter(menu=self.menu_id)
+
+    def localized(self, locale: str) -> dict | None:
+        """This link as ``locale`` should render it, or ``None``.
+
+        ``None`` when the destination is not public. An unpublished
+        page is a 404, and advertising one is exactly the rot that
+        hand-typed paths produced.
+        """
+        if not self.targets_published_page:
+            return None
+        path = self.resolved_path
+        label = self.resolved_label(locale)
+        if not path or not label:
+            return None
+        return {"label": label, "href" if self.is_external else "to": path}
+
+    @property
+    def resolved_path(self) -> str:
+        """Where this link points, as the storefront should render it.
+
+        A ContentPage resolves through ``LEGAL_ROUTE_BY_SLUG`` rather
+        than always to ``/info/<slug>``: the four legal slugs have
+        dedicated routes and ``/info/<slug>`` 301s to them, so linking
+        the generic path would make every footer click a redirect.
+        """
+        if self.content_page_id is not None:
+            slug = self.content_page.slug
+            return LEGAL_ROUTE_BY_SLUG.get(slug) or f"/info/{slug}"
+        if self.page_layout_id is not None:
+            return f"/{self.page_layout.page_type}"
+        return self.route or self.url
+
+    @property
+    def is_external(self) -> bool:
+        return bool(self.url)
+
+    def _own_label(self, locale: str) -> str:
+        """This link's override for ``locale``, and nothing else.
+
+        Read off the translation rows rather than through
+        ``safe_translation_getter``, which applies the parler fallback
+        chain: an override written in Greek would otherwise be served
+        as the ENGLISH label, hiding the page's own English title
+        behind it. A missing override is not a missing translation —
+        it means "use the page's title", which is the better answer in
+        every language.
+
+        Iterates the prefetched rows instead of querying, so
+        serializing a whole menu stays one query per relation.
+        """
+        for translation in self.translations.all():
+            if translation.language_code == locale:
+                return translation.label
+        return ""
+
+    def resolved_label(self, locale: str) -> str:
+        """The label, preferring the operator's override.
+
+        A page link with no override takes the page's own translated
+        title, so the document is translated once instead of once per
+        menu per locale.
+        """
+        override = self._own_label(locale)
+        if override:
+            return override
+        if self.content_page_id is not None:
+            return (
+                self.content_page.safe_translation_getter(
+                    "title", language_code=locale, any_language=True
+                )
+                or self.content_page.slug
+            )
+        if self.page_layout_id is not None:
+            return self.page_layout.title
+        # A route or external link has no page to borrow a name from,
+        # so an override in any language beats an empty menu entry.
+        return self.safe_translation_getter("label", any_language=True) or ""
+
+    @property
+    def targets_published_page(self) -> bool:
+        """False when the destination exists but is not public.
+
+        An unpublished page is a 404, so its link is omitted rather
+        than rendered — the defect that made hand-typed paths rot.
+        """
+        if self.content_page_id is not None:
+            return self.content_page.is_published
+        if self.page_layout_id is not None:
+            return self.page_layout.is_published
+        return True
+
+    def __str__(self) -> str:
+        label = self.safe_translation_getter("label", any_language=True)
+        return label or self.resolved_path or f"Link #{self.pk}"
+
+
+class NavigationLinkTranslation(TranslatedFieldsModel):
+    master = TranslationsForeignKey(
+        "page_config.NavigationLink",
+        on_delete=models.CASCADE,
+        related_name="translations",
+        null=True,
+    )
+    label = models.CharField(
+        _("Label"),
+        max_length=100,
+        blank=True,
+        default="",
+        help_text=_(
+            "Leave empty for a page link to use the page's own title, "
+            "which is already translated."
+        ),
+    )
+
+    class Meta:
+        app_label = "page_config"
+        db_table = "page_config_navigationlink_translation"
+        unique_together = ("language_code", "master")
+        verbose_name = _("Navigation Link Translation")
+        verbose_name_plural = _("Navigation Link Translations")
+
+    def __str__(self) -> str:
+        return self.label
 
 
 class ContentPageQuerySet(TranslatableOptimizedQuerySet):

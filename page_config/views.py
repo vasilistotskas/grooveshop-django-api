@@ -114,7 +114,7 @@ def public_navigation(request):
     a working header rather than losing one."""
     locale = requested_locale(request)
     menus = {}
-    for menu in NavigationMenu.objects.all():
+    for menu in NavigationMenu.objects.with_entries():
         items = menu.localized(locale)
         if items:
             menus[menu.slot] = items

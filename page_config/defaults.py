@@ -7,6 +7,7 @@ from django.conf import settings
 from page_config.legal_documents import (
     LEGAL_DOCUMENT_SLUGS,
     LEGAL_DOCUMENTS,
+    LEGAL_ROUTE_BY_SLUG,
     render_legal_document,
 )
 from page_config.models import (
@@ -221,6 +222,11 @@ def seed_brand_pages() -> dict[str, bool]:
     report what happened. Must be called inside the target tenant's
     schema (e.g. via ``django_tenants.utils.schema_context``) — this
     function itself has no notion of which schema it's running in.
+
+    Run AFTER provisioning, which is where it sits in practice: the
+    footer links resolve to the rows they point at, so the legal
+    ContentPages ``seed_content_pages`` creates must already exist or
+    those links are skipped (and logged) rather than stored as paths.
     """
     created_map: dict[str, bool] = {}
 
@@ -229,12 +235,9 @@ def seed_brand_pages() -> dict[str, bool]:
     # silently loses its Vision and Microlearning links.
     from page_config.models import NavigationMenu, NavigationSlot
 
-    _, footer_created = NavigationMenu.objects.get_or_create(
-        slot=NavigationSlot.FOOTER,
-        defaults={"items": BRAND_FOOTER_COLUMNS},
+    footer, footer_created = NavigationMenu.objects.get_or_create(
+        slot=NavigationSlot.FOOTER
     )
-    if footer_created:
-        logger.info("Seeded brand footer navigation")
     created_map["footer_navigation"] = footer_created
 
     for page_type, config in BRAND_PAGE_LAYOUTS.items():
@@ -276,6 +279,16 @@ def seed_brand_pages() -> dict[str, bool]:
         hero.save(update_fields=["props"])
         logger.info("Applied brand banner props to the home hero")
     created_map["home"] = home_created
+    # Built LAST, and as rows rather than the JSON this used to write:
+    # `localized()` reads columns and links now, so a seeded blob would
+    # give the store a footer that silently renders nothing. Last
+    # because a link resolves to the PageLayout it points at, and those
+    # are created above — seeded earlier, every brand link would find
+    # no target and be skipped.
+    if footer_created:
+        links = build_navigation_menu(footer, BRAND_FOOTER_COLUMNS)
+        logger.info("Seeded brand footer navigation (%s links)", links)
+
     return created_map
 
 
@@ -445,3 +458,145 @@ def legal_translation_coverage() -> dict[str, set[str]]:
         if body and body.strip():
             coverage.setdefault(slug, set()).add(language_code)
     return coverage
+
+
+def _navigation_target(path: str) -> dict | None:
+    """Which typed target a declarative spec's path refers to.
+
+    Seeds are written as paths because that is how a person describes a
+    menu, but they are STORED as targets — the whole point of the
+    relational menus is that nothing keeps a hand-typed path around to
+    rot. A path that matches nothing returns ``None`` and the caller
+    skips it rather than inventing a link.
+    """
+    from page_config.models import BuiltInRoute, ContentPage, PageLayout
+
+    if path.startswith(("http://", "https://")):
+        return {"url": path}
+    for slug, canonical in LEGAL_ROUTE_BY_SLUG.items():
+        if path == canonical:
+            page = ContentPage.objects.filter(slug=slug).first()
+            if page is not None:
+                return {"content_page": page}
+    if path.startswith("/info/"):
+        page = ContentPage.objects.filter(slug=path[len("/info/") :]).first()
+        if page is not None:
+            return {"content_page": page}
+    layout = PageLayout.objects.filter(page_type=path.lstrip("/")).first()
+    if layout is not None:
+        return {"page_layout": layout}
+    if path in set(BuiltInRoute.values):
+        return {"route": path}
+    return None
+
+
+def build_navigation_menu(
+    menu, spec: list[dict], i18n: dict[str, list] | None = None
+) -> int:
+    """Turn a declarative menu spec into columns and links.
+
+    One implementation for every seeder, so a store built by
+    ``seed_brand_pages`` and one built by the demo seeder cannot end up
+    with differently-shaped menus. The footer's spec is a list of
+    columns; header and mobile are a flat list of links.
+
+    ``i18n`` is the same spec per non-default locale, index-aligned
+    with ``spec`` because that is how the JSON menus expressed it: a
+    whole-menu copy. Only the LABELS are taken from it — a translation
+    cannot retarget a link — and a copy whose shape differs is ignored
+    rather than mis-assigned.
+
+    Returns how many links were created. Callers pass a freshly created
+    or emptied menu — this does not reconcile an existing one.
+    """
+    from page_config.models import (
+        NavigationColumn,
+        NavigationColumnTranslation,
+        NavigationLink,
+        NavigationLinkTranslation,
+        NavigationSlot,
+    )
+
+    language = settings.PARLER_DEFAULT_LANGUAGE_CODE
+    overrides = i18n or {}
+    created = 0
+
+    def _labels_at(*path) -> dict[str, str]:
+        """``{locale: label}`` for one position in the menu tree."""
+        found: dict[str, str] = {}
+        for locale, blob in overrides.items():
+            cursor: object = blob
+            for key in path:
+                if isinstance(cursor, list) and isinstance(key, int):
+                    cursor = cursor[key] if key < len(cursor) else None
+                elif isinstance(cursor, dict) and isinstance(key, str):
+                    cursor = cursor.get(key)
+                else:
+                    cursor = None
+                if cursor is None:
+                    break
+            if isinstance(cursor, dict) and cursor.get("label"):
+                found[locale] = cursor["label"]
+        return found
+
+    def _add_link(
+        entry: dict,
+        *,
+        index: int,
+        spec_path: tuple,
+        column=None,
+        parent=None,
+    ) -> None:
+        nonlocal created
+        path = entry.get("to") or entry.get("href") or ""
+        target = _navigation_target(path)
+        if target is None:
+            logger.warning("Navigation seed: no target for %r", path)
+            return
+        link = NavigationLink.objects.create(
+            menu=parent,
+            column=column,
+            sort_order=index,
+            content_page=target.get("content_page"),
+            page_layout=target.get("page_layout"),
+            route=target.get("route", ""),
+            url=target.get("url", ""),
+        )
+        created += 1
+        # A page link takes the page's own translated title; storing a
+        # copy here would freeze it at seed time.
+        if target.get("content_page") is None and entry.get("label"):
+            NavigationLinkTranslation.objects.create(
+                master=link, language_code=language, label=entry["label"]
+            )
+            for locale, label in _labels_at(*spec_path).items():
+                NavigationLinkTranslation.objects.create(
+                    master=link, language_code=locale, label=label
+                )
+
+    if menu.slot == NavigationSlot.FOOTER:
+        for i, column_spec in enumerate(spec):
+            column = NavigationColumn.objects.create(
+                menu=menu, sort_order=i, icon=column_spec.get("icon") or ""
+            )
+            NavigationColumnTranslation.objects.create(
+                master=column,
+                language_code=language,
+                label=column_spec.get("label") or "",
+            )
+            for locale, label in _labels_at(i).items():
+                NavigationColumnTranslation.objects.create(
+                    master=column, language_code=locale, label=label
+                )
+            for j, child in enumerate(column_spec.get("children") or []):
+                _add_link(
+                    child,
+                    index=j,
+                    spec_path=(i, "children", j),
+                    column=column,
+                )
+    else:
+        for i, entry in enumerate(spec):
+            _add_link(entry, index=i, spec_path=(i,), parent=menu)
+
+    return created

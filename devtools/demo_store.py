@@ -1719,6 +1719,7 @@ def seed_navigation() -> dict[str, int]:
     IS the operator's content, and a re-run must not overwrite a menu
     somebody edited in the admin.
     """
+    from page_config.defaults import build_navigation_menu
     from page_config.models import NavigationMenu, NavigationSlot
     from page_config.schemas import validate_navigation_items
 
@@ -1730,9 +1731,12 @@ def seed_navigation() -> dict[str, int]:
     }
     for slot, items in payloads.items():
         validate_navigation_items(slot, items)
-        _, created = NavigationMenu.objects.get_or_create(
-            slot=slot, defaults={"items": items}
-        )
+        menu, created = NavigationMenu.objects.get_or_create(slot=slot)
+        if created:
+            # Rows, not the JSON this used to store: the menu is built
+            # from columns and links now, so a seeded blob would leave
+            # the demo store with a footer that renders nothing.
+            build_navigation_menu(menu, items)
         _bump(report, "created" if created else "unchanged")
     return report
 

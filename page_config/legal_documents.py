@@ -32,6 +32,21 @@ merchant edits it like any other content.
 
 from collections.abc import Collection, Iterable, Mapping
 
+LEGAL_ROUTE_BY_SLUG: dict[str, str] = {
+    "terms": "/terms-of-use",
+    "privacy": "/privacy-policy",
+    "cookies": "/cookies-policy",
+    "return-policy": "/return-policy",
+}
+"""The canonical path a ContentPage slug is served at, when it has one.
+
+Mirrors the storefront's ``LEGAL_ROUTE_BY_SLUG``. Every other slug is
+served at ``/info/<slug>``, and ``/info/<one of these>`` permanently
+redirects to the path here — so a navigation link built from a
+ContentPage must resolve through this map or it would point the whole
+footer at a 301.
+"""
+
 LEGAL_DOCUMENT_SLUGS: tuple[str, ...] = ("terms", "privacy", "cookies")
 """Slugs whose seeded body is a real document rather than a placeholder.
 

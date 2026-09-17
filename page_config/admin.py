@@ -99,18 +99,14 @@ class PageLayoutAdmin(BaseModelAdmin):
 class NavigationMenuAdmin(BaseModelAdmin):
     """The chrome menu for one slot.
 
-    ``items``/``i18n`` are the JSON this model used to store and are
-    shown read-only: the menu is built from columns and links now, and
-    an editable copy of the old blob would be a second source of truth
-    that silently disagrees with what the storefront renders. They are
-    dropped once every replica serves the relational menus.
+    The row is only the slot; everything a visitor sees is the columns
+    and links edited through the inlines below.
     """
 
     compressed_fields = True
     warn_unsaved_form = True
     list_display = ("slot", "entry_count", "updated_at")
-    fields = ("slot", "items", "i18n")
-    readonly_fields = ("items", "i18n")
+    fields = ("slot",)
 
     def get_inlines(self, request, obj=None):
         # Only the footer groups its links under headings.

@@ -152,30 +152,16 @@ class PageLayoutAdminSerializer(serializers.ModelSerializer):
 
 
 class NavigationMenuSerializer(serializers.ModelSerializer):
+    """The slot row alone.
+
+    Columns and links are relational and edited in the admin; this
+    surface used to carry the JSON menu and validate it, and that blob
+    no longer exists on the model.
+    """
+
     class Meta:
         model = NavigationMenu
-        fields = ("slot", "items", "i18n")
-
-    def validate(self, attrs):
-        from django.core.exceptions import (
-            ValidationError as DjangoValidationError,
-        )
-
-        from page_config.schemas import (
-            validate_navigation_i18n,
-            validate_navigation_items,
-        )
-
-        slot = attrs.get("slot", getattr(self.instance, "slot", ""))
-        try:
-            validate_navigation_items(slot, attrs.get("items"))
-        except DjangoValidationError as exc:
-            raise serializers.ValidationError({"items": exc.messages}) from exc
-        try:
-            validate_navigation_i18n(slot, attrs.get("i18n"))
-        except DjangoValidationError as exc:
-            raise serializers.ValidationError({"i18n": exc.messages}) from exc
-        return attrs
+        fields = ("slot",)
 
 
 @extend_schema_field(generate_schema_multi_lang(ContentPage))

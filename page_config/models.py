@@ -267,17 +267,14 @@ class NavigationMenu(TimeStampMixinModel, UUIDModel):
     Chrome stays OUT of the page builder — it persists across routes
     and owns auth/cart state — but its LINKS are tenant data. One row
     per slot; the storefront falls back to its code-level menus when a
-    slot has no row (so webside keeps today's chrome untouched until an
-    operator publishes menus).
+    slot has no row (so an unconfigured tenant keeps the platform
+    chrome untouched until an operator publishes menus).
 
-    ``items`` shape per slot (validated in ``page_config/schemas.py``):
-    - header/mobile: ``[{label, to|href, icon?}]``
-    - footer: ``[{label, icon?, children: [{label, to|href}]}]``
-
-    ``i18n`` holds the same shape per non-default locale. Labels are
-    operator content, not translation keys, so a multilingual store
-    supplies its own menu per language; the storefront's navigation
-    route resolves it and keys its cache on the locale.
+    The menu itself is rows: ``NavigationColumn`` (footer headings)
+    and ``NavigationLink`` (entries that name WHAT they point at). The
+    JSON blob this row used to carry — ``items`` plus a whole second
+    copy per locale in ``i18n`` — is gone from the model; its columns
+    are dropped in a follow-up migration once no replica selects them.
     """
 
     slot = models.CharField(
@@ -285,31 +282,6 @@ class NavigationMenu(TimeStampMixinModel, UUIDModel):
         max_length=20,
         choices=NavigationSlot.choices,
         unique=True,
-    )
-    items = models.JSONField(
-        _("Items"),
-        blank=True,
-        default=list,
-        encoder=DjangoJSONEncoder,
-        help_text=_(
-            "header/mobile: [{label, to|href, icon?}]; "
-            "footer: [{label, icon?, children: [{label, to|href}]}]. "
-            "'to' must be an internal path starting with '/', 'href' "
-            "an https URL."
-        ),
-    )
-    i18n = models.JSONField(
-        _("Locale Overrides"),
-        blank=True,
-        default=dict,
-        encoder=DjangoJSONEncoder,
-        help_text=_(
-            'Per-locale menus, e.g. {"en": [...]}, in the same shape as '
-            "Items. A menu is translated whole rather than per item, "
-            "because an index-keyed overlay would retarget every label "
-            "the first time the menu is reordered. Locales with no entry "
-            "here get the menu above."
-        ),
     )
 
     objects = NavigationMenuQuerySet.as_manager()

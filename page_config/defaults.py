@@ -324,27 +324,47 @@ def tenant_document_context() -> tuple[str, str]:
     """
     from django.db import connection
 
-    tenant = getattr(connection, "tenant", None)
-
+    schema_name = getattr(connection, "schema_name", "") or ""
     site_host = ""
-    domains = getattr(tenant, "domains", None)
-    if domains is not None:
-        primary = domains.filter(is_primary=True).first()
-        site_host = primary.domain if primary else ""
+    store_name = ""
+
+    # Resolved from the SCHEMA NAME, not from ``connection.tenant``.
+    # That attribute is a real Tenant inside ``tenant_context`` but not
+    # while ``migrate_schemas`` runs, where it carries no ``domains`` —
+    # which is how migration 0021 seeded all four live tenants the
+    # APP_MAIN_HOST_NAME fallback instead of their own hosts (corrected
+    # by 0022). The schema name is right in both contexts.
+    if schema_name and schema_name != getattr(
+        settings, "PUBLIC_SCHEMA_NAME", "public"
+    ):
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT COALESCE(NULLIF(t.store_name, ''), t.name),
+                       COALESCE(d.domain, '')
+                  FROM public.tenant_tenant t
+                  LEFT JOIN public.tenant_tenantdomain d
+                         ON d.tenant_id = t.id AND d.is_primary
+                 WHERE t.schema_name = %s
+                 LIMIT 1
+                """,
+                [schema_name],
+            )
+            row = cursor.fetchone()
+        if row:
+            store_name, site_host = row[0] or "", row[1] or ""
+
     if not site_host:
         site_host = getattr(settings, "APP_MAIN_HOST_NAME", "") or ""
         logger.warning(
             "No primary domain for schema %r while seeding legal pages; "
             "fell back to %r",
-            getattr(tenant, "schema_name", "?"),
+            schema_name or "?",
             site_host,
         )
+    if not store_name:
+        store_name = getattr(settings, "SITE_NAME", "") or ""
 
-    store_name = (
-        getattr(tenant, "store_name", "")
-        or getattr(tenant, "name", "")
-        or getattr(settings, "SITE_NAME", "")
-    )
     return site_host, store_name
 
 

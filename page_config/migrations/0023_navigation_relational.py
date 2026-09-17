@@ -88,6 +88,10 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name='navigationcolumn',
+            index=django.contrib.postgres.indexes.BTreeIndex(fields=['sort_order'], name='navigationcolumn_sort_order_ix'),
+        ),
+        migrations.AddIndex(
+            model_name='navigationcolumn',
             index=django.contrib.postgres.indexes.BTreeIndex(fields=['created_at'], name='navigationcolumn_created_at_ix'),
         ),
         migrations.AddIndex(
@@ -97,6 +101,10 @@ class Migration(migrations.Migration):
         migrations.AlterUniqueTogether(
             name='navigationcolumntranslation',
             unique_together={('language_code', 'master')},
+        ),
+        migrations.AddIndex(
+            model_name='navigationlink',
+            index=django.contrib.postgres.indexes.BTreeIndex(fields=['sort_order'], name='navigationlink_sort_order_ix'),
         ),
         migrations.AddIndex(
             model_name='navigationlink',

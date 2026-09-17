@@ -402,7 +402,13 @@ class NavigationColumn(
         verbose_name = _("Navigation Column")
         verbose_name_plural = _("Navigation Columns")
         ordering = ["sort_order"]
-        indexes = [*TimeStampMixinModel.Meta.indexes]
+        # Both parents splatted back in: defining `indexes` REPLACES
+        # the abstract parents' list, and dropping SortableModel's
+        # would leave the ordering this model is read by unindexed.
+        indexes = [
+            *SortableModel.Meta.indexes,
+            *TimeStampMixinModel.Meta.indexes,
+        ]
 
     def get_ordering_queryset(self):
         return NavigationColumn.objects.filter(menu=self.menu)
@@ -526,7 +532,10 @@ class NavigationLink(
         verbose_name = _("Navigation Link")
         verbose_name_plural = _("Navigation Links")
         ordering = ["sort_order"]
-        indexes = [*TimeStampMixinModel.Meta.indexes]
+        indexes = [
+            *SortableModel.Meta.indexes,
+            *TimeStampMixinModel.Meta.indexes,
+        ]
         constraints = [
             models.CheckConstraint(
                 condition=(

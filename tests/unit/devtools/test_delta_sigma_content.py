@@ -227,6 +227,10 @@ class TestTheSeedStepsWriteBothLocales:
     def test_menus_carry_their_english_labels(self):
         from page_config.models import NavigationMenu, NavigationSlot
 
+        # Layouts first, which is the order the seed command runs them
+        # in: a link resolves to the PageLayout it points at, so without
+        # them every brand link is skipped rather than stored as a path.
+        delta_sigma.seed_layouts()
         delta_sigma.seed_navigation()
 
         header = NavigationMenu.objects.get(slot=NavigationSlot.HEADER)
@@ -234,7 +238,12 @@ class TestTheSeedStepsWriteBothLocales:
             "DeSET",
             "Specialization",
         ]
-        assert header.localized("el") == header.items
+        # The Greek menu is the same links, under their own labels —
+        # asserted against the rendered menu now that `items` is no
+        # longer where a menu lives.
+        assert [item["to"] for item in header.localized("el")] == [
+            item["to"] for item in header.localized("en")
+        ]
 
     def test_retiring_the_prose_pages_unpublishes_only_those_three(self):
         """``/info/*`` is the only surface that served them.
@@ -664,16 +673,26 @@ class TestTheSeedStepsConvergeOnExistingRows:
         """
         from page_config.models import NavigationMenu, NavigationSlot
 
+        delta_sigma.seed_layouts()
         delta_sigma.seed_navigation()
         menu = NavigationMenu.objects.get(slot=NavigationSlot.FOOTER)
-        menu.items = [{"label": "Παλιό", "children": []}]
-        menu.save(update_fields=["items"])
+        # Stand in for a drifted menu: one column, nothing under it.
+        menu.columns.all().delete()
+        menu.links.all().delete()
 
         report = delta_sigma.seed_navigation(overwrite=True)
 
-        menu.refresh_from_db()
         assert report.get("rewritten", 0) >= 1
-        assert menu.items == delta_sigma._nav_footer()
+        expected = [
+            child["to"]
+            for column in delta_sigma._nav_footer()
+            for child in column["children"]
+        ]
+        assert [
+            child["to"]
+            for column in menu.localized("el")
+            for child in column["children"]
+        ] == expected
 
     def test_a_rerun_without_overwrite_keeps_an_edited_menu(self):
         from page_config.models import NavigationMenu, NavigationSlot

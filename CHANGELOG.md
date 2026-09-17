@@ -3,6 +3,96 @@
 
 
 
+## v3.63.0 (2026-09-17)
+
+### Bug fixes
+
+* fix(i18n): make the parler fallback chain actually reach a language
+
+PARLER_LANGUAGES carried `"fallbacks": ["en"]`, which was a no-op for
+the reader who needed it most. parler resolves a translated field by
+walking `[active_language] + fallbacks` and SKIPS the active language
+(parler/models.py::_get_translated_model), so with `en` active the only
+candidate was `en` itself -- nothing was tried at all. `de` fell back to
+`en`, which this platform's Greek content does not have either.
+
+Both raised TranslationDoesNotExist, and that class deliberately
+inherits AttributeError ("causes the templates to handle the missing
+attributes silently", per its own docstring), so Django templates
+rendered it as an empty string. `{{ item.product.name }}` in every order
+email is a live parler field with no snapshot, rendered inside
+`translation.override(get_order_language(order))` -- so an order
+confirmation sent to an English-speaking customer listed BLANK product
+names for every Greek-only product.
+
+Verified against production 2026-09-17: webside product #3 (`el` only)
+rendered `[]` under `en` and the Greek name under `el`. With the chain
+fixed it renders the Greek name in all three languages.
+
+The chain is now derived -- the authoring language first, then every
+other configured one -- so adding a language to _PARLER_LANG_TUPLE
+cannot forget to make it reachable. `[PARLER_DEFAULT_LANGUAGE_CODE]` is
+also what parler itself defaults to; the languages after it mean a store
+authoring in something other than Greek degrades to a language it HAS
+rather than to a blank string.
+
+Nothing in the codebase catches TranslationDoesNotExist, so no detection
+path depended on the raise.
+
+Not fixed by this, because no fallback setting can: a translation row
+that EXISTS with an empty value stops the walk. webside product #1 has
+an empty `en` name and still renders blank -- a data defect, asserted as
+such in the tests.
+
+Mutation-checked: restoring `["en"]` fails 8 tests including the
+behavioural ones; narrowing to the default language alone fails the
+reverse case.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01PfgF89nTkMcXy4MC5pmDeY ([`65f34e1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/65f34e13c9f9a8c0161b79d65b95df796c0619af))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.62.1 [skip ci] ([`59ae36e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/59ae36ebb0d4bec18ea4e69aa5fe20c210976fe5))
+
+### Features
+
+* feat(tenant): refuse a locale whose legal documents are not translated
+
+The legal routes render the tenant's own ContentPage for the ACTIVE
+locale and throw a hard 404 on an empty body. The storefront's
+`extractTranslated` does not fall back the way parler does on this side,
+so enabling `en` on a store whose documents are Greek-only publishes a
+storefront where the terms, privacy policy and cookie policy are
+unreachable in English -- the one thing those pages exist to prevent.
+delta-sigma is in exactly that state and its sitemap advertised three
+such URLs until they were gated out.
+
+`Tenant.clean` now refuses the transition, naming each document and
+locale. It guards the TRANSITION, not the state: only locales a save
+ADDS are checked, so a tenant whose stored set is already inconsistent
+stays editable for every unrelated field instead of being locked by its
+own history.
+
+Blocking rather than warning is safe: parler's admin language tabs come
+from PARLER_LANGUAGES, not from this field, so a merchant can write the
+translation BEFORE the locale is enabled. There is no deadlock to
+escape, and a warning on a legal-compliance gate is a warning that gets
+ignored.
+
+The rule (`missing_legal_translations`) is pure so it can be tested
+without provisioning a schema; `legal_translation_coverage` reads it out
+of whichever schema the caller switched to. A translation row that
+exists with an EMPTY body counts as missing, because the route 404s on
+an empty body and parler will not fall back past a row that exists.
+
+Mutation-checked: never raising, validating the whole set instead of the
+delta, dropping the schema_exists guard, and removing the `clean()`
+wiring each fail a different test.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01PfgF89nTkMcXy4MC5pmDeY ([`2919283`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2919283488feee287e73ee0d5f602b7ae039edbf))
+
 ## v3.62.1 (2026-09-17)
 
 ### Bug fixes

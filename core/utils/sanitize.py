@@ -30,6 +30,12 @@ ALLOWED_TAGS = {
     "ol",
     "p",
     "pre",
+    # Sectioning content. The legal documents seeded into every tenant's
+    # ContentPage rows wrap each clause in ``<section id="...">`` so the
+    # table of contents has something to anchor to; stripping it would
+    # have silently flattened those anchors on save. Purely semantic —
+    # nh3 keeps no behaviour with it.
+    "section",
     "span",
     "strong",
     "sub",

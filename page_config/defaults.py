@@ -4,6 +4,11 @@ import logging
 
 from django.conf import settings
 
+from page_config.legal_documents import (
+    LEGAL_DOCUMENT_SLUGS,
+    LEGAL_DOCUMENTS,
+    render_legal_document,
+)
 from page_config.models import (
     ContentPage,
     ContentPageTranslation,
@@ -280,25 +285,15 @@ def seed_brand_pages() -> dict[str, bool]:
 # placeholder title/body just mark where each page belongs. Body is plain
 # HTML (not markdown) to match ``ContentPageTranslation.body``'s TinyMCE
 # field.
+# Pages seeded as an EMPTY PROMPT for the merchant to fill. Only the
+# slugs whose content nobody but the merchant can write live here: the
+# three legal documents are seeded with the platform's real text from
+# ``legal_documents.py`` instead, because a store must not go live
+# without terms, privacy and a cookie policy.
 DEFAULT_CONTENT_PAGES: dict[str, dict[str, str]] = {
     "return-policy": {
         "title": "Πολιτική Επιστροφών",
         "body": "<p>Προσθέστε εδώ την πολιτική επιστροφών του καταστήματός σας.</p>",
-    },
-    "terms": {
-        "title": "Όροι Χρήσης",
-        "body": "<p>Προσθέστε εδώ τους όρους χρήσης του καταστήματός σας.</p>",
-    },
-    "privacy": {
-        "title": "Πολιτική Απορρήτου",
-        "body": "<p>Προσθέστε εδώ την πολιτική απορρήτου του καταστήματός σας.</p>",
-    },
-    # The storefront ships a /cookies-policy route like terms and
-    # privacy, but no slug backed it — so a merchant could override the
-    # other two and was stuck with platform boilerplate for this one.
-    "cookies": {
-        "title": "Πολιτική Cookies",
-        "body": "<p>Προσθέστε εδώ την πολιτική cookies του καταστήματός σας.</p>",
     },
     "faq": {
         "title": "Συχνές Ερωτήσεις",
@@ -315,21 +310,90 @@ DEFAULT_CONTENT_PAGES: dict[str, dict[str, str]] = {
 }
 
 
-def seed_content_pages() -> dict[str, bool]:
-    """Create default (unpublished) content pages if they don't exist.
+def tenant_document_context() -> tuple[str, str]:
+    """Resolve ``(site_host, store_name)`` for the tenant being seeded.
 
-    Idempotent (``get_or_create`` by slug) — safe to run repeatedly.
-    Called during tenant provisioning (every tenant gets these) AND
-    backfilled into every already-existing tenant schema via
-    ``page_config/migrations/0007_seed_content_pages.py`` so a tenant
-    created before ``ContentPage`` existed (including live ``webside``)
-    converges on the same default set. Returns ``{slug: created}``.
+    The same two values the storefront bound into the legal templates as
+    ``siteHost`` / ``storeName``, resolved the same way: the primary
+    domain row, and the customer-facing store name.
+
+    Both fall back rather than raise. Seeding runs inside tenant
+    provisioning, and a missing domain row must not leave a new store
+    without a terms page — it leaves one sentence reading oddly, which
+    the merchant can fix in the admin.
     """
+    from django.db import connection
+
+    tenant = getattr(connection, "tenant", None)
+
+    site_host = ""
+    domains = getattr(tenant, "domains", None)
+    if domains is not None:
+        primary = domains.filter(is_primary=True).first()
+        site_host = primary.domain if primary else ""
+    if not site_host:
+        site_host = getattr(settings, "APP_MAIN_HOST_NAME", "") or ""
+        logger.warning(
+            "No primary domain for schema %r while seeding legal pages; "
+            "fell back to %r",
+            getattr(tenant, "schema_name", "?"),
+            site_host,
+        )
+
+    store_name = (
+        getattr(tenant, "store_name", "")
+        or getattr(tenant, "name", "")
+        or getattr(settings, "SITE_NAME", "")
+    )
+    return site_host, store_name
+
+
+def seed_content_pages() -> dict[str, bool]:
+    """Create each tenant's content pages if they don't exist.
+
+    Two kinds, and the difference is deliberate:
+
+    - The three legal documents (``LEGAL_DOCUMENT_SLUGS``) are seeded
+      with the platform's real text and **published**. A storefront must
+      not go live without terms, a privacy policy and a cookie policy,
+      and since 2026-09-17 the routes render these rows rather than
+      markup compiled into the storefront — so an unpublished row is a
+      missing legal page, not a blank one.
+    - Everything else is seeded unpublished with a prompt, because
+      nobody but the merchant can write it.
+
+    Idempotent (``get_or_create`` by slug) — safe to run repeatedly, and
+    it never touches a row that already exists, so a merchant's edits
+    are never overwritten. Returns ``{slug: created}``.
+    """
+    site_host, store_name = tenant_document_context()
+
+    seeds: dict[str, dict[str, str | bool]] = {
+        slug: {
+            "title": LEGAL_DOCUMENTS[slug]["title"],
+            "body": render_legal_document(
+                slug, site_host=site_host, store_name=store_name
+            ),
+            "published": True,
+        }
+        for slug in LEGAL_DOCUMENT_SLUGS
+    }
+    seeds.update(
+        {
+            slug: {
+                "title": content["title"],
+                "body": content["body"],
+                "published": False,
+            }
+            for slug, content in DEFAULT_CONTENT_PAGES.items()
+        }
+    )
+
     created_map: dict[str, bool] = {}
-    for slug, content in DEFAULT_CONTENT_PAGES.items():
+    for slug, content in seeds.items():
         page, created = ContentPage.objects.get_or_create(
             slug=slug,
-            defaults={"is_published": False},
+            defaults={"is_published": content["published"]},
         )
         if created:
             ContentPageTranslation.objects.create(

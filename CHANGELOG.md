@@ -3,6 +3,52 @@
 
 
 
+## v3.62.1 (2026-09-17)
+
+### Bug fixes
+
+* fix(page_config): give each tenant its OWN identity in the legal documents
+
+0021 resolved {site_host} and {store_name} from connection.tenant, which
+is not a usable tenant object while migrate_schemas runs — it carries no
+domains — so every schema fell through to the APP_MAIN_HOST_NAME
+fallback. All four live tenants were seeded byte-identical terms reading
+'the website platform.grooveshop.space' under a store name of
+'GrooveShop'. Not another tenant's identity, but not their own either,
+and wrong in a document that names the site it governs.
+
+Caught by reading the seeded rows back out of production rather than
+trusting that the migration reported success: four tenants, one length,
+none containing its own host.
+
+The schema NAME is always correct on the connection, so both the seeder
+and the correction resolve the tenant from it in SQL against the public
+schema — no dependency on what django-tenants attaches to the
+connection, and none on a model's current shape. The join is
+d.tenant_id = t.id; writing it against t.schema_name silently returns no
+row and falls back again, which is why this query was run against
+production before being trusted.
+
+0022 rewrites only rows that still carry 0021's exact output, which it
+identifies by regenerating the fallback rendering and comparing byte for
+byte. A merchant's own document, or a row already correct, is left
+alone.
+
+Gates mutation-checked: overwriting regardless of content fails 3 tests,
+breaking identity resolution fails 2. The first version of that test
+file mutation-tested GREEN — it ran against a schema with no tenant row,
+so the migration returned before the loop and the merchant-safety
+assertion never executed. It now creates a real tenant row, with
+auto_create_schema off: paying for a Postgres schema per test took the
+file from 11s to 9 minutes.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01PfgF89nTkMcXy4MC5pmDeY ([`7726e1b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7726e1be7f2c27ef90374cf65c754729eda44d38))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.62.0 [skip ci] ([`7c687fa`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7c687faeda6ff94b06194029e8e5d2f84ccfb63f))
+
 ## v3.62.0 (2026-09-17)
 
 ### Chores

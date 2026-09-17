@@ -3,6 +3,125 @@
 
 
 
+## v3.64.0 (2026-09-17)
+
+### Bug fixes
+
+* fix(user): a generated handle must not invalidate the password
+
+Adding a user from the admin without typing a username generates the
+handle in `clean_username`, so it is on the instance by the time Django
+validates the password against the user's attributes.
+`UserNameGenerator` builds it from an adjective, a noun and a hash of
+the email, so it occasionally lands within
+`UserAttributeSimilarityValidator`'s 0.7 threshold — and the operator
+is told their password is "too similar to the username" for a value
+they never typed and cannot see. Nothing they change fixes it except
+the password, for a reason that is not true.
+
+This is also the intermittent CI failure on the blank-username tests:
+reproduced locally 1 run in 8 against their fixed password, and 8 of 8
+clean afterwards.
+
+Only a GENERATED handle is excused. One the operator typed is a real
+signal they can act on, and the email stays in scope throughout — they
+chose that, so a password resembling it is a genuine weakness. Both
+have tests.
+
+Mutation-checked: excusing nothing, and excusing every handle, each
+fail a different test.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01PfgF89nTkMcXy4MC5pmDeY ([`704d3d5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/704d3d52554e37cc9c7d46de05275a3bde467f17))
+
+* fix(page_config): keep the sortable index on the navigation models
+
+`Meta.indexes` REPLACES the abstract parents' list rather than
+extending it, so declaring only TimeStampMixinModel's dropped
+SortableModel's sort_order index — on two models that are read in
+sort_order on every menu render. `test_abstract_model_indexes` exists
+for exactly this and caught it in CI.
+
+Folded into 0023 rather than added as a follow-up migration: 0023 has
+never been applied anywhere persistent (pushed today, no deploy since
+v3.63.0 predates it, CI builds fresh databases), so this leaves one
+honest CreateModel instead of a migration that adds an index the create
+should have had.
+
+The delta_sigma seeder tests move with it: they asserted on `items`,
+which is no longer where a menu lives, and ran seed_navigation in
+isolation — a link resolves to the PageLayout it points at, so they now
+seed layouts first, which is the order the seed command itself uses.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01PfgF89nTkMcXy4MC5pmDeY ([`a61a04f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a61a04f6b7d41a8b0306c28b53ccd9c53fbc7642))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.63.0 [skip ci] ([`675682e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/675682e07d2b99b393e65abd148f1e642588eb5a))
+
+### Features
+
+* feat(page_config): build navigation from rows, not a JSON blob
+
+A tenant admin can now build the footer: columns they name, each
+holding pages and links they choose. The request that prompted it --
+"move the returns policy into the Terms & Conditions section" -- was
+not expressible before, which is why an auto-generated "Pages" column
+existed at all.
+
+The old model was a single JSONField edited through two raw textareas.
+It could not reference a page, so every link was a hand-typed path that
+kept pointing at /info/faq after the page was unpublished or its slug
+changed -- the footer advertised a 404 and nothing in the system knew.
+`i18n` held a SECOND whole copy of the menu per locale, so reordering
+one diverged them.
+
+A link now names WHAT it points at: a ContentPage, a PageLayout, a
+built-in route, or an external URL, exactly one of the four enforced by
+a CheckConstraint. Three things follow:
+
+- a link to an unpublished page is omitted, and a column left empty
+  disappears with it, so dead footer links are structurally impossible
+- a page link needs no translation at all -- it takes the page's own
+  translated title, so a bilingual store translates the document once
+  instead of once per menu per locale
+- the server resolves the target to a path, so `localized()` returns
+  the shape the storefront already consumes and NO storefront change
+  was needed
+
+Verified against production before designing: all 92 links across the
+four tenants resolve to one of the four targets, which is why there is
+no raw-path escape hatch to fall back on.
+
+Legal slugs resolve through LEGAL_ROUTE_BY_SLUG to their canonical
+route rather than /info/<slug>, which 301s -- otherwise every footer
+click would be a redirect.
+
+Admin: columns are a sortable inline on the menu, links a sortable
+inline on the column. Django has no nested inlines (ticket #9025) and
+Unfold adds none, so this is the drill-through RegionInline already
+uses rather than a new dependency. `items`/`i18n` are shown read-only
+-- an editable copy of the old blob would be a second source of truth
+that silently disagrees with what renders.
+
+0024 backfills every tenant and deliberately LEAVES the JSON columns:
+the migration runs before the new pods exist, so old replicas keep
+reading what they always read. The columns go in a later cleanup.
+
+One builder (`build_navigation_menu`) serves the migration's runtime
+twin and all three seeders, so a store built by seed_brand_pages and
+one built by the demo seeder cannot end up shaped differently.
+seed_brand_pages now runs it AFTER the layouts exist, since a link
+resolves to the row it points at.
+
+Mutation-checked, including a bug `ty` caught: the parameter carrying
+the position in the spec tree shadowed the local holding the link URL,
+so locale overrides were silently dropped.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01PfgF89nTkMcXy4MC5pmDeY ([`d6adf83`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d6adf838d1dbc4e7214b98e533f63e9c7d097fd8))
+
 ## v3.63.0 (2026-09-17)
 
 ### Bug fixes

@@ -18,8 +18,11 @@ naming one.
 
 from __future__ import annotations
 
+from unittest import mock
+
 from django.test import TestCase
 
+from core.generators import UserNameGenerator
 from user.forms import UserAccountCreationForm
 from user.models import UserAccount
 from user.validators import ExtendedUnicodeUsernameValidator
@@ -153,3 +156,65 @@ class DisplayNameStillBelongsInNameFieldsTests(TestCase):
         )
 
         self.assertEqual(user.full_name, "Κωνσταντίνος Βάσκος")
+
+
+class GeneratedHandleDoesNotFailThePasswordTests(TestCase):
+    """A handle the operator never chose cannot make their password invalid.
+
+    ``clean_username`` invents the handle during cleaning, so it is on
+    the instance by the time Django validates the password against the
+    user's attributes. ``UserNameGenerator`` builds it from an
+    adjective, a noun and a hash of the email, so it occasionally lands
+    within ``UserAttributeSimilarityValidator``'s 0.7 threshold — and
+    the operator is told the password is "too similar to the username"
+    for a value they never typed and cannot see.
+
+    That is also why CI failed intermittently here: reproduced 1 run in
+    8 against the fixed password below.
+    """
+
+    def _form(self, **overrides):
+        data = {
+            "email": "konstantinosvaskos@hotmail.com",
+            "username": "",
+            "password1": "aVeryLongPassphrase42",
+            "password2": "aVeryLongPassphrase42",
+        }
+        data.update(overrides)
+        return UserAccountCreationForm(data=data)
+
+    def test_a_handle_resembling_the_password_is_not_held_against_it(self):
+        # The worst case the generator can produce: the handle IS the
+        # password. Random adjective/noun pairs only approach this, so
+        # pinning it here is what makes the flake deterministic.
+        with mock.patch.object(
+            UserNameGenerator,
+            "generate_username",
+            return_value="aVeryLongPassphrase42",
+        ):
+            form = self._form()
+
+            self.assertTrue(form.is_valid(), form.errors.as_data())
+
+    def test_a_handle_the_operator_typed_still_counts(self):
+        # Only a GENERATED handle is excused. One the operator chose is
+        # a real signal, and they can change it.
+        form = self._form(
+            username="aVeryLongPassphrase42",
+            password1="aVeryLongPassphrase42",
+            password2="aVeryLongPassphrase42",
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("password2", form.errors)
+
+    def test_the_email_is_still_checked(self):
+        # The user chose the email, so a password resembling it is a
+        # real weakness — excusing the handle must not excuse this.
+        form = self._form(
+            password1="konstantinosvaskos",
+            password2="konstantinosvaskos",
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("password2", form.errors)

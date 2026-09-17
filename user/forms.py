@@ -88,4 +88,34 @@ class UserAccountCreationForm(UserCreationForm):
             # nothing.
             return ""
 
+        self._username_was_generated = True
         return UserNameGenerator().generate_username(email)
+
+    def validate_password_for_user(self, user, **kwargs) -> None:
+        """Keep a GENERATED handle out of the similarity check.
+
+        Django validates the password against the user's attributes,
+        and by this point ``clean_username`` may have invented the
+        handle. ``UserNameGenerator`` builds it from an adjective, a
+        noun and a hash of the email, so it occasionally lands within
+        ``UserAttributeSimilarityValidator``'s 0.7 threshold of the
+        password — and the operator is then told their password is
+        "too similar to the username" for a handle they never typed
+        and cannot see. Nothing they change fixes it except the
+        password, for a reason that is not true.
+
+        Reproduced 1 run in 8 against a fixed password, which is also
+        why CI failed intermittently on the blank-username tests.
+
+        The email is deliberately still in scope: the user chose that,
+        so a password resembling it is a real weakness they can act on.
+        """
+        if not getattr(self, "_username_was_generated", False):
+            super().validate_password_for_user(user, **kwargs)
+            return
+        handle = user.username
+        user.username = ""
+        try:
+            super().validate_password_for_user(user, **kwargs)
+        finally:
+            user.username = handle

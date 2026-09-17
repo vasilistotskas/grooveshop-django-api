@@ -425,3 +425,23 @@ def seed_content_pages() -> dict[str, bool]:
             logger.info("Seeded content page: %s", slug)
         created_map[slug] = created
     return created_map
+
+
+def legal_translation_coverage() -> dict[str, set[str]]:
+    """Which locales each legal document is actually usable in, here.
+
+    Reads the CURRENT schema, so callers switch tenant first. A
+    translation row that exists with an empty body counts as missing:
+    the legal routes 404 on an empty body, so a blank row is exactly as
+    unreachable as no row at all — and parler will not fall back past a
+    row that exists, so nothing rescues it.
+    """
+    coverage: dict[str, set[str]] = {}
+    rows = ContentPageTranslation.objects.filter(
+        master__slug__in=LEGAL_DOCUMENT_SLUGS,
+        master__is_published=True,
+    ).values_list("master__slug", "language_code", "body")
+    for slug, language_code, body in rows:
+        if body and body.strip():
+            coverage.setdefault(slug, set()).add(language_code)
+    return coverage

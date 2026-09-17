@@ -30,6 +30,8 @@ correct, because a domain change is a change to the document, and the
 merchant edits it like any other content.
 """
 
+from collections.abc import Collection, Iterable, Mapping
+
 LEGAL_DOCUMENT_SLUGS: tuple[str, ...] = ("terms", "privacy", "cookies")
 """Slugs whose seeded body is a real document rather than a placeholder.
 
@@ -82,3 +84,30 @@ def render_legal_document(slug: str, *, site_host: str, store_name: str) -> str:
     return body.replace("{site_host}", site_host).replace(
         "{store_name}", store_name
     )
+
+
+def missing_legal_translations(
+    coverage: Mapping[str, Collection[str]],
+    locales: Iterable[str],
+) -> list[tuple[str, str]]:
+    """Which ``(slug, locale)`` pairs a store would serve as a 404.
+
+    ``coverage`` maps a slug to the locales whose translation carries a
+    usable body; ``locales`` is the set the store intends to serve.
+
+    Pure, so the rule is testable without a tenant schema. The reader
+    that builds ``coverage`` lives in ``page_config.defaults``.
+
+    A legal route renders the tenant's ContentPage for the ACTIVE
+    locale and throws a hard 404 on an empty body — ``extractTranslated``
+    on the storefront does not fall back the way parler does on this
+    side. So enabling a locale without translating these documents
+    publishes a store whose terms, privacy policy and cookie policy are
+    unreachable in that language.
+    """
+    return [
+        (slug, locale)
+        for slug in LEGAL_DOCUMENT_SLUGS
+        for locale in locales
+        if locale not in coverage.get(slug, frozenset())
+    ]

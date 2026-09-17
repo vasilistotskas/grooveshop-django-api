@@ -1071,6 +1071,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         self._validate_stripe_secret_key()
         self._validate_theme_metadata()
         self._validate_available_locales()
+        self._validate_legal_documents_for_new_locales()
         self._validate_allowed_csp_sources()
         self._validate_meta_pixel_id()
         self._validate_tiktok_pixel_id()
@@ -1108,6 +1109,72 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
                     % {"locale": self.default_locale}
                 }
             )
+
+    def _newly_added_locales(self) -> list[str]:
+        """Locales this save ADDS to the ones already stored.
+
+        Only the delta is validated. A tenant whose stored set is
+        already inconsistent — delta-sigma serves ``en`` with Greek-only
+        legal documents — must stay editable for every unrelated field,
+        so the rule guards the transition rather than the state.
+        """
+        if self.pk is None:
+            return []
+        previous = (
+            type(self)
+            .objects.filter(pk=self.pk)
+            .values_list("available_locales", flat=True)
+            .first()
+        )
+        return sorted(set(self.available_locales or []) - set(previous or []))
+
+    def _validate_legal_documents_for_new_locales(self) -> None:
+        """Refuse to serve a locale whose legal documents do not exist.
+
+        The legal routes render this tenant's own ContentPage for the
+        active locale and 404 on an empty body, so enabling a locale
+        before translating them publishes a store whose terms, privacy
+        policy and cookie policy are unreachable in that language —
+        which is the one thing those pages exist to prevent.
+
+        Blocking rather than warning is safe here: parler's admin
+        language tabs come from ``PARLER_LANGUAGES``, not from this
+        field, so a merchant can write the translation BEFORE the locale
+        is enabled. There is no deadlock to escape.
+        """
+        # Imported here: page_config imports tenant, so a module-level
+        # import would close the cycle.
+        from django_tenants.utils import schema_exists, tenant_context
+
+        from page_config.defaults import legal_translation_coverage
+        from page_config.legal_documents import missing_legal_translations
+
+        added = self._newly_added_locales()
+        if not added:
+            return
+        if not self.schema_name or not schema_exists(self.schema_name):
+            # Provisioning creates the schema and seeds the documents
+            # after the row; there is nothing to read yet.
+            return
+
+        with tenant_context(self):
+            coverage = legal_translation_coverage()
+
+        missing = missing_legal_translations(coverage, added)
+        if not missing:
+            return
+
+        details = ", ".join(f"{slug} ({locale})" for slug, locale in missing)
+        raise ValidationError(
+            {
+                "available_locales": _(
+                    "Translate these legal documents before serving the "
+                    "locale — the storefront 404s each of them in a "
+                    "language it has no body for: %(details)s"
+                )
+                % {"details": details}
+            }
+        )
 
     def _validate_stripe_publishable_key(self) -> None:
         key = self.stripe_publishable_key

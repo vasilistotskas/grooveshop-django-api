@@ -360,6 +360,33 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
 
     objects: OrderManager = OrderManager()
 
+    @property
+    def is_first_order(self) -> bool:
+        """Whether this is the customer's first order with the store.
+
+        Feeds Google Ads' ``new_customer`` conversion parameter, which
+        Google asks to be "calculated dynamically" — a hardcoded value
+        skews new-customer acquisition reporting for every campaign.
+
+        Identity is the account when there is one, else the email
+        (case-insensitive), so a guest who later registers is still one
+        customer. Canceled orders do not count: a checkout that never
+        completed is not a prior purchase. Queries the table once; the
+        only reader is the order detail on the success page.
+        """
+        if self.user_id is not None:
+            prior = Order.objects.filter(user_id=self.user_id)
+        else:
+            prior = Order.objects.filter(
+                user__isnull=True, email__iexact=self.email
+            )
+        return not (
+            prior.exclude(pk=self.pk)
+            .exclude(status=OrderStatus.CANCELED)
+            .filter(created_at__lt=self.created_at)
+            .exists()
+        )
+
     class Meta(TypedModelMeta):
         verbose_name = _("Order")
         verbose_name_plural = _("Orders")

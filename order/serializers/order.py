@@ -326,6 +326,15 @@ class OrderDetailSerializer(OrderSerializer):
             "totals in multi-currency reports."
         )
     )
+    is_first_order = serializers.BooleanField(
+        read_only=True,
+        help_text=(
+            "True when the customer (account, or email for a guest) has "
+            "no earlier non-canceled order. Feeds the ``new_customer`` "
+            "parameter of the Google Ads purchase conversion, which "
+            "Google asks to be calculated rather than hardcoded."
+        ),
+    )
     applied_coupon_codes = serializers.SerializerMethodField(
         help_text=(
             "Coupon codes redeemed on this order (empty when no coupon "
@@ -778,6 +787,7 @@ class OrderDetailSerializer(OrderSerializer):
             "full_address",
             "meta_event_ids",
             "currency",
+            "is_first_order",
         )
         read_only_fields = (
             *OrderSerializer.Meta.read_only_fields,

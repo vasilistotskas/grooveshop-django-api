@@ -539,6 +539,59 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
             "Empty → GA is disabled for this tenant."
         ),
     )
+    # Google Ads conversion tracking. One conversion ID per store and one
+    # LABEL per conversion action the storefront can report. The labels
+    # are explicit columns rather than a JSON map on purpose: the set of
+    # actions is closed — it is exactly the events the storefront fires
+    # — so a new action is a code change with a call site, and a column
+    # beside it is the honest cost. It also keeps them typed end to end
+    # (OpenAPI → Zod → TenantConfig) and editable as plain admin fields.
+    google_ads_conversion_id = models.CharField(
+        _("Google Ads Conversion ID"),
+        max_length=32,
+        blank=True,
+        default="",
+        help_text=_(
+            "Google Ads conversion ID (AW-XXXXXXXXXX). Empty → no "
+            "conversion events are sent for this tenant, whatever the "
+            "labels below say."
+        ),
+    )
+    google_ads_purchase_label = models.CharField(
+        _("Google Ads Purchase Label"),
+        max_length=64,
+        blank=True,
+        default="",
+        help_text=_(
+            "Conversion label for a completed purchase — the part after "
+            "the slash in 'AW-XXXXXXXXXX/LABEL'. Sent with the order "
+            "total, currency and transaction id."
+        ),
+    )
+    google_ads_add_to_cart_label = models.CharField(
+        _("Google Ads Add-to-Cart Label"),
+        max_length=64,
+        blank=True,
+        default="",
+        help_text=_("Conversion label for adding a product to the cart."),
+    )
+    google_ads_begin_checkout_label = models.CharField(
+        _("Google Ads Begin-Checkout Label"),
+        max_length=64,
+        blank=True,
+        default="",
+        help_text=_("Conversion label for starting the checkout."),
+    )
+    google_ads_page_view_label = models.CharField(
+        _("Google Ads Page-View Label"),
+        max_length=64,
+        blank=True,
+        default="",
+        help_text=_(
+            "Conversion label for a page view. Sent on every navigation, "
+            "so leave it empty unless a campaign is built on it."
+        ),
+    )
 
     # === Authentication ===
 
@@ -1077,6 +1130,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         self._validate_tiktok_pixel_id()
         self._validate_openai_pixel_id()
         self._validate_ga_tracking_id()
+        self._validate_google_ads()
         self._validate_social_urls()
         self._validate_box_now_partner_id()
 
@@ -1321,6 +1375,51 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
                     )
                 }
             )
+
+    GOOGLE_ADS_LABEL_FIELDS: tuple[str, ...] = (
+        "google_ads_purchase_label",
+        "google_ads_add_to_cart_label",
+        "google_ads_begin_checkout_label",
+        "google_ads_page_view_label",
+    )
+
+    def _validate_google_ads(self) -> None:
+        """A conversion ID is ``AW-`` plus digits; labels need the ID.
+
+        A label is the second half of ``send_to`` and means nothing
+        without the first, so a label set on a store with no conversion
+        ID is dead configuration that LOOKS armed. Refused rather than
+        ignored: the operator who typed it expects conversions to be
+        recorded.
+        """
+        conversion_id = self.google_ads_conversion_id
+        if conversion_id and not re.fullmatch(r"AW-\d{6,}", conversion_id):
+            raise ValidationError(
+                {
+                    "google_ads_conversion_id": _(
+                        "Google Ads conversion ID must be 'AW-' followed "
+                        "by digits (e.g. 'AW-1234567890')."
+                    )
+                }
+            )
+        errors = {}
+        for field in self.GOOGLE_ADS_LABEL_FIELDS:
+            label = getattr(self, field)
+            if not label:
+                continue
+            if not re.fullmatch(r"[A-Za-z0-9_-]+", label):
+                errors[field] = _(
+                    "A conversion label is letters, digits, '_' and '-' "
+                    "only — the part after the slash in 'AW-…/LABEL', "
+                    "not the whole 'send_to'."
+                )
+            elif not conversion_id:
+                errors[field] = _(
+                    "Set the Google Ads conversion ID first; a label "
+                    "cannot be sent without it."
+                )
+        if errors:
+            raise ValidationError(errors)
 
     def _validate_ga_tracking_id(self) -> None:
         """GA tracking IDs must start with G- (GA4) or UA- (Universal)."""

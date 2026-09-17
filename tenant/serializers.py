@@ -246,6 +246,11 @@ class TenantConfigSerializer(serializers.Serializer):
     # the contract on both sides.
     openai_pixel_id = serializers.CharField(required=False)
     ga_tracking_id = serializers.CharField(read_only=True)
+    google_ads_conversion_id = serializers.CharField(read_only=True)
+    google_ads_purchase_label = serializers.CharField(read_only=True)
+    google_ads_add_to_cart_label = serializers.CharField(read_only=True)
+    google_ads_begin_checkout_label = serializers.CharField(read_only=True)
+    google_ads_page_view_label = serializers.CharField(read_only=True)
 
     # --- Authentication ---
     totp_issuer = serializers.CharField(read_only=True)
@@ -380,6 +385,11 @@ class TenantAdminSerializer(serializers.ModelSerializer):
             "tiktok_pixel_id",
             "openai_pixel_id",
             "ga_tracking_id",
+            "google_ads_conversion_id",
+            "google_ads_purchase_label",
+            "google_ads_add_to_cart_label",
+            "google_ads_begin_checkout_label",
+            "google_ads_page_view_label",
             "meta_capi_access_token",
             "meta_capi_dataset_id",
             # --- Authentication ---

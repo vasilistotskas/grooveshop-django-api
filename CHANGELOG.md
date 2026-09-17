@@ -3,6 +3,84 @@
 
 
 
+## v3.62.0 (2026-09-17)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.61.1 [skip ci] ([`a1edce2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a1edce2956a70f9c3ab1d843bbba1724ad4edf7f))
+
+### Features
+
+* feat(page_config): seed the legal documents as data, not markup
+
+Terms, privacy and cookies rendered ~780 lines of Greek legal text
+compiled into the storefront, used as a FALLBACK whenever the tenant had
+not published a ContentPage at the matching slug. The storefront is
+about to render those rows and nothing else, so the text has to exist as
+data first — this is that half, and it ships BEFORE the storefront
+release so no legal page is ever blank.
+
+Three things were wrong with the markup version. The platform carried
+one wording for every tenant, so a merchant could not correct a word of
+the document that binds them without a release. The fallback meant two
+render paths and only one was ever exercised: the merchant path shipped
+a duplicate h1 and a table of contents anchored to ids that exist only
+in the boilerplate — live today on tenant #2's /privacy-policy. And a
+Vue template cannot be translated by the merchant, while
+Tenant.available_locales makes the document per-tenant anyway.
+
+So provisioning now seeds the real documents, published, and everything
+else stays an unpublished prompt. A store must not go live without
+terms; it can go live without an About page.
+
+The text is byte-faithful. It was extracted from the rendered pages
+rather than retyped, and verified three ways against production: visible
+text identical, tag+id sequence identical, and the rendered lengths
+(3321 / 2528 / 6507 chars) match what webside.gr serves today.
+{site_host} and {store_name} are resolved per tenant at seed time,
+mirroring the siteHost / storeName bindings the templates used.
+
+'section' joins the sanitizer allowlist. The documents wrap each clause
+in <section id=...> so the table of contents has something to anchor
+to, and stripping it would have silently flattened every anchor on save.
+It is purely semantic — nh3 keeps no behaviour with it.
+
+Migration 0021 backfills the four existing tenants and will not
+overwrite a merchant: a row is rewritten only when its body is still the
+exact placeholder from 0007, or empty. An audit before writing it found
+11 of 12 rows untouched and one — ekfyseosfyteias' privacy policy,
+written and published — which it leaves alone, published state included.
+
+Gates mutation-checked: dropping the merchant guard fails 2 tests,
+publishing a merchant's draft behind their back fails 1, and seeding the
+documents unpublished fails 1.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01PfgF89nTkMcXy4MC5pmDeY ([`1a4e06d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1a4e06de1d2cfd20786b0da69b2f406cfe6af0fc))
+
+### Testing
+
+* test(page_config): guard what the seeded legal documents must say
+
+These assertions lived in the storefront while the text was markup
+compiled into the Vue routes. The text moved here, so the guards move
+with it — a legal-correctness check belongs beside the words it checks.
+
+Each clause is guarded because an earlier draft got it wrong: the terms
+once fixed exclusive jurisdiction to one city's courts for every tenant,
+and once stated only the consumer's right to sue at home while staying
+silent on art. 18(2), which a merchant could read as licence to sue a
+customer in the merchant's own court.
+
+Also guards the shape the storefront depends on: every document must be
+sectioned, because the table of contents is derived from those sections,
+and must use only tags the sanitizer keeps — a tag outside the allowlist
+is dropped the first time a merchant saves the page, taking its anchors
+with it.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01PfgF89nTkMcXy4MC5pmDeY ([`eba10ec`](https://github.com/vasilistotskas/grooveshop-django-api/commit/eba10ec63f3b1e8e5a4f7d96c95f5ef4f9c21ee3))
+
 ## v3.61.1 (2026-09-16)
 
 ### Bug fixes

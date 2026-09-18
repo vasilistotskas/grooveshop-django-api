@@ -366,11 +366,17 @@ def register_default_surfaces() -> None:
             # from it. Without the route half a layout edit sits behind
             # Nitro's SSR cache for the rest of its TTL.
             #
-            # Only the page types the builder can actually drive
-            # (app/composables/usePageConfig.ts calls usePageConfig with
-            # a fixed set), so a layout edit does not evict the whole
-            # site's SSR cache. "/" resolves to Nitro's ``index``
-            # segment via _escaped_pathname.
+            # Only the pages this surface's data builds, so a layout edit
+            # does not evict the whole site's SSR cache: the builder-driven
+            # pages (every app/pages/*.vue that calls usePageConfig, minus
+            # the catalogue and blog listings, which their own surfaces
+            # cover) and the four legal pages rendered from ContentPage.
+            # All of them sit in the storefront's PRERENDERED_ROUTES at
+            # ``swr: 3600`` — before 2026-09-18 the marketing trio and the
+            # legal pages were missing here, so a policy edit purged its
+            # JSON and then served the old HTML for the rest of the hour.
+            # "/" resolves to Nitro's ``index`` segment via
+            # _escaped_pathname.
             # These are ``defineCachedEventHandler`` NAMES from the Nuxt
             # repo, not guesses — verified against the ``name:`` field of
             # server/api/page-config/[pageType].get.ts,
@@ -386,7 +392,20 @@ def register_default_surfaces() -> None:
                 "ContentPageViewSet",
                 "ContentPageDetailViewSet",
             )
-            + _nuxt_routes("/", "/about", "/contact", "/feedback", "/info"),
+            + _nuxt_routes(
+                "/",
+                "/about",
+                "/contact",
+                "/feedback",
+                "/info",
+                "/vision",
+                "/what-is-microlearning",
+                "/why-microlearning",
+                "/terms-of-use",
+                "/privacy-policy",
+                "/cookies-policy",
+                "/return-policy",
+            ),
             icon="dashboard_customize",
             group="content",
         )

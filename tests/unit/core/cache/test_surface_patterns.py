@@ -172,7 +172,34 @@ class TestPageConfigSurface:
         patterns = get_surface("page_config").nuxt_patterns
 
         assert "cache:nitro:routes:_:*" not in patterns
-        for path in ("index", "about", "contact", "feedback"):
+        for path in (
+            "index",
+            "about",
+            "contact",
+            "feedback",
+            "vision",
+            "whatismicrolearn",
+            "whymicrolearning",
+        ):
+            assert f"cache:nitro:routes:_:*{path}*" in patterns
+        for path in ("blog", "products"):
+            assert f"cache:nitro:routes:_:*{path}*" not in patterns
+
+    def test_covers_the_legal_pages_rendered_from_content_pages(self):
+        """The surface purges ``ContentPageDetailViewSet`` — the JSON a
+        legal page is built from — so it must also drop the HTML built
+        from it. The four legal routes are prerendered at ``swr: 3600``
+        on the storefront; without these a policy edit purged its JSON
+        and served the old clause for the rest of the hour.
+        """
+        patterns = get_surface("page_config").nuxt_patterns
+
+        for path in (
+            "termsofuse",
+            "privacypolicy",
+            "cookiespolicy",
+            "returnpolicy",
+        ):
             assert f"cache:nitro:routes:_:*{path}*" in patterns
 
     def test_declares_no_django_patterns(self):

@@ -3,6 +3,47 @@
 
 
 
+## v3.65.1 (2026-09-18)
+
+### Bug fixes
+
+* fix(cache): purge the legal and marketing page renders with the page_config surface
+
+The surface purged `ContentPageDetailViewSet` — the JSON a legal page is
+built from — and the renders of `/`, `/about`, `/contact`, `/feedback`
+and `/info`, but not `/terms-of-use`, `/privacy-policy`,
+`/cookies-policy`, `/return-policy` nor the builder-driven `/vision`,
+`/what-is-microlearning`, `/why-microlearning`. All seven are prerendered
+at `swr: 3600` on the storefront, so a policy edit dropped its JSON and
+then served the old clause for the rest of the hour.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01PfgF89nTkMcXy4MC5pmDeY ([`f6d4689`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f6d4689788221e7fb86de3b15d28632ac8637627))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.65.0 [skip ci] ([`f204c5c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f204c5ccf0085007c1bfb5b9f0972398686abc8f))
+
+### Refactoring
+
+* refactor(page_config): drop the JSON navigation columns
+
+Step two of two. 0025 removed items / i18n from Django's state and
+left the columns nullable so the previous release's replicas kept
+selecting them through the rollout. v3.65.0 is fully rolled out and no
+replica references the columns, so this drops them.
+
+RunSQL rather than RemoveField: the fields are already gone from
+state, so Django has nothing to resolve the column from. The reverse
+re-creates them nullable -- exactly the shape 0025 left them in -- and
+was exercised both ways on the dev database. The test inspects the
+TABLE, not the model: a state-only removal leaves the model looking
+finished while the columns quietly persist, which is precisely the
+half-done state it guards against.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01PfgF89nTkMcXy4MC5pmDeY ([`84e31ec`](https://github.com/vasilistotskas/grooveshop-django-api/commit/84e31eced663b01acb5353cc33fbd8583ccdb834))
+
 ## v3.65.0 (2026-09-18)
 
 ### Bug fixes

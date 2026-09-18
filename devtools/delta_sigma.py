@@ -3823,15 +3823,17 @@ def seed_layouts(*, overwrite: bool = False) -> dict[str, int]:
 def seed_navigation(*, overwrite: bool = False) -> dict[str, int]:
     """Create the three NavigationMenu slots.
 
-    ``get_or_create``, never ``update_or_create``: a NavigationMenu row
-    IS the merchant's content — the page builder's own editor writes
-    exactly this column — so a re-run must not overwrite an edit.
+    ``get_or_create``, never ``update_or_create``: a menu's columns and
+    links ARE the merchant's content — the admin edits exactly these
+    rows — so a re-run must not touch a menu that already exists.
 
-    ``overwrite`` rewrites ``items`` as well as ``i18n``, for the same
-    reason it rewrites section props: without it a change to the plan's
-    MENU could never reach a store that already had one. The footer
-    columns kept their first shape through three re-seeds because only
-    the English overlay was ever refilled.
+    ``overwrite`` rebuilds the menu from the plan, for the same reason it
+    rewrites section props: without it a change to the plan's MENU could
+    never reach a store that already had one. Rebuilt rather than
+    patched — a menu is a tree of rows, and reconciling one in place
+    would have to guess which link in the spec is which row. The
+    English labels are translations on those rows, written at build
+    time; there is no separate overlay to fill in afterwards.
     """
     from page_config.defaults import build_navigation_menu
     from page_config.models import NavigationMenu, NavigationSlot
@@ -3857,25 +3859,12 @@ def seed_navigation(*, overwrite: bool = False) -> dict[str, int]:
             build_navigation_menu(menu, items, i18n)
             _bump(report, "created")
             continue
-        rewritten = 0
         if overwrite:
-            # Rebuilt rather than patched: a menu is a tree of rows now,
-            # and reconciling one in place would have to guess which
-            # link in the spec is which row.
             menu.columns.all().delete()
             menu.links.all().delete()
             build_navigation_menu(menu, items, i18n)
-            rewritten = 1
-            _bump(report, "rewritten", rewritten)
-        filled = _fill_missing_i18n(
-            NavigationMenu.objects.filter(pk=menu.pk),
-            i18n,
-            validate=partial(validate_navigation_i18n, slot),
-            overwrite=overwrite,
-        )
-        if filled:
-            _bump(report, "localized", filled)
-        elif not rewritten:
+            _bump(report, "rewritten", 1)
+        else:
             _bump(report, "unchanged", 1)
     return report
 

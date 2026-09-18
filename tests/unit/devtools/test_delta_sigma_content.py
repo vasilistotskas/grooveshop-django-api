@@ -377,18 +377,17 @@ class TestTheSeedStepsConvergeOnExistingRows:
     """
 
     def test_a_rerun_fills_the_overrides_it_skipped(self):
-        from page_config.models import NavigationMenu, PageSection
+        # Sections only: a menu's English labels are translations on its
+        # rows, written when the menu is built, so there is no overlay a
+        # re-run could fill in — an existing menu is left alone.
+        from page_config.models import PageSection
 
         delta_sigma.seed_layouts()
-        delta_sigma.seed_navigation()
         PageSection.objects.update(i18n={})
-        NavigationMenu.objects.update(i18n={})
 
         layouts = delta_sigma.seed_layouts()
-        menus = delta_sigma.seed_navigation()
 
         assert layouts["sections_localized"] == PageSection.objects.count()
-        assert menus["localized"] == NavigationMenu.objects.count()
         assert not PageSection.objects.filter(i18n={}).exists()
         # Scoped to HOME: the closing band is on the DeSET page too,
         # so a bare `get` by component type matches both.
@@ -695,17 +694,27 @@ class TestTheSeedStepsConvergeOnExistingRows:
         ] == expected
 
     def test_a_rerun_without_overwrite_keeps_an_edited_menu(self):
-        from page_config.models import NavigationMenu, NavigationSlot
+        # The merchant's edit here is removing a link; a plain re-run
+        # must not put it back.
+        from page_config.models import (
+            NavigationLink,
+            NavigationMenu,
+            NavigationSlot,
+        )
 
+        delta_sigma.seed_layouts()
         delta_sigma.seed_navigation()
         menu = NavigationMenu.objects.get(slot=NavigationSlot.FOOTER)
-        menu.items = [{"label": "Δικό μου", "children": []}]
-        menu.save(update_fields=["items"])
+        before = NavigationLink.objects.filter(column__menu=menu).count()
+        NavigationLink.objects.filter(column__menu=menu).first().delete()
 
-        delta_sigma.seed_navigation()
+        report = delta_sigma.seed_navigation()
 
-        menu.refresh_from_db()
-        assert menu.items == [{"label": "Δικό μου", "children": []}]
+        assert report.get("unchanged", 0) >= 1
+        assert (
+            NavigationLink.objects.filter(column__menu=menu).count()
+            == before - 1
+        )
 
     def test_overwrite_reimposes_the_planned_props(self):
         """A change to the plan's COPY has to reach a seeded store.

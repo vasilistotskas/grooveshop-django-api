@@ -9,6 +9,7 @@ email otherwise, so a guest who later registers stays one customer.
 from __future__ import annotations
 
 from datetime import timedelta
+from typing import cast
 
 import pytest
 from django.utils import timezone
@@ -26,6 +27,18 @@ def _backdate(order: Order, days: int) -> None:
     order.refresh_from_db()
 
 
+def _earlier(**kwargs) -> Order:
+    """A prior order that COUNTS.
+
+    The factory picks a random status, and a canceled one is excluded
+    by design — which made this suite pass or fail on the draw (CI
+    shard 1, 2026-09-17). Pinned to a status that counts.
+    """
+    order = cast(Order, OrderFactory(status=OrderStatus.PENDING, **kwargs))
+    _backdate(order, days=3)
+    return order
+
+
 @pytest.mark.django_db
 class TestIsFirstOrder:
     def test_the_only_order_is_the_first(self) -> None:
@@ -37,8 +50,7 @@ class TestIsFirstOrder:
         self,
     ) -> None:
         user = UserAccountFactory()
-        earlier = OrderFactory(user=user)
-        _backdate(earlier, days=3)
+        earlier = _earlier(user=user)
         later = OrderFactory(user=user)
 
         assert later.is_first_order is False
@@ -54,22 +66,19 @@ class TestIsFirstOrder:
         assert later.is_first_order is True
 
     def test_guests_are_matched_by_email_case_insensitively(self) -> None:
-        earlier = OrderFactory(user=None, email="Repeat@Example.com")
-        _backdate(earlier, days=3)
+        _earlier(user=None, email="Repeat@Example.com")
         later = OrderFactory(user=None, email="repeat@example.com")
 
         assert later.is_first_order is False
 
     def test_a_different_guest_email_is_a_first_order(self) -> None:
-        earlier = OrderFactory(user=None, email="one@example.com")
-        _backdate(earlier, days=3)
+        _earlier(user=None, email="one@example.com")
         later = OrderFactory(user=None, email="two@example.com")
 
         assert later.is_first_order is True
 
     def test_another_accounts_order_does_not_count(self) -> None:
-        earlier = OrderFactory(user=UserAccountFactory())
-        _backdate(earlier, days=3)
+        _earlier(user=UserAccountFactory())
         later = OrderFactory(user=UserAccountFactory())
 
         assert later.is_first_order is True

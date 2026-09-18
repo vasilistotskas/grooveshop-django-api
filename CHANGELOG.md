@@ -3,6 +3,96 @@
 
 
 
+## v3.65.2 (2026-09-18)
+
+### Bug fixes
+
+* fix(order): settle the canceled payment in Order.save, not from the cascade
+
+The cascade settled it with a second save from inside `post_save`, while
+`_original_status` still held the old status — so the whole status
+transition fired twice (CI: `order_status_changed` called 2 times on
+PENDING → CANCELED), emails included. The rule now rides the ONE save
+every cancel path shares: `Order.save()` calls
+`settle_payment_on_cancel()` on the `status → CANCELED` transition and
+adds the column to `update_fields` itself.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com> ([`39007f5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/39007f58729cbedb5a8e7256443df3c1162cc9a2))
+
+* fix(product): honour ?ordering= on a product's review listing
+
+The `reviews` action built its queryset by hand and never ran
+`filter_queryset`, so `?ordering=` was silently ignored and the schema
+advertised no sort at all. It now lists through `get_queryset` like every
+other listing and sorts by the review contract (`PRODUCT_REVIEW_ORDERING`,
+shared with `ProductReviewViewSet`), so the storefront's product page can
+ask for a page and a sort and get exactly that. The review filterset stays
+off this action on purpose: drf-spectacular derives the action's model
+from the class `queryset` (Product) and django-filter asserts on the
+mismatch while the schema is built.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01PfgF89nTkMcXy4MC5pmDeY ([`156ff29`](https://github.com/vasilistotskas/grooveshop-django-api/commit/156ff2949ea3c056cd17a890f8d6243e61ca7fee))
+
+* fix(order): settle the payment of an order that is canceled unpaid
+
+`cancel_order` touched `payment_status` only when it refunded a paid
+order, so a canceled COD order or an unpaid Viva order closed by the 24h
+auto-cancel read "Pending" forever — 78 rows on tenant #1 (order 240:
+`viva_wallet`, auto-canceled 2026-08-09, payment still PENDING). An
+order that leaves unpaid owes nothing: `settle_unpaid_payment_on_cancel`
+moves PENDING / PROCESSING / FAILED to CANCELED, in the service's own
+save and — for the admin form save that flips only `status` — from the
+`order_canceled` cascade. Settled states are never touched, so a paid
+order still moves to REFUNDED through the refund and the webhook guards
+keep their meaning. `0057` backfills the rows already produced.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01PfgF89nTkMcXy4MC5pmDeY ([`4247a68`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4247a689f1efe862e439a596ca00c267faf5ced8))
+
+* fix(api): honour ?ordering= on the author, category and account listings
+
+Every extra action that lists a sub-resource blanked `ordering_fields`
+at the top of its body so the parent viewset's columns would not reach
+a queryset of another model. That also made `?ordering=` a silent no-op:
+on production `/blog/author/4/posts?ordering=createdAt` and `-createdAt`
+returned the same page, and the storefront's sort control on author,
+category, favourites, reviews, addresses and notifications pages changed
+nothing. The schema mirrored the cause — it advertised the AUTHOR's
+columns on the posts action, so the storefront's generated query schema
+forwarded keys the API would never honour.
+
+`ActionOrdering` + `ordering_for` give each action its own contract: a
+standard action keeps the class-level fields, an extra action sorts
+nothing unless the viewset declares it in `action_ordering`, and the
+OpenAPI extension reads the same rule so the schema advertises exactly
+what an action accepts. The blog `posts` actions share the BlogPost
+contract, the account actions name their own model's columns,
+`my_orders` keeps the full Order contract, and the category `posts`
+action now runs `filter_queryset` at all. Twenty-four actions that never
+sorted stop advertising an `ordering` parameter.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01PfgF89nTkMcXy4MC5pmDeY ([`6aa11e1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6aa11e1e97bd4adc815470aae6c9ccd7f4cda46a))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.65.1 [skip ci] ([`6b90faa`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6b90faac0da6c6b7e967b93d721de0bbb11c823f))
+
+### Testing
+
+* test(product): the reviews ordering test needs an ACTIVE product
+
+`ProductFactory` draws `active` at random and an anonymous caller cannot
+reach an inactive product's reviews (404), so the test flaked on CI.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com> ([`cb65835`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cb65835789a53aa090052327558ef96714f1f7aa))
+
+* test(filters): the default ordering is a list, as DRF hands it to order_by
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01PfgF89nTkMcXy4MC5pmDeY ([`0f141f2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0f141f2055c660bd965c7f745b9647c7d5576486))
+
 ## v3.65.1 (2026-09-18)
 
 ### Bug fixes

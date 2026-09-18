@@ -74,5 +74,5 @@ def test_the_filter_reads_the_same_contract():
         "view_count",
         "-created_at",
     ]
-    assert backend.get_default_ordering(view) == ("-created_at",)
+    assert backend.get_default_ordering(view) == ["-created_at"]
     assert backend.get_default_ordering(_view("undeclared")) is None

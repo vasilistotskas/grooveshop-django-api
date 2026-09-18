@@ -33,6 +33,7 @@ from product.serializers.product import (
 )
 from product.serializers.review import ProductReviewSerializer
 from product.serializers.variant import ProductVariantsResponseSerializer
+from product.views.review import PRODUCT_REVIEW_ORDERING
 from tag.serializers.tag import TagSerializer
 from tenant.membership import is_store_staff
 
@@ -203,11 +204,19 @@ class ProductViewSet(BaseModelViewSet):
         "stock",
     ]
     ordering = ["-availability_priority", "id"]
+    # ``reviews`` lists ProductReview rows, so it sorts by the review
+    # contract — the product fields above would be wrong columns there.
+    action_ordering = {"reviews": PRODUCT_REVIEW_ORDERING}
     search_fields = ["translations__name", "translations__description", "slug"]
 
     def get_filterset_class(self):
-        # For custom actions that don't use the main queryset, return None
-        # to avoid FilterSet/queryset model mismatch
+        # Custom actions paginate other models, so the product
+        # filterset would be a model mismatch there. ``reviews`` sorts
+        # through ``action_ordering`` and needs no filterset: the
+        # review one cannot be declared here either, because
+        # drf-spectacular derives the action's model from the class
+        # ``queryset`` (Product) and django-filter asserts on the
+        # mismatch while the schema is built.
         if self.action in ["reviews", "images", "tags", "variants"]:
             return None
         return ProductFilter
@@ -219,6 +228,9 @@ class ProductViewSet(BaseModelViewSet):
         Uses Product.objects.for_list() for list views and
         Product.objects.for_detail() for detail views to avoid N+1 queries.
         """
+        if self.action == "reviews":
+            return self._reviews_queryset()
+
         if self.action == "list":
             queryset = Product.objects.for_list()
         else:
@@ -242,6 +254,43 @@ class ProductViewSet(BaseModelViewSet):
             )
         )
         return queryset
+
+    def _reviews_queryset(self):
+        """The reviews of the product in the URL, as this caller may see them.
+
+        Lives in ``get_queryset`` (not the action body) so the action
+        reads like every other listing — ``filter_queryset(
+        get_queryset())`` — and the ordering backend runs on the review
+        rows. Schema generation instantiates the view without URL
+        kwargs, hence the empty queryset then.
+
+        The product is scoped like the detail route (``for_detail`` plus
+        ``active`` for non-staff), so the reviews of soft-deleted and
+        unreleased products stay unreachable.
+        """
+        pk = self.kwargs.get("pk")
+        if pk is None:
+            return ProductReview.objects.none()
+        products = Product.objects.for_detail()
+        if not is_store_staff(self.request.user):
+            products = products.active()
+        product = get_object_or_404(products, pk=pk)
+        self.check_object_permissions(self.request, product)
+        # ``visible_to`` is the same rule ProductReviewViewSet applies —
+        # shared rather than restated, because this action used to do
+        # ``.all()`` and quietly published reviews an admin had rejected
+        # as spam, plus reviews never approved, to anonymous callers.
+        #
+        # select_related("user") avoids N+1 for UserPublicSerializer.
+        # prefetch_related("translations") avoids N+1 for the parler
+        # TranslatableModelSerializer (one extra query per review
+        # otherwise, as parler fetches the translation row lazily).
+        return (
+            ProductReview.objects.filter(product=product)
+            .visible_to(self.request.user)
+            .select_related("user")
+            .prefetch_related("translations")
+        )
 
     @property
     def filterset_class(self):
@@ -272,25 +321,11 @@ class ProductViewSet(BaseModelViewSet):
         methods=["GET"],
     )
     def reviews(self, request, pk=None):
-        # ``self.get_object()``, not ``get_object_or_404(Product, pk=pk)``:
-        # the latter bypasses ``get_queryset`` and so served the reviews
-        # of soft-deleted and inactive products too.
-        product = self.get_object()
-        # ``visible_to`` is the same rule ProductReviewViewSet applies —
-        # shared rather than restated, because this action used to do
-        # ``.all()`` and quietly published reviews an admin had rejected
-        # as spam, plus reviews never approved, to anonymous callers.
-        #
-        # select_related("user") avoids N+1 for UserPublicSerializer.
-        # prefetch_related("translations") avoids N+1 for the parler
-        # TranslatableModelSerializer (one extra query per review
-        # otherwise, as parler fetches the translation row lazily).
-        reviews = (
-            ProductReview.objects.filter(product=product)
-            .visible_to(request.user)
-            .select_related("user")
-            .prefetch_related("translations")
-        )
+        # Through ``filter_queryset`` so the ordering backend runs — a
+        # hand-built queryset skipped it, so ``?ordering=`` was silently
+        # ignored here.
+        # See ``_reviews_queryset`` for the product scoping.
+        reviews = self.filter_queryset(self.get_queryset())
 
         response_serializer_class = self.get_response_serializer()
         return self.paginate_and_serialize(

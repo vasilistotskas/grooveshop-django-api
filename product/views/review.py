@@ -10,6 +10,7 @@ from rest_framework.response import Response
 from core.api.permissions import IsOwnerOrAdmin
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
+from core.filters.camel_case_ordering import ActionOrdering
 from core.utils.serializers import (
     ActionConfig,
     SerializersConfig,
@@ -54,6 +55,25 @@ serializers_config: SerializersConfig = {
 }
 
 
+# The sort contract of a list of reviews. Shared with ``ProductViewSet.
+# reviews``, which paginates ProductReview rows from the product viewset
+# and therefore cannot inherit that viewset's ``ordering_fields``.
+PRODUCT_REVIEW_ORDERING = ActionOrdering(
+    fields=(
+        "id",
+        "user_id",
+        "product_id",
+        "rate",
+        "status",
+        "is_published",
+        "created_at",
+        "updated_at",
+        "published_at",
+    ),
+    default=("-created_at",),
+)
+
+
 @extend_schema_view(
     **create_schema_view_config(
         model_class=ProductReview,
@@ -66,18 +86,8 @@ serializers_config: SerializersConfig = {
 )
 class ProductReviewViewSet(BaseModelViewSet):
     filterset_class = ProductReviewFilter
-    ordering_fields = [
-        "id",
-        "user_id",
-        "product_id",
-        "rate",
-        "status",
-        "is_published",
-        "created_at",
-        "updated_at",
-        "published_at",
-    ]
-    ordering = ["-created_at"]
+    ordering_fields = list(PRODUCT_REVIEW_ORDERING.fields)
+    ordering = list(PRODUCT_REVIEW_ORDERING.default)
     search_fields = [
         "product__translations__name",
         "user__email",

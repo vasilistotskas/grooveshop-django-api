@@ -14,9 +14,11 @@ from blog.filters.comment import BlogCommentFilter
 from blog.filters.post import BlogPostFilter
 from blog.serializers.comment import BlogCommentSerializer
 from blog.serializers.post import BlogPostSerializer
+from blog.views.post import BLOG_POST_ORDERING
 from core.api.permissions import IsOwnerOrAdmin
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
+from core.filters.camel_case_ordering import ActionOrdering
 from core.utils.serializers import (
     ActionConfig,
     SerializersConfig,
@@ -214,6 +216,43 @@ class UserAccountViewSet(BaseModelViewSet):
     permission_classes = [IsOwnerOrAdmin]
     ordering_fields = ["id", "email", "username", "created_at", "updated_at"]
     ordering = ["-created_at"]
+    # Every sub-resource action paginates another model, so each names
+    # its own sortable columns; the user fields above never apply there.
+    action_ordering = {
+        "favourite_products": ActionOrdering(
+            fields=("id", "created_at", "updated_at"),
+            default=("-created_at",),
+        ),
+        "orders": ActionOrdering(
+            fields=(
+                "id",
+                "created_at",
+                "updated_at",
+                "status",
+                "status_updated_at",
+                "payment_status",
+                "paid_amount",
+            ),
+            default=("-created_at",),
+        ),
+        "product_reviews": ActionOrdering(
+            fields=("id", "created_at", "updated_at", "rate"),
+            default=("-created_at",),
+        ),
+        "addresses": ActionOrdering(
+            fields=("id", "created_at", "updated_at", "is_main"),
+            default=("-is_main", "-created_at"),
+        ),
+        "blog_post_comments": ActionOrdering(
+            fields=("id", "created_at", "updated_at"),
+            default=("-created_at",),
+        ),
+        "liked_blog_posts": BLOG_POST_ORDERING,
+        "notifications": ActionOrdering(
+            fields=("id", "created_at", "updated_at"),
+            default=("-created_at",),
+        ),
+    }
     search_fields = ["id", "email", "username", "first_name", "last_name"]
 
     # Per-action filtersets — each nested action operates over a
@@ -310,8 +349,6 @@ class UserAccountViewSet(BaseModelViewSet):
 
     @action(detail=True, methods=["GET"])
     def favourite_products(self, request, pk=None):
-        self.ordering_fields = []
-        self.ordering = []
         self.search_fields = []
 
         queryset = self.filter_queryset(self.get_queryset())
@@ -323,8 +360,6 @@ class UserAccountViewSet(BaseModelViewSet):
 
     @action(detail=True, methods=["GET"])
     def orders(self, request, pk=None):
-        self.ordering_fields = []
-        self.ordering = []
         self.search_fields = []
 
         queryset = self.filter_queryset(self.get_queryset())
@@ -336,8 +371,6 @@ class UserAccountViewSet(BaseModelViewSet):
 
     @action(detail=True, methods=["GET"])
     def product_reviews(self, request, pk=None):
-        self.ordering_fields = []
-        self.ordering = []
         self.search_fields = []
 
         queryset = self.filter_queryset(self.get_queryset())
@@ -349,8 +382,6 @@ class UserAccountViewSet(BaseModelViewSet):
 
     @action(detail=True, methods=["GET"])
     def addresses(self, request, pk=None):
-        self.ordering_fields = []
-        self.ordering = []
         self.search_fields = []
 
         queryset = self.filter_queryset(self.get_queryset())
@@ -362,8 +393,6 @@ class UserAccountViewSet(BaseModelViewSet):
 
     @action(detail=True, methods=["GET"])
     def blog_post_comments(self, request, pk=None):
-        self.ordering_fields = []
-        self.ordering = []
         self.search_fields = []
 
         queryset = self.filter_queryset(self.get_queryset())
@@ -375,8 +404,6 @@ class UserAccountViewSet(BaseModelViewSet):
 
     @action(detail=True, methods=["GET"])
     def liked_blog_posts(self, request, pk=None):
-        self.ordering_fields = []
-        self.ordering = []
         self.search_fields = []
 
         queryset = self.filter_queryset(self.get_queryset())
@@ -388,8 +415,6 @@ class UserAccountViewSet(BaseModelViewSet):
 
     @action(detail=True, methods=["GET"])
     def notifications(self, request, pk=None):
-        self.ordering_fields = []
-        self.ordering = []
         self.search_fields = []
 
         queryset = self.filter_queryset(self.get_queryset())
@@ -404,8 +429,6 @@ class UserAccountViewSet(BaseModelViewSet):
         user = self.get_object()
 
         if request.method == "GET":
-            self.ordering_fields = []
-            self.ordering = []
             self.search_fields = []
 
             queryset = self.filter_queryset(self.get_queryset())
@@ -493,8 +516,6 @@ class UserAccountViewSet(BaseModelViewSet):
 
     @action(detail=True, methods=["GET"])
     def subscription_summary(self, request, pk=None):
-        self.ordering_fields = []
-        self.ordering = []
         self.search_fields = []
 
         user = self.get_object()
@@ -509,8 +530,6 @@ class UserAccountViewSet(BaseModelViewSet):
         """List this user's recent GDPR export jobs (paginated)."""
         from user.models.data_export import UserDataExport
 
-        self.ordering_fields = []
-        self.ordering = []
         self.search_fields = []
 
         user = self.get_object()

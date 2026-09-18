@@ -22,6 +22,7 @@ from blog.serializers.category import (
     BlogCategoryWriteSerializer,
 )
 from blog.serializers.post import BlogPostSerializer
+from blog.views.post import BLOG_POST_ORDERING
 from core.api.permissions import StoreStaffModelPermissions
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
@@ -161,6 +162,9 @@ class BlogCategoryViewSet(BaseModelViewSet):
         "name",
     ]
     ordering = ["sort_order", "lft", "-created_at"]
+    # ``posts`` lists BlogPost rows, so it sorts by the post contract —
+    # the tree fields above would be wrong columns for that queryset.
+    action_ordering = {"posts": BLOG_POST_ORDERING}
     search_fields = [
         "slug",
         "translations__name",
@@ -193,8 +197,6 @@ class BlogCategoryViewSet(BaseModelViewSet):
     def posts(self, request, pk=None, *args, **kwargs):
         category = self.get_object()
 
-        self.ordering_fields = []
-        self.ordering = []
         self.search_fields = []
 
         # ``BlogPost.objects`` (not the ``category.blog_posts`` reverse
@@ -207,7 +209,11 @@ class BlogCategoryViewSet(BaseModelViewSet):
         else:
             queryset = BlogPost.objects.filter(category=category)
 
-        queryset = (
+        # Through ``filter_queryset`` so the ordering backend (and the
+        # BlogPostFilter this action declares) actually run — building
+        # the queryset by hand skipped both, which is why ``?ordering=``
+        # here returned the same page in both directions.
+        queryset = self.filter_queryset(
             queryset.visible_to(request.user)
             .select_related("category", "author__user")
             .prefetch_related("likes", "tags")

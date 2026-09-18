@@ -41,6 +41,7 @@ from core.api.throttling import (
     VivaReturnThrottle,
 )
 from core.api.views import BaseModelViewSet
+from core.filters.camel_case_ordering import ActionOrdering
 from core.utils.serializers import (
     ActionConfig,
     SerializersConfig,
@@ -342,6 +343,14 @@ class OrderViewSet(BaseModelViewSet):
         "user__last_name",
     ]
     ordering = ["-created_at"]
+    # ``my_orders`` lists the same model through ``filter_queryset``, so
+    # it keeps the full contract; an extra action sorts nothing unless
+    # it says so (``core.filters.camel_case_ordering.ordering_for``).
+    action_ordering = {
+        "my_orders": ActionOrdering(
+            fields=tuple(ordering_fields), default=tuple(ordering)
+        ),
+    }
     search_fields = [
         "user__email",
         "user__username",

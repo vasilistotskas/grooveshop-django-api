@@ -16,6 +16,7 @@ from blog.serializers.author import (
     BlogAuthorWriteSerializer,
 )
 from blog.serializers.post import BlogPostSerializer
+from blog.views.post import BLOG_POST_ORDERING
 from core.api.permissions import StoreStaffModelPermissions
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
@@ -110,6 +111,9 @@ class BlogAuthorViewSet(BaseModelViewSet):
         "website",
     ]
     ordering = ["-created_at", "user__first_name", "user__last_name"]
+    # ``posts`` lists BlogPost rows, so it sorts by the post contract —
+    # the author fields above would be wrong columns for that queryset.
+    action_ordering = {"posts": BLOG_POST_ORDERING}
     search_fields = [
         "user__first_name",
         "user__last_name",
@@ -121,8 +125,6 @@ class BlogAuthorViewSet(BaseModelViewSet):
 
     @action(detail=True, methods=["GET"])
     def posts(self, request, pk=None, *args, **kwargs):
-        self.ordering_fields = []
-        self.ordering = []
         self.search_fields = []
 
         queryset = self.filter_queryset(self.get_queryset())

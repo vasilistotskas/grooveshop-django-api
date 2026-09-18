@@ -35,6 +35,7 @@ from blog.strategies.weighted_related_posts_strategy import (
 from core.api.permissions import StoreStaffModelPermissions
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
+from core.filters.camel_case_ordering import ActionOrdering
 from core.utils.serializers import (
     ActionConfig,
     SerializersConfig,
@@ -160,6 +161,22 @@ serializers_config: SerializersConfig = {
 }
 
 
+# The sort contract of a list of posts. Shared with the author and
+# category ``posts`` actions, which paginate BlogPost rows from another
+# viewset and therefore cannot inherit that viewset's ``ordering_fields``.
+BLOG_POST_ORDERING = ActionOrdering(
+    fields=(
+        "id",
+        "created_at",
+        "updated_at",
+        "published_at",
+        "view_count",
+        "featured",
+    ),
+    default=("-created_at",),
+)
+
+
 @extend_schema_view(
     **create_schema_view_config(
         model_class=BlogPost,
@@ -175,15 +192,8 @@ class BlogPostViewSet(BaseModelViewSet):
     queryset = BlogPost.objects.all()
     serializers_config = serializers_config
 
-    ordering_fields = [
-        "id",
-        "created_at",
-        "updated_at",
-        "published_at",
-        "view_count",
-        "featured",
-    ]
-    ordering = ["-created_at"]
+    ordering_fields = list(BLOG_POST_ORDERING.fields)
+    ordering = list(BLOG_POST_ORDERING.default)
 
     def get_permissions(self):
         if self.action in (
@@ -338,8 +348,6 @@ class BlogPostViewSet(BaseModelViewSet):
     def comments(self, request, pk=None):
         post = self.get_object()
 
-        self.ordering_fields = []
-        self.ordering = []
         self.search_fields = []
 
         queryset = post.comments.select_related(

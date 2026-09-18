@@ -3,6 +3,53 @@
 
 
 
+## v3.67.0 (2026-09-18)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.66.0 [skip ci] ([`220f6a7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/220f6a745227bd2737973132cd422be43bf7ae97))
+
+### Features
+
+* feat(page-config): give every band section a surface, product-first home alternates
+
+The storefront now draws each page-builder section as a full-width band.
+Two neighbours painting the same ground read as one section, so the
+choice of ground belongs to the PAGE: the same band sits last on one
+layout and after a raised one on another.
+
+- `surface` ("default" | "muted") is now a prop of every section type
+  that draws a band, through one shared `_check_surface` validator
+  rather than the four copies of the same lambda that had grown.
+  Heroes, dividers and spacers keep none: a hero paints its own ground.
+- `DEFAULT_PAGE_LAYOUTS["home"]` alternates ground and raised down the
+  stack. Sections that can render nothing (recently viewed before a
+  first visit, the blog before a first post) are skipped in the count
+  on purpose: they vanish, and the bands that remain still alternate.
+- `ProductViewSet.ordering_fields` gains `likes_count`, `review_average`
+  and `discount_percent`. DRF's OrderingFilter silently DROPS a field it
+  was not given, so a rail asking for "biggest discount" rendered the
+  default order under that heading, with nothing anywhere to say so.
+- `schema.yml` regenerated: the ordering parameter's pattern is what the
+  storefront validates its own query against, and it listed none of the
+  three.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Qy8F7sDCkyCEy9KQd2HmbW ([`ee45d59`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ee45d596f6b38c17102fe00ede46cc92cd2976a0))
+
+### Testing
+
+* test(product): the ordering-fields mirror lists the three rail sorts
+
+`test_ordering_fields_configuration` asserts the viewset's declared
+sortable fields verbatim, so adding `likes_count`, `review_average` and
+`discount_percent` to the viewset failed it. The list is a mirror, not a
+contract of its own — the reason those three exist is recorded beside
+them.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Qy8F7sDCkyCEy9KQd2HmbW ([`fdb335b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fdb335baecadd6a813a3da9739aa92d053023a72))
+
 ## v3.66.0 (2026-09-18)
 
 ### Chores

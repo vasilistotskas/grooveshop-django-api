@@ -3,6 +3,57 @@
 
 
 
+## v3.66.0 (2026-09-18)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.65.2 [skip ci] ([`075a5c9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/075a5c977c20b454c130b1ef57e4182cd8c800c1))
+
+### Features
+
+* feat(storefront): a shop's default homepage, shop section props, public tiers
+
+Groundwork for the storefront redesign, all of it lockstep with the Nuxt
+side.
+
+The default homepage was the first tenant's blog-first page — a
+prop-less carousel that renders nothing over a blog rail that renders
+"no articles yet" — so every new store opened on an empty state and
+showed no product at all. It is now product-first (categories →
+featured → new arrivals → recently viewed → blog → newsletter), and
+every section in it renders nothing when its data or flag is absent.
+That store's own page moves to BRAND_HOME_LAYOUT, and seed_brand_pages
+now ADDS a hero_carousel when the home layout has none: it fills a
+prop-less one with the banner artwork, and against the new default
+there was none to fill, so on a fresh schema the banner silently never
+applied.
+
+Section props gain what a shop band needs: a heading, a subheading and
+a CTA on the product and blog rails, plus / so
+two product rails on one page are different bands rather than the same
+one twice; a layout and a branch for product_categories; slides with
+their own copy and destination for hero_carousel (the flat
+images/link triple could express one link and no copy); a role and a
+five-point rating on a testimonial; mobile artwork and text alignment
+on hero_banner. Three new types — trust_badges, offers_preview,
+stats_strip. The migration is choices-only.
+
+New public settings: ANNOUNCEMENT_BAR (validated JSON, per-locale text
+through the same partial i18n override the page builder uses) and the
+three DEMO_ACCOUNT_* keys. The last are published deliberately: a demo
+store shows shared credentials on its login page so a prospect can see
+the logged-in storefront. All ship off/empty, and the seeder writes
+them only on a tenant flagged is_demo.
+
+/loyalty/tiers is now anonymous. It is the whole content of
+/loyalty-program, a public marketing page, and behind IsAuthenticated
+it could only render for someone already signed in. Both gates stay —
+the plan flag and the merchant's runtime switch, each 404ing — so a
+store with the programme off stops advertising its tiers.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Qy8F7sDCkyCEy9KQd2HmbW ([`1dc23bb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1dc23bb7061f1685163939308d78a3d88a118f83))
+
 ## v3.65.2 (2026-09-18)
 
 ### Bug fixes

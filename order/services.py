@@ -96,6 +96,23 @@ def _log_price_drift_if_needed(cart_item, current_price) -> None:
     )
 
 
+def settle_unpaid_payment_on_cancel(order: Order) -> bool:
+    """Settle the financial state of an order that is being canceled.
+
+    A canceled order that was never paid owes nothing any more, so its
+    ``payment_status`` is final too: PENDING / PROCESSING / FAILED become
+    CANCELED. A settled state (COMPLETED, REFUNDED, PARTIALLY_REFUNDED,
+    CANCELED) is never touched — a paid order moves to REFUNDED through
+    the refund, and the webhook guards rely on settled states staying
+    put. Mutates ``order`` in memory only; the caller saves. Returns
+    True when it changed something.
+    """
+    if order.payment_status in SETTLED_PAYMENT_STATUSES:
+        return False
+    order.payment_status = PaymentStatus.CANCELED
+    return True
+
+
 class OrderService:
     @classmethod
     def get_order_by_id(cls, order_id: int) -> Order:
@@ -2220,6 +2237,14 @@ class OrderService:
             old_status = order.status
             order.status = OrderStatus.CANCELED
             order.status_updated_at = timezone.now()
+            # An order that leaves unpaid owes nothing any more: settle
+            # its financial state too, or it reads "Pending" forever in
+            # the admin and the account page (78 such rows on tenant #1,
+            # 2026-09-18 — every COD and every unpaid Viva cancellation).
+            # A paid order keeps COMPLETED here and moves to REFUNDED
+            # through the refund below; the settled states are never
+            # touched, which is also what the webhook guards rely on.
+            settle_unpaid_payment_on_cancel(order)
 
             if not order.metadata:
                 order.metadata = {}
@@ -2232,7 +2257,12 @@ class OrderService:
             }
 
             order.save(
-                update_fields=["status", "status_updated_at", "metadata"]
+                update_fields=[
+                    "status",
+                    "status_updated_at",
+                    "payment_status",
+                    "metadata",
+                ]
             )
 
             # order_canceled signal is dispatched by

@@ -26,7 +26,7 @@ from order.notifications import (
     notify_payment_confirmed_live,
     notify_payment_failed_live,
 )
-from order.services import OrderService
+from order.services import OrderService, settle_unpaid_payment_on_cancel
 from order.signals import (
     order_canceled,
     order_completed,
@@ -623,6 +623,13 @@ def handle_order_canceled(
         cancellation.setdefault("canceled_at", timezone.now().isoformat())
         cancellation.setdefault("previous_status", previous_status)
         cancellation.setdefault("reason", cancellation_reason)
+
+        # The admin form save flips only ``status``. Settle the payment
+        # the way ``OrderService.cancel_order`` does before its own save
+        # (a no-op on that path, where it already happened), so a
+        # canceled order never reads "Pending" whichever door it left by.
+        if settle_unpaid_payment_on_cancel(order):
+            order.save(update_fields=["payment_status"])
 
         if kwargs.get("reason"):
             OrderHistory.log_note(

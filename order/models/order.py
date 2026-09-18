@@ -22,7 +22,11 @@ from core.models import (
     UUIDModel,
 )
 from order.enum.document_type import OrderDocumentTypeEnum
-from order.enum.status import OrderStatus, PaymentStatus
+from order.enum.status import (
+    SETTLED_PAYMENT_STATUSES,
+    OrderStatus,
+    PaymentStatus,
+)
 from order.managers.order import OrderManager
 from pay_way.enum.pay_way import PayWayEnum
 from pay_way.enum.settlement import PaySettlement
@@ -493,6 +497,19 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         )
         if status_changed:
             self.status_updated_at = timezone.now()
+        # An order that leaves unpaid owes nothing any more, so its
+        # financial state is final too. Decided HERE, in the one save
+        # every cancel path shares (the service, the admin form, a
+        # script), rather than in the cancel cascade: a second save
+        # from inside ``post_save`` runs while ``_original_status``
+        # still holds the old status and re-fires the whole status
+        # transition — emails included. 78 canceled orders on tenant
+        # #1 read "Pending" forever before this (2026-09-18).
+        payment_settled = (
+            status_changed
+            and self.status == OrderStatus.CANCELED
+            and self.settle_payment_on_cancel()
+        )
 
         if (
             not self.email
@@ -533,6 +550,8 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
             fields.add("updated_at")
             if status_changed:
                 fields.add("status_updated_at")
+            if payment_settled:
+                fields.add("payment_status")
             if pay_way_key_changed:
                 fields.add("pay_way_key")
             kwargs["update_fields"] = fields
@@ -543,6 +562,21 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         self._original_tracking_number = self.tracking_number
         self._original_shipping_carrier = self.shipping_carrier
         self._original_pay_way_id = self.pay_way_id
+
+    def settle_payment_on_cancel(self) -> bool:
+        """Settle the financial state of an order being canceled.
+
+        PENDING / PROCESSING / FAILED become CANCELED. A settled state
+        (COMPLETED, REFUNDED, PARTIALLY_REFUNDED, CANCELED) is never
+        touched — a paid order moves to REFUNDED through the refund,
+        and the webhook guards rely on settled states staying put.
+        In-memory only; ``save()`` calls it on the CANCELED transition.
+        Returns True when it changed something.
+        """
+        if self.payment_status in SETTLED_PAYMENT_STATUSES:
+            return False
+        self.payment_status = PaymentStatus.CANCELED
+        return True
 
     def _snapshot_pay_way_key(self) -> bool:
         """Freeze which payment method the shopper chose.

@@ -3,13 +3,16 @@
 Before this, ``cancel_order`` touched ``payment_status`` only when it
 refunded, so every canceled COD order and every unpaid Viva order that
 the 24h auto-cancel closed read "Pending" forever — 78 rows on tenant #1
-on 2026-09-18 (order 240 among them). Both doors are covered: the
-service, and the admin form save that flips ``status`` on its own.
+on 2026-09-18 (order 240 among them). The rule lives in ``Order.save()``
+so every door — the service, the admin form save, a script — shares one
+save; a second save from inside the cancel cascade re-fired the whole
+status transition (CI caught it: ``order_status_changed`` twice).
 """
 
 from __future__ import annotations
 
 from unittest import mock
+from unittest.mock import Mock
 
 import pytest
 from django.db import connection
@@ -18,28 +21,24 @@ from django.db.migrations.executor import MigrationExecutor
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
 from order.models.order import Order
-from order.services import OrderService, settle_unpaid_payment_on_cancel
+from order.services import OrderService
+from order.signals import order_status_changed
 
 
 @pytest.mark.django_db
 class TestServicePath:
     @pytest.mark.parametrize(
         "unpaid",
-        [PaymentStatus.PENDING, PaymentStatus.PROCESSING, PaymentStatus.FAILED],
+        [
+            PaymentStatus.PENDING,
+            PaymentStatus.PROCESSING,
+            PaymentStatus.FAILED,
+        ],
     )
     def test_an_unpaid_order_is_settled_as_canceled(self, unpaid):
         order = OrderFactory(status=OrderStatus.PENDING, payment_status=unpaid)
 
-        # The service settles it in its OWN save; the signal cascade is
-        # the safety net for the admin path, so it is silenced here to
-        # prove the service does not lean on it.
-        with mock.patch(
-            "order.signals.handlers.settle_unpaid_payment_on_cancel",
-            return_value=False,
-        ):
-            canceled, refund_info = OrderService.cancel_order(
-                order, reason="test"
-            )
+        canceled, refund_info = OrderService.cancel_order(order, reason="test")
 
         assert canceled.status == OrderStatus.CANCELED
         assert canceled.payment_status == PaymentStatus.CANCELED
@@ -74,15 +73,48 @@ class TestAdminFormSavePath:
 
         order.status = OrderStatus.CANCELED
         with mock.patch("order.services.OrderService.cancel_attached_shipment"):
-            order.save()
+            order.save(update_fields=["status"])
 
         assert (
             Order.objects.get(pk=order.pk).payment_status
             == PaymentStatus.CANCELED
         )
 
+    def test_the_transition_fires_once(self):
+        # The settle rides the SAME save. A second save from inside the
+        # cascade ran while ``_original_status`` still held the old
+        # status and re-fired the transition — emails included.
+        order = OrderFactory(
+            status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
+        )
+        receiver = Mock()
+        order_status_changed.connect(receiver)
+        try:
+            order.status = OrderStatus.CANCELED
+            with mock.patch(
+                "order.services.OrderService.cancel_attached_shipment"
+            ):
+                order.save()
+        finally:
+            order_status_changed.disconnect(receiver)
 
-def test_helper_never_touches_a_settled_state():
+        receiver.assert_called_once()
+
+    def test_any_other_transition_leaves_the_payment_alone(self):
+        order = OrderFactory(
+            status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
+        )
+
+        order.status = OrderStatus.PROCESSING
+        order.save()
+
+        assert (
+            Order.objects.get(pk=order.pk).payment_status
+            == PaymentStatus.PENDING
+        )
+
+
+def test_settle_never_touches_a_settled_state():
     for settled in (
         PaymentStatus.COMPLETED,
         PaymentStatus.REFUNDED,
@@ -90,11 +122,11 @@ def test_helper_never_touches_a_settled_state():
         PaymentStatus.CANCELED,
     ):
         order = Order(payment_status=settled)
-        assert settle_unpaid_payment_on_cancel(order) is False
+        assert order.settle_payment_on_cancel() is False
         assert order.payment_status == settled
 
     order = Order(payment_status=PaymentStatus.PENDING)
-    assert settle_unpaid_payment_on_cancel(order) is True
+    assert order.settle_payment_on_cancel() is True
     assert order.payment_status == PaymentStatus.CANCELED
 
 

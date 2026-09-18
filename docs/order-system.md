@@ -77,7 +77,7 @@ No explicit table — flips are direct assignments. Common paths:
 | `COMPLETED → REFUNDED` | `OrderService.refund_order()` (admin) OR `handle_stripe_charge_refunded` (full refund webhook) |
 | `COMPLETED → PARTIALLY_REFUNDED` | `handle_stripe_charge_refunded` (partial refund) |
 | `PENDING → CANCELED` | Viva refund webhook |
-| `PENDING / PROCESSING / FAILED → CANCELED` | `settle_unpaid_payment_on_cancel` (`order/services.py`), run by `OrderService.cancel_order` before its save and by `handle_order_canceled` for the admin form-save path. A canceled order that was never paid owes nothing, so its financial state is final too; `0057_settle_canceled_unpaid_orders` backfilled the rows that had stayed PENDING. |
+| `PENDING / PROCESSING / FAILED → CANCELED` | `Order.save()` on the `status → CANCELED` transition (`Order.settle_payment_on_cancel`, `order/models/order.py`) — one save shared by the service, the admin form and any script, never a second save from the cascade (that re-fires the transition). A canceled order that was never paid owes nothing, so its financial state is final too; `0057_settle_canceled_unpaid_orders` backfilled the rows that had stayed PENDING. |
 | `PENDING → COMPLETED` | `AcsService._mark_cod_order_paid_if_pending` (COD reconcile) |
 
 ## 3. Order creation paths
@@ -403,7 +403,7 @@ All WS notifications go through `notification.consumers.NotificationConsumer` an
 `cancel_order`:
 1. Locks order row.
 2. Releases stock + reservations (`StockManager.increment_stock`, `release_reservation`).
-3. Sets `status=CANCELED`, settles an unpaid `payment_status` to `CANCELED` (`settle_unpaid_payment_on_cancel`), records `metadata['cancellation']`.
+3. Sets `status=CANCELED` (the save settles an unpaid `payment_status` to `CANCELED` — `Order.settle_payment_on_cancel`), records `metadata['cancellation']`.
 4. Cascades to courier voucher via `ShippingService.cancel_shipment` (PR #2 H). Records dispatch outcome on metadata. Carrier rejection (e.g., voucher already in pickup list) is swallowed and logged.
 5. Optional refund via `refund_order` (when `refund_payment=True` AND `is_paid`).
 

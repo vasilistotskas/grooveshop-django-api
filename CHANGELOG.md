@@ -3,6 +3,93 @@
 
 
 
+## v3.65.0 (2026-09-18)
+
+### Bug fixes
+
+* fix(devtools): drop the JSON overlay fill from the navigation seeder
+
+Two CI failures on 9bd4455b.
+
+The delta_sigma seeder still called _fill_missing_i18n on NavigationMenu
+for any menu that already existed -- the rows-not-JSON conversion had
+only replaced the create and overwrite paths, and the field it filled
+is gone from the model. A menu's English labels are translations on its
+rows, written when the menu is built, so there is no overlay a re-run
+could fill: an existing menu is left alone, and --overwrite rebuilds
+it. The two tests that asserted on `items` / `i18n` now assert on rows.
+
+test_is_first_order passed or failed on the draw: OrderFactory picks a
+random status and a canceled prior order is excluded BY DESIGN, so a
+canceled draw made "the second order is not the first" untrue. The
+prior orders are pinned to a status that counts.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01PfgF89nTkMcXy4MC5pmDeY ([`79b8199`](https://github.com/vasilistotskas/grooveshop-django-api/commit/79b81997820fce5b93c80a61c1b43ae30b447ec0))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.64.0 [skip ci] ([`51e3d26`](https://github.com/vasilistotskas/grooveshop-django-api/commit/51e3d26476d53b9c41fc69298d37b520021d020f))
+
+### Features
+
+* feat(tenant): Google Ads conversion tracking, and isFirstOrder
+
+Per-store Google Ads conversion tracking: an AW- conversion ID and one
+label per action the storefront can report (purchase, add to cart,
+begin checkout, page view). Explicit columns rather than a JSON map on
+purpose -- the set of actions is closed, it is exactly the events the
+storefront fires, so a new action is a code change with a call site and
+a column beside it is the honest cost. It also keeps them typed end to
+end (OpenAPI -> Zod -> TenantConfig) and editable as plain admin
+fields, like the pixel ids beside them.
+
+A label without the ID is refused rather than ignored: it is the second
+half of send_to, can never be sent alone, and the operator who typed it
+expects conversions to be recorded. The most likely paste -- the whole
+'AW-.../LABEL' from Google's snippet -- is refused with a message that
+says which half to keep.
+
+Order.is_first_order feeds the purchase conversion's new_customer
+parameter, which Google asks to be calculated rather than hardcoded
+(it drives new-customer acquisition reporting). Identity is the account
+when there is one, else the email case-insensitively, so a guest who
+later registers stays one customer; canceled orders do not count.
+
+tenant_resolve_key is shape-keyed, so the added TenantConfig fields
+read a new cache key on deploy (the 2026-08-31 b2bEnabled outage cannot
+repeat here).
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01PfgF89nTkMcXy4MC5pmDeY ([`9bd4455`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9bd4455b7cc8795ab9d2ff1fb8e5f8257fe5a4a2))
+
+### Refactoring
+
+* refactor(page_config): retire the JSON navigation columns from state
+
+0024 rebuilt every menu as rows and localized() has read rows since
+v3.64.0, so NavigationMenu.items / i18n are dead weight -- and an
+editable copy of the old blob in the admin was a second source of truth
+that could silently disagree with what renders.
+
+Step one of two. A deploy runs migrations in the PreSync hook before
+the new pods exist, and the old replicas select these columns by name
+on every navigation request, so a DROP COLUMN here would 500 the
+storefront chrome for the length of the rollout. 0025 therefore makes
+the columns nullable (new code stops supplying them on insert) and
+removes the fields from Django's STATE only. The physical drop is a
+RunSQL follow-up once no replica references them -- RemoveField cannot
+do it, because by then the field is gone from state.
+
+The admin serializer shrinks to the slot; the JSON-shape validators
+stay, because the seeders validate their declarative specs with them.
+The backfill migration's test goes with the fields: it built its input
+as NavigationMenu(items=...) on the live model, which no longer has
+them, and its behavioural coverage lives in test_navigation_builder.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01PfgF89nTkMcXy4MC5pmDeY ([`6d97eae`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6d97eae3e3f1cc8854f91aed81bc2f2e5cccd532))
+
 ## v3.64.0 (2026-09-17)
 
 ### Bug fixes

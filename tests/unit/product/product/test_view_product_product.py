@@ -90,6 +90,13 @@ class ProductViewSetTestCase(TestCase):
             "availability_priority",
             "view_count",
             "stock",
+            # The storefront's product rails sort on these. A field the
+            # viewset does not declare is DROPPED in silence, so a rail
+            # would render the default order under a heading promising
+            # "biggest discount" or "best rated".
+            "likes_count",
+            "review_average",
+            "discount_percent",
         ]
         self.assertEqual(
             set(self.viewset.ordering_fields), set(expected_fields)

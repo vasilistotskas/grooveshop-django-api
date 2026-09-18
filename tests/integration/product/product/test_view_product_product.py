@@ -375,6 +375,34 @@ class ProductViewSetTestCase(APITestCase):
             second_created = response.data["results"][1]["created_at"]
             self.assertGreaterEqual(first_created, second_created)
 
+    def test_storefront_rail_orderings_actually_sort(self):
+        """A rail's heading promises the order it asked for.
+
+        ``OrderingFilter`` silently DROPS a field it was not given in
+        ``ordering_fields``, so a rail asking for "biggest discount" or
+        "best rated" would have rendered the default order under that
+        heading, with nothing anywhere to say so. ``likes_count`` and
+        ``review_average`` are annotations ``for_list()`` adds; the
+        assertion is that each sorts rather than 500s or no-ops.
+        """
+        url = self.get_product_list_url()
+
+        for field in ("discount_percent", "likes_count", "review_average"):
+            response = self.client.get(url, {"ordering": f"-{field}"})
+            self.assertEqual(
+                response.status_code,
+                status.HTTP_200_OK,
+                msg=f"ordering by {field} failed",
+            )
+            results = response.data["results"]
+            if field == "discount_percent" and len(results) > 1:
+                values = [float(row["discount_percent"]) for row in results]
+                self.assertEqual(
+                    values,
+                    sorted(values, reverse=True),
+                    msg="discount_percent was accepted but not applied",
+                )
+
     def test_validation_errors_consistent(self):
         payload = {
             "slug": "test-product-invalid",

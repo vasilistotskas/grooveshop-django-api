@@ -427,6 +427,7 @@ def _check_hero_slides(value) -> str | None:
 # (``featured``) beside what arrived last (``newest``).
 def _product_rail_props(max_page_size: int) -> dict:
     return {
+        "surface": _check_surface,
         "heading": lambda v: None if _is_str(v, 200) else "string ≤200",
         "subheading": lambda v: None if _is_str(v, 500) else "string ≤500",
         "cta_text": lambda v: None if _is_str(v, 100) else "string ≤100",
@@ -495,8 +496,18 @@ def _check_badge_items(value) -> str | None:
     return None
 
 
+# WHICH of the two page surfaces a band paints. A page built from
+# full-width bands separates two of them by alternating ground and
+# raised, so the choice belongs to the PAGE — the same band sits last on
+# one layout and after a raised one on another. Every section that draws
+# a band carries it; a hero paints its own ground and does not.
+def _check_surface(value) -> str | None:
+    return None if value in ("default", "muted") else "one of default/muted"
+
+
 # Same reasoning for the three blog rails.
 _BLOG_RAIL_PROPS: dict = {
+    "surface": _check_surface,
     "heading": lambda v: None if _is_str(v, 200) else "string ≤200",
     "subheading": lambda v: None if _is_str(v, 500) else "string ≤500",
     "cta_text": lambda v: None if _is_str(v, 100) else "string ≤100",
@@ -609,6 +620,7 @@ _VALIDATORS: dict[str, dict] = {
         "columns": lambda v: None if _is_int(v, 1, 6) else "int 1–6",
     },
     "product_categories": {
+        "surface": _check_surface,
         "heading": lambda v: None if _is_str(v, 200) else "string ≤200",
         # How the band draws them: a swipeable rail, a plain grid, or
         # image tiles. Presentation the page owns, because the same
@@ -661,9 +673,7 @@ _VALIDATORS: dict[str, dict] = {
         # alternating ground and raised; a CTA lands last on one page
         # and after a raised band on another, so the choice belongs to
         # the page rather than the component.
-        "surface": lambda v: (
-            None if v in ("default", "muted") else "one of default/muted"
-        ),
+        "surface": _check_surface,
     },
     "newsletter_signup": {
         "heading": lambda v: None if _is_str(v, 200) else "string ≤200",
@@ -673,11 +683,10 @@ _VALIDATORS: dict[str, dict] = {
         # Same surface enum as ``cta_banner``, for the same reason: on a
         # page of stacked full-width bands, whether this one sits on the
         # ground or a raised surface depends on what precedes it.
-        "surface": lambda v: (
-            None if v in ("default", "muted") else "one of default/muted"
-        ),
+        "surface": _check_surface,
     },
     "testimonials": {
+        "surface": _check_surface,
         "heading": lambda v: None if _is_str(v, 200) else "string ≤200",
         "items": _check_testimonial_items,
     },
@@ -701,8 +710,9 @@ _VALIDATORS: dict[str, dict] = {
     "why_microlearning": {},
     # Weekly schedule + open/closed badge; data comes from the
     # BUSINESS_HOURS extra_setting, so the section carries no props.
-    "business_hours": {},
+    "business_hours": {"surface": _check_surface},
     "location_map": {
+        "surface": _check_surface,
         "embed_url": lambda v: (
             None
             if _is_str(v, 1000) and str(v).startswith("https://")
@@ -953,6 +963,7 @@ _VALIDATORS: dict[str, dict] = {
         "attribution": lambda v: None if _is_str(v, 120) else "string ≤120",
     },
     "features_grid": {
+        "surface": _check_surface,
         "heading": lambda v: None if _is_str(v, 200) else "string ≤200",
         "items": lambda v: _check_items(
             v,
@@ -982,6 +993,7 @@ _VALIDATORS: dict[str, dict] = {
         "prompt": _check_prompt,
     },
     "media_text": {
+        "surface": _check_surface,
         "heading": lambda v: None if _is_str(v, 200) else "string ≤200",
         "body": lambda v: None if _is_str(v, 5000) else "string ≤5000",
         # A label above the heading, a footnote under the body, a
@@ -1019,6 +1031,7 @@ _VALIDATORS: dict[str, dict] = {
         ),
     },
     "image_gallery": {
+        "surface": _check_surface,
         "items": lambda v: _check_items(
             v,
             max_items=24,
@@ -1040,11 +1053,10 @@ _VALIDATORS: dict[str, dict] = {
         # Same enum, same reason as ``cta_banner``: this band is raised
         # on the page that shows it among others and grounded on the
         # page it belongs to, and only the page knows which.
-        "surface": lambda v: (
-            None if v in ("default", "muted") else "one of default/muted"
-        ),
+        "surface": _check_surface,
     },
     "faq": {
+        "surface": _check_surface,
         "heading": lambda v: None if _is_str(v, 200) else "string ≤200",
         "subheading": lambda v: None if _is_str(v, 500) else "string ≤500",
         "items": lambda v: _check_items(
@@ -1063,6 +1075,7 @@ _VALIDATORS: dict[str, dict] = {
     # agent-commerce flag is on, so a store that does not answer agents
     # cannot advertise that it does.
     "trust_badges": {
+        "surface": _check_surface,
         "heading": lambda v: None if _is_str(v, 200) else "string ≤200",
         "items": lambda v: _check_badge_items(v),
         # A marquee is for a strip too long to fit a phone; a static row
@@ -1073,6 +1086,7 @@ _VALIDATORS: dict[str, dict] = {
     # when promotions are off for the tenant or none are running, so a
     # merchant can leave it published between campaigns.
     "offers_preview": {
+        "surface": _check_surface,
         "heading": lambda v: None if _is_str(v, 200) else "string ≤200",
         "subheading": lambda v: None if _is_str(v, 500) else "string ≤500",
         "limit": lambda v: None if _is_int(v, 1, 6) else "int 1–6",
@@ -1093,9 +1107,7 @@ _VALIDATORS: dict[str, dict] = {
             required={"value": 12, "label": 80},
             optional={},
         ),
-        "surface": lambda v: (
-            None if v in ("default", "muted") else "one of default/muted"
-        ),
+        "surface": _check_surface,
     },
 }
 

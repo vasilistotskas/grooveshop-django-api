@@ -37,23 +37,31 @@ DEFAULT_PAGE_LAYOUTS: dict[str, dict] = {
     # ``featured_products`` and ``products_slider`` are not duplicates:
     # the first is what the merchant curates, the second is what arrived
     # last (``ordering``), which is why both are standard on a shop.
+    # ``surface`` alternates ground and raised down the stack. The
+    # storefront draws each section as a full-width BAND, and two
+    # neighbours on the same surface read as one; the page is what knows
+    # the order, so the alternation lives in the layout rather than in
+    # the components. Sections that can render nothing (recently viewed
+    # before a first visit, the blog before a first post) are skipped in
+    # the count on purpose — they vanish, and the bands that remain
+    # still alternate.
     "home": {
         "title": "Homepage",
         "sections": [
             {
                 "component_type": "product_categories",
                 "title": "",
-                "props": {},
+                "props": {"surface": "default"},
             },
             {
                 "component_type": "featured_products",
                 "title": "",
-                "props": {},
+                "props": {"surface": "muted"},
             },
             {
                 "component_type": "products_slider",
                 "title": "",
-                "props": {"ordering": "newest"},
+                "props": {"ordering": "newest", "surface": "default"},
             },
             {
                 "component_type": "recently_viewed",
@@ -63,12 +71,12 @@ DEFAULT_PAGE_LAYOUTS: dict[str, dict] = {
             {
                 "component_type": "blog_posts_grid",
                 "title": "",
-                "props": {},
+                "props": {"surface": "default"},
             },
             {
                 "component_type": "newsletter_signup",
                 "title": "",
-                "props": {},
+                "props": {"surface": "muted"},
             },
         ],
     },

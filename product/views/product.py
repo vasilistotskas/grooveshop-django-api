@@ -202,6 +202,16 @@ class ProductViewSet(BaseModelViewSet):
         "availability_priority",
         "view_count",
         "stock",
+        # The storefront's product rails sort on these — "most liked",
+        # "best rated", "biggest discount" — and DRF's OrderingFilter
+        # silently DROPS a field it was not given, so a rail asking for
+        # one of them would have rendered the default order under a
+        # heading promising something else. `likes_count` and
+        # `review_average` are annotations `for_list()` already adds
+        # (`with_counts`); `discount_percent` is a column.
+        "likes_count",
+        "review_average",
+        "discount_percent",
     ]
     ordering = ["-availability_priority", "id"]
     # ``reviews`` lists ProductReview rows, so it sorts by the review

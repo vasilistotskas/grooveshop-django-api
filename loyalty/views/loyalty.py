@@ -9,7 +9,7 @@ from drf_spectacular.utils import extend_schema_view
 from extra_settings.models import Setting
 from rest_framework import status
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from core.api.serializers import ErrorResponseSerializer
@@ -32,7 +32,7 @@ from loyalty.serializers.loyalty import (
 from loyalty.serializers.tier import LoyaltyTierSerializer
 from loyalty.services import LoyaltyService
 from product.models.product import Product
-from tenant.permissions import IsLoyaltyEnabled
+from tenant.permissions import IsLoyaltyEnabled, IsLoyaltyRuntimeEnabled
 
 logger = logging.getLogger(__name__)
 
@@ -88,8 +88,9 @@ class LoyaltyViewSet(BaseModelViewSet):
     """ViewSet for loyalty system endpoints.
 
     Provides endpoints for viewing loyalty summary, transaction history,
-    redeeming points, and previewing product points.
-    All actions require authentication.
+    redeeming points, and previewing product points. Everything that
+    reads or moves a CUSTOMER's points requires authentication; the tier
+    ladder does not — see ``get_permissions``.
     """
 
     queryset = PointsTransaction.objects.none()
@@ -103,6 +104,28 @@ class LoyaltyViewSet(BaseModelViewSet):
         IsAuthenticated,
     ]
     serializers_config = serializers_config
+
+    def get_permissions(self):
+        """The tier ladder is marketing copy, not account data.
+
+        ``/loyalty-program`` is a public page whose whole content is the
+        tiers — their names, the level each starts at, what each
+        multiplies — and it is identical for every visitor of a store.
+        Behind ``IsAuthenticated`` it could only be server-rendered for
+        a signed-in shopper, so the page that exists to SELL the
+        programme showed nothing to the people it is aimed at.
+
+        Both gates stay: the plan flag and the merchant's runtime
+        switch, each 404ing, so a store with the programme off does not
+        keep an indexable page advertising it.
+        """
+        if self.action == "tiers":
+            return [
+                AllowAny(),
+                IsLoyaltyEnabled(),
+                IsLoyaltyRuntimeEnabled(),
+            ]
+        return super().get_permissions()
 
     @action(detail=False, methods=["GET"])
     def summary(self, request):

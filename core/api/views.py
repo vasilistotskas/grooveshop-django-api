@@ -679,6 +679,19 @@ PUBLIC_SETTING_KEYS = frozenset(
         # Chat-widget kill switch — admin hides the storefront launcher
         # per tenant without a deploy; the gateway /chat stays up.
         "CHAT_WIDGET_ENABLED",
+        # The strip above the header. Operator-authored text rendered on
+        # every page, so it is public by construction.
+        "ANNOUNCEMENT_BAR",
+        # Demo-store credentials, deliberately public: the login page
+        # shows them so a prospect can see the logged-in storefront.
+        # Default off + empty everywhere; the demo seeder writes them
+        # only on a tenant flagged ``is_demo``, and a nightly task
+        # resets that account's data. Read
+        # ``settings.EXTRA_SETTINGS_DEFAULTS`` before enabling this on
+        # anything that is not a throwaway store.
+        "DEMO_ACCOUNT_ENABLED",
+        "DEMO_ACCOUNT_EMAIL",
+        "DEMO_ACCOUNT_PASSWORD",
         # "My reviews" account page toggle. A STORE preference, not a
         # plan flag: product-page reviews stay live regardless; this
         # only governs the account surface. Previously (mis)implemented

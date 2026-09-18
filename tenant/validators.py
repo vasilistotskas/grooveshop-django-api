@@ -341,6 +341,115 @@ def validate_social_login_providers_setting(value: object) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# ANNOUNCEMENT_BAR extra_setting
+# ---------------------------------------------------------------------------
+
+_ANNOUNCEMENT_KEYS = {
+    "enabled",
+    "text",
+    "i18n",
+    "link",
+    "icon",
+    "color",
+    "dismissible",
+    "id",
+}
+_ANNOUNCEMENT_COLORS = {
+    "primary",
+    "secondary",
+    "neutral",
+    "info",
+    "success",
+    "warning",
+    "error",
+}
+_ICON_NAME_RE = re.compile(r"^i-[a-z0-9:-]+$")
+_ANNOUNCEMENT_LINK_RE = re.compile(r"^(/|https://)")
+
+
+def validate_announcement_bar_setting(value: object) -> bool:
+    """django-extra-settings validator for ``ANNOUNCEMENT_BAR``.
+
+    Boolean contract, like ``validate_business_hours_setting``.
+
+    Shape: ``{"enabled": bool, "text": str, "i18n": {"<locale>":
+    {"text": str}}, "link"?, "icon"?, "color"?, "dismissible"?,
+    "id"?}``. ``text`` carries the DEFAULT locale's wording and
+    ``i18n`` overrides it per locale — the same partial-override
+    convention as ``PageSection.i18n`` and ``STORE_OFFICES``, so the
+    default locale is not a valid key there.
+
+    ``id`` is what a dismissal is remembered against in the visitor's
+    browser: changing it re-shows the bar to everyone, which is how a
+    merchant runs a second announcement without every previous
+    dismissal swallowing it.
+    """
+    if value in (None, "", {}):
+        return True
+    if not isinstance(value, dict):
+        return False
+    data = {str(k): v for k, v in value.items()}
+    if set(data) - _ANNOUNCEMENT_KEYS:
+        return False
+
+    enabled = data.get("enabled", False)
+    if not isinstance(enabled, bool):
+        return False
+
+    text = data.get("text", "")
+    if not isinstance(text, str) or len(text) > 200:
+        return False
+    # A bar with nothing to say is a blank strip above the header.
+    if enabled and not text.strip():
+        return False
+
+    for key, pattern, limit in (
+        ("link", _ANNOUNCEMENT_LINK_RE, 1000),
+        ("icon", _ICON_NAME_RE, 100),
+    ):
+        entry = data.get(key)
+        if entry is None:
+            continue
+        if not isinstance(entry, str) or len(entry) > limit:
+            return False
+        if entry and not pattern.match(entry):
+            return False
+
+    color = data.get("color")
+    if color is not None and color not in _ANNOUNCEMENT_COLORS:
+        return False
+
+    for key in ("dismissible",):
+        entry = data.get(key)
+        if entry is not None and not isinstance(entry, bool):
+            return False
+
+    identifier = data.get("id")
+    if identifier is not None and (
+        not isinstance(identifier, str) or len(identifier) > 64
+    ):
+        return False
+
+    from core.utils.i18n import available_language_codes
+
+    codes = available_language_codes()
+    default = settings.PARLER_DEFAULT_LANGUAGE_CODE
+    i18n = data.get("i18n", {})
+    if not isinstance(i18n, dict):
+        return False
+    for code, override in i18n.items():
+        if code not in codes or code == default:
+            return False
+        if not isinstance(override, dict) or set(override) - {"text"}:
+            return False
+        entry = override.get("text")
+        if not isinstance(entry, str) or len(entry) > 200:
+            return False
+
+    return True
+
+
+# ---------------------------------------------------------------------------
 # Reserved schema names
 # ---------------------------------------------------------------------------
 

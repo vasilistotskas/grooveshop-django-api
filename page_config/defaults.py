@@ -20,24 +20,40 @@ from page_config.models import (
 logger = logging.getLogger(__name__)
 
 DEFAULT_PAGE_LAYOUTS: dict[str, dict] = {
-    # Mirrors the platform homepage (and the Nuxt FALLBACK_LAYOUTS.home
-    # safety net) exactly: blog categories rail → main banner carousel →
-    # recently-viewed rail → blog posts list. Seeding the real page —
-    # instead of a generic marketing shape — means a freshly provisioned
-    # tenant (and webside at cutover) starts from today's proven layout
-    # and customizes from there.
+    # A SHOP's homepage: browse the catalogue, then the content around
+    # it. Until 2026-09-18 this mirrored the first tenant's blog-first
+    # page (blog categories rail → banner carousel → recently viewed →
+    # blog posts), which every new store inherited: a prop-less carousel
+    # renders nothing and an empty blog renders "no articles yet", so a
+    # freshly provisioned store opened on an empty state above the fold
+    # and showed no product at all. That page is still webside's own —
+    # ``BRAND_HOME_LAYOUT`` below — it is simply no longer the default.
+    #
+    # Every section here is DATA-DRIVEN and renders nothing when its
+    # data or its tenant flag is absent, so the stack degrades to
+    # whatever the store actually has rather than to empty cards. Keep
+    # that property when adding one.
+    #
+    # ``featured_products`` and ``products_slider`` are not duplicates:
+    # the first is what the merchant curates, the second is what arrived
+    # last (``ordering``), which is why both are standard on a shop.
     "home": {
         "title": "Homepage",
         "sections": [
             {
-                "component_type": "blog_categories",
+                "component_type": "product_categories",
                 "title": "",
                 "props": {},
             },
             {
-                "component_type": "hero_carousel",
+                "component_type": "featured_products",
                 "title": "",
                 "props": {},
+            },
+            {
+                "component_type": "products_slider",
+                "title": "",
+                "props": {"ordering": "newest"},
             },
             {
                 "component_type": "recently_viewed",
@@ -45,7 +61,12 @@ DEFAULT_PAGE_LAYOUTS: dict[str, dict] = {
                 "props": {},
             },
             {
-                "component_type": "blog_posts_list",
+                "component_type": "blog_posts_grid",
+                "title": "",
+                "props": {},
+            },
+            {
+                "component_type": "newsletter_signup",
                 "title": "",
                 "props": {},
             },
@@ -117,6 +138,25 @@ BRAND_HOME_HERO_PROPS: dict = {
     # HeroCarousel only renders the wrapping link when a ``link`` prop is
     # present — without it the promo became a dead image.
     "link": "/products/2/mini-powerbank-5000mah",
+}
+
+# The brand store's OWN homepage: blog categories rail → banner carousel
+# → recently viewed → blog posts list.
+#
+# This was ``DEFAULT_PAGE_LAYOUTS["home"]`` until the default became
+# product-first. It has to live here, and this seeder has to create it,
+# because ``seed_brand_pages`` fills a PROP-LESS ``hero_carousel`` with
+# the banner artwork below: against the new default there is no carousel
+# to fill, so on a fresh schema (a staging refresh, a test) the brand
+# banner would silently never apply.
+BRAND_HOME_LAYOUT: dict = {
+    "title": "Homepage",
+    "sections": [
+        {"component_type": "blog_categories", "title": "", "props": {}},
+        {"component_type": "hero_carousel", "title": "", "props": {}},
+        {"component_type": "recently_viewed", "title": "", "props": {}},
+        {"component_type": "blog_posts_list", "title": "", "props": {}},
+    ],
 }
 
 # Footer navigation for the brand store, published alongside the pages
@@ -257,24 +297,50 @@ def seed_brand_pages() -> dict[str, bool]:
             logger.info("Seeded brand page layout: %s", page_type)
         created_map[page_type] = created
 
-    # Home hero artwork: ensure the home layout exists (create it from
-    # the universal default when absent) and fill a PROP-LESS
-    # hero_carousel with the brand banner props. A hero that already
-    # carries props was customized by the merchant — left untouched.
-    home_config = DEFAULT_PAGE_LAYOUTS["home"]
+    # Home hero artwork: ensure the brand home layout exists (create it
+    # from BRAND_HOME_LAYOUT when absent — NOT from the universal
+    # default, which is product-first and carries no carousel) and fill a
+    # PROP-LESS hero_carousel with the brand banner props. A hero that
+    # already carries props was customized by the merchant — left
+    # untouched.
     home, home_created = PageLayout.objects.get_or_create(
         page_type="home",
         defaults={
-            "title": home_config["title"],
+            "title": BRAND_HOME_LAYOUT["title"],
             "is_published": True,
         },
     )
     if home_created:
-        for section_data in home_config["sections"]:
+        for section_data in BRAND_HOME_LAYOUT["sections"]:
             PageSection.objects.create(layout=home, **section_data)
         logger.info("Seeded page layout: home (via brand seeding)")
     hero = home.sections.filter(component_type="hero_carousel").first()
-    if hero is not None and not hero.props:
+    if hero is None:
+        # The store already had a home layout — the product-first
+        # default, or one the merchant built — so there is no carousel to
+        # carry the banner. Give it one at the top rather than dropping
+        # the artwork: SortableModel.save() assigns sort_order from
+        # max+1, so it is written first and then moved.
+        hero = PageSection.objects.create(
+            layout=home,
+            component_type="hero_carousel",
+            title="",
+            props={},
+        )
+        # SortableModel appends (max + 1), and a banner belongs above the
+        # page rather than under it, so renumber the layout with the hero
+        # first. Contiguous values, because this ordering is what the
+        # admin's drag-and-drop shows and edits.
+        ordered = [
+            hero,
+            *home.sections.exclude(pk=hero.pk).order_by("sort_order", "pk"),
+        ]
+        for index, section in enumerate(ordered):
+            if section.sort_order != index:
+                section.sort_order = index
+                section.save(update_fields=["sort_order"])
+        logger.info("Added a hero_carousel to the existing home layout")
+    if not hero.props:
         hero.props = dict(BRAND_HOME_HERO_PROPS)
         hero.save(update_fields=["props"])
         logger.info("Applied brand banner props to the home hero")

@@ -217,6 +217,22 @@ class IsB2BWholesaleEnabled(IsSettingEnabled):
     default = False
 
 
+class IsLoyaltyRuntimeEnabled(IsSettingEnabled):
+    """404 when the merchant has switched loyalty off at runtime.
+
+    The merchant tier of the loyalty gate; ``IsLoyaltyEnabled`` above is
+    the plan tier. Stacked on the PUBLIC tier listing for the same
+    reason as the promotions listing: ``/loyalty-program`` is a
+    crawlable marketing page, and a store that turned the programme off
+    must stop advertising its tiers, not just hide the account widgets.
+
+    Fails CLOSED like the other commercial gates.
+    """
+
+    setting_key = "LOYALTY_ENABLED"
+    default = False
+
+
 class IsPromotionsRuntimeEnabled(IsSettingEnabled):
     """404 when the merchant has switched promotions off at runtime.
 

@@ -2346,6 +2346,59 @@ EXTRA_SETTINGS_DEFAULTS = [
         "value": 30,
         "description": "HTTP request timeout in seconds. AADE endpoints are sometimes slow under load — 30s is the usual sweet spot.",
     },
+    {
+        "name": "ANNOUNCEMENT_BAR",
+        "type": "json",
+        "value": {},
+        "validator": "tenant.validators.validate_announcement_bar_setting",
+        "description": (
+            "Strip above the storefront header, as JSON: "
+            '{"enabled": bool, "text": "<default-locale wording>", '
+            '"i18n": {"<locale>": {"text": "..."}}, "link"?, "icon"?, '
+            '"color"?, "dismissible"?, "id"?}. `text` is capped at 200 '
+            "characters because the bar is one line; `color` is one of "
+            "primary/secondary/neutral/info/success/warning/error. "
+            "`id` is what a dismissal is remembered against in the "
+            "visitor's browser — change it to re-show the bar to "
+            "everyone. Empty {} = no bar."
+        ),
+    },
+    {
+        "name": "DEMO_ACCOUNT_ENABLED",
+        "type": "bool",
+        "value": False,
+        "description": (
+            "Show a demo-account card on the login page with the two "
+            "values below, so a prospect can see the logged-in "
+            "storefront without signing up. INTENDED FOR A DEMO STORE "
+            "ONLY: turning it on publishes DEMO_ACCOUNT_EMAIL and "
+            "DEMO_ACCOUNT_PASSWORD to every visitor through "
+            "/api/v1/settings/public. The seeder writes all three only "
+            "on a tenant flagged is_demo."
+        ),
+    },
+    {
+        "name": "DEMO_ACCOUNT_EMAIL",
+        "type": "string",
+        "value": "",
+        "description": (
+            "Email of the shared demo account. PUBLIC when "
+            "DEMO_ACCOUNT_ENABLED is on. Empty → the card does not "
+            "render, whatever the flag says."
+        ),
+    },
+    {
+        "name": "DEMO_ACCOUNT_PASSWORD",
+        "type": "string",
+        "value": "",
+        "description": (
+            "Password of the shared demo account, shown IN CLEAR on the "
+            "login page when DEMO_ACCOUNT_ENABLED is on. Only ever a "
+            "throwaway account on a demo store — one whose data a "
+            "nightly task resets. Never a real customer's, and never a "
+            "staff account."
+        ),
+    },
 ]
 
 EMAIL_BACKEND = getenv(

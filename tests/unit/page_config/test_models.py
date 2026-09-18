@@ -26,8 +26,9 @@ class TestComponentType(TestCase):
         # blocks (page_hero/feature_lists/option_selector/
         # comparison_table/flow_steps) + 3 for the pages a design
         # composes rather than writes (project_register/vendor_cards/
-        # contact_panel).
-        assert len(ComponentType.choices) == 41
+        # contact_panel) + 3 shop bands (trust_badges/offers_preview/
+        # stats_strip).
+        assert len(ComponentType.choices) == 44
 
 
 class TestPageLayout(TestCase):

@@ -675,3 +675,199 @@ def test_story_timeline_surface_is_an_enum():
     validate_section_props("story_timeline", {"surface": "default"})
     with pytest.raises(ValidationError):
         validate_section_props("story_timeline", {"surface": "raised"})
+
+
+# ---------------------------------------------------------------------------
+# Shop bands (2026-09-18) — the props the redesigned storefront renders
+# ---------------------------------------------------------------------------
+
+
+def test_a_product_rail_names_itself_and_picks_its_products():
+    """The three product rails share one prop shape.
+
+    Two rails on one page are only different bands if each can say what
+    it draws — what the merchant curates beside what arrived last.
+    """
+    for section in ("products_slider", "products_grid", "featured_products"):
+        validate_section_props(
+            section,
+            {
+                "heading": "Νέες αφίξεις",
+                "subheading": "Ό,τι μπήκε αυτή την εβδομάδα",
+                "cta_text": "Δες τα όλα",
+                "cta_link": "/products",
+                "ordering": "newest",
+                "category_id": 3,
+                "show_add_to_cart": True,
+                "page_size": 8,
+            },
+        )
+        with pytest.raises(ValidationError, match="ordering"):
+            validate_section_props(section, {"ordering": "cheapest"})
+        with pytest.raises(ValidationError, match="category_id"):
+            validate_section_props(section, {"category_id": 0})
+        with pytest.raises(ValidationError, match="cta_link"):
+            validate_section_props(section, {"cta_link": "javascript:0"})
+
+
+def test_product_rails_keep_their_own_page_size_ceiling():
+    """A grid holds more than a slider; a slider is swiped, not scanned."""
+    validate_section_props("products_grid", {"page_size": 48})
+    with pytest.raises(ValidationError, match="page_size"):
+        validate_section_props("products_slider", {"page_size": 48})
+
+
+def test_a_blog_rail_names_itself_and_picks_its_category():
+    for section in (
+        "blog_posts_carousel",
+        "blog_posts_grid",
+        "blog_posts_list",
+    ):
+        validate_section_props(
+            section,
+            {
+                "heading": "Από το blog",
+                "subheading": "Οδηγοί αγοράς",
+                "cta_text": "Όλα τα άρθρα",
+                "cta_link": "/blog",
+                "category_id": 2,
+            },
+        )
+        with pytest.raises(ValidationError, match="category_id"):
+            validate_section_props(section, {"category_id": "guides"})
+
+
+def test_product_categories_chooses_its_layout_and_branch():
+    validate_section_props(
+        "product_categories",
+        {
+            "heading": "Κατηγορίες",
+            "layout": "tiles",
+            "parent_id": 1,
+            "limit": 8,
+        },
+    )
+    with pytest.raises(ValidationError, match="layout"):
+        validate_section_props("product_categories", {"layout": "masonry"})
+
+
+def test_hero_slides_carry_their_own_copy_and_destination():
+    """The flat images/link triple could only express one link and no copy."""
+    validate_section_props(
+        "hero_carousel",
+        {
+            "slides": [
+                {
+                    "image_url": "/img/sale.avif",
+                    "mobile_image_url": "/img/sale-mobile.avif",
+                    "alt": "Προσφορές",
+                    "eyebrow": "Νέο",
+                    "heading": "Έκπτωση 20%",
+                    "subheading": "Σε επιλεγμένα ακουστικά",
+                    "cta_text": "Δες τα",
+                    "cta_link": "/offers",
+                    "theme": "dark",
+                }
+            ],
+            "autoplay_ms": 6000,
+            "aspect": "wide",
+        },
+    )
+
+
+def test_a_slide_without_artwork_is_rejected():
+    with pytest.raises(ValidationError, match="image_url"):
+        validate_section_props(
+            "hero_carousel", {"slides": [{"heading": "Χωρίς εικόνα"}]}
+        )
+
+
+def test_autoplay_is_off_or_readable():
+    validate_section_props("hero_carousel", {"autoplay_ms": 0})
+    with pytest.raises(ValidationError, match="autoplay_ms"):
+        validate_section_props("hero_carousel", {"autoplay_ms": 800})
+
+
+def test_a_testimonial_can_carry_a_role_and_a_five_point_rating():
+    """Stars, so the scale a reader expects — not ProductReview's 1..10."""
+    validate_section_props(
+        "testimonials",
+        {
+            "heading": "Τι λένε οι πελάτες μας",
+            "items": [
+                {
+                    "name": "Γιώργος Π.",
+                    "text": "Άψογα.",
+                    "role": "Χονδρική",
+                    "rating": 5,
+                }
+            ],
+        },
+    )
+    with pytest.raises(ValidationError, match="rating"):
+        validate_section_props(
+            "testimonials",
+            {"items": [{"name": "Α", "text": "Β", "rating": 9}]},
+        )
+
+
+def test_trust_badges_need_a_mark_and_a_known_kind():
+    validate_section_props(
+        "trust_badges",
+        {
+            "heading": "Ασφαλείς αγορές",
+            "items": [
+                {
+                    "kind": "payment",
+                    "label": "Viva Wallet",
+                    "image_url": "/img/viva.svg",
+                },
+                {
+                    "kind": "ai",
+                    "label": "AI-ready",
+                    "icon": "i-heroicons-cpu-chip",
+                    "href": "/info/ai-ready",
+                },
+            ],
+            "marquee": False,
+        },
+    )
+    with pytest.raises(ValidationError, match="kind"):
+        validate_section_props(
+            "trust_badges",
+            {"items": [{"kind": "award", "label": "x", "icon": "i-x"}]},
+        )
+    # A badge with neither a logo nor an icon is a bare word in a row of marks.
+    with pytest.raises(ValidationError, match="image_url or icon"):
+        validate_section_props(
+            "trust_badges", {"items": [{"kind": "custom", "label": "Εγγύηση"}]}
+        )
+
+
+def test_offers_preview_is_bounded_and_links_out():
+    validate_section_props(
+        "offers_preview",
+        {
+            "heading": "Προσφορές",
+            "limit": 3,
+            "cta_text": "Όλες",
+            "cta_link": "/offers",
+        },
+    )
+    with pytest.raises(ValidationError, match="limit"):
+        validate_section_props("offers_preview", {"limit": 7})
+
+
+def test_stats_strip_is_the_hero_proof_row_as_its_own_band():
+    validate_section_props(
+        "stats_strip",
+        {
+            "items": [{"value": "2.500+", "label": "παραγγελίες"}],
+            "surface": "muted",
+        },
+    )
+    with pytest.raises(ValidationError, match="items"):
+        validate_section_props(
+            "stats_strip",
+            {"items": [{"value": str(i), "label": "x"} for i in range(5)]},
+        )

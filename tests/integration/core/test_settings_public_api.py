@@ -88,3 +88,26 @@ def test_a_row_without_a_value_is_omitted():
     )
 
     assert "STORE_GEO_LAT" not in _public_settings()
+
+
+def test_the_demo_account_keys_are_public_and_default_to_off():
+    """A demo store shows shared credentials on its login page.
+
+    They are published deliberately — the card exists so a prospect can
+    see the logged-in storefront without signing up — which is why the
+    flag ships False and both values ship empty: a store that has not
+    asked for this must expose nothing, and the seeder writes the three
+    only on a tenant flagged ``is_demo``.
+    """
+    values = _public_settings()
+
+    assert values["DEMO_ACCOUNT_ENABLED"] == "False"
+    assert values["DEMO_ACCOUNT_EMAIL"] == ""
+    assert values["DEMO_ACCOUNT_PASSWORD"] == ""
+
+
+def test_the_announcement_bar_is_public_and_empty_by_default():
+    """Operator text rendered on every page, so public by construction."""
+    values = _public_settings()
+
+    assert values["ANNOUNCEMENT_BAR"] == "{}"

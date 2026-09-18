@@ -27,6 +27,23 @@ from tenant.models import Tenant
 # ---------------------------------------------------------------------------
 
 
+def _loyalty_runtime(enabled: bool):
+    """Set the merchant tier of the loyalty gate.
+
+    ``LOYALTY_ENABLED`` ships False and these tests create no Setting
+    rows, so without this every loyalty endpoint would 404 on the
+    runtime gate before the flag under test was ever consulted.
+    """
+    from unittest.mock import patch
+
+    return patch(
+        "extra_settings.models.Setting.get",
+        side_effect=lambda key, default=None: (
+            enabled if key == "LOYALTY_ENABLED" else default
+        ),
+    )
+
+
 def _make_tenant(slug: str, **kwargs) -> Tenant:
     """Persist a Tenant row without triggering schema creation."""
     t = Tenant(
@@ -148,9 +165,7 @@ class TestLoyaltyFeatureFlag:
     """``loyalty_enabled`` flag gates all loyalty endpoints with 404."""
 
     def test_tiers_when_loyalty_enabled_authenticated(self, monkeypatch):
-        """When loyalty is enabled, authenticated users can reach the tiers
-        endpoint. The IsAuthenticated check fires after the feature gate, so
-        auth is still required even when the feature is on."""
+        """When loyalty is enabled, the tier ladder is readable."""
         from user.factories.account import UserAccountFactory
 
         tenant = _make_tenant("ff-loyal-on", loyalty_enabled=True)
@@ -160,9 +175,47 @@ class TestLoyaltyFeatureFlag:
         client = APIClient()
         client.force_authenticate(user=user)
         url = reverse("loyalty:loyalty-tiers")
-        response = client.get(url)
+        with _loyalty_runtime(True):
+            response = client.get(url)
         # 200 OK — feature enabled + authenticated
         assert response.status_code == status.HTTP_200_OK
+
+    def test_tiers_are_readable_anonymously(self, monkeypatch):
+        """The tier ladder is the /loyalty-program page's whole content.
+
+        It is marketing copy — the same for every visitor of a store —
+        so it must render for the people the page is aimed at, who are
+        by definition not signed in. Everything that touches a
+        CUSTOMER's points stays authenticated (see the summary tests
+        below).
+        """
+        tenant = _make_tenant("ff-loyal-anon", loyalty_enabled=True)
+        monkeypatch.setattr(connection, "tenant", tenant, raising=False)
+
+        client = APIClient()
+        with _loyalty_runtime(True):
+            response = client.get(reverse("loyalty:loyalty-tiers"))
+
+        assert response.status_code == status.HTTP_200_OK
+
+    def test_tiers_404_when_the_merchant_switches_loyalty_off(
+        self, monkeypatch
+    ):
+        """The runtime tier of the gate, on a public and indexable page.
+
+        A store that turned the programme off must stop advertising its
+        tiers, not merely hide the account widgets. Fails CLOSED, like
+        every other commercial gate: ``LOYALTY_ENABLED`` ships False, so
+        an absent row is "off" rather than "on".
+        """
+        tenant = _make_tenant("ff-loyal-runtime-off", loyalty_enabled=True)
+        monkeypatch.setattr(connection, "tenant", tenant, raising=False)
+
+        client = APIClient()
+        with _loyalty_runtime(False):
+            response = client.get(reverse("loyalty:loyalty-tiers"))
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
 
     def test_tiers_when_loyalty_disabled(self, monkeypatch):
         tenant = _make_tenant("ff-loyal-off", loyalty_enabled=False)
@@ -220,11 +273,15 @@ class TestLoyaltyFeatureFlag:
         then rejects the anonymous request with 401. The critical assertion is
         that we do NOT get 404 — the feature gate is transparent on the public
         schema.
+
+        Asserted on ``summary`` rather than ``tiers``: the tier ladder is
+        deliberately anonymous now, so it could not tell a bypassed gate
+        from a passed one.
         """
         monkeypatch.setattr(connection, "tenant", None, raising=False)
 
         client = APIClient()
-        url = reverse("loyalty:loyalty-tiers")
+        url = reverse("loyalty:loyalty-summary")
         response = client.get(url)
         # IsLoyaltyEnabled passed → IsAuthenticated rejected anon with 401.
         # Must NOT be 404.

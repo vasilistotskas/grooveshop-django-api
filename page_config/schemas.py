@@ -344,10 +344,171 @@ def _check_testimonial_items(value) -> str | None:
         avatar = item.get("avatar")
         if avatar is not None and not _is_str(avatar, 1000):
             return f"items[{i}].avatar: must be a string (max 1000)"
-        unknown = set(item) - {"name", "text", "avatar"}
+        # Who the quote is FROM — "Verified buyer", "Χονδρική". The
+        # quote carries more weight with the role attached, and a
+        # merchant should not have to smuggle it into ``name``.
+        role = item.get("role")
+        if role is not None and not _is_str(role, 100):
+            return f"items[{i}].role: must be a string (max 100)"
+        # Displayed as stars, so the FIVE-point scale a reader expects —
+        # not ProductReview's internal 1..10 (RateEnum).
+        rating = item.get("rating")
+        if rating is not None and not _is_int(rating, 1, 5):
+            return f"items[{i}].rating: int 1–5"
+        unknown = set(item) - {"name", "text", "avatar", "role", "rating"}
         if unknown:
             return f"items[{i}]: unknown keys {sorted(unknown)}"
     return None
+
+
+def _check_hero_slides(value) -> str | None:
+    """``hero_carousel.slides`` — a carousel of full editorial slides.
+
+    The original ``images``/``mobile_images``/``link`` triple can only
+    express one link for the whole carousel and no copy at all, so the
+    artwork had to carry its own baked-in wording. A slide here owns its
+    own copy and its own destination; when ``slides`` is present it wins
+    and the flat props are ignored.
+    """
+    if not isinstance(value, list) or len(value) > 8:
+        return "slides: must be a list of at most 8 entries"
+    for i, raw in enumerate(value):
+        if not isinstance(raw, dict):
+            return f"slides[{i}]: must be an object"
+        slide = {str(k): v for k, v in raw.items()}
+        image = slide.get("image_url")
+        if not image or not _is_str(image, 1000):
+            return f"slides[{i}].image_url: required string (max 1000)"
+        for key, limit in (
+            ("mobile_image_url", 1000),
+            ("alt", 200),
+            ("eyebrow", 100),
+            ("heading", 200),
+            ("subheading", 500),
+            ("cta_text", 100),
+            ("secondary_cta_text", 100),
+        ):
+            entry = slide.get(key)
+            if entry is not None and not _is_str(entry, limit):
+                return f"slides[{i}].{key}: must be a string (max {limit})"
+        for key in ("cta_link", "secondary_cta_link"):
+            entry = slide.get(key)
+            if entry is None:
+                continue
+            if not _is_str(entry, 1000) or not _LINK_RE.match(entry):
+                return f"slides[{i}].{key}: internal path or https URL"
+        theme = slide.get("theme")
+        if theme is not None and theme not in ("light", "dark", "auto"):
+            return f"slides[{i}].theme: one of light/dark/auto"
+        unknown = set(slide) - {
+            "image_url",
+            "mobile_image_url",
+            "alt",
+            "eyebrow",
+            "heading",
+            "subheading",
+            "cta_text",
+            "cta_link",
+            "secondary_cta_text",
+            "secondary_cta_link",
+            "theme",
+        }
+        if unknown:
+            return f"slides[{i}]: unknown keys {sorted(unknown)}"
+    return None
+
+
+# A rail of products is the same band three times over — what it is
+# called, what it links on to, and which products it draws. Only the
+# page-size ceiling differs, so the shape is built once.
+#
+# ``ordering`` is what makes two rails on one page different bands
+# rather than the same one twice: what the merchant curates
+# (``featured``) beside what arrived last (``newest``).
+def _product_rail_props(max_page_size: int) -> dict:
+    return {
+        "heading": lambda v: None if _is_str(v, 200) else "string ≤200",
+        "subheading": lambda v: None if _is_str(v, 500) else "string ≤500",
+        "cta_text": lambda v: None if _is_str(v, 100) else "string ≤100",
+        "cta_link": lambda v: (
+            None
+            if _is_str(v, 1000) and _LINK_RE.match(v)
+            else "internal path or https URL"
+        ),
+        "ordering": lambda v: (
+            None
+            if v in ("featured", "newest", "popular", "discounted", "rating")
+            else "one of featured/newest/popular/discounted/rating"
+        ),
+        # Narrow the rail to one category ("New in Audio"). The id, not
+        # a slug: a slug is translatable and a rename would silently
+        # empty the band.
+        "category_id": lambda v: (
+            None if _is_int(v, 1, 2_147_483_647) else "positive int"
+        ),
+        "show_add_to_cart": lambda v: (
+            None if isinstance(v, bool) else "boolean"
+        ),
+        "page_size": lambda v: (
+            None if _is_int(v, 1, max_page_size) else f"int 1–{max_page_size}"
+        ),
+    }
+
+
+def _check_badge_items(value) -> str | None:
+    """``trust_badges.items`` — a logo or an icon plus a word.
+
+    ``kind`` decides both where the badge comes from and whether it may
+    render at all: ``ai`` is shown only to a tenant whose agent-commerce
+    flag is on, so a store cannot advertise a surface it does not serve.
+    """
+    if not isinstance(value, list) or len(value) > 12:
+        return "items: must be a list of at most 12 entries"
+    for i, raw in enumerate(value):
+        if not isinstance(raw, dict):
+            return f"items[{i}]: must be an object"
+        item = {str(k): v for k, v in raw.items()}
+        kind = item.get("kind")
+        if kind not in ("payment", "shipping", "ai", "custom"):
+            return f"items[{i}].kind: one of payment/shipping/ai/custom"
+        label = item.get("label")
+        if not label or not _is_str(label, 60):
+            return f"items[{i}].label: required string (max 60)"
+        image = item.get("image_url")
+        if image is not None and not _is_str(image, 1000):
+            return f"items[{i}].image_url: must be a string (max 1000)"
+        icon = item.get("icon")
+        if icon is not None and not _ICON_RE.match(str(icon)):
+            return f"items[{i}].icon: must be an i-* icon name"
+        href = item.get("href")
+        if href is not None and (
+            not _is_str(href, 1000) or not _LINK_RE.match(href)
+        ):
+            return f"items[{i}].href: internal path or https URL"
+        # A badge with neither a logo nor an icon is a bare word in a
+        # row of marks.
+        if image is None and icon is None:
+            return f"items[{i}]: needs image_url or icon"
+        unknown = set(item) - {"kind", "label", "image_url", "icon", "href"}
+        if unknown:
+            return f"items[{i}]: unknown keys {sorted(unknown)}"
+    return None
+
+
+# Same reasoning for the three blog rails.
+_BLOG_RAIL_PROPS: dict = {
+    "heading": lambda v: None if _is_str(v, 200) else "string ≤200",
+    "subheading": lambda v: None if _is_str(v, 500) else "string ≤500",
+    "cta_text": lambda v: None if _is_str(v, 100) else "string ≤100",
+    "cta_link": lambda v: (
+        None
+        if _is_str(v, 1000) and _LINK_RE.match(v)
+        else "internal path or https URL"
+    ),
+    "category_id": lambda v: (
+        None if _is_int(v, 1, 2_147_483_647) else "positive int"
+    ),
+}
 
 
 # key -> validator(value) returning an error string or None
@@ -391,8 +552,34 @@ _VALIDATORS: dict[str, dict] = {
             if v in ("none", "orbs", "gradient")
             else "one of none/orbs/gradient"
         ),
+        # A hero crops to a different shape on a phone than on a desk:
+        # one artwork cannot serve both without losing its subject.
+        "mobile_image_url": lambda v: (
+            None if _is_str(v, 1000) else "string ≤1000"
+        ),
+        "image_alt": lambda v: None if _is_str(v, 200) else "string ≤200",
+        "align": lambda v: (
+            None if v in ("left", "center") else "one of left/center"
+        ),
+        # Which way the copy reads over the artwork. ``auto`` keeps the
+        # component's own contrast choice.
+        "theme": lambda v: (
+            None if v in ("light", "dark", "auto") else "one of light/dark/auto"
+        ),
     },
     "hero_carousel": {
+        "slides": _check_hero_slides,
+        # 0 = no autoplay. Anything under three seconds is unreadable,
+        # and the component pauses it under prefers-reduced-motion
+        # regardless.
+        "autoplay_ms": lambda v: (
+            None if v == 0 or _is_int(v, 3000, 15000) else "0 or int 3000–15000"
+        ),
+        "aspect": lambda v: (
+            None
+            if v in ("wide", "banner", "square")
+            else "one of wide/banner/square"
+        ),
         "images": lambda v: (
             None
             if isinstance(v, list)
@@ -415,28 +602,44 @@ _VALIDATORS: dict[str, dict] = {
             else "internal path or https URL"
         ),
     },
-    "products_slider": {
-        "page_size": lambda v: None if _is_int(v, 1, 24) else "int 1–24",
-    },
-    "products_grid": {
-        "page_size": lambda v: None if _is_int(v, 1, 48) else "int 1–48",
-    },
+    "products_slider": _product_rail_props(24),
+    "products_grid": _product_rail_props(48),
     "featured_products": {
-        "page_size": lambda v: None if _is_int(v, 1, 24) else "int 1–24",
+        **_product_rail_props(24),
         "columns": lambda v: None if _is_int(v, 1, 6) else "int 1–6",
     },
-    "product_categories": {},
+    "product_categories": {
+        "heading": lambda v: None if _is_str(v, 200) else "string ≤200",
+        # How the band draws them: a swipeable rail, a plain grid, or
+        # image tiles. Presentation the page owns, because the same
+        # categories open a shop's homepage and sit mid-page elsewhere.
+        "layout": lambda v: (
+            None
+            if v in ("slider", "grid", "tiles")
+            else "one of slider/grid/tiles"
+        ),
+        # Draw the CHILDREN of one category instead of the tree's roots.
+        "parent_id": lambda v: (
+            None if _is_int(v, 1, 2_147_483_647) else "positive int"
+        ),
+        "limit": lambda v: None if _is_int(v, 1, 24) else "int 1–24",
+    },
     "blog_categories": {},
     "blog_posts_carousel": {
+        **_BLOG_RAIL_PROPS,
         "count": lambda v: None if _is_int(v, 1, 12) else "int 1–12",
     },
     "blog_posts_grid": {
+        **_BLOG_RAIL_PROPS,
         "count": lambda v: None if _is_int(v, 1, 24) else "int 1–24",
     },
     "blog_posts_list": {
+        **_BLOG_RAIL_PROPS,
         "page_size": lambda v: None if _is_int(v, 1, 24) else "int 1–24",
     },
-    "recently_viewed": {},
+    "recently_viewed": {
+        "heading": lambda v: None if _is_str(v, 200) else "string ≤200",
+    },
     "rich_text": {
         "content": lambda v: None if _is_str(v, 20000) else "string ≤20000",
     },
@@ -466,8 +669,16 @@ _VALIDATORS: dict[str, dict] = {
         "heading": lambda v: None if _is_str(v, 200) else "string ≤200",
         "description": lambda v: None if _is_str(v, 1000) else "string ≤1000",
         "placeholder": lambda v: None if _is_str(v, 100) else "string ≤100",
+        "button_text": lambda v: None if _is_str(v, 60) else "string ≤60",
+        # Same surface enum as ``cta_banner``, for the same reason: on a
+        # page of stacked full-width bands, whether this one sits on the
+        # ground or a raised surface depends on what precedes it.
+        "surface": lambda v: (
+            None if v in ("default", "muted") else "one of default/muted"
+        ),
     },
     "testimonials": {
+        "heading": lambda v: None if _is_str(v, 200) else "string ≤200",
         "items": _check_testimonial_items,
     },
     "spacer": {
@@ -835,6 +1046,7 @@ _VALIDATORS: dict[str, dict] = {
     },
     "faq": {
         "heading": lambda v: None if _is_str(v, 200) else "string ≤200",
+        "subheading": lambda v: None if _is_str(v, 500) else "string ≤500",
         "items": lambda v: _check_items(
             v,
             max_items=30,
@@ -842,6 +1054,48 @@ _VALIDATORS: dict[str, dict] = {
             optional={},
         ),
         "multiple": lambda v: None if isinstance(v, bool) else "boolean",
+    },
+    # The row of reassurances a shop puts near its footer or under a
+    # hero: how you pay, who delivers, and — for a store that answers
+    # agents — that it is agent-readable.
+    #
+    # ``kind`` is not decoration: ``ai`` renders only where the tenant's
+    # agent-commerce flag is on, so a store that does not answer agents
+    # cannot advertise that it does.
+    "trust_badges": {
+        "heading": lambda v: None if _is_str(v, 200) else "string ≤200",
+        "items": lambda v: _check_badge_items(v),
+        # A marquee is for a strip too long to fit a phone; a static row
+        # is calmer everywhere else.
+        "marquee": lambda v: None if isinstance(v, bool) else "boolean",
+    },
+    # Live promotions, on a page that is not /offers. Renders nothing
+    # when promotions are off for the tenant or none are running, so a
+    # merchant can leave it published between campaigns.
+    "offers_preview": {
+        "heading": lambda v: None if _is_str(v, 200) else "string ≤200",
+        "subheading": lambda v: None if _is_str(v, 500) else "string ≤500",
+        "limit": lambda v: None if _is_int(v, 1, 6) else "int 1–6",
+        "cta_text": lambda v: None if _is_str(v, 100) else "string ≤100",
+        "cta_link": lambda v: (
+            None
+            if _is_str(v, 1000) and _LINK_RE.match(v)
+            else "internal path or https URL"
+        ),
+    },
+    # The proof row — "2.500+ παραγγελίες", "4.8/5". ``hero_banner``
+    # already carries a ``stats`` prop; this is the same row as a band
+    # of its own, for a page whose hero is an image or a carousel.
+    "stats_strip": {
+        "items": lambda v: _check_items(
+            v,
+            max_items=4,
+            required={"value": 12, "label": 80},
+            optional={},
+        ),
+        "surface": lambda v: (
+            None if v in ("default", "muted") else "one of default/muted"
+        ),
     },
 }
 

@@ -206,6 +206,100 @@ class TestBrandHeroKeepsItsLink(TestCase):
         hero = home.sections.get(component_type="hero_carousel")
         assert hero.props.get("link")
 
+    def test_adds_a_hero_to_a_home_that_has_none(self):
+        """The default homepage is product-first and carries no carousel.
+
+        ``seed_brand_pages`` fills a PROP-LESS ``hero_carousel`` with the
+        banner artwork. On a schema that already went through
+        ``seed_page_layouts`` there is none to fill, so without this the
+        brand banner silently never applied — on a staging refresh, or
+        any test that seeds both.
+        """
+        from page_config.defaults import seed_brand_pages, seed_page_layouts
+        from page_config.models import PageLayout
+
+        seed_page_layouts()
+        home = PageLayout.objects.get(page_type="home")
+        assert not home.sections.filter(component_type="hero_carousel").exists()
+
+        seed_brand_pages()
+
+        hero = home.sections.get(component_type="hero_carousel")
+        assert hero.props.get("link")
+        # A banner belongs above the page, not under it.
+        assert hero.sort_order == 0
+        orders = list(
+            home.sections.order_by("sort_order").values_list(
+                "sort_order", flat=True
+            )
+        )
+        assert orders == list(range(len(orders)))
+
+    def test_brand_seeding_builds_the_brand_home_when_absent(self):
+        """...and that home is the store's OWN blog-first page.
+
+        Building it from ``DEFAULT_PAGE_LAYOUTS`` instead would give the
+        brand store the product-first default — a different homepage
+        from the one it runs.
+        """
+        from page_config.defaults import BRAND_HOME_LAYOUT, seed_brand_pages
+        from page_config.models import PageLayout
+
+        seed_brand_pages()
+
+        home = PageLayout.objects.get(page_type="home")
+        types = list(
+            home.sections.order_by("sort_order").values_list(
+                "component_type", flat=True
+            )
+        )
+        assert types == [
+            section["component_type"]
+            for section in BRAND_HOME_LAYOUT["sections"]
+        ]
+
+
+class TestDefaultHomeIsAShopHomepage(TestCase):
+    """The default homepage sells; it does not advertise an empty blog.
+
+    Until 2026-09-18 every new tenant inherited the first store's
+    blog-first page: a prop-less ``hero_carousel`` renders nothing and an
+    empty blog renders "no articles yet", so a freshly provisioned store
+    opened on an empty state and showed no product at all.
+    """
+
+    def test_leads_with_the_catalogue(self):
+        sections = [
+            entry["component_type"]
+            for entry in DEFAULT_PAGE_LAYOUTS["home"]["sections"]
+        ]
+        assert sections[0] == "product_categories"
+        assert "featured_products" in sections
+
+    def test_carries_nothing_that_renders_an_empty_state_first(self):
+        sections = [
+            entry["component_type"]
+            for entry in DEFAULT_PAGE_LAYOUTS["home"]["sections"]
+        ]
+        # The carousel needs artwork nobody has yet; the blog rail
+        # renders its own empty state.
+        assert "hero_carousel" not in sections
+        assert "blog_categories" not in sections
+
+    def test_every_default_section_satisfies_the_prop_contract(self):
+        """Seeded props are operator-editable rows like any other.
+
+        A default that the admin would reject on the first save is a
+        page the merchant cannot edit without first deleting it.
+        """
+        from page_config.schemas import validate_section_props
+
+        for config in DEFAULT_PAGE_LAYOUTS.values():
+            for section in config["sections"]:
+                validate_section_props(
+                    section["component_type"], section["props"]
+                )
+
 
 class TestSeedContentPages(TestCase):
     """Two kinds of seed, and the split is the point.

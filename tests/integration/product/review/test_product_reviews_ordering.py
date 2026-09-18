@@ -28,7 +28,7 @@ def _ids(response) -> list[int]:
 
 @pytest.mark.django_db
 def test_reviews_sort_both_ways_and_by_rate():
-    product = ProductFactory()
+    product = ProductFactory(active=True)
     older = ProductReviewFactory(
         product=product,
         user=UserAccountFactory(),

@@ -1,0 +1,3 @@
+# Downloads the build command keeps so a rebuild does not re-fetch. The
+# AVIFs beside it are the committed artefacts; these are not.
+.cache/

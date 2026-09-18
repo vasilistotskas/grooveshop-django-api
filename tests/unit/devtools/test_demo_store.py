@@ -15,6 +15,7 @@ for everything except the two seed functions at the end.
 
 from __future__ import annotations
 
+import json
 from io import StringIO
 from types import SimpleNamespace
 
@@ -144,33 +145,33 @@ class TestSettings(TestCase):
 
 class TestCatalogueIntegrity(TestCase):
     def test_product_slugs_are_unique(self):
-        slugs = [row[0] for row in demo_store.PRODUCTS]
+        slugs = [row.slug for row in demo_store.PRODUCTS]
         assert len(slugs) == len(set(slugs))
 
     def test_every_product_references_a_seeded_category(self):
-        categories = {row[0] for row in demo_store.CATEGORIES}
+        categories = {row.slug for row in demo_store.CATEGORIES}
         for row in demo_store.PRODUCTS:
-            assert row[2] in categories, row[0]
+            assert row.category in categories, row.slug
 
     def test_every_product_references_a_seeded_brand(self):
         for row in demo_store.PRODUCTS:
-            assert row[6] in demo_store.BRANDS, row[0]
+            assert row.brand in demo_store.BRANDS, row.slug
 
     def test_category_parents_resolve_and_come_first(self):
         """MPTT needs the parent saved before the child, and
-        ``seed_categories`` relies on tuple order for that.
+        ``seed_categories`` relies on the declared order for that.
         """
         seen: set[str] = set()
-        for slug, _name, parent in demo_store.CATEGORIES:
-            if parent is not None:
-                assert parent in seen, f"{slug} precedes its parent"
-            seen.add(slug)
+        for row in demo_store.CATEGORIES:
+            if row.parent is not None:
+                assert row.parent in seen, f"{row.slug} precedes its parent"
+            seen.add(row.slug)
 
     def test_tree_is_at_least_three_levels_deep(self):
         """A flat list never exercises breadcrumb depth or the
         descendant-aware category filters.
         """
-        parent_of = {row[0]: row[2] for row in demo_store.CATEGORIES}
+        parent_of = {row.slug: row.parent for row in demo_store.CATEGORIES}
         assert any(
             parent_of[slug] is not None
             and parent_of[parent_of[slug]] is not None
@@ -184,8 +185,8 @@ class TestCatalogueIntegrity(TestCase):
         nothing out of stock (no back-in-stock path) and nothing below
         the low-stock threshold.
         """
-        discounts = [float(row[4]) for row in demo_store.PRODUCTS]
-        stocks = [row[5] for row in demo_store.PRODUCTS]
+        discounts = [float(row.discount) for row in demo_store.PRODUCTS]
+        stocks = [row.stock for row in demo_store.PRODUCTS]
         assert any(value > 0 for value in discounts)
         assert any(value == 0 for value in stocks)
         assert any(0 < value < 10 for value in stocks)
@@ -193,17 +194,80 @@ class TestCatalogueIntegrity(TestCase):
     def test_prices_are_positive(self):
         """``Product.clean`` rejects a discount on a zero price."""
         for row in demo_store.PRODUCTS:
-            assert float(row[3]) > 0, row[0]
+            assert float(row.price) > 0, row.slug
 
-    def test_image_pool_points_at_media_paths(self):
-        assert demo_store.IMAGE_POOL
-        for path in demo_store.IMAGE_POOL:
-            assert path.startswith("uploads/"), path
+    def test_no_product_weighs_nothing(self):
+        """A zero weight is FALSY on the storefront.
+
+        It does not blank one field: the whole checkout payload fails
+        validation, so a single weightless product makes the store
+        unbuyable. See ``feedback_zero_measure_falsy_nulls_contract``.
+        """
+        for row in demo_store.PRODUCTS:
+            assert row.weight_g > 0, row.slug
+
+    def test_every_product_shows_the_thing_it_is(self):
+        """Every image key resolves to a committed photograph.
+
+        The catalogue used to map ten powerbank pictures round-robin
+        over everything, so a USB-C cable's card showed a powerbank.
+        The keys point into ``devtools/demo_assets``; a typo here is a
+        broken image on a product page.
+        """
+        from devtools.demo_media import LOCK_PATH
+
+        assert LOCK_PATH.exists(), "run `manage.py build_demo_assets`"
+        known = set(json.loads(LOCK_PATH.read_text(encoding="utf-8")))
+
+        for row in demo_store.PRODUCTS:
+            assert row.images, row.slug
+            for key in row.images:
+                assert key in known, f"{row.slug}: unknown asset {key!r}"
+
+        for row in demo_store.CATEGORIES:
+            assert row.image in known, (
+                f"{row.slug}: unknown asset {row.image!r}"
+            )
+
+    def test_every_row_is_written_in_both_languages(self):
+        """The store serves Greek AND English.
+
+        A half-translated catalogue is the thing a prospect actually
+        notices: one English page with Greek product names down it.
+        """
+        for row in demo_store.PRODUCTS:
+            assert row.name_el.strip(), row.slug
+            assert row.name_en.strip(), row.slug
+            assert row.blurb_el.strip(), row.slug
+            assert row.blurb_en.strip(), row.slug
+            assert row.name_el != row.name_en, row.slug
+
+        for row in demo_store.CATEGORIES:
+            assert row.name_el.strip(), row.slug
+            assert row.name_en.strip(), row.slug
+            assert row.description_el.strip(), row.slug
+            assert row.description_en.strip(), row.slug
+
+    def test_variant_groups_have_more_than_one_member(self):
+        """A group of one renders a variant selector with one choice."""
+        counts: dict[str, int] = {}
+        for row in demo_store.PRODUCTS:
+            if row.variant_group:
+                counts[row.variant_group] = counts.get(row.variant_group, 0) + 1
+        assert counts, "no variant groups at all"
+        for key, count in counts.items():
+            assert count > 1, f"{key} has a single member"
+
+    def test_every_attribute_axis_has_an_english_name(self):
+        """``ATTRIBUTE_NAMES_EN`` is what the /en specs panel reads."""
+        for row in demo_store.PRODUCTS:
+            for axis in row.attributes:
+                assert axis in demo_store.ATTRIBUTE_NAMES_EN, axis
 
 
 class TestReviews(TestCase):
     def test_every_review_targets_a_seeded_product(self):
-        slugs = {row[0] for row in demo_store.PRODUCTS}
+        slugs = {row.slug for row in demo_store.PRODUCTS}
         for row in demo_store.REVIEWS:
             assert row[0] in slugs, row[0]
 
@@ -252,7 +316,7 @@ class TestFeedback(TestCase):
 
 class TestB2B(TestCase):
     def test_price_list_products_exist(self):
-        slugs = {row[0] for row in demo_store.PRODUCTS}
+        slugs = {row.slug for row in demo_store.PRODUCTS}
         for slug in demo_store.PRICE_LIST_NET:
             assert slug in slugs, slug
 
@@ -261,7 +325,7 @@ class TestB2B(TestCase):
         binding invisible in the cart, which is the one thing the B2B
         pricing path needs to demonstrate.
         """
-        retail = {row[0]: float(row[3]) for row in demo_store.PRODUCTS}
+        retail = {row.slug: float(row.price) for row in demo_store.PRODUCTS}
         for slug, net in demo_store.PRICE_LIST_NET.items():
             assert float(net) < retail[slug], slug
 

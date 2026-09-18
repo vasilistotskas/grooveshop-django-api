@@ -33,6 +33,11 @@ import secrets
 from decimal import Decimal
 from typing import Any
 
+from measurement.measures import Weight
+
+from devtools.demo_catalogue import CATEGORIES, PRODUCTS
+from devtools.demo_media import ensure_asset, ensure_assets, storage_name
+
 logger = logging.getLogger(__name__)
 
 DEMO_MARKER = "demo"
@@ -44,26 +49,13 @@ DEMO_MARKER = "demo"
 PLACEHOLDER_BODY_PREFIX = "<p>Προσθέστε εδώ"
 
 # ── media ────────────────────────────────────────────────────────────
-# The demo tenant's OWN files under ``media/demo/uploads/products/`` on
-# the media volume (``docs``: a fresh tenant has no media — these ten
-# are copied in when the demo schema is created). Seeding a path that
-# has no file gives every demo product a broken image.
-IMAGE_POOL: tuple[str, ...] = (
-    "uploads/products/demo_powerbank_black_1.avif",
-    "uploads/products/demo_powerbank_black_2.avif",
-    "uploads/products/demo_powerbank_black_3.avif",
-    "uploads/products/demo_powerbank_black_4.avif",
-    "uploads/products/demo_powerbank_black_5.avif",
-    "uploads/products/demo_powerbank_white_1.avif",
-    "uploads/products/demo_powerbank_white_2.avif",
-    "uploads/products/demo_powerbank_white_3.avif",
-    "uploads/products/demo_powerbank_white_4.avif",
-    "uploads/products/demo_powerbank_white_5.avif",
-)
-
-
-def _image(index: int) -> str:
-    return IMAGE_POOL[index % len(IMAGE_POOL)]
+# The demo tenant's images come from ``devtools/demo_assets``, which is
+# committed and built by ``manage.py build_demo_assets``. Until
+# 2026-09-18 this was ten powerbank photographs mapped round-robin over
+# the whole catalogue, so a USB-C cable's card showed a powerbank, and
+# the files had to be copied onto the volume by hand. ``ensure_asset``
+# writes them through ``default_storage``, which is tenant-scoped, so a
+# seed in any environment produces its own media.
 
 
 def _platform_contact_email() -> str:
@@ -139,311 +131,37 @@ DEMO_SETTINGS: dict[str, Any] = {
 # trademarks reads as a real listing of someone else's goods.
 BRANDS: tuple[str, ...] = ("Groove", "Voltra", "Kabelo", "Nexis")
 
-# ── category tree ────────────────────────────────────────────────────
-# A NEW root with children and one grandchild. The two prod-cloned
-# roots (Powerbank, cable-management) are deliberately left alone:
-# reparenting live rows to manufacture depth would mutate cloned
-# production data for a cosmetic gain.
-#
-# (slug, name, parent_slug) — ordered parents-first, which is both the
-# MPTT insertion requirement and the intended sibling order.
-#
-# No sort_order here on purpose: ``SortableModel.save()`` assigns it
-# from ``max(siblings) + 1`` on every create and IGNORES whatever the
-# caller set, so carrying a value would only be misleading. Creation
-# order is what decides the final ordering.
-CATEGORIES: tuple[tuple[str, str, str | None], ...] = (
-    ("demo-accessories", "Αξεσουάρ Κινητών", None),
-    ("demo-chargers-cables", "Φορτιστές & Καλώδια", "demo-accessories"),
-    ("demo-usb-c-cables", "Καλώδια USB-C", "demo-chargers-cables"),
-    ("demo-cases", "Θήκες & Προστασία", "demo-accessories"),
-    ("demo-audio", "Ήχος", "demo-accessories"),
-)
-
-CATEGORY_DESCRIPTIONS: dict[str, str] = {
-    "demo-accessories": "<p>Όλα τα αξεσουάρ για το κινητό σου, σε ένα σημείο.</p>",
-    "demo-chargers-cables": "<p>Φορτιστές τοίχου, αυτοκινήτου και καλώδια κάθε τύπου.</p>",
-    "demo-usb-c-cables": "<p>Καλώδια USB-C με αντοχή στο καθημερινό τράβηγμα.</p>",
-    "demo-cases": "<p>Θήκες, τζαμάκια και προστασία οθόνης.</p>",
-    "demo-audio": "<p>Ακουστικά και ηχεία για κάθε χρήση.</p>",
+#: The English name of every attribute axis the catalogue uses. Here
+#: rather than on each row: an axis is named once and used by forty
+#: products.
+ATTRIBUTE_NAMES_EN: dict[str, str] = {
+    "Χρώμα": "Colour",
+    "Μήκος": "Length",
+    "Χωρητικότητα": "Capacity",
+    "Ισχύς": "Power",
+    "Υλικό": "Material",
+    "Σκληρότητα": "Hardness",
+    "Τεμάχια": "Pieces",
+    "Αυτονομία": "Battery life",
+    "Τοποθέτηση": "Mounting",
+    "Ύψος": "Height",
 }
 
-# ── products ─────────────────────────────────────────────────────────
-# (slug, name, category_slug, price, discount_percent, stock, brand)
-#
-# The spread is deliberate, not decorative — each odd value below is
-# the ONLY row on staging that exercises a code path:
-#   * discount_percent > 0  → strike-through pricing, the promotion
-#     engine's exclude_discounted_products branch, and the feeds'
-#     <g:sale_price> element (0 occurrences before this seed).
-#   * stock == 0            → out-of-stock badge, NotifyMe / back-in-
-#     stock alerts, and the feeds' availability branch.
-#   * stock < 10            → LOW_STOCK_THRESHOLD and its alert task.
-PRODUCTS: tuple[tuple[str, str, str, str, str, int, str], ...] = (
-    # Καλώδια USB-C
-    (
-        "demo-cable-usbc-1m-black",
-        "Καλώδιο USB-C 1m Μαύρο",
-        "demo-usb-c-cables",
-        "5.90",
-        "0",
-        240,
-        "Kabelo",
-    ),
-    (
-        "demo-cable-usbc-2m-black",
-        "Καλώδιο USB-C 2m Μαύρο",
-        "demo-usb-c-cables",
-        "7.90",
-        "0",
-        180,
-        "Kabelo",
-    ),
-    (
-        "demo-cable-usbc-1m-white",
-        "Καλώδιο USB-C 1m Λευκό",
-        "demo-usb-c-cables",
-        "5.90",
-        "0",
-        210,
-        "Kabelo",
-    ),
-    (
-        "demo-cable-usbc-braided",
-        "Καλώδιο USB-C Υφασμάτινο 1.5m",
-        "demo-usb-c-cables",
-        "9.90",
-        "15",
-        95,
-        "Kabelo",
-    ),
-    (
-        "demo-cable-usbc-90deg",
-        "Καλώδιο USB-C Γωνιακό για Gaming",
-        "demo-usb-c-cables",
-        "11.90",
-        "0",
-        60,
-        "Nexis",
-    ),
-    (
-        "demo-cable-usbc-short",
-        "Καλώδιο USB-C 20cm για Powerbank",
-        "demo-usb-c-cables",
-        "3.90",
-        "0",
-        320,
-        "Kabelo",
-    ),
-    (
-        "demo-cable-usbc-to-lightning",
-        "Καλώδιο USB-C σε Lightning 1m",
-        "demo-usb-c-cables",
-        "12.90",
-        "0",
-        140,
-        "Voltra",
-    ),
-    (
-        "demo-cable-usbc-4in1",
-        "Καλώδιο Φόρτισης 4 σε 1",
-        "demo-usb-c-cables",
-        "14.90",
-        "0",
-        4,
-        "Nexis",
-    ),
-    # Φορτιστές
-    (
-        "demo-charger-20w",
-        "Φορτιστής Τοίχου 20W USB-C",
-        "demo-chargers-cables",
-        "13.90",
-        "0",
-        150,
-        "Voltra",
-    ),
-    (
-        "demo-charger-45w-gan",
-        "Φορτιστής GaN 45W Διπλής Θύρας",
-        "demo-chargers-cables",
-        "29.90",
-        "10",
-        70,
-        "Voltra",
-    ),
-    (
-        "demo-charger-65w-gan",
-        "Φορτιστής GaN 65W Τριπλής Θύρας",
-        "demo-chargers-cables",
-        "39.90",
-        "0",
-        45,
-        "Voltra",
-    ),
-    (
-        "demo-charger-car-30w",
-        "Φορτιστής Αυτοκινήτου 30W",
-        "demo-chargers-cables",
-        "16.90",
-        "0",
-        110,
-        "Nexis",
-    ),
-    (
-        "demo-charger-wireless-15w",
-        "Ασύρματος Φορτιστής 15W",
-        "demo-chargers-cables",
-        "21.90",
-        "0",
-        0,
-        "Voltra",
-    ),
-    (
-        "demo-charger-magsafe-stand",
-        "Βάση Ασύρματης Φόρτισης Γραφείου",
-        "demo-chargers-cables",
-        "27.90",
-        "0",
-        55,
-        "Groove",
-    ),
-    # Θήκες
-    (
-        "demo-case-clear",
-        "Διάφανη Θήκη Σιλικόνης",
-        "demo-cases",
-        "8.90",
-        "0",
-        260,
-        "Groove",
-    ),
-    (
-        "demo-case-shockproof",
-        "Θήκη Shockproof Ενισχυμένη",
-        "demo-cases",
-        "14.90",
-        "0",
-        130,
-        "Nexis",
-    ),
-    (
-        "demo-case-leather",
-        "Θήκη Δερματίνης με Θήκη Κάρτας",
-        "demo-cases",
-        "19.90",
-        "0",
-        85,
-        "Groove",
-    ),
-    (
-        "demo-case-magsafe",
-        "Θήκη με Μαγνητικό Δακτύλιο",
-        "demo-cases",
-        "17.90",
-        "25",
-        90,
-        "Groove",
-    ),
-    (
-        "demo-screen-glass",
-        "Τζαμάκι Προστασίας 9H",
-        "demo-cases",
-        "6.90",
-        "0",
-        400,
-        "Nexis",
-    ),
-    (
-        "demo-screen-privacy",
-        "Τζαμάκι Privacy Anti-Spy",
-        "demo-cases",
-        "11.90",
-        "0",
-        120,
-        "Nexis",
-    ),
-    (
-        "demo-case-waterproof",
-        "Αδιάβροχη Θήκη Παραλίας",
-        "demo-cases",
-        "9.90",
-        "0",
-        75,
-        "Groove",
-    ),
-    # Ήχος
-    (
-        "demo-earbuds-tws",
-        "Ασύρματα Ακουστικά TWS",
-        "demo-audio",
-        "34.90",
-        "0",
-        65,
-        "Voltra",
-    ),
-    (
-        "demo-earbuds-anc",
-        "Ακουστικά TWS με Ακύρωση Θορύβου",
-        "demo-audio",
-        "49.90",
-        "0",
-        40,
-        "Voltra",
-    ),
-    (
-        "demo-earbuds-sport",
-        "Ακουστικά Sport με Άγκιστρο",
-        "demo-audio",
-        "27.90",
-        "0",
-        80,
-        "Nexis",
-    ),
-    (
-        "demo-headphones-onear",
-        "Ακουστικά On-Ear Bluetooth",
-        "demo-audio",
-        "44.90",
-        "0",
-        35,
-        "Voltra",
-    ),
-    (
-        "demo-earphones-usbc",
-        "Ενσύρματα Ακουστικά USB-C",
-        "demo-audio",
-        "12.90",
-        "0",
-        170,
-        "Kabelo",
-    ),
-    (
-        "demo-speaker-mini",
-        "Mini Ηχείο Bluetooth 5W",
-        "demo-audio",
-        "22.90",
-        "0",
-        95,
-        "Nexis",
-    ),
-    (
-        "demo-speaker-outdoor",
-        "Ηχείο Bluetooth Αδιάβροχο 20W",
-        "demo-audio",
-        "39.90",
-        "0",
-        50,
-        "Voltra",
-    ),
-)
 
 PRODUCT_BLURB = (
-    "<p>{name} — μια απλή, αξιόπιστη επιλογή για καθημερινή χρήση.</p>"
+    "<p>{blurb}</p>"
     "<ul><li>Συμβατό με όλες τις σύγχρονες συσκευές</li>"
     "<li>Ανθεκτικά υλικά</li>"
     "<li>Εγγύηση 2 ετών</li></ul>"
 )
+
+PRODUCT_BLURB_EN = (
+    "<p>{blurb}</p>"
+    "<ul><li>Works with every current device</li>"
+    "<li>Materials that last</li>"
+    "<li>Two-year warranty</li></ul>"
+)
+
 
 # ── tags ─────────────────────────────────────────────────────────────
 # Labels double as the natural key (Tag has no slug field). Order here
@@ -471,22 +189,22 @@ TAG_PRODUCT_RULES: dict[str, tuple[str, ...]] = {
     ),
     "Gaming": ("demo-cable-usbc-90deg",),
     "Ταξίδι": (
-        "demo-cable-usbc-short",
+        "demo-cable-usbc-20cm",
         "demo-charger-car",
         "demo-case-waterproof",
-        "demo-speaker-outdoor",
+        "demo-speaker-party",
     ),
     "Γραφείο": (
-        "demo-charger-magsafe-stand",
-        "demo-charger-65w",
-        "demo-headphones-onear",
+        "demo-wireless-stand",
+        "demo-charger-gan-65w",
+        "demo-speaker-wood",
     ),
     "Προσφορά": (
-        "demo-cable-usbc-braided",
-        "demo-charger-45w-gan",
-        "demo-case-magsafe",
+        "demo-cable-usbc-braided-black",
+        "demo-charger-gan-45w",
+        "demo-case-clear-magnetic",
     ),
-    "Νέο": ("demo-earbuds-anc", "demo-charger-65w-gan", "demo-screen-privacy"),
+    "Νέο": ("demo-earbuds-black", "demo-charger-gan-65w", "demo-glass-privacy"),
 }
 
 # ── reviews ──────────────────────────────────────────────────────────
@@ -526,43 +244,43 @@ REVIEWS: tuple[tuple[str, int, int, str], ...] = (
         "Το δίμετρο είναι ό,τι έψαχνα για τον καναπέ.",
     ),
     (
-        "demo-cable-usbc-braided",
+        "demo-cable-usbc-braided-black",
         0,
         9,
         "Η υφασμάτινη επένδυση κρατάει πολύ καλύτερα από τα απλά.",
     ),
     (
-        "demo-cable-usbc-braided",
+        "demo-cable-usbc-braided-black",
         3,
         7,
         "Καλό, αλλά είναι λίγο άκαμπτο στην αρχή.",
     ),
     (
-        "demo-cable-usbc-4in1",
+        "demo-cable-usbc-lightning",
         4,
         6,
         "Πρακτικό στο ταξίδι, αλλά φορτίζει πιο αργά όταν το χρησιμοποιείς σε δύο συσκευές.",
     ),
     (
-        "demo-charger-20w",
+        "demo-charger-20w-white",
         1,
         9,
         "Μικρό, ζεσταίνεται ελάχιστα, κάνει τη δουλειά του.",
     ),
     (
-        "demo-charger-45w-gan",
+        "demo-charger-gan-45w",
         2,
         10,
         "Εξαιρετικό. Φορτίζει laptop και κινητό ταυτόχρονα.",
     ),
     (
-        "demo-charger-45w-gan",
+        "demo-charger-gan-45w",
         5,
         9,
         "Πολύ μικρότερο από ό,τι περίμενα, σε καλό.",
     ),
     (
-        "demo-charger-65w-gan",
+        "demo-charger-gan-65w",
         0,
         10,
         "Αντικατέστησε τρεις φορτιστές στο γραφείο μου.",
@@ -574,7 +292,7 @@ REVIEWS: tuple[tuple[str, int, int, str], ...] = (
         "Σταθερή φόρτιση στο αυτοκίνητο, καλή εφαρμογή στην υποδοχή.",
     ),
     (
-        "demo-charger-wireless-15w",
+        "demo-wireless-pad-white",
         4,
         7,
         "Καλό, αλλά θέλει να κεντράρεις σωστά το κινητό.",
@@ -585,43 +303,43 @@ REVIEWS: tuple[tuple[str, int, int, str], ...] = (
         8,
         "Διάφανη και λεπτή. Μετά από μήνες κιτρινίζει λίγο.",
     ),
-    ("demo-case-shockproof", 2, 10, "Μου έπεσε δύο φορές, μηδέν ζημιά."),
-    ("demo-case-leather", 5, 9, "Ωραία αίσθηση, χωράει άνετα δύο κάρτες."),
+    ("demo-case-rugged", 2, 10, "Μου έπεσε δύο φορές, μηδέν ζημιά."),
+    ("demo-case-rugged", 5, 9, "Ωραία αίσθηση, χωράει άνετα δύο κάρτες."),
     (
-        "demo-case-magsafe",
+        "demo-case-clear-magnetic",
         0,
         9,
         "Ο μαγνήτης κρατάει γερά στη βάση του αυτοκινήτου.",
     ),
-    ("demo-screen-glass", 3, 8, "Μπήκε εύκολα χωρίς φυσαλίδες. Καλή τιμή."),
+    ("demo-glass-2pack", 3, 8, "Μπήκε εύκολα χωρίς φυσαλίδες. Καλή τιμή."),
     (
-        "demo-screen-privacy",
+        "demo-glass-privacy",
         4,
         6,
         "Κάνει τη δουλειά του αλλά σκουραίνει αισθητά την οθόνη.",
     ),
     (
-        "demo-earbuds-tws",
+        "demo-earbuds-white",
         1,
         8,
         "Καλός ήχος για την κατηγορία, κρατάει όλη μέρα.",
     ),
     (
-        "demo-earbuds-anc",
+        "demo-earbuds-black",
         2,
         10,
         "Η ακύρωση θορύβου είναι εντυπωσιακή για τα λεφτά της.",
     ),
     ("demo-earbuds-sport", 5, 9, "Δεν πέφτουν στο τρέξιμο, αυτό ήθελα."),
-    ("demo-headphones-onear", 0, 9, "Άνετα για πολλές ώρες, καλή μπαταρία."),
+    ("demo-speaker-wood", 0, 9, "Άνετα για πολλές ώρες, καλή μπαταρία."),
     (
-        "demo-earphones-usbc",
+        "demo-earbuds-sport",
         3,
         7,
         "Απλά και λειτουργικά. Καλή λύση χωρίς μπαταρία.",
     ),
-    ("demo-speaker-mini", 4, 8, "Μικρό και δυνατό για το μέγεθός του."),
-    ("demo-speaker-outdoor", 1, 9, "Το πήγα στην παραλία, άντεξε άνετα."),
+    ("demo-speaker-mini-grey", 4, 8, "Μικρό και δυνατό για το μέγεθός του."),
+    ("demo-speaker-party", 1, 9, "Το πήγα στην παραλία, άντεξε άνετα."),
 )
 
 # ── feedback ─────────────────────────────────────────────────────────
@@ -720,15 +438,15 @@ PRICE_LIST_NET: dict[str, str] = {
     "demo-cable-usbc-1m-black": "3.20",
     "demo-cable-usbc-2m-black": "4.40",
     "demo-cable-usbc-1m-white": "3.20",
-    "demo-cable-usbc-braided": "5.50",
-    "demo-cable-usbc-short": "2.10",
-    "demo-charger-20w": "8.10",
-    "demo-charger-45w-gan": "18.90",
-    "demo-charger-65w-gan": "25.40",
+    "demo-cable-usbc-braided-black": "5.50",
+    "demo-cable-usbc-20cm": "2.10",
+    "demo-charger-20w-white": "8.10",
+    "demo-charger-gan-45w": "18.90",
+    "demo-charger-gan-65w": "25.40",
     "demo-case-clear": "4.60",
-    "demo-screen-glass": "3.10",
-    "demo-earbuds-tws": "21.00",
-    "demo-speaker-mini": "13.50",
+    "demo-glass-2pack": "3.10",
+    "demo-earbuds-white": "21.00",
+    "demo-speaker-mini-grey": "13.50",
 }
 
 
@@ -1320,74 +1038,144 @@ def seed_brands() -> dict[str, int]:
 
 
 def seed_categories() -> dict[str, int]:
-    """Create the demo category tree (root, child, grandchild).
+    """Create the demo category tree, in both languages.
 
-    A NEW root, deliberately: the two prod-cloned roots stay flat
-    rather than being reparented, because mutating cloned production
-    rows to manufacture tree depth is not worth the cosmetic gain.
+    A NEW root, deliberately: the prod-cloned roots stay flat rather
+    than being reparented, because mutating cloned production rows to
+    manufacture tree depth is not worth the cosmetic gain.
+
+    An existing demo row is UPDATED rather than skipped. The names and
+    the copy are what a re-run is for, and a seed that skipped what it
+    found could never fix a translation.
     """
     from product.models import ProductCategory
 
     report: dict[str, int] = {}
     by_slug: dict[str, ProductCategory] = {}
-    # CATEGORIES is ordered parents-first so MPTT never sees an
-    # unsaved parent.
-    for slug, name, parent_slug in CATEGORIES:
-        existing = ProductCategory.objects.filter(slug=slug).first()
-        if existing is not None:
-            by_slug[slug] = existing
-            _bump(report, "unchanged")
-            continue
-        category = ProductCategory(
-            slug=slug,
-            active=True,
-            parent=by_slug.get(parent_slug) if parent_slug else None,
-            seo_title=name[:70],
-            seo_description=f"{name} - GrooveShop Demo.",
+    # CATEGORIES is ordered parents-first so MPTT never sees an unsaved
+    # parent.
+    for row in CATEGORIES:
+        category = ProductCategory.objects.filter(slug=row.slug).first()
+        created = category is None
+        if created:
+            category = ProductCategory(slug=row.slug)
+
+        category.active = True
+        category.parent = by_slug.get(row.parent) if row.parent else None
+        category.seo_title = row.name_el[:70]
+        category.seo_description = row.description_el[:300]
+        _translate(
+            category,
+            "el",
+            name=row.name_el,
+            description=f"<p>{row.description_el}</p>",
         )
         _translate(
             category,
-            name=name,
-            description=CATEGORY_DESCRIPTIONS.get(slug, ""),
+            "en",
+            name=row.name_en,
+            description=f"<p>{row.description_en}</p>",
         )
         category.save()
-        by_slug[slug] = category
-        _bump(report, "created")
+        by_slug[row.slug] = category
+        _bump(report, "created" if created else "updated")
     return report
 
 
 def seed_category_images() -> dict[str, int]:
-    """Give every category a MAIN image.
+    """Give every demo category its own MAIN image.
 
-    ``Product/Categories/Slider.vue`` renders ``item.mainImagePath``
-    through ``ImgWithFallback``, so a category without one shows the
-    fallback placeholder. Paths are reused from existing rows (see
-    ``IMAGE_POOL``) so the files are known to be on the media PVC.
+    The categories band and the category cards render
+    ``mainImagePath`` through ``ImgWithFallback``, so a category with
+    no image shows the placeholder.
     """
     from product.enum.category import CategoryImageTypeEnum
     from product.models import ProductCategory, ProductCategoryImage
 
     report: dict[str, int] = {}
-    for index, category in enumerate(
-        ProductCategory.objects.all().order_by("id")
-    ):
-        _, created = ProductCategoryImage.objects.get_or_create(
+    for row in CATEGORIES:
+        category = ProductCategory.objects.filter(slug=row.slug).first()
+        if category is None:
+            continue
+        name = ensure_asset(row.image)
+        image, created = ProductCategoryImage.objects.get_or_create(
             category=category,
             image_type=CategoryImageTypeEnum.MAIN,
-            defaults={"image": _image(index), "active": True},
+            defaults={"image": name, "active": True},
         )
-        _bump(report, "created" if created else "unchanged")
+        if created:
+            _bump(report, "created")
+        elif image.image != name:
+            image.image = name
+            image.active = True
+            image.save(update_fields=["image", "active", "updated_at"])
+            _bump(report, "updated")
+        else:
+            _bump(report, "unchanged")
     return report
 
 
+def _attribute_value(
+    attribute_name_el: str,
+    attribute_name_en: str,
+    value_el: str,
+    value_en: str,
+):
+    """The AttributeValue for one (attribute, value) pair, both languages.
+
+    Matched on the GREEK label, which is the store's authoring
+    language. Parler has no unique constraint across translations, so
+    looking a row up in "whatever language happens to be active" would
+    create a second Colour attribute the first time the seed ran with
+    English active.
+    """
+    from product.models import Attribute, AttributeValue
+
+    attribute = None
+    for candidate in Attribute.objects.all():
+        name = candidate.safe_translation_getter("name", language_code="el")
+        if name == attribute_name_el:
+            attribute = candidate
+            break
+    if attribute is None:
+        attribute = Attribute(
+            active=True,
+            # Colour, Length, Capacity and Power are what a shopper
+            # chooses BETWEEN; every other axis describes one product.
+            is_variant=attribute_name_el
+            in ("Χρώμα", "Μήκος", "Χωρητικότητα", "Ισχύς"),
+        )
+        _translate(attribute, "el", name=attribute_name_el)
+        _translate(attribute, "en", name=attribute_name_en)
+        attribute.save()
+
+    for candidate in attribute.values.all():
+        current = candidate.safe_translation_getter("value", language_code="el")
+        if current == value_el:
+            return candidate
+
+    value = AttributeValue(attribute=attribute, active=True)
+    _translate(value, "el", value=value_el)
+    _translate(value, "en", value=value_en)
+    value.save()
+    return value
+
+
 def seed_products() -> dict[str, int]:
-    """Create the demo catalogue.
+    """Create the demo catalogue: rows, copy, photographs, attributes.
 
     Slugs and SKUs are explicit rather than generated, so a re-run
     matches the existing rows instead of appending a second copy with a
     numeric suffix.
     """
-    from product.models import Brand, Product, ProductCategory, ProductImage
+    from product.models import (
+        Brand,
+        Product,
+        ProductAttribute,
+        ProductCategory,
+        ProductImage,
+        ProductVariantGroup,
+    )
     from vat.models import Vat
 
     report: dict[str, int] = {}
@@ -1399,44 +1187,97 @@ def seed_products() -> dict[str, int]:
     brands = {b.name: b for b in Brand.objects.all()}
     prefix = f"{DEMO_MARKER}-"
 
+    groups: dict[str, ProductVariantGroup] = {}
+
+    def group_for(key: str) -> ProductVariantGroup:
+        if key not in groups:
+            group = ProductVariantGroup(active=True)
+            _translate(group, "el", name=key)
+            group.save()
+            groups[key] = group
+        return groups[key]
+
+    # Written once per seed rather than once per product: several rows
+    # share a photograph on purpose — a 1m and a 2m black cable ARE the
+    # same object — and copying it four times would be four writes of
+    # one file.
+    ensure_assets(key for row in PRODUCTS for key in row.images)
+
     for index, row in enumerate(PRODUCTS):
-        slug, name, category_slug, price, discount, stock, brand_name = row
-        if Product.objects.filter(slug=slug).exists():
-            _bump(report, "unchanged")
-            continue
-        sku = f"{DEMO_MARKER.upper()}-{slug[len(prefix) :]}"
-        product = Product(
-            slug=slug,
-            sku=sku[:100],
-            category=categories.get(category_slug),
-            brand=brands.get(brand_name),
-            price=Decimal(price),
-            discount_percent=Decimal(discount),
-            stock=stock,
-            active=True,
-            vat=vat,
-            # Exercises the price-drop alert opt-in on a subset rather
-            # than everywhere, so both branches have rows.
-            price_drop_alerts_enabled=index % 4 == 0,
-            seo_title=name[:70],
-            seo_description=f"{name} - αποστολή σε 1-3 εργάσιμες.",
+        product = Product.objects.filter(slug=row.slug).first()
+        created = product is None
+        if created:
+            product = Product(slug=row.slug)
+
+        product.sku = f"{DEMO_MARKER.upper()}-{row.slug[len(prefix) :]}"[:100]
+        product.category = categories.get(row.category)
+        product.brand = brands.get(row.brand)
+        product.price = Decimal(row.price)
+        product.discount_percent = Decimal(row.discount)
+        product.stock = row.stock
+        product.active = True
+        product.vat = vat
+        # A `Weight`, not a dict: the field is a MeasurementField and
+        # hands the raw value to a FloatField. Never zero, either — a
+        # zero weight is FALSY on the storefront and 422s the whole
+        # checkout payload rather than the one field.
+        product.weight = Weight(g=row.weight_g)
+        # Exercises the price-drop alert opt-in on a subset rather than
+        # everywhere, so both branches have rows.
+        product.price_drop_alerts_enabled = index % 4 == 0
+        product.seo_title = row.name_el[:70]
+        product.seo_description = row.blurb_el[:300]
+        if row.variant_group:
+            product.variant_group = group_for(row.variant_group)
+
+        _translate(
+            product,
+            "el",
+            name=row.name_el,
+            description=PRODUCT_BLURB.format(blurb=row.blurb_el),
         )
         _translate(
             product,
-            name=name,
-            description=PRODUCT_BLURB.format(name=name),
+            "en",
+            name=row.name_en,
+            description=PRODUCT_BLURB_EN.format(blurb=row.blurb_en),
         )
         product.save()
 
-        # Three images each: one main plus two gallery shots, so the
-        # PDP gallery has something to show.
-        for offset in range(3):
-            ProductImage.objects.create(
-                product=product,
-                image=_image(index * 3 + offset),
-                is_main=offset == 0,
+        # The photographs this product actually is. The first is main.
+        wanted = [storage_name(key) for key in row.images]
+        current = [image.image.name for image in product.images.order_by("id")]
+        if current != wanted:
+            product.images.all().delete()
+            for position, name in enumerate(wanted):
+                ProductImage.objects.create(
+                    product=product, image=name, is_main=position == 0
+                )
+
+        for attribute_el, (value_el, value_en) in row.attributes.items():
+            attribute_en = ATTRIBUTE_NAMES_EN.get(attribute_el, attribute_el)
+            value = _attribute_value(
+                attribute_el, attribute_en, value_el, value_en
             )
-        _bump(report, "created")
+            ProductAttribute.objects.get_or_create(
+                product=product, attribute_value=value
+            )
+
+        _bump(report, "created" if created else "updated")
+
+    # A ``demo-`` product the catalogue no longer lists is DEACTIVATED,
+    # not deleted: order lines and reviews point at it, and a demo store
+    # that loses its order history is a worse demo. Deactivating takes
+    # it off the storefront, which is the whole ask — the previous
+    # catalogue's rows stayed live beside the new one, still carrying
+    # the powerbank photograph that started all this.
+    stale = Product.objects.filter(
+        slug__startswith=prefix, active=True
+    ).exclude(slug__in=[row.slug for row in PRODUCTS])
+    retired = stale.update(active=False)
+    if retired:
+        _bump(report, "retired", retired)
+
     return report
 
 

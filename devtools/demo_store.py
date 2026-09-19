@@ -1079,6 +1079,19 @@ def seed_categories() -> dict[str, int]:
         category.save()
         by_slug[row.slug] = category
         _bump(report, "created" if created else "updated")
+
+    # A ``demo-`` category the tree no longer lists is DEACTIVATED, for
+    # the same reason its products are: rows point at it. Without this
+    # the previous tree's categories stayed live beside the new one, so
+    # the storefront's categories band offered "Chargers & Cables" next
+    # to the "Charging" that replaced it, each with its own image.
+    stale = ProductCategory.objects.filter(
+        slug__startswith=f"{DEMO_MARKER}-", active=True
+    ).exclude(slug__in=[row.slug for row in CATEGORIES])
+    retired = stale.update(active=False)
+    if retired:
+        _bump(report, "retired", retired)
+
     return report
 
 

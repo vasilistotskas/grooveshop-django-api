@@ -844,6 +844,67 @@ NAV_FOOTER: list[dict[str, Any]] = [
     },
 ]
 
+
+# English menus.
+#
+# ``build_navigation_menu`` takes a WHOLE-MENU copy per locale and reads
+# only the labels out of it — a translation cannot retarget a link — but
+# `validate_navigation_i18n` still runs each copy through the full link
+# validator, so every entry needs its `to` and the shape has to match
+# position for position. Deriving the copy from the Greek menu is what
+# makes that impossible to get wrong: nothing can drift but a word.
+#
+# Without these, every `/en` page rendered a Greek header and a Greek
+# four-column footer. The menus are relational rows, not `t()` strings,
+# so nothing on the storefront side could translate them.
+NAV_LABELS_EN: dict[str, str] = {
+    "Αρχική": "Home",
+    "Κατάστημα": "Shop",
+    "Προσφορές": "Offers",
+    "Blog": "Blog",
+    "Δωροκάρτες": "Gift cards",
+    "Επιβράβευση": "Rewards",
+    "Επικοινωνία": "Contact",
+    "Όλα τα προϊόντα": "All products",
+    "Αξεσουάρ Κινητών": "Phone accessories",
+    "Πρόγραμμα Επιβράβευσης": "Rewards programme",
+    
+    "Εξυπηρέτηση": "Support",
+    "Συχνές Ερωτήσεις": "FAQ",
+    "Πληροφορίες Αποστολής": "Shipping information",
+    "Αξιολόγησε μας": "Leave feedback",
+    "Η εταιρεία": "The company",
+    "Σχετικά με εμάς": "About us",
+    "Όροι & Προϋποθέσεις": "Terms & conditions",
+    "Όροι Χρήσης": "Terms of use",
+    "Πολιτική Απορρήτου": "Privacy policy",
+    "Πολιτική Cookies": "Cookie policy",
+    "Πολιτική Επιστροφών": "Return policy",
+}
+
+
+def english_menu(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The same menu with English labels, shape for shape.
+
+    A label with no entry in ``NAV_LABELS_EN`` raises rather than
+    passing the Greek through: a menu that is English except for one
+    stray word reads as a bug, and silence would hide it until somebody
+    browsed ``/en``. ``test_demo_store`` covers every label, so this
+    cannot first raise during a seed run.
+    """
+    translated: list[dict[str, Any]] = []
+    for item in items:
+        label = item["label"]
+        if label not in NAV_LABELS_EN:
+            raise KeyError(f"No English label for navigation entry {label!r}")
+        copy = dict(item)
+        copy["label"] = NAV_LABELS_EN[label]
+        if "children" in copy:
+            copy["children"] = english_menu(item["children"])
+        translated.append(copy)
+    return translated
+
+
 # ── content pages ────────────────────────────────────────────────────
 # ONLY these two get published. The other five default slugs
 # (about, privacy, terms, cookies, return-policy) duplicate hardcoded
@@ -877,6 +938,29 @@ CONTENT_PAGES: dict[str, dict[str, str]] = {
             "<p><strong>Έχετε τιμές χονδρικής;</strong><br>"
             "Ναι, μέσα από το πρόγραμμα χονδρικής. Κάνε αίτηση από τον λογαριασμό σου.</p>"
         ),
+        "title_en": "Frequently Asked Questions",
+        "body_en": (
+            "<h2>Orders</h2>"
+            "<p><strong>How quickly does my order leave?</strong><br>"
+            "Anything placed before 14:00 on a working day ships the same day.</p>"
+            "<p><strong>Can I change my order?</strong><br>"
+            "While it still reads &laquo;Processing&raquo;, email us and we will amend it.</p>"
+            "<h2>Shipping</h2>"
+            "<p><strong>What does it cost?</strong><br>"
+            "&euro;2.99 with ACS (to your door or to a Smartpoint) and &euro;1.99 to a "
+            "BoxNow locker. Free on orders over &euro;50.</p>"
+            "<p><strong>Can I pay cash on delivery?</strong><br>"
+            "Yes, for an extra &euro;1.99. Free over &euro;50.</p>"
+            "<h2>Returns</h2>"
+            "<p><strong>How long do I have?</strong><br>"
+            "14 days from delivery, in the original packaging. See the "
+            '<a href="/return-policy">return policy</a>.</p>'
+            "<h2>Invoicing</h2>"
+            "<p><strong>Do you issue invoices?</strong><br>"
+            "Yes. Enter your VAT number and company details at checkout.</p>"
+            "<p><strong>Do you have wholesale prices?</strong><br>"
+            "Yes, through the wholesale programme. Apply from your account.</p>"
+        ),
     },
     "shipping-info": {
         "title": "Πληροφορίες Αποστολής",
@@ -900,6 +984,26 @@ CONTENT_PAGES: dict[str, dict[str, str]] = {
             "<h2>Αντικαταβολή</h2>"
             "<p>Διαθέσιμη με ACS, με επιπλέον χρέωση 1,99€ (δωρεάν πάνω από 50€). "
             "Δεν συνδυάζεται με παραλαβή από BoxNow locker.</p>"
+        ),
+        "title_en": "Shipping Information",
+        "body_en": (
+            "<h2>Shipping methods</h2>"
+            "<ul>"
+            "<li><strong>ACS to your door</strong> &mdash; &euro;2.99, delivered in 1-3 working days.</li>"
+            "<li><strong>ACS Smartpoint</strong> &mdash; &euro;2.99, collect from a point you choose.</li>"
+            "<li><strong>BoxNow locker</strong> &mdash; &euro;1.99, collect 24/7.</li>"
+            "</ul>"
+            "<p>Free shipping on orders over &euro;50, by any method.</p>"
+            "<h2>Delivery times</h2>"
+            "<p>Thessaloniki and Athens: 1 working day. The rest of mainland Greece: "
+            "1-2 working days. Islands and remote areas: 2-4 working days.</p>"
+            "<h2>Tracking</h2>"
+            "<p>As soon as your order leaves you get an email with the tracking code. "
+            "You can also find it in "
+            '<a href="/account/orders">your orders</a>.</p>'
+            "<h2>Cash on delivery</h2>"
+            "<p>Available with ACS, for an extra &euro;1.99 (free over &euro;50). "
+            "Not available with BoxNow locker collection.</p>"
         ),
     },
 }
@@ -1788,15 +1892,27 @@ def seed_blog() -> dict[str, int]:
 
 
 def seed_navigation() -> dict[str, int]:
-    """Create the three NavigationMenu slots.
+    """Create the three NavigationMenu slots, in both locales.
 
-    ``get_or_create``, never ``update_or_create``: a NavigationMenu row
-    IS the operator's content, and a re-run must not overwrite a menu
-    somebody edited in the admin.
+    ``get_or_create`` on an ordinary store: a NavigationMenu row IS the
+    operator's content, and a re-run must not overwrite a menu somebody
+    arranged in the admin.
+
+    A DEMO store is rebuilt instead, the same argument ``seed_layouts``
+    makes for the demo's page stacks: there is no operator behind these
+    menus, the seed IS the content, and without a rebuild a menu
+    created by an earlier run can never gain anything the seed later
+    adds. That is not hypothetical — it is how the demo store served a
+    Greek header and a Greek four-column footer on every `/en` page
+    after English was opened. The menus are relational rows, not `t()`
+    strings, so nothing on the storefront side could translate them.
     """
     from page_config.defaults import build_navigation_menu
     from page_config.models import NavigationMenu, NavigationSlot
-    from page_config.schemas import validate_navigation_items
+    from page_config.schemas import (
+        validate_navigation_i18n,
+        validate_navigation_items,
+    )
 
     report: dict[str, int] = {}
     payloads = {
@@ -1804,15 +1920,29 @@ def seed_navigation() -> dict[str, int]:
         NavigationSlot.MOBILE: NAV_MOBILE,
         NavigationSlot.FOOTER: NAV_FOOTER,
     }
+    rebuild = _current_tenant_is_demo()
+
     for slot, items in payloads.items():
+        overrides = {"en": english_menu(items)}
         validate_navigation_items(slot, items)
+        validate_navigation_i18n(slot, overrides)
+
         menu, created = NavigationMenu.objects.get_or_create(slot=slot)
-        if created:
-            # Rows, not the JSON this used to store: the menu is built
-            # from columns and links now, so a seeded blob would leave
-            # the demo store with a footer that renders nothing.
-            build_navigation_menu(menu, items)
-        _bump(report, "created" if created else "unchanged")
+        if not created and not rebuild:
+            _bump(report, "unchanged")
+            continue
+        if not created:
+            # Links hang off columns, so the columns go first and the
+            # links with them; leaving them would double every entry.
+            menu.columns.all().delete()
+            menu.links.all().delete()
+            _bump(report, "rebuilt")
+        else:
+            _bump(report, "created")
+        # Rows, not the JSON this used to store: the menu is built
+        # from columns and links now, so a seeded blob would leave
+        # the demo store with a footer that renders nothing.
+        build_navigation_menu(menu, items, overrides)
     return report
 
 
@@ -1828,7 +1958,17 @@ def publish_content_pages() -> dict[str, int]:
     The seeded placeholder body is REPLACED only while it is still the
     placeholder: a merchant who has written real content keeps it, and
     a re-run after that is a no-op.
+
+    The English copy is written where English is absent or empty, the
+    same rule ``demo_legal`` applies. It is not decoration: a navigation
+    link that points at a content page takes its label from the PAGE's
+    translated title rather than from the menu (``build_navigation_menu``
+    — storing a copy in the menu would freeze it at seed time), so
+    without an English title these two pages put "Συχνές Ερωτήσεις" and
+    "Πληροφορίες Αποστολής" in the middle of an otherwise English
+    footer.
     """
+    from django.conf import settings
     from django.utils import timezone
 
     from page_config.models import ContentPage
@@ -1840,6 +1980,17 @@ def publish_content_pages() -> dict[str, int]:
             logger.warning("Content page %s is missing from this schema", slug)
             _bump(report, "missing")
             continue
+
+        english = page.translations.filter(language_code="en").first()
+        if english is None or not (english.body or "").strip():
+            page.set_current_language("en")
+            page.title = content["title_en"]
+            page.body = content["body_en"]
+            page.save()
+            _bump(report, "english_written")
+            page.set_current_language(settings.PARLER_DEFAULT_LANGUAGE_CODE)
+        else:
+            _bump(report, "english_kept")
 
         translation = page.translations.filter(language_code="el").first()
         if translation is not None:

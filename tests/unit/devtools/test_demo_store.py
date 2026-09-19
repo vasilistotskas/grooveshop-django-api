@@ -772,3 +772,85 @@ class TestCachePurge(TestCase):
         self.assertEqual(result, {"skipped_no_tenant_row": 1})
         tenant_ctx.assert_not_called()
         purge_all.assert_not_called()
+
+
+class TestEnglishNavigation(TestCase):
+    """Every menu label and every seeded page needs an English twin.
+
+    The menus are relational rows and a content-page link takes its
+    label from the PAGE's translated title, so nothing on the storefront
+    can translate either. Until 2026-09-19 the demo store served a Greek
+    header and a Greek four-column footer on every `/en` page.
+    """
+
+    MENUS = (
+        (NavigationSlot.HEADER, demo_store.NAV_HEADER),
+        (NavigationSlot.MOBILE, demo_store.NAV_MOBILE),
+        (NavigationSlot.FOOTER, demo_store.NAV_FOOTER),
+    )
+
+    def test_every_label_has_an_english_translation(self):
+        """`english_menu` raises on a miss, so this is where it surfaces."""
+        for slot, items in self.MENUS:
+            with self.subTest(slot=slot):
+                demo_store.english_menu(items)
+
+    def test_the_english_copy_keeps_the_shape(self):
+        """`build_navigation_menu` matches by POSITION.
+
+        A copy of a different shape is ignored rather than
+        mis-assigned, so a drift here is a silently untranslated menu
+        rather than a crash.
+        """
+
+        def shape(items):
+            return [
+                (sorted(set(item) - {"label"}), shape(item.get("children", [])))
+                for item in items
+            ]
+
+        for slot, items in self.MENUS:
+            with self.subTest(slot=slot):
+                self.assertEqual(
+                    shape(demo_store.english_menu(items)), shape(items)
+                )
+
+    def test_the_english_copy_passes_the_locale_validator(self):
+        """It goes through the full link validator, not a label check.
+
+        So an override needs its `to` on every entry — a labels-only
+        copy is rejected.
+        """
+        from page_config.schemas import validate_navigation_i18n
+
+        for slot, items in self.MENUS:
+            with self.subTest(slot=slot):
+                validate_navigation_i18n(
+                    slot, {"en": demo_store.english_menu(items)}
+                )
+
+    def test_no_label_is_left_in_greek(self):
+        greek = []
+
+        def walk(items, path="en"):
+            for item in items:
+                if any("\u0370" <= ch <= "\u03ff" for ch in item["label"]):
+                    greek.append(f"{path}: {item['label']}")
+                walk(item.get("children", []), path)
+
+        for _slot, items in self.MENUS:
+            walk(demo_store.english_menu(items))
+        self.assertEqual(greek, [])
+
+    def test_every_seeded_content_page_carries_english(self):
+        """A nav link to one of these renders the PAGE's title."""
+        for slug, content in demo_store.CONTENT_PAGES.items():
+            with self.subTest(slug=slug):
+                self.assertTrue(content.get("title_en"))
+                self.assertTrue(content.get("body_en"))
+                self.assertFalse(
+                    any(
+                        "\u0370" <= ch <= "\u03ff" for ch in content["title_en"]
+                    ),
+                    "the English title still has Greek in it",
+                )

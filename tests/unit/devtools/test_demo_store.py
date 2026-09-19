@@ -340,14 +340,34 @@ class TestB2B(TestCase):
 
 
 class TestContentPages(TestCase):
-    def test_only_publishes_slugs_without_a_hardcoded_route(self):
-        """The storefront ships real static pages for about, privacy,
-        terms, cookies and return-policy. Publishing the ContentPage
-        rows for those puts two indexable copies of the same page on
-        the site, and the footer's LEGAL_PAGE_SLUGS dedup covers four
-        of them but NOT ``about``.
+    def test_publishes_exactly_the_slugs_a_showcase_has_to_carry(self):
+        """Three, and each for its own reason.
+
+        ``faq`` and ``shipping-info`` have no hardcoded equivalent.
+        ``return-policy`` does — `/return-policy` IS this row — but
+        provisioning seeds it unpublished, as a prompt only a merchant
+        can answer, so on a store with no merchant the route answered
+        404 while the footer and the FAQ both linked to it (verified on
+        demo-staging AND staging.webside.gr, 2026-09-19).
+
+        ``about`` stays out: `/about` is a PageLayout page with its own
+        content, and the footer's LEGAL_PAGE_SLUGS dedup does not cover
+        that slug, so publishing this row would put two indexable
+        copies of it on the site. ``terms``/``privacy``/``cookies`` stay
+        out because provisioning already publishes them with the
+        platform's own text.
         """
-        assert set(demo_store.CONTENT_PAGES) == {"faq", "shipping-info"}
+        assert set(demo_store.CONTENT_PAGES) == {
+            "faq",
+            "shipping-info",
+            "return-policy",
+        }
+
+    def test_the_returns_page_is_linked_from_both_faq_bodies(self):
+        """A 404 behind a link in the FAQ is how this was found."""
+        faq = demo_store.CONTENT_PAGES["faq"]
+        for key in ("body", "body_en"):
+            assert "/return-policy" in faq[key]
 
     def test_bodies_replace_the_placeholder(self):
         for slug, content in demo_store.CONTENT_PAGES.items():

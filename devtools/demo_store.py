@@ -905,12 +905,74 @@ def english_menu(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 # ── content pages ────────────────────────────────────────────────────
-# ONLY these two get published. The other five default slugs
-# (about, privacy, terms, cookies, return-policy) duplicate hardcoded
-# Nuxt routes that already carry real content, so publishing them puts
-# two indexable copies of the same policy on the site. The footer's
-# LEGAL_PAGE_SLUGS dedup covers four of them but NOT ``about``.
+# ``about`` stays unpublished: `/about` is a PageLayout page that
+# already carries real content, so publishing the ContentPage of the
+# same name puts two indexable copies of it on the site, and the
+# footer's LEGAL_PAGE_SLUGS dedup does not cover that slug.
+#
+# ``terms``, ``privacy`` and ``cookies`` are published at provisioning
+# with the platform's own text, so they are not listed here; their
+# English bodies come from ``demo_legal``.
+#
+# ``return-policy`` IS listed, and that is a correction rather than an
+# addition: provisioning seeds it as an unpublished prompt for the
+# merchant, and on a store with no merchant that left `/return-policy`
+# answering 404 with the footer and the FAQ both linking to it.
 CONTENT_PAGES: dict[str, dict[str, str]] = {
+    # Provisioning seeds this one as an unpublished PROMPT ("add your
+    # returns policy here"), because only a merchant can write it. On a
+    # showcase that left a hole nobody would accept in a real shop: the
+    # `/return-policy` route 404'd, the footer column that promises four
+    # links rendered three (a navigation target that resolves to
+    # nothing is dropped), and the FAQ's own link to it was broken — in
+    # both locales. A demo store has no merchant, so the seed writes it.
+    "return-policy": {
+        "title": "Πολιτική Επιστροφών",
+        "seo_title": "Πολιτική Επιστροφών",
+        "seo_description": "Δικαίωμα υπαναχώρησης 14 ημερών, διαδικασία επιστροφής και επιστροφή χρημάτων.",
+        "body": (
+            "<h2>Δικαίωμα υπαναχώρησης</h2>"
+            "<p>Έχεις 14 ημερολογιακές ημέρες από την παραλαβή για να "
+            "επιστρέψεις ένα προϊόν χωρίς να μας πεις τον λόγο. Η προθεσμία "
+            "μετριέται από την ημέρα που το παρέλαβες εσύ ή κάποιος που "
+            "όρισες.</p>"
+            "<h2>Σε τι κατάσταση</h2>"
+            "<p>Στην αρχική του συσκευασία, με όλα τα παρελκόμενα και χωρίς "
+            "φθορές από χρήση πέρα από όση χρειάστηκε για να το δοκιμάσεις.</p>"
+            "<h2>Πώς γίνεται</h2>"
+            '<p>Στείλε μας μήνυμα από τη <a href="/contact">σελίδα '
+            "επικοινωνίας</a> με τον αριθμό της παραγγελίας. Σου στέλνουμε "
+            "voucher επιστροφής και οδηγίες — δεν χρειάζεται να πληρώσεις "
+            "εσύ τα μεταφορικά της επιστροφής.</p>"
+            "<h2>Επιστροφή χρημάτων</h2>"
+            "<p>Μόλις παραλάβουμε και ελέγξουμε το προϊόν, σου επιστρέφουμε "
+            "το ποσό με τον ίδιο τρόπο πληρωμής, το αργότερο σε 14 ημέρες.</p>"
+            "<h2>Ελαττωματικό προϊόν</h2>"
+            "<p>Η νόμιμη εγγύηση συμμόρφωσης ισχύει για δύο χρόνια και είναι "
+            "ανεξάρτητη από το παραπάνω δικαίωμα υπαναχώρησης.</p>"
+        ),
+        "title_en": "Return Policy",
+        "body_en": (
+            "<h2>Right of withdrawal</h2>"
+            "<p>You have 14 calendar days from delivery to return an item "
+            "without giving us a reason. The clock starts the day you, or "
+            "someone you nominated, took delivery.</p>"
+            "<h2>In what condition</h2>"
+            "<p>In its original packaging, with every accessory, and no wear "
+            "beyond what it took to try it out.</p>"
+            "<h2>How it works</h2>"
+            '<p>Message us from the <a href="/contact">contact page</a> with '
+            "your order number. We send you a return voucher and "
+            "instructions &mdash; the return shipping is not yours to "
+            "pay.</p>"
+            "<h2>Refunds</h2>"
+            "<p>Once the item reaches us and has been checked, we refund you "
+            "by the same payment method, within 14 days at the latest.</p>"
+            "<h2>Faulty goods</h2>"
+            "<p>The statutory two-year guarantee of conformity applies and is "
+            "independent of the right of withdrawal above.</p>"
+        ),
+    },
     "faq": {
         "title": "Συχνές Ερωτήσεις",
         "seo_title": "Συχνές Ερωτήσεις",
@@ -1946,13 +2008,10 @@ def seed_navigation() -> dict[str, int]:
 
 
 def publish_content_pages() -> dict[str, int]:
-    """Publish the two content pages that have no hardcoded equivalent.
+    """Publish and fill the content pages a showcase has to carry.
 
-    Only ``faq`` and ``shipping-info``. The other five default slugs
-    (about, privacy, terms, cookies, return-policy) duplicate real Nuxt
-    routes that already carry full content, so publishing them puts two
-    indexable copies of the same page on the site — and the footer's
-    ``LEGAL_PAGE_SLUGS`` dedup covers four of them but not ``about``.
+    ``faq``, ``shipping-info`` and ``return-policy`` — see the note
+    above ``CONTENT_PAGES`` for why those three and not the others.
 
     The seeded placeholder body is REPLACED only while it is still the
     placeholder: a merchant who has written real content keeps it, and

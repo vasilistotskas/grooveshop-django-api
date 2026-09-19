@@ -89,10 +89,16 @@ STEPS: tuple[tuple[str, str], ...] = (
     # storefront 404s a locale the tenant does not list, so English
     # content is unreachable until this runs.
     ("locales", "seed_locales"),
-    # Last: the account references products, and writing the
-    # DEMO_ACCOUNT_* settings publishes credentials, so it should
+    # Before the purge: the account references products, and writing
+    # the DEMO_ACCOUNT_* settings publishes credentials, so it should
     # only happen once everything it advertises exists.
     ("demo-account", "seed_demo_account"),
+    # Last, and only ever last: every step above writes through the ORM
+    # (some of it around the signals on purpose), so nothing invalidates
+    # the two caches the storefront reads. Skip this and the seed is
+    # invisible — `/blog` answered "no articles yet" for hours after
+    # eight posts existed, off a handler cache recorded before the run.
+    ("cache-purge", "purge_caches"),
 )
 
 STEP_NAMES = tuple(label for label, _ in STEPS)
@@ -169,13 +175,14 @@ class Command(BaseCommand):
 
         self.stdout.write(
             self.style.SUCCESS(
-                "\nDone. Two follow-ups are NOT covered by this command:\n"
+                "\nDone. One follow-up is NOT covered by this command:\n"
                 "  * Meilisearch: run `manage.py "
                 "meilisearch_sync_all_indexes --all-tenants` so the new "
                 "products are searchable.\n"
-                "  * The storefront caches the homepage for 300s and the "
-                "settings proxy for its own window — purge from the admin "
-                "cache panel or wait it out."
+                "The caches ARE covered — the `cache-purge` step evicts "
+                "this store's keys in Django and in the storefront. If "
+                "you ran with --only or --skip and left it out, the "
+                "store will keep serving what it had."
             )
         )
 

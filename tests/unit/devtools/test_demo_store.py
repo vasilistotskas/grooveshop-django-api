@@ -677,3 +677,98 @@ class TestDemoOptIn(TestCase):
             )
 
         self.assertIn("viva_wallet_live_mode", str(caught.exception))
+
+
+class TestStepTable(TestCase):
+    """``STEPS`` is dispatched by NAME, so nothing checks it but this.
+
+    ``handle`` calls ``getattr(demo_store, function_name)()``. A
+    renamed function leaves the table pointing at nothing and the run
+    dies part-way through, after some of the store has already been
+    rewritten.
+    """
+
+    def test_every_step_names_a_callable(self):
+        missing = [
+            f"{label} -> {name}"
+            for label, name in seed_demo_store.STEPS
+            if not callable(getattr(demo_store, name, None))
+        ]
+        self.assertEqual(missing, [])
+
+    def test_labels_are_unique(self):
+        labels = [label for label, _ in seed_demo_store.STEPS]
+        self.assertEqual(sorted(labels), sorted(set(labels)))
+
+    def test_the_cache_purge_runs_last(self):
+        """Its entire value is being after every writer.
+
+        Moved up by one place, it evicts keys that the steps below it
+        then re-populate from the pre-seed data, and the store keeps
+        serving what it had — which is how eight blog posts existed for
+        hours behind a ``/blog`` that said "no articles yet".
+        """
+        self.assertEqual(seed_demo_store.STEPS[-1][0], "cache-purge")
+
+
+class TestCachePurge(TestCase):
+    """The purge must be scoped to the store that ran the seed.
+
+    The storefront's Nitro cache is shared by every tenant on the
+    deployment, and ``core.cache.nuxt`` scopes an eviction by reading
+    ``connection.tenant.domains``. ``schema_context`` — which is what
+    the command wraps the step loop in — installs a ``FakeTenant`` that
+    has no domains, and the purge then silently widens to every store.
+    """
+
+    def _run(self, tenant):
+        """Drive ``purge_caches`` with the tenant lookup stubbed out.
+
+        Nothing here touches ``django.db.connection``: patching an
+        attribute on the shared connection wrapper leaked into every
+        later test in the run, which is a far worse bug than the one
+        being pinned. The schema name it reads is whatever the test
+        database reports, and the lookup that uses it is mocked anyway.
+        """
+        from unittest import mock
+
+        entered = []
+
+        class _Ctx:
+            def __enter__(inner):
+                entered.append(tenant)
+                return tenant
+
+            def __exit__(inner, *exc):
+                return False
+
+        report = SimpleNamespace(total_django=3, total_nuxt=7, surfaces=[])
+        with (
+            mock.patch("tenant.models.Tenant.objects.filter") as tenant_filter,
+            mock.patch(
+                "django_tenants.utils.tenant_context", return_value=_Ctx()
+            ) as tenant_ctx,
+            mock.patch(
+                "core.cache.service.CacheService.purge_all",
+                return_value=report,
+            ) as purge_all,
+        ):
+            tenant_filter.return_value.first.return_value = tenant
+            result = demo_store.purge_caches()
+        return result, entered, tenant_ctx, purge_all
+
+    def test_purges_inside_the_real_tenant_not_a_fake_one(self):
+        tenant = SimpleNamespace(schema_name="demo")
+        result, entered, tenant_ctx, purge_all = self._run(tenant)
+
+        tenant_ctx.assert_called_once_with(tenant)
+        self.assertEqual(entered, [tenant])
+        purge_all.assert_called_once_with()
+        self.assertEqual(result, {"django_keys": 3, "nuxt_keys": 7})
+
+    def test_reports_rather_than_raises_when_the_tenant_row_is_gone(self):
+        result, _entered, tenant_ctx, purge_all = self._run(None)
+
+        self.assertEqual(result, {"skipped_no_tenant_row": 1})
+        tenant_ctx.assert_not_called()
+        purge_all.assert_not_called()

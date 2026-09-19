@@ -1833,6 +1833,78 @@ def publish_content_pages() -> dict[str, int]:
     return report
 
 
+def purge_caches() -> dict[str, int]:
+    """Evict everything this run just rewrote, in both caches.
+
+    This step is not housekeeping — without it the seeder's own output
+    is invisible. Every writer here goes through the ORM, and several
+    deliberately go around it (``bulk_create`` + ``update()`` for the
+    backdated orders, so no signal fires, no email is sent and no stock
+    moves), so the invalidation that normally follows a merchant's save
+    never happens. Nothing tells Django's Redis or the storefront's
+    Nitro cache that the store changed.
+
+    What that looked like on 2026-09-19: ``seed_blog`` created eight
+    posts and the demo store's ``/blog`` kept answering "no articles
+    yet" — ``BlogPostViewSet``'s handler cache (10-minute ``maxAge``,
+    24-hour ``staleMaxAge``) still held the empty payload it recorded
+    before the seed, and the rendered ``/blog`` document was cached on
+    top of it. Django itself returned all eight posts to a direct call
+    throughout.
+
+    ``purge_all`` rather than a list of surfaces: a seed run touches
+    settings, catalogue, blog, promotions, layouts, navigation, content
+    pages, locales and loyalty, which is very nearly the whole registry,
+    and a named list is one more place to forget a new surface.
+
+    Runs under ``tenant_context``, not the command's ``schema_context``:
+    the Nitro cache is shared by every tenant, and
+    ``core.cache.nuxt`` scopes the eviction to the purging store by
+    reading ``connection.tenant.domains``. A ``FakeTenant`` — which is
+    all ``schema_context`` installs — has no domains, and the purge
+    silently widens to every store on the deployment.
+    """
+    from django.db import connection
+    from django_tenants.utils import (
+        get_public_schema_name,
+        schema_context,
+        tenant_context,
+    )
+
+    from core.cache.service import CacheService
+    from tenant.models import Tenant
+
+    schema = connection.schema_name
+    with schema_context(get_public_schema_name()):
+        tenant = Tenant.objects.filter(schema_name=schema).first()
+    if tenant is None:  # pragma: no cover — the command resolved it
+        return {"skipped_no_tenant_row": 1}
+
+    with tenant_context(tenant):
+        report = CacheService.purge_all()
+
+    purged = {
+        "django_keys": report.total_django,
+        "nuxt_keys": report.total_nuxt,
+    }
+    errors = [
+        surface.nuxt_error or surface.django_error
+        for surface in report.surfaces
+        if surface.nuxt_error or surface.django_error
+    ]
+    if errors:
+        # Reported, never raised: an unreachable storefront must not
+        # cost the operator the seed run that already succeeded. The
+        # fallback is the admin cache panel.
+        purged["surfaces_with_errors"] = len(errors)
+        logger.warning(
+            "Cache purge finished with errors on %s: %s",
+            schema,
+            "; ".join(sorted(set(errors))),
+        )
+    return purged
+
+
 def ensure_acp_token(tenant) -> dict[str, int]:
     """Mint an ACP bearer token when the tenant has none.
 

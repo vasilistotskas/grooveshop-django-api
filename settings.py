@@ -1071,7 +1071,7 @@ def get_celery_beat_schedule():
             # is_demo are touched — the fan-out filters on it rather
             # than using run_for_all_tenants, because a reset that ran
             # against a real merchant would delete customer data.
-            "task": "devtools.tasks.fanout_reset_demo_stores",
+            "task": "tenant.tasks.fanout_reset_demo_stores",
             "schedule": SCHEDULE_PRESETS["daily_4am"],
         },
         "cleanup-abandoned-carts": {

@@ -10,6 +10,37 @@ logger = logging.getLogger(__name__)
 
 
 @celery_app.task(base=TenantTask)
+def fanout_reset_demo_stores():
+    """Reset every demo store's shared accounts.
+
+    Deliberately NOT ``run_for_all_tenants``: that helper dispatches to
+    every active tenant, and this task DELETES orders, reviews, comments
+    and carts. Against a real merchant it would destroy their customers'
+    data. The ``is_demo`` filter is the safety property, so it is
+    written out here rather than hidden behind a parameter.
+    """
+    from devtools.tasks import reset_demo_store_task
+    from tenant.models import Tenant
+
+    tenants = Tenant.objects.filter(
+        is_active=True, is_demo=True, suspended_at__isnull=True
+    ).exclude(schema_name="public")
+
+    dispatched: list[dict[str, str]] = []
+    for tenant in tenants:
+        result = reset_demo_store_task.apply_async(
+            args=[tenant.schema_name],
+            ignore_result=reset_demo_store_task.ignore_result,
+        )
+        dispatched.append(
+            {"schema": tenant.schema_name, "task_id": str(result.id)}
+        )
+    if not dispatched:
+        logger.info("No demo tenants to reset")
+    return dispatched
+
+
+@celery_app.task(base=TenantTask)
 def fanout_cleanup_abandoned_carts():
     return run_for_all_tenants("core.tasks.cleanup_abandoned_carts")
 

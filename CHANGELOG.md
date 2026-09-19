@@ -3,6 +3,44 @@
 
 
 
+## v3.71.0 (2026-09-19)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.70.1 [skip ci] ([`490fe88`](https://github.com/vasilistotskas/grooveshop-django-api/commit/490fe8878420447d647338d043c98493dab9fe0a))
+
+### Features
+
+* feat(demo): let the demo store actually serve the English it was given
+
+`/en` on the demo store answered **404**, on a store whose every string
+already had an English translation waiting: 15 section `i18n`
+overrides, 8 bilingual blog posts, every category, product and content
+page.
+
+`Tenant.available_locales` was `[]`, which means single-language on the
+default locale — the storefront 404s any other prefix and hides it from
+the language switcher, the hreflang set and the sitemap. All that
+bilingual content was unreachable, and nothing reported an error
+because a 404 on a locale a tenant does not serve is correct behaviour.
+
+The seeder now sets `["el", "en"]` on a tenant flagged `is_demo`,
+deduplicated so a store whose default IS `en` is not given it twice,
+which the validator rejects. `full_clean` then
+`save(update_fields=...)`: the validator is a FIELD validator and
+`save()` does not run it, while the narrow update still fires
+`post_save` — which is what purges the cached `tenant_resolve` payload
+the storefront reads the locale list from.
+
+Gated on `is_demo` like the account step, so a staging clone of a real
+store cannot start publishing a second locale its operator never asked
+for.
+
+Found by checking the rendered page rather than the API: Greek came
+back correct with no English leakage, and `/en` came back 404.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com> ([`2d7047d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2d7047d2741d7f990b1ecadf44a8b8cad9a66245))
+
 ## v3.70.1 (2026-09-19)
 
 ### Bug fixes

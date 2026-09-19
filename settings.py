@@ -2439,9 +2439,17 @@ EXTRA_SETTINGS_DEFAULTS = [
     },
 ]
 
-EMAIL_BACKEND = getenv(
+# The backend that actually delivers. Still env-driven, so console/
+# locmem/SMTP selection is unchanged; it is simply reached through the
+# wrapper below.
+EMAIL_DELEGATE_BACKEND = getenv(
     "EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend"
 )
+# Every sender in the codebase goes through django.core.mail, so this is
+# the one place a store's SHARED demo login can be kept out of the
+# recipient list. A passthrough everywhere else: the suppression list is
+# empty unless DEMO_ACCOUNT_ENABLED is on for that schema.
+EMAIL_BACKEND = "core.mail.DemoRecipientSuppressingBackend"
 EMAIL_HOST = getenv("EMAIL_HOST", "localhost")
 EMAIL_PORT = getenv("EMAIL_PORT", "25")
 EMAIL_HOST_USER = getenv("EMAIL_HOST_USER", "localhost@gmail.com")

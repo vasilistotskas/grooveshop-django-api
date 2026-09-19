@@ -294,3 +294,131 @@ class _User:
 
     def __init__(self, email: str):
         self.email = email
+
+
+@pytest.mark.django_db
+class TestMailSuppression(TestCase):
+    """Mail addressed to a shared demo login is dropped before delivery.
+
+    A stranger walking the checkout or asking for a password reset
+    generates mail the operator never asked for, to an address that may
+    not even forward — and a bounce counts against the platform's
+    sending domain.
+    """
+
+    def _backend(self, demo_emails):
+        from core import mail as core_mail
+
+        original = core_mail.demo_account_emails
+        core_mail.demo_account_emails = lambda: frozenset(demo_emails)
+        self.addCleanup(setattr, core_mail, "demo_account_emails", original)
+        with self.settings(
+            EMAIL_DELEGATE_BACKEND=(
+                "django.core.mail.backends.locmem.EmailBackend"
+            )
+        ):
+            return core_mail.DemoRecipientSuppressingBackend()
+
+    @staticmethod
+    def _message(to, cc=None):
+        from django.core.mail import EmailMessage
+
+        return EmailMessage(
+            subject="s", body="b", to=list(to), cc=list(cc or [])
+        )
+
+    def test_drops_a_message_addressed_only_to_the_demo_account(self):
+        from django.core import mail as django_mail
+
+        backend = self._backend({demo_account.RETAIL_EMAIL})
+        with self.settings(
+            EMAIL_DELEGATE_BACKEND=(
+                "django.core.mail.backends.locmem.EmailBackend"
+            )
+        ):
+            django_mail.outbox = []
+            sent = backend.send_messages(
+                [self._message([demo_account.RETAIL_EMAIL])]
+            )
+        assert sent == 0
+        assert django_mail.outbox == []
+
+    def test_keeps_a_message_to_a_real_customer(self):
+        from django.core import mail as django_mail
+
+        backend = self._backend({demo_account.RETAIL_EMAIL})
+        with self.settings(
+            EMAIL_DELEGATE_BACKEND=(
+                "django.core.mail.backends.locmem.EmailBackend"
+            )
+        ):
+            django_mail.outbox = []
+            sent = backend.send_messages([self._message(["real@example.com"])])
+        assert sent == 1
+        assert len(django_mail.outbox) == 1
+
+    def test_strips_the_demo_address_from_a_mixed_recipient_list(self):
+        from django.core import mail as django_mail
+
+        backend = self._backend({demo_account.RETAIL_EMAIL})
+        with self.settings(
+            EMAIL_DELEGATE_BACKEND=(
+                "django.core.mail.backends.locmem.EmailBackend"
+            )
+        ):
+            django_mail.outbox = []
+            backend.send_messages(
+                [self._message(["real@example.com", demo_account.RETAIL_EMAIL])]
+            )
+        assert django_mail.outbox[0].to == ["real@example.com"]
+
+    def test_strips_a_demo_address_hidden_in_cc(self):
+        from django.core import mail as django_mail
+
+        backend = self._backend({demo_account.RETAIL_EMAIL})
+        with self.settings(
+            EMAIL_DELEGATE_BACKEND=(
+                "django.core.mail.backends.locmem.EmailBackend"
+            )
+        ):
+            django_mail.outbox = []
+            backend.send_messages(
+                [
+                    self._message(
+                        ["real@example.com"],
+                        cc=[demo_account.RETAIL_EMAIL],
+                    )
+                ]
+            )
+        assert django_mail.outbox[0].cc == []
+
+    def test_matches_a_display_name_form(self):
+        from django.core import mail as django_mail
+
+        backend = self._backend({demo_account.RETAIL_EMAIL})
+        with self.settings(
+            EMAIL_DELEGATE_BACKEND=(
+                "django.core.mail.backends.locmem.EmailBackend"
+            )
+        ):
+            django_mail.outbox = []
+            sent = backend.send_messages(
+                [self._message([f"Demo <{demo_account.RETAIL_EMAIL}>"])]
+            )
+        assert sent == 0
+
+    def test_is_a_passthrough_on_a_store_with_no_demo_account(self):
+        from django.core import mail as django_mail
+
+        backend = self._backend(set())
+        with self.settings(
+            EMAIL_DELEGATE_BACKEND=(
+                "django.core.mail.backends.locmem.EmailBackend"
+            )
+        ):
+            django_mail.outbox = []
+            sent = backend.send_messages(
+                [self._message([demo_account.RETAIL_EMAIL])]
+            )
+        assert sent == 1
+        assert len(django_mail.outbox) == 1

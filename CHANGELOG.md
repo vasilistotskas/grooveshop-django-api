@@ -3,6 +3,72 @@
 
 
 
+## v3.72.0 (2026-09-19)
+
+### Bug fixes
+
+* fix(demo): report a blocked locale instead of killing the seed run
+
+`seed_locales` raised straight out of `full_clean`, so the whole
+`seed_demo_store` command died with a traceback and every later step
+was skipped.
+
+What it hit is a good validator doing its job: `Tenant` refuses a
+locale whose legal documents have no body in it, because the storefront
+404s them — which is the one thing terms, privacy and cookie pages
+exist to prevent. That is a CONTENT decision, not a seeding error;
+somebody has to write or approve the translation.
+
+So it is logged with the missing documents named and reported as
+`blocked`, and the run continues.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com> ([`73581f8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/73581f83b401ce55a1105e3f72dfe88cc2b6632e))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.71.0 [skip ci] ([`663aea7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/663aea7cad7a4eb5ab6fff51032268d368f76f09))
+
+### Features
+
+* feat(demo): English legal documents, so the demo store can serve /en
+
+`Tenant` refuses to serve a locale whose legal documents have no body
+in it, because the storefront 404s them — the one thing terms, a
+privacy policy and a cookie policy exist to prevent. So `/en` stayed
+404 and every English translation the seeder writes stayed unreachable:
+15 section overrides, 8 blog posts, every category and product.
+
+These mirror `page_config/legal_documents.py` — the PLATFORM's own
+Greek boilerplate that every tenant is provisioned with — section for
+section, including the `id` on each `<section>`. That is not
+cosmetic: the legal route builds its table of contents from those ids,
+and a translation that renamed them would give the English page a TOC
+whose every anchor resolves to nothing. That exact bug shipped once
+before, on tenant #2's /privacy-policy. A test pins the ids against the
+Greek.
+
+Correcting something I said earlier in this work: I described that
+Greek text as another company's, having seen webside's hostname in it
+on staging. It is not — it is the platform's boilerplate with
+`{site_host}` substituted, which is why the staging clone reads that
+way. Translating it is therefore ours to do.
+
+Scoped to `devtools/` rather than added to the platform module: the
+platform's English legal copy is a decision for whoever owns the
+wording, and this changes what ONE disposable showcase serves rather
+than what every future tenant is provisioned with.
+
+Each document states plainly that the store is a demonstration, that
+nothing on it is really for sale, and — in the privacy policy — that
+the shared account is reset nightly and its sign-in details are public.
+A published legal page that reads as a real shop's is the one way this
+content could mislead somebody, so a test asserts it says so.
+
+Written only where English is absent or empty, so a merchant's own
+translation is never overwritten and a re-run is a no-op.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com> ([`d579a26`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d579a261c49ebd958c377fc421cf1a1d277fdc2f))
+
 ## v3.71.0 (2026-09-19)
 
 ### Chores

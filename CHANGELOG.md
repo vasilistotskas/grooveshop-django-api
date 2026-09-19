@@ -3,6 +3,55 @@
 
 
 
+## v3.72.3 (2026-09-19)
+
+### Bug fixes
+
+* fix(devtools): translate the demo store's menus and seeded pages
+
+Opening `en` exposed what nothing could translate at render time. The
+navigation menus are relational rows, not `t()` strings, so every `/en`
+page served a Greek header and a Greek four-column footer; and a
+navigation link that points at a content page takes its label from the
+PAGE's translated title — deliberately, so the label cannot freeze at
+seed time — so `faq` and `shipping-info` put "Συχνές Ερωτήσεις" and
+"Πληροφορίες Αποστολής" in the middle of the English footer.
+
+`build_navigation_menu` already accepted a per-locale copy; nothing was
+passing one. The English copy is DERIVED from the Greek menu through a
+label map rather than written out beside it: the builder matches by
+POSITION and ignores a copy whose shape differs, so a hand-maintained
+twin would drift into a menu that is silently untranslated rather than
+one that fails. A label with no entry in the map raises — an English
+menu with one stray Greek word reads as a bug, and silence would hide
+it until somebody browsed `/en`.
+
+`seed_navigation` now rebuilds on a demo tenant, the argument
+`seed_layouts` already makes for the demo's page stacks: there is no
+operator behind these menus, the seed IS the content, and
+`get_or_create` meant a menu from an earlier run could never gain
+anything a later seed added. An ordinary store still keeps its menus.
+
+`seo_title`/`seo_description` are NOT translated on `ContentPage` —
+only `title` and `body` are — so no English twin is seeded for them.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01PzA5KfS6cqvHDynKZumU22 ([`41fda0f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/41fda0faf0542f307f24bae865790bd9033408eb))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.72.2 [skip ci] ([`2ca22a6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2ca22a60db3c0999a25b85a39d63675a98a82c0a))
+
+### Code style
+
+* style(devtools): drop trailing whitespace in the English label map
+
+Left behind while restoring a line during a mutation check; ruff's
+format gate caught it.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01PzA5KfS6cqvHDynKZumU22 ([`afd9637`](https://github.com/vasilistotskas/grooveshop-django-api/commit/afd963776efe701fb9ac7ef5c5a37d440f289676))
+
 ## v3.72.2 (2026-09-19)
 
 ### Bug fixes

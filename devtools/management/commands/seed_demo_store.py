@@ -73,6 +73,9 @@ STEPS: tuple[tuple[str, str], ...] = (
     ("category-images", "seed_category_images"),
     ("tags", "seed_tags"),
     ("reviews", "seed_reviews"),
+    # After reviews: the comment authors are the same demo shopper
+    # accounts `seed_reviews` gets-or-creates.
+    ("blog", "seed_blog"),
     ("feedback", "seed_feedback"),
     ("b2b", "seed_b2b"),
     ("layouts", "seed_layouts"),

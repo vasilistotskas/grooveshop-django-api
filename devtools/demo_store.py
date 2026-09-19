@@ -29,14 +29,22 @@ faker's English strings would make the demo store unreadable.
 from __future__ import annotations
 
 import logging
+import re
 import secrets
 from decimal import Decimal
 from typing import Any
 
 from measurement.measures import Weight
 
+from devtools.demo_blog import seed_blog as _seed_blog
 from devtools.demo_catalogue import CATEGORIES, PRODUCTS
-from devtools.demo_media import ensure_asset, ensure_assets, storage_name
+from devtools.demo_home import HOME_SECTIONS
+from devtools.demo_media import (
+    ensure_asset,
+    ensure_assets,
+    media_path,
+    storage_name,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -485,33 +493,6 @@ def acp_token() -> str:
 # ``sort_order`` below is the INTENDED order, used to sequence the
 # creates. It is not written: ``SortableModel.save()`` derives the
 # stored value from ``max(sections of this layout) + 1``.
-HOME_SECTIONS: tuple[dict[str, Any], ...] = (
-    {
-        "component_type": "product_categories",
-        "title": "Κατηγορίες",
-        "props": {},
-        "sort_order": 4,
-    },
-    {
-        "component_type": "featured_products",
-        "title": "Δημοφιλή προϊόντα",
-        "props": {"page_size": 8, "columns": 4},
-        "sort_order": 5,
-    },
-    {
-        "component_type": "cta_banner",
-        "title": "",
-        "props": {
-            "heading": "Δωρεάν αποστολή από 50€",
-            "description": "Παράδοση σε 1-3 εργάσιμες σε όλη την Ελλάδα.",
-            "button_text": "Δες τα προϊόντα",
-            "button_link": "/products",
-            "background_color": "#1F2937",
-        },
-        "sort_order": 6,
-    },
-)
-
 CONTACT_SECTIONS: tuple[dict[str, Any], ...] = (
     {
         "component_type": "business_hours",
@@ -720,7 +701,7 @@ ABOUT_SECTIONS: tuple[dict[str, Any], ...] = (
 # page_type -> (sections, mode) where mode is "append" (keep existing
 # rows, add ours) or "replace" (this layout is ours end to end).
 LAYOUT_PLAN: dict[str, tuple[tuple[dict[str, Any], ...], str]] = {
-    "home": (HOME_SECTIONS, "append"),
+    "home": (HOME_SECTIONS, "replace"),
     "about": (ABOUT_SECTIONS, "append"),
     "contact": (CONTACT_SECTIONS, "replace"),
     "feedback": (FEEDBACK_SECTIONS, "replace"),
@@ -1504,17 +1485,64 @@ def seed_b2b() -> dict[str, int]:
     return report
 
 
+_ASSET_RE = re.compile(r"\{\{asset:([a-z0-9-]+)\}\}")
+
+
+def _resolve_assets(value):
+    """Swap every ``{{asset:<key>}}`` for this tenant's media path.
+
+    A section prop stores a bare string, so it cannot lean on an
+    ImageField to produce a tenant-aware URL. The placeholder is
+    resolved here, at seed time, inside the tenant's schema context:
+    the file is copied into THIS store's media first and the path that
+    replaces it is ``media/<schema>/uploads/...``, which media-stream
+    routes and ``ImgWithFallback`` absolutises.
+
+    Writing a full URL into the dataset instead would bake a hostname
+    into per-tenant data and break the day the store changes domain.
+    """
+    if isinstance(value, str):
+        return _ASSET_RE.sub(
+            lambda match: (
+                ensure_asset(match.group(1)) and media_path(match.group(1))
+            ),
+            value,
+        )
+    if isinstance(value, list):
+        return [_resolve_assets(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _resolve_assets(item) for key, item in value.items()}
+    return value
+
+
 def seed_layouts() -> dict[str, int]:
     """Apply ``LAYOUT_PLAN`` and unpublish the microlearning boilerplate.
 
-    Props are validated with ``page_config.schemas.validate_section_props``
-    before every write. That validation is wired into the admin and the
-    serializers but NOT the model, so a direct ORM write bypasses it and
-    the mistake only surfaces as a silently-stripped prop in the Nuxt
-    proxy's ``safeParse``.
+    Two modes, because two different things are being seeded:
+
+    ``append`` adds a section type the layout does not have yet and
+    leaves everything else alone — right for a page an operator may
+    have already arranged.
+
+    ``replace`` rebuilds the stack from scratch. The demo store's home,
+    contact and feedback pages ARE this seed: there is no operator
+    behind them, the order of the bands is the design, and appending
+    could never remove the blog-first default stack the tenant was
+    created with. ``SortableModel`` assigns ``sort_order`` from
+    ``max(siblings) + 1``, so deleting first is also what makes the
+    order below the order on the page.
+
+    Props and per-locale overrides are validated before every write.
+    That validation is wired into the admin and the serializers but NOT
+    the model, so a direct ORM write bypasses it and the mistake only
+    surfaces as a silently-stripped prop in the Nuxt proxy's
+    ``safeParse``.
     """
     from page_config.models import PageLayout, PageSection
-    from page_config.schemas import validate_section_props
+    from page_config.schemas import (
+        validate_section_i18n,
+        validate_section_props,
+    )
 
     report: dict[str, int] = {}
     titles = {
@@ -1523,7 +1551,7 @@ def seed_layouts() -> dict[str, int]:
         "contact": "Contact",
         "feedback": "Feedback",
     }
-    for page_type, (sections, _mode) in LAYOUT_PLAN.items():
+    for page_type, (sections, mode) in LAYOUT_PLAN.items():
         layout, created = PageLayout.objects.get_or_create(
             page_type=page_type,
             defaults={
@@ -1538,6 +1566,11 @@ def seed_layouts() -> dict[str, int]:
             layout.save(update_fields=["is_published"])
             _bump(report, "layouts_published")
 
+        if mode == "replace":
+            removed, _ = layout.sections.all().delete()
+            if removed:
+                _bump(report, "sections_removed", removed)
+
         present = set(layout.sections.values_list("component_type", flat=True))
         # Iterate in the intended order: SortableModel assigns
         # sort_order from max(siblings) + 1 per layout, so CREATION
@@ -1548,12 +1581,16 @@ def seed_layouts() -> dict[str, int]:
             if component_type in present:
                 _bump(report, "sections_unchanged")
                 continue
-            validate_section_props(component_type, section["props"])
+            props = _resolve_assets(section["props"])
+            i18n = _resolve_assets(section.get("i18n") or {})
+            validate_section_props(component_type, props)
+            validate_section_i18n(component_type, i18n)
             PageSection.objects.create(
                 layout=layout,
                 component_type=component_type,
                 title=section["title"],
-                props=section["props"],
+                props=props,
+                i18n=i18n,
                 is_visible=True,
             )
             _bump(report, "sections_created")
@@ -1564,6 +1601,17 @@ def seed_layouts() -> dict[str, int]:
     if unpublished:
         _bump(report, "boilerplate_unpublished", unpublished)
     return report
+
+
+def seed_blog() -> dict[str, int]:
+    """The demo blog — see ``devtools/demo_blog.py`` for the dataset.
+
+    ``_translate`` and ``ensure_asset`` are handed over rather than
+    imported there, so that module stays a dataset plus one function
+    and this one keeps owning how a translation is written and how an
+    asset reaches tenant storage.
+    """
+    return _seed_blog(_translate, ensure_asset)
 
 
 def seed_navigation() -> dict[str, int]:

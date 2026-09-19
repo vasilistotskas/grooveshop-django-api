@@ -1,4 +1,60 @@
 {
+ "blog-battery-care": {
+  "author": "Alexander Andrews",
+  "download": "https://images.unsplash.com/photo-1536692192939-f1547f1cde39?ixid=M3wxMjA3fDB8MXxzZWFyY2h8Mnx8c21hcnRwaG9uZSUyMGJhdHRlcnklMjBsb3clMjBjaGFyZ2luZyUyMG5pZ2h0fGVufDB8fHx8MTc4OTgwNTYwOHww&ixlib=rb-4.1.0",
+  "kind": "blog",
+  "licence": "Unsplash",
+  "source": "https://unsplash.com/photos/person-holding-low-battery-smartphone-ivtjHB_pxq4"
+ },
+ "blog-car-mount": {
+  "author": "Isaac Mehegan",
+  "download": "https://images.unsplash.com/photo-1536825591064-574efec257f2?ixid=M3wxMjA3fDB8MXxzZWFyY2h8M3x8cGhvbmUlMjBtb3VudCUyMGNhciUyMGRhc2hib2FyZCUyMG5hdmlnYXRpb258ZW58MHx8fHwxNzg5ODA1NjAxfDA&ixlib=rb-4.1.0",
+  "kind": "blog",
+  "licence": "Unsplash",
+  "source": "https://unsplash.com/photos/smartphone-turned-on-in-vehicle-mount-inside-vehicle-7x5V13744KM"
+ },
+ "blog-earbuds": {
+  "author": "Roger Cai",
+  "download": "https://images.unsplash.com/photo-1578319439584-104c94d37305?ixid=M3wxMjA3fDB8MXxzZWFyY2h8Nnx8dHJ1ZSUyMHdpcmVsZXNzJTIwZWFyYnVkcyUyMGNhc2UlMjBjbG9zZSUyMHVwfGVufDB8fHx8MTc4OTgwNTU5Mnww&ixlib=rb-4.1.0",
+  "kind": "blog",
+  "licence": "Unsplash",
+  "source": "https://unsplash.com/photos/black-wireless-earphones-on-surfae-HuTUDQqr88c"
+ },
+ "blog-gan": {
+  "author": "Markus Winkler",
+  "download": "https://images.unsplash.com/photo-1586254116951-5263e2cdb44c?ixid=M3wxMjA3fDB8MXxzZWFyY2h8M3x8dXNiJTIwYyUyMHdhbGwlMjBjaGFyZ2VyJTIwcGx1ZyUyMGFkYXB0ZXJ8ZW58MHx8fHwxNzg5ODA1NTY2fDA&ixlib=rb-4.1.0",
+  "kind": "blog",
+  "licence": "Unsplash",
+  "source": "https://unsplash.com/photos/white-adapter-on-yellow-wall-9QTFMkh-ezM"
+ },
+ "blog-mah": {
+  "author": "gomi",
+  "download": "https://images.unsplash.com/photo-1706275790528-b8540a6ee5eb?ixid=M3wxMjA3fDB8MXxzZWFyY2h8Nnx8cG93ZXIlMjBiYW5rJTIwcG9ydGFibGUlMjBjaGFyZ2VyJTIwb24lMjBkZXNrfGVufDB8fHx8MTc4OTgwNTU1N3ww&ixlib=rb-4.1.0",
+  "kind": "blog",
+  "licence": "Unsplash",
+  "source": "https://unsplash.com/photos/a-wooden-table-topped-with-a-notebook-and-glasses-nt29-8UXYAc"
+ },
+ "blog-screen-protector": {
+  "author": "Jakub Żerdzicki",
+  "download": "https://images.unsplash.com/photo-1716113837779-dc9196cd7f5d?ixid=M3wxMjA3fDB8MXxzZWFyY2h8Nnx8YXBwbHlpbmclMjBzY3JlZW4lMjBwcm90ZWN0b3IlMjBwaG9uZXxlbnwwfHx8fDE3ODk4MDU1Nzl8MA&ixlib=rb-4.1.0",
+  "kind": "blog",
+  "licence": "Unsplash",
+  "source": "https://unsplash.com/photos/a-person-holding-a-cell-phone-in-their-hand-5SFiVF4lfnM"
+ },
+ "blog-usbc-cable": {
+  "author": "Masantocreative",
+  "download": "https://plus.unsplash.com/premium_photo-1760509400618-ebaee73e70ed?ixid=M3wxMjA3fDB8MXxzZWFyY2h8NXx8dXNiJTIwYyUyMGNhYmxlJTIwY29pbGVkJTIwYnJhaWRlZHxlbnwwfHx8fDE3ODk4MDU1NzJ8MA&ixlib=rb-4.1.0",
+  "kind": "blog",
+  "licence": "Unsplash",
+  "source": "https://unsplash.com/photos/yellow-usb-cable-coiled-on-a-blue-background-Cgu4VCmovzw"
+ },
+ "blog-wireless-charge": {
+  "author": "Daniel Korpai",
+  "download": "https://images.unsplash.com/photo-1545235616-db3cd822ad8c?ixid=M3wxMjA3fDB8MXxzZWFyY2h8Nnx8d2lyZWxlc3MlMjBjaGFyZ2luZyUyMHBhZCUyMHNtYXJ0cGhvbmV8ZW58MHx8fHwxNzg5ODA1NTg5fDA&ixlib=rb-4.1.0",
+  "kind": "blog",
+  "licence": "Unsplash",
+  "source": "https://unsplash.com/photos/smartphone-on-wireless-charging-case-at-83-percent-charge-Fo1ZKpX4-f8"
+ },
  "cable-braided-black": {
   "author": "Mika Baumeister",
   "download": "https://images.unsplash.com/photo-1595756630452-736bc8ef3693?ixid=M3wxMjA3fDB8MXxzZWFyY2h8NHx8dXNiJTIwYyUyMGNhYmxlJTIwd2hpdGUlMjBiYWNrZ3JvdW5kfGVufDB8fHx8MTc4OTc1NDkxMnww&ixlib=rb-4.1.0",
@@ -271,6 +327,27 @@
   "kind": "product",
   "licence": "Unsplash",
   "source": "https://unsplash.com/photos/a-couple-of-white-and-black-coasters-on-a-brown-surface-QO1-uXSrkAM"
+ },
+ "hero-audio": {
+  "author": "Hrushi Chavhan",
+  "download": "https://images.unsplash.com/photo-1645020089405-ee44c2cd7c58?ixid=M3wxMjA3fDB8MXxzZWFyY2h8NHx8d2lyZWxlc3MlMjBlYXJidWRzJTIwbGlmZXN0eWxlJTIwZGVzayUyMG1pbmltYWwlMjB3aWRlfGVufDB8fHx8MTc4OTgwNTUzNnww&ixlib=rb-4.1.0",
+  "kind": "hero",
+  "licence": "Unsplash",
+  "source": "https://unsplash.com/photos/a-pair-of-ear-buds-sitting-on-a-wooden-tray-Np80mWZ2EsU"
+ },
+ "hero-charging": {
+  "author": "I'M ZION",
+  "download": "https://images.unsplash.com/photo-1600577231598-31ea4cb50da3?ixid=M3wxMjA3fDB8MXxzZWFyY2h8Nnx8c21hcnRwaG9uZSUyMGNoYXJnaW5nJTIwY2FibGUlMjBkZXNrJTIwbWluaW1hbCUyMHdpZGV8ZW58MHx8fHwxNzg5ODA1NTI3fDA&ixlib=rb-4.1.0",
+  "kind": "hero",
+  "licence": "Unsplash",
+  "source": "https://unsplash.com/photos/person-holding-black-smartphone-on-white-textile-svsKYetYPUI"
+ },
+ "hero-protection": {
+  "author": "Grysell Alvarez",
+  "download": "https://images.unsplash.com/photo-1535157412991-2ef801c1748b?ixid=M3wxMjA3fDB8MXxzZWFyY2h8Mnx8c21hcnRwaG9uZSUyMGNhc2UlMjBwcm90ZWN0aW9uJTIwbWluaW1hbCUyMHdpZGV8ZW58MHx8fHwxNzg5ODA1NTQ3fDA&ixlib=rb-4.1.0",
+  "kind": "hero",
+  "licence": "Unsplash",
+  "source": "https://unsplash.com/photos/four-assorted-color-iphone-x-cases-FQXbLmlmvWY"
  },
  "powerbank-black": {
   "author": "gomi",

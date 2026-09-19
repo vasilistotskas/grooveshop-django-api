@@ -21,6 +21,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
+from urllib.parse import urlparse
 
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
@@ -103,3 +104,21 @@ def ensure_asset(key: str) -> str:
 def ensure_assets(keys) -> dict[str, str]:
     """``ensure_asset`` for many keys, de-duplicated."""
     return {key: ensure_asset(key) for key in dict.fromkeys(keys)}
+
+
+def media_path(key: str) -> str:
+    """The path a SECTION PROP carries for this asset.
+
+    A model with an ImageField gets this from ``image_to_media_path``,
+    but a page section stores a bare string, so it needs the same shape
+    built by hand: ``media/<schema>/uploads/...``, no leading slash and
+    no host, which is what media-stream routes and what
+    ``ImgWithFallback`` absolutises onto the tenant's assets origin.
+
+    Writing a full URL here instead would hardcode a hostname into
+    per-tenant data and break the moment the store moves domain.
+
+    Call inside the tenant's ``schema_context``.
+    """
+    url = default_storage.url(storage_name(key))
+    return urlparse(url).path.lstrip("/")

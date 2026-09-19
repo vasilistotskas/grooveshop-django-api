@@ -3,6 +3,149 @@
 
 
 
+## v3.70.0 (2026-09-19)
+
+### Bug fixes
+
+* fix(demo): put the reset fan-out where beat entries are required to look
+
+`tests/unit/tenant/test_celery_fanout.py` requires every beat entry to
+dispatch a `tenant.tasks.fanout_*` wrapper. Mine was a genuine fan-out
+with a stricter filter, but it lived in `devtools/tasks.py`, so the
+guard rejected it — correctly. A beat entry pointed at anything else
+fires once in the public schema and processes zero rows per tenant, and
+the test exists so that merging one fails here instead of silently
+no-opping in production.
+
+The wrapper moves to `tenant/tasks.py` beside the others; the
+per-tenant worker stays in `devtools/`. It still does NOT use
+`run_for_all_tenants` — that dispatches to every active tenant, and
+this task deletes orders, reviews, comments and carts, so against a
+real merchant it would destroy their customers' data. The `is_demo`
+filter is the safety property and stays written out.
+
+Caught by CI, not locally: I ran the devtools, order and email suites
+and not the tenant one.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com> ([`60d1ca8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/60d1ca8dbf8d7e0926ab6b0ba9d1873748a7b836))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.69.0 [skip ci] ([`77a558b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/77a558b049fefabb9152d67ccdc77b51610676ee))
+
+### Features
+
+* feat(demo): keep transactional mail away from the shared demo logins
+
+A demo store publishes an account's password on its own login page, so
+strangers generate mail as that account:
+
+* an order confirmation, whenever a visitor walks the cash-on-delivery
+  checkout — which is the point of letting them;
+* a password-reset mail, whenever a curious visitor asks for one. The
+  reset itself is already refused, but allauth sends the message
+  before anything can refuse it.
+
+Neither reaches the person who triggered it. The address belongs to the
+store, so the mail lands in the operator's inbox at whatever rate
+strangers produce it — and DNS says `grooveshop.space` receives through
+Namecheap forwarding, so an address with no forwarding rule BOUNCES,
+and the bounce is counted against a sending domain that was only just
+repaired.
+
+`DemoRecipientSuppressingBackend` wraps whatever backend the
+environment selects and removes demo addresses from `to`, `cc` and
+`bcc` before delegating; a message left with no recipients is dropped
+and reported as zero sent, because saying "1 sent" would make a
+suppressed mail look delivered in every caller's log.
+
+At the mail layer rather than per-sender: every sender in the codebase
+goes through `django.core.mail`, so this is the one place that also
+catches the next one. `EMAIL_BACKEND` selection stays env-driven — it
+just moved to `EMAIL_DELEGATE_BACKEND`, so console/locmem/SMTP work
+exactly as before.
+
+A passthrough on every ordinary store: the suppression list is empty
+unless `DEMO_ACCOUNT_ENABLED` is on for that schema, and the wrapper
+returns before it looks at a single recipient.
+
+Six tests, including the display-name form (`Demo <demo@…>`) and a demo
+address hidden in `cc`, which is the same leak with less noise. The
+wider suites confirm it is inert elsewhere: 499 email/notification
+tests and 1618 order tests pass unchanged.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com> ([`1ec70fd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1ec70fd226c85043ef348549324984012f7a7278))
+
+* feat(demo): shared demo logins, guarded, with a nightly reset
+
+Half of what the platform does only exists once you are signed in —
+order history and tracking, saved addresses, favourites, the loyalty
+ledger and tier, a gift-card balance, and the homepage `loyalty_hero`
+band, which renders NOTHING for a signed-out visitor. A prospect
+browsing the showcase as a guest never saw any of it, and asking them
+to register to look around is the point at which they leave.
+
+So the demo store publishes two accounts and prints their passwords on
+its own login page. TWO, kept apart on purpose: a B2B account changes
+every price on the storefront, so a prospect handed only the wholesale
+login would read those numbers as the retail ones. The card offers
+retail first and wholesale beside it.
+
+**The credentials being public is the whole design, and it makes the
+account hostile territory.** Anyone who signs in can change the
+password, add and verify their own address, or enrol a second factor —
+and each of those locks everybody else out until the reset runs, which
+can be most of a day away. So the mutations that cost the account its
+login are refused server-side:
+
+- `DemoAccountGuardMiddleware` refuses unsafe methods on
+  `/_allauth/app/v1/account/{password/change,email,phone,
+  authenticators/**}`. A middleware rather than a DRF permission for
+  the same reason `allauth_ratelimit` is one: `/_allauth/` bypasses
+  DRF entirely.
+- `TenantAccountAdapter.set_password` refuses too, because password
+  RESET is unauthenticated and the middleware cannot tell whose
+  account it is. Both flows go through that one hook.
+- `can_delete_email` keeps the published address on the account;
+  login is by email, so deleting it is the one email operation that
+  costs everyone their way in.
+
+Everything else stays writable. Hiding the account UI would hide a
+platform feature the demo exists to show, so the screen renders and the
+action comes back 403 with a reason.
+
+All of it keys on `demo_account_emails()`, which returns an EMPTY set
+unless `DEMO_ACCOUNT_ENABLED` is on for that schema — the same switch
+that publishes the credentials. On every real merchant's store this is
+a dict lookup that finds nothing, and the seeder only writes those rows
+on a tenant flagged `is_demo`, so a staging clone of a live store
+cannot start advertising a password either.
+
+`reset_demo_account` is the backstop, not the guard: it wipes what a
+visitor can create — orders, reviews, blog comments, carts, points,
+notifications, tokens and any authenticator that slipped through —
+rebuilds the fixtures, and restores seeded stock, which a
+cash-on-delivery checkout consumes. `devtools.tasks.fanout_reset_demo_stores`
+runs it nightly at 04:00 and deliberately does NOT use
+`run_for_all_tenants`: that helper dispatches to every active tenant,
+and a reset against a real merchant would delete their customers' data.
+The `is_demo` filter is the safety property, so it is written out.
+
+Fixture orders go through the ORM and are backdated with `update()`,
+never `OrderService`: a seeded order must not email anyone, must not
+move stock and must not enter the state machine. It is history for a
+list page to render, not a sale.
+
+24 tests. The dataset ones matter more than they look: my first pass
+had five invented product slugs, all of which the seeder would have
+skipped in silence, leaving the account with no favourites and no
+orders. The guard tests pin that it bites on both accounts, on every
+credential path, and on nothing else — reads pass, other endpoints
+pass, ordinary customers pass, and a store with no demo account is
+untouched.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com> ([`216bd5b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/216bd5bc58363bc2a3daf516fa61688fab8eb595))
+
 ## v3.69.0 (2026-09-19)
 
 ### Chores

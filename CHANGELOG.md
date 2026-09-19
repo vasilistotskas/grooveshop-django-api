@@ -3,6 +3,54 @@
 
 
 
+## v3.70.1 (2026-09-19)
+
+### Bug fixes
+
+* fix(demo): guard the shared logins where allauth actually resolves the user
+
+The middleware never fired. Verified against staging: logging in as the
+demo account and POSTing a password change returned **500**, and
+enrolling TOTP returned 400 — neither was refused.
+
+`/_allauth/app/v1/**` resolves its session token inside a VIEW
+DECORATOR (`headless.base.views.APIView.as_api_view` →
+`decorators.app_view`), not in middleware, so `request.user` is still
+anonymous when middleware runs. The storefront proxies the APP flow, so
+the guard would never have fired in production either — it only looked
+correct because the unit tests handed it a request with `user` already
+set. Deleted rather than patched: it cannot see the user it needs.
+
+The adapters are the seam that works, because allauth calls them after
+it has the user:
+
+- `clean_password(password, user)` — runs during FORM validation
+  (`ChangePasswordInput` and `ResetPasswordInput` both call it with
+  the user), so the refusal renders as a 400 on the field instead of
+  an exception nobody catches. `set_password` stays as a programmatic
+  backstop and is now documented as unreachable through the API.
+- `can_delete_email` — unchanged, already a clean boolean.
+- `MFAAdapter.is_mfa_enabled` — returns False for a demo login.
+
+That last one needed a change of target. allauth 65.19 has no
+pre-enrolment hook, and `ACCOUNT_FORMS`/`MFA_FORMS` do not reach the
+headless flow at all: the inputs SUBCLASS the concrete forms
+(`class ActivateTOTPInput(ActivateTOTPForm, inputs.Input)`), bypassing
+`get_form_class`. So enrolment is left alone and the LOCKOUT is
+prevented instead — the login stage asks `is_mfa_enabled` before
+demanding a code, so a factor a visitor enrols cannot stop the next
+person signing in with the published password. The nightly reset still
+deletes the row.
+
+Tests follow the same shape, including that a real customer's second
+factor still counts — the guard must not weaken anybody else's account.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com> ([`82288c5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/82288c52d3076ae34d5ec53f8b99ba2a80d3558d))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.70.0 [skip ci] ([`286dffb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/286dffbfe51b0ebe479499c170ad176004e9dfc3))
+
 ## v3.70.0 (2026-09-19)
 
 ### Bug fixes

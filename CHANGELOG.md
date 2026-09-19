@@ -3,6 +3,92 @@
 
 
 
+## v3.69.0 (2026-09-19)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.68.1 [skip ci] ([`d745896`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d745896725cbebf1e9e786b94d63998ed4a1cdd6))
+
+### Features
+
+* feat(demo): a homepage worth showing and a blog with something in it
+
+The demo store is what a prospect is shown, and it opened on a category
+grid. Its layout was still the platform's old blog-first default —
+`blog_categories`, a prop-less `hero_carousel`, `recently_viewed`,
+`blog_posts_list` — four sections of which render nothing without blog
+rows, and the tenant had none. So there was no hero at all, and the
+blog the plan switched on had `count: 0` posts and `count: 0`
+categories behind it.
+
+**The homepage** is now one band of every KIND the page builder offers:
+a carousel hero with three editorial slides, product rails read three
+different ways (newest, popular, by category), a features grid, live
+promotions, a stats strip, the loyalty band only a member sees, blog,
+testimonials with ratings and roles, recently viewed, an FAQ, and two
+conversion bands. Every one renders nothing when its data or its flag
+is absent, which is what makes the same stack safe for a store that has
+not filled everything in.
+
+`home` moves to **replace** mode, and `seed_layouts` now honours the
+mode it has always recorded — it was reading `_mode` and discarding it,
+so `contact` and `feedback` were appending too. Append could never have
+removed the default stack: that is why the empty bands survived every
+reseed. Sections also carry their `i18n` overrides now, validated with
+`validate_section_i18n` the same way props are, so the English page
+stops rendering Greek copy.
+
+**Eleven new photographs** — three hero, eight blog covers — curated,
+verified at their final crop, and committed as AVIF (3.1MB total, all
+under the 110KB budget). Two first picks were rejected on inspection:
+one showed a phone with a damaged screen, the other a competitor's
+brand name on the case. Unsplash's alt text is not trustworthy enough
+to skip looking.
+
+**The blog** is eight bilingual posts across three categories with two
+authors, eight tags and ten approved comments, dated over the last
+three months. Bodies are written for both locales throughout: the demo
+tenant serves `el` and `en`, and a Greek-only post turns the language
+switch into a dead end.
+
+Section props carry `{{asset:<key>}}` rather than a URL. It resolves at
+seed time, inside the tenant's schema context, to
+`media/<schema>/uploads/...` — the file has to be copied into THIS
+store's media first, and a literal URL would bake a hostname into
+per-tenant data.
+
+18 new contract tests cover what nothing else type-checks: every prop
+and locale override against `page_config.schemas`, contiguous sort
+order (the order IS the design under replace mode), every asset
+placeholder against `manifest.lock.json`, every post's category, author
+and tags, both locales on every post, and that a band carrying copy
+carries an `en` override.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com> ([`22e2299`](https://github.com/vasilistotskas/grooveshop-django-api/commit/22e22995b75b00ed0d0eb9303d2bea28bcc4c5ee))
+
+### Testing
+
+* test(demo): pin replace mode against the database
+
+The dataset tests cover what the data says; these cover what
+`seed_layouts` does with it, because the new behaviour is destructive —
+`replace` DELETES the sections a layout already has.
+
+That is the whole point: the mode was read and discarded for two
+releases, so every run appended, and there was no code path that could
+remove the blog-first default stack the demo tenant was created with.
+Four sections that render nothing survived every reseed.
+
+Four cases: pre-existing home sections are gone afterwards, bands land
+in the dataset's order (SortableModel assigns from `max(siblings) + 1`,
+so creation order is the only thing that decides), locale overrides and
+resolved asset paths are written, and a second run changes nothing.
+
+`ensure_asset`/`media_path` are patched rather than exercised — a unit
+test should not be writing image files into MEDIA_ROOT.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com> ([`289f187`](https://github.com/vasilistotskas/grooveshop-django-api/commit/289f1875af2d2f005bd8c10f5324b6b5f2e262c9))
+
 ## v3.68.1 (2026-09-19)
 
 ### Bug fixes

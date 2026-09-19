@@ -7,8 +7,9 @@ repository does not carry all fail SILENTLY: the storefront strips what
 it cannot parse and renders a component default, so the mistake reaches
 staging as a blank band rather than an error.
 
-No database here — these read the dataset. The seeding functions
-themselves are covered in ``test_demo_store.py``.
+Most of these only read the dataset. ``TestReplaceMode`` touches the
+database, because the one behaviour worth pinning is destructive: it
+DELETES the sections a layout already has.
 """
 
 from __future__ import annotations
@@ -217,6 +218,105 @@ class TestAssetResolution(TestCase):
         assert out["count"] == 3
         # The file must be COPIED into this schema, not merely named.
         assert seen == ["hero-audio"]
+
+
+class TestReplaceMode(TestCase):
+    """`replace` must actually remove what is already there.
+
+    ``seed_layouts`` read the mode and discarded it for two releases,
+    so every run appended. That is why the demo homepage kept the
+    blog-first default stack — four sections that render nothing —
+    through every reseed: there was no code path that could delete
+    them.
+    """
+
+    def _seed(self):
+        def fake_ensure(key: str) -> str:
+            return f"uploads/pages/{key}.avif"
+
+        def fake_media_path(key: str) -> str:
+            return f"media/demo/uploads/pages/{key}.avif"
+
+        with (
+            _patched(demo_store, "ensure_asset", fake_ensure),
+            _patched(demo_store, "media_path", fake_media_path),
+        ):
+            return demo_store.seed_layouts()
+
+    def test_pre_existing_home_sections_are_removed(self):
+        from page_config.models import PageLayout, PageSection
+
+        layout = PageLayout.objects.create(
+            page_type="home", title="Homepage", is_published=True
+        )
+        PageSection.objects.create(
+            layout=layout,
+            component_type="blog_categories",
+            title="",
+            props={},
+            is_visible=True,
+        )
+        PageSection.objects.create(
+            layout=layout,
+            component_type="blog_posts_list",
+            title="",
+            props={},
+            is_visible=True,
+        )
+
+        report = self._seed()
+
+        assert report.get("sections_removed"), report
+        live = set(
+            PageSection.objects.filter(layout=layout).values_list(
+                "component_type", flat=True
+            )
+        )
+        assert "blog_categories" not in live
+        assert "blog_posts_list" not in live
+        assert live == {section["component_type"] for section in HOME_SECTIONS}
+
+    def test_bands_land_in_the_dataset_order(self):
+        """SortableModel assigns from ``max(siblings) + 1``, so creation
+        order is the only thing that decides where a band sits."""
+        from page_config.models import PageSection
+
+        self._seed()
+        seeded = list(
+            PageSection.objects.filter(layout__page_type="home")
+            .order_by("sort_order")
+            .values_list("component_type", flat=True)
+        )
+        assert seeded == [
+            section["component_type"] for section in HOME_SECTIONS
+        ]
+
+    def test_locale_overrides_are_written(self):
+        from page_config.models import PageSection
+
+        self._seed()
+        hero = PageSection.objects.get(
+            layout__page_type="home", component_type="hero_carousel"
+        )
+        assert hero.i18n.get("en"), hero.i18n
+        assert hero.props["slides"][0]["image_url"].startswith("media/demo/")
+
+    def test_a_second_run_changes_nothing(self):
+        from page_config.models import PageSection
+
+        self._seed()
+        first = list(
+            PageSection.objects.filter(layout__page_type="home")
+            .order_by("sort_order")
+            .values_list("component_type", "props", "i18n")
+        )
+        self._seed()
+        second = list(
+            PageSection.objects.filter(layout__page_type="home")
+            .order_by("sort_order")
+            .values_list("component_type", "props", "i18n")
+        )
+        assert first == second
 
 
 class _patched:

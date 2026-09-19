@@ -868,7 +868,6 @@ NAV_LABELS_EN: dict[str, str] = {
     "Όλα τα προϊόντα": "All products",
     "Αξεσουάρ Κινητών": "Phone accessories",
     "Πρόγραμμα Επιβράβευσης": "Rewards programme",
-    
     "Εξυπηρέτηση": "Support",
     "Συχνές Ερωτήσεις": "FAQ",
     "Πληροφορίες Αποστολής": "Shipping information",

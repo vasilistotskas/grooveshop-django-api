@@ -3,6 +3,79 @@
 
 
 
+## v3.72.2 (2026-09-19)
+
+### Bug fixes
+
+* fix(tests): read either category payload shape without an if block
+
+`list` returns the paginated envelope and `all` a bare list, so the
+helper has to handle both. The `if "results" in payload` form trips
+ruff's SIM401, and its suggested `payload.get(...)` would raise on the
+list — ask whether the payload HAS `get` instead.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com> ([`e137ec0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e137ec08c9781cafeacf5dcfdd3b33a00e60ee73))
+
+* fix(devtools): publish the demo store's own mailbox, not the operator's
+
+`CONTACT_EMAIL` and `INVOICE_SELLER_EMAIL` on the demo tenant resolved
+to `settings.INFO_EMAIL`, on the reasoning that a showcase's enquiries
+should reach a human. What it did was print that mailbox, in plain
+text, in the footer and on the contact page of a store whose entire
+purpose is to be shown to strangers — and on this deployment that was a
+personal address.
+
+The demo now publishes an address on its OWN domain, paired with the
+tenant's primary host at seed time so production and staging each carry
+their own and neither hardcodes the other. There is no mailbox behind
+it, which is the point, so `core.mail` suppresses it: a contact-form
+notification sent there is exactly the bounce against the platform's
+sending domain that module already exists to prevent, arriving by a
+different route.
+
+`demo_store_mailboxes()` is separate from `demo_account_emails()` on
+purpose. The first is what a demo store PRINTS, the second is what
+anyone can sign into, and only the mail layer wants the union —
+widening `is_demo_account` would refuse a password change to a customer
+whose address happened to match the store's.
+
+The ΑΦΜ and ΓΕΜΗ stay reserved placeholders rather than being dressed
+up into plausible numbers: a well-formed twelve-digit ΓΕΜΗ belongs to
+somebody, and a showcase must not publish a real company's registry
+entry under a fictional name.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com> ([`9cd529b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9cd529b97f2ce47460ff3f17295e219b2ea6fa33))
+
+* fix(product): stop serving categories an operator switched off
+
+The category read actions are `AllowAny` and were unfiltered, so
+`active=False` meant nothing to anybody reading them. Found on the demo
+store 2026-09-19: `demo-chargers-cables` — inactive, zero products —
+still had a crawlable pill on `/products` linking to a page that listed
+nothing, and the same row reached the filter sidebar, the sitemap and
+the agent gateway's catalogue feed. Four consumers, one queryset; only
+the header menu filtered, in the storefront, on its own.
+
+`CategoryQuerySet.visible_to(user)` mirrors `BlogPost`'s: staff see
+everything for admin preview, everyone else sees an active branch.
+
+An inactive ANCESTOR hides its descendants too. Filtering on the row's
+own flag leaves a half-hidden branch — a child whose parent is not in
+the payload vanishes from the menu, which indexes by parent id, but
+keeps its pill and its sitemap entry — so switching off "Charging"
+would hide the heading and leave its four subcategories loose. The test
+is MPTT containment, one correlated EXISTS, not a walk.
+
+`ProductCategoryFilterTest` now authenticates as staff: it exercises the
+FILTERSET, and `?active=false` has nothing to return for the public any
+more, by design.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com> ([`b44a854`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b44a8548ec8500054f6c7648b0c2251a250ba324))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.72.1 [skip ci] ([`7ad0a36`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7ad0a368dee5a676ab31bdf431f7232555915c39))
+
 ## v3.72.1 (2026-09-19)
 
 ### Bug fixes

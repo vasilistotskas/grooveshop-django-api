@@ -66,12 +66,41 @@ PLACEHOLDER_BODY_PREFIX = "<p>Προσθέστε εδώ"
 # seed in any environment produces its own media.
 
 
-def _platform_contact_email() -> str:
-    """The platform operator's contact address, read when the seed
-    runs so no mailbox is written into the repository."""
+#: The local part of the demo store's own published mailbox. Paired
+#: with the tenant's primary domain at seed time, never hardcoded whole
+#: — the demo store is `demo.grooveshop.space` in production and
+#: `demo-staging.grooveshop.space` on staging, and a store must not
+#: publish another environment's address.
+DEMO_MAILBOX = "hello"
+
+
+def _demo_contact_email() -> str:
+    """The demo store's OWN contact address.
+
+    This used to resolve to ``settings.INFO_EMAIL`` — the platform
+    operator's mailbox — on the reasoning that a demo's enquiries should
+    reach a human. What it actually did was publish that mailbox, in
+    plain text, in the footer and on the contact page of a store whose
+    whole purpose is to be shown to strangers. On 2026-09-19 that was a
+    personal address.
+
+    A store's published identity should be the STORE's. So the demo
+    publishes an address on its own domain, and
+    ``core.mail.DemoRecipientSuppressingBackend`` drops mail addressed
+    to it rather than letting it bounce against the platform's sending
+    domain — which is the same thing it already does for the shared
+    demo logins, and for the same reason.
+
+    Nothing is lost: a prospect who wants to reach the operator does so
+    through the platform site, not through the showcase's contact form.
+    """
     from django.conf import settings
 
-    return settings.INFO_EMAIL
+    from page_config.defaults import tenant_document_context
+
+    site_host, _store_name = tenant_document_context()
+    host = site_host or getattr(settings, "APP_MAIN_HOST_NAME", "")
+    return f"{DEMO_MAILBOX}@{host}" if host else ""
 
 
 # ── settings (extra_settings rows) ───────────────────────────────────
@@ -93,10 +122,11 @@ DEMO_SETTINGS: dict[str, Any] = {
     # when B2B_ALLOW_PROMOTIONS is false).
     "B2B_ALLOW_PROMOTIONS": True,
     "B2B_LOYALTY_ENABLED": True,
-    # Demo inquiries go to the platform operator: resolved at seed
-    # time from settings.INFO_EMAIL (a store's contact address never
-    # falls back to it on its own — see tenant_contact_email).
-    "CONTACT_EMAIL": _platform_contact_email,
+    # The store's OWN mailbox, on its own domain, resolved at seed time
+    # — not the platform operator's, which this published in the footer
+    # and on the contact page of a public showcase. Mail to it is
+    # suppressed rather than delivered; see `_demo_contact_email`.
+    "CONTACT_EMAIL": _demo_contact_email,
     # Feeds the business_hours section, the footer open/closed badge and
     # the LocalBusiness schema.org block. Shape is validated by
     # tenant.validators.validate_business_hours_setting — exactly
@@ -118,7 +148,15 @@ DEMO_SETTINGS: dict[str, Any] = {
     "STORE_GEO_LAT": "40.6403",
     "STORE_GEO_LNG": "22.9439",
     # Every B2B invoice is structurally incomplete without these; the
-    # myDATA readiness check reads the same block.
+    # myDATA readiness check reads the same block, and the storefront
+    # publishes it in the footer (N. 4919/2022 art. 22 §3-4).
+    #
+    # The ΑΦΜ and the ΓΕΜΗ stay RESERVED placeholders — all nines, all
+    # zeros — on purpose, and are not dressed up into plausible-looking
+    # numbers. A well-formed twelve-digit ΓΕΜΗ belongs to somebody:
+    # putting one on a public showcase would publish a real company's
+    # registry entry under a fictional store's name. A number that
+    # obviously reads as "unset" cannot.
     "INVOICE_SELLER_NAME": "GrooveShop Demo",
     "INVOICE_SELLER_LEGAL_FORM": "ΙΚΕ",
     "INVOICE_SELLER_VAT_ID": "999999999",
@@ -130,7 +168,7 @@ DEMO_SETTINGS: dict[str, Any] = {
     "INVOICE_SELLER_CITY": "Θεσσαλονίκη",
     "INVOICE_SELLER_POSTAL_CODE": "54622",
     "INVOICE_SELLER_COUNTRY": "GR",
-    "INVOICE_SELLER_EMAIL": _platform_contact_email,
+    "INVOICE_SELLER_EMAIL": _demo_contact_email,
     "INVOICE_SELLER_PHONE": "+302310000000",
 }
 

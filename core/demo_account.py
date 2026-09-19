@@ -61,3 +61,43 @@ def is_demo_account(user) -> bool:
     if not email:
         return False
     return email in demo_account_emails()
+
+
+#: The store's OWN published mailboxes. Separate from the login set
+#: above because they answer a different question: these are addresses
+#: a demo store PRINTS (footer, contact page, invoice block), not
+#: accounts anyone can sign into. Only the mail layer reads them —
+#: ``is_demo_account`` must keep meaning "a shared login", or a customer
+#: whose address happened to match the store's would be refused a
+#: password change.
+_STORE_MAILBOX_SETTINGS = ("CONTACT_EMAIL", "INVOICE_SELLER_EMAIL")
+
+
+def demo_store_mailboxes() -> frozenset[str]:
+    """Every address a demo store publishes or logs in with.
+
+    A demo store's contact address is on the store's own domain and has
+    no mailbox behind it — deliberately, so a public showcase does not
+    publish the operator's inbox. Mail sent to it would therefore
+    bounce, and the bounce counts against the platform's sending domain.
+    So it is suppressed exactly like the shared logins.
+
+    Empty on every ordinary store, for the same reason
+    ``demo_account_emails`` is: the gate is ``DEMO_ACCOUNT_ENABLED``,
+    which only a tenant flagged ``is_demo`` is ever seeded with.
+    """
+    from extra_settings.models import Setting
+
+    accounts = demo_account_emails()
+    if not accounts:
+        return accounts
+
+    try:
+        published = {
+            str(Setting.get(name, "") or "").strip().lower()
+            for name in _STORE_MAILBOX_SETTINGS
+        }
+    except Exception:
+        logger.debug("demo store mailbox lookup failed", exc_info=True)
+        return accounts
+    return accounts | frozenset(email for email in published if email)

@@ -20,7 +20,13 @@ So it is dropped here, at the one place every sender passes through.
 Doing it per-sender would mean finding them all and finding the next one
 too.
 
-This is a passthrough on every ordinary store: ``demo_account_emails()``
+The store's OWN published address goes the same way. A demo store
+publishes a mailbox on its own domain rather than the operator's, so
+there is nothing behind it to deliver to — a contact-form notification
+addressed there is the bounce this module exists to prevent, arriving
+by a different route.
+
+This is a passthrough on every ordinary store: ``demo_store_mailboxes()``
 is empty unless ``DEMO_ACCOUNT_ENABLED`` is on for that schema, and then
 no recipient can match.
 """
@@ -33,7 +39,7 @@ from django.conf import settings
 from django.core.mail import get_connection
 from django.core.mail.backends.base import BaseEmailBackend
 
-from core.demo_account import demo_account_emails
+from core.demo_account import demo_store_mailboxes
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +66,7 @@ class DemoRecipientSuppressingBackend(BaseEmailBackend):
         if not email_messages:
             return 0
 
-        suppressed = demo_account_emails()
+        suppressed = demo_store_mailboxes()
         if not suppressed:
             return self._connection().send_messages(email_messages)
 
@@ -74,8 +80,8 @@ class DemoRecipientSuppressingBackend(BaseEmailBackend):
 
         if dropped:
             logger.info(
-                "Suppressed %d message(s) addressed only to a shared demo "
-                "account",
+                "Suppressed %d message(s) addressed only to a demo "
+                "store's own mailboxes",
                 dropped,
             )
         if not kept:

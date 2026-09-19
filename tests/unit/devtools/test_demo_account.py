@@ -14,6 +14,9 @@ to hold and neither is visible at runtime until it has already failed:
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+from unittest import mock
+
 import pytest
 from django.conf import settings as django_settings
 from django.core.exceptions import ValidationError
@@ -391,9 +394,13 @@ class TestMailSuppression(TestCase):
     def _backend(self, demo_emails):
         from core import mail as core_mail
 
-        original = core_mail.demo_account_emails
-        core_mail.demo_account_emails = lambda: frozenset(demo_emails)
-        self.addCleanup(setattr, core_mail, "demo_account_emails", original)
+        # `demo_store_mailboxes`, not `demo_account_emails`: the set the
+        # backend suppresses is the shared LOGINS plus the addresses the
+        # demo store publishes for itself, which have no mailbox behind
+        # them either.
+        original = core_mail.demo_store_mailboxes
+        core_mail.demo_store_mailboxes = lambda: frozenset(demo_emails)
+        self.addCleanup(setattr, core_mail, "demo_store_mailboxes", original)
         with self.settings(
             EMAIL_DELEGATE_BACKEND=(
                 "django.core.mail.backends.locmem.EmailBackend"
@@ -504,3 +511,98 @@ class TestMailSuppression(TestCase):
             )
         assert sent == 1
         assert len(django_mail.outbox) == 1
+
+
+class TestDemoStoreMailboxes(TestCase):
+    """The store's own published address is a suppressed address too.
+
+    A demo store publishes a mailbox on its OWN domain — the footer and
+    the contact page of a public showcase must not carry the operator's
+    inbox, which is what they carried until 2026-09-19. Nothing is
+    listening behind it, so a contact-form notification sent there is
+    the bounce `core.mail` exists to prevent.
+    """
+
+    def test_publishes_on_the_stores_own_domain(self):
+        """The address follows the tenant, never a hardcoded host.
+
+        The showcase is `demo.grooveshop.space` in production and
+        `demo-staging.grooveshop.space` on staging; one literal would
+        make one of them publish the other's address.
+        """
+        from devtools import demo_store
+
+        with mock.patch(
+            "page_config.defaults.tenant_document_context",
+            return_value=("demo-staging.grooveshop.space", "GrooveShop Demo"),
+        ):
+            self.assertEqual(
+                demo_store._demo_contact_email(),
+                "hello@demo-staging.grooveshop.space",
+            )
+
+    def test_falls_back_to_the_platform_host_not_a_personal_mailbox(self):
+        from devtools import demo_store
+
+        with (
+            mock.patch(
+                "page_config.defaults.tenant_document_context",
+                return_value=("", "GrooveShop Demo"),
+            ),
+            self.settings(
+                APP_MAIN_HOST_NAME="grooveshop.space",
+                INFO_EMAIL="someone@personal.example",
+            ),
+        ):
+            resolved = demo_store._demo_contact_email()
+
+        self.assertEqual(resolved, "hello@grooveshop.space")
+        self.assertNotIn("personal.example", resolved)
+
+    def test_the_published_address_joins_the_suppressed_set(self):
+        from core import demo_account as module
+
+        with (
+            mock.patch.object(
+                module,
+                "demo_account_emails",
+                return_value=frozenset({demo_account.RETAIL_EMAIL}),
+            ),
+            mock.patch(
+                "extra_settings.models.Setting.get",
+                side_effect=lambda name, default=None: {
+                    "CONTACT_EMAIL": "hello@demo.grooveshop.space",
+                    "INVOICE_SELLER_EMAIL": "hello@demo.grooveshop.space",
+                }.get(name, default),
+            ),
+        ):
+            mailboxes = module.demo_store_mailboxes()
+
+        self.assertIn(demo_account.RETAIL_EMAIL, mailboxes)
+        self.assertIn("hello@demo.grooveshop.space", mailboxes)
+
+    def test_is_empty_on_a_store_with_no_demo_account(self):
+        # The gate is the same one that publishes the credentials, so an
+        # ordinary merchant's mail is never inspected.
+        from core import demo_account as module
+
+        with mock.patch.object(
+            module, "demo_account_emails", return_value=frozenset()
+        ):
+            self.assertEqual(module.demo_store_mailboxes(), frozenset())
+
+    def test_the_published_address_is_not_treated_as_a_login(self):
+        """`is_demo_account` must keep meaning "a shared login".
+
+        Widening it would refuse a password change to any customer whose
+        address happened to match the store's published one.
+        """
+        from core import demo_account as module
+
+        with mock.patch.object(
+            module,
+            "demo_account_emails",
+            return_value=frozenset({demo_account.RETAIL_EMAIL}),
+        ):
+            shopper = SimpleNamespace(email="hello@demo.grooveshop.space")
+            self.assertFalse(module.is_demo_account(shopper))

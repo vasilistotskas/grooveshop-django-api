@@ -3,6 +3,27 @@
 
 
 
+## v3.68.1 (2026-09-19)
+
+### Bug fixes
+
+* fix(demo): retire demo categories the tree no longer lists
+
+Products already deactivate when the catalogue drops them; categories
+did not. So after reseeding, the storefront's categories band offered
+"Φορτιστές & Καλώδια" from the previous tree next to the "Φόρτιση" that
+replaced it, each with its own photograph — visible on staging.
+
+Deactivated rather than deleted, for the same reason as the products:
+orders and reviews point at them.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Qy8F7sDCkyCEy9KQd2HmbW ([`a20d548`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a20d548a477203e4c41d34d6c860386221da6319))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.68.0 [skip ci] ([`c859ab1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c859ab11723e278ce38daa3d8580c39a87ab8508))
+
 ## v3.68.0 (2026-09-19)
 
 ### Chores

@@ -3,6 +3,39 @@
 
 
 
+## v3.72.4 (2026-09-19)
+
+### Bug fixes
+
+* fix(devtools): give the demo store a returns policy
+
+`/return-policy` answered 404 on the demo store while its own footer
+and its own FAQ both linked to it, in both locales. Not a demo-only
+gap either — `staging.webside.gr/return-policy` is a 404 too.
+
+The row exists; provisioning seeds it as an unpublished prompt,
+because a returns policy is the one legal page only a merchant can
+write. That is right for a merchant and wrong for a showcase, which
+has none — so the seed writes it, EL and EN, matching the 14-day
+withdrawal the FAQ already promises and naming the statutory two-year
+guarantee beside it.
+
+Two knock-on corrections. The footer column headed "Terms & conditions"
+rendered three links, not four: a navigation target that resolves to
+nothing is dropped, silently, so the menu had always been one short.
+And the comment above `CONTENT_PAGES` claimed all five remaining
+default slugs "duplicate hardcoded Nuxt routes that already carry real
+content" — true of `about`, `terms`, `privacy` and `cookies`, but the
+hardcoded `/return-policy` route IS this row, so nothing carried it.
+The test asserting that set encoded the same wrong belief.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01PzA5KfS6cqvHDynKZumU22 ([`bbaf098`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bbaf0985f52aca32c9211f22c8e84adb31d87bb8))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.72.3 [skip ci] ([`e570454`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e5704540dc006c9c2e45623fd4868b54f886b83c))
+
 ## v3.72.3 (2026-09-19)
 
 ### Bug fixes

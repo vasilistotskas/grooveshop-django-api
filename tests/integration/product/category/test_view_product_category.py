@@ -327,3 +327,76 @@ class ProductCategoryViewSetTestCase(APITestCase):
             self.assertIn("id", child_data)
             self.assertIn("slug", child_data)
             self.assertIn("translations", child_data)
+
+
+class ProductCategoryVisibilityTestCase(APITestCase):
+    """A category switched off in the admin must leave the storefront.
+
+    The read actions are ``AllowAny`` and, until 2026-09-19, unfiltered:
+    the demo store carried a pill for ``demo-chargers-cables`` on
+    ``/products`` — inactive, zero products — linking to a page that
+    listed nothing, and the same row reached the filter sidebar, the
+    sitemap and the agent gateway's catalogue feed. Four consumers, one
+    queryset.
+    """
+
+    def setUp(self):
+        self.test_id = uuid.uuid4().hex[:8]
+        self.visible = ProductCategoryFactory(active=True)
+        self.hidden = ProductCategoryFactory(active=False)
+        # Active itself, but under a parent that is not: the whole
+        # branch goes, or the menu (which indexes by parent id) drops it
+        # while the products page and the sitemap keep it.
+        self.orphaned_child = ProductCategoryFactory(
+            parent=self.hidden, active=True
+        )
+        self.staff = User.objects.create_superuser(
+            email=f"staff-{self.test_id}@example.com",
+            username=f"staffuser-{self.test_id}",
+            password="testpass123",
+        )
+
+    @staticmethod
+    def _ids(payload):
+        rows = payload["results"] if "results" in payload else payload
+        return {row["id"] for row in rows}
+
+    def test_anonymous_list_omits_an_inactive_category(self):
+        response = self.client.get(reverse("product-category-list"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        ids = self._ids(response.data)
+        self.assertIn(self.visible.id, ids)
+        self.assertNotIn(self.hidden.id, ids)
+
+    def test_anonymous_list_omits_a_branch_under_an_inactive_parent(self):
+        response = self.client.get(reverse("product-category-list"))
+
+        self.assertNotIn(self.orphaned_child.id, self._ids(response.data))
+
+    def test_anonymous_all_omits_the_same_rows(self):
+        # `all` is the unpaginated endpoint the header menu and the
+        # filter sidebar read; it declares `filter_backends=[]`, so the
+        # queryset is the only thing standing in the way.
+        response = self.client.get(reverse("product-category-all"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        ids = self._ids(response.data)
+        self.assertIn(self.visible.id, ids)
+        self.assertNotIn(self.hidden.id, ids)
+        self.assertNotIn(self.orphaned_child.id, ids)
+
+    def test_anonymous_detail_of_an_inactive_category_is_404(self):
+        response = self.client.get(
+            reverse("product-category-detail", args=[self.hidden.id])
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_staff_still_see_the_whole_tree(self):
+        self.client.force_authenticate(user=self.staff)
+        response = self.client.get(reverse("product-category-all"))
+
+        ids = self._ids(response.data)
+        self.assertIn(self.hidden.id, ids)
+        self.assertIn(self.orphaned_child.id, ids)

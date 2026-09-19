@@ -89,10 +89,20 @@ class ProductCategoryViewSet(BaseModelViewSet):
 
         Uses ProductCategory.objects.for_list() for list views and
         ProductCategory.objects.for_detail() for detail views.
+
+        Read actions are ``AllowAny``, so the queryset is also the
+        visibility gate: ``visible_to`` drops categories an operator
+        switched off, and the branches under them, for everyone who is
+        not store staff. Without it a deactivated category kept a
+        crawlable pill on ``/products``, a row in the filter sidebar and
+        an entry in the sitemap. Staff keep the full tree so the admin
+        can still preview one.
         """
         if self.action in ["list", "all"]:
-            return ProductCategory.objects.for_list()
-        return ProductCategory.objects.for_detail()
+            queryset = ProductCategory.objects.for_list()
+        else:
+            queryset = ProductCategory.objects.for_detail()
+        return queryset.visible_to(self.request.user)
 
     @action(
         detail=False,

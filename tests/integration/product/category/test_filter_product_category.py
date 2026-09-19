@@ -1,6 +1,8 @@
+import uuid
 from datetime import timedelta
 from decimal import Decimal
 
+from django.contrib.auth import get_user_model
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework.test import APITestCase
@@ -14,6 +16,21 @@ class ProductCategoryFilterTest(APITestCase):
     def setUp(self):
         ProductCategory.objects.all().delete()
         Product.objects.all().delete()
+
+        # What is under test here is the FILTERSET, not who may see
+        # what. Since 2026-09-19 the read actions hide inactive
+        # categories — and the branches under them — from everyone who
+        # is not store staff (see ProductCategoryVisibilityTestCase),
+        # which would leave `?active=false` with nothing to return and
+        # every count below short by the `books` subtree. Staff still
+        # see the whole tree, so the filters are exercised as staff.
+        self.client.force_authenticate(
+            user=get_user_model().objects.create_superuser(
+                email=f"filters-{uuid.uuid4().hex[:8]}@example.com",
+                username=f"filters-{uuid.uuid4().hex[:8]}",
+                password="testpass123",
+            )
+        )
 
         self.now = timezone.now()
 

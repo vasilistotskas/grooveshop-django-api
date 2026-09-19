@@ -18,6 +18,49 @@ class CategoryQuerySet(TreeTranslatableQuerySet):
     def active(self) -> Self:
         return self.filter(active=True)
 
+    def visible_to(self, user) -> Self:
+        """Public visibility gate for the read-only category endpoints.
+
+        Staff see everything (admin preview); everyone else sees only a
+        branch that is active the whole way up. Every public entry point
+        into categories must route through this — the storefront reads
+        the tree from three of them (the header menu, the products-page
+        nav, the filter sidebar), the sitemap from a fourth and the
+        agent gateway's catalogue feed from a fifth, and until
+        2026-09-19 none of them filtered: a category switched off in the
+        admin kept its crawlable pill on ``/products``, its row in the
+        filter tree and its entry in the sitemap, linking to a page that
+        listed nothing.
+
+        An INACTIVE ANCESTOR hides its descendants too. Filtering on the
+        row's own flag alone leaves a half-hidden branch: children whose
+        parent is not in the payload vanish from the menu (it indexes by
+        parent id) but keep their pill on the products page and their
+        sitemap entry, so "switch off Charging" would hide the heading
+        and leave its four subcategories loose. The ancestor test is an
+        MPTT containment check — same tree, ``lft`` before and ``rght``
+        after — which is one correlated EXISTS rather than a walk.
+        """
+        from tenant.membership import is_store_staff
+
+        if is_store_staff(user):
+            return self
+        return self.active_branch()
+
+    def active_branch(self) -> Self:
+        """Active rows that have no inactive ancestor."""
+        from django.db.models import Exists, OuterRef
+
+        from product.models.category import ProductCategory
+
+        inactive_ancestors = ProductCategory.objects.filter(
+            active=False,
+            tree_id=OuterRef("tree_id"),
+            lft__lt=OuterRef("lft"),
+            rght__gt=OuterRef("rght"),
+        )
+        return self.filter(active=True).exclude(Exists(inactive_ancestors))
+
     def with_products_count(self) -> Self:
         """Annotate with products count."""
         from django.db.models import Count

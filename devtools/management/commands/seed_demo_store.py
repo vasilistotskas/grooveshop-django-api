@@ -81,6 +81,10 @@ STEPS: tuple[tuple[str, str], ...] = (
     ("layouts", "seed_layouts"),
     ("navigation", "seed_navigation"),
     ("content-pages", "publish_content_pages"),
+    # Before the account step, after everything translated: the
+    # storefront 404s a locale the tenant does not list, so English
+    # content is unreachable until this runs.
+    ("locales", "seed_locales"),
     # Last: the account references products, and writing the
     # DEMO_ACCOUNT_* settings publishes credentials, so it should
     # only happen once everything it advertises exists.

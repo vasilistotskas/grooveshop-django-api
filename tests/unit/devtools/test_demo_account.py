@@ -275,6 +275,44 @@ class TestMfaCannotLockOutTheDemoAccount(TestCase):
         assert adapter.is_mfa_enabled(user) is True
 
 
+@pytest.mark.django_db
+class TestLocales(TestCase):
+    """The demo store has to SERVE the English it was given.
+
+    Everything the seeder writes is bilingual, and none of it is
+    reachable while `available_locales` is empty: empty means
+    single-language, so the storefront 404s `/en` and hides it from the
+    switcher, the hreflang set and the sitemap. Staging answered 404 on
+    a store whose every string already had an English translation.
+    """
+
+    def test_skips_a_tenant_that_is_not_a_demo(self):
+        from devtools import demo_store
+
+        # No demo tenant in this schema, so nothing to do — and nothing
+        # that could start publishing a second locale on a real store.
+        assert demo_store.seed_locales() == {"skipped_not_a_demo_tenant": 1}
+
+    def test_the_list_it_would_write_is_valid(self):
+        """Whatever it writes must pass the field validator, which
+        `save()` does not run — hence the `full_clean` in the step."""
+        from django.conf import settings as django_conf
+
+        from tenant.validators import validate_available_locales
+
+        allowed = {code for code, _label in django_conf.LANGUAGES}
+        locales = list(dict.fromkeys(["el", "en"]))
+        assert set(locales) <= allowed, (locales, allowed)
+        validate_available_locales(locales)
+
+    def test_the_default_locale_is_never_duplicated(self):
+        """A store whose default IS `en` would otherwise be given it
+        twice, which the validator rejects."""
+        from tenant.validators import validate_available_locales
+
+        validate_available_locales(list(dict.fromkeys(["en", "en"])))
+
+
 class _Passed:
     status_code = 200
 

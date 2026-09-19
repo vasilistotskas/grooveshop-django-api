@@ -1622,6 +1622,51 @@ def _current_tenant_is_demo() -> bool:
         return Tenant.objects.filter(schema_name=schema, is_demo=True).exists()
 
 
+def seed_locales() -> dict[str, int]:
+    """Make the demo store serve English as well as Greek.
+
+    Everything this seeder writes is bilingual — 15 section overrides,
+    8 blog posts, every category and product — and NONE of it is
+    reachable while ``available_locales`` is empty. Empty means
+    single-language on the default locale, so the storefront 404s
+    ``/en`` and hides it from the switcher, the hreflang set and the
+    sitemap. Verified on staging before this step existed: ``/en``
+    answered 404 on a store whose every string had an English
+    translation waiting.
+
+    ``full_clean`` then ``save(update_fields=...)``: the validator is a
+    field validator, which ``save()`` does not run, and the narrow
+    update still fires ``post_save`` — that is what purges the cached
+    ``tenant_resolve`` payload the storefront reads the locale list
+    from.
+    """
+    from django.db import connection
+    from django_tenants.utils import get_public_schema_name, schema_context
+
+    from tenant.models import Tenant
+
+    schema = connection.schema_name
+    report: dict[str, int] = {}
+    with schema_context(get_public_schema_name()):
+        tenant = Tenant.objects.filter(schema_name=schema, is_demo=True).first()
+        if tenant is None:
+            return {"skipped_not_a_demo_tenant": 1}
+
+        wanted = [tenant.default_locale or "el", "en"]
+        # Deduplicate while keeping order: a store whose default IS `en`
+        # would otherwise be given it twice, which the validator
+        # rejects.
+        locales = list(dict.fromkeys(wanted))
+        if tenant.available_locales == locales:
+            return {"unchanged": 1}
+
+        tenant.available_locales = locales
+        tenant.full_clean(exclude=["schema_name"])
+        tenant.save(update_fields=["available_locales"])
+        _bump(report, "updated")
+    return report
+
+
 def seed_demo_account() -> dict[str, int]:
     """The two shared demo logins, and the settings that publish them.
 

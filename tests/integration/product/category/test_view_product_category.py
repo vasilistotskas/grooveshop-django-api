@@ -358,7 +358,13 @@ class ProductCategoryVisibilityTestCase(APITestCase):
 
     @staticmethod
     def _ids(payload):
-        rows = payload["results"] if "results" in payload else payload
+        """Ids out of either shape: `list` returns the paginated
+        envelope, `all` returns a bare list."""
+        rows = (
+            payload.get("results", payload)
+            if hasattr(payload, "get")
+            else payload
+        )
         return {row["id"] for row in rows}
 
     def test_anonymous_list_omits_an_inactive_category(self):

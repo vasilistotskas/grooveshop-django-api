@@ -3,6 +3,45 @@
 
 
 
+## v3.72.5 (2026-09-19)
+
+### Bug fixes
+
+* fix(promotion): answer offers in the language the shopper is reading
+
+Every `get_name`/`get_description` on the public offer serializers read
+`safe_translation_getter(field, any_language=True)` with no language,
+which resolves against whatever parler has ACTIVE — the site default on
+an API request, always. So `/offers` and the product page's offer panel
+were monolingual whatever locale the URL carried.
+
+The demo store's English homepage carried four Greek offer cards while
+the correct English translation sat in the database, unread; every one
+of its ten promotions had been bilingual the whole time. Found by
+reading the rendered page rather than the payload, which is also why it
+survived: the rows look right from the database and the response looks
+right from the API, and only the two together show the mismatch.
+
+The language comes from the serializer CONTEXT, which the two views —
+plain `APIView`s, so they inherit none of `TranslationsModelViewSet`'s
+— now fill from the request. Not from `translation.activate`: that
+would also change error messages and money formatting for the request,
+a far larger blast radius than one field. `any_language=True` stays as
+the fallback, so an untranslated promotion still shows its name rather
+than an empty card.
+
+`CamelCaseMiddleWare` underscoreizes query parameters, so the
+storefront's `?languageCode=en` arrives as `language_code`; the
+parameter is now declared on both endpoints rather than working by
+accident.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01PzA5KfS6cqvHDynKZumU22 ([`6e28566`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6e28566a1cc22a82285ced8afa45ebadda7b2b9c))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.72.4 [skip ci] ([`4607375`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4607375d49f68cd1433a7b246a5c4a323c7108e3))
+
 ## v3.72.4 (2026-09-19)
 
 ### Bug fixes

@@ -81,6 +81,10 @@ STEPS: tuple[tuple[str, str], ...] = (
     ("layouts", "seed_layouts"),
     ("navigation", "seed_navigation"),
     ("content-pages", "publish_content_pages"),
+    # Before `locales`: the Tenant model refuses a locale whose legal
+    # documents have no body in it, so the locale step is blocked
+    # until these exist.
+    ("legal-english", "seed_legal_english"),
     # Before the account step, after everything translated: the
     # storefront 404s a locale the tenant does not list, so English
     # content is unreachable until this runs.

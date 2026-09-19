@@ -1622,6 +1622,21 @@ def _current_tenant_is_demo() -> bool:
         return Tenant.objects.filter(schema_name=schema, is_demo=True).exists()
 
 
+def seed_legal_english() -> dict[str, int]:
+    """English bodies for the three legal documents.
+
+    Must run BEFORE ``locales``: ``Tenant`` refuses to serve a locale
+    whose legal documents have no body in it, so without this the
+    locale step is blocked and every English translation the seeder
+    writes stays unreachable.
+    """
+    from devtools.demo_legal import seed_english_legal_documents
+
+    if not _current_tenant_is_demo():
+        return {"skipped_not_a_demo_tenant": 1}
+    return seed_english_legal_documents()
+
+
 def seed_locales() -> dict[str, int]:
     """Make the demo store serve English as well as Greek.
 

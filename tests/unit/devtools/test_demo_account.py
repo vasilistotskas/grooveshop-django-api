@@ -313,6 +313,60 @@ class TestLocales(TestCase):
         validate_available_locales(list(dict.fromkeys(["en", "en"])))
 
 
+class TestEnglishLegalDocuments(TestCase):
+    """The documents that unblock the English locale.
+
+    `Tenant` refuses a locale whose legal documents have no body in it,
+    so these are what let the demo store serve `/en` at all.
+    """
+
+    def test_covers_every_slug_the_validator_checks(self):
+        from devtools import demo_legal
+        from page_config.legal_documents import LEGAL_DOCUMENT_SLUGS
+
+        assert set(demo_legal.DOCUMENTS) == set(LEGAL_DOCUMENT_SLUGS)
+
+    def test_section_ids_match_the_greek_document(self):
+        """The legal route builds its table of contents from these ids.
+
+        A translation that renames them gives the English page a TOC
+        whose every anchor resolves to nothing — which is the bug the
+        old compiled-in boilerplate shipped with on tenant #2.
+        """
+        import re
+
+        from devtools import demo_legal
+        from page_config.legal_documents import LEGAL_DOCUMENTS
+
+        def ids(html: str) -> list[str]:
+            return re.findall(r'<section id="([a-z0-9-]+)"', html)
+
+        for slug, document in demo_legal.DOCUMENTS.items():
+            assert ids(document["body"]) == ids(
+                LEGAL_DOCUMENTS[slug]["body"]
+            ), slug
+
+    def test_substitutions_are_resolved(self):
+        from devtools import demo_legal
+
+        for slug in demo_legal.DOCUMENTS:
+            rendered = demo_legal.render(
+                slug, site_host="demo.example", store_name="Demo Store"
+            )
+            assert "{site_host}" not in rendered, slug
+            assert "{store_name}" not in rendered, slug
+            assert "demo.example" in rendered or "Demo Store" in rendered
+
+    def test_each_document_says_it_is_a_demonstration(self):
+        """A published legal page that reads as a real shop's is the one
+        way this content could mislead somebody."""
+        from devtools import demo_legal
+
+        for slug in ("terms", "privacy"):
+            body = demo_legal.DOCUMENTS[slug]["body"].lower()
+            assert "demonstration" in body, slug
+
+
 class _Passed:
     status_code = 200
 

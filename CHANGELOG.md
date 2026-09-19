@@ -3,6 +3,42 @@
 
 
 
+## v3.72.1 (2026-09-19)
+
+### Bug fixes
+
+* fix(devtools): purge the caches the demo seeder invalidates
+
+The seeder writes everything through the ORM, and parts of it go around
+the signals on purpose (`bulk_create` + `update()` for the backdated
+orders, so nothing emails a customer or moves stock). Nothing therefore
+tells Django's Redis or the storefront's Nitro cache that the store
+changed, and the seed is invisible until somebody remembers the admin
+cache panel.
+
+What that cost on 2026-09-19: `seed_blog` created eight bilingual posts
+and the demo store's `/blog` kept answering "no articles yet".
+`BlogPostViewSet`'s handler cache (10-minute `maxAge`, 24-hour
+`staleMaxAge`) still held the empty payload recorded before the seed,
+with the rendered `/blog` document cached on top of it; Django returned
+all eight posts to a direct call throughout. A purge fixed it instantly.
+
+`purge_caches` runs last — its whole value is being after every writer
+— and under `tenant_context`, not the command's `schema_context`: the
+Nitro cache is shared by every tenant and `core.cache.nuxt` scopes an
+eviction by reading `connection.tenant.domains`, which a `FakeTenant`
+does not have. Errors are reported, never raised: an unreachable
+storefront must not cost an operator a seed run that succeeded.
+
+The command's closing note said the caches were NOT covered. They are
+now, and it says which flag combinations opt out of that.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com> ([`d8615a8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d8615a89227486812921db84a1b2ac549906b60b))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.72.0 [skip ci] ([`83d32a2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/83d32a26a7443c09ae2ae853d5f74057b0d3e789))
+
 ## v3.72.0 (2026-09-19)
 
 ### Bug fixes

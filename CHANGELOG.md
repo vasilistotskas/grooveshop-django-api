@@ -3,6 +3,64 @@
 
 
 
+## v3.68.0 (2026-09-19)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.67.0 [skip ci] ([`577340d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/577340d7fb2db92d3c383b7f87e13a4305f4d8f8))
+
+### Features
+
+* feat(demo): give the demo store a real catalogue with its own photographs
+
+The demo store's images were ten powerbank photographs mapped
+round-robin over the whole catalogue, so a USB-C cable's card showed a
+powerbank, a phone case showed a powerbank, and the files had to be
+copied onto the media volume by hand before a seed would render at all.
+That is the first thing a prospect sees.
+
+Now every product names the photograph of the thing it IS. 61 images
+were curated one family at a time, each checked against the product it
+belongs to rather than against the stock library's auto-generated alt
+text, which described a set of earbuds as a watch and a charging pad as
+sunglasses. They are committed as AVIF (2.5 MB for the set), so a
+deploy downloads nothing and a seed never depends on a stock library
+being reachable.
+
+- `manage.py build_demo_assets` is the only thing that writes
+  `devtools/demo_assets`: it downloads, crops to the shape each kind is
+  rendered at, and steps quality DOWN until the file fits 110 KB rather
+  than fixing one number for a flat studio background and a textured
+  fabric speaker alike. `--check` verifies the committed files against
+  the lock, and the lock carries each photograph's source, author and
+  licence so a file in the repository can always be traced back.
+- `devtools/demo_media.ensure_asset` copies them into the tenant's own
+  storage through `default_storage`, which is tenant-scoped, so a seed
+  in any environment produces its own media with no kubectl step. It
+  deletes before saving, because FileSystemStorage renames around a
+  collision and the seeded path would have pointed at stale bytes.
+- The catalogue is `devtools/demo_catalogue.py`: 55 products across 11
+  categories, every row in Greek AND English, with real weights (a zero
+  weight is falsy on the storefront and 422s the whole checkout
+  payload), variant groups by colour and length, and attribute axes
+  that drive the variant selector.
+- A `demo-` product the catalogue no longer lists is DEACTIVATED rather
+  than deleted: order lines and reviews point at it, and a demo store
+  that loses its order history is a worse demo. Without this the
+  previous catalogue's 22 rows stayed live beside the new one, still
+  carrying the powerbank photograph.
+
+The catalogue tests moved from tuple indexing to the named rows, and
+gained the invariants the new data needs: every image key resolves to a
+committed file, every row is written in both languages, no product
+weighs nothing, and no variant group has a single member. They earned
+it immediately — they caught 28 slugs in the reviews, the tag links and
+the wholesale price list still pointing at products that no longer
+exist.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Qy8F7sDCkyCEy9KQd2HmbW ([`eb19e0a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/eb19e0afccb4d8543cfebaef9a40d09d2bd00bc5))
+
 ## v3.67.0 (2026-09-18)
 
 ### Chores

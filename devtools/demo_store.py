@@ -1640,6 +1640,9 @@ def seed_locales() -> dict[str, int]:
     ``tenant_resolve`` payload the storefront reads the locale list
     from.
     """
+    from django.core.exceptions import (
+        ValidationError as DjangoValidationError,
+    )
     from django.db import connection
     from django_tenants.utils import get_public_schema_name, schema_context
 
@@ -1661,7 +1664,27 @@ def seed_locales() -> dict[str, int]:
             return {"unchanged": 1}
 
         tenant.available_locales = locales
-        tenant.full_clean(exclude=["schema_name"])
+        try:
+            tenant.full_clean(exclude=["schema_name"])
+        except DjangoValidationError as error:
+            # The Tenant model refuses a locale whose legal documents
+            # have no body in it, because the storefront 404s them —
+            # which is the one thing those pages exist to prevent. That
+            # is a CONTENT decision (somebody has to write or approve
+            # the translation), so it is reported rather than raised:
+            # a seeder that dies here takes every later step with it.
+            _bump(report, "blocked")
+            logger.warning(
+                "Not serving %s on %s yet: %s",
+                ", ".join(locales),
+                schema,
+                "; ".join(
+                    str(message)
+                    for messages in error.message_dict.values()
+                    for message in messages
+                ),
+            )
+            return report
         tenant.save(update_fields=["available_locales"])
         _bump(report, "updated")
     return report

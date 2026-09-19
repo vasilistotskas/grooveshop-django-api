@@ -34,6 +34,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from core.api.serializers import ErrorResponseSerializer
+from core.api.views import LANGUAGE_PARAMETER
 from product.models.product import Product
 from promotion.managers.promotion import publishable_code_q
 from promotion.models import Promotion, PromotionCode
@@ -57,6 +58,21 @@ MAX_OFFERS = 60
 MAX_PRODUCT_OFFERS = 8
 
 
+def _language_context(request) -> dict[str, str | None]:
+    """The locale the caller asked for, for the serializers to read.
+
+    These two views are plain ``APIView``s, so they get none of
+    ``TranslationsModelViewSet``'s context — which is why every offer
+    was rendered in the store's default language whatever locale the
+    shopper was reading. ``CamelCaseMiddleWare`` underscoreizes query
+    parameters, so the storefront's ``?languageCode=en`` arrives here as
+    ``language_code``.
+
+    ``None`` when unset, which keeps parler's own default behaviour.
+    """
+    return {"language_code": request.query_params.get("language_code") or None}
+
+
 class PublicPromotionListView(APIView):
     """Live promotions a shopper can act on, in engine-apply order."""
 
@@ -78,13 +94,16 @@ class PublicPromotionListView(APIView):
             "has promotions disabled at either tier."
         ),
         tags=["Promotions"],
+        parameters=[LANGUAGE_PARAMETER],
         responses={
             200: PublicPromotionSerializer(many=True),
             404: ErrorResponseSerializer,
         },
     )
     def get(self, request):
-        serializer = PublicPromotionSerializer(self._offers(), many=True)
+        serializer = PublicPromotionSerializer(
+            self._offers(), many=True, context=_language_context(request)
+        )
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     @staticmethod
@@ -133,7 +152,9 @@ class ProductPromotionListView(APIView):
         # No explicit path parameter: spectacular derives ``productId``
         # from the ``<int:product_id>`` converter, and declaring a
         # second one by hand put BOTH in the generated client's path
-        # schema.
+        # schema. The language one is a QUERY parameter, so it is safe
+        # to name.
+        parameters=[LANGUAGE_PARAMETER],
         responses={
             200: ProductPromotionSerializer(many=True),
             404: ErrorResponseSerializer,
@@ -153,7 +174,9 @@ class ProductPromotionListView(APIView):
         for offer in offers:
             offer.promotion._product_relation = offer.relation
         serializer = ProductPromotionSerializer(
-            [offer.promotion for offer in offers], many=True
+            [offer.promotion for offer in offers],
+            many=True,
+            context=_language_context(request),
         )
         return Response(serializer.data, status=status.HTTP_200_OK)
 

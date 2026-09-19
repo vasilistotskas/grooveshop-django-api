@@ -320,3 +320,83 @@ class TestGates:
             response = client.get(url)
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+@pytest.mark.django_db
+class TestLanguage:
+    """An offer answers in the language the shopper is reading.
+
+    Every `get_name`/`get_description` used to read
+    `safe_translation_getter(..., any_language=True)` with no language,
+    which resolves against whatever parler has ACTIVE — the site default
+    on an API request, always. So `/offers` and the product page's offer
+    panel were monolingual whatever locale the URL carried: the demo
+    store's English homepage carried four Greek offer cards while the
+    correct English translation sat in the database, unread. Found
+    2026-09-20 by reading the rendered page, not the payload.
+    """
+
+    @staticmethod
+    def _translate(promotion, **by_language):
+        """Set the translations the factory already created.
+
+        `PromotionFactory` auto-creates one row per configured language
+        named "Promotion <n>", and `PromotionTranslationFactory` is
+        `django_get_or_create` on (language_code, master) — so calling
+        it again returns the EXISTING row and silently ignores the name
+        you passed. Update in place instead.
+        """
+        for language_code, (name, description) in by_language.items():
+            translation = promotion.translations.get(
+                language_code=language_code
+            )
+            translation.name = name
+            translation.description = description
+            translation.save()
+        return promotion
+
+    @classmethod
+    def _bilingual(cls):
+        promotion = PromotionFactory(
+            trigger=PromotionTrigger.AUTOMATIC, is_active=True
+        )
+        return cls._translate(
+            promotion,
+            el=("Δωρεάν αποστολή", "Δωρεάν για κάθε καλάθι."),
+            en=("Free shipping", "Free on every cart."),
+        )
+
+    def test_answers_in_the_requested_language(
+        self, client, url, promotions_on
+    ):
+        self._bilingual()
+
+        rows = client.get(url, {"languageCode": "en"}).json()
+
+        assert rows[0]["name"] == "Free shipping"
+        assert rows[0]["description"] == "Free on every cart."
+
+    def test_answers_in_the_default_when_none_is_asked_for(
+        self, client, url, promotions_on
+    ):
+        self._bilingual()
+
+        rows = client.get(url).json()
+
+        assert rows[0]["name"] == "Δωρεάν αποστολή"
+
+    def test_falls_back_rather_than_rendering_an_empty_card(
+        self, client, url, promotions_on
+    ):
+        # A promotion nobody has translated yet still needs a name: an
+        # offer card with a blank heading is worse than one in the
+        # wrong language.
+        promotion = PromotionFactory(
+            trigger=PromotionTrigger.AUTOMATIC, is_active=True
+        )
+        self._translate(promotion, el=("Μόνο ελληνικά", ""))
+        promotion.translations.exclude(language_code="el").delete()
+
+        rows = client.get(url, {"languageCode": "en"}).json()
+
+        assert rows[0]["name"] == "Μόνο ελληνικά"

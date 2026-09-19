@@ -46,6 +46,39 @@ from promotion.models import Promotion
 REWARD_PREVIEW_LIMIT = 12
 
 
+def _translated(serializer, obj, field: str, default: str = "") -> str:
+    """One translatable field, in the language the CALLER asked for.
+
+    Every `get_name`/`get_description` on this module used to read
+    `safe_translation_getter(field, any_language=True)` with no
+    language, which resolves against whatever parler has ACTIVE — the
+    site default on an API request, always. So `/offers` and the
+    product page's offer panel answered in the store's default language
+    whatever locale the shopper was reading, and the demo store's
+    English homepage carried four Greek offer cards while a correct
+    English translation sat in the database unused. Found 2026-09-20;
+    the rows had been bilingual the whole time.
+
+    `any_language=True` stays as the fallback so a promotion somebody
+    has not translated yet still shows its name rather than an empty
+    card.
+
+    The language comes from the serializer CONTEXT, which the views
+    fill from the request, rather than from `translation.get_language()`
+    — activating a language for the request would also change error
+    messages and money formatting, which is a much larger blast radius
+    than one field.
+    """
+    return (
+        obj.safe_translation_getter(
+            field,
+            language_code=serializer.context.get("language_code"),
+            any_language=True,
+        )
+        or default
+    )
+
+
 class PromotionProductRefSerializer(serializers.Serializer):
     """The minimum a storefront product card needs to render."""
 
@@ -56,9 +89,7 @@ class PromotionProductRefSerializer(serializers.Serializer):
 
     @extend_schema_field(serializers.CharField())
     def get_name(self, obj) -> str:
-        return (
-            obj.safe_translation_getter("name", any_language=True) or obj.slug
-        )
+        return _translated(self, obj, "name", default=obj.slug)
 
 
 class PromotionCategoryRefSerializer(serializers.Serializer):
@@ -70,9 +101,7 @@ class PromotionCategoryRefSerializer(serializers.Serializer):
 
     @extend_schema_field(serializers.CharField())
     def get_name(self, obj) -> str:
-        return (
-            obj.safe_translation_getter("name", any_language=True) or obj.slug
-        )
+        return _translated(self, obj, "name", default=obj.slug)
 
 
 def _publishable(code) -> bool:
@@ -136,13 +165,11 @@ class PublicPromotionSerializer(serializers.ModelSerializer):
 
     @extend_schema_field(serializers.CharField())
     def get_name(self, obj: Promotion) -> str:
-        return obj.safe_translation_getter("name", any_language=True) or ""
+        return _translated(self, obj, "name")
 
     @extend_schema_field(serializers.CharField())
     def get_description(self, obj: Promotion) -> str:
-        return (
-            obj.safe_translation_getter("description", any_language=True) or ""
-        )
+        return _translated(self, obj, "description")
 
     @extend_schema_field(
         serializers.CharField(

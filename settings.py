@@ -291,6 +291,11 @@ MIDDLEWARE = [
     "tenant.middleware.TenantCsrfMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "core.middleware.allauth_ratelimit.AllAuthRateLimitMiddleware",
+    # After AuthenticationMiddleware so request.user is resolved: it
+    # refuses credential changes on a store's SHARED demo login,
+    # whose password is printed on that store's login page. A no-op
+    # on every store where DEMO_ACCOUNT_ENABLED is off.
+    "core.middleware.demo_account.DemoAccountGuardMiddleware",
     "core.middleware.idempotency.IdempotencyMiddleware",  # Idempotency-Key header replay protection
     "search.middleware.SearchAnalyticsMiddleware",  # Search analytics tracking
     "django.contrib.messages.middleware.MessageMiddleware",
@@ -1058,6 +1063,16 @@ def get_celery_beat_schedule():
             # cache hourly in development — a behaviour change to decide
             # deliberately, not to infer from the neighbours.
             "schedule": SCHEDULE_PRESETS["monthly_first_4am"],
+        },
+        "reset-demo-stores": {
+            # Demo stores hand their login out in public, so they
+            # collect a day of visitor orders, reviews, comments and
+            # carts. This puts the showroom back. Only tenants flagged
+            # is_demo are touched — the fan-out filters on it rather
+            # than using run_for_all_tenants, because a reset that ran
+            # against a real merchant would delete customer data.
+            "task": "devtools.tasks.fanout_reset_demo_stores",
+            "schedule": SCHEDULE_PRESETS["daily_4am"],
         },
         "cleanup-abandoned-carts": {
             "task": "tenant.tasks.fanout_cleanup_abandoned_carts",
@@ -2397,6 +2412,29 @@ EXTRA_SETTINGS_DEFAULTS = [
             "throwaway account on a demo store — one whose data a "
             "nightly task resets. Never a real customer's, and never a "
             "staff account."
+        ),
+    },
+    {
+        "name": "DEMO_ACCOUNT_B2B_EMAIL",
+        "type": "string",
+        "value": "",
+        "description": (
+            "Optional SECOND demo login, for the wholesale experience. "
+            "Kept separate from DEMO_ACCOUNT_EMAIL because a B2B "
+            "account changes every price on the storefront: a prospect "
+            "shown wholesale numbers would read them as the retail "
+            "ones. PUBLIC when DEMO_ACCOUNT_ENABLED is on. Empty → the "
+            "login card shows only the retail account."
+        ),
+    },
+    {
+        "name": "DEMO_ACCOUNT_B2B_PASSWORD",
+        "type": "string",
+        "value": "",
+        "description": (
+            "Password of the wholesale demo account, shown IN CLEAR "
+            "beside DEMO_ACCOUNT_B2B_EMAIL. Same rule as the retail "
+            "one: only ever a throwaway account on a demo store."
         ),
     },
 ]

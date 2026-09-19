@@ -1603,6 +1603,58 @@ def seed_layouts() -> dict[str, int]:
     return report
 
 
+def _current_tenant_is_demo() -> bool:
+    """Is the schema being seeded flagged ``is_demo``?
+
+    Resolved from the schema name rather than ``connection.tenant``:
+    ``schema_context`` installs a FakeTenant that carries the schema and
+    nothing else, so the flag is not on it.
+    """
+    from django.db import connection
+    from django_tenants.utils import get_public_schema_name, schema_context
+
+    from tenant.models import Tenant
+
+    schema = connection.schema_name
+    if schema == get_public_schema_name():
+        return False
+    with schema_context(get_public_schema_name()):
+        return Tenant.objects.filter(schema_name=schema, is_demo=True).exists()
+
+
+def seed_demo_account() -> dict[str, int]:
+    """The two shared demo logins, and the settings that publish them.
+
+    Gated on ``is_demo``, not merely on the command's guard: staging
+    clones a real store, and a clone that passed the hostname check
+    would otherwise start advertising a password on its login page.
+    """
+    from extra_settings.models import Setting
+
+    from devtools.demo_account import seed_demo_account as _seed
+    from devtools.demo_account import showcase_settings
+
+    if not _current_tenant_is_demo():
+        return {"skipped_not_a_demo_tenant": 1}
+
+    report = _seed()
+    for name, value in showcase_settings().items():
+        try:
+            setting = Setting.objects.get(name=name)
+        except Setting.DoesNotExist:
+            logger.warning("Setting row %s is missing from this schema", name)
+            _bump(report, "settings_missing")
+            continue
+        if setting.value == value:
+            _bump(report, "settings_unchanged")
+            continue
+        setting.value = value
+        setting.validate()
+        setting.save()
+        _bump(report, "settings_updated")
+    return report
+
+
 def seed_blog() -> dict[str, int]:
     """The demo blog — see ``devtools/demo_blog.py`` for the dataset.
 

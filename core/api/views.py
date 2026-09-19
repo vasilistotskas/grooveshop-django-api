@@ -692,6 +692,8 @@ PUBLIC_SETTING_KEYS = frozenset(
         "DEMO_ACCOUNT_ENABLED",
         "DEMO_ACCOUNT_EMAIL",
         "DEMO_ACCOUNT_PASSWORD",
+        "DEMO_ACCOUNT_B2B_EMAIL",
+        "DEMO_ACCOUNT_B2B_PASSWORD",
         # "My reviews" account page toggle. A STORE preference, not a
         # plan flag: product-page reviews stay live regardless; this
         # only governs the account surface. Previously (mis)implemented

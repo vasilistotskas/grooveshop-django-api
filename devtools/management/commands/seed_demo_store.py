@@ -81,6 +81,10 @@ STEPS: tuple[tuple[str, str], ...] = (
     ("layouts", "seed_layouts"),
     ("navigation", "seed_navigation"),
     ("content-pages", "publish_content_pages"),
+    # Last: the account references products, and writing the
+    # DEMO_ACCOUNT_* settings publishes credentials, so it should
+    # only happen once everything it advertises exists.
+    ("demo-account", "seed_demo_account"),
 )
 
 STEP_NAMES = tuple(label for label, _ in STEPS)

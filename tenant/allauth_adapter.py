@@ -70,6 +70,47 @@ class TenantAccountAdapter(UserAccountAdapter):
     table. See ``pre_login``.
     """
 
+    def set_password(self, user, password: str) -> None:
+        """Refuse a password change on a shared demo login.
+
+        Both the change flow and the RESET flow go through here
+        (``account/internal/flows/password_change.py`` and
+        ``password_reset.py``), which is why the guard sits in the
+        adapter rather than only in the middleware: a reset is
+        unauthenticated, so nothing upstream knows whose account it is
+        until the key has been resolved to this ``user``.
+
+        The seeder is unaffected — it calls ``user.set_password``
+        directly, as does the nightly reset, so the account can still be
+        restored to its published password.
+        """
+        from django.core.exceptions import ValidationError
+
+        from core.demo_account import is_demo_account
+
+        if is_demo_account(user):
+            raise ValidationError(
+                "This is a shared demo account, so its password cannot "
+                "be changed."
+            )
+        super().set_password(user, password)
+
+    def can_delete_email(self, email_address) -> bool:
+        """Keep the demo account's published address on the account.
+
+        Login is by email (``ACCOUNT_LOGIN_METHODS = {"email"}``), so
+        deleting the address printed on the login card is the one email
+        operation that costs everybody else their way in. Adding
+        another one is already refused by the middleware; this closes
+        the same door from the model side.
+        """
+        from core.demo_account import demo_account_emails
+
+        email = str(getattr(email_address, "email", "") or "").strip().lower()
+        if email and email in demo_account_emails():
+            return False
+        return super().can_delete_email(email_address)
+
     def _get_tenant_domain(self):
         tenant = getattr(connection, "tenant", None)
         if tenant is None:

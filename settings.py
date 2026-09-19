@@ -291,11 +291,6 @@ MIDDLEWARE = [
     "tenant.middleware.TenantCsrfMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "core.middleware.allauth_ratelimit.AllAuthRateLimitMiddleware",
-    # After AuthenticationMiddleware so request.user is resolved: it
-    # refuses credential changes on a store's SHARED demo login,
-    # whose password is printed on that store's login page. A no-op
-    # on every store where DEMO_ACCOUNT_ENABLED is off.
-    "core.middleware.demo_account.DemoAccountGuardMiddleware",
     "core.middleware.idempotency.IdempotencyMiddleware",  # Idempotency-Key header replay protection
     "search.middleware.SearchAnalyticsMiddleware",  # Search analytics tracking
     "django.contrib.messages.middleware.MessageMiddleware",

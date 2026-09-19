@@ -70,17 +70,42 @@ class TenantAccountAdapter(UserAccountAdapter):
     table. See ``pre_login``.
     """
 
+    def clean_password(self, password: str, user=None) -> str:
+        """Refuse a new password for a shared demo login.
+
+        THIS is the hook that produces a usable refusal. It runs during
+        FORM VALIDATION — `ChangePasswordInput` and `ResetPasswordInput`
+        both call it with the user — so allauth turns the error into a
+        400 with a message on the field. `set_password` below is called
+        after validation, where raising only produces a 500.
+
+        A middleware cannot do this job: `/_allauth/app/v1/**` resolves
+        its session token inside a VIEW DECORATOR, so `request.user` is
+        still anonymous while middleware runs. Verified against staging
+        on 2026-09-19 — the middleware never fired and the request fell
+        through to `set_password`, which 500'd.
+        """
+        from django.core.exceptions import ValidationError
+
+        from core.demo_account import is_demo_account
+
+        if user is not None and is_demo_account(user):
+            raise ValidationError(
+                "This is a shared demo account, so its password cannot "
+                "be changed."
+            )
+        return super().clean_password(password, user=user)
+
     def set_password(self, user, password: str) -> None:
-        """Refuse a password change on a shared demo login.
+        """Programmatic backstop for a password change on a demo login.
 
-        Both the change flow and the RESET flow go through here
-        (``account/internal/flows/password_change.py`` and
-        ``password_reset.py``), which is why the guard sits in the
-        adapter rather than only in the middleware: a reset is
-        unauthenticated, so nothing upstream knows whose account it is
-        until the key has been resolved to this ``user``.
+        Unreachable through the API: ``clean_password`` above rejects
+        the input first, on both the change and the reset flow. This
+        covers a path that skips form validation altogether — a future
+        flow, a management command — where a 500 is the right outcome
+        because nothing should be calling it.
 
-        The seeder is unaffected — it calls ``user.set_password``
+        The seeder is unaffected: it calls ``user.set_password``
         directly, as does the nightly reset, so the account can still be
         restored to its published password.
         """

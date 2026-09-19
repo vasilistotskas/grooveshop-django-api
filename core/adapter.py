@@ -43,6 +43,30 @@ class MFAAdapter(DefaultMFAAdapter):
     store's name shown to every other store's users.
     """
 
+    def is_mfa_enabled(self, user, types=None) -> bool:
+        """A shared demo login never has a second factor DEMANDED.
+
+        This is what allauth's login stage asks before it requires a
+        code (``mfa/stages.py``), so answering False here means that
+        even if a visitor enrols TOTP or a passkey on the shared
+        account, the NEXT person can still sign in with the published
+        password. Enrolment itself is left alone — allauth 65.19 has no
+        pre-enrolment adapter hook, and blocking it would mean reaching
+        into internals — but the lockout it would otherwise cause is
+        what actually matters, and that is gone.
+
+        The nightly reset deletes any authenticator a visitor left
+        behind, so the row does not accumulate either.
+
+        False for nobody else: ``demo_account_emails()`` is empty unless
+        the store publishes a demo login.
+        """
+        from core.demo_account import is_demo_account
+
+        if is_demo_account(user):
+            return False
+        return super().is_mfa_enabled(user, types=types)
+
     def get_public_key_credential_rp_entity(self):
         return {
             "id": _webauthn_rp_id(),

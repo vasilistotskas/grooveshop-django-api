@@ -17,7 +17,7 @@ from __future__ import annotations
 import pytest
 from django.conf import settings as django_settings
 from django.core.exceptions import ValidationError
-from django.test import RequestFactory, TestCase
+from django.test import TestCase
 
 from core.api.views import PUBLIC_SETTING_KEYS
 from devtools import demo_account
@@ -158,97 +158,15 @@ class TestDemoAccountLookup(TestCase):
 
 
 @pytest.mark.django_db
-class TestGuardMiddleware(TestCase):
-    """The guard must bite on the demo account and nowhere else."""
-
-    PATHS = (
-        "/_allauth/app/v1/account/password/change",
-        "/_allauth/app/v1/account/email",
-        "/_allauth/app/v1/account/authenticators/totp",
-        "/_allauth/app/v1/account/authenticators/webauthn",
-    )
-
-    def _middleware(self, demo_emails):
-        from core.middleware import demo_account as module
-
-        original = module.demo_account_emails
-        module.demo_account_emails = lambda: frozenset(demo_emails)
-        self.addCleanup(setattr, module, "demo_account_emails", original)
-        return module.DemoAccountGuardMiddleware(lambda request: _Passed())
-
-    def _request(self, path, email, method="POST"):
-        request = getattr(RequestFactory(), method.lower())(path)
-        request.user = _User(email)
-        return request
-
-    def test_blocks_every_credential_path_for_the_demo_account(self):
-        middleware = self._middleware({demo_account.RETAIL_EMAIL})
-        for path in self.PATHS:
-            response = middleware(
-                self._request(path, demo_account.RETAIL_EMAIL)
-            )
-            assert response.status_code == 403, path
-
-    def test_blocks_the_wholesale_account_too(self):
-        middleware = self._middleware(
-            {demo_account.RETAIL_EMAIL, demo_account.B2B_EMAIL}
-        )
-        response = middleware(
-            self._request(self.PATHS[0], demo_account.B2B_EMAIL)
-        )
-        assert response.status_code == 403
-
-    def test_lets_an_ordinary_customer_through(self):
-        middleware = self._middleware({demo_account.RETAIL_EMAIL})
-        for path in self.PATHS:
-            response = middleware(self._request(path, "real@example.com"))
-            assert response.status_code == 200, path
-
-    def test_lets_reads_through_even_for_the_demo_account(self):
-        """Hiding the account UI would hide a platform feature the demo
-        exists to show; only the mutation is refused."""
-        middleware = self._middleware({demo_account.RETAIL_EMAIL})
-        for path in self.PATHS:
-            response = middleware(
-                self._request(path, demo_account.RETAIL_EMAIL, method="get")
-            )
-            assert response.status_code == 200, path
-
-    def test_lets_everything_else_through_for_the_demo_account(self):
-        middleware = self._middleware({demo_account.RETAIL_EMAIL})
-        for path in (
-            "/_allauth/app/v1/account/providers",
-            "/_allauth/app/v1/auth/session",
-            "/api/v1/order",
-        ):
-            response = middleware(
-                self._request(path, demo_account.RETAIL_EMAIL)
-            )
-            assert response.status_code == 200, path
-
-    def test_is_a_no_op_on_a_store_with_no_demo_account(self):
-        """Every ordinary store: the settings are empty, so the guard
-        returns before it looks at the user at all."""
-        middleware = self._middleware(set())
-        for path in self.PATHS:
-            response = middleware(
-                self._request(path, demo_account.RETAIL_EMAIL)
-            )
-            assert response.status_code == 200, path
-
-    def test_ignores_an_anonymous_request(self):
-        from django.contrib.auth.models import AnonymousUser
-
-        middleware = self._middleware({demo_account.RETAIL_EMAIL})
-        request = RequestFactory().post(self.PATHS[0])
-        request.user = AnonymousUser()
-        assert middleware(request).status_code == 200
-
-
-@pytest.mark.django_db
 class TestAdapterGuards(TestCase):
-    """Password reset is unauthenticated, so the middleware cannot see
-    it — the adapter is what covers that path."""
+    """The adapters are the only seam that works for the app flow.
+
+    `/_allauth/app/v1/**` resolves its session token inside a VIEW
+    DECORATOR, so `request.user` is still anonymous while middleware
+    runs — a middleware guard never fired against staging and the
+    request fell through to `set_password`, which 500'd. These hooks run
+    where allauth has already resolved the user.
+    """
 
     def _adapter(self, demo_emails):
         from core import demo_account as core_demo
@@ -283,6 +201,78 @@ class TestAdapterGuards(TestCase):
             "E", (), {"email": demo_account.RETAIL_EMAIL, "primary": True}
         )
         assert adapter.can_delete_email(address()) is False
+
+    def test_refuses_a_new_password_during_validation(self):
+        """``clean_password`` is the hook that produces a USABLE refusal:
+        it runs inside form validation, so allauth renders a 400 with a
+        message instead of the 500 a post-validation raise gives."""
+        adapter = self._adapter({demo_account.RETAIL_EMAIL})
+        with pytest.raises(ValidationError):
+            adapter.clean_password(
+                "Whatever-2026", user=_User(demo_account.RETAIL_EMAIL)
+            )
+
+    def test_allows_a_new_password_for_everybody_else(self):
+        from django.contrib.auth import get_user_model
+
+        adapter = self._adapter({demo_account.RETAIL_EMAIL})
+        user = get_user_model().objects.create_user(
+            email="real@example.com", password="OriginalPass-1"
+        )
+        assert adapter.clean_password("ReplacementPass-2", user=user)
+
+    def test_signup_is_unaffected(self):
+        """Signup calls ``clean_password`` with no user at all."""
+        adapter = self._adapter({demo_account.RETAIL_EMAIL})
+        assert adapter.clean_password("BrandNewPass-3", user=None)
+
+
+@pytest.mark.django_db
+class TestMfaCannotLockOutTheDemoAccount(TestCase):
+    """Enrolment is left alone; the LOCKOUT is what is prevented.
+
+    allauth 65.19 has no pre-enrolment adapter hook, and blocking it
+    would mean reaching into internals. But the login stage asks
+    ``is_mfa_enabled`` before demanding a code, so answering False means
+    a factor a visitor enrolled cannot stop the next person signing in.
+    """
+
+    def _adapter(self, demo_emails):
+        from core import demo_account as core_demo
+        from core.adapter import MFAAdapter
+
+        original = core_demo.demo_account_emails
+        core_demo.demo_account_emails = lambda: frozenset(demo_emails)
+        self.addCleanup(setattr, core_demo, "demo_account_emails", original)
+        return MFAAdapter()
+
+    def test_never_demanded_for_a_demo_login(self):
+        adapter = self._adapter({demo_account.RETAIL_EMAIL})
+        assert adapter.is_mfa_enabled(_User(demo_account.RETAIL_EMAIL)) is False
+
+    def test_the_wholesale_login_too(self):
+        adapter = self._adapter(
+            {demo_account.RETAIL_EMAIL, demo_account.B2B_EMAIL}
+        )
+        assert adapter.is_mfa_enabled(_User(demo_account.B2B_EMAIL)) is False
+
+    def test_a_real_customer_keeps_their_second_factor(self):
+        """The whole point: this must not weaken anybody else's account."""
+        from django.contrib.auth import get_user_model
+
+        adapter = self._adapter({demo_account.RETAIL_EMAIL})
+        user = get_user_model().objects.create_user(
+            email="real@example.com", password="OriginalPass-1"
+        )
+        # No authenticators, so False — but via the real implementation,
+        # not the demo short-circuit. Enrolling one would flip it.
+        assert adapter.is_mfa_enabled(user) is False
+        from allauth.mfa.models import Authenticator
+
+        Authenticator.objects.create(
+            user=user, type=Authenticator.Type.TOTP, data={"secret": "x"}
+        )
+        assert adapter.is_mfa_enabled(user) is True
 
 
 class _Passed:

@@ -3,6 +3,91 @@
 
 
 
+## v3.73.0 (2026-09-20)
+
+### Bug fixes
+
+* fix(demo): stop seeding SEO copy the store can only serve in one language
+
+`SeoModel` keeps `seo_title`/`seo_description` on the BASE row, not on a
+translation, and every storefront page prefers them over the translated
+name, title and description. The seeder filled them from the Greek copy
+for every demo category, product, blog post and CMS page, so `/en`
+carried a Greek `<title>` and meta description on each one — eight pages
+in the sweep. `demo_blog.py` had been carrying a `seo_description_en`
+with nowhere to put it, which is the same fact from the other end; it
+goes with the field it fed.
+
+Blank, every one of those pages falls back to its TRANSLATED name or
+title and description, which is correct in both locales. The rows are
+emptied rather than merely left unset, because the ones written on an
+earlier run still carry the Greek; a CMS page is only cleared when its
+value still matches what the seeder put there, so an operator's own
+copy survives.
+
+Making the three SEO fields translatable is the real fix and is its own
+change: it moves them onto four translation models, migrates the data
+per tenant, and alters the OpenAPI contract.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com> ([`88be0f9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/88be0f90911b6a8ac76de59bd0b6db191dc6da8c))
+
+* fix(demo): translate the contact, feedback and about bands into English
+
+`demo_home.py` carries `i18n.en` on every band it seeds; the four
+layouts still living in `demo_store.py` carried none, so `/en` rendered
+Greek copy over rows the store had no English for at all — thirty-six
+lines on `/about` alone.
+
+`append` mode also skipped a section type the layout already had, which
+meant these overrides could never reach the rows they were written for.
+On a tenant flagged `is_demo` the seed is the page's only author, so a
+band this plan owns is now refreshed rather than skipped; anywhere else
+`append` keeps its promise and leaves an operator's arrangement alone.
+It writes through `update()` so `SortableModel.save()` cannot walk the
+band down the page on each run.
+
+The guard is mechanical: any prop holding a Greek string must have an
+English override under the same top-level key. Top-level because
+`i18n.<locale>.props` merges SHALLOWLY — an override of `items` replaces
+the whole list, so a partial one is not a thing that exists.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01PzA5KfS6cqvHDynKZumU22 ([`2da995b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2da995b017ed6c60ecf0a9a8bfa4061aeb3c1f0f))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.72.7 [skip ci] ([`71cc6d8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/71cc6d8af659df9e8bfc8ea9543f92ca569034a7))
+
+### Features
+
+* feat(demo): seed the store's twelve offers instead of making them by hand
+
+The demo store's promotions were created through kubectl and never
+written down, so they drifted: by 2026-09 several targeted products that
+had since been deactivated, which is invisible on `/offers` — the card
+renders, the cart refuses the code — and impossible to reproduce after a
+reseed. The homepage's `offers_preview` band has been rendering off them
+all along.
+
+`devtools/demo_promotions.py` is the dataset, twelve rows chosen to cover
+the surface rather than to look busy: every `BenefitType`, both triggers,
+a five-code bulk coupon and one expired row so the admin list has
+something in the past. The step resolves every slug against what the
+catalogue seeded and RAISES on a miss, which is the whole point of
+writing it down.
+
+Rows are matched on the Greek name — a promotion has no slug — and
+rewritten in full each run, because there is no operator behind this
+store and a re-run is how a corrected cap or translation reaches
+staging. `clean()` is called explicitly: it carries every cross-field
+rule the admin enforces and `save()` never calls it.
+
+The tests assert what only a run can show — that the rows the dataset
+marks as advertised are exactly the ones `publicly_listable` returns,
+and that a second run creates nothing.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com> ([`728c056`](https://github.com/vasilistotskas/grooveshop-django-api/commit/728c0565d1876b906c6134e6759d2a85806de725))
+
 ## v3.72.7 (2026-09-20)
 
 ### Bug fixes

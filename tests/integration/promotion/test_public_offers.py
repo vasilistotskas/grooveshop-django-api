@@ -266,7 +266,11 @@ class TestPayload:
     def test_free_gift_exposes_the_actual_gift_product(
         self, client, url, promotions_on
     ):
-        gift = ProductFactory(stock=5)
+        # `active=True` throughout this file: ProductFactory rolls
+        # `active` at 85% and the payload now lists sellable rows
+        # only, so an unpinned product makes the assertion a coin
+        # toss (one 15-product case failed in CI at ~9% odds).
+        gift = ProductFactory(stock=5, active=True)
         promotion = _automatic(
             benefit_type=BenefitType.FREE_GIFT,
             target_scope=TargetScope.ORDER,
@@ -283,12 +287,19 @@ class TestPayload:
         self, client, url, promotions_on
     ):
         """The preview list is truncated; the count must not be, or the
-        page cannot decide whether to render a "see all" link."""
+        page cannot decide whether to render a "see all" link.
+
+        `active=True` is explicit because `ProductFactory` randomises it
+        and the count now covers SELLABLE rows only — see
+        `TestSellableRefs`. Without pinning it this asserts on the
+        factory's dice rather than on truncation.
+        """
         from promotion.serializers import REWARD_PREVIEW_LIMIT
 
         promotion = _automatic(target_scope=TargetScope.PRODUCTS)
         products = [
-            ProductFactory(stock=1) for _ in range(REWARD_PREVIEW_LIMIT + 3)
+            ProductFactory(stock=1, active=True)
+            for _ in range(REWARD_PREVIEW_LIMIT + 3)
         ]
         promotion.products.add(*products)
 
@@ -399,7 +410,7 @@ class TestLanguage:
         from product.factories import ProductFactory
         from promotion.enum import TargetScope
 
-        product = ProductFactory()
+        product = ProductFactory(active=True)
         for language_code, name in (("el", "Καλώδιο"), ("en", "Cable")):
             translation = product.translations.get(language_code=language_code)
             translation.name = name

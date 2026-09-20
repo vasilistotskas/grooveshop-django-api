@@ -120,7 +120,7 @@ class TestRelation:
         self, client, product, promotions_on
     ):
         promotion = _promotion(target_scope=TargetScope.PRODUCTS)
-        promotion.products.set([ProductFactory()])
+        promotion.products.set([ProductFactory(active=True)])
 
         assert client.get(url_for(product)).json() == []
 

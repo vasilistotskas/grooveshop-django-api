@@ -3,6 +3,33 @@
 
 
 
+## v3.73.1 (2026-09-20)
+
+### Bug fixes
+
+* fix(demo): retire the offers the seeded dataset does not own
+
+Writing the twelve rows without retiring anything left them alongside
+the five hand-made ones they replace: `/offers` on demo-staging listed
+FIFTEEN, several of them the stale rows pointing at products that had
+since been deactivated — the exact failure the dataset was written to
+end.
+
+On a tenant flagged `is_demo` the seed is the whole offer list, so a
+promotion it does not own is retired, and its codes with it — a live
+code outliving its promotion still resolves at checkout. Anywhere else
+an operator's own promotions are none of the seeder's business.
+
+Retired means `is_active = False`, not deleted: `PromotionRedemption`
+and `CartPromotionCode` both PROTECT the rows they point at, and a
+store's discount history is not the seeder's to throw away.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com> ([`8b9ba5b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8b9ba5bc3c07d946fa8bdc1d81fa1c6c278f3726))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.73.0 [skip ci] ([`b774dd8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b774dd82c0158fe4864bb957def63b1be3710de4))
+
 ## v3.73.0 (2026-09-20)
 
 ### Bug fixes

@@ -1407,8 +1407,19 @@ def seed_categories() -> dict[str, int]:
 
         category.active = True
         category.parent = by_slug.get(row.parent) if row.parent else None
-        category.seo_title = row.name_el[:70]
-        category.seo_description = row.description_el[:300]
+        # Blank, deliberately. ``SeoModel`` is NOT translatable — the
+        # three fields sit on the base row, not on a translation — and
+        # both storefront pages prefer them over the translated name and
+        # description. This seeder used to fill them with the Greek
+        # copy, which is what put a Greek <title> and meta description
+        # on every English product and category page. Emptied rather
+        # than merely left unset, because the rows it wrote on an
+        # earlier run are still carrying that Greek. With them blank the
+        # storefront falls back to the TRANSLATED name and description,
+        # which is right in both locales. Translatable SEO fields are
+        # their own change.
+        category.seo_title = ""
+        category.seo_description = ""
         _translate(
             category,
             "el",
@@ -1583,8 +1594,19 @@ def seed_products() -> dict[str, int]:
         # Exercises the price-drop alert opt-in on a subset rather than
         # everywhere, so both branches have rows.
         product.price_drop_alerts_enabled = index % 4 == 0
-        product.seo_title = row.name_el[:70]
-        product.seo_description = row.blurb_el[:300]
+        # Blank, deliberately. ``SeoModel`` is NOT translatable — the
+        # three fields sit on the base row, not on a translation — and
+        # both storefront pages prefer them over the translated name and
+        # description. This seeder used to fill them with the Greek
+        # copy, which is what put a Greek <title> and meta description
+        # on every English product and category page. Emptied rather
+        # than merely left unset, because the rows it wrote on an
+        # earlier run are still carrying that Greek. With them blank the
+        # storefront falls back to the TRANSLATED name and description,
+        # which is right in both locales. Translatable SEO fields are
+        # their own change.
+        product.seo_title = ""
+        product.seo_description = ""
         if row.variant_group:
             product.variant_group = group_for(row.variant_group)
 
@@ -2247,12 +2269,21 @@ def publish_content_pages() -> dict[str, int]:
             page.is_published = True
             page.published_at = page.published_at or timezone.now()
             changed += ["is_published", "published_at"]
-        if not page.seo_title:
-            page.seo_title = content["seo_title"][:70]
-            changed.append("seo_title")
-        if not page.seo_description:
-            page.seo_description = content["seo_description"][:300]
-            changed.append("seo_description")
+        # ``seo_title``/``seo_description`` are NOT written, and any the
+        # seeder wrote before are cleared: ``SeoModel`` keeps them on the
+        # base row rather than on a translation, so the Greek copy this
+        # dataset holds would be served on ``/en`` too. Blank, the
+        # storefront falls back to the page's TRANSLATED title and body,
+        # which is right in both locales. An operator's own values are
+        # left alone — they are only cleared when they match what this
+        # seeder put there.
+        for field, seeded in (
+            ("seo_title", content["seo_title"][:70]),
+            ("seo_description", content["seo_description"][:300]),
+        ):
+            if getattr(page, field) == seeded:
+                setattr(page, field, "")
+                changed.append(field)
         if changed:
             page.save(update_fields=changed)
             _bump(report, "published")

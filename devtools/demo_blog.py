@@ -59,8 +59,6 @@ class PostRow:
     days_ago: int
     view_count: int
     featured: bool = False
-    seo_description_el: str = ""
-    seo_description_en: str = ""
 
 
 AUTHORS: tuple[AuthorRow, ...] = (
@@ -197,14 +195,6 @@ POSTS: tuple[PostRow, ...] = (
         days_ago=4,
         view_count=1840,
         featured=True,
-        seo_description_el=(
-            "Πόση από τη χωρητικότητα ενός power bank φτάνει τελικά στο "
-            "κινητό σου, και τι να κοιτάξεις πριν αγοράσεις."
-        ),
-        seo_description_en=(
-            "How much of a power bank's rated capacity actually reaches "
-            "your phone, and what to check before buying."
-        ),
     ),
     PostRow(
         slug="demo-gan-fortistes",
@@ -773,8 +763,19 @@ def seed_blog(translate, ensure_asset) -> dict[str, int]:
         else:
             bump("posts_created")
 
-        post.seo_title = row.title_el[:70]
-        post.seo_description = (row.seo_description_el or row.subtitle_el)[:300]
+        # Blank, deliberately. ``SeoModel`` is NOT translatable — the
+        # three fields sit on the base row, not on a translation — and
+        # the storefront prefers them over the translated title and
+        # body. This seeder used to fill them from the Greek copy, which
+        # is what put a Greek <title> and meta description on the
+        # English post; the English variant the dataset carried for one
+        # post had nowhere to go, which is the same story from the other
+        # end, and has gone with it. Emptied rather than merely left
+        # unset, because rows written on an earlier run still carry that
+        # Greek. The storefront falls back to the translated subtitle
+        # and body. Translatable SEO fields are their own change.
+        post.seo_title = ""
+        post.seo_description = ""
         translate(
             post,
             "el",

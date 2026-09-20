@@ -45,6 +45,7 @@ from devtools.demo_media import (
     media_path,
     storage_name,
 )
+from devtools.demo_promotions import seed_promotions as _seed_promotions
 
 logger = logging.getLogger(__name__)
 
@@ -2153,6 +2154,16 @@ def seed_blog() -> dict[str, int]:
     asset reaches tenant storage.
     """
     return _seed_blog(_translate, ensure_asset)
+
+
+def seed_promotions() -> dict[str, int]:
+    """The demo store's offers — see ``devtools/demo_promotions.py``.
+
+    ``_translate`` is handed over rather than imported there for the
+    same reason as the blog: that module stays a dataset plus one
+    function, and this one keeps owning how a translation is written.
+    """
+    return _seed_promotions(_translate)
 
 
 def seed_navigation() -> dict[str, int]:

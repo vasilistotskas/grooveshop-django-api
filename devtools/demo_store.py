@@ -546,6 +546,15 @@ CONTACT_SECTIONS: tuple[dict[str, Any], ...] = (
             "lng": 22.9439,
             "address": "Τσιμισκή 100, Θεσσαλονίκη 54622",
         },
+        "i18n": {
+            "en": {
+                "props": {
+                    "lat": 40.6403,
+                    "lng": 22.9439,
+                    "address": "100 Tsimiski St, Thessaloniki 54622",
+                }
+            }
+        },
         "sort_order": 1,
     },
     {
@@ -575,6 +584,27 @@ FEEDBACK_SECTIONS: tuple[dict[str, Any], ...] = (
                     "text": "Καλές τιμές και σοβαρή εξυπηρέτηση.",
                 },
             ],
+        },
+        "i18n": {
+            "en": {
+                "title": "What our customers say",
+                "props": {
+                    "items": [
+                        {
+                            "name": "George P.",
+                            "text": "Arrived the next day, everything correct.",
+                        },
+                        {
+                            "name": "Maria K.",
+                            "text": "Asked a question in the chat and got an answer straight away.",
+                        },
+                        {
+                            "name": "Nikos A.",
+                            "text": "Good prices and service that takes you seriously.",
+                        },
+                    ],
+                },
+            }
         },
         "sort_order": 0,
     },
@@ -608,6 +638,31 @@ ABOUT_SECTIONS: tuple[dict[str, Any], ...] = (
                 },
             ],
         },
+        "i18n": {
+            "en": {
+                "title": "Why us",
+                "props": {
+                    "heading": "Why shop with us",
+                    "items": [
+                        {
+                            "title": "Delivered in 1-3 days",
+                            "text": "From our warehouse in Thessaloniki.",
+                            "icon": "i-heroicons-truck",
+                        },
+                        {
+                            "title": "Two-year warranty",
+                            "text": "On everything we sell.",
+                            "icon": "i-heroicons-shield-check",
+                        },
+                        {
+                            "title": "Free returns",
+                            "text": "Fourteen days, no questions asked.",
+                            "icon": "i-heroicons-arrow-uturn-left",
+                        },
+                    ],
+                },
+            }
+        },
         "sort_order": 1,
     },
     {
@@ -621,6 +676,15 @@ ABOUT_SECTIONS: tuple[dict[str, Any], ...] = (
             "cta_text": "Δες τη γκάμα",
             "cta_link": "/products",
             "decor": "orbs",
+        },
+        "i18n": {
+            "en": {
+                "props": {
+                    "heading": "It started with a drawer full of cables",
+                    "body": "In 2019 we went looking for a cable that would last. We could not find one, so we started picking for ourselves what deserved a place in the drawer.",
+                    "cta_text": "See the range",
+                },
+            }
         },
         "sort_order": 2,
     },
@@ -656,6 +720,39 @@ ABOUT_SECTIONS: tuple[dict[str, Any], ...] = (
                 },
             ],
         },
+        "i18n": {
+            "en": {
+                "props": {
+                    "heading": "How we got here",
+                    "items": [
+                        {
+                            "date": "2019",
+                            "title": "First steps",
+                            "text": "We start out with twelve cable SKUs.",
+                            "icon": "i-heroicons-sparkles",
+                        },
+                        {
+                            "date": "2021",
+                            "title": "A warehouse of our own",
+                            "text": "We move into our own space.",
+                            "icon": "i-heroicons-building-storefront",
+                        },
+                        {
+                            "date": "2023",
+                            "title": "Shipping nationwide",
+                            "text": "We partner with ACS and BOX NOW.",
+                            "icon": "i-heroicons-truck",
+                        },
+                        {
+                            "date": "2026",
+                            "title": "Wholesale",
+                            "text": "We open a programme for businesses.",
+                            "icon": "i-heroicons-briefcase",
+                        },
+                    ],
+                },
+            }
+        },
         "sort_order": 3,
     },
     {
@@ -680,6 +777,29 @@ ABOUT_SECTIONS: tuple[dict[str, Any], ...] = (
                     "caption": "Δοκιμάζουμε ό,τι πουλάμε",
                 },
             ],
+        },
+        "i18n": {
+            "en": {
+                "props": {
+                    "items": [
+                        {
+                            "src": "/img/main-banner.png",
+                            "alt": "Our warehouse",
+                            "caption": "The warehouse in Thessaloniki",
+                        },
+                        {
+                            "src": "/img/main-banner-mobile.png",
+                            "alt": "An order being packed",
+                            "caption": "Every order packed by hand",
+                        },
+                        {
+                            "src": "/img/main-banner.png",
+                            "alt": "Quality control",
+                            "caption": "We test what we sell",
+                        },
+                    ],
+                },
+            }
         },
         "sort_order": 4,
     },
@@ -708,6 +828,31 @@ ABOUT_SECTIONS: tuple[dict[str, Any], ...] = (
                 },
             ],
         },
+        "i18n": {
+            "en": {
+                "props": {
+                    "heading": "Frequently asked questions",
+                    "items": [
+                        {
+                            "question": "How much is delivery?",
+                            "answer": "2.99 EUR with ACS and 1.99 EUR with BOX NOW. Free on orders over 50 EUR.",
+                        },
+                        {
+                            "question": "How quickly will it arrive?",
+                            "answer": "Orders placed before 14:00 leave the same day.",
+                        },
+                        {
+                            "question": "Can I return something?",
+                            "answer": "Yes, within fourteen days of delivery, in its original packaging.",
+                        },
+                        {
+                            "question": "Do you issue invoices?",
+                            "answer": "Yes. Fill in your company details at checkout and the invoice is issued automatically.",
+                        },
+                    ],
+                },
+            }
+        },
         "sort_order": 5,
     },
     {
@@ -717,6 +862,15 @@ ABOUT_SECTIONS: tuple[dict[str, Any], ...] = (
             "heading": "Μείνε ενημερωμένος",
             "description": "Νέα προϊόντα και προσφορές, μία φορά τον μήνα.",
             "placeholder": "Το email σου",
+        },
+        "i18n": {
+            "en": {
+                "props": {
+                    "heading": "Stay in the loop",
+                    "description": "New products and offers, once a month.",
+                    "placeholder": "Your email",
+                },
+            }
         },
         "sort_order": 6,
     },
@@ -731,6 +885,13 @@ ABOUT_SECTIONS: tuple[dict[str, Any], ...] = (
         "title": "",
         "props": {
             "content": "<h2>Επικοινωνία</h2><p>Στείλε μας μήνυμα από τη φόρμα επικοινωνίας για ό,τι χρειαστείς.</p>",
+        },
+        "i18n": {
+            "en": {
+                "props": {
+                    "content": "<h2>Get in touch</h2><p>Send us a message through the contact form for anything you need.</p>",
+                },
+            }
         },
         "sort_order": 8,
     },
@@ -1725,7 +1886,9 @@ def seed_layouts() -> dict[str, int]:
 
     ``append`` adds a section type the layout does not have yet and
     leaves everything else alone — right for a page an operator may
-    have already arranged.
+    have already arranged. On a tenant flagged ``is_demo`` it also
+    refreshes the bands this plan owns, because there is no operator
+    there and the seed is the only author the page has.
 
     ``replace`` rebuilds the stack from scratch. The demo store's home,
     contact and feedback pages ARE this seed: there is no operator
@@ -1748,6 +1911,7 @@ def seed_layouts() -> dict[str, int]:
     )
 
     report: dict[str, int] = {}
+    seed_owns_existing = _current_tenant_is_demo()
     titles = {
         "home": "Homepage",
         "about": "About",
@@ -1781,13 +1945,30 @@ def seed_layouts() -> dict[str, int]:
         ordered = sorted(sections, key=lambda item: item["sort_order"])
         for section in ordered:
             component_type = section["component_type"]
-            if component_type in present:
-                _bump(report, "sections_unchanged")
-                continue
             props = _resolve_assets(section["props"])
             i18n = _resolve_assets(section.get("i18n") or {})
             validate_section_props(component_type, props)
             validate_section_i18n(component_type, i18n)
+            if component_type in present:
+                # On a demo store the seed IS the content, so a re-run
+                # has to be able to correct a band that already exists —
+                # the English overrides below were added long after the
+                # rows were first written, and ``append`` alone would
+                # have left every one of them Greek forever. Anywhere
+                # else ``append`` keeps its promise and never touches an
+                # arrangement an operator may have made.
+                #
+                # ``update()`` on purpose: ``SortableModel.save()``
+                # would re-derive ``sort_order`` and walk the band down
+                # the page on every run.
+                if not seed_owns_existing:
+                    _bump(report, "sections_unchanged")
+                    continue
+                refreshed = layout.sections.filter(
+                    component_type=component_type
+                ).update(title=section["title"], props=props, i18n=i18n)
+                _bump(report, "sections_refreshed", refreshed)
+                continue
             PageSection.objects.create(
                 layout=layout,
                 component_type=component_type,

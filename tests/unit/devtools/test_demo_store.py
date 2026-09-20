@@ -28,10 +28,27 @@ from devtools.management.commands import seed_demo_store
 from page_config.models import ComponentType, NavigationSlot
 from page_config.schemas import (
     validate_navigation_items,
+    validate_section_i18n,
     validate_section_props,
 )
 from product.enum.review import RateEnum
 from tenant.validators import validate_business_hours_setting
+
+
+def _has_greek(value: object) -> bool:
+    """Does any string anywhere in ``value`` carry a Greek letter?
+
+    Greek is the tell because every string in this dataset is authored
+    Greek-first; a prop that is a slug, an icon name, a URL or a number
+    reads as ASCII and is correctly left alone.
+    """
+    if isinstance(value, str):
+        return any("Ͱ" <= char <= "Ͽ" for char in value)
+    if isinstance(value, dict):
+        return any(_has_greek(item) for item in value.values())
+    if isinstance(value, (list, tuple)):
+        return any(_has_greek(item) for item in value)
+    return False
 
 
 class TestSectionProps(TestCase):
@@ -75,6 +92,44 @@ class TestSectionProps(TestCase):
         """
         assert "products" not in demo_store.LAYOUT_PLAN
         assert "blog" not in demo_store.LAYOUT_PLAN
+
+    def test_i18n_overrides_pass_validation(self):
+        for page_type, (sections, _mode) in demo_store.LAYOUT_PLAN.items():
+            for section in sections:
+                # Raises ValidationError on an unknown locale, an
+                # unknown key, or a prop the component does not have.
+                validate_section_i18n(
+                    section["component_type"], section.get("i18n") or {}
+                )
+                assert page_type
+
+    def test_every_greek_string_is_covered_by_an_english_override(self):
+        """A band whose copy is only Greek renders Greek on ``/en``.
+
+        The demo store is the platform's shop window and serves both
+        locales, so an untranslated prop is a visible defect rather
+        than a missing nicety — ``/about`` shipped thirty-six Greek
+        lines to English readers this way. The rule is per TOP-LEVEL
+        prop key because ``i18n.<locale>.props`` is merged SHALLOWLY:
+        an override of ``items`` replaces the whole list, so a partial
+        one is not a thing that exists.
+        """
+        for page_type, (sections, _mode) in demo_store.LAYOUT_PLAN.items():
+            for section in sections:
+                english = (section.get("i18n") or {}).get("en") or {}
+                if _has_greek(section["title"]):
+                    assert english.get("title"), (
+                        f"{page_type}/{section['component_type']}: the "
+                        "section title has no English override"
+                    )
+                translated = english.get("props") or {}
+                for key, value in section["props"].items():
+                    if not _has_greek(value):
+                        continue
+                    assert key in translated, (
+                        f"{page_type}/{section['component_type']}: prop "
+                        f"{key!r} is Greek with no English override"
+                    )
 
     def test_no_heading_section_on_a_page_that_owns_its_h1(self):
         """``hero_banner`` is the only type in the storefront's

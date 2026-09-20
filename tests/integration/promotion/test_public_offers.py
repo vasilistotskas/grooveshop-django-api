@@ -432,3 +432,69 @@ class TestLanguage:
         rows = client.get(url, {"languageCode": "en"}).json()
 
         assert rows[0]["name"] == "Μόνο ελληνικά"
+
+
+@pytest.mark.django_db
+class TestSellableRefs:
+    """An offer must not advertise a product nobody can buy.
+
+    Found on the demo store: `/offers` listed four chargers by their
+    GREEK names on the English page. That read as a translation bug and
+    was not — they are `active=False` leftovers from an earlier seed
+    (22 of the store's 77 products), still wired into the promotions,
+    and an inactive row never gained an English translation because
+    nothing translates what nothing shows. The language was the symptom;
+    the defect is advertising a dead end.
+    """
+
+    @staticmethod
+    def _offer_over(*products):
+        from promotion.enum import TargetScope
+
+        promotion = PromotionFactory(
+            trigger=PromotionTrigger.AUTOMATIC,
+            is_active=True,
+            target_scope=TargetScope.PRODUCTS,
+        )
+        PromotionTranslationFactory(
+            master=promotion, language_code="el", name="Offer"
+        )
+        promotion.products.add(*products)
+        return promotion
+
+    def test_omits_an_inactive_product(self, client, url, promotions_on):
+        live = ProductFactory(active=True)
+        retired = ProductFactory(active=False)
+        self._offer_over(live, retired)
+
+        rows = client.get(url).json()
+
+        assert [p["id"] for p in rows[0]["eligibleProducts"]] == [live.id]
+
+    def test_counts_only_what_it_would_list(self, client, url, promotions_on):
+        # The count drives the "and N more" link, so a count that
+        # includes rows the list omits promises a page that is not there.
+        live = ProductFactory(active=True)
+        self._offer_over(live, ProductFactory(active=False))
+
+        rows = client.get(url).json()
+
+        assert rows[0]["eligibleProductCount"] == 1
+
+    def test_omits_an_inactive_reward(self, client, url, promotions_on):
+        from promotion.enum import BenefitType
+
+        promotion = PromotionFactory(
+            trigger=PromotionTrigger.AUTOMATIC,
+            is_active=True,
+            benefit_type=BenefitType.FREE_GIFT,
+            get_quantity=1,
+        )
+        PromotionTranslationFactory(
+            master=promotion, language_code="el", name="Gift"
+        )
+        promotion.get_products.add(ProductFactory(active=False))
+
+        rows = client.get(url).json()
+
+        assert rows[0]["rewardProducts"] == []

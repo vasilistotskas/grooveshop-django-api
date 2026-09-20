@@ -104,6 +104,24 @@ class PromotionCategoryRefSerializer(serializers.Serializer):
         return _translated(self, obj, "name", default=obj.slug)
 
 
+def _sellable(products) -> list:
+    """The products a shopper could actually buy, from a prefetched set.
+
+    An offer that names a product nobody can add to a cart is an advert
+    for a dead end. The demo store made it visible: `/offers` listed
+    four chargers by their Greek names on the English page, which looked
+    like a translation bug and was not — they are `active=False`
+    leftovers from an earlier seed, and an inactive row never gained an
+    English translation because nothing translates what nothing shows.
+
+    Filtered in PYTHON, not with a queryset filter: the view prefetches
+    `products__translations` and `get_products__translations`, so the
+    rows are already in memory and a `.filter()` here would throw that
+    away and issue a query per promotion.
+    """
+    return [product for product in products if product.active]
+
+
 def _publishable(code) -> bool:
     """Whether a shopper may be shown this code.
 
@@ -233,7 +251,7 @@ class PublicPromotionSerializer(serializers.ModelSerializer):
         reward pool is "the same products as the buy side" — the model's
         documented meaning for an empty ``get_products``.
         """
-        products = list(obj.get_products.all())[:REWARD_PREVIEW_LIMIT]
+        products = _sellable(obj.get_products.all())[:REWARD_PREVIEW_LIMIT]
         return list(
             PromotionProductRefSerializer(
                 products, many=True, context=self.context
@@ -242,7 +260,7 @@ class PublicPromotionSerializer(serializers.ModelSerializer):
 
     @extend_schema_field(PromotionProductRefSerializer(many=True))
     def get_eligible_products(self, obj: Promotion) -> list:
-        products = list(obj.products.all())[:REWARD_PREVIEW_LIMIT]
+        products = _sellable(obj.products.all())[:REWARD_PREVIEW_LIMIT]
         return list(
             PromotionProductRefSerializer(
                 products, many=True, context=self.context
@@ -252,8 +270,12 @@ class PublicPromotionSerializer(serializers.ModelSerializer):
     @extend_schema_field(serializers.IntegerField())
     def get_eligible_product_count(self, obj: Promotion) -> int:
         """Total, not the truncated preview — the page needs it to decide
-        whether to render a "see all" link."""
-        return obj.products.count()
+        whether to render a "see all" link.
+
+        Counts what `get_eligible_products` would list, so "and 3 more"
+        cannot promise rows the page would never show.
+        """
+        return len(_sellable(obj.products.all()))
 
     @extend_schema_field(PromotionCategoryRefSerializer(many=True))
     def get_eligible_categories(self, obj: Promotion) -> list:

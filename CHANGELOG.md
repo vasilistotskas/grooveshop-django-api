@@ -3,6 +3,50 @@
 
 
 
+## v3.72.7 (2026-09-20)
+
+### Bug fixes
+
+* fix(promotion): stop offers advertising products nobody can buy
+
+`/offers` listed four chargers by their GREEK names on the English
+page. That read as a translation bug and was not: they are
+`active=False` leftovers from an earlier demo seed — 22 of that store's
+77 products — still wired into the promotions, and an inactive row
+never gained an English translation because nothing translates what
+nothing shows. The language was the symptom; the defect is an offer
+advertising a dead end.
+
+`eligible_products`, `reward_products` and the count that drives the
+"and N more" link now cover only sellable rows. Filtered in Python
+rather than by queryset: the view prefetches these relations, so a
+`.filter()` would discard the prefetch and issue a query per promotion.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01PzA5KfS6cqvHDynKZumU22 ([`1d89fd3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1d89fd3705491056f7afe959f4b67ecfd3c9adb9))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.72.6 [skip ci] ([`f37876c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f37876cf2ce575e6691c4b35198764c0e7e962fd))
+
+### Testing
+
+* test(promotion): pin product activeness where the payload now filters
+
+`ProductFactory` rolls `active` at 85%, and the offer payload lists
+sellable rows only since the previous commit — so three assertions
+became coin tosses. The 15-product truncation case had ~9% odds of
+passing and CI drew the other side first try: `assert 14 == (12 + 3)`.
+
+Pinned rather than the filter relaxed: the assertions are about
+truncation, the gift product and translation, not about activeness, and
+a test that depends on a factory's dice is not testing what it says.
+
+Ran three times clean.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01PzA5KfS6cqvHDynKZumU22 ([`53ce466`](https://github.com/vasilistotskas/grooveshop-django-api/commit/53ce46688fc081aea5f62860866b1e0eb356c856))
+
 ## v3.72.6 (2026-09-20)
 
 ### Bug fixes

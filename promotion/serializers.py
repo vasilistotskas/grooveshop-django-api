@@ -234,12 +234,20 @@ class PublicPromotionSerializer(serializers.ModelSerializer):
         documented meaning for an empty ``get_products``.
         """
         products = list(obj.get_products.all())[:REWARD_PREVIEW_LIMIT]
-        return list(PromotionProductRefSerializer(products, many=True).data)
+        return list(
+            PromotionProductRefSerializer(
+                products, many=True, context=self.context
+            ).data
+        )
 
     @extend_schema_field(PromotionProductRefSerializer(many=True))
     def get_eligible_products(self, obj: Promotion) -> list:
         products = list(obj.products.all())[:REWARD_PREVIEW_LIMIT]
-        return list(PromotionProductRefSerializer(products, many=True).data)
+        return list(
+            PromotionProductRefSerializer(
+                products, many=True, context=self.context
+            ).data
+        )
 
     @extend_schema_field(serializers.IntegerField())
     def get_eligible_product_count(self, obj: Promotion) -> int:
@@ -250,7 +258,9 @@ class PublicPromotionSerializer(serializers.ModelSerializer):
     @extend_schema_field(PromotionCategoryRefSerializer(many=True))
     def get_eligible_categories(self, obj: Promotion) -> list:
         return list(
-            PromotionCategoryRefSerializer(obj.categories.all(), many=True).data
+            PromotionCategoryRefSerializer(
+                obj.categories.all(), many=True, context=self.context
+            ).data
         )
 
 

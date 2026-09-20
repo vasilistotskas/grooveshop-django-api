@@ -385,6 +385,38 @@ class TestLanguage:
 
         assert rows[0]["name"] == "Δωρεάν αποστολή"
 
+    def test_translates_the_products_and_categories_it_names(
+        self, client, url, promotions_on
+    ):
+        """The nested refs need the language too.
+
+        `eligible_products` / `eligible_categories` / `reward_products`
+        are rendered by their own serializers, which DRF does not hand
+        a context unless the parent passes one. Fixing only the
+        promotion's own name left `/en/offers` with English offer
+        headings over Greek product and category chips.
+        """
+        from product.factories import ProductFactory
+        from promotion.enum import TargetScope
+
+        product = ProductFactory()
+        for language_code, name in (("el", "Καλώδιο"), ("en", "Cable")):
+            translation = product.translations.get(language_code=language_code)
+            translation.name = name
+            translation.save()
+
+        promotion = PromotionFactory(
+            trigger=PromotionTrigger.AUTOMATIC,
+            is_active=True,
+            target_scope=TargetScope.PRODUCTS,
+        )
+        self._translate(promotion, en=("Offer", ""))
+        promotion.products.add(product)
+
+        rows = client.get(url, {"languageCode": "en"}).json()
+
+        assert rows[0]["eligibleProducts"][0]["name"] == "Cable"
+
     def test_falls_back_rather_than_rendering_an_empty_card(
         self, client, url, promotions_on
     ):

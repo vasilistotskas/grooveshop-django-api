@@ -3,6 +3,29 @@
 
 
 
+## v3.72.6 (2026-09-20)
+
+### Bug fixes
+
+* fix(promotion): translate the products and categories an offer names
+
+`eligible_products`, `reward_products` and `eligible_categories` are
+rendered by their own serializers, and DRF hands a nested serializer no
+context unless the parent passes one — so fixing the promotion's own
+name left `/en/offers` with English offer headings over Greek product
+and category chips. Same bug, one level down, and the half-fix looked
+plausible enough to ship.
+
+Found by re-reading the rendered page after deploying the first half
+rather than assuming it was done.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01PzA5KfS6cqvHDynKZumU22 ([`0e9c3a2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0e9c3a20ccd1f11ccc5cb00a724fbe0c3a01236c))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.72.5 [skip ci] ([`49e5366`](https://github.com/vasilistotskas/grooveshop-django-api/commit/49e53662d5f5986416a098a9152a48f4fc51edb1))
+
 ## v3.72.5 (2026-09-19)
 
 ### Bug fixes

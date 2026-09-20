@@ -323,3 +323,106 @@ class TestPromotionSeed(TestCase):
 
         with self.assertRaises(ValueError):
             demo_promotions.seed_promotions(self._translate)
+
+
+class TestRetiringForeignOffers(TestCase):
+    """On a showcase store the dataset is the WHOLE offer list.
+
+    The rows this file replaced were made by hand through kubectl.
+    Writing the seeded ones without retiring those left both sets live:
+    ``/offers`` listed fifteen offers, five of them the stale rows the
+    rewrite existed to remove, several pointing at products that had
+    since been deactivated.
+    """
+
+    def setUp(self):
+        from product.models.category import ProductCategory
+        from product.models.product import Product
+
+        categories = set()
+        products = set()
+        for row in demo_promotions.PROMOTIONS:
+            categories |= set(row.categories) | set(row.excluded_categories)
+            products |= (
+                set(row.products)
+                | set(row.excluded_products)
+                | set(row.get_products)
+            )
+        for slug in sorted(categories):
+            ProductCategory.objects.create(slug=slug)
+        for index, slug in enumerate(sorted(products)):
+            Product.objects.create(slug=slug, sku=f"SEED-{index}")
+
+    @staticmethod
+    def _translate(instance, language_code="el", **fields):
+        instance.set_current_language(language_code)
+        for name, value in fields.items():
+            setattr(instance, name, value)
+
+    def _hand_made(self):
+        from promotion.enum import BenefitType as Benefit
+        from promotion.models.code import PromotionCode
+        from promotion.models.promotion import Promotion
+
+        promotion = Promotion(
+            trigger=PromotionTrigger.CODE,
+            benefit_type=Benefit.PERCENTAGE,
+            benefit_value=Decimal(15),
+            target_scope=TargetScope.ORDER,
+            is_active=True,
+        )
+        self._translate(promotion, "el", name="Φτιαγμένη στο χέρι")
+        promotion.save()
+        PromotionCode.objects.create(code="HANDMADE", promotion=promotion)
+        return promotion
+
+    def test_a_demo_store_retires_what_the_dataset_does_not_own(self):
+        from promotion.models.code import PromotionCode
+
+        foreign = self._hand_made()
+
+        demo_promotions.seed_promotions(self._translate, tenant_is_demo=True)
+
+        foreign.refresh_from_db()
+        self.assertFalse(foreign.is_active)
+        self.assertFalse(
+            PromotionCode.objects.get(code="HANDMADE").is_active,
+            "the code outlived its promotion and still resolves at checkout",
+        )
+
+    def test_it_retires_rather_than_deletes(self):
+        """``PromotionRedemption`` and ``CartPromotionCode`` both PROTECT
+        the rows they point at, and a store's discount history is not
+        the seeder's to throw away.
+        """
+        from promotion.models.promotion import Promotion
+
+        foreign = self._hand_made()
+
+        demo_promotions.seed_promotions(self._translate, tenant_is_demo=True)
+
+        self.assertTrue(Promotion.objects.filter(pk=foreign.pk).exists())
+
+    def test_anywhere_else_it_leaves_them_alone(self):
+        """An operator's own promotions are none of the seeder's
+        business on a store that has an operator.
+        """
+        foreign = self._hand_made()
+
+        demo_promotions.seed_promotions(self._translate)
+
+        foreign.refresh_from_db()
+        self.assertTrue(foreign.is_active)
+
+    def test_its_own_rows_survive_the_sweep(self):
+        """The retirement excludes the rows just written — including the
+        expired one, which is inactive by schedule but not by flag.
+        """
+        from promotion.models.promotion import Promotion
+
+        demo_promotions.seed_promotions(self._translate, tenant_is_demo=True)
+
+        self.assertEqual(
+            Promotion.objects.filter(is_active=True).count(),
+            len(demo_promotions.PROMOTIONS),
+        )

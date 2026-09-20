@@ -2162,8 +2162,12 @@ def seed_promotions() -> dict[str, int]:
     ``_translate`` is handed over rather than imported there for the
     same reason as the blog: that module stays a dataset plus one
     function, and this one keeps owning how a translation is written.
+
+    The demo flag decides whether offers this dataset does not own are
+    retired: on a showcase store the seed is the whole list, anywhere
+    else an operator's own promotions are none of its business.
     """
-    return _seed_promotions(_translate)
+    return _seed_promotions(_translate, _current_tenant_is_demo())
 
 
 def seed_navigation() -> dict[str, int]:

@@ -305,7 +305,7 @@ def _bump(report: dict[str, int], key: str, amount: int = 1) -> None:
     report[key] = report.get(key, 0) + amount
 
 
-def seed_promotions(translate) -> dict[str, int]:
+def seed_promotions(translate, tenant_is_demo: bool = False) -> dict[str, int]:
     """Twelve offers, their coupon codes and their targets.
 
     ``translate`` is passed in rather than imported so this module stays
@@ -321,6 +321,15 @@ def seed_promotions(translate) -> dict[str, int]:
     and a miss RAISES. An offer whose targets silently resolved to
     nothing is the exact failure this file exists to end: the card still
     renders on ``/offers`` and the cart then refuses the code.
+
+    On a tenant flagged ``is_demo`` the dataset is the WHOLE offer list,
+    so a promotion it does not own is retired. Adding without retiring
+    left the five hand-made rows this file replaces sitting alongside
+    the twelve seeded ones — ``/offers`` listed fifteen, several of them
+    the stale rows the rewrite existed to remove. Retired means
+    ``is_active = False``, not deleted: ``PromotionRedemption`` and
+    ``CartPromotionCode`` both PROTECT the rows they point at, and a
+    store's discount history is not the seeder's to throw away.
     """
     from django.utils import timezone
     from djmoney.money import Money
@@ -360,6 +369,7 @@ def seed_promotions(translate) -> dict[str, int]:
     def when(days: int | None):
         return None if days is None else timezone.now() + timedelta(days=days)
 
+    seeded_ids: list[int] = []
     for row in PROMOTIONS:
         promotion = Promotion.objects.filter(
             translations__language_code="el",
@@ -413,6 +423,7 @@ def seed_promotions(translate) -> dict[str, int]:
         )
         promotion.get_products.set(products_for(row.get_products, row.name_el))
 
+        seeded_ids.append(promotion.pk)
         _bump(report, "created" if created else "updated")
 
         for code in row.codes:
@@ -425,5 +436,16 @@ def seed_promotions(translate) -> dict[str, int]:
                 },
             )
             _bump(report, "codes_created" if code_created else "codes_updated")
+
+    if tenant_is_demo:
+        stale = Promotion.objects.exclude(pk__in=seeded_ids)
+        retired_codes = PromotionCode.objects.filter(
+            promotion__in=stale, is_active=True
+        ).update(is_active=False)
+        retired = stale.filter(is_active=True).update(is_active=False)
+        if retired:
+            _bump(report, "retired", retired)
+        if retired_codes:
+            _bump(report, "codes_retired", retired_codes)
 
     return report

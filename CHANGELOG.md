@@ -3,6 +3,46 @@
 
 
 
+## v3.74.0 (2026-09-21)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.73.2 [skip ci] ([`1382203`](https://github.com/vasilistotskas/grooveshop-django-api/commit/138220335b9fc7feb6118d643ab6ba9e22dce9ff))
+
+### Features
+
+* feat(shipping): a built-in flat-rate carrier, so a store without a courier contract can still take an order
+
+ACS and BoxNow both gate entirely on tenant credentials — ACS: "an
+unconfigured tenant gets NEITHER kind"; BoxNow: "no BoxNow kind at
+all". Correct for them, and it left a hole underneath: a store with no
+carrier contract has no shipping option, `/shipping/options` returns
+`[]`, and the delivery step renders its heading over an empty panel.
+Measured on demo-staging 2026-09-21, and true of every newly
+provisioned tenant until it signs with a courier. In production, three
+of four stores have no active carrier.
+
+`flat_rate` closes it. There is no API behind it: the merchant packs
+the parcel and hands it to whoever they like, so it has no credentials
+to gate on, no label to fetch and no tracking to poll. Registered by
+`shipping` itself rather than by a carrier app, so a deployment cannot
+end up without the one adapter that makes a new store functional.
+
+The price is NOT a new setting. `OrderService` already had a flat-rate
+rule — `CHECKOUT_SHIPPING_PRICE` / `FREE_SHIPPING_THRESHOLD` — used as
+a last-resort fallback when no carrier priced the order, so the policy
+existed but was invisible at checkout. Reading the same two rows turns
+it into an option the shopper can see, with no second definition of
+"the store's shipping price" to drift from the first.
+
+Seeded INACTIVE by migration, because that migration runs against every
+existing tenant and turning on a checkout option for a live store is
+its merchant's decision, not a deploy's. New tenants get it switched on
+at provisioning — that is what removes the onboarding cliff — and the
+demo seeder switches it on for the showcase.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com> ([`aa43d7d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/aa43d7dbe83ada69601687500c1b6e6a119e8b64))
+
 ## v3.73.2 (2026-09-21)
 
 ### Bug fixes

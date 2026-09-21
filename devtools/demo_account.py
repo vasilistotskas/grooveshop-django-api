@@ -36,6 +36,8 @@ from datetime import timedelta
 from decimal import Decimal
 from typing import Any
 
+from core.enum import FloorChoicesEnum
+
 logger = logging.getLogger(__name__)
 
 RETAIL_EMAIL = "demo@grooveshop.space"
@@ -53,7 +55,7 @@ class AddressRow:
     street_number: str
     city: str
     zipcode: str
-    floor: str
+    floor: FloorChoicesEnum
     is_main: bool
 
 
@@ -85,7 +87,7 @@ ADDRESSES: tuple[AddressRow, ...] = (
         street_number="100",
         city="Θεσσαλονίκη",
         zipcode="54622",
-        floor="3",
+        floor=FloorChoicesEnum.THIRD_FLOOR,
         is_main=True,
     ),
     AddressRow(
@@ -96,7 +98,7 @@ ADDRESSES: tuple[AddressRow, ...] = (
         street_number="42",
         city="Αθήνα",
         zipcode="10679",
-        floor="1",
+        floor=FloorChoicesEnum.FIRST_FLOOR,
         is_main=False,
     ),
 )

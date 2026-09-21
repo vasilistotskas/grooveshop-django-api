@@ -18,6 +18,7 @@ from rest_framework.test import APITestCase
 
 from cart.factories.cart import CartFactory
 from cart.factories.item import CartItemFactory
+from core.enum import FloorChoicesEnum, LocationChoicesEnum
 from country.factories import CountryFactory
 from order.enum.status import OrderStatus, PaymentStatus
 from order.serializers.order import OrderCreateFromCartSerializer
@@ -69,8 +70,7 @@ class TestOrderCreateSerializerValidation(APITestCase):
         data.update(overrides)
         return data
 
-    def test_serializer_accepts_optional_address_fields(self):
-        """floor and location_type are accepted without error."""
+    def _address_payload(self, **overrides):
         data = {
             "pay_way_id": self.pay_way.id,
             "first_name": "Jane",
@@ -81,14 +81,54 @@ class TestOrderCreateSerializerValidation(APITestCase):
             "zipcode": "18534",
             "country_id": self.country.alpha_2,
             "phone": "+306900000001",
-            "floor": "3",
-            "location_type": "home",
         }
-        serializer = OrderCreateFromCartSerializer(data=data)
+        data.update(overrides)
+        return data
+
+    def test_serializer_accepts_optional_address_fields(self):
+        """floor and location_type are optional — and are their enums.
+
+        This case used to pass "3" and "home". Both are values the
+        MODEL's ``choices`` reject and the generated OpenAPI read schema
+        cannot express, so an order carrying them failed the
+        storefront's own response parsing: ``/account/orders`` rendered
+        "an error occurred" for every order in the page. Sample values,
+        not an intention — the storefront offers a select of enum
+        members and has never sent anything else.
+        """
+        serializer = OrderCreateFromCartSerializer(
+            data=self._address_payload(
+                floor=FloorChoicesEnum.THIRD_FLOOR,
+                location_type=LocationChoicesEnum.HOME,
+            )
+        )
         assert serializer.is_valid(), serializer.errors
-        vd = serializer.validated_data
-        assert vd["floor"] == "3"
-        assert vd["location_type"] == "home"
+
+    def test_serializer_allows_both_to_be_omitted_or_blank(self):
+        """The model default is "", which is not an enum member."""
+        for payload in ({}, {"floor": "", "location_type": ""}):
+            with self.subTest(payload=payload):
+                serializer = OrderCreateFromCartSerializer(
+                    data=self._address_payload(**payload)
+                )
+                assert serializer.is_valid(), serializer.errors
+
+    def test_serializer_rejects_free_text_floor_and_location(self):
+        """A write the read path cannot serialize must not be accepted.
+
+        Postgres does not enforce ``choices`` and this serializer used a
+        bare CharField, so anything at all could be stored and then
+        break its own order page. ``OrderWriteSerializer`` — a
+        ModelSerializer — has always validated these; the two write
+        paths simply disagreed.
+        """
+        for field, value in (("floor", "3"), ("location_type", "home")):
+            with self.subTest(field=field):
+                serializer = OrderCreateFromCartSerializer(
+                    data=self._address_payload(**{field: value})
+                )
+                assert not serializer.is_valid()
+                assert field in serializer.errors
 
     def test_serializer_rejects_invalid_email(self):
         """validate_email blocks malformed email addresses."""
@@ -428,8 +468,8 @@ class TestOrderCreateBothFlowsViaSerializer(APITestCase):
         data = {
             **self._base_address(),
             "pay_way_id": pay_way.id,
-            "floor": "2",
-            "location_type": "office",
+            "floor": FloorChoicesEnum.SECOND_FLOOR,
+            "location_type": LocationChoicesEnum.OFFICE,
         }
 
         with (

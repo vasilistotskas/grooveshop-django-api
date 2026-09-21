@@ -7,6 +7,7 @@ from phonenumber_field.serializerfields import PhoneNumberField
 from rest_framework import serializers
 from rest_framework.relations import PrimaryKeyRelatedField
 
+from core.enum import FloorChoicesEnum, LocationChoicesEnum
 from core.utils.email import is_disposable_domain
 from country.models import Country
 from order.enum.document_type import OrderCreateDocumentTypeEnum
@@ -872,17 +873,27 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
         allow_blank=True,
         help_text=_("Customer notes or special instructions"),
     )
-    floor = serializers.CharField(
-        max_length=50,
+    # ChoiceField, not CharField: the MODEL constrains both of these to
+    # their enum, and the generated OpenAPI read schema types them as
+    # that enum — but `choices` is not enforced by Postgres and this
+    # serializer never validated it, so any client could store free
+    # text here. The demo seeder wrote a literal "3" and every order it
+    # touched then failed the storefront's response parsing with a 422,
+    # which the account's order list renders as "an error occurred":
+    # a write that is accepted and then makes its own page unreadable.
+    # The storefront has always sent enum members — `addresses/new.vue`
+    # offers a select — so this rejects nothing a real client sends.
+    floor = serializers.ChoiceField(
+        choices=FloorChoicesEnum.choices,
         required=False,
         allow_blank=True,
-        help_text=_("Floor number or label (e.g. FIRST_FLOOR)"),
+        help_text=_("Floor, as a FloorChoicesEnum member (e.g. FIRST_FLOOR)"),
     )
-    location_type = serializers.CharField(
-        max_length=100,
+    location_type = serializers.ChoiceField(
+        choices=LocationChoicesEnum.choices,
         required=False,
         allow_blank=True,
-        help_text=_("Location type, e.g. HOME or OFFICE (optional)"),
+        help_text=_("Location, as a LocationChoicesEnum member (e.g. HOME)"),
     )
 
     # B2B billing identity — required only when the buyer wants a

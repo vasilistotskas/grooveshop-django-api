@@ -3,6 +3,38 @@
 
 
 
+## v3.74.4 (2026-09-21)
+
+### Bug fixes
+
+* fix(order): validate floor and location_type on the checkout write path
+
+The model constrains both to their enum and the generated OpenAPI READ
+schema types them as that enum — but `choices` is not enforced by
+Postgres and `OrderCreateFromCartSerializer` used a bare CharField, so
+any client could store free text. `OrderWriteSerializer`, a
+ModelSerializer, has always validated them: the two write paths simply
+disagreed.
+
+The demo seeder wrote a literal "3" for the floor. Every order it
+touched then failed the storefront's response parsing with a 422 and
+`/account/orders` rendered "Παρουσιάστηκε σφάλμα" for the whole page —
+a write that is accepted and then makes its own page unreadable.
+Production is clean today only because the demo store has not been
+seeded there yet; it would have arrived with the seed.
+
+The existing test asserted floor="3" and location_type="office" were
+valid. That encoded the mistake rather than an intention — the
+storefront offers a select of enum members and has never sent anything
+else — so it now uses enum members, with a case pinning that free text
+is rejected.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com> ([`c627f12`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c627f1227faf84c9cd4ba0c2a906013649f71d29))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.74.3 [skip ci] ([`a93893f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a93893f173d1b1b7821892109e18b88f0e0018c6))
+
 ## v3.74.3 (2026-09-21)
 
 ### Bug fixes

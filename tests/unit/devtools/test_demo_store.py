@@ -396,9 +396,12 @@ class TestB2B(TestCase):
 
 class TestContentPages(TestCase):
     def test_publishes_exactly_the_slugs_a_showcase_has_to_carry(self):
-        """Three, and each for its own reason.
+        """Four, and each for its own reason.
 
-        ``faq`` and ``shipping-info`` have no hardcoded equivalent.
+        ``faq``, ``shipping-info`` and ``ai-ready`` have no hardcoded
+        equivalent — `/info/<slug>` is the only route that renders
+        them. ``ai-ready`` is the agent-commerce page the footer's
+        trust badge points at once agent commerce is on.
         ``return-policy`` does — `/return-policy` IS this row — but
         provisioning seeds it unpublished, as a prompt only a merchant
         can answer, so on a store with no merchant the route answered
@@ -416,6 +419,7 @@ class TestContentPages(TestCase):
             "faq",
             "shipping-info",
             "return-policy",
+            "ai-ready",
         }
 
     def test_the_returns_page_is_linked_from_both_faq_bodies(self):

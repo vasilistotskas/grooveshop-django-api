@@ -78,6 +78,9 @@ STEPS: tuple[tuple[str, str], ...] = (
     ("blog", "seed_blog"),
     ("feedback", "seed_feedback"),
     ("b2b", "seed_b2b"),
+    # Before anything a shopper touches: without an active carrier the
+    # delivery step renders an empty panel.
+    ("shipping", "activate_default_carrier"),
     # After products and categories: every offer names the slugs it
     # targets and the step RAISES on one it cannot resolve, which is
     # the whole point — the rows this replaces were made by hand and

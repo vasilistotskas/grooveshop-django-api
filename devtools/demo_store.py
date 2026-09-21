@@ -1229,6 +1229,65 @@ CONTENT_PAGES: dict[str, dict[str, str]] = {
             "Not available with BoxNow locker collection.</p>"
         ),
     },
+    # The agent-commerce story, and the demo store's sharpest
+    # differentiator: this platform is addressable by an AI agent, not
+    # just by a browser. The footer's "AI-ready" trust badge points
+    # here when the tenant has agent commerce on.
+    "ai-ready": {
+        "title": "Έτοιμο για AI agents",
+        "seo_title": "Έτοιμο για AI agents",
+        "seo_description": (
+            "Πώς ένας AI agent μπορεί να βρει, να ρωτήσει και να "
+            "παραγγείλει από αυτό το κατάστημα."
+        ),
+        "body": (
+            "<p>Αυτό το κατάστημα δεν απαντά μόνο σε ανθρώπους με "
+            "browser. Απαντά και σε AI agents, με ανοιχτά πρωτόκολλα "
+            "και χωρίς κλειστό API.</p>"
+            "<h2>Τι σημαίνει πρακτικά</h2>"
+            "<ul>"
+            "<li><strong>MCP</strong> — ένας agent συνδέεται στο "
+            "κατάστημα και χρησιμοποιεί εργαλεία: αναζήτηση "
+            "προϊόντων, διαθεσιμότητα, καλάθι.</li>"
+            "<li><strong>UCP &amp; ACP</strong> — ο agent ολοκληρώνει "
+            "παραγγελία με εξουσιοδότηση του χρήστη, χωρίς να "
+            "χειρίζεται ο ίδιος τα στοιχεία πληρωμής.</li>"
+            "<li><strong>llms.txt</strong> — κάθε σελίδα διατίθεται "
+            "και σε καθαρό κείμενο, ώστε ο agent να διαβάζει το "
+            "περιεχόμενο και όχι τη διάταξη.</li>"
+            "<li><strong>Feeds καταλόγου</strong> — το κατάστημα "
+            "εκθέτει τον κατάλογό του σε μορφή που διαβάζεται "
+            "μηχανικά.</li>"
+            "</ul>"
+            "<h2>Γιατί έχει σημασία</h2>"
+            "<p>Όταν κάποιος ζητήσει από έναν agent «βρες μου ένα "
+            "καλώδιο USB-C δύο μέτρων», το κατάστημα που μπορεί να "
+            "απαντήσει είναι αυτό που θα προταθεί.</p>"
+        ),
+        "title_en": "AI-agent ready",
+        "body_en": (
+            "<p>This store does not only answer people with a browser. "
+            "It answers AI agents too, over open protocols and without "
+            "a closed API.</p>"
+            "<h2>What that means in practice</h2>"
+            "<ul>"
+            "<li><strong>MCP</strong> — an agent connects to the store "
+            "and uses tools: product search, availability, cart.</li>"
+            "<li><strong>UCP &amp; ACP</strong> — the agent completes "
+            "an order on the customer's authorisation, without "
+            "handling their payment details itself.</li>"
+            "<li><strong>llms.txt</strong> — every page is available "
+            "as plain text, so an agent reads the content rather than "
+            "the layout.</li>"
+            "<li><strong>Catalogue feeds</strong> — the store exposes "
+            "its catalogue in a machine-readable form.</li>"
+            "</ul>"
+            "<h2>Why it matters</h2>"
+            '<p>When someone asks an agent for "a two-metre USB-C '
+            'cable", the store that can answer is the store that gets '
+            "recommended.</p>"
+        ),
+    },
 }
 
 
@@ -2154,6 +2213,30 @@ def seed_blog() -> dict[str, int]:
     asset reaches tenant storage.
     """
     return _seed_blog(_translate, ensure_asset)
+
+
+def activate_default_carrier() -> dict[str, int]:
+    """Switch on the flat-rate carrier for the showcase store.
+
+    The migration seeds every provider row inactive — right for a live
+    store, whose checkout is not a deploy's to change — and new tenants
+    get this one activated at provisioning. The demo store predates
+    both, and without it the delivery step rendered an empty panel: the
+    heading "choose how you want to receive your order" over nothing,
+    because ACS and BoxNow both gate on credentials this tenant has
+    none of. Verified on demo-staging 2026-09-21.
+
+    Only ever the flat-rate row: activating a courier the store has no
+    credentials for would put an option in checkout that cannot quote.
+    """
+    from shipping.models.provider import ShippingProvider
+
+    report: dict[str, int] = {}
+    activated = ShippingProvider.objects.filter(
+        code="flat_rate", is_active=False
+    ).update(is_active=True)
+    _bump(report, "activated" if activated else "unchanged")
+    return report
 
 
 def seed_promotions() -> dict[str, int]:

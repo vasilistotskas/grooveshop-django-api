@@ -334,6 +334,42 @@ def _seed_page_layouts(tenant: Tenant) -> bool:
         return False
 
 
+def _activate_default_carrier(tenant: Tenant) -> bool:
+    """Switch on the built-in flat-rate carrier for a NEW store.
+
+    The migration seeds every provider row inactive, which is right for
+    ACS and BoxNow — they would expose a broken option without
+    credentials — and right for existing stores, whose checkout is not
+    a deploy's to change. But it left a new store with no shipping
+    option at all: `/shipping/options` returned `[]` and the delivery
+    step rendered an empty panel until the merchant signed a courier
+    contract.
+
+    `flat_rate` has nothing to misconfigure — it prices from the
+    store's own `CHECKOUT_SHIPPING_PRICE` and the merchant hands the
+    parcel to whoever they like — so a new store gets it on, and can
+    turn it off the moment it has a real carrier.
+    """
+    try:
+        from shipping.models.provider import ShippingProvider
+
+        updated = ShippingProvider.objects.filter(code="flat_rate").update(
+            is_active=True
+        )
+        if not updated:
+            logger.warning(
+                "No flat_rate ShippingProvider row for %s — the store has "
+                "no shipping option until a carrier is configured",
+                tenant.schema_name,
+            )
+            return False
+        logger.info("Activated flat_rate carrier for %s", tenant.schema_name)
+        return True
+    except Exception:
+        logger.warning("Could not activate default carrier", exc_info=True)
+        return False
+
+
 def _seed_recommendation_slots(tenant: Tenant) -> bool:
     try:
         from recommendation.presets import seed_recommendation_slots
@@ -427,6 +463,7 @@ def seed_tenant_defaults(tenant: Tenant) -> list[str]:
         ("extra settings", _seed_extra_settings),
         ("page layouts", _seed_page_layouts),
         ("content pages", _seed_content_pages),
+        ("default carrier", _activate_default_carrier),
         ("recommendation slots", _seed_recommendation_slots),
         ("Meilisearch indexes", _create_meili_indexes),
     )

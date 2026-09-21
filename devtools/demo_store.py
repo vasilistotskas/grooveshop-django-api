@@ -1578,19 +1578,48 @@ def _attribute_value(
             in ("Χρώμα", "Μήκος", "Χωρητικότητα", "Ισχύς"),
         )
         _translate(attribute, "el", name=attribute_name_el)
-        _translate(attribute, "en", name=attribute_name_en)
         attribute.save()
+    _ensure_english(attribute, name=attribute_name_en)
 
     for candidate in attribute.values.all():
         current = candidate.safe_translation_getter("value", language_code="el")
         if current == value_el:
+            _ensure_english(candidate, value=value_en)
             return candidate
 
     value = AttributeValue(attribute=attribute, active=True)
     _translate(value, "el", value=value_el)
-    _translate(value, "en", value=value_en)
     value.save()
+    _ensure_english(value, value=value_en)
     return value
+
+
+def _ensure_english(instance, **fields) -> bool:
+    """Write the English translation when it is absent or empty.
+
+    English used to be written only on the path that CREATED the row,
+    so an attribute or value that already existed — from a run before
+    these English labels were in the dataset — kept only Greek forever.
+    The PDP's variant selector on `/en` offered "Χρώμα: Μαύρο / Λευκό /
+    Μέντα" to an English reader; measured on demo-staging 2026-09-21.
+
+    Absent-or-empty rather than unconditional: a merchant who has
+    written their own English keeps it, and a re-run is a no-op.
+    """
+    from django.conf import settings
+
+    existing = instance.translations.filter(language_code="en").first()
+    if existing is not None and all(
+        (getattr(existing, name, "") or "").strip() for name in fields
+    ):
+        return False
+    _translate(instance, "en", **fields)
+    instance.save()
+    # Back to the authoring language: the caller goes on reading Greek
+    # off this instance, and parler keeps the active language on the
+    # object rather than per call.
+    instance.set_current_language(settings.PARLER_DEFAULT_LANGUAGE_CODE)
+    return True
 
 
 def seed_products() -> dict[str, int]:

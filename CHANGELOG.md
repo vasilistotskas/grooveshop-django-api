@@ -3,6 +3,31 @@
 
 
 
+## v3.74.3 (2026-09-21)
+
+### Bug fixes
+
+* fix(demo): back-fill English on attributes and values that already existed
+
+English was written only on the branch that CREATED the row. An
+attribute or value from an earlier run — before these English labels
+were in the dataset — kept Greek forever, so the PDP's variant selector
+on `/en` offered "Χρώμα: Μαύρο / Λευκό / Μέντα" to an English reader.
+Measured on demo-staging.
+
+The same append-only shape as the layouts and the promotions: the seed
+added, and never revisited what it had already added.
+
+Written only when English is absent or empty, the rule
+`publish_content_pages` already uses — a merchant who wrote their own
+English keeps it, and a re-run is a no-op.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com> ([`455c38f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/455c38f8042c27e9639c1f79f9b72a06e1338f91))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.74.2 [skip ci] ([`10fa7ae`](https://github.com/vasilistotskas/grooveshop-django-api/commit/10fa7aea0daadc70a906bccaabca22541d60f3b9))
+
 ## v3.74.2 (2026-09-21)
 
 ### Bug fixes

@@ -3,6 +3,34 @@
 
 
 
+## v3.74.2 (2026-09-21)
+
+### Bug fixes
+
+* fix(shipping): flat-rate cannot offer a carrier-collected payment
+
+Checkout showed it as soon as the carrier went live on staging: BOX NOW
+PAY ON THE GO appeared against flat-rate HOME DELIVERY — a carrier
+collecting for a parcel that carrier never touches.
+
+`supported_settlements` defaulted to `None`, meaning "no constraint",
+and I left it there reasoning that a person at a door can take cash.
+That part is true; the rest is not. `CARRIER_TERMINAL` is not a
+terminal and not cash — it is the CARRIER collecting online after
+dispatch by sending its own payment link and activating the pickup PIN
+when it clears. That mechanism only exists if there is a carrier, and
+here there is not.
+
+Declared as what this carrier can genuinely do: paid at checkout, by
+transfer, or cash at the door — the last being exactly the capability a
+locker lacks and this one has.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com> ([`00aba93`](https://github.com/vasilistotskas/grooveshop-django-api/commit/00aba93b2b944821bf48691e906878a3829e6a0b))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.74.1 [skip ci] ([`03bcb12`](https://github.com/vasilistotskas/grooveshop-django-api/commit/03bcb12f1933f5608a75101f9463033a6e2a77ce))
+
 ## v3.74.1 (2026-09-21)
 
 ### Bug fixes

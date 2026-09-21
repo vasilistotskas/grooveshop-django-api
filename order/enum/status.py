@@ -40,6 +40,17 @@ class PaymentStatus(models.TextChoices):
     CANCELED = "CANCELED", _("Canceled")
 
 
+PAYMENT_CLOSING_STATUSES: frozenset[str] = frozenset(
+    {OrderStatus.CANCELED, OrderStatus.RETURNED}
+)
+"""The order statuses after which no payment will ever be collected.
+
+An order that reaches one of these while still unpaid owes nothing, so
+``Order.save()`` settles its ``payment_status`` to CANCELED on the
+transition (``Order.settle_unpaid_payment``). A paid order is left to
+the refund: REFUNDED is the exit for money that actually moved.
+"""
+
 SETTLED_PAYMENT_STATUSES: frozenset[str] = frozenset(
     {
         PaymentStatus.COMPLETED,

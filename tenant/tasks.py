@@ -117,6 +117,11 @@ def fanout_auto_cancel_stuck_pending_orders():
 
 
 @celery_app.task(base=TenantTask)
+def fanout_complete_paid_delivered_orders():
+    return run_for_all_tenants("order.tasks.complete_paid_delivered_orders")
+
+
+@celery_app.task(base=TenantTask)
 def fanout_send_checkout_abandonment_emails():
     return run_for_all_tenants("order.tasks.send_checkout_abandonment_emails")
 

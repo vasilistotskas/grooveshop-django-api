@@ -63,7 +63,9 @@ PENDING → PROCESSING → SHIPPED → DELIVERED → COMPLETED
   - `PENDING → PROCESSING` on COD voucher mint (`AcsService._advance_pending_order_to_processing`, `BoxNowService._advance_pending_order_to_processing`).
   - `PROCESSING → SHIPPED` from carrier events (`_apply_order_status_transition` in both services).
   - `SHIPPED → DELIVERED` from carrier events.
-  - `DELIVERED → COMPLETED` for paid orders (`OrderService.maybe_advance_to_completed`).
+  - `DELIVERED → COMPLETED` for paid orders (`OrderService.maybe_advance_to_completed`), applied inline by the carrier poll and the COD reconcile and swept hourly by `order.tasks.complete_paid_delivered_orders` for everything that lands outside those two moments (a payment entered by hand, a webhook after delivery, an inline attempt that failed once — prod orders 252, 253, 73, 92 on 2026-09-20).
+  - `PROCESSING → SHIPPED` also from an ACS `attempted` state: a failed delivery attempt proves the parcel shipped (prod order 267 sat at PROCESSING for the ten days ACS held it). And a shipment the summary still calls `new` is lifted to `in_transit` when `ACS_TrackingDetails` holds any checkpoint that is not a print (`_has_left_sender`), because ACS reports `shipment_status=5` / `delivery_flag=0` / no reason for a parcel waiting at a Smartpoint (prod order 284).
+  - A CANCELED shipment state (only ever produced by the admin retire action or a voucher cancel, never by tracking) routes the order through `OrderService.cancel_order` (`AcsService._cancel_order_for_dead_shipment`) — stock back, payment settled, cancellation recorded — never a bare status write. Reached from `manage.py reconcile_acs_order_status`.
   - Carrier bridge: when a carrier reports DELIVERED or RETURNED while the order is still PENDING/PROCESSING (state jump between polls / missed webhook), `_apply_order_status_transition` walks the missing SHIPPED step first. The SHIPPED hop is customer-silent on the RETURNED path (`update_order_status(..., silent_for_customer=True)`) — prod orders 179 & 189 (2026-07) were stuck because the direct PROCESSING → RETURNED was rejected forever.
 
 ### 2.2 PaymentStatus transitions
@@ -77,7 +79,7 @@ No explicit table — flips are direct assignments. Common paths:
 | `COMPLETED → REFUNDED` | `OrderService.refund_order()` (admin) OR `handle_stripe_charge_refunded` (full refund webhook) |
 | `COMPLETED → PARTIALLY_REFUNDED` | `handle_stripe_charge_refunded` (partial refund) |
 | `PENDING → CANCELED` | Viva refund webhook |
-| `PENDING / PROCESSING / FAILED → CANCELED` | `Order.save()` on the `status → CANCELED` transition (`Order.settle_payment_on_cancel`, `order/models/order.py`) — one save shared by the service, the admin form and any script, never a second save from the cascade (that re-fires the transition). A canceled order that was never paid owes nothing, so its financial state is final too; `0057_settle_canceled_unpaid_orders` backfilled the rows that had stayed PENDING. |
+| `PENDING / PROCESSING / FAILED → CANCELED` | `Order.save()` on the `status → CANCELED` **or `RETURNED`** transition (`PAYMENT_CLOSING_STATUSES`, `Order.settle_unpaid_payment`, `order/models/order.py`) — one save shared by the service, the admin form and any script, never a second save from the cascade (that re-fires the transition). An order that closes unpaid owes nothing, so its financial state is final too: a canceled order (`0057_settle_canceled_unpaid_orders` backfilled 78 rows) and a refused or uncollected COD parcel that came back RETURNED (`0058_settle_returned_unpaid_orders` backfilled 34). A PAID return keeps COMPLETED until the refund moves it to REFUNDED. |
 | `PENDING → COMPLETED` | `AcsService._mark_cod_order_paid_if_pending` (COD reconcile) |
 
 ## 3. Order creation paths
@@ -224,7 +226,9 @@ success redirect (customer landed on the homepage via the
 4. Carrier polls: shipment_state advances → status flips PROCESSING → SHIPPED → DELIVERED
 5. Daily ACS COD reconcile (02:30 Athens, queries yesterday's payouts):
    AcsService._mark_cod_order_paid_if_pending → payment_status=PENDING → COMPLETED
-   Then maybe_advance_to_completed → status=DELIVERED → COMPLETED.
+   Then maybe_advance_to_completed → status=DELIVERED → COMPLETED
+   (and the hourly complete_paid_delivered_orders sweep catches any
+   DELIVERED + COMPLETED row that step missed).
    Always silent for customers (email + toast suppressed; the shopper
    paid in person and already got the DELIVERED notification) — both
    the beat task and the backfill command pass silent_for_customer.
@@ -263,6 +267,12 @@ Each carrier implements `ShippingCarrierInterface` in
   sporadic transient 406s (~2% of tracking polls, self-healing —
   verified 2026-07-11); only a persistent rejection means a bad
   key/IP.
+- A refused or uncollected COD parcel: ACS records `attempted` (order →
+  SHIPPED), texts the customer and holds the parcel about ten days, then
+  reports `returned_flag=1` → shipment RETURNED → order RETURNED, and the
+  save settles the uncollected payment to CANCELED. Stock is not touched
+  by that transition — the goods arrive back days later and may be
+  damaged, so restocking is a staff decision on the physical parcel.
 - Staleness watch: `check_stale_acs_shipments` (daily 09:00 Athens)
   emails ADMINS about non-terminal shipments with no tracking event
   for `ACS_STALE_SHIPMENT_DAYS` (default 3) days. Dedup via the
@@ -403,7 +413,7 @@ All WS notifications go through `notification.consumers.NotificationConsumer` an
 `cancel_order`:
 1. Locks order row.
 2. Releases stock + reservations (`StockManager.increment_stock`, `release_reservation`).
-3. Sets `status=CANCELED` (the save settles an unpaid `payment_status` to `CANCELED` — `Order.settle_payment_on_cancel`), records `metadata['cancellation']`.
+3. Sets `status=CANCELED` (the save settles an unpaid `payment_status` to `CANCELED` — `Order.settle_unpaid_payment`), records `metadata['cancellation']`.
 4. Cascades to courier voucher via `ShippingService.cancel_shipment` (PR #2 H). Records dispatch outcome on metadata. Carrier rejection (e.g., voucher already in pickup list) is swallowed and logged.
 5. Optional refund via `refund_order` (when `refund_payment=True` AND `is_paid`).
 

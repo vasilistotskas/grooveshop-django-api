@@ -1,4 +1,9 @@
-"""A canceled order that was never paid owes nothing: its payment is settled.
+"""An order that closes unpaid owes nothing: its payment is settled.
+
+CANCELED and RETURNED are the two ways an order closes without money ever
+arriving. A refused or uncollected cash-on-delivery parcel comes back
+RETURNED with the cash uncollected — 34 rows on tenant #1 read "Pending"
+forever on 2026-09-20, the oldest from May.
 
 Before this, ``cancel_order`` touched ``payment_status`` only when it
 refunded, so every canceled COD order and every unpaid Viva order that
@@ -114,6 +119,50 @@ class TestAdminFormSavePath:
         )
 
 
+@pytest.mark.django_db
+class TestReturnedPath:
+    def test_a_returned_unpaid_order_is_settled_as_canceled(self):
+        # The carrier path: SHIPPED -> RETURNED through the state machine.
+        order = OrderFactory(
+            status=OrderStatus.SHIPPED, payment_status=PaymentStatus.PENDING
+        )
+
+        OrderService.update_order_status(order, OrderStatus.RETURNED)
+
+        assert (
+            Order.objects.get(pk=order.pk).payment_status
+            == PaymentStatus.CANCELED
+        )
+
+    def test_a_returned_paid_order_is_left_to_the_refund(self):
+        # Money moved, so REFUNDED is the exit — never CANCELED.
+        order = OrderFactory(
+            status=OrderStatus.DELIVERED,
+            payment_status=PaymentStatus.COMPLETED,
+        )
+
+        OrderService.update_order_status(order, OrderStatus.RETURNED)
+
+        assert (
+            Order.objects.get(pk=order.pk).payment_status
+            == PaymentStatus.COMPLETED
+        )
+
+    def test_the_returned_transition_fires_once(self):
+        order = OrderFactory(
+            status=OrderStatus.SHIPPED, payment_status=PaymentStatus.PENDING
+        )
+        receiver = Mock()
+        order_status_changed.connect(receiver)
+        try:
+            order.status = OrderStatus.RETURNED
+            order.save()
+        finally:
+            order_status_changed.disconnect(receiver)
+
+        receiver.assert_called_once()
+
+
 def test_settle_never_touches_a_settled_state():
     for settled in (
         PaymentStatus.COMPLETED,
@@ -122,11 +171,11 @@ def test_settle_never_touches_a_settled_state():
         PaymentStatus.CANCELED,
     ):
         order = Order(payment_status=settled)
-        assert order.settle_payment_on_cancel() is False
+        assert order.settle_unpaid_payment() is False
         assert order.payment_status == settled
 
     order = Order(payment_status=PaymentStatus.PENDING)
-    assert order.settle_payment_on_cancel() is True
+    assert order.settle_unpaid_payment() is True
     assert order.payment_status == PaymentStatus.CANCELED
 
 
@@ -164,3 +213,40 @@ def test_backfill_settles_only_canceled_unpaid_rows():
     assert statuses[failed.pk] == PaymentStatus.CANCELED
     assert statuses[refunded.pk] == PaymentStatus.REFUNDED
     assert statuses[live.pk] == PaymentStatus.PENDING
+
+
+@pytest.mark.django_db(transaction=True)
+def test_returned_backfill_settles_only_returned_unpaid_rows():
+    executor = MigrationExecutor(connection)
+    settle = (
+        executor.loader.get_migration(
+            "order", "0058_settle_returned_unpaid_orders"
+        )
+        .operations[0]
+        .code
+    )
+
+    stale = OrderFactory(
+        status=OrderStatus.RETURNED, payment_status=PaymentStatus.PENDING
+    )
+    failed = OrderFactory(
+        status=OrderStatus.RETURNED, payment_status=PaymentStatus.FAILED
+    )
+    paid = OrderFactory(
+        status=OrderStatus.RETURNED, payment_status=PaymentStatus.COMPLETED
+    )
+    delivered_cod = OrderFactory(
+        status=OrderStatus.DELIVERED, payment_status=PaymentStatus.PENDING
+    )
+
+    settle(executor.loader.project_state().apps, connection.schema_editor())
+
+    statuses = {
+        o.pk: Order.objects.get(pk=o.pk).payment_status
+        for o in (stale, failed, paid, delivered_cod)
+    }
+    assert statuses[stale.pk] == PaymentStatus.CANCELED
+    assert statuses[failed.pk] == PaymentStatus.CANCELED
+    assert statuses[paid.pk] == PaymentStatus.COMPLETED
+    # A delivered COD order is still waiting for the courier's payout.
+    assert statuses[delivered_cod.pk] == PaymentStatus.PENDING

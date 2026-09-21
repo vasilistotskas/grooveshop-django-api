@@ -23,6 +23,7 @@ from core.models import (
 )
 from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.status import (
+    PAYMENT_CLOSING_STATUSES,
     SETTLED_PAYMENT_STATUSES,
     OrderStatus,
     PaymentStatus,
@@ -505,10 +506,17 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         # still holds the old status and re-fires the whole status
         # transition — emails included. 78 canceled orders on tenant
         # #1 read "Pending" forever before this (2026-09-18).
+        #
+        # RETURNED closes the same way. A parcel the customer refused
+        # or never collected comes back with the cash still uncollected,
+        # so the order owes nothing either; its only other exit,
+        # REFUNDED, is for money that actually moved. 34 returned COD
+        # orders on tenant #1 read "Pending" forever before this
+        # (2026-09-20).
         payment_settled = (
             status_changed
-            and self.status == OrderStatus.CANCELED
-            and self.settle_payment_on_cancel()
+            and self.status in PAYMENT_CLOSING_STATUSES
+            and self.settle_unpaid_payment()
         )
 
         if (
@@ -563,15 +571,16 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         self._original_shipping_carrier = self.shipping_carrier
         self._original_pay_way_id = self.pay_way_id
 
-    def settle_payment_on_cancel(self) -> bool:
-        """Settle the financial state of an order being canceled.
+    def settle_unpaid_payment(self) -> bool:
+        """Settle the financial state of an order that closes unpaid.
 
         PENDING / PROCESSING / FAILED become CANCELED. A settled state
         (COMPLETED, REFUNDED, PARTIALLY_REFUNDED, CANCELED) is never
         touched — a paid order moves to REFUNDED through the refund,
         and the webhook guards rely on settled states staying put.
-        In-memory only; ``save()`` calls it on the CANCELED transition.
-        Returns True when it changed something.
+        In-memory only; ``save()`` calls it on the CANCELED and RETURNED
+        transitions (``PAYMENT_CLOSING_STATUSES``). Returns True when it
+        changed something.
         """
         if self.payment_status in SETTLED_PAYMENT_STATUSES:
             return False

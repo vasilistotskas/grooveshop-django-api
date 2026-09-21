@@ -52,8 +52,29 @@ _SHIPPED_STATES: frozenset[AcsShipmentState] = frozenset(
         AcsShipmentState.IN_TRANSIT,
         AcsShipmentState.AT_DESTINATION,
         AcsShipmentState.OUT_FOR_DELIVERY,
+        # A failed delivery attempt is proof the parcel was shipped.
+        # Without it, a parcel whose FIRST observed summary was already
+        # "attempted" (fast routes deliver-or-fail between two polls)
+        # never bridged PROCESSING → SHIPPED: prod order 267 sat at
+        # PROCESSING for ten days while ACS held it at the branch and
+        # texted the customer four times (2026-09-20).
+        AcsShipmentState.ATTEMPTED,
     }
 )
+
+# ``ACS_TrackingDetails`` checkpoint actions that ACS records BEFORE the
+# parcel physically leaves the sender: label prints and the pickup-list
+# print. Every other checkpoint (pickup scan, departure, hub, arrival at
+# the branch, Smartpoint drop, SMS to the recipient, …) means the parcel
+# is on its way. Read together with the summary because the summary
+# alone is not enough: ``shipment_status=5`` with ``delivery_flag=0`` and
+# no non-delivery reason is what ACS reports for a parcel waiting at a
+# Smartpoint (prod order 284) and for one in the delivery branch's hands
+# (prod order 287 until it was delivered), and the mapping leaves that
+# at ``current`` — which for a parcel picked up between two polls is
+# still ``new``. Prod order 83, never handed over in 121 days, carries
+# exactly these two print checkpoints and nothing else.
+_PRE_DISPATCH_CHECKPOINT_PREFIXES: tuple[str, ...] = ("ΕΚΤΥΠΩΣΗ",)
 _PRE_SHIPPED_ORDER_STATUSES: frozenset[str] = frozenset(
     {"PENDING", "PROCESSING"}
 )
@@ -182,6 +203,23 @@ def _normalize_phone_for_acs(value: object) -> str:
         if digits.startswith(prefix) and len(digits) - len(prefix) == 10:
             return digits[len(prefix) :]
     return digits
+
+
+def _has_left_sender(details: list[dict[str, Any]]) -> bool:
+    """True when the tracking history holds a checkpoint past the print.
+
+    See ``_PRE_DISPATCH_CHECKPOINT_PREFIXES``. Only consulted when the
+    summary still says ``new``; once ACS reports a clearer state the
+    summary wins, and terminal states never come through here.
+    """
+    for row in details:
+        action = (row.get("checkpoint_action") or "").strip().upper()
+        if not action:
+            continue
+        if action.startswith(_PRE_DISPATCH_CHECKPOINT_PREFIXES):
+            continue
+        return True
+    return False
 
 
 def _event_fingerprint(
@@ -1377,6 +1415,8 @@ class AcsService:
             new_state = AcsShipmentState.from_tracking_summary(
                 summary, current=old_state
             )
+            if new_state == AcsShipmentState.NEW and _has_left_sender(details):
+                new_state = AcsShipmentState.IN_TRANSIT
 
             # Event upsert via fingerprint
             latest_event_at: datetime | None = shipment.last_event_at
@@ -2155,6 +2195,12 @@ class AcsService:
         if new_status is None:
             return
 
+        if new_status == "CANCELED":
+            cls._cancel_order_for_dead_shipment(
+                order, silent_for_customer=silent_for_customer
+            )
+            return
+
         # ACS occasionally jumps a parcel straight to DELIVERED between
         # two of our 15-min polls without us ever observing an
         # intermediate IN_TRANSIT/OUT_FOR_DELIVERY state — fast COD
@@ -2240,6 +2286,45 @@ class AcsService:
             OrderService.maybe_advance_to_completed(
                 order, silent_for_customer=True
             )
+
+    @staticmethod
+    def _cancel_order_for_dead_shipment(
+        order: Order, *, silent_for_customer: bool
+    ) -> None:
+        """Close an order whose voucher was retired before it shipped.
+
+        A CANCELED shipment state is never produced by ACS tracking; it
+        comes from the admin retire action or a voucher cancel, i.e. a
+        parcel that never left. Such an order is not "status CANCELED",
+        it is a cancellation: stock must go back on the shelf, the
+        reservation released, the payment settled, the history and
+        signals fired — everything ``OrderService.cancel_order`` owns.
+        A bare ``update_order_status`` would flip the label and strand
+        the stock (prod order 248, retired 2026-09-13, still PROCESSING
+        a week later with its unit still counted as sold).
+
+        The refund is left to a human: a paid order in this situation is
+        rare (the retire path is COD's), and the replay this runs from is
+        historic — moving money without someone looking is worse than
+        one WARNING.
+        """
+        from order.services import OrderService
+
+        if silent_for_customer:
+            OrderService._suppress_customer_status_notifications(
+                order, "CANCELED"
+            )
+        if order.is_paid:
+            logger.warning(
+                "ACS shipment canceled for a PAID order=%s — canceling "
+                "without a refund; refund it by hand.",
+                order.id,
+            )
+        OrderService.cancel_order(
+            order,
+            reason="ACS shipment canceled before dispatch",
+            refund_payment=False,
+        )
 
     @classmethod
     def _advance_pending_order_to_processing(cls, order: Order) -> None:

@@ -1155,6 +1155,14 @@ def get_celery_beat_schedule():
             "task": "tenant.tasks.fanout_auto_cancel_stuck_pending_orders",
             "schedule": crontab(minute="*/15"),
         },
+        # DELIVERED + paid → COMPLETED is applied inline by the carrier
+        # poll and the COD reconcile; this sweep closes what lands
+        # outside those two moments (a payment entered by hand, a
+        # webhook after delivery, an inline attempt that failed once).
+        "complete-paid-delivered-orders": {
+            "task": "tenant.tasks.fanout_complete_paid_delivered_orders",
+            "schedule": SCHEDULE_PRESETS["every_hour"],
+        },
         "check-low-stock-products": {
             "task": "tenant.tasks.fanout_check_low_stock_products",
             "schedule": SCHEDULE_PRESETS["every_hour"],

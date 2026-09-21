@@ -309,6 +309,13 @@ def test_the_mapping_is_asked_not_re_derived():
         )
         == "DELIVERED"
     )
+    # A failed attempt proves the parcel shipped (prod order 267).
+    assert (
+        AcsService.order_status_for_shipment_state(
+            AcsShipmentState.ATTEMPTED, "PROCESSING"
+        )
+        == "SHIPPED"
+    )
     # Already agreed, or already terminal — leave it alone.
     assert (
         AcsService.order_status_for_shipment_state(
@@ -385,3 +392,48 @@ def test_an_agreeing_order_is_left_alone(capsys):
     _run_replay(orders=[order.id])
 
     assert "agrees with its order status" in capsys.readouterr().out
+
+
+def test_a_retired_voucher_cancels_the_order_properly(capsys):
+    """Prod order 248: voucher retired 2026-09-13 with the parcel never
+    handed over; the order sat at PROCESSING with its unit still counted
+    as sold. The replay must run the real cancel — stock back, payment
+    settled, cancellation recorded — not a bare status flip."""
+    from order.models import OrderItem
+    from order.stock import StockManager
+    from product.factories import ProductFactory
+
+    product = ProductFactory(stock=10)
+    order = OrderFactory(
+        status=OrderStatus.PROCESSING,
+        payment_status=PaymentStatus.PENDING,
+        num_order_items=0,
+    )
+    OrderItem.objects.create(
+        order=order,
+        product=product,
+        quantity=1,
+        price=product.price,
+        sort_order=1,
+    )
+    StockManager.decrement_stock(
+        product_id=product.id, quantity=1, order_id=order.id, reason="test"
+    )
+    AcsShipmentFactory(
+        order=order,
+        voucher_no="9803334192",
+        shipment_state=AcsShipmentState.CANCELED,
+        charge_type=AcsChargeType.COD,
+        cod_amount=Money(Decimal("24.97"), "EUR"),
+    )
+
+    _run_replay(orders=[order.id], apply=True)
+
+    order.refresh_from_db()
+    product.refresh_from_db()
+    assert order.status == OrderStatus.CANCELED
+    assert order.payment_status == PaymentStatus.CANCELED
+    assert product.stock == 10
+    assert order.metadata["cancellation"]["previous_status"] == "PROCESSING"
+    assert order.metadata.get("suppress_status_ws_CANCELED") is True
+    assert "-> CANCELED" in capsys.readouterr().out

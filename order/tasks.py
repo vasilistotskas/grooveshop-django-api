@@ -1837,6 +1837,67 @@ def cleanup_expired_stock_reservations() -> int:
     retry_backoff=True,
     retry_jitter=True,
 )
+def complete_paid_delivered_orders() -> dict[str, int]:
+    """Advance every DELIVERED order that is paid to COMPLETED.
+
+    ``OrderService.maybe_advance_to_completed`` runs inline at exactly
+    two moments — the carrier reporting DELIVERED and the COD reconcile
+    flipping the payment — and nowhere else. Anything that pays a
+    delivered order outside those two (staff entering a bank transfer or
+    cash by hand in the admin, a payment webhook landing after the
+    parcel) leaves it at DELIVERED for good, and so does an inline call
+    that failed once. Prod 2026-09-20: orders 252 and 253 had their COD
+    payout matched on 09-07 and were still DELIVERED; 73 and 92 were
+    paid by hand and never moved.
+
+    Idempotent and cheap (two indexed equality filters). Silent for the
+    customer, like every automatic COMPLETED: the shopper already has the
+    DELIVERED message and this is bookkeeping.
+
+    The row is loaded whole, not through ``values``: ``maybe_advance_to_
+    completed`` re-reads what it needs, and ``Order.__init__`` snapshots
+    columns a partial load would leave deferred.
+    """
+    candidate_ids = list(
+        Order.objects.filter(
+            status=OrderStatus.DELIVERED,
+            payment_status=PaymentStatus.COMPLETED,
+        ).values_list("id", flat=True)
+    )
+    advanced = 0
+    for order_id in candidate_ids:
+        try:
+            with transaction.atomic():
+                order = Order.objects.get(pk=order_id)
+                after = OrderService.maybe_advance_to_completed(
+                    order, silent_for_customer=True
+                )
+        except Exception:
+            logger.exception(
+                "complete_paid_delivered_orders: order %s could not be "
+                "advanced",
+                order_id,
+            )
+            continue
+        if after.status == OrderStatus.COMPLETED:
+            advanced += 1
+
+    if candidate_ids:
+        logger.info(
+            "complete_paid_delivered_orders: candidates=%s advanced=%s",
+            len(candidate_ids),
+            advanced,
+        )
+    return {"candidates": len(candidate_ids), "advanced": advanced}
+
+
+@celery_app.task(
+    base=MonitoredTask,
+    autoretry_for=(Exception,),
+    max_retries=3,
+    retry_backoff=True,
+    retry_jitter=True,
+)
 def auto_cancel_stuck_pending_orders() -> dict[str, int]:
     """Auto-cancel PENDING orders that will never be paid.
 

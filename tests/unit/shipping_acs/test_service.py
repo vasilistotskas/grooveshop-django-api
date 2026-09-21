@@ -553,6 +553,184 @@ class TestPollShipmentDeliveryTransitions:
         assert order.status == OrderStatus.COMPLETED
 
 
+def _acs_client_with_tracking(monkeypatch, *, summary, details):
+    """A poll-only client double answering with the given ACS payloads."""
+    from shipping_acs import services
+
+    class _Client:
+        def tracking_summary(self, voucher_no):
+            return dict(summary)
+
+        def tracking_details(self, voucher_no):
+            return [dict(row) for row in details]
+
+    monkeypatch.setattr(services, "AcsClient", _Client)
+    return _Client
+
+
+_PRINT_CHECKPOINTS = [
+    {
+        "checkpoint_date_time": "2026-05-22T16:11:00",
+        "checkpoint_action": "ΕΚΤΥΠΩΣΗ ΕΤΙΚΕΤΑΣ ACSCONNECT/WEBTOOLS",
+        "checkpoint_location": "ΜΑΡΟΥΣΙ",
+        "checkpoint_notes": "",
+    },
+    {
+        "checkpoint_date_time": "2026-05-22T16:30:02",
+        "checkpoint_action": "ΕΚΤΥΠΩΣΗ ΚΑΤΑΣΤΑΣΗΣ ΠΑΡΑΛΑΒΗΣ",
+        "checkpoint_location": "ΜΑΡΟΥΣΙ",
+        "checkpoint_notes": "",
+    },
+]
+
+# What ACS reports for a parcel sitting at a Smartpoint or in the
+# delivery branch's hands: status 5, not delivered, no failure reason.
+_AMBIGUOUS_SUMMARY = {
+    "delivery_flag": 0,
+    "returned_flag": 0,
+    "shipment_status": 5,
+    "non_delivery_reason_code": "",
+}
+
+
+class TestPollShippedInference:
+    """The order must read SHIPPED whenever the parcel has left the sender.
+
+    Two production gaps, both 2026-09-20 on tenant #1:
+
+    * Order 267 — the first summary the poll ever saw was already
+      ``attempted`` (status 5 with a non-delivery reason). ATTEMPTED was
+      not a "shipped" state, so the order stayed PROCESSING for the ten
+      days ACS held the parcel at the branch.
+    * Order 284 — the summary said status 5 / not delivered / no reason
+      for the whole time the parcel waited at a Smartpoint locker. That
+      maps to ``current`` = ``new``, so neither the shipment nor the
+      order ever moved, although the tracking history showed the pickup
+      scan, the hub and the arrival at the branch.
+    """
+
+    def test_attempted_bridges_processing_to_shipped(self, monkeypatch):
+        from order.enum.status import OrderStatus, PaymentStatus
+
+        _acs_client_with_tracking(
+            monkeypatch,
+            summary={
+                "delivery_flag": 0,
+                "returned_flag": 0,
+                "shipment_status": 5,
+                "non_delivery_reason_code": "ΕΝΤΟΛΗ ΠΑΡΑΛΑΒΗΣ ΑΠΟ ΓΡΑΦΕΙΟ",
+            },
+            details=[],
+        )
+        order = OrderFactory(
+            status=OrderStatus.PROCESSING,
+            payment_status=PaymentStatus.PENDING,
+        )
+        shipment = AcsShipmentFactory(
+            order=order,
+            voucher_no="9804659524",
+            shipment_state=AcsShipmentState.NEW,
+        )
+
+        AcsService.poll_shipment_tracking(shipment)
+
+        shipment.refresh_from_db()
+        order.refresh_from_db()
+        assert shipment.shipment_state == AcsShipmentState.ATTEMPTED
+        assert order.status == OrderStatus.SHIPPED
+
+    def test_a_pickup_scan_lifts_new_to_in_transit(self, monkeypatch):
+        from order.enum.status import OrderStatus, PaymentStatus
+
+        _acs_client_with_tracking(
+            monkeypatch,
+            summary=_AMBIGUOUS_SUMMARY,
+            details=[
+                *_PRINT_CHECKPOINTS,
+                {
+                    "checkpoint_date_time": "2026-09-14T13:31:00",
+                    "checkpoint_action": "ΠΑΡΑΛΑΒΗ ΑΠΟ ΑΠΟΣΤΟΛΕΑ",
+                    "checkpoint_location": "ΜΑΡΟΥΣΙ",
+                    "checkpoint_notes": "ΚΑ****ΟΥ",
+                },
+            ],
+        )
+        order = OrderFactory(
+            status=OrderStatus.PROCESSING,
+            payment_status=PaymentStatus.PENDING,
+        )
+        shipment = AcsShipmentFactory(
+            order=order,
+            voucher_no="9806718073",
+            shipment_state=AcsShipmentState.NEW,
+        )
+
+        AcsService.poll_shipment_tracking(shipment)
+
+        shipment.refresh_from_db()
+        order.refresh_from_db()
+        assert shipment.shipment_state == AcsShipmentState.IN_TRANSIT
+        assert order.status == OrderStatus.SHIPPED
+
+    def test_print_checkpoints_alone_keep_the_parcel_new(self, monkeypatch):
+        """Prod order 83: label and pickup-list printed, never handed
+        over, 121 days later still exactly these two checkpoints."""
+        from order.enum.status import OrderStatus, PaymentStatus
+
+        _acs_client_with_tracking(
+            monkeypatch,
+            summary={
+                "delivery_flag": "",
+                "returned_flag": "",
+                "shipment_status": "",
+            },
+            details=_PRINT_CHECKPOINTS,
+        )
+        order = OrderFactory(
+            status=OrderStatus.PROCESSING,
+            payment_status=PaymentStatus.PENDING,
+        )
+        shipment = AcsShipmentFactory(
+            order=order,
+            voucher_no="9773485551",
+            shipment_state=AcsShipmentState.NEW,
+        )
+
+        AcsService.poll_shipment_tracking(shipment)
+
+        shipment.refresh_from_db()
+        order.refresh_from_db()
+        assert shipment.shipment_state == AcsShipmentState.NEW
+        assert order.status == OrderStatus.PROCESSING
+
+    def test_the_lift_does_not_flap_once_in_transit(self, monkeypatch):
+        """A later poll with the same ambiguous summary must not move the
+        shipment back to ``new`` — the history still holds the scan."""
+        _acs_client_with_tracking(
+            monkeypatch,
+            summary=_AMBIGUOUS_SUMMARY,
+            details=[
+                *_PRINT_CHECKPOINTS,
+                {
+                    "checkpoint_date_time": "2026-09-14T13:31:00",
+                    "checkpoint_action": "ΠΑΡΑΛΑΒΗ (SCAN)",
+                    "checkpoint_location": "ΜΑΡΟΥΣΙ",
+                    "checkpoint_notes": "",
+                },
+            ],
+        )
+        shipment = AcsShipmentFactory(
+            voucher_no="9806718074",
+            shipment_state=AcsShipmentState.IN_TRANSIT,
+        )
+
+        AcsService.poll_shipment_tracking(shipment)
+        AcsService.poll_shipment_tracking(shipment)
+
+        shipment.refresh_from_db()
+        assert shipment.shipment_state == AcsShipmentState.IN_TRANSIT
+
+
 @pytest.fixture
 def acs_client_mock_returned(monkeypatch):
     """Variant of ``acs_client_mock`` that drives summaries to RETURNED.

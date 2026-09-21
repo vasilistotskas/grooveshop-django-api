@@ -25,10 +25,13 @@ Customer notifications are suppressed. These transitions are months late;
 "your order was returned" about a July parcel would confuse, not inform.
 Internal state still flows — history rows, signals, the state machine.
 
-Stock is NOT touched. A RETURNED transition never restored stock (only
-``cancel_order`` does), so whether the returned goods went back on the
-shelf is a separate, physical question. Confirmed with the site owner on
-2026-09-08 that stock was already correct for those nine.
+A RETURNED transition does not touch stock: whether the returned goods
+went back on the shelf is a separate, physical question (confirmed with
+the site owner on 2026-09-08 that stock was already correct for the nine
+above). A CANCELED shipment — a voucher retired before the parcel ever
+left — is different: the shared transition routes that order through
+``OrderService.cancel_order``, so stock IS restored, the payment settled
+and the cancellation recorded exactly as a staff cancel would.
 """
 
 from django.core.management.base import BaseCommand

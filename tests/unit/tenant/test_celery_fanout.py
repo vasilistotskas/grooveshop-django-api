@@ -104,6 +104,17 @@ class TestFanoutTaskWrappers:
         )
 
     @pytest.mark.django_db
+    def test_fanout_complete_paid_delivered_orders(self):
+        from tenant import tasks as tenant_tasks
+
+        with patch("tenant.tasks.run_for_all_tenants") as run:
+            tenant_tasks.fanout_complete_paid_delivered_orders()
+
+        run.assert_called_once_with(
+            "order.tasks.complete_paid_delivered_orders"
+        )
+
+    @pytest.mark.django_db
     def test_fanout_send_checkout_abandonment_emails(self):
         from tenant import tasks as tenant_tasks
 

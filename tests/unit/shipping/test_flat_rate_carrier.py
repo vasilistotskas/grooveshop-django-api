@@ -176,16 +176,31 @@ class TestFulfilment(TestCase):
     def setUp(self):
         self.carrier = FlatRateCarrier()
 
-    def test_it_settles_by_any_means(self):
-        """No protocol constraint — a person at a door can take cash.
+    def test_it_can_take_cash_at_the_door(self):
+        """The capability a locker does not have — and the reason COD
+        must survive here."""
+        from pay_way.enum.settlement import PaySettlement
 
-        The restriction that exists for an unattended locker does not
-        exist here, and declaring one would silently remove COD.
-        """
-        assert (
-            self.carrier.supported_settlements(ShippingKind.HOME_DELIVERY)
-            is None
+        supported = self.carrier.supported_settlements(
+            ShippingKind.HOME_DELIVERY
         )
+        assert PaySettlement.COURIER_CASH in supported
+        assert PaySettlement.ONLINE in supported
+
+    def test_it_never_offers_a_carrier_collected_payment(self):
+        """`CARRIER_TERMINAL` is the CARRIER collecting after dispatch
+        by sending its own payment link. There is no carrier here.
+
+        Declaring no constraint at all put BOX NOW PAY ON THE GO against
+        flat-rate home delivery in checkout — a carrier collecting for a
+        parcel it never touches.
+        """
+        from pay_way.enum.settlement import PaySettlement
+
+        supported = self.carrier.supported_settlements(
+            ShippingKind.HOME_DELIVERY
+        )
+        assert PaySettlement.CARRIER_TERMINAL not in supported
 
     def test_it_has_nothing_to_track_or_cancel(self):
         assert self.carrier.fetch_tracking_events(None) == []

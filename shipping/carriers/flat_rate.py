@@ -30,6 +30,7 @@ from collections.abc import Mapping
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, ClassVar
 
+from pay_way.enum.settlement import PaySettlement
 from shipping.enum import ShippingKind
 from shipping.interfaces import ShippingCarrierInterface, register_provider
 
@@ -161,7 +162,27 @@ class FlatRateCarrier(ShippingCarrierInterface):
     ) -> dict[str, list[str]]:
         return {}
 
-    # ``supported_settlements`` stays at the default ``None``: a person
-    # delivering a parcel by hand can take cash at the door, and can
-    # equally deliver something paid for online. The constraint that
-    # exists for an unattended locker does not exist here.
+    def supported_settlements(
+        self, kind: ShippingKind
+    ) -> frozenset[PaySettlement] | None:
+        """Everything except the one a carrier system performs.
+
+        The default ``None`` — no constraint — was wrong, and checkout
+        showed it: BOX NOW PAY ON THE GO appeared against flat-rate HOME
+        DELIVERY, offering to let a carrier collect for a parcel that
+        carrier never touches. ``CARRIER_TERMINAL`` is not a terminal
+        and not cash; it is the carrier collecting online after dispatch
+        by sending its own payment link, which only exists if there is a
+        carrier. There is not one here.
+
+        The rest this carrier can genuinely do: the merchant is paid at
+        checkout, or by transfer, or takes cash at the door — that last
+        one is the whole reason a locker cannot do it and this can.
+        """
+        return frozenset(
+            {
+                PaySettlement.ONLINE,
+                PaySettlement.COURIER_CASH,
+                PaySettlement.OFFLINE_TRANSFER,
+            }
+        )

@@ -3,6 +3,48 @@
 
 
 
+## v3.73.2 (2026-09-21)
+
+### Bug fixes
+
+* fix(order): settle returned COD payments, ship attempted parcels, sweep paid deliveries
+
+Audit of tenant #1 on 2026-09-20 found four ways an order stopped
+matching its parcel and never recovered.
+
+- A refused or uncollected cash-on-delivery parcel came back RETURNED
+  with payment_status PENDING forever (34 rows, oldest from May). RETURNED
+  joins CANCELED in PAYMENT_CLOSING_STATUSES: Order.save() now settles a
+  still-unpaid payment to CANCELED on either transition
+  (settle_payment_on_cancel -> settle_unpaid_payment), and migration 0058
+  backfills the existing rows. A paid return keeps COMPLETED until the
+  refund.
+- An ACS "attempted" state never bridged PROCESSING -> SHIPPED because it
+  was not a shipped state; order 267 sat at PROCESSING for the ten days ACS
+  held it at the branch. ATTEMPTED joins _SHIPPED_STATES.
+- ACS reports shipment_status=5 / delivery_flag=0 / no reason for a parcel
+  waiting at a Smartpoint, which the mapping leaves at "new" when the
+  pickup fell between two polls (order 284). The poll now lifts a "new"
+  shipment to in_transit when the tracking history holds any checkpoint
+  that is not a print; a voucher never handed over keeps only print
+  checkpoints and stays new (order 83).
+- DELIVERED + paid -> COMPLETED ran inline at two moments only, so orders
+  paid by hand or whose inline attempt failed once stayed DELIVERED (252,
+  253, 73, 92). Hourly complete_paid_delivered_orders sweeps them,
+  silently for the customer.
+- A CANCELED shipment state (retired voucher) now routes the order through
+  cancel_order from the replay command, so stock is restored and the
+  payment settled instead of a bare status write (order 248).
+
+docs/order-system.md updated alongside.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_014MgEUYPpT4KeiBqR3kCjxh ([`62d3540`](https://github.com/vasilistotskas/grooveshop-django-api/commit/62d3540c8122125b74cdd33d1aef4847bb6fc179))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.73.1 [skip ci] ([`e982acb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e982acb19b272ffec4f41964ea2174eb3e9c69b1))
+
 ## v3.73.1 (2026-09-20)
 
 ### Bug fixes

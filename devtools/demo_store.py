@@ -1080,7 +1080,7 @@ def english_menu(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
 # addition: provisioning seeds it as an unpublished prompt for the
 # merchant, and on a store with no merchant that left `/return-policy`
 # answering 404 with the footer and the FAQ both linking to it.
-CONTENT_PAGES: dict[str, dict[str, str]] = {
+CONTENT_PAGES: dict[str, dict[str, Any]] = {
     # Provisioning seeds this one as an unpublished PROMPT ("add your
     # returns policy here"), because only a merchant can write it. On a
     # showcase that left a hole nobody would accept in a real shop: the
@@ -1234,6 +1234,9 @@ CONTENT_PAGES: dict[str, dict[str, str]] = {
     # just by a browser. The footer's "AI-ready" trust badge points
     # here when the tenant has agent commerce on.
     "ai-ready": {
+        # Not provisioned with the store — this seeder is its only
+        # author, so it is created rather than reported missing.
+        "create_if_missing": True,
         "title": "Έτοιμο για AI agents",
         "seo_title": "Έτοιμο για AI agents",
         "seo_description": (
@@ -2336,9 +2339,25 @@ def publish_content_pages() -> dict[str, int]:
     for slug, content in CONTENT_PAGES.items():
         page = ContentPage.objects.filter(slug=slug).first()
         if page is None:
-            logger.warning("Content page %s is missing from this schema", slug)
-            _bump(report, "missing")
-            continue
+            # A row this seeder OWNS is created; a row provisioning owns
+            # is reported. `faq`, `shipping-info` and `return-policy`
+            # come from `page_config.defaults` at tenant creation, so
+            # their absence means the schema is under-provisioned and
+            # should be said out loud rather than papered over. The
+            # AI-ready page has no such origin — it is showcase content,
+            # and this is the only thing that writes it.
+            if not content.get("create_if_missing"):
+                logger.warning(
+                    "Content page %s is missing from this schema", slug
+                )
+                _bump(report, "missing")
+                continue
+            page = ContentPage(slug=slug)
+            page.set_current_language(settings.PARLER_DEFAULT_LANGUAGE_CODE)
+            page.title = content["title"]
+            page.body = content["body"]
+            page.save()
+            _bump(report, "created")
 
         english = page.translations.filter(language_code="en").first()
         if english is None or not (english.body or "").strip():

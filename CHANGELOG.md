@@ -3,6 +3,28 @@
 
 
 
+## v3.74.1 (2026-09-21)
+
+### Bug fixes
+
+* fix(demo): create the AI-ready page instead of reporting it missing
+
+`publish_content_pages` only ever published rows that already existed,
+because the three it knew about come from `page_config.defaults` at
+tenant creation — their absence means the schema is under-provisioned
+and should be said out loud. The AI-ready page has no such origin: this
+seeder is its only author, so the run reported `missing=1` and wrote
+nothing.
+
+A row the seeder owns now carries `create_if_missing` and is created.
+The distinction is the point — an under-provisioned schema still warns.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com> ([`5ee0cd9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5ee0cd9b6ebc165b24c9d5e655569fa0759c2f97))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.74.0 [skip ci] ([`6b29818`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6b29818a8371ae8f0fafe2ff1c6ef7470631abff))
+
 ## v3.74.0 (2026-09-21)
 
 ### Chores

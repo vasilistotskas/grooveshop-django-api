@@ -12,8 +12,11 @@ engine.
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 import pytest
 from django.urls import reverse
+from djmoney.money import Money
 from rest_framework.test import APIClient
 
 from product.factories.category import ProductCategoryFactory
@@ -27,6 +30,13 @@ URL = reverse("recommendation-list")
 
 
 def _product(**kwargs):
+    # A fixed price, as in the cart budget test: the CART slot keeps only
+    # candidates inside a price band around the seeds, and the factory's
+    # random price left the single-seed request with nothing to suggest
+    # about one run in fourteen — an empty response skips hydration, so
+    # the test compared 7 queries against 11 and blamed the engine.
+    kwargs.setdefault("price", Money(Decimal("50.00"), "EUR"))
+    kwargs.setdefault("discount_percent", Decimal(0))
     kwargs.setdefault("active", True)
     kwargs.setdefault("stock", 5)
     kwargs.setdefault("num_images", 0)
@@ -77,8 +87,10 @@ def test_cost_does_not_grow_with_the_number_of_seeds():
             "seeds": ",".join(str(s.id) for s in seeds[:count]),
         }
 
-    one, _ = _measure(client, _query(1))
-    four, _ = _measure(client, _query(4))
+    one, response = _measure(client, _query(1))
+    assert response.data["items"], "one seed: no suggestions to cost"
+    four, response = _measure(client, _query(4))
+    assert response.data["items"], "four seeds: no suggestions to cost"
 
     assert four == one, (
         f"suggestions cost grew from {one} to {four} queries with three "

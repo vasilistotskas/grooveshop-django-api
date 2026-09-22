@@ -3,6 +3,50 @@
 
 
 
+## v3.75.0 (2026-09-22)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.74.4 [skip ci] ([`bd732b3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bd732b34b88cd1680481db2ff4b4c5ed5de67cbc))
+
+### Features
+
+* feat(core): audit file references against what storage actually holds
+
+A FileField is a database string and nothing ties its lifetime to the
+bytes on disk. Under TenantFileSystemStorage those bytes live on a
+shared RWX PVC with no backup target configured, so a row outlives its
+file and stays perfectly valid to the ORM.
+
+Found by a log audit on 2026-09-22: nine of the nineteen webside users
+carrying an avatar pointed at a file the PVC no longer had, every
+surviving file in that directory dated to one migration. Each render
+asked media-stream for it and both it and the static origin logged the
+404, while the storefront's UAvatar fell back to the alt initials -- so
+nothing looked broken and nothing got fixed. Measured across all four
+production tenants: 239 references, 11 models, 9 dangling.
+
+Read-only by default. --clear blanks the dangling references, which is
+the honest repair when the bytes are unrecoverable: an empty field
+renders the same fallback without asking the network for a file that
+does not exist. image_to_media_path() already returns "" for an unset
+field, so the storefront contract is unchanged.
+
+Fields come from the app registry, not a hardcoded list, so a model
+that grows an image next month is covered. App labels are read off the
+app configs rather than sliced out of the TENANT_APPS strings, because
+a label need not be the last dotted segment of the name. _base_manager
+is used so a soft-deleted row -- still restorable, still pointing at a
+file -- is not skipped, and each field's own storage is asked rather
+than default_storage. Clearing goes through save(update_fields=...) so
+post_save still invalidates the caches and search documents that carry
+the image path.
+
+scan_current_schema() is split from audit_schema() so the rule can be
+tested without provisioning a tenant schema.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com> ([`5a5d38e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5a5d38e5b953189b50c80dadd8bdc6132c5674be))
+
 ## v3.74.4 (2026-09-21)
 
 ### Bug fixes

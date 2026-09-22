@@ -3,6 +3,31 @@
 
 
 
+## v3.76.0 (2026-09-22)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.75.0 [skip ci] ([`f8b9496`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f8b94969210da77732ce26810a4b395e6c60b5c6))
+
+### Features
+
+* feat(page-config): a hero slide no longer carries a theme
+
+The storefront redraws `hero_carousel` as a panel beside the photograph:
+the copy sits on the store's accent surface, in the accent's own
+foreground token, and is never set over the artwork. With no copy over a
+photograph there is no "which way does it read" left for an operator to
+choose, so the slide-level `theme` goes from the validator, the demo
+seed and the schema test. The storefront's Zod mirror already strips it,
+so a stored value from before this change is dropped on read rather
+than served.
+
+`hero_banner` keeps its `theme`: that section still draws copy over a
+full-bleed photograph.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013JbAFMFWuDfcAkTEzXQFv8 ([`1c430e0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1c430e09e8d2fcaf9fb8c505191c8499fce6995d))
+
 ## v3.75.0 (2026-09-22)
 
 ### Chores

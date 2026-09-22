@@ -766,7 +766,6 @@ def test_hero_slides_carry_their_own_copy_and_destination():
                     "subheading": "Σε επιλεγμένα ακουστικά",
                     "cta_text": "Δες τα",
                     "cta_link": "/offers",
-                    "theme": "dark",
                 }
             ],
             "autoplay_ms": 6000,

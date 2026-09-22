@@ -44,7 +44,6 @@ HOME_SECTIONS: tuple[dict[str, Any], ...] = (
                     "cta_link": "/products",
                     "secondary_cta_text": "Οδηγοί αγοράς",
                     "secondary_cta_link": "/blog",
-                    "theme": "dark",
                 },
                 {
                     "image_url": "{{asset:hero-audio}}",
@@ -57,7 +56,6 @@ HOME_SECTIONS: tuple[dict[str, Any], ...] = (
                     ),
                     "cta_text": "Δες τον ήχο",
                     "cta_link": "/products",
-                    "theme": "dark",
                 },
                 {
                     "image_url": "{{asset:hero-protection}}",
@@ -67,7 +65,6 @@ HOME_SECTIONS: tuple[dict[str, Any], ...] = (
                     "subheading": "Θήκες και tempered glass για κάθε μοντέλο.",
                     "cta_text": "Δες την προστασία",
                     "cta_link": "/products",
-                    "theme": "light",
                 },
             ],
         },
@@ -89,7 +86,6 @@ HOME_SECTIONS: tuple[dict[str, Any], ...] = (
                             "cta_link": "/products",
                             "secondary_cta_text": "Buying guides",
                             "secondary_cta_link": "/blog",
-                            "theme": "dark",
                         },
                         {
                             "image_url": "{{asset:hero-audio}}",
@@ -102,7 +98,6 @@ HOME_SECTIONS: tuple[dict[str, Any], ...] = (
                             ),
                             "cta_text": "Shop audio",
                             "cta_link": "/products",
-                            "theme": "dark",
                         },
                         {
                             "image_url": "{{asset:hero-protection}}",
@@ -114,7 +109,6 @@ HOME_SECTIONS: tuple[dict[str, Any], ...] = (
                             ),
                             "cta_text": "Shop protection",
                             "cta_link": "/products",
-                            "theme": "light",
                         },
                     ],
                 },

@@ -369,6 +369,10 @@ def _check_hero_slides(value) -> str | None:
     artwork had to carry its own baked-in wording. A slide here owns its
     own copy and its own destination; when ``slides`` is present it wins
     and the flat props are ignored.
+
+    No ``theme``: the storefront sets a slide's copy on the accent panel
+    beside the artwork, never over it, so there is no "which way does
+    it read" for an operator to choose.
     """
     if not isinstance(value, list) or len(value) > 8:
         return "slides: must be a list of at most 8 entries"
@@ -397,9 +401,6 @@ def _check_hero_slides(value) -> str | None:
                 continue
             if not _is_str(entry, 1000) or not _LINK_RE.match(entry):
                 return f"slides[{i}].{key}: internal path or https URL"
-        theme = slide.get("theme")
-        if theme is not None and theme not in ("light", "dark", "auto"):
-            return f"slides[{i}].theme: one of light/dark/auto"
         unknown = set(slide) - {
             "image_url",
             "mobile_image_url",
@@ -411,7 +412,6 @@ def _check_hero_slides(value) -> str | None:
             "cta_link",
             "secondary_cta_text",
             "secondary_cta_link",
-            "theme",
         }
         if unknown:
             return f"slides[{i}]: unknown keys {sorted(unknown)}"

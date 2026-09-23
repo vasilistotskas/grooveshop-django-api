@@ -134,3 +134,36 @@ def mt_public_tenant(django_db_setup, django_db_blocker):
             tenant.auto_create_schema = False
             tenant.save()
         yield tenant
+
+
+# A SECOND provisioned tenant, for the few tests that need two real
+# schemas side by side (a token issued by one store presented to
+# another). Costs one more migration replay per session, so only tests
+# that ask for it pay.
+MT_TENANT_B_SCHEMA = "mt_smoke_b"
+MT_TENANT_B_DOMAIN = "mt-smoke-b.test"
+
+
+@pytest.fixture(scope="session")
+def mt_tenant_b(django_db_setup, django_db_blocker):
+    # Created lazily, so the connection may still be bound to a schema an
+    # earlier test switched to — and django-tenants refuses to create a
+    # tenant outside the public schema.
+    from django_tenants.utils import get_public_schema_name, schema_context
+
+    with django_db_blocker.unblock(), schema_context(get_public_schema_name()):
+        from tenant.models import Tenant, TenantDomain
+
+        tenant, _created = Tenant.objects.get_or_create(
+            schema_name=MT_TENANT_B_SCHEMA,
+            defaults={
+                "name": "MT Smoke Tenant B",
+                "slug": "mt-smoke-b",
+                "owner_email": "mt-smoke-b@example.com",
+            },
+        )
+        TenantDomain.objects.get_or_create(
+            domain=MT_TENANT_B_DOMAIN,
+            defaults={"tenant": tenant, "is_primary": True},
+        )
+        yield tenant

@@ -2,7 +2,7 @@
 {{ SITE_NAME }}
 ================================================================================
 
-{% blocktrans with first_name=user.first_name|default:user.username %}Hi {{ first_name }},{% endblocktrans %}
+{% if user %}{% blocktrans with first_name=user.first_name|default:user.username %}Hi {{ first_name }},{% endblocktrans %}{% else %}{% trans "Hello," %}{% endif %}
 
 {% blocktrans with topic_name=topic.name %}Please confirm you'd like to subscribe to {{ topic_name }}. Your subscription isn't active yet — open the link below to complete it.{% endblocktrans %}
 

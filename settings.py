@@ -454,6 +454,11 @@ REST_FRAMEWORK = {
         # apply on top.
         "contact": None if DEBUG else "5/minute",
         "feedback": None if DEBUG else "5/minute",
+        # The anonymous newsletter form. Each accepted request can send
+        # an email to an arbitrary address, so it is budgeted like the
+        # contact form (the confirmation resend also has its own
+        # 10-minute cooldown per address).
+        "newsletter_subscribe": None if DEBUG else "5/minute",
         # One file per request, and each can be tens of megabytes on
         # the pod's disk until it is claimed or reaped - so this is a
         # bandwidth budget, not just an anti-spam one. Generous enough
@@ -1031,6 +1036,15 @@ def get_celery_beat_schedule():
             # Fanout: drops the BYTES of claimed attachments past the
             # store's retention window, keeping the rows.
             "task": "tenant.tasks.fanout_purge_expired_attachment_files",
+            "schedule": SCHEDULE_PRESETS["daily_4am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_hour"],
+        },
+        "purge-unconfirmed-guest-subscriptions": {
+            # Fanout: UserSubscription is per-tenant. A guest newsletter
+            # signup never confirmed within 30 days is an address and a
+            # consent record nobody gave us permission to keep.
+            "task": "tenant.tasks.fanout_purge_unconfirmed_guest_subscriptions",
             "schedule": SCHEDULE_PRESETS["daily_4am"]
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
@@ -1629,27 +1643,6 @@ EXTRA_SETTINGS_DEFAULTS = [
         "name": "DEFAULT_WEIGHT_UNIT",
         "type": "string",
         "value": "kg",
-    },
-    {
-        "name": "SUBSCRIPTION_CONFIRMATION_URL",
-        "type": "string",
-        # Relative path template — the {token} placeholder is filled at
-        # send time.  The full URL is built dynamically by
-        # send_subscription_confirmation() via
-        # core.utils.tenant_urls.get_tenant_api_base_url() so that the
-        # link points to the correct tenant's API domain (an explicit
-        # "api*" TenantDomain row, else api.<primary domain>) rather
-        # than the platform-wide API_BASE_URL baked at startup.
-        "value": "/api/v1/user/subscription/confirm/{token}",
-        "description": (
-            "URL path template for subscription confirmation emails. "
-            "The {token} placeholder is substituted at send time. "
-            "The API host prefix is prepended dynamically using the "
-            "current tenant's API domain (falls back to "
-            "settings.API_BASE_URL). "
-            "Example resolved value: "
-            "https://api.myshop.com/api/v1/user/subscription/confirm/abc123"
-        ),
     },
     {
         "name": "STOCK_RESERVATION_TTL_MINUTES",

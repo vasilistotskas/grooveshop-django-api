@@ -18474,6 +18474,166 @@ msgstr "ΦΠΑ"
 msgid "Vats"
 msgstr "ΦΠΑ"
 
+#: .\core\templates\emails\subscription\confirmation.html:9
+#: .\core\templates\emails\subscription\confirmation.txt:5
+msgid "Hello,"
+msgstr "Γεια σας,"
+
+#: .\user\serializers\subscription.py
+msgid "Consent is required to subscribe."
+msgstr "Απαιτείται η συγκατάθεσή σας για την εγγραφή."
+
+#: .\user\serializers\subscription.py .\user\models\subscription.py
+msgid "Only one active newsletter topic can be the default."
+msgstr ""
+"Μόνο ένα ενεργό θέμα ενημερωτικού δελτίου μπορεί να είναι το προεπιλεγμένο."
+
+#: .\user\views\subscription.py
+msgid "This store has no newsletter to subscribe to."
+msgstr "Αυτό το κατάστημα δεν διαθέτει ενημερωτικό δελτίο."
+
+#: .\user\views\subscription.py
+msgid ""
+"Thank you. Check your inbox for a link to confirm your subscription."
+msgstr ""
+"Ευχαριστούμε. Θα βρείτε στα εισερχόμενά σας έναν σύνδεσμο για να "
+"επιβεβαιώσετε την εγγραφή σας."
+
+#: .\user\views\subscription.py
+msgid "Invalid confirmation link."
+msgstr "Μη έγκυρος σύνδεσμος επιβεβαίωσης."
+
+#: .\user\views\subscription.py
+msgid ""
+"This confirmation link has expired. Please subscribe again to get a new one."
+msgstr ""
+"Αυτός ο σύνδεσμος επιβεβαίωσης έχει λήξει. Κάντε ξανά εγγραφή για να λάβετε "
+"νέο σύνδεσμο."
+
+#: .\user\admin.py
+msgid "Guest (email only)"
+msgstr "Επισκέπτης (μόνο email)"
+
+#: .\user\admin.py
+msgid "Subscriber"
+msgstr "Συνδρομητής"
+
+#: .\user\admin.py
+msgid "Consent"
+msgstr "Συγκατάθεση"
+
+#: .\user\models\subscription.py
+msgid "Newsletter form"
+msgstr "Φόρμα ενημερωτικού δελτίου"
+
+#: .\user\models\subscription.py
+msgid "Signup"
+msgstr "Εγγραφή λογαριασμού"
+
+#: .\user\models\subscription.py
+msgid "Where the subscription was made."
+msgstr "Πού έγινε η εγγραφή."
+
+#: .\user\models\subscription.py
+msgid "Confirmation Sent At"
+msgstr "Αποστολή επιβεβαίωσης"
+
+#: .\user\models\subscription.py
+msgid "Confirmed At"
+msgstr "Επιβεβαιώθηκε"
+
+#: .\user\models\subscription.py
+msgid "Confirmed From IP"
+msgstr "IP επιβεβαίωσης"
+
+#: .\user\models\subscription.py
+msgid "Consent Text"
+msgstr "Κείμενο συγκατάθεσης"
+
+#: .\user\models\subscription.py
+msgid "Consent IP"
+msgstr "IP συγκατάθεσης"
+
+#: .\user\models\subscription.py
+msgid "Consent User Agent"
+msgstr "User agent συγκατάθεσης"
+
+#: .\user\models\subscription.py
+msgid ""
+"Account and system topics: new users are subscribed automatically. "
+"Newsletter topic: the one the storefront newsletter form subscribes "
+"visitors to (at most one active). Topics of any other category are never "
+"subscribed automatically — they need the recipient's consent."
+msgstr ""
+"Θέματα λογαριασμού και συστήματος: οι νέοι χρήστες εγγράφονται αυτόματα. "
+"Θέμα ενημερωτικού δελτίου: αυτό στο οποίο εγγράφει τους επισκέπτες η φόρμα "
+"ενημερωτικού δελτίου του καταστήματος (το πολύ ένα ενεργό). Θέματα κάθε "
+"άλλης κατηγορίας δεν εγγράφουν ποτέ αυτόματα — απαιτούν τη συγκατάθεση του "
+"παραλήπτη."
+
+#: .\user\models\subscription.py
+msgid ""
+"The address submitted on the newsletter form. The recipient of a guest "
+"subscription; an account's subscription mails the account's own address."
+msgstr ""
+"Η διεύθυνση που δόθηκε στη φόρμα ενημερωτικού δελτίου. Είναι ο παραλήπτης "
+"μιας εγγραφής επισκέπτη· η εγγραφή ενός λογαριασμού αποστέλλεται στη "
+"διεύθυνση του λογαριασμού."
+
+#: .\user\models\subscription.py
+msgid "Language the subscription was made in; its emails use it."
+msgstr "Η γλώσσα στην οποία έγινε η εγγραφή· τη χρησιμοποιούν τα email της."
+
+#: .\user\models\subscription.py
+msgid ""
+"When the current confirmation link was issued. The link expires a week later."
+msgstr ""
+"Πότε εκδόθηκε ο τρέχων σύνδεσμος επιβεβαίωσης. Λήγει μία εβδομάδα αργότερα."
+
+#: .\user\models\subscription.py
+msgid "The exact consent sentence shown to the subscriber."
+msgstr "Η ακριβής φράση συγκατάθεσης που είδε ο συνδρομητής."
+
+#: .\user\serializers\subscription.py
+msgid "The visitor ticked the consent box. Must be true."
+msgstr "Ο επισκέπτης επέλεξε το πλαίσιο συγκατάθεσης. Πρέπει να είναι true."
+
+#: .\user\serializers\subscription.py
+msgid "The exact consent sentence shown to the visitor."
+msgstr "Η ακριβής φράση συγκατάθεσης που είδε ο επισκέπτης."
+
+#: .\user\serializers\subscription.py
+msgid ""
+"Whether the store has a default newsletter topic the form can subscribe to."
+msgstr ""
+"Αν το κατάστημα έχει προεπιλεγμένο θέμα ενημερωτικού δελτίου στο οποίο "
+"μπορεί να εγγράψει η φόρμα."
+
+#: .\user\views\subscription.py
+msgid "Whether the newsletter form can be offered"
+msgstr "Αν μπορεί να προσφερθεί η φόρμα ενημερωτικού δελτίου"
+
+#: .\user\views\subscription.py
+msgid "Subscribe an email address to the newsletter"
+msgstr "Εγγραφή μιας διεύθυνσης email στο ενημερωτικό δελτίο"
+
+#: user/models/subscription.py
+msgid "Consented At"
+msgstr "Συγκατάθεση στις"
+
+#: user/models/subscription.py
+msgid "When the subscriber submitted the consent."
+msgstr "Πότε υπέβαλε ο συνδρομητής τη συγκατάθεση."
+
+#: user/admin.py
+msgid "Resend confirmation"
+msgstr "Επαναποστολή επιβεβαίωσης"
+
+#: user/admin.py
+#, python-format
+msgid "%(count)d confirmation emails were queued."
+msgstr "Μπήκαν σε αναμονή %(count)d email επιβεβαίωσης."
+
 #~ msgid ""
 #~ "Sender address for outbound email from this tenant (e.g. 'no-"
 #~ "reply@myshop.com'). Empty falls back to settings.DEFAULT_FROM_EMAIL."

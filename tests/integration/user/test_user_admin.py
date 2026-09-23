@@ -622,10 +622,56 @@ class TestUserSubscriptionAdmin:
             "user_info",
             "topic_info",
             "status_label",
+            "source",
             "subscription_dates",
             "created_at",
         ]
         assert admin.list_display == expected_fields
+
+    def test_consent_evidence_is_read_only(self):
+        admin = UserSubscriptionAdmin(UserSubscription, AdminSite())
+
+        for field in (
+            "consent_text",
+            "consent_ip",
+            "consent_user_agent",
+            "confirmation_sent_at",
+            "confirmed_at",
+            "confirmed_ip",
+            "source",
+        ):
+            assert field in admin.readonly_fields
+        assert "email" in admin.search_fields
+
+    def test_user_info_for_a_guest(self):
+        admin = UserSubscriptionAdmin(UserSubscription, AdminSite())
+        subscription = UserSubscription.objects.create(
+            topic=SubscriptionTopicFactory(),
+            email="guest@example.com",
+            source=UserSubscription.Source.NEWSLETTER_FORM,
+        )
+
+        assert "guest@example.com" in admin.user_info(subscription)
+
+    def test_subscriber_kind_filter(self):
+        from user.admin import SubscriberKindFilter
+
+        topic = SubscriptionTopicFactory()
+        account_row = UserSubscriptionFactory(topic=topic)
+        guest_row = UserSubscription.objects.create(
+            topic=topic, email="guest@example.com"
+        )
+        admin = UserSubscriptionAdmin(UserSubscription, AdminSite())
+        qs = UserSubscription.objects.filter(topic=topic)
+
+        def run(value):
+            flt = SubscriberKindFilter(
+                None, {"subscriber_kind": [value]}, UserSubscription, admin
+            )
+            return set(flt.queryset(None, qs))
+
+        assert run("guest") == {guest_row}
+        assert run("account") == {account_row}
 
     def test_subscription_info(self):
         admin = UserSubscriptionAdmin(UserSubscription, AdminSite())
@@ -703,40 +749,66 @@ class TestUserSubscriptionAdmin:
         # Locale-agnostic: assert the date rendered, not the label.
         assert str(subscription.subscribed_at.year) in result
 
+    def test_admin_has_no_way_to_activate(self):
+        """Only the subscriber's own confirmation makes a row ACTIVE."""
+        admin = UserSubscriptionAdmin(UserSubscription, AdminSite())
+
+        assert admin.actions == [
+            "resend_confirmation",
+            "deactivate_subscriptions",
+        ]
+        assert not hasattr(admin, "activate_subscriptions")
+        for field in ("status", "user", "email", "topic"):
+            assert field in admin.readonly_fields
+        assert admin.has_add_permission(None) is False
+
+    def test_inline_is_read_only(self):
+        from user.admin import UserSubscriptionInline
+
+        inline = UserSubscriptionInline(UserAccount, AdminSite())
+        assert "status" in inline.readonly_fields
+        assert "topic" in inline.readonly_fields
+        assert inline.has_add_permission(None) is False
+
     @patch.object(UserSubscriptionAdmin, "message_user")
-    def test_activate_subscriptions_action(
+    def test_resend_confirmation_rearms_pending_rows_only(
         self, mock_message_user, admin_request
     ):
         admin = UserSubscriptionAdmin(UserSubscription, AdminSite())
-
-        user = UserAccountFactory()
         topic = SubscriptionTopicFactory()
-        subscription1 = UserSubscriptionFactory(
-            user=user,
+        pending = UserSubscriptionFactory(
+            user=UserAccountFactory(),
             topic=topic,
-            status=UserSubscription.SubscriptionStatus.UNSUBSCRIBED,
+            status=UserSubscription.SubscriptionStatus.PENDING,
+            confirmation_token="old-token",
         )
-        subscription2 = UserSubscriptionFactory(
+        unsubscribed = UserSubscriptionFactory(
             user=UserAccountFactory(),
             topic=topic,
             status=UserSubscription.SubscriptionStatus.UNSUBSCRIBED,
         )
 
-        queryset = UserSubscription.objects.filter(
-            id__in=[subscription1.id, subscription2.id]
-        )
+        with patch(
+            "user.services.subscription.dispatch_confirmation"
+        ) as mock_dispatch:
+            admin.resend_confirmation(
+                admin_request,
+                UserSubscription.objects.filter(
+                    id__in=[pending.id, unsubscribed.id]
+                ),
+            )
 
-        admin.activate_subscriptions(admin_request, queryset)
-
-        subscription1.refresh_from_db()
-        subscription2.refresh_from_db()
+        pending.refresh_from_db()
+        unsubscribed.refresh_from_db()
+        assert pending.status == UserSubscription.SubscriptionStatus.PENDING
+        assert pending.confirmation_token not in ("", "old-token")
+        assert pending.confirmation_sent_at is not None
         assert (
-            subscription1.status == UserSubscription.SubscriptionStatus.ACTIVE
+            unsubscribed.status
+            == UserSubscription.SubscriptionStatus.UNSUBSCRIBED
         )
-        assert (
-            subscription2.status == UserSubscription.SubscriptionStatus.ACTIVE
-        )
-
+        mock_dispatch.assert_called_once()
+        assert mock_dispatch.call_args.args[0].pk == pending.pk
         mock_message_user.assert_called_once()
 
     @patch.object(UserSubscriptionAdmin, "message_user")

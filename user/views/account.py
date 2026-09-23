@@ -34,9 +34,8 @@ from product.filters.review import ProductReviewFilter
 from product.serializers.favourite import ProductFavouriteSerializer
 from product.serializers.review import ProductReviewSerializer
 from tenant.membership import is_store_staff
-from user.filters import UserAddressFilter, UserSubscriptionFilter
+from user.filters import UserAddressFilter
 from user.filters.account import UserAccountFilter
-from user.models.subscription import SubscriptionTopic, UserSubscription
 from user.serializers.account import (
     DeleteAccountRequestSerializer,
     DeleteAccountResponseSerializer,
@@ -44,12 +43,9 @@ from user.serializers.account import (
     UserDetailsSerializer,
     UsernameUpdateResponseSerializer,
     UsernameUpdateSerializer,
-    UserSubscriptionSummaryResponseSerializer,
     UserWriteSerializer,
 )
 from user.serializers.address import UserAddressSerializer
-from user.serializers.subscription import UserSubscriptionSerializer
-from user.utils.subscription import get_user_subscription_summary
 
 User = get_user_model()
 
@@ -129,27 +125,12 @@ serializers_config: SerializersConfig = {
             ),
         ],
     ),
-    "subscriptions": ActionConfig(
-        response=UserSubscriptionSerializer,
-        many=True,
-        operation_id="getUserAccountSubscriptions",
-        summary=_("Get user's subscriptions"),
-        description=_("Get all subscriptions for a specific user."),
-        tags=["User Accounts"],
-    ),
     "change_username": ActionConfig(
         request=UsernameUpdateSerializer,
         response=UsernameUpdateResponseSerializer,
         operation_id="changeUserAccountUsername",
         summary=_("Change username"),
         description=_("Change the username for a specific user."),
-        tags=["User Accounts"],
-    ),
-    "subscription_summary": ActionConfig(
-        response=UserSubscriptionSummaryResponseSerializer,
-        operation_id="getUserAccountSubscriptionSummary",
-        summary=_("Get user's subscription summary"),
-        description=_("Get a summary of subscriptions for a specific user."),
         tags=["User Accounts"],
     ),
     "request_data_export": ActionConfig(
@@ -277,7 +258,6 @@ class UserAccountViewSet(BaseModelViewSet):
         "blog_post_comments": BlogCommentFilter,
         "liked_blog_posts": BlogPostFilter,
         "notifications": NotificationUserFilter,
-        "subscriptions": UserSubscriptionFilter,
     }
 
     def get_filterset_class(self):
@@ -330,9 +310,6 @@ class UserAccountViewSet(BaseModelViewSet):
 
                 user = self._get_checked_user()
                 queryset = NotificationUser.objects.for_list().filter(user=user)
-            case "subscriptions":
-                user = self._get_checked_user()
-                queryset = user.subscriptions.select_related("topic")
             case _:
                 queryset = (
                     User.objects.all()
@@ -424,64 +401,6 @@ class UserAccountViewSet(BaseModelViewSet):
             queryset, request, serializer_class=response_serializer_class
         )
 
-    @action(detail=True, methods=["GET", "POST"])
-    def subscriptions(self, request, pk=None):
-        user = self.get_object()
-
-        if request.method == "GET":
-            self.search_fields = []
-
-            queryset = self.filter_queryset(self.get_queryset())
-
-            response_serializer_class = self.get_response_serializer()
-            return self.paginate_and_serialize(
-                queryset, request, serializer_class=response_serializer_class
-            )
-
-        elif request.method == "POST":
-            topic_id = request.data.get("topic_id")
-            if not topic_id:
-                return Response(
-                    {"detail": _("Topic ID is required.")},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            try:
-                topic = SubscriptionTopic.objects.get(
-                    id=topic_id, is_active=True
-                )
-            except SubscriptionTopic.DoesNotExist:
-                return Response(
-                    {"detail": _("Topic not found or not active.")},
-                    status=status.HTTP_404_NOT_FOUND,
-                )
-
-            subscription, created = UserSubscription.objects.get_or_create(
-                user=user,
-                topic=topic,
-                defaults={
-                    "status": UserSubscription.SubscriptionStatus.PENDING
-                    if topic.requires_confirmation
-                    else UserSubscription.SubscriptionStatus.ACTIVE
-                },
-            )
-
-            if (
-                not created
-                and subscription.status
-                == UserSubscription.SubscriptionStatus.ACTIVE
-            ):
-                return Response(
-                    {"detail": _("User is already subscribed to this topic.")},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            response_serializer_class = self.get_response_serializer()
-            response_serializer = response_serializer_class(subscription)
-            return Response(
-                response_serializer.data, status=status.HTTP_201_CREATED
-            )
-
     @action(detail=True, methods=["POST"])
     def change_username(self, request, pk=None):
         user = self.get_object()
@@ -513,17 +432,6 @@ class UserAccountViewSet(BaseModelViewSet):
         response_serializer_class = self.get_response_serializer()
         response_serializer = response_serializer_class(response_data)
         return Response(response_serializer.data, status=status.HTTP_200_OK)
-
-    @action(detail=True, methods=["GET"])
-    def subscription_summary(self, request, pk=None):
-        self.search_fields = []
-
-        user = self.get_object()
-        summary = get_user_subscription_summary(user)
-
-        response_serializer_class = self.get_response_serializer()
-        response_serializer = response_serializer_class(summary)
-        return Response(response_serializer.data)
 
     @action(detail=True, methods=["GET"])
     def data_exports(self, request, pk=None):

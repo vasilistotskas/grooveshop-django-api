@@ -86,6 +86,37 @@ class SubscriptionTopicWriteSerializer(
             )
         return value
 
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+
+        def resolved(name):
+            if name in attrs:
+                return attrs[name]
+            if self.instance is not None:
+                return getattr(self.instance, name)
+            return SubscriptionTopic._meta.get_field(name).get_default()
+
+        # Mirrors the ``sub_topic_one_default_newsletter`` constraint,
+        # which DRF cannot turn into a validator (see the model).
+        if (
+            resolved("category") == SubscriptionTopic.TopicCategory.NEWSLETTER
+            and resolved("is_default")
+            and resolved("is_active")
+        ):
+            others = SubscriptionTopic.objects.default_newsletter()
+            if self.instance is not None:
+                others = others.exclude(pk=self.instance.pk)
+            if others.exists():
+                raise serializers.ValidationError(
+                    {
+                        "is_default": _(
+                            "Only one active newsletter topic can be the "
+                            "default."
+                        )
+                    }
+                )
+        return attrs
+
 
 class UserSubscriptionSerializer(serializers.ModelSerializer[UserSubscription]):
     topic_details = SubscriptionTopicSerializer(source="topic", read_only=True)
@@ -249,4 +280,41 @@ class BulkSubscriptionResultSerializer(serializers.Serializer):
     failed = BulkSubscriptionFailureSerializer(many=True, read_only=True)
     already_processed = serializers.ListField(
         child=serializers.CharField(), read_only=True
+    )
+
+
+class NewsletterSubscribeSerializer(serializers.Serializer):
+    """The storefront newsletter form.
+
+    ``consent_text`` is the consent sentence exactly as the visitor saw
+    it, in the language it was shown. The storefront server supplies it
+    from its own messages; it is stored verbatim as the consent record.
+    """
+
+    email = serializers.EmailField(max_length=254)
+    consent = serializers.BooleanField(
+        help_text=_("The visitor ticked the consent box. Must be true."),
+    )
+    consent_text = serializers.CharField(
+        min_length=1,
+        max_length=500,
+        trim_whitespace=True,
+        help_text=_("The exact consent sentence shown to the visitor."),
+    )
+
+    def validate_consent(self, value: bool) -> bool:
+        if value is not True:
+            raise serializers.ValidationError(
+                _("Consent is required to subscribe.")
+            )
+        return value
+
+
+class NewsletterAvailabilitySerializer(serializers.Serializer):
+    available = serializers.BooleanField(
+        read_only=True,
+        help_text=_(
+            "Whether the store has a default newsletter topic the form "
+            "can subscribe to."
+        ),
     )

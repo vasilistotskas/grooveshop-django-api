@@ -187,6 +187,25 @@ class TopicCategoryFilter(DropdownFilter):
         return queryset.filter(topic__category=v) if v else queryset
 
 
+class SubscriberKindFilter(DropdownFilter):
+    title = _("Subscriber")
+    parameter_name = "subscriber_kind"
+
+    def lookups(self, request, model_admin):
+        return [
+            ("account", _("Account")),
+            ("guest", _("Guest (email only)")),
+        ]
+
+    def queryset(self, request, queryset):
+        v = self.value()
+        if v == "account":
+            return queryset.filter(user__isnull=False)
+        if v == "guest":
+            return queryset.filter(user__isnull=True)
+        return queryset
+
+
 class UserAddressInline(TabularInline):
     model = UserAddress
     extra = 0
@@ -210,9 +229,15 @@ class UserSubscriptionInline(TabularInline):
     extra = 0
     per_page = 15
     fields = ("topic", "status", "subscribed_at", "unsubscribed_at")
-    readonly_fields = ("subscribed_at", "unsubscribed_at")
+    # Read-only for the same reason as UserSubscriptionAdmin: a status
+    # an operator sets is a consent nobody gave. The change link leads
+    # to the subscription's own page and its actions.
+    readonly_fields = fields
     show_change_link = True
     tab = True
+
+    def has_add_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(Group)
@@ -817,41 +842,90 @@ class UserSubscriptionAdmin(BaseModelAdmin):
         "user_info",
         "topic_info",
         "status_label",
+        "source",
         "subscription_dates",
         "created_at",
     ]
 
     list_filter = [
         "status",
+        "source",
+        SubscriberKindFilter,
         TopicCategoryFilter,
         ("topic", RelatedDropdownFilter),
         ("subscribed_at", RangeDateTimeFilter),
         ("unsubscribed_at", RangeDateTimeFilter),
     ]
     search_fields = [
+        "email",
         "user__email",
         "user__username",
         "topic__translations__name",
         "user__first_name",
         "user__last_name",
     ]
+    # The consent and confirmation fields are EVIDENCE — what the
+    # subscriber agreed to, when and from where. Nobody edits evidence.
+    #
+    # ``status`` is read-only too, and so are who and what the row is
+    # about: the ONLY way to ACTIVE is the subscriber's own confirmation
+    # click (``UserSubscription.confirm``). An operator switching a row
+    # to ACTIVE — or moving an active row to another topic or address —
+    # would be a consent nobody gave. What staff can do is resend the
+    # confirmation, and unsubscribe.
     readonly_fields = [
+        "user",
+        "email",
+        "topic",
+        "status",
         "subscribed_at",
         "unsubscribed_at",
         "created_at",
         "updated_at",
         "confirmation_token",
+        "source",
+        "language",
+        "consent_text",
+        "consent_ip",
+        "consent_user_agent",
+        "consented_at",
+        "confirmation_sent_at",
+        "confirmed_at",
+        "confirmed_ip",
     ]
-    raw_id_fields = ["user"]
-    autocomplete_fields = ["topic"]
     list_select_related = ["user", "topic"]
 
-    actions = ["activate_subscriptions", "deactivate_subscriptions"]
+    actions = ["resend_confirmation", "deactivate_subscriptions"]
 
     fieldsets = (
         (
             _("Subscription Details"),
-            {"fields": ("user", "topic", "status"), "classes": ("wide",)},
+            {
+                "fields": (
+                    "user",
+                    "email",
+                    "topic",
+                    "status",
+                    "source",
+                    "language",
+                ),
+                "classes": ("wide",),
+            },
+        ),
+        (
+            _("Consent"),
+            {
+                "fields": (
+                    "consent_text",
+                    "consent_ip",
+                    "consent_user_agent",
+                    "consented_at",
+                    "confirmation_sent_at",
+                    "confirmed_at",
+                    "confirmed_ip",
+                ),
+                "classes": ("wide",),
+            },
         ),
         (
             _("Timestamps"),
@@ -886,6 +960,8 @@ class UserSubscriptionAdmin(BaseModelAdmin):
 
     @display(description=_("User"))
     def user_info(self, obj):
+        if obj.user is None:
+            return f"{_('Guest')} ({obj.email})"
         name = obj.user.full_name or obj.user.username or _("Anonymous")
         return f"{name} ({obj.user.email})"
 
@@ -905,27 +981,45 @@ class UserSubscriptionAdmin(BaseModelAdmin):
             }
         return _("Subscribed %(sub)s") % {"sub": format_dt(obj.subscribed_at)}
 
+    def has_add_permission(self, request):
+        # Subscriptions are made by subscribers (account, signup, the
+        # newsletter form), never typed in: an added row would carry no
+        # consent at all.
+        return False
+
     @action(
-        description=str(_("Activate selected subscriptions")),
-        variant=ActionVariant.SUCCESS,
-        icon="check_circle",
+        description=str(_("Resend confirmation")),
+        variant=ActionVariant.INFO,
+        icon="forward_to_inbox",
     )
-    def activate_subscriptions(self, request, queryset):
-        # Bulk update is intentional here: no per-instance signals fire
-        # on UserSubscription.save(), so .update() is safe and efficient.
+    def resend_confirmation(self, request, queryset):
+        # PENDING rows only: a fresh link (the old one stops working)
+        # and its email. Nothing here makes a row ACTIVE — only the
+        # subscriber's click does.
+        from user.services.subscription import dispatch_confirmation
+
+        sent = 0
         with transaction.atomic():
-            updated = queryset.filter(
-                status__in=[
-                    UserSubscription.SubscriptionStatus.PENDING,
-                    UserSubscription.SubscriptionStatus.UNSUBSCRIBED,
-                ]
-            ).update(
-                status=UserSubscription.SubscriptionStatus.ACTIVE,
-                unsubscribed_at=None,
-            )
+            for subscription in queryset.select_for_update().filter(
+                status=UserSubscription.SubscriptionStatus.PENDING
+            ):
+                subscription.arm_confirmation()
+                subscription.save(
+                    update_fields=[
+                        "status",
+                        "confirmation_token",
+                        "confirmation_sent_at",
+                        "confirmed_at",
+                        "confirmed_ip",
+                        "unsubscribed_at",
+                        "updated_at",
+                    ]
+                )
+                dispatch_confirmation(subscription)
+                sent += 1
         self.message_user(
             request,
-            _("%(count)d subscriptions were activated.") % {"count": updated},
+            _("%(count)d confirmation emails were queued.") % {"count": sent},
         )
 
     @action(

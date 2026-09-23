@@ -38,6 +38,8 @@ GATED_LIST_ENDPOINTS = [
     ("BLOG_COMMENTS_ENABLED", "blog-comment-list", False),
     ("NEWSLETTER_ENABLED", "user-subscription-topic-list", True),
     ("NEWSLETTER_ENABLED", "user-subscription-list", True),
+    # The anonymous newsletter form's availability read.
+    ("NEWSLETTER_ENABLED", "user-subscription-newsletter", False),
     ("PRODUCT_ALERTS_ENABLED", "product-alert-list", True),
 ]
 
@@ -81,6 +83,18 @@ class TestSettingGates:
             response = client.post(url, {"message": "hi"}, format="json")
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
+    def test_newsletter_subscribe_gate(self):
+        client = APIClient()
+        url = reverse("user-subscription-newsletter")
+        body = {
+            "email": "guest@example.com",
+            "consent": True,
+            "consentText": "I agree.",
+        }
+        with _settings_off("NEWSLETTER_ENABLED"):
+            response = client.post(url, body, format="json")
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
     def test_agent_surface_gated_by_runtime_setting(self):
         """The agent-commerce runtime gate fires BEFORE token auth:
         disabled -> 404 (route hidden); enabled -> the usual 401/403
@@ -104,14 +118,14 @@ class TestSettingGates:
         the gate's 404-with-empty-body)."""
         client = APIClient()
         with _settings_off("NEWSLETTER_ENABLED"):
-            response = client.get(
+            response = client.post(
                 reverse(
                     "user-subscription-confirm-by-token",
                     args=["not-a-real-token"],
                 )
             )
         # The view answers (invalid token), the gate does not.
-        assert response.status_code != status.HTTP_404_NOT_FOUND
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
 
 
 class TestNotificationTaskGuards:

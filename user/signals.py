@@ -3,9 +3,11 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+from allauth.account.models import EmailAddress
 from allauth.account.signals import (
     authentication_step_completed,
     email_changed,
+    email_confirmed,
     password_changed,
     password_reset,
     user_signed_up,
@@ -18,9 +20,9 @@ from django.contrib.auth.signals import (
 )
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from django.utils.crypto import get_random_string
 
 from user.models.subscription import SubscriptionTopic, UserSubscription
+from user.utils.subscription import claim_guest_subscriptions
 
 if TYPE_CHECKING:  # pragma: no cover
     from allauth.socialaccount.models import SocialLogin
@@ -237,30 +239,54 @@ def populate_profile(
     post_save, sender=User, dispatch_uid="user.create_default_subscriptions"
 )
 def create_default_subscriptions(sender, instance, created, **kwargs):
-    if created:
-        default_topics = SubscriptionTopic.objects.filter(
-            is_active=True, is_default=True
-        )
+    """Subscribe a new account to the store's default SERVICE topics.
 
+    Only categories in ``SubscriptionTopic.AUTO_SUBSCRIBE_CATEGORIES``
+    (account and system notices) — an allowlist, whatever ``is_default``
+    says on anything else: consent to direct marketing must be the
+    recipient's own affirmative act (GDPR art. 4(11)/7, ePrivacy art.
+    13), and creating the account is not one. Those topics are joined
+    from the account's preferences or the storefront newsletter form.
+    """
+    if created:
+        from user.services.subscription import subscribe_account
+
+        default_topics = SubscriptionTopic.objects.filter(
+            is_active=True,
+            is_default=True,
+            category__in=SubscriptionTopic.AUTO_SUBSCRIBE_CATEGORIES,
+        )
         for topic in default_topics:
-            subscription = UserSubscription.objects.create(
-                user=instance,
-                topic=topic,
-                status=(
-                    UserSubscription.SubscriptionStatus.PENDING
-                    if topic.requires_confirmation
-                    else UserSubscription.SubscriptionStatus.ACTIVE
-                ),
+            subscribe_account(
+                instance,
+                topic,
+                source=UserSubscription.Source.SIGNUP,
+                language=instance.language_code or "",
             )
 
-            if topic.requires_confirmation:
-                subscription.confirmation_token = get_random_string(64)
-                subscription.save()
-                # Dispatch only after the outer transaction commits so the
-                # worker can't read the row before it's persisted.
-                from tenant.celery import dispatch_on_commit
-                from user.tasks import send_subscription_confirmation_email_task
 
-                dispatch_on_commit(
-                    send_subscription_confirmation_email_task, [subscription.id]
-                )
+# ---------------------------------------------------------------------------
+# Guest newsletter subscriptions follow the address to its account — but
+# only once the account has PROVEN it owns the address. A guest row
+# carries its subscriber's consent record; attaching it on an unverified
+# address would hand one person's subscription (and IP/user agent) to
+# whoever typed their email into a signup form.
+# ---------------------------------------------------------------------------
+
+
+@receiver(email_confirmed, dispatch_uid="user.claim_guest_subs_on_confirm")
+def claim_guest_subscriptions_on_email_confirmed(
+    sender, request, email_address, **kwargs
+):
+    if email_address.verified:
+        claim_guest_subscriptions(email_address.user, email_address.email)
+
+
+@receiver(user_signed_up, dispatch_uid="user.claim_guest_subs_on_signup")
+def claim_guest_subscriptions_on_signup(sender, request, user, **kwargs):
+    # A social signup arrives with the provider's address already
+    # verified (allauth saves the EmailAddress rows before this signal),
+    # so no ``email_confirmed`` follows. An email/password signup has
+    # none verified yet and is claimed on confirmation instead.
+    for address in EmailAddress.objects.filter(user=user, verified=True):
+        claim_guest_subscriptions(user, address.email)

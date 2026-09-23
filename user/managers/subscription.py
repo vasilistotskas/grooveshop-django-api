@@ -33,6 +33,15 @@ class SubscriptionTopicQuerySet(TranslatableOptimizedQuerySet):
         """Get topics that are default subscriptions."""
         return self.filter(is_default=True, is_active=True)
 
+    def default_newsletter(self) -> Self:
+        """The tenant's default newsletter topic — the one the storefront
+        newsletter form subscribes to. A DB constraint holds it to at
+        most one row, so ``.first()`` on this is the answer, not a pick.
+        """
+        return self.filter(
+            is_default=True, is_active=True, category="NEWSLETTER"
+        )
+
     def for_list(self) -> Self:
         """
         Optimized queryset for list views.

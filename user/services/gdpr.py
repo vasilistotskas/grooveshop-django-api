@@ -31,6 +31,7 @@ from typing import Any
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import connection, transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from tenant.credentials import tenant_site_name
@@ -85,6 +86,47 @@ def _serialize_money(value: Any) -> dict[str, Any] | None:
 
 def _iso(dt: Any) -> str | None:
     return dt.isoformat() if dt else None
+
+
+def _verified_emails(user) -> list[str]:
+    from allauth.account.models import EmailAddress
+
+    return list(
+        EmailAddress.objects.filter(user=user, verified=True).values_list(
+            "email", flat=True
+        )
+    )
+
+
+def _guest_subscriptions(user):
+    """Guest (newsletter form) rows made with one of ``user``'s addresses.
+
+    VERIFIED addresses only: a guest row holds its subscriber's consent
+    record (IP, user agent), and ``user.email`` alone may be an address
+    the account has never proven it owns — exporting or deleting on it
+    would reach a stranger's data. Normally these rows were already
+    attached by ``claim_guest_subscriptions`` when the address was
+    verified; this catches any that were not.
+    """
+    from user.models.subscription import UserSubscription
+
+    emails = _verified_emails(user)
+    if not emails:
+        return UserSubscription.objects.none()
+    match_any = Q()
+    for email in emails:
+        match_any |= Q(email__iexact=email)
+    return UserSubscription.objects.filter(match_any, user__isnull=True)
+
+
+def _subject_subscriptions(user):
+    """Every subscription row about ``user``: theirs, plus guest rows
+    made with one of their verified addresses."""
+    from user.models.subscription import UserSubscription
+
+    return UserSubscription.objects.filter(
+        Q(user=user) | Q(pk__in=_guest_subscriptions(user).values("pk"))
+    )
 
 
 def compile_user_data(user) -> dict[str, Any]:
@@ -264,9 +306,19 @@ def compile_user_data(user) -> dict[str, Any]:
             "topic_slug": s.topic.slug if s.topic_id else None,
             "topic_name": s.topic.name if s.topic_id else None,
             "status": s.status,
+            "source": s.source,
+            "email": s.email,
+            "language": s.language,
+            "consent_text": s.consent_text,
+            "consent_ip": s.consent_ip,
+            "consent_user_agent": s.consent_user_agent,
+            "confirmation_sent_at": _iso(s.confirmation_sent_at),
+            "confirmed_at": _iso(s.confirmed_at),
+            "confirmed_ip": s.confirmed_ip,
+            "unsubscribed_at": _iso(s.unsubscribed_at),
             "created_at": _iso(s.created_at),
         }
-        for s in user.subscriptions.select_related("topic")
+        for s in _subject_subscriptions(user).select_related("topic")
     ]
 
     loyalty: dict[str, Any] = {"transactions": [], "points_balance": None}
@@ -504,6 +556,12 @@ def anonymise_and_delete_user(user) -> dict[str, int]:
     counts["product_alerts"] = ProductAlert.objects.filter(user=user).delete()[
         0
     ]
+
+    # The account's own subscriptions cascade with the user row; guest
+    # newsletter rows made with one of its verified addresses do not,
+    # and they are the subject's data too (address + consent record).
+    # Read before the EmailAddress rows go below.
+    counts["guest_subscriptions"] = _guest_subscriptions(user).delete()[0]
 
     # Search history is behavioural data about the subject and nothing
     # else: the query text is theirs, and the row also carries the IP,

@@ -1,6 +1,9 @@
+from datetime import timedelta
+
 import pytest
 from django.contrib.auth import get_user_model
 from django.urls import reverse
+from django.utils import timezone
 from knox.models import get_token_model
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -421,6 +424,7 @@ class UserSubscriptionViewSetTest(BaseSubscriptionAPITest):
 
         pending_sub = self.user_subscriptions[2]
         pending_sub.confirmation_token = "test-token-123"
+        pending_sub.confirmation_sent_at = timezone.now()
         pending_sub.save()
 
         url = reverse(
@@ -437,6 +441,39 @@ class UserSubscriptionViewSetTest(BaseSubscriptionAPITest):
             pending_sub.status, UserSubscription.SubscriptionStatus.ACTIVE
         )
         self.assertEqual(pending_sub.confirmation_token, "")
+        self.assertIsNotNone(pending_sub.confirmed_at)
+
+    def test_confirm_with_an_expired_link_is_gone(self):
+        """The signed-in confirm applies the emailed link's rule
+        (``UserSubscription.confirm``): a week-old token answers 410."""
+        self.authenticate(self.user_token)
+
+        pending_sub = self.user_subscriptions[2]
+        pending_sub.confirmation_token = "test-token-123"
+        pending_sub.confirmation_sent_at = timezone.now() - timedelta(days=8)
+        pending_sub.save()
+
+        url = reverse("user-subscription-confirm", args=[pending_sub.id])
+        response = self.client.post(url, {"token": "test-token-123"})
+
+        self.assertEqual(response.status_code, status.HTTP_410_GONE)
+        pending_sub.refresh_from_db()
+        self.assertEqual(
+            pending_sub.status, UserSubscription.SubscriptionStatus.PENDING
+        )
+
+    def test_confirm_with_an_empty_token_is_refused(self):
+        self.authenticate(self.user_token)
+
+        pending_sub = self.user_subscriptions[2]
+        pending_sub.confirmation_token = ""
+        pending_sub.confirmation_sent_at = timezone.now()
+        pending_sub.save()
+
+        url = reverse("user-subscription-confirm", args=[pending_sub.id])
+        response = self.client.post(url, {"token": ""})
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_confirm_with_invalid_token(self):
         self.authenticate(self.user_token)
@@ -467,7 +504,7 @@ class UserSubscriptionViewSetTest(BaseSubscriptionAPITest):
         response = self.client.post(url, data)
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("not pending confirmation", response.data["detail"])
+        self.assertIn("Invalid confirmation token", response.data["detail"])
 
     def test_ordering_subscriptions(self):
         self.authenticate(self.user_token)

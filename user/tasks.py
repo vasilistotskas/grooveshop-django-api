@@ -56,9 +56,11 @@ def send_subscription_confirmation_email_task(
 ) -> bool:
     """Send the confirmation email for a pending subscription.
 
-    Retries 3× with 300s backoff on SMTP failure. Safe to run multiple times —
-    the underlying helper is a no-op when the subscription is no longer
-    PENDING or when the user already has an ACTIVE subscription for the topic.
+    Retries 3 times, 300 s apart (``default_retry_delay``), when sending
+    fails — ``send_subscription_confirmation`` lets the mail error
+    through for exactly that. Safe to run multiple times — the helper is
+    a no-op once the subscription is no longer PENDING. Serves account
+    and guest (newsletter form) rows alike.
     """
     from user.models.subscription import UserSubscription
     from user.utils.subscription import send_subscription_confirmation
@@ -74,7 +76,7 @@ def send_subscription_confirmation_email_task(
         return False
 
     try:
-        return send_subscription_confirmation(subscription, subscription.user)
+        return send_subscription_confirmation(subscription)
     except Exception as exc:
         logger.error(
             "Error sending subscription confirmation for %s: %s",
@@ -84,6 +86,71 @@ def send_subscription_confirmation_email_task(
         if self.request.retries < self.max_retries:
             raise self.retry(exc=exc) from exc
         return False
+
+
+@celery_app.task(
+    base=MonitoredTask,
+    bind=True,
+    # The submitted address and the visitor's network identity are the
+    # payload; keep them out of the failure log.
+    sensitive_kwargs=frozenset({"email", "consent_ip", "consent_user_agent"}),
+)
+def subscribe_to_newsletter_task(
+    self,
+    *,
+    topic_id: int,
+    email: str,
+    consent_text: str,
+    consent_ip: str | None,
+    consent_user_agent: str,
+    language: str,
+    consented_at: str,
+) -> dict:
+    """Everything the newsletter form does that depends on the address.
+
+    ``NewsletterSubscribeView`` only validates the request and snapshots
+    the consent, then always enqueues this one task and answers 202 — so
+    the request's cost cannot tell a new address from a confirmed one.
+    Here: the row lookup, the verified-owner attach, (re-)arming with the
+    cooldown, the insert race, and queuing the confirmation email (which
+    carries its own retry policy). Runs in the requesting tenant's schema
+    (``dispatch_on_commit`` pins it; ``TenantTask`` enters it).
+    """
+    from datetime import datetime
+
+    from user.models.subscription import SubscriptionTopic
+    from user.services.subscription import (
+        dispatch_confirmation,
+        subscribe_email_to_newsletter,
+    )
+
+    topic = (
+        SubscriptionTopic.objects.default_newsletter()
+        .filter(pk=topic_id)
+        .first()
+    )
+    if topic is None:
+        # The topic stopped being the default between request and run.
+        logger.info(
+            "subscribe_to_newsletter_task: topic %s is no longer the "
+            "default newsletter topic",
+            topic_id,
+        )
+        return {"status": "skipped", "reason": "topic_unavailable"}
+
+    subscription = subscribe_email_to_newsletter(
+        topic=topic,
+        email=email,
+        consent_text=consent_text,
+        consent_ip=consent_ip,
+        consent_user_agent=consent_user_agent,
+        language=language,
+        consented_at=datetime.fromisoformat(consented_at),
+    )
+    if subscription is None:
+        return {"status": "noop"}
+    dispatch_confirmation(subscription)
+    return {"status": "armed", "subscription_id": subscription.id}
 
 
 @celery_app.task(
@@ -332,6 +399,41 @@ def cleanup_expired_data_exports(self) -> dict:
         stranded,
     )
     return {"status": "success", "expired": expired, "stranded": stranded}
+
+
+#: A guest newsletter signup that was never confirmed within this window
+#: is deleted: the address and its consent record were given for a
+#: subscription that never came into being.
+UNCONFIRMED_GUEST_SUBSCRIPTION_RETENTION_DAYS = 30
+
+
+@celery_app.task(
+    base=MonitoredTask, bind=True, max_retries=3, default_retry_delay=300
+)
+def purge_unconfirmed_guest_subscriptions(self) -> dict:
+    """Delete guest subscriptions still PENDING 30 days after their last
+    confirmation email. Registered as a periodic beat task (fanned out
+    per tenant). Account rows are never touched: they are the account's
+    own preferences, and erasure of those goes through the account.
+    """
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from user.models.subscription import UserSubscription
+
+    cutoff = timezone.now() - timedelta(
+        days=UNCONFIRMED_GUEST_SUBSCRIPTION_RETENTION_DAYS
+    )
+    deleted, _ = UserSubscription.objects.filter(
+        user__isnull=True,
+        status=UserSubscription.SubscriptionStatus.PENDING,
+        confirmation_sent_at__lt=cutoff,
+    ).delete()
+    logger.info(
+        "purge_unconfirmed_guest_subscriptions: deleted %s row(s)", deleted
+    )
+    return {"status": "success", "deleted": deleted}
 
 
 def _smtp_codes(exc: BaseException) -> list[int]:

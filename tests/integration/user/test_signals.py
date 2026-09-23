@@ -14,11 +14,19 @@ class CreateDefaultSubscriptionsSignalTest(TransactionTestCase):
         self.default_topics = []
         self.non_default_topics = []
 
-        for i in range(3):
+        # The allowlisted categories: only these are ever subscribed
+        # automatically (see test_marketing_defaults_need_consent).
+        for i, category in enumerate(
+            (
+                SubscriptionTopic.TopicCategory.ACCOUNT,
+                SubscriptionTopic.TopicCategory.SYSTEM,
+                SubscriptionTopic.TopicCategory.SYSTEM,
+            )
+        ):
             topic = SubscriptionTopic.objects.create(
                 slug=f"default-topic-{i}",
                 name=f"Default Topic {i}",
-                category=SubscriptionTopic.TopicCategory.NEWSLETTER,
+                category=category,
                 is_active=True,
                 is_default=True,
             )
@@ -58,6 +66,64 @@ class CreateDefaultSubscriptionsSignalTest(TransactionTestCase):
             self.assertEqual(
                 subscription.status, UserSubscription.SubscriptionStatus.ACTIVE
             )
+            self.assertEqual(
+                subscription.source, UserSubscription.Source.SIGNUP
+            )
+
+    def test_marketing_defaults_need_consent(self):
+        """Creating an account is not consent to marketing mail: only the
+        allowlisted service categories (account, system) auto-subscribe.
+        Product updates, "other", marketing, newsletter and promotional
+        topics subscribe nobody, whatever their ``is_default`` says."""
+        marketing = [
+            SubscriptionTopic.objects.create(
+                slug=f"marketing-{category.lower()}",
+                name=f"Marketing {category}",
+                category=category,
+                is_active=True,
+                is_default=True,
+            )
+            for category in SubscriptionTopic.TopicCategory
+            if category not in SubscriptionTopic.AUTO_SUBSCRIBE_CATEGORIES
+        ]
+        # Product updates and "other" are refused explicitly: they are the
+        # two a denylist got wrong.
+        assert {topic.category for topic in marketing} >= {
+            SubscriptionTopic.TopicCategory.PRODUCT,
+            SubscriptionTopic.TopicCategory.OTHER,
+        }
+
+        user = User.objects.create_user(
+            email="consent@test.com", password="testpass123", username="c"
+        )
+
+        self.assertFalse(
+            UserSubscription.objects.filter(
+                user=user, topic__in=marketing
+            ).exists()
+        )
+        self.assertEqual(UserSubscription.objects.filter(user=user).count(), 3)
+
+    def test_default_topic_requiring_confirmation_is_armed(self):
+        topic = SubscriptionTopic.objects.create(
+            slug="confirm-me",
+            name="Confirm Me",
+            category=SubscriptionTopic.TopicCategory.ACCOUNT,
+            is_active=True,
+            is_default=True,
+            requires_confirmation=True,
+        )
+
+        user = User.objects.create_user(
+            email="armed@test.com", password="testpass123", username="armed"
+        )
+
+        subscription = UserSubscription.objects.get(user=user, topic=topic)
+        self.assertEqual(
+            subscription.status, UserSubscription.SubscriptionStatus.PENDING
+        )
+        self.assertEqual(len(subscription.confirmation_token), 64)
+        self.assertIsNotNone(subscription.confirmation_sent_at)
 
     def test_existing_user_no_subscriptions(self):
         post_save.disconnect(

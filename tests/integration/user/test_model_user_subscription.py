@@ -1,9 +1,15 @@
+from datetime import timedelta
+
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError
 from django.test import TestCase
 from django.utils import timezone
 
-from user.models.subscription import SubscriptionTopic, UserSubscription
+from user.models.subscription import (
+    ConfirmOutcome,
+    SubscriptionTopic,
+    UserSubscription,
+)
 
 User = get_user_model()
 
@@ -113,7 +119,7 @@ class UserSubscriptionModelTestCase(TestCase):
             topic=self.topic,
             status=UserSubscription.SubscriptionStatus.ACTIVE,
         )
-        expected = f"{self.user} - {self.topic} ({subscription.status})"
+        expected = f"{self.user.email} - {self.topic} ({subscription.status})"
         self.assertEqual(str(subscription), expected)
 
     def test_unique_together_constraint(self):
@@ -161,15 +167,77 @@ class UserSubscriptionModelTestCase(TestCase):
         self.assertIsNotNone(subscription.unsubscribed_at)
         self.assertGreaterEqual(subscription.unsubscribed_at, time_before)
 
-    def test_activate_method(self):
+    def test_confirm_method(self):
         subscription = UserSubscription.objects.create(
             user=self.user,
             topic=self.topic,
             status=UserSubscription.SubscriptionStatus.PENDING,
             confirmation_token="test-token-123",
+            confirmation_sent_at=timezone.now(),
         )
 
-        subscription.activate()
+        outcome = subscription.confirm("test-token-123", ip="203.0.113.9")
+
+        self.assertEqual(outcome, ConfirmOutcome.CONFIRMED)
+        subscription.refresh_from_db()
+        self.assertEqual(subscription.confirmed_ip, "203.0.113.9")
+        self.assertIsNotNone(subscription.confirmed_at)
+
+    def test_confirm_refuses_wrong_empty_expired_and_non_pending(self):
+        subscription = UserSubscription.objects.create(
+            user=self.user,
+            topic=self.topic,
+            status=UserSubscription.SubscriptionStatus.PENDING,
+            confirmation_token="test-token-123",
+            confirmation_sent_at=timezone.now(),
+        )
+        self.assertEqual(
+            subscription.confirm("wrong", ip=None), ConfirmOutcome.INVALID
+        )
+        self.assertEqual(
+            subscription.confirm("", ip=None), ConfirmOutcome.INVALID
+        )
+
+        subscription.confirmation_sent_at = timezone.now() - timedelta(days=8)
+        subscription.save()
+        self.assertEqual(
+            subscription.confirm("test-token-123", ip=None),
+            ConfirmOutcome.EXPIRED,
+        )
+
+        subscription.status = UserSubscription.SubscriptionStatus.ACTIVE
+        subscription.save()
+        self.assertEqual(
+            subscription.confirm("test-token-123", ip=None),
+            ConfirmOutcome.INVALID,
+        )
+
+    def test_confirm_refuses_an_empty_token_on_a_tokenless_row(self):
+        subscription = UserSubscription.objects.create(
+            user=self.user,
+            topic=self.topic,
+            status=UserSubscription.SubscriptionStatus.PENDING,
+            confirmation_token="",
+            confirmation_sent_at=timezone.now(),
+        )
+        self.assertEqual(
+            subscription.confirm("", ip=None), ConfirmOutcome.INVALID
+        )
+        subscription.refresh_from_db()
+        self.assertEqual(
+            subscription.status, UserSubscription.SubscriptionStatus.PENDING
+        )
+
+    def test_activate_via_confirm_clears_token(self):
+        subscription = UserSubscription.objects.create(
+            user=self.user,
+            topic=self.topic,
+            status=UserSubscription.SubscriptionStatus.PENDING,
+            confirmation_token="test-token-123",
+            confirmation_sent_at=timezone.now(),
+        )
+
+        subscription.confirm("test-token-123", ip=None)
 
         subscription.refresh_from_db()
 

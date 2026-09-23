@@ -2,30 +2,30 @@ from __future__ import annotations
 
 import logging
 from datetime import timedelta
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 from urllib.parse import urlsplit
 
 from django.contrib.auth import get_user_model
 from django.core import signing
 from django.core.mail import EmailMultiAlternatives
-from django.db import connection
+from django.db import connection, transaction
 from django.template.loader import render_to_string
 from django.utils import translation
 from django.utils.translation import gettext as _
-from extra_settings.models import Setting
 
 from core.utils.email_context import build_email_context
 from core.utils.i18n import get_user_language
 from core.utils.tenant_urls import (
     get_tenant_api_base_url,
     get_tenant_base_url,
+    get_tenant_frontend_url,
 )
 from tenant.credentials import (
     tenant_contact_email,
     tenant_from_email,
     tenant_reply_to,
 )
-from user.models.subscription import SubscriptionTopic, UserSubscription
+from user.models.subscription import UserSubscription
 
 logger = logging.getLogger(__name__)
 
@@ -47,102 +47,121 @@ else:
     User = get_user_model()
 
 
-def send_subscription_confirmation(
-    subscription: UserSubscription, user: User
-) -> bool:
-    if check_subscription_before_send(
-        user=user, topic_slug=subscription.topic.slug
-    ):
-        logger.warning(
-            f"Attempted to send confirmation for already active subscription {subscription.id}"
-        )
-        return False
+def subscription_confirmation_url(token: str) -> str:
+    """The storefront page that confirms a pending subscription.
 
+    A STOREFRONT page, not the API endpoint, built the way every other
+    storefront link in outbound mail is: against the tenant's primary
+    domain (``get_tenant_frontend_url``). The page shows a button that
+    POSTs the token — a mail link scanner prefetching the URL must not
+    confirm anything, which is why ``ConfirmSubscriptionByTokenView``
+    accepts POST only.
+    """
+    return get_tenant_frontend_url(f"/newsletter/confirm/{token}")
+
+
+def send_subscription_confirmation(subscription: UserSubscription) -> bool:
+    """Email the double opt-in link for a PENDING subscription.
+
+    Works for account and guest rows alike: the recipient is
+    ``subscription.recipient_email`` and the language the one the
+    subscription was made in (an account row that recorded none uses
+    the account's language).
+
+    Returns False when there is nothing to send. A failure to SEND is
+    raised, not swallowed: ``send_subscription_confirmation_email_task``
+    retries on it, and a helper that caught it made that retry policy
+    unreachable.
+    """
     if subscription.status != UserSubscription.SubscriptionStatus.PENDING:
         logger.warning(
-            f"Attempted to send confirmation for non-pending subscription {subscription.id}"
+            "Attempted to send confirmation for non-pending subscription %s",
+            subscription.id,
         )
         return False
 
     if not subscription.confirmation_token:
         logger.error(
-            f"No confirmation token for subscription {subscription.id}"
+            "No confirmation token for subscription %s", subscription.id
         )
         return False
 
-    try:
-        # SUBSCRIPTION_CONFIRMATION_URL is a relative path template
-        # (e.g. "/api/v1/user/subscription/confirm/{token}").  We
-        # prepend the current tenant's API base URL at send time so the
-        # link is always correct for the tenant that owns the request,
-        # rather than relying on API_BASE_URL baked into the setting at
-        # startup.
-        url_path_template = Setting.get("SUBSCRIPTION_CONFIRMATION_URL")
-        # The confirmation URL points at a Django API endpoint
-        # (``/api/v1/user/subscription/confirm/<token>``), NOT the
-        # storefront. There is no Nuxt proxy for that path, so we must
-        # build against the tenant's API origin — a platform-wide
-        # ``API_BASE_URL`` would 404 for every non-platform tenant.
-        api_base = get_tenant_api_base_url()
-        # SUBSCRIPTION_CONFIRMATION_URL is a RELATIVE path template by
-        # contract (see EXTRA_SETTINGS_DEFAULTS) — an absolute value
-        # stored per-tenant would pin every tenant's confirmation links
-        # to one host. Cutover normalizes any absolute rows
-        # (MULTI_TENANT_CUTOVER.md §0.3).
-        confirmation_url = f"{api_base}{url_path_template}".format(
-            token=subscription.confirmation_token
-        )
+    confirmation_url = subscription_confirmation_url(
+        subscription.confirmation_token
+    )
+    user = subscription.user
+    language = subscription.language or get_user_language(user)
 
-        user = subscription.user
-        language = get_user_language(user)
-
-        context = build_email_context(
-            user=user,
-            topic=subscription.topic,
-            subscription=subscription,
-            confirmation_url=confirmation_url,
-            LANGUAGE_CODE=language,
-        )
-
-        with translation.override(language):
-            subject = _("Confirm your subscription to {topic}").format(
-                topic=subscription.topic.name
-            )
-            html_message = render_to_string(
-                "emails/subscription/confirmation.html", context
-            )
-            text_message = render_to_string(
-                "emails/subscription/confirmation.txt", context
-            )
-
-        email = EmailMultiAlternatives(
-            subject=subject,
-            body=text_message,
-            from_email=tenant_from_email(),
-            to=[user.email],
-            reply_to=tenant_reply_to(),
-        )
-        email.attach_alternative(html_message, "text/html")
-        email.send()
-
-        logger.info(
-            f"Sent confirmation email for subscription {subscription.id}"
-        )
-        return True
-
-    except Exception as e:
-        logger.error(
-            f"Failed to send confirmation email for subscription {subscription.id}: {e}"
-        )
-        return False
-
-
-def check_subscription_before_send(user: User, topic_slug: str) -> bool:
-    return UserSubscription.objects.filter(
+    context = build_email_context(
         user=user,
-        topic__slug=topic_slug,
-        status=UserSubscription.SubscriptionStatus.ACTIVE,
-    ).exists()
+        topic=subscription.topic,
+        subscription=subscription,
+        confirmation_url=confirmation_url,
+        LANGUAGE_CODE=language,
+    )
+
+    with translation.override(language):
+        subject = _("Confirm your subscription to {topic}").format(
+            topic=subscription.topic.name
+        )
+        html_message = render_to_string(
+            "emails/subscription/confirmation.html", context
+        )
+        text_message = render_to_string(
+            "emails/subscription/confirmation.txt", context
+        )
+
+    email = EmailMultiAlternatives(
+        subject=subject,
+        body=text_message,
+        from_email=tenant_from_email(),
+        to=[subscription.recipient_email],
+        reply_to=tenant_reply_to(),
+    )
+    email.attach_alternative(html_message, "text/html")
+    email.send()
+
+    logger.info("Sent confirmation email for subscription %s", subscription.id)
+    return True
+
+
+def claim_guest_subscriptions(user: User, email: str) -> int:
+    """Attach the guest subscriptions made with ``email`` to ``user``.
+
+    Call ONLY once ``email`` is a verified address of ``user``: a guest
+    row carries its subscriber's consent record, and an unverified
+    address may belong to someone else. Where the account already has a
+    row for the same topic, the ACTIVE one wins and the other is
+    deleted (neither active: the account's own row stays).
+
+    Returns the number of guest rows attached.
+    """
+    active = UserSubscription.SubscriptionStatus.ACTIVE
+    claimed = 0
+    with transaction.atomic():
+        guests = UserSubscription.objects.select_for_update().filter(
+            user__isnull=True, email__iexact=email
+        )
+        for guest in guests:
+            existing = (
+                UserSubscription.objects.select_for_update()
+                .filter(user=user, topic_id=guest.topic_id)
+                .first()
+            )
+            if existing is not None:
+                if guest.status == active and existing.status != active:
+                    existing.delete()
+                else:
+                    guest.delete()
+                    continue
+            guest.user = user
+            guest.save(update_fields=["user", "updated_at"])
+            claimed += 1
+    if claimed:
+        logger.info(
+            "Claimed %s guest subscription(s) for user %s", claimed, user.pk
+        )
+    return claimed
 
 
 def _make_unsubscribe_token(user: AbstractBaseUser) -> str:
@@ -160,16 +179,37 @@ def _make_unsubscribe_token(user: AbstractBaseUser) -> str:
     )
 
 
-def generate_unsubscribe_link(user: User, topic: SubscriptionTopic) -> str:
-    # The unsubscribe URL targets a Django API endpoint that has no
-    # Nuxt proxy, so the tenant's API origin is the correct base. The
-    # token bakes in ``connection.schema_name`` (see
-    # ``_make_unsubscribe_token``) and the verifier rejects any token
-    # whose schema doesn't match the request's — so a platform-host
-    # link here is guaranteed rejected for every non-platform tenant.
-    token = _make_unsubscribe_token(user)
+def _make_guest_unsubscribe_token(subscription: UserSubscription) -> str:
+    """Sign a guest subscription's uuid + owning schema.
+
+    A guest has no account, so the token names the subscription row
+    itself (``sid``). Schema-scoped for the same reason as
+    ``_make_unsubscribe_token``: the verifier rejects a token minted
+    for another tenant.
+    """
+    return signing.dumps(
+        {"schema": connection.schema_name, "sid": str(subscription.uuid)},
+        salt=UNSUBSCRIBE_SALT,
+    )
+
+
+def generate_unsubscribe_link(subscription: UserSubscription) -> str:
+    """Topic-scoped unsubscribe URL for one subscription's recipient.
+
+    An account row signs the account (the link then unsubscribes that
+    account from the topic); a guest row signs the row itself. The URL
+    targets a Django API endpoint that has no Nuxt proxy, so the
+    tenant's API origin is the correct base.
+    """
+    token = (
+        _make_unsubscribe_token(subscription.user)
+        if subscription.user_id
+        else _make_guest_unsubscribe_token(subscription)
+    )
     base_url = get_tenant_api_base_url()
-    return f"{base_url}/api/v1/user/unsubscribe/{token}/{topic.slug}"
+    return (
+        f"{base_url}/api/v1/user/unsubscribe/{token}/{subscription.topic.slug}"
+    )
 
 
 def generate_blanket_unsubscribe_link(
@@ -263,37 +303,3 @@ def build_transactional_list_headers(*, list_id: str) -> dict[str, str]:
     if mailto:
         headers["List-Unsubscribe"] = mailto[0]
     return headers
-
-
-def get_user_subscription_summary(user: User) -> dict[str, Any]:
-    subscriptions = UserSubscription.objects.filter(user=user).select_related(
-        "topic"
-    )
-
-    summary = {
-        "total": subscriptions.count(),
-        "active": subscriptions.filter(
-            status=UserSubscription.SubscriptionStatus.ACTIVE
-        ).count(),
-        "pending": subscriptions.filter(
-            status=UserSubscription.SubscriptionStatus.PENDING
-        ).count(),
-        "unsubscribed": subscriptions.filter(
-            status=UserSubscription.SubscriptionStatus.UNSUBSCRIBED
-        ).count(),
-        "by_category": {},
-    }
-
-    for subscription in subscriptions:
-        category = subscription.topic.category
-        if category not in summary["by_category"]:
-            summary["by_category"][category] = {
-                "total": 0,
-                "active": 0,
-            }
-
-        summary["by_category"][category]["total"] += 1
-        if subscription.status == UserSubscription.SubscriptionStatus.ACTIVE:
-            summary["by_category"][category]["active"] += 1
-
-    return summary

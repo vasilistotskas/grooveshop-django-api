@@ -342,12 +342,6 @@ class UsernameUpdateResponseSerializer(serializers.Serializer):
     )
 
 
-class UserSubscriptionSummaryResponseSerializer(serializers.Serializer):
-    total_subscriptions = serializers.IntegerField()
-    active_subscriptions = serializers.IntegerField()
-    categories = serializers.ListField(child=serializers.CharField())
-
-
 class UserDataExportSerializer(serializers.Serializer):
     """Read-only view of a UserDataExport row for the privacy UI."""
 

@@ -73,7 +73,7 @@ class UnsubscribeLinkViewTestCase(APITestCase):
     def test_generated_topic_link_is_resolvable_and_works(self):
         """The URL produced by ``generate_unsubscribe_link`` resolves to the
         endpoint and unsubscribes — end-to-end contract check."""
-        url = generate_unsubscribe_link(self.user, self.topic)
+        url = generate_unsubscribe_link(self.subscription)
         path = url.split("https://api.test-site.com")[1]
 
         response = self.client.get(path)

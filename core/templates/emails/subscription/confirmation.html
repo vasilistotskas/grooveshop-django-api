@@ -6,7 +6,7 @@
 {% block email_content %}
 <h1>{% trans "Confirm your subscription" %}</h1>
 
-<p>{% blocktrans with first_name=user.first_name|default:user.username %}Hi {{ first_name }},{% endblocktrans %}</p>
+<p>{% if user %}{% blocktrans with first_name=user.first_name|default:user.username %}Hi {{ first_name }},{% endblocktrans %}{% else %}{% trans "Hello," %}{% endif %}</p>
 
 <p>{% blocktrans with topic_name=topic.name %}Please confirm you'd like to subscribe to {{ topic_name }}. Your subscription isn't active yet — tap the button below to complete it.{% endblocktrans %}</p>
 

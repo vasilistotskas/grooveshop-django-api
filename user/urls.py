@@ -6,6 +6,7 @@ from user.views.address import UserAddressViewSet
 from user.views.data_export import UserDataExportDownloadView
 from user.views.subscription import (
     ConfirmSubscriptionByTokenView,
+    NewsletterSubscribeView,
     SubscriptionTopicViewSet,
     UnsubscribeAllView,
     UnsubscribeTopicView,
@@ -146,6 +147,11 @@ urlpatterns = [
         "user/subscription/<int:pk>/confirm",
         UserSubscriptionViewSet.as_view({"post": "confirm"}),
         name="user-subscription-confirm",
+    ),
+    path(
+        "user/subscription/newsletter",
+        NewsletterSubscribeView.as_view(),
+        name="user-subscription-newsletter",
     ),
     path(
         "user/subscription/topic",

@@ -208,6 +208,17 @@ def fanout_purge_expired_attachment_files():
     )
 
 
+# A retention sweep like the two above, so it reaches SUSPENDED tenants
+# too: an unconfirmed signup past its window is personal data kept
+# without consent, whatever the store's billing state.
+@celery_app.task(base=TenantTask)
+def fanout_purge_unconfirmed_guest_subscriptions():
+    return run_for_all_tenants(
+        "user.tasks.purge_unconfirmed_guest_subscriptions",
+        include_suspended=True,
+    )
+
+
 @celery_app.task(base=TenantTask)
 def fanout_cleanup_expired_data_exports():
     return run_for_all_tenants("user.tasks.cleanup_expired_data_exports")

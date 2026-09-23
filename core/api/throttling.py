@@ -81,6 +81,13 @@ class FeedbackCreateThrottle(UserOrIpRateThrottle):
     scope = "feedback"
 
 
+class NewsletterSubscribeThrottle(UserOrIpRateThrottle):
+    """Per-caller budget for the anonymous newsletter form, which sends a
+    confirmation email to whatever address it is given."""
+
+    scope = "newsletter_subscribe"
+
+
 class ContactAttachmentThrottle(UserOrIpRateThrottle):
     """Tight per-caller budget for the anonymous attachment upload.
 

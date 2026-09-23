@@ -1,4 +1,6 @@
+import importlib
 import os
+from types import SimpleNamespace
 
 import pytest
 from django.conf import settings
@@ -602,7 +604,7 @@ def _reseed_shipping_providers(request):
     only runs once at DB creation. Same issue as the
     ``_reseed_extra_settings`` fixture above: any test marked
     ``@pytest.mark.django_db(transaction=True)`` flushes every table on
-    teardown, wiping the ``acs`` / ``boxnow`` rows.
+    teardown, wiping the ``acs`` / ``boxnow`` / ``flat_rate`` rows.
 
     Subsequent tests that ``ShippingProvider.objects.get(code="acs")``
     (e.g. via the carrier registry, the order serializer, or the
@@ -686,6 +688,19 @@ def _reseed_shipping_providers(request):
                         },
                     },
                 },
+            )
+            # The flat-rate row is re-seeded by its migration's own
+            # callable rather than a copy of its defaults, so the two
+            # cannot drift. ``tenant.provisioning`` activates it, and a
+            # flushed worker DB used to make ``seed_tenant_defaults``
+            # report "default carrier" as a failed step.
+            from django.apps import apps as django_apps
+
+            flat_rate_seed = importlib.import_module(
+                "shipping.migrations.0009_seed_flat_rate_provider"
+            )
+            flat_rate_seed.seed_flat_rate(
+                django_apps, SimpleNamespace(connection=connection)
             )
         except Exception:
             # The fixture is best-effort — a transient DB connection

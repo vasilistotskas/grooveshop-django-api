@@ -3,6 +3,105 @@
 
 
 
+## v3.77.0 (2026-09-23)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.76.0 [skip ci] ([`c611790`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c61179077d32de9e8e76c0cd4b408b613da1f7b2))
+
+### Features
+
+* feat(newsletter): guest double opt-in signups with a consent record
+
+- UserSubscription holds guest rows (email, no user) next to account
+  rows, with the consent snapshot: sentence, language, IP, user agent,
+  and the time and IP of confirmation.
+- POST /user/subscription/newsletter subscribes an address to the one
+  default NEWSLETTER topic. The request only validates, snapshots the
+  consent and enqueues one task, then answers 202 whatever the address,
+  so neither the body nor the timing reveals a subscriber or account.
+- Confirmation is POST-only, expires after 7 days (410), and follows one
+  rule, UserSubscription.confirm, for guests and signed-in users. The
+  link is built on the store's own domain, so the
+  SUBSCRIPTION_CONFIRMATION_URL setting is removed.
+- One shared subscribe_account helper arms a token whenever a topic
+  needs confirmation; no tokenless PENDING rows remain.
+- New accounts are auto-subscribed only to ACCOUNT and SYSTEM topics.
+- A verified email claims its guest rows. GDPR export and erasure cover
+  guest rows on the user's verified addresses. Unconfirmed guest rows
+  are purged after 30 days.
+- The admin can resend a confirmation or deactivate, and can no longer
+  make a subscription active.
+- Removes the unrouted UserAccountViewSet subscriptions and
+  subscription_summary actions.
+- Confirmation mail errors now reach the task's retry.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_016F5trstVMoFXNan1ZQMLEp ([`8d2aa68`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8d2aa68dee0b834f244a71360c6682ca8122a09a))
+
+* feat(devtools): give the demo store its favicon
+
+Without one the storefront answers /favicon.ico with a deliberate 404,
+which browsers log and Lighthouse flags. seed_branding points the demo
+tenant's favicon_url at the platform mark the storefront image ships,
+on the tenant's own primary domain, so staging and production each use
+their own host.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_016F5trstVMoFXNan1ZQMLEp ([`0fa0ec6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0fa0ec6b482a296e9b1f109f20c983a2d0c3dcd4))
+
+* feat(seo): translate SEO fields per language
+
+seo_title, seo_description and seo_keywords were one shared value per
+product, category, blog post and page layout, so a store's English pages
+carried its Greek meta tags. They now live on each model's parler
+translation through the abstract SeoTranslationModel, which replaces
+SeoModel; PageLayout becomes translatable to hold them.
+
+Each app migrates in three steps: add the translated columns, copy the
+shared values into the tenant's own default_locale translation (creating
+it when missing, reversible), then drop the shared columns. Admin writes
+take SEO inside translations, and the demo seeds write home-page SEO in
+both languages.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_016F5trstVMoFXNan1ZQMLEp ([`076765f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/076765fc7af56dbb8f0e9a35d0d179cbfdc166a2))
+
+### Testing
+
+* test(conftest): restore the flat-rate carrier after a flushing test
+
+The shipping-provider reseed fixture restored acs and boxnow but not
+flat_rate, seeded later by shipping 0009. After any transaction=True
+test flushed a worker's database, seed_tenant_defaults found no
+flat_rate row and the provisioning tests saw "default carrier" as a
+failed step. The fixture now runs that migration's own seed callable,
+so the two cannot drift.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_016F5trstVMoFXNan1ZQMLEp ([`e05e09f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e05e09f03cb7d414519fb8a2c15c8a07a6e9e2ca))
+
+* test(recommendation): pin the seed-budget test's prices so both requests have something to cost
+
+`test_cost_does_not_grow_with_the_number_of_seeds` built its products
+with the factory's random price. The CART slot keeps only candidates
+inside a price band around the seeds (`price_band_ratio`), so about one
+run in fourteen the single-seed request had no candidate in band,
+`suggest()` returned nothing, and `hydrate_pairs` skipped its four
+queries — the test then compared an empty response (7 queries) against
+a hydrated one (11) and blamed the engine. Reproduced deterministically
+by reseeding factory_boy: seeds 9, 30, 31 and 39 of 1–60 failed; CI run
+35757768848 hit it.
+
+The engine is right; the data was not guaranteed to exercise it. The
+products now carry a fixed 50.00 price and no discount, as the cart
+budget test's `_sellable()` already does for the same reason, and both
+measurements assert they returned suggestions, so a future change to
+the band or `min_fill` fails with that message instead of a misleading
+query diff. 0 of 60 seeds fail after the change.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com> ([`e00b59f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e00b59fa22659d4987784d558f85bd9531392028))
+
 ## v3.76.0 (2026-09-22)
 
 ### Chores

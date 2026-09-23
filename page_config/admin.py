@@ -35,7 +35,7 @@ class PageSectionInline(TabularInline):
 
 
 @admin.register(PageLayout)
-class PageLayoutAdmin(BaseModelAdmin):
+class PageLayoutAdmin(BaseTranslatableAdmin):
     compressed_fields = True
     warn_unsaved_form = True
     list_fullwidth = True

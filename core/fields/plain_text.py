@@ -32,8 +32,8 @@ class PlainTextField(models.TextField):
     ``<meta name="description" content="<div>…</div>">`` for 40% of blog
     posts because editors pasted rich text into the field. Normalizing at
     the field level covers every write path (admin, DRF, imports, shell)
-    for every model that inherits ``SeoModel``, instead of asking each
-    caller to remember.
+    for every translations model that inherits ``SeoTranslationModel``,
+    instead of asking each caller to remember.
 
     ``pre_save`` is the hook rather than ``clean()`` so the guarantee
     holds for saves that never run model validation, which is most of

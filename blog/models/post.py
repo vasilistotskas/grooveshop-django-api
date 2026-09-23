@@ -10,7 +10,7 @@ from blog.managers.post import BlogPostManager
 from core.fields.image import ImageAndSvgField
 from core.models import (
     PublishableModel,
-    SeoModel,
+    SeoTranslationModel,
     TimeStampMixinModel,
     UUIDModel,
 )
@@ -25,7 +25,6 @@ from search.transliteration import (
 
 class BlogPost(
     TranslatableModel,
-    SeoModel,
     TimeStampMixinModel,
     PublishableModel,
     UUIDModel,
@@ -151,7 +150,9 @@ class BlogPost(
 # bases declare the method with signatures that django-stubs types
 # differently, and ty reports the pair rather than a mismatch in the code
 # written here.
-class BlogPostTranslation(TranslatedFieldsModel, IndexMixin):  # ty: ignore[invalid-method-override]
+class BlogPostTranslation(
+    TranslatedFieldsModel, SeoTranslationModel, IndexMixin
+):  # ty: ignore[invalid-method-override]
     master = TranslationsForeignKey(
         "blog.BlogPost",
         on_delete=models.CASCADE,

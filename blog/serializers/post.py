@@ -101,9 +101,6 @@ class BlogPostDetailSerializer(BlogPostSerializer):
             *BlogPostSerializer.Meta.fields,
             "likes",
             "user_has_liked",
-            "seo_title",
-            "seo_description",
-            "seo_keywords",
         )
         read_only_fields = (
             *BlogPostSerializer.Meta.read_only_fields,
@@ -169,9 +166,6 @@ class BlogPostWriteSerializer(
             "author",
             "featured",
             "is_published",
-            "seo_title",
-            "seo_description",
-            "seo_keywords",
         )
 
     def validate_slug(self, value: str) -> str:

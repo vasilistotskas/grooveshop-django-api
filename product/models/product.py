@@ -27,7 +27,7 @@ from tinymce.models import HTMLField
 from core.fields.measurement import MeasurementField
 from core.models import (
     MetaDataModel,
-    SeoModel,
+    SeoTranslationModel,
     SoftDeleteModel,
     TimeStampMixinModel,
     UUIDModel,
@@ -69,7 +69,6 @@ class Product(
     SoftDeleteModel,
     TranslatableModel,
     TimeStampMixinModel,
-    SeoModel,
     UUIDModel,
     MetaDataModel,
     TaggedModel,
@@ -445,7 +444,9 @@ class Product(
 # bases declare the method with signatures that django-stubs types
 # differently, and ty reports the pair rather than a mismatch in the code
 # written here.
-class ProductTranslation(TranslatedFieldsModel, IndexMixin):  # ty: ignore[invalid-method-override]
+class ProductTranslation(
+    TranslatedFieldsModel, SeoTranslationModel, IndexMixin
+):  # ty: ignore[invalid-method-override]
     master = TranslationsForeignKey(
         "product.Product",
         on_delete=models.CASCADE,

@@ -72,9 +72,6 @@ class ProductCategoryDetailSerializer(ProductCategorySerializer):
             *ProductCategorySerializer.Meta.fields,
             "children",
             "recursive_product_count",
-            "seo_title",
-            "seo_description",
-            "seo_keywords",
         )
 
 
@@ -90,9 +87,6 @@ class ProductCategoryWriteSerializer(
             "slug",
             "active",
             "parent",
-            "seo_title",
-            "seo_description",
-            "seo_keywords",
         )
         read_only_fields = ()
 

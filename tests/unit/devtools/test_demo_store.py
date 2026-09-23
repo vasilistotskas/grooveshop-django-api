@@ -435,6 +435,57 @@ class TestContentPages(TestCase):
             ), slug
             assert content["title"], slug
             assert content["seo_description"], slug
+            assert content["seo_title_en"], slug
+            assert content["seo_description_en"], slug
+            assert not _has_greek(content["seo_title_en"]), slug
+            assert not _has_greek(content["seo_description_en"]), slug
+
+
+class TestLayoutSeo(TestCase):
+    def test_home_carries_seo_in_both_languages(self):
+        home = demo_store.LAYOUT_SEO["home"]
+        assert set(home) == {"el", "en"}
+        for language, (title, description) in home.items():
+            # What a results page shows without truncating.
+            assert len(title) <= 60, language
+            assert 140 <= len(description) <= 160, language
+        assert not _has_greek(home["en"][0])
+        assert not _has_greek(home["en"][1])
+        assert _has_greek(home["el"][1])
+
+    def test_writes_each_language_and_keeps_an_operators_own(self):
+        from page_config.models import PageLayout
+
+        layout = PageLayout.objects.create(page_type="home", title="Home")
+        layout.set_current_language("en")
+        layout.seo_title = "The operator's own"
+        layout.save()
+        report: dict[str, int] = {}
+
+        demo_store._write_seo(layout, demo_store.LAYOUT_SEO["home"], report)
+
+        layout = PageLayout.objects.get(pk=layout.pk)
+        greek_title, greek_description = demo_store.LAYOUT_SEO["home"]["el"]
+        el = layout.translations.get(language_code="el")
+        en = layout.translations.get(language_code="en")
+        assert (el.seo_title, el.seo_description) == (
+            greek_title,
+            greek_description,
+        )
+        assert en.seo_title == "The operator's own"
+        assert en.seo_description == ""
+        assert report == {"seo_written": 1, "seo_kept": 1}
+
+    def test_a_rerun_changes_nothing(self):
+        from page_config.models import PageLayout
+
+        layout = PageLayout.objects.create(page_type="home", title="Home")
+        demo_store._write_seo(layout, demo_store.LAYOUT_SEO["home"], {})
+        report: dict[str, int] = {}
+
+        demo_store._write_seo(layout, demo_store.LAYOUT_SEO["home"], report)
+
+        assert report == {"seo_kept": 2}
 
 
 class TestSeedFunctions(TestCase):

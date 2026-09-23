@@ -25,7 +25,7 @@ This file contains every pattern you need to scaffold a complete endpoint. Read 
 |-------|-------------|-------------|
 | `TimeStampMixinModel` | `created_at`, `updated_at` | Almost always |
 | `UUIDModel` | `uuid` (UUID4, unique) | When external/guest access needed |
-| `SeoModel` | `seo_title`, `seo_description`, `seo_keywords` | Public-facing content |
+| `SeoTranslationModel` | `seo_title`, `seo_description`, `seo_keywords` — on the TRANSLATIONS model, never the shared row: inherit it on an explicit `TranslatedFieldsModel` subclass, or spread `**SeoTranslationModel.translated_fields()` into `TranslatedFields(...)` | Public-facing content (per-language `<title>` / meta description) |
 | `SortableModel` | `sort_order` (atomic move_up/move_down) | Ordered items |
 | `PublishableModel` | `is_published`, `published_at` + `.published()` queryset | Time-sensitive content |
 | `MetaDataModel` | `metadata`, `private_metadata` (JSONField + GIN index) | Extensible entities |
@@ -316,15 +316,16 @@ class YourModelDetailSerializer(YourModelSerializer):
         fields = (
             *YourModelSerializer.Meta.fields,
             "related_items",
-            "seo_title",
-            "seo_description",
-            "seo_keywords",
         )
         read_only_fields = (
             *YourModelSerializer.Meta.read_only_fields,
             "related_items",
         )
 ```
+
+SEO fields are translated, so they travel inside `translations` with the
+model's other translated fields (`TranslatedFieldsFieldExtend`), never as flat
+fields on the serializer.
 
 ### Write Serializer
 
@@ -979,7 +980,7 @@ Add URL inclusion inside `i18n_patterns(...)`:
 from core.models import (
     TimeStampMixinModel,
     UUIDModel,
-    SeoModel,
+    SeoTranslationModel,
     SortableModel,
     PublishableModel,
     MetaDataModel,

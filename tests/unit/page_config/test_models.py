@@ -44,12 +44,34 @@ class TestPageLayout(TestCase):
         assert layout.uuid is not None
 
     def test_seo_fields_default_empty(self):
-        # SeoModel, as on ContentPage/Product/BlogPost: empty means "the
+        # Translated, as on ContentPage/Product/BlogPost: empty means "the
         # storefront keeps its own default", never a null to special-case.
         layout = PageLayout.objects.create(page_type="about", title="About")
+        layout.create_translation("en")
+        layout.set_current_language("en")
         assert layout.seo_title == ""
         assert layout.seo_description == ""
         assert layout.seo_keywords == ""
+
+    def test_seo_fields_are_per_language(self):
+        layout = PageLayout.objects.create(page_type="about", title="About")
+        layout.set_current_language("el")
+        layout.seo_title = "Σχετικά"
+        layout.set_current_language("en")
+        layout.seo_title = "About"
+        layout.save()
+
+        layout = PageLayout.objects.get(pk=layout.pk)
+        el_title = layout.safe_translation_getter(
+            "seo_title", language_code="el"
+        )
+        en_title = layout.safe_translation_getter(
+            "seo_title", language_code="en"
+        )
+        assert el_title == "Σχετικά"
+        assert en_title == "About"
+        # The admin label stays one untranslated string.
+        assert layout.title == "About"
 
     def test_str(self):
         layout = PageLayout.objects.create(page_type="home", title="Homepage")

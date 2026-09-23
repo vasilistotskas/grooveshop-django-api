@@ -17,9 +17,8 @@ from core.managers import (
     TranslatableOptimizedQuerySet,
 )
 from core.models import (
-    PublishableManager,
     PublishableModel,
-    SeoModel,
+    SeoTranslationModel,
     SortableModel,
     TimeStampMixinModel,
     UUIDModel,
@@ -113,15 +112,44 @@ class ComponentType(models.TextChoices):
     CONTACT_PANEL = "contact_panel", _("Contact Panel")
 
 
+class PublishedTranslatableQuerySet(TranslatableOptimizedQuerySet):
+    """``published()`` for a translatable ``PublishableModel``.
+
+    Mirrors ``core.models.PublishedQuerySet.published()`` — the base
+    ``PublishableManager`` isn't parler-aware, so a translatable
+    publishable model needs its own manager stack (matching
+    ``blog.managers.post.BlogPostManager``) to keep ``.published()`` and
+    ``.with_translations()`` composable.
+    """
+
+    def published(self) -> Self:
+        now = timezone.now()
+        return self.filter(
+            Q(published_at__lte=now, is_published=True)
+            | Q(published_at__isnull=True, is_published=True)
+        )
+
+
+class PageLayoutManager(TranslatableOptimizedManager):
+    queryset_class = PublishedTranslatableQuerySet
+
+    def get_queryset(self) -> PublishedTranslatableQuerySet:
+        return PublishedTranslatableQuerySet(self.model, using=self._db)
+
+    def published(self) -> PublishedTranslatableQuerySet:
+        return self.get_queryset().published()
+
+
 class PageLayout(
-    # ``SeoModel``: the operator's own <title> / meta description for the
-    # page this layout drives (home, about, vision, contact, ...). Those
-    # pages had no per-page description and inherited the store-wide
-    # one — Ahrefs "Meta description too short" on every static page,
-    # 2026-09-11 — and the homepage title was the bare store name. Same
-    # mixin ContentPage, Product and BlogPost use; the storefront applies
-    # the values over the page's code defaults when set.
-    SeoModel,
+    # Translatable for its SEO fields only: the operator's own <title> /
+    # meta description for the page this layout drives (home, about,
+    # vision, contact, ...), per language. Those pages had no per-page
+    # description and inherited the store-wide one — Ahrefs "Meta
+    # description too short" on every static page, 2026-09-11 — and the
+    # homepage title was the bare store name. ``title`` stays the
+    # untranslated admin label, and section copy keeps its own
+    # ``PageSection.i18n`` overlay.
+    TranslatableModel,
     PublishableModel,
     TimeStampMixinModel,
     UUIDModel,
@@ -146,7 +174,7 @@ class PageLayout(
         encoder=DjangoJSONEncoder,
     )
 
-    objects = PublishableManager()
+    objects: PageLayoutManager = PageLayoutManager()
 
     class Meta(TypedModelMeta):
         verbose_name = _("Page Layout")
@@ -159,6 +187,31 @@ class PageLayout(
 
     def __str__(self) -> str:
         return f"{self.title} ({self.page_type})"
+
+
+# Suppression is a stubs artefact, not a real override conflict: the two
+# bases declare ``save_base`` with signatures that django-stubs types
+# differently, and ty reports the pair rather than a mismatch in the code
+# written here (same as ``product.ProductTranslation``).
+class PageLayoutTranslation(  # ty: ignore[invalid-method-override]
+    TranslatedFieldsModel, SeoTranslationModel
+):
+    master = TranslationsForeignKey(
+        "page_config.PageLayout",
+        on_delete=models.CASCADE,
+        related_name="translations",
+        null=True,
+    )
+
+    class Meta:
+        app_label = "page_config"
+        db_table = "page_config_pagelayout_translation"
+        unique_together = ("language_code", "master")
+        verbose_name = _("Page Layout Translation")
+        verbose_name_plural = _("Page Layout Translations")
+
+    def __str__(self) -> str:
+        return f"{self.master} ({self.language_code})"
 
 
 class PageSection(
@@ -679,21 +732,8 @@ class NavigationLinkTranslation(TranslatedFieldsModel):
         return self.label
 
 
-class ContentPageQuerySet(TranslatableOptimizedQuerySet):
-    """Optimized QuerySet for ContentPage.
-
-    Mirrors ``core.models.PublishedQuerySet.published()`` — the base
-    ``PublishableManager`` isn't parler-aware, so ContentPage needs its
-    own manager stack (matching ``blog.managers.post.BlogPostManager``)
-    to keep ``.published()`` and ``.with_translations()`` composable.
-    """
-
-    def published(self) -> Self:
-        now = timezone.now()
-        return self.filter(
-            Q(published_at__lte=now, is_published=True)
-            | Q(published_at__isnull=True, is_published=True)
-        )
+class ContentPageQuerySet(PublishedTranslatableQuerySet):
+    """Optimized QuerySet for ContentPage."""
 
     def for_list(self) -> Self:
         return self.with_translations()
@@ -720,7 +760,6 @@ class ContentPageManager(TranslatableOptimizedManager):
 
 class ContentPage(
     TranslatableModel,
-    SeoModel,
     TimeStampMixinModel,
     PublishableModel,
     UUIDModel,
@@ -751,7 +790,13 @@ class ContentPage(
         return title or self.slug
 
 
-class ContentPageTranslation(TranslatedFieldsModel):
+# Suppression is a stubs artefact, not a real override conflict: the two
+# bases declare ``save_base`` with signatures that django-stubs types
+# differently, and ty reports the pair rather than a mismatch in the code
+# written here (same as ``product.ProductTranslation``).
+class ContentPageTranslation(  # ty: ignore[invalid-method-override]
+    TranslatedFieldsModel, SeoTranslationModel
+):
     master = TranslationsForeignKey(
         "page_config.ContentPage",
         on_delete=models.CASCADE,

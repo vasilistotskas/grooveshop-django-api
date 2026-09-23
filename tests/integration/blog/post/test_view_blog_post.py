@@ -143,11 +143,28 @@ class BlogPostViewSetTestCase(TestURLFixerMixin, APITestCase):
             "reading_time",
             "content_preview",
             "user_has_liked",
-            "seo_title",
-            "seo_description",
-            "seo_keywords",
         }
         self.assertTrue(expected_fields.issubset(set(response.data.keys())))
+
+    def test_retrieve_carries_seo_per_language(self):
+        self.post.set_current_language("el")
+        self.post.seo_title = "Οδηγός φόρτισης"
+        self.post.set_current_language("en")
+        self.post.seo_title = "Charging guide"
+        self.post.seo_description = "How to charge a phone well."
+        self.post.save()
+
+        response = self.client.get(self.get_post_detail_url(self.post.id))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertNotIn("seo_title", response.data)
+        translations = response.data["translations"]
+        self.assertEqual(translations["el"]["seo_title"], "Οδηγός φόρτισης")
+        self.assertEqual(translations["en"]["seo_title"], "Charging guide")
+        self.assertEqual(
+            translations["en"]["seo_description"],
+            "How to charge a phone well.",
+        )
 
     def test_retrieve_uses_correct_serializer(self):
         url = self.get_post_detail_url(self.post.id)
@@ -156,9 +173,6 @@ class BlogPostViewSetTestCase(TestURLFixerMixin, APITestCase):
 
         detail_only_fields = {
             "user_has_liked",
-            "seo_title",
-            "seo_description",
-            "seo_keywords",
         }
         response_fields = set(response.data.keys())
 
@@ -221,9 +235,6 @@ class BlogPostViewSetTestCase(TestURLFixerMixin, APITestCase):
             "reading_time",
             "content_preview",
             "user_has_liked",
-            "seo_title",
-            "seo_description",
-            "seo_keywords",
         }
         self.assertTrue(expected_fields.issubset(set(response.data.keys())))
 
@@ -287,9 +298,6 @@ class BlogPostViewSetTestCase(TestURLFixerMixin, APITestCase):
             "reading_time",
             "content_preview",
             "user_has_liked",
-            "seo_title",
-            "seo_description",
-            "seo_keywords",
         }
         self.assertTrue(expected_fields.issubset(set(response.data.keys())))
 
@@ -342,9 +350,6 @@ class BlogPostViewSetTestCase(TestURLFixerMixin, APITestCase):
             "reading_time",
             "content_preview",
             "user_has_liked",
-            "seo_title",
-            "seo_description",
-            "seo_keywords",
         }
         self.assertTrue(expected_fields.issubset(set(response.data.keys())))
 

@@ -3473,10 +3473,19 @@ def seed_deset_products(*, overwrite: bool = False) -> dict[str, int]:
     slug, name, name_en = DESET_CATEGORY
     category = ProductCategory.objects.filter(slug=slug).first()
     if category is None:
-        category = ProductCategory(slug=slug, active=True, seo_title=name[:70])
-        _translate(category, name=name, description=DESET_COMPLIANCE)
+        category = ProductCategory(slug=slug, active=True)
         _translate(
-            category, "en", name=name_en, description=DESET_COMPLIANCE_EN
+            category,
+            name=name,
+            description=DESET_COMPLIANCE,
+            seo_title=name[:70],
+        )
+        _translate(
+            category,
+            "en",
+            name=name_en,
+            description=DESET_COMPLIANCE_EN,
+            seo_title=name_en[:70],
         )
         category.save()
         _bump(report, "category_created")
@@ -3518,19 +3527,21 @@ def seed_deset_products(*, overwrite: bool = False) -> dict[str, int]:
             stock=0,
             active=True,
             vat=vat,
-            seo_title=system["name"][:70],
-            seo_description=system["summary"][:300],
         )
         _translate(
             product,
             name=system["name"],
             description=_deset_description(system, locale="el"),
+            seo_title=system["name"][:70],
+            seo_description=system["summary"][:300],
         )
         _translate(
             product,
             "en",
             name=system["name_en"],
             description=_deset_description(system, locale="en"),
+            seo_title=system["name_en"][:70],
+            seo_description=system["summary_en"][:300],
         )
         product.save()
         _bump(report, "products_created")

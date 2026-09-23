@@ -7,7 +7,12 @@ from mptt.models import MPTTModel
 from parler.models import TranslatableModel, TranslatedFields
 from tinymce.models import HTMLField
 
-from core.models import SeoModel, SortableModel, TimeStampMixinModel, UUIDModel
+from core.models import (
+    SeoTranslationModel,
+    SortableModel,
+    TimeStampMixinModel,
+    UUIDModel,
+)
 from core.utils.generators import SlugifyConfig, unique_slugify
 from product.managers.category import CategoryManager
 from product.models.product import Product
@@ -19,7 +24,6 @@ class ProductCategory(
     MPTTModel,
     UUIDModel,
     TimeStampMixinModel,
-    SeoModel,
 ):
     id = models.BigAutoField(primary_key=True)
     slug = models.SlugField(_("Slug"), max_length=255, unique=True)
@@ -34,6 +38,7 @@ class ProductCategory(
     translations = TranslatedFields(
         name=models.CharField(_("Name"), max_length=255, blank=True, null=True),
         description=HTMLField(_("Description"), blank=True, null=True),
+        **SeoTranslationModel.translated_fields(),
     )
 
     objects: CategoryManager = CategoryManager()

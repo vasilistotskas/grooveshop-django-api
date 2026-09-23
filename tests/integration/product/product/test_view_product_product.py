@@ -520,10 +520,14 @@ class ProductViewSetTestCase(APITestCase):
                     "en": {
                         "name": "Complex Product EN",
                         "description": "Complex product description EN",
+                        "seo_title": "Complex Product SEO Title EN",
+                        "seo_description": "Complex Product SEO Description",
+                        "seo_keywords": "complex, product, test",
                     },
                     "de": {
                         "name": "Complex Product DE",
                         "description": "Complex product description DE",
+                        "seo_title": "Complex Product SEO Title DE",
                     },
                 }
             ),
@@ -536,9 +540,6 @@ class ProductViewSetTestCase(APITestCase):
                 "value": "2.50",
                 "unit": "kg",
             },
-            "seo_title": "Complex Product SEO Title",
-            "seo_description": "Complex Product SEO Description",
-            "seo_keywords": "complex, product, test",
         }
 
         url = self.get_product_list_url()
@@ -553,12 +554,19 @@ class ProductViewSetTestCase(APITestCase):
         ]:
             product.set_current_language("en")
             self.assertEqual(product.name, "Complex Product EN")
+            self.assertEqual(product.seo_title, "Complex Product SEO Title EN")
+            self.assertEqual(
+                product.seo_description, "Complex Product SEO Description"
+            )
+            self.assertEqual(product.seo_keywords, "complex, product, test")
 
         if "de" in [
             lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
         ]:
             product.set_current_language("de")
             self.assertEqual(product.name, "Complex Product DE")
+            self.assertEqual(product.seo_title, "Complex Product SEO Title DE")
+            self.assertEqual(product.seo_description, "")
 
     def test_queryset_optimization(self):
         url = self.get_product_list_url()

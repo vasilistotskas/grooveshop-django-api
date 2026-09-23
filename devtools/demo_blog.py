@@ -763,19 +763,6 @@ def seed_blog(translate, ensure_asset) -> dict[str, int]:
         else:
             bump("posts_created")
 
-        # Blank, deliberately. ``SeoModel`` is NOT translatable — the
-        # three fields sit on the base row, not on a translation — and
-        # the storefront prefers them over the translated title and
-        # body. This seeder used to fill them from the Greek copy, which
-        # is what put a Greek <title> and meta description on the
-        # English post; the English variant the dataset carried for one
-        # post had nowhere to go, which is the same story from the other
-        # end, and has gone with it. Emptied rather than merely left
-        # unset, because rows written on an earlier run still carry that
-        # Greek. The storefront falls back to the translated subtitle
-        # and body. Translatable SEO fields are their own change.
-        post.seo_title = ""
-        post.seo_description = ""
         translate(
             post,
             "el",

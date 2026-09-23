@@ -898,6 +898,32 @@ ABOUT_SECTIONS: tuple[dict[str, Any], ...] = (
     },
 )
 
+# page_type -> language -> (SEO title, meta description). Only the home
+# page carries its own: without it the storefront's <title> is the bare
+# store name and the description the store-wide one. Titles stay under
+# 60 characters and descriptions within 140-160, the lengths search
+# results show without truncating.
+LAYOUT_SEO: dict[str, dict[str, tuple[str, str]]] = {
+    "home": {
+        "el": (
+            "GrooveShop Demo | Αξεσουάρ κινητού με γρήγορη αποστολή",
+            (
+                "Θήκες, τζαμάκια, καλώδια USB-C, φορτιστές GaN και "
+                "powerbanks για το κινητό σου. Αποστολή σε 1-3 ημέρες, "
+                "δωρεάν πάνω από 50€ και εγγύηση 2 ετών."
+            ),
+        ),
+        "en": (
+            "GrooveShop Demo | Phone Accessories, Delivered Fast",
+            (
+                "Cases, screen protectors, USB-C cables, GaN chargers and "
+                "power banks for your phone. Delivered in 1-3 days, free "
+                "over €50, with a two-year warranty."
+            ),
+        ),
+    },
+}
+
 # page_type -> (sections, mode) where mode is "append" (keep existing
 # rows, add ours) or "replace" (this layout is ours end to end).
 LAYOUT_PLAN: dict[str, tuple[tuple[dict[str, Any], ...], str]] = {
@@ -1114,6 +1140,11 @@ CONTENT_PAGES: dict[str, dict[str, Any]] = {
             "ανεξάρτητη από το παραπάνω δικαίωμα υπαναχώρησης.</p>"
         ),
         "title_en": "Return Policy",
+        "seo_title_en": "Return Policy",
+        "seo_description_en": (
+            "14-day right of withdrawal, how to return an item and how "
+            "the refund is made."
+        ),
         "body_en": (
             "<h2>Right of withdrawal</h2>"
             "<p>You have 14 calendar days from delivery to return an item "
@@ -1162,6 +1193,10 @@ CONTENT_PAGES: dict[str, dict[str, Any]] = {
             "Ναι, μέσα από το πρόγραμμα χονδρικής. Κάνε αίτηση από τον λογαριασμό σου.</p>"
         ),
         "title_en": "Frequently Asked Questions",
+        "seo_title_en": "Frequently Asked Questions",
+        "seo_description_en": (
+            "Answers on shipping, returns, payments and invoicing."
+        ),
         "body_en": (
             "<h2>Orders</h2>"
             "<p><strong>How quickly does my order leave?</strong><br>"
@@ -1209,6 +1244,10 @@ CONTENT_PAGES: dict[str, dict[str, Any]] = {
             "Δεν συνδυάζεται με παραλαβή από BoxNow locker.</p>"
         ),
         "title_en": "Shipping Information",
+        "seo_title_en": "Shipping Information",
+        "seo_description_en": (
+            "Shipping methods, costs, delivery times and order tracking."
+        ),
         "body_en": (
             "<h2>Shipping methods</h2>"
             "<ul>"
@@ -1268,6 +1307,10 @@ CONTENT_PAGES: dict[str, dict[str, Any]] = {
             "απαντήσει είναι αυτό που θα προταθεί.</p>"
         ),
         "title_en": "AI-agent ready",
+        "seo_title_en": "AI-agent ready",
+        "seo_description_en": (
+            "How an AI agent can find, ask about and order from this store."
+        ),
         "body_en": (
             "<p>This store does not only answer people with a browser. "
             "It answers AI agents too, over open protocols and without "
@@ -1322,6 +1365,35 @@ def _translate(instance, language_code: str = "el", **fields) -> None:
     instance.set_current_language(language_code)
     for name, value in fields.items():
         setattr(instance, name, value)
+
+
+def _write_seo(
+    instance,
+    seo: dict[str, tuple[str, str]],
+    report: dict[str, int],
+) -> None:
+    """Write a translated SEO title and description per language.
+
+    ``seo`` maps a language code to ``(title, description)``. A language
+    whose translation already carries either value is left alone — an
+    operator's own SEO is never overwritten, and a re-run is a no-op.
+    The translation row is created when the language has none yet.
+    """
+    from django.conf import settings
+
+    for language, (title, description) in seo.items():
+        existing = instance.translations.filter(language_code=language).first()
+        if existing is not None and (
+            existing.seo_title or existing.seo_description
+        ):
+            _bump(report, "seo_kept")
+            continue
+        instance.set_current_language(language)
+        instance.seo_title = title[:70]
+        instance.seo_description = description[:300]
+        instance.save()
+        _bump(report, "seo_written")
+    instance.set_current_language(settings.PARLER_DEFAULT_LANGUAGE_CODE)
 
 
 def seed_settings() -> dict[str, int]:
@@ -1470,19 +1542,6 @@ def seed_categories() -> dict[str, int]:
 
         category.active = True
         category.parent = by_slug.get(row.parent) if row.parent else None
-        # Blank, deliberately. ``SeoModel`` is NOT translatable — the
-        # three fields sit on the base row, not on a translation — and
-        # both storefront pages prefer them over the translated name and
-        # description. This seeder used to fill them with the Greek
-        # copy, which is what put a Greek <title> and meta description
-        # on every English product and category page. Emptied rather
-        # than merely left unset, because the rows it wrote on an
-        # earlier run are still carrying that Greek. With them blank the
-        # storefront falls back to the TRANSLATED name and description,
-        # which is right in both locales. Translatable SEO fields are
-        # their own change.
-        category.seo_title = ""
-        category.seo_description = ""
         _translate(
             category,
             "el",
@@ -1686,19 +1745,6 @@ def seed_products() -> dict[str, int]:
         # Exercises the price-drop alert opt-in on a subset rather than
         # everywhere, so both branches have rows.
         product.price_drop_alerts_enabled = index % 4 == 0
-        # Blank, deliberately. ``SeoModel`` is NOT translatable — the
-        # three fields sit on the base row, not on a translation — and
-        # both storefront pages prefer them over the translated name and
-        # description. This seeder used to fill them with the Greek
-        # copy, which is what put a Greek <title> and meta description
-        # on every English product and category page. Emptied rather
-        # than merely left unset, because the rows it wrote on an
-        # earlier run are still carrying that Greek. With them blank the
-        # storefront falls back to the TRANSLATED name and description,
-        # which is right in both locales. Translatable SEO fields are
-        # their own change.
-        product.seo_title = ""
-        product.seo_description = ""
         if row.variant_group:
             product.variant_group = group_for(row.variant_group)
 
@@ -2046,6 +2092,8 @@ def seed_layouts() -> dict[str, int]:
             layout.is_published = True
             layout.save(update_fields=["is_published"])
             _bump(report, "layouts_published")
+        if page_type in LAYOUT_SEO:
+            _write_seo(layout, LAYOUT_SEO[page_type], report)
 
         if mode == "replace":
             removed, _ = layout.sections.all().delete()
@@ -2388,6 +2436,15 @@ def publish_content_pages() -> dict[str, int]:
             page.save()
             _bump(report, "created")
 
+        _write_seo(
+            page,
+            {
+                "el": (content["seo_title"], content["seo_description"]),
+                "en": (content["seo_title_en"], content["seo_description_en"]),
+            },
+            report,
+        )
+
         english = page.translations.filter(language_code="en").first()
         if english is None or not (english.body or "").strip():
             page.set_current_language("en")
@@ -2415,21 +2472,6 @@ def publish_content_pages() -> dict[str, int]:
             page.is_published = True
             page.published_at = page.published_at or timezone.now()
             changed += ["is_published", "published_at"]
-        # ``seo_title``/``seo_description`` are NOT written, and any the
-        # seeder wrote before are cleared: ``SeoModel`` keeps them on the
-        # base row rather than on a translation, so the Greek copy this
-        # dataset holds would be served on ``/en`` too. Blank, the
-        # storefront falls back to the page's TRANSLATED title and body,
-        # which is right in both locales. An operator's own values are
-        # left alone — they are only cleared when they match what this
-        # seeder put there.
-        for field, seeded in (
-            ("seo_title", content["seo_title"][:70]),
-            ("seo_description", content["seo_description"][:300]),
-        ):
-            if getattr(page, field) == seeded:
-                setattr(page, field, "")
-                changed.append(field)
         if changed:
             page.save(update_fields=changed)
             _bump(report, "published")

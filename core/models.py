@@ -33,9 +33,27 @@ class JSONBConcat(Func):
     output_field = JSONField()
 
 
-class SeoModel(models.Model):
-    """
-    Abstract model that adds SEO fields (title, description, keywords).
+class SeoTranslationModel(models.Model):
+    """Abstract holder of the per-language SEO fields (title, description,
+    keywords).
+
+    These belong on a model's parler TRANSLATIONS model, never on the
+    shared row: a bilingual store otherwise serves one language's
+    ``<title>`` and meta description on every locale's URL.
+
+    Parler builds the translations model in one of two ways, and this
+    serves both from one declaration:
+
+    * an explicit ``TranslatedFieldsModel`` subclass inherits it —
+      ``class ProductTranslation(TranslatedFieldsModel,
+      SeoTranslationModel)``. ``TranslatedFieldsModelBase`` skips
+      abstract classes, and ``get_translated_fields`` reads
+      ``_meta.local_fields``, which carries fields inherited from an
+      abstract parent, so parler proxies them like any other.
+    * a ``TranslatedFields(...)`` declaration cannot take a base class
+      (``create_translations_model`` always builds on
+      ``TranslatedFieldsModel`` alone), so it receives fresh copies:
+      ``TranslatedFields(name=..., **SeoTranslationModel.translated_fields())``.
     """
 
     seo_title = models.CharField(
@@ -53,6 +71,16 @@ class SeoModel(models.Model):
 
     class Meta:
         abstract = True
+
+    @classmethod
+    def translated_fields(cls) -> dict[str, models.Field]:
+        """Unbound copies of the SEO fields, for ``TranslatedFields``.
+
+        ``Field.clone()`` rebuilds each field from its ``deconstruct()``,
+        so every caller gets its own instance — one field object cannot
+        be attached to two models.
+        """
+        return {field.name: field.clone() for field in cls._meta.local_fields}
 
 
 class SortableModel(models.Model):

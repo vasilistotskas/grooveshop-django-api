@@ -51,8 +51,48 @@ class PageSectionSerializer(serializers.ModelSerializer):
         return data
 
 
+class LocaleTranslatedField(serializers.CharField):
+    """One parler translated field, in the serializer context's locale.
+
+    STRICT: the requested locale's own translation or ``""`` — never
+    parler's fallback chain (``PARLER_LANGUAGES`` falls back to the
+    default language, which would put Greek SEO on an English page).
+    The storefront reads an empty string as "emit no tag, keep the
+    page's own default" (``usePageConfig``), so an untranslated locale
+    must answer empty rather than borrow another language's copy.
+
+    Reads ``translations.all()`` so the view's prefetch answers it
+    without a query per field.
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(source="*", read_only=True, **kwargs)
+
+    def bind(self, field_name: str, parent) -> None:
+        super().bind(field_name, parent)
+        # The declared name IS the translated field it reads.
+        self.translated_field = field_name
+
+    def to_representation(self, value) -> str:
+        locale = self.context["locale"]
+        for row in value.translations.all():
+            if row.language_code == locale:
+                return getattr(row, self.translated_field)
+        return ""
+
+
 class PageLayoutSerializer(serializers.ModelSerializer):
+    """The public, per-locale layout (``public_page_config``).
+
+    Page config answers ONE locale per request (see
+    ``page_config.localization``), so the SEO fields travel as flat
+    strings resolved for it rather than as a ``translations`` object.
+    """
+
     sections = PageSectionSerializer(many=True, read_only=True)
+    seo_title = LocaleTranslatedField()
+    seo_description = LocaleTranslatedField()
+    seo_keywords = LocaleTranslatedField()
 
     class Meta:
         model = PageLayout
@@ -109,7 +149,42 @@ class PageSectionWriteSerializer(serializers.ModelSerializer):
         return attrs
 
 
-class PageLayoutAdminSerializer(serializers.ModelSerializer):
+@extend_schema_field(generate_schema_multi_lang(PageLayout))
+class PageLayoutTranslatedFieldsField(TranslatedFieldExtended):
+    pass
+
+
+class PageLayoutAdminDetailSerializer(
+    TranslatableModelSerializer, serializers.ModelSerializer[PageLayout]
+):
+    """The staff read of a layout: every language's SEO, not one."""
+
+    translations = PageLayoutTranslatedFieldsField(shared_model=PageLayout)
+    sections = PageSectionSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = PageLayout
+        fields = (
+            "id",
+            "uuid",
+            "page_type",
+            "title",
+            "translations",
+            "is_published",
+            "metadata",
+            "sections",
+        )
+
+
+class PageLayoutAdminSerializer(
+    TranslatableModelSerializer, serializers.ModelSerializer[PageLayout]
+):
+    # A layout may carry no SEO in any language — the storefront then
+    # keeps the page's own title and the store description — so unlike
+    # ContentPage no translation is required.
+    translations = PageLayoutTranslatedFieldsField(
+        shared_model=PageLayout, required=False
+    )
     sections = PageSectionWriteSerializer(many=True, required=False)
 
     class Meta:
@@ -119,9 +194,7 @@ class PageLayoutAdminSerializer(serializers.ModelSerializer):
             "uuid",
             "page_type",
             "title",
-            "seo_title",
-            "seo_description",
-            "seo_keywords",
+            "translations",
             "is_published",
             "metadata",
             "sections",
@@ -130,7 +203,7 @@ class PageLayoutAdminSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         sections_data = validated_data.pop("sections", [])
-        layout = PageLayout.objects.create(**validated_data)
+        layout = super().create(validated_data)
         for idx, section_data in enumerate(sections_data):
             PageSection.objects.create(
                 layout=layout, sort_order=idx, **section_data
@@ -139,9 +212,7 @@ class PageLayoutAdminSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         sections_data = validated_data.pop("sections", None)
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-        instance.save()
+        instance = super().update(instance, validated_data)
         if sections_data is not None:
             instance.sections.all().delete()
             for idx, section_data in enumerate(sections_data):
@@ -196,13 +267,8 @@ class ContentPageSerializer(
 
 
 class ContentPageDetailSerializer(ContentPageSerializer):
-    class Meta(ContentPageSerializer.Meta):
-        fields = (
-            *ContentPageSerializer.Meta.fields,
-            "seo_title",
-            "seo_description",
-            "seo_keywords",
-        )
+    """The detail tier. Its SEO travels in ``translations`` like every
+    other translated field, so it adds nothing to the list shape."""
 
 
 class ContentPageWriteSerializer(
@@ -219,9 +285,6 @@ class ContentPageWriteSerializer(
             "translations",
             "slug",
             "is_published",
-            "seo_title",
-            "seo_description",
-            "seo_keywords",
         )
 
     def validate_slug(self, value: str) -> str:

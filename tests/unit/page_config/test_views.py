@@ -32,11 +32,13 @@ class TestPublicPageConfig(TestCase):
         self.layout = PageLayout.objects.create(
             page_type="home",
             title="Homepage",
-            seo_title="Webside | Μπες στο side της τεχνολογίας",
-            seo_description="Οδηγοί, άρθρα και προϊόντα τεχνολογίας.",
             is_published=True,
             published_at=timezone.now(),
         )
+        self.layout.set_current_language("el")
+        self.layout.seo_title = "Webside | Μπες στο side της τεχνολογίας"
+        self.layout.seo_description = "Οδηγοί, άρθρα και προϊόντα τεχνολογίας."
+        self.layout.save()
         self.section1 = PageSection.objects.create(
             layout=self.layout,
             component_type=ComponentType.HERO_CAROUSEL,
@@ -70,6 +72,28 @@ class TestPublicPageConfig(TestCase):
         assert (
             data["seoDescription"] == "Οδηγοί, άρθρα και προϊόντα τεχνολογίας."
         )
+        assert data["seoKeywords"] == ""
+        assert "translations" not in data
+
+    def test_public_layout_seo_answers_the_requested_locale(self):
+        self.layout.set_current_language("en")
+        self.layout.seo_title = "Webside | Get on the side of technology"
+        self.layout.seo_description = "Guides, articles and tech products."
+        self.layout.save()
+
+        el = self.client.get("/api/v1/page-config/home?locale=el").json()
+        en = self.client.get("/api/v1/page-config/home?locale=en").json()
+
+        assert el["seoTitle"] == "Webside | Μπες στο side της τεχνολογίας"
+        assert en["seoTitle"] == "Webside | Get on the side of technology"
+        assert en["seoDescription"] == "Guides, articles and tech products."
+
+    def test_untranslated_locale_answers_empty_not_the_default(self):
+        """No parler fallback: Greek SEO on an English page is worse
+        than none, and empty tells the storefront to emit no tag."""
+        data = self.client.get("/api/v1/page-config/home?locale=en").json()
+        assert data["seoTitle"] == ""
+        assert data["seoDescription"] == ""
         assert data["seoKeywords"] == ""
 
     def test_sections_include_props(self):
@@ -201,6 +225,44 @@ class TestPageLayoutAdminViewSet(TestCase):
         assert result["pageType"] == "home"
         assert len(result["sections"]) == 2
 
+    def test_create_writes_seo_per_language(self):
+        data = {
+            "pageType": "about",
+            "title": "About",
+            "translations": {
+                "el": {
+                    "seoTitle": "Σχετικά με εμάς",
+                    "seoDescription": "Ποιοι είμαστε.",
+                },
+                "en": {"seoTitle": "About us", "seoKeywords": "about"},
+            },
+        }
+        response = self.client.post(
+            "/api/v1/page-config/admin", data=data, format="json"
+        )
+        assert response.status_code == 201
+        result = response.json()
+        # Staff read every language, and nothing flat beside them.
+        assert "seoTitle" not in result
+        assert result["translations"]["el"]["seoTitle"] == "Σχετικά με εμάς"
+        assert result["translations"]["en"]["seoKeywords"] == "about"
+
+        layout = PageLayout.objects.get(page_type="about")
+        layout.set_current_language("en")
+        assert layout.seo_title == "About us"
+        assert layout.seo_description == ""
+        layout.set_current_language("el")
+        assert layout.seo_description == "Ποιοι είμαστε."
+
+    def test_retrieve_carries_every_language(self):
+        layout = PageLayout.objects.create(page_type="home", title="Homepage")
+        layout.set_current_language("en")
+        layout.seo_title = "Home"
+        layout.save()
+        response = self.client.get(f"/api/v1/page-config/admin/{layout.pk}")
+        assert response.status_code == 200
+        assert response.json()["translations"]["en"]["seoTitle"] == "Home"
+
     def test_update_replaces_sections(self):
         layout = PageLayout.objects.create(page_type="home", title="Homepage")
         PageSection.objects.create(
@@ -274,6 +336,24 @@ class TestContentPageViewSet(TestCase):
         response = self.client.get("/api/v1/content-page/terms")
         assert response.status_code == 200
         assert response.json()["slug"] == "terms"
+
+    def test_seo_travels_per_language_in_translations(self):
+        self.published.set_current_language("el")
+        self.published.seo_title = "Όροι Χρήσης | Κατάστημα"
+        self.published.save()
+        self.published.set_current_language("en")
+        self.published.title = "Terms of Use"
+        self.published.seo_title = "Terms of Use | Store"
+        self.published.save()
+
+        data = self.client.get("/api/v1/content-page/terms").json()
+
+        assert "seoTitle" not in data
+        assert data["translations"]["el"]["seoTitle"] == (
+            "Όροι Χρήσης | Κατάστημα"
+        )
+        assert data["translations"]["en"]["seoTitle"] == "Terms of Use | Store"
+        assert data["translations"]["en"]["seoDescription"] == ""
 
     def test_anonymous_unpublished_returns_404(self):
         response = self.client.get("/api/v1/content-page/privacy")

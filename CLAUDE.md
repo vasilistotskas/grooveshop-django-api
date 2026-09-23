@@ -82,13 +82,13 @@ All apps live at the project root (flat structure, no `src/` directory):
 **Abstract models** (all in `core/models.py`):
 - `TimeStampMixinModel` — `created_at`/`updated_at` with indexes
 - `UUIDModel` — UUID4 field for external/guest access
-- `SeoModel` — `seo_title`, `seo_description`, `seo_keywords`
+- `SeoTranslationModel` — `seo_title`, `seo_description`, `seo_keywords`, for a model's parler **translations** model (never the shared row): inherit it on an explicit `TranslatedFieldsModel`, or spread `**SeoTranslationModel.translated_fields()` into `TranslatedFields(...)`
 - `SortableModel` — `sort_order` with atomic `move_up()`/`move_down()` using `select_for_update()`
 - `PublishableModel` — `is_published`/`published_at` with `PublishableManager.published()` queryset
 - `MetaDataModel` — `metadata`/`private_metadata` JSONFields with GinIndex
 - `SoftDeleteModel` — `is_deleted`/`deleted_at` with `SoftDeleteManager` (`.all_with_deleted()`, `.deleted_only()`, `.restore()`, `.hard_delete()`)
 
-Domain models compose multiple mixins, e.g. `Product(SoftDeleteModel, TranslatableModel, TimeStampMixinModel, SeoModel, UUIDModel, MetaDataModel, TaggedModel)`.
+Domain models compose multiple mixins, e.g. `Product(SoftDeleteModel, TranslatableModel, TimeStampMixinModel, UUIDModel, MetaDataModel, TaggedModel)` with `ProductTranslation(TranslatedFieldsModel, SeoTranslationModel, IndexMixin)`.
 
 **Base ViewSet** (`core/api/views.py: BaseModelViewSet`):
 - Combines `RequestResponseSerializerMixin`, `TranslationsModelViewSet`, `PaginationModelViewSet`

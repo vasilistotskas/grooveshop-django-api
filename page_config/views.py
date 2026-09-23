@@ -32,6 +32,7 @@ from page_config.serializers import (
     ContentPageSerializer,
     ContentPageWriteSerializer,
     NavigationMenuSerializer,
+    PageLayoutAdminDetailSerializer,
     PageLayoutAdminSerializer,
     PageLayoutSerializer,
 )
@@ -57,8 +58,10 @@ _LOCALE_PARAMETER = OpenApiParameter(
         "Language to answer operator-authored copy in. Section titles, "
         "section props and navigation labels are JSON held per store, "
         "not parler translations, so they are resolved here rather than "
-        "shipped per locale. Unknown or omitted means the store's "
-        "default language."
+        "shipped per locale. A layout's SEO title, description and "
+        "keywords are resolved for it too, strictly: a locale with no "
+        "translation answers them empty. Unknown or omitted means the "
+        "store's default language."
     ),
 )
 
@@ -73,6 +76,7 @@ _LOCALE_PARAMETER = OpenApiParameter(
 def public_page_config(request, page_type):
     layout = get_object_or_404(
         PageLayout.objects.published().prefetch_related(
+            "translations",
             Prefetch(
                 "sections",
                 queryset=PageSection.objects.filter(is_visible=True).order_by(
@@ -151,7 +155,7 @@ class NavigationMenuAdminViewSet(BaseModelViewSet):
 
 
 class PageLayoutAdminViewSet(BaseModelViewSet):
-    queryset = PageLayout.objects.prefetch_related("sections")
+    queryset = PageLayout.objects.prefetch_related("translations", "sections")
     # A platform-staff user must not be
     # able to mutate ANOTHER tenant's layout. The original fix paired
     # ``IsAdminUser`` with ``HasTenantAccess``, which was unsound on an
@@ -166,21 +170,21 @@ class PageLayoutAdminViewSet(BaseModelViewSet):
     # is_staff is not the gate at all.
     permission_classes = [StoreStaffModelPermissions]
     serializers_config = {
-        "list": ActionConfig(response=PageLayoutSerializer),
-        "retrieve": ActionConfig(response=PageLayoutSerializer),
+        "list": ActionConfig(response=PageLayoutAdminDetailSerializer),
+        "retrieve": ActionConfig(response=PageLayoutAdminDetailSerializer),
         "create": ActionConfig(
             request=PageLayoutAdminSerializer,
-            response=PageLayoutSerializer,
+            response=PageLayoutAdminDetailSerializer,
         ),
         "update": ActionConfig(
             request=PageLayoutAdminSerializer,
-            response=PageLayoutSerializer,
+            response=PageLayoutAdminDetailSerializer,
         ),
         "partial_update": ActionConfig(
             request=PageLayoutAdminSerializer,
-            response=PageLayoutSerializer,
+            response=PageLayoutAdminDetailSerializer,
         ),
-        "destroy": ActionConfig(response=PageLayoutSerializer),
+        "destroy": ActionConfig(response=PageLayoutAdminDetailSerializer),
     }
 
 

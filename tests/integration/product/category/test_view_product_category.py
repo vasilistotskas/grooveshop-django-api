@@ -84,9 +84,6 @@ class ProductCategoryViewSetTestCase(APITestCase):
             "uuid",
             "recursive_product_count",
             "children",
-            "seo_title",
-            "seo_description",
-            "seo_keywords",
         }
         self.assertTrue(expected_fields.issubset(set(response.data.keys())))
 
@@ -120,9 +117,6 @@ class ProductCategoryViewSetTestCase(APITestCase):
             "uuid",
             "recursive_product_count",
             "children",
-            "seo_title",
-            "seo_description",
-            "seo_keywords",
         }
         self.assertTrue(expected_fields.issubset(set(response.data.keys())))
 
@@ -159,9 +153,6 @@ class ProductCategoryViewSetTestCase(APITestCase):
             "uuid",
             "recursive_product_count",
             "children",
-            "seo_title",
-            "seo_description",
-            "seo_keywords",
         }
         self.assertTrue(expected_fields.issubset(set(response.data.keys())))
 
@@ -193,9 +184,6 @@ class ProductCategoryViewSetTestCase(APITestCase):
             "uuid",
             "recursive_product_count",
             "children",
-            "seo_title",
-            "seo_description",
-            "seo_keywords",
         }
         self.assertTrue(expected_fields.issubset(set(response.data.keys())))
 

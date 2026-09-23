@@ -66,9 +66,6 @@ class ProductSerializer(
             "low_stock_threshold",
             "active",
             "weight",
-            "seo_title",
-            "seo_description",
-            "seo_keywords",
             "discount_percent",
             "discount_value",
             "price_save_percent",
@@ -183,8 +180,5 @@ class ProductWriteSerializer(
             "stock",
             "weight",
             "discount_percent",
-            "seo_title",
-            "seo_description",
-            "seo_keywords",
             "active",
         )

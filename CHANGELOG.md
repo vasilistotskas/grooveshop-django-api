@@ -3,6 +3,36 @@
 
 
 
+## v3.78.0 (2026-09-23)
+
+### Chores
+
+* chore(git): normalize line endings to LF
+
+core.autocrlf=true on the Windows checkout made line-ending-only
+differences show as modified files; the index is already LF, so this
+changes no content.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01QoFnBjC6Z1yeyiyjVRTrxg ([`ba422d0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ba422d0fdeea6b431949256231f1e3618b938add))
+
+* chore(deps): sync uv.lock to 3.77.0 [skip ci] ([`a2970c4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a2970c43ac2432f74ae2bcb0cb2e49510a7bdf5c))
+
+### Features
+
+* feat(newsletter): every store starts with a default newsletter topic
+
+The default home layout carries a newsletter band, and the band renders
+only when the store has a default NEWSLETTER topic, so a new store's
+band showed nothing until the merchant found the topics screen.
+ensure_default_newsletter_topic creates one, double opt-in and written
+in el and en, and never touches a topic the merchant made. Provisioning
+runs it as a seed step and the demo seed runs it for the existing demo
+store.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_016F5trstVMoFXNan1ZQMLEp ([`f84827a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f84827a00428cfa1f70f22038bab36508ddb3879))
+
 ## v3.77.0 (2026-09-23)
 
 ### Chores

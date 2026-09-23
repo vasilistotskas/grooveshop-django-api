@@ -3,8 +3,7 @@
 Two entry points, one per kind of subscriber:
 
 - :func:`subscribe_account` — a signed-in account (the topic subscribe
-  action, the account's subscriptions endpoint, the bulk update, and the
-  default topics at signup). A topic that requires confirmation gets a
+  action, the bulk update, and the default topics at signup). A topic that requires confirmation gets a
   PENDING row with a live confirmation link and its email; any other
   topic an ACTIVE row. No path can leave a PENDING row without a token,
   or turn a confirmation-required topic ACTIVE without the click.
@@ -12,6 +11,9 @@ Two entry points, one per kind of subscriber:
 - :func:`subscribe_email_to_newsletter` — the anonymous newsletter form,
   run from ``user.tasks.subscribe_to_newsletter_task`` so the request
   never touches the rows (see the view for why).
+
+:func:`ensure_default_newsletter_topic` gives a store the topic that
+form subscribes to.
 """
 
 from __future__ import annotations
@@ -188,3 +190,53 @@ def subscribe_email_to_newsletter(
             "newsletter: concurrent signup for topic %s collapsed", topic.pk
         )
         return None
+
+
+#: The topic a store starts with, so the newsletter band that the
+#: default page layout carries has something to subscribe to. Written in
+#: every storefront language; the merchant renames or retires it in the
+#: admin like any other topic.
+DEFAULT_NEWSLETTER_TOPIC_SLUG = "newsletter"
+DEFAULT_NEWSLETTER_TOPIC_TRANSLATIONS = {
+    "el": {
+        "name": "Newsletter",
+        "description": "Νέα προϊόντα και προσφορές του καταστήματος.",
+    },
+    "en": {
+        "name": "Newsletter",
+        "description": "New products and offers from the store.",
+    },
+}
+
+
+def ensure_default_newsletter_topic() -> SubscriptionTopic | None:
+    """Create the current schema's default newsletter topic if it has none.
+
+    Returns the new topic, or ``None`` when nothing was created: the
+    store already has a default newsletter topic, or a topic already
+    uses the slug. A topic the merchant made is never touched, so this
+    is safe to run on an existing store as well as a new one.
+
+    The topic requires confirmation: a marketing list is double opt-in.
+    """
+    if SubscriptionTopic.objects.default_newsletter().exists():
+        return None
+    if SubscriptionTopic.objects.filter(
+        slug=DEFAULT_NEWSLETTER_TOPIC_SLUG
+    ).exists():
+        return None
+
+    with transaction.atomic():
+        topic = SubscriptionTopic(
+            slug=DEFAULT_NEWSLETTER_TOPIC_SLUG,
+            category=SubscriptionTopic.TopicCategory.NEWSLETTER,
+            is_active=True,
+            is_default=True,
+            requires_confirmation=True,
+        )
+        for language, fields in DEFAULT_NEWSLETTER_TOPIC_TRANSLATIONS.items():
+            topic.set_current_language(language)
+            topic.name = fields["name"]
+            topic.description = fields["description"]
+        topic.save()
+    return topic

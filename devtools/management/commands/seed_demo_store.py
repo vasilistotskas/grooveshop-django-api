@@ -99,6 +99,8 @@ STEPS: tuple[tuple[str, str], ...] = (
     ("locales", "seed_locales"),
     # The demo store's favicon, on its own primary domain.
     ("branding", "seed_branding"),
+    # The topic the home page's newsletter band subscribes to.
+    ("newsletter", "seed_newsletter"),
     # Before the purge: the account references products, and writing
     # the DEMO_ACCOUNT_* settings publishes credentials, so it should
     # only happen once everything it advertises exists.

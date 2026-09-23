@@ -2251,6 +2251,20 @@ def seed_locales() -> dict[str, int]:
     return report
 
 
+def seed_newsletter() -> dict[str, int]:
+    """Give the demo store the default newsletter topic its newsletter
+    band subscribes to — the same one a new store gets at provisioning.
+
+    The demo predates that provisioning step, so its band rendered
+    nothing. Never touches a topic that already exists.
+    """
+    from user.services.subscription import ensure_default_newsletter_topic
+
+    if ensure_default_newsletter_topic() is None:
+        return {"unchanged": 1}
+    return {"created": 1}
+
+
 #: Where the storefront image serves the GrooveShop mark. The demo store
 #: IS the platform's showcase ("GrooveShop Demo"), so the platform mark is
 #: its own brand, not another store's — and it ships inside the storefront

@@ -370,6 +370,27 @@ def _activate_default_carrier(tenant: Tenant) -> bool:
         return False
 
 
+def _seed_newsletter_topic(tenant: Tenant) -> bool:
+    """Give a NEW store its default newsletter topic.
+
+    The default home layout carries a newsletter band, and the band
+    renders only when the store has a default newsletter topic to
+    subscribe to — without one a new store's layout had a section that
+    showed nothing until the merchant found the topics screen.
+    """
+    try:
+        from user.services.subscription import (
+            ensure_default_newsletter_topic,
+        )
+
+        if ensure_default_newsletter_topic() is not None:
+            logger.info("Seeded newsletter topic for %s", tenant.schema_name)
+        return True
+    except Exception:
+        logger.warning("Could not seed newsletter topic", exc_info=True)
+        return False
+
+
 def _seed_recommendation_slots(tenant: Tenant) -> bool:
     try:
         from recommendation.presets import seed_recommendation_slots
@@ -464,6 +485,7 @@ def seed_tenant_defaults(tenant: Tenant) -> list[str]:
         ("page layouts", _seed_page_layouts),
         ("content pages", _seed_content_pages),
         ("default carrier", _activate_default_carrier),
+        ("newsletter topic", _seed_newsletter_topic),
         ("recommendation slots", _seed_recommendation_slots),
         ("Meilisearch indexes", _create_meili_indexes),
     )

@@ -2251,6 +2251,56 @@ def seed_locales() -> dict[str, int]:
     return report
 
 
+#: Where the storefront image serves the GrooveShop mark. The demo store
+#: IS the platform's showcase ("GrooveShop Demo"), so the platform mark is
+#: its own brand, not another store's — and it ships inside the storefront
+#: image, like every tenant's brand files, so no upload is involved.
+DEMO_FAVICON_PATH = "/platform-favicon/favicon.ico"
+
+
+def seed_branding() -> dict[str, int]:
+    """Give the demo store its favicon.
+
+    Without one the storefront answers ``/favicon.ico`` with a 404 by
+    design (an unbranded store shows the browser's default icon rather
+    than another store's), which every browser logs as a console error
+    and Lighthouse reports under best practices — measured on
+    demo.grooveshop.space, 2026-09-22.
+
+    The URL is built from the demo tenant's OWN primary domain, so the
+    staging and production demo stores each point at their own host.
+    ``core.utils.tenant_urls.get_tenant_base_url`` is not used: under
+    this command ``connection.tenant`` is a schema-only stand-in with no
+    domains, and that helper would fall back to the platform URL.
+    """
+    from django.db import connection
+    from django_tenants.utils import get_public_schema_name, schema_context
+
+    from tenant.models import Tenant
+
+    schema = connection.schema_name
+    with schema_context(get_public_schema_name()):
+        tenant = Tenant.objects.filter(schema_name=schema, is_demo=True).first()
+        if tenant is None:
+            return {"skipped_not_a_demo_tenant": 1}
+        domain = (
+            tenant.domains.filter(is_primary=True)
+            .values_list("domain", flat=True)
+            .first()
+        )
+        if not domain:
+            return {"skipped_no_primary_domain": 1}
+
+        favicon_url = f"https://{domain}{DEMO_FAVICON_PATH}"
+        if tenant.favicon_url == favicon_url:
+            return {"unchanged": 1}
+        tenant.favicon_url = favicon_url
+        # The narrow update still fires `post_save`, which purges the
+        # cached `tenant_resolve` payload the storefront reads it from.
+        tenant.save(update_fields=["favicon_url"])
+    return {"updated": 1}
+
+
 def seed_demo_account() -> dict[str, int]:
     """The two shared demo logins, and the settings that publish them.
 

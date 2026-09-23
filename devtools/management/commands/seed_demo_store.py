@@ -97,6 +97,8 @@ STEPS: tuple[tuple[str, str], ...] = (
     # storefront 404s a locale the tenant does not list, so English
     # content is unreachable until this runs.
     ("locales", "seed_locales"),
+    # The demo store's favicon, on its own primary domain.
+    ("branding", "seed_branding"),
     # Before the purge: the account references products, and writing
     # the DEMO_ACCOUNT_* settings publishes credentials, so it should
     # only happen once everything it advertises exists.

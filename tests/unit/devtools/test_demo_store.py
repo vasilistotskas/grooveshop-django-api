@@ -19,6 +19,7 @@ import json
 from io import StringIO
 from types import SimpleNamespace
 
+import pytest
 from django.core.management.base import CommandError
 from django.test import TestCase
 
@@ -984,3 +985,74 @@ class TestEnglishNavigation(TestCase):
                     ),
                     "the English title still has Greek in it",
                 )
+
+
+class TestBranding:
+    """`seed_branding` gives the demo store its favicon on its OWN host.
+
+    Without one the storefront answers `/favicon.ico` with a 404 by
+    design, which every browser logs and Lighthouse reports. The URL has
+    to follow the demo tenant's primary domain, so staging and
+    production each point at themselves.
+    """
+
+    @pytest.fixture
+    def demo_tenant(self, db):
+        from tenant.models import Tenant, TenantDomain
+        from tests.utils.staff import bind_store_tenant, unbind_store_tenant
+
+        tenant = Tenant(
+            schema_name="branding_demo",
+            name="Branding Demo",
+            slug="branding-demo",
+            owner_email="owner-branding-demo@example.com",
+            is_demo=True,
+        )
+        tenant.auto_create_schema = False
+        tenant.save()
+        TenantDomain.objects.create(
+            domain="demo.example.test", tenant=tenant, is_primary=True
+        )
+        TenantDomain.objects.create(
+            domain="api.demo.example.test", tenant=tenant, is_primary=False
+        )
+        # The seeder resolves its tenant from the schema it runs in, and
+        # enters `schema_context`, whose exit restores the connection via
+        # `set_tenant(previous)` — so bind through the django-tenants API.
+        previous = bind_store_tenant(tenant)
+        yield tenant
+        unbind_store_tenant(previous)
+
+    @staticmethod
+    def _favicon_url(tenant) -> str:
+        # Tenant rows live in the public schema; the test is bound to the
+        # tenant's, exactly as the seeder runs.
+        from django_tenants.utils import get_public_schema_name, schema_context
+
+        with schema_context(get_public_schema_name()):
+            return type(tenant).objects.get(pk=tenant.pk).favicon_url
+
+    def test_points_the_favicon_at_the_primary_domain(self, demo_tenant):
+        assert demo_store.seed_branding() == {"updated": 1}
+
+        assert (
+            self._favicon_url(demo_tenant)
+            == "https://demo.example.test/platform-favicon/favicon.ico"
+        )
+
+    def test_a_second_run_changes_nothing(self, demo_tenant):
+        demo_store.seed_branding()
+        assert demo_store.seed_branding() == {"unchanged": 1}
+
+    def test_skips_a_store_that_is_not_a_demo(self, demo_tenant):
+        type(demo_tenant).objects.filter(pk=demo_tenant.pk).update(
+            is_demo=False
+        )
+
+        assert demo_store.seed_branding() == {"skipped_not_a_demo_tenant": 1}
+        assert self._favicon_url(demo_tenant) == ""
+
+    def test_skips_a_demo_without_a_primary_domain(self, demo_tenant):
+        demo_tenant.domains.update(is_primary=False)
+
+        assert demo_store.seed_branding() == {"skipped_no_primary_domain": 1}

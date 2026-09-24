@@ -3,6 +3,38 @@
 
 
 
+## v3.80.0 (2026-09-24)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.79.0 [skip ci] ([`a2fcc5a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a2fcc5a5260bf5491bbcccb263b68875d83450de))
+
+### Features
+
+* feat(i18n): answer every API request in the page's language
+
+API requests always rendered in LANGUAGE_CODE: LocaleMiddleware forces
+it on unprefixed paths under i18n_patterns(prefix_default_language=False),
+so validation errors, detail messages and allauth errors came back in
+Greek on English pages. RequestLanguageMiddleware replaces it for
+unprefixed /api/ and /_allauth/ requests. It activates
+resolve_request_language (X-Language first) in process_view, after URL
+resolution, because LocalePrefixPattern resolves against the active
+language. It sets request.LANGUAGE_CODE, which cache_page keys on, and
+adds Vary: X-Language, X-Locale. The admin keeps its own rule.
+
+Order.language_code now records the language the customer shopped in,
+so an English order's emails and invoice are English.
+
+Order creation reports a stable error.type (OrderCreateErrorType,
+OrderCreateErrorSerializer in the contract): a lapsed reservation is
+reservation_unavailable instead of a generic error or a 500, and an
+unready cart is insufficient_stock or cart_invalid. The "always Greek"
+help text on the display fields describes the new behaviour.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_016F5trstVMoFXNan1ZQMLEp ([`e232bb9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e232bb918a1def2ccd9ccbde68e6f9ca7f2bd426))
+
 ## v3.79.0 (2026-09-24)
 
 ### Chores

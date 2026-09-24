@@ -6,13 +6,13 @@ client pick" route is not open to them: ``props`` is one field mixing
 layout configuration with customer-facing copy, and duplicating the
 whole blob per language would let ``columns`` drift between them.
 
-They are resolved server-side from an explicit ``?locale=`` instead of
-from ``Accept-Language``. The storefront proxies these endpoints and
-already knows the locale it is rendering (``event.context.locale``); it
-does NOT forward ``Accept-Language`` — it sends its own ``X-Language``
-header, which nothing in the request path activates — so a header-based
-answer would silently serve the default locale. An explicit parameter
-also keeps the caches honest: both sides key on the value they passed.
+They are resolved server-side from an explicit ``?locale=``. The
+storefront proxies these endpoints and already knows the locale it is
+rendering (``event.context.locale``), which it passes both as this
+parameter and as ``X-Language`` — the header the request is answered in
+(``core.middleware.locale.RequestLanguageMiddleware``). The explicit
+parameter selects the operator content and keeps the caches honest:
+both sides key on the value they passed.
 """
 
 from __future__ import annotations

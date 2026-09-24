@@ -335,6 +335,47 @@ class TestOrderCreateBothFlowsViaSerializer(APITestCase):
 
     @patch("order.services.OrderService.validate_cart_for_checkout")
     @patch("order.services.OrderService.validate_shipping_address")
+    def test_order_language_is_the_language_the_customer_shopped_in(
+        self,
+        mock_validate_address,
+        mock_validate_cart,
+    ):
+        """``Order.language_code`` is seeded from the request language.
+
+        It drives every email and the invoice for the order's lifetime
+        (``get_order_language``). The storefront states the page locale
+        in ``X-Language``; before the API honoured it, every order was
+        seeded ``el`` whatever language the checkout was in.
+        """
+        from order.models.order import Order
+
+        mock_validate_cart.return_value = {"valid": True, "errors": []}
+        mock_validate_address.return_value = None
+        pay_way = PayWayFactory(
+            provider_code="cod",
+            settlement=PaySettlement.COURIER_CASH,
+            active=True,
+        )
+        self.client.force_authenticate(user=self.user)
+
+        for language in ("en", "el"):
+            with self.subTest(language=language):
+                cart = CartFactory(user=self.user)
+                CartItemFactory(cart=cart, product=self.product, quantity=1)
+                response = self.client.post(
+                    self.create_url,
+                    {**self._base_address(), "pay_way_id": pay_way.id},
+                    format="json",
+                    HTTP_X_CART_ID=str(cart.uuid),
+                    HTTP_X_LANGUAGE=language,
+                )
+
+                self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+                order = Order.objects.get(pk=response.data["id"])
+                self.assertEqual(order.language_code, language)
+
+    @patch("order.services.OrderService.validate_cart_for_checkout")
+    @patch("order.services.OrderService.validate_shipping_address")
     def test_inactive_pay_way_rejected_at_creation(
         self, mock_validate_address, mock_validate_cart
     ):

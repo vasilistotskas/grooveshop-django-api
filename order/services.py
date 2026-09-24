@@ -19,6 +19,7 @@ from order.enum.status import (
     PaymentStatus,
 )
 from order.exceptions import (
+    CartNotReadyError,
     InsufficientStockError,
     InvalidCouponError,
     InvalidGiftCardError,
@@ -418,11 +419,7 @@ class OrderService:
             # Step 1: Validate cart for checkout
             validation_result = cls.validate_cart_for_checkout(cart)
             if not validation_result.get("valid", False):
-                raise InvalidOrderDataError(
-                    _("Cart validation failed: {errors}").format(
-                        errors=", ".join(validation_result.get("errors", []))
-                    )
-                )
+                raise CartNotReadyError.from_validation(validation_result)
 
             # Step 2: Validate shipping address
             cls.validate_shipping_address(shipping_address, pay_way=pay_way)
@@ -1010,6 +1007,7 @@ class OrderService:
         except (
             ProductNotFoundError,
             InsufficientStockError,
+            StockReservationError,
             InvalidCouponError,
             InvalidGiftCardError,
             InvalidOrderDataError,
@@ -1101,11 +1099,7 @@ class OrderService:
             # Step 1: Validate cart for checkout
             validation_result = cls.validate_cart_for_checkout(cart)
             if not validation_result.get("valid", False):
-                raise InvalidOrderDataError(
-                    _("Cart validation failed: {errors}").format(
-                        errors=", ".join(validation_result.get("errors", []))
-                    )
-                )
+                raise CartNotReadyError.from_validation(validation_result)
 
             # Step 2: Validate shipping address
             cls.validate_shipping_address(shipping_address, pay_way=pay_way)
@@ -1579,6 +1573,7 @@ class OrderService:
         except (
             ProductNotFoundError,
             InsufficientStockError,
+            StockReservationError,
             InvalidCouponError,
             InvalidGiftCardError,
             InvalidOrderDataError,
@@ -1610,8 +1605,13 @@ class OrderService:
                 {
                     'valid': bool,
                     'errors': list[str],
-                    'warnings': list[str]
+                    'warnings': list[str],
+                    'insufficient_stock': bool,
                 }
+
+            ``insufficient_stock`` says whether any error is a stock
+            shortfall — the stable fact a client branches on, where
+            ``errors`` is text in the request's language.
 
         Example:
             >>> result = OrderService.validate_cart_for_checkout(cart)
@@ -1622,6 +1622,7 @@ class OrderService:
         """
         errors = []
         warnings = []
+        insufficient_stock = False
 
         # Get cart items with optimized prefetching
         cart_items = cart.get_items()
@@ -1633,6 +1634,7 @@ class OrderService:
                 "valid": False,
                 "errors": errors,
                 "warnings": warnings,
+                "insufficient_stock": insufficient_stock,
             }
 
         # Check 2: All products exist, are active, and are in stock
@@ -1664,6 +1666,7 @@ class OrderService:
                 exclude_session_id=str(cart.uuid),
             )
             if available_stock < cart_item.quantity:
+                insufficient_stock = True
                 errors.append(
                     _(
                         "Product '{product}' has insufficient stock. "
@@ -1680,6 +1683,7 @@ class OrderService:
             "valid": len(errors) == 0,
             "errors": errors,
             "warnings": warnings,
+            "insufficient_stock": insufficient_stock,
         }
 
     @classmethod
@@ -2617,10 +2621,10 @@ class OrderService:
         of what locale the request was in, so a German shopper would
         get Greek emails for the rest of their order's lifecycle.
 
-        Pulled from ``django.utils.translation.get_language`` (set
-        by ``LocaleMiddleware`` from the i18n cookie + Accept-Language
-        header) so views don't need to thread a ``request`` argument
-        through. Validated against ``settings.LANGUAGES`` so a stray
+        Pulled from ``django.utils.translation.get_language`` — the
+        request language ``core.middleware.locale.RequestLanguageMiddleware``
+        activates from the storefront's ``X-Language`` — so views don't
+        need to thread a ``request`` argument through. Validated against ``settings.LANGUAGES`` so a stray
         unknown code never lands in the DB.
         """
         if order_data.get("language_code"):

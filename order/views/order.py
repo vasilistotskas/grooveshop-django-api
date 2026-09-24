@@ -47,7 +47,9 @@ from core.utils.serializers import (
     SerializersConfig,
     create_schema_view_config,
 )
+from order.enum.create_error import OrderCreateErrorType
 from order.exceptions import (
+    CartNotReadyError,
     InsufficientStockError,
     InvalidCouponError,
     InvalidGiftCardError,
@@ -58,6 +60,7 @@ from order.exceptions import (
     PaymentCurrencyMismatchError,
     PaymentNotFoundError,
     PaymentVerificationError,
+    StockReservationError,
 )
 from order.filters import OrderFilter
 from order.models.history import OrderHistory
@@ -77,6 +80,7 @@ from order.serializers.order import (
     CreateCheckoutSessionResponseSerializer,
     CreatePaymentIntentRequestSerializer,
     CreatePaymentIntentResponseSerializer,
+    OrderCreateErrorSerializer,
     OrderCreateFromCartSerializer,
     OrderDetailSerializer,
     OrderSerializer,
@@ -98,7 +102,9 @@ serializers_config: SerializersConfig = {
     "list": ActionConfig(response=OrderSerializer),
     "retrieve": ActionConfig(response=OrderDetailSerializer),
     "create": ActionConfig(
-        request=OrderCreateFromCartSerializer, response=OrderDetailSerializer
+        request=OrderCreateFromCartSerializer,
+        response=OrderDetailSerializer,
+        responses={400: OrderCreateErrorSerializer},
     ),
     "update": ActionConfig(
         request=OrderWriteSerializer, response=OrderDetailSerializer
@@ -705,10 +711,47 @@ class OrderViewSet(BaseModelViewSet):
                 {
                     "detail": _("Insufficient stock for product"),
                     "error": {
-                        "type": "insufficient_stock",
+                        "type": OrderCreateErrorType.INSUFFICIENT_STOCK,
                         "product_id": e.product_id,
                         "available": e.available,
                         "requested": e.requested,
+                    },
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        except CartNotReadyError as e:
+            # Before InvalidOrderDataError, which it subclasses. The
+            # messages go out under ``cart`` for display; the client
+            # branches on ``error.type``, never on their (translated) text.
+            logger.warning("Cart not ready for checkout: %s", e)
+            return Response(
+                {
+                    "detail": _("The cart cannot be checked out."),
+                    "cart": e.errors,
+                    "error": {
+                        "type": (
+                            OrderCreateErrorType.INSUFFICIENT_STOCK
+                            if e.insufficient_stock
+                            else OrderCreateErrorType.CART_INVALID
+                        ),
+                    },
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        except StockReservationError as e:
+            # A hold lapsed or was consumed between the cart check and its
+            # conversion to a sale — the checkout can simply be retried.
+            logger.warning("Stock reservation unavailable: %s", e)
+            return Response(
+                {
+                    "detail": _(
+                        "Your stock reservation is no longer valid. "
+                        "Please try again."
+                    ),
+                    "error": {
+                        "type": OrderCreateErrorType.RESERVATION_UNAVAILABLE,
                     },
                 },
                 status=status.HTTP_400_BAD_REQUEST,
@@ -719,7 +762,7 @@ class OrderViewSet(BaseModelViewSet):
             error_response = {
                 "detail": _("Invalid order data"),
                 "error": {
-                    "type": "invalid_order_data",
+                    "type": OrderCreateErrorType.INVALID_ORDER_DATA,
                 },
             }
             if e.field_errors:
@@ -739,7 +782,7 @@ class OrderViewSet(BaseModelViewSet):
                 {
                     "detail": _("The coupon code can no longer be used."),
                     "error": {
-                        "type": "invalid_coupon",
+                        "type": OrderCreateErrorType.INVALID_COUPON,
                         "code": e.code,
                         "reason": e.reason,
                     },
@@ -755,7 +798,7 @@ class OrderViewSet(BaseModelViewSet):
                 {
                     "detail": _("The gift card cannot be used."),
                     "error": {
-                        "type": "invalid_gift_card",
+                        "type": OrderCreateErrorType.INVALID_GIFT_CARD,
                         "reason": e.reason,
                     },
                 },
@@ -768,7 +811,7 @@ class OrderViewSet(BaseModelViewSet):
                 {
                     "detail": _("Payment not found"),
                     "error": {
-                        "type": "payment_not_found",
+                        "type": OrderCreateErrorType.PAYMENT_NOT_FOUND,
                     },
                 },
                 status=status.HTTP_400_BAD_REQUEST,
@@ -779,7 +822,9 @@ class OrderViewSet(BaseModelViewSet):
             return Response(
                 {
                     "detail": _("Payment verification failed"),
-                    "error": {"type": "payment_verification"},
+                    "error": {
+                        "type": OrderCreateErrorType.PAYMENT_VERIFICATION
+                    },
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -794,7 +839,7 @@ class OrderViewSet(BaseModelViewSet):
                 {
                     "detail": _("Payment amount does not match order total."),
                     "error": {
-                        "type": "payment_amount_mismatch",
+                        "type": OrderCreateErrorType.PAYMENT_AMOUNT_MISMATCH,
                     },
                 },
                 status=status.HTTP_400_BAD_REQUEST,
@@ -812,7 +857,7 @@ class OrderViewSet(BaseModelViewSet):
                         "Payment currency does not match order currency."
                     ),
                     "error": {
-                        "type": "payment_currency_mismatch",
+                        "type": OrderCreateErrorType.PAYMENT_CURRENCY_MISMATCH,
                     },
                 },
                 status=status.HTTP_400_BAD_REQUEST,
@@ -879,8 +924,7 @@ class OrderViewSet(BaseModelViewSet):
         # Step 3: Validate cart is ready for checkout
         validation_result = OrderService.validate_cart_for_checkout(cart)
         if not validation_result.get("valid", False):
-            errors = validation_result.get("errors", [])
-            raise ValidationError({"cart": errors})
+            raise CartNotReadyError.from_validation(validation_result)
 
         # Step 4: Build and validate shipping address from validated data
         shipping_address = self._build_shipping_address_from_validated(
@@ -956,8 +1000,7 @@ class OrderViewSet(BaseModelViewSet):
         # Step 2: Validate cart is ready for checkout
         validation_result = OrderService.validate_cart_for_checkout(cart)
         if not validation_result.get("valid", False):
-            errors = validation_result.get("errors", [])
-            raise ValidationError({"cart": errors})
+            raise CartNotReadyError.from_validation(validation_result)
 
         # Step 3: Build and validate shipping address from validated data
         shipping_address = self._build_shipping_address_from_validated(

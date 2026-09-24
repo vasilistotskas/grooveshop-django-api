@@ -32,11 +32,8 @@ interchangeable:
 
 Django-rendered surfaces (invoice PDF, merchant email, admin) use
 `PayWay.display_name`, which resolves the key to a localised label. The
-API cannot do that: every route sits under
-`i18n_patterns(prefix_default_language=False)`, so `LocaleMiddleware`
-pins responses to `settings.LANGUAGE_CODE` and `Accept-Language` is
-inert — which is why the storefront gets the key and translates it
-itself.
+storefront gets the key instead and translates it itself: it owns the
+payment-method labels, and a key stays stable across languages.
 
 Each shipping provider (ACS, BoxNow) is a `ShippingCarrier` adapter
 in `shipping/interfaces.py` registered through
@@ -359,8 +356,16 @@ premature "shipped"); now it sends only the confirmation.
 
 - `Order.language_code` captured at create time
   (`OrderService._seed_language_code` reads
-  `django.utils.translation.get_language()` from the active
-  request locale).
+  `django.utils.translation.get_language()` — the request language
+  `core/middleware/locale.py: RequestLanguageMiddleware` activates from
+  the storefront's `X-Language`), so an order's emails and invoice come
+  in the language the customer shopped in.
+- A refused create answers 400 with a stable `error.type`
+  (`order/enum/create_error.py: OrderCreateErrorType`); `detail` and
+  `cart` are display text in the request's language, never a contract.
+  A cart that fails `validate_cart_for_checkout` is `insufficient_stock`
+  or `cart_invalid` (`CartNotReadyError`), and a hold that lapsed between
+  the cart check and its conversion is `reservation_unavailable`.
 - Every email task wraps render in
   `translation.override(get_order_language(order))`.
 

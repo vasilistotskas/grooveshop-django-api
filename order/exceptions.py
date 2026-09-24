@@ -13,6 +13,7 @@ Exception Hierarchy:
     │   └── StockReservationError
     ├── ProductNotFoundError
     ├── InvalidOrderDataError
+    │   └── CartNotReadyError
     ├── OrderNotFoundError
     ├── InvalidStatusTransitionError
     ├── OrderCancellationError
@@ -148,6 +149,39 @@ class InvalidOrderDataError(OrderServiceError):
         """
         self.field_errors = field_errors or {}
         super().__init__(message)
+
+
+class CartNotReadyError(InvalidOrderDataError):
+    """Raised when a cart fails ``OrderService.validate_cart_for_checkout``.
+
+    Carries the per-item messages and whether any of them is a stock
+    shortfall, so the API answers with a stable ``error.type``
+    (``insufficient_stock`` or ``cart_invalid``) rather than leaving a
+    client to match message text — which is in the request's language.
+
+    A subclass of ``InvalidOrderDataError`` so every caller that already
+    treats a failed cart as invalid order data keeps doing so.
+
+    Attributes:
+        errors (list[str]): The validation messages, one per problem
+        insufficient_stock (bool): Whether any problem is a stock shortfall
+    """
+
+    def __init__(self, errors: list[str], *, insufficient_stock: bool):
+        self.errors = [str(error) for error in errors]
+        self.insufficient_stock = insufficient_stock
+        super().__init__(
+            "Cart validation failed: {errors}".format(
+                errors=", ".join(self.errors)
+            )
+        )
+
+    @classmethod
+    def from_validation(cls, result: dict) -> CartNotReadyError:
+        return cls(
+            result.get("errors", []),
+            insufficient_stock=bool(result.get("insufficient_stock")),
+        )
 
 
 class InvalidCouponError(OrderServiceError):

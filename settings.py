@@ -284,7 +284,7 @@ MIDDLEWARE = [
     "core.middleware.correlation_id.CorrelationIdMiddleware",
     "django.middleware.gzip.GZipMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
-    "django.middleware.locale.LocaleMiddleware",
+    "core.middleware.locale.RequestLanguageMiddleware",
     "core.middleware.admin_locale.AdminDefaultGreekMiddleware",
     "core.middleware.translation_reload.TranslationReloadMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -4181,6 +4181,13 @@ SPECTACULAR_SETTINGS = {
     ],
     "ENUM_NAME_OVERRIDES": {
         "OrderStatus": "order.enum.status.OrderStatus",
+        # Two choice sets now sit behind fields named ``type``: the BoxNow
+        # locker type and ``OrderCreateErrorDetailSerializer.type``.
+        # Without both overrides drf-spectacular renames the older one to
+        # a hashed ``Type8dcEnum``, which bleeds into the generated
+        # frontend types. ``TypeEnum`` keeps the name it already had.
+        "TypeEnum": "shipping_boxnow.enum.locker_type.BoxNowLockerType",
+        "OrderCreateErrorType": "order.enum.create_error.OrderCreateErrorType",
         "ReviewStatus": "product.enum.review.ReviewStatus",
         "SubscriptionStatus": "user.models.subscription.UserSubscription.SubscriptionStatus",
         # Both ``SubscriptionTopic.category`` and ``Notification.category``

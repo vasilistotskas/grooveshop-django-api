@@ -20,8 +20,8 @@ from django.utils import translation
 class AdminDefaultGreekMiddleware:
     """Activate Greek for admin requests with no language cookie.
 
-    Place this *after* `django.middleware.locale.LocaleMiddleware` so the
-    user's explicit choice (cookie) wins. Anonymous staff hitting
+    Place this *after* `core.middleware.locale.RequestLanguageMiddleware`
+    so the user's explicit choice (cookie) wins. Anonymous staff hitting
     `/admin/login/` for the first time will see Greek.
     """
 

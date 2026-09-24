@@ -10,6 +10,7 @@ from rest_framework.relations import PrimaryKeyRelatedField
 from core.enum import FloorChoicesEnum, LocationChoicesEnum
 from core.utils.email import is_disposable_domain
 from country.models import Country
+from order.enum.create_error import OrderCreateErrorType
 from order.enum.document_type import OrderCreateDocumentTypeEnum
 from order.enum.status import OrderStatus
 from order.models.order import Order
@@ -65,20 +66,25 @@ class OrderSerializer(serializers.ModelSerializer[Order]):
         max_digits=11, decimal_places=2, read_only=True
     )
     phone = PhoneNumberField()
-    status_display = serializers.SerializerMethodField("get_status_display")
+    status_display = serializers.SerializerMethodField(
+        "get_status_display",
+        help_text=(
+            "Label for ``status``, rendered by the frontend instead of "
+            "the raw enum value. In the request's language: "
+            "``X-Language``, then ``X-Locale``, then "
+            "``Accept-Language``, falling back to the default language "
+            "(``core.middleware.locale.RequestLanguageMiddleware``)."
+        ),
+    )
     payment_status_display = serializers.SerializerMethodField(
         "get_payment_status_display",
         help_text=(
             "Label for ``payment_status`` (mirrors ``status_display``), "
-            "rendered by the frontend instead of the raw enum value. "
-            "ALWAYS GREEK, whatever the caller asks for: every route "
-            "lives under ``i18n_patterns(prefix_default_language="
-            "False)``, and Django's ``LocaleMiddleware`` pins any path "
-            "without a language prefix to ``settings.LANGUAGE_CODE`` — "
-            "so ``Accept-Language`` and ``X-Language`` are both inert "
-            "here (measured 2026-09-09). A second UI locale needs its "
-            "own client-side map, the way pay-way names already work; "
-            "do not add server-rendered labels expecting negotiation."
+            "rendered by the frontend instead of the raw enum value. In "
+            "the request's language: ``X-Language``, then "
+            "``X-Locale``, then ``Accept-Language``, falling back to the "
+            "default language "
+            "(``core.middleware.locale.RequestLanguageMiddleware``)."
         ),
     )
     pay_way_key = serializers.ChoiceField(
@@ -88,10 +94,10 @@ class OrderSerializer(serializers.ModelSerializer[Order]):
         help_text=(
             "Which payment method the shopper chose, as the "
             "``PayWayEnum`` key — the storefront's label for the order. "
-            "Deliberately the KEY and not a rendered string: the API "
-            "is pinned to Greek (see ``paymentStatusDisplay``), so a "
-            "server-rendered label would lock the storefront to one "
-            "locale. Snapshotted on the order, so it survives the "
+            "Deliberately the KEY and not a rendered string: the "
+            "storefront owns the label map for payment methods, so the "
+            "key is stable across languages and the label follows the "
+            "page. Snapshotted on the order, so it survives the "
             "PayWay row being deleted (``SET_NULL``) or its key "
             "renamed. EMPTY when the order has no pay way — "
             "``allow_blank`` is load-bearing, without it the generated "
@@ -1663,3 +1669,54 @@ class ReorderResponseSerializer(serializers.Serializer):
     cart_id = serializers.IntegerField(allow_null=True)
     added_items = ReorderItemSerializer(many=True)
     skipped_items = ReorderItemSerializer(many=True)
+
+
+class OrderCreateErrorDetailSerializer(serializers.Serializer):
+    type = serializers.ChoiceField(
+        choices=OrderCreateErrorType.choices,
+        help_text=_(
+            "Stable code for why the order was refused. Branch on this, "
+            "never on ``detail`` or ``cart``, which are in the request's "
+            "language."
+        ),
+    )
+    product_id = serializers.IntegerField(
+        required=False, help_text=_("``insufficient_stock`` only.")
+    )
+    available = serializers.IntegerField(
+        required=False, help_text=_("``insufficient_stock`` only.")
+    )
+    requested = serializers.IntegerField(
+        required=False, help_text=_("``insufficient_stock`` only.")
+    )
+    code = serializers.CharField(
+        required=False, help_text=_("``invalid_coupon`` only.")
+    )
+    reason = serializers.CharField(
+        required=False,
+        help_text=_("``invalid_coupon`` / ``invalid_gift_card`` only."),
+    )
+
+
+class OrderCreateErrorSerializer(serializers.Serializer):
+    """The 400 body of ``POST /order``.
+
+    A refusal the order service understands carries ``error.type``; a
+    malformed payload is DRF's field-error map instead (``{field:
+    [messages]}``), which is why every key here is optional.
+    """
+
+    detail = serializers.CharField(required=False)
+    error = OrderCreateErrorDetailSerializer(required=False)
+    cart = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        help_text=_(
+            "``insufficient_stock`` / ``cart_invalid`` from the cart "
+            "check: one message per problem, for display."
+        ),
+    )
+    field_errors = serializers.DictField(
+        child=serializers.ListField(child=serializers.CharField()),
+        required=False,
+    )

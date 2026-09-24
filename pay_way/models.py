@@ -167,15 +167,13 @@ class PayWay(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         the stored value unchanged. Blank stays blank so callers can
         fall back.
 
-        NOT for storefront JSON. The API is pinned to ``el`` — every
-        route lives under ``i18n_patterns(prefix_default_language=
-        False)``, and Django's ``LocaleMiddleware`` forces
-        ``settings.LANGUAGE_CODE`` for any path without a language
-        prefix — so a label resolved here is always Greek regardless of
-        the caller's ``Accept-Language``. That is correct for the
-        surfaces above (staff and Greek customers) and wrong for a
-        storefront that translates client-side. The order serializer
-        exposes ``pay_way_key`` for that; see ``Order.pay_way_key``.
+        NOT for storefront JSON. A label resolved here is in whatever
+        language is active — the request's on the API
+        (``core.middleware.locale.RequestLanguageMiddleware``), the
+        recipient's in an email — and a storefront that owns its own
+        payment-method labels needs the stable key instead. The order
+        serializer exposes ``pay_way_key`` for that; see
+        ``Order.pay_way_key``.
         """
         raw = self.safe_translation_getter("name", any_language=True) or ""
         if not raw:

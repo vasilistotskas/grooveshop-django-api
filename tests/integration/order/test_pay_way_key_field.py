@@ -5,12 +5,9 @@ the GATEWAY code — so a real customer saw "acs_cod" (and, on an order
 whose gateway had not written yet, nothing at all, falling back to a
 hardcoded ``Method 5``).
 
-Deliberately the KEY and not a server-rendered label. Every route lives
-under ``i18n_patterns(prefix_default_language=False)``, so Django's
-``LocaleMiddleware`` pins the whole API to ``settings.LANGUAGE_CODE``
-and ``Accept-Language`` is inert (measured 2026-09-09). A localised
-string from here would lock the storefront to Greek forever; the key
-lets ``@nuxtjs/i18n`` translate it the same way the checkout pay-way
+Deliberately the KEY and not a server-rendered label: the storefront
+owns the payment-method labels, so a key stays stable across languages
+and ``@nuxtjs/i18n`` translates it the same way the checkout pay-way
 list already does.
 """
 

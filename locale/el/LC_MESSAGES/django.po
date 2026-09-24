@@ -18,6 +18,14 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "X-Translated-Using: django-rosetta 0.10.3\n"
 
+#: .\order\views\order.py
+msgid "The cart cannot be checked out."
+msgstr "Το καλάθι δεν μπορεί να ολοκληρωθεί σε παραγγελία."
+
+#: .\order\views\order.py
+msgid "Your stock reservation is no longer valid. Please try again."
+msgstr "Η δέσμευση αποθέματος δεν ισχύει πλέον. Δοκίμασε ξανά."
+
 #: .\admin\admin.py:23 .\admin\platform_site.py:91 .\settings.py:2469
 msgid "Platform Admin"
 msgstr "Διαχείριση Πλατφόρμας"

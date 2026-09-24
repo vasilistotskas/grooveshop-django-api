@@ -63,11 +63,11 @@ def _translated(serializer, obj, field: str, default: str = "") -> str:
     has not translated yet still shows its name rather than an empty
     card.
 
-    The language comes from the serializer CONTEXT, which the views
-    fill from the request, rather than from `translation.get_language()`
-    — activating a language for the request would also change error
-    messages and money formatting, which is a much larger blast radius
-    than one field.
+    The language comes from the serializer CONTEXT when the caller
+    names one (`?languageCode=`), so an explicit parameter selects the
+    content it names whatever language the request is answered in.
+    Without it, `language_code=None` reads the active language — the
+    request's (`core.middleware.locale.RequestLanguageMiddleware`).
     """
     return (
         obj.safe_translation_getter(

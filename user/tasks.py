@@ -239,18 +239,21 @@ def export_user_data_task(self, export_id: int) -> dict:
             ]
         )
 
+        language = get_user_language(user)
         download_url = get_tenant_frontend_url(
-            f"/account/settings/privacy?export={export.token}"
+            f"/account/settings/privacy?export={export.token}",
+            language=language,
         )
 
         context = build_email_context(
+            language=language,
             user=user,
             download_url=download_url,
             expires_at=export.expires_at,
             file_size_kb=round(export.file_size / 1024, 1),
         )
 
-        with override(get_user_language(user)):
+        with override(language):
             subject = _("Your data export is ready")
             html_body = render_to_string(
                 "emails/user/data_export_ready.html", context

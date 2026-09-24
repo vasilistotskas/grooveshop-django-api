@@ -20,7 +20,7 @@ from django.db import connection
 from django_tenants.utils import get_public_schema_name
 
 from core.utils.tenant_urls import (
-    get_tenant_base_url,
+    get_tenant_frontend_url,
     get_tenant_static_base_url,
 )
 from tenant.credentials import (
@@ -31,8 +31,13 @@ from tenant.credentials import (
 )
 
 
-def build_email_context(**extra: Any) -> dict[str, Any]:
+def build_email_context(*, language: str, **extra: Any) -> dict[str, Any]:
     """Return the shared template context for a transactional email.
+
+    ``language`` is the language the email is rendered in — the value
+    the caller hands ``translation.override`` — so ``SITE_URL`` (the
+    storefront home page, which templates also build page links on)
+    opens the storefront in that same language.
 
     ``**extra`` are the caller's task-specific keys (e.g. ``order``,
     ``items``, ``unsubscribe_url``) merged on top — an ``extra`` key
@@ -42,7 +47,7 @@ def build_email_context(**extra: Any) -> dict[str, Any]:
     """
     return {
         "SITE_NAME": tenant_site_name(),
-        "SITE_URL": get_tenant_base_url(),
+        "SITE_URL": get_tenant_frontend_url("", language=language),
         "INFO_EMAIL": tenant_contact_email(),
         "STATIC_BASE_URL": get_tenant_static_base_url(),
         "SITE_LOGO_URL": _email_logo_url(),

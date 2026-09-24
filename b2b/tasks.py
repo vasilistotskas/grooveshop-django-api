@@ -59,8 +59,9 @@ def send_business_profile_status_email(self, profile_id: int) -> dict:
     if not recipient:
         return {"status": "skipped", "reason": "no_email"}
 
-    context = build_email_context(profile=profile)
-    with translation.override(get_user_language(profile.user)):
+    language = get_user_language(profile.user)
+    context = build_email_context(language=language, profile=profile)
+    with translation.override(language):
         if profile.status == "APPROVED":
             subject = _(
                 "[{site}] Your business account has been approved"
@@ -125,7 +126,10 @@ def send_admin_new_business_profile_email(self, profile_id: int) -> dict:
         )
         return {"status": "skipped", "reason": "no_contact_email"}
 
-    context = build_email_context(profile=profile)
+    # Merchant-facing, rendered under no override: the active language.
+    context = build_email_context(
+        language=translation.get_language(), profile=profile
+    )
     text_content = render_to_string(
         "emails/b2b/admin_new_business_profile.txt", context
     )

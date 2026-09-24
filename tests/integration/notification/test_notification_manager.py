@@ -51,7 +51,7 @@ class TestNotificationQuerySet(TestCase):
             kind=NotificationKindEnum.INFO,
             category=NotificationCategoryEnum.PROMOTION,
             priority=NotificationPriorityEnum.LOW,
-            link="https://example.com/promo",
+            link="/promo",
         )
 
         self.active_notification_1.link = ""

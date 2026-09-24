@@ -285,9 +285,11 @@ class EmailTemplatePreviewService:
         # PLATFORM base url and omitted SITE_LOGO_URL entirely, so every
         # preview rendered the text wordmark instead of the tenant's
         # logo, on the wrong domain.
+        language = translation.get_language() or settings.LANGUAGE_CODE
         context = build_email_context(
             **context,
-            LANGUAGE_CODE=translation.get_language() or settings.LANGUAGE_CODE,
+            language=language,
+            LANGUAGE_CODE=language,
         )
 
         try:

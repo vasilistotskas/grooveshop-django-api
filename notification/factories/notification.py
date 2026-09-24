@@ -72,7 +72,7 @@ class NotificationTranslationFactory(factory.django.DjangoModelFactory):
 
 
 class NotificationFactory(factory.django.DjangoModelFactory):
-    link = factory.Faker("url")
+    link = factory.Sequence(lambda n: f"/account/orders/{n}")
     kind = factory.Iterator(NotificationKindEnum, getter=lambda c: c.value)
 
     class Meta:

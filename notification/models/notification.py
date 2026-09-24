@@ -9,6 +9,7 @@ from django_stubs_ext.db.models import TypedModelMeta
 from parler.models import TranslatableModel, TranslatedFields
 
 from core.models import TimeStampMixinModel, UUIDModel
+from core.utils.tenant_urls import validate_storefront_path
 from notification.enum import (
     NotificationCategoryEnum,
     NotificationKindEnum,
@@ -21,7 +22,20 @@ EXPIRATION_DAYS = 6 * 30
 
 
 class Notification(TranslatableModel, TimeStampMixinModel, UUIDModel):
-    link = models.URLField(_("Link"), blank=True, default="")
+    # A locale-neutral storefront path (``/account/orders/42``), never an
+    # absolute URL: the storefront opens it in the viewer's current
+    # locale. ``max_length`` is the 200 the URLField carried.
+    link = models.CharField(
+        _("Link"),
+        max_length=200,
+        blank=True,
+        default="",
+        validators=[validate_storefront_path],
+        help_text=_(
+            "Storefront path, e.g. /account/orders/42. No host and no "
+            "language prefix: it opens in the reader's language."
+        ),
+    )
     kind = models.CharField(
         _("Kind"),
         max_length=250,

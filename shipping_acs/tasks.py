@@ -33,6 +33,7 @@ from django.utils import timezone
 
 from core.utils.email_context import build_email_context
 from core.utils.i18n import get_order_language
+from core.utils.tenant_urls import storefront_path
 from shipping_acs.exceptions import (
     AcsAPIError,
     AcsConfigError,
@@ -265,8 +266,14 @@ def _alert_unprinted_vouchers(
         )
         return {"alerted": 0, "reason": "no_recipients"}
 
+    from django.utils.translation import get_language
+
+    # Merchant-facing, rendered under no override: the active language.
     context = build_email_context(
-        vouchers=rows, blocked=blocked, acs_message=acs_message
+        language=get_language(),
+        vouchers=rows,
+        blocked=blocked,
+        acs_message=acs_message,
     )
     if blocked:
         subject = _(
@@ -755,11 +762,15 @@ def check_stale_acs_shipments(self) -> dict[str, Any]:
         for s in shipments
     ]
 
+    from django.utils.translation import get_language
+    from django.utils.translation import gettext as _
+
+    # Merchant-facing, rendered under no override: the active language.
     context = build_email_context(
+        language=get_language(),
         shipments=rows,
         threshold_days=threshold_days,
     )
-    from django.utils.translation import gettext as _
 
     subject = _("Stale ACS shipment alert — {n} shipment(s)").format(
         n=len(rows)
@@ -895,9 +906,11 @@ def acs_send_arrival_notification(self, shipment_id: int) -> dict[str, Any]:
         return {"status": "not_found", "shipment_id": shipment_id}
 
     order = shipment.order
-    with translation.override(get_order_language(order)):
+    language = get_order_language(order)
+    with translation.override(language):
         subject = _("Your ACS parcel is out for delivery")
         context = build_email_context(
+            language=language,
             order=order,
             shipment=shipment,
             voucher_no=shipment.voucher_no,
@@ -940,7 +953,7 @@ def acs_send_arrival_notification(self, shipment_id: int) -> dict[str, Any]:
                     category=NotificationCategoryEnum.SHIPPING,
                     priority=NotificationPriorityEnum.HIGH,
                     notification_type=NotificationTypeEnum.ACS_OUT_FOR_DELIVERY,
-                    link=f"/account/orders/{order.id}",
+                    link=storefront_path(f"/account/orders/{order.id}"),
                 )
         except Exception as exc:
             logger.warning(

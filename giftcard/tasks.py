@@ -47,8 +47,11 @@ def deliver_gift_card_email(self, gift_card_id: int) -> dict:
     if not card.recipient_email:
         return {"status": "skipped", "reason": "no_recipient"}
 
-    context = build_email_context(card=card, balance=card.balance)
-    with translation.override(get_user_language(card.issued_to)):
+    language = get_user_language(card.issued_to)
+    context = build_email_context(
+        language=language, card=card, balance=card.balance
+    )
+    with translation.override(language):
         subject = _("[{site}] You received a gift card!").format(
             site=tenant_site_name()
         )
@@ -136,8 +139,9 @@ def send_gift_card_purchase_receipt(self, purchase_id: int) -> dict:
     if not purchase.buyer_email:
         return {"status": "skipped", "reason": "no_buyer_email"}
 
-    context = build_email_context(purchase=purchase)
-    with translation.override(get_user_language(purchase.buyer)):
+    language = get_user_language(purchase.buyer)
+    context = build_email_context(language=language, purchase=purchase)
+    with translation.override(language):
         subject = _("[{site}] Your gift card purchase").format(
             site=tenant_site_name()
         )
@@ -204,8 +208,11 @@ def send_gift_card_expiry_reminders(self) -> dict:
     for card in due:
         if card.balance.amount <= 0:
             continue
-        context = build_email_context(card=card, balance=card.balance)
-        with translation.override(get_user_language(card.issued_to)):
+        language = get_user_language(card.issued_to)
+        context = build_email_context(
+            language=language, card=card, balance=card.balance
+        )
+        with translation.override(language):
             subject = _("[{site}] Your gift card expires soon").format(
                 site=tenant_site_name()
             )

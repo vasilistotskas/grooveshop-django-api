@@ -4,7 +4,6 @@ import logging
 from urllib.parse import urlsplit, urlunsplit
 
 from allauth.headless.adapter import DefaultHeadlessAdapter
-from django.db import connection
 
 from user.adapter import SocialAccountAdapter, UserAccountAdapter
 
@@ -59,11 +58,12 @@ def _resolve_tenant_from_request(request):
 
 
 class TenantAccountAdapter(UserAccountAdapter):
-    """Dynamic frontend URLs for tenant-scoped account emails.
+    """Tenant-scoped account adapter.
 
-    Email links (confirmation, password reset) use the tenant's primary
-    domain so a tenant-B user never clicks a link that takes them to
-    another store.
+    Email links (confirmation, password reset) are built by allauth from
+    ``HEADLESS_FRONTEND_URLS``; ``TenantHeadlessAdapter`` below moves them
+    onto the tenant's primary domain, and ``UserAccountAdapter.send_mail``
+    gives them the email's language.
 
     Login needs no tenant gate: customers are per-schema, so a shopper
     registered at tenant A simply does not exist in tenant B's user
@@ -135,32 +135,6 @@ class TenantAccountAdapter(UserAccountAdapter):
         if email and email in demo_account_emails():
             return False
         return super().can_delete_email(email_address)
-
-    def _get_tenant_domain(self):
-        tenant = getattr(connection, "tenant", None)
-        if tenant is None:
-            return None
-        domain = tenant.domains.filter(is_primary=True).first()
-        return domain.domain if domain else None
-
-    def _scheme(self) -> str:
-        return _default_url_scheme()
-
-    def get_email_confirmation_url(self, request, emailconfirmation):
-        # Accept either a full HMAC emailconfirmation model or the raw
-        # key string depending on caller; allauth's headless stack
-        # sometimes passes the model and sometimes the key.
-        #
-        # This IS a genuinely-invoked hook: ``DefaultAccountAdapter.
-        # send_confirmation_mail`` calls ``self.get_email_confirmation_url``
-        # directly (verified against the installed allauth package),
-        # unlike ``get_reset_password_url`` below (removed — allauth
-        # never calls an adapter method by that name).
-        key = getattr(emailconfirmation, "key", None) or str(emailconfirmation)
-        domain = self._get_tenant_domain()
-        if domain:
-            return f"{self._scheme()}://{domain}/account/verify-email/{key}"
-        return super().get_email_confirmation_url(request, emailconfirmation)
 
     def pre_login(self, request, user, **kwargs):
         """No tenant gate here — per-schema user tables ARE the gate.

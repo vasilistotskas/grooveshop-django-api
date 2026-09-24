@@ -61,7 +61,7 @@ class NotificationUserFilterTest(APITestCase):
             category=NotificationCategoryEnum.ORDER,
             priority=NotificationPriorityEnum.HIGH,
             notification_type="order_failed",
-            link="https://example.com/order/123",
+            link="/order/123",
             expiry_date=self.now + timedelta(days=30),
         )
         self.high_priority_notification.created_at = self.now - timedelta(
@@ -74,7 +74,7 @@ class NotificationUserFilterTest(APITestCase):
             category=NotificationCategoryEnum.SYSTEM,
             priority=NotificationPriorityEnum.NORMAL,
             notification_type="system_update",
-            link="https://example.com/system",
+            link="/system",
             expiry_date=self.now + timedelta(days=7),
         )
         self.normal_notification.created_at = self.now - timedelta(days=2)
@@ -85,7 +85,7 @@ class NotificationUserFilterTest(APITestCase):
             category=NotificationCategoryEnum.PAYMENT,
             priority=NotificationPriorityEnum.NORMAL,
             notification_type="payment_reminder",
-            link="https://example.com/payment",
+            link="/payment",
             expiry_date=self.now - timedelta(days=1),
         )
         self.expired_notification.created_at = self.now - timedelta(days=10)
@@ -271,9 +271,7 @@ class NotificationUserFilterTest(APITestCase):
         self.assertEqual(len(result_ids), 1)
         self.assertIn(self.seen_notification_user.id, result_ids)
 
-        response = self.client.get(
-            url, {"notification__link": "example.com/system"}
-        )
+        response = self.client.get(url, {"notification__link": "/system"})
         self.assertEqual(response.status_code, 200)
         result_ids = [r["id"] for r in response.data["results"]]
         self.assertEqual(len(result_ids), 2)

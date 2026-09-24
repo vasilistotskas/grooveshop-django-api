@@ -2,7 +2,7 @@ import logging
 
 from core import celery_app
 from core.tasks import MonitoredTask
-from core.utils.tenant_urls import get_tenant_frontend_url
+from core.utils.tenant_urls import storefront_path
 
 logger = logging.getLogger(__name__)
 
@@ -131,7 +131,7 @@ def notify_loyalty_tier_up_live(self, user_id: int) -> dict:
         tier.safe_translation_getter("name", any_language=True) if tier else ""
     ) or ""
 
-    loyalty_url = get_tenant_frontend_url("/account/loyalty")
+    loyalty_url = storefront_path("/account/loyalty")
 
     create_user_notification(
         user,

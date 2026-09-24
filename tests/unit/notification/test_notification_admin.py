@@ -69,7 +69,7 @@ class NotificationStatusFilterTestCase(TestCase):
             category="PROMOTION",
             priority="NORMAL",
             notification_type="promotion",
-            link="https://example.com",
+            link="/",
         )
 
     def test_lookups(self):
@@ -270,7 +270,7 @@ class NotificationAdminTestCase(TestCase):
             category="SYSTEM",
             priority="HIGH",
             notification_type="general",
-            link="https://example.com",
+            link="/",
             expiry_date=timezone.now() + timedelta(days=7),
         )
 

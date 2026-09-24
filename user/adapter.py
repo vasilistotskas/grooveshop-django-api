@@ -15,8 +15,11 @@ from django.utils.encoding import force_str
 from django.utils.http import url_has_allowed_host_and_scheme
 
 from core.utils.email_context import build_email_context
-from core.utils.i18n import resolve_request_language
-from core.utils.tenant_urls import get_tenant_frontend_url
+from core.utils.i18n import get_user_language, resolve_request_language
+from core.utils.tenant_urls import (
+    get_tenant_frontend_url,
+    localize_storefront_url,
+)
 from tenant.credentials import tenant_from_email, tenant_site_name
 from tenant.middleware import tenant_domain_set
 
@@ -24,6 +27,14 @@ if TYPE_CHECKING:  # pragma: no cover
     from allauth.socialaccount.models import SocialAccount
 
 logger = logging.getLogger(__name__)
+
+# The context keys allauth fills with ``HEADLESS_FRONTEND_URLS`` links
+# in the emails it sends (see ``UserAccountAdapter.send_mail``).
+_ALLAUTH_STOREFRONT_URL_KEYS = (
+    "activate_url",
+    "password_reset_url",
+    "signup_url",
+)
 
 
 class UserAccountAdapter(DefaultAccountAdapter):
@@ -45,14 +56,41 @@ class UserAccountAdapter(DefaultAccountAdapter):
         ``send_mail`` never did, so ``core/templates/account/email/*``
         would render with unresolved ``SITE_NAME``/``THEME`` variables.
         allauth's own keys always win on collision (none exist today).
+
+        The storefront links allauth put in ``context`` are localized
+        here, because this is where the email's language is decided.
+        allauth resolves them earlier, from ``HEADLESS_FRONTEND_URLS``,
+        without knowing the recipient: ``request_password_reset`` builds
+        ``password_reset_url`` before ``send_password_reset_mail``;
+        ``send_unknown_account_mail`` and
+        ``send_account_already_exists_mail`` build ``signup_url`` /
+        ``password_reset_url`` from the request alone;
+        ``send_confirmation_mail`` builds ``activate_url``. Every one of
+        them then calls this method (allauth 65.19:
+        ``account/internal/flows/password_reset.py``,
+        ``account/internal/flows/signup.py``, ``account/adapter.py``).
+
+        The language is the recipient's when allauth names one, and
+        otherwise the visitor's who asked for the email (an unknown
+        address, an address that already has an account).
+        ``self.request`` is that visitor's request: ``BaseAdapter``
+        reads it from ``allauth.core.context.request``, which
+        ``AccountMiddleware`` sets for the whole request.
         """
         user = context.get("user") if isinstance(context, dict) else None
         language = (
-            getattr(user, "language_code", None) if user else None
-        ) or settings.LANGUAGE_CODE
+            get_user_language(user)
+            if user is not None
+            else resolve_request_language(self.request)
+        )
         merged_context = {
-            **build_email_context(LANGUAGE_CODE=language),
+            **build_email_context(language=language, LANGUAGE_CODE=language),
             **context,
+            **{
+                key: localize_storefront_url(context[key], language=language)
+                for key in _ALLAUTH_STOREFRONT_URL_KEYS
+                if context.get(key)
+            },
         }
         with translation.override(language):
             msg = self.render_mail(template_prefix, email, merged_context)
@@ -182,4 +220,6 @@ class SocialAccountAdapter(DefaultSocialAccountAdapter):
             url, allowed_hosts=allowed_hosts
         ):
             return url
-        return get_tenant_frontend_url("/account")
+        return get_tenant_frontend_url(
+            "/account", language=resolve_request_language(request)
+        )

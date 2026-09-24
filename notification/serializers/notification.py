@@ -24,7 +24,10 @@ class NotificationSerializer(
             "type": "string",
             "nullable": True,
             "maxLength": 200,
-            "description": _("URL link or empty string"),
+            "description": _(
+                "Locale-neutral storefront path (e.g. /account/orders/42) "
+                "or empty string; open it under the viewer's locale"
+            ),
         }
     )
     def get_link(self, obj) -> str | None:

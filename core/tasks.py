@@ -518,7 +518,9 @@ def send_inactive_user_notifications() -> dict[str, Any]:
 
             unsubscribe_url = generate_blanket_unsubscribe_link(user)
 
+            language = get_user_language(user)
             context = build_email_context(
+                language=language,
                 user={
                     "id": user.id,
                     "first_name": user.first_name,
@@ -528,7 +530,7 @@ def send_inactive_user_notifications() -> dict[str, Any]:
                 unsubscribe_url=unsubscribe_url,
             )
 
-            with translation.override(get_user_language(user)):
+            with translation.override(language):
                 mail_subject = _("We miss you!")
                 html_body = render_to_string(
                     "emails/user/inactive_user_email_template.html", context

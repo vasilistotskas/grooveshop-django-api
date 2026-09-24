@@ -34,11 +34,26 @@ class TestSocialAccountAdapter(TestCase):
         request = mock.Mock()
         request.POST.get.return_value = None
         request.GET.get.return_value = None
+        request.headers = {}
+        request.META = {}
         social_account = mock.Mock()
 
         url = self.adapter.get_connect_redirect_url(request, social_account)
 
         self.assertEqual(url, "https://example.com/account")
+
+    @override_settings(NUXT_BASE_URL="https://example.com")
+    def test_default_redirect_follows_the_request_language(self):
+        request = mock.Mock()
+        request.POST.get.return_value = None
+        request.GET.get.return_value = None
+        request.headers = {"X-Language": "en"}
+        request.META = {}
+        social_account = mock.Mock()
+
+        url = self.adapter.get_connect_redirect_url(request, social_account)
+
+        self.assertEqual(url, "https://example.com/en/account")
 
     def test_post_next_takes_priority_over_get_next(self):
         request = mock.Mock()

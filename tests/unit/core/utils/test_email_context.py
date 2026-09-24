@@ -43,7 +43,7 @@ class TestBuildEmailContext:
     def test_includes_every_shared_key(self, bind_tenant):
         bind_tenant(_fake_tenant(store_name="Acme"))
 
-        context = build_email_context()
+        context = build_email_context(language="el")
 
         assert set(context) == {
             "SITE_NAME",
@@ -61,7 +61,9 @@ class TestBuildEmailContext:
     def test_extra_kwargs_are_merged_in(self, bind_tenant):
         bind_tenant(_fake_tenant())
 
-        context = build_email_context(order="ORDER-1", items=[1, 2])
+        context = build_email_context(
+            language="el", order="ORDER-1", items=[1, 2]
+        )
 
         assert context["order"] == "ORDER-1"
         assert context["items"] == [1, 2]
@@ -69,7 +71,9 @@ class TestBuildEmailContext:
     def test_extra_kwarg_overrides_a_shared_key(self, bind_tenant):
         bind_tenant(_fake_tenant(contact_email="tenant@example.com"))
 
-        context = build_email_context(INFO_EMAIL="staff@example.com")
+        context = build_email_context(
+            language="el", INFO_EMAIL="staff@example.com"
+        )
 
         # e.g. admin-notification tasks that must reply to a staff
         # address rather than the tenant's public contact address.
@@ -80,7 +84,7 @@ class TestBuildEmailContext:
             _fake_tenant(logo_light_url="https://cdn.example.com/logo.svg")
         )
 
-        context = build_email_context()
+        context = build_email_context(language="el")
 
         assert context["SITE_LOGO_URL"] == "https://cdn.example.com/logo.svg"
 
@@ -90,7 +94,7 @@ class TestBuildEmailContext:
         # a text wordmark instead.
         bind_tenant(_fake_tenant(domain="shop.acme.example", logo_light_url=""))
 
-        context = build_email_context()
+        context = build_email_context(language="el")
 
         assert context["SITE_LOGO_URL"] == ""
 
@@ -105,7 +109,7 @@ class TestBuildEmailContext:
             )
         )
 
-        context = build_email_context()
+        context = build_email_context(language="el")
 
         assert context["SITE_LOGO_URL"].endswith("/static/logo-dark.svg")
 
@@ -119,7 +123,7 @@ class TestBuildEmailContext:
         settings.NUXT_BASE_URL = "https://platform.example"
         bind_tenant(_fake_tenant(domain="platform.example", logo_light_url=""))
 
-        context = build_email_context()
+        context = build_email_context(language="el")
 
         assert context["SITE_LOGO_URL"] == ""
 
@@ -127,6 +131,38 @@ class TestBuildEmailContext:
         # Public-schema/admin contexts keep the platform logo.
         bind_tenant(None)
 
-        context = build_email_context()
+        context = build_email_context(language="el")
 
         assert context["SITE_LOGO_URL"].endswith("/static/logo-dark.svg")
+
+
+class TestSiteUrlLanguage:
+    """``SITE_URL`` is the storefront home page in the email's language
+    — the base template's "Visit our website" link, and the root order
+    templates build page links on."""
+
+    def test_english_email_links_to_the_english_home_page(self, bind_tenant):
+        bind_tenant(
+            _fake_tenant(
+                domain="shop.acme.example",
+                default_locale="el",
+                available_locales=["el", "en"],
+            )
+        )
+
+        context = build_email_context(language="en")
+
+        assert context["SITE_URL"] == "https://shop.acme.example/en"
+
+    def test_greek_email_links_to_the_unprefixed_home_page(self, bind_tenant):
+        bind_tenant(
+            _fake_tenant(
+                domain="shop.acme.example",
+                default_locale="el",
+                available_locales=["el", "en"],
+            )
+        )
+
+        context = build_email_context(language="el")
+
+        assert context["SITE_URL"] == "https://shop.acme.example"

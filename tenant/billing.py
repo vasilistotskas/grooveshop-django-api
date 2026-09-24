@@ -134,7 +134,9 @@ def _send_stage_email(tenant: Any, stage: int, *, grace_days: int) -> None:
     from tenant.models import TenantPlan
 
     slug, copy_admins = _STAGES[stage]
+    locale = tenant.default_locale or settings.LANGUAGE_CODE
     context = build_email_context(
+        language=locale,
         store_name=tenant.store_name or tenant.name,
         plan_display=tenant.get_plan_display(),
         is_trial=tenant.plan == TenantPlan.TRIAL,
@@ -143,7 +145,6 @@ def _send_stage_email(tenant: Any, stage: int, *, grace_days: int) -> None:
         owner_email=tenant.owner_email,
     )
 
-    locale = tenant.default_locale or settings.LANGUAGE_CODE
     with translation.override(locale):
         subject = _stage_subject(tenant, stage)
         html_body = render_to_string(f"emails/billing/{slug}.html", context)

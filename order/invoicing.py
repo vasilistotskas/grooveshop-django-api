@@ -235,15 +235,18 @@ def _pay_way_display(order: Order) -> str:
     return order.payment_method or ""
 
 
-def _verification_url(order: Order) -> str:
+def _verification_url(order: Order, *, language: str) -> str:
     """Public-facing order URL the QR code points at.
 
     Lands on the customer's order detail page on the storefront —
     scanning redirects a logged-in customer straight to their copy of
     the invoice download button. Guests hit the login wall; once the
-    order is claimed via its UUID the Nuxt page re-renders.
+    order is claimed via its UUID the Nuxt page re-renders. *language*
+    is the one the invoice is rendered in.
     """
-    return get_tenant_frontend_url(f"/account/orders/{order.id}")
+    return get_tenant_frontend_url(
+        f"/account/orders/{order.id}", language=language
+    )
 
 
 def _build_qr_svg(url: str) -> str:
@@ -342,7 +345,9 @@ def _build_context(
     we fall back to our own order-tracking URL so the PDF still has
     a useful scan target pre-transmission.
     """
-    qr_target_url = invoice.mydata_qr_url or _verification_url(order)
+    qr_target_url = invoice.mydata_qr_url or _verification_url(
+        order, language=get_order_language(order)
+    )
     return {
         "invoice": invoice,
         "order": order,

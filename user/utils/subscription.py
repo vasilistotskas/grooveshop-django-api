@@ -47,7 +47,7 @@ else:
     User = get_user_model()
 
 
-def subscription_confirmation_url(token: str) -> str:
+def subscription_confirmation_url(token: str, *, language: str) -> str:
     """The storefront page that confirms a pending subscription.
 
     A STOREFRONT page, not the API endpoint, built the way every other
@@ -57,7 +57,9 @@ def subscription_confirmation_url(token: str) -> str:
     confirm anything, which is why ``ConfirmSubscriptionByTokenView``
     accepts POST only.
     """
-    return get_tenant_frontend_url(f"/newsletter/confirm/{token}")
+    return get_tenant_frontend_url(
+        f"/newsletter/confirm/{token}", language=language
+    )
 
 
 def send_subscription_confirmation(subscription: UserSubscription) -> bool:
@@ -86,13 +88,14 @@ def send_subscription_confirmation(subscription: UserSubscription) -> bool:
         )
         return False
 
-    confirmation_url = subscription_confirmation_url(
-        subscription.confirmation_token
-    )
     user = subscription.user
     language = subscription.language or get_user_language(user)
+    confirmation_url = subscription_confirmation_url(
+        subscription.confirmation_token, language=language
+    )
 
     context = build_email_context(
+        language=language,
         user=user,
         topic=subscription.topic,
         subscription=subscription,

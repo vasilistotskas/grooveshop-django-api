@@ -79,7 +79,7 @@ class TestSubscriptionUtils:
         primary domain — built like every other storefront link in mail —
         whose button POSTs the token, so a prefetching scanner confirms
         nothing."""
-        mock_frontend_url.side_effect = lambda path: (
+        mock_frontend_url.side_effect = lambda path, *, language: (
             f"https://tenant-b.example{path}"
         )
         mock_render.return_value = "<html></html>"

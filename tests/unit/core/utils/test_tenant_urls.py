@@ -13,15 +13,22 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
+from django.core.exceptions import ValidationError
 from django.db import connection
 from django.test import override_settings
 
 from core.utils.tenant_urls import (
+    STOREFRONT_DEFAULT_LOCALE,
+    STOREFRONT_LOCALES,
     get_tenant_api_base_url,
     get_tenant_assets_base_url,
     get_tenant_base_url,
     get_tenant_frontend_url,
     get_tenant_static_base_url,
+    localize_storefront_url,
+    storefront_locale_prefix,
+    storefront_path,
+    tenant_storefront_locales,
 )
 
 
@@ -127,33 +134,189 @@ class TestGetTenantBaseUrl:
             assert get_tenant_base_url() == "https://fallback.example"
 
 
+def _locale_tenant(
+    primary_domain: str = "webside.gr",
+    *,
+    default_locale: str = "el",
+    available_locales: list[str] | None = None,
+):
+    """A fake tenant carrying the two fields the locale rule reads."""
+    tenant = _fake_tenant(primary_domain=primary_domain)
+    tenant.default_locale = default_locale
+    tenant.available_locales = (
+        ["el", "en"] if available_locales is None else available_locales
+    )
+    return tenant
+
+
 class TestGetTenantFrontendUrl:
     def test_prepends_leading_slash_when_missing(self, bind_tenant):
-        bind_tenant(_fake_tenant(primary_domain="webside.gr"))
+        bind_tenant(_locale_tenant())
         assert (
-            get_tenant_frontend_url("account/orders/42")
+            get_tenant_frontend_url("account/orders/42", language="el")
             == "https://webside.gr/account/orders/42"
         )
 
     def test_respects_leading_slash_when_present(self, bind_tenant):
-        bind_tenant(_fake_tenant(primary_domain="webside.gr"))
+        bind_tenant(_locale_tenant())
         assert (
-            get_tenant_frontend_url("/account/orders/42")
+            get_tenant_frontend_url("/account/orders/42", language="el")
             == "https://webside.gr/account/orders/42"
         )
 
     def test_empty_path_returns_base_url(self, bind_tenant):
-        bind_tenant(_fake_tenant(primary_domain="webside.gr"))
-        assert get_tenant_frontend_url("") == "https://webside.gr"
+        bind_tenant(_locale_tenant())
+        assert (
+            get_tenant_frontend_url("", language="el") == "https://webside.gr"
+        )
+
+    def test_empty_path_in_a_prefixed_locale_is_its_home_page(
+        self, bind_tenant
+    ):
+        bind_tenant(_locale_tenant())
+        assert (
+            get_tenant_frontend_url("", language="en")
+            == "https://webside.gr/en"
+        )
 
     def test_switches_tenants_per_call(self, bind_tenant):
-        bind_tenant(_fake_tenant(primary_domain="tenant-a.example"))
-        first = get_tenant_frontend_url("/cart")
+        bind_tenant(_locale_tenant(primary_domain="tenant-a.example"))
+        first = get_tenant_frontend_url("/cart", language="el")
         assert first == "https://tenant-a.example/cart"
 
-        bind_tenant(_fake_tenant(primary_domain="tenant-b.example"))
-        second = get_tenant_frontend_url("/cart")
+        bind_tenant(_locale_tenant(primary_domain="tenant-b.example"))
+        second = get_tenant_frontend_url("/cart", language="el")
         assert second == "https://tenant-b.example/cart"
+
+
+class TestStorefrontLocalePrefix:
+    """The storefront's ``prefix_except_default`` URLs, gated by the
+    tenant's served locales (``tenantAllowedLocales`` on the Nuxt side).
+    """
+
+    def test_served_locale_gets_its_prefix(self, bind_tenant):
+        bind_tenant(_locale_tenant(available_locales=["el", "en"]))
+        assert (
+            get_tenant_frontend_url("/products/1/x", language="en")
+            == "https://webside.gr/en/products/1/x"
+        )
+
+    def test_locale_the_tenant_does_not_serve_gets_no_prefix(self, bind_tenant):
+        # /en would 404 on a Greek-only store (locale-available.global.ts).
+        bind_tenant(_locale_tenant(available_locales=["el"]))
+        assert (
+            get_tenant_frontend_url("/products/1/x", language="en")
+            == "https://webside.gr/products/1/x"
+        )
+
+    def test_unprefixed_locale_never_gets_a_prefix(self, bind_tenant):
+        bind_tenant(_locale_tenant(available_locales=["el", "en"]))
+        assert (
+            get_tenant_frontend_url("/products/1/x", language="el")
+            == "https://webside.gr/products/1/x"
+        )
+
+    @override_settings(LANGUAGE_CODE="en")
+    def test_unprefixed_locale_is_the_storefront_build_constant(
+        self, bind_tenant
+    ):
+        # The storefront's DEFAULT_LOCALE is fixed at build time, so an env
+        # override of Django's LANGUAGE_CODE must not move the prefix.
+        assert STOREFRONT_DEFAULT_LOCALE == "el"
+        bind_tenant(_locale_tenant(available_locales=["el", "en"]))
+        assert (
+            get_tenant_frontend_url("/cart", language="en")
+            == "https://webside.gr/en/cart"
+        )
+        assert (
+            get_tenant_frontend_url("/cart", language="el")
+            == "https://webside.gr/cart"
+        )
+
+    def test_empty_available_locales_means_only_the_default(self, bind_tenant):
+        bind_tenant(_locale_tenant(default_locale="el", available_locales=[]))
+        assert (
+            get_tenant_frontend_url("/cart", language="en")
+            == "https://webside.gr/cart"
+        )
+
+    def test_empty_available_locales_serves_a_non_greek_default(
+        self, bind_tenant
+    ):
+        # An English-only store: its pages are the /en ones, because the
+        # storefront's unprefixed locale is el at build time.
+        bind_tenant(_locale_tenant(default_locale="en", available_locales=[]))
+        assert (
+            get_tenant_frontend_url("/cart", language="en")
+            == "https://webside.gr/en/cart"
+        )
+
+    def test_code_the_storefront_does_not_support_gets_no_prefix(
+        self, bind_tenant
+    ):
+        # ``de`` is a valid Django/parler language and a valid
+        # available_locales entry, but the storefront has no /de routes.
+        bind_tenant(_locale_tenant(available_locales=["el", "en", "de"]))
+        assert (
+            get_tenant_frontend_url("/cart", language="de")
+            == "https://webside.gr/cart"
+        )
+        assert (
+            get_tenant_frontend_url("/cart", language="fr")
+            == "https://webside.gr/cart"
+        )
+
+    @override_settings(NUXT_BASE_URL="https://platform.example")
+    def test_no_tenant_serves_every_storefront_locale(self, bind_tenant):
+        bind_tenant(None)
+        assert (
+            get_tenant_frontend_url("/cart", language="en")
+            == "https://platform.example/en/cart"
+        )
+
+    def test_served_locales_mirror_tenant_allowed_locales(self):
+        assert tenant_storefront_locales(None) == STOREFRONT_LOCALES
+        assert tenant_storefront_locales(
+            SimpleNamespace(default_locale="el", available_locales=["en", "de"])
+        ) == ("en",)
+        assert tenant_storefront_locales(
+            SimpleNamespace(default_locale="el", available_locales=[])
+        ) == ("el",)
+        assert (
+            tenant_storefront_locales(
+                SimpleNamespace(default_locale="de", available_locales=[])
+            )
+            == STOREFRONT_LOCALES
+        )
+
+    def test_prefix_is_empty_or_the_code(self):
+        tenant = SimpleNamespace(
+            default_locale="el", available_locales=["el", "en"]
+        )
+        assert storefront_locale_prefix(tenant, "en") == "/en"
+        assert storefront_locale_prefix(tenant, "el") == ""
+
+
+class TestLocalizeStorefrontUrl:
+    def test_inserts_the_prefix_before_the_path(self, bind_tenant):
+        bind_tenant(_locale_tenant())
+        assert (
+            localize_storefront_url(
+                "https://webside.gr/account/password/reset/key/abc?x=1",
+                language="en",
+            )
+            == "https://webside.gr/en/account/password/reset/key/abc?x=1"
+        )
+
+    def test_leaves_the_unprefixed_locale_alone(self, bind_tenant):
+        bind_tenant(_locale_tenant())
+        url = "https://webside.gr/account/signup"
+        assert localize_storefront_url(url, language="el") == url
+
+    def test_leaves_a_locale_the_tenant_does_not_serve_alone(self, bind_tenant):
+        bind_tenant(_locale_tenant(available_locales=["el"]))
+        url = "https://webside.gr/account/signup"
+        assert localize_storefront_url(url, language="en") == url
 
 
 class TestGetTenantApiBaseUrl:
@@ -341,3 +504,40 @@ class TestPrefixRequiresASeparator:
                 _fake_tenant_with_rows([("example.gr", True), (host, False)])
             )
             assert get_tenant_api_base_url() == f"https://{host}"
+
+
+class TestStorefrontPath:
+    """The locale-neutral link an in-app notification stores."""
+
+    @pytest.mark.parametrize(
+        "path",
+        [
+            "/",
+            "/account/orders/42",
+            "/products/7/slug",
+            "/account/settings/privacy?export=abc",
+            "/blog/post/1/x#blog-post-comments",
+            "/english-guide",  # a segment that merely starts with a code
+        ],
+    )
+    def test_accepts_neutral_paths(self, path):
+        assert storefront_path(path) == path
+
+    @pytest.mark.parametrize(
+        "path",
+        [
+            "",
+            "account/orders/42",
+            "https://webside.gr/account/orders/42",
+            "//evil.example/x",
+            "/account/orders/ 42",
+            "/account/orders/42\n",
+            "/en",
+            "/en/account/orders/42",
+            "/el/account/orders/42",
+            "/en?x=1",
+        ],
+    )
+    def test_rejects_everything_else(self, path):
+        with pytest.raises(ValidationError):
+            storefront_path(path)

@@ -8,6 +8,7 @@ from django.utils import translation
 
 from core.utils.email_context import build_email_context
 from core.utils.i18n import get_order_language
+from core.utils.tenant_urls import storefront_path
 from shipping_boxnow.exceptions import (
     BoxNowAPIError,
     BoxNowConfigError,
@@ -330,9 +331,11 @@ def boxnow_send_arrival_notification(
     )
 
     # --- Email -----------------------------------------------------------
-    with translation.override(get_order_language(order)):
+    language = get_order_language(order)
+    with translation.override(language):
         subject = _("Your BOX NOW parcel arrived at the locker")
         context = build_email_context(
+            language=language,
             order=order,
             shipment=shipment,
             locker=locker,
@@ -381,7 +384,7 @@ def boxnow_send_arrival_notification(
             category=NotificationCategoryEnum.SHIPPING,
             priority=NotificationPriorityEnum.HIGH,
             notification_type=NotificationTypeEnum.BOXNOW_PARCEL_AT_LOCKER,
-            link=f"/account/orders/{order.id}",
+            link=storefront_path(f"/account/orders/{order.id}"),
         )
 
     return {

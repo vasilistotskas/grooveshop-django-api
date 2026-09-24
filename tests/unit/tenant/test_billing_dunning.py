@@ -351,3 +351,42 @@ class TestReactivateOnRenewal:
         t.refresh_from_db()
         assert t.is_active is False
         assert t.suspended_reason == SuspendedReason.MANUAL
+
+
+# ---------------------------------------------------------------------------
+# Storefront link language
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+class TestDunningEmailLinkLanguage:
+    """The dunning email renders in the tenant's default locale, so its
+    storefront link opens that locale's page."""
+
+    @pytest.mark.parametrize(
+        ("locale", "site_url"),
+        [
+            ("en", "https://platform.example/en"),
+            ("el", "https://platform.example"),
+        ],
+    )
+    def test_site_link_follows_the_default_locale(
+        self, settings, bind_tenant, locale, site_url
+    ):
+        from django.core import mail
+
+        from tenant.billing import _send_stage_email
+
+        settings.NUXT_BASE_URL = "https://platform.example"
+        bind_tenant(None)
+        tenant = _make_tenant(
+            default_locale=locale, paid_until=date(2026, 8, 1)
+        )
+        mail.outbox = []
+
+        _send_stage_email(tenant, 2, grace_days=7)
+
+        body = mail.outbox[0].body
+        assert site_url in body
+        if locale == "el":
+            assert "https://platform.example/en" not in body

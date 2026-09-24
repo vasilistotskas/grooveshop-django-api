@@ -10,7 +10,10 @@ django-tenants' ``TenantMainMiddleware`` (or by ``TenantTask`` for
 Celery tasks) and builds an absolute URL against that tenant's primary
 domain. Falls back to ``settings.NUXT_BASE_URL`` so callers that might
 run in the public schema or under misconfiguration still produce a valid
-URL.
+URL. It also takes the link's language and adds the storefront's locale
+prefix for it (``storefront_locale_prefix``), so an English email opens
+the English page. ``get_tenant_base_url`` is the bare origin, for callers
+that need a host rather than a page.
 
 ``get_tenant_api_base_url`` is the API-origin sibling: for links that
 target a Django endpoint directly (no Nuxt proxy), e.g. unsubscribe /
@@ -34,8 +37,12 @@ platform Stripe key which must never silently bill the wrong account.
 
 from __future__ import annotations
 
+from urllib.parse import urlsplit, urlunsplit
+
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import connection
+from django.utils.translation import gettext_lazy as _
 
 
 def get_tenant_base_url() -> str:
@@ -65,19 +72,146 @@ def get_tenant_base_url() -> str:
     return fallback.rstrip("/")
 
 
-def get_tenant_frontend_url(path: str = "") -> str:
-    """Join ``path`` onto the current tenant's storefront base URL.
+# The storefront's URL-language contract, mirrored here. Keep in step with
+# the storefront repository, which owns it:
+#
+# - ``STOREFRONT_LOCALES`` is ``SUPPORTED_LOCALES`` in its
+#   ``i18n/locales.ts``: the locales it generates routes for at build time.
+#   Deliberately narrower than ``settings.LANGUAGES`` — Django carries
+#   ``de`` content, the storefront has no ``/de`` routes, so a ``/de`` link
+#   would 404.
+# - ``STOREFRONT_DEFAULT_LOCALE`` is ``DEFAULT_LOCALE`` in the same file:
+#   the UNPREFIXED locale. @nuxtjs/i18n runs ``prefix_except_default``, so
+#   that locale's pages carry no prefix and every other locale's pages
+#   live under ``/<code>``. A build-time constant there, so a constant
+#   here — never ``settings.LANGUAGE_CODE``, which env can override
+#   without rebuilding the storefront.
+#
+# Changing the storefront's default locale or its locale list means
+# changing this block in the same release.
+STOREFRONT_LOCALES: tuple[str, ...] = ("el", "en")
+STOREFRONT_DEFAULT_LOCALE = "el"
 
-    Example: ``get_tenant_frontend_url("/account/orders/42")`` returns
-    ``https://webside.gr/account/orders/42`` on the webside tenant and
-    ``https://tenant-b.com/account/orders/42`` on tenant-b.
+
+def tenant_storefront_locales(tenant) -> tuple[str, ...]:
+    """The locales *tenant*'s storefront is reachable in.
+
+    The storefront's ``shared/i18n/tenantLocales.ts:tenantAllowedLocales``,
+    rule for rule, because a link has to agree with the storefront's
+    ``locale-available`` route middleware, which 404s any other prefix:
+    ``Tenant.available_locales`` filtered to :data:`STOREFRONT_LOCALES`;
+    empty means ``[default_locale]``; no tenant at all, or a default the
+    storefront does not support, means every storefront locale.
     """
-    base = get_tenant_base_url()
-    if not path:
-        return base
-    if not path.startswith("/"):
+    if tenant is None:
+        return STOREFRONT_LOCALES
+    listed = tuple(
+        code
+        for code in (getattr(tenant, "available_locales", None) or [])
+        if code in STOREFRONT_LOCALES
+    )
+    if listed:
+        return listed
+    default = getattr(tenant, "default_locale", None)
+    if default in STOREFRONT_LOCALES:
+        return (default,)
+    return STOREFRONT_LOCALES
+
+
+def storefront_locale_prefix(tenant, language: str) -> str:
+    """The path prefix that opens *tenant*'s storefront in *language*.
+
+    ``"/<language>"`` when the tenant serves that language and it is not
+    :data:`STOREFRONT_DEFAULT_LOCALE`; ``""`` otherwise, which is the
+    storefront's default-locale page. The one place the rule lives —
+    every storefront link goes through it.
+    """
+    if language == STOREFRONT_DEFAULT_LOCALE:
+        return ""
+    if language not in tenant_storefront_locales(tenant):
+        return ""
+    return f"/{language}"
+
+
+def get_tenant_frontend_url(path: str, *, language: str) -> str:
+    """Absolute URL of storefront *path*, in *language*, on the current
+    tenant's primary domain.
+
+    *language* is the language of whatever carries the link — for an
+    email, the one it is rendered in — so the page it opens reads the
+    same. ``get_tenant_frontend_url("/account/orders/42", language="en")``
+    is ``https://webside.gr/en/account/orders/42`` on a tenant that serves
+    English, and ``https://webside.gr/account/orders/42`` for ``el`` or on
+    a Greek-only tenant. An empty *path* is the storefront home page.
+    """
+    if path and not path.startswith("/"):
         path = "/" + path
-    return f"{base}{path}"
+    prefix = storefront_locale_prefix(
+        getattr(connection, "tenant", None), language
+    )
+    return f"{get_tenant_base_url()}{prefix}{path}"
+
+
+def localize_storefront_url(url: str, *, language: str) -> str:
+    """Put *language*'s prefix on an absolute storefront *url* built
+    without one.
+
+    For links built by a library rather than by
+    :func:`get_tenant_frontend_url` — allauth resolves its email links
+    from ``HEADLESS_FRONTEND_URLS`` before the email's language is known
+    (see ``UserAccountAdapter.send_mail``). Same rule, same tenant.
+    """
+    parts = urlsplit(url)
+    prefix = storefront_locale_prefix(
+        getattr(connection, "tenant", None), language
+    )
+    if not prefix:
+        return url
+    return urlunsplit(parts._replace(path=f"{prefix}{parts.path}"))
+
+
+def validate_storefront_path(value: str) -> None:
+    """Validator for a locale-neutral storefront path.
+
+    Accepts ``/account/orders/42``, optionally with a query and a
+    fragment. Rejects anything that names a host or a scheme (a leading
+    ``//`` included), whitespace, and a leading locale segment
+    (``/en/...``): the path must open in whatever language its viewer is
+    browsing, which the storefront adds when the link is followed.
+    """
+    if not value.startswith("/") or value.startswith("//"):
+        raise ValidationError(
+            _("Enter a storefront path starting with a single '/'."),
+            code="invalid_storefront_path",
+        )
+    if any(char.isspace() for char in value):
+        raise ValidationError(
+            _("A storefront path cannot contain whitespace."),
+            code="invalid_storefront_path",
+        )
+    path = urlsplit(value).path
+    if path.split("/")[1] in STOREFRONT_LOCALES:
+        raise ValidationError(
+            _("A storefront path cannot start with a locale prefix."),
+            code="invalid_storefront_path",
+        )
+
+
+def storefront_path(path: str) -> str:
+    """A locale-neutral storefront path, for a link whose viewer's
+    language is not known when it is written — an in-app notification,
+    shown in whatever language the recipient is browsing. The storefront
+    applies that locale when the link is clicked (``useLocalePath``).
+
+    The frozen webside ``NotificationsBell.vue`` navigates the path as-is,
+    which is exactly right there: webside serves ``el`` only, the
+    unprefixed locale.
+
+    Raises ``ValidationError`` for anything
+    :func:`validate_storefront_path` rejects.
+    """
+    validate_storefront_path(path)
+    return path
 
 
 def get_tenant_api_base_url() -> str:

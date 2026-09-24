@@ -121,7 +121,7 @@ class TestRenderedOutput:
     def test_rendered_email_contains_no_unresolved_css(self):
         html = render_to_string(
             "emails/order/order_shipped.html",
-            build_email_context(order={"id": 1}, items=[]),
+            build_email_context(language="el", order={"id": 1}, items=[]),
         )
         assert "var(--" not in html
         assert "{{" not in html
@@ -130,9 +130,9 @@ class TestRenderedOutput:
         """The exact declaration that used to resolve to transparent."""
         html = render_to_string(
             "emails/order/order_shipped.html",
-            build_email_context(order={"id": 1}, items=[]),
+            build_email_context(language="el", order={"id": 1}, items=[]),
         )
-        theme = build_email_context()["THEME"]
+        theme = build_email_context(language="el")["THEME"]
         assert f"background-color: {theme['primary']}" in html
         assert theme["primary"].startswith("#")
 
@@ -140,6 +140,7 @@ class TestRenderedOutput:
         html = render_to_string(
             "emails/order/boxnow_parcel_at_locker.html",
             build_email_context(
+                language="el",
                 order={"id": 7, "first_name": "Maria"},
                 shipment={"parcel_id": "BN123"},
                 locker_address="Somewhere 1",

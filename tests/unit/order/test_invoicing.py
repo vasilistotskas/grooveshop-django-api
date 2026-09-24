@@ -25,6 +25,7 @@ from order.invoicing import (
     _compute_vat_breakdown,
     _order_totals,
     _render_items,
+    _verification_url,
     generate_invoice,
 )
 from order.models.invoice import Invoice, InvoiceCounter
@@ -488,3 +489,23 @@ class BuildContextTestCase(TestCase):
         # Items exposed as flat dicts, not model instances.
         self.assertIsInstance(ctx["items"][0], dict)
         self.assertIn("name", ctx["items"][0])
+
+
+class VerificationUrlLanguageTestCase(TestCase):
+    """The invoice QR opens the order page in the invoice's language."""
+
+    @override_settings(NUXT_BASE_URL="https://shop.example.com")
+    def test_english_invoice_links_to_the_english_order_page(self) -> None:
+        order = OrderFactory(num_order_items=0, language_code="en")
+        self.assertEqual(
+            _verification_url(order, language="en"),
+            f"https://shop.example.com/en/account/orders/{order.id}",
+        )
+
+    @override_settings(NUXT_BASE_URL="https://shop.example.com")
+    def test_greek_invoice_links_to_the_unprefixed_order_page(self) -> None:
+        order = OrderFactory(num_order_items=0, language_code="el")
+        self.assertEqual(
+            _verification_url(order, language="el"),
+            f"https://shop.example.com/account/orders/{order.id}",
+        )

@@ -1057,6 +1057,7 @@ class BoxNowService:
             return
 
         try:
+            from core.utils.tenant_urls import storefront_path
             from notification.enum import (
                 NotificationCategoryEnum,
                 NotificationKindEnum,
@@ -1082,7 +1083,7 @@ class BoxNowService:
                 category=NotificationCategoryEnum.SHIPPING,
                 priority=NotificationPriorityEnum.NORMAL,
                 notification_type=NotificationTypeEnum.BOXNOW_PARCEL_DELIVERED,
-                link=f"/account/orders/{order.id}",
+                link=storefront_path(f"/account/orders/{order.id}"),
             )
         except Exception:
             logger.exception(

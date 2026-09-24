@@ -188,7 +188,8 @@ def send_order_confirmation_email(self, order_id: int) -> bool:
             and order.payment_status == PaymentStatus.COMPLETED
         )
 
-        with translation.override(get_order_language(order)):
+        language = get_order_language(order)
+        with translation.override(language):
             if is_paid:
                 template_base = "emails/order/order_payment_confirmed"
                 subject = _("Payment Confirmed - Order #{order_id}").format(
@@ -234,6 +235,7 @@ def send_order_confirmation_email(self, order_id: int) -> bool:
             )
 
             context = build_email_context(
+                language=language,
                 order=order,
                 items=order.items.all(),
                 pay_way=pay_way,
@@ -392,7 +394,9 @@ def send_dispute_notification_email(
 
         reason = (order.metadata or {}).get("dispute_reason", "unknown")
 
+        # Staff-facing, rendered under no override: the active language.
         context = build_email_context(
+            language=translation.get_language(),
             order=order,
             dispute_id=dispute_id,
             reason=reason,
@@ -497,7 +501,9 @@ def send_admin_new_order_email(self, order_id: int) -> bool:
             )
             return False
 
+        # Merchant-facing, rendered under no override: the active language.
         context = build_email_context(
+            language=translation.get_language(),
             order=order,
             items=order.items.all(),
             pay_way=order.pay_way,
@@ -596,14 +602,18 @@ def send_payment_failed_email(self, order_id: int) -> bool:
         # context nor renders a line table.
         order = Order.objects.select_related("user", "pay_way").get(id=order_id)
 
-        retry_url = get_tenant_frontend_url(f"/account/orders/{order.id}")
+        language = get_order_language(order)
+        retry_url = get_tenant_frontend_url(
+            f"/account/orders/{order.id}", language=language
+        )
 
         context = build_email_context(
+            language=language,
             order=order,
             retry_url=retry_url,
         )
 
-        with translation.override(get_order_language(order)):
+        with translation.override(language):
             subject = _("Payment Failed - Order #{order_id}").format(
                 order_id=order.id
             )
@@ -773,14 +783,16 @@ def send_refund_confirmation_email(self, order_id: int) -> bool:
             if order.payment_status
             else PaymentStatus.REFUNDED.label
         )
+        language = get_order_language(order)
         context = build_email_context(
+            language=language,
             order=order,
             status="REFUNDED",
             status_display=status_label,
             items=order.items.all(),
         )
 
-        with translation.override(get_order_language(order)):
+        with translation.override(language):
             subject = _("Refund Processed - Order #{order_id}").format(
                 order_id=order.id
             )
@@ -919,7 +931,9 @@ def send_order_status_update_email(
         ):
             return True
 
+        language = get_order_language(order)
         context = build_email_context(
+            language=language,
             order=order,
             items=order.items.select_related("product").all(),
             status=status,
@@ -928,7 +942,7 @@ def send_order_status_update_email(
 
         template_base = f"emails/order/order_{status.lower()}"
 
-        with translation.override(get_order_language(order)):
+        with translation.override(language):
             subject = _("Order #{order_id} Status Update - {status}").format(
                 order_id=order.id, status=OrderStatus(status).label
             )
@@ -1141,13 +1155,15 @@ def send_shipping_notification_email(self, order_id: int) -> bool:
             )
             return True
 
+        language = get_order_language(order)
         context = build_email_context(
+            language=language,
             order=order,
             tracking_number=order.tracking_number,
             carrier=order.shipping_carrier,
         )
 
-        with translation.override(get_order_language(order)):
+        with translation.override(language):
             subject = _("Your Order #{order_id} Has Shipped").format(
                 order_id=order.id
             )
@@ -1374,11 +1390,13 @@ def send_invoice_email(self, order_id: int) -> bool:
             )
             return False
 
-        with translation.override(get_order_language(order)):
+        language = get_order_language(order)
+        with translation.override(language):
             subject = _(
                 "Invoice {invoice_number} for your order #{order_id}"
             ).format(invoice_number=invoice.invoice_number, order_id=order.id)
             context = build_email_context(
+                language=language,
                 order=order,
                 invoice=invoice,
             )
@@ -1736,9 +1754,10 @@ def check_pending_orders() -> int:
         # try/except also swallowed setup errors, defeating the
         # task-level autoretry).
         try:
-            context = build_email_context(order=order)
+            language = get_order_language(order)
+            context = build_email_context(language=language, order=order)
 
-            with translation.override(get_order_language(order)):
+            with translation.override(language):
                 subject = _("Reminder: Complete Your Order #{order_id}").format(
                     order_id=order.id
                 )
@@ -2093,7 +2112,9 @@ def send_checkout_abandonment_emails() -> int:
 
             unsubscribe_url = generate_blanket_unsubscribe_link(cart.user)
 
+            language = get_user_language(cart.user)
             context = build_email_context(
+                language=language,
                 cart=cart,
                 items=list(cart.items.all()),
                 # Point the CTA at the recovery route — the Nuxt page
@@ -2102,13 +2123,15 @@ def send_checkout_abandonment_emails() -> int:
                 # global auth middleware) and forwards to /cart with a
                 # ``recovered=1`` flag so the shopper sees a welcome
                 # banner instead of landing silently on their items.
-                cart_url=get_tenant_frontend_url(f"/cart/recover/{cart.uuid}"),
+                cart_url=get_tenant_frontend_url(
+                    f"/cart/recover/{cart.uuid}", language=language
+                ),
                 preferences_url=get_tenant_frontend_url(
-                    "/account/subscriptions/"
+                    "/account/subscriptions/", language=language
                 ),
                 unsubscribe_url=unsubscribe_url,
             )
-            with translation.override(get_user_language(cart.user)):
+            with translation.override(language):
                 subject = _("Did you forget something? — {site_name}").format(
                     site_name=tenant_site_name()
                 )

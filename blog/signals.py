@@ -6,7 +6,7 @@ from django.dispatch import receiver
 
 from blog.models import BlogComment
 from blog.models.post import BlogPost
-from core.utils.tenant_urls import get_tenant_frontend_url
+from core.utils.tenant_urls import storefront_path
 from tenant.celery import dispatch_on_commit
 
 logger = logging.getLogger(__name__)
@@ -77,7 +77,7 @@ def notify_comment_liked_receiver(
     if not post:
         return
 
-    blog_post_url = get_tenant_frontend_url(
+    blog_post_url = storefront_path(
         f"/blog/post/{post.id}/{post.slug}#blog-post-comments"
     )
 

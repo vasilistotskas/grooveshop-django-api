@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING, Any
 from django.conf import settings
 from extra_settings.models import Setting
 
+from core.utils.i18n import get_order_language
 from core.utils.tenant_urls import get_tenant_base_url, get_tenant_frontend_url
 from meta_capi.events import META_EVENT_ID_KEYS, ContentType, StandardEvent
 from tenant.credentials import (
@@ -312,7 +313,9 @@ def _success_url_for_order(order: Order) -> str:
     Uses the active tenant's storefront domain (via
     ``get_tenant_frontend_url``) rather than the platform-wide
     ``settings.NUXT_BASE_URL``, so a tenant-B order reports back to
-    tenant-B's domain instead of webside.gr.
+    tenant-B's domain instead of webside.gr. In the order's language,
+    which is the locale the checkout ran in — the page the shopper was
+    actually on.
     """
     base = get_tenant_base_url()
     if not base:
@@ -322,7 +325,9 @@ def _success_url_for_order(order: Order) -> str:
     uuid = getattr(order, "uuid", None)
     if not uuid:
         return base
-    return get_tenant_frontend_url(f"/checkout/success/{uuid}")
+    return get_tenant_frontend_url(
+        f"/checkout/success/{uuid}", language=get_order_language(order)
+    )
 
 
 def _new_event(

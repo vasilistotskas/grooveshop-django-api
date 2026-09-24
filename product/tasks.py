@@ -7,6 +7,7 @@ from django.db import models
 from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.html import escape
+from django.utils.translation import get_language as translation_get_language
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import override as translation_override
 
@@ -14,7 +15,7 @@ from core import celery_app
 from core.tasks import MonitoredTask
 from core.utils.email_context import build_email_context
 from core.utils.i18n import get_user_language
-from core.utils.tenant_urls import get_tenant_frontend_url
+from core.utils.tenant_urls import get_tenant_frontend_url, storefront_path
 from tenant.credentials import (
     tenant_contact_email,
     tenant_from_email,
@@ -64,9 +65,7 @@ def notify_back_in_stock_favourites_live(product_id: int) -> dict:
         )
         return {"status": "skipped", "reason": "product_not_found"}
 
-    product_url = get_tenant_frontend_url(
-        f"/products/{product.id}/{product.slug}"
-    )
+    product_link = storefront_path(f"/products/{product.id}/{product.slug}")
     product_name = (
         product.safe_translation_getter("name", any_language=True)
         or f"Product {product.slug or product.id}"
@@ -84,7 +83,7 @@ def notify_back_in_stock_favourites_live(product_id: int) -> dict:
             kind=NotificationKindEnum.SUCCESS,
             category=NotificationCategoryEnum.PRODUCT,
             notification_type=NotificationTypeEnum.RESTOCK_FAVOURITE,
-            link=product_url,
+            link=product_link,
             # Plain text — the ``link`` field above carries the target
             # URL and the frontend wraps the whole card in a navigate
             # handler, so embedding ``<a>`` tags in the body would just
@@ -162,9 +161,7 @@ def send_price_drop_notifications(
         )
         return {"status": "skipped", "reason": "product_not_found"}
 
-    product_url = get_tenant_frontend_url(
-        f"/products/{product.id}/{product.slug}"
-    )
+    product_link = storefront_path(f"/products/{product.id}/{product.slug}")
     instance_name = (
         product.safe_translation_getter("name", any_language=True)
         or f"Product {product.slug or product.id}"
@@ -183,7 +180,7 @@ def send_price_drop_notifications(
             kind=NotificationKindEnum.INFO,
             category=NotificationCategoryEnum.PRODUCT,
             notification_type=NotificationTypeEnum.PRICE_DROP_FAVOURITE,
-            link=product_url,
+            link=product_link,
             # Plain text — see restock task above for rationale.
             translations={
                 "en": {
@@ -296,7 +293,10 @@ def check_low_stock_products() -> dict:
         for p in products_to_alert
     ]
 
-    context = build_email_context(products=rows)
+    # Merchant-facing, rendered under no override: the active language.
+    context = build_email_context(
+        language=translation_get_language(), products=rows
+    )
     subject = _("[{site}] Low stock alert — {n} product(s)").format(
         site=tenant_site_name(), n=len(rows)
     )
@@ -428,9 +428,7 @@ def send_product_alert_restock(product_id: int) -> dict:
     except Product.DoesNotExist:
         return {"status": "skipped", "reason": "product_not_found"}
 
-    product_url = get_tenant_frontend_url(
-        f"/products/{product.id}/{product.slug}"
-    )
+    product_path = f"/products/{product.id}/{product.slug}"
 
     alerts = ProductAlert.objects.filter(
         product_id=product_id,
@@ -450,14 +448,18 @@ def send_product_alert_restock(product_id: int) -> dict:
         # templates rendered inside the helper — to the recipient's
         # language (anonymous alerts fall back to LANGUAGE_CODE).
         user = alert.user if alert.user_id else None
-        with translation_override(get_user_language(user)):
+        language = get_user_language(user)
+        with translation_override(language):
             product_name = (
                 product.safe_translation_getter("name", any_language=True)
                 or f"Product {product.slug or product.id}"
             )
             context = build_email_context(
+                language=language,
                 product_name=product_name,
-                product_url=product_url,
+                product_url=get_tenant_frontend_url(
+                    product_path, language=language
+                ),
             )
             subject = _("[{site}] {name} is back in stock").format(
                 site=tenant_site_name(), name=product_name
@@ -507,9 +509,7 @@ def send_product_alert_price_drop(product_id: int, new_price: float) -> dict:
         return {"status": "skipped", "reason": "product_not_found"}
 
     new_price_dec = Decimal(str(new_price))
-    product_url = get_tenant_frontend_url(
-        f"/products/{product.id}/{product.slug}"
-    )
+    product_path = f"/products/{product.id}/{product.slug}"
 
     alerts = ProductAlert.objects.filter(
         product_id=product_id,
@@ -530,14 +530,18 @@ def send_product_alert_price_drop(product_id: int, new_price: float) -> dict:
 
         # Same per-recipient localization rationale as the restock task.
         user = alert.user if alert.user_id else None
-        with translation_override(get_user_language(user)):
+        language = get_user_language(user)
+        with translation_override(language):
             product_name = (
                 product.safe_translation_getter("name", any_language=True)
                 or f"Product {product.slug or product.id}"
             )
             context = build_email_context(
+                language=language,
                 product_name=product_name,
-                product_url=product_url,
+                product_url=get_tenant_frontend_url(
+                    product_path, language=language
+                ),
                 new_price=new_price,
                 target_price=str(alert.target_price.amount),
             )

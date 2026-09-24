@@ -27,7 +27,7 @@ from django.utils.translation import override as translation_override
 
 from core import celery_app
 from core.tasks import MonitoredTask
-from core.utils.tenant_urls import get_tenant_frontend_url
+from core.utils.tenant_urls import storefront_path
 from notification.enum import (
     NotificationCategoryEnum,
     NotificationKindEnum,
@@ -122,8 +122,8 @@ _ORDER_STATUS_COPY: dict[str, tuple[str, str, str, tuple[str, str]]] = {
 
 
 def _order_link(order: Order) -> str:
-    """Absolute URL pointing at the shopper's order detail page."""
-    return get_tenant_frontend_url(f"/account/orders/{order.id}")
+    """Storefront path of the shopper's order detail page."""
+    return storefront_path(f"/account/orders/{order.id}")
 
 
 def _render_translations(

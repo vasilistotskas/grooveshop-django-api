@@ -72,6 +72,33 @@ class CreateUserNotificationTestCase(TestCase):
         )
         self.assertEqual(n.link, "/account/orders/42")
 
+    def test_rejects_a_link_that_is_not_a_neutral_storefront_path(
+        self,
+    ) -> None:
+        """``objects.create`` skips field validators, so the helper every
+        task goes through validates the link itself — and writes nothing
+        when it is wrong."""
+        from django.core.exceptions import ValidationError
+
+        from notification.models.notification import Notification
+
+        before = Notification.objects.count()
+        for link in (
+            "https://webside.gr/account/orders/42",
+            "//evil.example/x",
+            "account/orders/42",
+            "/en/account/orders/42",
+            "/el",
+            "/account/orders/42 ",
+        ):
+            with self.subTest(link=link), self.assertRaises(ValidationError):
+                create_user_notification(
+                    self.user,
+                    link=link,
+                    translations={"en": {"title": "T", "message": "M"}},
+                )
+        self.assertEqual(Notification.objects.count(), before)
+
     def test_skips_unsupported_languages_silently(self) -> None:
         """Languages outside PARLER_LANGUAGES must drop without raising.
 

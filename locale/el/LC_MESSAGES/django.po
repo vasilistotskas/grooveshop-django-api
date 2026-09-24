@@ -18634,6 +18634,34 @@ msgstr "Επαναποστολή επιβεβαίωσης"
 msgid "%(count)d confirmation emails were queued."
 msgstr "Μπήκαν σε αναμονή %(count)d email επιβεβαίωσης."
 
+#: .\core\utils\tenant_urls.py
+msgid "Enter a storefront path starting with a single '/'."
+msgstr "Εισαγάγετε μια διαδρομή του καταστήματος που ξεκινά με ένα μόνο '/'."
+
+#: .\core\utils\tenant_urls.py
+msgid "A storefront path cannot contain whitespace."
+msgstr "Η διαδρομή του καταστήματος δεν μπορεί να περιέχει κενά."
+
+#: .\core\utils\tenant_urls.py
+msgid "A storefront path cannot start with a locale prefix."
+msgstr "Η διαδρομή του καταστήματος δεν μπορεί να ξεκινά με πρόθεμα γλώσσας."
+
+#: .\notification\models\notification.py
+msgid ""
+"Storefront path, e.g. /account/orders/42. No host and no language prefix: it "
+"opens in the reader's language."
+msgstr ""
+"Διαδρομή του καταστήματος, π.χ. /account/orders/42. Χωρίς διεύθυνση "
+"τομέα και χωρίς πρόθεμα γλώσσας: ανοίγει στη γλώσσα του αναγνώστη."
+
+#: .\notification\serializers\notification.py
+msgid ""
+"Locale-neutral storefront path (e.g. /account/orders/42) or empty string; "
+"open it under the viewer's locale"
+msgstr ""
+"Διαδρομή του καταστήματος χωρίς γλώσσα (π.χ. /account/orders/42) ή κενή "
+"τιμή· ανοίγει στη γλώσσα του αναγνώστη"
+
 #~ msgid ""
 #~ "Sender address for outbound email from this tenant (e.g. 'no-"
 #~ "reply@myshop.com'). Empty falls back to settings.DEFAULT_FROM_EMAIL."

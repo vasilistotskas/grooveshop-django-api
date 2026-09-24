@@ -74,3 +74,19 @@ class TestSuccessUrlForOrder:
             url = _success_url_for_order(order)
 
         assert url == ""
+
+    @pytest.mark.parametrize(
+        ("language", "prefix"), [("en", "/en"), ("el", "")]
+    )
+    def test_follows_the_order_language(self, bind_tenant, language, prefix):
+        # The shopper checked out in the order's language, so that is the
+        # success page they were actually on.
+        order = OrderFactory(num_order_items=0, language_code=language)
+        bind_tenant(None)
+
+        with override_settings(NUXT_BASE_URL="https://webside.gr"):
+            url = _success_url_for_order(order)
+
+        assert url == (
+            f"https://webside.gr{prefix}/checkout/success/{order.uuid}"
+        )

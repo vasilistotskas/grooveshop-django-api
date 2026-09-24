@@ -15,6 +15,7 @@ from django.conf import settings
 from django.contrib.auth.models import AbstractBaseUser
 from django.db import transaction
 
+from core.utils.tenant_urls import validate_storefront_path
 from notification.enum import (
     NotificationCategoryEnum,
     NotificationKindEnum,
@@ -59,7 +60,14 @@ def create_user_notification(
 
     Wrapped in an atomic block so a partial translation-save failure
     cannot leak a half-populated Notification row.
+
+    ``link`` is a locale-neutral storefront path (build it with
+    ``core.utils.tenant_urls.storefront_path``). It is validated here
+    because ``objects.create`` never runs the field's validators, and
+    this is the one write path every task goes through.
     """
+    if link:
+        validate_storefront_path(link)
     notification = Notification.objects.create(
         kind=kind,
         category=category,

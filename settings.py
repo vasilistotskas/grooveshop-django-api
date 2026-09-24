@@ -1,4 +1,5 @@
 import datetime
+import tomllib
 from os import getenv, makedirs, path
 from pathlib import Path
 
@@ -713,6 +714,14 @@ DEFAULT_CACHE_KEY_PREFIX = getenv("DEFAULT_CACHE_KEY_PREFIX", "default")
 DEFAULT_CACHE_VERSION = int(getenv("DEFAULT_CACHE_VERSION", "1"))
 DEFAULT_CACHE_TTL = int(getenv("DEFAULT_CACHE_TTL", "7200"))
 DISABLE_CACHE = getenv("DISABLE_CACHE", "False").lower() == "true"
+
+# The running release, read from the pyproject.toml every image ships
+# (semantic-release bumps it in the release commit the image is built
+# from). ``cache_methods`` namespaces the response cache with it, so a
+# new release never serves a body an older one cached — the same
+# build-scoped design as the storefront's ``cache:<buildId>`` keys.
+with (BASE_DIR / "pyproject.toml").open("rb") as _pyproject:
+    RELEASE_VERSION: str = tomllib.load(_pyproject)["project"]["version"]
 
 CACHES = {
     "default": {

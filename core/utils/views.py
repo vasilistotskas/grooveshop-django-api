@@ -68,6 +68,23 @@ class TranslationsProcessingMixin:
 cache_methods_registry = []
 
 
+def response_cache_key_prefix(class_name: str, method_name: str) -> str:
+    """The ``cache_page`` key prefix for one ViewSet method.
+
+    Leads with the running release: a deploy that changes what an
+    endpoint returns would otherwise keep serving the previous
+    release's cached body until it expired (seen 2026-09-24: a blog
+    list cached before the SEO move still lacked its SEO fields).
+    The old release's entries are never read again and expire on
+    their own TTL. Only the response cache is scoped this way —
+    sessions, throttle counters and locks share the cache and must
+    survive a deploy. The purge patterns (``*<Class>ViewSet_*`` in
+    ``core/cache/surfaces.py``) match inside the key, so they reach
+    every release's entries.
+    """
+    return f"{settings.RELEASE_VERSION}.{class_name}_{method_name}"
+
+
 def cache_methods(timeout, methods, *, cache=None):
     def class_decorator(cls):
         if cls not in cache_methods_registry:
@@ -86,7 +103,7 @@ def cache_methods(timeout, methods, *, cache=None):
         for method_name in methods:
             func = getattr(cls, method_name)
             class_name = cls.__name__
-            key_prefix = f"{class_name}_{method_name}"
+            key_prefix = response_cache_key_prefix(class_name, method_name)
             cache_decorator = cache_page(
                 timeout, cache=cache, key_prefix=key_prefix
             )

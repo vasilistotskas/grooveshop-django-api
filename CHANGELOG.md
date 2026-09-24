@@ -3,6 +3,30 @@
 
 
 
+## v3.80.1 (2026-09-24)
+
+### Bug fixes
+
+* fix(cache): scope the response cache to the running release
+
+The ViewSet response cache outlived deploys, so a release that changed
+an endpoint's shape kept serving the previous release's cached body
+until it expired. On 2026-09-24 webside's blog list, cached before the
+SEO move, still lacked its SEO fields. cache_methods now leads every
+cache_page key prefix with settings.RELEASE_VERSION, read from the
+pyproject.toml the image ships, so a new release never reads an old
+release's entries and those expire on their own timeout. Only the
+response cache is scoped: sessions, throttle counters and locks share
+the backend and survive deploys. The *ViewSet_* purge patterns still
+match every release's keys, which a test pins.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_016F5trstVMoFXNan1ZQMLEp ([`035a7de`](https://github.com/vasilistotskas/grooveshop-django-api/commit/035a7de997e7dfc206bc329cb88ec38131170f00))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.80.0 [skip ci] ([`0687734`](https://github.com/vasilistotskas/grooveshop-django-api/commit/06877347663048f0a7fe24bfae59824f8a573d18))
+
 ## v3.80.0 (2026-09-24)
 
 ### Chores

@@ -3,6 +3,36 @@
 
 
 
+## v3.79.0 (2026-09-24)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.78.0 [skip ci] ([`d669909`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d669909ab408f6bd16379d0f77bc3c0d7c02cff2))
+
+### Features
+
+* feat(email): open every storefront link in the email's own language
+
+Mail links carried no locale prefix, so an English email opened the
+Greek page. get_tenant_frontend_url now requires the language the email
+is rendered in and prefixes /<code> exactly when the storefront would:
+the store serves that locale and it is not the storefront's unprefixed
+default (STOREFRONT_DEFAULT_LOCALE, mirroring the storefront's build
+constant). build_email_context localizes SITE_URL the same way, and
+allauth's links are localized in the adapter's send_mail. Emails with no
+user, such as unknown-account, now follow the visitor's language.
+
+In-app notifications are read in whatever language the viewer browses,
+so Notification.link becomes a locale-neutral storefront path, validated
+on write and built with storefront_path. Migration 0017 rewrites stored
+absolute links on the tenant's own hosts to paths and clears foreign
+ones.
+
+Also removes the unreachable TenantAccountAdapter.get_email_confirmation_url.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_016F5trstVMoFXNan1ZQMLEp ([`f664d1d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f664d1d56b382be6e290a37533141b6419faaabe))
+
 ## v3.78.0 (2026-09-23)
 
 ### Chores

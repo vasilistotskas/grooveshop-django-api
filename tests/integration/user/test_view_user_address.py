@@ -69,7 +69,7 @@ class UserAddressViewSetTestCase(APITestCase):
             "street": "test",
             "street_number": "test",
             "city": "test",
-            "zipcode": "test",
+            "zipcode": "54624",
             "is_main": False,
         }
 
@@ -123,7 +123,7 @@ class UserAddressViewSetTestCase(APITestCase):
             "street": "test",
             "street_number": "test",
             "city": "test",
-            "zipcode": "test",
+            "zipcode": "54624",
             "is_main": False,
         }
 

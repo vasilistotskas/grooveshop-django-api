@@ -3,6 +3,66 @@
 
 
 
+## v3.81.0 (2026-09-25)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.80.1 [skip ci] ([`5450744`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5450744ba2ec035b03c993e8ad4613113656ee7e))
+
+### Features
+
+* feat(address): validate postcodes per country and catch swapped fields
+
+Order #316 reached ACS with street '1', street number '70300' and a
+non-numeric postcode; checkout accepted it and ACS rejected the voucher.
+Country now carries postal_code_pattern and postal_code_example, seeded
+verbatim from Google's Address Data Service for 178 countries (additive,
+db_default). core/validators/address.py checks that the postcode matches
+the country, that the street contains a letter, and that the street
+number is not a postcode. Checkout, saved addresses, the address API and
+the admin (Order.clean and UserAddress.clean) all use it; edits are
+judged only when the address changes, so old orders stay editable.
+street_number is required on order create, as the service already
+demanded. Greek translations included.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_016F5trstVMoFXNan1ZQMLEp ([`45ccb44`](https://github.com/vasilistotskas/grooveshop-django-api/commit/45ccb44b501b1df8181b45138c67073567969bf9))
+
+* feat(migrations): refuse a deploy that would break the serving release
+
+On 2026-09-23 the SEO release renamed columns in its first migration,
+and pods of the previous release failed with 'column seo_title does not
+exist' until they were replaced. Production also skips releases, so
+'drop it one release later' cannot be enforced from the tag history.
+
+migration_preflight checks, per schema, every pending operation against
+the state the database is actually in, meaning the serving release's
+models. It refuses anything whose database effect removes, renames or
+tightens a table or column that state still has: RemoveField,
+DeleteModel, a real rename, NOT NULL without db_default, and the
+database side of SeparateDatabaseAndState. A RunSQL contract migration
+must declare contract_of and runs only once its expand target is
+deployed; accepted_downtime is a reported escape hatch. Fresh schemas
+pass. CI replays the upgrade path from the previous main and runs the
+same check. The rule is written into CLAUDE.md and docs/migrations.md,
+and the reviewer agent and skills no longer call AddField with a Python
+default safe.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_016F5trstVMoFXNan1ZQMLEp ([`58bc981`](https://github.com/vasilistotskas/grooveshop-django-api/commit/58bc981058c82df2edbb967f75542d11cb1531d8))
+
+### Testing
+
+* test(address): send a real Greek postcode in the address API tests
+
+They posted zipcode 'test' for GR, which passed only while the test's GR
+row had no postal_code_pattern. CountryFactory reuses an existing GR
+row, so in CI the seeded pattern applied and the create and update
+returned 400. The validation was right; the data was not.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_016F5trstVMoFXNan1ZQMLEp ([`3545e59`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3545e59db67b7f22a91fe5ff1bd228bc6267ebaf))
+
 ## v3.80.1 (2026-09-24)
 
 ### Bug fixes

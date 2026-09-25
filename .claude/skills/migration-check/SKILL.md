@@ -44,6 +44,17 @@ Validate that Django migrations are consistent with model definitions.
    ```
    - If this fails, there may be circular dependencies or broken migrations
 
+6. **Deploy safety** (before applying the new migrations locally — the
+   check judges what is still pending against what is applied):
+   ```bash
+   uv run python manage.py migration_preflight
+   ```
+   - Exit 1 names each operation that would break the release still
+     serving (a drop, a rename, a NOT NULL column without `db_default`)
+     and the schemas it hits. CI and the PreSync hook run the same
+     command, so a failure here fails the deploy too. Fix per
+     `docs/migrations.md`, or run the `migration-safety-audit` skill.
+
 ## Common Issues and Fixes
 
 | Issue | Cause | Fix |
@@ -57,4 +68,5 @@ Validate that Django migrations are consistent with model definitions.
 
 - Review the generated migration file to ensure it matches expectations
 - Verify no data loss operations (field removal, type changes) without explicit confirmation
+- A new NOT NULL column on an existing table needs `db_default`, not just `default` — the old release's INSERTs do not name it
 - Run `uv run pytest tests/unit/ -x --timeout=60` to ensure migrations don't break tests

@@ -32,8 +32,8 @@ Read it with the `Read` tool. Look at the `operations = [...]` list.
 
 | Operation | Verdict | Reason |
 |-----------|---------|--------|
-| `AddField` (with `default=` or `null=True`) | SAFE | Old code ignores the new column |
-| `AddField` (NOT NULL, no default) | UNSAFE | Migration will fail on a non-empty table |
+| `AddField` (with `db_default=` or `null=True`) | SAFE | Old code ignores the new column |
+| `AddField` (NOT NULL with only `default=`) on an existing table | UNSAFE | Django drops the default right after `ADD COLUMN`; old INSERTs omit the column → IntegrityError |
 | `CreateModel` | SAFE | Old code doesn't reference the table |
 | `AddIndex` / `AddConstraint` | USUALLY SAFE | Watch for long lock on large tables; consider `CONCURRENTLY` |
 | `RemoveField` | UNSAFE | Old pods still SELECT/INSERT the column → 500s |
@@ -42,11 +42,20 @@ Read it with the `Read` tool. Look at the `operations = [...]` list.
 | `RenameModel` | UNSAFE | Same reason as RenameField |
 | `AlterField` (type widening, e.g. `CharField(50)` → `CharField(100)`) | SAFE | Old code can still read |
 | `AlterField` (type narrowing or incompatible change) | UNSAFE | Truncates/breaks old writes |
-| `AlterField` (`null=True` → `null=False` without default) | UNSAFE | Old pods may insert NULL → IntegrityError |
+| `AlterField` (`null=True` → `null=False` without `db_default`) | UNSAFE | Old pods may insert NULL → IntegrityError |
 | `AlterField` (`null=False` → `null=True`) | SAFE | More permissive |
 | `AlterUniqueTogether` / `AlterIndexTogether` | SAFE-ISH | Watch for duplicate-data violations |
 | `RunPython` | DEPENDS | Read the callable; classify what it does to data |
-| `RunSQL` | DEPENDS | Read the SQL; same logic |
+| `RunSQL` | DEPENDS | Read the SQL; same logic. A drop / rename / SET NOT NULL needs `contract_of` |
+| `SeparateDatabaseAndState` | JUDGE `database_operations` | `state_operations` never touch the database |
+
+Then run the automated gate against a database that is still at the
+previous release (not yet migrated). It checks every schema and names
+each blocking operation:
+
+```bash
+uv run python manage.py migration_preflight
+```
 
 ### 4. Report findings
 
@@ -57,22 +66,28 @@ For each UNSAFE op, output:
 
 ### 5. Prescribe the fix
 
-For destructive ops, the canonical fix is the **two-release pattern**:
+**Removing a field or model (expand / contract):**
+- Release N: the code stops reading and writing it. The migration gives
+  the column a `db_default` or `null=True` (the new code stops supplying
+  it), then takes the field out of STATE only:
+  `SeparateDatabaseAndState(state_operations=[RemoveField(...)], database_operations=[])`.
+- Release N+1, once N is what production runs: a `RunSQL` drops the
+  column in a migration that declares
+  `contract_of = [("<app>", "<release N migration>")]`. `RemoveField`
+  cannot — the field already left the state. A deploy that skips N is
+  refused by `migration_preflight`.
 
-**Release 1 (safe):**
-- Add the new column / new table / new field name
-- Keep the old column writable
-- Update code to dual-write (write both old and new) and read from new with fallback to old
-- Deploy. Old pods + new pods both work.
+**Replacing a shape (rename, move, type change):**
+- Release N: `AddField` the new field (`null=True` or `db_default=`) +
+  RunPython copy; the code dual-writes and reads new with fallback.
+- Release N+1: the code uses only the new field; the old one leaves the
+  state as above.
+- Release N+2: the `RunSQL` drop with `contract_of`.
+- When only the Python name changes, a state-only `RenameField` plus
+  `AlterField(db_column=<old column>)` touches no column and is safe in
+  one release.
 
-**Release 2 (cleanup):**
-- Remove dual-write code, read only from new
-- Remove the old column / table / field name in a follow-up migration
-- Deploy. By now no code references the old thing.
-
-For `RenameField` specifically, the correct sequence is:
-1. Release 1: `AddField(new_name)` + RunPython copy + dual-write
-2. Release 2: `RemoveField(old_name)` once all reads/writes target `new_name`
+`docs/migrations.md` has the full rule and the worked SEO example.
 
 ### 6. Check for long-running operations on hot tables
 
@@ -80,7 +95,7 @@ For `RenameField` specifically, the correct sequence is:
 grep -l "AddIndex\|AddConstraint" <migration_path>
 ```
 
-If the table is large (`Order`, `Product`, `OrderItem`), warn: the PreSync Job has `activeDeadlineSeconds=600` — a long `CREATE INDEX` may exceed it. Suggest `AddIndexConcurrently` or splitting.
+If the table is large (`Order`, `Product`, `OrderItem`), warn: the PreSync Job has `activeDeadlineSeconds=1800` for the whole hook, every schema included — a long `CREATE INDEX` may exceed it, and it blocks writes while it runs. Suggest `AddIndexConcurrently` or splitting.
 
 ### 7. Verify no `--fake` is needed
 
@@ -110,5 +125,5 @@ Recommendation:
 ## Notes
 
 - Never edit the migration file yourself — the user owns the model design decision; this skill only reports.
-- The PreSync hook deploy model is documented in the project memory (`Backend Init Steps Run as Argo PreSync Hook` entry, added 2026-04-06).
-- If the user explicitly accepts downtime for a release, UNSAFE migrations become acceptable — note that as the user's call.
+- The PreSync hook deploy model and the rule are in `docs/migrations.md`.
+- If the user explicitly accepts downtime for a release, UNSAFE migrations become acceptable — note that as the user's call; the migration then declares `accepted_downtime = "<reason>"`, which the preflight reports without blocking.

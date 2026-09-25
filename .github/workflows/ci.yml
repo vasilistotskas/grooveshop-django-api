@@ -123,14 +123,18 @@ jobs:
   migrations:
     name: Migration Check
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    # Validates both django-tenants migration paths on a clean DB:
-    # ``migrate_schemas --shared`` for SHARED_APPS (which also runs the
-    # ``tenant.0002_seed_webside_tenant`` seed), then the TENANT_APPS
-    # path against the seeded webside schema. Lives in its own job so
-    # its ~4 min run in parallel with the test shards instead of on
-    # their critical path — pytest builds its own test databases and
-    # does not depend on this DB. Redis + Meilisearch services mirror
+    timeout-minutes: 25
+    # Replays a deploy: the database is migrated at the BASE commit (PR
+    # base, or the previous tip of main), then the head's
+    # ``migration_preflight`` judges the pending migrations against it —
+    # the same check the Argo CD PreSync hook runs as its step 0 — and
+    # the head migrations are applied on top. Both django-tenants paths
+    # run each time: ``migrate_schemas --shared`` for SHARED_APPS (which
+    # also runs the ``tenant.0002_seed_webside_tenant`` seed), then the
+    # TENANT_APPS path against the seeded webside schema. The clean-DB
+    # path stays covered by pytest, which builds its test databases from
+    # the full migration history. Lives in its own job so it runs in
+    # parallel with the test shards. Redis + Meilisearch services mirror
     # the testing job: the tenant seed's ``post_save`` signal touches
     # the Redis-backed resolve cache.
     services:
@@ -184,6 +188,9 @@ jobs:
 
       - name: Checkout code
         uses: actions/checkout@v6
+        with:
+          # The base commit has to be reachable to migrate from it.
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -203,11 +210,43 @@ jobs:
       - name: Install psycopg prerequisites
         run: sudo apt-get install -y --no-install-recommends libpq-dev
 
+      - name: Resolve the deploy base
+        id: base
+        env:
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+        run: |
+          base="${PR_BASE:-$PUSH_BEFORE}"
+          # workflow_dispatch has neither; a new branch's ``before`` is
+          # all zeros. Fall back to the parent commit.
+          if [ -z "$base" ] || ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
+            base="$(git rev-parse HEAD~1)"
+          fi
+          echo "sha=$base" >> "$GITHUB_OUTPUT"
+          echo "head=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "Deploy replay: $base -> $(git rev-parse HEAD)"
+
+      - name: Migrate at the base commit (the serving release)
+        env:
+          BASE_SHA: ${{ steps.base.outputs.sha }}
+        run: |
+          git checkout --detach "$BASE_SHA"
+          uv sync --locked --all-extras --dev
+          uv run python manage.py migrate_schemas --shared
+          uv run python manage.py migrate_schemas --schema=webside
+
       - name: Install Dependencies
-        run: uv sync --locked --all-extras --dev
+        env:
+          HEAD_SHA: ${{ steps.base.outputs.head }}
+        run: |
+          git checkout --detach "$HEAD_SHA"
+          uv sync --locked --all-extras --dev
 
       - name: Check for missing migrations
         run: uv run python manage.py makemigrations --check --dry-run
+
+      - name: Migration preflight (PreSync step 0)
+        run: uv run python manage.py migration_preflight
 
       - name: Run migrations (django-tenants)
         run: |

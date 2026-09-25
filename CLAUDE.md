@@ -245,12 +245,28 @@ If the container seems to ignore a change, confirm it is actually running your
 code — `docker compose exec backend grep <something> path/to/file.py` — before
 debugging the code.
 
+### Migrations: the release still serving reads the new schema
+
+The Argo CD PreSync hook migrates before the new image rolls, so the
+previous release keeps querying the migrated schema until its last pod
+exits. **A migration may only add.** Anything that removes, renames or
+tightens ships in two releases: release N stops using the old shape and
+takes it out of state with `SeparateDatabaseAndState` (giving every
+column the new code stops writing a `db_default` or `null=True`);
+release N+1, once N runs in production, drops it with a `RunSQL` whose
+migration declares `contract_of = [("<app>", "<expand migration>")]`.
+Every new NOT NULL column on an existing table needs `db_default` — a
+plain `default=` is dropped right after `ADD COLUMN`.
+`manage.py migration_preflight` enforces this in CI and as PreSync step
+0; `accepted_downtime = "<reason>"` on a migration is the reported
+escape hatch. Full rule and the worked SEO example: `docs/migrations.md`.
+
 ### CI/CD
 
 GitHub Actions (`.github/workflows/ci.yml`) jobs:
 1. **Security Scan** — Trivy filesystem scan (HIGH/CRITICAL fail the job).
 2. **Code Quality** — Ruff format + lint, `ty check`, OpenAPI schema validation.
-3. **Migration Check** — `makemigrations --check` plus both django-tenants migration paths on a clean DB.
+3. **Migration Check** — replays a deploy: migrates at the base commit, then runs the head's `makemigrations --check` and `migration_preflight`, then both django-tenants migration paths on top.
 4. **Testing** — 4 duration-balanced pytest shards (pytest-split, `.test_durations`) against PostgreSQL 18 + Redis + Meilisearch, each uploading raw coverage data.
 5. **Testing (multi-tenant lane)** — `tests_mt` serially with the real tenant router and middleware.
 6. **Coverage Gate** — combines the shard data and enforces `fail_under`.

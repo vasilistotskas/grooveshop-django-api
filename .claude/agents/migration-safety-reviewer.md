@@ -18,7 +18,15 @@ are still serving traffic.
 This means any migration that breaks the old code's queries will produce
 500s during the rollout window. The fix is to ship destructive changes as a
 **two-release split**: release 1 adds the new shape additively, release 2
-removes the old shape after no code reads it.
+removes the old shape after no code reads it. The full rule, with the
+`contract_of` / `accepted_downtime` attributes, is `docs/migrations.md`.
+
+`manage.py migration_preflight` (`core/db/migration_safety.py`) is the
+automated gate for the mechanical cases — it runs in CI and as PreSync
+step 0. This review covers what it cannot see: `RunPython` data
+changes, column type changes, unique constraints on dirty data, lock
+duration, and whether the code in the same change really stopped using
+what an expand migration takes out of state.
 
 ## Review Process
 
@@ -42,7 +50,9 @@ For every entry in `operations = [...]`, assign one of:
 
 #### Safe operations
 - `CreateModel` — new table, old code doesn't reference it
-- `AddField` with `null=True` or `default=...` — old code ignores the column
+- `AddField` with `null=True` or `db_default=...` — old code ignores the
+  column. A plain `default=...` is NOT enough: Django drops it right
+  after `ADD COLUMN`, so old INSERTs hit the NOT NULL constraint
 - `AddIndex` / `AddConstraint` on small tables — quick lock, no semantic change
 - `AlterField` widening a type (e.g. `CharField(50)` → `CharField(100)`)
 - `AlterField` `null=False` → `null=True` (more permissive)
@@ -55,19 +65,23 @@ For every entry in `operations = [...]`, assign one of:
 - `RenameField` — old name vanishes; both old and new names need to coexist
 - `RenameModel` — same problem as `RenameField`
 - `AlterField` narrowing a type (e.g. `CharField(100)` → `CharField(50)`)
-- `AlterField` `null=True` → `null=False` without `default=...` — old code may
-  insert NULL → IntegrityError
+- `AlterField` `null=True` → `null=False` without `db_default=...` — old
+  code may insert NULL → IntegrityError
+- `AddField` NOT NULL without `db_default` on an existing table — old
+  INSERTs do not name the column → IntegrityError
+- `RunSQL` that drops, renames or sets NOT NULL without `contract_of`
 - `AlterField` changing the column type incompatibly (e.g. text → integer)
 - `AlterUniqueTogether` adding a constraint that existing duplicate rows violate
 
 #### Conditional operations
 - `AddIndex` / `AddConstraint` on a hot table (Order, Product, OrderItem,
-  Cart, BlogPost) — long lock may exceed the PreSync Job's
-  `activeDeadlineSeconds=600`. Suggest `AddIndexConcurrently` or splitting.
+  Cart, BlogPost) — a long lock blocks writes, and the PreSync Job's
+  `activeDeadlineSeconds=1800` kills the whole hook. Suggest
+  `AddIndexConcurrently` or splitting.
 - `RunPython` / `RunSQL` — must read the actual code/SQL and apply the same
   classification rules to its effect on data
-- `AddField` NOT NULL with a default — safe in Django (the migration backfills),
-  but watch for write contention on huge tables
+- `AddField` NOT NULL with `db_default` — safe for old code, but the
+  backfill rewrites the table: watch for write contention on huge tables
 
 ### 3. For each UNSAFE op, prescribe the two-release split
 
@@ -79,10 +93,14 @@ Default template:
 >    fallback to old
 > 3. Deploy. Old + new pods both work because the old shape still exists.
 >
-> **Release 2 (cleanup), after release 1 is fully rolled out:**
+> **Release 2 (cleanup), after release 1 is what production runs:**
 > 1. Code change: drop the dual-write, read only from new
-> 2. Migration that removes the old column / table / field name
-> 3. Deploy.
+> 2. Release 1 took the old field out of STATE
+>    (`SeparateDatabaseAndState`, `database_operations=[]`, after giving
+>    the column a `db_default` or `null=True`), so this migration drops
+>    it with `RunSQL` and declares
+>    `contract_of = [("<app>", "<release 1 migration>")]`
+> 3. Deploy. A deploy that skips release 1 is refused by the preflight.
 
 Specialise per op type:
 - `RemoveField`: split is "stop reading/writing it" → "remove column"
@@ -100,8 +118,9 @@ For any `AddIndex` / `AddConstraint`, estimate impact:
   rows in production, recommend `AddIndexConcurrently` and a manual,
   non-PreSync-hook migration window.
 
-The PreSync Job has `activeDeadlineSeconds=600` (10 min). A `CREATE INDEX`
-that exceeds this gets killed mid-flight, leaving a partial index.
+The PreSync Job has `activeDeadlineSeconds=1800` (30 min) for the whole
+hook, every schema included. A `CREATE INDEX` that exceeds it gets killed
+mid-flight, leaving a partial index.
 
 ### 5. Verify migration consistency
 
@@ -110,6 +129,8 @@ After auditing safety, confirm the migration applies cleanly:
 ```bash
 uv run python manage.py makemigrations --check --dry-run
 uv run python manage.py migrate --check
+# Against a database still at the previous release (not yet migrated):
+uv run python manage.py migration_preflight
 ```
 
 If either fails, the migration set is internally inconsistent regardless of

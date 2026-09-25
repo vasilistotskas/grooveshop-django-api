@@ -10,6 +10,7 @@ from unittest.mock import patch
 from django.test import TestCase
 from extra_settings.models import Setting
 
+from country.factories import CountryFactory
 from order.serializers.order import OrderCreateFromCartSerializer
 
 BASE_PAYLOAD = {
@@ -39,6 +40,11 @@ COMPANY_FIELDS = {
 
 
 class B2BInvoiceFieldsTestCase(TestCase):
+    def setUp(self):
+        # ``country_id`` must name an existing row: the serializer looks
+        # it up for its postcode format.
+        CountryFactory(alpha_2="GR", alpha_3="GRC")
+
     def _stub_settings(self, **values) -> None:
         def stub(cls, key, default=None):
             return values.get(key, default)

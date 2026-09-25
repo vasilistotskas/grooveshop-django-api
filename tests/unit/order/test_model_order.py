@@ -35,6 +35,13 @@ class OrderModelTestCase(TestCase):
         self.order.city = "Test City"
         self.order.zipcode = "12345"
         self.order.place = ""
+        # Unsaved (no stored row), so ``clean()`` judges the address
+        # against the country's postcode format.
+        self.order.pk = None
+        self.order.country_id = "GR"
+        self.order.country = Mock(
+            postal_code_pattern=r"\d{3} ?\d{2}", postal_code_example="151 24"
+        )
 
         item1 = Mock()
         item1.product = Mock()

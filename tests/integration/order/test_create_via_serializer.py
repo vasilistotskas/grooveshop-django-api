@@ -77,6 +77,7 @@ class TestOrderCreateSerializerValidation(APITestCase):
             "last_name": "Doe",
             "email": "jane@example.com",
             "street": "Oak Avenue",
+            "street_number": "12",
             "city": "Piraeus",
             "zipcode": "18534",
             "country_id": self.country.alpha_2,

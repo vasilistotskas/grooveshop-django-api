@@ -19017,3 +19017,30 @@ msgstr ""
 
 #~ msgid "Place or district (optional)"
 #~ msgstr "Τόπος ή περιοχή (προαιρετικό)"
+
+msgid "Enter a valid postcode, e.g. %(example)s."
+msgstr "Εισαγάγετε έγκυρο ταχυδρομικό κώδικα, π.χ. %(example)s."
+
+msgid "Enter a valid postcode."
+msgstr "Εισαγάγετε έγκυρο ταχυδρομικό κώδικα."
+
+msgid "Enter the street name here; the number goes in the street number field."
+msgstr "Εισαγάγετε εδώ την οδό· ο αριθμός μπαίνει στο πεδίο του αριθμού οδού."
+
+msgid "This looks like a postcode. Enter the street number here and the postcode in the postcode field."
+msgstr "Αυτό μοιάζει με ταχυδρομικό κώδικα. Εισαγάγετε εδώ τον αριθμό οδού και τον ταχυδρομικό κώδικα στο αντίστοιχο πεδίο."
+
+msgid "Enter a valid regular expression: %(error)s"
+msgstr "Εισαγάγετε έγκυρη κανονική έκφραση: %(error)s"
+
+msgid "Postal Code Pattern"
+msgstr "Μορφή ταχυδρομικού κώδικα"
+
+msgid "Postal Code Example"
+msgstr "Παράδειγμα ταχυδρομικού κώδικα"
+
+msgid "A valid postcode shown to shoppers, e.g. 151 24."
+msgstr "Ένας έγκυρος ταχυδρομικός κώδικας που βλέπουν οι πελάτες, π.χ. 151 24."
+
+msgid "Regular expression a whole postcode must match, e.g. \\d{3} ?\\d{2} for Greece. Blank disables the format check."
+msgstr "Κανονική έκφραση με την οποία πρέπει να ταιριάζει ολόκληρος ο ταχυδρομικός κώδικας, π.χ. \\d{3} ?\\d{2} για την Ελλάδα. Κενό απενεργοποιεί τον έλεγχο μορφής."

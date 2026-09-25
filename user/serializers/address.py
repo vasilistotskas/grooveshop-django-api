@@ -4,6 +4,7 @@ from phonenumber_field.serializerfields import PhoneNumberField
 from rest_framework import serializers
 from rest_framework.relations import PrimaryKeyRelatedField
 
+from core.validators import address as address_rules
 from country.models import Country
 from region.models import Region
 from user.models.address import UserAddress
@@ -76,6 +77,12 @@ class UserAddressWriteSerializer(serializers.ModelSerializer[UserAddress]):
                     raise serializers.ValidationError(
                         _("A main address already exists for this user")
                     )
+
+        # The same delivery-address rules as checkout, since a saved
+        # address is what checkout prefills.
+        errors = address_rules.address_update_errors(attrs, self.instance)
+        if errors:
+            raise serializers.ValidationError(errors)
 
         return attrs
 

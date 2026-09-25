@@ -7,6 +7,7 @@ from phonenumber_field.modelfields import PhoneNumberField
 
 from core.enum import FloorChoicesEnum, LocationChoicesEnum
 from core.models import TimeStampMixinModel, UUIDModel
+from core.validators import address as address_rules
 from user.managers.address import UserAddressManager
 
 
@@ -105,6 +106,11 @@ class UserAddress(TimeStampMixinModel, UUIDModel):
                 raise ValidationError(
                     _("There can only be one main address per user.")
                 )
+        # Checkout prefills from saved addresses, so they obey the same
+        # delivery-address rules as an order.
+        errors = address_rules.model_address_errors(self)
+        if errors:
+            raise ValidationError(errors)
 
     @classmethod
     def get_user_addresses(cls, user):

@@ -29,6 +29,8 @@ class CountrySerializer(
             "alpha_3",
             "iso_cc",
             "phone_code",
+            "postal_code_pattern",
+            "postal_code_example",
             "sort_order",
             "created_at",
             "updated_at",
@@ -95,6 +97,8 @@ class CountryWriteSerializer(
             "alpha_3",
             "iso_cc",
             "phone_code",
+            "postal_code_pattern",
+            "postal_code_example",
             "sort_order",
         )
         read_only_fields = ("sort_order",)

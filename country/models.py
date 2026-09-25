@@ -6,6 +6,7 @@ from django_stubs_ext.db.models import TypedModelMeta
 from parler.models import TranslatableModel, TranslatedFields
 
 from core.models import SortableModel, TimeStampMixinModel, UUIDModel
+from core.validators.address import validate_postal_code_pattern
 from country.managers import CountryManager
 
 
@@ -46,6 +47,35 @@ class Country(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
     )
     image_flag = models.ImageField(
         _("Image Flag"), blank=True, null=True, upload_to="uploads/country/"
+    )
+    # The country's postcode format, verbatim from Google's Address Data
+    # Service (``zip`` and the first ``zipex`` of
+    # https://www.gstatic.com/chrome/autofill/libaddressinput/chromium-i18n/ssl-address/data/<CC>).
+    # One row serves both repos: Django validates every address write
+    # against it (``core.validators.address``) and the storefront reads
+    # it from the countries API, so the checkout's inline check and the
+    # server's cannot disagree. Blank means no format rule, only
+    # "required". ``db_default`` because the PreSync migration adds the
+    # column while the previous image, whose INSERT omits it, still serves.
+    postal_code_pattern = models.CharField(
+        _("Postal Code Pattern"),
+        max_length=1000,
+        blank=True,
+        default="",
+        db_default="",
+        validators=[validate_postal_code_pattern],
+        help_text=_(
+            "Regular expression a whole postcode must match, e.g. "
+            "\\d{3} ?\\d{2} for Greece. Blank disables the format check."
+        ),
+    )
+    postal_code_example = models.CharField(
+        _("Postal Code Example"),
+        max_length=50,
+        blank=True,
+        default="",
+        db_default="",
+        help_text=_("A valid postcode shown to shoppers, e.g. 151 24."),
     )
     translations = TranslatedFields(
         name=models.CharField(_("Name"), max_length=100, blank=True, null=True)

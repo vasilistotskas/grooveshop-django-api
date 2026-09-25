@@ -9,6 +9,7 @@ from rest_framework.relations import PrimaryKeyRelatedField
 
 from core.enum import FloorChoicesEnum, LocationChoicesEnum
 from core.utils.email import is_disposable_domain
+from core.validators import address as address_rules
 from country.models import Country
 from order.enum.create_error import OrderCreateErrorType
 from order.enum.document_type import OrderCreateDocumentTypeEnum
@@ -849,17 +850,23 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
     street = serializers.CharField(
         max_length=255, required=True, help_text=_("Street name")
     )
+    # Required: the courier voucher cannot be issued without one, and
+    # the service layer already rejected a blank value — the field
+    # declaration said otherwise.
     street_number = serializers.CharField(
-        max_length=50,
-        required=False,
-        allow_blank=True,
-        help_text=_("Street number"),
+        max_length=50, required=True, help_text=_("Street number")
     )
     city = serializers.CharField(
         max_length=100, required=True, help_text=_("City name")
     )
     zipcode = serializers.CharField(
-        max_length=20, required=True, help_text=_("Postal/ZIP code")
+        max_length=20,
+        required=True,
+        help_text=_(
+            "Postal/ZIP code. Must match the country's "
+            "``postal_code_pattern``; stored normalised (trimmed, "
+            "upper-case, single spaces)."
+        ),
     )
     country_id = serializers.CharField(
         required=True, help_text=_("Country alpha-2 code (e.g., 'GR', 'US')")
@@ -1174,8 +1181,25 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
         3. ``(shipping_provider_code='boxnow', shipping_kind='pickup_point')``
            ⇒ ``boxnow_locker_id`` required and ``pay_way`` must be an
            online-payment method (BoxNow rejects COD at lockers).
+        4. The delivery address passes ``core.validators.address`` for
+           its country, and the postcode is stored normalised.
         """
         from extra_settings.models import Setting
+
+        country = Country.objects.filter(alpha_2=attrs["country_id"]).first()
+        if country is None:
+            raise serializers.ValidationError(
+                {"country_id": _("Select a valid country.")}
+            )
+        errors = address_rules.address_errors(
+            country=country,
+            street=attrs["street"],
+            street_number=attrs["street_number"],
+            zipcode=attrs["zipcode"],
+        )
+        if errors:
+            raise serializers.ValidationError(errors)
+        attrs["zipcode"] = address_rules.normalize_postcode(attrs["zipcode"])
 
         document_type = attrs.get("document_type", "RECEIPT")
         billing_vat_id = attrs.get("billing_vat_id", "")
@@ -1340,6 +1364,18 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
                 _("Try using a different email address.")
             )
         return value
+
+    def validate(self, attrs):
+        """An address edit passes the same rules as checkout.
+
+        Judged only when the payload changes the address, so editing an
+        old order's notes does not demand a fix to an address that
+        predates the rules.
+        """
+        errors = address_rules.address_update_errors(attrs, self.instance)
+        if errors:
+            raise serializers.ValidationError(errors)
+        return attrs
 
     def update(self, instance, validated_data):
         # Order line items are immutable after creation: each carries a

@@ -21,6 +21,7 @@ from core.models import (
     TimeStampMixinModel,
     UUIDModel,
 )
+from core.validators import address as address_rules
 from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.status import (
     PAYMENT_CLOSING_STATUSES,
@@ -650,6 +651,11 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
             errors["address"] = [
                 _("Street, street number, and city are required.")
             ]
+
+        if not errors:
+            # Postcode format + street/number mix-ups, only for an
+            # address that is being entered or changed.
+            errors.update(address_rules.model_address_errors(self))
 
         if errors:
             raise ValidationError(errors)

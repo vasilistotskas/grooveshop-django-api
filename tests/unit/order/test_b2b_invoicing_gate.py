@@ -3,6 +3,7 @@ from unittest.mock import patch
 from django.test import TestCase
 from extra_settings.models import Setting
 
+from country.factories import CountryFactory
 from order.serializers.order import OrderCreateFromCartSerializer
 
 BASE_PAYLOAD = {
@@ -26,6 +27,11 @@ class B2BInvoicingGateTestCase(TestCase):
     admin, closing the direct-API bypass that would otherwise defeat
     the UI gate in ``StepPersonalInfo.vue``.
     """
+
+    def setUp(self):
+        # ``country_id`` must name an existing row: the serializer looks
+        # it up for its postcode format.
+        CountryFactory(alpha_2="GR", alpha_3="GRC")
 
     def _set_enabled(self, value: bool) -> None:
         """Stub ``Setting.get`` so the validator reads our chosen value

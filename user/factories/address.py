@@ -61,7 +61,9 @@ class UserAddressFactory(factory.django.DjangoModelFactory):
     first_name = factory.Faker("first_name")
     last_name = factory.Faker("last_name")
     street = factory.Faker("street_name")
-    street_number = factory.Faker("building_number")
+    # 1-3 digits: Faker's ``building_number`` can be five digits, which
+    # the address rules reject as a postcode typed into the wrong field.
+    street_number = factory.Faker("numerify", text="%##")
     city = factory.Faker("city")
     zipcode = factory.Faker("postcode")
     country = factory.LazyFunction(get_or_create_country)

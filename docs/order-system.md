@@ -102,6 +102,35 @@ Two entry points in `order/services.py` (the legacy `OrderService.create_order`
 - For **online (Viva)**: skips the immediate dispatch — Viva's
   webhook handler does it after payment confirms.
 
+### 3.3 Delivery-address rules (`core/validators/address.py`)
+
+Every address write is checked against the order's country row before
+an order or saved address exists, so a courier never receives an
+address it cannot place (prod order #316: street "1", street number
+"70300", a non-numeric postcode, rejected by `ACS_Create_Voucher`).
+
+- **Postcode**: normalised (trimmed, upper-case, whitespace collapsed to
+  one space) and full-matched (ASCII) against
+  `Country.postal_code_pattern`. The pattern and `postal_code_example`
+  are Google's Address Data Service `zip` / first `zipex`, seeded by
+  `country/migrations/0011_country_postal_code_format.py` and editable
+  in the Country admin. A blank pattern means only "required".
+- **Street** must contain a letter; **street number** must not itself
+  match the country's postcode pattern (4+ characters).
+- Applied in `OrderCreateFromCartSerializer.validate` (always; an
+  unknown `country_id` is a field error), `OrderWriteSerializer` and
+  `UserAddressWriteSerializer` (`address_update_errors`), and
+  `Order.clean()` / `UserAddress.clean()` (`model_address_errors`, the
+  admin). The last three judge the address only when the write changes
+  `country`, `street`, `street_number` or `zipcode`, so an unrelated
+  edit of an old record is not blocked by an address that predates the
+  rules.
+- Carrier code calls `normalize_postcode(value)` and
+  `postcode_matches(country, value)`.
+- The storefront applies the same rules inline from the same country row
+  (`shared/utils/postalCode.ts`); only the normalisation and the two
+  street rules are mirrored in code, and they must stay in lockstep.
+
 ## 4. Payment paths
 
 **Per-tenant payment identity.** Every tenant runs its OWN payment

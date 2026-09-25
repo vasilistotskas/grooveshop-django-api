@@ -104,6 +104,17 @@ class CountryAdmin(BaseTranslatableAdmin):
             },
         ),
         (
+            _("Postal Code Format"),
+            {
+                "fields": ("postal_code_pattern", "postal_code_example"),
+                "classes": ("wide",),
+                "description": _(
+                    "Checked on every checkout and saved address. Seeded "
+                    "from Google's Address Data Service."
+                ),
+            },
+        ),
+        (
             _("Contact & Media"),
             {
                 "fields": ("phone_code", "image_flag"),

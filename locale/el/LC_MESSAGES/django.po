@@ -19044,3 +19044,33 @@ msgstr "Ένας έγκυρος ταχυδρομικός κώδικας που �
 
 msgid "Regular expression a whole postcode must match, e.g. \\d{3} ?\\d{2} for Greece. Blank disables the format check."
 msgstr "Κανονική έκφραση με την οποία πρέπει να ταιριάζει ολόκληρος ο ταχυδρομικός κώδικας, π.χ. \\d{3} ?\\d{2} για την Ελλάδα. Κενό απενεργοποιεί τον έλεγχο μορφής."
+
+msgid "Mark selected orders as refunded"
+msgstr "Σήμανση επιλεγμένων παραγγελιών ως επιστραφέντων χρημάτων"
+
+msgid "Mark selected orders as returned"
+msgstr "Σήμανση επιλεγμένων παραγγελιών ως επιστραμμένων"
+
+msgid "Order %(order_id)s marked as refunded"
+msgstr "Η παραγγελία %(order_id)s σημειώθηκε ως επιστραφέντων χρημάτων"
+
+msgid "Order %(order_id)s marked as returned"
+msgstr "Η παραγγελία %(order_id)s σημειώθηκε ως επιστραμμένη"
+
+msgid "A completed payment needs the amount paid, unless discounts, loyalty points or gift cards cover the whole order total."
+msgstr "Μια ολοκληρωμένη πληρωμή χρειάζεται το ποσό που καταβλήθηκε, εκτός αν εκπτώσεις, πόντοι επιβράβευσης ή δωροκάρτες καλύπτουν όλο το σύνολο της παραγγελίας."
+
+msgid "Order #%(order)s has not been paid yet — the voucher is issued automatically once the online payment is confirmed."
+msgstr "Η παραγγελία #%(order)s δεν έχει πληρωθεί ακόμη — το voucher εκδίδεται αυτόματα μόλις επιβεβαιωθεί η online πληρωμή."
+
+msgid "Order #%(order)s has not been paid yet — the parcel is created automatically once the online payment is confirmed."
+msgstr "Η παραγγελία #%(order)s δεν έχει πληρωθεί ακόμη — το δέμα δημιουργείται αυτόματα μόλις επιβεβαιωθεί η online πληρωμή."
+
+msgid "Create BoxNow parcel now"
+msgstr "Δημιουργία δέματος BoxNow τώρα"
+
+msgid "Parcel creation task dispatched."
+msgstr "Η δημιουργία του δέματος ξεκίνησε."
+
+msgid "This shipment already has a BoxNow parcel."
+msgstr "Αυτή η αποστολή έχει ήδη δέμα BoxNow."

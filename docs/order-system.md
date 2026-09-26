@@ -5,7 +5,7 @@ Keep this file synchronised when invariants change. Cross-references
 are file paths + line numbers; the system has enough load-bearing
 "don't undo this" pieces that drift here is expensive.
 
-Last refresh: 2026-08-24 (line anchors resynced post `OrderService.create_order` dead-code removal — the legacy path was deleted, `create_order_from_cart`/`_offline` are now the only two entry points). See git log for changes since.
+Last refresh: 2026-09-25 (no mint before payment, payment-after-cancel ahead of the settled guard, admin status read-only, ACS pickup-list `blocked_unprinted`, postcode refusal). See git log for changes since.
 
 ## 1. Overview
 
@@ -78,6 +78,12 @@ No explicit table — flips are direct assignments. Common paths:
 | `PENDING → CANCELED` | Viva refund webhook |
 | `PENDING / PROCESSING / FAILED → CANCELED` | `Order.save()` on the `status → CANCELED` **or `RETURNED`** transition (`PAYMENT_CLOSING_STATUSES`, `Order.settle_unpaid_payment`, `order/models/order.py`) — one save shared by the service, the admin form and any script, never a second save from the cascade (that re-fires the transition). An order that closes unpaid owes nothing, so its financial state is final too: a canceled order (`0057_settle_canceled_unpaid_orders` backfilled 78 rows) and a refused or uncollected COD parcel that came back RETURNED (`0058_settle_returned_unpaid_orders` backfilled 34). A PAID return keeps COMPLETED until the refund moves it to REFUNDED. |
 | `PENDING → COMPLETED` | `AcsService._mark_cod_order_paid_if_pending` (COD reconcile) |
+| `CANCELED → COMPLETED` on a CANCELED order | `OrderService.record_payment_after_cancel` — a confirmed Stripe (`handle_payment_succeeded`, `checkout.session.completed`) or Viva (`_handle_payment_created`) charge for an order that is already canceled. Checked **before** the settled-state guard (`OrderService.is_payment_after_cancel`), because a canceled order always carries a settled payment and behind the guard the charge was dropped with a WARNING. Books the money (`mark_as_paid`), records `metadata["payment_after_cancel"]`, logs ERROR, emails ops, notes the order; the order stays CANCELED and nothing ships. Idempotent per payment id. A REFUNDED / PARTIALLY_REFUNDED canceled order still ignores a stale success. |
+
+`Order.clean()` refuses a COMPLETED payment with `paid_amount` 0.00
+unless deductions cover the whole total (`Order._payment_consistency_errors`)
+— the admin form edits both fields. It is not a `CheckConstraint`: the
+total is a sum over the order's lines.
 
 ## 3. Order creation paths
 
@@ -265,7 +271,28 @@ success redirect (customer landed on the homepage via the
 
 Each carrier implements `ShippingCarrierInterface` in
 `shipping/interfaces.py` and registers with
-`ShippingProviderRegistry`. Two carriers today:
+`ShippingProviderRegistry`. Two carriers today.
+
+Rules both carriers share:
+
+- **No shipment before payment.** Every order gets its carrier row in
+  `pending_creation` at checkout, but the mint choke points
+  (`AcsService.create_voucher_for_order`,
+  `BoxNowService.create_shipment_for_order`) raise
+  `shipping.exceptions.ShipmentAwaitingPaymentError` while
+  `Order.awaits_online_payment` holds — checked on the order row loaded
+  under the shipment lock. An online-paid voucher carries no COD amount,
+  so a voucher minted for an unpaid card order would hand the goods over
+  for free (prod order 304 was one admin click away, 2026-09-24). The
+  tasks return `{"status": "awaiting_payment"}` with no retry and no
+  alert; the admin buttons ("Issue ACS voucher now", "Create BoxNow
+  parcel now") refuse with a message, because the task's refusal never
+  reaches the page.
+- **A permanent rejection is noted on the order.**
+  `shipping.alerts.alert_admins_shipment_creation_failed` emails ops AND
+  writes an `OrderHistory` note, both carrying the carrier's own remedy
+  ("Fix the address on the order, then press Issue ACS voucher now").
+  Nothing retries a business error, so re-dispatching is that button.
 
 ### 5.1 ACS Courier (`shipping_acs/`)
 
@@ -324,11 +351,36 @@ Each carrier implements `ShippingCarrierInterface` in
   `None` instead of raising. One live candidate still makes a refusal a
   failure. Those dead rows are reported by `check_stale_acs_shipments`,
   which owns them; this path deliberately does not send a second alert.
+- An unprinted-labels refusal (`Unprinted_Found > 0`) is a status, not
+  a failed task. The service raises `AcsUnprintedVouchersError`; the
+  daily task returns `{"status": "blocked_unprinted", "unprinted": [...],
+  "order_ids": [...]}`, emails the orders with a link to the shipments
+  changelist filtered to `label_printed_at__isempty=1`, and notes each
+  blocked order. The fix is "Print labels for selected shipments", then
+  "Issue ACS pickup list now". Every other refusal is a plain
+  `AcsAPIError` and still fails the task. Evidence the courier does not
+  depend on the list: orders 295–297 were refused on 2026-09-23 and
+  scanned as picked up the next morning, and ~40 of ~45 September
+  vouchers were collected without appearing on any list.
+- The stale digest's "stranded mint" class (`pending_creation` > 24 h)
+  excludes orders awaiting their online payment — the auto-cancel owns
+  those, and listing them invited an "Issue ACS voucher now" for unpaid
+  goods.
+- `Recipient_Zipcode` is refused locally when the order's postcode does
+  not match its country (`core.validators.address.postcode_matches`):
+  a non-retryable `AcsAPIError` naming the field, recorded in
+  `metadata["last_error"]` with the mint claim released. A valid one goes
+  out with its space removed. The old digits-only filter turned a
+  4-letter postcode into `""` and ACS answered with its generic "fill
+  data error" (order 316, 2026-09-24).
 
 ### 5.2 BoxNow (`shipping_boxnow/`)
 
 - **REST + webhook** for tracking events.
 - Voucher mint: same 3-phase design as ACS.
+- "Create BoxNow parcel now" (shipment detail action) re-dispatches a
+  row left in `pending_creation` by a business error, once its data is
+  fixed — the counterpart of ACS's "Issue ACS voucher now".
 - Webhook handler: `BoxNowService.apply_webhook_event` — idempotent on `webhook_message_id`.
 
 ### 5.3 Adding a new carrier
@@ -441,7 +493,7 @@ All WS notifications go through `notification.consumers.NotificationConsumer` an
 ### 7.1 Cancel paths
 
 - **Customer**: `POST /api/v1/orders/{id}/cancel/` → `OrderService.cancel_order(order, reason, refund_payment=True)`.
-- **Admin**: same `cancel_order` via Django admin action / unfold detail action.
+- **Admin**: same `cancel_order` via the "Cancel selected orders and restore stock" action. The change form's `status` field is **read-only**: a form save wrote the column straight to the row, bypassing both `cancel_order` (no stock restore — prod orders 242 and 213, 2026-09-08) and the transition table in `update_order_status`. Every other transition is an action too (`mark_as_processing` … `mark_as_returned`, `mark_as_refunded`), routed through `update_order_status`. RETURNED and REFUNDED deliberately leave stock alone (§5.1).
 - **Auto**: `auto_cancel_stuck_pending_orders` Celery beat — cancels online orders stuck in PENDING for >24h.
 
 `cancel_order`:
@@ -469,6 +521,10 @@ the linked memory note or the originating PR's commit message.
 |---|---|
 | Backend uses `psycopg` pool with `CONN_MAX_AGE=0` under ASGI | `project_db_pool.md` |
 | `ShippingService.dispatch_create_shipment_task` wraps in `transaction.on_commit` | `project_shipping_dispatch_on_commit.md` |
+| No carrier mint while `Order.awaits_online_payment` (`ShipmentAwaitingPaymentError`) | §5 above |
+| A payment-success handler checks `is_payment_after_cancel` BEFORE its settled-state guard | §2.2 above |
+| Order `status` changes only through admin actions / `OrderService`, never the change form | §7.1 above |
+| The default cache fails open on a Redis outage (reads miss, writes no-op — `core/caches.py`), but never for keys under `STRICT_KEY_PREFIXES`: the `strict:` throttle namespace, allauth's rate limits, TOTP replay protection, the IdP's single-use codes and WebSocket tickets. The checkout, payment, coupon and gift-card throttles (`core/api/throttling.py`, `fail_closed = True`) therefore DENY with 429 during an outage, while browsing/search/cart throttles and DRF's default `anon`/`user` budgets allow | `core/api/throttling.py` module docstring |
 | ACS voucher mint uses 3-phase claim → API → persist with 300s TTL | `project_acs_voucher_orphan_prevention.md` |
 | `Order.objects.filter(pk=...).values(...).first()` — NOT `refresh_from_db(fields=...)` | `project_order_state_machine_invariants.md` |
 | `_suppress_customer_status_notifications` on chained transitions | `project_order_state_machine_invariants.md` |

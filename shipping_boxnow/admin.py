@@ -292,7 +292,11 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
     )
     inlines = [BoxNowParcelEventInline]
     actions = ["cancel_parcels", "resync_label", "download_labels_zip"]
-    actions_detail = ["download_voucher_action", "cancel_parcel_action"]
+    actions_detail = [
+        "download_voucher_action",
+        "create_parcel_action",
+        "cancel_parcel_action",
+    ]
     list_select_related = ["order", "locker"]
     date_hierarchy = "created_at"
 
@@ -566,6 +570,60 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
         response["Content-Disposition"] = f'attachment; filename="{filename}"'
         response["Content-Length"] = str(len(pdf_bytes))
         return response
+
+    @action(
+        description=str(_("Create BoxNow parcel now")),
+        variant=ActionVariant.PRIMARY,
+        icon="local_shipping",
+    )
+    def create_parcel_action(self, request, object_id):
+        """Re-dispatch parcel creation after its data was corrected.
+
+        The BoxNow counterpart of ACS's "Issue ACS voucher now". A
+        permanent BoxNow rejection (bad locker, bad phone) leaves the row
+        in ``pending_creation`` and nothing retries it, so the alert's
+        "fix the data, then re-dispatch" needs a button to press.
+        """
+        from django.shortcuts import redirect
+
+        from shipping_boxnow.tasks import create_boxnow_shipment_for_order
+
+        change_url = reverse(
+            "admin:shipping_boxnow_boxnowshipment_change", args=[object_id]
+        )
+        try:
+            shipment = BoxNowShipment.objects.select_related("order").get(
+                pk=object_id
+            )
+        except BoxNowShipment.DoesNotExist:
+            messages.error(request, _("Shipment not found."))
+            return redirect(change_url)
+
+        if shipment.delivery_request_id:
+            messages.warning(
+                request,
+                _("This shipment already has a BoxNow parcel."),
+            )
+            return redirect(change_url)
+
+        # The service refuses an unpaid online order
+        # (``ShipmentAwaitingPaymentError``), but inside a Celery task
+        # whose refusal never reaches this page — so say it here.
+        if shipment.order.awaits_online_payment:
+            messages.error(
+                request,
+                _(
+                    "Order #%(order)s has not been paid yet — the parcel is "
+                    "created automatically once the online payment is "
+                    "confirmed."
+                )
+                % {"order": shipment.order_id},
+            )
+            return redirect(change_url)
+
+        create_boxnow_shipment_for_order.delay(shipment.order_id)
+        messages.info(request, _("Parcel creation task dispatched."))
+        return redirect(change_url)
 
     @action(
         description=str(_("Cancel parcel via BoxNow API")),

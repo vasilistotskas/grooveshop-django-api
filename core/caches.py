@@ -1,15 +1,122 @@
 from __future__ import annotations
 
 import logging
+import threading
+import time
 from collections.abc import Awaitable
 from typing import Any, cast
 
 from django.conf import settings
+from django.core.cache.backends.base import DEFAULT_TIMEOUT
 from django.core.cache.backends.redis import RedisCache, RedisCacheClient
 from redis.backoff import ExponentialBackoff
+from redis.exceptions import ConnectionError as RedisConnectionError
+from redis.exceptions import TimeoutError as RedisTimeoutError
 from redis.retry import Retry
 
 logger = logging.getLogger(__name__)
+
+# The two failures that mean "Redis is unreachable", as opposed to a bad
+# command or a serialisation bug, which must keep raising. redis-py's
+# own classes (``redis/exceptions.py``), not the builtins of the same
+# name; ``Retry`` re-raises the last of them once its attempts run out.
+REDIS_UNAVAILABLE = (RedisConnectionError, RedisTimeoutError)
+
+# One line per burst: an outage fails every cache call on every request,
+# and a line per call would bury the log it is meant to be in.
+BURST_INTERVAL_SECONDS = 60.0
+
+#: Namespace for a key whose reads and writes must NEVER fail open. Code
+#: that needs "Redis down means stop" rather than "Redis down means
+#: miss" puts its keys under it (``core.api.throttling`` does, for every
+#: throttle it defines).
+STRICT_NAMESPACE = "strict:"
+
+#: Every key the fail-open layer must leave raising. A miss on these is
+#: not "slower", it is a security control switched off:
+#:
+#: - ``strict:`` — our own opt-in namespace (above).
+#: - ``allauth:rl:`` — allauth's rate limits: login, signup, password
+#:   reset, email confirmation and MFA attempts
+#:   (``allauth/core/internal/ratelimit.py`` ``get_cache_key``). Failing
+#:   open would lift the brute-force limit on login.
+#: - ``allauth.mfa.totp.used?`` — TOTP replay protection
+#:   (``allauth/mfa/totp/internal/auth.py``): a miss reports a used code
+#:   as unused.
+#: - ``allauth.idp.oidc.authorization_code[`` / ``user_code[`` /
+#:   ``device_code[`` — the OAuth IdP's single-use codes
+#:   (``allauth/idp/oidc/internal/oauthlib/``): a lost ``delete`` leaves a
+#:   redeemed code redeemable until its TTL.
+#: - ``ws:ticket:`` — the single-use WebSocket ticket
+#:   (``notification/views/websocket.py``): a lost ``set`` hands the
+#:   browser a ticket that can never be redeemed, so the mint must fail
+#:   visibly instead.
+#:
+#: These are third-party or fixed keys — allauth reads the default alias
+#: directly and offers no setting to point it elsewhere — so the match is
+#: on the key, in this one place.
+STRICT_KEY_PREFIXES: tuple[str, ...] = (
+    STRICT_NAMESPACE,
+    "allauth:rl:",
+    "allauth.mfa.totp.used?",
+    "allauth.idp.oidc.authorization_code[",
+    "allauth.idp.oidc.user_code[",
+    "allauth.idp.oidc.device_code[",
+    "ws:ticket:",
+)
+
+
+def _is_strict(key: Any) -> bool:
+    return isinstance(key, str) and key.startswith(STRICT_KEY_PREFIXES)
+
+
+class BurstLogger:
+    """Log the first event of a burst, then one line per interval.
+
+    Process-wide rather than per backend instance: Django hands every
+    thread its own cache object (``django.core.cache.CacheHandler`` is a
+    ``BaseConnectionHandler`` over ``asgiref.local.Local``), so an
+    instance counter would log once per thread instead of once per burst.
+
+    ``message`` is a %-format taking the caller's ``args`` followed by
+    the suppressed count and the interval in seconds.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        level: int = logging.WARNING,
+        target: logging.Logger | None = None,
+    ) -> None:
+        self._message = message
+        self._level = level
+        self._logger = target or logger
+        self._lock = threading.Lock()
+        self._last_logged = float("-inf")
+        self._suppressed = 0
+
+    def report(self, *args: Any) -> None:
+        now = time.monotonic()
+        with self._lock:
+            if now - self._last_logged < BURST_INTERVAL_SECONDS:
+                self._suppressed += 1
+                return
+            suppressed, self._suppressed = self._suppressed, 0
+            self._last_logged = now
+        self._logger.log(
+            self._level,
+            self._message,
+            *args,
+            suppressed,
+            int(BURST_INTERVAL_SECONDS),
+        )
+
+
+_burst_warning = BurstLogger(
+    "Redis cache unavailable during %s — serving without the cache: %s "
+    "(%s similar failure(s) suppressed in the last %ss)"
+)
 
 
 _SCAN_BATCH_SIZE = 500
@@ -53,6 +160,11 @@ class CustomCache(RedisCache):
     """
     Redis cache backend with prefix-aware clearing and key inspection.
 
+    Fails open: with Redis unreachable, reads miss and writes do nothing
+    (see "Fail-open reads and writes" below for exactly which methods) —
+    except for keys under ``STRICT_KEY_PREFIXES``, which keep raising
+    because a miss there switches a security control off.
+
     Provides:
     - ``clear_by_prefixes()`` -- selectively clear keys by prefix
       instead of FLUSHDB, safe for shared Redis instances. Platform-
@@ -92,6 +204,166 @@ class CustomCache(RedisCache):
             },
         }
         super().__init__(server, params)
+
+    # ------------------------------------------------------------------
+    # Fail-open reads and writes
+    # ------------------------------------------------------------------
+    #
+    # A cache is an optimisation, so an unreachable Redis must cost
+    # speed, not requests: a read is a miss, a write or delete does
+    # nothing, and one WARNING per burst says so. Only
+    # ``REDIS_UNAVAILABLE`` is absorbed — any other error is a real bug —
+    # and never for a key under ``STRICT_KEY_PREFIXES``, where a miss
+    # would switch a security control off (see that tuple).
+    #
+    # These are all the per-key methods ``RedisCache`` implements
+    # (``django/core/cache/backends/redis.py``). ``BaseCache`` builds
+    # the rest on them — ``decr`` on ``incr``, ``incr_version`` on
+    # ``get``/``set``/``delete``, ``__contains__`` on ``has_key``, and
+    # every ``a*`` method is ``sync_to_async`` over its sync twin
+    # (``backends/base.py``) — so the async API fails open too.
+    #
+    # Consequence for rate limiting: DRF's ``SimpleRateThrottle`` keeps
+    # its history with ``cache.get``/``cache.set`` on this alias
+    # (``rest_framework/throttling.py``), so a throttle on its default
+    # key ALLOWS every request during an outage. That is right for the
+    # general ``anon``/``user`` budgets and wrong for the security
+    # scopes, which is why every throttle in ``core.api.throttling``
+    # keys under ``strict:`` and decides per class whether an outage
+    # denies or allows (``ResilientThrottleMixin.fail_closed``).
+    #
+    # Deliberately left raising:
+    # - ``add`` and ``incr``: their RESULT is a decision, not a value.
+    #   ``add`` is the lock primitive (the order-confirmation send, the
+    #   ACS pickup-list and poll-batch mutexes) and ``incr`` a counter;
+    #   neither "acquired" nor "not acquired" is a safe lie, and their
+    #   callers already handle the exception (the confirmation task
+    #   retries; the rate limiter and idempotency budget decide on it
+    #   themselves).
+    # - ``clear`` (FLUSHDB), ``keys``, ``clear_by_prefixes`` and
+    #   ``failing_persistence_statuses``: explicit admin and health
+    #   operations whose failure must be seen — see ``keys()``.
+    #   ``delete_raw_keys`` keeps its own documented handling.
+
+    def get(self, key: Any, default: Any = None, version: int | None = None):
+        try:
+            return super().get(key, default, version)
+        except REDIS_UNAVAILABLE as exc:
+            if _is_strict(key):
+                raise
+            _burst_warning.report("get", exc)
+            return default
+
+    def get_many(self, keys: Any, version: int | None = None) -> dict:
+        keys = list(keys)
+        try:
+            return super().get_many(keys, version)
+        except REDIS_UNAVAILABLE as exc:
+            if any(_is_strict(key) for key in keys):
+                raise
+            _burst_warning.report("get_many", exc)
+            return {}
+
+    def has_key(self, key: Any, version: int | None = None) -> bool:
+        try:
+            return super().has_key(key, version)
+        except REDIS_UNAVAILABLE as exc:
+            if _is_strict(key):
+                raise
+            _burst_warning.report("has_key", exc)
+            return False
+
+    def get_or_set(
+        self,
+        key: Any,
+        default: Any,
+        timeout: Any = DEFAULT_TIMEOUT,
+        version: int | None = None,
+    ) -> Any:
+        """``BaseCache.get_or_set`` with an outage returning the default.
+
+        The base implementation stores the value through ``add``, which
+        raises on purpose (see above); without this, an outage would
+        fail every ``get_or_set`` caller instead of computing the value.
+        Same steps as the base otherwise, so a callable default is
+        computed once.
+        """
+        value = self.get(key, self._missing_key, version=version)
+        if value is not self._missing_key:
+            return value
+        if callable(default):
+            default = default()
+        try:
+            self.add(key, default, timeout=timeout, version=version)
+        except REDIS_UNAVAILABLE as exc:
+            if _is_strict(key):
+                raise
+            _burst_warning.report("get_or_set", exc)
+            return default
+        # Read back, as the base does: another caller may have added a
+        # value between the first ``get`` and the ``add``.
+        return self.get(key, default, version=version)
+
+    def set(
+        self,
+        key: Any,
+        value: Any,
+        timeout: Any = DEFAULT_TIMEOUT,
+        version: int | None = None,
+    ) -> None:
+        try:
+            super().set(key, value, timeout, version)
+        except REDIS_UNAVAILABLE as exc:
+            if _is_strict(key):
+                raise
+            _burst_warning.report("set", exc)
+
+    def set_many(
+        self,
+        data: dict,
+        timeout: Any = DEFAULT_TIMEOUT,
+        version: int | None = None,
+    ) -> list:
+        try:
+            return super().set_many(data, timeout, version)
+        except REDIS_UNAVAILABLE as exc:
+            if any(_is_strict(key) for key in data):
+                raise
+            _burst_warning.report("set_many", exc)
+            # ``set_many`` returns the keys that failed to insert.
+            return list(data)
+
+    def touch(
+        self,
+        key: Any,
+        timeout: Any = DEFAULT_TIMEOUT,
+        version: int | None = None,
+    ) -> bool:
+        try:
+            return super().touch(key, timeout, version)
+        except REDIS_UNAVAILABLE as exc:
+            if _is_strict(key):
+                raise
+            _burst_warning.report("touch", exc)
+            return False
+
+    def delete(self, key: Any, version: int | None = None) -> bool:
+        try:
+            return super().delete(key, version)
+        except REDIS_UNAVAILABLE as exc:
+            if _is_strict(key):
+                raise
+            _burst_warning.report("delete", exc)
+            return False
+
+    def delete_many(self, keys: Any, version: int | None = None) -> None:
+        keys = list(keys)
+        try:
+            super().delete_many(keys, version)
+        except REDIS_UNAVAILABLE as exc:
+            if any(_is_strict(key) for key in keys):
+                raise
+            _burst_warning.report("delete_many", exc)
 
     def keys(self, search: str | None = None) -> list[str]:
         """

@@ -657,8 +657,41 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
             # address that is being entered or changed.
             errors.update(address_rules.model_address_errors(self))
 
+        errors.update(self._payment_consistency_errors())
+
         if errors:
             raise ValidationError(errors)
+
+    def _payment_consistency_errors(self) -> dict[str, list]:
+        """A COMPLETED payment with nothing paid must be fully covered.
+
+        ``paid_amount`` is legitimately 0.00 on a COMPLETED order only
+        when deductions — promotion, loyalty redemption, gift card —
+        cover the whole total (see ``is_paid``); ``calculate_order_total_
+        amount`` is exactly that remainder. Anything else is a payment
+        booked without the money: the admin form, which edits both
+        fields, is the path this guards (the demo fixtures that produced
+        eight such rows no longer go through ``save`` at all).
+
+        Not a ``CheckConstraint``: the total is a sum over the order's
+        lines, which a row constraint cannot see. An unsaved order has
+        no lines to total, so it is not judged.
+        """
+        if self.payment_status != PaymentStatus.COMPLETED or self.pk is None:
+            return {}
+        if self.paid_amount is not None and self.paid_amount.amount > 0:
+            return {}
+        if self.calculate_order_total_amount().amount == 0:
+            return {}
+        return {
+            "paid_amount": [
+                _(
+                    "A completed payment needs the amount paid, unless "
+                    "discounts, loyalty points or gift cards cover the "
+                    "whole order total."
+                )
+            ]
+        }
 
     @property
     def total_price_items(self) -> Money:

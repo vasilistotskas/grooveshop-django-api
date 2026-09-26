@@ -25,10 +25,15 @@ from django.utils.dateparse import parse_datetime
 
 from pay_way.enum.settlement import PaySettlement
 from shipping.enum import ShippingKind
+from shipping.exceptions import ShipmentAwaitingPaymentError
 from shipping.services import DELIVERY_NOTES_MAX_LEN, sanitize_delivery_notes
 from shipping_acs.client import AcsClient
 from shipping_acs.enum.shipment_state import AcsShipmentState
-from shipping_acs.exceptions import AcsAPIError, AcsError
+from shipping_acs.exceptions import (
+    AcsAPIError,
+    AcsError,
+    AcsUnprintedVouchersError,
+)
 from shipping_acs.models import (
     AcsPickupList,
     AcsShipment,
@@ -162,20 +167,38 @@ def _kg_from_grams(weight_grams: int | None) -> str:
     return text.replace(".", ",")
 
 
-def _normalize_zipcode_for_acs(value: object) -> str:
-    """Strip whitespace/hyphens/etc; return up to 5 leading digits.
+def _zipcode_for_acs(order: Order, country_code: str) -> str:
+    """Return the order's postcode in the form ACS accepts, or refuse.
 
-    ACS rejects any non-digit characters in ``Recipient_Zipcode``
-    (verified against order 57 on 2026-05-15 — the customer typed the
-    Greek convention ``"848 00"`` with a space and ACS returned the
-    generic ``"Error fill data error"`` rejection). The sample payload
-    in the ACS REST API guide §3 shows the field as a bare integer
-    (``17778``), so digits-only is the safe canonical form.
+    ACS rejects any space in ``Recipient_Zipcode`` (order 57,
+    2026-05-15: the Greek convention ``"848 00"`` came back as the
+    generic ``"Error fill data error"``), and the ACS REST API guide §3
+    shows the field as a bare number (``17778``). So a valid postcode
+    goes out with its space removed.
+
+    An invalid one is refused HERE, naming the field. Blanking it (the
+    old digits-only filter turned four letters into ``""``) sent a
+    voucher ACS could only answer with the same generic error, which
+    says nothing about which field is wrong — prod order 316,
+    2026-09-24. The rule is the one checkout and the admin apply
+    (``core.validators.address.postcode_matches``), read against the
+    same ``Country`` row the voucher's ``Recipient_Country`` names.
     """
-    if not value:
-        return ""
-    digits = "".join(ch for ch in str(value) if ch.isdigit())
-    return digits[:5]
+    from core.validators.address import normalize_postcode, postcode_matches
+    from country.models import Country
+
+    country = order.country or Country.objects.filter(pk=country_code).first()
+    zipcode = order.zipcode or ""
+    if country is None or not postcode_matches(country, zipcode):
+        raise AcsAPIError(
+            alias="ACS_Create_Voucher",
+            error_message=(
+                f"Recipient_Zipcode: order {order.id} has no valid postcode "
+                f"for country {country_code} ({len(zipcode)} character(s) "
+                "on the order). Correct the postcode on the order."
+            ),
+        )
+    return normalize_postcode(zipcode).replace(" ", "")
 
 
 def _normalize_phone_for_acs(value: object) -> str:
@@ -313,6 +336,13 @@ class AcsService:
                 )
                 return shipment
 
+            # Never mint for an order the shopper still owes online: the
+            # voucher would carry Cod_Ammount 0 and hand the parcel over
+            # for free. ``shipment.order`` was loaded under this lock, so
+            # a payment that landed a moment ago is seen.
+            if shipment.order.awaits_online_payment:
+                raise ShipmentAwaitingPaymentError(order.id)
+
             metadata = shipment.metadata or {}
             started_raw = metadata.get("mint_started_at")
             if started_raw:
@@ -406,7 +436,15 @@ class AcsService:
         )
 
         # ----- Phase 2: API call (no DB lock held) -----
-        params = cls._build_create_voucher_params(order, shipment, client)
+        try:
+            params = cls._build_create_voucher_params(order, shipment, client)
+        except AcsAPIError as exc:
+            # Refused locally (an invalid postcode): record it where the
+            # admin reads ACS's own rejections, and release the claim so
+            # "Issue ACS voucher now" works the moment the order is fixed.
+            cls._record_last_error(shipment, {}, exc)
+            cls._release_mint_claim(shipment)
+            raise
         try:
             result = client.create_voucher(params)
         except Exception as exc:
@@ -652,7 +690,9 @@ class AcsService:
             ),
             "Recipient_Address": order.street,
             "Recipient_Address_Number": order.street_number,
-            "Recipient_Zipcode": _normalize_zipcode_for_acs(order.zipcode),
+            "Recipient_Zipcode": _zipcode_for_acs(
+                order, country_code or fallback_country
+            ),
             "Recipient_Region": order.city,
             "Recipient_Phone": _normalize_phone_for_acs(order.phone),
             "Recipient_Cell_Phone": _normalize_phone_for_acs(order.phone),
@@ -1153,6 +1193,28 @@ class AcsService:
                     stale_days,
                 )
                 return None
+            if unprinted_count or unprinted_vouchers:
+                # The documented refusal (docs/_acs-web-services.txt,
+                # ACS_Issue_Pickup_List: ``PickupList_No: null`` with
+                # ``Unprinted_Found > 0`` and the voucher numbers in the
+                # table rows). A normal business outcome with one fix —
+                # print the named labels and issue again — so it gets
+                # its own type for the task to report, not a failure.
+                logger.warning(
+                    "ACS_Issue_Pickup_List refused date=%s: %s unprinted "
+                    "voucher(s) %s among candidates %s: %r",
+                    the_date,
+                    unprinted_count,
+                    unprinted_vouchers,
+                    blocked,
+                    acs_message,
+                )
+                raise AcsUnprintedVouchersError(
+                    alias="ACS_Issue_Pickup_List",
+                    error_message=acs_message
+                    or f"ACS rejected {unprinted_count} unprinted voucher(s).",
+                    raw=result,
+                )
             logger.error(
                 "ACS_Issue_Pickup_List issued no list for date=%s with %s "
                 "candidate voucher(s) %s: unprinted_found=%s "
@@ -1167,12 +1229,8 @@ class AcsService:
             )
             if not acs_message:
                 acs_message = (
-                    f"ACS rejected {unprinted_count} unprinted voucher(s)."
-                    if unprinted_count
-                    else (
-                        f"ACS returned no PickupList_No for {the_date} with "
-                        f"{len(candidates)} candidate voucher(s)."
-                    )
+                    f"ACS returned no PickupList_No for {the_date} with "
+                    f"{len(candidates)} candidate voucher(s)."
                 )
             raise AcsAPIError(
                 alias="ACS_Issue_Pickup_List",

@@ -9,7 +9,12 @@ from django.utils import timezone
 
 from order.factories.order import OrderFactory
 from shipping_acs.enum.shipment_state import AcsShipmentState
-from shipping_acs.exceptions import AcsAPIError, AcsError
+from shipping_acs.exceptions import (
+    AcsAPIError,
+    AcsError,
+    AcsRetryableError,
+    AcsUnprintedVouchersError,
+)
 from shipping_acs.factories import (
     AcsPickupListFactory,
     AcsShipmentFactory,
@@ -19,7 +24,7 @@ from shipping_acs.services import (
     AcsService,
     _kg_from_grams,
     _normalize_phone_for_acs,
-    _normalize_zipcode_for_acs,
+    _zipcode_for_acs,
 )
 
 pytestmark = pytest.mark.django_db
@@ -1186,7 +1191,7 @@ class TestIssueDailyPickupList:
             },
         )
 
-        with pytest.raises(AcsAPIError) as exc_info:
+        with pytest.raises(AcsUnprintedVouchersError) as exc_info:
             AcsService.issue_daily_pickup_list()
 
         error = exc_info.value
@@ -1197,6 +1202,23 @@ class TestIssueDailyPickupList:
             "7227891111",
             "7227891222",
         ]
+
+    def test_a_refusal_naming_nothing_unprinted_is_a_plain_api_error(
+        self, monkeypatch
+    ):
+        """Only the documented unprinted refusal gets its own type — the
+        daily task reports it as a status. Anything else must still be
+        an ordinary ``AcsAPIError`` so the task keeps failing on it."""
+        self._candidate("7227891111")
+        self._client_returning(
+            monkeypatch,
+            {"PickupList_No": None, "Unprinted_Found": 0, "Error_Message": ""},
+        )
+
+        with pytest.raises(AcsAPIError) as exc_info:
+            AcsService.issue_daily_pickup_list()
+
+        assert not isinstance(exc_info.value, AcsUnprintedVouchersError)
 
     def test_no_pickup_list_row_is_created_on_refusal(self, monkeypatch):
         from shipping_acs.models import AcsPickupList
@@ -1412,22 +1434,83 @@ class TestFetchLabelBytes:
 # ---------------------------------------------------------------------------
 
 
-class TestNormalizeZipcodeForAcs:
-    def test_strips_internal_whitespace(self):
-        assert _normalize_zipcode_for_acs("848 00") == "84800"
+class TestZipcodeForAcs:
+    """A valid postcode goes out without its space; an invalid one is
+    refused locally, naming the field.
 
-    def test_strips_punctuation_and_keeps_first_five(self):
-        assert _normalize_zipcode_for_acs("12345-6") == "12345"
+    Prod order 316 (2026-09-24): four letters typed as the postcode were
+    reduced to ``""`` by the old digits-only filter, and ACS answered
+    the voucher with its generic "fill data error", which names nothing.
+    """
 
-    def test_blank_returns_empty(self):
-        assert _normalize_zipcode_for_acs("") == ""
-        assert _normalize_zipcode_for_acs(None) == ""
+    @staticmethod
+    def _country(pattern=r"\d{3} ?\d{2}"):
+        from country.factories import CountryFactory
 
-    def test_truncates_to_five_digits(self):
-        assert _normalize_zipcode_for_acs("123456789") == "12345"
+        # Written after creation: the factory get-or-creates on
+        # ``alpha_2``, which would ignore a pattern passed as a default.
+        country = CountryFactory()
+        country.postal_code_pattern = pattern
+        country.save(update_fields=["postal_code_pattern"])
+        return country
 
-    def test_handles_integer_input(self):
-        assert _normalize_zipcode_for_acs(17778) == "17778"
+    @classmethod
+    def _order(cls, zipcode, *, pattern=r"\d{3} ?\d{2}"):
+        from types import SimpleNamespace
+
+        return SimpleNamespace(
+            id=316, country=cls._country(pattern), zipcode=zipcode
+        )
+
+    def test_strips_the_space_from_a_valid_greek_postcode(self):
+        assert _zipcode_for_acs(self._order("848 00"), "GR") == "84800"
+
+    def test_a_valid_postcode_passes_unchanged(self):
+        assert _zipcode_for_acs(self._order("17778"), "GR") == "17778"
+
+    def test_letters_are_refused_naming_the_field(self):
+        with pytest.raises(AcsAPIError) as exc_info:
+            _zipcode_for_acs(self._order("ΑΘΗΝ"), "GR")
+
+        assert exc_info.value.alias == "ACS_Create_Voucher"
+        assert "Recipient_Zipcode" in exc_info.value.error_message
+        # Not retryable: nothing changes until someone edits the order.
+        assert not isinstance(exc_info.value, AcsRetryableError)
+
+    def test_blank_is_refused(self):
+        with pytest.raises(AcsAPIError):
+            _zipcode_for_acs(self._order(""), "GR")
+
+    def test_a_country_without_a_pattern_accepts_any_postcode(self):
+        assert _zipcode_for_acs(self._order("AB 12", pattern=""), "GR") == (
+            "AB12"
+        )
+
+    def test_the_refusal_releases_the_claim_and_records_the_error(
+        self, acs_client_mock
+    ):
+        """Refused before any ACS call: the row must be ready for
+        "Issue ACS voucher now" the moment the order is corrected."""
+        from order.enum.status import OrderStatus, PaymentStatus
+        from pay_way.factories import PayWayFactory
+
+        order = OrderFactory(
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+            pay_way=PayWayFactory(),
+            country=self._country(),
+            zipcode="ΑΘΗΝ",
+        )
+        shipment = AcsShipmentFactory(order=order)
+
+        with pytest.raises(AcsAPIError):
+            AcsService.create_voucher_for_order(order)
+
+        assert acs_client_mock.last_create_payload is None
+        shipment.refresh_from_db()
+        assert "mint_started_at" not in shipment.metadata
+        assert "Recipient_Zipcode" in shipment.metadata["last_error"]["error"]
+        assert shipment.voucher_no is None
 
 
 class TestNormalizePhoneForAcs:

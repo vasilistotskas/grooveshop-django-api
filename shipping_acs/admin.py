@@ -439,6 +439,24 @@ class AcsShipmentAdmin(BaseModelAdmin):
             messages.error(request, _("Shipment not found."))
             return _back_to_changelist(self)
 
+        # The mint itself refuses an unpaid online order
+        # (``ShipmentAwaitingPaymentError`` in
+        # ``AcsService.create_voucher_for_order``), but it runs in a
+        # Celery task, so its refusal never reaches this page. Say so
+        # here, before resetting anything, instead of reporting a
+        # dispatch that is bound to be refused.
+        if shipment.order.awaits_online_payment:
+            messages.error(
+                request,
+                _(
+                    "Order #%(order)s has not been paid yet — the voucher "
+                    "is issued automatically once the online payment is "
+                    "confirmed."
+                )
+                % {"order": shipment.order_id},
+            )
+            return _back_to_changelist(self)
+
         # A CANCELED shipment keeps its (now-deleted) voucher_no, which
         # makes the mint task short-circuit and return the dead voucher.
         # Reset it first so a fresh voucher is issued — ACS supports the

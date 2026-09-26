@@ -475,6 +475,13 @@ class OrderAdmin(BaseModelAdmin):
     autocomplete_fields = ["user", "country", "region", "pay_way"]
     readonly_fields = (
         "uuid",
+        # Changed only through the actions below, never the form. A form
+        # save wrote ``status`` straight to the row, skipping both the
+        # transition table in ``OrderService.update_order_status`` and
+        # ``OrderService.cancel_order`` — so a CANCELED picked from the
+        # dropdown never restored stock (prod orders 242 and 213,
+        # 2026-09-08). Every action routes through the service.
+        "status",
         "created_at",
         "updated_at",
         "status_updated_at",
@@ -628,6 +635,8 @@ class OrderAdmin(BaseModelAdmin):
         "mark_as_shipped",
         "mark_as_delivered",
         "mark_as_completed",
+        "mark_as_returned",
+        "mark_as_refunded",
         "mark_as_canceled",
     ]
     # Detail header had 5 long English buttons that overflowed the
@@ -831,6 +840,38 @@ class OrderAdmin(BaseModelAdmin):
             queryset,
             OrderStatus.COMPLETED,
             _("Order %(order_id)s marked as completed"),
+        )
+
+    @action(
+        description=str(_("Mark selected orders as returned")),
+        variant=ActionVariant.WARNING,
+        icon="assignment_return",
+    )
+    def mark_as_returned(self, request, queryset):
+        # Stock is deliberately untouched: the goods come back days later
+        # and may be damaged, so restocking is a staff decision on the
+        # physical parcel (docs/order-system.md §5.1).
+        self._bulk_update_status(
+            request,
+            queryset,
+            OrderStatus.RETURNED,
+            _("Order %(order_id)s marked as returned"),
+        )
+
+    @action(
+        description=str(_("Mark selected orders as refunded")),
+        variant=ActionVariant.WARNING,
+        icon="currency_exchange",
+    )
+    def mark_as_refunded(self, request, queryset):
+        # The order status only; the money moves through
+        # ``OrderService.refund_order`` or the provider's refund webhook,
+        # neither of which changes ``status`` (docs/order-system.md §4.2).
+        self._bulk_update_status(
+            request,
+            queryset,
+            OrderStatus.REFUNDED,
+            _("Order %(order_id)s marked as refunded"),
         )
 
     def _bulk_update_status(

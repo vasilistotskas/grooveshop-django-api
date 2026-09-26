@@ -14,6 +14,8 @@ to hold and neither is visible at runtime until it has already failed:
 
 from __future__ import annotations
 
+import uuid
+from datetime import timedelta
 from types import SimpleNamespace
 from unittest import mock
 
@@ -21,6 +23,7 @@ import pytest
 from django.conf import settings as django_settings
 from django.core.exceptions import ValidationError
 from django.test import TestCase
+from django.utils import timezone
 
 from core.api.views import PUBLIC_SETTING_KEYS
 from devtools import demo_account
@@ -56,7 +59,19 @@ class TestDataset(TestCase):
         order list renders tracking, payment state and cancellation
         differently."""
         statuses = {order.status for order in demo_account.ORDERS}
-        assert {"DELIVERED", "SHIPPED", "CANCELED"} <= statuses
+        assert {"COMPLETED", "SHIPPED", "CANCELED"} <= statuses
+
+    def test_every_fixture_is_a_state_a_real_order_can_hold(self):
+        """``complete_paid_delivered_orders`` moves DELIVERED + paid to
+        COMPLETED within the hour, so a DELIVERED fixture only re-entered
+        the state machine; and a paid order always owes its money through
+        a settlement that can collect it."""
+        from pay_way.enum.settlement import PaySettlement
+
+        settlements = {value for value, _label in PaySettlement.choices}
+        for order in demo_account.ORDERS:
+            assert order.status != "DELIVERED", order
+            assert order.settlement in settlements, order
 
     def test_points_ledger_reads_as_a_story(self):
         kinds = [kind for kind, _points, _description in demo_account.POINTS]
@@ -606,3 +621,258 @@ class TestDemoStoreMailboxes(TestCase):
         ):
             shopper = SimpleNamespace(email="hello@demo.grooveshop.space")
             self.assertFalse(module.is_demo_account(shopper))
+
+
+@pytest.mark.django_db
+class TestResetIsSilent:
+    """The nightly reset rebuilds fixtures; it must not act like a sale.
+
+    Production 2026-09-25 04:00: every fixture order went through
+    ``save()``, so ``order_created`` fired four times — four order
+    confirmations and four merchant new-order emails (the demo mail
+    backend dropped them), a WebSocket toast and a gateway push each —
+    and the queryset "wipe" only soft-deleted, leaving 12 hidden rows.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _a_demo_store(self):
+        # The reset refuses a schema that is not flagged ``is_demo``;
+        # the test schema is not a tenant at all.
+        with mock.patch(
+            "devtools.demo_store._current_tenant_is_demo", return_value=True
+        ):
+            yield
+
+    @staticmethod
+    def _catalogue():
+        from pay_way.enum.settlement import PaySettlement
+        from pay_way.factories import PayWayFactory
+        from product.factories.product import ProductFactory
+
+        for slug in {
+            slug for row in demo_account.ORDERS for slug, _q in row.items
+        }:
+            ProductFactory(slug=slug, stock=10, num_images=0, num_reviews=0)
+        PayWayFactory.create_online_payment()
+        PayWayFactory(settlement=PaySettlement.CARRIER_TERMINAL.value)
+
+    def test_reset_sends_no_mail_dispatches_nothing_leaves_no_residue(
+        self, settings, django_capture_on_commit_callbacks
+    ):
+        from django.core import mail
+
+        from order.models.history import OrderHistory
+        from order.models.order import Order
+
+        settings.EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+        self._catalogue()
+        demo_account.seed_demo_account()
+
+        mail.outbox = []
+        with (
+            mock.patch("celery.app.task.Task.apply_async") as dispatched,
+            django_capture_on_commit_callbacks(execute=True),
+        ):
+            demo_account.reset_demo_account()
+
+        assert mail.outbox == []
+        dispatched.assert_not_called()
+
+        orders = Order.objects.all_with_deleted().filter(
+            user__email=demo_account.RETAIL_EMAIL
+        )
+        assert orders.count() == len(demo_account.ORDERS)
+        assert not orders.filter(is_deleted=True).exists()
+        # ``handle_order_created`` writes "Order created" into the
+        # history; no row at all proves the signal never fired.
+        assert not OrderHistory.objects.filter(order__in=orders).exists()
+
+    def test_fixtures_are_internally_consistent(self, settings):
+        from order.models.order import Order
+
+        settings.EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+        self._catalogue()
+        demo_account.seed_demo_account()
+
+        by_seed = {
+            order.metadata["demo_seed"]: order
+            for order in Order.objects.filter(
+                user__email=demo_account.RETAIL_EMAIL
+            ).select_related("pay_way")
+        }
+        for row in demo_account.ORDERS:
+            order = by_seed[row.days_ago]
+            assert order.pay_way.settlement == row.settlement
+            assert order.pay_way_key
+            assert order.paid_amount.amount > 0
+            assert order.paid_amount == order.calculate_order_total_amount()
+            if row.payment_status == "COMPLETED":
+                assert order.payment_method == order.pay_way.provider_code
+            else:
+                assert order.payment_method == ""
+            # The model's own payment rule accepts every fixture.
+            assert order._payment_consistency_errors() == {}
+
+
+@pytest.mark.django_db
+class TestGuestCheckoutsAreCleared:
+    """A visitor's guest checkout on the demo store goes with the reset.
+
+    Prod demo order #1 (2026-09-22) was a guest cash-on-delivery order on
+    a store with no carrier: nothing could advance it, the auto-cancel
+    only closes online payments, and the account wipe never reached it.
+    """
+
+    @staticmethod
+    def _guest_order_holding_stock():
+        from order.enum.status import OrderStatus, PaymentStatus
+        from order.factories.order import OrderFactory
+        from order.models.stock_reservation import StockReservation
+        from order.stock import StockManager
+        from product.factories.product import ProductFactory
+
+        # Outside the seeded catalogue, so ``_restore_demo_stock`` cannot
+        # be what puts the stock back.
+        product = ProductFactory(
+            slug=f"visitor-{uuid.uuid4().hex[:8]}",
+            stock=10,
+            num_images=0,
+            num_reviews=0,
+        )
+        order = OrderFactory(
+            user=None,
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+            num_order_items=0,
+        )
+        StockManager.decrement_stock(
+            product_id=product.id, quantity=2, order_id=order.id
+        )
+        reservation = StockReservation.objects.create(
+            product=product,
+            quantity=1,
+            session_id="visitor",
+            expires_at=timezone.now() + timedelta(minutes=15),
+            order=order,
+        )
+        return order, product, reservation
+
+    def test_the_guest_order_goes_and_its_stock_comes_back(
+        self, settings, django_capture_on_commit_callbacks
+    ):
+        from django.core import mail
+
+        from order.models.order import Order
+
+        settings.EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+        order, product, reservation = self._guest_order_holding_stock()
+        product.refresh_from_db()
+        assert product.stock == 8
+        TestResetIsSilent._catalogue()
+        demo_account.seed_demo_account()
+
+        mail.outbox = []
+        with (
+            mock.patch(
+                "devtools.demo_store._current_tenant_is_demo",
+                return_value=True,
+            ),
+            mock.patch("celery.app.task.Task.apply_async") as dispatched,
+            django_capture_on_commit_callbacks(execute=True),
+        ):
+            report = demo_account.reset_demo_account()
+
+        assert report["guest_orders"] == 1
+        assert report["guest_stock_restored"] == 2
+        assert not Order.objects.all_with_deleted().filter(pk=order.pk).exists()
+        product.refresh_from_db()
+        assert product.stock == 10
+        reservation.refresh_from_db()
+        assert reservation.consumed is True
+        assert mail.outbox == []
+        dispatched.assert_not_called()
+        # The shared account's fixtures are untouched.
+        assert Order.objects.filter(
+            user__email=demo_account.RETAIL_EMAIL
+        ).count() == len(demo_account.ORDERS)
+
+    def test_restocking_a_sold_out_product_emails_nobody(
+        self, settings, django_capture_on_commit_callbacks
+    ):
+        """A guest who bought the last units leaves the product at 0; the
+        reset puts them back WITHOUT the 0 → positive save that fires
+        ``product_back_in_stock`` (restock emails to every subscriber)."""
+        from django.core import mail
+
+        from order.enum.status import OrderStatus, PaymentStatus
+        from order.factories.order import OrderFactory
+        from order.models.stock_log import StockLog
+        from order.stock import StockManager
+        from product.factories.product import ProductFactory
+
+        settings.EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+        product = ProductFactory(
+            slug=f"sold-out-{uuid.uuid4().hex[:8]}",
+            stock=2,
+            num_images=0,
+            num_reviews=0,
+        )
+        order = OrderFactory(
+            user=None,
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+            num_order_items=0,
+        )
+        StockManager.decrement_stock(
+            product_id=product.id, quantity=2, order_id=order.id
+        )
+
+        mail.outbox = []
+        with (
+            mock.patch("celery.app.task.Task.apply_async") as dispatched,
+            django_capture_on_commit_callbacks(execute=True),
+        ):
+            demo_account._wipe_guest_checkouts(before=timezone.now())
+
+        product.refresh_from_db()
+        assert product.stock == 2
+        dispatched.assert_not_called()
+        assert mail.outbox == []
+        # The restore is still on the audit trail.
+        assert StockLog.objects.filter(
+            product=product,
+            operation_type=StockLog.OPERATION_INCREMENT,
+            quantity_delta=2,
+        ).exists()
+
+    def test_an_order_placed_after_the_run_began_is_kept(self):
+        from order.models.order import Order
+
+        order, _product, _reservation = self._guest_order_holding_stock()
+
+        demo_account._wipe_guest_checkouts(
+            before=order.created_at - timedelta(seconds=1)
+        )
+
+        assert Order.objects.filter(pk=order.pk).exists()
+
+    def test_refuses_to_run_on_a_store_that_is_not_a_demo(self):
+        from order.models.order import Order
+
+        order, _product, _reservation = self._guest_order_holding_stock()
+
+        with mock.patch(
+            "devtools.demo_store._current_tenant_is_demo", return_value=False
+        ):
+            report = demo_account.reset_demo_account()
+
+        assert report == {"skipped_not_a_demo_tenant": 1}
+        assert Order.objects.filter(pk=order.pk).exists()
+
+    def test_the_demo_check_reads_the_tenant_flag(self):
+        """The guard itself: a non-demo, non-public schema is refused."""
+        from devtools.demo_store import _current_tenant_is_demo
+
+        # The test database has no Tenant row flagged ``is_demo`` for
+        # whatever schema it runs in.
+        assert _current_tenant_is_demo() is False

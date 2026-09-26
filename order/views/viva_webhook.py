@@ -1266,6 +1266,25 @@ def _handle_payment_created(order, event_data, transaction_id):
         order.id,
     )
 
+    from order.services import OrderService
+
+    # Before the settled guard: a canceled order's payment is already
+    # settled (``Order.save`` settles an unpaid one to CANCELED), so
+    # behind the guard a verified charge on it was dropped with only a
+    # WARNING — the customer charged, the order dead, nobody told. The
+    # money is booked, staff are paged, nothing ships (G0281).
+    if OrderService.is_payment_after_cancel(order):
+        if not order.metadata:
+            order.metadata = {}
+        order.metadata["viva_transaction_id"] = transaction_id
+        OrderService.record_payment_after_cancel(
+            order, payment_id=transaction_id, payment_method="viva_wallet"
+        )
+        from order.payment_events import publish_payment_status
+
+        publish_payment_status(order)
+        return None
+
     # Guard: a stale or out-of-order Viva webhook must not un-refund or
     # un-cancel an order that is already in a settled financial state.
     # Viva does NOT guarantee delivery order.  COMPLETED is allowed
@@ -1312,8 +1331,6 @@ def _handle_payment_created(order, event_data, transaction_id):
         # Without this pre-stamp the post-save signal would fire a
         # second PROCESSING email + toast within ms of the
         # confirmation email.
-        from order.services import OrderService
-
         OrderService._suppress_customer_status_notifications(
             order, OrderStatus.PROCESSING.value
         )

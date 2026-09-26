@@ -2791,6 +2791,97 @@ class OrderService:
 
         ShippingService.dispatch_create_shipment_task(order)
 
+    @staticmethod
+    def is_payment_after_cancel(order: Order) -> bool:
+        """True when a confirmed charge lands on a CANCELED order.
+
+        Checked BEFORE the settled-state guard of every payment-success
+        handler. A canceled order carries a settled ``payment_status``
+        (``Order.save`` settles an unpaid one to CANCELED), so behind that
+        guard a genuine charge was dropped with a WARNING — money taken,
+        order dead, nobody told. A REFUNDED / PARTIALLY_REFUNDED order is
+        excluded: there the money already went back, and a success event
+        is a stale redelivery the guard must keep ignoring.
+        """
+        return (
+            order.status == OrderStatus.CANCELED
+            and order.payment_status
+            not in (
+                PaymentStatus.REFUNDED,
+                PaymentStatus.PARTIALLY_REFUNDED,
+            )
+        )
+
+    @classmethod
+    def record_payment_after_cancel(
+        cls, order: Order, *, payment_id: str, payment_method: str
+    ) -> None:
+        """Book a charge that arrived for a CANCELED order and page staff.
+
+        The money is recorded as received (``mark_as_paid``), which is
+        what lets ``refund_order`` act on the order — it refuses one that
+        ``is_paid`` says is unpaid. The order stays CANCELED and no courier
+        shipment is dispatched (G0281). ``metadata["payment_after_cancel"]``
+        is the reconciliation record, an ERROR log the monitored channel,
+        an ops email the prompt, and an ``OrderHistory`` note the trace on
+        the order page. Idempotent per ``payment_id``: a redelivered event
+        neither re-books nor re-alerts.
+
+        Called with the order row locked by the payment handler.
+        """
+        from order.models.history import OrderHistory
+        from shipping.alerts import send_ops_alert
+
+        recorded = (order.metadata or {}).get("payment_after_cancel") or {}
+        if recorded.get("payment_id") == payment_id:
+            logger.info(
+                "Payment %s for CANCELED order %s already recorded",
+                payment_id,
+                order.id,
+            )
+            return
+
+        order.mark_as_paid(payment_id=payment_id, payment_method=payment_method)
+        if not order.metadata:
+            order.metadata = {}
+        order.metadata["payment_after_cancel"] = {
+            "payment_id": payment_id,
+            "payment_method": payment_method,
+            "recorded_at": timezone.now().isoformat(),
+        }
+        order.save(update_fields=["metadata"])
+        logger.error(
+            "Payment %s (%s) received for CANCELED order %s — manual refund "
+            "required; NOT dispatching shipment creation",
+            payment_id,
+            payment_method,
+            order.id,
+        )
+        OrderHistory.log_note(
+            order=order,
+            note=(
+                f"Payment {payment_id} ({payment_method}) arrived after the "
+                "order was canceled. The order stays canceled and nothing "
+                "ships — refund the customer."
+            ),
+        )
+        try:
+            send_ops_alert(
+                subject=f"Payment received for canceled order {order.id}",
+                message=(
+                    f"A confirmed {payment_method} payment ({payment_id}) "
+                    f"arrived for order {order.id}, which was already "
+                    "canceled. Nothing will ship. Refund the customer in "
+                    f"the {payment_method} dashboard; the provider's "
+                    "refund webhook records it on the order."
+                ),
+            )
+        except Exception:
+            logger.exception(
+                "Could not send the payment-after-cancel alert for order %s",
+                order.id,
+            )
+
     @classmethod
     @transaction.atomic
     def handle_payment_succeeded(cls, payment_intent_id: str) -> Order | None:
@@ -2843,6 +2934,13 @@ class OrderService:
             )
             return None
 
+        if cls.is_payment_after_cancel(order):
+            cls.record_payment_after_cancel(
+                order, payment_id=payment_intent_id, payment_method="stripe"
+            )
+            publish_payment_status(order)
+            return order
+
         # Guard: a stale or out-of-order "payment succeeded" event must not
         # un-refund or un-cancel an order that is already in a settled state.
         # Stripe does NOT guarantee event delivery order.  COMPLETED is
@@ -2866,29 +2964,6 @@ class OrderService:
         order.mark_as_paid(
             payment_id=payment_intent_id, payment_method="stripe"
         )
-
-        if order.status == OrderStatus.CANCELED:
-            # Payment landed for an order that was already CANCELED (the
-            # customer cancelled before the webhook, or the two raced).
-            # Marking the money received above is intentional bookkeeping,
-            # but we must NOT mint a courier shipment for a cancelled order
-            # (G0281). Record the receipt for reconciliation and alert staff
-            # (ERROR is the monitored channel) so a manual refund is issued.
-            if not order.metadata:
-                order.metadata = {}
-            order.metadata["payment_after_cancel"] = {
-                "payment_id": payment_intent_id,
-                "recorded_at": timezone.now().isoformat(),
-            }
-            order.save(update_fields=["metadata"])
-            logger.error(
-                "Payment %s received for CANCELED order %s — manual refund "
-                "required; NOT dispatching shipment creation",
-                payment_intent_id,
-                order.id,
-            )
-            publish_payment_status(order)
-            return order
 
         if order.status == OrderStatus.PENDING:
             # The Stripe webhook handler dispatches

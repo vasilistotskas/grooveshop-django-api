@@ -64,6 +64,19 @@ class AcsRetryableError(AcsAPIError):
     """Raised on HTTP 5xx and connection errors — Celery autoretries."""
 
 
+class AcsUnprintedVouchersError(AcsAPIError):
+    """``ACS_Issue_Pickup_List`` refused the day because labels are unprinted.
+
+    ACS refuses the whole pickup list while any voucher for the date is
+    unprinted (``Unprinted_Found > 0``; the voucher numbers arrive in
+    ``raw["Unprinted_Vouchers"]``). An expected business outcome with a
+    single fix — print the named labels, then issue again — so the daily
+    task reports it as a status instead of failing, while every other
+    refusal stays a plain :class:`AcsAPIError`. Not retryable: nothing
+    changes until someone prints.
+    """
+
+
 class AcsAuthError(AcsRetryableError):
     """Raised on HTTP 403 / 406 — auth-layer rejection.
 

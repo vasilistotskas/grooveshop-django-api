@@ -34,10 +34,12 @@ from django.utils import timezone
 from core.utils.email_context import build_email_context
 from core.utils.i18n import get_order_language
 from core.utils.tenant_urls import storefront_path
+from shipping.exceptions import ShipmentAwaitingPaymentError
 from shipping_acs.exceptions import (
     AcsAPIError,
     AcsConfigError,
     AcsRetryableError,
+    AcsUnprintedVouchersError,
 )
 from tenant.celery import TenantTask
 from tenant.credentials import tenant_contact_email, tenant_from_email
@@ -105,6 +107,16 @@ def create_acs_voucher_for_order(self, order_id: int) -> dict[str, Any]:
 
     try:
         shipment = AcsService.create_voucher_for_order(order)
+    except ShipmentAwaitingPaymentError as exc:
+        # Not a failure: the payment webhook dispatches this task again
+        # once the shopper pays. No retry, no "creation failed" alert.
+        logger.warning(
+            "ACS voucher not created for order %s: %s",
+            order_id,
+            exc,
+            extra={"order_id": order_id},
+        )
+        return {"status": "awaiting_payment", "order_id": order_id}
     except AcsConfigError as exc:
         # The tenant has no ACS credentials. AcsConfigError is a SIBLING
         # of AcsAPIError, not a subclass, so it matched neither the
@@ -131,6 +143,10 @@ def create_acs_voucher_for_order(self, order_id: int) -> dict[str, Any]:
             order_id=order_id,
             carrier="ACS",
             error=f"ACS credentials missing for this tenant: {exc}",
+            remedy=(
+                "Add the store's ACS credentials, then press “Issue ACS "
+                "voucher now” on the order's ACS shipment."
+            ),
         )
         return {
             "status": "acs_not_configured",
@@ -161,7 +177,13 @@ def create_acs_voucher_for_order(self, order_id: int) -> dict[str, Any]:
             },
         )
         alert_admins_shipment_creation_failed(
-            order_id=order_id, carrier="ACS", error=str(exc)
+            order_id=order_id,
+            carrier="ACS",
+            error=str(exc),
+            remedy=(
+                "Fix the address on the order, then press “Issue ACS "
+                "voucher now” on the order's ACS shipment."
+            ),
         )
         return {
             "status": "acs_api_error",
@@ -233,6 +255,52 @@ def _unprinted_rows(voucher_numbers: list[str] | None = None) -> list[dict]:
     ]
 
 
+def _unprinted_changelist_url() -> str:
+    """Absolute link to the ACS shipments admin, filtered to unprinted.
+
+    The tenant admin lives on the tenant's API host (``core/urls.py``
+    mounts ``admin.site.urls`` in the storefront URLconf), and the
+    changelist's ``("label_printed_at", EmptyFieldListFilter)`` reads
+    ``label_printed_at__isempty=1`` (``django/contrib/admin/filters.py``,
+    ``EmptyFieldListFilter.lookup_kwarg``). That page carries both the
+    "Print labels for selected shipments" action and the "Issue ACS
+    pickup list now" button.
+    """
+    from django.urls import reverse
+
+    from core.utils.tenant_urls import get_tenant_api_base_url
+
+    path = reverse("admin:shipping_acs_acsshipment_changelist")
+    return f"{get_tenant_api_base_url()}{path}?label_printed_at__isempty=1"
+
+
+def _note_unprinted_on_orders(rows: list[dict], *, acs_message: str) -> None:
+    """Record the pickup-list block on each order it holds back.
+
+    The alert email reaches an inbox; the order page is where staff look
+    when a customer asks why their parcel has not moved, and until now it
+    showed nothing.
+    """
+    from order.models.history import OrderHistory
+    from order.models.order import Order
+
+    orders = Order.objects.in_bulk([row["order_id"] for row in rows])
+    for row in rows:
+        order = orders.get(row["order_id"])
+        if order is None:
+            continue
+        OrderHistory.log_note(
+            order=order,
+            note=(
+                f"ACS refused today's pickup list: voucher "
+                f"{row['voucher_no']} has no printed label"
+                + (f" (ACS: {acs_message})" if acs_message else "")
+                + ". Print its label (ACS shipments → Print labels for "
+                "selected shipments), then press Issue ACS pickup list now."
+            ),
+        )
+
+
 def _alert_unprinted_vouchers(
     rows: list[dict], *, blocked: bool, acs_message: str = ""
 ) -> dict[str, Any]:
@@ -274,6 +342,7 @@ def _alert_unprinted_vouchers(
         vouchers=rows,
         blocked=blocked,
         acs_message=acs_message,
+        unprinted_admin_url=_unprinted_changelist_url(),
     )
     if blocked:
         subject = _(
@@ -489,23 +558,26 @@ def issue_daily_acs_pickup_list(self) -> dict[str, Any]:
 
     try:
         pickup_list = AcsService.issue_daily_pickup_list()
-    except AcsAPIError as exc:
-        # The manifest did not go out AND a live parcel was waiting —
-        # the service returns None instead of raising when every
-        # candidate is a voucher ACS will never collect. The service has
-        # already logged ACS's reason and named the vouchers; the email
-        # exists only to add what a log cannot, which is the list of
-        # orders whose labels need printing. When ACS names nothing
-        # unprinted there is no such list and no email: the ERROR log
-        # and the failed task row are the record, and a dead voucher is
-        # reported by ``check_stale_acs_shipments``, not from here.
-        unprinted = (exc.raw or {}).get("Unprinted_Vouchers") or []
-        _alert_unprinted_vouchers(
-            _unprinted_rows(unprinted),
-            blocked=True,
-            acs_message=exc.error_message,
+    except AcsUnprintedVouchersError as exc:
+        # ACS refused the day over unprinted labels — the one refusal
+        # with a known fix (print, then "Issue ACS pickup list now"), and
+        # in production the courier collected those parcels the next
+        # morning regardless (orders 295-297, 2026-09-23). A status, not
+        # a failed task: the email and the order notes are what a human
+        # acts on. Every other refusal is an ``AcsAPIError`` and still
+        # propagates to Celery as a failure.
+        rows = _unprinted_rows((exc.raw or {}).get("Unprinted_Vouchers"))
+        alert = _alert_unprinted_vouchers(
+            rows, blocked=True, acs_message=exc.error_message
         )
-        raise
+        _note_unprinted_on_orders(rows, acs_message=exc.error_message)
+        return {
+            "status": "blocked_unprinted",
+            "unprinted": [row["voucher_no"] for row in rows],
+            "order_ids": [row["order_id"] for row in rows],
+            "acs_message": exc.error_message,
+            **alert,
+        }
 
     if pickup_list is None:
         logger.info("issue_daily_acs_pickup_list: nothing to issue")
@@ -690,6 +762,8 @@ def check_stale_acs_shipments(self) -> dict[str, Any]:
     from django.db.models import Q
     from django.template.loader import render_to_string
 
+    from order.enum.status import PaymentStatus
+    from pay_way.enum.settlement import PaySettlement
     from shipping_acs.enum.shipment_state import AcsShipmentState
     from shipping_acs.models import AcsShipment
 
@@ -713,14 +787,30 @@ def check_stale_acs_shipments(self) -> dict[str, Any]:
             | (Q(last_event_at__isnull=True) & Q(created_at__lt=cutoff))
         )
     )
-    stranded_mint = Q(
-        shipment_state=AcsShipmentState.PENDING_CREATION,
-        created_at__lt=now - timedelta(hours=24),
+    # An online order the shopper has not paid yet is not a stranded
+    # mint: its voucher is dispatched by the payment webhook, and the
+    # mint refuses it until then (``ShipmentAwaitingPaymentError``).
+    # Reporting it would invite staff to "Issue ACS voucher now" for
+    # unpaid goods. The database form of ``Order.awaits_online_payment``.
+    awaiting_payment = Q(order__pay_way__settlement=PaySettlement.ONLINE) & ~Q(
+        order__payment_status=PaymentStatus.COMPLETED
+    )
+    stranded_mint = (
+        Q(
+            shipment_state=AcsShipmentState.PENDING_CREATION,
+            created_at__lt=now - timedelta(hours=24),
+        )
+        & ~awaiting_payment
     )
 
     with transaction.atomic():
         shipment_ids = list(
-            AcsShipment.objects.select_for_update(skip_locked=True)
+            # ``of=("self",)``: lock only the shipment rows — the order /
+            # pay-way join above sits on the nullable side of an outer
+            # join, which PostgreSQL refuses to lock FOR UPDATE.
+            AcsShipment.objects.select_for_update(
+                skip_locked=True, of=("self",)
+            )
             .filter(stale_alert_sent=False)
             .filter(stale_tracking | stranded_mint)
             .values_list("id", flat=True)

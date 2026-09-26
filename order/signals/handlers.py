@@ -1329,6 +1329,21 @@ def handle_stripe_checkout_completed(sender, **kwargs):
             from order.payment_events import publish_payment_status
             from shipping.services import ShippingService
 
+            order.metadata["stripe_checkout_session_id"] = session_id
+            order.metadata["stripe_payment_intent_id"] = payment_intent_id
+
+            # Before the settled guard: a canceled order's payment is
+            # already settled, and behind the guard a real charge on it
+            # was dropped with a WARNING. Never ships (G0281).
+            if OrderService.is_payment_after_cancel(order):
+                OrderService.record_payment_after_cancel(
+                    order,
+                    payment_id=payment_intent_id,
+                    payment_method="stripe",
+                )
+                publish_payment_status(order)
+                return
+
             # Settled-state guard: Stripe does not guarantee event
             # delivery order, so a delayed checkout.session.completed
             # must never un-refund / un-cancel an order that already
@@ -1356,9 +1371,6 @@ def handle_stripe_checkout_completed(sender, **kwargs):
             order.mark_as_paid(
                 payment_id=payment_intent_id, payment_method="stripe"
             )
-
-            order.metadata["stripe_checkout_session_id"] = session_id
-            order.metadata["stripe_payment_intent_id"] = payment_intent_id
             order.save(update_fields=["metadata"])
 
             OrderHistory.log_payment_update(
@@ -1370,29 +1382,6 @@ def handle_stripe_checkout_completed(sender, **kwargs):
                     "checkout_session_id": session_id,
                 },
             )
-
-            if order.status == OrderStatus.CANCELED:
-                # Payment landed for an already-CANCELED order (the
-                # customer cancelled before the webhook, or the two
-                # raced). Record the receipt for reconciliation and
-                # page staff (ERROR is the monitored channel) for a
-                # manual refund — but do NOT advance status or mint a
-                # shipment for a cancelled order. Mirrors
-                # handle_payment_succeeded (G0281).
-                order.metadata["payment_after_cancel"] = {
-                    "payment_id": payment_intent_id,
-                    "recorded_at": timezone.now().isoformat(),
-                }
-                order.save(update_fields=["metadata"])
-                logger.error(
-                    "Payment %s received via checkout session for "
-                    "CANCELED order %s — manual refund required; NOT "
-                    "dispatching shipment creation",
-                    payment_intent_id,
-                    order.id,
-                )
-                publish_payment_status(order)
-                return
 
             if order.status == OrderStatus.PENDING:
                 OrderService.update_order_status(order, OrderStatus.PROCESSING)

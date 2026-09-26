@@ -42,6 +42,12 @@ class OrderModelTestCase(TestCase):
         self.order.country = Mock(
             postal_code_pattern=r"\d{3} ?\d{2}", postal_code_example="151 24"
         )
+        # ``clean()`` also runs the payment-consistency helper; bind the
+        # real one so a spec'd Mock does not answer it with a Mock.
+        self.order.payment_status = PaymentStatus.PENDING
+        self.order._payment_consistency_errors = lambda: (
+            Order._payment_consistency_errors(self.order)
+        )
 
         item1 = Mock()
         item1.product = Mock()

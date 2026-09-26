@@ -22,10 +22,10 @@ input is expected:
     addresses, favourites, points — is wiped and rebuilt by
     `reset_demo_account`, which the nightly task runs.
 
-Orders are written with the ORM directly and backdated with `update()`
-rather than through `OrderService`. A seeded order must not send a
-confirmation email, must not move stock, and must not enter the state
-machine — it is a fixture, not a sale.
+Orders are written with `bulk_create` and backdated with `update()`
+rather than through `OrderService` or `save()`. A seeded order must not
+send a confirmation email, must not move stock, and must not enter the
+state machine — it is a fixture, not a sale.
 """
 
 from __future__ import annotations
@@ -70,7 +70,11 @@ class OrderRow:
 
     status: str
     payment_status: str
-    payment_method: str
+    #: How the shopper paid (``PaySettlement``). The fixture takes the
+    #: store's first pay way with that settlement, so the order's
+    #: ``pay_way`` and its payment fields always agree; with no such pay
+    #: way the row is skipped, like a row whose products are missing.
+    settlement: str
     days_ago: int
     items: tuple[tuple[str, int], ...]
     tracking_number: str = ""
@@ -115,40 +119,45 @@ FAVOURITE_SLUGS: tuple[str, ...] = (
     "demo-glass-privacy",
 )
 
+#: Each row is a state a real order can hold. A paid order that was
+#: delivered is COMPLETED — ``complete_paid_delivered_orders`` moves any
+#: DELIVERED + paid order there within the hour, so a DELIVERED fixture
+#: only ever re-entered the state machine. The collect-on-delivery
+#: parcel went to a BoxNow locker, so it settles at the locker terminal.
 ORDERS: tuple[OrderRow, ...] = (
     OrderRow(
-        status="DELIVERED",
+        status="COMPLETED",
         payment_status="COMPLETED",
-        payment_method="Κάρτα",
+        settlement="online",
         days_ago=21,
         items=(
             ("demo-powerbank-20k", 1),
             ("demo-cable-usbc-braided-black", 2),
         ),
         tracking_number="DEMO0000000021",
-        shipping_carrier="ACS",
+        shipping_carrier="acs",
     ),
     OrderRow(
         status="SHIPPED",
         payment_status="PENDING",
-        payment_method="Αντικαταβολή",
+        settlement="carrier_terminal",
         days_ago=5,
         items=(("demo-earbuds-black", 1),),
         tracking_number="DEMO0000000005",
-        shipping_carrier="BOX NOW",
+        shipping_carrier="boxnow",
         customer_notes="Παράδοση μετά τις 17:00 παρακαλώ.",
     ),
     OrderRow(
         status="PROCESSING",
         payment_status="COMPLETED",
-        payment_method="Κάρτα",
+        settlement="online",
         days_ago=1,
         items=(("demo-charger-gan-65w", 1), ("demo-case-clear", 1)),
     ),
     OrderRow(
         status="CANCELED",
         payment_status="CANCELED",
-        payment_method="Κάρτα",
+        settlement="online",
         days_ago=40,
         items=(("demo-glass-privacy", 1),),
     ),
@@ -265,9 +274,18 @@ def _seed_favourites(user) -> int:
 def _seed_orders(user) -> int:
     """Fixture orders, written straight to the ORM and backdated.
 
-    Never ``OrderService``: that sends the confirmation email, reserves
-    and decrements stock and drives the state machine. These are
-    history for an order-list page to render, not sales.
+    Never ``OrderService``, and never ``save()`` either: ``bulk_create``
+    sends no ``post_save`` (Django's documented bulk_create caveat), so
+    ``handle_order_post_save`` never fires ``order_created`` — which is
+    what mailed an order confirmation and a merchant new-order email for
+    every fixture on every nightly reset, pushed a WebSocket toast and
+    an agent-gateway event, while the docstring above promised none of
+    it. These are history for an order-list page to render, not sales.
+
+    ``bulk_create`` also skips ``Order.save()``, so the two fields it
+    derives are written here: ``pay_way_key`` through the model's own
+    snapshot, and ``paid_amount`` — what the shopper owed, as on a real
+    order — once the lines exist to total.
     """
     from django.utils import timezone
 
@@ -278,46 +296,57 @@ def _seed_orders(user) -> int:
     from product.models import Product
 
     country = Country.objects.filter(alpha_2="GR").first()
-    pay_way = PayWay.objects.filter(active=True).order_by("id").first()
     main = ADDRESSES[0]
     now = timezone.now()
     written = 0
 
     for row in ORDERS:
+        if Order.objects.filter(
+            user=user, metadata__demo_seed=row.days_ago
+        ).exists():
+            continue
         products = [
             (Product.objects.filter(slug=slug).first(), quantity)
             for slug, quantity in row.items
         ]
         products = [(p, q) for p, q in products if p is not None]
-        if not products:
+        pay_way = (
+            PayWay.objects.filter(settlement=row.settlement)
+            .order_by("id")
+            .first()
+        )
+        if not products or pay_way is None:
             continue
 
-        placed_at = now - timedelta(days=row.days_ago)
-        order, created = Order.objects.get_or_create(
+        order = Order(
             user=user,
-            metadata__demo_seed=row.days_ago,
-            defaults={
-                "email": user.email,
-                "first_name": main.first_name,
-                "last_name": main.last_name,
-                "street": main.street,
-                "street_number": main.street_number,
-                "city": main.city,
-                "zipcode": main.zipcode,
-                "floor": main.floor,
-                "country": country,
-                "pay_way": pay_way,
-                "status": row.status,
-                "payment_status": row.payment_status,
-                "payment_method": row.payment_method,
-                "tracking_number": row.tracking_number,
-                "shipping_carrier": row.shipping_carrier,
-                "customer_notes": row.customer_notes,
-                "metadata": {"demo_seed": row.days_ago},
-            },
+            email=user.email,
+            first_name=main.first_name,
+            last_name=main.last_name,
+            street=main.street,
+            street_number=main.street_number,
+            city=main.city,
+            zipcode=main.zipcode,
+            floor=main.floor,
+            country=country,
+            pay_way=pay_way,
+            status=row.status,
+            payment_status=row.payment_status,
+            # The gateway that took the money (docs/order-system.md §1),
+            # so only a paid online order names one.
+            payment_method=(
+                pay_way.provider_code
+                if row.payment_status == "COMPLETED"
+                and row.settlement == "online"
+                else ""
+            ),
+            tracking_number=row.tracking_number,
+            shipping_carrier=row.shipping_carrier,
+            customer_notes=row.customer_notes,
+            metadata={"demo_seed": row.days_ago},
         )
-        if not created:
-            continue
+        order._snapshot_pay_way_key()
+        [order] = Order.objects.bulk_create([order])
 
         OrderItem.objects.bulk_create(
             [
@@ -330,9 +359,10 @@ def _seed_orders(user) -> int:
                 for product, quantity in products
             ]
         )
-        # `update()` rather than `save()`: auto_now on the timestamp
-        # mixin would stamp today over every backdate.
+        placed_at = now - timedelta(days=row.days_ago)
+        # `update()`: bulk_create stamps today into the auto_now columns.
         Order.objects.filter(pk=order.pk).update(
+            paid_amount=order.calculate_order_total_amount(),
             created_at=placed_at,
             updated_at=placed_at,
             status_updated_at=placed_at,
@@ -421,13 +451,29 @@ def reset_demo_account() -> dict[str, int]:
     """Put both accounts back the way the seed left them.
 
     Everything a visitor can create while signed in is removed first —
-    see ``_VISITOR_OWNED`` — and then the fixtures are rebuilt. The
+    see ``_VISITOR_OWNED`` — and so is every guest checkout placed before
+    this run (``_wipe_guest_checkouts``); then the fixtures are rebuilt.
+    Refuses to run on a schema that is not flagged ``is_demo``. The
     password is restored too: the adapter refuses a change through the
     API, but a reset that could not restore it would be one bug away
     from a store nobody can sign into.
     """
     from django.contrib.auth import get_user_model
+    from django.utils import timezone
 
+    from devtools.demo_store import _current_tenant_is_demo
+
+    # The wipe below deletes customer orders. The fanout only ever sends
+    # ``is_demo`` schemas here (``tenant/tasks.py``), but a reset that
+    # ran against a real merchant — a hand-run task, a wrong schema —
+    # would delete that merchant's guest checkouts, so the store is
+    # checked again at the point of deletion.
+    if not _current_tenant_is_demo():
+        return {"skipped_not_a_demo_tenant": 1}
+
+    # Everything a visitor placed BEFORE this run; nothing that lands
+    # while the reset is working.
+    started_at = timezone.now()
     report: dict[str, int] = {}
     user_model = get_user_model()
     emails = (RETAIL_EMAIL, B2B_EMAIL)
@@ -438,11 +484,128 @@ def reset_demo_account() -> dict[str, int]:
             continue
         _bump(report, "wiped", _wipe_visitor_data(user))
 
+    for key, value in _wipe_guest_checkouts(before=started_at).items():
+        _bump(report, key, value)
+
     seeded = seed_demo_account()
     for key, value in seeded.items():
         report[f"seeded_{key}"] = value
     _bump(report, "stock_restored", _restore_demo_stock())
     return report
+
+
+def _wipe_guest_checkouts(*, before) -> dict[str, int]:
+    """Remove the guest checkouts visitors placed on the demo store.
+
+    A demo store invites strangers to walk the checkout, and a guest
+    order is not under either shared account, so the account wipe never
+    reached it — prod demo order #1 (2026-09-22) sat PENDING for good,
+    because the demo store has no carrier to advance it and the
+    auto-cancel only closes online payments.
+
+    Not through ``OrderService.cancel_order``: that is a customer-facing
+    cancellation — it emails the guest "your order was canceled",
+    cascades to the carrier and pushes the change to the agent gateway —
+    for an order that is about to stop existing. What a cancel must
+    ALSO do is kept: open reservations are released
+    (``StockManager.release_reservation``) and the stock the order
+    physically took — its net DECREMENT / INCREMENT in ``StockLog``, the
+    sum ``cancel_order`` restores — goes back, so a product outside the
+    seeded catalogue does not drain either (``_restore_demo_stock``
+    resets only the catalogue's quantities).
+
+    The stock goes back with a queryset ``update()`` plus the INCREMENT
+    ``StockLog`` row ``StockManager.increment_stock`` would write — not
+    through ``increment_stock`` itself. That method saves the product,
+    and the product's history signal (``product/signals.py``) turns a
+    0 → positive stock into ``product_back_in_stock``, which emails every
+    restock subscriber and pushes a live notification to favouriters;
+    the save also queues a recommendation recompute. A reset that must
+    be silent cannot go through it — ``_restore_demo_stock`` uses
+    ``update()`` for the same reason.
+
+    Then the rows go with ``hard_delete``: items, history and carrier
+    shipments cascade; the audit trails that ``SET_NULL`` (stock log,
+    webhook and analytics events) keep their rows. Coupon redemptions
+    are deleted so the demo coupons' usage limits refill, and an invoice
+    is removed first because ``Invoice.order`` is ``PROTECT``.
+    """
+    from django.db import transaction
+    from django.db.models import F, Sum
+
+    from order.exceptions import StockReservationError
+    from order.models.invoice import Invoice
+    from order.models.order import Order
+    from order.models.stock_log import StockLog
+    from order.models.stock_reservation import StockReservation
+    from order.stock import StockManager
+    from product.models import Product
+    from promotion.models.redemption import PromotionRedemption
+
+    guests = Order.objects.all_with_deleted().filter(
+        user__isnull=True, created_at__lt=before
+    )
+    orders = list(guests.values_list("id", "metadata"))
+    if not orders:
+        return {}
+    order_ids = [order_id for order_id, _metadata in orders]
+
+    reservation_ids = set(
+        StockReservation.objects.filter(
+            order_id__in=order_ids, consumed=False
+        ).values_list("id", flat=True)
+    )
+    for _order_id, metadata in orders:
+        reservation_ids.update(
+            (metadata or {}).get("stock_reservation_ids") or []
+        )
+    for reservation_id in sorted(reservation_ids):
+        try:
+            StockManager.release_reservation(reservation_id)
+        except StockReservationError:
+            # Already consumed or expired-and-cleaned: nothing held.
+            continue
+
+    restored = 0
+    taken = (
+        StockLog.objects.filter(
+            order_id__in=order_ids,
+            operation_type__in=(
+                StockLog.OPERATION_DECREMENT,
+                StockLog.OPERATION_INCREMENT,
+            ),
+        )
+        .values("order_id", "product_id")
+        .annotate(net=Sum("quantity_delta"))
+    )
+    for row in taken:
+        quantity = -row["net"]
+        if quantity <= 0:
+            continue
+        with transaction.atomic():
+            before_stock = (
+                Product.objects.select_for_update()
+                .values_list("stock", flat=True)
+                .get(pk=row["product_id"])
+            )
+            Product.objects.filter(pk=row["product_id"]).update(
+                stock=F("stock") + quantity
+            )
+            StockLog.objects.create(
+                product_id=row["product_id"],
+                order_id=row["order_id"],
+                operation_type=StockLog.OPERATION_INCREMENT,
+                quantity_delta=quantity,
+                stock_before=before_stock,
+                stock_after=before_stock + quantity,
+                reason=f"Demo reset: guest order {row['order_id']} cleared",
+            )
+        restored += quantity
+
+    PromotionRedemption.objects.filter(order_id__in=order_ids).delete()
+    Invoice.objects.filter(order_id__in=order_ids).delete()
+    guests.hard_delete()
+    return {"guest_orders": len(order_ids), "guest_stock_restored": restored}
 
 
 def _wipe_visitor_data(user) -> int:
@@ -458,8 +621,14 @@ def _wipe_visitor_data(user) -> int:
     from product.models.review import ProductReview
 
     removed = 0
-    # Orders first: points transactions reference them.
-    removed += Order.objects.filter(user=user).delete()[0]
+    # Orders first: points transactions reference them. ``hard_delete``
+    # over ``all_with_deleted``: ``Order``'s queryset ``delete()`` only
+    # soft-deletes, so every reset left the previous night's four
+    # fixtures behind as hidden rows (production demo schema: 12 of 17
+    # orders on 2026-09-25).
+    removed += (
+        Order.objects.all_with_deleted().filter(user=user).hard_delete()[0]
+    )
     removed += PointsTransaction.objects.filter(user=user).delete()[0]
     removed += ProductReview.objects.filter(user=user).delete()[0]
     removed += BlogComment.objects.filter(user=user).delete()[0]

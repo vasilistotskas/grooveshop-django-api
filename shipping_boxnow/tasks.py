@@ -9,6 +9,7 @@ from django.utils import translation
 from core.utils.email_context import build_email_context
 from core.utils.i18n import get_order_language
 from core.utils.tenant_urls import storefront_path
+from shipping.exceptions import ShipmentAwaitingPaymentError
 from shipping_boxnow.exceptions import (
     BoxNowAPIError,
     BoxNowConfigError,
@@ -94,6 +95,16 @@ def create_boxnow_shipment_for_order(self, order_id: int) -> dict[str, Any]:
 
     try:
         shipment = BoxNowService.create_shipment_for_order(order)
+    except ShipmentAwaitingPaymentError as exc:
+        # Not a failure: the payment webhook dispatches this task again
+        # once the shopper pays. No retry, no "creation failed" alert.
+        logger.warning(
+            "BoxNow shipment not created for order %s: %s",
+            order_id,
+            exc,
+            extra={"order_id": order_id},
+        )
+        return {"status": "awaiting_payment", "order_id": order_id}
     except BoxNowConfigError as exc:
         # The tenant has no BoxNow credentials. BoxNowConfigError is a
         # SIBLING of BoxNowAPIError, not a subclass, so it matched
@@ -117,6 +128,10 @@ def create_boxnow_shipment_for_order(self, order_id: int) -> dict[str, Any]:
             order_id=order_id,
             carrier="BoxNow",
             error=f"BoxNow credentials missing for this tenant: {exc}",
+            remedy=(
+                "Add the store's BoxNow credentials, then press “Create "
+                "BoxNow parcel now” on the order's BoxNow shipment."
+            ),
         )
         return {
             "status": "boxnow_not_configured",
@@ -147,7 +162,14 @@ def create_boxnow_shipment_for_order(self, order_id: int) -> dict[str, Any]:
             },
         )
         alert_admins_shipment_creation_failed(
-            order_id=order_id, carrier="BoxNow", error=str(exc)
+            order_id=order_id,
+            carrier="BoxNow",
+            error=str(exc),
+            remedy=(
+                "Fix the locker on the BoxNow shipment or the contact "
+                "details on the order, then press “Create BoxNow parcel "
+                "now” on that shipment."
+            ),
         )
         return {
             "status": "boxnow_api_error",

@@ -12,6 +12,8 @@ labels" is not actionable without the list:
 
 * 15:45 — ``warn_unprinted_acs_vouchers``, while there is still time.
 * 16:30 — the manifest was refused; say so instead of failing silently.
+  An unprinted-labels refusal is reported as ``blocked_unprinted``;
+  every other refusal still fails the task.
 """
 
 from __future__ import annotations
@@ -21,7 +23,7 @@ from unittest.mock import patch
 import pytest
 
 from shipping_acs.enum.shipment_state import AcsShipmentState
-from shipping_acs.exceptions import AcsAPIError
+from shipping_acs.exceptions import AcsAPIError, AcsUnprintedVouchersError
 from shipping_acs.factories import AcsShipmentFactory
 from shipping_acs.tasks import (
     issue_daily_acs_pickup_list,
@@ -105,9 +107,18 @@ class TestWarnUnprintedAcsVouchers:
 
 
 class TestPickupListRefusalAlert:
+    """An unprinted-labels refusal is a status, not a failed task.
+
+    Production 2026-09-23: ACS refused the list over orders 295-297 and
+    collected all three the next morning anyway. The fix is always the
+    same — print, then "Issue ACS pickup list now" — so the task reports
+    ``blocked_unprinted`` and hands the fix to a human through the email
+    and a note on each order, instead of a red Celery row.
+    """
+
     @staticmethod
     def _refusal(vouchers):
-        return AcsAPIError(
+        return AcsUnprintedVouchersError(
             alias="ACS_Issue_Pickup_List",
             error_message="Αδύνατη η έκδοση λίστας παραλαβής.",
             raw={
@@ -117,7 +128,7 @@ class TestPickupListRefusalAlert:
             },
         )
 
-    def test_alerts_and_still_fails_the_task(
+    def test_reports_blocked_and_emails_the_orders(
         self, acs_configured_tenant, admins_configured
     ):
         blocking = _candidate("9800000001")
@@ -128,18 +139,71 @@ class TestPickupListRefusalAlert:
                 side_effect=self._refusal(["9800000001"]),
             ),
             patch("django.core.mail.send_mail") as mock_mail,
-            # The alert must not swallow the failure: a task that
-            # reports success here is the exact bug this replaces.
-            pytest.raises(AcsAPIError),
         ):
-            issue_daily_acs_pickup_list.run()
+            result = issue_daily_acs_pickup_list.run()
 
-        assert mock_mail.called
+        assert result["status"] == "blocked_unprinted"
+        assert result["unprinted"] == ["9800000001"]
+        assert result["order_ids"] == [blocking.order_id]
+        assert result["alerted"] == 1
         body = mock_mail.call_args.kwargs["message"]
         assert "9800000001" in body
         assert str(blocking.order_id) in body
         # ACS's own words are the actionable part.
         assert "Αδύνατη η έκδοση" in body
+
+    def test_email_links_the_unprinted_admin_filter(
+        self, acs_configured_tenant, admins_configured
+    ):
+        from django.urls import reverse
+
+        _candidate("9800000001")
+
+        with (
+            patch(
+                "shipping_acs.services.AcsService.issue_daily_pickup_list",
+                side_effect=self._refusal(["9800000001"]),
+            ),
+            patch("django.core.mail.send_mail") as mock_mail,
+        ):
+            issue_daily_acs_pickup_list.run()
+
+        # ``EmptyFieldListFilter`` reads ``<field>__isempty=1``.
+        link = (
+            reverse("admin:shipping_acs_acsshipment_changelist")
+            + "?label_printed_at__isempty=1"
+        )
+        body = mock_mail.call_args.kwargs["message"]
+        html = mock_mail.call_args.kwargs["html_message"]
+        assert link in body
+        assert link in html
+        assert "Issue ACS pickup list now" in body
+
+    def test_notes_the_block_on_each_order(
+        self, acs_configured_tenant, admins_configured
+    ):
+        from order.models.history import OrderHistory
+
+        blocking = _candidate("9800000001")
+
+        with (
+            patch(
+                "shipping_acs.services.AcsService.issue_daily_pickup_list",
+                side_effect=self._refusal(["9800000001"]),
+            ),
+            patch("django.core.mail.send_mail"),
+        ):
+            issue_daily_acs_pickup_list.run()
+
+        notes = [
+            h.new_value["note"]
+            for h in OrderHistory.objects.filter(
+                order_id=blocking.order_id, change_type="NOTE"
+            )
+        ]
+        [note] = [n for n in notes if "pickup list" in n]
+        assert "9800000001" in note
+        assert "Issue ACS pickup list now" in note
 
     def test_acs_voucher_list_wins_over_the_local_flag(
         self, acs_configured_tenant, admins_configured
@@ -156,7 +220,6 @@ class TestPickupListRefusalAlert:
                 side_effect=self._refusal(["9800000001"]),
             ),
             patch("django.core.mail.send_mail") as mock_mail,
-            pytest.raises(AcsAPIError),
         ):
             issue_daily_acs_pickup_list.run()
 
@@ -164,7 +227,7 @@ class TestPickupListRefusalAlert:
         assert str(acs_says.order_id) in body
         assert "9800000002" not in body
 
-    def test_a_mail_failure_does_not_mask_the_refusal(
+    def test_a_mail_failure_still_reports_the_block(
         self, acs_configured_tenant, admins_configured
     ):
         _candidate("9800000001")
@@ -178,9 +241,11 @@ class TestPickupListRefusalAlert:
                 "django.core.mail.send_mail",
                 side_effect=OSError("smtp down"),
             ),
-            pytest.raises(AcsAPIError),
         ):
-            issue_daily_acs_pickup_list.run()
+            result = issue_daily_acs_pickup_list.run()
+
+        assert result["status"] == "blocked_unprinted"
+        assert result["alerted"] == 0
 
     def test_a_successful_issue_sends_nothing(
         self, acs_configured_tenant, admins_configured
@@ -280,7 +345,7 @@ class TestRefusalWithNothingUnprinted:
         with (
             patch(
                 "shipping_acs.services.AcsService.issue_daily_pickup_list",
-                side_effect=AcsAPIError(
+                side_effect=AcsUnprintedVouchersError(
                     alias="ACS_Issue_Pickup_List",
                     error_message="unprinted",
                     raw={
@@ -291,7 +356,6 @@ class TestRefusalWithNothingUnprinted:
                 ),
             ),
             patch("django.core.mail.send_mail") as mock_mail,
-            pytest.raises(AcsAPIError),
         ):
             issue_daily_acs_pickup_list.run()
 

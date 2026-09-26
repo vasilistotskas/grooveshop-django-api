@@ -49,15 +49,41 @@ def send_ops_alert(*, subject: str, message: str) -> bool:
     return True
 
 
-def alert_admins_shipment_creation_failed(
-    *, order_id: int, carrier: str, error: str
-) -> None:
-    """Email the tenant's operators that a courier rejected the shipment.
+def _note_on_order(order_id: int, note: str) -> None:
+    """Best-effort ``OrderHistory`` note for an order-scoped alert."""
+    from order.models.history import OrderHistory
+    from order.models.order import Order
 
-    Best-effort: an SMTP failure must never mask the original carrier
-    error or fail the calling task — the task's own error handling and
-    return value stay authoritative.
+    try:
+        order = Order.objects.filter(pk=order_id).first()
+        if order is not None:
+            OrderHistory.log_note(order=order, note=note)
+    except Exception:
+        logger.exception(
+            "Could not record the operational alert on order %s", order_id
+        )
+
+
+def alert_admins_shipment_creation_failed(
+    *, order_id: int, carrier: str, error: str, remedy: str
+) -> None:
+    """Tell the tenant's operators that a courier rejected the shipment.
+
+    Two records, because they serve different moments: the email reaches
+    an inbox now, and an ``OrderHistory`` note stays on the order, which
+    is where staff look when the customer asks where the parcel is (prod
+    order 316, 2026-09-24: the alert went out, the order page said
+    nothing). ``remedy`` is the carrier's own next step — only the
+    carrier knows which admin action re-dispatches it.
+
+    Best-effort: neither an SMTP nor a database failure may mask the
+    original carrier error or fail the calling task — the task's own
+    error handling and return value stay authoritative.
     """
+    _note_on_order(
+        order_id,
+        f"{carrier} shipment creation failed: {error}. {remedy}",
+    )
     try:
         sent = send_ops_alert(
             subject=(
@@ -67,9 +93,7 @@ def alert_admins_shipment_creation_failed(
                 f"The {carrier} API permanently rejected the shipment for "
                 f"order {order_id}:\n\n{error}\n\n"
                 "The customer has already checked out and is waiting. "
-                "Fix the underlying data (address, destination, locker) "
-                "and re-dispatch the voucher from the shipment's admin "
-                "page, or cancel the order and contact the customer."
+                f"{remedy} Or cancel the order and contact the customer."
             ),
         )
         if not sent:

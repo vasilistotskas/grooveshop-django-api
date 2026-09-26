@@ -10,6 +10,7 @@ from django.db import transaction
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
+from shipping.exceptions import ShipmentAwaitingPaymentError
 from shipping.services import DELIVERY_NOTES_MAX_LEN
 from shipping_boxnow.client import BoxNowClient
 from shipping_boxnow.enum import BoxNowParcelState, BoxNowPaymentMode
@@ -256,6 +257,13 @@ class BoxNowService:
                     shipment.delivery_request_id,
                 )
                 return shipment
+
+            # Never create a parcel for an order the shopper still owes
+            # online: a prepaid parcel collects nothing at the locker.
+            # ``shipment.order`` was loaded under this lock, so a payment
+            # that landed a moment ago is seen.
+            if shipment.order.awaits_online_payment:
+                raise ShipmentAwaitingPaymentError(order.id)
 
             metadata = shipment.metadata or {}
             started_raw = metadata.get("mint_started_at")

@@ -30,6 +30,7 @@ from shipping_acs.admin import AcsCodPayoutAdmin, AcsShipmentAdmin
 from shipping_acs.enum.shipment_state import AcsShipmentState
 from shipping_acs.factories import AcsShipmentFactory
 from shipping_acs.models import AcsCodPayout, AcsShipment
+from tests.utils.orders import courier_cash_order
 
 pytestmark = pytest.mark.django_db
 
@@ -60,8 +61,12 @@ class TestRowActionsReturnAResponse:
 
     def test_issue_voucher_now(self):
         admin = AcsShipmentAdmin(AcsShipment, AdminSite())
+        # Cash on delivery: an unpaid online order is refused before the
+        # dispatch (tests/unit/shipping/test_mint_awaits_payment.py).
         shipment = AcsShipmentFactory(
-            voucher_no=None, shipment_state=AcsShipmentState.PENDING_CREATION
+            order=courier_cash_order(),
+            voucher_no=None,
+            shipment_state=AcsShipmentState.PENDING_CREATION,
         )
 
         with (

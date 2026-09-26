@@ -31,6 +31,25 @@
         </div>
     </div>
 
+    {# Legal-text update the platform could not apply: the merchant's #}
+    {# own pages. Shown to whoever may edit content pages.            #}
+    {% if legal_update_pages %}
+    <div class="rounded-default px-4 py-3 bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-400">
+        <div class="flex items-start gap-3">
+            {% component "unfold/components/icon.html" with class="shrink-0" %}gavel{% endcomponent %}
+            <div class="flex-1">
+                <h3 class="text-sm font-semibold mb-1">{% trans "Your legal pages need an update" %}</h3>
+                {% component "unfold/components/text.html" with class="mb-2" %}{% trans "The platform has added new text to its legal documents. These pages were not changed automatically because their text is yours. Open each one to see the text to add." %}{% endcomponent %}
+                <ul class="text-sm list-disc ml-5">
+                    {% for page in legal_update_pages %}
+                    <li>{% component "unfold/components/link.html" with href=page.url class="font-medium" %}{{ page.title }}{% endcomponent %}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     {# ────────────────────────────────────────────────────────────── #}
     {# ZONE D — Superuser-only system warnings                        #}
     {# ────────────────────────────────────────────────────────────── #}

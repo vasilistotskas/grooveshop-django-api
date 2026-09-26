@@ -93,7 +93,38 @@ def dashboard_callback(request, context):
             "environment": "",
         }
         context["low_stock_products"] = []
+    context["legal_update_pages"] = _check_legal_updates(request)
     return context
+
+
+# ── Legal-text updates — fresh, for whoever edits content pages ────────
+
+
+def _check_legal_updates(request) -> list[dict]:
+    """Legal pages the platform updated but could not rewrite here.
+
+    Not part of Zone D: the merchant is the one who has to act, and
+    merchants are not superusers. Shown to anyone who may change content
+    pages; computed fresh (three rows at most) so marking a page
+    reviewed clears the banner on the next load.
+    """
+    if _is_public_schema() or not request.user.has_perm(
+        "page_config.change_contentpage"
+    ):
+        return []
+
+    from page_config.defaults import pending_legal_reviews
+
+    pages = {page.pk: page for page, _update in pending_legal_reviews()}
+    return [
+        {
+            "title": str(page),
+            "url": reverse(
+                "admin:page_config_contentpage_change", args=[page.pk]
+            ),
+        }
+        for page in pages.values()
+    ]
 
 
 # ── Zone D — fresh, superuser-only ─────────────────────────────────────

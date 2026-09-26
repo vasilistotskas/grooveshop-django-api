@@ -24,6 +24,8 @@ from __future__ import annotations
 
 import logging
 
+from page_config.legal_documents import PRIVACY_SERVER_LOGS_SECTION
+
 logger = logging.getLogger(__name__)
 
 TERMS = """
@@ -110,6 +112,10 @@ personal data, and to object to its processing. To exercise any of
 these, or to complain, contact us through the contact page; you may
 also complain to the Hellenic Data Protection Authority.</p></section>
 """.strip()
+
+# The server-log section is the platform's own English text, not a
+# demo rewording: the log it describes is the same for every store.
+PRIVACY = f"{PRIVACY}\n\n{PRIVACY_SERVER_LOGS_SECTION['en'].strip()}"
 
 COOKIES = """
 <section id="intro"><h2>Introduction</h2>

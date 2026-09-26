@@ -8,6 +8,10 @@ from page_config.legal_documents import (
     LEGAL_DOCUMENT_SLUGS,
     LEGAL_DOCUMENTS,
     LEGAL_ROUTE_BY_SLUG,
+    LEGAL_TEXT_REVISION,
+    LEGAL_TEXT_UPDATES,
+    LegalTextUpdate,
+    pending_legal_updates,
     render_legal_document,
 )
 from page_config.models import (
@@ -471,7 +475,9 @@ def seed_content_pages() -> dict[str, bool]:
 
     Idempotent (``get_or_create`` by slug) — safe to run repeatedly, and
     it never touches a row that already exists, so a merchant's edits
-    are never overwritten. Returns ``{slug: created}``.
+    are never overwritten. A legal document it creates carries the
+    current platform text, so it is stamped ``LEGAL_TEXT_REVISION``.
+    Returns ``{slug: created}``.
     """
     site_host, store_name = tenant_document_context()
 
@@ -500,7 +506,14 @@ def seed_content_pages() -> dict[str, bool]:
     for slug, content in seeds.items():
         page, created = ContentPage.objects.get_or_create(
             slug=slug,
-            defaults={"is_published": content["published"]},
+            defaults={
+                "is_published": content["published"],
+                "legal_text_revision": (
+                    LEGAL_TEXT_REVISION
+                    if slug in LEGAL_DOCUMENT_SLUGS
+                    else None
+                ),
+            },
         )
         if created:
             ContentPageTranslation.objects.create(
@@ -532,6 +545,25 @@ def legal_translation_coverage() -> dict[str, set[str]]:
         if body and body.strip():
             coverage.setdefault(slug, set()).add(language_code)
     return coverage
+
+
+def pending_legal_reviews() -> list[tuple[ContentPage, LegalTextUpdate]]:
+    """Legal pages here that lack a platform update, with the update.
+
+    Reads the CURRENT schema. A page is listed while its
+    ``legal_text_revision`` is below an update to its slug: the rollout
+    could not apply the update because the text is the merchant's, so
+    the merchant has to. Marking the page reviewed in the admin clears
+    it. Unpublished pages count too — publishing one later must not
+    publish a stale document.
+    """
+    slugs = {update.slug for update in LEGAL_TEXT_UPDATES}
+    pages = ContentPage.objects.filter(slug__in=slugs).order_by("slug")
+    return [
+        (page, update)
+        for page in pages
+        for update in pending_legal_updates(page.slug, page.legal_text_revision)
+    ]
 
 
 def _navigation_target(path: str) -> dict | None:

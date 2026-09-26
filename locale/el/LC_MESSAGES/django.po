@@ -19074,3 +19074,52 @@ msgstr "Η δημιουργία του δέματος ξεκίνησε."
 
 msgid "This shipment already has a BoxNow parcel."
 msgstr "Αυτή η αποστολή έχει ήδη δέμα BoxNow."
+
+msgid "Platform legal text revision"
+msgstr "Αναθεώρηση νομικού κειμένου πλατφόρμας"
+
+msgid "Platform update to review"
+msgstr "Ενημέρωση της πλατφόρμας προς έλεγχο"
+
+msgid "Text to add"
+msgstr "Κείμενο προς προσθήκη"
+
+msgid "Mark platform legal update as reviewed"
+msgstr "Σήμανση ενημέρωσης νομικού κειμένου ως ελεγμένης"
+
+#, python-format
+msgid "%(count)d legal page(s) marked as reviewed."
+msgstr "%(count)d νομικές σελίδες σημάνθηκαν ως ελεγμένες."
+
+msgid ""
+"The platform has updated its legal text, and these pages were not changed "
+"automatically because their text is yours:"
+msgstr ""
+"Η πλατφόρμα ενημέρωσε τα νομικά της κείμενα. Οι παρακάτω σελίδες δεν "
+"άλλαξαν αυτόματα, επειδή το κείμενό τους είναι δικό σας:"
+
+msgid ""
+"The platform added the text below to its own version of this document. Your "
+"page was not changed automatically, because its text (or a translation of "
+"it) is yours. Add the text to every language your store serves, adjusting "
+"it if your store works differently, then select this page in the list and "
+"run \"Mark platform legal update as reviewed\"."
+msgstr ""
+"Η πλατφόρμα πρόσθεσε το παρακάτω κείμενο στη δική της εκδοχή αυτού του "
+"εγγράφου. Η σελίδα σας δεν άλλαξε αυτόματα, επειδή το κείμενό της (ή μια "
+"μετάφρασή της) είναι δικό σας. Προσθέστε το κείμενο σε κάθε γλώσσα που "
+"εξυπηρετεί το κατάστημά σας, προσαρμόζοντάς το αν το κατάστημά σας "
+"λειτουργεί διαφορετικά, και μετά επιλέξτε τη σελίδα στη λίστα και εκτελέστε "
+"«Σήμανση ενημέρωσης νομικού κειμένου ως ελεγμένης»."
+
+msgid "Your legal pages need an update"
+msgstr "Οι νομικές σελίδες σας χρειάζονται ενημέρωση"
+
+msgid ""
+"The platform has added new text to its legal documents. These pages were "
+"not changed automatically because their text is yours. Open each one to see "
+"the text to add."
+msgstr ""
+"Η πλατφόρμα πρόσθεσε νέο κείμενο στα νομικά της έγγραφα. Οι παρακάτω "
+"σελίδες δεν άλλαξαν αυτόματα, επειδή το κείμενό τους είναι δικό σας. "
+"Ανοίξτε την καθεμία για να δείτε το κείμενο που πρέπει να προσθέσετε."

@@ -773,6 +773,18 @@ class ContentPage(
     """
 
     slug = models.SlugField(_("Slug"), max_length=255, unique=True)
+    # Which platform legal-text revision this page is known to include
+    # (``page_config.legal_documents.LEGAL_TEXT_UPDATES``). Set by the
+    # seed and by a rollout that rewrote untouched text, or by the
+    # merchant marking an update reviewed; NULL is a page nobody has
+    # reconciled, which the admin flags. Not editable: it records what
+    # happened to the text, not a setting.
+    legal_text_revision = models.PositiveSmallIntegerField(
+        _("Platform legal text revision"),
+        null=True,
+        blank=True,
+        editable=False,
+    )
 
     objects: ContentPageManager = ContentPageManager()
 

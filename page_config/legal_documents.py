@@ -31,6 +31,7 @@ merchant edits it like any other content.
 """
 
 from collections.abc import Collection, Iterable, Mapping
+from dataclasses import dataclass
 
 LEGAL_ROUTE_BY_SLUG: dict[str, str] = {
     "terms": "/terms-of-use",
@@ -55,6 +56,51 @@ same slugs to their dedicated routes.
 """
 
 
+# The server-log disclosure, in every language the platform writes it
+# in. Kept apart from ``LEGAL_DOCUMENTS`` for two readers: the Greek
+# privacy document below ends with it, and ``LEGAL_TEXT_UPDATES`` hands
+# it to a merchant whose own text the platform must not rewrite, the
+# English one included, since the platform seeds no English document.
+#
+# Every claim is a fact of the running platform, not boilerplate: the
+# fields, the query-string drop and the token redaction are Traefik's
+# access-log config and the Vector transform, and 14 days is
+# VictoriaLogs' ``retentionPeriod`` (grooveshop-infrastructure
+# ``docs/logging.md``). Change one there and this text changes with it,
+# as a new ``LEGAL_TEXT_UPDATES`` revision.
+PRIVACY_SERVER_LOGS_SECTION: dict[str, str] = {
+    "el": """<section id="server-logs"><h2>Αρχεία καταγραφής διακομιστή</h2>
+<p>Κάθε φορά που επισκέπτεστε τον ιστότοπο {site_host}, το πρόγραμμα περιήγησής σας στέλνει αναγκαστικά ορισμένα τεχνικά στοιχεία, χωρίς τα οποία η σελίδα δεν μπορεί να σας εμφανιστεί. Για κάθε αίτημα καταγράφονται αυτόματα:</p>
+<ul>
+<li>η διεύθυνση IP της συσκευής σας και η χώρα από την οποία προέρχεται το αίτημα, όπως τις αναγνωρίζει το δίκτυο της Cloudflare,</li>
+<li>η ημερομηνία και η ώρα του αιτήματος, ο χρόνος που χρειάστηκε για να εξυπηρετηθεί και ο κωδικός απόκρισης του διακομιστή,</li>
+<li>η διεύθυνση (τομέας και διαδρομή) της σελίδας ή του αρχείου που ζητήθηκε, η μέθοδος και το πρωτόκολλο του αιτήματος και το μέγεθος του αιτήματος και της απάντησης,</li>
+<li>η ταυτότητα του προγράμματος περιήγησης και της συσκευής όπως τη δηλώνει το ίδιο το πρόγραμμα (user agent) και ένας κωδικός που εντοπίζει το αίτημα στο δίκτυο της Cloudflare.</li>
+</ul>
+<p>Δεν καταγράφονται οι παράμετροι της διεύθυνσης (ό,τι ακολουθεί το «?», όπως οι όροι αναζήτησης), τα cookies, τα στοιχεία σύνδεσης και η σελίδα από την οποία φτάσατε (Referer). Οι κωδικοί που περιέχουν ορισμένοι σύνδεσμοι, όπως οι σύνδεσμοι επαναφοράς κωδικού πρόσβασης, επιβεβαίωσης email ή εγγραφής, προβολής παραγγελίας επισκέπτη, διαγραφής από ενημερωτικά μηνύματα, ανάκτησης καλαθιού και λήψης αντιγράφου δεδομένων, αντικαθίστανται πριν από την αποθήκευση. Σε ορισμένες περιπτώσεις η διεύθυνση IP εμφανίζεται και στα αρχεία λειτουργίας των εφαρμογών του ιστοτόπου, για παράδειγμα όταν καταγράφεται ένα σφάλμα ή ένα συμβάν ασφαλείας· για αυτά ισχύουν οι ίδιοι σκοποί και η ίδια διάρκεια τήρησης.</p>
+<p><strong>Σκοπός και νομική βάση.</strong> Τα στοιχεία αυτά χρησιμοποιούνται αποκλειστικά για την ασφάλεια του ιστοτόπου και των συστημάτων που τον υποστηρίζουν (τον εντοπισμό και την αντιμετώπιση επιθέσεων, καταχρήσεων και απόπειρων μη εξουσιοδοτημένης πρόσβασης) και για τη διερεύνηση και τη διόρθωση τεχνικών σφαλμάτων. Η νομική βάση είναι το έννομο συμφέρον να παραμένουν ο ιστότοπος και η πλατφόρμα στην οποία λειτουργεί ασφαλή και διαθέσιμα (άρθρο 6 παρ. 1 στοιχ. στ΄ ΓΚΠΔ, βλ. και την αιτιολογική σκέψη 49). Τα στοιχεία δεν χρησιμοποιούνται για διαφήμιση ούτε για τη δημιουργία προφίλ.</p>
+<p><strong>Διάρκεια τήρησης.</strong> Τα αρχεία καταγραφής διαγράφονται αυτόματα 14 ημέρες μετά την καταγραφή τους.</p>
+<p><strong>Αποδέκτες.</strong> Το {store_name} λειτουργεί στην πλατφόρμα ηλεκτρονικού εμπορίου GrooveShop. Ο πάροχος της πλατφόρμας φιλοξενεί τον ιστότοπο και τηρεί τα αρχεία καταγραφής, στα οποία έχει πρόσβαση μόνο το εξουσιοδοτημένο τεχνικό του προσωπικό. Τα αρχεία αποθηκεύονται σε διακομιστές της Hetzner Online GmbH στη Γερμανία. Η κίνηση προς τον ιστότοπο, ολόκληρη ή μέρος της (για παράδειγμα οι εικόνες), διέρχεται από το δίκτυο της Cloudflare, Inc. (ΗΠΑ), η οποία επεξεργάζεται τα στοιχεία του αιτήματος για να το παραδώσει και για να προστατεύει τον ιστότοπο από επιθέσεις. Η διαβίβαση προς τις ΗΠΑ στηρίζεται στην απόφαση επάρκειας της Ευρωπαϊκής Επιτροπής για το Πλαίσιο Προστασίας Δεδομένων ΕΕ-ΗΠΑ (EU-U.S. Data Privacy Framework) και σε τυποποιημένες συμβατικές ρήτρες. Στοιχεία από τα αρχεία καταγραφής μπορεί να δοθούν σε δημόσιες αρχές μόνο όταν το επιβάλλει ο νόμος.</p>
+<p><strong>Τα δικαιώματά σας.</strong> Μπορείτε να ζητήσετε πρόσβαση στα στοιχεία αυτά, τη διαγραφή τους ή τον περιορισμό της επεξεργασίας τους, καθώς και πληροφορίες για τη στάθμιση του έννομου συμφέροντος στην οποία στηρίζεται η επεξεργασία, μέσω της σελίδας επικοινωνίας του καταστήματος. Τα αρχεία δεν είναι οργανωμένα ανά πρόσωπο, οπότε για να βρεθούν οι εγγραφές που σας αφορούν χρειάζονται η διεύθυνση IP σας και το χρονικό διάστημα της επίσκεψής σας· εγγραφές παλαιότερες των 14 ημερών έχουν ήδη διαγραφεί. Έχετε επίσης το δικαίωμα να υποβάλετε καταγγελία στην Αρχή Προστασίας Δεδομένων Προσωπικού Χαρακτήρα (www.dpa.gr).</p>
+<p><strong>Δικαίωμα εναντίωσης.</strong> Έχετε δικαίωμα να αντιταχθείτε ανά πάσα στιγμή, για λόγους που σχετίζονται με την ιδιαίτερη κατάστασή σας, στην επεξεργασία αυτή, επειδή βασίζεται σε έννομο συμφέρον (άρθρο 21 ΓΚΠΔ). Τότε η επεξεργασία των δεδομένων σας σταματά, εκτός αν αποδειχθούν επιτακτικοί και νόμιμοι λόγοι που υπερισχύουν των συμφερόντων, των δικαιωμάτων και των ελευθεριών σας ή αν τα δεδομένα είναι απαραίτητα για τη θεμελίωση, την άσκηση ή την υποστήριξη νομικών αξιώσεων.</p></section>
+""",
+    "en": """<section id="server-logs"><h2>Server logs</h2>
+<p>Every time you visit {site_host}, your browser necessarily sends some technical information, without which the page cannot be shown to you. For every request the following is recorded automatically:</p>
+<ul>
+<li>your device's IP address and the country the request comes from, as identified by the Cloudflare network,</li>
+<li>the date and time of the request, how long it took to serve and the status code the server answered with,</li>
+<li>the address (domain and path) of the page or file requested, the request method and protocol, and the size of the request and of the response,</li>
+<li>the browser and device identification your browser declares about itself (the user agent), and a code that locates the request in the Cloudflare network.</li>
+</ul>
+<p>The parameters of the address (everything after the "?", such as search terms), cookies, sign-in credentials and the page you came from (the Referer) are not recorded. The codes that some links carry, such as links to reset a password, confirm an email address or a subscription, view a guest order, unsubscribe from emails, recover a basket or download a copy of your data, are replaced before anything is stored. In some cases the IP address also appears in the operational logs of the site's applications, for example when an error or a security event is recorded; the same purposes and the same retention period apply to them.</p>
+<p><strong>Purpose and legal basis.</strong> This information is used only to keep the site and the systems behind it secure (detecting and stopping attacks, abuse and attempts at unauthorised access) and to investigate and fix technical faults. The legal basis is the legitimate interest in keeping the site, and the platform it runs on, secure and available (Article 6(1)(f) GDPR; see also Recital 49). It is not used for advertising or for profiling.</p>
+<p><strong>How long it is kept.</strong> Server logs are deleted automatically 14 days after they are recorded.</p>
+<p><strong>Recipients.</strong> {store_name} runs on the GrooveShop e-commerce platform. The platform's provider hosts the site and keeps the server logs, which only its authorised technical staff can access. The logs are stored on servers of Hetzner Online GmbH in Germany. All or part of the traffic to the site (images, for example) passes through the network of Cloudflare, Inc. (USA), which processes the request data to deliver it and to protect the site from attacks. Transfers to the United States rely on the European Commission's adequacy decision for the EU-U.S. Data Privacy Framework and on standard contractual clauses. Information from the logs may be given to public authorities only where the law requires it.</p>
+<p><strong>Your rights.</strong> You can ask for access to this information, for its erasure or for its processing to be restricted, and for information about the legitimate-interest assessment the processing relies on, through the store's contact page. The logs are not organised by person, so finding the entries about you needs your IP address and the time of your visit; entries older than 14 days have already been deleted. You also have the right to lodge a complaint with the Hellenic Data Protection Authority (www.dpa.gr).</p>
+<p><strong>Right to object.</strong> You have the right to object at any time, on grounds relating to your particular situation, to this processing, because it is based on legitimate interest (Article 21 GDPR). Your data is then no longer processed, unless compelling legitimate grounds are demonstrated that override your interests, rights and freedoms, or the data is needed for the establishment, exercise or defence of legal claims.</p></section>
+""",
+}
+
 LEGAL_DOCUMENTS: dict[str, dict[str, str]] = {
     "terms": {
         "title": "Όροι Χρήσης",
@@ -72,7 +118,8 @@ LEGAL_DOCUMENTS: dict[str, dict[str, str]] = {
 <section id="data-categories"><h2>Ποιες κατηγορίες προσωπικών δεδομένων επεξεργαζόμαστε;</h2><p>Τα προσωπικά δεδομένα που επεξεργαζόμαστε, είναι τα απολύτως αναγκαία, απαραίτητα και κατάλληλα για την επίτευξη των επιδιωκόμενων σκοπών μας και συνοψίζονται στα εξής: Προσωπικά δεδομένα, τα οποία μας παρέχετε εσείς, όπως:</p><ul><li>Δεδομένα ταυτοποίησης προσώπου &amp; νομιμοποίησης του υποκειμένου των συναλλαγών (ονοματεπώνυμο, ημερομηνία γέννησης, κ.α.)</li><li>Δεδομένα επικοινωνίας (ταχυδρομική διεύθυνση (E-mail), αριθμός σταθερής ή κινητής τηλεφωνίας, διεύθυνση ηλεκτρονικού ταχυδρομείου, FAX, κ.α.)</li></ul></section>
 <section id="account-creation"><h2>Για τη δημιουργία λογαριασμού στο {site_host}</h2><p>Προσωπικά δεδομένα συλλέγονται όταν δημιουργείτε λογαριασμό στον ιστότοπο του {store_name} {site_host}. Κατά τη δημιουργία λογαριασμού μπορεί να σας ζητηθούν περισσότερα στοιχεία, ωστόσο θα είναι τα ελάχιστα απαιτούμενα για τη σύναψη και ολοκλήρωση δημιουργίας.</p></section>
 <section id="marketing-communications"><h2>Για να σας ενημερώσουμε για τα νέα και τις προσφορές μας</h2><p>Εφόσον έχετε συναινέσει σε αυτό ή καλύπτεται από το έννομο συμφέρον μας, (στις περιπτώσεις των εγγεγραμένων χρηστών - πελατών) και υπό τις συγκεκριμένες προϋποθέσεις που θέτει το νομικό πλαίσιο, σας αποστέλλουμε ενημερώσεις για προϊόντα, υπηρεσίες, προσφορές κλπ. μέσω E-mail αλλά και των μέσων κοινωνικής δικτύωσης που διατηρούμε (Facebook/Instagram/Youtube κ.α.). Ειδικότερα, το {store_name} επεξεργάζεται προσωπικά δεδομένα σύμφωνα με το ισχύον κάθε φορά πλαίσιο, σας ενημερώνει για προσφορές και τα νέα μας μέσω της αποστολής ενημερωτικών newsletters.</p></section>
-""",
+"""
+        + PRIVACY_SERVER_LOGS_SECTION["el"],
     },
     "cookies": {
         "title": "Πολιτική Cookies",
@@ -87,6 +134,76 @@ LEGAL_DOCUMENTS: dict[str, dict[str, str]] = {
 }
 
 
+@dataclass(frozen=True)
+class LegalTextUpdate:
+    """One change the platform made to a seeded legal document.
+
+    A seeded document is the merchant's to edit, so a change to the
+    platform text cannot simply be written over every tenant. Each change
+    is recorded here with a revision number, and
+    ``ContentPage.legal_text_revision`` says which revision a page is
+    known to incorporate:
+
+    - a page whose text is still the platform's is brought forward by a
+      data migration and stamped with the new revision;
+    - any other page (merchant-edited, or with a translation the
+      platform never wrote) keeps its text and stays behind, and the
+      admin shows its merchant ``sections`` to add, until they mark the
+      update reviewed.
+
+    ``sections`` maps a language code to the HTML the update adds, with
+    the same ``{site_host}`` / ``{store_name}`` tokens the documents take.
+    """
+
+    revision: int
+    slug: str
+    sections: Mapping[str, str]
+
+
+LEGAL_TEXT_UPDATES: tuple[LegalTextUpdate, ...] = (
+    LegalTextUpdate(
+        revision=1,
+        slug="privacy",
+        sections=PRIVACY_SERVER_LOGS_SECTION,
+    ),
+)
+"""Every platform change to a legal document, oldest first.
+
+Adding one: change the document in ``LEGAL_DOCUMENTS``, append an entry
+with the next revision, and ship a data migration that rewrites and
+stamps the pages still carrying the previous platform text (see
+``page_config/migrations/0032_privacy_server_logs_section.py``).
+"""
+
+LEGAL_TEXT_REVISION: int = max(update.revision for update in LEGAL_TEXT_UPDATES)
+"""The revision the current ``LEGAL_DOCUMENTS`` text incorporates."""
+
+
+def pending_legal_updates(
+    slug: str, revision: int | None
+) -> list[LegalTextUpdate]:
+    """The updates to ``slug`` a page at ``revision`` does not have yet.
+
+    ``None`` is a page no rollout has stamped: seeded before revisions
+    existed, or written by the merchant. It has every update to its slug
+    pending, which is what makes an edited page surface rather than stay
+    silently behind.
+    """
+    reached = revision or 0
+    return [
+        update
+        for update in LEGAL_TEXT_UPDATES
+        if update.slug == slug and update.revision > reached
+    ]
+
+
+def render_legal_fragment(html: str, *, site_host: str, store_name: str) -> str:
+    """Apply the tenant's two values to any document or section."""
+    return html.replace("{site_host}", site_host).replace(
+        "{store_name}", store_name
+    )
+
+
 def render_legal_document(slug: str, *, site_host: str, store_name: str) -> str:
     """Return the seeded body for ``slug`` with the tenant's values applied.
 
@@ -95,9 +212,10 @@ def render_legal_document(slug: str, *, site_host: str, store_name: str) -> str:
     ``format`` raise, which is a silly way to fail a tenant's
     provisioning.
     """
-    body = LEGAL_DOCUMENTS[slug]["body"]
-    return body.replace("{site_host}", site_host).replace(
-        "{store_name}", store_name
+    return render_legal_fragment(
+        LEGAL_DOCUMENTS[slug]["body"],
+        site_host=site_host,
+        store_name=store_name,
     )
 
 

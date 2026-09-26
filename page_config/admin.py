@@ -1,11 +1,25 @@
-from django.contrib import admin
+from django.conf import settings
+from django.contrib import admin, messages
+from django.utils.html import escape, format_html_join
+from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import TabularInline
+from unfold.decorators import action
 
 from admin.base import (
     BaseModelAdmin,
     BaseTranslatableAdmin,
     BaseTranslatableTabularInline,
+)
+from page_config.defaults import (
+    pending_legal_reviews,
+    tenant_document_context,
+)
+from page_config.legal_documents import (
+    LEGAL_TEXT_REVISION,
+    LEGAL_TEXT_UPDATES,
+    pending_legal_updates,
+    render_legal_fragment,
 )
 from page_config.models import (
     ContentPage,
@@ -211,7 +225,14 @@ class ContentPageAdmin(BaseTranslatableAdmin):
     list_filter = ("is_published",)
     list_editable = ("is_published",)
     search_fields = ("translations__title", "slug")
-    readonly_fields = ("id", "uuid", "created_at", "updated_at")
+    readonly_fields = (
+        "id",
+        "uuid",
+        "created_at",
+        "updated_at",
+        "legal_update_text",
+    )
+    actions = ["mark_legal_update_reviewed"]
 
     fieldsets = (
         (
@@ -245,3 +266,96 @@ class ContentPageAdmin(BaseTranslatableAdmin):
         return obj.safe_translation_getter("title", any_language=True) or (
             obj.slug
         )
+
+    # --- Platform legal-text updates -----------------------------------
+    #
+    # A legal page the platform could not update itself (the text is the
+    # merchant's) is flagged here until the merchant adds the new text
+    # and marks it reviewed. See ``LegalTextUpdate``.
+
+    def get_fieldsets(self, request, obj=None):
+        fieldsets = super().get_fieldsets(request, obj)
+        if obj is None or not pending_legal_updates(
+            obj.slug, obj.legal_text_revision
+        ):
+            return fieldsets
+        return (
+            (
+                _("Platform update to review"),
+                {
+                    "fields": ("legal_update_text",),
+                    "classes": ("wide",),
+                    "description": LEGAL_UPDATE_HELP,
+                },
+            ),
+            *fieldsets,
+        )
+
+    @admin.display(description=_("Text to add"))
+    def legal_update_text(self, obj):
+        updates = pending_legal_updates(obj.slug, obj.legal_text_revision)
+        if not updates:
+            return "-"
+        site_host, store_name = tenant_document_context()
+        return format_html_join(
+            "",
+            '<div class="mb-6"><p class="font-semibold mb-2">{}</p>'
+            '<div class="prose dark:prose-invert max-w-none">{}</div></div>',
+            (
+                (
+                    dict(settings.LANGUAGES).get(language, language),
+                    # Platform-authored HTML, trusted; the two tenant
+                    # values going into it are escaped.
+                    mark_safe(
+                        render_legal_fragment(
+                            html,
+                            site_host=escape(site_host),
+                            store_name=escape(store_name),
+                        )
+                    ),
+                )
+                for update in updates
+                for language, html in update.sections.items()
+            ),
+        )
+
+    def changelist_view(self, request, extra_context=None):
+        pending = pending_legal_reviews()
+        if pending and request.method == "GET":
+            titles = sorted({str(page) for page, _update in pending})
+            self.message_user(
+                request,
+                f"{LEGAL_UPDATE_NOTICE} {', '.join(titles)}",
+                messages.WARNING,
+            )
+        return super().changelist_view(request, extra_context)
+
+    @action(
+        description=_("Mark platform legal update as reviewed"),
+        permissions=["change"],
+        icon="task_alt",
+    )
+    def mark_legal_update_reviewed(self, request, queryset):
+        count = queryset.filter(
+            slug__in={update.slug for update in LEGAL_TEXT_UPDATES}
+        ).update(legal_text_revision=LEGAL_TEXT_REVISION)
+        self.message_user(
+            request,
+            _("%(count)d legal page(s) marked as reviewed.") % {"count": count},
+            messages.SUCCESS,
+        )
+
+
+LEGAL_UPDATE_NOTICE = _(
+    "The platform has updated its legal text, and these pages were not "
+    "changed automatically because their text is yours:"
+)
+
+LEGAL_UPDATE_HELP = _(
+    "The platform added the text below to its own version of this "
+    "document. Your page was not changed automatically, because its text "
+    "(or a translation of it) is yours. Add the text to every language "
+    "your store serves, adjusting it if your store works differently, "
+    'then select this page in the list and run "Mark platform legal '
+    'update as reviewed".'
+)

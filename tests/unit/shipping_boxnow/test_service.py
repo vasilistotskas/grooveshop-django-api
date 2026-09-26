@@ -21,6 +21,7 @@ from shipping_boxnow.factories import (
 )
 from shipping_boxnow.models import BoxNowParcelEvent
 from shipping_boxnow.services import BoxNowService
+from tests.utils.orders import carrier_terminal_order
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -127,7 +128,7 @@ class TestCreateShipmentForOrder:
 
         from product.factories.product import ProductFactory
 
-        order = OrderFactory(
+        order = carrier_terminal_order(
             status=OrderStatus.PROCESSING,
             payment_status=PaymentStatus.PENDING,
             shipping_price=Money("0.00", settings.DEFAULT_CURRENCY),
@@ -186,7 +187,7 @@ class TestCreateShipmentForOrder:
 
     def test_propagates_boxnow_api_error(self):
         """BoxNowAPIError from the client bubbles up to the caller."""
-        order = OrderFactory(status=OrderStatus.PROCESSING)
+        order = carrier_terminal_order(status=OrderStatus.PROCESSING)
         BoxNowShipmentFactory(
             order=order,
             parcel_state=BoxNowParcelState.PENDING_CREATION,

@@ -38,12 +38,12 @@ import pytest
 from django.utils import timezone
 
 from order.enum.status import OrderStatus, PaymentStatus
-from order.factories.order import OrderFactory
 from shipping_acs.enum.shipment_state import AcsShipmentState
 from shipping_acs.exceptions import AcsRetryableError
 from shipping_acs.factories import AcsShipmentFactory
 from shipping_acs.models import AcsShipment
 from shipping_acs.services import AcsService
+from tests.utils.orders import courier_cash_order
 
 pytestmark = pytest.mark.django_db
 
@@ -95,7 +95,7 @@ class TestCreateVoucherSetsMintStartedAtBeforeApiCall:
         """
         from shipping_acs import services
 
-        order = OrderFactory(
+        order = courier_cash_order(
             status=OrderStatus.PENDING,
             payment_status=PaymentStatus.PENDING,
         )
@@ -161,7 +161,7 @@ class TestCreateVoucherPersistsMetadataWhenDbSaveFails:
 
         from shipping_acs import services
 
-        order = OrderFactory(
+        order = courier_cash_order(
             status=OrderStatus.PENDING,
             payment_status=PaymentStatus.PENDING,
         )
@@ -228,7 +228,7 @@ class TestCreateVoucherTreatsExpiredMintStartedAtAsNewAttempt:
         (300 s) must NOT raise ``AcsRetryableError`` — the service should
         log a warning and proceed as a fresh mint attempt.
         """
-        order = OrderFactory(
+        order = courier_cash_order(
             status=OrderStatus.PENDING,
             payment_status=PaymentStatus.PENDING,
         )
@@ -253,7 +253,7 @@ class TestCreateVoucherTreatsExpiredMintStartedAtAsNewAttempt:
         """A ``mint_started_at`` set just now (age < 300 s) must raise
         ``AcsRetryableError`` so the Celery task backs off.
         """
-        order = OrderFactory(
+        order = courier_cash_order(
             status=OrderStatus.PENDING,
             payment_status=PaymentStatus.PENDING,
         )
@@ -278,7 +278,7 @@ class TestCreateVoucherTreatsExpiredMintStartedAtAsNewAttempt:
         check in the service is ``if age < cls._MINT_CLAIM_TTL_SECONDS``,
         so age == 300 is NOT < 300 → treated as expired / re-mintable.
         """
-        order = OrderFactory(
+        order = courier_cash_order(
             status=OrderStatus.PENDING,
             payment_status=PaymentStatus.PENDING,
         )
@@ -309,7 +309,7 @@ class TestCancelVoucherClaimPattern:
         """
         from shipping_acs import services
 
-        order = OrderFactory(
+        order = courier_cash_order(
             status=OrderStatus.PROCESSING,
             payment_status=PaymentStatus.COMPLETED,
         )
@@ -353,7 +353,7 @@ class TestCancelVoucherClaimPattern:
         """
         from shipping_acs import services
 
-        order = OrderFactory(
+        order = courier_cash_order(
             status=OrderStatus.PROCESSING,
             payment_status=PaymentStatus.COMPLETED,
         )
@@ -388,7 +388,7 @@ class TestCancelVoucherClaimPattern:
 
         from shipping_acs import services
 
-        order = OrderFactory(
+        order = courier_cash_order(
             status=OrderStatus.PROCESSING,
             payment_status=PaymentStatus.COMPLETED,
         )
@@ -442,7 +442,7 @@ class TestCancelVoucherClaimPattern:
         """
         from shipping_acs import services
 
-        order = OrderFactory(
+        order = courier_cash_order(
             status=OrderStatus.PROCESSING,
             payment_status=PaymentStatus.COMPLETED,
         )
@@ -477,7 +477,7 @@ class TestCancelVoucherClaimPattern:
         """
         from shipping_acs import services
 
-        order = OrderFactory(
+        order = courier_cash_order(
             status=OrderStatus.PROCESSING,
             payment_status=PaymentStatus.COMPLETED,
         )
@@ -521,7 +521,7 @@ class TestCancelVoucherClaimPattern:
         """
         from shipping_acs import services
 
-        order = OrderFactory(
+        order = courier_cash_order(
             status=OrderStatus.PROCESSING,
             payment_status=PaymentStatus.COMPLETED,
         )

@@ -7,7 +7,6 @@ from datetime import timedelta
 import pytest
 from django.utils import timezone
 
-from order.factories.order import OrderFactory
 from shipping_acs.enum.shipment_state import AcsShipmentState
 from shipping_acs.exceptions import (
     AcsAPIError,
@@ -26,6 +25,7 @@ from shipping_acs.services import (
     _normalize_phone_for_acs,
     _zipcode_for_acs,
 )
+from tests.utils.orders import courier_cash_order
 
 pytestmark = pytest.mark.django_db
 
@@ -123,7 +123,7 @@ class TestCreateVoucherForOrder:
     def test_idempotent_when_voucher_already_set(self, acs_client_mock):
         from order.enum.status import OrderStatus, PaymentStatus
 
-        order = OrderFactory(
+        order = courier_cash_order(
             status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
         )
         existing = AcsShipmentFactory(order=order, voucher_no="7777")
@@ -136,7 +136,7 @@ class TestCreateVoucherForOrder:
     def test_persists_voucher_no_and_advances_state(self, acs_client_mock):
         from order.enum.status import OrderStatus, PaymentStatus
 
-        order = OrderFactory(
+        order = courier_cash_order(
             status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
         )
         AcsShipmentFactory(order=order, item_quantity=1)
@@ -150,7 +150,7 @@ class TestCreateVoucherForOrder:
     ):
         from order.enum.status import OrderStatus, PaymentStatus
 
-        order = OrderFactory(
+        order = courier_cash_order(
             status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
         )
         AcsShipmentFactory(order=order, item_quantity=3)
@@ -165,7 +165,7 @@ class TestCreateVoucherForOrder:
     def test_writes_tracking_info_on_order(self, acs_client_mock):
         from order.enum.status import OrderStatus, PaymentStatus
 
-        order = OrderFactory(
+        order = courier_cash_order(
             status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
         )
         AcsShipmentFactory(order=order)
@@ -186,7 +186,7 @@ class TestCreateVoucherForOrder:
                 return {"Voucher_No": "", "Error_Message": "Invalid address."}
 
         monkeypatch.setattr(services, "AcsClient", _BadClient)
-        order = OrderFactory(
+        order = courier_cash_order(
             status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
         )
         AcsShipmentFactory(order=order)
@@ -205,7 +205,7 @@ class TestCancelVoucher:
     def test_blocks_when_pickup_list_already_issued(self, acs_client_mock):
         from order.enum.status import OrderStatus, PaymentStatus
 
-        order = OrderFactory(
+        order = courier_cash_order(
             status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
         )
         pickup = AcsPickupListFactory()
@@ -222,7 +222,7 @@ class TestCancelVoucher:
     def test_calls_delete_when_eligible(self, acs_client_mock):
         from order.enum.status import OrderStatus, PaymentStatus
 
-        order = OrderFactory(
+        order = courier_cash_order(
             status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
         )
         shipment = AcsShipmentFactory(
@@ -239,7 +239,7 @@ class TestCancelVoucher:
     def test_idempotent_for_already_canceled(self, acs_client_mock):
         from order.enum.status import OrderStatus, PaymentStatus
 
-        order = OrderFactory(
+        order = courier_cash_order(
             status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
         )
         shipment = AcsShipmentFactory(
@@ -255,7 +255,7 @@ class TestResetShipmentForRemint:
     def test_reset_clears_voucher_and_preserves_history(self):
         from order.enum.status import OrderStatus, PaymentStatus
 
-        order = OrderFactory(
+        order = courier_cash_order(
             status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
         )
         shipment = AcsShipmentFactory(
@@ -274,7 +274,7 @@ class TestResetShipmentForRemint:
     def test_reset_refuses_non_canceled(self):
         from order.enum.status import OrderStatus, PaymentStatus
 
-        order = OrderFactory(
+        order = courier_cash_order(
             status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
         )
         shipment = AcsShipmentFactory(
@@ -295,7 +295,7 @@ class TestResetShipmentForRemint:
         # closing the cancel dead-end.
         from order.enum.status import OrderStatus, PaymentStatus
 
-        order = OrderFactory(
+        order = courier_cash_order(
             status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
         )
         shipment = AcsShipmentFactory(
@@ -320,7 +320,7 @@ class TestPollShipmentTracking:
     def test_inserts_event_with_fingerprint(self, acs_client_mock):
         from order.enum.status import OrderStatus, PaymentStatus
 
-        order = OrderFactory(
+        order = courier_cash_order(
             status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
         )
         shipment = AcsShipmentFactory(
@@ -337,7 +337,7 @@ class TestPollShipmentTracking:
     def test_idempotent_on_repoll(self, acs_client_mock):
         from order.enum.status import OrderStatus, PaymentStatus
 
-        order = OrderFactory(
+        order = courier_cash_order(
             status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
         )
         shipment = AcsShipmentFactory(
@@ -405,7 +405,7 @@ class TestPollShipmentDeliveryTransitions:
     ):
         from order.enum.status import OrderStatus, PaymentStatus
 
-        order = OrderFactory(
+        order = courier_cash_order(
             status=OrderStatus.SHIPPED,
             payment_status=PaymentStatus.COMPLETED,
         )
@@ -433,7 +433,7 @@ class TestPollShipmentDeliveryTransitions:
         from order.enum.status import OrderStatus, PaymentStatus
         from order.tasks import _status_update_reservation_key
 
-        order = OrderFactory(
+        order = courier_cash_order(
             status=OrderStatus.SHIPPED,
             payment_status=PaymentStatus.COMPLETED,
         )
@@ -477,7 +477,7 @@ class TestPollShipmentDeliveryTransitions:
     ):
         from order.enum.status import OrderStatus, PaymentStatus
 
-        order = OrderFactory(
+        order = courier_cash_order(
             status=OrderStatus.SHIPPED,
             payment_status=PaymentStatus.PENDING,
         )
@@ -511,7 +511,7 @@ class TestPollShipmentDeliveryTransitions:
         """
         from order.enum.status import OrderStatus, PaymentStatus
 
-        order = OrderFactory(
+        order = courier_cash_order(
             status=OrderStatus.PROCESSING,
             payment_status=PaymentStatus.COMPLETED,
         )
@@ -539,7 +539,7 @@ class TestPollShipmentDeliveryTransitions:
         returns when ``current_status in _TERMINAL_ORDER_STATUSES``."""
         from order.enum.status import OrderStatus, PaymentStatus
 
-        order = OrderFactory(
+        order = courier_cash_order(
             status=OrderStatus.COMPLETED,
             payment_status=PaymentStatus.COMPLETED,
         )
@@ -627,7 +627,7 @@ class TestPollShippedInference:
             },
             details=[],
         )
-        order = OrderFactory(
+        order = courier_cash_order(
             status=OrderStatus.PROCESSING,
             payment_status=PaymentStatus.PENDING,
         )
@@ -660,7 +660,7 @@ class TestPollShippedInference:
                 },
             ],
         )
-        order = OrderFactory(
+        order = courier_cash_order(
             status=OrderStatus.PROCESSING,
             payment_status=PaymentStatus.PENDING,
         )
@@ -691,7 +691,7 @@ class TestPollShippedInference:
             },
             details=_PRINT_CHECKPOINTS,
         )
-        order = OrderFactory(
+        order = courier_cash_order(
             status=OrderStatus.PROCESSING,
             payment_status=PaymentStatus.PENDING,
         )
@@ -789,7 +789,7 @@ class TestPollShipmentReturnTransitions:
         from order.enum.status import OrderStatus, PaymentStatus
         from order.tasks import _status_update_reservation_key
 
-        order = OrderFactory(
+        order = courier_cash_order(
             status=OrderStatus.PROCESSING,
             payment_status=PaymentStatus.PENDING,
         )
@@ -827,7 +827,7 @@ class TestPollShipmentReturnTransitions:
     ):
         from order.enum.status import OrderStatus, PaymentStatus
 
-        order = OrderFactory(
+        order = courier_cash_order(
             status=OrderStatus.SHIPPED,
             payment_status=PaymentStatus.PENDING,
         )
@@ -863,10 +863,10 @@ class TestIssueDailyPickupList:
     def test_creates_pickup_list_and_links_shipments(self, acs_client_mock):
         from order.enum.status import OrderStatus, PaymentStatus
 
-        order_a = OrderFactory(
+        order_a = courier_cash_order(
             status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
         )
-        order_b = OrderFactory(
+        order_b = courier_cash_order(
             status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
         )
         AcsShipmentFactory(
@@ -1002,7 +1002,7 @@ class TestIssueDailyPickupList:
     def _candidate(self, voucher_no, printed_at=None):
         from order.enum.status import OrderStatus, PaymentStatus
 
-        order = OrderFactory(
+        order = courier_cash_order(
             status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
         )
         return AcsShipmentFactory(
@@ -1375,7 +1375,7 @@ class TestFetchLabelBytes:
     def _shipment(self):
         from order.enum.status import OrderStatus, PaymentStatus
 
-        order = OrderFactory(
+        order = courier_cash_order(
             status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
         )
         return AcsShipmentFactory(
@@ -1494,7 +1494,7 @@ class TestZipcodeForAcs:
         from order.enum.status import OrderStatus, PaymentStatus
         from pay_way.factories import PayWayFactory
 
-        order = OrderFactory(
+        order = courier_cash_order(
             status=OrderStatus.PENDING,
             payment_status=PaymentStatus.PENDING,
             pay_way=PayWayFactory(),
@@ -1568,7 +1568,7 @@ class TestLastErrorPersisted:
                 }
 
         monkeypatch.setattr(services, "AcsClient", _BadClient)
-        order = OrderFactory(
+        order = courier_cash_order(
             status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
         )
         shipment = AcsShipmentFactory(order=order)
@@ -1599,7 +1599,7 @@ class TestLastErrorPersisted:
                 raise ConnectionError("ACS host unreachable")
 
         monkeypatch.setattr(services, "AcsClient", _ExplodingClient)
-        order = OrderFactory(
+        order = courier_cash_order(
             status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
         )
         shipment = AcsShipmentFactory(order=order)
@@ -1630,7 +1630,7 @@ class TestBuildCreateVoucherParamsNormalizes:
     ):
         from order.enum.status import OrderStatus, PaymentStatus
 
-        order = OrderFactory(
+        order = courier_cash_order(
             status=OrderStatus.PENDING,
             payment_status=PaymentStatus.PENDING,
             zipcode="848 00",
@@ -1684,7 +1684,7 @@ class TestDeliveryNotesInPayload:
     def test_customer_notes_lands_in_Delivery_Notes(self, acs_client_mock):
         from order.enum.status import OrderStatus, PaymentStatus
 
-        order = OrderFactory(
+        order = courier_cash_order(
             status=OrderStatus.PENDING,
             payment_status=PaymentStatus.PENDING,
             customer_notes="Χτυπήστε το κουδούνι 2  φορές.\nΘυρωρός.",
@@ -1701,7 +1701,7 @@ class TestDeliveryNotesInPayload:
     def test_empty_customer_notes_sends_empty_string(self, acs_client_mock):
         from order.enum.status import OrderStatus, PaymentStatus
 
-        order = OrderFactory(
+        order = courier_cash_order(
             status=OrderStatus.PENDING,
             payment_status=PaymentStatus.PENDING,
             customer_notes="",
@@ -1720,7 +1720,7 @@ class TestDeliveryNotesInPayload:
         recipient name/address/phone/email MUST NOT be on the row."""
         from order.enum.status import OrderStatus, PaymentStatus
 
-        order = OrderFactory(
+        order = courier_cash_order(
             status=OrderStatus.PENDING,
             payment_status=PaymentStatus.PENDING,
             customer_notes="Χτυπήστε το κουδούνι 2 φορές.",
@@ -1762,7 +1762,7 @@ class TestDeliveryNotesInPayload:
         current state. Mirrors the BoxNow success path."""
         from order.enum.status import OrderStatus, PaymentStatus
 
-        order = OrderFactory(
+        order = courier_cash_order(
             status=OrderStatus.PENDING,
             payment_status=PaymentStatus.PENDING,
         )

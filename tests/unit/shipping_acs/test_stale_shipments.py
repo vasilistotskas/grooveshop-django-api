@@ -22,6 +22,7 @@ from shipping_acs.enum.shipment_state import AcsShipmentState
 from shipping_acs.factories import AcsShipmentFactory
 from shipping_acs.models import AcsShipment
 from shipping_acs.tasks import check_stale_acs_shipments
+from tests.utils.orders import courier_cash_order
 
 pytestmark = pytest.mark.django_db
 
@@ -101,8 +102,12 @@ class TestCheckStaleAcsShipments:
         means the voucher mint failed permanently (prod order 143
         stranded 10 days) — it must appear in the digest even though
         it has no voucher."""
+        # Cash on delivery: an unpaid online order in pending_creation is
+        # not a stranded mint (it is waiting for its payment) and the
+        # digest skips it.
         shipment = AcsShipmentFactory(
-            shipment_state=AcsShipmentState.PENDING_CREATION
+            order=courier_cash_order(),
+            shipment_state=AcsShipmentState.PENDING_CREATION,
         )
         AcsShipment.objects.filter(pk=shipment.pk).update(
             created_at=timezone.now() - timedelta(days=2)

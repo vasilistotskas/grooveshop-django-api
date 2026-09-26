@@ -653,6 +653,8 @@ class TestProductionGuard(TestCase):
         "fyteia.grooveshop.space",
         "api.fyteia.grooveshop.space",
         "www.fyteia.grooveshop.space",
+        # Its first-level API host (tenant_urls.derive_api_domain).
+        "api-fyteia.grooveshop.space",
         # Substrings of a marker inside a live name must not count.
         "stagingear.gr",
         "mylocalhosting.gr",

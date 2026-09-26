@@ -57,6 +57,26 @@ class TestEnsureApiDomain:
             is_primary=False,
         ).exists()
 
+    def test_a_platform_hostname_gets_a_first_level_api_host(
+        self, tenant_factory, settings
+    ):
+        """``api.<store>.grooveshop.space`` is outside the zone's
+        Universal SSL wildcard, so Cloudflare could not proxy it."""
+        settings.CLOUDFLARE_PLATFORM_ZONE_NAME = "grooveshop.space"
+        tenant = tenant_factory("api-domain-platform")
+        TenantDomain.objects.create(
+            domain="api-domain-platform.grooveshop.space",
+            tenant=tenant,
+            is_primary=True,
+        )
+
+        result = ensure_api_domain(tenant)
+
+        assert result == "api-api-domain-platform.grooveshop.space"
+        assert TenantDomain.objects.filter(
+            tenant=tenant, domain=result, is_primary=False
+        ).exists()
+
     def test_is_idempotent(self, tenant_factory):
         tenant = tenant_factory("api-domain-idempotent")
         TenantDomain.objects.create(

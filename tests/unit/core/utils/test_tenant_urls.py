@@ -541,3 +541,37 @@ class TestStorefrontPath:
     def test_rejects_everything_else(self, path):
         with pytest.raises(ValidationError):
             storefront_path(path)
+
+
+class TestDeriveApiDomain:
+    """A store on a platform hostname gets a FIRST-level API host, so the
+    zone's Universal SSL wildcard covers it and Cloudflare can proxy it."""
+
+    @pytest.mark.parametrize(
+        ("primary", "expected"),
+        [
+            ("demo.grooveshop.space", "api-demo.grooveshop.space"),
+            (
+                "Delta-Sigma.GrooveShop.space",
+                "api-delta-sigma.grooveshop.space",
+            ),
+            ("a.b.grooveshop.space", "api-a-b.grooveshop.space"),
+            ("webside.gr", "api.webside.gr"),
+            ("shop.com.gr", "api.shop.com.gr"),
+            # A lookalike that merely ends with the zone's letters.
+            ("notgrooveshop.space", "api.notgrooveshop.space"),
+        ],
+    )
+    def test_convention(self, settings, primary, expected):
+        from core.utils.tenant_urls import derive_api_domain
+
+        settings.CLOUDFLARE_PLATFORM_ZONE_NAME = "grooveshop.space"
+        assert derive_api_domain(primary) == expected
+
+    def test_without_a_platform_zone_every_store_gets_api_dot(self, settings):
+        from core.utils.tenant_urls import derive_api_domain
+
+        settings.CLOUDFLARE_PLATFORM_ZONE_NAME = ""
+        assert derive_api_domain("demo.grooveshop.space") == (
+            "api.demo.grooveshop.space"
+        )

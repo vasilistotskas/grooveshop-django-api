@@ -40,10 +40,14 @@ logger = logging.getLogger(__name__)
 
 
 def ensure_api_domain(tenant: Tenant) -> str | None:
-    """Ensure the ``api.<primary-domain>`` ``TenantDomain`` row exists.
+    """Ensure the tenant's API ``TenantDomain`` row exists.
+
+    The host is ``core.utils.tenant_urls.derive_api_domain`` of the
+    primary domain: ``api.<primary>``, or ``api-<label>.<zone>`` for a
+    store on a platform hostname.
 
     The API host is not optional. Django's resolver DERIVES
-    ``apiDomain`` as ``api.<primary>`` when no explicit ``api*`` row
+    ``apiDomain`` the same way when no explicit ``api*`` row
     exists, and the storefront dials that value for the WebSocket
     connection, the social-login redirect and CSP connect-src. But
     request routing matches ``TenantDomain`` rows EXACTLY, so a
@@ -55,19 +59,20 @@ def ensure_api_domain(tenant: Tenant) -> str | None:
     Idempotent (``get_or_create``) — safe to call again for a tenant
     that already has its api domain.
 
-    Returns the derived ``api.<primary>`` domain string, or ``None``
+    Returns the derived API domain string, or ``None``
     when the tenant has no primary domain yet to derive from. Callers
     differ in how they report that (``CommandError`` for the CLI,
     ``messages.warning`` for the admin), so this function does not
     raise — it just cannot do anything.
     """
+    from core.utils.tenant_urls import derive_api_domain
     from tenant.models import TenantDomain
 
     primary = tenant.domains.filter(is_primary=True).first()
     if primary is None:
         return None
 
-    api_domain = f"api.{primary.domain}"
+    api_domain = derive_api_domain(primary.domain)
     TenantDomain.objects.get_or_create(
         domain=api_domain,
         tenant=tenant,

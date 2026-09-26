@@ -251,6 +251,26 @@ def get_tenant_api_base_url() -> str:
     return fallback.rstrip("/")
 
 
+def derive_api_domain(primary_domain: str) -> str:
+    """The API hostname a store with *primary_domain* gets by convention.
+
+    ``api.<primary>`` — except for a store on a platform hostname
+    (``<label>.<CLOUDFLARE_PLATFORM_ZONE_NAME>``), which gets
+    ``api-<label>.<zone>``. The zone's free Universal SSL certificate
+    covers ``*.<zone>``, one label deep: ``api.demo.grooveshop.space``
+    would be a second-level name Cloudflare cannot proxy, so it stays
+    DNS-only and bypasses the edge (grooveshop-infrastructure
+    ``docs/edge-trust-boundary.md``). A store on its own domain is the
+    apex of its own zone, where ``api.<primary>`` is one label deep.
+    """
+    primary = (primary_domain or "").lower()
+    zone = (settings.CLOUDFLARE_PLATFORM_ZONE_NAME or "").lower()
+    if zone and primary.endswith(f".{zone}"):
+        label = primary[: -len(zone) - 1]
+        return f"api-{label.replace('.', '-')}.{zone}"
+    return f"api.{primary}"
+
+
 def _resolve_prefixed_service_domain(
     tenant, prefix: str, *, derive: bool = True
 ) -> str:
@@ -265,8 +285,8 @@ def _resolve_prefixed_service_domain(
        convention (``<prefix>.<primary-domain>``) and shapes like
        ``api-staging.webside.gr`` that don't follow the
        ``<prefix>.<primary>`` pattern.
-    2. Only when ``derive`` is True: ``<prefix>.<primary domain>``
-       derived from the tenant's primary domain. The API host is the
+    2. Only when ``derive`` is True: :func:`derive_api_domain` of the
+       tenant's primary domain. The API host is the
        only prefix that derives — every tenant MUST have its own api
        origin (browser-facing auth/WebSocket/OAuth surfaces), so its
        DNS is a mandatory onboarding step. Asset/static hosts are
@@ -316,7 +336,7 @@ def _resolve_prefixed_service_domain(
     except Exception:
         primary_domain_obj = None
     if primary_domain_obj and getattr(primary_domain_obj, "domain", ""):
-        return f"{prefix}.{primary_domain_obj.domain}"
+        return derive_api_domain(primary_domain_obj.domain)
 
     return ""
 

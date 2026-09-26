@@ -22,7 +22,7 @@ def courier_cash_pay_way() -> PayWay:
     ).first()
     if existing is not None:
         return existing
-    return PayWayFactory(
+    return PayWayFactory.create(
         active=True,
         provider_code="cash_on_delivery",
         settlement=PaySettlement.COURIER_CASH,

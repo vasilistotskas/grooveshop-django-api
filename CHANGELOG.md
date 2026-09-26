@@ -3,6 +3,53 @@
 
 
 
+## v3.84.0 (2026-09-26)
+
+### Bug fixes
+
+* fix(demo): restore the demo's English legal text on every reset
+
+seed_english_legal_documents wrote English only where it was absent, so
+the demo store kept its first English privacy policy: no server-log
+section (added in ede527ef), and, because that English was not the
+platform's, migration 0032 could not stamp the page, so the demo admin
+listed it for review indefinitely. Verified in production: el carries
+the section, en does not, legal_text_revision is NULL.
+
+The demo is the platform's and resets nightly, so its English is now
+restored to the current text on each run, and the page is stamped with
+LEGAL_TEXT_REVISION when its other languages are the platform's current
+document (the test 0032 applies).
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_016F5trstVMoFXNan1ZQMLEp ([`8b58592`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8b58592c6d53e552866d061a9ce1cdc4f58951a6))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.83.0 [skip ci] ([`b439427`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b43942750096484c85bf322070dcef7b5ec5b68e))
+
+### Features
+
+* feat(tenant): give stores on a platform hostname a first-level API host
+
+A store on <label>.grooveshop.space got api.<label>.grooveshop.space, a
+second-level name outside the zone's free Universal SSL wildcard
+(*.grooveshop.space). Cloudflare cannot proxy such a host, so every one
+of them (api.demo, api.fyteia, api.delta-sigma) stayed DNS-only: no edge
+protection, no X-Origin-Verify proof, and the reason port 80/443 cannot
+be closed to everything but Cloudflare.
+
+derive_api_domain is now the one convention, used by ensure_api_domain
+and by the resolver's fallback: api-<label>.<CLOUDFLARE_PLATFORM_ZONE_NAME>
+for a platform hostname, api.<primary> for a store on its own domain
+(the apex of its own zone). The resolver already accepts the api- shape
+(staging's api-staging.webside.gr).
+
+Existing stores keep their rows; moving them is an operator step.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_016F5trstVMoFXNan1ZQMLEp ([`1551b5b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1551b5b82d5a808cf07ad66a4a4990d81e40e1bb))
+
 ## v3.83.0 (2026-09-26)
 
 ### Bug fixes

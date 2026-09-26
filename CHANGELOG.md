@@ -3,6 +3,66 @@
 
 
 
+## v3.83.0 (2026-09-26)
+
+### Bug fixes
+
+* fix(viva): read the webhook's source address from the hop a caller cannot write
+
+- _webhook_get_rate_limit keyed the handshake's 10/hour budget on a bare
+  X-Real-IP, which a caller that sets it chooses: a fresh budget per
+  request. It now uses client_ip_or_peer, like every other per-client
+  limit since ed16b77d.
+- _check_source_ip accepted a Viva address from ANY X-Forwarded-For
+  entry. Since Traefik keeps Cloudflare's header, entries left of its
+  own hop are the caller's to write, so the check reported whatever
+  Viva IP a caller claimed. It is informational (a log line; the
+  Retrieve Transaction call authenticates every webhook) and now reads
+  client_ip_or_peer too. Its docstring no longer describes an
+  optimisation that does not exist, nor blames SNAT.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_016F5trstVMoFXNan1ZQMLEp ([`3684f40`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3684f40fa439cb1ea234668fd3958aa9cf9fd031))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.82.1 [skip ci] ([`e3b5faa`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e3b5faa8e82d93effce4d6795ded4329dc85875a))
+
+### Documentation
+
+* docs(client-ip): describe Traefik's peer as it is since externalTrafficPolicy: Local
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_016F5trstVMoFXNan1ZQMLEp ([`7f65059`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7f650596a9190f13782c94f8f7a86b3c0ef7e588))
+
+### Features
+
+* feat(legal): disclose the server logs in every store's privacy policy
+
+The platform keeps a Traefik access log (and application logs) with the
+visitor's IP address, country, user agent, path and timing for 14 days,
+and no privacy document said so (GDPR Art. 13).
+
+- PRIVACY_SERVER_LOGS_SECTION (el, en): what is recorded and what is
+  not (query strings, cookies, credentials, Referer; capability tokens
+  in paths redacted), purpose and Art. 6(1)(f) basis, the 14-day
+  retention, the recipients (the platform provider, Hetzner in Germany,
+  Cloudflare with the DPF and SCCs), access/erasure/restriction and the
+  Art. 21 right to object. Each claim is the running configuration's
+  (grooveshop-infrastructure docs/logging.md).
+- The seeded Greek privacy document ends with it.
+- A seeded document is the merchant's to edit, so a platform change
+  cannot be written over it. LEGAL_TEXT_UPDATES records each change as
+  a revision and ContentPage.legal_text_revision the revision a page
+  incorporates: 0032 brings still-platform pages forward and stamps
+  them; an edited page keeps its text, and the admin (page and
+  dashboard) shows its merchant the section to add until they mark it
+  reviewed. `manage.py legal_text_status` lists where every store
+  stands.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_016F5trstVMoFXNan1ZQMLEp ([`ede527e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ede527eff2a3c15ee81a24fdc5df91c3afa90385))
+
 ## v3.82.1 (2026-09-26)
 
 ### Bug fixes

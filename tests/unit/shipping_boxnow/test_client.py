@@ -68,10 +68,8 @@ def _make_client(**kwargs) -> BoxNowClient:
 def _isolated_cache():
     """Give every test its own LocMemCache via ``django.core.cache.cache``.
 
-    The conftest ``settings.CACHES`` LocMem override is inert for cache
-    connections that materialised at app-load (see the note in
-    ``tests/conftest.py``), so in CI the default proxy is the *shared*
-    Redis — where another xdist worker's autouse ``cache.clear()`` can
+    The default proxy is the *shared* Redis (``tests/settings.py``) —
+    where another xdist worker's autouse ``cache.clear()`` can
     wipe the token between this module's ``cache.set`` and ``cache.get``
     (flaky ``test_authenticate_success``). Patching the module attribute
     covers both the client's call-time import and the tests' own local

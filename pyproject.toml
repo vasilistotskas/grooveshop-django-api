@@ -208,7 +208,6 @@ changelog_file = "CHANGELOG.md"
 # Pytest configuration
 # ─────────────────────────────────────────────────────────
 [tool.pytest.ini_options]
-DJANGO_SETTINGS_MODULE = "settings"
 python_files = ["test_*.py", "*_test.py", "testing/python/*.py"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
@@ -229,7 +228,12 @@ timeout = 600
 # happens on a COLD build. Pass ``--create-db`` to force a rebuild after adding
 # a migration. Safe for CI: its Postgres container is fresh each run, so there
 # is nothing to reuse and behaviour is unchanged; the win is purely local.
-addopts = "--tb=short --maxfail=0 -n auto --dist loadfile --reuse-db"
+# ``--ds=tests.settings`` rather than a ``DJANGO_SETTINGS_MODULE`` ini key:
+# pytest-django ranks the option above that environment variable and the
+# variable above the ini key, and every container started with
+# ``env_file: .env`` exports ``DJANGO_SETTINGS_MODULE=settings``. That
+# module pins what must be right before ``django.setup()``; see its docstring.
+addopts = "--ds=tests.settings --tb=short --maxfail=0 -n auto --dist loadfile --reuse-db"
 # Third-party deprecation noise we cannot fix here — each entry names the
 # offending package and the upstream state so it can be dropped on upgrade:
 # - daphne pins the Windows selector event-loop policy for Twisted compat

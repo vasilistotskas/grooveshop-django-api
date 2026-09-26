@@ -57,9 +57,8 @@ def throttled_rate(monkeypatch):
     )
     # A PRIVATE cache, not the default one.
     #
-    # ``SimpleRateThrottle.cache`` follows ``caches['default']``, which
-    # the suite's ``_restore_default_cache_backend`` fixture restores to
-    # the real Redis instance after every test. Redis is shared by every
+    # ``SimpleRateThrottle.cache`` follows ``caches['default']``, the
+    # suite's real Redis instance (``tests/settings.py``). Redis is shared by every
     # xdist worker, while each worker owns a separate database with its
     # own pk sequence — so two workers both mint ``UserAccountFactory()``
     # as pk 1 and derive the SAME key,

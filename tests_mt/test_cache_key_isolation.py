@@ -1,8 +1,8 @@
 """``CACHES["default"]["KEY_FUNCTION"] = tenant.cache.make_tenant_key``
 prefixes every cache key with the ACTIVE schema
 (``{schema}:{key_prefix}:{version}:{key}``), so the same raw key set
-from two different tenants must never collide. The main suite runs
-with ``DISABLE_CACHE = True`` and a LocMem backend, so this real-Redis,
+from two different tenants must never collide. The main suite has no
+tenant schemas (``tests/conftest.py`` strips the router), so this
 real-schema behaviour is never exercised there.
 
 Uses a real Redis connection (this lane's CI job runs the same Redis

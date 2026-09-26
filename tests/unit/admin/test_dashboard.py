@@ -81,11 +81,7 @@ class DashboardCallbackCachingTests(TestCase):
 
     def test_callback_caches_zones(self):
         # Patch ``admin.dashboard.cache`` directly rather than seeding
-        # the real ``cache`` proxy. The proxy resolves through the
-        # production Redis backend on CI (conftest's ``settings.CACHES``
-        # patch can't reset the already-materialised ``CacheHandler``
-        # registry — Channels middleware tests depend on Redis staying
-        # bound there). Without this patch, ``cache.get_or_set`` was
+        # the real ``cache`` proxy. Without this patch, ``cache.get_or_set`` was
         # racing against the post-save signal handler in
         # ``admin/signals.py`` that invalidates ``DASHBOARD_CACHE_KEY``
         # whenever a ``UserAccount`` is created (``_make_request``

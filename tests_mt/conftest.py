@@ -57,9 +57,12 @@ settings.CELERY_TASK_EAGER_PROPAGATES = True
 settings.DEBUG = False
 
 # Everything below is left at the settings.py default on purpose:
-# DATABASE_ROUTERS = ["django_tenants.routers.TenantSyncRouter"],
-# TenantMainMiddleware present, CACHES = the real Redis-backed
-# core.caches.CustomCache with KEY_FUNCTION = tenant.cache.make_tenant_key.
+# DATABASE_ROUTERS = ["django_tenants.routers.TenantSyncRouter"] and
+# TenantMainMiddleware present. CACHES and DISABLE_CACHE come from
+# ``tests/settings.py`` (``--ds`` in pyproject.toml, shared by both
+# lanes): the Redis-backed ``tests.cache.WorkerScopedCache`` — a
+# ``CustomCache`` whose ``clear()`` is scoped to this run's namespace —
+# with the production KEY_FUNCTION = tenant.cache.make_tenant_key.
 
 # The one tenant this whole lane shares.
 MT_TENANT_SCHEMA = "mt_smoke"

@@ -35,7 +35,9 @@ settings.PASSWORD_HASHERS = [
     "django.contrib.auth.hashers.MD5PasswordHasher",
 ]
 
-settings.DISABLE_CACHE = True
+# ``DISABLE_CACHE`` and ``CACHES`` are NOT set here: both are read while
+# Django sets up, which pytest-django does before importing this module.
+# They live in ``tests/settings.py``.
 settings.MEILISEARCH["OFFLINE"] = True
 
 # Never talk to a real Redis channel layer in tests.
@@ -93,38 +95,6 @@ settings.MIDDLEWARE = [
         "core.middleware.asgi_compat.ASGICompatMiddleware",
     }
 ]
-
-# The ``default`` cache proxy materialised as the production RedisCache at
-# app-load, before this module runs. We intentionally do NOT reset
-# ``django.core.cache.caches``: the Channels middleware tests
-# (``tests/unit/core/middleware/test_channels.py``) patch
-# ``cache._cache.get_client`` directly and require the real Redis backend.
-# Because the registry is not reset, the ``settings.CACHES`` LocMem patch
-# below is inert against that live instance — it only affects code that
-# reads ``settings.CACHES`` directly.
-settings.CACHES = {
-    "default": {
-        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-        "LOCATION": "test-cache",
-    },
-}
-
-# Every pytest-xdist worker shares that single Redis instance. Isolate them
-# by namespacing every default-cache key with the worker id. Without this,
-# constant keys (e.g. loyalty's ``_TIER_LEVEL_CACHE_KEY`` map) and PK-keyed
-# values (e.g. the parler translation cache, whose PKs collide across the
-# per-worker test databases) leak between workers and produce
-# order-dependent flakes. The teardown clear below deletes only this
-# worker's namespace so it never FLUSHDBs another worker's live keys.
-CACHE_WORKER_PREFIX = "test_{}".format(
-    os.environ.get("PYTEST_XDIST_WORKER", "master")
-)
-caches["default"].key_prefix = CACHE_WORKER_PREFIX
-
-# The Redis-backed instance the whole suite is meant to use. Captured
-# here, while it is still the one built at app-load, so it can be put
-# back after any test that swapped it out.
-_ORIGINAL_DEFAULT_CACHE = caches["default"]
 
 
 # Route django-extra-settings through a DummyCache so every ``Setting.get``
@@ -308,45 +278,15 @@ def requires_meilisearch(obj):
     return _meilisearch_unavailable(obj)
 
 
-def _delete_worker_keys(backend) -> None:
-    """Delete every key in ``backend``'s worker namespace, and only those.
-
-    ``backend`` must be Redis-backed. Connection errors propagate.
-    """
-    client = backend._cache.get_client(None, write=True)
-    # make_tenant_key prepends the ACTIVE SCHEMA to every raw key
-    # ({schema}:{key_prefix}:{version}:{key}), so the worker-namespace
-    # pattern must tolerate the schema segment. Without it the per-test
-    # clear silently matched nothing and stale entries (e.g. parler's
-    # translation cache after a delete + same-PK recreate) leaked
-    # between tests as order-dependent failures.
-    patterns = (
-        f"{backend.key_prefix}:*",  # non-tenant layouts (safety net)
-        f"*:{backend.key_prefix}:*",  # {schema}:{prefix}:… tenant layout
-    )
-    keys: list = []
-    for pattern in patterns:
-        keys.extend(client.scan_iter(match=pattern, count=1000))
-    if keys:
-        client.delete(*keys)
-
-
 def _reset_worker_cache():
     """Clear only THIS worker's cache namespace after each test.
 
-    Best-effort by design: see the ConnectionError handling at the end.
+    ``clear()`` on the suite backend (``tests.cache.WorkerScopedCache``)
+    deletes this worker's keys and no others; inside an
+    ``override_settings(CACHES=...)`` it is that backend's own clear.
 
-    A blanket ``cache.clear()`` is a Redis ``FLUSHDB``; on the shared test
-    Redis that wipes other workers' live keys mid-test, turning their
-    ``assertNumQueries`` cache-hit assertions into flaky misses. Deleting
-    only the worker-prefixed keys keeps each worker's teardown local. Falls
-    back to a plain ``clear()`` for non-Redis backends (e.g. LocMem).
+    Best-effort by design: see the ConnectionError handling below.
     """
-    backend = caches["default"]
-    get_client = getattr(getattr(backend, "_cache", None), "get_client", None)
-    if get_client is None:
-        backend.clear()
-        return
     # Redis connection errors here must not fail the test that just
     # passed. Under -n auto every worker holds pooled connections to the
     # same localhost Redis, and one occasionally comes back dead —
@@ -358,42 +298,11 @@ def _reset_worker_cache():
     # teardown, and they are namespaced to this worker anyway.
     for attempt in (1, 2):
         try:
-            _delete_worker_keys(backend)
+            caches["default"].clear()
             return
         except RedisConnectionError:
             if attempt == 2:
                 return
-
-
-def _clear_worker_namespace() -> None:
-    """``clear()`` for the suite's Redis cache: this worker's keys only.
-
-    Tests call ``cache.clear()`` directly (to evict parler's shared
-    translation cache after a queryset ``.update()``, to reset throttle
-    counters, …). On the Redis backend that is ``FLUSHDB``, and every
-    xdist worker shares the one Redis database — so each such call also
-    wiped whatever the OTHER workers had cached at that instant.
-
-    That made any test whose query count depends on a warm cache flaky
-    at a rate set by whatever ran beside it. Observed in CI as
-    ``test_cost_does_not_grow_with_the_number_of_seeds`` failing with
-    "grew from 11 to 17 queries": another worker's flush landed between
-    the warm-up request and the measured one, evicting
-    ``recs:tenant_context``, and the measured request paid the six
-    queries of ``build_tenant_context``. Reproduced locally by running
-    the recommendation budget tests while a second process issued
-    ``FLUSHDB`` at random intervals: 53 of 80 runs failed.
-
-    Scoping ``clear()`` to the worker namespace keeps what every caller
-    means — "forget what this test cached" — without the side effect.
-    Bound to the instance, the same way ``key_prefix`` is set above, so
-    a standalone ``CustomCache`` a test builds for itself (the fail-open
-    and ``clear_by_prefixes`` tests) keeps the real ``FLUSHDB``.
-    """
-    _delete_worker_keys(_ORIGINAL_DEFAULT_CACHE)
-
-
-_ORIGINAL_DEFAULT_CACHE.clear = _clear_worker_namespace
 
 
 @pytest.fixture(autouse=True)
@@ -1016,34 +925,6 @@ def live_meilisearch_indexes():
     if MEILISEARCH_AVAILABLE:
         provision_meilisearch_indexes()
     yield
-
-
-@pytest.fixture(autouse=True)
-def _restore_default_cache_backend():
-    """Undo cache-backend leakage between tests.
-
-    ``override_settings(CACHES=LocMem)`` (the dashboard caching tests)
-    makes ``CacheHandler`` resolve and CACHE a LocMemCache. Django
-    restores the *settings* when the override exits, but the resolved
-    instance stays in ``caches._connections``, so later tests on the
-    same worker keep getting LocMem. Anything expecting the Redis API
-    then dies on an attribute that backend does not have —
-    ``'LocMemCache' object has no attribute 'keys'`` in
-    core/cache/service.py, and ``OrderedDict has no attribute
-    'get_client'`` in the channels middleware. Both were reproducible by
-    running tests/unit/admin/test_dashboard.py immediately before the
-    affected file.
-
-    Deleting the entry is NOT a fix: tests/conftest.py deliberately
-    leaves ``settings.CACHES`` pointing at LocMem, so a rebuild would
-    hand back LocMem again. Restore the captured Redis instance instead.
-    """
-    yield
-    try:
-        if caches._connections.default is not _ORIGINAL_DEFAULT_CACHE:
-            caches._connections.default = _ORIGINAL_DEFAULT_CACHE
-    except AttributeError:
-        caches._connections.default = _ORIGINAL_DEFAULT_CACHE
 
 
 def _retry_meili_connection_errors(attempts: int = 3) -> None:

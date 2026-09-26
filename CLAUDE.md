@@ -204,9 +204,11 @@ All factories extend `CustomDjangoModelFactory` from `devtools/factories.py`. Ke
 
 ### Test Configuration
 
-Tests in `tests/` with `unit/`, `integration/`, and `utils/` subdirectories. Key `conftest.py` settings:
+Tests in `tests/` with `unit/`, `integration/`, and `utils/` subdirectories.
+
+Settings read while Django sets up live in `tests/settings.py`, selected with `--ds=tests.settings` in `addopts` (the option outranks a `DJANGO_SETTINGS_MODULE` env var, which every container gets from `env_file: .env`). It pins `DISABLE_CACHE`, `ENABLE_DEBUG_TOOLBAR`, `APPEND_SLASH` and `DEBUG` in the environment before `settings.py` loads, so the developer's `.env` cannot make a local run differ from CI, and declares `CACHES` as `tests.cache.WorkerScopedCache` (Redis, one `KEY_PREFIX` per xdist worker, `clear()` scoped to it). pytest-django imports `conftest.py` only after `django.setup()`, so a value assigned there is too late for anything an `AppConfig.ready()` or the cache registry reads. Key `conftest.py` settings:
 - MD5 password hasher (faster than default)
-- `DISABLE_CACHE = True`, `MEILISEARCH["OFFLINE"] = True`
+- `MEILISEARCH["OFFLINE"] = True`
 - `CELERY_TASK_ALWAYS_EAGER = True` (synchronous execution)
 - Auto-fixtures: cache clearing, DB query reset, site cache clear, connection cleanup for xdist
 - `requires_meilisearch` skip marker for tests needing live Meilisearch

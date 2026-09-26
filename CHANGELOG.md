@@ -3,6 +3,89 @@
 
 
 
+## v3.82.0 (2026-09-26)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.81.1 [skip ci] ([`3b256ef`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3b256ef8dabef3e3ad0a71114b674f8e33ddd0eb))
+
+### Features
+
+* feat(cache): purge storefront pages from the Cloudflare edge
+
+The storefront now lets Cloudflare cache the pages Nitro serves from its page
+cache and tags them storefront-html and storefront-html-<schema>. Django purges
+those tags:
+
+- after an edit: when CacheService purges a surface with page renders, it
+  queues one purge of the store's tag 30 seconds later, coalescing a burst of
+  saves (Cloudflare's Free plan allows five purges a minute per account). On
+  the public schema it purges every store.
+- after a deploy: manage.py purge_edge_cache purges storefront-html from every
+  zone, retrying Cloudflare's rate limit and failing loudly, because an edge
+  copy from the previous build points at /_nuxt chunks the new one no longer
+  serves.
+
+A store on a platform hostname is purged with the platform zone's credentials
+(CLOUDFLARE_PLATFORM_ZONE_NAME/_ZONE_ID/_API_TOKEN); a store on its own domain
+in its own Cloudflare account carries its zone ID and token on its Tenant row
+(new fields, add-only migration with db_default, token kept out of history).
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01WjJucy7gQj77PFgeVh4fhk ([`2e47930`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2e479307c9b6349dc61607cc9bb39146e81e6415))
+
+### Testing
+
+* test(cache): prune non-source trees before scanning for @cache_methods
+
+The dead-pattern check walked the whole repo with Path.rglob, which
+enumerated every file in .venv before filtering, and killed its xdist
+worker on every full run ('node down: Not properly terminated'). It now
+prunes .venv, node_modules and other non-source directories before
+descending: the same 1997 files and 18 decorated classes, without
+entering the virtualenv.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_016F5trstVMoFXNan1ZQMLEp ([`9e8a6a1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9e8a6a1392078a03e3c2091dd6ce7621a459d442))
+
+* test: one settings module so local runs match CI
+
+The suite's configuration depended on each developer's .env. pytest-django
+calls django.setup() before conftest.py is imported, so the conftest's
+DISABLE_CACHE came too late: CI connected six cache-invalidation
+receivers, local runs none. conftest also declared a LocMem CACHES while
+the live backend was Redis, so a class-level CACHES override put the
+first test after the class on LocMem.
+
+tests/settings.py, selected with --ds (it outranks the
+DJANGO_SETTINGS_MODULE every container gets from .env), pins
+DISABLE_CACHE, ENABLE_DEBUG_TOOLBAR, APPEND_SLASH and DEBUG before
+settings.py loads and declares the real cache backend:
+tests.cache.WorkerScopedCache, Redis with one key prefix per xdist
+worker and a clear() scoped to it. The conftest workarounds for the old
+mismatch are gone, and tests_mt uses the same module. A regression suite
+pins each value.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_016F5trstVMoFXNan1ZQMLEp ([`9b40ec5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9b40ec5d5ce852b6b0637ff635ce2f07635169f2))
+
+* test: keep cache.clear() inside the calling xdist worker
+
+On the suite's Redis cache clear() is a FLUSHDB, and every xdist worker
+shares DB 0, so a test calling cache.clear() wiped the other workers'
+keys. The recommendation query-budget tests failed whenever that landed
+between their warm-up and measured requests: the tenant context was
+rebuilt, costing its six queries (11 -> 17). Reproduced 35 failures in
+80 runs against a concurrent clearer; 80 of 80 pass now.
+
+The suite's cache instance gets a clear() that deletes only this
+worker's namespace, sharing the key scan with the per-test reset. A
+cache a test builds for itself still flushes. A regression test pins
+that another worker's key survives.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_016F5trstVMoFXNan1ZQMLEp ([`908d3d9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/908d3d9718c41b970b95ed10a67b52e82268634b))
+
 ## v3.81.1 (2026-09-26)
 
 ### Bug fixes

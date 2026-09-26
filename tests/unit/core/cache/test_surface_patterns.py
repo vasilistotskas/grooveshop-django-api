@@ -219,33 +219,26 @@ class TestPromotionsSurface:
         assert "cache:nitro:routes:_:*offers*" in patterns
 
 
-#: Directories that hold no project source. Pruned BEFORE descending:
-#: ``Path.rglob`` enumerated the whole virtualenv (tens of thousands of
-#: files) and only then filtered it, which pushed an xdist worker past
-#: its memory on every full run ("node down: Not properly terminated").
-_NON_SOURCE_DIRS = frozenset(
-    {
-        ".venv",
-        "node_modules",
-        ".git",
-        "__pycache__",
-        ".mypy_cache",
-        ".ruff_cache",
-        ".pytest_cache",
-        "static",
-        "staticfiles",
-        "media",
-    }
-)
-
-
 def _project_python_files(root):
-    """Yield the repo's ``.py`` files without entering non-source trees."""
+    """Yield the repo's ``.py`` files: the root's own, then every package.
+
+    Descends only into directories holding an ``__init__.py`` — every
+    Django app is one — rather than walking everything and skipping a
+    list of known non-source trees. That list kept falling behind: the
+    local ``mediafiles/`` held millions of uploaded files, and the walk
+    through it outran this test's 600 s timeout under a full parallel
+    run, which pytest-timeout ends by killing the worker ("node down:
+    Not properly terminated").
+    """
     import os
     from pathlib import Path
 
     for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = [d for d in dirnames if d not in _NON_SOURCE_DIRS]
+        dirnames[:] = [
+            d
+            for d in dirnames
+            if os.path.isfile(os.path.join(dirpath, d, "__init__.py"))
+        ]
         for filename in filenames:
             if filename.endswith(".py"):
                 yield Path(dirpath) / filename

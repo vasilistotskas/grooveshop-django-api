@@ -27,6 +27,9 @@ developer machine and CI.
 """
 
 from os import environ
+from pathlib import Path
+from shutil import rmtree
+from tempfile import gettempdir
 
 _PINNED_ENVIRONMENT = {
     # Nothing is response-cached under pytest (``core.utils.views
@@ -80,3 +83,21 @@ CACHES = {
         "KEY_FUNCTION": "tenant.cache.make_tenant_key",
     },
 }
+
+# Uploads go to a per-worker tree under the OS temp directory, emptied
+# whenever a worker starts. ``settings.py`` points MEDIA_ROOT at the
+# repository's ``mediafiles/``, the tree the development server serves,
+# and the suite never deletes what it uploads: every run added its
+# images there, 4.5 million files by 2026-09-26, and a test that walks
+# the repository took past its timeout on that tree alone. The private
+# root follows (``tenant.storage.private_media_root``: MEDIA_ROOT with a
+# ``_private`` suffix). Per worker, so one worker's wipe cannot delete
+# another's files mid-test.
+MEDIA_ROOT = str(
+    Path(gettempdir())
+    / "grooveshop-tests"
+    / environ.get("PYTEST_XDIST_WORKER", "master")
+    / "mediafiles"
+)
+for _root in (MEDIA_ROOT, MEDIA_ROOT + "_private"):
+    rmtree(_root, ignore_errors=True)

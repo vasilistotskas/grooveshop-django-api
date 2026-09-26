@@ -15,6 +15,8 @@ from django.core.cache import cache
 from django.db import connection
 from django.http import HttpRequest, HttpResponse, JsonResponse
 
+from core.client_ip import client_ip_or_peer
+
 logger = logging.getLogger(__name__)
 
 # (path_prefix, per_minute, per_hour) — None means unlimited
@@ -34,17 +36,16 @@ _ALLAUTH_RATE_LIMITS: list[tuple[str, int | None, int | None]] = [
 def _client_key(request: HttpRequest) -> str:
     """Return a stable, non-reversible identifier for the requesting client.
 
-    Mirrors the precedence in ``UserAccountAdapter.get_client_ip`` exactly:
-    1. ``X-Real-IP`` — set by the Nuxt proxy via h3 ``getRequestIP``.
-    2. ``REMOTE_ADDR`` — direct-to-Django connections (health probes, tests).
-    3. Empty string — fail-open if neither header is present.
+    The same address ``UserAccountAdapter.get_client_ip`` uses:
+    ``core.client_ip.client_ip_or_peer`` — the edge-proven visitor, else the
+    peer Traefik saw, else ``REMOTE_ADDR``.
 
-    The XFF fallback has been deliberately dropped: when X-Real-IP is absent
-    and REMOTE_ADDR is a private address, trusting the rightmost XFF entry
-    would be trivially spoofable by an attacker who controls the request body.
+    It used to be ``X-Real-IP`` unconditionally. On the SSR path the Nuxt
+    proxy fills that from the incoming ``CF-Connecting-IP``, which a caller
+    sending the login straight to a node IP chooses freely: a fresh
+    login-throttle bucket per attempt.
     """
-    real_ip = request.META.get("HTTP_X_REAL_IP", "").strip()
-    ip = real_ip or request.META.get("REMOTE_ADDR", "")
+    ip = client_ip_or_peer(request)
     return hashlib.sha256(ip.encode()).hexdigest()[:32]
 
 

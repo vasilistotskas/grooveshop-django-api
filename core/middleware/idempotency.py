@@ -37,6 +37,8 @@ from django.core.cache import caches
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.utils.deprecation import MiddlewareMixin
 
+from core.client_ip import client_ip_or_peer
+
 logger = logging.getLogger(__name__)
 
 IDEMPOTENCY_HEADER = "HTTP_IDEMPOTENCY_KEY"
@@ -70,21 +72,15 @@ MAX_KEY_LENGTH = 255
 
 
 def _get_real_ip(request: HttpRequest) -> str:
-    """Return the real client IP, respecting X-Real-IP set by Traefik.
+    """Return the client address the per-scope budget is keyed on.
 
-    Preference order:
-    1. ``X-Real-IP`` header injected by our trusted reverse proxy (Traefik).
-    2. Rightmost entry in ``X-Forwarded-For`` (the one the proxy appended).
-    3. ``REMOTE_ADDR`` as final fallback for direct / test connections.
+    ``core.client_ip.client_ip_or_peer``: the edge-proven visitor, else the
+    peer Traefik saw, else ``REMOTE_ADDR``. Never a bare ``X-Real-IP``: on
+    the SSR path Nuxt fills it from the caller's own ``CF-Connecting-IP``,
+    so a caller at a node IP could pick a fresh scope — and a fresh
+    MAX_KEYS_PER_SCOPE budget — per request.
     """
-    real_ip = request.META.get("HTTP_X_REAL_IP", "").strip()
-    if real_ip:
-        return real_ip
-    xff = request.META.get("HTTP_X_FORWARDED_FOR", "")
-    entries = [e.strip() for e in xff.split(",") if e.strip()]
-    if entries:
-        return entries[-1]  # rightmost (trusted proxy)
-    return request.META.get("REMOTE_ADDR", "unknown")
+    return client_ip_or_peer(request) or "unknown"
 
 
 def _scope_id(request: HttpRequest) -> str:

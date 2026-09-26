@@ -14,6 +14,7 @@ from django.utils import translation
 from django.utils.encoding import force_str
 from django.utils.http import url_has_allowed_host_and_scheme
 
+from core.client_ip import client_ip_or_peer
 from core.utils.email_context import build_email_context
 from core.utils.i18n import get_user_language, resolve_request_language
 from core.utils.tenant_urls import (
@@ -158,13 +159,15 @@ class UserAccountAdapter(DefaultAccountAdapter):
         """
         Resolve the client IP for UserSession tracking and rate limiting.
 
-        Prefers X-Real-IP (set by the Nuxt proxy via h3's getRequestIP, which
-        resolves the real client IP from the X-Forwarded-For chain) and falls
-        back to REMOTE_ADDR so direct-to-Django callers (health probes,
-        Celery-triggered HTTP, integration tests) don't trip allauth's strict
-        "header-or-nothing" default introduced in 65.14.2.
+        ``core.client_ip.client_ip_or_peer``: the edge-proven visitor, else
+        the peer Traefik saw, else REMOTE_ADDR — so direct-to-Django callers
+        (health probes, Celery-triggered HTTP, integration tests) still
+        don't trip allauth's strict "header-or-nothing" default introduced
+        in 65.14.2. A bare X-Real-IP is not believed: on the SSR path the
+        Nuxt proxy fills it from the caller's own CF-Connecting-IP, which
+        allauth's login-failure limits would then key on.
         """
-        ip = request.headers.get("X-Real-IP") or request.META.get("REMOTE_ADDR")
+        ip = client_ip_or_peer(request)
         cleaned = clean_client_ip(ip) if ip else None
         if not cleaned:
             raise PermissionDenied("Unable to determine client IP address")

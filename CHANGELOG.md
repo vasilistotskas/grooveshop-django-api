@@ -3,6 +3,41 @@
 
 
 
+## v3.85.0 (2026-09-26)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.84.1 [skip ci] ([`fb53944`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fb53944eb8e143c254d5dec235f13b1b2d767cb5))
+
+### Features
+
+* feat(cache): purge page surfaces on a merchant's edit, batched off the request
+
+A product, category, blog post, promotion, page layout or menu edit left the
+rendered pages (Nitro, and now the Cloudflare edge) and Django's API cache
+stale until their TTL: only the admin Cache tool purged them. Wiring those
+models to the synchronous on-commit purge was avoided because a catalogue
+import would SCAN Redis and POST to Nuxt once per product.
+
+Auto-invalidation is now batched: a commit adds its stale surfaces to a
+per-schema Redis set (CustomCache.add_to_set) and queues ONE
+invalidate_cache_surfaces_task 10 s later, which takes the whole set
+atomically (pop_set) and purges it; every commit in the window rides it, and
+a commit landing while the task runs queues the next one. An import costs one
+purge; an edit shows in ~10 s plus the edge purge.
+
+- products, categories, blog, page_config, promotions and tags declare their
+  merchant-edited models (and translations) in invalidated_by; user-generated
+  rows (reviews, comments, favourites, alerts, redemptions) stay out.
+- CacheSurface.ignored_update_fields: the products surface ignores
+  save(update_fields=[stock, updated_at]), the stock decrement every order
+  makes, which would otherwise empty a store's product cache on each sale.
+- test_edge asserted an English message the suite now renders in Greek;
+  it asserts the field instead.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01WjJucy7gQj77PFgeVh4fhk ([`209c9f0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/209c9f0fb8e97a41ccaf614633726193acc6c431))
+
 ## v3.84.1 (2026-09-26)
 
 ### Bug fixes

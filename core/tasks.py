@@ -22,6 +22,8 @@ from extra_settings.models import Setting
 
 from cart.models import Cart
 from core import celery_app
+from core.cache import edge as edge_cache
+from core.cache.edge import EdgePurgeError
 from core.exceptions import HealthCheckFailed, ManagementCommandFailed
 from core.utils.email_context import build_email_context
 from core.utils.i18n import get_user_language
@@ -120,6 +122,24 @@ def clear_expired_sessions_task():
     except Exception:
         logger.exception("Unexpected error in clear_expired_sessions")
         raise
+
+
+@celery_app.task(
+    base=MonitoredTask,
+    max_retries=5,
+    autoretry_for=(EdgePurgeError,),
+    # Cloudflare's Free plan refills five purges a minute; back off past it.
+    retry_backoff=15,
+    retry_jitter=True,
+)
+def purge_edge_cache_task():
+    """Purge storefront pages from Cloudflare after Nitro's were purged.
+
+    Queued by ``core.cache.edge.schedule_purge``; runs in the schema that
+    queued it (``TenantTask``): one store's pages, or every store's.
+    """
+    zones = edge_cache.run_scheduled_purge()
+    return {"status": "success", "zones": zones}
 
 
 @celery_app.task(

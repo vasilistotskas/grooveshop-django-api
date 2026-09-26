@@ -4,6 +4,9 @@ from django.utils.translation import gettext_lazy as _
 
 from core.cache.registry import CacheSurface, register_surface
 
+#: Where Nitro keeps its cached page renders (``_nuxt_routes``).
+NUXT_ROUTE_PREFIX = "cache:nitro:routes:"
+
 
 def _nuxt(*names: str) -> tuple[str, ...]:
     """Build Nuxt Nitro handler patterns from EXACT handler names.
@@ -63,7 +66,7 @@ def _nuxt_routes(*paths: str) -> tuple[str, ...]:
     """
 
     return tuple(
-        f"cache:nitro:routes:_:*{_escaped_pathname(path)}*" for path in paths
+        f"{NUXT_ROUTE_PREFIX}_:*{_escaped_pathname(path)}*" for path in paths
     )
 
 

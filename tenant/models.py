@@ -510,6 +510,42 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         ),
     )
 
+    # === Edge cache (Cloudflare) ===
+    # Only for a store on its OWN domain proxied through its OWN Cloudflare
+    # account. Stores on a platform hostname are purged with the
+    # platform's credentials (core.cache.edge). Set both or neither.
+
+    cloudflare_zone_id = models.CharField(
+        _("Cloudflare zone ID"),
+        max_length=32,
+        blank=True,
+        default="",
+        db_default="",
+        validators=[
+            RegexValidator(
+                r"^[0-9a-f]{32}$",
+                _("A Cloudflare zone ID is 32 lowercase hex characters."),
+            )
+        ],
+        help_text=_(
+            "The zone of the store's own domain, from the Cloudflare "
+            "dashboard's domain overview. Empty when the store uses a "
+            "platform hostname."
+        ),
+    )
+    cloudflare_api_token = models.CharField(
+        _("Cloudflare API token"),
+        max_length=255,
+        blank=True,
+        default="",
+        db_default="",
+        help_text=_(
+            "A token with only Zone → Cache Purge → Purge on that zone. "
+            "Secret — used to clear the store's pages from Cloudflare's "
+            "cache after an edit or a deploy."
+        ),
+    )
+
     # === Analytics ===
 
     meta_pixel_id = models.CharField(
@@ -1073,6 +1109,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         excluded_fields=[
             "stripe_secret_key",
             "meta_capi_access_token",
+            "cloudflare_api_token",
             "viva_wallet_api_key",
             "viva_wallet_client_secret",
             "viva_wallet_webhook_verification_key",
@@ -1184,6 +1221,19 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         self._validate_google_ads()
         self._validate_social_urls()
         self._validate_box_now_partner_id()
+        self._validate_cloudflare_credentials()
+
+    def _validate_cloudflare_credentials(self) -> None:
+        # A zone without a token (or the reverse) purges nothing, and the
+        # merchant's edits would then stay behind at the edge unnoticed.
+        if bool(self.cloudflare_zone_id) != bool(self.cloudflare_api_token):
+            raise ValidationError(
+                {
+                    "cloudflare_api_token": _(
+                        "Set the Cloudflare zone ID and API token together."
+                    )
+                }
+            )
 
     def _validate_schema_name(self) -> None:
         # Field validators only run in full_clean()/DRF; mirror the

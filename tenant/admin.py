@@ -653,6 +653,18 @@ class TenantAdmin(ModelAdmin):
             },
         ),
         (
+            _("Edge cache — Cloudflare"),
+            {
+                "fields": ["cloudflare_zone_id", "cloudflare_api_token"],
+                "classes": ["collapse"],
+                "description": _(
+                    "Only for a store on its own domain in its own "
+                    "Cloudflare account. Leave empty on a platform "
+                    "hostname."
+                ),
+            },
+        ),
+        (
             _("Payments — Viva Wallet"),
             {
                 "fields": [

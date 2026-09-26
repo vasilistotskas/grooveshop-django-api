@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 # clear_by_prefixes) to it.
 from django.core.cache import cache as cache_instance
 
+from core.cache import edge as edge_cache
 from core.cache import gateway as gateway_client
 from core.cache import nuxt as nuxt_client
 from core.cache.protected import filter_protected
@@ -19,6 +20,7 @@ from core.cache.registry import (
     get_surface,
     iter_surfaces,
 )
+from core.cache.surfaces import NUXT_ROUTE_PREFIX
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractBaseUser
@@ -143,6 +145,7 @@ class CacheService:
 
         ordered = expand_with_related(codes) if include_related else list(codes)
 
+        purged_pages = False
         for code in ordered:
             try:
                 surface = get_surface(code)
@@ -152,6 +155,15 @@ class CacheService:
 
             result = CacheService._purge_surface(surface, dry_run=dry_run)
             report.surfaces.append(result)
+            purged_pages = purged_pages or any(
+                pattern.startswith(NUXT_ROUTE_PREFIX)
+                for pattern in surface.nuxt_patterns
+            )
+
+        # The rendered pages Nitro just dropped are also cached at the
+        # Cloudflare edge, which refetches them from Nitro once purged.
+        if purged_pages and not dry_run:
+            edge_cache.schedule_purge()
 
         CacheService._log_audit(report, actor=actor)
         return report

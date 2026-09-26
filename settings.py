@@ -752,6 +752,14 @@ CACHE_CLEAR_PREFIXES: list[str] = [
 NUXT_INTERNAL_BASE_URL = getenv("NUXT_INTERNAL_BASE_URL", "")
 NUXT_CACHE_PURGE_TOKEN = getenv("NUXT_CACHE_PURGE_TOKEN", "")
 
+# The platform's own Cloudflare zone, which caches the storefront pages of
+# every store on a platform hostname (``core.cache.edge``). A store on its
+# own domain in its own Cloudflare account carries its credentials on the
+# Tenant row instead. The token needs only Zone → Cache Purge → Purge.
+CLOUDFLARE_PLATFORM_ZONE_NAME = getenv("CLOUDFLARE_PLATFORM_ZONE_NAME", "")
+CLOUDFLARE_PLATFORM_ZONE_ID = getenv("CLOUDFLARE_PLATFORM_ZONE_ID", "")
+CLOUDFLARE_PLATFORM_API_TOKEN = getenv("CLOUDFLARE_PLATFORM_API_TOKEN", "")
+
 if SYSTEM_ENV == "ci":
     CACHES = {
         "default": {

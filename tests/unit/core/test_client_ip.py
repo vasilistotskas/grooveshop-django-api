@@ -175,3 +175,50 @@ def test_limit_keys_do_not_follow_a_forged_x_real_ip(rf, settings, key_of):
         HTTP_X_FORWARDED_FOR=EDGE_HOP,
     )
     assert key_of(proven) != key_of(first)
+
+
+VIVA_IP = "51.138.37.238"  # in VIVA_WEBHOOK_IPS_PRODUCTION
+
+
+@pytest.fixture
+def viva_live(monkeypatch):
+    monkeypatch.setattr(
+        "tenant.credentials.viva_wallet_credentials",
+        lambda: {"live_mode": True},
+    )
+
+
+def test_viva_source_check_ignores_a_forged_forwarded_entry(
+    rf, settings, viva_live
+):
+    """It used to accept a Viva address from ANY X-Forwarded-For entry,
+    and entries left of Traefik's own hop are the caller's to write."""
+    from order.views.viva_webhook import _check_source_ip
+
+    settings.ORIGIN_VERIFY_SECRET = SECRET
+    forged = _req(rf, HTTP_X_FORWARDED_FOR=f"{VIVA_IP}, {EDGE_HOP}")
+    assert _check_source_ip(forged) == (False, EDGE_HOP)
+
+    proven = _req(
+        rf,
+        HTTP_X_ORIGIN_VERIFY=SECRET,
+        HTTP_CF_CONNECTING_IP=VIVA_IP,
+        HTTP_X_FORWARDED_FOR=f"{VIVA_IP}, {EDGE_HOP}",
+    )
+    assert _check_source_ip(proven) == (True, VIVA_IP)
+
+
+def test_viva_handshake_budget_does_not_follow_a_forged_x_real_ip(rf, settings):
+    from django.core.cache import cache
+
+    from order.views.viva_webhook import _webhook_get_rate_limit
+
+    settings.ORIGIN_VERIFY_SECRET = SECRET
+    cache.clear()
+    results = [
+        _webhook_get_rate_limit(
+            _req(rf, HTTP_X_REAL_IP=f"1.2.3.{n}", HTTP_X_FORWARDED_FOR=EDGE_HOP)
+        )
+        for n in range(11)
+    ]
+    assert results == [False] * 10 + [True]

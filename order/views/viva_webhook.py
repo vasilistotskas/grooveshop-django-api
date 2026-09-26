@@ -22,6 +22,7 @@ from django_tenants.utils import (
     tenant_context,
 )
 
+from core.client_ip import client_ip_or_peer
 from order.enum.status import (
     SETTLED_PAYMENT_STATUSES,
     OrderStatus,
@@ -220,21 +221,17 @@ def _webhook_get_rate_limit(request) -> bool:
     Fails open on cache errors so a Redis outage doesn't take down
     Viva's handshake.
 
-    Deliberately NOT an IP allowlist, though one exists: ``_check_source_ip``
-    already resolves the real client IP by walking ``X-Forwarded-For`` (then
-    ``X-Real-IP``), so the old reason recorded here — that REMOTE_ADDR is
-    SNAT-ed to the node IP by K3s/Flannel and the cluster would first need
-    ``externalTrafficPolicy: Local`` — is no longer what stands in the way.
+    Keyed on ``client_ip_or_peer``, never a bare ``X-Real-IP``: a caller
+    that chooses that header gets a fresh budget per request.
 
-    What stands in the way is failing CLOSED on the handshake: Viva's
-    published ranges (VIVA_WEBHOOK_IPS_PRODUCTION / _DEMO) are a hardcoded
-    list, and a range changing on Viva's side would silently break webhook
-    registration for every tenant. The rate limit degrades instead. Tighten
-    this only together with a way to notice that breakage.
+    Deliberately NOT an IP allowlist, though Viva publishes its ranges
+    (VIVA_WEBHOOK_IPS_PRODUCTION / _DEMO): that would fail CLOSED on the
+    handshake, and a range changing on Viva's side would silently break
+    webhook registration for every tenant. The rate limit degrades
+    instead. Tighten this only together with a way to notice that
+    breakage.
     """
-    ip = request.META.get("HTTP_X_REAL_IP", "").strip() or request.META.get(
-        "REMOTE_ADDR", ""
-    )
+    ip = client_ip_or_peer(request)
     key = "viva_wh_get:" + hashlib.sha256(ip.encode()).hexdigest()[:24]
     try:
         cache.add(key, 0, 3600)
@@ -327,20 +324,18 @@ def _fetch_verification_key(
 
 
 def _check_source_ip(request) -> tuple[bool, str]:
-    """Best-effort check of the webhook source IP.
+    """Whether the webhook's source address is in Viva's published range.
 
-    Returns (is_viva_ip, observed_ip). Used as a non-blocking signal:
-    when the IP IS in Viva's range we can skip the Retrieve Transaction
-    API call as an optimization. When it ISN'T we MUST fall back to the
-    API call to authenticate the webhook.
+    Returns (is_viva_ip, observed_ip), for the log line only: nothing
+    is skipped or refused on it. The Retrieve Transaction call in
+    ``_process_event_in_tenant`` is the authentication — it needs our
+    own OAuth2 credentials and confirms the transaction exists at Viva.
 
-    Why this isn't a hard gate: in Kubernetes with Traefik and
-    `externalTrafficPolicy: Cluster` the source IP is SNAT-ed to a node
-    or pod IP (e.g. 10.42.x.x) — so the original Viva IP is lost both
-    in REMOTE_ADDR and in X-Forwarded-For. Hard-rejecting on IP would
-    block every real webhook. The Retrieve Transaction API call is the
-    real authentication: it requires our own OAuth2 credentials and
-    confirms the transaction exists in Viva's system.
+    The address is ``client_ip_or_peer``, the one a caller cannot
+    choose. Scanning every ``X-Forwarded-For`` entry for a match would
+    report whatever Viva address a caller wrote into the header. It
+    stays informational because refusing on it would fail closed the
+    day Viva's hardcoded ranges change.
 
     Caller must already be inside the resolved tenant's
     ``schema_context`` so ``live_mode`` reflects THIS tenant's Viva
@@ -353,33 +348,12 @@ def _check_source_ip(request) -> tuple[bool, str]:
         VIVA_WEBHOOK_IPS_PRODUCTION if live_mode else VIVA_WEBHOOK_IPS_DEMO
     )
 
-    forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR", "")
-    if forwarded_for:
-        # Try every entry — the original Viva IP may be anywhere in the chain
-        # depending on how many proxies SNAT-ed the request.
-        candidates = [ip.strip() for ip in forwarded_for.split(",")]
-    else:
-        candidates = [
-            request.META.get(
-                "HTTP_X_REAL_IP",
-                request.META.get("REMOTE_ADDR", ""),
-            )
-        ]
-
-    observed = candidates[0] if candidates else ""
-
-    for ip_str in candidates:
-        if not ip_str:
-            continue
-        try:
-            client_ip = ipaddress.ip_address(ip_str)
-        except ValueError:
-            continue
-        for network in allowed_networks:
-            if client_ip in network:
-                return True, ip_str
-
-    return False, observed
+    observed = client_ip_or_peer(request)
+    try:
+        source = ipaddress.ip_address(observed)
+    except ValueError:
+        return False, observed
+    return any(source in network for network in allowed_networks), observed
 
 
 def _verify_transaction(transaction_id):
@@ -630,9 +604,8 @@ def _handle_webhook_event(request):
                 )
             else:
                 logger.info(
-                    "Viva webhook from non-Viva IP %s — will rely on "
-                    "transaction API verification (expected behind SNAT'd "
-                    "ingress)",
+                    "Viva webhook from non-Viva IP %s — authenticated by "
+                    "the transaction API as always",
                     observed_ip,
                 )
 

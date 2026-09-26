@@ -3,6 +3,60 @@
 
 
 
+## v3.82.1 (2026-09-26)
+
+### Bug fixes
+
+* fix(security): never key a per-client limit on a caller-chosen address
+
+The allauth login limiter, UserAccountAdapter.get_client_ip (allauth's
+login-failure limits and UserSession) and the idempotency budget read
+X-Real-IP unconditionally. On the SSR path the Nuxt proxy fills that
+from the incoming CF-Connecting-IP, which a caller sending the request
+straight to a node IP chooses freely: a fresh login-throttle bucket per
+attempt.
+
+core.client_ip.client_ip_or_peer is now the one resolution for them:
+the edge-proven visitor (X-Origin-Verify), else the rightmost
+X-Forwarded-For hop, which Traefik appends and, since it trusts only
+Cloudflare's ranges, a direct caller cannot pre-fill; else REMOTE_ADDR
+for callers that skip Traefik.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_016F5trstVMoFXNan1ZQMLEp ([`ed16b77`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ed16b77ddff8d0f28407c5603d0687af1007f5c5))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.82.0 [skip ci] ([`f20b27e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f20b27ec0ef27d9c41ae8090a29ac4e5ab152604))
+
+### Testing
+
+* test: keep uploads out of the repository and rebalance the CI shards
+
+The suite wrote every upload into settings.py's MEDIA_ROOT, the
+repository's mediafiles/ that the development server serves, and never
+deleted one: 4.5 million files by 2026-09-26. The @cache_methods scan in
+test_surface_patterns walked that tree, which under a full parallel run
+outlasted its 600 s timeout; pytest-timeout's thread method ends that
+by killing the worker ("node down: Not properly terminated"), and
+xdist's loadfile scheduler then raised KeyError on the replacement
+worker, or hung. That is the crash 9e8a6a13 put down to the virtualenv.
+
+- tests/settings.py: MEDIA_ROOT (and so the derived private root) is a
+  per-worker tree under the OS temp directory, emptied when a worker
+  starts.
+- the scan descends only into packages (directories with __init__.py)
+  instead of skipping a list of known non-source trees: 0.17 s, the
+  same 18 files git grep finds.
+- .test_durations regenerated from a clean full run (9079 passed,
+  HYPOTHESIS_PROFILE=ci, --clean-durations). It recorded 7387 of the
+  suite's 9091 tests; the rest were weighted at the average, which is
+  what pushed shard 3 past its 18-minute timeout. The four groups now
+  estimate within 0.7% of each other.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_016F5trstVMoFXNan1ZQMLEp ([`f4f8ad3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f4f8ad312d09f29defd32bf594b07532412b1ecb))
+
 ## v3.82.0 (2026-09-26)
 
 ### Chores

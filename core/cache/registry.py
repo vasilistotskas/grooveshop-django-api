@@ -49,10 +49,16 @@ class CacheSurface:
     # full TTL, which is how a corrected PayWay description kept
     # serving the old English copy on a Greek storefront.
     #
-    # Opt-in per surface, because "purge on every write" is wrong for
-    # high-volume models — a catalogue import would SCAN Redis once per
-    # product. Declare it where writes are operator-driven and rare.
+    # Declare the merchant-edited models the surface renders. The purge is
+    # batched per schema and runs off the request, so a catalogue import
+    # costs one purge, not one per row.
     invalidated_by: tuple[str, ...] = ()
+    # A save whose ``update_fields`` fall entirely inside this set does NOT
+    # invalidate the surface. For bookkeeping writes that are frequent and
+    # not what the cached pages are for: the stock decrement every order
+    # makes (``order/stock.py``) would otherwise empty a store's product
+    # cache on each sale. A full ``save()`` still invalidates.
+    ignored_update_fields: frozenset[str] = frozenset()
 
 
 _lock = threading.RLock()

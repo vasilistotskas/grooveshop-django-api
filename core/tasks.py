@@ -23,6 +23,7 @@ from extra_settings.models import Setting
 from cart.models import Cart
 from core import celery_app
 from core.cache import edge as edge_cache
+from core.cache import invalidation as cache_invalidation
 from core.cache.edge import EdgePurgeError
 from core.exceptions import HealthCheckFailed, ManagementCommandFailed
 from core.utils.email_context import build_email_context
@@ -122,6 +123,20 @@ def clear_expired_sessions_task():
     except Exception:
         logger.exception("Unexpected error in clear_expired_sessions")
         raise
+
+
+@celery_app.task(base=MonitoredTask)
+def invalidate_cache_surfaces_task():
+    """Purge the cache surfaces the current schema's recent commits made stale.
+
+    Queued by ``core.cache.invalidation`` after a write to a model a surface
+    declares in ``invalidated_by``; runs in that schema (``TenantTask``).
+    No retry: ``CacheService.purge`` isolates each surface's failures and
+    logs them, and a retry would purge surfaces a later commit already
+    re-queued.
+    """
+    surfaces = cache_invalidation.run_queued_purge()
+    return {"status": "success", "surfaces": surfaces}
 
 
 @celery_app.task(

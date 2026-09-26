@@ -410,6 +410,39 @@ class CustomCache(RedisCache):
             logger.warning("Error deleting raw cache keys: %s", str(exc))
             return 0
 
+    def add_to_set(self, key: str, members: list[str], timeout: int) -> None:
+        """Add ``members`` to the Redis set at ``key``, renewing its expiry.
+
+        ``key`` goes through ``make_key`` like any cache key, so the set is
+        scoped to the active schema. Unlike the fail-open reads and writes,
+        a Redis error RAISES: the callers use the set to hand work to
+        another process, and losing it silently is the bug they exist to
+        prevent.
+        """
+        name = self.make_key(key)
+        pipe = self._cache.get_client(key, write=True).pipeline()
+        pipe.sadd(name, *members)
+        pipe.expire(name, timeout)
+        pipe.execute()
+
+    def pop_set(self, key: str) -> frozenset[str]:
+        """Atomically read and delete the Redis set at ``key``.
+
+        One MULTI, so a member added concurrently is either returned now
+        or left for the next reader — never dropped. Raises on a Redis
+        error, like ``add_to_set``.
+        """
+        name = self.make_key(key)
+        pipe = self._cache.get_client(key, write=True).pipeline(
+            transaction=True
+        )
+        pipe.smembers(name)
+        pipe.delete(name)
+        members, _ = pipe.execute()
+        return frozenset(
+            m.decode("utf-8") if isinstance(m, bytes) else m for m in members
+        )
+
     def clear_by_prefixes(
         self, prefixes: list[str] | None = None
     ) -> dict[str, int]:

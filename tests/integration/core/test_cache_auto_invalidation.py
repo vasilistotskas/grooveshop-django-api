@@ -276,3 +276,147 @@ class TestWiring:
         for surface in iter_surfaces():
             for label in surface.invalidated_by:
                 apps.get_model(label)  # raises LookupError on a typo
+
+
+class TestBatching:
+    """A commit only records its stale surfaces and queues one delayed
+    purge; every commit inside the delay rides it. A catalogue import
+    that commits once per product must cost one purge, not one per row.
+    """
+
+    def test_commits_in_separate_transactions_share_one_queued_purge(
+        self, purge
+    ):
+        from core.cache import invalidation
+
+        with mock.patch(
+            "core.tasks.invalidate_cache_surfaces_task.apply_async"
+        ) as queue:
+            for code in ("first", "second", "third"):
+                with transaction.atomic():
+                    PayWay.objects.create(provider_code=code)
+
+        queue.assert_called_once_with(
+            countdown=invalidation.PURGE_DELAY_SECONDS
+        )
+        assert purge.call_count == 0, "nothing purges until the task runs"
+
+        assert invalidation.run_queued_purge() == ["pay_way"]
+        assert _codes(purge) == ["pay_way"]
+
+    def test_the_task_takes_the_whole_set_once(self, purge):
+        from core.cache import invalidation
+
+        with mock.patch(
+            "core.tasks.invalidate_cache_surfaces_task.apply_async"
+        ):
+            with transaction.atomic():
+                PayWay.objects.create(provider_code="once")
+
+        assert invalidation.run_queued_purge() == ["pay_way"]
+        assert invalidation.run_queued_purge() == []
+        assert purge.call_count == 1
+
+    def test_a_commit_while_the_task_runs_queues_the_next_one(self, purge):
+        """The flag is cleared before the set is taken, so an edit landing
+        during a purge schedules another instead of being dropped."""
+        from core.cache import invalidation
+
+        with mock.patch(
+            "core.tasks.invalidate_cache_surfaces_task.apply_async"
+        ) as queue:
+            with transaction.atomic():
+                PayWay.objects.create(provider_code="before")
+            invalidation.run_queued_purge()
+            with transaction.atomic():
+                PayWay.objects.create(provider_code="during")
+
+        assert queue.call_count == 2
+        assert invalidation.run_queued_purge() == ["pay_way"]
+
+    def test_a_queueing_failure_does_not_break_the_write(self):
+        with mock.patch(
+            "django.core.cache.cache.add_to_set",
+            side_effect=RuntimeError("redis down"),
+        ):
+            with transaction.atomic():
+                pay_way = PayWay.objects.create(provider_code="redis_down")
+
+        assert PayWay.objects.filter(pk=pay_way.pk).exists()
+        assert _pending_codes() == set()
+
+
+class TestIgnoredUpdateFields:
+    """Every order decrements stock with ``save(update_fields=["stock",
+    "updated_at"])``. Purging the product surface for that would empty a
+    store's product cache on each sale."""
+
+    def test_a_stock_only_save_leaves_the_product_surface_alone(self):
+        from core.cache import invalidation
+
+        with mock.patch.object(invalidation, "_mark_stale") as mark:
+            receiver = invalidation._make_receiver(
+                "products", frozenset({"stock", "updated_at"})
+            )
+            receiver(sender=None, update_fields=frozenset({"stock"}))
+            receiver(
+                sender=None, update_fields=frozenset({"stock", "updated_at"})
+            )
+        mark.assert_not_called()
+
+    def test_any_other_field_or_a_full_save_invalidates(self):
+        from core.cache import invalidation
+
+        with mock.patch.object(invalidation, "_mark_stale") as mark:
+            receiver = invalidation._make_receiver(
+                "products", frozenset({"stock", "updated_at"})
+            )
+            receiver(sender=None, update_fields=frozenset({"stock", "price"}))
+            receiver(sender=None, update_fields=None)
+        assert mark.call_count == 2
+
+    def test_the_product_surface_declares_the_stock_fields(self):
+        from core.cache.registry import get_surface
+
+        assert get_surface("products").ignored_update_fields == frozenset(
+            {"stock", "updated_at"}
+        )
+
+
+class TestPageSurfacesAreWired:
+    """The surfaces whose Nitro page renders are also cached at the
+    Cloudflare edge purge on a merchant's edit, not only from the Cache
+    tool — otherwise a price change waits out the page TTL."""
+
+    @pytest.mark.parametrize(
+        ("code", "label"),
+        [
+            ("products", "product.Product"),
+            ("products", "product.ProductTranslation"),
+            ("products", "product.ProductImage"),
+            ("categories", "product.ProductCategoryTranslation"),
+            ("blog", "blog.BlogPostTranslation"),
+            ("page_config", "page_config.PageSection"),
+            ("page_config", "page_config.NavigationLinkTranslation"),
+            ("promotions", "promotion.PromotionTranslation"),
+        ],
+    )
+    def test_declares(self, code, label):
+        from core.cache.registry import get_surface
+
+        assert label in get_surface(code).invalidated_by
+
+    def test_user_generated_rows_stay_out(self):
+        from core.cache.registry import iter_surfaces
+
+        declared = {
+            label for s in iter_surfaces() for label in s.invalidated_by
+        }
+        for label in (
+            "product.ProductReview",
+            "product.ProductFavourite",
+            "product.ProductAlert",
+            "blog.BlogComment",
+            "promotion.PromotionRedemption",
+        ):
+            assert label not in declared

@@ -15,10 +15,19 @@ once, long after the database was right.
 Design notes
 ------------
 
-* **Opt-in per surface** via ``CacheSurface.invalidated_by``. Purging on
-  every write is wrong for high-volume models: ``CacheService.purge``
-  SCANs Redis and POSTs to the Nuxt purge endpoint, so wiring it to
-  ``product.Product`` would fire that per row of a catalogue import.
+* **Opt-in per surface** via ``CacheSurface.invalidated_by``: a surface
+  names the merchant-edited models it renders. User-generated rows
+  (reviews, comments, favourites) stay out — they change constantly and
+  are social proof, which the TTL already bounds.
+
+* **Batched across transactions, off the request.** ``CacheService.purge``
+  SCANs Redis and POSTs to the Nuxt purge endpoint, and a catalogue import
+  commits once per product. So a commit only records its stale surfaces in
+  a per-schema Redis set and queues ONE ``invalidate_cache_surfaces_task``
+  ``PURGE_DELAY_SECONDS`` later; every commit inside that window rides the
+  same purge. A thousand-product import costs one purge, not a thousand,
+  and a merchant's edit shows within about ten seconds — plus the edge
+  purge that follows it (``core.cache.edge``).
 
 * **Translations are separate models.** parler stores every language in
   its own row, so a receiver bound only to ``PayWay`` never fires when
@@ -65,33 +74,70 @@ def _pending_codes() -> set[str]:
     return codes
 
 
+#: How long commits are gathered before one purge runs.
+PURGE_DELAY_SECONDS = 10
+
+# Both keys go through the cache's ``make_key``, so they are per schema.
+_PENDING_KEY = "cache-invalidate:pending"
+_SCHEDULED_KEY = "cache-invalidate:scheduled"
+
+
 def _flush(schema_name: str) -> None:
-    """Purge everything marked stale, once, after commit."""
+    """Hand everything this transaction marked stale to the batched purge."""
 
     codes = _pending_codes()
     if not codes:
         return
-    # Clear BEFORE purging: a failure must not leave codes pending for
+    # Clear BEFORE queueing: a failure must not leave codes pending for
     # the next transaction on this thread to retry forever.
     ordered = sorted(codes)
     codes.clear()
+
+    from django.core.cache import cache
+
+    try:
+        cache.add_to_set(
+            _PENDING_KEY, ordered, timeout=PURGE_DELAY_SECONDS * 30
+        )
+        # The flag outlives the delay so a slow worker is not raced by a
+        # second task; it is cleared the moment the task starts.
+        if cache.add(_SCHEDULED_KEY, True, timeout=PURGE_DELAY_SECONDS * 6):
+            from core.tasks import invalidate_cache_surfaces_task
+
+            invalidate_cache_surfaces_task.apply_async(
+                countdown=PURGE_DELAY_SECONDS
+            )
+    except Exception:
+        logger.exception(
+            "Cache auto-invalidation could not be queued for surfaces=%s "
+            "schema=%s; the write succeeded and these surfaces stay stale "
+            "until their TTL expires or an operator purges them",
+            ordered,
+            schema_name,
+        )
+
+
+def run_queued_purge() -> list[str]:
+    """Purge every surface queued for the current schema; the task body.
+
+    The flag is cleared BEFORE the set is taken, so a commit landing in
+    between queues another task rather than being missed — at worst that
+    task finds an empty set. Returns the purged surface codes.
+    """
+    from django.core.cache import cache
+    from django.db import connection
 
     # Imported here, not at module scope: ``CacheService`` reaches the
     # cache backend and the Nuxt client at import time, and this module
     # is imported from ``AppConfig.ready()``.
     from core.cache.service import CacheService
 
-    try:
-        report = CacheService.purge(ordered)
-    except Exception:
-        logger.exception(
-            "Cache auto-invalidation failed for surfaces=%s schema=%s; "
-            "the write succeeded and these surfaces stay stale until "
-            "their TTL expires or an operator purges them",
-            ordered,
-            schema_name,
-        )
-        return
+    cache.delete(_SCHEDULED_KEY)
+    ordered = sorted(cache.pop_set(_PENDING_KEY))
+    if not ordered:
+        return []
+    schema_name = connection.schema_name
+    report = CacheService.purge(ordered)
 
     failed = report.failed_surfaces
     log = logger.warning if failed else logger.info
@@ -104,6 +150,7 @@ def _flush(schema_name: str) -> None:
         report.nuxt_headline,
         [s.code for s in failed],
     )
+    return ordered
 
 
 def _mark_stale(code: str) -> None:
@@ -128,11 +175,14 @@ def _mark_stale(code: str) -> None:
     transaction.on_commit(lambda: _flush(schema_name))
 
 
-def _make_receiver(code: str):
+def _make_receiver(code: str, ignored_update_fields: frozenset[str]):
     def receiver(sender, **kwargs):
         # ``raw`` is a loaddata/fixture load. The cache is irrelevant
         # mid-fixture and the surrounding transaction is not a real edit.
         if kwargs.get("raw"):
+            return
+        update_fields = kwargs.get("update_fields")
+        if update_fields and set(update_fields) <= ignored_update_fields:
             return
         _mark_stale(code)
 
@@ -152,7 +202,7 @@ def _dispatch_uid(code: str, label: str) -> str:
 
 
 def _iter_declared_models():
-    """Yield ``(surface_code, model_label, model)`` for every declared
+    """Yield ``(surface, model_label, model)`` for every declared
     model, skipping — loudly — any label that does not resolve."""
 
     for surface in iter_surfaces():
@@ -177,7 +227,7 @@ def _iter_declared_models():
                 )
                 continue
 
-            yield surface.code, label, model
+            yield surface, label, model
 
 
 def connect_surface_invalidation(*, force: bool = False) -> None:
@@ -199,10 +249,10 @@ def connect_surface_invalidation(*, force: bool = False) -> None:
     if getattr(settings, "DISABLE_CACHE", False) and not force:
         return
 
-    for code, label, model in _iter_declared_models():
-        receiver = _make_receiver(code)
+    for surface, label, model in _iter_declared_models():
+        receiver = _make_receiver(surface.code, surface.ignored_update_fields)
         _receivers.append(receiver)
-        uid = _dispatch_uid(code, label)
+        uid = _dispatch_uid(surface.code, label)
         post_save.connect(receiver, sender=model, dispatch_uid=uid, weak=False)
         post_delete.connect(
             receiver, sender=model, dispatch_uid=uid, weak=False
@@ -217,8 +267,8 @@ def disconnect_surface_invalidation() -> None:
     in the same worker reach for a Redis client that tests do not have.
     """
 
-    for code, label, model in _iter_declared_models():
-        uid = _dispatch_uid(code, label)
+    for surface, label, model in _iter_declared_models():
+        uid = _dispatch_uid(surface.code, label)
         post_save.disconnect(sender=model, dispatch_uid=uid)
         post_delete.disconnect(sender=model, dispatch_uid=uid)
     _receivers.clear()

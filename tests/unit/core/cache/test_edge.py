@@ -217,8 +217,9 @@ class TestCredentials:
         from tenant.models import Tenant
 
         tenant = Tenant(schema_name="edge_half", cloudflare_zone_id=OWN_ZONE)
-        with pytest.raises(ValidationError, match="together"):
+        with pytest.raises(ValidationError) as raised:
             tenant._validate_cloudflare_credentials()
+        assert "cloudflare_api_token" in raised.value.message_dict
 
     def test_the_token_never_reaches_the_history_table(self):
         from tenant.models import Tenant

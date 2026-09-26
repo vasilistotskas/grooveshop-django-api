@@ -244,6 +244,23 @@ def register_default_surfaces() -> None:
             # Redis. Without this a price change took up to six
             # hours to reach Google, Meta and TikTok.
             invalidates_gateway_feeds=True,
+            invalidated_by=(
+                "product.Product",
+                "product.ProductTranslation",
+                "product.ProductImage",
+                "product.ProductImageTranslation",
+                "product.Attribute",
+                "product.AttributeTranslation",
+                "product.AttributeValue",
+                "product.AttributeValueTranslation",
+                "product.ProductAttribute",
+                "product.Brand",
+                "product.ProductVariantGroup",
+                "product.ProductVariantGroupTranslation",
+            ),
+            # Each order's stock decrement; the product pages show stock,
+            # but checkout re-validates it and the page TTL bounds it.
+            ignored_update_fields=frozenset({"stock", "updated_at"}),
             icon="inventory_2",
             group="catalog",
         )
@@ -272,6 +289,12 @@ def register_default_surfaces() -> None:
             # Redis. Without this a price change took up to six
             # hours to reach Google, Meta and TikTok.
             invalidates_gateway_feeds=True,
+            invalidated_by=(
+                "product.ProductCategory",
+                "product.ProductCategoryTranslation",
+                "product.ProductCategoryImage",
+                "product.ProductCategoryImageTranslation",
+            ),
             icon="category",
             group="catalog",
         )
@@ -302,6 +325,16 @@ def register_default_surfaces() -> None:
             # /blog, /blog/categories, /blog/category/**, /blog/post/**
             # are SWR-cached (600s).
             nuxt_patterns=_nuxt_matching("Blog") + _nuxt_routes("/blog"),
+            invalidated_by=(
+                "blog.BlogPost",
+                "blog.BlogPostTranslation",
+                "blog.BlogCategory",
+                "blog.BlogCategoryTranslation",
+                "blog.BlogAuthor",
+                "blog.BlogAuthorTranslation",
+                "blog.BlogTag",
+                "blog.BlogTagTranslation",
+            ),
             icon="article",
             group="content",
         )
@@ -409,6 +442,18 @@ def register_default_surfaces() -> None:
                 "/cookies-policy",
                 "/return-policy",
             ),
+            invalidated_by=(
+                "page_config.ContentPage",
+                "page_config.ContentPageTranslation",
+                "page_config.PageLayout",
+                "page_config.PageLayoutTranslation",
+                "page_config.PageSection",
+                "page_config.NavigationMenu",
+                "page_config.NavigationColumn",
+                "page_config.NavigationColumnTranslation",
+                "page_config.NavigationLink",
+                "page_config.NavigationLinkTranslation",
+            ),
             icon="dashboard_customize",
             group="content",
         )
@@ -439,6 +484,10 @@ def register_default_surfaces() -> None:
             # SWR window.
             nuxt_patterns=_nuxt("PublicPromotionList", "ProductPromotionList")
             + _nuxt_routes("/offers", "/products"),
+            invalidated_by=(
+                "promotion.Promotion",
+                "promotion.PromotionTranslation",
+            ),
             icon="local_offer",
             group="commerce",
         )
@@ -455,6 +504,11 @@ def register_default_surfaces() -> None:
             ),
             django_patterns=("*TagViewSet_*", "*TaggedItemViewSet_*"),
             nuxt_patterns=(),
+            invalidated_by=(
+                "tag.Tag",
+                "tag.TagTranslation",
+                "tag.TaggedItem",
+            ),
             icon="sell",
             group="content",
         )

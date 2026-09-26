@@ -3,6 +3,114 @@
 
 
 
+## v3.81.1 (2026-09-26)
+
+### Bug fixes
+
+* fix(pay_way): bulk activate/deactivate saves each pay way
+
+queryset.update sent no post_save, so a bulk toggle never bumped the
+tenant resolve-cache generation and the agent gateway kept advertising
+the old payment instruments for up to the cache TTL. Each pay way is now
+saved, and only rows that actually change are counted.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_016F5trstVMoFXNan1ZQMLEp ([`1ed495d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1ed495d1b6852493343af33a7e2cc932fabb5baf))
+
+* fix(tenant): keep tenant caches correct through a Redis outage
+
+The tenant resolve and domain caches were invalidated by deletes, which
+the fail-open cache drops silently while Redis is down, leaving a stale
+store config or domain list for up to the TTL. They also deleted inside
+the write's transaction, so a reader could re-cache pre-commit data.
+
+Tenant.cache_generation (additive, db_default) is now part of both keys
+and is bumped in the database inside each write's transaction:
+Tenant.save increments it in its own UPDATE (read back via RETURNING),
+and domain, pay-way and agent-setting writes bump it with a relative
+UPDATE. After the commit every reader builds the new key; nothing
+depends on a delete landing. Reads still answer from the database when
+Redis is down.
+
+The nightly demo reset also returns the demo gift card to its seeded
+value with one ADJUST ledger row, reactivates it and renews its expiry,
+so guest spending no longer drains it.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_016F5trstVMoFXNan1ZQMLEp ([`e9a1523`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e9a1523d65084b7b8c9997fef89121ab1e03c870))
+
+* fix: unpaid vouchers, admin cancels, outage-safe limits, and the demo reset
+
+- An unpaid online order can no longer get a courier voucher or parcel:
+  both carriers refuse it under the row lock
+  (ShipmentAwaitingPaymentError), the admin buttons say so, and the
+  stale-mint digest skips those orders.
+- An order's status is read-only on the admin form, which bypassed both
+  the transition table and cancel_order's stock restore; changes go
+  through the actions, now including Mark as returned / refunded.
+- The ACS pickup list blocked by unprinted vouchers is a reported
+  outcome (blocked_unprinted) with a link to the unprinted shipments,
+  not a task failure. Voucher and parcel failures are also written to
+  the order's history with the fix to apply. BoxNow gets a Create
+  BoxNow parcel now button to retry after the data is fixed.
+- An invalid postcode is refused before the ACS call, using the address
+  validators, instead of being sent empty.
+- A payment arriving for a canceled order is recorded, booked for
+  refund and alerted to ops; that handling was unreachable for Stripe
+  and Viva since cancels settle the payment.
+- The cache fails open on a Redis outage (a miss or a no-op), except
+  keys under STRICT_KEY_PREFIXES: security throttles (gift card, coupon,
+  order and payment, staff login, newsletter, partner APIs) deny with a
+  429, and allauth's rate limits, TOTP replay protection and single-use
+  codes still raise. General browsing throttles stay open.
+- The nightly demo reset writes its fixtures without order signals,
+  hard-deletes, and clears guest checkouts on demo stores only,
+  releasing their reservations and returning their stock without
+  restock alerts.
+- Order.clean() refuses a completed payment with nothing paid unless
+  deductions cover the total. Greek translations for the new admin text.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_016F5trstVMoFXNan1ZQMLEp ([`5967646`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5967646a2c1e0c5156edb417a790954bb1e147de))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.81.0 [skip ci] ([`dbae9e0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/dbae9e09f6f3eca3d32ff0a5b9ad099c3e54b248))
+
+### Testing
+
+* test(shipping_acs): issue the voucher for a cash-on-delivery order
+
+The row action refuses an unpaid online order before dispatching, and
+its refusal message needs the messages middleware the RequestFactory
+request lacks, so the test failed whenever OrderFactory drew an online
+pay way. It means a cash-on-delivery order; say so.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_016F5trstVMoFXNan1ZQMLEp ([`05e986d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/05e986d6be228504a9a6a96f9c954b58e1463ab0))
+
+* test(shipping): build the helper's pay way with Factory.create for ty
+
+Calling the factory class is typed as returning the factory, so ty
+rejected the PayWay return annotation; Factory.create returns the model.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_016F5trstVMoFXNan1ZQMLEp ([`f5e845e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f5e845e5fd742d7ddbabad8c01d9d241cffffe77))
+
+* test(shipping): pin the pay way that voucher tests mean
+
+OrderFactory draws a random existing pay way. With the new mint guard an
+online pay way with a pending payment is an unpaid order the carriers
+refuse to ship, so the ACS voucher tests and two BoxNow parcel tests
+passed or failed on that draw; CI drew online and 11 failed. They model
+cash on delivery and pay-at-the-locker orders, so they now say so
+through tests.utils.orders (courier_cash_order, carrier_terminal_order).
+The stale-shipment digest test uses a cash order for the same reason:
+an unpaid online order waiting for payment is not a stranded mint.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_016F5trstVMoFXNan1ZQMLEp ([`d50dc31`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d50dc3129bd2b86356661a26c20d50dbe2a0f9ff))
+
 ## v3.81.0 (2026-09-25)
 
 ### Chores

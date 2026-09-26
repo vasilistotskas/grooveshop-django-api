@@ -530,6 +530,36 @@ class PayWayAdminTestCase(TestCase):
             self.payway.refresh_from_db()
             self.assertFalse(self.payway.active)
 
+    def test_bulk_toggle_moves_the_tenant_cache_generation(self):
+        """The bulk actions save each pay way, so the post_save that
+        moves the tenant resolve cache on runs; a queryset update sent
+        none and left the gateway advertising the old instruments."""
+        request = self.factory.post("/admin/pay_way/payway/")
+        request.user = self.user
+        request._messages = Mock()
+        queryset = PayWay.objects.filter(id=self.payway.id)
+
+        with (
+            patch.object(self.admin, "message_user"),
+            patch("tenant.signals._bump_generation_for_current_schema") as bump,
+        ):
+            self.admin.deactivate_payment_methods(request, queryset)
+            self.assertEqual(bump.call_count, 1)
+            self.admin.activate_payment_methods(request, queryset)
+            self.assertEqual(bump.call_count, 2)
+
+    def test_bulk_toggle_counts_only_rows_that_changed(self):
+        request = self.factory.post("/admin/pay_way/payway/")
+        request.user = self.user
+        request._messages = Mock()
+        already_active = PayWay.objects.filter(id=self.payway.id)
+
+        with patch.object(self.admin, "message_user") as mock_message:
+            self.admin.activate_payment_methods(request, already_active)
+
+        message = mock_message.call_args[0][1]
+        self.assertIn("0", str(message))
+
     def test_move_up_in_order_action(self):
         other_payway = PayWay.objects.create(sort_order=2)
 

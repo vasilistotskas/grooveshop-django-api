@@ -336,7 +336,7 @@ class PayWayAdmin(BaseTranslatableAdmin):
         icon="check_circle",
     )
     def activate_payment_methods(self, request, queryset):
-        updated = queryset.update(active=True)
+        updated = self._set_active(queryset, active=True)
         self.message_user(
             request,
             _("%(count)d payment methods were successfully activated.")
@@ -349,12 +349,30 @@ class PayWayAdmin(BaseTranslatableAdmin):
         icon="cancel",
     )
     def deactivate_payment_methods(self, request, queryset):
-        updated = queryset.update(active=False)
+        updated = self._set_active(queryset, active=False)
         self.message_user(
             request,
             _("%(count)d payment methods were successfully deactivated.")
             % {"count": updated},
         )
+
+    @staticmethod
+    def _set_active(queryset, *, active: bool) -> int:
+        """Switch each pay way through ``save`` so its signals fire.
+
+        ``queryset.update`` sends no ``post_save``, so a bulk toggle
+        skipped the tenant resolve-cache generation bump
+        (``tenant.signals``) and the gateway kept advertising the old
+        payment instruments for up to the cache TTL. A store has a
+        handful of pay ways, so one save each costs nothing. Rows already
+        in the target state are left alone and not counted.
+        """
+        changed = 0
+        for pay_way in queryset.filter(active=not active):
+            pay_way.active = active
+            pay_way.save(update_fields=["active"])
+            changed += 1
+        return changed
 
     @action(
         description=str(_("Move selected items up in sort order")),

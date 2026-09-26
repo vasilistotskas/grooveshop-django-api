@@ -19123,3 +19123,27 @@ msgstr ""
 "Η πλατφόρμα πρόσθεσε νέο κείμενο στα νομικά της έγγραφα. Οι παρακάτω "
 "σελίδες δεν άλλαξαν αυτόματα, επειδή το κείμενό τους είναι δικό σας. "
 "Ανοίξτε την καθεμία για να δείτε το κείμενο που πρέπει να προσθέσετε."
+
+msgid "Cloudflare zone ID"
+msgstr "Αναγνωριστικό ζώνης Cloudflare"
+
+msgid "The zone of the store's own domain, from the Cloudflare dashboard's domain overview. Empty when the store uses a platform hostname."
+msgstr "Η ζώνη του δικού σας domain, από την επισκόπηση του domain στο Cloudflare. Κενό όταν το κατάστημα χρησιμοποιεί διεύθυνση της πλατφόρμας."
+
+msgid "A Cloudflare zone ID is 32 lowercase hex characters."
+msgstr "Το αναγνωριστικό ζώνης Cloudflare αποτελείται από 32 πεζούς δεκαεξαδικούς χαρακτήρες."
+
+msgid "Cloudflare API token"
+msgstr "Token API Cloudflare"
+
+msgid "A token with only Zone → Cache Purge → Purge on that zone. Secret — used to clear the store's pages from Cloudflare's cache after an edit or a deploy."
+msgstr "Token μόνο με το δικαίωμα Zone → Cache Purge → Purge σε αυτή τη ζώνη. Απόρρητο — χρησιμοποιείται για να καθαρίζονται οι σελίδες του καταστήματος από την cache του Cloudflare μετά από μια αλλαγή ή μια νέα έκδοση."
+
+msgid "Set the Cloudflare zone ID and API token together."
+msgstr "Συμπληρώστε μαζί το αναγνωριστικό ζώνης και το token API του Cloudflare."
+
+msgid "Edge cache — Cloudflare"
+msgstr "Cache στο Cloudflare"
+
+msgid "Only for a store on its own domain in its own Cloudflare account. Leave empty on a platform hostname."
+msgstr "Μόνο για κατάστημα με δικό του domain σε δικό του λογαριασμό Cloudflare. Αφήστε κενό αν χρησιμοποιείτε διεύθυνση της πλατφόρμας."

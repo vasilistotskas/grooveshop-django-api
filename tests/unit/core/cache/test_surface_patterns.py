@@ -219,6 +219,38 @@ class TestPromotionsSurface:
         assert "cache:nitro:routes:_:*offers*" in patterns
 
 
+#: Directories that hold no project source. Pruned BEFORE descending:
+#: ``Path.rglob`` enumerated the whole virtualenv (tens of thousands of
+#: files) and only then filtered it, which pushed an xdist worker past
+#: its memory on every full run ("node down: Not properly terminated").
+_NON_SOURCE_DIRS = frozenset(
+    {
+        ".venv",
+        "node_modules",
+        ".git",
+        "__pycache__",
+        ".mypy_cache",
+        ".ruff_cache",
+        ".pytest_cache",
+        "static",
+        "staticfiles",
+        "media",
+    }
+)
+
+
+def _project_python_files(root):
+    """Yield the repo's ``.py`` files without entering non-source trees."""
+    import os
+    from pathlib import Path
+
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in dirnames if d not in _NON_SOURCE_DIRS]
+        for filename in filenames:
+            if filename.endswith(".py"):
+                yield Path(dirpath) / filename
+
+
 class TestNoDeadDjangoPatterns:
     """Registry-wide invariant: a viewset-shaped pattern must name a
     class that actually carries ``@cache_methods``.
@@ -255,10 +287,7 @@ class TestNoDeadDjangoPatterns:
 
         root = Path(__file__).resolve().parents[4]
         names: set[str] = set()
-        for path in root.rglob("*.py"):
-            parts = set(path.parts)
-            if ".venv" in parts or "node_modules" in parts:
-                continue
+        for path in _project_python_files(root):
             try:
                 text = path.read_text(encoding="utf-8")
             except OSError, UnicodeDecodeError:

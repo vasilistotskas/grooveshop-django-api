@@ -308,6 +308,29 @@ def requires_meilisearch(obj):
     return _meilisearch_unavailable(obj)
 
 
+def _delete_worker_keys(backend) -> None:
+    """Delete every key in ``backend``'s worker namespace, and only those.
+
+    ``backend`` must be Redis-backed. Connection errors propagate.
+    """
+    client = backend._cache.get_client(None, write=True)
+    # make_tenant_key prepends the ACTIVE SCHEMA to every raw key
+    # ({schema}:{key_prefix}:{version}:{key}), so the worker-namespace
+    # pattern must tolerate the schema segment. Without it the per-test
+    # clear silently matched nothing and stale entries (e.g. parler's
+    # translation cache after a delete + same-PK recreate) leaked
+    # between tests as order-dependent failures.
+    patterns = (
+        f"{backend.key_prefix}:*",  # non-tenant layouts (safety net)
+        f"*:{backend.key_prefix}:*",  # {schema}:{prefix}:… tenant layout
+    )
+    keys: list = []
+    for pattern in patterns:
+        keys.extend(client.scan_iter(match=pattern, count=1000))
+    if keys:
+        client.delete(*keys)
+
+
 def _reset_worker_cache():
     """Clear only THIS worker's cache namespace after each test.
 
@@ -324,17 +347,6 @@ def _reset_worker_cache():
     if get_client is None:
         backend.clear()
         return
-    client = get_client(None, write=True)
-    # make_tenant_key prepends the ACTIVE SCHEMA to every raw key
-    # ({schema}:{key_prefix}:{version}:{key}), so the worker-namespace
-    # pattern must tolerate the schema segment. Without it the per-test
-    # clear silently matched nothing and stale entries (e.g. parler's
-    # translation cache after a delete + same-PK recreate) leaked
-    # between tests as order-dependent failures.
-    patterns = (
-        f"{backend.key_prefix}:*",  # non-tenant layouts (safety net)
-        f"*:{backend.key_prefix}:*",  # {schema}:{prefix}:… tenant layout
-    )
     # Redis connection errors here must not fail the test that just
     # passed. Under -n auto every worker holds pooled connections to the
     # same localhost Redis, and one occasionally comes back dead —
@@ -346,16 +358,42 @@ def _reset_worker_cache():
     # teardown, and they are namespaced to this worker anyway.
     for attempt in (1, 2):
         try:
-            keys: list = []
-            for pattern in patterns:
-                keys.extend(client.scan_iter(match=pattern, count=1000))
-            if keys:
-                client.delete(*keys)
+            _delete_worker_keys(backend)
             return
         except RedisConnectionError:
             if attempt == 2:
                 return
-            client = get_client(None, write=True)
+
+
+def _clear_worker_namespace() -> None:
+    """``clear()`` for the suite's Redis cache: this worker's keys only.
+
+    Tests call ``cache.clear()`` directly (to evict parler's shared
+    translation cache after a queryset ``.update()``, to reset throttle
+    counters, …). On the Redis backend that is ``FLUSHDB``, and every
+    xdist worker shares the one Redis database — so each such call also
+    wiped whatever the OTHER workers had cached at that instant.
+
+    That made any test whose query count depends on a warm cache flaky
+    at a rate set by whatever ran beside it. Observed in CI as
+    ``test_cost_does_not_grow_with_the_number_of_seeds`` failing with
+    "grew from 11 to 17 queries": another worker's flush landed between
+    the warm-up request and the measured one, evicting
+    ``recs:tenant_context``, and the measured request paid the six
+    queries of ``build_tenant_context``. Reproduced locally by running
+    the recommendation budget tests while a second process issued
+    ``FLUSHDB`` at random intervals: 53 of 80 runs failed.
+
+    Scoping ``clear()`` to the worker namespace keeps what every caller
+    means — "forget what this test cached" — without the side effect.
+    Bound to the instance, the same way ``key_prefix`` is set above, so
+    a standalone ``CustomCache`` a test builds for itself (the fail-open
+    and ``clear_by_prefixes`` tests) keeps the real ``FLUSHDB``.
+    """
+    _delete_worker_keys(_ORIGINAL_DEFAULT_CACHE)
+
+
+_ORIGINAL_DEFAULT_CACHE.clear = _clear_worker_namespace
 
 
 @pytest.fixture(autouse=True)

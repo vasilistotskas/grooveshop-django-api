@@ -3,6 +3,19 @@
 
 
 
+## v3.84.1 (2026-09-26)
+
+### Bug fixes
+
+* fix(i18n): Greek labels for the Tenant's Cloudflare edge cache fields
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01WjJucy7gQj77PFgeVh4fhk ([`eb6c90f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/eb6c90f0c43d024d87de9178983bad808a12629b))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.84.0 [skip ci] ([`3f9ea32`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3f9ea324a5b11364347566d5a9f493d1f170f96b))
+
 ## v3.84.0 (2026-09-26)
 
 ### Bug fixes

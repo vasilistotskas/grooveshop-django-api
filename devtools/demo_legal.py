@@ -183,16 +183,28 @@ def render(slug: str, *, site_host: str, store_name: str) -> str:
 
 
 def seed_english_legal_documents() -> dict[str, int]:
-    """Give the three legal documents an English body.
+    """Give the three legal documents this module's English body.
 
-    Written only where English is absent or empty: a merchant who has
-    translated their own keeps it, and a re-run is a no-op. An empty row
-    counts as absent, because the legal route 404s on an empty body and
-    parler will not fall back past a row that exists.
+    The demo store is the platform's, reset every night, so its English
+    is restored to the current text on every run rather than kept once
+    written: keeping it left the demo's English privacy policy without
+    the server-log section added after it was first seeded. A re-run
+    with the text already current is a no-op.
+
+    Then the page is stamped with ``LEGAL_TEXT_REVISION`` when its other
+    languages are the platform's current document too, the same test
+    the legal-text rollout applies (``page_config`` 0032). Otherwise the
+    admin keeps listing it for review.
 
     Call inside the tenant's ``schema_context``.
     """
+    from django.conf import settings
+
     from page_config.defaults import tenant_document_context
+    from page_config.legal_documents import (
+        LEGAL_TEXT_REVISION,
+        render_legal_document,
+    )
     from page_config.models import ContentPage
 
     report: dict[str, int] = {}
@@ -211,15 +223,38 @@ def seed_english_legal_documents() -> dict[str, int]:
             bump("missing")
             continue
 
+        body = render(slug, site_host=site_host, store_name=store_name)
         translation = page.translations.filter(language_code="en").first()
-        if translation is not None and (translation.body or "").strip():
+        if (
+            translation is not None
+            and (translation.body or "").strip() == body.strip()
+            and translation.title == document["title"]
+        ):
             bump("kept")
-            continue
+        else:
+            page.set_current_language("en")
+            page.title = document["title"]
+            page.body = body
+            page.save()
+            bump("written")
 
-        page.set_current_language("en")
-        page.title = document["title"]
-        page.body = render(slug, site_host=site_host, store_name=store_name)
-        page.save()
-        bump("written")
+        platform_body = render_legal_document(
+            slug, site_host=site_host, store_name=store_name
+        ).strip()
+        others_current = all(
+            (other.body or "").strip() == platform_body
+            for other in page.translations.exclude(language_code="en")
+        )
+        if (
+            others_current
+            and page.translations.filter(
+                language_code=settings.PARLER_DEFAULT_LANGUAGE_CODE
+            ).exists()
+            and page.legal_text_revision != LEGAL_TEXT_REVISION
+        ):
+            ContentPage.objects.filter(pk=page.pk).update(
+                legal_text_revision=LEGAL_TEXT_REVISION
+            )
+            bump("stamped")
 
     return report

@@ -129,15 +129,15 @@ class UserOrIpRateThrottle(ResilientThrottleMixin, SimpleRateThrottle):
     a shared office IP no longer puts every colleague in one bucket.
 
     For anonymous callers the IP comes from ``core.client_ip``, NOT from
-    ``get_ident``. Behind k3s ServiceLB every inbound connection is SNATd
-    to the node's Flannel gateway before Traefik sees it, so the
-    NUM_PROXIES-aware rightmost X-Forwarded-For hop is an internal
-    ``10.42.x.x`` address — proven in production 2026-09-16. Keying on it
-    puts EVERY anonymous visitor in one bucket, which turns a per-caller
-    budget into a store-wide one: at ``order_create_anon`` 10/minute, a
-    single client could lock all guests out of checkout. ``get_ident``
-    remains the fallback for requests whose provenance cannot be proven,
-    because it is coarse but cannot be forged.
+    ``get_ident``. The NUM_PROXIES-aware rightmost X-Forwarded-For hop is
+    Traefik's TCP peer: a Cloudflare edge node for proxied traffic (and
+    an internal ``10.42.x.x`` SNAT address before the Traefik Service
+    moved to ``externalTrafficPolicy: Local`` — proven in production
+    2026-09-16). Keying on it puts everyone behind that address in one
+    bucket, which turns a per-caller budget into a shared one: at
+    ``order_create_anon`` 10/minute, a single client could lock all guests
+    out of checkout. ``get_ident`` remains the fallback for requests whose
+    provenance cannot be proven, because it is coarse but cannot be forged.
     """
 
     def get_cache_key(self, request, view):

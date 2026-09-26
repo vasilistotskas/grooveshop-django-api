@@ -232,9 +232,10 @@ class SearchAnalyticsMiddleware(MiddlewareMixin):
         """
         # Preferred: the visitor Cloudflare reported, accepted only when
         # the request provably came through our edge. Without this the
-        # value below is the k3s SNAT address (klipper-lb rewrites the
-        # source before Traefik sees it), so every row recorded the same
-        # internal 10.42.x.x and the field was useless for analytics.
+        # value below is Traefik's TCP peer — the Cloudflare edge node, or
+        # (before externalTrafficPolicy: Local) the internal 10.42.x.x SNAT
+        # address — so rows share it and the field says little about who
+        # searched.
         edge_ip = trusted_client_ip(request)
         if edge_ip:
             return edge_ip

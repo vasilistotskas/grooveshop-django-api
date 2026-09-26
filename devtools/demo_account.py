@@ -19,8 +19,8 @@ input is expected:
   - the credential mutations that could cost everyone the login are
     refused server-side (`core/demo_account.py`);
   - everything a visitor CAN change — orders, cart, reviews, comments,
-    addresses, favourites, points — is wiped and rebuilt by
-    `reset_demo_account`, which the nightly task runs.
+    addresses, favourites, points, the gift card's balance — is wiped
+    and rebuilt by `reset_demo_account`, which the nightly task runs.
 
 Orders are written with `bulk_create` and backdated with `update()`
 rather than through `OrderService` or `save()`. A seeded order must not
@@ -423,6 +423,71 @@ def _seed_gift_card(user) -> bool:
     return True
 
 
+def _restore_gift_card() -> int:
+    """Put the demo gift card back to its seeded balance and state.
+
+    Guests on the demo store may spend it, and a redemption is a REDEEM
+    row on an append-only ledger whose ``order`` goes ``SET_NULL`` when
+    the reset deletes the guest's order — so without this the card only
+    ever drains, and the next prospect is handed an empty card.
+
+    Through the ledger, the way the domain corrects a balance (the
+    admin's "Adjust balance" writes the same row): one ADJUST for the
+    difference between the issued value and the RAW ledger sum — not
+    ``GiftCard.balance``, which floors at zero and would leave the sum
+    off after an over-drawn history. Nothing is overwritten, so the sum
+    of the ledger is the balance again, and the card's history still
+    shows every spend. The row is locked the way a redemption locks it
+    (``plan_redemption(lock=True)``), so a checkout racing the reset
+    cannot spend against the balance being restored.
+
+    The state goes back to what ``GiftCardService.issue`` gave it:
+    active, a fresh validity window, and no expiry reminder on record.
+    A queryset ``update()``, like the rest of this reset, so no card
+    save signal can fire. Neither ``GiftCard`` nor
+    ``GiftCardTransaction`` has a save receiver today, and the reset
+    must stay silent if one is added.
+
+    Only the card the seed issued: ``GIFT_CARD_CODE`` is fixed and
+    ``code`` is unique, while every other card carries a code
+    ``generate_code`` drew.
+    """
+    from django.db import transaction
+    from django.db.models import Sum
+
+    from giftcard.enum import GiftCardStatus, GiftCardTransactionKind
+    from giftcard.models import GiftCard, GiftCardTransaction
+    from giftcard.services import GiftCardService
+
+    with transaction.atomic():
+        card = (
+            GiftCard.objects.select_for_update()
+            .filter(code=GIFT_CARD_CODE)
+            .first()
+        )
+        if card is None:
+            return 0
+        ledger = card.transactions.aggregate(total=Sum("amount"))[
+            "total"
+        ] or Decimal(0)
+        # The value it was ISSUED with, not today's constant: a card
+        # holding more than its ``initial_value`` reads as a bug.
+        difference = Decimal(card.initial_value.amount) - ledger
+        if difference:
+            GiftCardTransaction.objects.create(
+                gift_card=card,
+                kind=GiftCardTransactionKind.ADJUST,
+                amount=difference,
+                description="Demo reset: balance restored",
+            )
+        GiftCard.objects.filter(pk=card.pk).update(
+            status=GiftCardStatus.ACTIVE,
+            expires_at=GiftCardService.default_expiry(),
+            expiry_reminder_sent_at=None,
+        )
+    return int(bool(difference))
+
+
 def seed_demo_account() -> dict[str, int]:
     """Both shared accounts, with everything a signed-in demo needs."""
     report: dict[str, int] = {}
@@ -452,7 +517,9 @@ def reset_demo_account() -> dict[str, int]:
 
     Everything a visitor can create while signed in is removed first —
     see ``_VISITOR_OWNED`` — and so is every guest checkout placed before
-    this run (``_wipe_guest_checkouts``); then the fixtures are rebuilt.
+    this run (``_wipe_guest_checkouts``); then the fixtures are rebuilt,
+    the catalogue's stock is put back and the demo gift card is
+    returned to its seeded balance (``_restore_gift_card``).
     Refuses to run on a schema that is not flagged ``is_demo``. The
     password is restored too: the adapter refuses a change through the
     API, but a reset that could not restore it would be one bug away
@@ -491,6 +558,7 @@ def reset_demo_account() -> dict[str, int]:
     for key, value in seeded.items():
         report[f"seeded_{key}"] = value
     _bump(report, "stock_restored", _restore_demo_stock())
+    _bump(report, "gift_card_restored", _restore_gift_card())
     return report
 
 

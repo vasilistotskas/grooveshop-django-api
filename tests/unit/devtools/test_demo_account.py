@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import timedelta
+from decimal import Decimal
 from types import SimpleNamespace
 from unittest import mock
 
@@ -876,3 +877,163 @@ class TestGuestCheckoutsAreCleared:
         # The test database has no Tenant row flagged ``is_demo`` for
         # whatever schema it runs in.
         assert _current_tenant_is_demo() is False
+
+
+@pytest.mark.django_db
+class TestDemoGiftCardIsRestored:
+    """Guests on the demo store may spend the published gift card, and
+    the seed never re-issues it; the reset returns it to its issued
+    balance through the ledger, never by rewriting history."""
+
+    @pytest.fixture(autouse=True)
+    def _a_demo_store(self, settings):
+        settings.EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+        with mock.patch(
+            "devtools.demo_store._current_tenant_is_demo", return_value=True
+        ):
+            yield
+
+    @staticmethod
+    def _seeded_card():
+        from giftcard.models import GiftCard
+
+        TestResetIsSilent._catalogue()
+        demo_account.seed_demo_account()
+        return GiftCard.objects.get(code=demo_account.GIFT_CARD_CODE)
+
+    @staticmethod
+    def _spend(card, amount: str):
+        """What a guest checkout leaves: a REDEEM row on a guest order
+        that the reset then deletes."""
+        from giftcard.enum import GiftCardTransactionKind
+        from giftcard.models import GiftCardTransaction
+        from order.enum.status import OrderStatus, PaymentStatus
+        from order.factories.order import OrderFactory
+
+        order = OrderFactory(
+            user=None,
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+            num_order_items=0,
+        )
+        GiftCardTransaction.objects.create(
+            gift_card=card,
+            kind=GiftCardTransactionKind.REDEEM,
+            amount=-Decimal(amount),
+            order=order,
+            description=f"Order #{order.id}",
+        )
+        return order
+
+    @staticmethod
+    def _ledger_sum(card):
+        from django.db.models import Sum
+
+        return card.transactions.aggregate(total=Sum("amount"))["total"]
+
+    def test_a_spent_card_is_back_to_its_issued_balance(
+        self, django_capture_on_commit_callbacks
+    ):
+        from django.core import mail
+
+        from giftcard.enum import GiftCardStatus, GiftCardTransactionKind
+
+        card = self._seeded_card()
+        order = self._spend(card, "18.50")
+        assert card.balance.amount == demo_account.GIFT_CARD_AMOUNT - Decimal(
+            "18.50"
+        )
+
+        mail.outbox = []
+        with (
+            mock.patch("celery.app.task.Task.apply_async") as dispatched,
+            django_capture_on_commit_callbacks(execute=True),
+        ):
+            report = demo_account.reset_demo_account()
+
+        card.refresh_from_db()
+        assert report["gift_card_restored"] == 1
+        assert card.balance.amount == demo_account.GIFT_CARD_AMOUNT
+        # The ledger IS the balance: nothing was overwritten.
+        assert self._ledger_sum(card) == demo_account.GIFT_CARD_AMOUNT
+        assert card.is_redeemable
+        assert card.status == GiftCardStatus.ACTIVE
+        # The spend stays on the card's history, its guest order gone.
+        redeem = card.transactions.get(kind=GiftCardTransactionKind.REDEEM)
+        assert redeem.order_id is None
+        assert (
+            not type(order)
+            .objects.all_with_deleted()
+            .filter(pk=order.pk)
+            .exists()
+        )
+        adjust = card.transactions.get(kind=GiftCardTransactionKind.ADJUST)
+        assert str(adjust.amount) == "18.50"
+        assert mail.outbox == []
+        dispatched.assert_not_called()
+
+    def test_a_disabled_and_expired_card_is_active_again(self):
+        from giftcard.enum import GiftCardStatus
+        from giftcard.models import GiftCard
+        from giftcard.services import GiftCardService
+
+        card = self._seeded_card()
+        GiftCard.objects.filter(pk=card.pk).update(
+            status=GiftCardStatus.DISABLED,
+            expires_at=timezone.now() - timedelta(days=1),
+            expiry_reminder_sent_at=timezone.now() - timedelta(days=30),
+        )
+        # The daily sweep reclaims an expired card's balance.
+        GiftCardService.expire_cards()
+
+        demo_account.reset_demo_account()
+
+        card.refresh_from_db()
+        assert card.status == GiftCardStatus.ACTIVE
+        assert not card.is_expired
+        assert card.expiry_reminder_sent_at is None
+        assert card.balance.amount == demo_account.GIFT_CARD_AMOUNT
+        assert self._ledger_sum(card) == demo_account.GIFT_CARD_AMOUNT
+        assert card.is_redeemable
+
+    def test_an_untouched_card_gets_no_ledger_row(self):
+        from giftcard.enum import GiftCardTransactionKind
+
+        card = self._seeded_card()
+
+        report = demo_account.reset_demo_account()
+
+        assert report["gift_card_restored"] == 0
+        assert not card.transactions.filter(
+            kind=GiftCardTransactionKind.ADJUST
+        ).exists()
+        assert self._ledger_sum(card) == demo_account.GIFT_CARD_AMOUNT
+
+    def test_a_card_the_seed_did_not_issue_is_left_alone(self):
+        from djmoney.money import Money
+
+        from giftcard.services import GiftCardService
+
+        self._seeded_card()
+        bought = GiftCardService.issue(Money("30.00", "EUR"))
+        self._spend(bought, "30.00")
+
+        demo_account.reset_demo_account()
+
+        bought.refresh_from_db()
+        assert bought.balance.amount == 0
+        assert bought.transactions.count() == 2
+
+    def test_a_store_that_is_not_a_demo_is_untouched(self):
+        card = self._seeded_card()
+        self._spend(card, "25.00")
+
+        with mock.patch(
+            "devtools.demo_store._current_tenant_is_demo", return_value=False
+        ):
+            report = demo_account.reset_demo_account()
+
+        assert report == {"skipped_not_a_demo_tenant": 1}
+        card.refresh_from_db()
+        assert card.balance.amount == 0
+        assert card.transactions.count() == 2

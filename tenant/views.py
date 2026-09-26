@@ -97,31 +97,31 @@ def tenant_resolve(request: Request) -> Response:
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    # "global:" — schema-independent (tenant.cache.make_tenant_key):
-    # this endpoint can be called via ANY tenant's domain to resolve a
-    # DIFFERENT domain, while tenant/signals.py's invalidation always
-    # fires from the public schema. A schema-prefixed key here would
-    # almost never match that invalidation.
-    # Keyed by payload SHAPE as well as domain — see
-    # ``tenant.cache.tenant_resolve_key``; a serializer field addition
-    # must never be served from an entry cached before it existed.
-    cache_key = tenant_resolve_key(domain)
+    # One indexed query on every call, cache hit or not: the row carries
+    # ``cache_generation``, which is part of the key
+    # (``tenant.cache.tenant_resolve_key``), so a committed tenant,
+    # domain, pay-way or setting write is never answered from the entry
+    # cached before it, and no delete has to reach Redis for that to
+    # hold. ``tenant__is_active`` is enforced per call for the same
+    # reason. What the cache saves is the serializer, the expensive
+    # part. The key also carries the payload SHAPE, so a serializer
+    # field addition is never served from an entry cached before it.
+    tenant_domain = (
+        TenantDomain.objects.select_related("tenant")
+        .filter(domain=domain, tenant__is_active=True)
+        .first()
+    )
+    if tenant_domain is None:
+        return Response(
+            {"detail": "Store not found."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+    tenant = tenant_domain.tenant
+
+    cache_key = tenant_resolve_key(domain, tenant)
     data = cache.get(cache_key)
     if data is None:
-        # Always query from public schema
-        tenant_domain = (
-            TenantDomain.objects.select_related("tenant")
-            .filter(domain=domain, tenant__is_active=True)
-            .first()
-        )
-
-        if tenant_domain is None:
-            return Response(
-                {"detail": "Store not found."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
-        data = TenantConfigSerializer(tenant_domain.tenant).data
+        data = TenantConfigSerializer(tenant).data
         cache.set(cache_key, data, TENANT_RESOLVE_CACHE_TTL)
 
     # Secrets ride only on internally-authenticated responses and are
@@ -131,16 +131,10 @@ def tenant_resolve(request: Request) -> Response:
     # secret-bearing variant.
     is_gateway = _is_gateway(request)
     if is_gateway:
-        secrets = (
-            TenantDomain.objects.filter(domain=domain, tenant__is_active=True)
-            .values_list("tenant__chat_api_key", "tenant__acp_bearer_token")
-            .first()
-        )
-        chat_api_key, acp_bearer_token = secrets or ("", "")
         data = {
             **data,
-            "chat_api_key": chat_api_key or "",
-            "acp_bearer_token": acp_bearer_token or "",
+            "chat_api_key": tenant.chat_api_key or "",
+            "acp_bearer_token": tenant.acp_bearer_token or "",
         }
     response = Response(data)
     patch_vary_headers(response, ("X-Internal-Token",))

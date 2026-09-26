@@ -2197,9 +2197,9 @@ def seed_locales() -> dict[str, int]:
 
     ``full_clean`` then ``save(update_fields=...)``: the validator is a
     field validator, which ``save()`` does not run, and the narrow
-    update still fires ``post_save`` — that is what purges the cached
-    ``tenant_resolve`` payload the storefront reads the locale list
-    from.
+    update still goes through ``Tenant.save``, which bumps the
+    ``cache_generation`` the cached ``tenant_resolve`` payload (where
+    the storefront reads the locale list) is keyed by.
     """
     from django.core.exceptions import (
         ValidationError as DjangoValidationError,
@@ -2309,8 +2309,8 @@ def seed_branding() -> dict[str, int]:
         if tenant.favicon_url == favicon_url:
             return {"unchanged": 1}
         tenant.favicon_url = favicon_url
-        # The narrow update still fires `post_save`, which purges the
-        # cached `tenant_resolve` payload the storefront reads it from.
+        # The narrow update still goes through `Tenant.save`, which bumps
+        # the generation the cached `tenant_resolve` payload is keyed by.
         tenant.save(update_fields=["favicon_url"])
     return {"updated": 1}
 

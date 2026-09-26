@@ -346,7 +346,7 @@ class TestTenantResolveChatApiKey:
         self, resolve_client, tenant_factory, settings
     ):
         settings.AGENT_GATEWAY_INTERNAL_SECRET = "gw-secret"
-        self._tenant_with_key(
+        tenant = self._tenant_with_key(
             tenant_factory, "chat-key-tenant", "chat-key.example"
         )
         url = "/api/v1/tenant/resolve?domain=chat-key.example"
@@ -367,7 +367,8 @@ class TestTenantResolveChatApiKey:
         after = resolve_client.get(url)
         assert "chatApiKey" not in after.json()
         assert "acpBearerToken" not in after.json()
-        cached = cache.get(tenant_resolve_key("chat-key.example"))
+        tenant.refresh_from_db()
+        cached = cache.get(tenant_resolve_key("chat-key.example", tenant))
         assert cached is not None
         assert "chat_api_key" not in cached
         assert "acp_bearer_token" not in cached

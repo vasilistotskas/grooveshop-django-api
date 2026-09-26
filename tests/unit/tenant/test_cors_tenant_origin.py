@@ -9,6 +9,7 @@ from django.core.cache import cache
 from django.urls import reverse
 from rest_framework.test import APIClient
 
+from tenant.cache import tenant_domains_key
 from tenant.middleware import origin_belongs_to_tenant
 from tenant.models import TenantDomain
 from tests.utils.staff import (
@@ -116,9 +117,12 @@ def test_platform_origin_needs_no_tenant(client):
     assert response["Access-Control-Allow-Origin"] == settings.NUXT_BASE_URL
 
 
-def test_domain_cache_is_populated_and_invalidated(tenant, client):
-    key = f"global:tenant_domains:{tenant.schema_name}"
-    cache.delete(key)
+def test_domain_cache_follows_the_tenant_generation(tenant, client):
+    # ``TenantMainMiddleware`` loads the row afresh on every request; the
+    # main lane binds the fixture's object instead, so it is refreshed
+    # wherever a request would have reloaded it.
+    tenant.refresh_from_db()
+    key = tenant_domains_key(tenant)
     client.get(_url(), HTTP_ORIGIN=TENANT_ORIGIN)
     assert cache.get(key) == {
         "shop.cors-tenant.example",
@@ -127,7 +131,8 @@ def test_domain_cache_is_populated_and_invalidated(tenant, client):
     TenantDomain.objects.create(
         tenant=tenant, domain="www.cors-tenant.example", is_primary=False
     )
-    assert cache.get(key) is None
+    tenant.refresh_from_db()
+    assert tenant_domains_key(tenant) != key
     response = client.get(_url(), HTTP_ORIGIN="https://www.cors-tenant.example")
     assert (
         response["Access-Control-Allow-Origin"]

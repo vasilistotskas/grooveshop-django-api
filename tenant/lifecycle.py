@@ -11,9 +11,10 @@ they are extracted here rather than duplicated:
   which is what scopes renewal-driven auto-reactivation to billing
   suspensions only.
 
-Resolve-cache invalidation needs nothing here: the ``post_save`` signal
-on ``Tenant`` (tenant/signals.py) already clears every domain's cached
-payload on any save.
+Resolve-cache invalidation needs nothing here: every ``Tenant.save``
+bumps ``cache_generation`` in the same UPDATE, and the resolve and
+domain cache keys include it (tenant/cache.py), so the next read after
+the commit builds a fresh key.
 """
 
 from __future__ import annotations

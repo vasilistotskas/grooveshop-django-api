@@ -9,6 +9,8 @@ from django.http import JsonResponse
 from django.middleware.csrf import CsrfViewMiddleware
 from django.utils.translation import gettext_lazy as _
 
+from tenant.cache import tenant_domains_key
+
 logger = logging.getLogger(__name__)
 
 TENANT_DOMAINS_CACHE_TTL = 300  # 5 minutes
@@ -17,16 +19,18 @@ TENANT_DOMAINS_CACHE_TTL = 300  # 5 minutes
 def tenant_domain_set(tenant) -> set[str]:
     """The tenant's registered hostnames, cached schema-independently.
 
-    "global:" — schema-independent (tenant.cache.make_tenant_key): the
-    invalidating signal (tenant/signals.py) always fires from the public
-    schema, so a schema-prefixed key here would never be found by that
-    delete. A ``FakeTenant`` (``schema_context``) carries no ``domains``
-    manager and owns no hostnames.
+    Keyed by the tenant's ``cache_generation`` (``tenant.cache``), which
+    every ``TenantDomain`` write bumps: a removed domain stops being
+    trusted by the next request, whether or not Redis was reachable
+    when it was removed. *tenant* is the row ``TenantMainMiddleware``
+    loaded for this request, so the generation costs no query. A
+    ``FakeTenant`` (``schema_context``) carries no ``domains`` manager
+    and owns no hostnames.
     """
     manager = getattr(tenant, "domains", None)
     if manager is None:
         return set()
-    cache_key = f"global:tenant_domains:{tenant.schema_name}"
+    cache_key = tenant_domains_key(tenant)
     domains = cache.get(cache_key)
     if domains is None:
         domains = set(manager.values_list("domain", flat=True))

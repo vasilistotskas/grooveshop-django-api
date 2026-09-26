@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 from corsheaders.signals import check_request_enabled
-from django.core.cache import cache
-from django.db import connection, transaction
+from django.db import connection
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 
-from tenant.cache import tenant_resolve_key
+from tenant.cache import bump_cache_generation
 from tenant.middleware import origin_belongs_to_tenant
 from tenant.models import Tenant, TenantDomain
 
@@ -35,91 +34,54 @@ def allow_tenant_origin(sender, request, **kwargs) -> bool:
 @receiver(
     [post_save, post_delete],
     sender=TenantDomain,
-    dispatch_uid="tenant.invalidate_domain_caches",
+    dispatch_uid="tenant.bump_generation_on_domain_change",
 )
-def invalidate_domain_caches(sender, instance, **kwargs):
-    """Clear tenant resolve + CSRF domain caches when a domain changes.
+def bump_generation_on_domain_change(sender, instance, **kwargs):
+    """A domain row changed: move the tenant's cached entries on.
 
-    Admin/API contexts that mutate ``TenantDomain`` are gated to the
-    public schema, so these deletes must target the same
-    schema-independent "global:" keys the writers use (see
-    ``tenant.cache.make_tenant_key`` / ``tenant/views.py`` /
-    ``tenant/middleware.py``) — a schema-prefixed delete here would
-    almost never match a write that happened on a tenant's own domain.
-
-    Every SIBLING domain's cached payload must go too, not just the
-    changed row's own: the resolve config embeds cross-row derivations
+    Both families read it — ``tenant_domains`` is the list itself, and
+    the resolve payload embeds cross-row derivations
     (``apiDomain``/``assetsDomain``/``staticDomain`` prefer an explicit
     prefixed sibling row), so adding e.g. ``assets-staging.…`` changes
-    the payload cached under the PRIMARY domain's key (observed on
-    staging 2026-08-19: images kept pointing at the derived dot-host
-    for the full TTL).
+    what the PRIMARY domain resolves to (observed on staging
+    2026-08-19). One generation covers every sibling at once.
+
+    ``tenant_id``, not ``tenant``: on a cascade the parent row may be
+    going too, and the UPDATE then simply matches nothing.
     """
-    cache.delete(tenant_resolve_key(instance.domain))
-    if hasattr(instance, "tenant"):
-        for sibling in instance.tenant.domains.values_list("domain", flat=True):
-            cache.delete(tenant_resolve_key(sibling))
-        cache.delete(f"global:tenant_domains:{instance.tenant.schema_name}")
+    bump_cache_generation(pk=instance.tenant_id)
 
 
-@receiver(
-    post_save, sender=Tenant, dispatch_uid="tenant.invalidate_tenant_caches"
-)
-def invalidate_tenant_caches(sender, instance, **kwargs):
-    """Clear caches for all domains of a tenant when tenant config changes."""
-    for domain in instance.domains.values_list("domain", flat=True):
-        cache.delete(tenant_resolve_key(domain))
-    cache.delete(f"global:tenant_domains:{instance.schema_name}")
-
-
-def _purge_resolve_for_schema(schema: str) -> None:
-    from django_tenants.utils import schema_context
-
-    with schema_context("public"):
-        tenant = Tenant.objects.filter(schema_name=schema).first()
-        if tenant is None:
-            return
-        for domain in tenant.domains.values_list("domain", flat=True):
-            cache.delete(tenant_resolve_key(domain))
-
-
-def _purge_resolve_for_current_schema():
-    """Purge the tenant-resolve cache for the schema handling this write.
+def _bump_generation_for_current_schema() -> None:
+    """Bump the generation of the tenant whose schema this write is in.
 
     For rows that live in a TENANT schema and are folded into the cached
-    ``TenantConfigSerializer`` payload. The connection's current schema
-    identifies whose domains to purge; the keys themselves are
-    schema-independent "global:" keys (see ``invalidate_domain_caches``).
-
-    The purge runs on commit: a ``post_save`` fires inside the caller's
-    transaction, so purging there would clear the cache before the row
-    is visible (a concurrent resolve would re-cache the stale payload)
-    and pay the public-schema round-trip once per seeded row instead of
-    once per transaction. The schema is captured NOW because the commit
-    hook may run after a ``schema_context`` has unwound.
+    ``TenantConfigSerializer`` payload. The public schema owns no
+    storefront's settings or pay-ways, so a write there (seed and
+    fixture loads) moves nothing. ``Tenant`` is a shared model: the
+    tenant schema's ``search_path`` ends in ``public``, so the UPDATE
+    reaches it without leaving the caller's transaction.
     """
-    from django.db import connection
-
     schema = connection.schema_name
     if schema == "public":
         return
-    transaction.on_commit(lambda: _purge_resolve_for_schema(schema))
+    bump_cache_generation(schema_name=schema)
 
 
 @receiver(
     post_save,
     sender="extra_settings.Setting",
-    dispatch_uid="tenant.invalidate_resolve_on_agent_setting_change",
+    dispatch_uid="tenant.bump_generation_on_agent_setting_change",
 )
-def invalidate_resolve_on_agent_setting_change(sender, instance, **kwargs):
-    """Purge the tenant-resolve cache when a merchant edits a setting
+def bump_generation_on_agent_setting_change(sender, instance, **kwargs):
+    """Move the tenant-resolve cache on when a merchant edits a setting
     that is FOLDED into the cached TenantConfig payload.
 
     ``AGENT_COMMERCE_ENABLED`` / ``PRODUCT_FEEDS_ENABLED`` are combined
     with the plan flag inside ``TenantConfigSerializer`` — without this
-    purge a merchant toggle would sit behind the resolve cache for the
+    bump a merchant toggle would sit behind the resolve cache for the
     full TTL. Setting rows live in the TENANT schema, so the current
-    connection schema identifies whose domains to purge.
+    connection schema identifies whose generation to bump.
     """
     if getattr(instance, "name", "") not in {
         "AGENT_COMMERCE_ENABLED",
@@ -127,16 +89,16 @@ def invalidate_resolve_on_agent_setting_change(sender, instance, **kwargs):
         "AGENT_HOSTED_PAYMENT_ENABLED",
     }:
         return
-    _purge_resolve_for_current_schema()
+    _bump_generation_for_current_schema()
 
 
 @receiver(
     [post_save, post_delete],
     sender="pay_way.PayWay",
-    dispatch_uid="tenant.invalidate_resolve_on_pay_way_change",
+    dispatch_uid="tenant.bump_generation_on_pay_way_change",
 )
-def invalidate_resolve_on_pay_way_change(sender, instance, **kwargs):
-    """Purge the tenant-resolve cache when a pay-way changes.
+def bump_generation_on_pay_way_change(sender, instance, **kwargs):
+    """Move the tenant-resolve cache on when a pay-way changes.
 
     ``agent_payment_instruments`` is derived from the tenant's active
     offline pay-ways inside ``TenantConfigSerializer``, so a merchant
@@ -144,7 +106,7 @@ def invalidate_resolve_on_pay_way_change(sender, instance, **kwargs):
     agents for the full TTL — the agent gateway reads that list to
     decide which UCP payment instruments the store advertises.
     """
-    _purge_resolve_for_current_schema()
+    _bump_generation_for_current_schema()
 
 
 @receiver(post_save, sender=Tenant, dispatch_uid="tenant.reactivate_on_renewal")

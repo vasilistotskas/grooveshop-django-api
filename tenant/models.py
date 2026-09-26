@@ -6,6 +6,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.db import models
+from django.db.models.expressions import Combinable
 from django.utils.translation import gettext_lazy as _
 from django_tenants.models import DomainMixin, TenantMixin, _check_schema_name
 from knox.models import AbstractAuthToken
@@ -385,6 +386,24 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
             "Never suspend, reactivate or destroy this tenant through "
             "admin actions, the platform API or automation."
         ),
+    )
+    # Part of every key the tenant's cached resolve payload and domain
+    # set are read under (``tenant.cache``), and bumped in the same
+    # statement or transaction as each write that changes them. A
+    # committed write moves every reader to a new key, so no Redis
+    # DELETE has to land for a stale entry to stop being served — and
+    # the fail-open cache (``core/caches.py``) drops deletes during an
+    # outage. Only ever written relatively, as ``F() + 1`` (``save``
+    # below, ``tenant.cache.bump_cache_generation``), so a stale
+    # in-memory copy can never write an older generation back — and the
+    # annotation admits the ``F()`` that ``save`` assigns.
+    cache_generation: models.PositiveBigIntegerField[int | Combinable, int] = (
+        models.PositiveBigIntegerField(
+            _("Cache Generation"),
+            default=0,
+            db_default=0,
+            editable=False,
+        )
     )
 
     # Feature flags
@@ -1064,10 +1083,42 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
             "box_now_webhook_secret",
             "acp_bearer_token",
             "chat_api_key",
+            # A cache key component, not a fact about the store.
+            "cache_generation",
         ],
     )
 
     auto_create_schema = True
+
+    def save(self, *args, **kwargs):
+        """Bump ``cache_generation`` in the same UPDATE as the write.
+
+        On every update, whatever changed: the cached resolve payload is
+        built from most of this row, and a list of the fields it reads
+        would be one more thing to keep in step. Django refreshes an
+        expression-assigned field from the UPDATE's ``RETURNING``
+        (``Model._save_table``), so the instance holds the new integer
+        again before ``post_save`` runs. An empty ``update_fields``
+        stays the no-op Django makes it, and an insert starts at the
+        column default.
+        """
+        update_fields = kwargs.get("update_fields")
+        if self._state.adding or (
+            update_fields is not None and not update_fields
+        ):
+            return super().save(*args, **kwargs)
+
+        previous = self.cache_generation
+        self.cache_generation = models.F("cache_generation") + 1
+        if update_fields is not None:
+            kwargs["update_fields"] = {*update_fields, "cache_generation"}
+        try:
+            return super().save(*args, **kwargs)
+        except BaseException:
+            # A failed save must not leave an expression on the instance
+            # for the next reader to build a cache key from.
+            self.cache_generation = previous
+            raise
 
     def delete(
         self, using=None, keep_parents=False, *, force_drop: bool = False

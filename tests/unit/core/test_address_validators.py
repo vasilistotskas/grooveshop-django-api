@@ -20,6 +20,7 @@ from core.validators.address import (
     validate_postal_code_pattern,
 )
 from country.models import Country
+from region.models import Region
 
 pytestmark = pytest.mark.assert_english
 
@@ -41,6 +42,12 @@ GREECE = _country("GR")
 CYPRUS = _country("CY")
 UK = _country("GB")
 NO_FORMAT = Country(alpha_2="ZZ")
+# Unsaved is enough — ``region.country_id`` is a plain attribute read,
+# never a query, and every GREECE-based test below only needs a region
+# that genuinely belongs to GR to stay error-free now that a country
+# with any seeded Region rows (GR has 12, from
+# ``region/migrations/0009_seed_default_regions.py``) requires one.
+ATTICA = Region(alpha="GR-A1", country_id="GR")
 
 
 class TestNormalizePostcode:
@@ -88,9 +95,19 @@ class TestPostcodeMatches:
 
 
 class TestAddressErrors:
+    # A country-with-regions check (below) is a real query
+    # (``country.regions.exists()``) whenever ``region`` is omitted —
+    # every test in this class needs DB access now, even the ones
+    # whose own assertions have nothing to do with regions.
+    pytestmark = pytest.mark.django_db
+
     def test_order_316_is_rejected_on_all_three_fields(self):
         errors = address_errors(
-            country=GREECE, street="1", street_number="70300", zipcode="ΑΒΓΔ"
+            country=GREECE,
+            street="1",
+            street_number="70300",
+            zipcode="ΑΒΓΔ",
+            region=ATTICA,
         )
 
         assert set(errors) == {"street", "street_number", "zipcode"}
@@ -103,6 +120,7 @@ class TestAddressErrors:
                 street="Εγνατίας",
                 street_number="12Α",
                 zipcode="546 22",
+                region=ATTICA,
             )
             == {}
         )
@@ -114,6 +132,7 @@ class TestAddressErrors:
             street="Εγνατίας",
             street_number=street_number,
             zipcode="54622",
+            region=ATTICA,
         )
         assert "street_number" not in errors
 
@@ -123,6 +142,7 @@ class TestAddressErrors:
             street="Εγνατίας",
             street_number="703 00",
             zipcode="54622",
+            region=ATTICA,
         )
         assert set(errors) == {"street_number"}
 
@@ -141,6 +161,39 @@ class TestAddressErrors:
             country=country, street="Main", street_number="1", zipcode="x"
         )
         assert str(errors["zipcode"][0]) == "Enter a valid postcode."
+
+    def test_a_region_is_required_when_the_country_has_any(self):
+        """GR has 12 real seeded districts — omitting one is now a
+        genuine error, not silently accepted."""
+        errors = address_errors(
+            country=GREECE,
+            street="Εγνατίας",
+            street_number="12",
+            zipcode="546 22",
+        )
+        assert set(errors) == {"region"}
+
+    def test_no_region_required_when_the_country_has_none(self):
+        """``NO_FORMAT`` ("ZZ") is not a real, seeded country — it has
+        no Region rows, so omitting one is fine."""
+        errors = address_errors(
+            country=NO_FORMAT,
+            street="Main Street",
+            street_number="1",
+            zipcode="whatever",
+        )
+        assert errors == {}
+
+    def test_a_region_belonging_to_a_different_country_is_rejected(self):
+        cyprus_region = Region(alpha="CY-01", country_id="CY")
+        errors = address_errors(
+            country=GREECE,
+            street="Εγνατίας",
+            street_number="12",
+            zipcode="546 22",
+            region=cyprus_region,
+        )
+        assert set(errors) == {"region"}
 
 
 class TestValidatePostalCodePattern:

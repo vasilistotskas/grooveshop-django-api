@@ -31,9 +31,13 @@ class TestRegionStatusFilter(TestCase):
 
         self.model_admin = MockModelAdmin()
 
-        self.country = Country.objects.create(
-            alpha_2="US", alpha_3="USA", iso_cc="840"
-        )
+        # ``country/migrations/0012_seed_iso_countries.py`` seeds every
+        # real ISO country now — ``get_or_create`` so this returns the
+        # already-seeded US row (with the same alpha_3/iso_cc this test
+        # would otherwise have created) instead of an IntegrityError.
+        self.country = Country.objects.get_or_create(
+            alpha_2="US", defaults={"alpha_3": "USA", "iso_cc": 840}
+        )[0]
 
         self.region_with_name = Region.objects.create(
             alpha="CA", country=self.country
@@ -193,9 +197,13 @@ class TestRegionAdmin(TestCase):
         self.site = AdminSite()
         self.admin = RegionAdmin(Region, self.site)
 
-        self.country = Country.objects.create(
-            alpha_2="US", alpha_3="USA", iso_cc="840"
-        )
+        # ``country/migrations/0012_seed_iso_countries.py`` seeds every
+        # real ISO country now — ``get_or_create`` so this returns the
+        # already-seeded US row (with the same alpha_3/iso_cc this test
+        # would otherwise have created) instead of an IntegrityError.
+        self.country = Country.objects.get_or_create(
+            alpha_2="US", defaults={"alpha_3": "USA", "iso_cc": 840}
+        )[0]
         self.country.set_current_language("en")
         self.country.name = "United States"
         self.country.save()
@@ -492,9 +500,9 @@ class TestRegionAdminEdgeCases(TestCase):
         self.admin = RegionAdmin(Region, self.site)
 
     def test_region_info_empty_alpha(self):
-        country = Country.objects.create(
-            alpha_2="US", alpha_3="USA", iso_cc="840"
-        )
+        country = Country.objects.get_or_create(
+            alpha_2="US", defaults={"alpha_3": "USA", "iso_cc": 840}
+        )[0]
 
         empty_region = Region.objects.create(alpha="", country=country)
 
@@ -503,9 +511,9 @@ class TestRegionAdminEdgeCases(TestCase):
         self.assertIn("Unnamed Region", result)
 
     def test_analytics_with_special_characters(self):
-        country = Country.objects.create(
-            alpha_2="US", alpha_3="USA", iso_cc="840"
-        )
+        country = Country.objects.get_or_create(
+            alpha_2="US", defaults={"alpha_3": "USA", "iso_cc": 840}
+        )[0]
 
         special_region = Region.objects.create(alpha="CA-1", country=country)
 
@@ -514,9 +522,9 @@ class TestRegionAdminEdgeCases(TestCase):
         self.assertIn("Code length", result)
 
     def test_completeness_calculation_edge_cases(self):
-        country = Country.objects.create(
-            alpha_2="US", alpha_3="USA", iso_cc="840"
-        )
+        country = Country.objects.get_or_create(
+            alpha_2="US", defaults={"alpha_3": "USA", "iso_cc": 840}
+        )[0]
         minimal_region = Region.objects.create(alpha="XX", country=country)
 
         result = self.admin.completeness_badge(minimal_region)
@@ -538,9 +546,9 @@ class TestRegionAdminEdgeCases(TestCase):
             )
 
     def test_display_methods_with_none_values(self):
-        country = Country.objects.create(
-            alpha_2="US", alpha_3="USA", iso_cc="840"
-        )
+        country = Country.objects.get_or_create(
+            alpha_2="US", defaults={"alpha_3": "USA", "iso_cc": 840}
+        )[0]
 
         region_with_nones = Region.objects.create(
             alpha="XX", country=country, sort_order=None

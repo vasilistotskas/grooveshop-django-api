@@ -21,6 +21,7 @@ from order.serializers.order import (
 )
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
+from region.factories import RegionFactory
 
 pytestmark = [pytest.mark.django_db, pytest.mark.assert_english]
 
@@ -39,6 +40,10 @@ def greece():
 
 def _create_payload(**overrides):
     pay_way = PayWayFactory(settlement=PaySettlement.ONLINE, active=True)
+    # GR has real seeded districts, so a region is required now — any
+    # one attached to GR satisfies that; the tests below aren't
+    # exercising region selection itself.
+    region = RegionFactory(country_id="GR")
     data = {
         "pay_way_id": pay_way.id,
         "first_name": "Jane",
@@ -49,6 +54,7 @@ def _create_payload(**overrides):
         "city": "Θεσσαλονίκη",
         "zipcode": "54622",
         "country_id": "GR",
+        "region_id": region.alpha,
         "phone": "+306900000001",
     }
     data.update(overrides)

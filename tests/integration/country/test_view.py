@@ -9,6 +9,7 @@ from country.serializers import (
     CountryDetailSerializer,
     CountrySerializer,
 )
+from region.factories import RegionFactory
 from tests.utils import TestURLFixerMixin
 from user.factories.account import UserAccountFactory
 
@@ -42,8 +43,8 @@ class CountryViewSetTestCase(TestURLFixerMixin, APITestCase):
             phone_code=33,
             num_regions=0,
         )
-        # ``country/migrations/0012_seed_cyprus.py`` seeds a real CY row
-        # on a fresh database — the tests below use CY's own ISO data
+        # ``country/migrations/0012_seed_iso_countries.py`` seeds a real
+        # CY row on a fresh database — the tests below use CY's own ISO data
         # (alpha_3 "CYP", iso_cc 196) to exercise CREATE, so they need
         # CY absent, not a duplicate 400.
         Country.objects.filter(alpha_2="CY").delete()
@@ -64,7 +65,13 @@ class CountryViewSetTestCase(TestURLFixerMixin, APITestCase):
         self.assertIn("count", response.data)
 
         if response.data["results"]:
-            serializer = CountrySerializer(instance=self.country)
+            # ``for_list()`` annotates ``has_regions`` — a plain,
+            # unannotated instance silently drops that read-only field
+            # (DRF's ``SkipField`` for a missing attribute) rather than
+            # rendering it, so the comparison instance must be fetched
+            # the same way the view itself fetches it.
+            annotated = Country.objects.for_list().get(pk=self.country.pk)
+            serializer = CountrySerializer(instance=annotated)
             expected_fields = set(serializer.data.keys())
             actual_fields = set(response.data["results"][0].keys())
             self.assertEqual(expected_fields, actual_fields)
@@ -73,7 +80,8 @@ class CountryViewSetTestCase(TestURLFixerMixin, APITestCase):
         response = self.client.get(self.detail_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        serializer = CountryDetailSerializer(instance=self.country)
+        annotated = Country.objects.for_detail().get(pk=self.country.pk)
+        serializer = CountryDetailSerializer(instance=annotated)
         expected_fields = set(serializer.data.keys())
         actual_fields = set(response.data.keys())
         self.assertEqual(expected_fields, actual_fields)
@@ -108,7 +116,8 @@ class CountryViewSetTestCase(TestURLFixerMixin, APITestCase):
         response = self.client.put(self.detail_url, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        serializer = CountryDetailSerializer(instance=self.country)
+        annotated = Country.objects.for_detail().get(pk=self.country.pk)
+        serializer = CountryDetailSerializer(instance=annotated)
         expected_fields = set(serializer.data.keys())
         actual_fields = set(response.data.keys())
         self.assertEqual(expected_fields, actual_fields)
@@ -132,22 +141,25 @@ class CountryViewSetTestCase(TestURLFixerMixin, APITestCase):
         self.assertIn("translations", response.data)
 
     def test_create_country(self):
+        # ISO 3166-1's own "user-assigned" range (never a real country,
+        # so never seeded by ``0012_seed_iso_countries.py``) — this
+        # test only cares that CREATE works, not which country.
         initial_count = Country.objects.count()
         payload = {
-            "alpha_2": "CA",
-            "alpha_3": "CAN",
-            "iso_cc": 124,
+            "alpha_2": "QM",
+            "alpha_3": "QMA",
+            "iso_cc": 900,
             "phone_code": 999,
-            "translations": {default_language: {"name": "Canada"}},
+            "translations": {default_language: {"name": "Testland"}},
         }
 
         response = self.client.post(self.list_url, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(Country.objects.count(), initial_count + 1)
 
-        country = Country.objects.get(alpha_2="CA")
-        self.assertEqual(country.alpha_3, "CAN")
-        self.assertEqual(country.iso_cc, 124)
+        country = Country.objects.get(alpha_2="QM")
+        self.assertEqual(country.alpha_3, "QMA")
+        self.assertEqual(country.iso_cc, 900)
 
     def test_update_country(self):
         payload = {
@@ -368,6 +380,30 @@ class CountryViewSetTestCase(TestURLFixerMixin, APITestCase):
         response = self.client.get(self.detail_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("main_image_path", response.data)
+
+    def test_has_regions_true_for_a_country_with_real_districts(self):
+        # A dedicated country+region, not GR: ``test_delete_country``
+        # elsewhere in this class deletes ``self.country`` (GR) without
+        # it coming back for the rest of this test run, so relying on
+        # GR's own real seeded districts here would depend on file
+        # execution order.
+        country = CountryFactory(num_regions=0)
+        RegionFactory(country=country)
+        url = reverse("country-detail", args=[country.pk])
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data["has_regions"])
+
+    def test_has_regions_false_for_a_country_with_none(self):
+        country = CountryFactory(num_regions=0)
+        url = reverse("country-detail", args=[country.pk])
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(response.data["has_regions"])
 
     def test_consistency_with_manual_serializer_instantiation(self):
         response = self.client.get(self.detail_url)

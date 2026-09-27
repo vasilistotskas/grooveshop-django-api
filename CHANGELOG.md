@@ -3,6 +3,30 @@
 
 
 
+## v3.85.2 (2026-09-27)
+
+### Bug fixes
+
+* fix(cache): the loyalty surface purges the now-cached programme page
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01WjJucy7gQj77PFgeVh4fhk ([`8e78b96`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8e78b9688bffe0f3f542a55fd49e8f9f252bd64d))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.85.1 [skip ci] ([`8f44632`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8f44632a272b09ffa4fce0fd670fe6407d23f947))
+
+### Testing
+
+* test(cart): the total-items filter test built one cart when two Faker emails collided
+
+UserAccountFactory gets-or-creates by a random email and CartFactory by user,
+so a repeated email turned the test's small (1) and big (9) carts into one cart
+of 10 — CI failed on 8e78b968 with exactly that. Explicit emails.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01WjJucy7gQj77PFgeVh4fhk ([`07610cf`](https://github.com/vasilistotskas/grooveshop-django-api/commit/07610cf756618042d42f22c76ce501fefa0565f1))
+
 ## v3.85.1 (2026-09-27)
 
 ### Bug fixes

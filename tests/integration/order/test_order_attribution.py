@@ -12,6 +12,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 import pytest
+from django.test import override_settings
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -75,7 +76,7 @@ class TestOrderAttributionOnCreate(APITestCase):
         self.url = reverse("order-list")
         self.client.force_authenticate(user=self.user)
 
-    def _post(self, pay_way, *, user_agent="", **extra):
+    def _post(self, pay_way, *, user_agent="", gateway_secret="", **extra):
         return self.client.post(
             self.url,
             {
@@ -95,6 +96,7 @@ class TestOrderAttributionOnCreate(APITestCase):
             format="json",
             HTTP_X_CART_ID=str(self.cart.uuid),
             HTTP_USER_AGENT=user_agent,
+            HTTP_X_INTERNAL_GATEWAY=gateway_secret,
         )
 
     def _cod(self):
@@ -152,12 +154,38 @@ class TestOrderAttributionOnCreate(APITestCase):
         assert response.json()["attribution"]["source"] == "instagram"
         assert response.json()["attribution"]["sourceType"] == "social"
 
+    @override_settings(AGENT_GATEWAY_INTERNAL_SECRET="gateway-secret")
     def test_the_agent_gateway_protocol_is_an_agent_order(self, *_mocks):
-        response = self._post(self._cod(), attribution={"agentProtocol": "acp"})
+        response = self._post(
+            self._cod(),
+            gateway_secret="gateway-secret",
+            attribution={"agentProtocol": "acp"},
+        )
 
         assert response.status_code == status.HTTP_201_CREATED
         assert response.json()["attribution"]["sourceType"] == "agent"
         assert response.json()["attribution"]["source"] == "acp"
+
+    def _assert_agent_claim_ignored(self, gateway_secret):
+        response = self._post(
+            self._cod(),
+            gateway_secret=gateway_secret,
+            attribution={"agentProtocol": "acp", "utmSource": "ig"},
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED
+        assert response.json()["attribution"]["sourceType"] == "campaign"
+        assert response.json()["attribution"]["source"] == "instagram"
+
+    @override_settings(AGENT_GATEWAY_INTERNAL_SECRET="gateway-secret")
+    def test_an_agent_claim_without_the_gateway_secret_is_ignored(
+        self, *_mocks
+    ):
+        self._assert_agent_claim_ignored(gateway_secret="")
+
+    @override_settings(AGENT_GATEWAY_INTERNAL_SECRET="gateway-secret")
+    def test_an_agent_claim_with_a_wrong_secret_is_ignored(self, *_mocks):
+        self._assert_agent_claim_ignored(gateway_secret="guess")
 
     def test_a_referrer_on_the_store_own_domain_is_ignored(self, *_mocks):
         with patch(

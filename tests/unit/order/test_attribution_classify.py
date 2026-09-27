@@ -317,6 +317,7 @@ class TestFromPayload:
                 "agent_protocol": "acp",
             },
             user_agent=INSTAGRAM_UA,
+            from_agent_gateway=True,
         )
 
         assert inp == AttributionInput(
@@ -328,9 +329,20 @@ class TestFromPayload:
             user_agent=INSTAGRAM_UA,
         )
 
+    def test_an_agent_protocol_without_the_gateway_proof_is_dropped(self):
+        inp = AttributionInput.from_payload(
+            {"utm_source": "ig", "agent_protocol": "acp"},
+            user_agent="",
+            from_agent_gateway=False,
+        )
+
+        assert inp == AttributionInput(utm_source="ig")
+
     def test_no_payload_is_an_empty_input(self):
         assert (
-            AttributionInput.from_payload(None, user_agent="")
+            AttributionInput.from_payload(
+                None, user_agent="", from_agent_gateway=False
+            )
             == AttributionInput()
         )
 

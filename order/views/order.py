@@ -95,6 +95,7 @@ from order.services import OrderService
 from pay_way.enum.settlement import PaySettlement
 from pay_way.models import PayWay
 from pay_way.services import PayWayService
+from tenant.internal import is_internal_caller
 from tenant.membership import is_store_staff
 
 logger = logging.getLogger(__name__)
@@ -1064,11 +1065,17 @@ class OrderViewSet(BaseModelViewSet):
 
         The UA is the shopper's own: the Nuxt proxy relays it
         (``clientIdentityHeaders``), and an in-app browser that strips
-        ``Referer`` still names itself there.
+        ``Referer`` still names itself there. The gateway's
+        ``agentProtocol`` is believed only alongside its shared secret,
+        which it sends as ``X-Internal-Gateway`` on every cart and order
+        call (the header the gateway-aware cart throttle checks too).
         """
         return AttributionInput.from_payload(
             validated_data.get("attribution"),
             user_agent=request.headers.get("User-Agent", ""),
+            from_agent_gateway=is_internal_caller(
+                request.headers.get("X-Internal-Gateway", "")
+            ),
         )
 
     def _get_cart_and_user(self, request):

@@ -33,7 +33,7 @@ from datetime import timedelta
 from django.apps import apps
 from django.core.cache import cache
 from django.db import connection
-from django.db.models import Avg, Count, Max, Q, Sum
+from django.db.models import Avg, Count, Max, Min, Q, Sum
 from django.db.models.functions import Length, TruncDay
 from django.urls import reverse
 from django.utils import timezone
@@ -929,34 +929,33 @@ def _order_source_chart(Order, month_ago) -> dict:
     """
     from order.attribution import source_label
 
-    rows = list(
-        Order.objects.filter(
-            created_at__gte=month_ago, attribution__isnull=False
-        )
-        .values("attribution__source", "attribution__source_type")
-        .annotate(count=Count("id"))
-        .order_by("attribution__source", "attribution__source_type")
+    attributed = Order.objects.filter(
+        created_at__gte=month_ago, attribution__isnull=False
     )
     # One slice per source: the same source can arrive as several types
-    # (Instagram organically and from a tagged campaign).
-    counts: dict[str, int] = {}
-    labels: dict[str, str] = {}
-    for row in rows:
-        source = row["attribution__source"]
-        counts[source] = counts.get(source, 0) + row["count"]
-        labels.setdefault(
-            source,
-            str(source_label(source, row["attribution__source_type"])),
+    # (Instagram organically and from a tagged campaign), named after the
+    # first type alphabetically. Ranked and cut in the database, since
+    # sources are open-ended (free-text utm_source, any referrer host);
+    # "Other" is the remainder of one total count.
+    top = list(
+        attributed.values("attribution__source")
+        .annotate(
+            count=Count("id"),
+            source_type=Min("attribution__source_type"),
         )
-    ranked = sorted(counts.items(), key=lambda item: -item[1])
-    top, rest = ranked[:_ORDER_SOURCE_TOP_N], ranked[_ORDER_SOURCE_TOP_N:]
+        .order_by("-count", "attribution__source")[:_ORDER_SOURCE_TOP_N]
+    )
+    other = attributed.count() - sum(row["count"] for row in top)
 
-    chart_labels = [labels[source] for source, _count in top]
-    chart_data = [count for _source, count in top]
+    chart_labels = [
+        str(source_label(row["attribution__source"], row["source_type"]))
+        for row in top
+    ]
+    chart_data = [row["count"] for row in top]
     chart_colors = list(_ORDER_SOURCE_PALETTE[: len(top)])
-    if rest:
+    if other:
         chart_labels.append(str(_("Other")))
-        chart_data.append(sum(count for _source, count in rest))
+        chart_data.append(other)
         chart_colors.append(_ORDER_SOURCE_OTHER_COLOR)
 
     return {

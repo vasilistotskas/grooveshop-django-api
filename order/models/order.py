@@ -702,18 +702,24 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         when available (set by ``for_list()`` and related querysets) to
         avoid issuing extra DB queries.  Falls back to an aggregation query
         only when the annotation is absent (e.g. ad-hoc lookups).
+
+        The annotation is a ``SUM`` over the items, so an order with none
+        carries it as ``NULL``: presence of the key, not its value, says
+        the queryset annotated it. Testing the value sent every item-less
+        row of a list back to the fallback — one aggregate per row.
         """
         default_currency = getattr(settings, "DEFAULT_CURRENCY", "EUR")
 
         # Use pre-computed annotation when present (avoids 2 extra queries).
-        annotated = self.__dict__.get("items_total")
-        if annotated is not None:
+        if "items_total" in self.__dict__:
             currency = (
                 self.shipping_price.currency
                 if self.shipping_price
                 else default_currency
             )
-            return Money(amount=annotated, currency=currency)
+            return Money(
+                amount=self.__dict__["items_total"] or 0, currency=currency
+            )
 
         # Fallback: aggregate from the related manager (2 queries).
         result = self.items.aggregate(total=Sum(F("price") * F("quantity")))

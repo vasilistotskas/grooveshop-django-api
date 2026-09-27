@@ -3,6 +3,34 @@
 
 
 
+## v3.86.2 (2026-09-27)
+
+### Bug fixes
+
+* fix(content): a save that never validated refuses markup instead of stripping it
+
+RichTextField.pre_save stripped whatever the policy would not keep, and
+every save of a translation row runs it - including ones that never
+validate (shell, management commands, seeds). That is how 29 embedded
+videos in 20 webside blog posts were lost after 2026-08-14 with no error
+and no record: they are in that day's dump and were gone by 2026-09-27.
+
+pre_save now runs the same check as validation and raises, naming the
+markup, so no write path can lose content silently; it still stores the
+normalised value (entities, link rel). Existing prod data is all inside
+the policy (414 rows, 5 tenants), so nothing that saves today breaks.
+
+Also pins the TinyMCE plugin list the allowlist was measured against, so
+adding a plugin fails a test until its output is re-measured, and covers
+the admin change form end to end.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01YTTjGBFbJxXzYHDZsabK7h ([`d8b0c61`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d8b0c619dd559aee30ddddeba8e6e77ddd4428d2))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.86.1 [skip ci] ([`eb50883`](https://github.com/vasilistotskas/grooveshop-django-api/commit/eb50883e3d06a9ec5340dfa82fc96b213d852647))
+
 ## v3.86.1 (2026-09-27)
 
 ### Bug fixes

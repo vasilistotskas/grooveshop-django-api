@@ -167,6 +167,7 @@ class TestBoxNowMint:
         alert.assert_not_called()
 
 
+@pytest.mark.assert_english
 class TestAdminButtons:
     def test_issue_acs_voucher_now_refuses_and_says_why(self):
         from shipping_acs.admin import AcsShipmentAdmin

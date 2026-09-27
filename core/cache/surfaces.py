@@ -393,7 +393,9 @@ def register_default_surfaces() -> None:
             nuxt_patterns=_nuxt(
                 "loyalty-settings",
                 "LoyaltySummaryAnon",
-            ),
+            )
+            # The cached programme page renders these settings.
+            + _nuxt_routes("/loyalty-program"),
             icon="loyalty",
             group="commerce",
         )

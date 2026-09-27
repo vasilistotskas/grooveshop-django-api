@@ -3,6 +3,25 @@
 
 
 
+## v3.85.1 (2026-09-27)
+
+### Bug fixes
+
+* fix(cache): purge each prefixed locale's cached home page with page_config
+
+The storefront now caches every page under /en too. The family patterns
+(*products*, *blog*, *about*) already match their prefixed pages, but a
+locale's home is stored under the bare segment 'en', which neither *index*
+nor _nuxt_routes('/en') (= *en*, nearly every key) could target. page_config
+adds *<locale>.* for each non-default language in settings.LANGUAGES.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01WjJucy7gQj77PFgeVh4fhk ([`5a5dd66`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5a5dd6644118b48ccb92e24e7b77ef457f81bcdb))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.85.0 [skip ci] ([`5da4929`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5da492976b9f5abf086cca821fb11adadeddbc97))
+
 ## v3.85.0 (2026-09-26)
 
 ### Chores

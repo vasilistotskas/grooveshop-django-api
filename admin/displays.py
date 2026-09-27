@@ -33,6 +33,7 @@ from typing import Any
 from django.utils.translation import gettext_lazy as _
 from unfold.decorators import display
 
+from order.enum.attribution import OrderSourceType
 from order.enum.status import OrderStatus, PaymentStatus
 from product.enum.review import ReviewStatus
 from shipping_acs.enum.shipment_state import AcsShipmentState
@@ -62,6 +63,16 @@ PAYMENT_STATUS_VARIANT: dict[str, str] = {
     PaymentStatus.REFUNDED: "primary",
     PaymentStatus.PARTIALLY_REFUNDED: "primary",
     PaymentStatus.CANCELED: "danger",
+}
+
+ORDER_SOURCE_TYPE_VARIANT: dict[str, str] = {
+    OrderSourceType.DIRECT: "default",
+    OrderSourceType.CAMPAIGN: "primary",
+    OrderSourceType.PAID: "warning",
+    OrderSourceType.SOCIAL: "info",
+    OrderSourceType.SEARCH: "success",
+    OrderSourceType.REFERRAL: "default",
+    OrderSourceType.AGENT: "primary",
 }
 
 REVIEW_STATUS_VARIANT: dict[str, str] = {

@@ -4,7 +4,7 @@ from typing import Any, ClassVar
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.db import transaction
+from django.db import connection, transaction
 from django.db.models import QuerySet, Sum
 from django.utils import timezone
 from django.utils.translation import get_language
@@ -12,6 +12,7 @@ from django.utils.translation import gettext_lazy as _
 from django_stubs_ext import StrOrPromise
 from djmoney.money import Money
 
+from order.attribution import AttributionInput, classify
 from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.status import (
     SETTLED_PAYMENT_STATUSES,
@@ -34,6 +35,7 @@ from order.exceptions import (
     ProductNotFoundError,
     StockReservationError,
 )
+from order.models.attribution import OrderAttribution
 from order.models.item import OrderItem
 from order.models.order import Order
 from order.models.stock_log import StockLog
@@ -43,6 +45,7 @@ from order.signals import order_refunded
 from order.stock import StockManager
 from pay_way.enum.settlement import PaySettlement
 from promotion.services import CouponService, PromotionEngine
+from tenant.middleware import tenant_domain_set
 
 logger = logging.getLogger(__name__)
 
@@ -95,6 +98,33 @@ def _log_price_drift_if_needed(cart_item, current_price) -> None:
         current_price.amount,
         current_price.amount - frozen.amount,
     )
+
+
+class OrderAttributionService:
+    @classmethod
+    def record(
+        cls, order: Order, attribution: AttributionInput
+    ) -> OrderAttribution:
+        """Classify where *order* came from and store it.
+
+        Every new order gets a row — ``direct`` when there was no signal
+        at all — so "no row" keeps meaning "placed before attribution
+        existed". A referrer on one of the store's own domains is an
+        internal navigation or a return from checkout, never a source.
+        """
+        classified = classify(
+            attribution,
+            own_hosts=tenant_domain_set(getattr(connection, "tenant", None)),
+        )
+        return OrderAttribution.objects.create(
+            order=order,
+            source_type=classified.source_type,
+            source=classified.source,
+            medium=classified.medium,
+            campaign=classified.campaign,
+            referrer_host=classified.referrer_host,
+            landing_path=classified.landing_path,
+        )
 
 
 class OrderService:
@@ -358,6 +388,7 @@ class OrderService:
         loyalty_points_to_redeem: int | None = None,
         gift_card_codes: list[str] | None = None,
         meta_context: dict[str, Any] | None = None,
+        attribution: AttributionInput | None = None,
     ) -> Order:
         """
         Create order from cart after payment confirmation (payment-first flow).
@@ -770,6 +801,9 @@ class OrderService:
             cls._resolve_shipping_provider(order_data)
             cls._seed_language_code(order_data)
             order = Order.objects.create(**order_data)
+            OrderAttributionService.record(
+                order, attribution or AttributionInput()
+            )
 
             # Reuse the already-locked/materialised cart_items list rather
             # than issuing a second SELECT on the same rows.
@@ -1037,6 +1071,7 @@ class OrderService:
         loyalty_points_to_redeem: int | None = None,
         gift_card_codes: list[str] | None = None,
         meta_context: dict[str, Any] | None = None,
+        attribution: AttributionInput | None = None,
     ) -> Order:
         """
         Create order from cart using the order-first flow.
@@ -1263,6 +1298,9 @@ class OrderService:
             cls._seed_language_code(order_data)
 
             order = Order.objects.create(**order_data)
+            OrderAttributionService.record(
+                order, attribution or AttributionInput()
+            )
 
             # Set payment_id for offline settlements only. Providers
             # that settle by hosted redirect get their payment_id from

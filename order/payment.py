@@ -6,6 +6,8 @@ import moneyed
 import stripe
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
+from django.utils.translation import gettext_lazy as _
+from django_stubs_ext import StrOrPromise
 from djmoney.money import Money
 from djstripe.models import PaymentIntent, Refund
 
@@ -37,6 +39,11 @@ class PaymentProvider(ABC):
 
     #: Registry key. Matches ``PayWay.provider_code``.
     code: ClassVar[str] = ""
+
+    #: The PSP's name as staff know it — the admin's payment-method
+    #: column. The pay way's own name cannot stand in: Viva's seeded
+    #: pay way is keyed ``CREDIT_CARD``.
+    display_name: ClassVar[StrOrPromise]
 
     #: Intent-first: an intent is minted before the order exists and the
     #: shopper confirms it client-side. The order-creation path can then
@@ -128,6 +135,7 @@ class StripePaymentProvider(PaymentProvider):
     """
 
     code: ClassVar[str] = "stripe"
+    display_name: ClassVar[StrOrPromise] = _("Stripe")
     # Both: PaymentIntents for the intent-first checkout, and hosted
     # Checkout Sessions for the pay-later/retry links.
     supports_payment_intent: ClassVar[bool] = True
@@ -701,6 +709,7 @@ class VivaWalletPaymentProvider(PaymentProvider):
     LIVE_TRANSACTIONS_URL = "https://www.vivapayments.com"
 
     code: ClassVar[str] = "viva_wallet"
+    display_name: ClassVar[StrOrPromise] = _("Viva Wallet")
     # Hosted redirect only. ``process_payment`` below delegates straight
     # to ``create_checkout_session`` — there is no intent to confirm, so
     # an order using Viva is created BEFORE any money moves.
@@ -1113,6 +1122,13 @@ def provider_supports(provider_name: str, capability: str) -> bool:
     """
     provider_class = get_payment_provider_class(provider_name)
     return bool(provider_class and getattr(provider_class, capability, False))
+
+
+def payment_provider_label(provider_name: str) -> StrOrPromise | None:
+    """The PSP's display name, or None for a code no provider registers
+    (an offline method such as cash on delivery). Never instantiates."""
+    provider_class = get_payment_provider_class(provider_name)
+    return provider_class.display_name if provider_class else None
 
 
 def registered_provider_codes() -> frozenset[str]:

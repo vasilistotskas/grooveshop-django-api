@@ -29,6 +29,11 @@ class OrderQuerySet(SoftDeleteQuerySetMixin, OptimizedQuerySet):
         """Select related payment and location info."""
         return self.select_related("pay_way", "country", "region")
 
+    def with_attribution(self) -> Self:
+        """Select related acquisition source. A reverse one-to-one, so an
+        order without a row caches ``None`` instead of querying again."""
+        return self.select_related("attribution")
+
     def _enriched_items_prefetch(self) -> Prefetch:
         """Prefetch ``items`` with each item's product enriched for the
         embedded ``ProductSerializer`` — translations, category/vat/brand,
@@ -98,6 +103,7 @@ class OrderQuerySet(SoftDeleteQuerySetMixin, OptimizedQuerySet):
             self.exclude_deleted()
             .with_user()
             .with_payment_info()
+            .with_attribution()
             .with_items_basic()
             .with_counts()
             .with_total_amounts()
@@ -125,6 +131,7 @@ class OrderQuerySet(SoftDeleteQuerySetMixin, OptimizedQuerySet):
             self.exclude_deleted()
             .with_user()
             .with_payment_info()
+            .with_attribution()
             .with_items()
             .with_counts()
             .with_total_amounts()

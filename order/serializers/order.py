@@ -11,9 +11,11 @@ from core.enum import FloorChoicesEnum, LocationChoicesEnum
 from core.utils.email import is_disposable_domain
 from core.validators import address as address_rules
 from country.models import Country
+from order.attribution import AGENT_PROTOCOLS, CLICK_ID_PARAMS
 from order.enum.create_error import OrderCreateErrorType
 from order.enum.document_type import OrderCreateDocumentTypeEnum
 from order.enum.status import OrderStatus
+from order.models.attribution import OrderAttribution
 from order.models.order import Order
 from order.serializers.item import (
     OrderItemCreateSerializer,
@@ -42,6 +44,60 @@ CARRIER_TRACKING_URLS: dict[str, str] = {
     "dhl": "https://www.dhl.com/en/express/tracking.html?AWB={number}",
     "fedex": "https://www.fedex.com/fedextrack/?trknbr={number}",
 }
+
+
+class OrderAttributionSerializer(serializers.ModelSerializer[OrderAttribution]):
+    """Where the order came from, as ``order.attribution.classify`` named it."""
+
+    class Meta:
+        model = OrderAttribution
+        fields = ("source_type", "source", "medium", "campaign")
+        read_only_fields = fields
+
+
+class OrderAttributionInputSerializer(serializers.Serializer):
+    """The acquisition signals the storefront captured for this tab.
+
+    Untrusted analytics — anyone can type a UTM — so nothing here is
+    rejected for its content, only for its shape: a checkout must never
+    fail over a strange referrer. Overlong strings are cut to their
+    column in ``order.attribution.classify``, the referrer is reduced to
+    its host there, and click ids are parameter NAMES, never values.
+    """
+
+    utm_source = serializers.CharField(required=False, allow_blank=True)
+    utm_medium = serializers.CharField(required=False, allow_blank=True)
+    utm_campaign = serializers.CharField(required=False, allow_blank=True)
+    click_ids = serializers.ListField(
+        child=serializers.ChoiceField(choices=list(CLICK_ID_PARAMS)),
+        required=False,
+        help_text=_(
+            "Names of the ad click-id parameters the landing URL "
+            "carried. Their values are never sent."
+        ),
+    )
+    referrer = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        help_text=_(
+            "The landing page's ``document.referrer``. Only its host is "
+            "kept, and not at all when it is one of the store's own "
+            "domains."
+        ),
+    )
+    landing_path = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        help_text=_("Path of the first page, without its query string."),
+    )
+    agent_protocol = serializers.ChoiceField(
+        choices=list(AGENT_PROTOCOLS),
+        required=False,
+        help_text=_(
+            "Set by the agent gateway for an order an AI agent placed "
+            "over UCP or ACP."
+        ),
+    )
 
 
 class OrderSerializer(serializers.ModelSerializer[Order]):
@@ -135,6 +191,14 @@ class OrderSerializer(serializers.ModelSerializer[Order]):
     )
     can_be_canceled = serializers.BooleanField(read_only=True)
     is_paid = serializers.BooleanField(read_only=True)
+    attribution = OrderAttributionSerializer(
+        read_only=True,
+        allow_null=True,
+        help_text=(
+            "Where the shopper came from. Null for an order placed "
+            "before attribution was recorded."
+        ),
+    )
 
     @extend_schema_field({"type": "string"})
     def get_status_display(self, order: Order) -> str:
@@ -217,6 +281,7 @@ class OrderSerializer(serializers.ModelSerializer[Order]):
             "is_collected_on_delivery",
             "can_be_canceled",
             "is_paid",
+            "attribution",
         )
         read_only_fields = (
             "id",
@@ -245,6 +310,7 @@ class OrderSerializer(serializers.ModelSerializer[Order]):
             "is_paid",
             "is_online_payment",
             "is_collected_on_delivery",
+            "attribution",
             # Derived: ``Order.save()`` owns this column. Writable
             # would let a client pin a key that contradicts ``pay_way``
             # — ``_snapshot_pay_way_key`` only rewrites a snapshot when
@@ -1116,6 +1182,15 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
             "marketing cookies; the CAPI dispatcher then skips the "
             "send."
         ),
+    )
+
+    # ---------- Acquisition source ----------
+    # Sent by the storefront with the shopper's own submit, and by the
+    # agent gateway (``agent_protocol`` only). Classified and stored on
+    # ``OrderAttribution`` in the creation transaction; absent means a
+    # ``direct`` row, never a refused order.
+    attribution = OrderAttributionInputSerializer(
+        required=False, write_only=True
     )
 
     def validate_email(self, value: str) -> str:

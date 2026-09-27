@@ -5,7 +5,8 @@ in six zones:
 
 A. Hero KPIs (4 cards) — the revenue card carries per-period figures
    (7d/1m/3m/1y) switched client-side via Alpine.js in the template
-B. Operations charts (revenue+orders bar/line, status doughnut) — chart
+B. Operations charts (revenue+orders bar/line, status and order-source
+   doughnuts) — chart
    payloads are pre-serialized to JSON strings so the template can feed
    them straight into unfold's ``{% component "unfold/components/chart/*.html" %}``
    ``data``/``options`` attributes (and the hand-rolled doughnut canvas).
@@ -38,7 +39,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
-DASHBOARD_CACHE_KEY = "admin:dashboard:data:v5"
+DASHBOARD_CACHE_KEY = "admin:dashboard:data:v6"
 DASHBOARD_CACHE_TTL = 300  # 5 minutes
 
 # Selectable windows for the hero revenue card. Every period is compared
@@ -58,6 +59,22 @@ _REQUIRED_SELLER_SETTINGS = (
     ("INVOICE_SELLER_VAT_ID", _("VAT ID (ΑΦΜ)")),
     ("INVOICE_SELLER_TAX_OFFICE", _("Tax office (ΔΟΥ)")),
 )
+
+# The order-source doughnut names this many sources and folds the rest
+# into "Other" — past that, slices are too thin to read.
+_ORDER_SOURCE_TOP_N = 6
+
+# Categorical slice colours for the order-source doughnut, in rank
+# order; the "Other" slice takes the neutral one.
+_ORDER_SOURCE_PALETTE = (
+    "oklch(65% 0.15 250)",
+    "oklch(70% 0.15 145)",
+    "oklch(75% 0.15 85)",
+    "oklch(65% 0.2 25)",
+    "oklch(70% 0.12 200)",
+    "oklch(60% 0.15 300)",
+)
+_ORDER_SOURCE_OTHER_COLOR = "oklch(60% 0.05 250)"
 
 # Neutral gray that reads fine on both light and dark admin themes —
 # matches the tick color unfold's own bundled chart defaults use.
@@ -299,6 +316,8 @@ def _empty_zones() -> dict:
         "performance_chart_options": json.dumps({}),
         "status_chart_data": empty_chart,
         "status_chart_options": json.dumps({}),
+        "source_chart_data": empty_chart,
+        "source_chart_options": json.dumps({}),
         "orders_queue": [],
         "reviews_queue": [],
         "messages_queue": [],
@@ -354,7 +373,7 @@ def _build_cached_zones() -> dict:
             PaymentStatus,
             OrderStatus,
         ),
-        **_zone_b_ops_charts(Order, now, OrderStatus, PaymentStatus),
+        **_zone_b_ops_charts(Order, now, month_ago, OrderStatus, PaymentStatus),
         **_zone_c_queues(Order, ProductReview, Contact, ReviewStatus),
         **_zone_e_growth(Order, User, now, month_ago, PaymentStatus),
         **_zone_f_search_insights(now, month_ago),
@@ -670,8 +689,11 @@ def _revenue_periods(Order, now, PaymentStatus) -> list[dict]:
 # ── Zone B — Operations charts ────────────────────────────────────────
 
 
-def _zone_b_ops_charts(Order, now, OrderStatus, PaymentStatus) -> dict:
-    """Two charts: 14-day combined orders+revenue, status doughnut.
+def _zone_b_ops_charts(
+    Order, now, month_ago, OrderStatus, PaymentStatus
+) -> dict:
+    """Three charts: 14-day combined orders+revenue, status doughnut,
+    and the last 30 days' orders by acquisition source.
 
     Both chart payloads and their Chart.js options are pre-serialized
     to JSON strings here — unfold's chart components (and the
@@ -887,11 +909,67 @@ def _zone_b_ops_charts(Order, now, OrderStatus, PaymentStatus) -> dict:
         },
     }
 
+    source_chart = _order_source_chart(Order, month_ago)
+
     return {
         "performance_chart_data": json.dumps(performance_chart),
         "performance_chart_options": json.dumps(performance_chart_options),
         "status_chart_data": json.dumps(status_chart),
         "status_chart_options": json.dumps(status_chart_options),
+        "source_chart_data": json.dumps(source_chart),
+        # Same doughnut presentation as the status chart.
+        "source_chart_options": json.dumps(status_chart_options),
+    }
+
+
+def _order_source_chart(Order, month_ago) -> dict:
+    """Last 30 days' orders per source: the top few by name, the rest
+    as "Other". Orders placed before attribution existed have no row
+    and are left out rather than shown as a source they did not have.
+    """
+    from order.attribution import source_label
+
+    rows = list(
+        Order.objects.filter(
+            created_at__gte=month_ago, attribution__isnull=False
+        )
+        .values("attribution__source", "attribution__source_type")
+        .annotate(count=Count("id"))
+        .order_by("attribution__source", "attribution__source_type")
+    )
+    # One slice per source: the same source can arrive as several types
+    # (Instagram organically and from a tagged campaign).
+    counts: dict[str, int] = {}
+    labels: dict[str, str] = {}
+    for row in rows:
+        source = row["attribution__source"]
+        counts[source] = counts.get(source, 0) + row["count"]
+        labels.setdefault(
+            source,
+            str(source_label(source, row["attribution__source_type"])),
+        )
+    ranked = sorted(counts.items(), key=lambda item: -item[1])
+    top, rest = ranked[:_ORDER_SOURCE_TOP_N], ranked[_ORDER_SOURCE_TOP_N:]
+
+    chart_labels = [labels[source] for source, _count in top]
+    chart_data = [count for _source, count in top]
+    chart_colors = list(_ORDER_SOURCE_PALETTE[: len(top)])
+    if rest:
+        chart_labels.append(str(_("Other")))
+        chart_data.append(sum(count for _source, count in rest))
+        chart_colors.append(_ORDER_SOURCE_OTHER_COLOR)
+
+    return {
+        "labels": chart_labels,
+        "datasets": [
+            {
+                "data": chart_data,
+                "backgroundColor": chart_colors,
+                "hoverOffset": 8,
+                "borderWidth": 2,
+                "borderColor": "#ffffff",
+            }
+        ],
     }
 
 

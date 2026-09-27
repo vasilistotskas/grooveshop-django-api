@@ -12,6 +12,7 @@ from django.utils.translation import gettext_lazy as _
 from unfold.admin import TabularInline
 from unfold.contrib.filters.admin import (
     AutocompleteSelectFilter,
+    ChoicesDropdownFilter,
     DropdownFilter,
     RangeDateFilter,
     RangeDateTimeFilter,
@@ -23,6 +24,7 @@ from unfold.enums import ActionVariant
 
 from admin.base import BaseModelAdmin
 from admin.displays import (
+    ORDER_SOURCE_TYPE_VARIANT,
     ORDER_STATUS_VARIANT,
     PAYMENT_STATUS_VARIANT,
     SHIPMENT_STATE_VARIANT,
@@ -33,15 +35,18 @@ from admin.displays import (
     relative_time,
 )
 from admin.mixins import IsSuperuserOnlyModelAdmin
+from order.attribution import source_label
 from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.status import OrderStatus, PaymentStatus
 from order.invoicing import generate_invoice
+from order.models.attribution import OrderAttribution
 from order.models.history import OrderHistory, OrderItemHistory
 from order.models.invoice import Invoice, InvoiceCounter, MyDataStatus
 from order.models.item import OrderItem
 from order.models.order import Order
 from order.models.stock_log import StockLog
 from order.models.viva_webhook_event import VivaWebhookEvent
+from order.payment import payment_provider_label
 from order.services import OrderService
 
 logger = logging.getLogger(__name__)
@@ -166,6 +171,52 @@ class PaymentStatusFilter(DropdownFilter):
                 return queryset
 
         return queryset.filter(**filter_kwargs)
+
+
+class OrderSourceFilter(DropdownFilter):
+    """The sources orders were actually attributed to, by name.
+
+    Direct visits have no source (an empty value would read as "All"),
+    so they are reached through the source-type filter instead.
+    """
+
+    title = _("Order source")
+    parameter_name = "order_source"
+
+    def lookups(self, request, model_admin):
+        labels = {}
+        for source, source_type in (
+            OrderAttribution.objects.exclude(source="")
+            .values_list("source", "source_type")
+            .order_by("source", "source_type")
+            .distinct()
+        ):
+            labels.setdefault(source, source_label(source, source_type))
+        return sorted(labels.items(), key=lambda item: str(item[1]).lower())
+
+    def queryset(self, request, queryset):
+        if not self.value():
+            return queryset
+        return queryset.filter(attribution__source=self.value())
+
+
+def _attribution_field(field: str, description):
+    """A read-only change-form field showing one ``OrderAttribution``
+    column — "-" for an order placed before attribution existed."""
+
+    @admin.display(description=description)
+    def _field(self, obj):
+        attribution = getattr(obj, "attribution", None)
+        if attribution is None:
+            return None
+        if field == "source_type":
+            return attribution.get_source_type_display()
+        if field == "source":
+            return source_label(attribution.source, attribution.source_type)
+        return getattr(attribution, field) or None
+
+    _field.__name__ = f"attribution_{field}"
+    return _field
 
 
 class DocumentTypeFilter(DropdownFilter):
@@ -423,7 +474,9 @@ class OrderAdmin(BaseModelAdmin):
         "status_label",
         "customer",
         "order_summary",
+        "order_source",
         "payment_status_label",
+        "payment_method_label",
         "shipment_state",
         "shipping_info",
         "created",
@@ -434,6 +487,8 @@ class OrderAdmin(BaseModelAdmin):
         DocumentTypeFilter,
         WholesaleOrderFilter,
         RecentOrdersFilter,
+        ("attribution__source_type", ChoicesDropdownFilter),
+        OrderSourceFilter,
         "status",
         "payment_status",
         ("created_at", RangeDateTimeFilter),
@@ -492,6 +547,13 @@ class OrderAdmin(BaseModelAdmin):
         "loyalty_discount",
         "gift_card_amount",
         "wholesale_pricing",
+        # Shopper-supplied analytics, recorded once at checkout.
+        "attribution_source_type",
+        "attribution_source",
+        "attribution_medium",
+        "attribution_campaign",
+        "attribution_referrer_host",
+        "attribution_landing_path",
     )
 
     @admin.display(description=_("Wholesale pricing"))
@@ -624,7 +686,15 @@ class OrderAdmin(BaseModelAdmin):
         (
             _("Additional Information"),
             {
-                "fields": ("customer_notes",),
+                "fields": (
+                    "customer_notes",
+                    "attribution_source_type",
+                    "attribution_source",
+                    "attribution_medium",
+                    "attribution_campaign",
+                    "attribution_referrer_host",
+                    "attribution_landing_path",
+                ),
                 "classes": ("tab",),
             },
         ),
@@ -665,7 +735,13 @@ class OrderAdmin(BaseModelAdmin):
     ]
     inlines = [OrderItemInline, InvoiceInline, OrderHistoryInline]
     date_hierarchy = "created_at"
-    list_select_related = ["user", "country", "region", "pay_way"]
+    list_select_related = [
+        "user",
+        "country",
+        "region",
+        "pay_way",
+        "attribution",
+    ]
 
     def get_inlines(self, request, obj=None):
         # Show the carrier-specific shipment inline only when the order
@@ -719,6 +795,7 @@ class OrderAdmin(BaseModelAdmin):
                 "country",
                 "region",
                 "pay_way",
+                "attribution",
                 "shipping_provider",
                 "boxnow_shipment",
                 "acs_shipment",
@@ -733,6 +810,45 @@ class OrderAdmin(BaseModelAdmin):
         variants=PAYMENT_STATUS_VARIANT,
         description=_("Payment"),
     )
+
+    attribution_source_type = _attribution_field(
+        "source_type", _("Source type")
+    )
+    attribution_source = _attribution_field("source", _("Order source"))
+    attribution_medium = _attribution_field("medium", _("Traffic medium"))
+    attribution_campaign = _attribution_field("campaign", _("Campaign name"))
+    attribution_referrer_host = _attribution_field(
+        "referrer_host", _("Referrer host")
+    )
+    attribution_landing_path = _attribution_field(
+        "landing_path", _("Landing page")
+    )
+
+    @display(description=_("Payment Method"), ordering="pay_way__provider_code")
+    def payment_method_label(self, obj):
+        """The PSP when the pay way charges through one, else the
+        method the shopper picked (cash on delivery has no PSP).
+        ``pay_way`` is select_related and both names are in memory, so
+        the column costs no query."""
+        provider_code = obj.pay_way.provider_code if obj.pay_way_id else ""
+        return (
+            payment_provider_label(provider_code)
+            or obj.get_pay_way_key_display()
+            or None
+        )
+
+    @display(
+        description=_("Order source"),
+        label=ORDER_SOURCE_TYPE_VARIANT,
+        ordering="attribution__source",
+    )
+    def order_source(self, obj):
+        attribution = getattr(obj, "attribution", None)
+        if attribution is None:
+            return None
+        return attribution.source_type, source_label(
+            attribution.source, attribution.source_type
+        )
 
     @display(description=_("Customer"), header=True, ordering="last_name")
     def customer(self, obj):

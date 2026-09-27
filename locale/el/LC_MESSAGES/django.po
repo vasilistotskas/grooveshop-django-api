@@ -19154,3 +19154,83 @@ msgstr "Το περιεχόμενο περιέχει κώδικα που δεν 
 
 msgid "Only YouTube and Vimeo videos can be embedded."
 msgstr "Μπορείτε να ενσωματώσετε μόνο βίντεο από YouTube και Vimeo."
+
+msgid "Source type"
+msgstr "Τύπος πηγής"
+
+msgid "Order source"
+msgstr "Πηγή παραγγελίας"
+
+msgid "A known channel's key (e.g. ``instagram``), the referring host, or the raw ``utm_source``. Empty for a direct visit."
+msgstr "Το κλειδί ενός γνωστού καναλιού (π.χ. ``instagram``), ο ιστότοπος παραπομπής ή το ``utm_source`` όπως ήρθε. Κενό για απευθείας επίσκεψη."
+
+msgid "Traffic medium"
+msgstr "Μέσο επισκεψιμότητας"
+
+msgid "Campaign name"
+msgstr "Όνομα καμπάνιας"
+
+msgid "Referrer host"
+msgstr "Ιστότοπος παραπομπής"
+
+msgid "Landing page"
+msgstr "Σελίδα προσγείωσης"
+
+msgid "Order attribution"
+msgstr "Προέλευση παραγγελίας"
+
+msgid "Order attributions"
+msgstr "Προελεύσεις παραγγελιών"
+
+msgctxt "order source type"
+msgid "Direct"
+msgstr "Απευθείας"
+
+msgctxt "order source type"
+msgid "Campaign"
+msgstr "Καμπάνια"
+
+msgctxt "order source type"
+msgid "Paid"
+msgstr "Διαφήμιση"
+
+msgctxt "order source type"
+msgid "Social"
+msgstr "Κοινωνικά δίκτυα"
+
+msgctxt "order source type"
+msgid "Search"
+msgstr "Αναζήτηση"
+
+msgctxt "order source type"
+msgid "Referral"
+msgstr "Παραπομπή"
+
+msgctxt "order source type"
+msgid "AI agent"
+msgstr "Πράκτορας AI"
+
+#, python-format
+msgid "AI agent (%(protocol)s)"
+msgstr "Πράκτορας AI (%(protocol)s)"
+
+msgid "Orders by source"
+msgstr "Παραγγελίες ανά πηγή"
+
+msgid "Filter by acquisition source, e.g. ``instagram`` or a referring host (case-insensitive)"
+msgstr "Φίλτρο ανά πηγή προέλευσης, π.χ. ``instagram`` ή ιστότοπο παραπομπής (χωρίς διάκριση πεζών-κεφαλαίων)"
+
+msgid "Filter by acquisition source type"
+msgstr "Φίλτρο ανά τύπο πηγής προέλευσης"
+
+msgid "Names of the ad click-id parameters the landing URL carried. Their values are never sent."
+msgstr "Τα ονόματα των παραμέτρων click-id διαφημίσεων που είχε η διεύθυνση προσγείωσης. Οι τιμές τους δεν αποστέλλονται ποτέ."
+
+msgid "The landing page's ``document.referrer``. Only its host is kept, and not at all when it is one of the store's own domains."
+msgstr "Το ``document.referrer`` της σελίδας προσγείωσης. Κρατείται μόνο ο ιστότοπος, και καθόλου όταν είναι ένα από τα domain του ίδιου του καταστήματος."
+
+msgid "Path of the first page, without its query string."
+msgstr "Η διαδρομή της πρώτης σελίδας, χωρίς τις παραμέτρους της."
+
+msgid "Set by the agent gateway for an order an AI agent placed over UCP or ACP."
+msgstr "Ορίζεται από το agent gateway για παραγγελία που έκανε πράκτορας AI μέσω UCP ή ACP."

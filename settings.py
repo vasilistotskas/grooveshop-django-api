@@ -4239,6 +4239,10 @@ SPECTACULAR_SETTINGS = {
         # ``OrderCreateFromCartSerializer.acs_charge_type`` share the
         # same choice set; consolidate naming.
         "AcsChargeType": "shipping_acs.enum.charge_type.AcsChargeType",
+        # ``OrderAttribution.source_type`` is read on every order and
+        # filtered on the order list; a field-derived ``SourceTypeEnum``
+        # would say nothing about what the source is of.
+        "OrderSourceType": "order.enum.attribution.OrderSourceType",
     },
 }
 

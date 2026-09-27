@@ -1,3 +1,4 @@
+from .attribution import OrderAttribution
 from .history import OrderHistory, OrderItemHistory
 from .invoice import Invoice, InvoiceCounter
 from .item import OrderItem
@@ -10,6 +11,7 @@ __all__ = [
     "Invoice",
     "InvoiceCounter",
     "Order",
+    "OrderAttribution",
     "OrderHistory",
     "OrderItem",
     "OrderItemHistory",

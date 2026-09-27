@@ -5,6 +5,7 @@ from django_filters import rest_framework as filters
 
 from core.filters.camel_case_filters import CamelCaseTimeStampFilterSet
 from core.filters.core import UUIDFilterMixin
+from order.enum.attribution import OrderSourceType
 from order.enum.status import OrderStatus, PaymentStatus
 from order.models.item import OrderItem
 from order.models.order import Order
@@ -41,6 +42,19 @@ class OrderFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
     )
     location_type = filters.CharFilter(
         field_name="location_type", help_text=_("Filter by location type")
+    )
+    source = filters.CharFilter(
+        field_name="attribution__source",
+        lookup_expr="iexact",
+        help_text=_(
+            "Filter by acquisition source, e.g. ``instagram`` or a "
+            "referring host (case-insensitive)"
+        ),
+    )
+    source_type = filters.ChoiceFilter(
+        field_name="attribution__source_type",
+        choices=OrderSourceType.choices,
+        help_text=_("Filter by acquisition source type"),
     )
 
     user__email = filters.CharFilter(

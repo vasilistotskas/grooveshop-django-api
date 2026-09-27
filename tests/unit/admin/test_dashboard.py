@@ -16,7 +16,7 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.test import RequestFactory, TestCase, override_settings
-from django.utils import timezone
+from django.utils import timezone, translation
 
 from admin.dashboard import (
     DASHBOARD_CACHE_KEY,
@@ -70,6 +70,8 @@ class DashboardCallbackCachingTests(TestCase):
             "performance_chart_options",
             "status_chart_data",
             "status_chart_options",
+            "source_chart_data",
+            "source_chart_options",
             "orders_queue",
             "reviews_queue",
             "messages_queue",
@@ -352,3 +354,58 @@ class SearchInsightsZoneTests(TestCase):
         insights = self._zone()
         assert insights["clicks_30d"] == 1
         assert insights["ctr_pct"] == 100.0
+
+
+class OrderSourceChartTests(TestCase):
+    """Zone B "Orders by source" doughnut: last 30 days, top N + Other."""
+
+    def setUp(self):
+        # Order rows are tenant-schema data; see RevenuePeriodsTests.
+        patcher = patch("admin.dashboard._is_public_schema", return_value=False)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def _order(self, source: str, source_type: str, *, days_ago: int = 0):
+        from order.factories import OrderAttributionFactory
+        from order.models.order import Order
+
+        attribution = OrderAttributionFactory(
+            source=source, source_type=source_type
+        )
+        Order.objects.filter(pk=attribution.order_id).update(
+            created_at=timezone.now() - timedelta(days=days_ago)
+        )
+
+    def _chart(self) -> dict:
+        import json
+
+        return json.loads(_build_cached_zones()["source_chart_data"])
+
+    def test_counts_per_source_by_name(self):
+        from order.enum.attribution import OrderSourceType
+        from order.factories.order import OrderFactory
+
+        self._order("instagram", OrderSourceType.SOCIAL)
+        self._order("instagram", OrderSourceType.CAMPAIGN)
+        self._order("google", OrderSourceType.SEARCH)
+        self._order("google", OrderSourceType.SEARCH, days_ago=45)
+        OrderFactory(num_order_items=0)  # placed before attribution
+
+        chart = self._chart()
+
+        assert chart["labels"] == ["Instagram", "Google"]
+        assert chart["datasets"][0]["data"] == [2, 1]
+
+    def test_sources_past_the_top_fold_into_other(self):
+        from admin.dashboard import _ORDER_SOURCE_TOP_N
+        from order.enum.attribution import OrderSourceType
+
+        for index in range(_ORDER_SOURCE_TOP_N + 2):
+            self._order(f"site{index}.example.org", OrderSourceType.REFERRAL)
+
+        with translation.override("en"):
+            chart = self._chart()
+
+        assert len(chart["labels"]) == _ORDER_SOURCE_TOP_N + 1
+        assert chart["labels"][-1] == "Other"
+        assert chart["datasets"][0]["data"][-1] == 2

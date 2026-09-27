@@ -228,7 +228,7 @@
 
 
     {# ────────────────────────────────────────────────────────────── #}
-    {# ZONE B — Operations charts (2)                                  #}
+    {# ZONE B — Operations charts (3)                                  #}
     {# ────────────────────────────────────────────────────────────── #}
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
@@ -243,6 +243,14 @@
         {% component "unfold/components/card.html" with title=status_title %}
             <div class="h-[320px] flex items-center justify-center">
                 <canvas class="chart" data-type="doughnut" data-value="{{ status_chart_data }}" data-options="{{ status_chart_options }}"></canvas>
+            </div>
+        {% endcomponent %}
+
+        {% trans "Orders by source" as source_title %}
+        {% capture as source_action silent %}{% include "unfold/helpers/label.html" with text=last_30d_label %}{% endcapture %}
+        {% component "unfold/components/card.html" with title=source_title action=source_action %}
+            <div class="h-[320px] flex items-center justify-center">
+                <canvas class="chart" data-type="doughnut" data-value="{{ source_chart_data }}" data-options="{{ source_chart_options }}"></canvas>
             </div>
         {% endcomponent %}
 

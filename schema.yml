@@ -13208,6 +13208,35 @@ paths:
           - type: number
         description: Φίλτρο ανά ελάχιστα έξοδα αποστολής
       - in: query
+        name: source
+        schema:
+          type: string
+        description: Φίλτρο ανά πηγή προέλευσης, π.χ. ``instagram`` ή ιστότοπο παραπομπής
+          (χωρίς διάκριση πεζών-κεφαλαίων)
+      - in: query
+        name: sourceType
+        schema:
+          type: string
+          title: Τύπος πηγής
+          enum:
+          - agent
+          - campaign
+          - direct
+          - paid
+          - referral
+          - search
+          - social
+        description: |-
+          Φίλτρο ανά τύπο πηγής προέλευσης
+
+          * `direct` - Απευθείας
+          * `campaign` - Καμπάνια
+          * `paid` - Διαφήμιση
+          * `social` - Κοινωνικά δίκτυα
+          * `search` - Αναζήτηση
+          * `referral` - Παραπομπή
+          * `agent` - Πράκτορας AI
+      - in: query
         name: status
         schema:
           type: string
@@ -16306,6 +16335,35 @@ paths:
             pattern: ^-?\d+(\.\d+)?$
           - type: number
         description: Φίλτρο ανά ελάχιστα έξοδα αποστολής
+      - in: query
+        name: source
+        schema:
+          type: string
+        description: Φίλτρο ανά πηγή προέλευσης, π.χ. ``instagram`` ή ιστότοπο παραπομπής
+          (χωρίς διάκριση πεζών-κεφαλαίων)
+      - in: query
+        name: sourceType
+        schema:
+          type: string
+          title: Τύπος πηγής
+          enum:
+          - agent
+          - campaign
+          - direct
+          - paid
+          - referral
+          - search
+          - social
+        description: |-
+          Φίλτρο ανά τύπο πηγής προέλευσης
+
+          * `direct` - Απευθείας
+          * `campaign` - Καμπάνια
+          * `paid` - Διαφήμιση
+          * `social` - Κοινωνικά δίκτυα
+          * `search` - Αναζήτηση
+          * `referral` - Παραπομπή
+          * `agent` - Πράκτορας AI
       - in: query
         name: status
         schema:
@@ -32411,6 +32469,14 @@ components:
       - firstName
       - id
       - lastName
+    AgentProtocolEnum:
+      enum:
+      - ucp
+      - acp
+      type: string
+      description: |-
+        * `ucp` - ucp
+        * `acp` - acp
     Attribute:
       type: object
       description: Serializer for Attribute with translations.
@@ -35824,6 +35890,28 @@ components:
       - clientSecret
       - currency
       - paymentIntentId
+    ClickIdsEnum:
+      enum:
+      - gclid
+      - gbraid
+      - wbraid
+      - msclkid
+      - ttclid
+      - twclid
+      - li_fat_id
+      - epik
+      - fbclid
+      type: string
+      description: |-
+        * `gclid` - gclid
+        * `gbraid` - gbraid
+        * `wbraid` - wbraid
+        * `msclkid` - msclkid
+        * `ttclid` - ttclid
+        * `twclid` - twclid
+        * `li_fat_id` - li_fat_id
+        * `epik` - epik
+        * `fbclid` - fbclid
     CompartmentSizeEnum:
       enum:
       - 1
@@ -36378,12 +36466,16 @@ components:
           title: Κωδικός κλήσης
         postalCodePattern:
           type: string
-          description: Regular expression a whole postcode must match, e.g. \d{3}
-            ?\d{2} for Greece. Blank disables the format check.
+          title: Μορφή ταχυδρομικού κώδικα
+          description: Κανονική έκφραση με την οποία πρέπει να ταιριάζει ολόκληρος
+            ο ταχυδρομικός κώδικας, π.χ. \d{3} ?\d{2} για την Ελλάδα. Κενό απενεργοποιεί
+            τον έλεγχο μορφής.
           maxLength: 1000
         postalCodeExample:
           type: string
-          description: A valid postcode shown to shoppers, e.g. 151 24.
+          title: Παράδειγμα ταχυδρομικού κώδικα
+          description: Ένας έγκυρος ταχυδρομικός κώδικας που βλέπουν οι πελάτες, π.χ.
+            151 24.
           maxLength: 50
         sortOrder:
           type: integer
@@ -36462,12 +36554,16 @@ components:
           title: Κωδικός κλήσης
         postalCodePattern:
           type: string
-          description: Regular expression a whole postcode must match, e.g. \d{3}
-            ?\d{2} for Greece. Blank disables the format check.
+          title: Μορφή ταχυδρομικού κώδικα
+          description: Κανονική έκφραση με την οποία πρέπει να ταιριάζει ολόκληρος
+            ο ταχυδρομικός κώδικας, π.χ. \d{3} ?\d{2} για την Ελλάδα. Κενό απενεργοποιεί
+            τον έλεγχο μορφής.
           maxLength: 1000
         postalCodeExample:
           type: string
-          description: A valid postcode shown to shoppers, e.g. 151 24.
+          title: Παράδειγμα ταχυδρομικού κώδικα
+          description: Ένας έγκυρος ταχυδρομικός κώδικας που βλέπουν οι πελάτες, π.χ.
+            151 24.
           maxLength: 50
         sortOrder:
           type: integer
@@ -36555,12 +36651,16 @@ components:
           title: Κωδικός κλήσης
         postalCodePattern:
           type: string
-          description: Regular expression a whole postcode must match, e.g. \d{3}
-            ?\d{2} for Greece. Blank disables the format check.
+          title: Μορφή ταχυδρομικού κώδικα
+          description: Κανονική έκφραση με την οποία πρέπει να ταιριάζει ολόκληρος
+            ο ταχυδρομικός κώδικας, π.χ. \d{3} ?\d{2} για την Ελλάδα. Κενό απενεργοποιεί
+            τον έλεγχο μορφής.
           maxLength: 1000
         postalCodeExample:
           type: string
-          description: A valid postcode shown to shoppers, e.g. 151 24.
+          title: Παράδειγμα ταχυδρομικού κώδικα
+          description: Ένας έγκυρος ταχυδρομικός κώδικας που βλέπουν οι πελάτες, π.χ.
+            151 24.
           maxLength: 50
       required:
       - alpha2
@@ -38343,7 +38443,15 @@ components:
         isPaid:
           type: boolean
           readOnly: true
+        attribution:
+          allOf:
+          - $ref: '#/components/schemas/OrderAttribution'
+          readOnly: true
+          nullable: true
+          description: Where the shopper came from. Null for an order placed before
+            attribution was recorded.
       required:
+      - attribution
       - billingActivity
       - billingCity
       - billingCompanyName
@@ -38386,6 +38494,74 @@ components:
       - updatedAt
       - uuid
       - zipcode
+    OrderAttribution:
+      type: object
+      description: Where the order came from, as ``order.attribution.classify`` named
+        it.
+      properties:
+        sourceType:
+          allOf:
+          - $ref: '#/components/schemas/OrderSourceType'
+          readOnly: true
+          title: Τύπος πηγής
+        source:
+          type: string
+          readOnly: true
+          title: Πηγή παραγγελίας
+          description: Το κλειδί ενός γνωστού καναλιού (π.χ. ``instagram``), ο ιστότοπος
+            παραπομπής ή το ``utm_source`` όπως ήρθε. Κενό για απευθείας επίσκεψη.
+        medium:
+          type: string
+          readOnly: true
+          title: Μέσο επισκεψιμότητας
+        campaign:
+          type: string
+          readOnly: true
+          title: Όνομα καμπάνιας
+      required:
+      - campaign
+      - medium
+      - source
+      - sourceType
+    OrderAttributionInputRequest:
+      type: object
+      description: |-
+        The acquisition signals the storefront captured for this tab.
+
+        Untrusted analytics — anyone can type a UTM — so nothing here is
+        rejected for its content, only for its shape: a checkout must never
+        fail over a strange referrer. Overlong strings are cut to their
+        column in ``order.attribution.classify``, the referrer is reduced to
+        its host there, and click ids are parameter NAMES, never values.
+      properties:
+        utmSource:
+          type: string
+        utmMedium:
+          type: string
+        utmCampaign:
+          type: string
+        clickIds:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClickIdsEnum'
+          description: Τα ονόματα των παραμέτρων click-id διαφημίσεων που είχε η διεύθυνση
+            προσγείωσης. Οι τιμές τους δεν αποστέλλονται ποτέ.
+        referrer:
+          type: string
+          description: Το ``document.referrer`` της σελίδας προσγείωσης. Κρατείται
+            μόνο ο ιστότοπος, και καθόλου όταν είναι ένα από τα domain του ίδιου του
+            καταστήματος.
+        landingPath:
+          type: string
+          description: Η διαδρομή της πρώτης σελίδας, χωρίς τις παραμέτρους της.
+        agentProtocol:
+          allOf:
+          - $ref: '#/components/schemas/AgentProtocolEnum'
+          description: |-
+            Ορίζεται από το agent gateway για παραγγελία που έκανε πράκτορας AI μέσω UCP ή ACP.
+
+            * `ucp` - ucp
+            * `acp` - acp
     OrderCreateDocumentType:
       enum:
       - RECEIPT
@@ -38698,6 +38874,10 @@ components:
             add_payment_info}), ``consent`` (dict με boolean ``ads``). Κενό dict /
             null όταν ο πελάτης αρνήθηκε τα cookies μάρκετινγκ· ο αποστολέας CAPI
             τότε παραλείπει την αποστολή.'
+        attribution:
+          allOf:
+          - $ref: '#/components/schemas/OrderAttributionInputRequest'
+          writeOnly: true
       required:
       - city
       - countryId
@@ -38998,6 +39178,13 @@ components:
         isPaid:
           type: boolean
           readOnly: true
+        attribution:
+          allOf:
+          - $ref: '#/components/schemas/OrderAttribution'
+          readOnly: true
+          nullable: true
+          description: Where the shopper came from. Null for an order placed before
+            attribution was recorded.
         orderTimeline:
           type: array
           items:
@@ -39185,6 +39372,7 @@ components:
       required:
       - acsShipment
       - appliedCouponCodes
+      - attribution
       - billingActivity
       - billingCity
       - billingCompanyName
@@ -39490,6 +39678,24 @@ components:
       required:
       - order
       - product
+    OrderSourceType:
+      enum:
+      - direct
+      - campaign
+      - paid
+      - social
+      - search
+      - referral
+      - agent
+      type: string
+      description: |-
+        * `direct` - Απευθείας
+        * `campaign` - Καμπάνια
+        * `paid` - Διαφήμιση
+        * `social` - Κοινωνικά δίκτυα
+        * `search` - Αναζήτηση
+        * `referral` - Παραπομπή
+        * `agent` - Πράκτορας AI
     OrderStatus:
       enum:
       - PENDING
@@ -41573,12 +41779,16 @@ components:
           title: Κωδικός κλήσης
         postalCodePattern:
           type: string
-          description: Regular expression a whole postcode must match, e.g. \d{3}
-            ?\d{2} for Greece. Blank disables the format check.
+          title: Μορφή ταχυδρομικού κώδικα
+          description: Κανονική έκφραση με την οποία πρέπει να ταιριάζει ολόκληρος
+            ο ταχυδρομικός κώδικας, π.χ. \d{3} ?\d{2} για την Ελλάδα. Κενό απενεργοποιεί
+            τον έλεγχο μορφής.
           maxLength: 1000
         postalCodeExample:
           type: string
-          description: A valid postcode shown to shoppers, e.g. 151 24.
+          title: Παράδειγμα ταχυδρομικού κώδικα
+          description: Ένας έγκυρος ταχυδρομικός κώδικας που βλέπουν οι πελάτες, π.χ.
+            151 24.
           maxLength: 50
     PatchedNavigationMenuRequest:
       type: object

@@ -26,6 +26,7 @@ from order.payment import (
     StripePaymentProvider,
     VivaWalletPaymentProvider,
     get_payment_provider_class,
+    payment_provider_label,
     provider_supports,
     registered_provider_codes,
 )
@@ -67,6 +68,32 @@ class TestTheRegistryIsTheOnlyList:
         False forever and silently disable a flow."""
         for capability in CAPABILITIES:
             assert hasattr(PaymentProvider, capability)
+
+
+class TestEveryProviderNamesItself:
+    """The admin's payment-method column reads the PSP's own name."""
+
+    def test_every_registered_provider_has_a_display_name(self):
+        for code in registered_provider_codes():
+            assert str(payment_provider_label(code))
+
+    def test_the_names(self):
+        assert str(payment_provider_label("stripe")) == "Stripe"
+        assert str(payment_provider_label("viva_wallet")) == "Viva Wallet"
+
+    def test_an_offline_code_has_no_provider_name(self):
+        """Cash on delivery has no PSP; the column falls back to the
+        method the shopper picked."""
+        assert payment_provider_label("") is None
+        assert payment_provider_label("cod") is None
+
+    def test_reading_the_name_does_not_construct(self):
+        with patch.object(
+            VivaWalletPaymentProvider,
+            "__init__",
+            side_effect=AssertionError("must not construct"),
+        ):
+            assert payment_provider_label("viva_wallet")
 
 
 class TestWhatEachProviderCanDo:

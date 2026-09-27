@@ -47,6 +47,7 @@ from core.utils.serializers import (
     SerializersConfig,
     create_schema_view_config,
 )
+from order.attribution import AttributionInput
 from order.enum.create_error import OrderCreateErrorType
 from order.exceptions import (
     CartNotReadyError,
@@ -962,6 +963,7 @@ class OrderViewSet(BaseModelViewSet):
             loyalty_points_to_redeem=loyalty_points_to_redeem,
             gift_card_codes=validated_data.get("gift_card_codes"),
             meta_context=meta_context,
+            attribution=self._attribution_input(request, validated_data),
         )
 
         # Return order details
@@ -1036,6 +1038,7 @@ class OrderViewSet(BaseModelViewSet):
             loyalty_points_to_redeem=loyalty_points_to_redeem,
             gift_card_codes=validated_data.get("gift_card_codes"),
             meta_context=meta_context,
+            attribution=self._attribution_input(request, validated_data),
         )
 
         # Return order details
@@ -1053,6 +1056,19 @@ class OrderViewSet(BaseModelViewSet):
 
         return Response(
             response_serializer.data, status=status.HTTP_201_CREATED
+        )
+
+    @staticmethod
+    def _attribution_input(request, validated_data: dict) -> AttributionInput:
+        """The storefront's first-touch capture plus the shopper's UA.
+
+        The UA is the shopper's own: the Nuxt proxy relays it
+        (``clientIdentityHeaders``), and an in-app browser that strips
+        ``Referer`` still names itself there.
+        """
+        return AttributionInput.from_payload(
+            validated_data.get("attribution"),
+            user_agent=request.headers.get("User-Agent", ""),
         )
 
     def _get_cart_and_user(self, request):

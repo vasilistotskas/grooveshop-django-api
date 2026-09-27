@@ -19234,3 +19234,23 @@ msgstr "Η διαδρομή της πρώτης σελίδας, χωρίς τι�
 
 msgid "Set by the agent gateway for an order an AI agent placed over UCP or ACP."
 msgstr "Ορίζεται από το agent gateway για παραγγελία που έκανε πράκτορας AI μέσω UCP ή ACP."
+
+#: ./core/validators/address.py:131
+msgid "Select a region that belongs to the selected country."
+msgstr "Επιλέξτε μια περιοχή που ανήκει στην επιλεγμένη χώρα."
+
+#: ./shipping_boxnow/carrier.py:191
+msgid "The selected locker is not in the delivery country."
+msgstr "Το επιλεγμένο locker δεν βρίσκεται στη χώρα παράδοσης."
+
+#: ./order/services.py:1839
+msgid "This shipping method is not available for the selected country."
+msgstr "Αυτή η μέθοδος αποστολής δεν είναι διαθέσιμη για την επιλεγμένη χώρα."
+
+#: ./order/services.py:3142 ./order/services.py:3150
+msgid "The selected shipping method is not available for the selected country."
+msgstr "Η επιλεγμένη μέθοδος αποστολής δεν είναι διαθέσιμη για την επιλεγμένη χώρα."
+
+#: ./order/services.py:3161 ./order/services.py:3166
+msgid "The cart is too heavy for the selected shipping method."
+msgstr "Το καλάθι είναι πολύ βαρύ για την επιλεγμένη μέθοδο αποστολής."

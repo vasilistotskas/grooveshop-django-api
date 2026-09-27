@@ -364,6 +364,68 @@ Rules both carriers share:
   ("Fix the address on the order, then press Issue ACS voucher now").
   Nothing retries a business error, so re-dispatching is that button.
 
+### 5.0 Shipping pricing: `ShippingRate`
+
+`shipping.ShippingRate` (tenant schema, cross-schema FK to
+`country.Country` — the same shape `Order.country` uses) is the single
+source of a store's shipping price, availability and weight cap, one
+row per `(provider, country, kind)`. It replaced a global
+`CHECKOUT_SHIPPING_PRICE` / `FREE_SHIPPING_THRESHOLD` /
+`BOXNOW_*` / `ACS_*` Setting sextet that priced every destination the
+same and had nothing to say about whether a store shipped there at
+all — the gap that blocked offering BoxNow-to-Cyprus without also
+accepting Cyprus orders at the Greek flat rate.
+
+- **`ShippingService.active_rate(provider_code, kind, country_code)`**
+  is the single gate: an active provider, a registered adapter, the
+  provider supporting `kind`, `is_kind_enabled`, and an active rate row
+  for that country — or `ShippingUnavailableError`.
+  `assert_available(...)` adds the weight-cap check
+  (`ShippingWeightExceededError`); both are used directly by a
+  free-shipping promo, which must not let an unavailable or over-weight
+  option through just because it charges nothing.
+- **`ShippingService.quote(...)`** is `assert_available` + pricing:
+  the rate's own `free_shipping_threshold` first, then the carrier's
+  `live_quote()` hook (ACS's weight-banded `ACS_Price_Calculation`,
+  gated on `ACS_DYNAMIC_PRICING_ENABLED`; every other carrier returns
+  `None` and the rate's stored `price` wins), and is
+  `OrderService.shipping_cost`'s only pricing path — no generic
+  fallback survives it.
+- **`ShippingCarrierInterface.live_quote(rate, country_code, region_id,
+  weight_grams, currency)`** replaces the old
+  `calculate_shipping_cost`/`free_shipping_threshold` pair. A
+  transient failure returns `None`, never raises — the stored rate
+  price is the safety net.
+- **`/shipping/options`** requires `country_code` (400 without) and
+  resolves the matrix from active rates for that country; each row
+  carries `country_code`, `max_weight_grams` and `exceeds_max_weight`
+  — an over-cap option (a heavy Cyprus BoxNow cart) is still listed,
+  flagged, so the storefront can disable it with a reason instead of
+  the step silently having one fewer card.
+- **`/shipping/free-shipping-info`** defaults to the first
+  `ShippingService.shippable_country_codes()` entry when no
+  `country_code` is given, echoing whichever it used.
+- **`?shippable=true` on `/country`** filters to
+  `shippable_country_codes()`; always empty on the platform host,
+  which has no tenant schema of its own to hold a rate.
+- **`ShippingService.resolve_home_delivery_provider(country_code)`**
+  picks the lowest-priority active home-delivery provider that has a
+  rate for the country (or, with no country yet, the lowest-priority
+  active one regardless) — shared by `_resolve_shipping_provider` (the
+  order's FK) and `shipping_cost` (the price), so both always agree on
+  which carrier a plain `home_delivery` request routes to.
+- **Release N migration** (`shipping/0011_convert_legacy_pricing_to_
+  rates.py`) copies each tenant's existing Setting values — or the
+  frozen historical default when a row is missing — into GR-only rate
+  rows (`metadata['supported_countries']` when set, else `["GR"]`), so
+  no store starts offering a new country just because this shipped.
+  The six Setting keys themselves are dropped in release N+1
+  (`0012_drop_legacy_shipping_settings.py`, additive-only rule —
+  `docs/migrations.md`).
+- **Adding a country to an existing carrier** is an admin action, not a
+  deploy: add a `ShippingRate` row (`ShippingProviderAdmin`'s Rates
+  inline) for `(provider, country, kind)`.
+
 ### 5.1 ACS Courier (`shipping_acs/`)
 
 - **REST API**, polling-based (no webhooks).

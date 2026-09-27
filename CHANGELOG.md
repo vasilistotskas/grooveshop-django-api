@@ -3,6 +3,35 @@
 
 
 
+## v3.86.0 (2026-09-27)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.85.3 [skip ci] ([`9971723`](https://github.com/vasilistotskas/grooveshop-django-api/commit/997172305f1aeff23463fa7160279f3d00265d42))
+
+### Features
+
+* feat(order): record each order's acquisition source; name the payment method in the admin list
+
+Every new order gets an OrderAttribution row: where the shopper came from
+(Instagram, Facebook, Google, a newsletter, an AI agent...). The storefront
+sends the landing's UTM values, click-id names and referrer; the gateway
+sends its checkout protocol. order.attribution.classify() turns that into a
+source type and source: agent, then utm_source, then click id, then a known
+referrer host, then the in-app browser's user agent, then any other
+referral, else direct. It ignores the store's own domains and keeps only the
+referrer host.
+
+The admin order list gains a Payment Method column right after Payment
+(the PSP's own display_name, e.g. Viva Wallet or Stripe; the pay-way label
+for offline methods) and an order-source badge, plus filters by source type
+and source, the attribution fields on the change form and an "Orders by
+source" doughnut on the dashboard. The order API exposes attribution
+read-only and filters on source / sourceType.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_016F5trstVMoFXNan1ZQMLEp ([`da2510d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/da2510da8b541c8df9f47413e405fd16ff9d17ec))
+
 ## v3.85.3 (2026-09-27)
 
 ### Bug fixes

@@ -4,10 +4,10 @@ from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from parler.fields import TranslationsForeignKey
 from parler.models import TranslatableModel, TranslatedFieldsModel
-from tinymce.models import HTMLField
 
 from blog.managers.post import BlogPostManager
 from core.fields.image import ImageAndSvgField
+from core.fields.rich_text import RichTextField
 from core.models import (
     PublishableModel,
     SeoTranslationModel,
@@ -163,14 +163,7 @@ class BlogPostTranslation(
     subtitle = models.CharField(
         _("Subtitle"), max_length=255, blank=True, default=""
     )
-    body = HTMLField(_("Body"), blank=True, null=True)
-
-    def save(self, *args, **kwargs):
-        from core.utils.sanitize import sanitize_html
-
-        if self.body:
-            self.body = sanitize_html(self.body)
-        super().save(*args, **kwargs)
+    body = RichTextField(_("Body"), blank=True, null=True)
 
     class Meta:
         app_label = "blog"

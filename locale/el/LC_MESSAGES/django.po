@@ -19147,3 +19147,10 @@ msgstr "Cache στο Cloudflare"
 
 msgid "Only for a store on its own domain in its own Cloudflare account. Leave empty on a platform hostname."
 msgstr "Μόνο για κατάστημα με δικό του domain σε δικό του λογαριασμό Cloudflare. Αφήστε κενό αν χρησιμοποιείτε διεύθυνση της πλατφόρμας."
+
+#, python-format
+msgid "This content contains markup that cannot be published and would be removed: %(markup)s."
+msgstr "Το περιεχόμενο περιέχει κώδικα που δεν μπορεί να δημοσιευτεί και θα αφαιρεθεί: %(markup)s."
+
+msgid "Only YouTube and Vimeo videos can be embedded."
+msgstr "Μπορείτε να ενσωματώσετε μόνο βίντεο από YouTube και Vimeo."

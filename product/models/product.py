@@ -22,9 +22,9 @@ from mptt.fields import TreeForeignKey
 from parler.fields import TranslationsForeignKey
 from parler.models import TranslatableModel, TranslatedFieldsModel
 from simple_history.models import HistoricalRecords
-from tinymce.models import HTMLField
 
 from core.fields.measurement import MeasurementField
+from core.fields.rich_text import RichTextField
 from core.models import (
     MetaDataModel,
     SeoTranslationModel,
@@ -454,14 +454,7 @@ class ProductTranslation(
         null=True,
     )
     name = models.CharField(_("Name"), max_length=255, blank=True, default="")
-    description = HTMLField(_("Description"), blank=True, null=True)
-
-    def save(self, *args, **kwargs):
-        from core.utils.sanitize import sanitize_html
-
-        if self.description:
-            self.description = sanitize_html(self.description)
-        super().save(*args, **kwargs)
+    description = RichTextField(_("Description"), blank=True, null=True)
 
     class Meta:
         app_label = "product"

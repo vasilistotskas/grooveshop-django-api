@@ -5,8 +5,8 @@ from django_stubs_ext.db.models import TypedModelMeta
 from mptt.fields import TreeForeignKey
 from mptt.models import MPTTModel
 from parler.models import TranslatableModel, TranslatedFields
-from tinymce.models import HTMLField
 
+from core.fields.rich_text import RichTextField
 from core.models import (
     SeoTranslationModel,
     SortableModel,
@@ -37,7 +37,7 @@ class ProductCategory(
     )
     translations = TranslatedFields(
         name=models.CharField(_("Name"), max_length=255, blank=True, null=True),
-        description=HTMLField(_("Description"), blank=True, null=True),
+        description=RichTextField(_("Description"), blank=True, null=True),
         **SeoTranslationModel.translated_fields(),
     )
 

@@ -9317,3 +9317,10 @@ msgstr ""
 #~| msgid "Thank you for shopping with us!"
 #~ msgid "Thank you for staying connected with %(site_name)s!"
 #~ msgstr "Thank you for shopping with us!"
+
+#, python-format
+msgid "This content contains markup that cannot be published and would be removed: %(markup)s."
+msgstr ""
+
+msgid "Only YouTube and Vimeo videos can be embedded."
+msgstr ""

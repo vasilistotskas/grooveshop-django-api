@@ -163,8 +163,12 @@ class OrderFactory(factory.django.DjangoModelFactory):
     document_type = factory.LazyFunction(
         lambda: random.choice([s[0] for s in OrderDocumentTypeEnum.choices])
     )
-    paid_amount = factory.LazyFunction(
-        lambda: (
+    # A COMPLETED payment always has money on it: ``Order.clean()`` refuses
+    # one with nothing paid unless deductions cover the whole total, so a
+    # zero here made about 1 in 25 default orders invalid and failed any
+    # test that validated them. Every other status keeps the old mix.
+    paid_amount = factory.LazyAttribute(
+        lambda o: (
             Money(
                 fake.pydecimal(
                     left_digits=3,
@@ -175,7 +179,8 @@ class OrderFactory(factory.django.DjangoModelFactory):
                 ),
                 settings.DEFAULT_CURRENCY,
             )
-            if random.randint(1, 10) > 3
+            if o.payment_status == PaymentStatus.COMPLETED
+            or random.randint(1, 10) > 3
             else Money(0, settings.DEFAULT_CURRENCY)
         )
     )

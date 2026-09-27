@@ -3,6 +3,32 @@
 
 
 
+## v3.86.1 (2026-09-27)
+
+### Bug fixes
+
+* fix(order): believe an order's agent protocol only from the gateway
+
+POST /order is public, so any shopper could send agentProtocol and book
+their order as an AI agent's. _attribution_input now keeps it only when
+the request carries the gateway's shared secret in X-Internal-Gateway,
+which the gateway already sends on every cart and order call and the
+gateway-aware cart throttle already checks. Anyone else's claim is
+dropped and the order is classified from its other signals.
+
+The order-system doc now also scopes the "no row means older than
+attribution" invariant to checkout orders: demo-seeded and factory
+orders have no row either.
+
+Raised in review of #74.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_016F5trstVMoFXNan1ZQMLEp ([`0f256aa`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0f256aad89d315aa0bf3e0daf77ada9d1ad5204a))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.86.0 [skip ci] ([`055ab98`](https://github.com/vasilistotskas/grooveshop-django-api/commit/055ab982b1d65f747ad12c549feeb684dbcc1de5))
+
 ## v3.86.0 (2026-09-27)
 
 ### Chores

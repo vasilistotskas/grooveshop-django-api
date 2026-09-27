@@ -116,9 +116,12 @@ class TestTotalItemsFilter:
         never resolved — and the only test here checked the parameter
         NAME, so nothing ever called `queryset()` with a value.
         """
-        small = CartFactory(user=UserAccountFactory())
+        # Explicit emails: both factories get-or-create (users by email,
+        # carts by user), so two Faker emails that collide made "small" and
+        # "big" the same cart with 1 + 9 items.
+        small = CartFactory(user=UserAccountFactory(email="small@example.com"))
         CartItemFactory(cart=small, product=ProductFactory(), quantity=1)
-        big = CartFactory(user=UserAccountFactory())
+        big = CartFactory(user=UserAccountFactory(email="big@example.com"))
         CartItemFactory(cart=big, product=ProductFactory(), quantity=9)
 
         at_least_five = self._filtered(admin_request, {"total_items_from": "5"})

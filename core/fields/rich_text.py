@@ -49,17 +49,22 @@ def validate_rich_text(value: Any) -> None:
 class RichTextField(HTMLField):
     """An ``HTMLField`` held to the policy in ``core.utils.sanitize``.
 
-    Two halves, because they guard different things:
+    No write path may drop markup silently:
 
     - ``validate_rich_text`` runs wherever validation does (the admin,
       DRF serializers) and turns anything the policy would drop into a
       form error the editor can act on.
-    - ``pre_save`` sanitises on every write path, including the ones
-      that never validate (imports, the shell, data migrations), since
-      the storefront renders this as HTML.
+    - ``pre_save`` runs on every save, including the ones that never
+      validate (a shell session, a management command, a seed), refuses
+      the same markup, and only then stores the sanitised value — which
+      normalises (entities, link ``rel``) but, having passed the check,
+      removes nothing.
 
-    Normally the two agree and ``pre_save`` changes nothing; it only
-    removes markup that reached the model without being validated.
+    ``pre_save`` used to strip instead of refuse. That is how 29 embedded
+    videos in 20 blog posts disappeared between 2026-08-14 and
+    2026-09-27 (they are in that day's database dump and were gone by
+    the later date): any later save of a translation row re-sanitised its
+    body, and nothing recorded what was dropped.
     """
 
     default_validators = [validate_rich_text]
@@ -67,6 +72,10 @@ class RichTextField(HTMLField):
     def pre_save(self, model_instance: models.Model, add: bool) -> Any:
         value = getattr(model_instance, self.attname)
         if isinstance(value, str):
+            try:
+                validate_rich_text(value)
+            except ValidationError as exc:
+                raise ValidationError({self.name: exc.error_list}) from exc
             value = sanitize_html(value)
             setattr(model_instance, self.attname, value)
         return value

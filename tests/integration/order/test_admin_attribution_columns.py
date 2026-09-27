@@ -208,10 +208,10 @@ class TestOrderChangelist:
         assert social.pk in pks
         assert search.pk not in pks
 
-    def test_the_new_columns_add_no_query_per_row(self, client):
-        # Rows carry a line item: an item-less order has no
-        # ``items_total`` annotation value and falls back to a per-row
-        # SUM, which is the order-total column's cost, not these ones.
+    def test_the_changelist_adds_no_query_per_row(self, client):
+        # Item-less rows on purpose: their ``items_total`` annotation is
+        # NULL, which ``Order.total_price_items`` must read as zero
+        # rather than fall back to a per-row SUM.
         def row():
             OrderAttributionFactory(
                 order=OrderFactory(
@@ -219,12 +219,12 @@ class TestOrderChangelist:
                         provider_code="viva_wallet",
                         settlement=PaySettlement.ONLINE,
                     ),
-                    num_order_items=1,
+                    num_order_items=0,
                 )
             )
 
         row()
-        OrderFactory(num_order_items=1)  # no attribution row
+        OrderFactory(num_order_items=0)  # no attribution row
         self._get(client)  # warm per-request caches
         with CaptureQueriesContext(connection) as few:
             assert self._get(client).status_code == 200

@@ -409,3 +409,25 @@ class OrderSourceChartTests(TestCase):
         assert len(chart["labels"]) == _ORDER_SOURCE_TOP_N + 1
         assert chart["labels"][-1] == "Other"
         assert chart["datasets"][0]["data"][-1] == 2
+
+    def test_a_tie_is_ordered_by_source_name(self):
+        from order.enum.attribution import OrderSourceType
+
+        self._order("zeta.example.org", OrderSourceType.REFERRAL)
+        self._order("alpha.example.org", OrderSourceType.REFERRAL)
+
+        assert self._chart()["labels"] == [
+            "alpha.example.org",
+            "zeta.example.org",
+        ]
+
+    def test_two_queries_however_many_sources(self):
+        from admin.dashboard import _ORDER_SOURCE_TOP_N, _order_source_chart
+        from order.enum.attribution import OrderSourceType
+        from order.models.order import Order
+
+        for index in range(_ORDER_SOURCE_TOP_N * 3):
+            self._order(f"site{index}.example.org", OrderSourceType.REFERRAL)
+
+        with self.assertNumQueries(2):
+            _order_source_chart(Order, timezone.now() - timedelta(days=30))

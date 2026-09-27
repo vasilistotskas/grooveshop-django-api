@@ -3,6 +3,72 @@
 
 
 
+## v3.85.3 (2026-09-27)
+
+### Bug fixes
+
+* fix(upload): editor image names keep their extension
+
+sanitize_filename reduced the whole name to [A-Za-z0-9_.-], so a Greek
+upload such as "εικόνα.png" became ".png", lost its dot and was stored
+as a file called "png" (blog post 8's intro image). The extension is now
+kept whatever happens to the stem, Greek is transliterated, accents are
+folded, and a stem with nothing left gets a random one.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01YTTjGBFbJxXzYHDZsabK7h ([`5fa1204`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5fa120440cfa5770d19c820401c5a03daa190320))
+
+* fix(content): refuse rich text the sanitiser would strip instead of dropping it silently
+
+Every rich-text column now uses one RichTextField: a validator that
+reports what the nh3 policy would remove (so the admin and the API return
+an error naming it), plus a pre_save that still sanitises writes that
+never validate. Category descriptions and payment instructions were not
+sanitised at all before; blog, product and content-page bodies did it in
+three hand-written save() overrides.
+
+The policy now covers what the enabled TinyMCE plugins actually emit,
+measured against the bundled editor: strikethrough is <s>, and tables
+carry border, <colgroup>/<col> widths, <caption>, <tfoot> and th[scope].
+All of those were silently stripped on save, just like the videos were.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01YTTjGBFbJxXzYHDZsabK7h ([`a4fb8a4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a4fb8a46192e52a2a03e159aa7e74f782c5e7576))
+
+* fix(content): keep embedded YouTube/Vimeo video through the save-time sanitiser
+
+The nh3 allow-list had no `iframe`, so every rich-text save silently
+dropped the video TinyMCE's media plugin inserted - blog post 8 kept only
+the empty `<p class="flex justify-center">` wrappers. The storefront's
+DOMPurify/CSP half was fixed on 2026-09-08, but it never had an iframe to
+render.
+
+`iframe` is now allowed with its player attributes; `src` survives only
+when its parsed origin is one of the storefront's EMBED_IFRAME_ORIGINS
+(YouTube, youtube-nocookie, Vimeo player), and `srcdoc` is never kept.
+
+Also declare `license_key: "gpl"` in TINYMCE_DEFAULT_CONFIG: the bundled
+self-hosted TinyMCE 7 otherwise runs in evaluation mode and logs a
+warning on every admin editor page.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01YTTjGBFbJxXzYHDZsabK7h ([`d42d99e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d42d99eee9a383eff1c7424e8c91c00ee79a0585))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.85.2 [skip ci] ([`aeb48ac`](https://github.com/vasilistotskas/grooveshop-django-api/commit/aeb48acb3f0107afce22bab6a7f4715543aa1991))
+
+### Continuous integration
+
+* ci: give the multi-tenant lane room — its green runs take 9.5-9.8 minutes
+
+The 10-minute limit cancelled the lane at exactly 10:00 on 5a5dd664 and
+07610cf7 with no failing test; green runs before and after measured
+9.5-9.8 minutes. 15 minutes, with the measurement recorded next to it.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01WjJucy7gQj77PFgeVh4fhk ([`affa22b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/affa22b05a0a2b776a8e7d2b7e4001470ee5272f))
+
 ## v3.85.2 (2026-09-27)
 
 ### Bug fixes

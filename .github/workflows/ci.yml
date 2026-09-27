@@ -409,7 +409,12 @@ jobs:
   test-mt:
     name: Testing (multi-tenant lane)
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # The lane runs serially and its green runs took 9.5-9.8 minutes by
+    # 2026-09-26, so a 10-minute limit killed it on any slower runner
+    # (5a5dd664 and 07610cf7 were cancelled at exactly 10:00 with no test
+    # failing). Raise it again only with a fresh measurement; a lane that
+    # keeps growing should be split, not given an open-ended limit.
+    timeout-minutes: 15
     # ``tests_mt/`` is a SIBLING of ``tests/``, deliberately excluded from
     # `testpaths` and from the ``testing`` job above: it keeps the real
     # ``TenantSyncRouter`` + ``TenantMainMiddleware`` (the main suite strips

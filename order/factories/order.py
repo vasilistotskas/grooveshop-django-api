@@ -40,7 +40,7 @@ def get_or_create_user():
 def get_or_create_country():
     """Prefer the seeded GR row; a random pick used to be harmless
     when GR was the only real candidate, but the CY seed migration
-    (``country/migrations/0012_seed_cyprus.py``) made it a genuine,
+    (``country/migrations/0012_seed_iso_countries.py``) made it a genuine,
     always-present alternative with a STRICT 4-digit postal format —
     which this factory's generic ``zipcode`` (a locale-agnostic Faker
     postcode) does not reliably satisfy. A test that cares which

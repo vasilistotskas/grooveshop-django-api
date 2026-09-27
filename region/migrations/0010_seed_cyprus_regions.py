@@ -1,7 +1,8 @@
 """Seed the 6 Cypriot districts, mirroring ``0009_seed_default_regions``.
 
-Depends on ``country/0012_seed_cyprus`` for its FK target — ``CY`` must
-exist before a region can reference it.
+Depends on ``country/0012_seed_iso_countries`` for its FK target — ``CY``
+(part of that migration's full ISO 3166-1 seed) must exist before a
+region can reference it.
 
 IDEMPOTENT AND NON-DESTRUCTIVE — ``get_or_create`` keyed on ``alpha``
 (the model's own primary key), never ``update_or_create``. Reverse is
@@ -61,7 +62,7 @@ def seed_cyprus_regions(apps, schema_editor):
 class Migration(migrations.Migration):
     dependencies = [
         ("region", "0009_seed_default_regions"),
-        ("country", "0012_seed_cyprus"),
+        ("country", "0012_seed_iso_countries"),
     ]
 
     operations = [

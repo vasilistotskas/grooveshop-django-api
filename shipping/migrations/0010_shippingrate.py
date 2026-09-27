@@ -10,65 +10,303 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('country', '0012_seed_cyprus'),
-        ('shipping', '0009_seed_flat_rate_provider'),
+        ("country", "0012_seed_iso_countries"),
+        ("shipping", "0009_seed_flat_rate_provider"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='HistoricalShippingRate',
+            name="HistoricalShippingRate",
             fields=[
-                ('id', models.BigIntegerField(auto_created=True, blank=True, db_index=True, verbose_name='ID')),
-                ('created_at', models.DateTimeField(blank=True, editable=False, verbose_name='Created At')),
-                ('updated_at', models.DateTimeField(blank=True, editable=False, verbose_name='Updated At')),
-                ('kind', models.CharField(choices=[('home_delivery', 'Home delivery'), ('pickup_point', 'Pickup point / locker')], max_length=32, verbose_name='Kind')),
-                ('price_currency', djmoney.models.fields.CurrencyField(choices=[('EUR', 'EUR €'), ('USD', 'USD $')], default='EUR', editable=False, max_length=3)),
-                ('price', djmoney.models.fields.MoneyField(decimal_places=2, default=djmoney.money.Money(0, 'EUR'), help_text="What the shopper pays for this (provider, country, kind), before ``free_shipping_threshold`` or a carrier's own ``live_quote`` override it.", max_digits=11, verbose_name='Price')),
-                ('free_shipping_threshold_currency', djmoney.models.fields.CurrencyField(choices=[('EUR', 'EUR €'), ('USD', 'USD $')], default='EUR', editable=False, max_length=3, null=True)),
-                ('free_shipping_threshold', djmoney.models.fields.MoneyField(blank=True, decimal_places=2, default=None, help_text='Cart subtotal above which this combination ships free. Blank means this combination is never free.', max_digits=11, null=True, verbose_name='Free Shipping Threshold')),
-                ('max_weight_grams', models.PositiveIntegerField(blank=True, default=None, help_text='Heaviest parcel this combination will carry. Blank means no cap. A cart over the cap still lists the option (flagged ``exceeds_max_weight``) rather than disappearing silently.', null=True, verbose_name='Max Weight (grams)')),
-                ('is_active', models.BooleanField(db_default=True, default=True, help_text="Master switch for this (provider, country, kind) — off hides it from checkout regardless of the provider's own ``is_active``.", verbose_name='Is Active')),
-                ('history_id', models.AutoField(primary_key=True, serialize=False)),
-                ('history_date', models.DateTimeField(db_index=True)),
-                ('history_change_reason', models.CharField(max_length=100, null=True)),
-                ('history_type', models.CharField(choices=[('+', 'Created'), ('~', 'Changed'), ('-', 'Deleted')], max_length=1)),
-                ('country', models.ForeignKey(blank=True, db_constraint=False, null=True, on_delete=django.db.models.deletion.DO_NOTHING, related_name='+', to='country.country')),
-                ('history_user', models.ForeignKey(db_constraint=False, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='+', to=settings.AUTH_USER_MODEL)),
-                ('provider', models.ForeignKey(blank=True, db_constraint=False, null=True, on_delete=django.db.models.deletion.DO_NOTHING, related_name='+', to='shipping.shippingprovider')),
+                (
+                    "id",
+                    models.BigIntegerField(
+                        auto_created=True,
+                        blank=True,
+                        db_index=True,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(
+                        blank=True, editable=False, verbose_name="Created At"
+                    ),
+                ),
+                (
+                    "updated_at",
+                    models.DateTimeField(
+                        blank=True, editable=False, verbose_name="Updated At"
+                    ),
+                ),
+                (
+                    "kind",
+                    models.CharField(
+                        choices=[
+                            ("home_delivery", "Home delivery"),
+                            ("pickup_point", "Pickup point / locker"),
+                        ],
+                        max_length=32,
+                        verbose_name="Kind",
+                    ),
+                ),
+                (
+                    "price_currency",
+                    djmoney.models.fields.CurrencyField(
+                        choices=[("EUR", "EUR €"), ("USD", "USD $")],
+                        default="EUR",
+                        editable=False,
+                        max_length=3,
+                    ),
+                ),
+                (
+                    "price",
+                    djmoney.models.fields.MoneyField(
+                        decimal_places=2,
+                        default=djmoney.money.Money(0, "EUR"),
+                        help_text="What the shopper pays for this (provider, country, kind), before ``free_shipping_threshold`` or a carrier's own ``live_quote`` override it.",
+                        max_digits=11,
+                        verbose_name="Price",
+                    ),
+                ),
+                (
+                    "free_shipping_threshold_currency",
+                    djmoney.models.fields.CurrencyField(
+                        choices=[("EUR", "EUR €"), ("USD", "USD $")],
+                        default="EUR",
+                        editable=False,
+                        max_length=3,
+                        null=True,
+                    ),
+                ),
+                (
+                    "free_shipping_threshold",
+                    djmoney.models.fields.MoneyField(
+                        blank=True,
+                        decimal_places=2,
+                        default=None,
+                        help_text="Cart subtotal above which this combination ships free. Blank means this combination is never free.",
+                        max_digits=11,
+                        null=True,
+                        verbose_name="Free Shipping Threshold",
+                    ),
+                ),
+                (
+                    "max_weight_grams",
+                    models.PositiveIntegerField(
+                        blank=True,
+                        default=None,
+                        help_text="Heaviest parcel this combination will carry. Blank means no cap. A cart over the cap still lists the option (flagged ``exceeds_max_weight``) rather than disappearing silently.",
+                        null=True,
+                        verbose_name="Max Weight (grams)",
+                    ),
+                ),
+                (
+                    "is_active",
+                    models.BooleanField(
+                        db_default=True,
+                        default=True,
+                        help_text="Master switch for this (provider, country, kind) — off hides it from checkout regardless of the provider's own ``is_active``.",
+                        verbose_name="Is Active",
+                    ),
+                ),
+                (
+                    "history_id",
+                    models.AutoField(primary_key=True, serialize=False),
+                ),
+                ("history_date", models.DateTimeField(db_index=True)),
+                (
+                    "history_change_reason",
+                    models.CharField(max_length=100, null=True),
+                ),
+                (
+                    "history_type",
+                    models.CharField(
+                        choices=[
+                            ("+", "Created"),
+                            ("~", "Changed"),
+                            ("-", "Deleted"),
+                        ],
+                        max_length=1,
+                    ),
+                ),
+                (
+                    "country",
+                    models.ForeignKey(
+                        blank=True,
+                        db_constraint=False,
+                        null=True,
+                        on_delete=django.db.models.deletion.DO_NOTHING,
+                        related_name="+",
+                        to="country.country",
+                    ),
+                ),
+                (
+                    "history_user",
+                    models.ForeignKey(
+                        db_constraint=False,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="+",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "provider",
+                    models.ForeignKey(
+                        blank=True,
+                        db_constraint=False,
+                        null=True,
+                        on_delete=django.db.models.deletion.DO_NOTHING,
+                        related_name="+",
+                        to="shipping.shippingprovider",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'historical Shipping Rate',
-                'verbose_name_plural': 'historical Shipping Rates',
-                'ordering': ('-history_date', '-history_id'),
-                'get_latest_by': ('history_date', 'history_id'),
+                "verbose_name": "historical Shipping Rate",
+                "verbose_name_plural": "historical Shipping Rates",
+                "ordering": ("-history_date", "-history_id"),
+                "get_latest_by": ("history_date", "history_id"),
             },
             bases=(simple_history.models.HistoricalChanges, models.Model),
         ),
         migrations.CreateModel(
-            name='ShippingRate',
+            name="ShippingRate",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(auto_now_add=True, verbose_name='Created At')),
-                ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Updated At')),
-                ('kind', models.CharField(choices=[('home_delivery', 'Home delivery'), ('pickup_point', 'Pickup point / locker')], max_length=32, verbose_name='Kind')),
-                ('price_currency', djmoney.models.fields.CurrencyField(choices=[('EUR', 'EUR €'), ('USD', 'USD $')], default='EUR', editable=False, max_length=3)),
-                ('price', djmoney.models.fields.MoneyField(decimal_places=2, default=djmoney.money.Money(0, 'EUR'), help_text="What the shopper pays for this (provider, country, kind), before ``free_shipping_threshold`` or a carrier's own ``live_quote`` override it.", max_digits=11, verbose_name='Price')),
-                ('free_shipping_threshold_currency', djmoney.models.fields.CurrencyField(choices=[('EUR', 'EUR €'), ('USD', 'USD $')], default='EUR', editable=False, max_length=3, null=True)),
-                ('free_shipping_threshold', djmoney.models.fields.MoneyField(blank=True, decimal_places=2, default=None, help_text='Cart subtotal above which this combination ships free. Blank means this combination is never free.', max_digits=11, null=True, verbose_name='Free Shipping Threshold')),
-                ('max_weight_grams', models.PositiveIntegerField(blank=True, default=None, help_text='Heaviest parcel this combination will carry. Blank means no cap. A cart over the cap still lists the option (flagged ``exceeds_max_weight``) rather than disappearing silently.', null=True, verbose_name='Max Weight (grams)')),
-                ('is_active', models.BooleanField(db_default=True, default=True, help_text="Master switch for this (provider, country, kind) — off hides it from checkout regardless of the provider's own ``is_active``.", verbose_name='Is Active')),
-                ('country', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='+', to='country.country')),
-                ('provider', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='rates', to='shipping.shippingprovider')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(
+                        auto_now_add=True, verbose_name="Created At"
+                    ),
+                ),
+                (
+                    "updated_at",
+                    models.DateTimeField(
+                        auto_now=True, verbose_name="Updated At"
+                    ),
+                ),
+                (
+                    "kind",
+                    models.CharField(
+                        choices=[
+                            ("home_delivery", "Home delivery"),
+                            ("pickup_point", "Pickup point / locker"),
+                        ],
+                        max_length=32,
+                        verbose_name="Kind",
+                    ),
+                ),
+                (
+                    "price_currency",
+                    djmoney.models.fields.CurrencyField(
+                        choices=[("EUR", "EUR €"), ("USD", "USD $")],
+                        default="EUR",
+                        editable=False,
+                        max_length=3,
+                    ),
+                ),
+                (
+                    "price",
+                    djmoney.models.fields.MoneyField(
+                        decimal_places=2,
+                        default=djmoney.money.Money(0, "EUR"),
+                        help_text="What the shopper pays for this (provider, country, kind), before ``free_shipping_threshold`` or a carrier's own ``live_quote`` override it.",
+                        max_digits=11,
+                        verbose_name="Price",
+                    ),
+                ),
+                (
+                    "free_shipping_threshold_currency",
+                    djmoney.models.fields.CurrencyField(
+                        choices=[("EUR", "EUR €"), ("USD", "USD $")],
+                        default="EUR",
+                        editable=False,
+                        max_length=3,
+                        null=True,
+                    ),
+                ),
+                (
+                    "free_shipping_threshold",
+                    djmoney.models.fields.MoneyField(
+                        blank=True,
+                        decimal_places=2,
+                        default=None,
+                        help_text="Cart subtotal above which this combination ships free. Blank means this combination is never free.",
+                        max_digits=11,
+                        null=True,
+                        verbose_name="Free Shipping Threshold",
+                    ),
+                ),
+                (
+                    "max_weight_grams",
+                    models.PositiveIntegerField(
+                        blank=True,
+                        default=None,
+                        help_text="Heaviest parcel this combination will carry. Blank means no cap. A cart over the cap still lists the option (flagged ``exceeds_max_weight``) rather than disappearing silently.",
+                        null=True,
+                        verbose_name="Max Weight (grams)",
+                    ),
+                ),
+                (
+                    "is_active",
+                    models.BooleanField(
+                        db_default=True,
+                        default=True,
+                        help_text="Master switch for this (provider, country, kind) — off hides it from checkout regardless of the provider's own ``is_active``.",
+                        verbose_name="Is Active",
+                    ),
+                ),
+                (
+                    "country",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="+",
+                        to="country.country",
+                    ),
+                ),
+                (
+                    "provider",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="rates",
+                        to="shipping.shippingprovider",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Shipping Rate',
-                'verbose_name_plural': 'Shipping Rates',
-                'ordering': ['provider__priority', 'country_id', 'kind'],
-                'indexes': [django.contrib.postgres.indexes.BTreeIndex(fields=['created_at'], name='shippingrate_created_at_ix'), django.contrib.postgres.indexes.BTreeIndex(fields=['updated_at'], name='shippingrate_updated_at_ix'), django.contrib.postgres.indexes.BTreeIndex(fields=['country', 'is_active'], name='shipping_rate_country_active_ix')],
-                'constraints': [models.UniqueConstraint(fields=('provider', 'country', 'kind'), name='shipping_rate_provider_country_kind_unique')],
+                "verbose_name": "Shipping Rate",
+                "verbose_name_plural": "Shipping Rates",
+                "ordering": ["provider__priority", "country_id", "kind"],
+                "indexes": [
+                    django.contrib.postgres.indexes.BTreeIndex(
+                        fields=["created_at"], name="shippingrate_created_at_ix"
+                    ),
+                    django.contrib.postgres.indexes.BTreeIndex(
+                        fields=["updated_at"], name="shippingrate_updated_at_ix"
+                    ),
+                    django.contrib.postgres.indexes.BTreeIndex(
+                        fields=["country", "is_active"],
+                        name="shipping_rate_country_active_ix",
+                    ),
+                ],
+                "constraints": [
+                    models.UniqueConstraint(
+                        fields=("provider", "country", "kind"),
+                        name="shipping_rate_provider_country_kind_unique",
+                    )
+                ],
             },
         ),
     ]

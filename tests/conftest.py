@@ -545,7 +545,7 @@ def _reseed_extra_settings(request):
 
 @pytest.fixture(autouse=True)
 def _reseed_countries(request):
-    """Restore the GR ``Country`` + ``Region`` seed rows for every DB test.
+    """Restore the ``Country`` + ``Region`` seed rows for every DB test.
 
     Same problem as ``_reseed_extra_settings`` above: ``country`` and
     ``region`` had no data migration until seed migrations added one,
@@ -557,15 +557,17 @@ def _reseed_countries(request):
     Requested as a parameter (not just ``autouse`` ordering) by that
     fixture so this always runs first.
 
-    Deliberately does NOT reseed CY here (unlike the real migrations,
-    which seed both): ``OrderFactory.country`` picks a RANDOM existing
-    ``Country`` row (``get_or_create_country``), and CY is the one
-    seeded country with a real ``postal_code_pattern`` (``\\d{4}``) —
-    an always-present CY row made that picker occasionally hand ACS
-    voucher tests a Faker postcode CY's strict pattern rejects,
-    failing unrelated tests non-deterministically. Tests that actually
-    exercise Cyprus create it explicitly (``CountryFactory(alpha_2=
-    "CY", ...)`` or the real seed migration in an integration test).
+    Runs all four seed migrations in dependency order — GR (0010),
+    then the full ISO 3166-1 seed (0012, which also corrects GR's
+    ``iso_cc`` and, as a side effect, brings back CY and the other 247
+    countries), then each app's own default/Cyprus regions. Bringing
+    CY back this way used to make ``OrderFactory``/``UserAddressFactory``'s
+    RANDOM country picker (``get_or_create_country()``) occasionally
+    hand an ACS voucher test a Faker postcode CY's strict 4-digit
+    format rejects — those helpers now deterministically prefer GR
+    first instead of picking randomly, which is what actually closes
+    that gap; this fixture flushing back to "only GR" was never the
+    fix, just an accident that hid it.
     """
     if request.node.get_closest_marker("django_db"):
         try:
@@ -579,6 +581,18 @@ def _reseed_countries(request):
                 (
                     "region.migrations.0009_seed_default_regions",
                     "seed_default_regions",
+                ),
+                # Must run after the two above: it corrects GR's
+                # iso_cc only when the row still carries
+                # 0010_seed_default_country's own (wrong) 297, and CY's
+                # region seed depends on CY already existing.
+                (
+                    "country.migrations.0012_seed_iso_countries",
+                    "seed_iso_countries",
+                ),
+                (
+                    "region.migrations.0010_seed_cyprus_regions",
+                    "seed_cyprus_regions",
                 ),
             ):
                 module = importlib.import_module(module_name)

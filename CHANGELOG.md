@@ -3,6 +3,71 @@
 
 
 
+## v3.86.3 (2026-09-27)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.86.2 [skip ci] ([`ce126bd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ce126bd903734c002811135357adccce3ddd9620))
+
+### Continuous integration
+
+* ci(test): run the suite against the translations production serves
+
+The Dockerfile compiles the gettext catalogue, CI never did, so tests saw
+English msgids where production shows Greek. A test asserting English text
+without the ``assert_english`` marker therefore passed in CI and failed on
+any machine that had compiled the catalogue. TestAdminButtons in
+test_mint_awaits_payment.py was one: it asserts "not been paid" and failed
+locally on unmodified main.
+
+Both test jobs (the shards and the multi-tenant lane) now install gettext
+and run ``compilemessages --ignore=.venv`` exactly as the image does, and
+TestAdminButtons carries the marker, so a missing marker fails in CI.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_016F5trstVMoFXNan1ZQMLEp ([`5e4adfc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5e4adfc96b70176367f1c5d87b3337ab5278455a))
+
+### Performance improvements
+
+* perf(order): no per-row query for an item-less order; rank the source chart in the database
+
+Order.total_price_items read the ``items_total`` annotation only when it
+was non-NULL. The annotation is a SUM over the items, so an order with
+none carries it as NULL, and every such row of the order list (API and
+admin changelist) fell back to its own aggregate query. It now tests
+that the annotation is present and reads NULL as zero. The changelist
+query-count test uses item-less orders, and fails without the fix
+(40 queries vs 36).
+
+The dashboard's "Orders by source" chart loaded every distinct
+(source, type) pair and ranked them in Python. Sources are open-ended
+(free-text utm_source, any referrer host), so it now takes the top six
+straight from the database, ties by name, each named after its first
+type alphabetically as before, and derives "Other" from one total
+count: two queries however many sources there are. Raised by CodeRabbit
+on #74.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_016F5trstVMoFXNan1ZQMLEp ([`c9b088a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c9b088a2a63db9df2827d39271a032db8f98846b))
+
+### Testing
+
+* test(order): a factory order with a COMPLETED payment always has money on it
+
+OrderFactory drew payment_status and paid_amount independently, with
+paid_amount 0 for 30% of orders. Order.clean() refuses a COMPLETED
+payment with nothing paid unless deductions cover the total, so about
+1 in 25 default orders was invalid and any test that validated one
+flaked - main CI for 634425a7 failed that way in
+test_address_rules::test_fixing_the_address_normalises_the_postcode.
+
+paid_amount now follows payment_status: COMPLETED always gets a positive
+amount, every other status keeps the old mix, and an explicit value
+still wins.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01YTTjGBFbJxXzYHDZsabK7h ([`b58365c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b58365ca4d4995e13f344f65e6766151a30001d8))
+
 ## v3.86.2 (2026-09-27)
 
 ### Bug fixes

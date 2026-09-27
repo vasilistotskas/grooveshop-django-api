@@ -1,5 +1,7 @@
 import pytest
+from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.urls import reverse
 from rest_framework.test import APIClient
 
@@ -82,15 +84,66 @@ def test_youtube_embed_survives_a_save():
 
 
 @pytest.mark.django_db
-def test_unvalidated_save_is_still_sanitised():
+def test_unvalidated_save_refuses_instead_of_stripping():
+    """A save that never validated (shell, command, seed) must not lose
+    markup either: it raises, and the stored body is untouched."""
+    post = BlogPostFactory(slug="rich-text-unvalidated", body=YOUTUBE)
+    translation = post.translations.first()
+    translation.body = VIDEO_FILE
+
+    # Django marks the enclosing transaction for rollback when save()
+    # raises; the savepoint keeps that to this one write.
+    with pytest.raises(ValidationError) as exc, transaction.atomic():
+        translation.save()
+
+    assert "body" in exc.value.message_dict
+    translation.refresh_from_db()
+    assert translation.body == YOUTUBE
+
+
+@pytest.mark.django_db
+def test_unvalidated_save_still_normalises():
     post = BlogPostFactory(
-        slug="rich-text-unvalidated",
-        body="<p>kept</p><script>alert(1)</script>",
+        slug="rich-text-normalised",
+        body='<p><a href="https://example.com">x</a></p>',
     )
 
     post.refresh_from_db()
 
-    assert post.body == "<p>kept</p>"
+    assert post.body == (
+        '<p><a href="https://example.com" rel="noopener noreferrer">x</a></p>'
+    )
+
+
+def test_editor_plugins_are_the_audited_set():
+    """The policy covers what THESE plugins emit, measured against the
+    bundled TinyMCE. A plugin added or removed here must be re-measured
+    and the allowlist in core/utils/sanitize.py updated to match, or its
+    output is refused on save."""
+    plugins = {
+        name.strip()
+        for name in settings.TINYMCE_DEFAULT_CONFIG["plugins"].split(",")
+    }
+
+    assert plugins == {
+        "advlist",
+        "anchor",
+        "autolink",
+        "charmap",
+        "code",
+        "fullscreen",
+        "help",
+        "image",
+        "insertdatetime",
+        "link",
+        "lists",
+        "media",
+        "preview",
+        "searchreplace",
+        "table",
+        "visualblocks",
+        "wordcount",
+    }
 
 
 @pytest.mark.django_db
@@ -123,3 +176,51 @@ def test_api_write_refuses_unsupported_markup():
     assert response.status_code == 400
     post.refresh_from_db()
     assert "video" not in (post.body or "")
+
+
+def _admin_form(post, body):
+    """BlogPostAdmin's own change form, bound to the post's current data."""
+    from django.contrib.admin.sites import site
+    from django.forms.models import model_to_dict
+    from django.test import RequestFactory
+
+    from blog.models.post import BlogPost
+
+    model_admin = site._registry[BlogPost]
+    request = RequestFactory().post("/")
+    request.user = UserAccountFactory(
+        num_addresses=0, is_superuser=True, is_staff=True
+    )
+    form_class = model_admin.get_form(request, post)
+    unbound = form_class(instance=post)
+    data = {**model_to_dict(post), **unbound.initial, "body": body}
+    data = {
+        name: [getattr(v, "pk", v) for v in value]
+        if isinstance(value, list | tuple)
+        else getattr(value, "pk", value)
+        for name, value in data.items()
+        if name in unbound.fields and value is not None
+    }
+    return form_class(data=data, instance=post)
+
+
+@pytest.mark.django_db
+def test_admin_form_keeps_a_youtube_embed():
+    post = BlogPostFactory(slug="rich-text-admin-ok")
+
+    form = _admin_form(post, YOUTUBE)
+
+    assert form.is_valid(), form.errors
+    form.save()
+    post.refresh_from_db()
+    assert post.body == YOUTUBE
+
+
+@pytest.mark.django_db
+def test_admin_form_names_what_it_refuses():
+    post = BlogPostFactory(slug="rich-text-admin-refused")
+
+    form = _admin_form(post, VIDEO_FILE)
+
+    assert not form.is_valid()
+    assert "<source>, <video>" in form.errors["body"][0]

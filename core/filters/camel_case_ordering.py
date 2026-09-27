@@ -2,11 +2,14 @@ import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 
+from django.conf import settings
+from django.utils.translation import get_language
 from drf_spectacular.extensions import OpenApiFilterExtension
 from rest_framework.filters import OrderingFilter
 from rest_framework.request import Request
 from rest_framework.views import APIView
 
+from core.filters.translations import translated_value
 from core.utils.string_case import camel_to_snake, snake_to_camel
 
 
@@ -123,6 +126,37 @@ class CamelCaseOrderingFilter(OrderingFilter):
                 validated_fields.append(field)
 
         return validated_fields or self.get_default_ordering(view)
+
+    def filter_queryset(self, request, queryset, view):
+        ordering = self.get_ordering(request, queryset, view)
+        if not ordering:
+            return queryset
+        return queryset.order_by(
+            *(
+                self._order_expression(key, request, queryset.model)
+                for key in ordering
+            )
+        )
+
+    @staticmethod
+    def _order_expression(key: str, request: Request, model):
+        """``key`` as an ``order_by`` term.
+
+        A key through a parler translation table (``translations__name``,
+        ``product__translations__name``) orders by the value in the
+        request's language instead of joining every translation row into
+        the outer query — see ``translated_value``.
+        """
+        field = key.lstrip("-")
+        if "translations__" not in field:
+            return key
+        language = request.query_params.get("language_code") or get_language()
+        value = translated_value(
+            model, field, language, settings.PARLER_DEFAULT_LANGUAGE_CODE
+        )
+        if key.startswith("-"):
+            return value.desc(nulls_last=True)
+        return value.asc(nulls_last=True)
 
     def get_ordering_param(self, request: Request) -> list[str] | None:
         ordering = request.query_params.get(self.ordering_param)

@@ -254,9 +254,20 @@ class AttributionInput:
 
     @classmethod
     def from_payload(
-        cls, payload: Mapping[str, Any] | None, *, user_agent: str
+        cls,
+        payload: Mapping[str, Any] | None,
+        *,
+        user_agent: str,
+        from_agent_gateway: bool,
     ) -> AttributionInput:
-        """Build from ``OrderAttributionInputSerializer.validated_data``."""
+        """Build from ``OrderAttributionInputSerializer.validated_data``.
+
+        ``agent_protocol`` counts only when ``from_agent_gateway``: the
+        request proved it is the gateway with the internal secret. The
+        endpoint is public, so a shopper could otherwise book any order
+        as an agent's, the one source type we can verify rather than
+        take on trust like a UTM tag.
+        """
         data = payload or {}
         return cls(
             utm_source=str(data.get("utm_source") or "").strip(),
@@ -265,7 +276,11 @@ class AttributionInput:
             click_ids=tuple(data.get("click_ids") or ()),
             referrer=str(data.get("referrer") or "").strip(),
             landing_path=str(data.get("landing_path") or "").strip(),
-            agent_protocol=str(data.get("agent_protocol") or ""),
+            agent_protocol=(
+                str(data.get("agent_protocol") or "")
+                if from_agent_gateway
+                else ""
+            ),
             user_agent=user_agent,
         )
 

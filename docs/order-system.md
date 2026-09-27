@@ -148,19 +148,25 @@ address it cannot place (prod order #316: street "1", street number
 
 ### 3.4 Acquisition source (`order/attribution.py`)
 
-Every order created by either path gets exactly one `OrderAttribution`
-row (`order/models/attribution.py`, one-to-one, `related_name=
-"attribution"`), written by `OrderAttributionService.record`
+Every order created by either checkout path gets exactly one
+`OrderAttribution` row (`order/models/attribution.py`, one-to-one,
+`related_name="attribution"`), written by `OrderAttributionService.record`
 (`order/services.py`) right after `Order.objects.create` inside the
-creation transaction. An order with **no row** was placed before the
-table existed (`0059_orderattribution`, no backfill); an order with no
-signal at all gets a `direct` row, so the two never blur.
+creation transaction. A checkout order with no signal at all gets a
+`direct` row, so for checkout orders **no row** means placed before the
+table existed (`0059_orderattribution`, no backfill), never "direct".
+Orders made outside checkout — the demo seed (`devtools/demo_account.py`,
+`bulk_create`) and the test factories — have no row either.
 
 - **Input.** `OrderCreateFromCartSerializer.attribution`
   (`OrderAttributionInputSerializer`, write-only, optional): `utm_source`,
   `utm_medium`, `utm_campaign`, `click_ids` (parameter NAMES from
   `CLICK_ID_PARAMS`, never values), `referrer`, `landing_path`, and
-  `agent_protocol` (`ucp`/`acp`, set only by the agent gateway).
+  `agent_protocol` (`ucp`/`acp`). The agent gateway sets it, and
+  `_attribution_input` believes it only when the request also carries the
+  gateway's shared secret, which it sends as `X-Internal-Gateway` on
+  every cart and order call (`is_internal_caller`, `tenant/internal.py`); from anyone else it is dropped and the order is
+  classified from its other signals.
   `OrderViewSet._attribution_input` adds the request's `User-Agent`,
   which the Nuxt order proxy relays from the shopper
   (`clientIdentityHeaders`). Content is never refused, only shape: a
@@ -192,8 +198,9 @@ signal at all gets a `direct` row, so the two never blur.
   (`admin/dashboard.py: _order_source_chart`, last 30 days, top six plus
   "Other", orders without a row left out). `source_label()` turns a
   stored `(source, source_type)` into the name staff read.
-- **Trust.** Every input is shopper-controlled, so the row is analytics
-  only and never an authorisation or pricing signal.
+- **Trust.** Every input but the agent protocol is shopper-controlled,
+  so the row is analytics only and never an authorisation or pricing
+  signal. The agent source type is the one verified claim (see Input).
 
 Adding a known channel is one `KnownSource` entry (and, for a new
 click-id parameter, one `CLICK_ID_PARAMS` entry, which changes the
@@ -587,7 +594,7 @@ the linked memory note or the originating PR's commit message.
 | No carrier mint while `Order.awaits_online_payment` (`ShipmentAwaitingPaymentError`) | §5 above |
 | A payment-success handler checks `is_payment_after_cancel` BEFORE its settled-state guard | §2.2 above |
 | Order `status` changes only through admin actions / `OrderService`, never the change form | §7.1 above |
-| Every order created since `0059_orderattribution` has exactly one `OrderAttribution` row (`direct` when there was no signal); a missing row means "older than attribution", never "direct" | §3.4 above |
+| Every checkout-created order since `0059_orderattribution` has exactly one `OrderAttribution` row (`direct` when there was no signal); for a checkout order a missing row means "older than attribution", never "direct"; `source_type=agent` only with the gateway's `X-Internal-Gateway` secret | §3.4 above |
 | The default cache fails open on a Redis outage (reads miss, writes no-op — `core/caches.py`), but never for keys under `STRICT_KEY_PREFIXES`: the `strict:` throttle namespace, allauth's rate limits, TOTP replay protection, the IdP's single-use codes and WebSocket tickets. The checkout, payment, coupon and gift-card throttles (`core/api/throttling.py`, `fail_closed = True`) therefore DENY with 429 during an outage, while browsing/search/cart throttles and DRF's default `anon`/`user` budgets allow | `core/api/throttling.py` module docstring |
 | The tenant resolve payload and domain set are invalidated by `Tenant.cache_generation`, never by a Redis delete: it is part of their keys, and `Tenant.save`, every `TenantDomain` write and the folded pay-way / agent-setting writes bump it in the database inside the write's transaction. A delete during an outage is a fail-open no-op, so purge-by-delete left the pre-write payload served for up to its TTL; strict keys would have made the READS raise, and resolve is on every storefront request | `tenant/cache.py` module docstring |
 | The nightly demo reset returns the published demo gift card (`GIFT_CARD_CODE`) to its issued value with one `ADJUST` ledger row, so the ledger sum stays the balance and every guest spend stays on the card's history; only on `is_demo` tenants, and silently (no mail, no dispatch) | `devtools/demo_account.py: _restore_gift_card` |

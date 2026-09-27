@@ -8,9 +8,9 @@ from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from djmoney.models.fields import MoneyField
 from parler.models import TranslatableModel, TranslatedFields
-from tinymce.models import HTMLField
 
 from core.fields.image import ImageAndSvgField
+from core.fields.rich_text import RichTextField
 from core.models import SortableModel, TimeStampMixinModel, UUIDModel
 from pay_way.enum.pay_way import PayWayEnum
 from pay_way.enum.settlement import PaySettlement
@@ -120,7 +120,7 @@ class PayWay(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
             choices=PayWayEnum,
         ),
         description=models.TextField(_("Description"), blank=True, null=True),
-        instructions=HTMLField(
+        instructions=RichTextField(
             _("Payment Instructions"),
             blank=True,
             null=True,

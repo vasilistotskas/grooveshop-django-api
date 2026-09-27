@@ -9626,3 +9626,10 @@ msgstr "Mahnstufe"
 #: .\tenant\models.py:158
 msgid "Billing Notice Term"
 msgstr "Mahnstufen-Laufzeit"
+
+#, python-format
+msgid "This content contains markup that cannot be published and would be removed: %(markup)s."
+msgstr "Dieser Inhalt enthält Markup, das nicht veröffentlicht werden kann und entfernt würde: %(markup)s."
+
+msgid "Only YouTube and Vimeo videos can be embedded."
+msgstr "Nur Videos von YouTube und Vimeo können eingebettet werden."

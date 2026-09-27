@@ -82,6 +82,9 @@ class TestOrderCreateSerializerValidation(APITestCase):
             "city": "Piraeus",
             "zipcode": "18534",
             "country_id": self.country.alpha_2,
+            # ``setUp`` gives this ad-hoc country a real region
+            # (``self.region``), so one is required now.
+            "region_id": self.region.alpha,
             "phone": "+306900000001",
         }
         data.update(overrides)

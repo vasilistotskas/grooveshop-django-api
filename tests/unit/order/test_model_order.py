@@ -42,6 +42,11 @@ class OrderModelTestCase(TestCase):
         self.order.country = Mock(
             postal_code_pattern=r"\d{3} ?\d{2}", postal_code_example="151 24"
         )
+        # ``regions.exists()`` on a bare Mock is itself a truthy Mock,
+        # which the new "region required when the country has any"
+        # rule reads as "yes, GR has regions" — pin it to the real
+        # answer this test wants: no region required.
+        self.order.country.regions.exists.return_value = False
         # No region on this order — a bare ``Mock()`` auto-attribute
         # would otherwise fail the "region belongs to country" check
         # (its ``country_id`` is itself a Mock, never equal to "GR").

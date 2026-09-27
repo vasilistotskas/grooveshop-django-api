@@ -707,6 +707,7 @@ class BoxNowLockerAdmin(BaseModelAdmin):
     list_filter = (
         "is_active",
         "type",
+        "country_code",
         ("last_synced_at", RangeDateTimeFilter),
     )
     search_fields = (

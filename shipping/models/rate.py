@@ -44,7 +44,7 @@ class ShippingRate(TimeStampMixinModel):
         on_delete=models.PROTECT,
     )
     kind = models.CharField(
-        _("Kind"),
+        _("Shipping Kind"),
         max_length=32,
         choices=ShippingKind.choices,
     )

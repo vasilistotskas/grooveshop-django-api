@@ -4314,6 +4314,11 @@ TENANT_INVOICE_RETENTION_YEARS = int(
 )
 
 TINYMCE_DEFAULT_CONFIG = {
+    # The editor is the self-hosted bundle shipped by django-tinymce,
+    # used under TinyMCE's GPLv2+ licence. Without this TinyMCE runs in
+    # "evaluation mode" and logs a warning on every admin page with an
+    # editor. https://www.tiny.cloud/docs/tinymce/latest/license-key/
+    "license_key": "gpl",
     "theme": "silver",
     "height": 500,
     "width": 960,

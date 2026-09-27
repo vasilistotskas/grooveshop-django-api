@@ -238,13 +238,13 @@ class MeasurementSerializerField(serializers.Field):
     {
         "type": "object",
         "properties": {
-            "name": {"type": "string", "example": "CHECKOUT_SHIPPING_PRICE"},
-            "value": {"type": "string", "example": "3.00"},
+            "name": {"type": "string", "example": "GIFT_CARD_MIN_AMOUNT"},
+            "value": {"type": "string", "example": "10.00"},
             "type": {"type": "string", "example": "string"},
         },
         "example": {
-            "name": "CHECKOUT_SHIPPING_PRICE",
-            "value": "3.00",
+            "name": "GIFT_CARD_MIN_AMOUNT",
+            "value": "10.00",
             "type": "string",
         },
     }
@@ -262,7 +262,7 @@ class SettingSerializer(serializers.Serializer):
             "name": {"type": "string"},
             "value": {"type": "string"},
         },
-        "example": {"name": "CHECKOUT_SHIPPING_PRICE", "value": "3.00"},
+        "example": {"name": "GIFT_CARD_MIN_AMOUNT", "value": "10.00"},
     }
 )
 class SettingDetailSerializer(serializers.Serializer):

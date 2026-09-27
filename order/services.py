@@ -543,19 +543,17 @@ class OrderService:
             _cart_weight_grams = compute_total_weight_grams(
                 (item.product, item.quantity) for item in cart.items.all()
             ) + PromotionEngine.gift_weight_grams(promo_result)
-            if promo_result.free_shipping:
-                _shipping_cost = Money(0, _cart_total.currency)
-            else:
-                _shipping_cost = cls.calculate_shipping_cost(
-                    order_value=_cart_total,
-                    country_id=shipping_address.get("country_id"),
-                    region_id=shipping_address.get("region_id"),
-                    shipping_provider_code=shipping_address.get(
-                        "shipping_provider_code"
-                    ),
-                    shipping_kind=shipping_address.get("shipping_kind"),
-                    weight_grams=_cart_weight_grams,
-                )
+            _shipping_cost = cls.shipping_cost(
+                order_value=_cart_total,
+                country_id=shipping_address.get("country_id"),
+                region_id=shipping_address.get("region_id"),
+                shipping_provider_code=shipping_address.get(
+                    "shipping_provider_code"
+                ),
+                shipping_kind=shipping_address.get("shipping_kind"),
+                weight_grams=_cart_weight_grams,
+                free=promo_result.free_shipping,
+            )
             # Pay-way fee on the DISCOUNTED subtotal — mirrors the
             # create-payment-intent endpoint exactly.
             _order_subtotal = Money(
@@ -613,7 +611,7 @@ class OrderService:
                     # under a debugger. The (provider, kind, weight,
                     # country, region, cart_total, shipping_cost,
                     # payment_fee) tuple is exactly what was fed into
-                    # ``calculate_shipping_cost`` + ``calculate_payment_
+                    # ``shipping_cost`` + ``calculate_payment_
                     # method_fee`` above — if any of these differ from
                     # what the create-payment-intent step saw, the
                     # mismatch is upstream of this point.
@@ -759,19 +757,17 @@ class OrderService:
             cart_weight_grams = compute_total_weight_grams(
                 (ci.product, ci.quantity) for ci in cart_items
             ) + PromotionEngine.gift_weight_grams(promo_result)
-            if promo_result.free_shipping:
-                shipping_cost = Money(0, cart_total.currency)
-            else:
-                shipping_cost = cls.calculate_shipping_cost(
-                    order_value=cart_total,
-                    country_id=shipping_address.get("country_id"),
-                    region_id=shipping_address.get("region_id"),
-                    shipping_provider_code=shipping_address.get(
-                        "shipping_provider_code"
-                    ),
-                    shipping_kind=shipping_address.get("shipping_kind"),
-                    weight_grams=cart_weight_grams,
-                )
+            shipping_cost = cls.shipping_cost(
+                order_value=cart_total,
+                country_id=shipping_address.get("country_id"),
+                region_id=shipping_address.get("region_id"),
+                shipping_provider_code=shipping_address.get(
+                    "shipping_provider_code"
+                ),
+                shipping_kind=shipping_address.get("shipping_kind"),
+                weight_grams=cart_weight_grams,
+                free=promo_result.free_shipping,
+            )
             order_data["shipping_price"] = shipping_cost
 
             # Calculate payment method fee
@@ -1257,19 +1253,17 @@ class OrderService:
             cart_weight_grams = compute_total_weight_grams(
                 (ci.product, ci.quantity) for ci in cart_items
             ) + PromotionEngine.gift_weight_grams(promo_result)
-            if promo_result.free_shipping:
-                shipping_cost = Money(0, cart_total.currency)
-            else:
-                shipping_cost = cls.calculate_shipping_cost(
-                    order_value=cart_total,
-                    country_id=shipping_address.get("country_id"),
-                    region_id=shipping_address.get("region_id"),
-                    shipping_provider_code=shipping_address.get(
-                        "shipping_provider_code"
-                    ),
-                    shipping_kind=shipping_address.get("shipping_kind"),
-                    weight_grams=cart_weight_grams,
-                )
+            shipping_cost = cls.shipping_cost(
+                order_value=cart_total,
+                country_id=shipping_address.get("country_id"),
+                region_id=shipping_address.get("region_id"),
+                shipping_provider_code=shipping_address.get(
+                    "shipping_provider_code"
+                ),
+                shipping_kind=shipping_address.get("shipping_kind"),
+                weight_grams=cart_weight_grams,
+                free=promo_result.free_shipping,
+            )
             order_data["shipping_price"] = shipping_cost
 
             # Calculate payment method fee
@@ -1848,6 +1842,42 @@ class OrderService:
                 except ValueError, TypeError:
                     errors["country_id"] = [
                         _("Country ID must be a valid integer or country code")
+                    ]
+
+        # Availability gate: an active ShippingRate must exist for the
+        # resolved (provider, kind, country). Checked here — without
+        # the weight cap, which isn't known until the cart total is
+        # computed later in order creation — so an unavailable
+        # combination (the common Cyprus case: no rate added yet)
+        # surfaces as a field-scoped 400 before any stock or payment
+        # work happens, rather than only when ``shipping_cost`` is
+        # reached deep inside order creation.
+        if not errors.get("shipping_provider_code") and not errors.get(
+            "country_id"
+        ):
+            from shipping.exceptions import ShippingUnavailableError
+            from shipping.services import ShippingService
+
+            resolved_provider_code = provider_code
+            if not resolved_provider_code and kind_value == "home_delivery":
+                resolved_provider_code = (
+                    ShippingService.resolve_home_delivery_provider(
+                        address.get("country_id")
+                    )
+                )
+            if resolved_provider_code and kind_value:
+                try:
+                    ShippingService.active_rate(
+                        provider_code=resolved_provider_code,
+                        kind=kind_value,
+                        country_code=address.get("country_id"),
+                    )
+                except ShippingUnavailableError:
+                    errors["shipping_provider_code"] = [
+                        _(
+                            "This shipping method is not available for "
+                            "the selected country."
+                        )
                     ]
 
         # If there are errors, raise ValidationError
@@ -2592,21 +2622,26 @@ class OrderService:
         Dispatch is registry-driven from the explicit
         ``(shipping_provider_code, shipping_kind)`` pair only.
         ``home_delivery`` orders without an explicit code auto-route
-        to whichever active provider advertises
-        ``supports_home_delivery=True`` — adding a new courier (ELTA,
-        Speedex …) is then a one-row admin change.
+        to whichever active provider has a rate for the order's
+        country — adding a new courier (ELTA, Speedex …) is then a
+        one-row admin change.
         """
         from shipping.models import ShippingProvider
+        from shipping.services import ShippingService
 
         code = order_data.pop("shipping_provider_code", None) or None
         kind = order_data.get("shipping_kind") or "home_delivery"
 
         # Dynamic-routing fallback: a plain ``home_delivery`` request
-        # auto-routes to the active home-delivery carrier. Shared with
-        # ``calculate_shipping_cost`` so the cost we charge and the
-        # carrier the order is assigned to always agree.
+        # auto-routes to the active home-delivery carrier for the
+        # order's country. Shared with ``shipping_cost`` (via the same
+        # ``ShippingService.resolve_home_delivery_provider``) so the
+        # cost we charge and the carrier the order is assigned to
+        # always agree.
         if not code and kind == "home_delivery":
-            code = cls._resolve_active_home_delivery_code()
+            code = ShippingService.resolve_home_delivery_provider(
+                order_data.get("country_id")
+            )
 
         if code:
             provider = ShippingProvider.objects.filter(code=code).first()
@@ -2620,32 +2655,6 @@ class OrderService:
                 order_data["shipping_provider"] = provider
 
         order_data["shipping_kind"] = kind
-
-    @classmethod
-    def _resolve_active_home_delivery_code(cls) -> str | None:
-        """Return the active home-delivery carrier's code, or None.
-
-        Lower ``ShippingProvider.priority`` wins the tie. Adding a new
-        courier (ELTA, Speedex …) is then a one-row Django admin
-        change — no order-flow code touched.
-
-        Shared between :meth:`calculate_shipping_cost` (pricing) and
-        :meth:`_resolve_shipping_provider` (FK assignment) so both
-        callers route ``home_delivery`` through the SAME carrier;
-        otherwise the order would be charged against one carrier's
-        threshold and served by another, producing the kind of silent
-        UI/charge mismatch that motivated this helper.
-        """
-        from shipping.models import ShippingProvider
-
-        picked = (
-            ShippingProvider.objects.filter(
-                is_active=True, supports_home_delivery=True
-            )
-            .order_by("priority", "code")
-            .first()
-        )
-        return picked.code if picked is not None else None
 
     @staticmethod
     def _seed_language_code(order_data: dict[str, Any]) -> None:
@@ -3092,72 +3101,114 @@ class OrderService:
         return order
 
     @classmethod
-    def calculate_shipping_cost(
+    def shipping_cost(
         cls,
         order_value: Money,
-        country_id: int | None = None,
-        region_id: int | None = None,
+        country_id: str | None = None,
+        region_id: str | None = None,
         shipping_provider_code: str | None = None,
         shipping_kind: str | None = None,
         weight_grams: int | None = None,
+        *,
+        free: bool = False,
     ) -> Money:
-        from extra_settings.models import Setting
+        """The shipping price for a (provider, kind, country) — or 0 when ``free``.
+
+        ``ShippingRate`` is the only source of a shipping price now —
+        replaces ``calculate_shipping_cost`` and the generic
+        ``CHECKOUT_SHIPPING_PRICE`` / ``FREE_SHIPPING_THRESHOLD``
+        fallback it used to fall through to for an unmatched carrier.
+        A combination with no active rate is a genuine error, not a
+        gap to paper over with a platform-wide flat price.
+
+        ``free=True`` is for a free-shipping promotion: the price is
+        forced to 0, but availability and the weight cap are STILL
+        checked — a promo must never make an unavailable or
+        over-weight option orderable just because it charges nothing.
+
+        Raises :class:`~order.exceptions.InvalidOrderDataError` (never
+        the raw ``shipping.exceptions`` types) so every caller — order
+        creation, the create-payment-intent endpoint — gets the same
+        field-scoped 400 shape it already handles for every other
+        checkout-time rejection.
+        """
+        from shipping.exceptions import (
+            ShippingUnavailableError,
+            ShippingWeightExceededError,
+        )
+        from shipping.services import ShippingService
 
         # Auto-resolve ``home_delivery`` to the active home-delivery
         # provider's code when the caller didn't supply one — mirrors
         # what ``_resolve_shipping_provider`` does for the order FK
         # (same helper, single source of truth) so the cost calc and
-        # the assigned carrier always agree.
-        #
-        # Without this, a ``home_delivery`` cart with no explicit
-        # provider_code (the storefront sends ``null`` per
+        # the assigned carrier always agree. Without this, a
+        # ``home_delivery`` cart with no explicit provider_code (the
+        # storefront sends ``null`` per
         # ``shared/shipping/index.ts::carrierForMethod`` — home
-        # delivery is provider-agnostic at the form level) would fall
-        # through to the generic ``FREE_SHIPPING_THRESHOLD`` /
-        # ``CHECKOUT_SHIPPING_PRICE`` pair below, charging a flat
-        # rate against the wrong threshold. Meanwhile
-        # ``_resolve_shipping_provider`` would still set the order's
-        # FK to ACS, so the order DB row would look ACS-served but
-        # would have generic pricing — a silent disagreement between
-        # the carrier the customer was promised and the price they
-        # paid.
+        # delivery is provider-agnostic at the form level) would never
+        # resolve a rate, and ``_resolve_shipping_provider`` would
+        # still set the order's FK to a real carrier — a silent
+        # disagreement between the carrier the customer was promised
+        # and the price they paid.
         if not shipping_provider_code and shipping_kind == "home_delivery":
-            shipping_provider_code = cls._resolve_active_home_delivery_code()
+            shipping_provider_code = (
+                ShippingService.resolve_home_delivery_provider(country_id)
+            )
 
-        # When we have a (provider, kind) pair, dispatch through the
-        # registry so each provider owns its own pricing rules. The
-        # adapter has full control over flat rate, dynamic quotes,
-        # free-shipping thresholds, and per-country/region overrides.
-        if shipping_provider_code and shipping_kind:
-            from shipping.services import ShippingService
+        try:
+            if free:
+                ShippingService.assert_available(
+                    provider_code=shipping_provider_code,
+                    kind=shipping_kind,
+                    country_code=country_id,
+                    weight_grams=weight_grams,
+                )
+                return Money(0, order_value.currency)
 
-            quote = ShippingService.calculate_shipping_cost(
+            return ShippingService.quote(
                 provider_code=shipping_provider_code,
                 kind=shipping_kind,
-                order_value_amount=float(order_value.amount),
-                currency=str(order_value.currency),
-                country_id=str(country_id) if country_id else None,
-                region_id=str(region_id) if region_id else None,
+                country_code=country_id,
+                region_id=region_id,
                 weight_grams=weight_grams,
+                order_value=order_value,
             )
-            if quote is not None:
-                amount, currency = quote
-                return Money(amount, currency)
-
-        # Generic fallback for the rare case with no active
-        # home-delivery carrier (a deploy mid-config) — the platform's
-        # flat-rate price.
-        base_shipping_cost = Setting.get(
-            "CHECKOUT_SHIPPING_PRICE", default=3.00
-        )
-        free_shipping_threshold = Setting.get(
-            "FREE_SHIPPING_THRESHOLD", default=50.00
-        )
-
-        if order_value.amount >= float(free_shipping_threshold):
-            return Money(0, order_value.currency)
-
-        return Money(float(base_shipping_cost), order_value.currency)
+        except ShippingUnavailableError as exc:
+            raise InvalidOrderDataError(
+                str(
+                    _(
+                        "The selected shipping method is not available "
+                        "for the selected country."
+                    )
+                ),
+                field_errors={
+                    "shipping_provider_code": [
+                        str(
+                            _(
+                                "The selected shipping method is not "
+                                "available for the selected country."
+                            )
+                        )
+                    ]
+                },
+            ) from exc
+        except ShippingWeightExceededError as exc:
+            raise InvalidOrderDataError(
+                str(
+                    _("The cart is too heavy for the selected shipping method.")
+                ),
+                field_errors={
+                    "shipping_provider_code": [
+                        str(
+                            _(
+                                "The cart is too heavy for the selected "
+                                "shipping method."
+                            )
+                        )
+                    ]
+                },
+            ) from exc
 
     @classmethod
     def calculate_payment_method_fee(

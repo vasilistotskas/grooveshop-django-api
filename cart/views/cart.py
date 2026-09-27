@@ -44,7 +44,11 @@ from core.utils.serializers import (
     SerializersConfig,
     create_schema_view_config,
 )
-from order.exceptions import InsufficientStockError, StockReservationError
+from order.exceptions import (
+    InsufficientStockError,
+    InvalidOrderDataError,
+    StockReservationError,
+)
 from order.models import StockReservation
 from order.payment import provider_supports
 from order.services import OrderService
@@ -924,16 +928,23 @@ class CartViewSet(BaseModelViewSet):
         cart_weight_grams = compute_total_weight_grams(
             (item.product, item.quantity) for item in cart.items.all()
         ) + PromotionEngine.gift_weight_grams(promo_result)
-        if promo_result.free_shipping:
-            shipping_cost = Money(0, cart_total.currency)
-        else:
-            shipping_cost = OrderService.calculate_shipping_cost(
+        try:
+            shipping_cost = OrderService.shipping_cost(
                 order_value=cart_total,
                 country_id=country_id,
                 region_id=region_id,
                 shipping_provider_code=shipping_provider_code,
                 shipping_kind=shipping_kind,
                 weight_grams=cart_weight_grams,
+                free=promo_result.free_shipping,
+            )
+        except InvalidOrderDataError as exc:
+            return Response(
+                {
+                    "detail": str(exc),
+                    "field_errors": exc.field_errors,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
             )
         # Pay-way fee (and its free_threshold) is computed on the
         # DISCOUNTED subtotal — the same figure order creation uses.

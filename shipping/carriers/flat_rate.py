@@ -15,19 +15,19 @@ gate on, no label to fetch and no tracking to poll, and it is registered
 by ``shipping`` itself rather than by a carrier app so that it is always
 present.
 
-The price is NOT a new setting. ``OrderService`` already had a flat-rate
-rule — ``CHECKOUT_SHIPPING_PRICE`` / ``FREE_SHIPPING_THRESHOLD`` — used
-as a last-resort fallback when no carrier priced the order. That policy
-was invisible at checkout, because the quote only happened at order time.
-Reading the same two rows here turns it into a first-class option the
-shopper can see and choose, with no second definition of "the store's
-shipping price" to drift.
+Pricing is NOT this adapter's job any more. It used to read the global
+``CHECKOUT_SHIPPING_PRICE`` / ``FREE_SHIPPING_THRESHOLD`` Setting rows
+as a last-resort fallback; that fallback is gone, because a per-country
+``ShippingRate`` row is now the only source of "the store's shipping
+price" — for this carrier same as every other. This class is therefore
+lifecycle-only: it exists so ``ShippingService`` can dispatch to it
+unconditionally, and every hook below answers "there is nothing here"
+truthfully rather than pricing anything itself.
 """
 
 from __future__ import annotations
 
 from collections.abc import Mapping
-from decimal import Decimal
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from pay_way.enum.settlement import PaySettlement
@@ -37,30 +37,6 @@ from shipping.interfaces import ShippingCarrierInterface, register_provider
 if TYPE_CHECKING:
     from order.models.order import Order
 
-#: Matches ``OrderService._shipping_cost``'s own fallback, so a store
-#: that has never touched its settings is priced identically whether the
-#: quote comes from here or from that path.
-DEFAULT_PRICE = Decimal("3.00")
-DEFAULT_FREE_THRESHOLD = Decimal("50.00")
-
-
-def _setting(name: str, default: Decimal) -> Decimal:
-    """Read a money Setting as ``Decimal``, falling back to ``default``.
-
-    Via ``str`` rather than ``float``: these rows are authored as
-    decimal strings in the admin and binary floating point would put
-    3.00 on the invoice as 2.9999999999999996.
-    """
-    from extra_settings.models import Setting
-
-    raw = Setting.get(name, default=None)
-    if raw in (None, ""):
-        return default
-    try:
-        return Decimal(str(raw))
-    except ArithmeticError, ValueError:
-        return default
-
 
 @register_provider
 class FlatRateCarrier(ShippingCarrierInterface):
@@ -69,48 +45,6 @@ class FlatRateCarrier(ShippingCarrierInterface):
     #: Nothing to pick — no locker, no pickup point, no per-order
     #: carrier data. The interface anticipates exactly this shape.
     payload_keys: ClassVar[tuple[str, ...]] = ()
-
-    # ------------------------------------------------------------------
-    # Pricing — the only part of this adapter that does real work
-    # ------------------------------------------------------------------
-
-    def calculate_shipping_cost(
-        self,
-        *,
-        order_value_amount: float,
-        currency: str,
-        kind: ShippingKind,
-        country_id: str | None = None,
-        region_id: str | None = None,
-        weight_grams: int | None = None,
-    ) -> tuple[float, str] | None:
-        """The store's flat rate, free above its own threshold.
-
-        Weight and destination are deliberately ignored: a merchant
-        quoting a single number to their customers is the whole point of
-        this carrier. A store that needs weight bands or zone pricing
-        wants a real courier integration, not this.
-        """
-        if kind != ShippingKind.HOME_DELIVERY:
-            return None
-
-        threshold = _setting("FREE_SHIPPING_THRESHOLD", DEFAULT_FREE_THRESHOLD)
-        if Decimal(str(order_value_amount)) >= threshold:
-            return 0.0, currency
-
-        price = _setting("CHECKOUT_SHIPPING_PRICE", DEFAULT_PRICE)
-        return float(price), currency
-
-    def free_shipping_threshold(self, kind: ShippingKind) -> Decimal | None:
-        """Advertise the same threshold the quote above honours.
-
-        Without this the PDP and cart would show no "free over X"
-        line for a store whose only carrier is this one — the view
-        skips ``None`` — while checkout went on applying the threshold.
-        """
-        if kind != ShippingKind.HOME_DELIVERY:
-            return None
-        return _setting("FREE_SHIPPING_THRESHOLD", DEFAULT_FREE_THRESHOLD)
 
     # ------------------------------------------------------------------
     # Lifecycle — there is no carrier system to talk to

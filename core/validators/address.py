@@ -28,6 +28,7 @@ if TYPE_CHECKING:
     from django_stubs_ext import StrOrPromise
 
     from country.models import Country
+    from region.models import Region
 
 _WHITESPACE_RUN = re.compile(r"\s+")
 
@@ -85,15 +86,19 @@ def address_errors(
     street: str,
     street_number: str,
     zipcode: str,
+    region: Region | None = None,
 ) -> dict[str, list[StrOrPromise]]:
     """Field errors for a delivery address, keyed by model field name.
 
-    Three rules, each aimed at the mix-up that let order #316 through
-    (street "1", street number "70300", a non-numeric postcode):
+    Four rules, the first three aimed at the mix-up that let order #316
+    through (street "1", street number "70300", a non-numeric postcode):
 
     - the postcode matches the country's format;
     - the street name contains a letter, so a bare number is rejected;
-    - the street number is not itself a postcode of that country.
+    - the street number is not itself a postcode of that country;
+    - the region, when given, actually belongs to the country — added
+      for Cyprus, where a Greek region picked by a stale client would
+      otherwise pair silently with a Cypriot address.
     """
     errors: dict[str, list[StrOrPromise]] = {}
 
@@ -121,10 +126,15 @@ def address_errors(
             )
         ]
 
+    if region is not None and region.country_id != country.alpha_2:
+        errors["region"] = [
+            _("Select a region that belongs to the selected country.")
+        ]
+
     return errors
 
 
-ADDRESS_FIELDS = ("country", "street", "street_number", "zipcode")
+ADDRESS_FIELDS = ("country", "region", "street", "street_number", "zipcode")
 
 
 def address_update_errors(
@@ -156,6 +166,7 @@ def address_update_errors(
         street=address["street"],
         street_number=address["street_number"],
         zipcode=address["zipcode"],
+        region=address["region"],
     )
     if not errors:
         attrs["zipcode"] = normalize_postcode(address["zipcode"])
@@ -172,7 +183,7 @@ def model_address_errors(instance: Any) -> dict[str, list[StrOrPromise]]:
     """
     if instance.country_id is None:
         return {}
-    fields = ("country_id", "street", "street_number", "zipcode")
+    fields = ("country_id", "region_id", "street", "street_number", "zipcode")
     stored = (
         type(instance)
         ._base_manager.filter(pk=instance.pk)
@@ -190,6 +201,7 @@ def model_address_errors(instance: Any) -> dict[str, list[StrOrPromise]]:
         street=instance.street,
         street_number=instance.street_number,
         zipcode=instance.zipcode,
+        region=instance.region,
     )
     if not errors:
         instance.zipcode = normalize_postcode(instance.zipcode)

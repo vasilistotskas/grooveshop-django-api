@@ -38,23 +38,43 @@ def get_or_create_user():
 
 
 def get_or_create_country():
-    if apps.get_model("country", "Country").objects.exists():
-        return (
-            apps.get_model("country", "Country").objects.order_by("?").first()
-        )
-    else:
-        country_factory_module = importlib.import_module("country.factories")
-        country_factory_class = country_factory_module.CountryFactory
-        return country_factory_class.create()
+    """Prefer the seeded GR row; a random pick used to be harmless
+    when GR was the only real candidate, but the CY seed migration
+    (``country/migrations/0012_seed_cyprus.py``) made it a genuine,
+    always-present alternative with a STRICT 4-digit postal format —
+    which this factory's generic ``zipcode`` (a locale-agnostic Faker
+    postcode) does not reliably satisfy. A test that cares which
+    country it gets already passes one explicitly.
+    """
+    Country = apps.get_model("country", "Country")
+    gr = Country.objects.filter(alpha_2="GR").first()
+    if gr is not None:
+        return gr
+    if Country.objects.exists():
+        return Country.objects.order_by("?").first()
+    country_factory_module = importlib.import_module("country.factories")
+    country_factory_class = country_factory_module.CountryFactory
+    return country_factory_class.create()
 
 
 def get_or_create_region():
-    if apps.get_model("region", "Region").objects.exists():
-        return apps.get_model("region", "Region").objects.order_by("?").first()
-    else:
-        region_factory_module = importlib.import_module("region.factories")
-        region_factory_class = region_factory_module.RegionFactory
-        return region_factory_class.create()
+    """Prefer a GR region, matching ``get_or_create_country``'s
+    deterministic GR default above — ``region`` is picked
+    independently of ``country`` here, and since the CY region seed
+    migration (``region/migrations/0010_seed_cyprus_regions.py``)
+    added real CY-* rows, a purely random pick could hand a GR order a
+    Cypriot region, which ``Order.clean()``'s region-belongs-to-
+    country check now rejects.
+    """
+    Region = apps.get_model("region", "Region")
+    gr_region = Region.objects.filter(country_id="GR").order_by("?").first()
+    if gr_region is not None:
+        return gr_region
+    if Region.objects.exists():
+        return Region.objects.order_by("?").first()
+    region_factory_module = importlib.import_module("region.factories")
+    region_factory_class = region_factory_module.RegionFactory
+    return region_factory_class.create()
 
 
 def get_or_create_pay_way():

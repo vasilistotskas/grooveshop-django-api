@@ -1581,54 +1581,6 @@ SEED_BATCH_SIZE = int(getenv("SEED_BATCH_SIZE", "10"))
 
 EXTRA_SETTINGS_DEFAULTS = [
     {
-        "name": "CHECKOUT_SHIPPING_PRICE",
-        "type": "decimal",
-        "value": 3.00,
-    },
-    {
-        "name": "FREE_SHIPPING_THRESHOLD",
-        "type": "decimal",
-        "value": 50.00,
-    },
-    {
-        "name": "BOXNOW_SHIPPING_PRICE",
-        "type": "decimal",
-        "value": 2.50,
-        "description": (
-            "Flat shipping cost in EUR when the customer ships to a "
-            "BoxNow locker. BoxNow's contractual rate; admin-tunable."
-        ),
-    },
-    {
-        "name": "BOXNOW_FREE_SHIPPING_THRESHOLD",
-        "type": "decimal",
-        "value": 30.00,
-        "description": (
-            "Cart subtotal in EUR above which BoxNow shipping becomes "
-            "free. Admin-tunable; mirrors FREE_SHIPPING_THRESHOLD for "
-            "the home-delivery flow."
-        ),
-    },
-    {
-        "name": "ACS_SHIPPING_PRICE",
-        "type": "decimal",
-        "value": 3.50,
-        "description": (
-            "Flat ACS home-delivery / Smartpoint shipping cost in EUR. "
-            "Phase 4 may switch to live ACS_Price_Calculation; for now "
-            "this admin-tunable Setting is the source of truth."
-        ),
-    },
-    {
-        "name": "ACS_FREE_SHIPPING_THRESHOLD",
-        "type": "decimal",
-        "value": 40.00,
-        "description": (
-            "Cart subtotal in EUR above which ACS shipping becomes "
-            "free. Mirrors the BoxNow + checkout-default thresholds."
-        ),
-    },
-    {
         "name": "ACS_SMARTPOINT_ENABLED",
         "type": "bool",
         "value": False,
@@ -4681,8 +4633,9 @@ BOXNOW_HTTP_TIMEOUT = int(getenv("BOXNOW_HTTP_TIMEOUT", "10"))
 # Per-merchant identity (API key, Company_*/User_* credentials, billing
 # code, station origin) lives ONLY on the ``Tenant`` model (see
 # ``tenant/credentials.py:acs_credentials()``) — no platform fallback.
-# Only transport/platform config (base URL, timeout, supported
-# countries, stale-shipment threshold) stays here.
+# Only transport/platform config (base URL, timeout, stale-shipment
+# threshold) stays here — which countries ACS ships to is now a
+# per-tenant ``ShippingRate`` question, not a platform one.
 ACS_API_BASE_URL = getenv(
     "ACS_API_BASE_URL",
     "https://webservices.acscourier.net/ACSRestServices/api/ACSAutoRest",
@@ -4701,15 +4654,11 @@ ACS_COD_REMITTANCE_ALERT_DAYS = int(
     getenv("ACS_COD_REMITTANCE_ALERT_DAYS", "10")
 )
 ACS_PICKUP_LIST_TIMEZONE = getenv("ACS_PICKUP_LIST_TIMEZONE", "Europe/Athens")
-ACS_SUPPORTED_COUNTRIES = [
-    code.strip().upper()
-    for code in getenv("ACS_SUPPORTED_COUNTRIES", "GR").split(",")
-    if code.strip()
-]
-# Pricing lives in extra_settings.Setting rows
-# (ACS_SHIPPING_PRICE / ACS_FREE_SHIPPING_THRESHOLD) so admins can
-# retune without a redeploy. The master on/off switch is the
-# ShippingProvider.is_active flag, NOT a setting — see Phase 0
+# Pricing AND the countries ACS ships to live in ``shipping.ShippingRate``
+# rows now, not here or in ``extra_settings`` — an admin adds a rate to
+# add a country, and retunes price/threshold on the same row, no
+# redeploy either way. The master on/off switch is still the
+# ShippingProvider.is_active flag — see Phase 0
 # (shipping/migrations/0002_seed_providers.py).
 
 # ---------- Recommendations ----------

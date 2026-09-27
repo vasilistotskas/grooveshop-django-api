@@ -350,10 +350,16 @@ def _activate_default_carrier(tenant: Tenant) -> bool:
     step rendered an empty panel until the merchant signed a courier
     contract.
 
-    `flat_rate` has nothing to misconfigure — it prices from the
-    store's own `CHECKOUT_SHIPPING_PRICE` and the merchant hands the
+    `flat_rate` has nothing to misconfigure — the merchant hands the
     parcel to whoever they like — so a new store gets it on, and can
-    turn it off the moment it has a real carrier.
+    turn it off the moment it has a real carrier. Pricing lives on
+    ``ShippingRate`` rows, not here: a brand-new tenant schema runs its
+    full migration history at creation, including
+    ``shipping/migrations/0011_convert_legacy_pricing_to_rates.py``,
+    which already gives ``flat_rate`` a GR/home_delivery rate at the
+    frozen historical default (no ``extra_settings`` rows exist yet at
+    that point, so it falls back to 3.00 / 50.00) — this function only
+    needs to flip the provider's own switch on.
     """
     try:
         from shipping.models.provider import ShippingProvider

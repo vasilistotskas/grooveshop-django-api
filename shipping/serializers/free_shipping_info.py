@@ -80,3 +80,14 @@ class FreeShippingInfoSerializer(serializers.Serializer):
         ),
     )
     currency = serializers.CharField(max_length=3)
+    country_code = serializers.CharField(
+        max_length=2,
+        allow_null=True,
+        help_text=_(
+            "The country these thresholds were resolved for — the "
+            "caller's ``country_code`` when given, else the first "
+            "shippable country, matching the rule checkout uses for "
+            "its initial country. Null only when the store has no "
+            "active shipping rate anywhere yet."
+        ),
+    )

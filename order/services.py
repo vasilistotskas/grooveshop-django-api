@@ -3132,11 +3132,18 @@ class OrderService:
         field-scoped 400 shape it already handles for every other
         checkout-time rejection.
         """
+        from shipping.enum import ShippingKind
         from shipping.exceptions import (
             ShippingUnavailableError,
             ShippingWeightExceededError,
         )
         from shipping.services import ShippingService
+
+        # An order created without a kind is a home delivery —
+        # ``Order.shipping_kind``'s own default, and what
+        # ``_resolve_shipping_provider`` assigns the carrier for — so
+        # it is priced as one too.
+        shipping_kind = shipping_kind or ShippingKind.HOME_DELIVERY.value
 
         # Auto-resolve ``home_delivery`` to the active home-delivery
         # provider's code when the caller didn't supply one — mirrors

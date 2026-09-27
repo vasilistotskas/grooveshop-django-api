@@ -675,9 +675,18 @@ class AcsService:
         # ``Country.pk`` IS the alpha-2 code, so ``order.country_id`` is
         # already the string ACS wants — no lookup needed. Order
         # creation requires a country (``validate_shipping_address``),
-        # so a missing one here means pre-migration data; "GR" is a
-        # defensive last resort, not a configured default.
-        country_code = order.country_id or "GR"
+        # so a missing one here means pre-migration data — refuse
+        # rather than guess: ACS now (or eventually) ships to more than
+        # one country, so there is no default to fall back to.
+        if not order.country_id:
+            raise AcsAPIError(
+                alias="ACS_Create_Voucher",
+                error_message=(
+                    f"Order {order.id} has no country — cannot build an "
+                    "ACS voucher without a destination."
+                ),
+            )
+        country_code = order.country_id
 
         params: dict[str, Any] = {
             "Billing_Code": client.billing_code,

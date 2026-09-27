@@ -1645,6 +1645,29 @@ class TestBuildCreateVoucherParamsNormalizes:
         assert sent["Recipient_Phone"] == "6989424342"
         assert sent["Recipient_Cell_Phone"] == "6989424342"
 
+    def test_a_missing_country_refuses_rather_than_defaults_to_gr(
+        self, acs_client_mock
+    ):
+        """Order creation always requires a country, so a missing one
+        here means pre-migration data (the FK is SET_NULL) — refused,
+        never silently shipped as Greek. ACS is Greece-only today, but
+        that must never be hardcoded here."""
+        from order.enum.status import OrderStatus, PaymentStatus
+
+        order = courier_cash_order(
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+            country=None,
+            region=None,
+        )
+        AcsShipmentFactory(order=order)
+
+        with pytest.raises(AcsAPIError) as excinfo:
+            AcsService.create_voucher_for_order(order)
+
+        assert str(order.id) in excinfo.value.error_message
+        assert acs_client_mock.last_create_payload is None
+
 
 # ---------------------------------------------------------------------------
 # Delivery_Notes — site owner reported on 2026-05-16 that the checkout

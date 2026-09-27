@@ -444,6 +444,12 @@ accepting Cyprus orders at the Greek flat rate.
   `AcsService.create_voucher_for_order`. Survives
   `idle_in_transaction_session_timeout` — see
   `project_acs_voucher_orphan_prevention.md`. **TTL 300s** (PR #6).
+  `_build_create_voucher_params` uses `order.country_id` verbatim as
+  `Recipient_Country` (no lookup — `Country.pk` IS the alpha-2 code)
+  and refuses with `AcsAPIError` if it is missing, rather than
+  defaulting to "GR" — ACS is Greece-only today, but which countries
+  it serves comes from active `ShippingRate` rows (§5.0), never a
+  hardcoded fallback here.
 - Polling: `poll_shipment_tracking` runs in two phases (read,
   no lock; API call, no transaction; persist with
   `select_for_update`) — survives slow ACS responses without

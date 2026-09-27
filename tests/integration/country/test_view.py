@@ -186,8 +186,23 @@ class CountryViewSetTestCase(TestURLFixerMixin, APITestCase):
         self.assertEqual(self.country.iso_cc, 303)
 
     def test_delete_country(self):
-        country_id = self.country.pk
-        response = self.client.delete(self.detail_url)
+        # A country of its own, not ``self.country`` (GR): this DELETE
+        # was observed to survive Django TestCase's own per-test
+        # rollback under this app's django-tenants/Postgres backend —
+        # confirmed on a fresh database, in isolation, with a separate
+        # connection reading the row back afterward. Every other test
+        # in this class, and the wider suite's per-country ISO seed
+        # (country/migrations/0012_seed_iso_countries.py), depends on
+        # GR surviving — deleting a disposable row here instead of GR
+        # is the minimal fix for the blast radius that dependency now
+        # has, whatever the root cause of the rollback gap turns out
+        # to be.
+        disposable = CountryFactory(num_regions=0)
+        url = reverse("country-detail", args=[disposable.pk])
+        country_id = disposable.pk
+
+        response = self.client.delete(url)
+
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertFalse(Country.objects.filter(pk=country_id).exists())
 

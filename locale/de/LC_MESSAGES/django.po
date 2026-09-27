@@ -9653,3 +9653,126 @@ msgstr "Die ausgewählte Versandart ist für das ausgewählte Land nicht verfüg
 #: ./order/services.py:3161 ./order/services.py:3166
 msgid "The cart is too heavy for the selected shipping method."
 msgstr "Der Warenkorb ist für die ausgewählte Versandart zu schwer."
+
+#: .\core\validators\address.py
+msgid "Select a region for the selected country."
+msgstr "Wählen Sie eine Region für das ausgewählte Land."
+
+#: .\shipping\admin.py
+msgid "Rates"
+msgstr "Tarife"
+
+#: .\shipping\models\rate.py
+msgid "Free Shipping Threshold"
+msgstr "Schwelle für kostenlosen Versand"
+
+#: .\shipping\models\rate.py
+msgid "Max Weight (grams)"
+msgstr "Maximalgewicht (Gramm)"
+
+#: .\shipping\models\rate.py
+msgid "Shipping Rate"
+msgstr "Versandtarif"
+
+#: .\shipping\models\rate.py
+msgid "Shipping Rates"
+msgstr "Versandtarife"
+
+#: .\shipping\models\rate.py
+msgid "Price cannot be negative."
+msgstr "Der Preis darf nicht negativ sein."
+
+#: .\shipping\models\rate.py
+#, python-format
+msgid "%(provider)s does not support %(kind)s shipments."
+msgstr "%(provider)s unterstützt keine Sendungen der Art „%(kind)s“."
+
+#: .\shipping\models\rate.py
+#, python-format
+msgid "Currency must match the store's own currency (%(currency)s)."
+msgstr "Die Währung muss der Währung des Shops entsprechen (%(currency)s)."
+
+#: .\shipping\models\rate.py
+msgid "What the shopper pays for this (provider, country, kind), before ``free_shipping_threshold`` or a carrier's own ``live_quote`` override it."
+msgstr "Was der Kunde für diese Kombination (Anbieter, Land, Versandart) zahlt, bevor ``free_shipping_threshold`` oder das eigene ``live_quote`` des Versanddienstleisters greift."
+
+#: .\shipping\models\rate.py
+msgid "Cart subtotal above which this combination ships free. Blank means this combination is never free."
+msgstr "Warenkorb-Zwischensumme, ab der diese Kombination kostenlos versendet wird. Leer bedeutet: nie kostenlos."
+
+#: .\shipping\models\rate.py
+msgid "Heaviest parcel this combination will carry. Blank means no cap. A cart over the cap still lists the option (flagged ``exceeds_max_weight``) rather than disappearing silently."
+msgstr "Das schwerste Paket, das diese Kombination befördert. Leer bedeutet keine Obergrenze. Ein Warenkorb über der Grenze sieht die Option weiterhin (markiert mit ``exceeds_max_weight``), statt dass sie stillschweigend verschwindet."
+
+#: .\shipping\models\rate.py
+msgid "Master switch for this (provider, country, kind) — off hides it from checkout regardless of the provider's own ``is_active``."
+msgstr "Hauptschalter für diese Kombination (Anbieter, Land, Versandart) — ausgeschaltet wird sie im Checkout ausgeblendet, unabhängig vom ``is_active`` des Anbieters."
+
+#: .\shipping\models\provider.py
+msgid "Provider-specific configuration (feature flags, branding hints, locker/map chrome). Which countries this provider ships to is a ``ShippingRate`` question, not a metadata key — see the Rates inline below."
+msgstr "Anbieterspezifische Konfiguration (Feature-Flags, Branding-Hinweise, Locker-/Kartendarstellung). In welche Länder dieser Anbieter versendet, legt ``ShippingRate`` fest, kein Metadaten-Schlüssel — siehe die Tarife unten."
+
+#: .\country\filters.py
+msgid "Filter to countries the current store has an active ShippingRate for. On the platform host — which has no store, so no rates — this always returns none."
+msgstr "Filtert auf Länder, für die der aktuelle Shop einen aktiven ShippingRate hat. Auf dem Plattform-Host — der keinen Shop und damit keine Tarife hat — liefert er immer keine."
+
+#: .\country\serializers.py
+msgid "Regular expression the whole national number (no country code, no leading zero) must match for this country."
+msgstr "Regulärer Ausdruck, dem die gesamte nationale Nummer (ohne Ländervorwahl und führende Null) für dieses Land entsprechen muss."
+
+#: .\country\serializers.py
+msgid "Valid national-number lengths for this country."
+msgstr "Gültige Längen der nationalen Nummer für dieses Land."
+
+#: .\country\serializers.py
+msgid "Digits a local number is written with but that are not part of the E.164 number (e.g. Germany's leading '0'). Null when the country has none — most don't."
+msgstr "Ziffern, mit denen eine lokale Nummer geschrieben wird, die aber nicht Teil der E.164-Nummer sind (z. B. die führende „0“ in Deutschland). Null, wenn das Land keine hat — die meisten haben keine."
+
+#: .\country\serializers.py
+msgid "A real-shaped example mobile number, national format (e.g. GR '6912345678', CY '96123456')."
+msgstr "Eine realistische Beispiel-Mobilnummer im nationalen Format (z. B. GR „6912345678“, CY „96123456“)."
+
+#: .\country\serializers.py
+msgid "Phone-number validation shape for this country, derived from Django's own ``phonenumbers`` dependency — never stored. Null only for a placeholder/reserved alpha-2 code ``phonenumbers`` has no metadata for."
+msgstr "Die Telefonnummern-Validierung für dieses Land, abgeleitet aus Djangos eigener Abhängigkeit ``phonenumbers`` — nie gespeichert. Null nur für einen reservierten Alpha-2-Code, für den ``phonenumbers`` keine Metadaten hat."
+
+#: .\country\serializers.py
+msgid "Whether this country has any Region rows. Most of the full ISO 3166-1 seed doesn't — the storefront uses this to decide whether the address form's region field is shown at all for the selected country, rather than unconditionally requiring one."
+msgstr "Ob dieses Land Regionen hat. Die meisten Länder der vollständigen ISO-3166-1-Liste haben keine — der Shop entscheidet damit, ob das Regionsfeld im Adressformular überhaupt angezeigt wird, statt es immer zu verlangen."
+
+#: .\shipping\serializers\free_shipping_info.py
+msgid "The country these thresholds were resolved for — the caller's ``country_code`` when given, else the first shippable country, matching the rule checkout uses for its initial country. Null only when the store has no active shipping rate anywhere yet."
+msgstr "Das Land, für das diese Schwellen ermittelt wurden — das ``country_code`` der Anfrage, falls angegeben, sonst das erste belieferbare Land, nach derselben Regel wie das Startland im Checkout. Null nur, wenn der Shop noch nirgends einen aktiven Versandtarif hat."
+
+#: .\shipping\serializers\option.py
+msgid "ISO 3166-1 alpha-2 country code (e.g. 'GR'). Required — a ``ShippingRate`` is per-country, so there is no destination-agnostic matrix of options to return."
+msgstr "ISO-3166-1-Alpha-2-Ländercode (z. B. „GR“). Erforderlich — ein ``ShippingRate`` gilt pro Land, daher gibt es keine vom Ziel unabhängige Liste von Optionen."
+
+#: .\cart\serializers\cart.py
+msgid "ISO 3166-1 alpha-2 country code — required because a ``ShippingRate`` is per-country, so there is no priceable shipping option without a destination. Match what the order-create body will carry."
+msgstr "ISO-3166-1-Alpha-2-Ländercode — erforderlich, weil ein ``ShippingRate`` pro Land gilt und es ohne Ziel keine bepreisbare Versandoption gibt. Muss mit dem Land der Bestellanfrage übereinstimmen."
+
+#: .\shipping\serializers\option.py
+msgid "The resolved ``ShippingRate`` price (or a live provider quote, or 0 when the rate's free-shipping threshold is met)."
+msgstr "Der ermittelte ``ShippingRate``-Preis (oder ein Live-Angebot des Anbieters, oder 0, wenn die Schwelle für kostenlosen Versand erreicht ist)."
+
+#: .\shipping\serializers\option.py
+msgid "The destination this option was priced for."
+msgstr "Das Ziel, für das diese Option bepreist wurde."
+
+#: .\shipping\serializers\option.py
+msgid "The rate's weight cap, or null when it has none. Compare against the cart weight the caller already knows — this row does not repeat it."
+msgstr "Die Gewichtsgrenze des Tarifs, oder null, wenn es keine gibt. Mit dem bereits bekannten Warenkorbgewicht vergleichen — diese Zeile wiederholt es nicht."
+
+#: .\shipping\serializers\option.py
+msgid "True when the caller's ``weight_grams`` exceeds ``max_weight_grams``. The option is still returned rather than hidden — the storefront shows it disabled with a reason, so a heavy cart never sees a checkout step with one fewer option and no explanation."
+msgstr "True, wenn das ``weight_grams`` der Anfrage ``max_weight_grams`` überschreitet. Die Option wird trotzdem zurückgegeben statt ausgeblendet — der Shop zeigt sie deaktiviert mit Begründung, sodass ein schwerer Warenkorb nie eine Option weniger ohne Erklärung sieht."
+
+#: .\core\api\views.py
+msgid "Setting key name (e.g., GIFT_CARD_MIN_AMOUNT)"
+msgstr "Name des Einstellungsschlüssels (z. B. GIFT_CARD_MIN_AMOUNT)"
+
+#: .\shipping_boxnow\admin.py
+#, python-format
+msgid "BoxNow locker sync complete: %(created)d created, %(updated)d updated, %(deactivated)d deactivated, %(skipped_no_country)d skipped (no country)."
+msgstr "BoxNow-Locker-Synchronisierung abgeschlossen: %(created)d erstellt, %(updated)d aktualisiert, %(deactivated)d deaktiviert, %(skipped_no_country)d übersprungen (kein Land)."

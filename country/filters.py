@@ -126,6 +126,14 @@ class CountryFilter(
             "Filter countries that have complete data (ISO, phone, flag, name)"
         ),
     )
+    shippable = filters.BooleanFilter(
+        method="filter_shippable",
+        help_text=_(
+            "Filter to countries the current store has an active "
+            "ShippingRate for. On the platform host — which has no "
+            "store, so no rates — this always returns none."
+        ),
+    )
 
     class Meta:
         model = Country
@@ -245,6 +253,29 @@ class CountryFilter(
                 | Q(translations__name__exact="")
             ).distinct()
         return queryset
+
+    def filter_shippable(self, queryset, name, value):
+        """``true`` restricts to countries with an active ``ShippingRate``.
+
+        ``false`` is the complement; anything else (unset) is a no-op.
+        The platform host has no tenant schema of its own to hold
+        ``ShippingRate`` rows, so ``true`` there always yields
+        ``none()`` rather than leaking one tenant's coverage onto it.
+        """
+        from django.db import connection
+
+        if value is None:
+            return queryset
+
+        if connection.schema_name == "public":
+            return queryset.none() if value else queryset
+
+        from shipping.services import ShippingService
+
+        shippable_codes = ShippingService.shippable_country_codes()
+        if value:
+            return queryset.filter(alpha_2__in=shippable_codes)
+        return queryset.exclude(alpha_2__in=shippable_codes)
 
     def filter_has_all_data(self, queryset, name, value):
         """Filter countries that have complete data (ISO, phone, flag, name)."""

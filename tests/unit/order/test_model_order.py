@@ -42,6 +42,10 @@ class OrderModelTestCase(TestCase):
         self.order.country = Mock(
             postal_code_pattern=r"\d{3} ?\d{2}", postal_code_example="151 24"
         )
+        # No region on this order — a bare ``Mock()`` auto-attribute
+        # would otherwise fail the "region belongs to country" check
+        # (its ``country_id`` is itself a Mock, never equal to "GR").
+        self.order.region = None
         # ``clean()`` also runs the payment-consistency helper; bind the
         # real one so a spec'd Mock does not answer it with a Mock.
         self.order.payment_status = PaymentStatus.PENDING

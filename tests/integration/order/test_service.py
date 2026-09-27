@@ -192,7 +192,7 @@ class OrderServiceTestCase(TestCase):
         self.assertIn("cannot be canceled", str(context.exception))
 
     def test_calculate_shipping_cost(self):
-        def mock_calculate_shipping_cost(order_value):
+        def mock_shipping_cost(order_value, **_kwargs):
             if order_value.amount > Decimal("100.00"):
                 return Money("0.00", settings.DEFAULT_CURRENCY)
             else:
@@ -200,15 +200,19 @@ class OrderServiceTestCase(TestCase):
 
         with patch.object(
             OrderService,
-            "calculate_shipping_cost",
-            side_effect=mock_calculate_shipping_cost,
+            "shipping_cost",
+            side_effect=mock_shipping_cost,
         ):
-            result = OrderService.calculate_shipping_cost(
-                Money("50.00", settings.DEFAULT_CURRENCY)
+            result = OrderService.shipping_cost(
+                order_value=Money("50.00", settings.DEFAULT_CURRENCY),
+                country_id="GR",
+                shipping_kind="home_delivery",
             )
             self.assertEqual(result, Money("10.00", settings.DEFAULT_CURRENCY))
 
-            result = OrderService.calculate_shipping_cost(
-                Money("150.00", settings.DEFAULT_CURRENCY)
+            result = OrderService.shipping_cost(
+                order_value=Money("150.00", settings.DEFAULT_CURRENCY),
+                country_id="GR",
+                shipping_kind="home_delivery",
             )
             self.assertEqual(result, Money("0.00", settings.DEFAULT_CURRENCY))

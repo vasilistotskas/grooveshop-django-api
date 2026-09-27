@@ -15,6 +15,7 @@ import importlib
 import pytest
 
 from country.models import Country
+from shipping.models import ShippingRate
 
 MIGRATION = "country.migrations.0010_seed_default_country"
 
@@ -38,6 +39,7 @@ def seed():
 @pytest.mark.django_db
 class TestFreshEnvironmentSeeding:
     def test_seeds_greece(self, seed):
+        ShippingRate.objects.all().delete()
         Country.objects.all().delete()
 
         seed()
@@ -49,6 +51,7 @@ class TestFreshEnvironmentSeeding:
         assert country.sort_order == 0
 
     def test_seeds_the_greek_translation(self, seed):
+        ShippingRate.objects.all().delete()
         Country.objects.all().delete()
 
         seed()
@@ -58,6 +61,7 @@ class TestFreshEnvironmentSeeding:
         assert country.name == "Ελλάδα"
 
     def test_is_idempotent(self, seed):
+        ShippingRate.objects.all().delete()
         Country.objects.all().delete()
 
         seed()
@@ -72,6 +76,7 @@ class TestFreshEnvironmentSeeding:
 @pytest.mark.django_db
 class TestExistingEnvironmentIsUntouched:
     def test_does_not_rewrite_an_operator_customised_row(self, seed):
+        ShippingRate.objects.all().delete()
         Country.objects.all().delete()
         custom = Country.objects.create(
             alpha_2="GR",

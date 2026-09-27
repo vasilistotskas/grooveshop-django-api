@@ -26,6 +26,7 @@ from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
 from region.factories import RegionFactory
+from tests.utils.shipping import enable_rate
 from user.factories.account import UserAccountFactory
 
 User = get_user_model()
@@ -242,6 +243,9 @@ class TestOrderCreateBothFlowsViaSerializer(APITestCase):
         self.user = UserAccountFactory()
         self.country = CountryFactory()
         self.region = RegionFactory(country=self.country)
+        # A ShippingRate is per-country now — this ad-hoc country has
+        # none until this call.
+        enable_rate(self.country)
         self.product = ProductFactory(
             active=True, stock=10, num_images=0, num_reviews=0
         )
@@ -261,6 +265,7 @@ class TestOrderCreateBothFlowsViaSerializer(APITestCase):
             "country_id": self.country.alpha_2,
             "region_id": self.region.alpha,
             "phone": "+306911111111",
+            "shipping_kind": "home_delivery",
         }
 
     @patch("order.payment.get_payment_provider")

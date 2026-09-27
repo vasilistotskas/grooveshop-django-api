@@ -19,6 +19,7 @@ from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
 from region.factories import RegionFactory
+from tests.utils.shipping import enable_rate
 from user.factories.account import UserAccountFactory
 
 User = get_user_model()
@@ -62,6 +63,9 @@ class TestPaymentFirstOrderCreation(APITestCase):
         # Create location data
         self.country = CountryFactory()
         self.region = RegionFactory(country=self.country)
+        # A ShippingRate is per-country now — this ad-hoc country has
+        # none until this call.
+        enable_rate(self.country)
 
         # Create products with stock
         self.product1 = ProductFactory(
@@ -108,6 +112,7 @@ class TestPaymentFirstOrderCreation(APITestCase):
             "region_id": self.region.alpha,  # Region uses alpha as PK
             "phone": "+306900000000",
             "notes": "Test order",
+            "shipping_kind": "home_delivery",
         }
 
     @patch("order.payment.get_payment_provider")

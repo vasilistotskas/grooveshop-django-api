@@ -544,22 +544,77 @@ def _reseed_extra_settings(request):
 
 
 @pytest.fixture(autouse=True)
-def _reseed_shipping_providers(request):
-    """Restore the ``ShippingProvider`` seed rows for every DB test.
+def _reseed_countries(request):
+    """Restore the GR ``Country`` + ``Region`` seed rows for every DB test.
+
+    Same problem as ``_reseed_extra_settings`` above: ``country`` and
+    ``region`` had no data migration until seed migrations added one,
+    and any test marked ``@pytest.mark.django_db(transaction=True)``
+    flushes every table on teardown — including these rows, which
+    unlike ``ShippingProvider``/``Setting`` had no reseed fixture of
+    their own until ``_reseed_shipping_providers`` below started
+    depending on GR existing to create its ``ShippingRate`` rows.
+    Requested as a parameter (not just ``autouse`` ordering) by that
+    fixture so this always runs first.
+
+    Deliberately does NOT reseed CY here (unlike the real migrations,
+    which seed both): ``OrderFactory.country`` picks a RANDOM existing
+    ``Country`` row (``get_or_create_country``), and CY is the one
+    seeded country with a real ``postal_code_pattern`` (``\\d{4}``) —
+    an always-present CY row made that picker occasionally hand ACS
+    voucher tests a Faker postcode CY's strict pattern rejects,
+    failing unrelated tests non-deterministically. Tests that actually
+    exercise Cyprus create it explicitly (``CountryFactory(alpha_2=
+    "CY", ...)`` or the real seed migration in an integration test).
+    """
+    if request.node.get_closest_marker("django_db"):
+        try:
+            from django.apps import apps as django_apps
+
+            for module_name, func_name in (
+                (
+                    "country.migrations.0010_seed_default_country",
+                    "seed_default_country",
+                ),
+                (
+                    "region.migrations.0009_seed_default_regions",
+                    "seed_default_regions",
+                ),
+            ):
+                module = importlib.import_module(module_name)
+                getattr(module, func_name)(
+                    django_apps, SimpleNamespace(connection=connection)
+                )
+        except Exception:
+            # Fixture is best-effort — a transient DB connection error
+            # must not mask the real failure of the test itself.
+            pass
+
+
+@pytest.fixture(autouse=True)
+def _reseed_shipping_providers(request, _reseed_countries):
+    """Restore the ``ShippingProvider`` + ``ShippingRate`` seed rows for
+    every DB test.
 
     The ``shipping/migrations/0002_seed_providers.py`` data migration
     only runs once at DB creation. Same issue as the
     ``_reseed_extra_settings`` fixture above: any test marked
     ``@pytest.mark.django_db(transaction=True)`` flushes every table on
-    teardown, wiping the ``acs`` / ``boxnow`` / ``flat_rate`` rows.
+    teardown, wiping the ``acs`` / ``boxnow`` / ``flat_rate`` rows —
+    and, now, the GR ``ShippingRate`` rows those seed migrations imply.
 
     Subsequent tests that ``ShippingProvider.objects.get(code="acs")``
     (e.g. via the carrier registry, the order serializer, or the
     ``available_options`` view) then explode with ``DoesNotExist`` —
     one or two unlucky tests at random per ``-n auto`` run.
 
-    Idempotent: ``update_or_create`` is a no-op when the seed rows
-    are still in place, restorative when they are not.
+    ``metadata`` carries no ``supported_countries`` key — that concept
+    is gone; ``convert_legacy_pricing`` below (and production) fall
+    back to GR when it's absent, matching a store that has never
+    touched the key.
+
+    Idempotent: ``update_or_create``/``get_or_create`` is a no-op when
+    the seed rows are still in place, restorative when they are not.
     """
     if request.node.get_closest_marker("django_db"):
         try:
@@ -575,7 +630,6 @@ def _reseed_shipping_providers(request):
                     "live_mode": False,
                     "priority": 20,
                     "metadata": {
-                        "supported_countries": ["GR"],
                         "locker_picker_kind": "boxnow_widget",
                         "tagline_key": "shipping.method.boxnow.tagline",
                         "tagline_color": "info",
@@ -599,7 +653,6 @@ def _reseed_shipping_providers(request):
                     # the keys being present on every test row, and
                     # production reads the same keys.
                     "metadata": {
-                        "supported_countries": ["GR"],
                         "locker_picker_kind": "acs_db_picker",
                         "logo": "/img/shipping/acs.png",
                         "shop_kinds_by_country": {
@@ -647,6 +700,19 @@ def _reseed_shipping_providers(request):
                 "shipping.migrations.0009_seed_flat_rate_provider"
             )
             flat_rate_seed.seed_flat_rate(
+                django_apps, SimpleNamespace(connection=connection)
+            )
+
+            # GR ``ShippingRate`` rows for every kind each seeded
+            # provider supports — same "frozen historical default"
+            # function the real migration runs, so a test that asserts
+            # a specific price (3.00 / 50.00 flat_rate, 2.50 / 30.00
+            # boxnow, 3.50 / 40.00 acs) matches what a real deploy's
+            # conversion produced.
+            rate_seed = importlib.import_module(
+                "shipping.migrations.0011_convert_legacy_pricing_to_rates"
+            )
+            rate_seed.convert_legacy_pricing(
                 django_apps, SimpleNamespace(connection=connection)
             )
         except Exception:

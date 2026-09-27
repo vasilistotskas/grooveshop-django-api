@@ -8,6 +8,7 @@ from rest_framework.test import APITestCase
 from cart.factories.cart import CartFactory
 from cart.factories.item import CartItemFactory
 from cart.models import Cart
+from country.factories import CountryFactory
 from product.factories.product import ProductFactory
 from tests.utils import TestURLFixerMixin, count_queries
 from user.factories.account import UserAccountFactory
@@ -61,10 +62,11 @@ class CartViewSetTest(TestURLFixerMixin, APITestCase):
             {"client_secret": "cs_test_123", "payment_id": "pi_test_123"},
         )
 
+        country = CountryFactory()
         url = reverse("cart-create-payment-intent")
         with (
             patch(
-                "cart.views.cart.OrderService.calculate_shipping_cost",
+                "cart.views.cart.OrderService.shipping_cost",
                 return_value=Money("0.00", "EUR"),
             ),
             patch(
@@ -78,7 +80,11 @@ class CartViewSetTest(TestURLFixerMixin, APITestCase):
         ):
             response = self.client.post(
                 url,
-                {"pay_way_id": pay_way.id, "shipping_kind": "home_delivery"},
+                {
+                    "pay_way_id": pay_way.id,
+                    "shipping_kind": "home_delivery",
+                    "country_id": country.alpha_2,
+                },
                 format="json",
             )
 
@@ -110,6 +116,7 @@ class CartViewSetTest(TestURLFixerMixin, APITestCase):
         )
 
         provider = MagicMock()
+        country = CountryFactory()
         url = reverse("cart-create-payment-intent")
         with patch(
             "pay_way.services.PayWayService.get_provider_for_pay_way",
@@ -117,7 +124,11 @@ class CartViewSetTest(TestURLFixerMixin, APITestCase):
         ):
             response = self.client.post(
                 url,
-                {"pay_way_id": pay_way.id, "shipping_kind": "home_delivery"},
+                {
+                    "pay_way_id": pay_way.id,
+                    "shipping_kind": "home_delivery",
+                    "country_id": country.alpha_2,
+                },
                 format="json",
             )
 

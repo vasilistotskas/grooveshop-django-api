@@ -28,6 +28,7 @@ from order.services import OrderService
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories import ProductFactory
+from tests.utils.shipping import enable_rate
 
 pytestmark = pytest.mark.django_db
 
@@ -43,6 +44,9 @@ def _order():
     )
     CartItemFactory(cart=cart, product=product, quantity=2)
     country = CountryFactory()
+    # A ShippingRate is per-country now — this ad-hoc country has none
+    # until this call.
+    enable_rate(country)
     return OrderService.create_order_from_cart_offline(
         cart=cart,
         shipping_address={
@@ -55,6 +59,7 @@ def _order():
             "zipcode": "10563",
             "country_id": country.alpha_2,
             "phone": "+306900000000",
+            "shipping_kind": "home_delivery",
         },
         pay_way=PayWayFactory(
             settlement=PaySettlement.COURIER_CASH,

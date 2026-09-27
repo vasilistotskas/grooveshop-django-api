@@ -36,25 +36,78 @@ def test_acs_validation_passes_for_home_delivery():
 
 
 @pytest.mark.django_db
-def test_calculate_shipping_cost_uses_settings_threshold():
+def test_live_quote_returns_none_when_dynamic_pricing_disabled():
+    """Default (``ACS_DYNAMIC_PRICING_ENABLED`` unset/False): the
+    carrier has no live pricing of its own, so ``ShippingService.quote``
+    falls back to the resolved ``ShippingRate.price`` unchanged.
+    """
+    adapter = get_provider("acs")
+    assert (
+        adapter.live_quote(
+            rate=None,
+            country_code="GR",
+            weight_grams=None,
+            currency="EUR",
+        )
+        is None
+    )
+
+
+@pytest.mark.django_db
+def test_live_quote_uses_the_live_api_when_dynamic_pricing_enabled():
+    """Flipping the toggle asks ``_fetch_live_quote``, and its
+    ``(amount, currency)`` tuple becomes a bare ``Decimal`` amount —
+    ``ShippingService`` supplies the currency from the order itself.
+    """
+    from decimal import Decimal
+    from unittest.mock import patch
+
+    from extra_settings.models import Setting
+
+    from shipping_acs.carrier import AcsCarrier
+
+    Setting.objects.update_or_create(
+        name="ACS_DYNAMIC_PRICING_ENABLED",
+        defaults={"value_type": Setting.TYPE_BOOL, "value_bool": True},
+    )
     adapter = get_provider("acs")
 
-    # Below threshold → returns flat rate (default 3.50 from settings).
-    cheap = adapter.calculate_shipping_cost(
-        order_value_amount=10.0,
-        currency="EUR",
-        kind=ShippingKind.HOME_DELIVERY,
-    )
-    assert cheap is not None
-    assert cheap[0] > 0
+    with patch.object(
+        AcsCarrier, "_fetch_live_quote", return_value=(4.20, "EUR")
+    ):
+        result = adapter.live_quote(
+            rate=None,
+            country_code="GR",
+            weight_grams=500,
+            currency="EUR",
+        )
+    assert result == Decimal("4.20")
 
-    # At/above threshold (default 40) → free shipping.
-    free = adapter.calculate_shipping_cost(
-        order_value_amount=80.0,
-        currency="EUR",
-        kind=ShippingKind.HOME_DELIVERY,
+
+@pytest.mark.django_db
+def test_live_quote_falls_back_to_none_when_the_live_call_fails():
+    """A transient ACS outage must never block checkout — the stored
+    rate price is used instead, not an exception."""
+    from unittest.mock import patch
+
+    from extra_settings.models import Setting
+
+    from shipping_acs.carrier import AcsCarrier
+
+    Setting.objects.update_or_create(
+        name="ACS_DYNAMIC_PRICING_ENABLED",
+        defaults={"value_type": Setting.TYPE_BOOL, "value_bool": True},
     )
-    assert free == (0.0, "EUR")
+    adapter = get_provider("acs")
+
+    with patch.object(AcsCarrier, "_fetch_live_quote", return_value=None):
+        result = adapter.live_quote(
+            rate=None,
+            country_code="GR",
+            weight_grams=500,
+            currency="EUR",
+        )
+    assert result is None
 
 
 @pytest.mark.django_db

@@ -38,11 +38,13 @@ class TestCreateOrderFromCart:
         from order.stock import StockManager
         from pay_way.factories import PayWayFactory
         from product.factories import ProductFactory
+        from tests.utils.shipping import enable_rate
         from user.factories import UserAccountFactory
 
         # Setup
         user = UserAccountFactory()
         country = CountryFactory()
+        enable_rate(country)
         cart = CartFactory(user=user)
         product1 = ProductFactory(
             stock=10, price=Money(100, "EUR"), active=True
@@ -78,6 +80,7 @@ class TestCreateOrderFromCart:
             "zipcode": "12345",
             "country_id": country.alpha_2,
             "phone": "+306900000000",
+            "shipping_kind": "home_delivery",
         }
 
         payment_intent_id = "pi_test_123"
@@ -143,11 +146,13 @@ class TestCreateOrderFromCart:
         from country.factories import CountryFactory
         from pay_way.factories import PayWayFactory
         from product.factories import ProductFactory
+        from tests.utils.shipping import enable_rate
         from user.factories import UserAccountFactory
 
         # Setup
         user = UserAccountFactory()
         country = CountryFactory()
+        enable_rate(country)
         cart = CartFactory(user=user)
         product = ProductFactory(stock=10, price=Money(100, "EUR"), active=True)
         CartItemFactory(cart=cart, product=product, quantity=2)
@@ -163,6 +168,7 @@ class TestCreateOrderFromCart:
             "zipcode": "12345",
             "country_id": country.alpha_2,
             "phone": "+306900000000",
+            "shipping_kind": "home_delivery",
         }
 
         payment_intent_id = "pi_test_456"

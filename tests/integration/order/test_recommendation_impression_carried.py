@@ -20,6 +20,7 @@ from order.services import OrderService
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories import ProductFactory
+from tests.utils.shipping import enable_rate
 from user.factories import UserAccountFactory
 
 pytestmark = pytest.mark.django_db
@@ -36,6 +37,9 @@ def _product():
 
 def _checkout(cart):
     country = CountryFactory()
+    # A ShippingRate is per-country now — this ad-hoc country has none
+    # until this call.
+    enable_rate(country)
     return OrderService.create_order_from_cart_offline(
         cart=cart,
         shipping_address={
@@ -48,6 +52,7 @@ def _checkout(cart):
             "zipcode": "10563",
             "country_id": country.alpha_2,
             "phone": "+306900000000",
+            "shipping_kind": "home_delivery",
         },
         pay_way=PayWayFactory(
             settlement=PaySettlement.COURIER_CASH,
@@ -100,6 +105,9 @@ def test_the_payment_first_order_line_inherits_the_cart_line_impression():
     )
     CartItemFactory(cart=cart, product=plain, quantity=1)
     country = CountryFactory()
+    # A ShippingRate is per-country now — this ad-hoc country has none
+    # until this call.
+    enable_rate(country)
 
     with patch("order.payment.get_payment_provider") as provider:
         provider.return_value.get_payment_status.return_value = (
@@ -118,6 +126,7 @@ def test_the_payment_first_order_line_inherits_the_cart_line_impression():
                 "zipcode": "10563",
                 "country_id": country.alpha_2,
                 "phone": "+306900000000",
+                "shipping_kind": "home_delivery",
             },
             payment_intent_id="pi_test_123",
             pay_way=PayWayFactory(provider_code="stripe"),

@@ -16,6 +16,7 @@ from order.models.order import Order
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
 from region.factories import RegionFactory
+from tests.utils.shipping import enable_rate
 from user.factories.account import UserAccountFactory
 
 User = UserAccountFactory._meta.model
@@ -27,6 +28,9 @@ class CheckoutAPITestCase(APITestCase):
         self.user = UserAccountFactory(num_addresses=0)
         self.country = CountryFactory(num_regions=0)
         self.region = RegionFactory(country=self.country)
+        # A ShippingRate is per-country now — this ad-hoc country has
+        # none until this call.
+        enable_rate(self.country)
         # Create offline payment method for testing offline checkout flow
         self.pay_way = PayWayFactory.create_offline_payment(
             provider_code="cash", requires_confirmation=False
@@ -55,6 +59,7 @@ class CheckoutAPITestCase(APITestCase):
             "region_id": self.region.alpha,
             "pay_way_id": self.pay_way.id,
             "shipping_price": "10.00",
+            "shipping_kind": "home_delivery",
             "items": [
                 {"product": self.product1.id, "quantity": 2},
                 {"product": self.product2.id, "quantity": 1},
@@ -387,6 +392,9 @@ class GuestOrderTestCase(APITestCase):
 
         self.country = CountryFactory(num_regions=0)
         self.region = RegionFactory(country=self.country)
+        # A ShippingRate is per-country now — this ad-hoc country has
+        # none until this call.
+        enable_rate(self.country)
         self.pay_way = PayWayFactory(active=True)
 
         self.product1 = ProductFactory.create(
@@ -410,6 +418,7 @@ class GuestOrderTestCase(APITestCase):
             "region_id": self.region.alpha,
             "pay_way_id": self.pay_way.id,
             "shipping_price": "10.00",
+            "shipping_kind": "home_delivery",
             "items": [
                 {"product": self.product1.id, "quantity": 1},
                 {"product": self.product2.id, "quantity": 1},

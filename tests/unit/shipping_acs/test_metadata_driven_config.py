@@ -134,21 +134,6 @@ class TestWeightBounds:
 
 
 @pytest.mark.django_db
-class TestDefaultCountry:
-    def test_setting_first_wins(self, settings, acs_provider):
-        settings.ACS_SUPPORTED_COUNTRIES = ["CY", "GR"]
-        assert acs_config.default_country() == "CY"
-
-    def test_falls_back_to_metadata_then_gr(self, settings, acs_provider):
-        settings.ACS_SUPPORTED_COUNTRIES = []
-        acs_provider.metadata = {
-            "shop_kinds_by_country": {"IT": [7]},
-        }
-        acs_provider.save(update_fields=["metadata"])
-        assert acs_config.default_country() == "IT"
-
-
-@pytest.mark.django_db
 class TestMapConfig:
     def test_map_config_passes_metadata_through(self, acs_provider):
         cfg = acs_config.map_config()

@@ -25,11 +25,15 @@ from order.services import OrderService
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories import ProductFactory
+from tests.utils.shipping import enable_rate
 
 pytestmark = pytest.mark.django_db
 
 
 def _shipping_address(country):
+    # A ShippingRate is per-country now — this ad-hoc country has none
+    # until this call.
+    enable_rate(country)
     return {
         "first_name": "Maria",
         "last_name": "Papadopoulou",
@@ -40,6 +44,7 @@ def _shipping_address(country):
         "zipcode": "10563",
         "country_id": country.alpha_2,
         "phone": "+306900000000",
+        "shipping_kind": "home_delivery",
     }
 
 

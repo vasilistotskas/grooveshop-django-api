@@ -40,12 +40,17 @@ class TestOrderServiceCreateOrderFromCart:
     def setup_method(self):
         """Set up test data for each test method."""
         from country.factories import CountryFactory
+        from tests.utils.shipping import enable_rate
 
         self.user = UserAccountFactory.create()
         self.pay_way = PayWayFactory.create(provider_code="stripe")
 
         # Create country for shipping address
         self.country = CountryFactory.create()
+        # A ShippingRate is per-country now — this ad-hoc country has
+        # none until this call, and every ``shipping_cost`` call below
+        # would raise ``InvalidOrderDataError`` without it.
+        enable_rate(self.country)
 
         # Create products with stock (active=True so cart validation passes)
         self.product1 = ProductFactory.create(
@@ -86,6 +91,7 @@ class TestOrderServiceCreateOrderFromCart:
             "zipcode": "12345",
             "country_id": self.country.alpha_2,  # Use actual country ID
             "phone": "+306900000000",
+            "shipping_kind": "home_delivery",
         }
 
         self.payment_intent_id = "pi_test123abc"

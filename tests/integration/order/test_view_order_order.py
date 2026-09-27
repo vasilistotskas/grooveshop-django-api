@@ -38,6 +38,11 @@ class OrderViewSetTestCase(TestURLFixerMixin, APITestCase):
         self.pay_way = PayWayFactory(active=True)
         self.country = CountryFactory()
         self.region = RegionFactory(country=self.country)
+        # A ShippingRate is per-country now — this ad-hoc country has
+        # none until this call.
+        from tests.utils.shipping import enable_rate
+
+        enable_rate(self.country)
 
         self.order = OrderFactory(
             user=self.user,
@@ -126,6 +131,7 @@ class OrderViewSetTestCase(TestURLFixerMixin, APITestCase):
             "city": "New York",
             "zipcode": "10001",
             "phone": "+12345678901",
+            "shipping_kind": "home_delivery",
         }
 
         # Mock payment provider
@@ -327,6 +333,7 @@ class OrderViewSetTestCase(TestURLFixerMixin, APITestCase):
             "city": "Seattle",
             "zipcode": "98101",
             "phone": "+12345678903",
+            "shipping_kind": "home_delivery",
         }
 
         # Mock payment provider

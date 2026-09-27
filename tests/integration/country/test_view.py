@@ -42,6 +42,11 @@ class CountryViewSetTestCase(TestURLFixerMixin, APITestCase):
             phone_code=33,
             num_regions=0,
         )
+        # ``country/migrations/0012_seed_cyprus.py`` seeds a real CY row
+        # on a fresh database — the tests below use CY's own ISO data
+        # (alpha_3 "CYP", iso_cc 196) to exercise CREATE, so they need
+        # CY absent, not a duplicate 400.
+        Country.objects.filter(alpha_2="CY").delete()
 
     def setUp(self):
         self.admin_user = UserAccountFactory(

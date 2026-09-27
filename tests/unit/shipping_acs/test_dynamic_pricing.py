@@ -1,21 +1,30 @@
 """Phase 4a tests — ACS dynamic pricing via ACS_Price_Calculation.
 
+``AcsCarrier.live_quote`` is now the sole pricing hook (replaces the
+old ``calculate_shipping_cost``): it either returns a live-quoted
+``Decimal`` amount, or ``None`` when the toggle is off, the API call
+fails, or the station origin is unresolvable — in every ``None`` case
+``ShippingService._priced`` falls back to the resolved
+``ShippingRate.price`` unchanged, so a transient outage never blocks
+checkout. The free-shipping-threshold short-circuit that used to live
+here is a ``ShippingRate`` concern now — see
+``tests/unit/shipping/test_shipping_service_rates.py``.
+
 Covers:
-* Toggle off → flat-rate path unchanged.
+* Toggle off → ``live_quote`` returns None (caller uses the rate price).
 * Toggle on + successful API call → live quote returned.
-* Toggle on + API failure → graceful fallback to flat rate.
+* Toggle on + API failure → ``None``, not an exception.
 * Cache hit short-circuits the API.
-* Free-shipping threshold short-circuits both paths.
 """
 
 from __future__ import annotations
 
+from decimal import Decimal
 from unittest.mock import patch
 
 import pytest
 from django.core.cache import cache
 
-from shipping.enum import ShippingKind
 from shipping.interfaces import get_provider
 
 pytestmark = pytest.mark.django_db
@@ -68,33 +77,12 @@ def dynamic_pricing_on():
     setting.save(update_fields=["value_bool"])
 
 
-def test_flat_rate_when_toggle_off(dynamic_pricing_off):
+def test_live_quote_is_none_when_toggle_off(dynamic_pricing_off):
     adapter = get_provider("acs")
-    quote = adapter.calculate_shipping_cost(
-        order_value_amount=10.0,
-        currency="EUR",
-        kind=ShippingKind.HOME_DELIVERY,
+    quote = adapter.live_quote(
+        rate=None, country_code="GR", weight_grams=None, currency="EUR"
     )
-    assert quote is not None
-    # Default flat rate from ACS_SHIPPING_PRICE Setting (3.50)
-    assert quote == (3.5, "EUR")
-
-
-def test_free_shipping_short_circuits_dynamic_pricing(dynamic_pricing_on):
-    """Even with the live-quote toggle on, the free-shipping
-    threshold check fires first so we don't burn an API call when
-    the answer is already known to be 0."""
-    adapter = get_provider("acs")
-
-    with patch("shipping_acs.client.AcsClient") as mock_class:
-        quote = adapter.calculate_shipping_cost(
-            order_value_amount=80.0,
-            currency="EUR",
-            kind=ShippingKind.HOME_DELIVERY,
-        )
-
-    assert quote == (0.0, "EUR")
-    assert mock_class.called is False
+    assert quote is None
 
 
 def test_live_quote_used_when_toggle_on(dynamic_pricing_on, pin_station_origin):
@@ -106,21 +94,19 @@ def test_live_quote_used_when_toggle_on(dynamic_pricing_on, pin_station_origin):
             "Basic_Ammount": 4.20,
             "Total_Ammount": 5.21,
         }
-        quote = adapter.calculate_shipping_cost(
-            order_value_amount=10.0,
-            currency="EUR",
-            kind=ShippingKind.HOME_DELIVERY,
+        quote = adapter.live_quote(
+            rate=None, country_code="GR", weight_grams=None, currency="EUR"
         )
 
-    assert quote == (5.21, "EUR")
+    assert quote == Decimal("5.21")
     assert instance.price_calculation.called
 
 
-def test_falls_back_to_flat_rate_on_api_error(
+def test_falls_back_to_none_on_api_error(
     dynamic_pricing_on, pin_station_origin
 ):
-    """Transient ACS API failure must never block checkout — the
-    flat-rate path is the safety net."""
+    """Transient ACS API failure must never block checkout — ``None``
+    tells ``ShippingService`` to use the resolved rate's own price."""
     from shipping_acs.exceptions import AcsAPIError
 
     adapter = get_provider("acs")
@@ -131,13 +117,11 @@ def test_falls_back_to_flat_rate_on_api_error(
             alias="ACS_Price_Calculation",
             error_message="Test outage",
         )
-        quote = adapter.calculate_shipping_cost(
-            order_value_amount=10.0,
-            currency="EUR",
-            kind=ShippingKind.HOME_DELIVERY,
+        quote = adapter.live_quote(
+            rate=None, country_code="GR", weight_grams=None, currency="EUR"
         )
 
-    assert quote == (3.5, "EUR")  # flat-rate fallback
+    assert quote is None
 
 
 def test_quote_is_cached_per_country_region(
@@ -185,30 +169,30 @@ def test_quote_is_cached_per_country_region(
         instance = mock_class.return_value
         instance.price_calculation.return_value = {"Total_Ammount": 7.50}
 
-        adapter.calculate_shipping_cost(
-            order_value_amount=10.0,
-            currency="EUR",
-            kind=ShippingKind.HOME_DELIVERY,
-            country_id=unique_country,
+        adapter.live_quote(
+            rate=None,
+            country_code=unique_country,
             region_id="A",
+            weight_grams=None,
+            currency="EUR",
         )
-        adapter.calculate_shipping_cost(
-            order_value_amount=12.0,
-            currency="EUR",
-            kind=ShippingKind.HOME_DELIVERY,
-            country_id=unique_country,
+        adapter.live_quote(
+            rate=None,
+            country_code=unique_country,
             region_id="A",
+            weight_grams=None,
+            currency="EUR",
         )
 
     assert instance.price_calculation.call_count == 1
     assert len(fake_store) == 1
 
 
-def test_invalid_amount_falls_back_to_flat_rate(
+def test_invalid_amount_falls_back_to_none(
     dynamic_pricing_on, pin_station_origin
 ):
     """A garbage Total_Ammount value (e.g. None / non-numeric) must
-    not propagate — fall back to the flat rate."""
+    not propagate — returns None rather than a bogus quote."""
     adapter = get_provider("acs")
 
     with patch("shipping_acs.client.AcsClient") as mock_class:
@@ -216,13 +200,11 @@ def test_invalid_amount_falls_back_to_flat_rate(
         instance.price_calculation.return_value = {
             "Total_Ammount": "not-a-number"
         }
-        quote = adapter.calculate_shipping_cost(
-            order_value_amount=10.0,
-            currency="EUR",
-            kind=ShippingKind.HOME_DELIVERY,
+        quote = adapter.live_quote(
+            rate=None, country_code="GR", weight_grams=None, currency="EUR"
         )
 
-    assert quote == (3.5, "EUR")
+    assert quote is None
 
 
 # ---------------------------------------------------------------------------
@@ -287,11 +269,11 @@ def test_live_quote_forwards_bucketed_weight_to_acs(
     with patch("shipping_acs.client.AcsClient") as mock_class:
         instance = mock_class.return_value
         instance.price_calculation.return_value = {"Total_Ammount": 5.21}
-        adapter.calculate_shipping_cost(
-            order_value_amount=10.0,
-            currency="EUR",
-            kind=ShippingKind.HOME_DELIVERY,
+        adapter.live_quote(
+            rate=None,
+            country_code="GR",
             weight_grams=3200,
+            currency="EUR",
         )
 
     assert instance.price_calculation.called
@@ -316,10 +298,11 @@ def test_live_quote_floor_when_weight_omitted(
     with patch("shipping_acs.client.AcsClient") as mock_class:
         instance = mock_class.return_value
         instance.price_calculation.return_value = {"Total_Ammount": 3.50}
-        adapter.calculate_shipping_cost(
-            order_value_amount=10.0,
+        adapter.live_quote(
+            rate=None,
+            country_code="GR",
+            weight_grams=None,
             currency="EUR",
-            kind=ShippingKind.HOME_DELIVERY,
         )
 
     payload = instance.price_calculation.call_args[0][0]
@@ -359,13 +342,12 @@ def test_quote_cache_buckets_collapse_near_weights(
         instance.price_calculation.return_value = {"Total_Ammount": 3.50}
 
         for weight in (200, 487, 499, 500):
-            adapter.calculate_shipping_cost(
-                order_value_amount=10.0,
-                currency="EUR",
-                kind=ShippingKind.HOME_DELIVERY,
-                country_id=unique_country,
+            adapter.live_quote(
+                rate=None,
+                country_code=unique_country,
                 region_id="A",
                 weight_grams=weight,
+                currency="EUR",
             )
 
     assert instance.price_calculation.call_count == 1
@@ -390,11 +372,11 @@ def test_live_quote_sends_station_origin_and_destination(dynamic_pricing_on):
     ):
         instance = mock_class.return_value
         instance.price_calculation.return_value = {"Total_Ammount": 2.30}
-        adapter.calculate_shipping_cost(
-            order_value_amount=10.0,
-            currency="EUR",
-            kind=ShippingKind.HOME_DELIVERY,
+        adapter.live_quote(
+            rate=None,
+            country_code="GR",
             weight_grams=2000,
+            currency="EUR",
         )
 
     assert instance.price_calculation.called
@@ -404,9 +386,9 @@ def test_live_quote_sends_station_origin_and_destination(dynamic_pricing_on):
 
 
 def test_live_quote_falls_back_when_station_origin_missing(dynamic_pricing_on):
-    """No billing code + no metadata override → adapter must fall
-    back to the flat-rate Setting instead of calling ACS with empty
-    origin (which would always return the same business error)."""
+    """No billing code + no metadata override → adapter must return
+    ``None`` instead of calling ACS with empty origin (which would
+    always return the same business error)."""
     from shipping_acs import config as acs_config
 
     adapter = get_provider("acs")
@@ -416,22 +398,22 @@ def test_live_quote_falls_back_when_station_origin_missing(dynamic_pricing_on):
         patch("shipping_acs.client.AcsClient") as mock_class,
     ):
         instance = mock_class.return_value
-        quote = adapter.calculate_shipping_cost(
-            order_value_amount=10.0,
-            currency="EUR",
-            kind=ShippingKind.HOME_DELIVERY,
+        quote = adapter.live_quote(
+            rate=None,
+            country_code="GR",
             weight_grams=2000,
+            currency="EUR",
         )
 
     assert instance.price_calculation.called is False
-    assert quote == (3.5, "EUR")
+    assert quote is None
 
 
-def test_live_quote_business_error_falls_back_to_flat_rate(dynamic_pricing_on):
+def test_live_quote_business_error_falls_back_to_none(dynamic_pricing_on):
     """ACS returns 200 with ``Error_Message`` populated (not an
     exception) for unknown-station rejections. The adapter must
-    treat that as a fall-back, not propagate the empty
-    ``Total_Ammount`` as a 0€ quote."""
+    treat that as ``None``, not propagate the empty ``Total_Ammount``
+    as a 0€ quote."""
     from shipping_acs import config as acs_config
 
     adapter = get_provider("acs")
@@ -446,14 +428,14 @@ def test_live_quote_business_error_falls_back_to_flat_rate(dynamic_pricing_on):
             "Basic_Ammount": None,
             "Error_Message": "Άγνωστο κατάστημα παραλαβής.",
         }
-        quote = adapter.calculate_shipping_cost(
-            order_value_amount=10.0,
-            currency="EUR",
-            kind=ShippingKind.HOME_DELIVERY,
+        quote = adapter.live_quote(
+            rate=None,
+            country_code="GR",
             weight_grams=2000,
+            currency="EUR",
         )
 
-    assert quote == (3.5, "EUR")
+    assert quote is None
 
 
 def test_station_origin_parses_from_billing_code(monkeypatch):
@@ -523,21 +505,19 @@ def test_quote_cache_separates_distinct_weight_buckets(
         instance = mock_class.return_value
         instance.price_calculation.return_value = {"Total_Ammount": 4.20}
 
-        adapter.calculate_shipping_cost(
-            order_value_amount=10.0,
-            currency="EUR",
-            kind=ShippingKind.HOME_DELIVERY,
-            country_id=unique_country,
+        adapter.live_quote(
+            rate=None,
+            country_code=unique_country,
             region_id="A",
             weight_grams=487,
-        )
-        adapter.calculate_shipping_cost(
-            order_value_amount=10.0,
             currency="EUR",
-            kind=ShippingKind.HOME_DELIVERY,
-            country_id=unique_country,
+        )
+        adapter.live_quote(
+            rate=None,
+            country_code=unique_country,
             region_id="A",
             weight_grams=1500,
+            currency="EUR",
         )
 
     assert instance.price_calculation.call_count == 2

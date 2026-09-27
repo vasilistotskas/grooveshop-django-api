@@ -1,6 +1,7 @@
 from decimal import Decimal
 from unittest import TestCase, mock
 
+import pytest
 from django.conf import settings
 from djmoney.money import Money
 
@@ -158,36 +159,10 @@ class StripePaymentAmountTestCase(TestCase):
         self.assertNotIn("shipping_options", call_kwargs)
 
 
-class ShippingCostCalculationTestCase(TestCase):
-    """Test shipping cost calculation used in payment intent creation."""
-
-    @mock.patch("extra_settings.models.Setting.get")
-    def test_shipping_included_below_threshold(self, mock_setting):
-        """Orders below free shipping threshold should include shipping."""
-        from order.services import OrderService
-
-        mock_setting.side_effect = lambda key, **kw: {
-            "CHECKOUT_SHIPPING_PRICE": 3.00,
-            "FREE_SHIPPING_THRESHOLD": 50.00,
-        }.get(key, kw.get("default"))
-
-        cart_total = Money(Decimal("25.00"), "EUR")
-        shipping = OrderService.calculate_shipping_cost(cart_total)
-        self.assertEqual(shipping.amount, Decimal("3.00"))
-
-    @mock.patch("extra_settings.models.Setting.get")
-    def test_free_shipping_above_threshold(self, mock_setting):
-        """Orders above free shipping threshold get free shipping."""
-        from order.services import OrderService
-
-        mock_setting.side_effect = lambda key, **kw: {
-            "CHECKOUT_SHIPPING_PRICE": 3.00,
-            "FREE_SHIPPING_THRESHOLD": 50.00,
-        }.get(key, kw.get("default"))
-
-        cart_total = Money(Decimal("60.00"), "EUR")
-        shipping = OrderService.calculate_shipping_cost(cart_total)
-        self.assertEqual(shipping.amount, Decimal(0))
+class PaymentMethodFeeTestCase(TestCase):
+    """``calculate_payment_method_fee`` is plain Money math over a
+    ``pay_way`` — unaffected by the ``ShippingRate`` migration, so it
+    stays a DB-less ``TestCase`` with a mocked pay-way."""
 
     def test_payment_method_fee_below_threshold(self):
         """Payment method fee is charged when order is below threshold."""
@@ -213,18 +188,202 @@ class ShippingCostCalculationTestCase(TestCase):
         fee = OrderService.calculate_payment_method_fee(pay_way, order_value)
         self.assertEqual(fee.amount, Decimal(0))
 
-    @mock.patch("extra_settings.models.Setting.get")
-    def test_total_payment_amount_includes_all_components(self, mock_setting):
-        """The total sent to Stripe must equal items + shipping + fee."""
+
+@pytest.mark.django_db
+class TestOrderServiceShippingCost:
+    """``OrderService.shipping_cost`` — pricing now comes from a
+    ``ShippingRate`` row, not a global Setting pair; ``ShippingService``
+    itself (gate, quote order, weight cap) is covered by ``tests/unit/
+    shipping/test_shipping_service_rates.py``. These tests pin what
+    THIS wrapper adds: home-delivery auto-resolution, the ``free``
+    override, and translating ``shipping.exceptions`` into
+    ``InvalidOrderDataError`` so every caller gets one error shape.
+    """
+
+    def test_shipping_included_below_threshold(self):
+        from country.factories import CountryFactory
+        from order.services import OrderService
+        from tests.utils.shipping import enable_rate
+
+        country = CountryFactory()
+        enable_rate(
+            country,
+            provider_code="flat_rate",
+            price=Decimal("3.00"),
+            free_shipping_threshold=Decimal("50.00"),
+        )
+
+        shipping = OrderService.shipping_cost(
+            order_value=Money(Decimal("25.00"), "EUR"),
+            country_id=country.alpha_2,
+            shipping_provider_code="flat_rate",
+            shipping_kind="home_delivery",
+        )
+        assert shipping.amount == Decimal("3.00")
+
+    def test_free_shipping_above_threshold(self):
+        from country.factories import CountryFactory
+        from order.services import OrderService
+        from tests.utils.shipping import enable_rate
+
+        country = CountryFactory()
+        enable_rate(
+            country,
+            provider_code="flat_rate",
+            price=Decimal("3.00"),
+            free_shipping_threshold=Decimal("50.00"),
+        )
+
+        shipping = OrderService.shipping_cost(
+            order_value=Money(Decimal("60.00"), "EUR"),
+            country_id=country.alpha_2,
+            shipping_provider_code="flat_rate",
+            shipping_kind="home_delivery",
+        )
+        assert shipping.amount == Decimal(0)
+
+    def test_home_delivery_auto_resolves_the_active_provider(self):
+        """No explicit ``shipping_provider_code`` — the lowest-priority
+        active provider with a rate for the country wins."""
+        from country.factories import CountryFactory
+        from order.services import OrderService
+        from tests.utils.shipping import enable_rate
+
+        country = CountryFactory()
+        enable_rate(country, provider_code="flat_rate", price=Decimal("4.00"))
+
+        shipping = OrderService.shipping_cost(
+            order_value=Money(Decimal("10.00"), "EUR"),
+            country_id=country.alpha_2,
+            shipping_kind="home_delivery",
+        )
+        assert shipping.amount == Decimal("4.00")
+
+    def test_free_true_forces_zero_but_still_checks_availability(self):
+        from country.factories import CountryFactory
+        from order.services import OrderService
+        from tests.utils.shipping import enable_rate
+
+        country = CountryFactory()
+        enable_rate(country, provider_code="flat_rate", price=Decimal("4.00"))
+
+        shipping = OrderService.shipping_cost(
+            order_value=Money(Decimal("10.00"), "EUR"),
+            country_id=country.alpha_2,
+            shipping_provider_code="flat_rate",
+            shipping_kind="home_delivery",
+            free=True,
+        )
+        assert shipping.amount == Decimal(0)
+
+    def test_free_true_still_raises_when_unavailable(self):
+        """A free-shipping promo cannot make an unavailable option
+        orderable just because it charges nothing."""
+        from country.factories import CountryFactory
+        from order.exceptions import InvalidOrderDataError
         from order.services import OrderService
 
-        mock_setting.side_effect = lambda key, **kw: {
-            "CHECKOUT_SHIPPING_PRICE": 3.00,
-            "FREE_SHIPPING_THRESHOLD": 50.00,
-        }.get(key, kw.get("default"))
+        country = CountryFactory()
+        with pytest.raises(InvalidOrderDataError):
+            OrderService.shipping_cost(
+                order_value=Money(Decimal("10.00"), "EUR"),
+                country_id=country.alpha_2,
+                shipping_provider_code="not_a_real_carrier",
+                shipping_kind="home_delivery",
+                free=True,
+            )
+
+    def test_raises_invalid_order_data_error_when_unavailable(self):
+        from country.factories import CountryFactory
+        from order.exceptions import InvalidOrderDataError
+        from order.services import OrderService
+
+        country = CountryFactory()
+        with pytest.raises(InvalidOrderDataError) as exc_info:
+            OrderService.shipping_cost(
+                order_value=Money(Decimal("10.00"), "EUR"),
+                country_id=country.alpha_2,
+                shipping_provider_code="not_a_real_carrier",
+                shipping_kind="home_delivery",
+            )
+        assert "shipping_provider_code" in exc_info.value.field_errors
+
+    def test_raises_invalid_order_data_error_over_the_weight_cap(self):
+        from country.factories import CountryFactory
+        from order.exceptions import InvalidOrderDataError
+        from order.services import OrderService
+        from tests.utils.shipping import enable_rate
+
+        country = CountryFactory()
+        enable_rate(
+            country,
+            provider_code="flat_rate",
+            price=Decimal("4.00"),
+            max_weight_grams=4000,
+        )
+
+        with pytest.raises(InvalidOrderDataError):
+            OrderService.shipping_cost(
+                order_value=Money(Decimal("10.00"), "EUR"),
+                country_id=country.alpha_2,
+                shipping_provider_code="flat_rate",
+                shipping_kind="home_delivery",
+                weight_grams=5000,
+            )
+
+    def test_boxnow_shipping_ignores_country_region_adjustments(
+        self, boxnow_configured_tenant
+    ):
+        """BoxNow's rate is flat per country — no separate region
+        multiplier, so ``region_id`` doesn't change the price."""
+        from country.factories import CountryFactory
+        from order.services import OrderService
+        from shipping.enum import ShippingKind
+        from shipping.models import ShippingProvider
+        from tests.utils.shipping import enable_rate
+
+        country = CountryFactory()
+        boxnow = ShippingProvider.objects.get(code="boxnow")
+        boxnow.is_active = True
+        boxnow.save(update_fields=["is_active"])
+        enable_rate(
+            country,
+            provider_code="boxnow",
+            kind=ShippingKind.PICKUP_POINT,
+            price=Decimal("2.50"),
+            free_shipping_threshold=Decimal("30.00"),
+        )
+
+        shipping = OrderService.shipping_cost(
+            order_value=Money(Decimal("25.00"), "EUR"),
+            country_id=country.alpha_2,
+            region_id="ignored-region",
+            shipping_provider_code="boxnow",
+            shipping_kind="pickup_point",
+        )
+        assert shipping.amount == Decimal("2.50")
+
+    def test_total_payment_amount_includes_all_components(self):
+        """The total sent to Stripe must equal items + shipping + fee."""
+        from country.factories import CountryFactory
+        from order.services import OrderService
+        from tests.utils.shipping import enable_rate
+
+        country = CountryFactory()
+        enable_rate(
+            country,
+            provider_code="flat_rate",
+            price=Decimal("3.00"),
+            free_shipping_threshold=Decimal("50.00"),
+        )
 
         items_total = Money(Decimal("25.00"), "EUR")
-        shipping = OrderService.calculate_shipping_cost(items_total)
+        shipping = OrderService.shipping_cost(
+            order_value=items_total,
+            country_id=country.alpha_2,
+            shipping_provider_code="flat_rate",
+            shipping_kind="home_delivery",
+        )
 
         pay_way = mock.Mock()
         pay_way.cost = Money(Decimal("1.50"), "EUR")
@@ -236,87 +395,4 @@ class ShippingCostCalculationTestCase(TestCase):
         total = Money(subtotal.amount + fee.amount, "EUR")
 
         # €25 items + €3 shipping + €1.50 fee = €29.50
-        self.assertEqual(total.amount, Decimal("29.50"))
-
-    @mock.patch("extra_settings.models.Setting.get")
-    def test_small_order_with_shipping_above_stripe_minimum(self, mock_setting):
-        """€0.25 product + €0.40 shipping = €0.65, above Stripe minimum."""
-        from order.services import OrderService
-
-        mock_setting.side_effect = lambda key, **kw: {
-            "CHECKOUT_SHIPPING_PRICE": 0.40,
-            "FREE_SHIPPING_THRESHOLD": 50.00,
-        }.get(key, kw.get("default"))
-
-        items_total = Money(Decimal("0.25"), "EUR")
-        shipping = OrderService.calculate_shipping_cost(items_total)
-        self.assertEqual(shipping.amount, Decimal("0.40"))
-
-        total = Money(items_total.amount + shipping.amount, "EUR")
-        # €0.25 + €0.40 = €0.65, above Stripe €0.50 minimum
-        self.assertEqual(total.amount, Decimal("0.65"))
-        self.assertGreaterEqual(total.amount, Decimal("0.50"))
-
-    @mock.patch("extra_settings.models.Setting.get")
-    def test_boxnow_shipping_uses_boxnow_settings_below_threshold(
-        self, mock_setting
-    ):
-        """BoxNow shipping reads BOXNOW_* settings, not the home_delivery ones."""
-        from order.services import OrderService
-
-        mock_setting.side_effect = lambda key, **kw: {
-            "BOXNOW_SHIPPING_PRICE": 2.50,
-            "BOXNOW_FREE_SHIPPING_THRESHOLD": 30.00,
-            # Home-delivery settings are present but should NOT be used.
-            "CHECKOUT_SHIPPING_PRICE": 99.00,
-            "FREE_SHIPPING_THRESHOLD": 999.00,
-        }.get(key, kw.get("default"))
-
-        cart_total = Money(Decimal("25.00"), "EUR")
-        shipping = OrderService.calculate_shipping_cost(
-            cart_total,
-            shipping_provider_code="boxnow",
-            shipping_kind="pickup_point",
-        )
-        self.assertEqual(shipping.amount, Decimal("2.50"))
-
-    @mock.patch("extra_settings.models.Setting.get")
-    def test_boxnow_shipping_free_above_threshold(self, mock_setting):
-        """BoxNow shipping is waived once cart total reaches the threshold."""
-        from order.services import OrderService
-
-        mock_setting.side_effect = lambda key, **kw: {
-            "BOXNOW_SHIPPING_PRICE": 2.50,
-            "BOXNOW_FREE_SHIPPING_THRESHOLD": 30.00,
-        }.get(key, kw.get("default"))
-
-        cart_total = Money(Decimal("35.00"), "EUR")
-        shipping = OrderService.calculate_shipping_cost(
-            cart_total,
-            shipping_provider_code="boxnow",
-            shipping_kind="pickup_point",
-        )
-        self.assertEqual(shipping.amount, Decimal(0))
-
-    @mock.patch("extra_settings.models.Setting.get")
-    def test_boxnow_shipping_ignores_country_region_adjustments(
-        self, mock_setting
-    ):
-        """BoxNow's flat partnership rate ignores country/region multipliers."""
-        from order.services import OrderService
-
-        mock_setting.side_effect = lambda key, **kw: {
-            "BOXNOW_SHIPPING_PRICE": 2.50,
-            "BOXNOW_FREE_SHIPPING_THRESHOLD": 30.00,
-        }.get(key, kw.get("default"))
-
-        cart_total = Money(Decimal("25.00"), "EUR")
-        shipping = OrderService.calculate_shipping_cost(
-            cart_total,
-            country_id="GR",
-            region_id="GR-A1",
-            shipping_provider_code="boxnow",
-            shipping_kind="pickup_point",
-        )
-        # BoxNow rate is flat: country/region adjustments don't apply.
-        self.assertEqual(shipping.amount, Decimal("2.50"))
+        assert total.amount == Decimal("29.50")

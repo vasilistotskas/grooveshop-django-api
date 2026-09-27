@@ -25,7 +25,12 @@ def test_sync_boxnow_lockers_skips_when_unconfigured():
     ) as mock_sync:
         result = sync_boxnow_lockers.run()
 
-    assert result == {"created": 0, "updated": 0, "deactivated": 0}
+    assert result == {
+        "created": 0,
+        "updated": 0,
+        "deactivated": 0,
+        "skipped_no_country": 0,
+    }
     mock_sync.assert_not_called()
 
 

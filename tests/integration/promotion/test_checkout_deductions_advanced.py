@@ -23,6 +23,7 @@ from pay_way.factories import PayWayFactory
 from product.factories import ProductFactory
 from promotion.enum import BenefitType, PromotionTrigger
 from promotion.factories import PromotionFactory
+from tests.utils.shipping import enable_rate
 from user.factories import UserAccountFactory
 
 pytestmark = pytest.mark.django_db
@@ -48,6 +49,9 @@ def enable_promotions():
 def checkout():
     user = UserAccountFactory()
     country = CountryFactory()
+    # A ShippingRate is per-country now — this ad-hoc country has none
+    # until this call.
+    enable_rate(country)
     cart = CartFactory(user=user)
     cart.items.all().delete()
     product = ProductFactory(
@@ -73,6 +77,7 @@ def checkout():
         "zipcode": "10671",
         "country_id": country.alpha_2,
         "phone": "+306900000002",
+        "shipping_kind": "home_delivery",
     }
     return {
         "user": user,
@@ -203,12 +208,12 @@ class TestLoyaltyPaymentIntentParity:
 
         # Expected charge: 100 items − 5.00 loyalty (500 pts @ 100/EUR)
         # + generic shipping (free ≥ threshold at 100 EUR carts).
-        expected_total = OrderService.calculate_shipping_cost(
+        expected_total = OrderService.shipping_cost(
             order_value=Money(Decimal(100), "EUR"),
             country_id=checkout["shipping_address"]["country_id"],
             region_id=None,
             shipping_provider_code=None,
-            shipping_kind=None,
+            shipping_kind="home_delivery",
             weight_grams=0,
         ).amount + Decimal("95.00")
 
@@ -260,12 +265,12 @@ class TestLoyaltyPaymentIntentParity:
             cost=Money(Decimal(0), "EUR"),
             free_threshold=Money(Decimal(0), "EUR"),
         )
-        undiscounted = OrderService.calculate_shipping_cost(
+        undiscounted = OrderService.shipping_cost(
             order_value=Money(Decimal(100), "EUR"),
             country_id=checkout["shipping_address"]["country_id"],
             region_id=None,
             shipping_provider_code=None,
-            shipping_kind=None,
+            shipping_kind="home_delivery",
             weight_grams=0,
         ).amount + Decimal("100.00")
 

@@ -10,6 +10,7 @@ from order.services import OrderService
 from order.stock import StockManager
 from pay_way.factories import PayWayFactory
 from product.factories import ProductFactory
+from tests.utils.shipping import enable_rate
 from user.factories import UserAccountFactory
 
 
@@ -44,7 +45,11 @@ class TestPaymentConfirmationConvertsReservations:
     @pytest.fixture
     def country(self):
         """Create a test country for foreign key constraints."""
-        return CountryFactory(alpha_2="US", name="United States")
+        country = CountryFactory(alpha_2="US", name="United States")
+        # A ShippingRate is per-country now — this ad-hoc country has
+        # none until this call.
+        enable_rate(country)
+        return country
 
     @pytest.mark.parametrize(
         "num_products,quantities,initial_stocks,description",
@@ -157,6 +162,7 @@ class TestPaymentConfirmationConvertsReservations:
             "zipcode": "12345",
             "country_id": country.alpha_2,
             "phone": "+1234567890",
+            "shipping_kind": "home_delivery",
         }
 
         # Execute: Create order from cart (this simulates payment confirmation)
@@ -278,6 +284,7 @@ class TestPaymentConfirmationConvertsReservations:
             "zipcode": "12345",
             "country_id": country.alpha_2,
             "phone": "+1234567890",
+            "shipping_kind": "home_delivery",
         }
 
         order = OrderService.create_order_from_cart(
@@ -352,6 +359,7 @@ class TestPaymentConfirmationConvertsReservations:
             "zipcode": "12345",
             "country_id": country.alpha_2,
             "phone": "+1234567890",
+            "shipping_kind": "home_delivery",
         }
 
         order = OrderService.create_order_from_cart(
@@ -428,6 +436,7 @@ class TestPaymentConfirmationConvertsReservations:
             "zipcode": "12345",
             "country_id": country.alpha_2,
             "phone": "+1234567890",
+            "shipping_kind": "home_delivery",
         }
 
         from order.exceptions import InsufficientStockError
@@ -507,6 +516,7 @@ class TestPaymentConfirmationConvertsReservations:
             "zipcode": "12345",
             "country_id": country.alpha_2,
             "phone": "+1234567890",
+            "shipping_kind": "home_delivery",
         }
 
         order = OrderService.create_order_from_cart(

@@ -347,3 +347,48 @@ class TestNoDeadDjangoPatterns:
         assert not uncovered, (
             f"@cache_methods-decorated but no surface purges them: {uncovered}"
         )
+
+
+def _endpoint_regex(pattern: str):
+    """The purge endpoint's mid-glob matcher (``purge.post.ts``)."""
+    import re
+
+    return re.compile(
+        "^" + ".*".join(re.escape(part) for part in pattern.split("*")) + "$"
+    )
+
+
+class TestPrefixedLocalePages:
+    """The storefront caches every page under each prefixed locale too
+    (``/en``, ``/en/products/...``); a purge must reach them."""
+
+    EN_HOME = "cache:nitro:routes:_:en.a1:host.b2:xdeviceclass.c3.json"
+
+    def _matches(self, code: str, key: str) -> bool:
+        return any(
+            _endpoint_regex(p).match(key)
+            for p in get_surface(code).nuxt_patterns
+        )
+
+    def test_page_config_purges_each_locale_home(self):
+        assert self._matches("page_config", self.EN_HOME)
+        assert self._matches(
+            "page_config", "cache:nitro:routes:_:index.a:host.b.json"
+        )
+
+    def test_the_locale_home_pattern_is_not_a_catch_all(self):
+        """``*en*`` would match nearly every key; ``*en.*`` only a segment
+        that ends in ``en``."""
+        for key in (
+            "cache:nitro:routes:_:enproducts.a1:host.b2.json",
+            "cache:nitro:routes:_:blogpost42mnhmhr.a1:host.b2.json",
+        ):
+            assert not self._matches("page_config", key), key
+
+    def test_family_patterns_reach_prefixed_pages(self):
+        assert self._matches(
+            "products", "cache:nitro:routes:_:enproducts3some.a:host.b.json"
+        )
+        assert self._matches(
+            "blog", "cache:nitro:routes:_:enblogpost42mnh.a:host.b.json"
+        )

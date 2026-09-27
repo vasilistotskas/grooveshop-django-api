@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 
 from core.cache.registry import CacheSurface, register_surface
@@ -87,6 +88,27 @@ def _escaped_pathname(path: str) -> str:
     if path in ("", "/"):
         return "index"
     return "".join(ch for ch in path if ch.isalnum())[:16]
+
+
+def _nuxt_locale_homes() -> tuple[str, ...]:
+    """Nuxt patterns for the home page of every prefixed locale (``/en``).
+
+    ``_nuxt_routes`` already covers the prefixed pages BENEATH a route —
+    ``/en/products`` is stored as ``enproducts…``, which ``*products*``
+    matches — but not a locale's home: ``/en`` is stored under the bare
+    segment ``en``, and ``_nuxt_routes("/en")`` would give ``*en*``, which
+    matches nearly every key. The segment is followed by ``.<hash>``, so
+    ``*en.*`` matches it and, at most, a page whose escaped path happens
+    to end in ``en`` — an over-purge, which is safe.
+
+    The locales are Django's own; a language the storefront does not
+    route only adds a pattern that matches nothing.
+    """
+    return tuple(
+        f"{NUXT_ROUTE_PREFIX}_:*{code}.*"
+        for code, _name in settings.LANGUAGES
+        if code != settings.LANGUAGE_CODE
+    )
 
 
 def _nuxt_functions(*names: str) -> tuple[str, ...]:
@@ -441,7 +463,8 @@ def register_default_surfaces() -> None:
                 "/privacy-policy",
                 "/cookies-policy",
                 "/return-policy",
-            ),
+            )
+            + _nuxt_locale_homes(),
             invalidated_by=(
                 "page_config.ContentPage",
                 "page_config.ContentPageTranslation",

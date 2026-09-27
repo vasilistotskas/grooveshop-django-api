@@ -69,7 +69,6 @@ class BoxNowLocker(UUIDModel, TimeStampMixinModel):
     country_code = models.CharField(
         _("Country Code"),
         max_length=2,
-        default="GR",
         help_text=_("ISO 3166-1 alpha-2 country code"),
     )
     note = models.TextField(_("Note"), blank=True, default="")

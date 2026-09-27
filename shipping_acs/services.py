@@ -672,14 +672,12 @@ class AcsService:
         from shipping_acs.enum.cod_payment_way import AcsCodPaymentWay
 
         sender = tenant_site_name() or "GrooveShop"
-        fallback_country = acs_config.default_country()
-        country_code = (
-            order.country_id
-            if isinstance(order.country_id, str)
-            else (
-                order.country.alpha_2 if order.country_id else fallback_country
-            )
-        )
+        # ``Country.pk`` IS the alpha-2 code, so ``order.country_id`` is
+        # already the string ACS wants — no lookup needed. Order
+        # creation requires a country (``validate_shipping_address``),
+        # so a missing one here means pre-migration data; "GR" is a
+        # defensive last resort, not a configured default.
+        country_code = order.country_id or "GR"
 
         params: dict[str, Any] = {
             "Billing_Code": client.billing_code,
@@ -690,13 +688,11 @@ class AcsService:
             ),
             "Recipient_Address": order.street,
             "Recipient_Address_Number": order.street_number,
-            "Recipient_Zipcode": _zipcode_for_acs(
-                order, country_code or fallback_country
-            ),
+            "Recipient_Zipcode": _zipcode_for_acs(order, country_code),
             "Recipient_Region": order.city,
             "Recipient_Phone": _normalize_phone_for_acs(order.phone),
             "Recipient_Cell_Phone": _normalize_phone_for_acs(order.phone),
-            "Recipient_Country": country_code or fallback_country,
+            "Recipient_Country": country_code,
             "Recipient_Email": order.email or "",
             "Charge_Type": shipment.charge_type,
             "Item_Quantity": shipment.item_quantity,
@@ -1562,7 +1558,7 @@ class AcsService:
     def sync_stations(
         cls,
         *,
-        country: str | None = None,
+        country: str,
         kinds: tuple[int, ...] | None = None,
     ) -> dict[str, int]:
         """Refresh ``AcsStation`` from the ``Acs_Stations`` endpoint.
@@ -1572,16 +1568,16 @@ class AcsService:
         a kind we *do not* deactivate existing rows for that kind —
         a transient API failure must not blank the entire local cache.
 
-        ``country`` defaults to the ACS provider's first configured
-        country (``ShippingProvider.metadata.shop_kinds_by_country``);
+        ``country`` is required — the caller (``sync_acs_stations``)
+        iterates the countries that have an active ACS ``ShippingRate``,
+        so there is no longer a single "the" ACS country to default to.
         ``kinds`` defaults to that country's locker kinds plus the
         physical SHOP kind (1) so we keep our generic-shop fallback
-        rows up to date.  Pass either explicitly to sync a specific
-        country or kind set.
+        rows up to date. Pass it explicitly to sync a specific kind set.
         """
         from shipping_acs import config as acs_config
 
-        country = (country or acs_config.default_country()).upper()
+        country = country.upper()
         if kinds is None:
             country_kinds = acs_config.shop_kinds_for_country(country)
             # Always include kind 1 (physical SHOP) so the fallback

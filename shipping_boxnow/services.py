@@ -1360,7 +1360,8 @@ class BoxNowService:
         ``is_active=False``.
 
         Returns:
-            ``{"created": N, "updated": M, "deactivated": K}``
+            ``{"created": N, "updated": M, "deactivated": K,
+            "skipped_no_country": S}``
         """
         started = time.monotonic()
         client = BoxNowClient()
@@ -1396,6 +1397,7 @@ class BoxNowService:
         seen_external_ids: set[str] = set()
         created_count = 0
         updated_count = 0
+        skipped_no_country = 0
         batch_size = 100
 
         for batch_start in range(0, len(destinations), batch_size):
@@ -1429,6 +1431,27 @@ class BoxNowService:
                             external_id,
                             dest.get("lat"),
                             dest.get("lng"),
+                            extra={"boxnow_locker_external_id": external_id},
+                        )
+                        continue
+
+                    # ShippingRate is now per-country: a locker we can't
+                    # place in a country can't be checked against the
+                    # destination's ``ShippingRate.country``, and
+                    # defaulting to GR used to let a Cypriot locker with
+                    # dropped country data mint as if it were Greek.
+                    # Skipped rather than deactivated — added to
+                    # ``seen_external_ids`` so an existing row keeps its
+                    # last-known-good country until BoxNow sends one
+                    # again, instead of being marked inactive because
+                    # one sync response glitched.
+                    if not (dest.get("country") or "").strip():
+                        skipped_no_country += 1
+                        seen_external_ids.add(external_id)
+                        logger.warning(
+                            "sync_lockers: destination %s has no country — "
+                            "skipping it rather than defaulting to GR",
+                            external_id,
                             extra={"boxnow_locker_external_id": external_id},
                         )
                         continue
@@ -1481,11 +1504,12 @@ class BoxNowService:
 
         logger.info(
             "sync_lockers: partner=%s created=%d updated=%d deactivated=%d "
-            "active=%d in %.2fs",
+            "skipped_no_country=%d active=%d in %.2fs",
             client.partner_id,
             created_count,
             updated_count,
             deactivated_count,
+            skipped_no_country,
             BoxNowLocker.objects.filter(is_active=True).count(),
             time.monotonic() - started,
             extra={
@@ -1493,12 +1517,14 @@ class BoxNowService:
                 "boxnow_created": created_count,
                 "boxnow_updated": updated_count,
                 "boxnow_deactivated": deactivated_count,
+                "boxnow_skipped_no_country": skipped_no_country,
             },
         )
         return {
             "created": created_count,
             "updated": updated_count,
             "deactivated": deactivated_count,
+            "skipped_no_country": skipped_no_country,
         }
 
     # ------------------------------------------------------------------
@@ -1796,7 +1822,7 @@ class BoxNowService:
             "address_line_1": dest.get("addressLine1", ""),
             "address_line_2": dest.get("addressLine2", ""),
             "postal_code": dest.get("postalCode", ""),
-            "country_code": dest.get("country") or "GR",
+            "country_code": (dest.get("country") or "").strip().upper(),
             "note": dest.get("note", ""),
             "is_active": True,
             "last_synced_at": timezone.now(),

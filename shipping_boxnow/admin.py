@@ -787,12 +787,14 @@ class BoxNowLockerAdmin(BaseModelAdmin):
                 request,
                 _(
                     "BoxNow locker sync complete: %(created)d created, "
-                    "%(updated)d updated, %(deactivated)d deactivated."
+                    "%(updated)d updated, %(deactivated)d deactivated, "
+                    "%(skipped_no_country)d skipped (no country)."
                 )
                 % {
                     "created": result.get("created", 0),
                     "updated": result.get("updated", 0),
                     "deactivated": result.get("deactivated", 0),
+                    "skipped_no_country": result.get("skipped_no_country", 0),
                 },
             )
         except Exception as exc:

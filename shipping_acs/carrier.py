@@ -13,6 +13,7 @@ from shipping.interfaces import ShippingCarrierInterface, register_provider
 
 if TYPE_CHECKING:
     from order.models.order import Order
+    from shipping.models import ShippingRate
     from shipping_acs.models import AcsShipment
 
 logger = logging.getLogger(__name__)
@@ -300,51 +301,37 @@ class AcsCarrier(ShippingCarrierInterface):
     # Pricing
     # ------------------------------------------------------------------
 
-    def calculate_shipping_cost(
+    def live_quote(
         self,
         *,
-        order_value_amount: float,
-        currency: str,
-        kind: ShippingKind,
-        country_id: str | None = None,
+        rate: ShippingRate,
+        country_code: str,
         region_id: str | None = None,
         weight_grams: int | None = None,
-    ) -> tuple[float, str] | None:
-        from extra_settings.models import Setting
-
-        free_threshold = float(
-            Setting.get("ACS_FREE_SHIPPING_THRESHOLD", default=40.00)
-        )
-        if order_value_amount >= free_threshold:
-            return (0.0, currency)
-
-        # Phase 4a: optional live quote via ACS_Price_Calculation.
-        # ACS_SHIPPING_PRICE Setting remains the source of truth when
-        # the toggle is off OR when the live API call fails — a
-        # transient ACS outage must never block checkout.
-        if bool(Setting.get("ACS_DYNAMIC_PRICING_ENABLED", default=False)):
-            quote = self._fetch_live_quote(
-                country_id=country_id,
-                region_id=region_id,
-                currency=currency,
-                weight_grams=weight_grams,
-            )
-            if quote is not None:
-                return quote
-
-        base = float(Setting.get("ACS_SHIPPING_PRICE", default=3.50))
-        return (base, currency)
-
-    def free_shipping_threshold(
-        self,
-        kind: ShippingKind,
+        currency: str,
     ) -> Decimal | None:
+        """Optional live quote via ``ACS_Price_Calculation``.
+
+        ``rate.price`` (was ``ACS_SHIPPING_PRICE``) remains the source
+        of truth when ``ACS_DYNAMIC_PRICING_ENABLED`` is off OR when
+        the live API call fails — a transient ACS outage must never
+        block checkout.
+        """
         from extra_settings.models import Setting
 
-        # ACS applies the same threshold to both home delivery and
-        # Smartpoint pickup (see :meth:`calculate_shipping_cost`).
-        raw = Setting.get("ACS_FREE_SHIPPING_THRESHOLD", default=40.00)
-        return Decimal(str(raw))
+        if not bool(Setting.get("ACS_DYNAMIC_PRICING_ENABLED", default=False)):
+            return None
+
+        quote = self._fetch_live_quote(
+            country_id=country_code,
+            region_id=region_id,
+            currency=currency,
+            weight_grams=weight_grams,
+        )
+        if quote is None:
+            return None
+        amount, _currency = quote
+        return Decimal(str(amount))
 
     # ACS minimum chargeable weight per published tariff. Anything
     # below 500g is billed at 500g.

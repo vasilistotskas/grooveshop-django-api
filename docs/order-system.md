@@ -132,14 +132,25 @@ address it cannot place (prod order #316: street "1", street number
   in the Country admin. A blank pattern means only "required".
 - **Street** must contain a letter; **street number** must not itself
   match the country's postcode pattern (4+ characters).
+- **Region**: required exactly when the country has any (`Country.
+  has_regions`, an `Exists(Region…)` annotation `for_list()`/
+  `for_detail()` add — never a prefetch, so the storefront's country
+  picker can decide whether to show the region field per country
+  without an extra query); when given, it must belong to the selected
+  country. `country/migrations/0012_seed_iso_countries.py` seeds the
+  full ISO 3166-1 list, most of which have no seeded regions at all —
+  a region could no longer be unconditionally required at the
+  serializer-field level (`UserAddressWriteSerializer.region` and
+  `OrderCreateFromCartSerializer.region_id` are both optional; this
+  validator is what actually enforces it, per-country).
 - Applied in `OrderCreateFromCartSerializer.validate` (always; an
   unknown `country_id` is a field error), `OrderWriteSerializer` and
   `UserAddressWriteSerializer` (`address_update_errors`), and
   `Order.clean()` / `UserAddress.clean()` (`model_address_errors`, the
   admin). The last three judge the address only when the write changes
-  `country`, `street`, `street_number` or `zipcode`, so an unrelated
-  edit of an old record is not blocked by an address that predates the
-  rules.
+  `country`, `region`, `street`, `street_number` or `zipcode`, so an
+  unrelated edit of an old record is not blocked by an address that
+  predates the rules.
 - Carrier code calls `normalize_postcode(value)` and
   `postcode_matches(country, value)`.
 - The storefront applies the same rules inline from the same country row

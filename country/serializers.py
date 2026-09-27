@@ -66,6 +66,16 @@ class CountrySerializer(
             "``phonenumbers`` has no metadata for."
         ),
     )
+    has_regions = serializers.BooleanField(
+        read_only=True,
+        help_text=_(
+            "Whether this country has any Region rows. Most of the "
+            "full ISO 3166-1 seed doesn't — the storefront uses this "
+            "to decide whether the address form's region field is "
+            "shown at all for the selected country, rather than "
+            "unconditionally requiring one."
+        ),
+    )
 
     @extend_schema_field(PhoneMetadataSerializer(allow_null=True))
     def get_phone_metadata(self, obj: Country) -> PhoneMetadataDict | None:
@@ -82,6 +92,7 @@ class CountrySerializer(
             "postal_code_pattern",
             "postal_code_example",
             "phone_metadata",
+            "has_regions",
             "sort_order",
             "created_at",
             "updated_at",
@@ -95,6 +106,7 @@ class CountrySerializer(
             "uuid",
             "main_image_path",
             "phone_metadata",
+            "has_regions",
         )
 
 

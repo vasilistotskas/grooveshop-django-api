@@ -90,15 +90,23 @@ def address_errors(
 ) -> dict[str, list[StrOrPromise]]:
     """Field errors for a delivery address, keyed by model field name.
 
-    Four rules, the first three aimed at the mix-up that let order #316
+    Five rules, the first three aimed at the mix-up that let order #316
     through (street "1", street number "70300", a non-numeric postcode):
 
     - the postcode matches the country's format;
     - the street name contains a letter, so a bare number is rejected;
     - the street number is not itself a postcode of that country;
+    - a region is required exactly when the country has any — added
+      for the full ISO 3166-1 seed, most of which have none, so a
+      region can no longer be unconditionally required at the field
+      level (``UserAddressWriteSerializer.region`` is
+      ``required=False``; this validator is what actually enforces
+      it, per-country);
     - the region, when given, actually belongs to the country — added
       for Cyprus, where a Greek region picked by a stale client would
-      otherwise pair silently with a Cypriot address.
+      otherwise pair silently with a Cypriot address (this also covers
+      "a region was given for a country that has none": no region row
+      can belong to a country with zero of them).
     """
     errors: dict[str, list[StrOrPromise]] = {}
 
@@ -126,7 +134,10 @@ def address_errors(
             )
         ]
 
-    if region is not None and region.country_id != country.alpha_2:
+    if region is None:
+        if country.regions.exists():
+            errors["region"] = [_("Select a region for the selected country.")]
+    elif region.country_id != country.alpha_2:
         errors["region"] = [
             _("Select a region that belongs to the selected country.")
         ]

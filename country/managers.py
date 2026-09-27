@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from django.db.models import Exists, OuterRef
+
 from core.managers import (
     TranslatableOptimizedManager,
     TranslatableOptimizedQuerySet,
@@ -23,21 +25,37 @@ class CountryQuerySet(TranslatableOptimizedQuerySet):
         """Prefetch regions with their translations."""
         return self.prefetch_related("regions", "regions__translations")
 
+    def with_has_regions(self) -> Self:
+        """Annotate whether the country has any ``Region`` row.
+
+        A single correlated ``EXISTS`` per query, not a prefetch — the
+        storefront needs this on every list row to decide whether to
+        show a region field at all (most of the full ISO 3166-1 seed
+        has none), and a prefetch-then-``bool(regions.all())`` would
+        pull every region row just to answer yes/no.
+        """
+        from region.models import Region
+
+        return self.annotate(
+            has_regions=Exists(Region.objects.filter(country_id=OuterRef("pk")))
+        )
+
     def for_list(self) -> Self:
         """
         Optimized queryset for list views.
 
-        Includes translations.
+        Includes translations and the ``has_regions`` annotation.
         """
-        return self.with_translations()
+        return self.with_translations().with_has_regions()
 
     def for_detail(self) -> Self:
         """
         Optimized queryset for detail views.
 
-        Includes translations and regions.
+        Includes translations, regions and the ``has_regions``
+        annotation.
         """
-        return self.with_translations().with_regions()
+        return self.with_translations().with_regions().with_has_regions()
 
 
 class CountryManager(TranslatableOptimizedManager):

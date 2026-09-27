@@ -338,11 +338,23 @@ jobs:
             **/pyproject.toml
             **/uv.lock
 
-      - name: Install psycopg prerequisites
-        run: sudo apt-get install -y --no-install-recommends libpq-dev
+      - name: Install psycopg and gettext prerequisites
+        # gettext for ``compilemessages`` below; the runner image does
+        # not ship msgfmt.
+        run: sudo apt-get install -y --no-install-recommends libpq-dev gettext
 
       - name: Install Dependencies
         run: uv sync --locked --all-extras --dev
+
+      - name: Compile translations
+        # The same step as the Dockerfile's, so tests run against the
+        # Greek catalogue production serves. Without it gettext fell back
+        # to the English msgid here and a test asserting English text
+        # passed in CI but failed on any machine that had compiled the
+        # catalogue — the ``assert_english`` marker (tests/conftest.py)
+        # is what such a test needs, and only this step makes CI notice
+        # a missing one.
+        run: uv run python manage.py compilemessages --ignore=.venv
 
       - name: Run Tests (shard)
         # ``--dist loadfile`` is mandatory for stability per
@@ -476,11 +488,23 @@ jobs:
             **/pyproject.toml
             **/uv.lock
 
-      - name: Install psycopg prerequisites
-        run: sudo apt-get install -y --no-install-recommends libpq-dev
+      - name: Install psycopg and gettext prerequisites
+        # gettext for ``compilemessages`` below; the runner image does
+        # not ship msgfmt.
+        run: sudo apt-get install -y --no-install-recommends libpq-dev gettext
 
       - name: Install Dependencies
         run: uv sync --locked --all-extras --dev
+
+      - name: Compile translations
+        # The same step as the Dockerfile's, so tests run against the
+        # Greek catalogue production serves. Without it gettext fell back
+        # to the English msgid here and a test asserting English text
+        # passed in CI but failed on any machine that had compiled the
+        # catalogue — the ``assert_english`` marker (tests/conftest.py)
+        # is what such a test needs, and only this step makes CI notice
+        # a missing one.
+        run: uv run python manage.py compilemessages --ignore=.venv
 
       - name: Run MT lane
         # Serial (-n 0): the lane is small (~10 tests) and schema

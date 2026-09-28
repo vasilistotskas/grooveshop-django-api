@@ -3,6 +3,467 @@
 
 
 
+## v3.89.0 (2026-09-28)
+
+### Bug fixes
+
+* fix(shipping): route home delivery to a carrier that can carry the cart
+
+resolve_home_delivery_provider picked the lowest-priority carrier with a
+rate for the country and ignored its weight cap, so a heavy cart was
+refused as over-weight even when another home-delivery carrier had room
+for it. It now prefers a carrier whose rate fits the cart's weight, and
+both the price (shipping_cost) and the carrier assigned to the order
+(_resolve_shipping_provider) pass the same cart weight, so they still
+agree. When no carrier fits it names the first, and the quote reports
+the weight cap rather than 'not available for this country'.
+
+Found by CodeRabbit on the storefront PR, whose combined home-delivery
+row had the same first-carrier assumption.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01FjnQ7zTpdT8APsEWrbh6QJ ([`e006f55`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e006f556e660a247a654fce1ef12deae1a2296c8))
+
+* fix(cart): refuse an unshippable payment intent without echoing the exception
+
+CodeQL flagged py/stack-trace-exposure on the create-payment-intent 400:
+it returned str(exc) as the detail. The refusal now has the same shape
+as order creation's: the fixed 'Invalid order data' detail plus the
+field-scoped messages, with the exception logged instead.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01FjnQ7zTpdT8APsEWrbh6QJ ([`e4a57ee`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e4a57ee22d74ac8e0df95171370d21e0ad1bae1b))
+
+* fix(order): price an order without a kind as the home delivery it is
+
+Order.shipping_kind defaults to home_delivery and
+_resolve_shipping_provider assigns the carrier on that basis, but
+shipping_cost looked up a rate for an empty kind and refused the
+order. Order creation leaves the kind optional, and the agent gateway
+omits it when unset, so both now agree on the model's default. main's
+order-attribution tests build orders exactly that way, for a country
+of their own that now gets a rate.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01FjnQ7zTpdT8APsEWrbh6QJ ([`e8c00eb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e8c00eb91a90f1a9189b57279b09ead42ca41eae))
+
+* fix(i18n): translate the shipping-rate, region and phone strings
+
+The branch's new admin labels, validation messages and API help texts
+never reached the catalogs, so the Greek admin showed Shipping Rates,
+Free Shipping Threshold and the rest in English. Adds native el and de
+entries for every string the branch introduced.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01FjnQ7zTpdT8APsEWrbh6QJ ([`777f50a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/777f50a959048edd1feca5fe48295a03751b34a8))
+
+* fix(core): order through translations in the request language
+
+Ordering by a translations__<field> key joined the parler translation
+table into the outer query, returning every row once per language.
+With countries now seeded in el/en/de, /api/v1/country served 248 rows
+of which 83 were distinct, and paging never reached most countries;
+any list ordered by a translated name (products, blog, pay ways, ...)
+does the same once its rows carry more than one translation.
+
+CamelCaseOrderingFilter now turns such keys into translated_value(): a
+correlated subquery picking the value in the request's language, or
+parler's default language when that translation is missing. One row
+per record, and the order follows the language the client reads.
+
+Drops the ordering=sortOrder workaround in test_search_by_alpha_2,
+which passes on the default ordering again.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01FjnQ7zTpdT8APsEWrbh6QJ ([`5524be9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5524be918fe308855297b285156ef82cd878123e))
+
+* fix(shipping_acs): refuse to mint a voucher for an order with no country
+
+_build_create_voucher_params no longer falls back to "GR" when
+order.country_id is missing — raises AcsAPIError instead, caught by
+create_voucher_for_order's existing "refused locally" handler (records
+the failure, releases the mint claim). ACS is Greece-only today, but
+which countries it serves comes from active ShippingRate rows, never
+a hardcoded fallback in the voucher builder; an order without a
+country (only possible for pre-migration data — the FK is SET_NULL)
+must not silently ship as Greek.
+
+Also fixes test_view.py::test_delete_country: it deleted the shared
+GR row (self.country), which this branch's ISO seed and region rule
+now make many more tests depend on. Confirmed the actual bug rather
+than assuming: on a freshly-built database, running this single test
+in complete isolation and then querying with a separate connection
+afterward shows GR permanently gone — Django's TestCase-level rollback
+is not reverting the delete. _reseed_countries does NOT paper over
+this: pytest-django detects APITestCase/TestCase subclasses via
+issubclass(cls, TransactionTestCase), which never touches the
+get_closest_marker("django_db") check that fixture gates on, so it
+never runs for this test at all. Root-causing the actual rollback gap
+(django-tenants' Postgres backend under this app's DATABASE_ROUTERS=[]
+test config is the leading suspect) is out of scope here; the test now
+deletes a disposable country instead of the shared GR fixture, which
+directly removes the blast radius this branch raised regardless of
+that root cause.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01FjnQ7zTpdT8APsEWrbh6QJ ([`7276bb7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7276bb7b9b6ed25012933a601d5106ef669a279f))
+
+* fix(shipping): rename ShippingRate.kind's admin label to Shipping Kind
+
+Reuses the existing "Shipping Kind" msgid from Order.shipping_kind
+(same concept, same field name) instead of the bare "Kind" this field
+had — one translation to keep in sync, not two. Migration is
+verbose_name-only, confirmed no-op SQL via sqlmigrate.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01FjnQ7zTpdT8APsEWrbh6QJ ([`a68c102`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a68c1026a64682281b5349a1dd93ed131d2a728c))
+
+* fix(shipping_boxnow): add country_code to BoxNowLocker admin list_filter
+
+Ops can now filter the locker list by country in the admin — needed
+to verify the Cyprus lockers synced once BoxNow ships there, without
+scrolling the full list.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01FjnQ7zTpdT8APsEWrbh6QJ ([`b8fecb7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b8fecb7f62aa8337cd498883fe7fba7ac8d71a8d))
+
+### Build system
+
+* build(schema): regenerate with the translated shipping descriptions
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01FjnQ7zTpdT8APsEWrbh6QJ ([`00a3192`](https://github.com/vasilistotskas/grooveshop-django-api/commit/00a3192d238f18e4a2c184fac3e5a4554aa37159))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.88.0 [skip ci] ([`261df9b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/261df9b5e03ab14d634dc8fa60fe0e310b46e2d1))
+
+### Documentation
+
+* docs(shipping): document ShippingRate; regenerate schema.yml
+
+docs/order-system.md gets a new 5.0 section covering ShippingRate,
+the active_rate/assert_available/quote gate chain, the carrier
+live_quote hook, the /shipping/options and /shipping/free-shipping-info
+contract, ?shippable=true, resolve_home_delivery_provider, the
+release-N conversion migration and the release-N+1 Setting drop it
+sets up, and how an operator adds a new country to an existing
+carrier (a ShippingRate row, not a deploy).
+
+locale/el and locale/de gain msgstrs for the new user-facing strings
+this feature adds (rate admin help text, the not-available/weight-
+exceeded checkout errors, the region-country mismatch validator
+message).
+
+schema.yml is the drf-spectacular regeneration for every endpoint
+change in this branch so far (ShippingRate in the admin/API surface,
+shipping/options and free-shipping-info's country_code parameter,
+country's shippable filter).
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01FjnQ7zTpdT8APsEWrbh6QJ ([`355a80a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/355a80a92fa29cb2a6c0fa5bf18483c9ca458d05))
+
+### Features
+
+* feat(country): require a region only when the country has any
+
+address_errors gains a fifth rule: a region is required exactly when
+country.regions.exists() — most of the full ISO 3166-1 seed has none,
+so unconditionally requiring one (the previous rule) would make every
+address outside a handful of countries unwritable. When a region IS
+given, it must still belong to the selected country (existing rule);
+that check alone also covers "a region was given for a country with
+zero of them", since no region row can belong to a country that has
+none.
+
+UserAddressWriteSerializer.region is now required=False, allow_null=True
+— the field itself can't enforce a per-country rule, so the validator
+does. OrderCreateFromCartSerializer.region_id was already optional at
+the field level; both routes already resolve region=None correctly and
+pass it through to address_errors, so no further serializer change was
+needed there.
+
+Country.has_regions is a new read-only API field — an Exists(Region…)
+annotation for_list()/for_detail() add, never a prefetch, so the
+storefront can decide whether to show the address form's region field
+at all for the selected country without an extra round trip.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01FjnQ7zTpdT8APsEWrbh6QJ ([`fa47dee`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fa47deeaa958275131499dd578abcc7c9013701e))
+
+* feat(country): replace the CY-only seed with a full ISO 3166-1 seed
+
+country/migrations/0012_seed_iso_countries.py supersedes
+0012_seed_cyprus.py: seeds all 249 ISO 3166-1 countries so a merchant
+can add a ShippingRate for any of them without a platform-side
+migration, not just the one this branch happened to add for BoxNow.
+The frozen literal was generated once, offline, from pycountry
+(alpha_2/alpha_3/numeric), phonenumbers (calling code) and babel's
+CLDR territory names for el/en/de — none of those three are imported
+here at migration runtime. get_or_create keyed on alpha_2, same
+non-destructive rule as every other seed migration in this app; also
+corrects 0010_seed_default_country's own wrong GR iso_cc (297, actually
+Aruba's — ISO 3166-1's real value for Greece is 300), but only when
+the row still carries that exact original value. iso_cc/alpha_3
+collisions with an operator-added row are handled without aborting the
+rest of the seed. sort_order keeps existing rows' order and appends
+new ones in English-name order; postal patterns are single-sourced
+from 0011's own table via importlib, never duplicated.
+
+CountryFactory's alpha_2/alpha_3 generators now draw from ISO 3166-1's
+own reserved "user-assigned" range (AA, QM-QZ, XA-XZ, ZZ — never a
+real country, so never seeded here) instead of Faker's real-country
+pool: with all ~195 of Faker's own codes now pre-seeded, the factory's
+DB-uniqueness retry loop would exhaust on nearly every call across the
+whole suite. Same trick tests/integration/region/test_filters.py
+already used for the identical reason.
+
+tests/conftest.py's _reseed_countries now replays this migration (and
+region's Cyprus-region seed) too, in dependency order, so a test that
+flushes the country table gets the full seed back, not just GR.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01FjnQ7zTpdT8APsEWrbh6QJ ([`74be404`](https://github.com/vasilistotskas/grooveshop-django-api/commit/74be404d2959e636457da572161208f73cf2a709))
+
+* feat(country): seed Cyprus, expose phone metadata and a shippable filter
+
+country/migrations/0012_seed_cyprus.py seeds CY (idempotent
+get_or_create on alpha_2, reverse a no-op — an operator-edited row is
+left untouched, matching 0010_seed_default_country's own pattern);
+region/migrations/0010_seed_cyprus_regions.py adds its 6 districts the
+same way, depending on the country migration for its FK target.
+
+country/phone.py adds phone_metadata_for_region(), reading the
+phonenumbers library's per-region metadata (general vs mobile
+sub-objects) so the frontend can validate a Cypriot phone number
+without a hardcoded pattern table.
+
+country/filters.py's shippable=true/false splits the country list by
+ShippingService.shippable_country_codes() (previous commits) — the
+countries the CURRENT tenant actually has an active rate for, never
+the platform host's, which has no schema of its own to hold one.
+
+NOTE: this 0012_seed_cyprus.py migration will be replaced by a
+0012_seed_iso_countries.py migration in a following commit (full
+ISO 3166-1 seed, per updated scope) — kept here as the CY-only
+snapshot this branch built on.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01FjnQ7zTpdT8APsEWrbh6QJ ([`bad421c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bad421cc1c375a567ce78a3943b5ac62870a902f))
+
+* feat(shipping_acs,shipping_boxnow): read country support from ShippingRate
+
+Both carriers stop trusting a hardcoded/env-configured country list
+and instead check ShippingRate directly: ACS's station sync and
+BoxNow's is_kind_enabled/locker sync now derive which countries they
+serve from active rates, not ACS_SUPPORTED_COUNTRIES or a metadata
+key. shippable_country_codes (shipping/services.py, previous commit)
+is the shared query both read from.
+
+BoxNowLocker.country_code drops its hardcoded "GR" Python default —
+a locker's country now always comes from the BoxNow API response,
+never an assumption; the migration is a no-op at the SQL level (state
+only, the column already allowed any value).
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01FjnQ7zTpdT8APsEWrbh6QJ ([`0a004cf`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0a004cfd7270f6afda003cfa54e33bd7d3adcc81))
+
+* feat(shipping): route order/cart pricing through ShippingRate
+
+OrderService.shipping_cost replaces calculate_shipping_cost: it takes
+(order_value, country_id, region_id, shipping_provider_code,
+shipping_kind, weight_grams) and is now the ONLY shipping-cost path
+for both order creation and the create-payment-intent endpoint, so
+they can no longer disagree on the same (provider, kind, country)
+triple the way the old generic-fallback split allowed. A combination
+with no active rate is a genuine 400 (InvalidOrderDataError), not a
+platform-wide flat price to fall through to.
+
+home_delivery with no explicit provider code (the frontend sends null
+— provider-agnostic at the form level) auto-resolves to the active
+home-delivery provider for the destination country via
+ShippingService.resolve_home_delivery_provider, shared by
+_resolve_shipping_provider (the order's FK) so the assigned carrier
+and the charged price always agree.
+
+PUBLIC_SETTING_KEYS drops the six retired Setting keys; the cache
+surface registry invalidates on ShippingRate/ShippingProvider writes
+and on the CountryViewSet's own shippable-filter surface.
+
+core/validators/address.py gains a fourth rule: a region, when given,
+must belong to the selected country — added for Cyprus, where a stale
+Greek region picked by the client would otherwise pair silently with a
+Cypriot address.
+
+tenant/provisioning.py's flat_rate activation docstring is updated to
+explain why it doesn't also need to seed a rate: a brand-new tenant
+schema runs its full migration history at creation, including
+0011_convert_legacy_pricing_to_rates, which already gives flat_rate a
+GR/home_delivery rate at the frozen historical default.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01FjnQ7zTpdT8APsEWrbh6QJ ([`b9b90c6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b9b90c63835a77b433fed8e20a4f1228cb99da69))
+
+* feat(shipping): add ShippingRate as the per-country pricing model
+
+Replaces the global CHECKOUT_SHIPPING_PRICE / FREE_SHIPPING_THRESHOLD /
+BOXNOW_* / ACS_* Setting sextet with one row per (provider, country,
+kind), carrying price, free-shipping threshold, weight cap and an
+active flag. A single global price had no way to say a store ships to
+one country but not another — the gap that blocked offering BoxNow
+lockers in Cyprus without also accepting Cyprus home-delivery orders
+at the Greek flat rate.
+
+0011 converts each tenant's existing Setting values (or the frozen
+historical default when a row is missing) into GR-only rate rows, so
+no store starts offering a new country just because this shipped.
+0012 is a help-text-only ShippingProvider.metadata update, no-op SQL.
+
+Admin gets a Rates inline on ShippingProvider; the interface/exception
+types the carrier adapters and service layer build on land here first.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01FjnQ7zTpdT8APsEWrbh6QJ ([`4c2cbc3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4c2cbc3c321b665a5d75eaf8be723e3960b3cf15))
+
+### Performance improvements
+
+* perf(country): seed the ISO countries with two bulk inserts
+
+The seed created each of the 249 countries and 747 translations with
+its own query: 3,242 queries and ~3.2 s from an empty table. The test
+suite re-runs it after every flushing test, which put a ~5 s setup in
+front of dozens of tests per CI shard and pushed shard 3 to within a
+minute of its timeout. The rows are now built in memory and written
+with one bulk_create each: 7 queries, ~40 ms. Same rows, same rules.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01FjnQ7zTpdT8APsEWrbh6QJ ([`e7dad19`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e7dad196b97a40ab80be6f7d7c294462769d04cf))
+
+### Testing
+
+* test: skip the per-test country and rate reseed while the rows exist
+
+_reseed_countries re-ran four seed migrations (26 queries, ~23 ms) and
+_reseed_shipping_providers the rate conversion (17 queries, ~17 ms)
+before every DB test, although the rows only go missing after a
+flushing test. Two counts now decide whether the country seeds need to
+run, and one query whether the GR rates do.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01FjnQ7zTpdT8APsEWrbh6QJ ([`b9cd30e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b9cd30e22377bbbd1608d870a50d51ab6d35f45a))
+
+* test: give the gift-card and settings tests what the rate model needs
+
+TestSplitPayment built orders for a country with no ShippingRate, so
+every path refused them as unavailable; its fixture now enables one.
+The public-settings test asked for FREE_SHIPPING_THRESHOLD, which is no
+longer a setting, and the cache-isolation and wholesale tests still
+named or patched it; they use a surviving key or drop the dead patch.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01FjnQ7zTpdT8APsEWrbh6QJ ([`c935cea`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c935cead08deea12c924db0dfe96903e2161d15f))
+
+* test(country): search_by_alpha_2 orders by sort_order only
+
+The full ISO seed gives "GR" real ambiguous matches for the first time
+(BG/GRL/GRD alpha_3 substrings, "Montenegro" by translated name, etc.).
+DRF's SearchFilter correctly de-duplicates its own OR-filter into one
+row per country (must_call_distinct wraps it in an EXISTS subquery),
+but CountryViewSet's default secondary ordering key, translations__name,
+re-joins translations on the OUTER query with no matching dedup, fanning
+every multi-language row back out — so LIMIT 7 (the page size the
+correctly-deduped COUNT produces) can slice into that fan-out before
+reaching GR.
+
+Requesting ordering=sortOrder explicitly needs no translations join, so
+nothing fans out and GR is reliably on the page. This is a latent
+ordering/search interaction in CountryViewSet — the same
+translations__name ordering pattern is used across the app — that a
+small seed (CY, GR, a few ad-hoc test rows) never had enough overlapping
+matches to expose; fixed at the test's blast radius rather than
+reworking the view's default ordering project-wide.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01FjnQ7zTpdT8APsEWrbh6QJ ([`c3cdc61`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c3cdc61d8f1e10254f268d336d38dea8f7f11679))
+
+* test(order): pin region-required mocks and payloads for the new rule
+
+OrderModelTestCase's bare Mock() country made regions.exists() itself a
+truthy Mock, which address_errors() now reads as "this country has
+regions" — pin it to False for a country that should need none.
+TestOrderCreateSerializerValidation's ad-hoc country genuinely has a
+region (created in setUp), so its base address payload needs region_id
+now that the field is populated instead of omitted.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01FjnQ7zTpdT8APsEWrbh6QJ ([`a3721d9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a3721d976844b1e0dbb72c89d84ca6ac903d135a))
+
+* test(country): cover the ISO seed and the region-optional rule
+
+test_seed_iso_countries.py replaces test_seed_cyprus.py: fresh-
+environment seeding (CY's exact ISO data, a country absent from the
+postal-format table stays blank), the GR iso_cc correction (and that
+an operator-set value or an already-corrected row is left alone),
+idempotency, sort_order appending, and both uniqueness-collision
+paths (iso_cc nulled, alpha_3 skips the row).
+
+address_errors' new region-required rule needed
+tests/unit/core/test_address_validators.py's TestAddressErrors class
+marked django_db (the rule is a real query whenever region is
+omitted) and every GREECE-based existing test given a region — GR
+has 12 real seeded districts now, so omitting one is a genuine error
+where it wasn't before. New tests cover both directions plus the
+existing "wrong country" rule.
+
+Six other test files created a Country directly with a real alpha_2
+("US", "GB", "DE", "FR", "JP", "BB", ...) that the full ISO seed
+(previous commit) now seeds first — switched to get_or_create so they
+get the already-seeded row instead of an IntegrityError, or added a
+region_id/region to a GR-based payload that the new region rule now
+requires.
+
+Also discovered, NOT fixed here (out of scope, pre-existing and
+byte-identical to origin/main): test_view.py::test_delete_country
+does not roll back its DELETE after the test — confirmed on a fresh
+database, in isolation, by querying with a separate connection
+afterward. Left test_search_by_alpha_2 (also pre-existing) as-is; it
+depends on GR surviving test_delete_country and can flake depending on
+execution order/shard assignment.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01FjnQ7zTpdT8APsEWrbh6QJ ([`305a454`](https://github.com/vasilistotskas/grooveshop-django-api/commit/305a4543519e0bcfcd2f8556cb62264f4d0f3aeb))
+
+* test(shipping): cover ShippingRate, Cyprus seeding, and the rate gate
+
+New coverage: the ShippingRate model (clean() validation, ordering),
+the admin Rates inline, the service-layer rate gate
+(active_rate/assert_available/quote), the legacy-pricing conversion
+migration (frozen defaults, metadata-driven countries, idempotency,
+reverse), the country seed migration and its cross-schema FK under
+the real tenant router (tests_mt), the ?shippable= filter, and phone
+metadata lookup.
+
+tests/utils/shipping.py::enable_rate is the shared helper every
+checkout-path test needing an ad-hoc country now calls: a
+CountryFactory() country has no rate of its own, so the ~20 order/
+cart/promotion/b2b integration tests that built a checkout around one
+needed either this call, a "shipping_kind" in their payload, or both
+— the plain 400 the missing piece produces otherwise.
+
+tests/conftest.py adds _reseed_countries, ordered before
+_reseed_shipping_providers (which depends on GR existing to create its
+rate rows) — country/region had no reseed fixture of their own before
+this, unlike ShippingProvider/Setting.
+
+order/factories/order.py and user/factories/address.py's
+get_or_create_country()/get_or_create_region() (previous commit) now
+deterministically prefer GR over a random pick, so an order/address
+factory never non-deterministically pairs a Faker postcode with CY's
+strict 4-digit format, or a GR country with a CY region.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01FjnQ7zTpdT8APsEWrbh6QJ ([`32e304c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/32e304c47c4c568cbb09dce933173a9d38ff290a))
+
 ## v3.88.0 (2026-09-28)
 
 ### Chores

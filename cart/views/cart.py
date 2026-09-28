@@ -939,9 +939,12 @@ class CartViewSet(BaseModelViewSet):
                 free=promo_result.free_shipping,
             )
         except InvalidOrderDataError as exc:
+            # Same shape as order creation's refusal: a fixed detail and
+            # the field-scoped messages, never the exception's own text.
+            logger.warning("Invalid order data: %s", exc)
             return Response(
                 {
-                    "detail": str(exc),
+                    "detail": _("Invalid order data"),
                     "field_errors": exc.field_errors,
                 },
                 status=status.HTTP_400_BAD_REQUEST,

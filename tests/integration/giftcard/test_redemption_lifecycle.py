@@ -23,6 +23,7 @@ from order.services import OrderService
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories import ProductFactory
+from tests.utils.shipping import enable_rate
 from user.factories import UserAccountFactory
 
 pytestmark = pytest.mark.django_db
@@ -46,6 +47,7 @@ def enable_gift_cards():
 def checkout():
     user = UserAccountFactory()
     country = CountryFactory()
+    enable_rate(country)
     cart = CartFactory(user=user)
     cart.items.all().delete()
     product = ProductFactory(

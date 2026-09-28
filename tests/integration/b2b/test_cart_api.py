@@ -195,14 +195,7 @@ class TestPaymentIntentBinding:
         )
 
         def _get(key, default=None):
-            # Free shipping above 50€ makes the expected charge exact:
-            # the 90.00 wholesale items total clears it (the 100.00
-            # retail total would too — the assertion below tells the
-            # two apart by the amount itself).
-            return {
-                "B2B_WHOLESALE_ENABLED": True,
-                "FREE_SHIPPING_THRESHOLD": Decimal("50.00"),
-            }.get(key, default)
+            return {"B2B_WHOLESALE_ENABLED": True}.get(key, default)
 
         with (
             patch(

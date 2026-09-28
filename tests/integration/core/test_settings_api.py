@@ -85,13 +85,13 @@ class TestGetSettingByKeyPublicAccess:
     """Anonymous callers can read whitelisted keys, nothing else."""
 
     def test_whitelisted_key_returns_200_anonymous(self):
-        """FREE_SHIPPING_THRESHOLD is in PUBLIC_SETTING_KEYS."""
+        """LOYALTY_ENABLED is in PUBLIC_SETTING_KEYS."""
         client = _anon_client()
         url = reverse("api-settings-get")
-        response = client.get(url, {"key": "FREE_SHIPPING_THRESHOLD"})
+        response = client.get(url, {"key": "LOYALTY_ENABLED"})
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert data["name"] == "FREE_SHIPPING_THRESHOLD"
+        assert data["name"] == "LOYALTY_ENABLED"
         assert "value" in data
 
     def test_contact_email_whitelisted_returns_200_anonymous(self):
@@ -240,8 +240,8 @@ class TestSettingValueIsolation:
         from extra_settings.models import Setting
 
         obj, _ = Setting.objects.get_or_create(
-            name="FREE_SHIPPING_THRESHOLD",
-            defaults={"value_type": "decimal", "value_decimal": "50.00"},
+            name="GIFT_CARD_MIN_AMOUNT",
+            defaults={"value_type": "decimal", "value_decimal": "10.00"},
         )
         # Overwrite via the ORM to simulate an admin change.  Set
         # ``value_type`` explicitly because ``get_or_create`` may have

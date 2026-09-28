@@ -160,12 +160,24 @@ class TestPaymentIntentBinding:
         return {
             "pay_way_id": pay_way.id,
             "shipping_kind": "home_delivery",
+            "country_id": "GR",
         }
 
     def test_intent_amount_uses_wholesale_total(
         self, b2b_tenant, enable_wholesale
     ):
+        from country.models import Country
         from pay_way.factories import PayWayFactory
+        from tests.utils.shipping import enable_rate
+
+        # A ShippingRate is per-country now — make sure GR's is active
+        # with a threshold the 90.00 wholesale total (but not
+        # necessarily a retail total) clears, regardless of which
+        # schema this test's tenant binding leaves active.
+        enable_rate(
+            Country.objects.get(alpha_2="GR"),
+            free_shipping_threshold=Decimal("50.00"),
+        )
 
         user, _group = _wholesale_buyer(discount="10.00")
         _cart_with_line(user, "100.00")
@@ -183,14 +195,7 @@ class TestPaymentIntentBinding:
         )
 
         def _get(key, default=None):
-            # Free shipping above 50€ makes the expected charge exact:
-            # the 90.00 wholesale items total clears it (the 100.00
-            # retail total would too — the assertion below tells the
-            # two apart by the amount itself).
-            return {
-                "B2B_WHOLESALE_ENABLED": True,
-                "FREE_SHIPPING_THRESHOLD": Decimal("50.00"),
-            }.get(key, default)
+            return {"B2B_WHOLESALE_ENABLED": True}.get(key, default)
 
         with (
             patch(

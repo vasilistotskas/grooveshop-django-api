@@ -69,8 +69,10 @@ class ShippingProvider(TimeStampMixinModel):
         default=dict,
         blank=True,
         help_text=_(
-            "Provider-specific configuration (supported countries, "
-            "feature flags, branding hints)."
+            "Provider-specific configuration (feature flags, branding "
+            "hints, locker/map chrome). Which countries this provider "
+            "ships to is a ``ShippingRate`` question, not a metadata "
+            "key — see the Rates inline below."
         ),
     )
     logo = ImageAndSvgField(

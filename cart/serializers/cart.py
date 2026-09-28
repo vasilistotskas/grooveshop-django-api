@@ -457,11 +457,10 @@ class CartCreatePaymentIntentRequestSerializer(serializers.Serializer):
     )
     country_id = serializers.CharField(
         max_length=2,
-        required=False,
-        allow_blank=True,
         help_text=_(
-            "Optional ISO 3166-1 alpha-2 country code — drives the "
-            "country-level shipping multiplier. Match what the "
+            "ISO 3166-1 alpha-2 country code — required because a "
+            "``ShippingRate`` is per-country, so there is no priceable "
+            "shipping option without a destination. Match what the "
             "order-create body will carry."
         ),
     )

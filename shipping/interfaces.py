@@ -30,6 +30,7 @@ if TYPE_CHECKING:
     from order.models.order import Order
     from pay_way.enum.settlement import PaySettlement
     from shipping.enum import ShippingKind
+    from shipping.models import ShippingRate
 
 
 class ShippingCarrierInterface(ABC):
@@ -103,54 +104,36 @@ class ShippingCarrierInterface(ABC):
         Empty dict when the payload is valid for this provider+kind.
         """
 
-    def calculate_shipping_cost(
+    def live_quote(
         self,
         *,
-        order_value_amount: float,
-        currency: str,
-        kind: ShippingKind,
-        country_id: str | None = None,
+        rate: ShippingRate,
+        country_code: str,
         region_id: str | None = None,
         weight_grams: int | None = None,
-    ) -> tuple[float, str] | None:
-        """Return ``(amount, currency)`` for the provider's shipping cost.
-
-        ``weight_grams`` is the total cart weight at quote time. Carriers
-        whose tariff is weight-banded (ACS) use it; flat-rate carriers
-        (BoxNow) ignore it. ``None`` means caller has no weight info —
-        carriers fall back to a sensible floor (ACS uses its 0.5 kg
-        minimum chargeable weight).
-
-        Default: provider has no opinion → caller falls back to the
-        global ``CHECKOUT_SHIPPING_PRICE`` / ``FREE_SHIPPING_THRESHOLD``
-        Setting rows.  Override when the provider should price its own
-        kind (e.g. ACS flat ``ACS_SHIPPING_PRICE``).
-        """
-        return None
-
-    def free_shipping_threshold(
-        self,
-        kind: ShippingKind,
+        currency: str,
     ) -> Decimal | None:
-        """Return the cart-subtotal above which the carrier ships free.
+        """Return a live-quoted price that overrides ``rate.price``.
 
-        Customer-facing hook used by ``GET /api/v1/shipping/free-
-        shipping-info`` to advertise the "Δωρεάν μεταφορικά άνω των X €"
-        line on the PDP and the cart summary.  Co-located with the
-        ``calculate_shipping_cost`` rule so a carrier owns both ends of
-        its pricing — adding a new carrier means one new file declaring
-        both the live cost AND the marketing threshold; the rest of
-        the platform picks the row up automatically.
+        ``rate`` is the resolved ``ShippingRate`` for this
+        (provider, country, kind) — the price, free-shipping threshold
+        and weight cap all live there now; this hook exists only for a
+        carrier whose tariff varies by destination or weight bracket
+        beyond what a single stored price can express (ACS's weight-
+        banded ``ACS_Price_Calculation``).
 
-        Return ``None`` when the carrier+kind combination has no
-        threshold (e.g. carriers that always charge for shipping, or
-        kinds the carrier doesn't price itself). The shipping-info view
-        skips ``None`` entries so they neither dilute the aggregate nor
-        produce a misleading "free above €0" line.
+        ``weight_grams`` is the total cart weight at quote time.
+        ``None`` means caller has no weight info — carriers fall back
+        to a sensible floor (ACS uses its 0.5 kg minimum chargeable
+        weight).
 
-        Currency is always the platform default (``settings.DEFAULT_
-        CURRENCY``) — the threshold is a marketing promise denominated
-        in store currency, not a per-locale FX figure.
+        Default ``None``: the carrier has no live pricing of its own,
+        so :meth:`shipping.services.ShippingService.quote` uses
+        ``rate.price`` unchanged. Override only when the provider
+        genuinely re-prices per call (e.g. ACS with
+        ``ACS_DYNAMIC_PRICING_ENABLED``); a transient failure here MUST
+        return ``None`` rather than raise, so a live-pricing outage
+        falls back to the stored rate instead of blocking checkout.
         """
         return None
 

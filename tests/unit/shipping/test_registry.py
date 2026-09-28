@@ -6,7 +6,6 @@ from typing import Any, ClassVar
 
 import pytest
 
-from shipping.enum import ShippingKind
 from shipping.exceptions import ShippingProviderNotFoundError
 from shipping.interfaces import (
     _REGISTRY,
@@ -77,12 +76,18 @@ def test_register_provider_rejects_empty_code():
         register_provider(_NoCode)
 
 
-def test_default_calculate_shipping_cost_returns_none(cleanup_dummy):
+def test_default_live_quote_returns_none(cleanup_dummy):
+    """Default ``live_quote`` — the caller keeps ``ShippingRate.price``.
+
+    A carrier that never overrides it has no live pricing of its own;
+    ``ShippingService.quote`` falls back to the stored rate.
+    """
     register_provider(_DummyCarrier)
     adapter = get_provider("dummy_test")
-    result = adapter.calculate_shipping_cost(
-        order_value_amount=42.0,
+    result = adapter.live_quote(
+        rate=None,
+        country_code="GR",
+        weight_grams=None,
         currency="EUR",
-        kind=ShippingKind.HOME_DELIVERY,
     )
     assert result is None

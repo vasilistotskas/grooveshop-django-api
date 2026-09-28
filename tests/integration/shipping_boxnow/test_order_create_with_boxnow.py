@@ -31,6 +31,7 @@ from region.factories import RegionFactory
 from shipping_boxnow.enum.parcel_state import BoxNowParcelState
 from shipping_boxnow.factories import BoxNowLockerFactory
 from shipping_boxnow.models import BoxNowShipment
+from tests.utils.shipping import enable_rate
 from user.factories.account import UserAccountFactory
 
 
@@ -69,6 +70,9 @@ class TestOrderCreateWithBoxNow(APITestCase):
         self.user = UserAccountFactory(num_addresses=0)
         self.country = CountryFactory(num_regions=0)
         self.region = RegionFactory(country=self.country)
+        # A ShippingRate is per-country now — this ad-hoc country has
+        # none until this call.
+        enable_rate(self.country, provider_code="boxnow", kind="pickup_point")
         self.online_pay_way = PayWayFactory(
             provider_code="stripe",
             settlement=PaySettlement.ONLINE,
@@ -134,6 +138,35 @@ class TestOrderCreateWithBoxNow(APITestCase):
         )
         mock_get_payment_provider.return_value = provider
 
+    def _bind_boxnow_tenant(self):
+        """Same shape as the ``boxnow_configured_tenant`` fixture in
+        ``tests/conftest.py``, inlined: pytest fixture injection by
+        extra parameter name does not reach ``APITestCase`` methods
+        wrapped in ``@patch`` the way it does a plain pytest function,
+        so this class binds it manually instead.
+
+        ``BoxNowCarrier.is_kind_enabled()`` gates on tenant credentials
+        (``shipping_boxnow/services.py::is_configured``) — since
+        ``OrderService.shipping_cost`` now resolves the rate through
+        the real carrier adapter, a BoxNow pickup_point order needs one
+        bound, same as the live checkout flow does.
+        """
+        from types import SimpleNamespace
+
+        from django.db import connection
+
+        previous = getattr(connection, "tenant", None)
+        connection.tenant = SimpleNamespace(
+            schema_name="test-boxnow-tenant",
+            box_now_client_id="TEST_BOXNOW_CLIENT",
+            box_now_client_secret="TEST_BOXNOW_SECRET",
+            box_now_partner_id="12345",
+            box_now_warehouse_id="2",
+            box_now_notify_phone="+302100000000",
+            box_now_webhook_secret="TEST_BOXNOW_WHS",
+        )
+        self.addCleanup(setattr, connection, "tenant", previous)
+
     @patch("order.payment.get_payment_provider")
     @patch("order.services.OrderService.validate_cart_for_checkout")
     @patch("order.services.OrderService.validate_shipping_address")
@@ -143,6 +176,7 @@ class TestOrderCreateWithBoxNow(APITestCase):
         mock_validate_cart,
         mock_get_payment_provider,
     ):
+        self._bind_boxnow_tenant()
         mock_validate_cart.return_value = {
             "valid": True,
             "errors": [],
@@ -184,6 +218,7 @@ class TestOrderCreateWithBoxNow(APITestCase):
         mock_validate_cart,
         mock_get_payment_provider,
     ):
+        self._bind_boxnow_tenant()
         # BoxNow PAY ON THE GO is collected at the locker: the
         # shipment row must be created with payment_mode=COD so the
         # voucher prints "COD" — that wire value is correct for this

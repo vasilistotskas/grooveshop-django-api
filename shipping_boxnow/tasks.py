@@ -213,7 +213,12 @@ def sync_boxnow_lockers(self) -> dict[str, int]:
     locker absent from the latest response as is_active=False.
     """
     if _skip_if_boxnow_unconfigured("sync_boxnow_lockers"):
-        return {"created": 0, "updated": 0, "deactivated": 0}
+        return {
+            "created": 0,
+            "updated": 0,
+            "deactivated": 0,
+            "skipped_no_country": 0,
+        }
 
     # Lazy import avoids circular dependency at startup.
     from shipping_boxnow.services import BoxNowService

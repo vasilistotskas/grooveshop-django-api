@@ -23,29 +23,30 @@ class CountryStatusFilterTestCase(TestCase):
         self.factory = RequestFactory()
         self.request = self.factory.get("/admin/country/country/")
 
-        self.complete_country = Country.objects.create(
+        # ``country/migrations/0012_seed_iso_countries.py`` seeds every
+        # real ISO country now — ``get_or_create`` so a real code like
+        # "US"/"GB" returns the already-seeded row instead of an
+        # IntegrityError.
+        self.complete_country = Country.objects.get_or_create(
             alpha_2="US",
-            alpha_3="USA",
-            iso_cc=840,
-            phone_code=1,
-        )
+            defaults={"alpha_3": "USA", "iso_cc": 840, "phone_code": 1},
+        )[0]
         self.complete_country.set_current_language("en")
         self.complete_country.name = "United States"
         self.complete_country.save()
 
-        self.incomplete_country = Country.objects.create(
+        self.incomplete_country = Country.objects.get_or_create(
             alpha_2="XX",
-            alpha_3="XXX",
-        )
+            defaults={"alpha_3": "XXX"},
+        )[0]
         self.incomplete_country.set_current_language("en")
         self.incomplete_country.name = "Test Country"
         self.incomplete_country.save()
 
-        self.with_phone_country = Country.objects.create(
+        self.with_phone_country = Country.objects.get_or_create(
             alpha_2="GB",
-            alpha_3="GBR",
-            phone_code=44,
-        )
+            defaults={"alpha_3": "GBR", "phone_code": 44},
+        )[0]
 
     def test_lookups(self):
         lookups = self.filter.lookups(self.request, None)
@@ -158,31 +159,31 @@ class CountryAdminTestCase(TestCase):
         self.admin = CountryAdmin(Country, self.site)
         self.factory = RequestFactory()
 
-        self.country = Country.objects.create(
+        self.country = Country.objects.get_or_create(
             alpha_2="DE",
-            alpha_3="DEU",
-            iso_cc=276,
-            phone_code=49,
-            sort_order=10,
-        )
+            defaults={
+                "alpha_3": "DEU",
+                "iso_cc": 276,
+                "phone_code": 49,
+                "sort_order": 10,
+            },
+        )[0]
         self.country.set_current_language("en")
         self.country.name = "Germany"
         self.country.save()
 
-        self.country_no_flag = Country.objects.create(
+        self.country_no_flag = Country.objects.get_or_create(
             alpha_2="FR",
-            alpha_3="FRA",
-            iso_cc=250,
-            phone_code=33,
-        )
+            defaults={"alpha_3": "FRA", "iso_cc": 250, "phone_code": 33},
+        )[0]
         self.country_no_flag.set_current_language("en")
         self.country_no_flag.name = "France"
         self.country_no_flag.save()
 
-        self.incomplete_country = Country.objects.create(
+        self.incomplete_country = Country.objects.get_or_create(
             alpha_2="ZZ",
-            alpha_3="ZZZ",
-        )
+            defaults={"alpha_3": "ZZZ"},
+        )[0]
         self.incomplete_country.set_current_language("en")
         self.incomplete_country.name = "Test Country"
         self.incomplete_country.save()
@@ -279,8 +280,14 @@ class CountryAdminTestCase(TestCase):
         request.user = Mock()
         request._messages = Mock()
 
-        Country.objects.create(alpha_2="AA", alpha_3="AAA", iso_cc=1)
-        Country.objects.create(alpha_2="BB", alpha_3="BBB", iso_cc=2)
+        Country.objects.get_or_create(
+            alpha_2="AA", defaults={"alpha_3": "AAA", "iso_cc": 1}
+        )
+        # "BB" is Barbados — real and seeded now, but this action only
+        # cares that SOME two extra rows exist for the bulk re-sort.
+        Country.objects.get_or_create(
+            alpha_2="BB", defaults={"alpha_3": "BBB", "iso_cc": 2}
+        )
 
         queryset = Country.objects.all()
 
@@ -313,12 +320,14 @@ class CountryAdminIntegrationTestCase(TestCase):
                 ("XX", "Test Country", None, None),
             ]
         ):
-            country = Country.objects.create(
+            country = Country.objects.get_or_create(
                 alpha_2=alpha_2,
-                alpha_3=f"{alpha_2}X",
-                iso_cc=iso_cc,
-                phone_code=phone,
-            )
+                defaults={
+                    "alpha_3": f"{alpha_2}X",
+                    "iso_cc": iso_cc,
+                    "phone_code": phone,
+                },
+            )[0]
             country.set_current_language("en")
             country.name = name
             country.save()

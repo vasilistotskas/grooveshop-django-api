@@ -14,6 +14,7 @@ from order.services import OrderService
 from order.stock import StockManager
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
+from tests.utils.shipping import enable_rate
 from user.factories.account import UserAccountFactory
 
 
@@ -29,6 +30,9 @@ class TestTransactionFailuresRollbackCompletely:
         self.user = UserAccountFactory.create()
         self.pay_way = PayWayFactory.create()
         self.country = CountryFactory.create()
+        # A ShippingRate is per-country now — this ad-hoc country has
+        # none until this call.
+        enable_rate(self.country)
 
         self.shipping_address = {
             "first_name": "Test",
@@ -40,6 +44,7 @@ class TestTransactionFailuresRollbackCompletely:
             "zipcode": "12345",
             "country_id": self.country.alpha_2,  # Country uses alpha_2 as primary key
             "phone": "+1234567890",
+            "shipping_kind": "home_delivery",
         }
 
     @pytest.mark.parametrize(

@@ -1,3 +1,6 @@
+import random
+import string
+
 import factory
 from django.apps import apps
 from django.conf import settings
@@ -11,6 +14,30 @@ from devtools.factories import (
 )
 
 fake = Faker()
+
+# ISO 3166-1's own "user-assigned" alpha-2/alpha-3 ranges: reserved
+# indefinitely, never allocated to a real country by the standard, so
+# a value drawn from here can never collide with
+# ``country/migrations/0012_seed_iso_countries.py``'s full ISO seed —
+# real Faker country codes exist in `unique_model_fields`' DB-conflict
+# retry loop, but only ~195 of them, all now pre-seeded, so every
+# attempt failed and exhausted it. Same reserved-range trick
+# ``tests/integration/region/test_filters.py`` already uses for the
+# identical reason.
+_RESERVED_ALPHA_2 = (
+    ["AA", "ZZ"]
+    + [f"Q{c}" for c in "MNOPQRSTUVWXYZ"]
+    + [f"X{c}" for c in string.ascii_uppercase]
+)
+
+
+def _random_reserved_alpha_2() -> str:
+    return random.choice(_RESERVED_ALPHA_2)
+
+
+def _random_reserved_alpha_3() -> str:
+    return "X" + "".join(random.choices(string.ascii_uppercase, k=2))
+
 
 available_languages = [
     lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
@@ -39,8 +66,8 @@ class CountryFactory(CustomDjangoModelFactory):
     auto_translations = False
 
     unique_model_fields = [
-        ("alpha_2", lambda: fake.country_code(representation="alpha-2")),
-        ("alpha_3", lambda: fake.country_code(representation="alpha-3")),
+        ("alpha_2", _random_reserved_alpha_2),
+        ("alpha_3", _random_reserved_alpha_3),
         ("phone_code", lambda: fake.random_int(min=1, max=9999)),
     ]
 

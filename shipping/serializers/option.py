@@ -10,10 +10,12 @@ class ShippingOptionsQuerySerializer(serializers.Serializer):
     """Query params for ``GET /api/v1/shipping/options``."""
 
     country_code = serializers.CharField(
-        required=False,
-        allow_blank=True,
         max_length=2,
-        help_text=_("ISO 3166-1 alpha-2 country code (e.g. 'GR')."),
+        help_text=_(
+            "ISO 3166-1 alpha-2 country code (e.g. 'GR'). Required — "
+            "a ``ShippingRate`` is per-country, so there is no "
+            "destination-agnostic matrix of options to return."
+        ),
     )
     order_value_amount = serializers.DecimalField(
         required=False,
@@ -70,12 +72,36 @@ class ShippingOptionSerializer(serializers.Serializer):
     price = serializers.DecimalField(
         max_digits=11,
         decimal_places=2,
-        allow_null=True,
-        help_text=_("Null when the provider defers to the global flat rate."),
+        help_text=_(
+            "The resolved ``ShippingRate`` price (or a live provider "
+            "quote, or 0 when the rate's free-shipping threshold is "
+            "met)."
+        ),
     )
     currency = serializers.CharField(max_length=3)
     live_mode = serializers.BooleanField()
     priority = serializers.IntegerField()
+    country_code = serializers.CharField(
+        max_length=2,
+        help_text=_("The destination this option was priced for."),
+    )
+    max_weight_grams = serializers.IntegerField(
+        allow_null=True,
+        help_text=_(
+            "The rate's weight cap, or null when it has none. Compare "
+            "against the cart weight the caller already knows — this "
+            "row does not repeat it."
+        ),
+    )
+    exceeds_max_weight = serializers.BooleanField(
+        help_text=_(
+            "True when the caller's ``weight_grams`` exceeds "
+            "``max_weight_grams``. The option is still returned rather "
+            "than hidden — the storefront shows it disabled with a "
+            "reason, so a heavy cart never sees a checkout step with "
+            "one fewer option and no explanation."
+        ),
+    )
     logo_url = serializers.URLField(
         allow_null=True,
         required=False,

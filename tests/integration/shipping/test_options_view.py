@@ -1,4 +1,11 @@
-"""Integration tests for GET /api/v1/shipping/options."""
+"""Integration tests for GET /api/v1/shipping/options.
+
+A ``ShippingRate`` is now the single source of "does this store ship
+this way to this country" — the GR rates for ``flat_rate``/``boxnow``/
+``acs`` are auto-seeded for every DB test (``tests/conftest.py``), at
+the same frozen historical prices ``0011_convert_legacy_pricing_to_
+rates`` writes in production.
+"""
 
 from __future__ import annotations
 
@@ -7,9 +14,18 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
 
+from country.factories import CountryFactory
+from shipping.enum import ShippingKind
+from shipping.factories import ShippingRateFactory
 from shipping.models import ShippingProvider
 
 pytestmark = pytest.mark.django_db
+
+
+def test_country_code_is_required():
+    client = APIClient()
+    response = client.get(reverse("shipping-options"))
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
 
 
 def test_options_lists_only_active_providers():
@@ -39,6 +55,7 @@ def test_options_returns_active_provider_kinds(boxnow_configured_tenant):
 
 
 def test_options_filters_by_country_code(boxnow_configured_tenant):
+    """DE has no BoxNow rate — only GR does (the autouse seed)."""
     ShippingProvider.objects.filter(code="boxnow").update(is_active=True)
 
     client = APIClient()
@@ -69,7 +86,7 @@ def test_options_skips_provider_with_unregistered_adapter():
     )
 
     client = APIClient()
-    response = client.get(reverse("shipping-options"))
+    response = client.get(reverse("shipping-options"), {"country_code": "GR"})
 
     assert all(
         opt["providerCode"] != "ghost_carrier" for opt in response.json()
@@ -78,9 +95,9 @@ def test_options_skips_provider_with_unregistered_adapter():
 
 def test_options_forwards_weight_grams_to_adapter(acs_configured_tenant):
     """Endpoint passes ``weight_grams`` through ``available_options``
-    into the carrier adapter. Without this thread the ACS live quote
-    would always price at the 0.5 kg floor, no matter how heavy the
-    cart was."""
+    into the carrier adapter's ``live_quote``. Without this thread the
+    ACS live quote would always price at the 0.5 kg floor, no matter
+    how heavy the cart was."""
     from unittest.mock import patch
 
     ShippingProvider.objects.filter(code="acs").update(is_active=True)
@@ -88,12 +105,11 @@ def test_options_forwards_weight_grams_to_adapter(acs_configured_tenant):
     client = APIClient()
     captured: dict[str, object] = {}
 
-    def _spy(self, *, order_value_amount, currency, kind, **kwargs):
-        captured["weight_grams"] = kwargs.get("weight_grams")
-        return (3.5, currency)
+    def _spy(self, *, rate, country_code, weight_grams=None, **kwargs):
+        captured["weight_grams"] = weight_grams
 
     with patch(
-        "shipping_acs.carrier.AcsCarrier.calculate_shipping_cost",
+        "shipping_acs.carrier.AcsCarrier.live_quote",
         new=_spy,
     ):
         response = client.get(
@@ -115,7 +131,7 @@ def test_options_rejects_negative_weight():
     client = APIClient()
     response = client.get(
         reverse("shipping-options"),
-        {"weight_grams": "-1"},
+        {"country_code": "GR", "weight_grams": "-1"},
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
 
@@ -126,9 +142,85 @@ def test_options_rejects_absurd_weight():
     client = APIClient()
     response = client.get(
         reverse("shipping-options"),
-        {"weight_grams": "1000000"},
+        {"country_code": "GR", "weight_grams": "1000000"},
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
+class TestRateFields:
+    """Each row carries ``countryCode``, ``maxWeightGrams`` and
+    ``exceedsMaxWeight`` — the fields that let the storefront show an
+    over-cap option disabled with a reason instead of hiding it."""
+
+    def test_country_code_echoes_the_request(self, boxnow_configured_tenant):
+        ShippingProvider.objects.filter(code="boxnow").update(is_active=True)
+
+        client = APIClient()
+        response = client.get(
+            reverse("shipping-options"), {"country_code": "gr"}
+        )
+
+        assert all(opt["countryCode"] == "GR" for opt in response.json())
+
+    def test_a_cart_under_the_cap_is_not_flagged(
+        self, boxnow_configured_tenant
+    ):
+        ShippingProvider.objects.filter(code="boxnow").update(is_active=True)
+        provider = ShippingProvider.objects.get(code="boxnow")
+        country = CountryFactory()
+        ShippingRateFactory(
+            provider=provider,
+            country=country,
+            kind=ShippingKind.PICKUP_POINT,
+            max_weight_grams=4000,
+        )
+
+        client = APIClient()
+        response = client.get(
+            reverse("shipping-options"),
+            {"country_code": country.alpha_2, "weight_grams": "2000"},
+        )
+
+        opt = next(o for o in response.json() if o["providerCode"] == "boxnow")
+        assert opt["maxWeightGrams"] == 4000
+        assert opt["exceedsMaxWeight"] is False
+
+    def test_a_cart_over_the_cap_is_flagged_but_still_listed(
+        self, boxnow_configured_tenant
+    ):
+        """A heavy Cyprus cart never gets a silently empty step — the
+        option stays in the response, flagged."""
+        ShippingProvider.objects.filter(code="boxnow").update(is_active=True)
+        provider = ShippingProvider.objects.get(code="boxnow")
+        country = CountryFactory()
+        ShippingRateFactory(
+            provider=provider,
+            country=country,
+            kind=ShippingKind.PICKUP_POINT,
+            max_weight_grams=4000,
+        )
+
+        client = APIClient()
+        response = client.get(
+            reverse("shipping-options"),
+            {"country_code": country.alpha_2, "weight_grams": "5000"},
+        )
+
+        opt = next(o for o in response.json() if o["providerCode"] == "boxnow")
+        assert opt["exceedsMaxWeight"] is True
+
+    def test_no_cap_means_never_flagged(self, boxnow_configured_tenant):
+        ShippingProvider.objects.filter(code="boxnow").update(is_active=True)
+
+        client = APIClient()
+        response = client.get(
+            reverse("shipping-options"),
+            {"country_code": "GR", "weight_grams": "100000"},
+        )
+
+        opt = next(o for o in response.json() if o["providerCode"] == "boxnow")
+        assert opt["maxWeightGrams"] is None
+        assert opt["exceedsMaxWeight"] is False
 
 
 def _name_it(pay_way, enum_value: str):

@@ -1,10 +1,35 @@
 from django.contrib import admin
+from django.db.models import Count
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
+from unfold.admin import TabularInline
 
 from admin.base import BaseModelAdmin
 from pay_way.admin import PayWayShippingExclusionInline
-from shipping.models import ShippingProvider
+from shipping.models import ShippingProvider, ShippingRate
+
+
+class ShippingRateInline(TabularInline):
+    """Per-(country, kind) price, free-threshold and weight cap.
+
+    ``country`` has no ``autocomplete_fields`` entry — the country
+    admin is platform-only, so a tenant-schema admin session hitting
+    its autocomplete endpoint gets a 403. A plain select is slower to
+    scroll through ~250 rows but always works.
+    """
+
+    model = ShippingRate
+    extra = 0
+    fields = (
+        "country",
+        "kind",
+        "price",
+        "free_shipping_threshold",
+        "max_weight_grams",
+        "is_active",
+    )
+    verbose_name = _("Rate")
+    verbose_name_plural = _("Rates")
 
 
 @admin.register(ShippingProvider)
@@ -17,6 +42,7 @@ class ShippingProviderAdmin(BaseModelAdmin):
         "supports_pickup_point",
         "live_mode",
         "priority",
+        "rates_count",
         "logo_preview",
         "logo_pickup_point_preview",
     )
@@ -32,7 +58,16 @@ class ShippingProviderAdmin(BaseModelAdmin):
     # Same inline as on PayWayAdmin — rows where this provider is the
     # FK target. Lets ops manage exclusions from whichever side they
     # land on (per-provider sweep vs per-pay-way sweep).
-    inlines = [PayWayShippingExclusionInline]
+    inlines = [ShippingRateInline, PayWayShippingExclusionInline]
+
+    def get_queryset(self, request):
+        return (
+            super().get_queryset(request).annotate(_rates_count=Count("rates"))
+        )
+
+    @admin.display(description=_("Rates"), ordering="_rates_count")
+    def rates_count(self, obj) -> int:
+        return obj._rates_count
 
     @admin.display(description=_("Logo"), empty_value="—")
     def logo_preview(self, obj):

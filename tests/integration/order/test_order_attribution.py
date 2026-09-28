@@ -28,6 +28,7 @@ from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
 from region.factories import RegionFactory
+from tests.utils.shipping import enable_rate
 from user.factories.account import UserAccountFactory
 
 INSTAGRAM_UA = (
@@ -65,6 +66,7 @@ class TestOrderAttributionOnCreate(APITestCase):
         self.user = UserAccountFactory()
         self.country = CountryFactory()
         self.region = RegionFactory(country=self.country)
+        enable_rate(self.country)
         self.cart = CartFactory(user=self.user)
         CartItemFactory(
             cart=self.cart,

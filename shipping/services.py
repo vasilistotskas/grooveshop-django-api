@@ -1,9 +1,10 @@
 """Top-level shipping dispatcher.
 
 Order-flow code, the Order detail serializer, the payment hook, and
-``calculate_shipping_cost`` go through this module so they never import
-provider apps directly.  The dispatcher resolves the provider via the
-DB-backed ``ShippingProvider`` row + the in-memory carrier registry.
+``quote`` go through this module so they never import provider apps
+directly. The dispatcher resolves the provider via the DB-backed
+``ShippingProvider`` row + the in-memory carrier registry, and the
+price/availability/weight-cap via the DB-backed ``ShippingRate`` row.
 """
 
 from __future__ import annotations
@@ -14,10 +15,15 @@ from typing import TYPE_CHECKING, Any
 
 from django.conf import settings
 from django.db.models import Q
+from djmoney.money import Money
 
 from shipping.enum import ShippingKind
+from shipping.exceptions import (
+    ShippingUnavailableError,
+    ShippingWeightExceededError,
+)
 from shipping.interfaces import get_provider, is_registered
-from shipping.models import ShippingProvider
+from shipping.models import ShippingProvider, ShippingRate
 
 if TYPE_CHECKING:
     from order.models.order import Order
@@ -235,20 +241,35 @@ class ShippingService:
     def available_options(
         cls,
         *,
-        country_code: str | None = None,
+        country_code: str,
         order_value_amount: float = 0.0,
         currency: str = "EUR",
         weight_grams: int | None = None,
     ) -> list[dict[str, Any]]:
         """Return the matrix of (provider, kind) options for checkout.
 
+        ``country_code`` is required — a per-country ``ShippingRate``
+        is what makes a (provider, kind) offerable at all now, so there
+        is no destination-agnostic matrix left to return.
+
         Filters by:
-        * ``ShippingProvider.is_active = True``
+        * ``ShippingProvider.is_active = True``.
         * Provider must have an adapter registered (so deployments
           missing a provider app don't surface its options).
-        * ``country_code`` filter against the provider's
-          ``metadata['supported_countries']`` list when present.
+        * The (provider, kind)'s per-kind feature flag
+          (``adapter.is_kind_enabled``).
+        * An active ``ShippingRate`` exists for
+          (provider, country_code, kind) — the single source of
+          "does this store ship this way to this country".
+
+        A cart heavier than the rate's ``max_weight_grams`` still gets
+        its row, flagged ``exceeds_max_weight`` — the storefront shows
+        it disabled with a reason rather than a step that silently has
+        one fewer option.
         """
+        country_code = country_code.upper()
+        order_value = Money(order_value_amount, currency)
+
         qs = ShippingProvider.objects.filter(is_active=True).filter(
             Q(supports_home_delivery=True) | Q(supports_pickup_point=True)
         )
@@ -261,16 +282,6 @@ class ShippingService:
                     "— skipping in available_options()",
                     provider.code,
                 )
-                continue
-
-            supported_countries = (provider.metadata or {}).get(
-                "supported_countries"
-            )
-            if (
-                country_code
-                and supported_countries
-                and country_code.upper() not in supported_countries
-            ):
                 continue
 
             adapter = get_provider(provider.code)
@@ -287,12 +298,35 @@ class ShippingService:
                 # on a Setting it controls itself.
                 if not adapter.is_kind_enabled(kind):
                     continue
-                price = adapter.calculate_shipping_cost(
-                    order_value_amount=order_value_amount,
-                    currency=currency,
-                    kind=kind,
-                    weight_grams=weight_grams,
+
+                rate = (
+                    ShippingRate.objects.filter(
+                        provider=provider,
+                        country_id=country_code,
+                        kind=kind.value,
+                        is_active=True,
+                    )
+                    .select_related("provider")
+                    .first()
                 )
+                if rate is None:
+                    # No rate for this country — this (provider, kind)
+                    # simply does not ship here.
+                    continue
+
+                exceeds_max_weight = bool(
+                    weight_grams is not None
+                    and rate.max_weight_grams is not None
+                    and weight_grams > rate.max_weight_grams
+                )
+                price = cls._priced(
+                    rate,
+                    country_code=country_code,
+                    region_id=None,
+                    weight_grams=weight_grams,
+                    order_value=order_value,
+                )
+
                 # Per-(provider, kind) logo: ``pickup_point`` rows
                 # prefer ``logo_pickup_point`` when uploaded so a
                 # carrier can have a distinct locker illustration vs
@@ -305,13 +339,16 @@ class ShippingService:
                         "provider_code": provider.code,
                         "provider_name": provider.name,
                         "kind": kind.value,
-                        "price": price[0] if price else None,
-                        "currency": price[1] if price else currency,
+                        "price": price.amount,
+                        "currency": str(price.currency),
                         "live_mode": provider.live_mode,
                         "priority": provider.priority,
                         "logo_url": provider.logo_url_for_kind(kind.value),
                         "metadata": provider.metadata or {},
                         "pay_ways": cls._pay_ways_for(provider.code, kind),
+                        "country_code": country_code,
+                        "max_weight_grams": rate.max_weight_grams,
+                        "exceeds_max_weight": exceeds_max_weight,
                     }
                 )
 
@@ -379,7 +416,7 @@ class ShippingService:
         currency: str | None = None,
         country_code: str | None = None,
     ) -> dict[str, Any]:
-        """Aggregate per-(active provider, kind) free-shipping thresholds.
+        """Aggregate per-(active rate) free-shipping thresholds.
 
         Powers ``GET /api/v1/shipping/free-shipping-info`` which the
         storefront reads to render "Δωρεάν μεταφορικά άνω των X €" on
@@ -396,65 +433,70 @@ class ShippingService:
           summary can show carrier-specific badges if we want to in
           the future without another round-trip.
 
+        ``country_code`` defaults to the first :meth:`shippable_country_
+        codes` entry — the same rule checkout uses for its initial
+        country — so a caller with no address yet still gets a
+        meaningful "from X €" line. The response echoes the country it
+        actually used in ``country_code``, which is ``None`` only when
+        the store ships nowhere at all yet.
+
         Filters mirror :meth:`available_options`:
-        * ``ShippingProvider.is_active`` must be True.
+        * ``ShippingProvider.is_active`` and ``ShippingRate.is_active``
+          must both be True.
         * The provider's adapter must be registered (so a deploy
           missing a provider app doesn't surface stale rows).
-        * ``country_code`` matches against the provider's
-          ``metadata['supported_countries']`` list when present.
         * The carrier's ``is_kind_enabled(kind)`` hook lets a provider
           gate a kind independently (e.g. ACS Smartpoint hidden
           until ops flip ``ACS_SMARTPOINT_ENABLED``).
-        * Rows where the adapter returns ``None`` from
-          ``free_shipping_threshold`` are skipped — a missing
-          threshold is NOT the same as "free at €0".
+        * Rows whose rate has no ``free_shipping_threshold`` are
+          skipped — a missing threshold is NOT the same as "free at
+          €0".
         """
         active_currency = currency or settings.DEFAULT_CURRENCY
 
-        qs = ShippingProvider.objects.filter(is_active=True).filter(
-            Q(supports_home_delivery=True) | Q(supports_pickup_point=True),
+        resolved_country = (country_code or "").upper() or next(
+            iter(cls.shippable_country_codes()), None
         )
+        if resolved_country is None:
+            return {
+                "providers": [],
+                "min_threshold": None,
+                "max_threshold": None,
+                "currency": active_currency,
+                "country_code": None,
+            }
+
+        rates = ShippingRate.objects.filter(
+            provider__is_active=True,
+            country_id=resolved_country,
+            is_active=True,
+            free_shipping_threshold__isnull=False,
+        ).select_related("provider")
 
         providers: list[dict[str, Any]] = []
-        for provider in qs:
-            if not is_registered(provider.code):
+        for rate in rates:
+            if not is_registered(rate.provider.code):
                 logger.warning(
-                    "Active ShippingProvider '%s' has no registered adapter"
+                    "Active ShippingRate for '%s' has no registered adapter"
                     " — skipping in free_shipping_info()",
-                    provider.code,
+                    rate.provider.code,
                 )
                 continue
 
-            supported_countries = (provider.metadata or {}).get(
-                "supported_countries"
+            kind_enum = ShippingKind(rate.kind)
+            adapter = get_provider(rate.provider.code)
+            if not adapter.is_kind_enabled(kind_enum):
+                continue
+
+            providers.append(
+                {
+                    "provider_code": rate.provider.code,
+                    "provider_name": rate.provider.name,
+                    "kind": rate.kind,
+                    "threshold": rate.free_shipping_threshold.amount,
+                    "priority": rate.provider.priority,
+                }
             )
-            if (
-                country_code
-                and supported_countries
-                and country_code.upper() not in supported_countries
-            ):
-                continue
-
-            adapter = get_provider(provider.code)
-
-            for kind, supported in (
-                (ShippingKind.HOME_DELIVERY, provider.supports_home_delivery),
-                (ShippingKind.PICKUP_POINT, provider.supports_pickup_point),
-            ):
-                if not supported or not adapter.is_kind_enabled(kind):
-                    continue
-                threshold = adapter.free_shipping_threshold(kind)
-                if threshold is None:
-                    continue
-                providers.append(
-                    {
-                        "provider_code": provider.code,
-                        "provider_name": provider.name,
-                        "kind": kind.value,
-                        "threshold": threshold,
-                        "priority": provider.priority,
-                    }
-                )
 
         providers.sort(key=lambda row: (row["priority"], row["provider_code"]))
 
@@ -464,75 +506,288 @@ class ShippingService:
             "min_threshold": min(thresholds) if thresholds else None,
             "max_threshold": max(thresholds) if thresholds else None,
             "currency": active_currency,
+            "country_code": resolved_country,
         }
 
     # ------------------------------------------------------------------
-    # Pricing dispatcher
+    # Rate resolution + pricing
     # ------------------------------------------------------------------
 
     @classmethod
-    def calculate_shipping_cost(
+    def shippable_country_codes(cls) -> list[str]:
+        """Alpha-2 codes with at least one active rate, by ``Country.sort_order``.
+
+        The ordering matches the countries API's own default (``Country``
+        is itself ``ordering = ["sort_order"]``), so a caller that lists
+        shippable countries and one that lists all countries agree on
+        which one is "first" — the rule ``free_shipping_info`` and the
+        storefront's initial-country pick both rely on.
+        """
+        from country.models import Country
+
+        # ``.order_by()`` clears ``ShippingRate.Meta.ordering`` for this
+        # queryset — without it, Postgres' ``SELECT DISTINCT`` must
+        # include every ``ORDER BY`` column, so a country with rates
+        # under two different kinds (different ``ORDER BY`` values)
+        # would count as two "distinct" rows instead of one.
+        rated_codes = (
+            ShippingRate.objects.filter(
+                is_active=True, provider__is_active=True
+            )
+            .order_by()
+            .values_list("country_id", flat=True)
+            .distinct()
+        )
+        return list(
+            Country.objects.filter(alpha_2__in=rated_codes)
+            .order_by("sort_order")
+            .values_list("alpha_2", flat=True)
+        )
+
+    @classmethod
+    def resolve_home_delivery_provider(
+        cls, country_code: str | None, weight_grams: int | None = None
+    ) -> str | None:
+        """Return the active home-delivery carrier's code for ``country_code``.
+
+        Lower ``ShippingProvider.priority`` wins the tie. Without a
+        country, falls back to the lowest-priority active home-delivery
+        provider regardless of rate coverage (there is nothing more
+        specific to prefer yet). Moved from ``OrderService.
+        _resolve_active_home_delivery_code`` so both the FK-assignment
+        and the pricing paths route ``home_delivery`` through the same
+        carrier for the same country — otherwise an order could be
+        priced against one carrier's rate and assigned to another.
+
+        With ``weight_grams`` it prefers a carrier whose rate can carry
+        that cart, so a capped carrier listed first does not hide an
+        uncapped one behind it. When none can, it still names the
+        first carrier, so the quote fails as over-weight rather than as
+        unavailable for the country.
+        """
+        qs = ShippingProvider.objects.filter(
+            is_active=True, supports_home_delivery=True
+        )
+        if country_code:
+            rate = Q(
+                rates__country_id=country_code.upper(),
+                rates__kind=ShippingKind.HOME_DELIVERY.value,
+                rates__is_active=True,
+            )
+            if weight_grams is not None:
+                # In the same filter() as ``rate``, so both conditions
+                # hold on ONE rate row, not on two different ones.
+                fitting = qs.filter(
+                    rate
+                    & (
+                        Q(rates__max_weight_grams__isnull=True)
+                        | Q(rates__max_weight_grams__gte=weight_grams)
+                    )
+                )
+                picked = fitting.order_by("priority", "code").first()
+                if picked is not None:
+                    return picked.code
+            qs = qs.filter(rate)
+        picked = qs.order_by("priority", "code").first()
+        return picked.code if picked is not None else None
+
+    @classmethod
+    def active_rate(
         cls,
         *,
         provider_code: str | None,
-        kind: str,
-        order_value_amount: float,
-        currency: str,
-        country_id: str | None = None,
-        region_id: str | None = None,
-        weight_grams: int | None = None,
-    ) -> tuple[float, str] | None:
-        """Return the shipping price for a provider+kind combination.
+        kind: str | None,
+        country_code: str | None,
+    ) -> ShippingRate:
+        """Resolve the single active ``ShippingRate`` for this combination.
 
-        Returns None when the provider has no opinion — caller falls
-        back to the global flat rate.
+        The one gate every quote and every order-creation path shares:
+        an active provider, a registered adapter, the provider actually
+        supporting ``kind``, the kind enabled for checkout, and an
+        active rate row for ``country_code``. Raises
+        :class:`~shipping.exceptions.ShippingUnavailableError` the
+        moment any of those is not true, naming exactly which — a
+        missing ``kind`` included, since ``home_delivery`` auto-
+        resolution can still leave it unset when the caller never
+        supplied one.
         """
-        if not provider_code or not is_registered(provider_code):
-            logger.debug(
-                "ShippingService.calculate_shipping_cost: no adapter for "
-                "provider_code=%r — returning None (caller will use "
-                "generic fallback)",
-                provider_code,
+        if not provider_code or not kind or not country_code:
+            raise ShippingUnavailableError(
+                provider_code=provider_code,
+                kind=kind or "",
+                country_code=country_code,
             )
-            return None
+        if not is_registered(provider_code):
+            raise ShippingUnavailableError(
+                provider_code=provider_code,
+                kind=kind,
+                country_code=country_code,
+            )
+
+        country_code = country_code.upper()
+        provider = ShippingProvider.objects.filter(
+            code=provider_code, is_active=True
+        ).first()
+        if provider is None or not provider.supports(kind):
+            raise ShippingUnavailableError(
+                provider_code=provider_code,
+                kind=kind,
+                country_code=country_code,
+            )
+
         adapter = get_provider(provider_code)
         kind_enum = ShippingKind(kind)
-        quote = adapter.calculate_shipping_cost(
-            order_value_amount=order_value_amount,
-            currency=currency,
-            kind=kind_enum,
-            country_id=country_id,
+        if not adapter.is_kind_enabled(kind_enum):
+            raise ShippingUnavailableError(
+                provider_code=provider_code,
+                kind=kind,
+                country_code=country_code,
+            )
+
+        rate = (
+            ShippingRate.objects.select_related("provider")
+            .filter(
+                provider=provider,
+                country_id=country_code,
+                kind=kind,
+                is_active=True,
+            )
+            .first()
+        )
+        if rate is None:
+            raise ShippingUnavailableError(
+                provider_code=provider_code,
+                kind=kind,
+                country_code=country_code,
+            )
+        return rate
+
+    @classmethod
+    def assert_available(
+        cls,
+        *,
+        provider_code: str | None,
+        kind: str | None,
+        country_code: str | None,
+        weight_grams: int | None = None,
+    ) -> ShippingRate:
+        """:meth:`active_rate`, plus the weight-cap check.
+
+        Used directly (not through :meth:`quote`) by callers that need
+        to gate on availability without needing a priced amount — e.g.
+        a free-shipping promotion still must not let an unavailable or
+        over-weight option through just because it charges nothing.
+        """
+        rate = cls.active_rate(
+            provider_code=provider_code, kind=kind, country_code=country_code
+        )
+        if (
+            weight_grams is not None
+            and rate.max_weight_grams is not None
+            and weight_grams > rate.max_weight_grams
+        ):
+            raise ShippingWeightExceededError(
+                weight_grams=weight_grams,
+                max_weight_grams=rate.max_weight_grams,
+            )
+        return rate
+
+    @classmethod
+    def _priced(
+        cls,
+        rate: ShippingRate,
+        *,
+        country_code: str,
+        region_id: str | None,
+        weight_grams: int | None,
+        order_value: Money,
+    ) -> Money:
+        """Price ``rate`` for ``order_value`` — threshold, then live quote, then rate price.
+
+        Deliberately does not re-check availability or the weight cap
+        (:meth:`assert_available` already did, or the caller is
+        display-only and wants a price regardless — see
+        ``available_options``, which shows an over-cap option's price
+        alongside its ``exceeds_max_weight`` flag rather than hiding it).
+        """
+        if (
+            rate.free_shipping_threshold is not None
+            and order_value.amount >= rate.free_shipping_threshold.amount
+        ):
+            return Money(0, order_value.currency)
+
+        adapter = get_provider(rate.provider.code)
+        live = adapter.live_quote(
+            rate=rate,
+            country_code=country_code,
             region_id=region_id,
             weight_grams=weight_grams,
+            currency=str(order_value.currency),
+        )
+        if live is not None:
+            return Money(live, order_value.currency)
+        return Money(rate.price.amount, order_value.currency)
+
+    @classmethod
+    def quote(
+        cls,
+        *,
+        provider_code: str | None,
+        kind: str | None,
+        country_code: str | None,
+        region_id: str | None = None,
+        weight_grams: int | None = None,
+        order_value: Money,
+    ) -> Money:
+        """Gate on availability + weight cap, then price the shipment.
+
+        The single entry point ``OrderService.shipping_cost`` and the
+        create-payment-intent view use — replaces the old
+        ``calculate_shipping_cost`` dispatcher. Raises
+        :class:`~shipping.exceptions.ShippingUnavailableError` /
+        :class:`~shipping.exceptions.ShippingWeightExceededError`
+        instead of silently falling back to a generic flat rate:
+        ``ShippingRate`` is now the only source of a shipping price, so
+        "no rate" is a genuine error state, not a gap to paper over.
+        """
+        rate = cls.assert_available(
+            provider_code=provider_code,
+            kind=kind,
+            country_code=country_code,
+            weight_grams=weight_grams,
+        )
+        price = cls._priced(
+            rate,
+            country_code=(country_code or "").upper(),
+            region_id=region_id,
+            weight_grams=weight_grams,
+            order_value=order_value,
         )
         # Anchor log for the per-carrier pricing decision. Used by ops
         # to answer "did the free-shipping threshold fire for this
         # cart?" without re-running the carrier adapter under a
-        # debugger. ``extra={}`` keys mirror the structured logging
-        # used in OrderService so a single query joins both halves of
-        # the calc trail.
-        if quote is not None:
-            amount, _ = quote
-            logger.info(
-                "Shipping quote: provider=%s kind=%s order_value=%.2f %s "
-                "weight_grams=%s -> %.2f %s",
-                provider_code,
-                kind,
-                order_value_amount,
-                currency,
-                weight_grams,
-                amount,
-                currency,
-                extra={
-                    "shipping_provider_code": provider_code,
-                    "shipping_kind": kind,
-                    "order_value_amount": order_value_amount,
-                    "currency": currency,
-                    "weight_grams": weight_grams,
-                    "country_id": country_id,
-                    "region_id": region_id,
-                    "shipping_amount": amount,
-                    "is_free": amount == 0.0,
-                },
-            )
-        return quote
+        # debugger.
+        logger.info(
+            "Shipping quote: provider=%s kind=%s country=%s "
+            "order_value=%.2f %s weight_grams=%s -> %.2f %s",
+            provider_code,
+            kind,
+            country_code,
+            order_value.amount,
+            order_value.currency,
+            weight_grams,
+            price.amount,
+            price.currency,
+            extra={
+                "shipping_provider_code": provider_code,
+                "shipping_kind": kind,
+                "country_code": country_code,
+                "region_id": region_id,
+                "order_value_amount": str(order_value.amount),
+                "currency": str(order_value.currency),
+                "weight_grams": weight_grams,
+                "shipping_amount": str(price.amount),
+                "is_free": price.amount == 0,
+            },
+        )
+        return price

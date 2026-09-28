@@ -147,7 +147,9 @@ def test_options_endpoint_returns_null_logo_when_no_upload(
 
     client = APIClient()
     url = reverse("shipping-options")
-    response = client.get(url, {"orderValueAmount": "20", "currency": "EUR"})
+    response = client.get(
+        url, {"countryCode": "GR", "orderValueAmount": "20", "currency": "EUR"}
+    )
     assert response.status_code == 200
 
     body = response.json()
@@ -178,7 +180,9 @@ def test_options_endpoint_pickup_kind_uses_pickup_logo_when_set(
 
     client = APIClient()
     url = reverse("shipping-options")
-    response = client.get(url, {"orderValueAmount": "20", "currency": "EUR"})
+    response = client.get(
+        url, {"countryCode": "GR", "orderValueAmount": "20", "currency": "EUR"}
+    )
     assert response.status_code == 200
 
     body = response.json()
@@ -219,7 +223,9 @@ def test_options_endpoint_pickup_kind_falls_back_to_primary_logo(
 
     client = APIClient()
     url = reverse("shipping-options")
-    response = client.get(url, {"orderValueAmount": "20", "currency": "EUR"})
+    response = client.get(
+        url, {"countryCode": "GR", "orderValueAmount": "20", "currency": "EUR"}
+    )
     body = response.json()
     acs_rows = [row for row in body if row["providerCode"] == "acs"]
     assert len({row["logoUrl"] for row in acs_rows}) == 1, (
@@ -243,7 +249,9 @@ def test_options_endpoint_surfaces_uploaded_logo_url(
 
     client = APIClient()
     url = reverse("shipping-options")
-    response = client.get(url, {"orderValueAmount": "20", "currency": "EUR"})
+    response = client.get(
+        url, {"countryCode": "GR", "orderValueAmount": "20", "currency": "EUR"}
+    )
     assert response.status_code == 200
 
     body = response.json()

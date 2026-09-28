@@ -213,13 +213,28 @@ def create_acs_voucher_for_order(self, order_id: int) -> dict[str, Any]:
     max_retries=3,
 )
 def sync_acs_stations(self) -> dict[str, int]:
-    """Refresh the local AcsStation cache (Phase 2)."""
+    """Refresh the local AcsStation cache (Phase 2).
+
+    Syncs every country that has an active ACS ``ShippingRate`` —
+    there is no longer a single configured "the" ACS country. A store
+    with no active ACS rate anywhere has nothing to sync.
+    """
     if _skip_if_acs_unconfigured("sync_acs_stations"):
         return {"upserted": 0, "deactivated": 0}
 
+    from shipping.models import ShippingRate
     from shipping_acs.services import AcsService
 
-    countries = getattr(settings, "ACS_SUPPORTED_COUNTRIES", ["GR"]) or ["GR"]
+    # ``.order_by()`` clears ``ShippingRate.Meta.ordering`` — without
+    # it, Postgres' ``SELECT DISTINCT`` must include every ``ORDER BY``
+    # column, so a country with rates under two different kinds would
+    # count as two "distinct" rows and get synced (and counted) twice.
+    countries = list(
+        ShippingRate.objects.filter(provider__code="acs", is_active=True)
+        .order_by()
+        .values_list("country_id", flat=True)
+        .distinct()
+    )
     totals = {"upserted": 0, "deactivated": 0}
     for country in countries:
         result = AcsService.sync_stations(country=country)

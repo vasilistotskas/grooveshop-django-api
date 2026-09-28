@@ -18,7 +18,7 @@ def test_explicit_provider_code_attaches_provider_fk():
         "shipping_provider_code": "acs",
         "shipping_kind": "pickup_point",
     }
-    OrderService._resolve_shipping_provider(order_data)
+    OrderService._resolve_shipping_provider(order_data, weight_grams=0)
 
     provider = order_data.get("shipping_provider")
     assert provider is not None
@@ -34,7 +34,7 @@ def test_explicit_boxnow_pickup_point_attaches_boxnow():
         "shipping_provider_code": "boxnow",
         "shipping_kind": "pickup_point",
     }
-    OrderService._resolve_shipping_provider(order_data)
+    OrderService._resolve_shipping_provider(order_data, weight_grams=0)
 
     provider = order_data.get("shipping_provider")
     assert provider is not None
@@ -48,7 +48,7 @@ def test_home_delivery_without_explicit_provider_stays_unlinked_when_no_provider
     unlinked — they fall through to the platform's flat-rate
     home-delivery path without a courier adapter."""
     order_data = {"shipping_kind": "home_delivery"}
-    OrderService._resolve_shipping_provider(order_data)
+    OrderService._resolve_shipping_provider(order_data, weight_grams=0)
 
     # All seeded providers default to is_active=False so no auto-routing.
     assert order_data.get("shipping_provider") is None
@@ -65,7 +65,7 @@ def test_home_delivery_auto_routes_to_active_provider():
     ShippingProvider.objects.filter(code="acs").update(is_active=True)
 
     order_data = {"shipping_kind": "home_delivery"}
-    OrderService._resolve_shipping_provider(order_data)
+    OrderService._resolve_shipping_provider(order_data, weight_grams=0)
 
     provider = order_data.get("shipping_provider")
     assert provider is not None
@@ -82,6 +82,6 @@ def test_default_kind_is_home_delivery_when_omitted():
     ShippingProvider.objects.filter(code="acs").update(is_active=True)
 
     order_data: dict = {}
-    OrderService._resolve_shipping_provider(order_data)
+    OrderService._resolve_shipping_provider(order_data, weight_grams=0)
 
     assert order_data["shipping_kind"] == "home_delivery"

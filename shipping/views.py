@@ -45,8 +45,11 @@ class ShippingOptionsView(APIView):
         parameters=[
             OpenApiParameter(
                 name="country_code",
-                description="ISO 3166-1 alpha-2 country code (e.g. 'GR').",
-                required=False,
+                description=(
+                    "ISO 3166-1 alpha-2 country code (e.g. 'GR'). "
+                    "Required — a ``ShippingRate`` is per-country."
+                ),
+                required=True,
                 type=str,
             ),
             OpenApiParameter(
@@ -82,7 +85,9 @@ class ShippingOptionsView(APIView):
     def get(self, request: Request) -> Response:
         query = ShippingOptionsQuerySerializer(data=request.query_params)
         query.is_valid(raise_exception=True)
-        country_code = query.validated_data.get("country_code") or None
+        # Required on the serializer now — a ``ShippingRate`` is
+        # per-country, so there is no destination-agnostic matrix.
+        country_code = query.validated_data["country_code"]
         amount = float(query.validated_data.get("order_value_amount") or 0)
         currency = query.validated_data.get("currency") or "EUR"
         weight_grams = query.validated_data.get("weight_grams")

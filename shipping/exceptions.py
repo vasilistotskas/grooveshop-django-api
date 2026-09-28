@@ -17,6 +17,51 @@ class ShippingProviderNotFoundError(ShippingError):
         )
 
 
+class ShippingUnavailableError(ShippingError):
+    """No active ``ShippingRate`` matches (provider, kind, country).
+
+    Raised by :meth:`shipping.services.ShippingService.active_rate` —
+    the single gate every quote and every order-creation path goes
+    through. Covers every reason a combination can be unavailable: the
+    provider is inactive or unconfigured, the kind is disabled, or
+    simply no rate row exists for that country (the common Cyprus
+    case: a rate must be added before the country becomes orderable
+    for that carrier).
+    """
+
+    def __init__(
+        self,
+        *,
+        provider_code: str | None,
+        kind: str,
+        country_code: str | None,
+    ) -> None:
+        self.provider_code = provider_code
+        self.kind = kind
+        self.country_code = country_code
+        super().__init__(
+            f"No active shipping rate for provider={provider_code!r} "
+            f"kind={kind!r} country={country_code!r}."
+        )
+
+
+class ShippingWeightExceededError(ShippingError):
+    """The cart's weight exceeds the resolved rate's ``max_weight_grams``.
+
+    Raised by :meth:`shipping.services.ShippingService.assert_available`
+    once a rate has been found but the parcel is too heavy for it —
+    e.g. a Cyprus BoxNow rate capped at 4 kg.
+    """
+
+    def __init__(self, *, weight_grams: int, max_weight_grams: int) -> None:
+        self.weight_grams = weight_grams
+        self.max_weight_grams = max_weight_grams
+        super().__init__(
+            f"Cart weight {weight_grams}g exceeds the "
+            f"{max_weight_grams}g cap for this shipping option."
+        )
+
+
 class ShipmentAwaitingPaymentError(ShippingError):
     """A courier shipment was requested for an order that still owes payment.
 

@@ -655,11 +655,12 @@ class TestSyncLockers:
                 "title": "A",
                 "lat": "37.9750",
                 "lng": "23.7350",
-                "address": {
-                    "addressLine1": "Addr A",
-                    "postalCode": "11521",
-                    "countryCode": "GR",
-                },
+                # Address fields are TOP-LEVEL on the real BoxNow
+                # payload, not nested under "address" — see
+                # ``_locker_defaults_from_dest``'s docstring.
+                "addressLine1": "Addr A",
+                "postalCode": "11521",
+                "country": "GR",
             },
             {
                 "id": "b",
@@ -668,11 +669,9 @@ class TestSyncLockers:
                 "title": "B",
                 "lat": "37.9810",
                 "lng": "23.7300",
-                "address": {
-                    "addressLine1": "Addr B",
-                    "postalCode": "11522",
-                    "countryCode": "GR",
-                },
+                "addressLine1": "Addr B",
+                "postalCode": "11522",
+                "country": "GR",
             },
         ]
 

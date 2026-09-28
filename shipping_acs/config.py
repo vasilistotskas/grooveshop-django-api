@@ -1,8 +1,9 @@
 """Read ACS configuration from ``ShippingProvider.metadata``.
 
 Single source of truth for "structural" per-provider config (locker
-kinds, nearest-search limit, weight bounds, default country, map
-chrome).
+kinds per country, nearest-search limit, weight bounds, map chrome).
+Which countries ACS actually ships to is answered by its active
+``ShippingRate`` rows, not by anything here.
 
 The constants below are NOT dead seed duplicates — they are the
 per-key default for an operator-editable JSON blob, and they carry
@@ -40,8 +41,6 @@ from __future__ import annotations
 import logging
 from decimal import Decimal
 from typing import Any
-
-from django.conf import settings as django_settings
 
 logger = logging.getLogger(__name__)
 
@@ -153,24 +152,6 @@ def max_voucher_weight_kg() -> Decimal:
         return Decimal(str(raw))
     except Exception:
         return _DEFAULT_MAX_WEIGHT_KG
-
-
-def default_country() -> str:
-    """Country to use when an order/cart has no explicit country.
-
-    Reads ``settings.ACS_SUPPORTED_COUNTRIES[0]`` first (existing env
-    var), then falls back to the first key in metadata, then 'GR'.
-    """
-    supported = getattr(django_settings, "ACS_SUPPORTED_COUNTRIES", None)
-    if supported:
-        first = supported[0] if isinstance(supported, list | tuple) else None
-        if first:
-            return str(first).upper()
-    metadata = _provider_metadata()
-    by_country = metadata.get("shop_kinds_by_country") or {}
-    if by_country:
-        return next(iter(by_country.keys())).upper()
-    return "GR"
 
 
 def default_voucher_language() -> str:

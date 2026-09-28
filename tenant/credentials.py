@@ -507,10 +507,10 @@ def acs_credentials() -> dict[str, str]:
     station sync, COD reconcile) skip the tenant cleanly.
 
     Platform-scoped transport config (``ACS_API_BASE_URL``,
-    ``ACS_HTTP_TIMEOUT``, ``ACS_SUPPORTED_COUNTRIES``,
-    ``ACS_STALE_SHIPMENT_DAYS``) is NOT per-merchant identity and stays
-    in ``settings`` — read directly by ``AcsClient`` / the tasks, not
-    through this helper.
+    ``ACS_HTTP_TIMEOUT``, ``ACS_STALE_SHIPMENT_DAYS``) is NOT
+    per-merchant identity and stays in ``settings`` — read directly by
+    ``AcsClient`` / the tasks, not through this helper. Which countries
+    ACS ships to is a per-tenant ``shipping.ShippingRate`` question.
 
     The raw strings are returned unchanged — Greek billing codes (e.g.
     ``ΑΚ12345678``) are preserved as-is. The locale-decimal conversion

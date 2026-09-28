@@ -16,6 +16,10 @@ BASE_PAYLOAD = {
     "city": "Athens",
     "zipcode": "10563",
     "country_id": "GR",
+    # GR has real seeded districts (region/migrations/
+    # 0009_seed_default_regions.py), so a region is required now —
+    # "GR-14" (Attica) is that seed's own static alpha, always present.
+    "region_id": "GR-14",
     "phone": "+302101234567",
 }
 

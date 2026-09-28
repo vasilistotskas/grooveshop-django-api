@@ -30,5 +30,12 @@ import pytest
 def _clear_seeded_default_country(django_db_setup, django_db_blocker):
     with django_db_blocker.unblock():
         from country.models import Country
+        from shipping.models import ShippingRate
 
+        # ``shipping/migrations/0011_convert_legacy_pricing_to_rates.py``
+        # gives a fresh database a GR ``ShippingRate`` row too (the
+        # frozen historical default, since no ``extra_settings`` rows
+        # exist yet at migration time) — ``ShippingRate.country`` is
+        # PROTECT, so it must go before the Country row it references.
+        ShippingRate.objects.filter(country_id="GR").delete()
         Country.objects.filter(alpha_2="GR").delete()

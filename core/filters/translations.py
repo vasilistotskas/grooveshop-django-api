@@ -30,12 +30,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from django.db.models import Exists, OuterRef, Q
+from django.db.models import Exists, OuterRef, Q, Subquery
+from django.db.models.functions import Coalesce
 
 if TYPE_CHECKING:
     from django.db.models import Model
 
-__all__ = ["any_translation"]
+__all__ = ["any_translation", "translated_value"]
 
 
 def any_translation(
@@ -67,3 +68,37 @@ def any_translation(
     if annotate:
         subquery = subquery.annotate(**annotate)
     return Exists(subquery.filter(*conditions, **lookups))
+
+
+def translated_value(
+    model: type[Model],
+    path: str,
+    language: str,
+    fallback_language: str,
+) -> Coalesce:
+    """One translated value per outer row, for ``order_by``.
+
+    ``path`` is an ordering key through the translation table, optionally
+    reached across relations: ``translations__name`` on ``model`` itself,
+    or ``product__translations__name`` on a model related to it.
+    Ordering by the raw key joins the translation table into the outer
+    query and returns every row once per language, so a paginated list
+    repeats rows and loses others off the end of the page. Here each row
+    contributes the value in ``language``, or in ``fallback_language``
+    when that translation is missing — the same fallback parler applies
+    when it renders the field.
+    """
+    prefix, _, field = path.rpartition("translations__")
+    owner = model
+    for part in filter(None, prefix.split("__")):
+        owner = owner._meta.get_field(part).related_model
+    translations = owner._parler_meta.get_model_by_field(field)
+
+    def in_language(code: str) -> Subquery:
+        return Subquery(
+            translations.objects.filter(
+                master=OuterRef(f"{prefix}pk"), language_code=code
+            ).values(field)[:1]
+        )
+
+    return Coalesce(in_language(language), in_language(fallback_language))

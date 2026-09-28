@@ -58,7 +58,14 @@ class UserAddressDetailSerializer(UserAddressSerializer):
 class UserAddressWriteSerializer(serializers.ModelSerializer[UserAddress]):
     user = PrimaryKeyRelatedField(read_only=True)
     country = PrimaryKeyRelatedField(queryset=Country.objects.all())
-    region = PrimaryKeyRelatedField(queryset=Region.objects.all())
+    # Required exactly when the country has regions — not every
+    # country does (the full ISO 3166-1 seed's smaller territories
+    # mostly don't), so the field itself can't require it
+    # unconditionally. ``address_rules.address_update_errors`` below
+    # is what actually enforces it, per-country.
+    region = PrimaryKeyRelatedField(
+        queryset=Region.objects.all(), required=False, allow_null=True
+    )
     phone = PhoneNumberField()
 
     def validate(self, attrs):

@@ -217,6 +217,15 @@ def register_default_surfaces() -> None:
                 "shipping.lockers",
                 "shipping.acs.nearest",
                 "shipping.acs.stations",
+                "shipping.freeShippingInfo",
+            ),
+            # A rate's price, threshold, weight cap or active flag
+            # changes what ``/shipping/options`` and
+            # ``/shipping/free-shipping-info`` return; a provider's
+            # active/capability flags do too.
+            invalidated_by=(
+                "shipping.ShippingRate",
+                "shipping.ShippingProvider",
             ),
             icon="local_shipping",
             group="commerce",
@@ -372,6 +381,11 @@ def register_default_surfaces() -> None:
             ),
             django_patterns=("*RegionViewSet_*", "*CountryViewSet_*"),
             nuxt_patterns=_nuxt("RegionViewSet", "CountryViewSet"),
+            # ``?shippable=true`` is answered from active ShippingRate
+            # rows (``ShippingService.shippable_country_codes``), so
+            # adding/disabling a rate changes this surface's own
+            # ``CountryViewSet`` response, not just ``shipping``.
+            invalidated_by=("shipping.ShippingRate",),
             icon="public",
             group="commerce",
         )

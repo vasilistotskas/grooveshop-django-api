@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping
-from decimal import Decimal
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from pay_way.enum.settlement import PaySettlement
@@ -140,24 +139,61 @@ class BoxNowCarrier(ShippingCarrierInterface):
         kind: ShippingKind,
         payload: dict[str, Any],
     ) -> dict[str, list[str]]:
+        """Locker required for a locker order, and it must be in the
+        delivery country.
+
+        A locker absent from the local ``BoxNowLocker`` cache is
+        ACCEPTED with a warning rather than rejected: the daily sync
+        task lags behind BoxNow's own catalogue, so a locker that
+        genuinely exists can be momentarily unknown to us — rejecting
+        it would block a real order over our own stale cache, not a
+        bad selection.
+        """
         from django.utils.translation import gettext_lazy as _
 
         if kind != ShippingKind.PICKUP_POINT:
             return {}
 
-        errors: dict[str, list[str]] = {}
-
-        if not payload.get("boxnow_locker_id"):
-            errors["boxnow_locker_id"] = [
-                str(
-                    _(
-                        "Select a BOX NOW locker before placing an order "
-                        "with locker delivery."
+        locker_id = payload.get("boxnow_locker_id")
+        if not locker_id:
+            return {
+                "boxnow_locker_id": [
+                    str(
+                        _(
+                            "Select a BOX NOW locker before placing an "
+                            "order with locker delivery."
+                        )
                     )
-                )
-            ]
+                ]
+            }
 
-        return errors
+        from shipping_boxnow.models import BoxNowLocker
+
+        locker = BoxNowLocker.objects.filter(external_id=locker_id).first()
+        if locker is None:
+            logger.warning(
+                "BoxNow locker %s not found in the local cache — "
+                "accepting anyway (daily sync lags BoxNow's own catalogue)",
+                locker_id,
+                extra={"boxnow_locker_external_id": locker_id},
+            )
+            return {}
+
+        order_country = (payload.get("country_id") or "").upper()
+        if (
+            order_country
+            and locker.country_code
+            and locker.country_code.upper() != order_country
+        ):
+            return {
+                "boxnow_locker_id": [
+                    str(
+                        _("The selected locker is not in the delivery country.")
+                    )
+                ]
+            }
+
+        return {}
 
     # ------------------------------------------------------------------
     # Order-creation hooks (Phase 3 abstraction)
@@ -277,45 +313,8 @@ class BoxNowCarrier(ShippingCarrierInterface):
             headers={"_schema_name": schema_name or connection.schema_name},
         )
 
-    # ------------------------------------------------------------------
-    # Pricing
-    # ------------------------------------------------------------------
-
-    def calculate_shipping_cost(
-        self,
-        *,
-        order_value_amount: float,
-        currency: str,
-        kind: ShippingKind,
-        country_id: str | None = None,
-        region_id: str | None = None,
-        weight_grams: int | None = None,
-    ) -> tuple[float, str] | None:
-        # ``weight_grams`` is intentionally unused — BoxNow's tariff is
-        # contract-flat per partner, not weight-banded.
-        from extra_settings.models import Setting
-
-        if kind != ShippingKind.PICKUP_POINT:
-            return None
-
-        base = float(Setting.get("BOXNOW_SHIPPING_PRICE", default=2.50))
-        free_threshold = float(
-            Setting.get("BOXNOW_FREE_SHIPPING_THRESHOLD", default=30.00)
-        )
-        if order_value_amount >= free_threshold:
-            return (0.0, currency)
-        return (base, currency)
-
-    def free_shipping_threshold(
-        self,
-        kind: ShippingKind,
-    ) -> Decimal | None:
-        # BoxNow only quotes for PICKUP_POINT; mirror the same kind
-        # gate the pricing path uses so the advertised threshold can
-        # never appear for a kind the carrier doesn't actually serve.
-        if kind != ShippingKind.PICKUP_POINT:
-            return None
-        from extra_settings.models import Setting
-
-        raw = Setting.get("BOXNOW_FREE_SHIPPING_THRESHOLD", default=30.00)
-        return Decimal(str(raw))
+    # Pricing is a ``ShippingRate`` row now (boxnow/CY/pickup_point,
+    # boxnow/GR/pickup_point, ...) — this adapter has no
+    # ``live_quote`` override because BoxNow's tariff is contract-flat
+    # per partner, not weight- or destination-banded, so the default
+    # "no live pricing" behaviour (``rate.price`` unchanged) is correct.

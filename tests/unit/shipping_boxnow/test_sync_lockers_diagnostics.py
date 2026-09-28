@@ -30,6 +30,7 @@ def _destination(external_id: str) -> dict:
         "title": external_id,
         "lat": "37.9750",
         "lng": "23.7350",
+        "country": "GR",
     }
 
 
@@ -110,6 +111,46 @@ def test_an_unparseable_coordinate_is_refused():
     stats = _run_sync([_destination("a"), junk])
 
     assert stats["created"] == 1
+
+
+def test_a_destination_with_no_country_is_skipped_not_defaulted_to_gr(caplog):
+    """``ShippingRate`` is per-country now — a locker we can't place
+    in a country can't be checked against it, so it is skipped and
+    counted rather than silently defaulted to GR (which used to let a
+    Cypriot locker with dropped country data mint as if it were Greek).
+    """
+    from shipping_boxnow.models import BoxNowLocker
+
+    no_country = _destination("50")
+    del no_country["country"]
+
+    with caplog.at_level(logging.WARNING, logger="shipping_boxnow.services"):
+        stats = _run_sync([_destination("a"), no_country])
+
+    assert stats["created"] == 1
+    assert stats["skipped_no_country"] == 1
+    assert not BoxNowLocker.objects.filter(external_id="50").exists()
+    assert "no country" in caplog.text
+
+
+def test_an_existing_locker_keeps_its_country_when_a_later_sync_omits_it(
+    caplog,
+):
+    """A previously-good locker isn't deactivated just because one
+    sync response glitched and dropped its country — it's excluded
+    from the update, not from ``seen_external_ids``."""
+
+    existing = BoxNowLockerFactory(
+        external_id="51", country_code="CY", is_active=True
+    )
+
+    no_country = _destination("51")
+    del no_country["country"]
+    _run_sync([no_country])
+
+    existing.refresh_from_db()
+    assert existing.is_active
+    assert existing.country_code == "CY"
 
 
 def test_a_normal_refresh_does_not_warn(caplog):

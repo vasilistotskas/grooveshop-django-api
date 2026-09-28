@@ -1266,11 +1266,15 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
             raise serializers.ValidationError(
                 {"country_id": _("Select a valid country.")}
             )
+        region = None
+        if attrs.get("region_id"):
+            region = Region.objects.filter(alpha=attrs["region_id"]).first()
         errors = address_rules.address_errors(
             country=country,
             street=attrs["street"],
             street_number=attrs["street_number"],
             zipcode=attrs["zipcode"],
+            region=region,
         )
         if errors:
             raise serializers.ValidationError(errors)

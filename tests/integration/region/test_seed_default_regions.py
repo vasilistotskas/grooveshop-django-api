@@ -14,6 +14,7 @@ import pytest
 
 from country.models import Country
 from region.models import Region
+from shipping.models import ShippingRate
 
 COUNTRY_MIGRATION = "country.migrations.0010_seed_default_country"
 REGION_MIGRATION = "region.migrations.0009_seed_default_regions"
@@ -67,6 +68,7 @@ def seed_regions_only():
 
 
 def _reset():
+    ShippingRate.objects.all().delete()
     Region.objects.all().delete()
     Country.objects.filter(alpha_2="GR").delete()
 

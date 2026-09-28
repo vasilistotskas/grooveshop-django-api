@@ -81,6 +81,36 @@ class TestWriteSerializer:
 
         assert serializer.is_valid(), serializer.errors
 
+    def test_a_region_is_required_for_a_country_that_has_any(self, greece):
+        """GR has real seeded districts — the field itself is optional
+        (``required=False``) so a country with none isn't blocked, but
+        the validator still requires one when the country has some."""
+        payload = _payload(greece)
+        del payload["region"]
+
+        serializer = UserAddressWriteSerializer(data=payload)
+
+        assert not serializer.is_valid()
+        assert "region" in serializer.errors
+
+    def test_no_region_required_for_a_country_that_has_none(self):
+        country = CountryFactory(num_regions=0)
+        payload = {
+            "title": "Home",
+            "first_name": "Jane",
+            "last_name": "Doe",
+            "street": "Main Street",
+            "street_number": "12",
+            "city": "Nowhere",
+            "zipcode": "12345",
+            "phone": "+306900000001",
+            "country": country.pk,
+        }
+
+        serializer = UserAddressWriteSerializer(data=payload)
+
+        assert serializer.is_valid(), serializer.errors
+
 
 class TestModelClean:
     def test_changing_the_postcode_to_an_invalid_one_is_rejected(self, greece):

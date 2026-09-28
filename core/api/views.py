@@ -606,15 +606,14 @@ STORE_SETTING_KEYS = frozenset(
 
 PUBLIC_SETTING_KEYS = frozenset(
     {
-        "CHECKOUT_SHIPPING_PRICE",
-        "FREE_SHIPPING_THRESHOLD",
-        "BOXNOW_SHIPPING_PRICE",
-        "BOXNOW_FREE_SHIPPING_THRESHOLD",
-        # ACS pricing + on/off toggles read by the Nuxt checkout —
-        # see useCheckoutForm.ts. The rest (e.g. ACS_DYNAMIC_PRICING_ENABLED)
-        # are server-side only and stay admin-gated.
-        "ACS_SHIPPING_PRICE",
-        "ACS_FREE_SHIPPING_THRESHOLD",
+        # Shipping price/free-threshold is a per-country ``ShippingRate``
+        # row now (``/api/v1/shipping/options`` and
+        # ``/api/v1/shipping/free-shipping-info``), not a Setting — the
+        # six CHECKOUT_SHIPPING_PRICE / FREE_SHIPPING_THRESHOLD /
+        # BOXNOW_* / ACS_* pricing keys are gone.
+        # ACS toggle read by the Nuxt checkout — see useCheckoutForm.ts.
+        # The rest (e.g. ACS_DYNAMIC_PRICING_ENABLED) are server-side
+        # only and stay admin-gated.
         "ACS_SMARTPOINT_ENABLED",
         "LOYALTY_ENABLED",
         "PROMOTIONS_ENABLED",
@@ -712,7 +711,7 @@ PUBLIC_SETTING_KEYS = frozenset(
     parameters=[
         OpenApiParameter(
             name="key",
-            description=_("Setting key name (e.g., CHECKOUT_SHIPPING_PRICE)"),
+            description=_("Setting key name (e.g., GIFT_CARD_MIN_AMOUNT)"),
             required=True,
             type=str,
             location=OpenApiParameter.QUERY,

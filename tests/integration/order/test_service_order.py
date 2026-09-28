@@ -218,16 +218,35 @@ class OrderServiceTestCase(TestCase):
             mock_refund.assert_called_once()
 
     def test_calculate_shipping_cost(self):
+        from tests.utils.shipping import enable_rate
+
+        enable_rate(
+            self.order.country,
+            provider_code="flat_rate",
+            price=Decimal("5.00"),
+            free_shipping_threshold=Decimal("100.00"),
+        )
+
         order_value = Money(
             amount=Decimal("49.99"), currency=settings.DEFAULT_CURRENCY
         )
-        shipping_cost = OrderService.calculate_shipping_cost(order_value)
+        shipping_cost = OrderService.shipping_cost(
+            order_value=order_value,
+            country_id=self.order.country_id,
+            shipping_provider_code="flat_rate",
+            shipping_kind="home_delivery",
+        )
         self.assertTrue(shipping_cost.amount > 0)
 
         order_value = Money(
             amount=Decimal("500.00"), currency=settings.DEFAULT_CURRENCY
         )
-        shipping_cost = OrderService.calculate_shipping_cost(order_value)
+        shipping_cost = OrderService.shipping_cost(
+            order_value=order_value,
+            country_id=self.order.country_id,
+            shipping_provider_code="flat_rate",
+            shipping_kind="home_delivery",
+        )
         self.assertEqual(shipping_cost.amount, 0)
 
     @patch("order.payment.get_payment_provider")

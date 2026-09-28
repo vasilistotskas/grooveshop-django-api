@@ -3,6 +3,36 @@
 
 
 
+## v3.89.1 (2026-09-28)
+
+### Bug fixes
+
+* fix(blog): Greek labels for the FAQ item in the editor
+
+TinyMCE's bundled Greek pack ships the accordion plugin's strings with
+empty values, and TinyMCE returns a present key's value as is, so a
+Greek-speaking admin saw a blank Insert entry and a blank toolbar
+tooltip for the FAQ item (measured on staging, 2026-09-28).
+
+static/admin/js/tinymce_i18n_el.js fills the six strings the plugin
+shows. TINYMCE_EXTRA_MEDIA loads it between tinymce.min.js and
+init_tinymce.js, after the Greek pack: TinyMCE then finds 'el'
+registered and does not fetch the pack again, which would put the empty
+values back. Checked in a real browser against the bundled TinyMCE 7.8:
+blank before, "Ερώτηση & απάντηση" after.
+
+Tests read the strings from the bundled plugin itself (an upgrade that
+adds one fails CI), pin the script order, and use the editor's real
+saved markup, measured on staging: the editing-only answer wrapper is
+not saved.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_016F5trstVMoFXNan1ZQMLEp ([`29928fe`](https://github.com/vasilistotskas/grooveshop-django-api/commit/29928fefbbdb7d2654eb8b67d0fa1254a13c330f))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.89.0 [skip ci] ([`acd0343`](https://github.com/vasilistotskas/grooveshop-django-api/commit/acd0343efa09f27782f0be29dbc882c382c03b4c))
+
 ## v3.89.0 (2026-09-28)
 
 ### Bug fixes

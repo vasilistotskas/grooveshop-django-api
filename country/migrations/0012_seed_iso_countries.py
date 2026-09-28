@@ -719,6 +719,11 @@ def seed_iso_countries(apps, schema_editor):
     )["sort_order__max"]
     next_sort_order = (max_sort_order or 0) + 1
 
+    # Built in memory and written with two bulk inserts: one query per
+    # row made the seed ~1,000 round trips, which the test suite pays
+    # again after every flushing test.
+    countries = []
+    translations = []
     for (
         alpha_2,
         alpha_3,
@@ -744,14 +749,16 @@ def seed_iso_countries(apps, schema_editor):
 
         pattern, example = postal_formats.get(alpha_2, ("", ""))
 
-        country = Country.objects.using(db_alias).create(
-            alpha_2=alpha_2,
-            alpha_3=alpha_3,
-            iso_cc=iso_cc,
-            phone_code=phone_code,
-            sort_order=next_sort_order,
-            postal_code_pattern=pattern,
-            postal_code_example=example,
+        countries.append(
+            Country(
+                alpha_2=alpha_2,
+                alpha_3=alpha_3,
+                iso_cc=iso_cc,
+                phone_code=phone_code,
+                sort_order=next_sort_order,
+                postal_code_pattern=pattern,
+                postal_code_example=example,
+            )
         )
         next_sort_order += 1
         existing_alpha_2.add(alpha_2)
@@ -759,13 +766,20 @@ def seed_iso_countries(apps, schema_editor):
         if iso_cc is not None:
             existing_iso_cc.add(iso_cc)
 
+        # A country created here has no translations yet, so these
+        # need no get-or-create.
         names = {"el": name_el, "en": name_en, "de": name_de}
-        for language_code in SEED_LANGUAGES:
-            CountryTranslation.objects.using(db_alias).get_or_create(
-                master=country,
+        translations.extend(
+            CountryTranslation(
+                master_id=alpha_2,
                 language_code=language_code,
-                defaults={"name": names[language_code]},
+                name=names[language_code],
             )
+            for language_code in SEED_LANGUAGES
+        )
+
+    Country.objects.using(db_alias).bulk_create(countries)
+    CountryTranslation.objects.using(db_alias).bulk_create(translations)
 
 
 class Migration(migrations.Migration):

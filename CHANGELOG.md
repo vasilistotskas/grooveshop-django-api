@@ -3,6 +3,31 @@
 
 
 
+## v3.89.4 (2026-09-28)
+
+### Bug fixes
+
+* fix(shipping): drop the unread ACS map metadata and map_config (#88)
+
+0004 seeded tile_provider, default_map_center and default_map_zoom into
+the ACS provider metadata for the Smartpoint map, but the storefront
+never passed provider metadata to the map, and map_config() had no
+caller outside its own test. The stored tile URLs are keyless CARTO
+URLs, which CARTO now serves with an "API KEY REQUIRED" watermark; the
+storefront owns its basemap and the platform key (storefront#31).
+
+0015 pops the three keys in every tenant schema. It is idempotent, and
+the reverse is a no-op.
+
+
+Claude-Session: https://claude.ai/code/session_01FjnQ7zTpdT8APsEWrbh6QJ
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`c3995c4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c3995c442621cb2116199a88478c6f1dc8ffd7ff))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.89.3 [skip ci] ([`fc553e1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc553e189bd9a5fdee43329a974f381b6dd82513))
+
 ## v3.89.3 (2026-09-28)
 
 ### Bug fixes

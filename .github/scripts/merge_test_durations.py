@@ -116,7 +116,9 @@ def main() -> int:
 
     # Same layout pytest-split writes, so a refresh diffs cleanly.
     args.output.write_text(
-        json.dumps(merged, sort_keys=True, indent=4), encoding="utf-8"
+        json.dumps(merged, sort_keys=True, indent=4),
+        encoding="utf-8",
+        newline="\n",
     )
     for group in sorted(shards):
         total = sum(shards[group].values()) / 60

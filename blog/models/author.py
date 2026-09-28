@@ -7,6 +7,7 @@ from django_stubs_ext.db.models import TypedModelMeta
 from parler.models import TranslatableModel, TranslatedFields
 
 from blog.managers.author import BlogAuthorManager
+from core.fields.rich_text import RichTextField
 from core.models import TimeStampMixinModel, UUIDModel
 
 
@@ -15,7 +16,7 @@ class BlogAuthor(TranslatableModel, TimeStampMixinModel, UUIDModel):
     user = models.OneToOneField("user.UserAccount", on_delete=models.PROTECT)
     website = models.URLField(_("Website"), blank=True, default="")
     translations = TranslatedFields(
-        bio=models.TextField(_("Bio"), blank=True, null=True)
+        bio=RichTextField(_("Bio"), blank=True, null=True)
     )
 
     objects: BlogAuthorManager = BlogAuthorManager()

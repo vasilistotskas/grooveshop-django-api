@@ -3,6 +3,33 @@
 
 
 
+## v3.88.0 (2026-09-28)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.87.0 [skip ci] ([`566491d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/566491df6145b573daf91b01481d7cdbfdf591a1))
+
+### Features
+
+* feat(blog): FAQ items in the rich-text editor
+
+A merchant asked to add questions with answers that open as a dropdown
+in a blog post. The bundled TinyMCE (7.8) ships the open-source
+accordion plugin; it is now enabled, with its toolbar button next to
+the other insert tools. It writes native
+<details class="mce-accordion"><summary>, which the storefront styles
+as the mobile footer's accordion and opens with no JavaScript.
+
+Items are open while the author writes (details_initial_state) and
+saved closed (details_serialized_state), so the stored HTML never
+carries ``open`` and the sanitiser allows only ``details`` and
+``summary``. An item pasted with ``open`` is refused on save like any
+other markup the storefront would not show. The audited plugin set and
+the measured editor output include the accordion.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_016F5trstVMoFXNan1ZQMLEp ([`7669be2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7669be2e2668e7a5817be24cc8fb3e76fa9cedc9))
+
 ## v3.87.0 (2026-09-28)
 
 ### Bug fixes

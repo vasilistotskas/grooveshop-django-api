@@ -4329,11 +4329,11 @@ TINYMCE_DEFAULT_CONFIG = {
     "menubar": "file edit view insert format tools table help",
     "plugins": "advlist,autolink,lists,link,image,charmap,preview,anchor,"
     "searchreplace,visualblocks,code,fullscreen,insertdatetime,media,table,"
-    "code,help,wordcount",
+    "code,help,wordcount,accordion",
     "toolbar": "undo redo | bold italic underline strikethrough | fontselect fontsizeselect formatselect | alignleft "
     "aligncenter alignright alignjustify | outdent indent |  numlist bullist checklist | forecolor "
     "backcolor casechange permanentpen formatpainter removeformat | pagebreak | charmap emoticons | "
-    "fullscreen  preview save print | insertfile image media pageembed template link anchor codesample | "
+    "fullscreen  preview save print | insertfile image media pageembed template link anchor codesample accordion | "
     "a11ycheck ltr rtl | showcomments addcomment code",
     # Custom upload handler instead of `images_upload_url`. The built-in
     # uploader sends FormData with cookies (via `images_upload_credentials`)
@@ -4363,6 +4363,12 @@ TINYMCE_DEFAULT_CONFIG = {
         " });"
         "}"
     ),
+    # FAQ items (the accordion plugin's <details>/<summary>): open while
+    # the author writes, saved closed, so a reader sees the questions
+    # and taps the one they want. Saved closed also means ``open`` never
+    # reaches the stored HTML, so the sanitiser does not allow it.
+    "details_initial_state": "expanded",
+    "details_serialized_state": "collapsed",
     "relative_urls": False,
     "remove_script_host": False,
     "entity_encoding": "raw",

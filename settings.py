@@ -28,10 +28,17 @@ def load_dotenv_file():
 load_dotenv_file()
 
 SYSTEM_ENV = getenv("SYSTEM_ENV", "dev")
+# The deployment this is: ``production``, ``staging``, ``dev`` or ``ci``.
+# ``SYSTEM_ENV`` names it (the admin's environment badge and tab prefix,
+# admin/environment.py); PRODUCTION_PROFILE is the hardening a real
+# deployment needs — required secrets, TLS to the database, JSON logs.
+# Staging runs the production profile on purpose, so a release rehearses
+# exactly what production will run, and still says it is staging.
+PRODUCTION_PROFILE = SYSTEM_ENV in ("production", "staging")
 
 SECRET_KEY = getenv("SECRET_KEY", "")
 if not SECRET_KEY:
-    if SYSTEM_ENV == "production":
+    if PRODUCTION_PROFILE:
         from django.core.exceptions import ImproperlyConfigured
 
         raise ImproperlyConfigured(
@@ -95,7 +102,7 @@ USE_X_FORWARDED_HOST = getenv("USE_X_FORWARDED_HOST", "True") == "True"
 # TENANT_APPS live in each tenant schema (store-specific data).
 # Apps in BOTH must appear in both lists (e.g. contenttypes, auth).
 
-if SYSTEM_ENV == "production" and not USE_X_FORWARDED_HOST:
+if PRODUCTION_PROFILE and not USE_X_FORWARDED_HOST:
     from django.core.exceptions import ImproperlyConfigured
 
     raise ImproperlyConfigured(
@@ -527,7 +534,7 @@ REST_FRAMEWORK = {
 APPEND_SLASH = getenv("APPEND_SLASH", "False") == "True"
 
 DEEPL_AUTH_KEY = getenv("DEEPL_AUTH_KEY", "changeme")
-if DEEPL_AUTH_KEY == "changeme" and SYSTEM_ENV == "production":
+if DEEPL_AUTH_KEY == "changeme" and PRODUCTION_PROFILE:
     from django.core.exceptions import ImproperlyConfigured
 
     raise ImproperlyConfigured(
@@ -777,7 +784,7 @@ if SYSTEM_ENV == "ci":
 # Broker & Results
 CELERY_BROKER_URL = getenv("CELERY_BROKER_URL", "")
 if not CELERY_BROKER_URL:
-    if SYSTEM_ENV == "production":
+    if PRODUCTION_PROFILE:
         from django.core.exceptions import ImproperlyConfigured
 
         raise ImproperlyConfigured(
@@ -1479,7 +1486,7 @@ _db_options: dict = {
     # Postgres usually has no server cert (G0362).
     "sslmode": getenv(
         "DB_SSLMODE",
-        "require" if SYSTEM_ENV == "production" else "prefer",
+        "require" if PRODUCTION_PROFILE else "prefer",
     ),
 }
 if DB_POOL_ENABLED:
@@ -1490,7 +1497,7 @@ if DB_POOL_ENABLED:
     }
 
 DB_PASSWORD = getenv("DB_PASSWORD", "postgres")
-if DB_PASSWORD == "postgres" and SYSTEM_ENV == "production":
+if DB_PASSWORD == "postgres" and PRODUCTION_PROFILE:
     from django.core.exceptions import ImproperlyConfigured
 
     raise ImproperlyConfigured(
@@ -1543,7 +1550,7 @@ if SYSTEM_ENV == "ci":
 
 # Maili settings
 _meili_master_key = getenv("MEILI_MASTER_KEY", "changeme")
-if _meili_master_key == "changeme" and SYSTEM_ENV == "production":
+if _meili_master_key == "changeme" and PRODUCTION_PROFILE:
     from django.core.exceptions import ImproperlyConfigured
 
     raise ImproperlyConfigured(
@@ -1556,7 +1563,7 @@ if _meili_master_key == "changeme" and SYSTEM_ENV == "production":
 # "Default Search API Key" (or a custom search-only key). When unset, the
 # search client falls back to the master key so local/dev still works.
 _meili_search_key = getenv("MEILI_SEARCH_KEY", "")
-if not _meili_search_key and SYSTEM_ENV == "production":
+if not _meili_search_key and PRODUCTION_PROFILE:
     import logging as _logging
 
     _logging.getLogger("meili").warning(
@@ -2419,7 +2426,7 @@ EMAIL_HOST = getenv("EMAIL_HOST", "localhost")
 EMAIL_PORT = getenv("EMAIL_PORT", "25")
 EMAIL_HOST_USER = getenv("EMAIL_HOST_USER", "localhost@gmail.com")
 EMAIL_HOST_PASSWORD = getenv("EMAIL_HOST_PASSWORD", "changeme")
-if EMAIL_HOST_PASSWORD == "changeme" and SYSTEM_ENV == "production":
+if EMAIL_HOST_PASSWORD == "changeme" and PRODUCTION_PROFILE:
     from django.core.exceptions import ImproperlyConfigured
 
     raise ImproperlyConfigured(
@@ -4437,9 +4444,7 @@ if IS_KUBERNETES:
         "handlers": {
             "console": {
                 "class": "logging.StreamHandler",
-                "formatter": "json"
-                if SYSTEM_ENV == "production"
-                else "console",
+                "formatter": "json" if PRODUCTION_PROFILE else "console",
                 "level": logging_level,
                 "filters": [
                     "add_hostname",

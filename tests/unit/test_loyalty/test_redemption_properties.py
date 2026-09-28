@@ -85,7 +85,6 @@ class TestOverRedemptionRejected:
         excess=excess_amounts,
     )
     @settings(
-        max_examples=100,
         deadline=None,
         suppress_health_check=[HealthCheck.too_slow],
     )
@@ -157,7 +156,6 @@ class TestRedeemTransactionHasNegativePoints:
         balance=balance_amounts,
     )
     @settings(
-        max_examples=100,
         deadline=None,
         suppress_health_check=[HealthCheck.too_slow],
     )
@@ -230,7 +228,6 @@ class TestAdminAdjustmentRecordsCreatedBy:
         points=adjustment_points,
     )
     @settings(
-        max_examples=100,
         deadline=None,
         suppress_health_check=[HealthCheck.too_slow],
     )

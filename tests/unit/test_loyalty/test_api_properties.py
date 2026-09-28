@@ -41,7 +41,7 @@ class TestUnauthenticatedAccessReturns401:
     """**Validates: Requirements 10.5**"""
 
     @given(endpoint=loyalty_endpoints)
-    @settings(max_examples=100, deadline=None)
+    @settings(deadline=None)
     def test_unauthenticated_request_returns_401(
         self,
         endpoint: tuple[str, str],

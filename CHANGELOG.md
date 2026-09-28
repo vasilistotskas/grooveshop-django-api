@@ -3,6 +3,135 @@
 
 
 
+## v3.89.2 (2026-09-28)
+
+### Bug fixes
+
+* fix(shipping): drop the price settings and country lists ShippingRate replaced (#86)
+
+The release-N+1 half of the ShippingRate change (#80). Release N
+copied every store's six shipping-price settings and each provider's
+metadata['supported_countries'] into ShippingRate rows and stopped
+reading them, but kept the data while the previous release still
+served during the PreSync rollout. v3.89.0 now runs in production, so
+0014 deletes the six Setting rows and pops supported_countries from
+every provider's metadata, in every tenant schema.
+
+
+Claude-Session: https://claude.ai/code/session_01FjnQ7zTpdT8APsEWrbh6QJ
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`efcad6f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/efcad6fed0ce41a9681bdcd93df54972c2fb73c6))
+
+* fix(ci): write .test_durations with LF line endings
+
+Path.write_text translates newlines on Windows, so a refresh made there
+rewrote every line of the file as CRLF.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01FjnQ7zTpdT8APsEWrbh6QJ ([`b14b44e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b14b44eee6f9ffc97158e856dd7adf864b6396c7))
+
+* fix(ci): keep test-database creation out of the stored durations
+
+pytest-split drops a setup or teardown from --store-durations only above
+10 minutes, and an xdist worker's test database takes 4-5 minutes to
+create on a runner. It was billed to whichever test the worker ran
+first: the first CI-recorded file had a dozen trivial unit tests at
+250-300 s each, which moved their files around the next split at
+random. Setups over 30 s are now left out, which no real fixture here
+reaches.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01FjnQ7zTpdT8APsEWrbh6QJ ([`b14b44e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b14b44eee6f9ffc97158e856dd7adf864b6396c7))
+
+### Chores
+
+* chore(ci): refresh .test_durations from CI run 36386434415
+
+The first durations recorded on the runners. Summed per shard they were
+22.7 / 25.4 / 23.3 / 15.6 minutes of worker time: shard 4 carried two
+thirds of the others' load, which the locally recorded file could not
+show. Split with these weights the groups estimate 21.9 / 23.9 / 21.9
+/ 19.8. Covers all 9194 tests; none falls back to the average.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01FjnQ7zTpdT8APsEWrbh6QJ ([`b14b44e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b14b44eee6f9ffc97158e856dd7adf864b6396c7))
+
+* chore(ci): refresh .test_durations from CI run 36390705457
+
+Recorded with test-database creation left out, so the only large
+entries are tests that really are slow. Replaces the previous refresh,
+whose biggest values were a dozen trivial tests billed for their
+worker's database setup.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01FjnQ7zTpdT8APsEWrbh6QJ
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`b14b44e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b14b44eee6f9ffc97158e856dd7adf864b6396c7))
+
+* chore(deps): sync uv.lock to 3.89.1 [skip ci] ([`4b9b197`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4b9b197435d706e81d1b92a17626db9f8b98d61f))
+
+### Continuous integration
+
+* ci(test): record shard durations on CI and merge them into .test_durations (#82) ([`b14b44e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b14b44eee6f9ffc97158e856dd7adf864b6396c7))
+
+* ci(test): record the shard durations on CI and merge them from there
+
+pytest-split balances the four shards from .test_durations, which was
+refreshed by a local full-suite run and so weighted every test by a
+developer machine. The 2026-09-26 refresh estimated the groups within
+0.7% of each other; on CI they ran 9 to 16 minutes, and shard 3 now
+comes within a minute of its 18-minute timeout on every branch.
+
+Each shard now splits from a copy of .test_durations, rewrites that
+copy with the tests it ran as timed on the runner, and uploads it.
+.github/scripts/merge_test_durations.py merges the four artifacts of a
+green run into .test_durations, refusing a missing shard or a test two
+shards claim, so a refresh is one command and no local suite run.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01FjnQ7zTpdT8APsEWrbh6QJ ([`b14b44e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b14b44eee6f9ffc97158e856dd7adf864b6396c7))
+
+### Testing
+
+* test: stop the single-schema suite building tenant schemas; honour Hypothesis profiles (#84) ([`793b41b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/793b41bd52b86e0d1c8959e5e408d9662349be62))
+
+* test: never create a tenant schema in the single-schema suite
+
+TenantMixin.save creates the schema on ANY save of a tenant whose schema
+is absent, replaying all ~500 migrations. Tests set
+auto_create_schema = False on the instance they build, but a reloaded
+copy has the class default again, so production code that re-fetches
+the tenant paid 70-150 s per save. On CI that made
+test_tenant_create_command (270 s), the demo store's seed_branding
+tests (150-160 s each) and the tenant cache's stale-copy test (139 s)
+the slowest tests in the suite, and the tail of their shards.
+
+The suite runs without the tenant router, and tests_mt owns real
+schemas, so the class attribute is off in tests/conftest.py. The one
+module that already patched it for this reason drops its own fixture.
+Locally the tenant, admin and demo-store tests all pass (1371) and none
+of the three is above a second.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01FjnQ7zTpdT8APsEWrbh6QJ ([`793b41b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/793b41bd52b86e0d1c8959e5e408d9662349be62))
+
+* test(loyalty): let the Hypothesis profile set the example count
+
+Every loyalty property test pinned max_examples=100 in its @settings,
+overriding the ci profile's 50 (and dev's 10), so CI ran them at twice
+the intended count: ~170 s of one shard. The decorators keep their
+deadline and health-check options; the count now comes from the
+profile, as the other property tests already do.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01FjnQ7zTpdT8APsEWrbh6QJ
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`793b41b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/793b41bd52b86e0d1c8959e5e408d9662349be62))
+
 ## v3.89.1 (2026-09-28)
 
 ### Bug fixes

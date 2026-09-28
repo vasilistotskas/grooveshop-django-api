@@ -134,17 +134,6 @@ class TestWeightBounds:
 
 
 @pytest.mark.django_db
-class TestMapConfig:
-    def test_map_config_passes_metadata_through(self, acs_provider):
-        cfg = acs_config.map_config()
-        assert cfg["default_map_center"] == [37.9838, 23.7275]
-        assert cfg["default_map_zoom"] == 11
-        assert "tile_provider" in cfg
-        assert "light" in cfg["tile_provider"]
-        assert "dark" in cfg["tile_provider"]
-
-
-@pytest.mark.django_db
 class TestVoucherLanguage:
     def test_metadata_overrides_language(self, acs_provider):
         acs_provider.metadata = {

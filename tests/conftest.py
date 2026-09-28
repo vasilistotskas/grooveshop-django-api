@@ -745,28 +745,6 @@ def _reseed_shipping_providers(request, _reseed_countries):
                         "max_weight_kg": "999",
                         "default_voucher_language": "GR",
                         "print_type": 1,
-                        "default_map_center": [37.9838, 23.7275],
-                        "default_map_zoom": 11,
-                        "tile_provider": {
-                            "light": {
-                                "url": (
-                                    "https://{s}.basemaps.cartocdn.com/"
-                                    "light_all/{z}/{x}/{y}{r}.png"
-                                ),
-                                "attribution": "© OSM © CARTO",
-                                "max_zoom": 19,
-                                "subdomains": "abcd",
-                            },
-                            "dark": {
-                                "url": (
-                                    "https://{s}.basemaps.cartocdn.com/"
-                                    "dark_all/{z}/{x}/{y}{r}.png"
-                                ),
-                                "attribution": "© OSM © CARTO",
-                                "max_zoom": 19,
-                                "subdomains": "abcd",
-                            },
-                        },
                     },
                 },
             )

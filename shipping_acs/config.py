@@ -1,7 +1,7 @@
 """Read ACS configuration from ``ShippingProvider.metadata``.
 
 Single source of truth for "structural" per-provider config (locker
-kinds per country, nearest-search limit, weight bounds, map chrome).
+kinds per country, nearest-search limit, weight bounds).
 Which countries ACS actually ships to is answered by its active
 ``ShippingRate`` rows, not by anything here.
 
@@ -247,19 +247,3 @@ def station_origin() -> str | None:
         if candidate:
             return candidate
     return None
-
-
-def map_config() -> dict[str, Any]:
-    """Map chrome (centre/zoom/tile providers) for the picker UI.
-
-    Surfaced verbatim by the ``/api/v1/shipping/options`` response and
-    consumed by the Nuxt SmartpointMap component. No defaults baked
-    in here — when metadata is empty the frontend uses its own
-    fallbacks (Athens centre, CARTO tiles).
-    """
-    metadata = _provider_metadata()
-    return {
-        "default_map_center": metadata.get("default_map_center"),
-        "default_map_zoom": metadata.get("default_map_zoom"),
-        "tile_provider": metadata.get("tile_provider"),
-    }

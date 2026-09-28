@@ -216,7 +216,6 @@ class TestDisabledSystemNoSideEffects:
         quantity=quantities,
     )
     @settings(
-        max_examples=100,
         deadline=None,
         suppress_health_check=[HealthCheck.too_slow],
     )
@@ -281,7 +280,6 @@ class TestEarnTransactionPerItem:
         coeff=coefficients,
     )
     @settings(
-        max_examples=100,
         deadline=None,
         suppress_health_check=[HealthCheck.too_slow],
     )
@@ -352,7 +350,6 @@ class TestXpEqualsTotalEarned:
         bonus=fixed_points,
     )
     @settings(
-        max_examples=100,
         deadline=None,
         suppress_health_check=[HealthCheck.too_slow],
     )
@@ -435,7 +432,6 @@ class TestGuestOrdersNoTransactions:
         quantity=quantities,
     )
     @settings(
-        max_examples=100,
         deadline=None,
         suppress_health_check=[HealthCheck.too_slow],
     )
@@ -502,7 +498,6 @@ class TestTierMultiplierApplied:
         quantity=quantities,
     )
     @settings(
-        max_examples=100,
         deadline=None,
         suppress_health_check=[HealthCheck.too_slow],
     )
@@ -627,7 +622,6 @@ class TestReversalNegatesEarnSum:
         ),
     )
     @settings(
-        max_examples=100,
         deadline=None,
         suppress_health_check=[HealthCheck.too_slow],
     )
@@ -731,7 +725,6 @@ class TestXpSubtractedOnReversal:
         ),
     )
     @settings(
-        max_examples=100,
         deadline=None,
         suppress_health_check=[HealthCheck.too_slow],
     )
@@ -809,7 +802,6 @@ class TestExpirationIdentifiesCorrectTransactions:
         points_per_tx=st.integers(min_value=1, max_value=500),
     )
     @settings(
-        max_examples=100,
         deadline=None,
         suppress_health_check=[HealthCheck.too_slow],
     )
@@ -893,7 +885,6 @@ class TestExpirationIdentifiesCorrectTransactions:
         points_per_tx=st.integers(min_value=1, max_value=500),
     )
     @settings(
-        max_examples=100,
         deadline=None,
         suppress_health_check=[HealthCheck.too_slow],
     )
@@ -960,7 +951,6 @@ class TestNewCustomerBonusLogic:
         price=positive_prices,
     )
     @settings(
-        max_examples=100,
         deadline=None,
         suppress_health_check=[HealthCheck.too_slow],
     )
@@ -1042,7 +1032,6 @@ class TestNewCustomerBonusLogic:
         price=positive_prices,
     )
     @settings(
-        max_examples=100,
         deadline=None,
         suppress_health_check=[HealthCheck.too_slow],
     )

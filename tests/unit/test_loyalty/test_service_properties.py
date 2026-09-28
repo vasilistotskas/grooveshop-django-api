@@ -133,7 +133,6 @@ class TestPriceBasisCalculation:
         final_price=positive_money_amounts,
         basis=price_basis_choices,
     )
-    @settings(max_examples=100)
     def test_price_basis_returns_correct_value_for_all_settings(
         self,
         price: Decimal,
@@ -189,7 +188,6 @@ class TestPointsCalculationFormula:
         points_factor=points_factors,
         quantity=quantities,
     )
-    @settings(max_examples=100)
     def test_points_formula_matches_specification(
         self,
         price: Decimal,
@@ -261,7 +259,7 @@ class TestRedemptionDiscount:
         points_amount=redeem_points_amounts,
         redemption_ratio=redemption_ratios,
     )
-    @settings(max_examples=100, deadline=None)
+    @settings(deadline=None)
     def test_redemption_returns_correct_discount(
         self,
         points_amount: int,
@@ -332,7 +330,7 @@ class TestBalanceEqualsTransactionSum:
             max_size=20,
         ),
     )
-    @settings(max_examples=100, deadline=None)
+    @settings(deadline=None)
     def test_balance_equals_algebraic_sum_of_transactions(
         self,
         points_list: list[int],
@@ -389,7 +387,6 @@ class TestLevelFormula:
         total_xp=xp_values,
         xp_per_level=xp_per_level_values,
     )
-    @settings(max_examples=100)
     def test_level_equals_one_plus_floor_xp_div_xp_per_level(
         self,
         total_xp: int,
@@ -431,7 +428,6 @@ class TestTierAssignment:
         required_levels=tier_levels,
         user_level=st.integers(min_value=0, max_value=1500),
     )
-    @settings(max_examples=100)
     def test_tier_is_highest_qualifying_for_level(
         self,
         required_levels: list[int],

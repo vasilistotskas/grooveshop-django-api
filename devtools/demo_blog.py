@@ -22,6 +22,8 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
 
+from django.utils.html import linebreaks
+
 logger = logging.getLogger(__name__)
 
 
@@ -647,8 +649,9 @@ def _seed_authors(users: dict[str, Any], translate) -> tuple[list, dict]:
     for row in AUTHORS:
         user = users[row.email]
         author, created = BlogAuthor.objects.get_or_create(user=user)
-        translate(author, "el", bio=row.bio_el)
-        translate(author, "en", bio=row.bio_en)
+        # Rich text, as the admin's editor stores it: one <p> each.
+        translate(author, "el", bio=linebreaks(row.bio_el, autoescape=True))
+        translate(author, "en", bio=linebreaks(row.bio_en, autoescape=True))
         author.save()
         authors.append(author)
         report["authors_created" if created else "authors_unchanged"] = (

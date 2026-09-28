@@ -1,8 +1,11 @@
+from html import unescape
+
 from django.contrib import admin
 from django.db import transaction
 from django.db.models import Count
 from django.utils import timezone
-from django.utils.html import format_html
+from django.utils.html import format_html, strip_tags
+from django.utils.text import Truncator
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import TabularInline
 from unfold.contrib.filters.admin import (
@@ -271,10 +274,10 @@ class BlogAuthorAdmin(BaseTranslatableAdmin):
 
     @admin.display(description=_("Bio"))
     def bio_preview(self, obj):
+        # The bio is rich text: preview its words, not its markup or its
+        # entities (``&amp;``). The admin template escapes the result.
         bio = obj.safe_translation_getter("bio", any_language=True) or ""
-        if len(bio) > 50:
-            return f"{bio[:50]}..."
-        return bio
+        return Truncator(unescape(strip_tags(bio))).chars(50)
 
     @admin.display(description=_("Posts"))
     def posts_count(self, obj):

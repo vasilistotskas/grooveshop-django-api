@@ -1,3 +1,4 @@
+import functools
 import importlib
 import os
 from types import SimpleNamespace
@@ -543,6 +544,42 @@ def _reseed_extra_settings(request):
         pass
 
 
+@functools.cache
+def _seeded_region_and_country_codes() -> tuple[frozenset, frozenset]:
+    """Every alpha-2 and region code the seed migrations create."""
+    countries = importlib.import_module(
+        "country.migrations.0012_seed_iso_countries"
+    )
+    default_regions = importlib.import_module(
+        "region.migrations.0009_seed_default_regions"
+    )
+    cyprus_regions = importlib.import_module(
+        "region.migrations.0010_seed_cyprus_regions"
+    )
+    return (
+        frozenset(row[0] for row in countries.ISO_COUNTRIES),
+        frozenset(
+            row[0]
+            for row in (
+                *default_regions.DEFAULT_REGIONS,
+                *cyprus_regions.CYPRUS_REGIONS,
+            )
+        ),
+    )
+
+
+def _country_seed_is_intact() -> bool:
+    from country.models import Country
+    from region.models import Region
+
+    country_codes, region_codes = _seeded_region_and_country_codes()
+    return Country.objects.filter(alpha_2__in=country_codes).count() == len(
+        country_codes
+    ) and Region.objects.filter(alpha__in=region_codes).count() == len(
+        region_codes
+    )
+
+
 @pytest.fixture(autouse=True)
 def _reseed_countries(request):
     """Restore the ``Country`` + ``Region`` seed rows for every DB test.
@@ -572,6 +609,13 @@ def _reseed_countries(request):
     if request.node.get_closest_marker("django_db"):
         try:
             from django.apps import apps as django_apps
+
+            # The seeds re-check every one of ~270 rows with a query
+            # each. Before EVERY DB test that roughly doubled CI's
+            # test time, while the rows are almost always still there:
+            # only a flushing test removes them. Two counts settle it.
+            if _country_seed_is_intact():
+                return
 
             for module_name, func_name in (
                 (
@@ -726,9 +770,21 @@ def _reseed_shipping_providers(request, _reseed_countries):
             rate_seed = importlib.import_module(
                 "shipping.migrations.0011_convert_legacy_pricing_to_rates"
             )
-            rate_seed.convert_legacy_pricing(
-                django_apps, SimpleNamespace(connection=connection)
+            # Same cost argument as ``_reseed_countries``: the rates
+            # only go missing after a flush, so skip the conversion
+            # while every seeded provider still has its GR rate.
+            from shipping.models import ShippingRate
+
+            seeded = set(
+                ShippingRate.objects.filter(
+                    country_id="GR",
+                    provider__code__in=rate_seed._PROVIDER_CODES,
+                ).values_list("provider__code", flat=True)
             )
+            if seeded != set(rate_seed._PROVIDER_CODES):
+                rate_seed.convert_legacy_pricing(
+                    django_apps, SimpleNamespace(connection=connection)
+                )
         except Exception:
             # The fixture is best-effort — a transient DB connection
             # error must not mask the real failure of the test itself.

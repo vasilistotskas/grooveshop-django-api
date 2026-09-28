@@ -1,9 +1,13 @@
+import re
+
 import pytest
 from django.conf import settings
+from django.contrib.staticfiles import finders
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.urls import reverse
 from rest_framework.test import APIClient
+from tinymce.widgets import AdminTinyMCE
 
 from blog.factories.post import BlogPostFactory
 from core.fields.rich_text import validate_rich_text
@@ -39,11 +43,11 @@ VIDEO_FILE = (
             'rel="noopener">link</a></p>'
         ),
         '<ol style="list-style-type: lower-alpha;"><li>a</li></ol>',
-        # An FAQ item, as the accordion plugin saves it (collapsed).
+        # An FAQ item as the editor saves it, measured on staging: closed,
+        # the summary's class and the editing-only answer wrapper dropped.
         (
-            '<details class="mce-accordion"><summary class="mce-accordion-summary">'
-            'Question?</summary><div class="mce-accordion-body"><p>Answer.</p>'
-            "</div></details>"
+            '<details class="mce-accordion">\n<summary>Question?</summary>\n'
+            "<p>Answer with <strong>formatting</strong>.</p>\n</details>"
         ),
     ],
 )
@@ -138,6 +142,47 @@ def test_an_faq_item_saved_open_is_refused():
         )
 
     assert exc.value.error_list[0].params == {"markup": "<details open>"}
+
+
+_GREEK_LABELS = "admin/js/tinymce_i18n_el.js"
+
+
+def _static_text(path):
+    return open(finders.find(path), encoding="utf-8").read()
+
+
+def test_every_accordion_label_has_a_greek_translation():
+    """The bundled Greek pack leaves the accordion plugin's strings empty,
+    which TinyMCE shows as a blank menu entry. Read the strings from the
+    plugin itself, so a TinyMCE upgrade that adds one fails here instead
+    of shipping a blank label."""
+    plugin = _static_text("tinymce/plugins/accordion/plugin.min.js")
+    shown = set(
+        re.findall(r'(?:text|tooltip):"([^"]+)"', plugin)
+        + re.findall(r'translate\("([^"]+)"', plugin)
+    )
+    labels = _static_text(_GREEK_LABELS)
+    translated = set(re.findall(r"'([^']+)': '[^']+'", labels))
+
+    assert shown
+    assert shown <= translated
+
+
+def test_greek_labels_load_between_the_pack_and_the_editor():
+    """After the pack, or its empty values win; before the editor
+    initialises, or its UI is already drawn."""
+    scripts = list(AdminTinyMCE().media._js)
+
+    order = [
+        next(i for i, s in enumerate(scripts) if s.endswith(name))
+        for name in (
+            "tinymce/tinymce.min.js",
+            "tinymce/langs/el.js",
+            _GREEK_LABELS,
+            "django_tinymce/init_tinymce.js",
+        )
+    ]
+    assert order == sorted(order)
 
 
 def test_editor_plugins_are_the_audited_set():

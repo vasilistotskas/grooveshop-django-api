@@ -4327,6 +4327,13 @@ TINYMCE_DEFAULT_CONFIG = {
 }
 
 TINYMCE_COMPRESSOR = False
+# Between ``tinymce.min.js`` and ``init_tinymce.js`` (django-tinymce's
+# widget media): the bundled Greek pack, then the labels it leaves
+# empty, so the editor's Greek UI has no blank entries. See the header
+# of static/admin/js/tinymce_i18n_el.js for why the order matters.
+TINYMCE_EXTRA_MEDIA = {
+    "js": ["tinymce/langs/el.js", "admin/js/tinymce_i18n_el.js"],
+}
 
 FILE_UPLOAD_MAX_MEMORY_SIZE = 2621440
 

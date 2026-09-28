@@ -63,16 +63,33 @@ def test_no_hardening_check_keys_on_the_deployment_name():
     assert not re.search(r'SYSTEM_ENV\s*==\s*"production"', source)
 
 
+# What settings.py refuses to start without under the production profile.
+_PRODUCTION_SECRETS = {
+    "SECRET_KEY": "not-the-default",
+    "DB_PASSWORD": "not-the-default",
+    "DEEPL_AUTH_KEY": "not-the-default",
+    "CELERY_BROKER_URL": "amqp://user:pass@broker:5672//",
+    "MEILI_MASTER_KEY": "not-the-default",
+    "MEILI_SEARCH_KEY": "not-the-default",
+    "EMAIL_HOST_PASSWORD": "not-the-default",
+    "USE_X_FORWARDED_HOST": "True",
+}
+
+
 def _import_settings(**env):
     """Import settings.py in a fresh interpreter: its checks run at
-    import time, which an in-process test cannot repeat."""
+    import time, which an in-process test cannot repeat.
+
+    Every value the production profile requires is given here, so the
+    result depends only on the arguments: CI has no ``.env`` behind it,
+    and python-dotenv never overrides a variable that is already set.
+    """
     return subprocess.run(
         [sys.executable, "-c", "import settings"],
         cwd=SETTINGS_FILE.parent,
         env={
             **os.environ,
-            "DB_PASSWORD": "not-the-default",
-            "SECRET_KEY": "not-the-default",
+            **_PRODUCTION_SECRETS,
             **env,
         },
         capture_output=True,

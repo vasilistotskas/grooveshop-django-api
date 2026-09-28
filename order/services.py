@@ -794,7 +794,9 @@ class OrderService:
             order_data.setdefault(
                 "shipping_kind", shipping_address.get("shipping_kind")
             )
-            cls._resolve_shipping_provider(order_data)
+            cls._resolve_shipping_provider(
+                order_data, weight_grams=cart_weight_grams
+            )
             cls._seed_language_code(order_data)
             order = Order.objects.create(**order_data)
             OrderAttributionService.record(
@@ -1288,7 +1290,9 @@ class OrderService:
             order_data.setdefault(
                 "shipping_kind", shipping_address.get("shipping_kind")
             )
-            cls._resolve_shipping_provider(order_data)
+            cls._resolve_shipping_provider(
+                order_data, weight_grams=cart_weight_grams
+            )
             cls._seed_language_code(order_data)
 
             order = Order.objects.create(**order_data)
@@ -2611,7 +2615,9 @@ class OrderService:
         return order
 
     @classmethod
-    def _resolve_shipping_provider(cls, order_data: dict[str, Any]) -> None:
+    def _resolve_shipping_provider(
+        cls, order_data: dict[str, Any], *, weight_grams: int
+    ) -> None:
         """Resolve ``shipping_provider_code`` → ``shipping_provider`` FK.
 
         Mutates ``order_data`` in place: removes ``shipping_provider_code``
@@ -2640,7 +2646,7 @@ class OrderService:
         # always agree.
         if not code and kind == "home_delivery":
             code = ShippingService.resolve_home_delivery_provider(
-                order_data.get("country_id")
+                order_data.get("country_id"), weight_grams
             )
 
         if code:
@@ -3160,7 +3166,9 @@ class OrderService:
         # and the price they paid.
         if not shipping_provider_code and shipping_kind == "home_delivery":
             shipping_provider_code = (
-                ShippingService.resolve_home_delivery_provider(country_id)
+                ShippingService.resolve_home_delivery_provider(
+                    country_id, weight_grams
+                )
             )
 
         try:

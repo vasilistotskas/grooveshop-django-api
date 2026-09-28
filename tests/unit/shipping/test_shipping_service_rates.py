@@ -379,6 +379,54 @@ class TestResolveHomeDeliveryProvider:
             == high_priority.code
         )
 
+    def test_a_capped_carrier_listed_first_does_not_hide_one_that_fits(
+        self,
+    ):
+        country = CountryFactory()
+        capped = ShippingProviderFactory(code="rate_home_capped", priority=1)
+        roomy = ShippingProviderFactory(code="rate_home_roomy", priority=5)
+        ShippingRateFactory(
+            provider=capped, country=country, max_weight_grams=2000
+        )
+        ShippingRateFactory(
+            provider=roomy, country=country, max_weight_grams=None
+        )
+
+        assert (
+            ShippingService.resolve_home_delivery_provider(
+                country.alpha_2, weight_grams=5000
+            )
+            == roomy.code
+        )
+        assert (
+            ShippingService.resolve_home_delivery_provider(
+                country.alpha_2, weight_grams=1500
+            )
+            == capped.code
+        )
+
+    def test_when_no_carrier_fits_it_still_names_the_first(self):
+        """Over every cap, the first carrier is still returned, so the
+        quote that follows raises the weight error (covered by the
+        weight-cap tests above) rather than the misleading "not
+        available for this country"."""
+        country = CountryFactory()
+        first = ShippingProviderFactory(code="rate_home_first", priority=1)
+        second = ShippingProviderFactory(code="rate_home_second", priority=5)
+        ShippingRateFactory(
+            provider=first, country=country, max_weight_grams=1000
+        )
+        ShippingRateFactory(
+            provider=second, country=country, max_weight_grams=2000
+        )
+
+        assert (
+            ShippingService.resolve_home_delivery_provider(
+                country.alpha_2, weight_grams=9000
+            )
+            == first.code
+        )
+
     def test_ignores_a_provider_with_no_rate_for_the_country(self):
         rated_country = CountryFactory()
         unrated_country = CountryFactory()

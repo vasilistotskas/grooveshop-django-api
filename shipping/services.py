@@ -546,7 +546,7 @@ class ShippingService:
 
     @classmethod
     def resolve_home_delivery_provider(
-        cls, country_code: str | None
+        cls, country_code: str | None, weight_grams: int | None = None
     ) -> str | None:
         """Return the active home-delivery carrier's code for ``country_code``.
 
@@ -558,16 +558,36 @@ class ShippingService:
         and the pricing paths route ``home_delivery`` through the same
         carrier for the same country — otherwise an order could be
         priced against one carrier's rate and assigned to another.
+
+        With ``weight_grams`` it prefers a carrier whose rate can carry
+        that cart, so a capped carrier listed first does not hide an
+        uncapped one behind it. When none can, it still names the
+        first carrier, so the quote fails as over-weight rather than as
+        unavailable for the country.
         """
         qs = ShippingProvider.objects.filter(
             is_active=True, supports_home_delivery=True
         )
         if country_code:
-            qs = qs.filter(
+            rate = Q(
                 rates__country_id=country_code.upper(),
                 rates__kind=ShippingKind.HOME_DELIVERY.value,
                 rates__is_active=True,
             )
+            if weight_grams is not None:
+                # In the same filter() as ``rate``, so both conditions
+                # hold on ONE rate row, not on two different ones.
+                fitting = qs.filter(
+                    rate
+                    & (
+                        Q(rates__max_weight_grams__isnull=True)
+                        | Q(rates__max_weight_grams__gte=weight_grams)
+                    )
+                )
+                picked = fitting.order_by("priority", "code").first()
+                if picked is not None:
+                    return picked.code
+            qs = qs.filter(rate)
         picked = qs.order_by("priority", "code").first()
         return picked.code if picked is not None else None
 

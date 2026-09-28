@@ -3,6 +3,65 @@
 
 
 
+## v3.89.3 (2026-09-28)
+
+### Bug fixes
+
+* fix(settings): the production profile refuses a cleartext database
+
+From review on #87. ``sslmode=require`` was only the production
+profile's default: an explicit DB_SSLMODE of disable, allow or prefer
+silently downgraded production or staging to an unencrypted database
+connection. The profile now refuses anything but the libpq modes that
+reject cleartext (require, verify-ca, verify-full), the same way it
+refuses the default DB_PASSWORD. Neither cluster sets DB_SSLMODE, so
+both keep running on require. Tests import settings in a subprocess,
+where the check runs.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_016F5trstVMoFXNan1ZQMLEp ([`f4113f6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f4113f67745a2b7507cb6b56a61d3d229a7ac885))
+
+* fix(admin): the staging admin says staging, and keeps production's hardening
+
+SYSTEM_ENV did two jobs: it named the deployment (the admin's
+environment badge and [PROD] tab prefix, admin/environment.py) and it
+switched on the production hardening (ten `SYSTEM_ENV == "production"`
+checks in settings.py: required secrets, TLS to the database, JSON
+logs). Staging needs the hardening, so it ran SYSTEM_ENV=production and
+its admin labelled itself PRODUCTION: a red badge and [PROD] on the
+environment built for rehearsing changes.
+
+PRODUCTION_PROFILE = SYSTEM_ENV in ("production", "staging") now carries
+the hardening, and every one of the ten checks reads it. SYSTEM_ENV
+names the deployment, which admin/environment.py already maps to
+"Staging" / [STAGE]. With SYSTEM_ENV=staging, settings refuse the same
+insecure defaults production does (checked); dev and ci are unchanged.
+
+Deploy this before staging switches to SYSTEM_ENV=staging (infra):
+older code would read "staging" as "not production" and drop the
+hardening.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_016F5trstVMoFXNan1ZQMLEp ([`41987b9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/41987b94c3288b4a7dff445b1c49302cf6cec6a2))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.89.2 [skip ci] ([`5825de2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5825de2dc66a112afc04e5f508ad044b98e2982d))
+
+### Testing
+
+* test(settings): the production-profile import tests carry their own secrets
+
+They passed locally and failed in CI: the subprocess inherited a local
+.env with every production secret, while CI has none, so settings.py
+stopped at DEEPL_AUTH_KEY before reaching the database TLS check. The
+tests now pass all eight values the production profile requires, which
+python-dotenv never overrides, so the result depends only on the
+arguments. Checked with the .env moved away and those variables unset.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_016F5trstVMoFXNan1ZQMLEp ([`8e20b76`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8e20b76926e4fb9f5f711c9ac4fd8810f5d92723))
+
 ## v3.89.2 (2026-09-28)
 
 ### Bug fixes

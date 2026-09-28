@@ -1504,6 +1504,18 @@ if DB_PASSWORD == "postgres" and PRODUCTION_PROFILE:
         "DB_PASSWORD must be set in production "
         "(current value is the insecure default 'postgres')."
     )
+# ``require`` above is only the default: an explicit DB_SSLMODE would
+# otherwise quietly downgrade the production profile to cleartext. These
+# are the libpq modes that refuse an unencrypted connection.
+_DB_TLS_SSLMODES = {"require", "verify-ca", "verify-full"}
+if PRODUCTION_PROFILE and _db_options["sslmode"] not in _DB_TLS_SSLMODES:
+    from django.core.exceptions import ImproperlyConfigured
+
+    raise ImproperlyConfigured(
+        f"DB_SSLMODE={_db_options['sslmode']!r} allows an unencrypted "
+        "database connection; production needs one of "
+        f"{', '.join(sorted(_DB_TLS_SSLMODES))}."
+    )
 
 DATABASES = {
     "default": {

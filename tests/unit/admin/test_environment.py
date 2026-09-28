@@ -11,7 +11,10 @@ keeps.
 
 from __future__ import annotations
 
+import os
 import re
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -58,3 +61,38 @@ def test_no_hardening_check_keys_on_the_deployment_name():
     source = SETTINGS_FILE.read_text(encoding="utf-8")
 
     assert not re.search(r'SYSTEM_ENV\s*==\s*"production"', source)
+
+
+def _import_settings(**env):
+    """Import settings.py in a fresh interpreter: its checks run at
+    import time, which an in-process test cannot repeat."""
+    return subprocess.run(
+        [sys.executable, "-c", "import settings"],
+        cwd=SETTINGS_FILE.parent,
+        env={
+            **os.environ,
+            "DB_PASSWORD": "not-the-default",
+            "SECRET_KEY": "not-the-default",
+            **env,
+        },
+        capture_output=True,
+        text=True,
+        timeout=120,
+        check=False,
+    )
+
+
+@pytest.mark.parametrize("sslmode", ["disable", "allow", "prefer"])
+def test_the_production_profile_refuses_a_cleartext_database(sslmode):
+    """``require`` is only the default; an explicit weaker DB_SSLMODE
+    must not downgrade production or staging to cleartext."""
+    result = _import_settings(SYSTEM_ENV="staging", DB_SSLMODE=sslmode)
+
+    assert result.returncode != 0
+    assert f"DB_SSLMODE='{sslmode}' allows an unencrypted" in result.stderr
+
+
+def test_the_production_profile_accepts_a_tls_database():
+    result = _import_settings(SYSTEM_ENV="staging", DB_SSLMODE="verify-full")
+
+    assert result.returncode == 0, result.stderr

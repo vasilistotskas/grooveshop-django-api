@@ -160,6 +160,19 @@ _extra_settings_cache.del_cached_setting = _noop_del_cached_setting
 _extra_settings_models.get_cached_setting = _noop_get_cached_setting
 _extra_settings_models.set_cached_setting = _noop_set_cached_setting
 
+# This suite runs single-schema (see ``DATABASE_ROUTERS`` below), so no
+# test here needs a real tenant schema — ``tests_mt`` owns that. But
+# ``TenantMixin.save`` creates one on ANY save of a tenant whose schema
+# is absent, and replays all ~500 migrations to do it. Setting
+# ``auto_create_schema = False`` on the instance a test builds does not
+# survive a reload, so production code that re-fetches the tenant
+# (``seed_branding``, a stale copy, a second ``Tenant.objects.create``)
+# paid 70-150 s per save: the slowest tests on CI. Off at the class, for
+# every tenant this suite touches.
+from tenant.models import Tenant as _Tenant  # noqa: E402
+
+_Tenant.auto_create_schema = False
+
 settings.DATABASES["default"]["ATOMIC_REQUESTS"] = False
 settings.DATABASES["default"]["AUTOCOMMIT"] = True
 settings.DATABASES["default"]["CONN_MAX_AGE"] = 0

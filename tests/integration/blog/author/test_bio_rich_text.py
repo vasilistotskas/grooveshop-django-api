@@ -63,6 +63,16 @@ class TestBackfill:
             "<p>Second paragraph,<br>same block.</p>"
         )
 
+    def test_running_it_again_converts_nothing_twice(self):
+        translation = _translation(_author())
+        _store_raw(translation, "First.\r\n\r\nSecond.")
+
+        _migration._plain_bio_to_rich_text(_historical_apps(), None)
+        _migration._plain_bio_to_rich_text(_historical_apps(), None)
+
+        translation.refresh_from_db()
+        assert translation.bio == "<p>First.</p>\n\n<p>Second.</p>"
+
     def test_an_empty_or_missing_bio_is_left_alone(self):
         empty = _translation(_author())
         missing = _translation(_author())
@@ -113,3 +123,14 @@ class TestAdminPreview:
         assert "<" not in preview
         assert preview.startswith("Mike Ganos is a performance")
         assert len(preview) <= 50
+
+    def test_previews_entities_as_the_characters_they_are(self):
+        author = _author()
+        author.set_current_language("el")
+        author.bio = "<p>Tom &amp; Jerry</p>"
+        author.save()
+        admin = BlogAuthorAdmin(BlogAuthor, AdminSite())
+
+        preview = admin.bio_preview(BlogAuthor.objects.get(pk=author.pk))
+
+        assert preview == "Tom & Jerry"

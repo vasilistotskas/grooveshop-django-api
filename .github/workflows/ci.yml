@@ -380,10 +380,18 @@ jobs:
         # Shard 3 running ~1-2 min longer than the rest is the accepted
         # cost; a CI-weighted ``.test_durations`` refresh is the only
         # safe rebalancing lever.
-        # Refresh ``.test_durations`` occasionally with ``uv run pytest
-        # --store-durations`` (HYPOTHESIS_PROFILE=ci for CI-like
-        # weights); tests missing from the file are assumed average, so
-        # drift costs balance, never correctness. Four shards, not more:
+        # The weights come from CI itself. Each shard splits from a copy
+        # of ``.test_durations`` (so the split is unchanged) and, with
+        # ``--store-durations --clean-durations``, rewrites that copy
+        # with only the tests it ran, timed on this runner under this
+        # coverage and xdist load; the next steps upload it. To refresh:
+        # ``python .github/scripts/merge_test_durations.py`` merges the
+        # four shards of the latest green run on main, then commit the
+        # file. A LOCAL ``--store-durations`` run records a developer
+        # machine instead: the 2026-09-26 one estimated the groups
+        # within 0.7% of each other and they ran 9-16 minutes on CI.
+        # Tests missing from the file are assumed average, so drift
+        # costs balance, never correctness. Four shards, not more:
         # each shard pays a fixed ~3 min creating its xdist worker
         # test-databases (validated locally with ``--create-db -n 4``),
         # so extra shards mostly buy overhead.
@@ -397,12 +405,25 @@ jobs:
         # creeps toward its timeout, profile first:
         # pytest --durations=25.
         run: >
+          cp .test_durations test-durations-shard-${{ matrix.group }}.json &&
           uv run pytest --cov=. --cov-report= --cov-fail-under=0
           --cov-config=pyproject.toml -n auto --dist loadfile
           --splits 4 --group ${{ matrix.group }}
+          --durations-path test-durations-shard-${{ matrix.group }}.json
+          --store-durations --clean-durations
         timeout-minutes: 18
         env:
           HYPOTHESIS_PROFILE: ci
+
+      - name: Upload shard durations
+        # Read by .github/scripts/merge_test_durations.py; kept two
+        # weeks so a refresh can pick any recent green run.
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-durations-shard-${{ matrix.group }}
+          path: test-durations-shard-${{ matrix.group }}.json
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Stage coverage data for upload
         # upload-artifact excludes dotfiles by default; a visible,

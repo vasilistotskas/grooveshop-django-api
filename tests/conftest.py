@@ -173,6 +173,16 @@ from tenant.models import Tenant as _Tenant  # noqa: E402
 
 _Tenant.auto_create_schema = False
 
+# ``--store-durations`` (CI's per-shard ``.test_durations``) drops a
+# setup or teardown only above 10 minutes. Creating an xdist worker's
+# test database takes 4-5 on a runner and is billed to whichever test
+# that worker runs first, so a trivial unit test was recorded at ~250 s
+# and dragged its whole file around the next split. No real fixture
+# here takes 30 s; anything longer is database creation.
+import pytest_split.plugin as _pytest_split_plugin  # noqa: E402
+
+_pytest_split_plugin.STORE_DURATIONS_SETUP_AND_TEARDOWN_THRESHOLD = 30
+
 settings.DATABASES["default"]["ATOMIC_REQUESTS"] = False
 settings.DATABASES["default"]["AUTOCOMMIT"] = True
 settings.DATABASES["default"]["CONN_MAX_AGE"] = 0

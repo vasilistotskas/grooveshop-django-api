@@ -39,6 +39,12 @@ VIDEO_FILE = (
             'rel="noopener">link</a></p>'
         ),
         '<ol style="list-style-type: lower-alpha;"><li>a</li></ol>',
+        # An FAQ item, as the accordion plugin saves it (collapsed).
+        (
+            '<details class="mce-accordion"><summary class="mce-accordion-summary">'
+            'Question?</summary><div class="mce-accordion-body"><p>Answer.</p>'
+            "</div></details>"
+        ),
     ],
 )
 def test_editor_output_is_accepted(html):
@@ -115,6 +121,25 @@ def test_unvalidated_save_still_normalises():
     )
 
 
+def test_faq_items_are_saved_closed():
+    """The sanitiser allows ``<details>`` but not its ``open`` attribute:
+    the editor must serialise every FAQ item collapsed, or a save that
+    left one open would be refused."""
+    config = settings.TINYMCE_DEFAULT_CONFIG
+
+    assert config["details_serialized_state"] == "collapsed"
+
+
+def test_an_faq_item_saved_open_is_refused():
+    with pytest.raises(ValidationError) as exc:
+        validate_rich_text(
+            '<details class="mce-accordion" open="open">'
+            "<summary>Q</summary><p>A</p></details>"
+        )
+
+    assert exc.value.error_list[0].params == {"markup": "<details open>"}
+
+
 def test_editor_plugins_are_the_audited_set():
     """The policy covers what THESE plugins emit, measured against the
     bundled TinyMCE. A plugin added or removed here must be re-measured
@@ -126,6 +151,7 @@ def test_editor_plugins_are_the_audited_set():
     }
 
     assert plugins == {
+        "accordion",
         "advlist",
         "anchor",
         "autolink",

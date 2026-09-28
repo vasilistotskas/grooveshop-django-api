@@ -51,6 +51,10 @@ ALLOWED_TAGS = {
     "code",
     "col",
     "colgroup",
+    # FAQ items: the accordion plugin's <details class="mce-accordion">
+    # with a <summary> question. Saved closed (TinyMCE
+    # ``details_serialized_state``), so ``open`` is not allowed.
+    "details",
     "div",
     "em",
     "h1",
@@ -79,6 +83,7 @@ ALLOWED_TAGS = {
     "span",
     "strong",
     "sub",
+    "summary",
     "sup",
     "table",
     "tbody",

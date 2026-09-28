@@ -3,6 +3,50 @@
 
 
 
+## v3.87.0 (2026-09-28)
+
+### Bug fixes
+
+* fix(blog): decode entities in the bio preview; make the bio backfill idempotent
+
+From review on #81. The admin preview stripped the tags but left
+``&amp;`` encoded, so it now unescapes before truncating (the admin
+template escapes the result). The 0039 backfill skips a bio that
+already holds markup, so reversing to 0038 (a no-op) and re-applying
+never escapes converted HTML into ``&lt;p&gt;``.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_016F5trstVMoFXNan1ZQMLEp ([`7136555`](https://github.com/vasilistotskas/grooveshop-django-api/commit/713655529448650d50969bd6e714c2471e83fda1))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.86.3 [skip ci] ([`dbe636a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/dbe636a80dbcce428ff1953b59670893b3abaf60))
+
+### Features
+
+* feat(blog): the author bio is rich text
+
+A merchant reported that the author page runs a bio's paragraphs
+together (webside.gr/blog/author/2). The bio was a plain TextField, so
+its blank-line-separated paragraphs collapsed into one block in HTML.
+It is now a RichTextField like every other long merchant-written text
+(post bodies, product and category descriptions, content pages, payment
+instructions): the admin edits it in the rich-text editor, and the
+save-time policy refuses markup the storefront cannot show.
+
+0039 converts every stored bio with django.utils.html.linebreaks
+(autoescape=True: blank-line blocks become <p>, single newlines <br>,
+and the text is escaped), through values and a queryset update per row,
+since a parler translation row loaded with .only() recurses into
+refresh_from_db. The admin preview shows the bio's words, not its
+markup, and the demo seed stores paragraphs as the editor does.
+
+Deploy the storefront change first: until it ships, the storefront
+prints the bio as text, and the converted HTML would show its tags.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_016F5trstVMoFXNan1ZQMLEp ([`2fe8ad9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2fe8ad9ea5e12773f4af7251e3fa9caf1f0793b8))
+
 ## v3.86.3 (2026-09-27)
 
 ### Chores

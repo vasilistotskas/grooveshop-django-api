@@ -3,6 +3,48 @@
 
 
 
+## v3.89.5 (2026-09-29)
+
+### Bug fixes
+
+* fix(content): an image left with no source is refused; hidden stays hidden
+
+Review of the paste change:
+- <img srcset> alone was dropped without refusing, leaving an image with
+  no source. It is now reported, but only when the image ends up with no
+  src: an image pasted from a web page carries srcset beside src and
+  survives on src, so refusing every dropped srcset would block those.
+- `hidden` is allowed. The editor already hides that content from the
+  author; dropping the attribute would show readers text nobody reviewed.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_0157G5ntewxVbCZ3G7sSVT7M ([`9b2e489`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9b2e4893b63e2a9d40e26cdd765d75af0f1a1856))
+
+* fix(content): pasted text saves; only lost content is refused
+
+Saving blog post 82 with pasted text failed with "would be removed:
+<span dir>". TinyMCE keeps every attribute of pasted HTML (measured
+against the bundled editor): Google Docs, Word and ChatGPT bring dir,
+lang, title, data-*, aria-*, role, tabindex. The save check refused any
+attribute the policy drops, so a paste blocked the save over markup no
+reader can see. The lists plugin's "start at 3" (<ol start>) was refused
+the same way.
+
+- Allow what carries meaning and is inert: dir, lang, title on every
+  element; ol[start|reversed] and li[value]. The storefront's DOMPurify
+  already keeps all of them.
+- Refuse only lost content (lost_content): a dropped element, or a
+  dropped href/src. Other residue (data-*, aria-*, event handlers) is
+  normalised away. An FAQ item saved open is stored closed rather than
+  refused.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_0157G5ntewxVbCZ3G7sSVT7M ([`7d21f95`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7d21f95a26cecf7f1b914f0cce51811b6f979432))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.89.4 [skip ci] ([`000943b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/000943be992e5d30bd7800a7972e9973ee728d83))
+
 ## v3.89.4 (2026-09-28)
 
 ### Bug fixes

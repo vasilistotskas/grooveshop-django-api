@@ -9,10 +9,16 @@
     @page {
       size: A4;
       margin: 18mm 16mm 28mm 16mm;
-      @bottom-center {
+      /* Right, not center: a center box keeps the left and right boxes
+         equal width so it stays centered, and a long seller footer then
+         squeezed "Page 1 / 1" onto two lines. Without a center box the
+         seller footer takes the width it needs, and nowrap keeps the
+         page counter on one line. */
+      @bottom-right {
         content: "{% trans 'Page' %} " counter(page) " / " counter(pages);
         font-size: 8.5pt;
         color: #777;
+        white-space: nowrap;
       }
       @bottom-left {
         content: element(seller-footer);

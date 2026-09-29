@@ -127,7 +127,9 @@ ALLOWED_ATTRIBUTES: dict[str, set[str]] = {
     # ChatGPT) and TinyMCE keeps them: they set text direction and tell
     # screen readers and hyphenation which language a run is in.
     # ``title`` is the tooltip. All three are plain text and inert.
-    "*": {"class", "dir", "id", "lang", "style", "title"},
+    # ``hidden`` too: the editor already hides that content from the
+    # author, and dropping it would show readers text nobody reviewed.
+    "*": {"class", "dir", "hidden", "id", "lang", "style", "title"},
 }
 
 # nh3 always sets ``rel`` on links itself, so ``rel`` is not in the
@@ -229,8 +231,17 @@ def lost_content(html: str) -> list[str]:
     pasted HTML, so refusing those would block a save over something
     nobody can see.
     """
-    return [
+    removed = removed_markup(html)
+    lost = [
         key
-        for key in removed_markup(html)
+        for key in removed
         if " " not in key or key[1:-1].split(" ", 1)[1] in _CONTENT_ATTRIBUTES
     ]
+    # ``srcset`` alone is not content: an image pasted from a web page
+    # carries it beside ``src`` and survives on ``src``. It is only when
+    # an image is left with no ``src`` at all that the picture is gone.
+    if "<img srcset>" in removed:
+        kept = _markup(sanitize_html(html))
+        if kept["<img>"] > kept["<img src>"]:
+            lost.append("<img srcset>")
+    return sorted(lost)

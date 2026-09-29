@@ -111,6 +111,32 @@ def test_pasted_text_keeps_direction_language_and_tooltip():
     )
 
 
+def test_hidden_content_stays_hidden():
+    html = '<p>shown</p><p hidden="">not reviewed</p>'
+
+    validate_rich_text(html)
+    assert sanitize_html(html) == html
+
+
+def test_an_image_from_a_web_page_keeps_its_src():
+    html = (
+        '<p><img src="https://example.com/a.jpg" '
+        'srcset="https://example.com/a2.jpg 2x" alt="a"></p>'
+    )
+
+    validate_rich_text(html)
+    assert sanitize_html(html) == (
+        '<p><img src="https://example.com/a.jpg" alt="a"></p>'
+    )
+
+
+def test_an_image_left_without_a_source_is_refused():
+    with pytest.raises(ValidationError) as exc:
+        validate_rich_text('<p><img srcset="https://example.com/a.jpg 1x"></p>')
+
+    assert exc.value.error_list[0].params == {"markup": "<img srcset>"}
+
+
 def test_list_numbering_is_kept():
     html = '<ol reversed="" start="3"><li value="7">a</li></ol>'
 

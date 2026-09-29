@@ -3,6 +3,37 @@
 
 
 
+## v3.89.7 (2026-09-29)
+
+### Bug fixes
+
+* fix(invoice): page counter stays on one line; the discount row is translated
+
+Footer: the page counter sat in @bottom-center. A center margin box
+keeps the left and right boxes equal width so it stays centered, so a
+long seller footer squeezed "Σελίδα 1 / 1" onto two lines. It now sits
+in @bottom-right with white-space: nowrap; without a center box the
+seller footer takes the width it needs and wraps on its own line if it
+must.
+
+Discount label: the Greek entry was fuzzy with the wrong text ("Σύνολο
+(με ΦΠΑ)", auto-matched from "Total (incl. VAT)"), so invoices printed
+the English "Discount (incl. VAT)"; clearing the flag alone would have
+labelled the discount a total. Now "Έκπτωση (με ΦΠΑ)". German gains the
+missing entry ("Rabatt (inkl. MwSt.)") and its empty "Email"
+("E-Mail"). These were the only gaps among the 31 strings the invoice
+uses; the prod Translation overlay has no rows for them.
+
+Verified by rendering the template in the production image: before, the
+counter wrapped; after, one line on the right, also with an exaggerated
+seller footer.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`67f0c0c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/67f0c0c1c89a21bd18fdafc1574e341a866f994d))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.89.6 [skip ci] ([`82cd074`](https://github.com/vasilistotskas/grooveshop-django-api/commit/82cd07424b4166b1eed998ed9cbae72f2c98bec8))
+
 ## v3.89.6 (2026-09-29)
 
 ### Bug fixes

@@ -15,9 +15,14 @@ stripped on save while the editor kept showing it, so a post looked
 right in the admin and lost its video on the storefront. When an editor
 plugin is added, re-check what it emits against this list.
 
-What still falls outside the policy — pasted source, a video file, an
-embed from another host — is refused by ``removed_markup`` at validation
-time instead of disappearing.
+Pasted HTML is the other source, and TinyMCE keeps every attribute of
+it. The allowlist takes the ones that mean something (``dir``, ``lang``,
+``title``, list numbering); the rest is residue no reader sees.
+
+Content that still falls outside the policy — pasted source, a video
+file, an embed from another host, a ``javascript:`` link — is refused by
+``lost_content`` at validation time instead of disappearing. Invisible
+residue (``data-*``, ``aria-*``, event handlers) is normalised away.
 """
 
 from collections import Counter
@@ -111,10 +116,20 @@ ALLOWED_ATTRIBUTES: dict[str, set[str]] = {
         "referrerpolicy",
     },
     "img": {"src", "alt", "width", "height", "loading"},
+    # The lists plugin's "List properties": numbering that starts, runs
+    # backwards or jumps is the author's content, not formatting.
+    "li": {"value"},
+    "ol": {"start", "reversed"},
     "table": {"border"},
     "td": {"colspan", "rowspan"},
     "th": {"colspan", "rowspan", "scope"},
-    "*": {"class", "id", "style"},
+    # ``dir``/``lang`` arrive with nearly every paste (Google Docs, Word,
+    # ChatGPT) and TinyMCE keeps them: they set text direction and tell
+    # screen readers and hyphenation which language a run is in.
+    # ``title`` is the tooltip. All three are plain text and inert.
+    # ``hidden`` too: the editor already hides that content from the
+    # author, and dropping it would show readers text nobody reviewed.
+    "*": {"class", "dir", "hidden", "id", "lang", "style", "title"},
 }
 
 # nh3 always sets ``rel`` on links itself, so ``rel`` is not in the
@@ -198,3 +213,35 @@ def removed_markup(html: str) -> list[str]:
         for key in removed
         if " " not in key or key[1:].split(" ", 1)[0] not in dropped_elements
     )
+
+
+# Attributes whose removal loses something a reader gets: where a link
+# goes, what an image or player shows. Everything else nh3 drops is
+# markup no reader sees - a paste's ``data-*``/``aria-*``/``role``, an
+# event handler - and is normalised away without refusing the save.
+_CONTENT_ATTRIBUTES = frozenset({"href", "src"})
+
+
+def lost_content(html: str) -> list[str]:
+    """The part of ``removed_markup`` a reader would miss, sorted.
+
+    An element (``<video>``, ``<script>``) or a link/media address
+    (``<a href>``, ``<iframe src>``). The other attributes the policy
+    drops are editor or paste residue: TinyMCE keeps every attribute of
+    pasted HTML, so refusing those would block a save over something
+    nobody can see.
+    """
+    removed = removed_markup(html)
+    lost = [
+        key
+        for key in removed
+        if " " not in key or key[1:-1].split(" ", 1)[1] in _CONTENT_ATTRIBUTES
+    ]
+    # ``srcset`` alone is not content: an image pasted from a web page
+    # carries it beside ``src`` and survives on ``src``. It is only when
+    # an image is left with no ``src`` at all that the picture is gone.
+    if "<img srcset>" in removed:
+        kept = _markup(sanitize_html(html))
+        if kept["<img>"] > kept["<img src>"]:
+            lost.append("<img srcset>")
+    return sorted(lost)

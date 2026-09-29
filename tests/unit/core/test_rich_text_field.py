@@ -11,6 +11,7 @@ from tinymce.widgets import AdminTinyMCE
 
 from blog.factories.post import BlogPostFactory
 from core.fields.rich_text import validate_rich_text
+from core.utils.sanitize import sanitize_html
 from user.factories.account import UserAccountFactory
 
 YOUTUBE = (
@@ -80,7 +81,81 @@ def test_script_is_refused_without_the_embed_hint():
     assert [error.code for error in exc.value.error_list] == [
         "unsupported_markup"
     ]
-    assert exc.value.error_list[0].params == {"markup": "<p onclick>, <script>"}
+    # The handler is residue, not content: it is dropped, not reported.
+    assert exc.value.error_list[0].params == {"markup": "<script>"}
+
+
+def test_event_handlers_never_survive_the_save():
+    assert sanitize_html('<p onclick="x()">a</p>') == "<p>a</p>"
+
+
+# Pasted from Google Docs / Word / ChatGPT, as TinyMCE keeps it
+# (measured against the bundled editor): the save that failed on
+# /admin/blog/blogpost/82 with "<span dir>".
+PASTED = (
+    '<p dir="ltr" lang="el" data-start="1" data-end="9" aria-label="x" '
+    'role="note" tabindex="0" class="MsoNormal"><span dir="ltr" '
+    'lang="EN-US" title="t" data-darkreader-inline-color="">'
+    "Τι είναι τα mAh;</span></p>"
+)
+
+
+def test_pasted_text_is_accepted():
+    validate_rich_text(PASTED)
+
+
+def test_pasted_text_keeps_direction_language_and_tooltip():
+    assert sanitize_html(PASTED) == (
+        '<p dir="ltr" lang="el" class="MsoNormal"><span dir="ltr" '
+        'lang="EN-US" title="t">Τι είναι τα mAh;</span></p>'
+    )
+
+
+def test_hidden_content_stays_hidden():
+    html = '<p>shown</p><p hidden="">not reviewed</p>'
+
+    validate_rich_text(html)
+    assert sanitize_html(html) == html
+
+
+def test_an_image_from_a_web_page_keeps_its_src():
+    html = (
+        '<p><img src="https://example.com/a.jpg" '
+        'srcset="https://example.com/a2.jpg 2x" alt="a"></p>'
+    )
+
+    validate_rich_text(html)
+    assert sanitize_html(html) == (
+        '<p><img src="https://example.com/a.jpg" alt="a"></p>'
+    )
+
+
+def test_an_image_left_without_a_source_is_refused():
+    with pytest.raises(ValidationError) as exc:
+        validate_rich_text('<p><img srcset="https://example.com/a.jpg 1x"></p>')
+
+    assert exc.value.error_list[0].params == {"markup": "<img srcset>"}
+
+
+def test_list_numbering_is_kept():
+    html = '<ol reversed="" start="3"><li value="7">a</li></ol>'
+
+    validate_rich_text(html)
+    assert sanitize_html(html) == html
+
+
+@pytest.mark.parametrize(
+    ("html", "lost"),
+    [
+        ('<p><a href="javascript:alert(1)">x</a></p>', "<a href>"),
+        ('<p><img src="data:image/png;base64,AAAA" alt="x"></p>', "<img src>"),
+    ],
+)
+def test_a_link_or_image_address_that_would_be_dropped_is_refused(html, lost):
+    with pytest.raises(ValidationError) as exc:
+        validate_rich_text(html)
+
+    assert exc.value.error_list[0].params == {"markup": lost}
 
 
 @pytest.mark.django_db
@@ -127,21 +202,25 @@ def test_unvalidated_save_still_normalises():
 
 def test_faq_items_are_saved_closed():
     """The sanitiser allows ``<details>`` but not its ``open`` attribute:
-    the editor must serialise every FAQ item collapsed, or a save that
-    left one open would be refused."""
+    the editor serialises every FAQ item collapsed, so a reader sees the
+    questions and opens the one they want."""
     config = settings.TINYMCE_DEFAULT_CONFIG
 
     assert config["details_serialized_state"] == "collapsed"
 
 
-def test_an_faq_item_saved_open_is_refused():
-    with pytest.raises(ValidationError) as exc:
-        validate_rich_text(
-            '<details class="mce-accordion" open="open">'
-            "<summary>Q</summary><p>A</p></details>"
-        )
+def test_an_faq_item_saved_open_is_stored_closed():
+    """``open`` is display state, not content: it is dropped, not
+    refused, so the item is stored closed like every other."""
+    html = (
+        '<details class="mce-accordion" open="open">'
+        "<summary>Q</summary><p>A</p></details>"
+    )
 
-    assert exc.value.error_list[0].params == {"markup": "<details open>"}
+    validate_rich_text(html)
+    assert sanitize_html(html) == (
+        '<details class="mce-accordion"><summary>Q</summary><p>A</p></details>'
+    )
 
 
 _GREEK_LABELS = "admin/js/tinymce_i18n_el.js"

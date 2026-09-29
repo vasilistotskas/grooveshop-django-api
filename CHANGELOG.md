@@ -3,6 +3,68 @@
 
 
 
+## v3.89.6 (2026-09-29)
+
+### Bug fixes
+
+* fix(deps): weasyprint 70.0 and picomatch 2.3.2 for two Dependabot advisories
+
+- weasyprint 69.0 -> 70.0 (CVE-2026-55073 / GHSA-jf6q-chmf-3h3v, SSRF):
+  write_pdf(xmp_metadata=..., stylesheets=...) ignored a custom
+  url_fetcher. Not exploitable here - the one call is
+  HTML(string=...).write_pdf() on our own invoice template, with none
+  of those parameters - but 70.0 is the security release (it also stops
+  rendering EPS images) and has no API change affecting that call.
+  Only weasyprint moves in uv.lock.
+- picomatch 2.3.1 -> 2.3.2 (CVE-2026-33672, dev-only, via the Tailwind
+  CLI). Only its lock entry changes; npm 11 would also have rewritten
+  an optional wasm package's bundled deps, which is lockfile-format
+  churn and left out.
+
+Verified: the real invoices/invoice.html renders to a valid, visually
+identical PDF with 69.0 and 70.0 inside the production image (its own
+Pango/cairo/HarfBuzz); the Tailwind CSS build is byte-identical with
+picomatch 2.3.1 and 2.3.2; npm ci accepts the lock; 59 invoice tests
+pass.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01EHEvci9p43WnuwkqtUNNao ([`f9f95e6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f9f95e64379cc8e2b360a59078f6f982d08ee41b))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.89.5 [skip ci] ([`62cb604`](https://github.com/vasilistotskas/grooveshop-django-api/commit/62cb604e0c6e346ff786e66a51ef495f18b4a354))
+
+### Continuous integration
+
+* ci(deps): keep GitHub Actions current with Dependabot
+
+This repository had no Dependabot config, so its actions drifted to old
+majors unnoticed (checkout, setup-node, pnpm/action-setup and more were
+a major behind until the manual bump). Weekly github-actions updates:
+minor and patch grouped into one PR, each major on its own for review,
+a 7-day cooldown before a release is proposed, and a "ci" prefix so
+the PRs cut no release. SHA-pinned actions are updated in place,
+version comment included.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01EHEvci9p43WnuwkqtUNNao ([`8082ae5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8082ae53d03cee581650c8ce4c89e10e9510517b))
+
+* ci(actions): move every action to its latest release
+
+- actions/checkout v6 -> v7: refuses fork checkouts only under
+  pull_request_target/workflow_run, which no workflow here uses.
+- actions/setup-python v6 -> v7: drops the pip-install input, which is
+  not used here.
+- astral-sh/setup-uv v8.1.0 -> v10.2.0 (SHA-pinned): v9 stops pruning the
+  cache by default, v10 disables the AUTO cache on pull_request_target,
+  workflow_run and release; every step here sets enable-cache: true and
+  runs on push/pull_request. All inputs used (version, enable-cache,
+  cache-dependency-glob) still exist.
+- astral-sh/ruff-action v4.0.0 -> v4.1.0 (SHA-pinned): additive.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01EHEvci9p43WnuwkqtUNNao ([`edf9e30`](https://github.com/vasilistotskas/grooveshop-django-api/commit/edf9e3006d24e5b60a96f7c03518e7086d598de9))
+
 ## v3.89.5 (2026-09-29)
 
 ### Bug fixes

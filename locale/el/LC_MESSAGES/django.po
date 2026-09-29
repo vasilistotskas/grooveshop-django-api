@@ -6691,10 +6691,8 @@ msgid "Unnamed product"
 msgstr "Προϊόν χωρίς όνομα"
 
 #: .\core\templates\invoices\invoice.html:255
-#, fuzzy
-#| msgid "Total (incl. VAT)"
 msgid "Discount (incl. VAT)"
-msgstr "Σύνολο (με ΦΠΑ)"
+msgstr "Έκπτωση (με ΦΠΑ)"
 
 #: .\core\templates\invoices\invoice.html:260 .\order\models\invoice.py:220
 msgid "Subtotal (excl. VAT)"

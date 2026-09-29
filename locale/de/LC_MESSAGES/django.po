@@ -1834,7 +1834,7 @@ msgstr ""
 
 #: .\contact\models.py:15 .\order\models\order.py:122
 msgid "Email"
-msgstr ""
+msgstr "E-Mail"
 
 #: .\contact\models.py:30
 msgid "Contacts"
@@ -9776,3 +9776,7 @@ msgstr "Name des Einstellungsschlüssels (z. B. GIFT_CARD_MIN_AMOUNT)"
 #, python-format
 msgid "BoxNow locker sync complete: %(created)d created, %(updated)d updated, %(deactivated)d deactivated, %(skipped_no_country)d skipped (no country)."
 msgstr "BoxNow-Locker-Synchronisierung abgeschlossen: %(created)d erstellt, %(updated)d aktualisiert, %(deactivated)d deaktiviert, %(skipped_no_country)d übersprungen (kein Land)."
+
+#: .\core\templates\invoices\invoice.html:255
+msgid "Discount (incl. VAT)"
+msgstr "Rabatt (inkl. MwSt.)"

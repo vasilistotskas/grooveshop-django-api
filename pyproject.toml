@@ -56,7 +56,7 @@ dependencies = [
   "defusedxml>=0.7.1",
   "django-tenants>=3.14.0,<4.0.0",
   "nh3>=0.3.6",
-  "weasyprint>=69.0",
+  "weasyprint>=70.0",
   "requests==2.34.2",
   "xmlschema==4.3.2",
   "argon2-cffi>=25.1.0",

@@ -23,6 +23,10 @@ from typing import Any
 from django.core.exceptions import ValidationError
 from django.utils.deconstruct import deconstructible
 from django.utils.module_loading import import_string
+from djangorestframework_camel_case.util import (
+    camelize_re,
+    underscore_to_camel,
+)
 from jsonschema import Draft202012Validator, FormatChecker
 from jsonschema.exceptions import ValidationError as SchemaError
 
@@ -88,3 +92,32 @@ def schema_validator(field: Any) -> JSONSchemaValidator | None:
         ),
         None,
     )
+
+
+def wire_schema(schema: Any) -> Any:
+    """``schema`` as the API emits the data: property names camelized
+    the way djangorestframework-camel-case camelizes response keys.
+
+    drf-spectacular's camelize hook walks only its own registry, so a
+    schema published as a component (the page sections) is converted
+    here, at every depth.
+    """
+    if isinstance(schema, list):
+        return [wire_schema(entry) for entry in schema]
+    if not isinstance(schema, dict):
+        return schema
+    wired: dict[str, Any] = {}
+    for key, value in schema.items():
+        if key == "properties":
+            wired[key] = {
+                _camel(name): wire_schema(sub) for name, sub in value.items()
+            }
+        elif key == "required":
+            wired[key] = [_camel(name) for name in value]
+        else:
+            wired[key] = wire_schema(value)
+    return wired
+
+
+def _camel(name: str) -> str:
+    return camelize_re.sub(underscore_to_camel, name)

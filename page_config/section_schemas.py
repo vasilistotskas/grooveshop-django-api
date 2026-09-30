@@ -326,7 +326,9 @@ SECTION_PROPS: dict[str, dict[str, Schema]] = {
         "slides": SLIDES,
         # 0 = no autoplay. Under three seconds is unreadable, and the
         # component pauses under prefers-reduced-motion regardless.
-        "autoplay_ms": {"oneOf": [{"const": 0}, integer(3000, 15000)]},
+        # ``enum: [0]``, not ``const``: the API publishes these as
+        # OpenAPI 3.0, which has no ``const``.
+        "autoplay_ms": {"oneOf": [{"enum": [0]}, integer(3000, 15000)]},
         "aspect": choice("wide", "banner", "square"),
         "images": array(text(1000), 10),
         # Mobile variants at matching indices; the storefront falls back

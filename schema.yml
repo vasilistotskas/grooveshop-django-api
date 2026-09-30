@@ -48681,6 +48681,1409 @@ components:
       - count
       - languageCode
       - query
+    PageSectionHeroBannerProps:
+      type: object
+      properties:
+        heading:
+          type: string
+          maxLength: 200
+        stats:
+          type: array
+          items:
+            type: object
+            properties:
+              value:
+                type: string
+                minLength: 1
+                maxLength: 12
+              label:
+                type: string
+                minLength: 1
+                maxLength: 80
+            additionalProperties: false
+            required:
+            - value
+            - label
+          maxItems: 4
+        subheading:
+          type: string
+          maxLength: 500
+        eyebrow:
+          type: string
+          maxLength: 100
+        imageUrl:
+          type: string
+          maxLength: 1000
+        ctaText:
+          type: string
+          maxLength: 100
+        ctaLink:
+          type: string
+          maxLength: 1000
+          pattern: ^(/|https://)
+        secondaryCtaText:
+          type: string
+          maxLength: 100
+        secondaryCtaLink:
+          type: string
+          maxLength: 1000
+          pattern: ^(/|https://)
+        overlayOpacity:
+          type: number
+          minimum: 0
+          maximum: 1
+        decor:
+          enum:
+          - none
+          - orbs
+          - gradient
+        mobileImageUrl:
+          type: string
+          maxLength: 1000
+        imageAlt:
+          type: string
+          maxLength: 200
+        align:
+          enum:
+          - left
+          - center
+        theme:
+          enum:
+          - light
+          - dark
+          - auto
+      additionalProperties: false
+    PageSectionHeroCarouselProps:
+      type: object
+      properties:
+        slides:
+          type: array
+          items:
+            type: object
+            properties:
+              imageUrl:
+                type: string
+                minLength: 1
+                maxLength: 1000
+              mobileImageUrl:
+                type: string
+                maxLength: 1000
+              alt:
+                type: string
+                maxLength: 200
+              eyebrow:
+                type: string
+                maxLength: 100
+              heading:
+                type: string
+                maxLength: 200
+              subheading:
+                type: string
+                maxLength: 500
+              ctaText:
+                type: string
+                maxLength: 100
+              ctaLink:
+                type: string
+                maxLength: 1000
+                pattern: ^(/|https://)
+              secondaryCtaText:
+                type: string
+                maxLength: 100
+              secondaryCtaLink:
+                type: string
+                maxLength: 1000
+                pattern: ^(/|https://)
+            additionalProperties: false
+            required:
+            - imageUrl
+          maxItems: 8
+        autoplayMs:
+          oneOf:
+          - enum:
+            - 0
+          - type: integer
+            minimum: 3000
+            maximum: 15000
+        aspect:
+          enum:
+          - wide
+          - banner
+          - square
+        images:
+          type: array
+          items:
+            type: string
+            maxLength: 1000
+          maxItems: 10
+        mobileImages:
+          type: array
+          items:
+            type: string
+            maxLength: 1000
+          maxItems: 10
+        link:
+          type: string
+          maxLength: 1000
+          pattern: ^(/|https://)
+      additionalProperties: false
+    PageSectionProductsSliderProps:
+      type: object
+      properties:
+        surface:
+          enum:
+          - default
+          - muted
+        heading:
+          type: string
+          maxLength: 200
+        subheading:
+          type: string
+          maxLength: 500
+        ctaText:
+          type: string
+          maxLength: 100
+        ctaLink:
+          type: string
+          maxLength: 1000
+          pattern: ^(/|https://)
+        ordering:
+          enum:
+          - featured
+          - newest
+          - popular
+          - discounted
+          - rating
+        categoryId:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        showAddToCart:
+          type: boolean
+        pageSize:
+          type: integer
+          minimum: 1
+          maximum: 24
+      additionalProperties: false
+    PageSectionProductsGridProps:
+      type: object
+      properties:
+        surface:
+          enum:
+          - default
+          - muted
+        heading:
+          type: string
+          maxLength: 200
+        subheading:
+          type: string
+          maxLength: 500
+        ctaText:
+          type: string
+          maxLength: 100
+        ctaLink:
+          type: string
+          maxLength: 1000
+          pattern: ^(/|https://)
+        ordering:
+          enum:
+          - featured
+          - newest
+          - popular
+          - discounted
+          - rating
+        categoryId:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        showAddToCart:
+          type: boolean
+        pageSize:
+          type: integer
+          minimum: 1
+          maximum: 48
+      additionalProperties: false
+    PageSectionFeaturedProductsProps:
+      type: object
+      properties:
+        surface:
+          enum:
+          - default
+          - muted
+        heading:
+          type: string
+          maxLength: 200
+        subheading:
+          type: string
+          maxLength: 500
+        ctaText:
+          type: string
+          maxLength: 100
+        ctaLink:
+          type: string
+          maxLength: 1000
+          pattern: ^(/|https://)
+        ordering:
+          enum:
+          - featured
+          - newest
+          - popular
+          - discounted
+          - rating
+        categoryId:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        showAddToCart:
+          type: boolean
+        pageSize:
+          type: integer
+          minimum: 1
+          maximum: 24
+        columns:
+          type: integer
+          minimum: 1
+          maximum: 6
+      additionalProperties: false
+    PageSectionProductCategoriesProps:
+      type: object
+      properties:
+        surface:
+          enum:
+          - default
+          - muted
+        heading:
+          type: string
+          maxLength: 200
+        layout:
+          enum:
+          - slider
+          - grid
+          - tiles
+        parentId:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 24
+      additionalProperties: false
+    PageSectionBlogCategoriesProps:
+      type: object
+      properties: {}
+      additionalProperties: false
+    PageSectionBlogPostsCarouselProps:
+      type: object
+      properties:
+        surface:
+          enum:
+          - default
+          - muted
+        heading:
+          type: string
+          maxLength: 200
+        subheading:
+          type: string
+          maxLength: 500
+        ctaText:
+          type: string
+          maxLength: 100
+        ctaLink:
+          type: string
+          maxLength: 1000
+          pattern: ^(/|https://)
+        categoryId:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        count:
+          type: integer
+          minimum: 1
+          maximum: 12
+      additionalProperties: false
+    PageSectionBlogPostsGridProps:
+      type: object
+      properties:
+        surface:
+          enum:
+          - default
+          - muted
+        heading:
+          type: string
+          maxLength: 200
+        subheading:
+          type: string
+          maxLength: 500
+        ctaText:
+          type: string
+          maxLength: 100
+        ctaLink:
+          type: string
+          maxLength: 1000
+          pattern: ^(/|https://)
+        categoryId:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        count:
+          type: integer
+          minimum: 1
+          maximum: 24
+      additionalProperties: false
+    PageSectionBlogPostsListProps:
+      type: object
+      properties:
+        surface:
+          enum:
+          - default
+          - muted
+        heading:
+          type: string
+          maxLength: 200
+        subheading:
+          type: string
+          maxLength: 500
+        ctaText:
+          type: string
+          maxLength: 100
+        ctaLink:
+          type: string
+          maxLength: 1000
+          pattern: ^(/|https://)
+        categoryId:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        pageSize:
+          type: integer
+          minimum: 1
+          maximum: 24
+      additionalProperties: false
+    PageSectionRecentlyViewedProps:
+      type: object
+      properties:
+        heading:
+          type: string
+          maxLength: 200
+      additionalProperties: false
+    PageSectionRichTextProps:
+      type: object
+      properties:
+        content:
+          type: string
+          maxLength: 20000
+      additionalProperties: false
+    PageSectionCtaBannerProps:
+      type: object
+      properties:
+        heading:
+          type: string
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 1000
+        buttonText:
+          type: string
+          maxLength: 100
+        buttonLink:
+          type: string
+          maxLength: 1000
+          pattern: ^(/|https://)
+        backgroundColor:
+          type: string
+          pattern: ^#[0-9a-fA-F]{6}$
+        surface:
+          enum:
+          - default
+          - muted
+      additionalProperties: false
+    PageSectionNewsletterSignupProps:
+      type: object
+      properties:
+        heading:
+          type: string
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 1000
+        placeholder:
+          type: string
+          maxLength: 100
+        buttonText:
+          type: string
+          maxLength: 60
+        surface:
+          enum:
+          - default
+          - muted
+      additionalProperties: false
+    PageSectionTestimonialsProps:
+      type: object
+      properties:
+        surface:
+          enum:
+          - default
+          - muted
+        heading:
+          type: string
+          maxLength: 200
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+                maxLength: 100
+              text:
+                type: string
+                maxLength: 1000
+              avatar:
+                type: string
+                maxLength: 1000
+              role:
+                type: string
+                maxLength: 100
+              rating:
+                type: integer
+                minimum: 1
+                maximum: 5
+            additionalProperties: false
+          maxItems: 20
+      additionalProperties: false
+    PageSectionSpacerProps:
+      type: object
+      properties:
+        height:
+          enum:
+          - sm
+          - md
+          - lg
+          - xl
+      additionalProperties: false
+    PageSectionDividerProps:
+      type: object
+      properties:
+        variant:
+          enum:
+          - line
+          - thread
+      additionalProperties: false
+    PageSectionLoyaltyHeroProps:
+      type: object
+      properties: {}
+      additionalProperties: false
+    PageSectionSearchBarProps:
+      type: object
+      properties: {}
+      additionalProperties: false
+    PageSectionAboutContentProps:
+      type: object
+      properties: {}
+      additionalProperties: false
+    PageSectionVisionContentProps:
+      type: object
+      properties: {}
+      additionalProperties: false
+    PageSectionWhatIsMicrolearningProps:
+      type: object
+      properties: {}
+      additionalProperties: false
+    PageSectionWhyMicrolearningProps:
+      type: object
+      properties: {}
+      additionalProperties: false
+    PageSectionBusinessHoursProps:
+      type: object
+      properties:
+        surface:
+          enum:
+          - default
+          - muted
+      additionalProperties: false
+    PageSectionLocationMapProps:
+      type: object
+      properties:
+        surface:
+          enum:
+          - default
+          - muted
+        embedUrl:
+          type: string
+          maxLength: 1000
+          pattern: ^https://
+        lat:
+          type: number
+          minimum: -90
+          maximum: 90
+        lng:
+          type: number
+          minimum: -180
+          maximum: 180
+        address:
+          type: string
+          maxLength: 300
+      additionalProperties: false
+    PageSectionPartnerStripProps:
+      type: object
+      properties:
+        label:
+          type: string
+          maxLength: 80
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+                minLength: 1
+                maxLength: 60
+              href:
+                type: string
+                maxLength: 1000
+                pattern: ^(/|https://)
+            additionalProperties: false
+            required:
+            - name
+          maxItems: 12
+      additionalProperties: false
+    PageSectionPageHeroProps:
+      type: object
+      properties:
+        eyebrow:
+          type: string
+          maxLength: 100
+        heading:
+          type: string
+          maxLength: 200
+        standfirst:
+          type: string
+          maxLength: 300
+        body:
+          type: string
+          maxLength: 1000
+        ctaText:
+          type: string
+          maxLength: 100
+        ctaLink:
+          type: string
+          maxLength: 1000
+          pattern: ^(/|https://)
+        secondaryCtaText:
+          type: string
+          maxLength: 100
+        secondaryCtaLink:
+          type: string
+          maxLength: 1000
+          pattern: ^(/|https://)
+        stats:
+          type: array
+          items:
+            type: object
+            properties:
+              value:
+                type: string
+                minLength: 1
+                maxLength: 12
+              label:
+                type: string
+                minLength: 1
+                maxLength: 80
+            additionalProperties: false
+            required:
+            - value
+            - label
+          maxItems: 4
+        callout:
+          type: object
+          properties:
+            tone:
+              enum:
+              - info
+              - warning
+              - success
+            title:
+              type: string
+              minLength: 1
+              maxLength: 100
+            text:
+              type: string
+              maxLength: 400
+            note:
+              type: string
+              maxLength: 160
+          additionalProperties: false
+          required:
+          - title
+        facts:
+          type: array
+          items:
+            type: object
+            properties:
+              label:
+                type: string
+                minLength: 1
+                maxLength: 40
+              value:
+                type: string
+                minLength: 1
+                maxLength: 60
+            additionalProperties: false
+            required:
+            - label
+            - value
+          maxItems: 6
+      additionalProperties: false
+    PageSectionFeatureListsProps:
+      type: object
+      properties:
+        heading:
+          type: string
+          maxLength: 200
+        note:
+          type: string
+          maxLength: 1000
+        emphasis:
+          type: string
+          maxLength: 120
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              title:
+                type: string
+                minLength: 1
+                maxLength: 100
+              icon:
+                type: string
+                pattern: ^i-[a-z0-9:-]+$
+                maxLength: 100
+              bullets:
+                type: array
+                items:
+                  type: string
+                  minLength: 1
+                  maxLength: 300
+                maxItems: 8
+            additionalProperties: false
+            required:
+            - title
+          maxItems: 4
+      additionalProperties: false
+    PageSectionOptionSelectorProps:
+      type: object
+      properties:
+        heading:
+          type: string
+          maxLength: 200
+        standfirst:
+          type: string
+          maxLength: 400
+        rowsLabel:
+          type: string
+          maxLength: 60
+        rationaleLabel:
+          type: string
+          maxLength: 60
+        bulletsLabel:
+          type: string
+          maxLength: 60
+        layout:
+          enum:
+          - cards
+          - strip
+          - rail
+        prompt:
+          type: object
+          properties:
+            title:
+              type: string
+              minLength: 1
+              maxLength: 100
+            text:
+              type: string
+              maxLength: 300
+            ctaText:
+              type: string
+              maxLength: 100
+            ctaLink:
+              type: string
+              maxLength: 1000
+              pattern: ^(/|https://)
+          additionalProperties: false
+          required:
+          - title
+        options:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+                minLength: 1
+                maxLength: 60
+              label:
+                type: string
+                maxLength: 40
+              model:
+                type: string
+                maxLength: 120
+              title:
+                type: string
+                maxLength: 120
+              rationale:
+                type: string
+                maxLength: 600
+              note:
+                type: string
+                maxLength: 400
+              ctaText:
+                type: string
+                maxLength: 100
+              ctaLink:
+                type: string
+                maxLength: 1000
+                pattern: ^(/|https://)
+              bullets:
+                type: array
+                items:
+                  type: string
+                  minLength: 1
+                  maxLength: 200
+                maxItems: 10
+              rows:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    label:
+                      type: string
+                      minLength: 1
+                      maxLength: 60
+                    value:
+                      type: string
+                      minLength: 1
+                      maxLength: 120
+                  additionalProperties: false
+                  required:
+                  - label
+                  - value
+                maxItems: 12
+            additionalProperties: false
+            required:
+            - name
+          maxItems: 8
+      additionalProperties: false
+    PageSectionComparisonTableProps:
+      type: object
+      properties:
+        heading:
+          type: string
+          maxLength: 200
+        rowLabel:
+          type: string
+          maxLength: 60
+        note:
+          type: string
+          maxLength: 600
+        columns:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 60
+          maxItems: 4
+          minItems: 1
+        rows:
+          type: array
+          items:
+            type: object
+            properties:
+              label:
+                type: string
+                minLength: 1
+                maxLength: 60
+              values:
+                type: array
+                items:
+                  type: string
+                  maxLength: 120
+                maxItems: 4
+                minItems: 1
+            additionalProperties: false
+            required:
+            - label
+            - values
+          maxItems: 24
+      additionalProperties: false
+    PageSectionFlowStepsProps:
+      type: object
+      properties:
+        heading:
+          type: string
+          maxLength: 200
+        body:
+          type: string
+          maxLength: 600
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              title:
+                type: string
+                minLength: 1
+                maxLength: 100
+              label:
+                type: string
+                maxLength: 60
+              lines:
+                type: array
+                items:
+                  type: string
+                  minLength: 1
+                  maxLength: 120
+                maxItems: 8
+            additionalProperties: false
+            required:
+            - title
+          maxItems: 4
+      additionalProperties: false
+    PageSectionReferenceCardsProps:
+      type: object
+      properties:
+        heading:
+          type: string
+          maxLength: 200
+        metaLabel:
+          type: string
+          maxLength: 40
+        ctaText:
+          type: string
+          maxLength: 100
+        ctaLink:
+          type: string
+          maxLength: 1000
+          pattern: ^(/|https://)
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              title:
+                type: string
+                minLength: 1
+                maxLength: 160
+              label:
+                type: string
+                maxLength: 60
+              text:
+                type: string
+                maxLength: 300
+              meta:
+                type: string
+                maxLength: 80
+            additionalProperties: false
+            required:
+            - title
+          maxItems: 6
+      additionalProperties: false
+    PageSectionProjectRegisterProps:
+      type: object
+      properties:
+        metaLabel:
+          type: string
+          maxLength: 60
+        note:
+          type: string
+          maxLength: 400
+        sectors:
+          type: array
+          items:
+            type: object
+            properties:
+              key:
+                type: string
+                minLength: 1
+                maxLength: 40
+              label:
+                type: string
+                minLength: 1
+                maxLength: 40
+            additionalProperties: false
+            required:
+            - key
+            - label
+          maxItems: 12
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              title:
+                type: string
+                minLength: 1
+                maxLength: 200
+              sector:
+                type: string
+                maxLength: 40
+              note:
+                type: string
+                maxLength: 200
+              meta:
+                type: string
+                maxLength: 120
+            additionalProperties: false
+            required:
+            - title
+          maxItems: 200
+      additionalProperties: false
+    PageSectionVendorCardsProps:
+      type: object
+      properties:
+        note:
+          type: string
+          maxLength: 400
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              title:
+                type: string
+                minLength: 1
+                maxLength: 60
+              label:
+                type: string
+                maxLength: 60
+              text:
+                type: string
+                maxLength: 600
+              tags:
+                type: array
+                items:
+                  type: string
+                  minLength: 1
+                  maxLength: 40
+                maxItems: 8
+            additionalProperties: false
+            required:
+            - title
+          maxItems: 8
+      additionalProperties: false
+    PageSectionContactPanelProps:
+      type: object
+      properties:
+        eyebrow:
+          type: string
+          maxLength: 100
+        heading:
+          type: string
+          maxLength: 200
+        body:
+          type: string
+          maxLength: 600
+        hint:
+          type: string
+          maxLength: 400
+        responseTime:
+          type: string
+          maxLength: 120
+        subjects:
+          type: array
+          items:
+            type: object
+            properties:
+              label:
+                type: string
+                minLength: 1
+                maxLength: 40
+            additionalProperties: false
+            required:
+            - label
+          maxItems: 6
+      additionalProperties: false
+    PageSectionPullQuoteProps:
+      type: object
+      properties:
+        quote:
+          type: string
+          maxLength: 300
+        text:
+          type: string
+          maxLength: 1000
+        attribution:
+          type: string
+          maxLength: 120
+      additionalProperties: false
+    PageSectionFeaturesGridProps:
+      type: object
+      properties:
+        surface:
+          enum:
+          - default
+          - muted
+        heading:
+          type: string
+          maxLength: 200
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              title:
+                type: string
+                minLength: 1
+                maxLength: 100
+              text:
+                type: string
+                maxLength: 500
+              icon:
+                type: string
+                pattern: ^i-[a-z0-9:-]+$
+                maxLength: 100
+            additionalProperties: false
+            required:
+            - title
+          maxItems: 12
+        body:
+          type: string
+          maxLength: 600
+        columns:
+          type: integer
+          minimum: 1
+          maximum: 4
+        decor:
+          enum:
+          - none
+          - gradient_tiles
+          - framed
+        ctaText:
+          type: string
+          maxLength: 100
+        ctaLink:
+          type: string
+          maxLength: 1000
+          pattern: ^(/|https://)
+        prompt:
+          type: object
+          properties:
+            title:
+              type: string
+              minLength: 1
+              maxLength: 100
+            text:
+              type: string
+              maxLength: 300
+            ctaText:
+              type: string
+              maxLength: 100
+            ctaLink:
+              type: string
+              maxLength: 1000
+              pattern: ^(/|https://)
+          additionalProperties: false
+          required:
+          - title
+      additionalProperties: false
+    PageSectionMediaTextProps:
+      type: object
+      properties:
+        surface:
+          enum:
+          - default
+          - muted
+        heading:
+          type: string
+          maxLength: 200
+        body:
+          type: string
+          maxLength: 5000
+        eyebrow:
+          type: string
+          maxLength: 100
+        note:
+          type: string
+          maxLength: 200
+        emphasis:
+          type: string
+          maxLength: 120
+        bullets:
+          type: array
+          items:
+            type: object
+            properties:
+              text:
+                type: string
+                minLength: 1
+                maxLength: 300
+            additionalProperties: false
+            required:
+            - text
+          maxItems: 6
+        specs:
+          type: array
+          items:
+            type: object
+            properties:
+              label:
+                type: string
+                maxLength: 40
+              name:
+                type: string
+                minLength: 1
+                maxLength: 60
+              subtitle:
+                type: string
+                maxLength: 120
+              rows:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    label:
+                      type: string
+                      minLength: 1
+                      maxLength: 40
+                    value:
+                      type: string
+                      minLength: 1
+                      maxLength: 80
+                  additionalProperties: false
+                  required:
+                  - label
+                  - value
+                maxItems: 8
+            additionalProperties: false
+            required:
+            - name
+          maxItems: 4
+        imageUrl:
+          type: string
+          maxLength: 1000
+        imagePosition:
+          enum:
+          - left
+          - right
+        ctaText:
+          type: string
+          maxLength: 100
+        ctaLink:
+          type: string
+          maxLength: 1000
+          pattern: ^(/|https://)
+        decor:
+          enum:
+          - none
+          - orbs
+          - gradient
+      additionalProperties: false
+    PageSectionImageGalleryProps:
+      type: object
+      properties:
+        surface:
+          enum:
+          - default
+          - muted
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              src:
+                type: string
+                minLength: 1
+                maxLength: 1000
+              alt:
+                type: string
+                minLength: 1
+                maxLength: 200
+              caption:
+                type: string
+                maxLength: 200
+            additionalProperties: false
+            required:
+            - src
+            - alt
+          maxItems: 24
+        columns:
+          type: integer
+          minimum: 2
+          maximum: 4
+      additionalProperties: false
+    PageSectionStoryTimelineProps:
+      type: object
+      properties:
+        heading:
+          type: string
+          maxLength: 200
+        subheading:
+          type: string
+          maxLength: 500
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              title:
+                type: string
+                minLength: 1
+                maxLength: 100
+              date:
+                type: string
+                maxLength: 50
+              text:
+                type: string
+                maxLength: 500
+              icon:
+                type: string
+                pattern: ^i-[a-z0-9:-]+$
+                maxLength: 100
+            additionalProperties: false
+            required:
+            - title
+          maxItems: 20
+        surface:
+          enum:
+          - default
+          - muted
+      additionalProperties: false
+    PageSectionFaqProps:
+      type: object
+      properties:
+        surface:
+          enum:
+          - default
+          - muted
+        heading:
+          type: string
+          maxLength: 200
+        subheading:
+          type: string
+          maxLength: 500
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              question:
+                type: string
+                minLength: 1
+                maxLength: 200
+              answer:
+                type: string
+                minLength: 1
+                maxLength: 2000
+            additionalProperties: false
+            required:
+            - question
+            - answer
+          maxItems: 30
+        multiple:
+          type: boolean
+      additionalProperties: false
+    PageSectionTrustBadgesProps:
+      type: object
+      properties:
+        surface:
+          enum:
+          - default
+          - muted
+        heading:
+          type: string
+          maxLength: 200
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              kind:
+                enum:
+                - payment
+                - shipping
+                - ai
+                - custom
+              label:
+                type: string
+                minLength: 1
+                maxLength: 60
+              imageUrl:
+                type: string
+                maxLength: 1000
+              icon:
+                type: string
+                pattern: ^i-[a-z0-9:-]+$
+              href:
+                type: string
+                maxLength: 1000
+                pattern: ^(/|https://)
+            additionalProperties: false
+            required:
+            - kind
+            - label
+            anyOf:
+            - required:
+              - imageUrl
+            - required:
+              - icon
+          maxItems: 12
+        marquee:
+          type: boolean
+      additionalProperties: false
+    PageSectionOffersPreviewProps:
+      type: object
+      properties:
+        surface:
+          enum:
+          - default
+          - muted
+        heading:
+          type: string
+          maxLength: 200
+        subheading:
+          type: string
+          maxLength: 500
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 6
+        ctaText:
+          type: string
+          maxLength: 100
+        ctaLink:
+          type: string
+          maxLength: 1000
+          pattern: ^(/|https://)
+      additionalProperties: false
+    PageSectionStatsStripProps:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              value:
+                type: string
+                minLength: 1
+                maxLength: 12
+              label:
+                type: string
+                minLength: 1
+                maxLength: 80
+            additionalProperties: false
+            required:
+            - value
+            - label
+          maxItems: 4
+        surface:
+          enum:
+          - default
+          - muted
+      additionalProperties: false
   securitySchemes:
     cookieAuth:
       type: apiKey

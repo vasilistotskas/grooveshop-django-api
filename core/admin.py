@@ -21,6 +21,7 @@ from extra_settings.models import Setting
 from unfold.admin import ModelAdmin
 from unfold.widgets import UnfoldAdminSelectWidget, UnfoldAdminTextInputWidget
 
+from admin.base import BaseModelAdmin
 from admin.mixins import (
     IsSuperuserOnlyModelAdmin,
     WithheldOnTenantHostModelAdmin,
@@ -236,14 +237,11 @@ class SettingCategoryFilter(admin.SimpleListFilter):
         return queryset.filter(query)
 
 
-class SettingAdmin(ModelAdmin):
+class SettingAdmin(BaseModelAdmin):
     from core.forms.settings import SettingAdminForm
 
     form = SettingAdminForm
-    compressed_fields = True
-    warn_unsaved_form = True
     list_fullwidth = False
-    list_filter_submit = True
     ordering = ["name"]
 
     list_display = [
@@ -353,27 +351,27 @@ class SettingAdmin(ModelAdmin):
 
 
 class PeriodicTaskAdmin(
-    WithheldOnTenantHostModelAdmin, BasePeriodicTaskAdmin, ModelAdmin
+    BasePeriodicTaskAdmin, BaseModelAdmin
 ):
     form = UnfoldPeriodicTaskForm
 
 
-class IntervalScheduleAdmin(WithheldOnTenantHostModelAdmin, ModelAdmin):
+class IntervalScheduleAdmin(BaseModelAdmin):
     pass
 
 
 class CrontabScheduleAdmin(
-    WithheldOnTenantHostModelAdmin, BaseCrontabScheduleAdmin, ModelAdmin
+    BaseCrontabScheduleAdmin, BaseModelAdmin
 ):
     pass
 
 
-class SolarScheduleAdmin(WithheldOnTenantHostModelAdmin, ModelAdmin):
+class SolarScheduleAdmin(BaseModelAdmin):
     pass
 
 
 class ClockedScheduleAdmin(
-    WithheldOnTenantHostModelAdmin, BaseClockedScheduleAdmin, ModelAdmin
+    BaseClockedScheduleAdmin, BaseModelAdmin
 ):
     pass
 
@@ -382,9 +380,7 @@ from core.cache.models import CachePurgeLog  # noqa: E402
 
 
 @admin.register(CachePurgeLog)
-class CachePurgeLogAdmin(
-    WithheldOnTenantHostModelAdmin, IsSuperuserOnlyModelAdmin, ModelAdmin
-):
+class CachePurgeLogAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
     # ``actor_email`` rather than ``actor``: this changelist is control-plane
     # only, where the cross-schema FK does resolve correctly, but showing the
     # stored string keeps one display that is right in every context and

@@ -40,11 +40,11 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
-from unfold.admin import ModelAdmin
 from unfold.contrib.filters.admin import ChoicesRadioFilter
 from unfold.decorators import action, display
 from unfold.enums import ActionVariant
 
+from admin.base import BaseModelAdmin
 from tenant.lifecycle import (
     SUSPEND_COOLDOWN,
     activate_tenant,
@@ -182,7 +182,7 @@ class PublicSchemaModelChoiceField(forms.ModelChoiceField):
 
 
 @admin.register(Tenant)
-class TenantAdmin(ModelAdmin):
+class TenantAdmin(BaseModelAdmin):
     list_display = [
         "display_store",
         "display_plan",
@@ -1122,7 +1122,7 @@ class TenantAdmin(ModelAdmin):
 
 
 @admin.register(TenantDomain)
-class TenantDomainAdmin(ModelAdmin):
+class TenantDomainAdmin(BaseModelAdmin):
     list_display = ["domain", "tenant", "is_primary"]
     list_filter = ["is_primary"]
     search_fields = ["domain"]
@@ -1132,7 +1132,7 @@ class TenantDomainAdmin(ModelAdmin):
 
 
 @admin.register(UserTenantMembership)
-class UserTenantMembershipAdmin(ModelAdmin):
+class UserTenantMembershipAdmin(BaseModelAdmin):
     list_display = ["user", "tenant", "role", "is_active", "created_at"]
     list_filter = ["role", "is_active", "tenant"]
     search_fields = ["user__email", "user__username", "tenant__name"]
@@ -1272,7 +1272,7 @@ class UserTenantMembershipAdmin(ModelAdmin):
 
 
 @admin.register(TenantArchive)
-class TenantArchiveAdmin(ModelAdmin):
+class TenantArchiveAdmin(BaseModelAdmin):
     """Read-only erasure records for destroyed tenants.
 
     GDPR art. 5(2) requires the controller to be able to DEMONSTRATE

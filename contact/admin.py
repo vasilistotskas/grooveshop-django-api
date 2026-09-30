@@ -17,8 +17,9 @@ from unfold.contrib.filters.admin import (
 )
 from unfold.decorators import display
 
+from admin.base import BaseModelAdmin
 from admin.displays import format_dt, header_two_line, relative_time
-from admin.export import ExportModelAdmin
+from admin.export import ExportActionMixin
 from contact.models import Contact, ContactAttachment, Feedback
 
 FEEDBACK_RATING_VARIANT: dict[str, str] = {
@@ -154,13 +155,8 @@ class ContactAttachmentInline(TabularInline):
 
 
 @admin.register(Contact)
-class ContactAdmin(ExportModelAdmin):
-    compressed_fields = True
-    warn_unsaved_form = True
-    list_fullwidth = True
-    list_filter_submit = True
-    list_filter_sheet = True
-
+class ContactAdmin(ExportActionMixin, BaseModelAdmin):
+    actions = ["export_csv", "export_xml"]
     list_display = [
         "contact_info",
         "enquiry_subject",
@@ -186,7 +182,6 @@ class ContactAdmin(ExportModelAdmin):
         "created_at",
         "updated_at",
     )
-    list_per_page = 25
     date_hierarchy = "created_at"
 
     fieldsets = (
@@ -336,13 +331,8 @@ class ContactAdmin(ExportModelAdmin):
 
 
 @admin.register(Feedback)
-class FeedbackAdmin(ExportModelAdmin):
-    compressed_fields = True
-    warn_unsaved_form = True
-    list_fullwidth = True
-    list_filter_submit = True
-    list_filter_sheet = True
-
+class FeedbackAdmin(ExportActionMixin, BaseModelAdmin):
+    actions = ["export_csv", "export_xml"]
     list_display = [
         "submitter_info",
         "rating_display",
@@ -362,7 +352,6 @@ class FeedbackAdmin(ExportModelAdmin):
         "created_at",
         "updated_at",
     )
-    list_per_page = 25
     date_hierarchy = "created_at"
 
     fieldsets = (

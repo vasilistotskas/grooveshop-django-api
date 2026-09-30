@@ -15,9 +15,9 @@ admin:
   without touching the tenant admin's ``UNFOLD`` block. Verified against
   django-unfold 0.108.0.
 - Per-store models are never registered here, so they are structurally
-  absent rather than reachable-but-403. The 403 guard in
-  ``BaseModelAdmin._withheld_on_public`` stays as defence in depth for
-  the shared site.
+  absent rather than reachable-but-403, and the store admin is never
+  mounted on this host
+  (``tests/unit/tenant/test_platform_host_serves_only_the_platform_admin.py``).
 
 Registration is COPIED from the default site's registry rather than
 re-declared with ``@admin.register(..., site=...)``. Every ModelAdmin

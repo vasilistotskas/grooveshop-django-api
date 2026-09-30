@@ -846,11 +846,10 @@ class ProductAdmin(
     adds CSV/XML export actions (no cooperative-``super()`` methods
     of its own) and ``SimpleHistoryAdmin`` adds the audit-history
     view — neither redefines unfold's plumbing, so both sit between
-    parler and ``BaseModelAdmin`` without breaking either chain. This
-    is the same relative ordering the project used before the unfold
-    conversion; only ``ExportModelAdmin`` (which re-extends unfold's
-    ``ModelAdmin``, duplicating ``BaseModelAdmin``'s bases) was
-    swapped for the plain ``ExportActionMixin``.
+    parler and ``BaseModelAdmin`` without breaking either chain.
+    ``BaseTranslatableAdmin`` cannot express that order (its bases are
+    parler then ``BaseModelAdmin``), which is why this one admin lists
+    the bases itself.
     """
 
     list_display = (
@@ -919,6 +918,8 @@ class ProductAdmin(
         "make_inactive",
         "apply_custom_discount",
         "clear_discount",
+        "export_csv",
+        "export_xml",
     ]
     # Per-row quick action: clone a product into a new draft for the
     # catalog team to riff on without leaving the list page.

@@ -19,6 +19,7 @@ from unfold.contrib.filters.admin import (
     RelatedDropdownFilter,
 )
 from unfold.dataclasses import ActionDialog
+from unfold.datasets import BaseDataset
 from unfold.decorators import action, display
 from unfold.enums import ActionVariant
 from unfold.forms import (
@@ -28,7 +29,10 @@ from unfold.forms import (
 )
 
 from admin.base import BaseModelAdmin, BaseTranslatableAdmin
+from admin.datasets import RelatedDatasetAdmin
 from admin.displays import (
+    ORDER_STATUS_VARIANT,
+    PAYMENT_STATUS_VARIANT,
     choice_label,
     format_dt,
     header_two_line,
@@ -240,6 +244,37 @@ class AdjustLoyaltyPointsForm(BaseDialogForm):
     )
 
 
+class CustomerOrderDatasetAdmin(RelatedDatasetAdmin):
+    parent_field = "user"
+    list_display = (
+        "id",
+        "status_label",
+        "payment_status_label",
+        "paid_amount",
+        "created_at",
+    )
+    list_display_links = ("id",)
+    ordering = ("-created_at",)
+
+    status_label = choice_label(
+        "status", variants=ORDER_STATUS_VARIANT, description=_("Status")
+    )
+    payment_status_label = choice_label(
+        "payment_status",
+        variants=PAYMENT_STATUS_VARIANT,
+        description=_("Payment"),
+    )
+
+
+class CustomerOrderDataset(BaseDataset):
+    from order.models import Order
+
+    model = Order
+    model_admin = CustomerOrderDatasetAdmin
+    title = _("Orders")
+    tab = True
+
+
 @admin.register(UserAccount)
 class UserAdmin(ExportActionMixin, BaseModelAdmin):
     actions = ["export_csv", "export_xml"]
@@ -429,6 +464,7 @@ class UserAdmin(ExportActionMixin, BaseModelAdmin):
         ),
     )
     inlines = [UserAddressInline, UserSubscriptionInline]
+    change_form_datasets = [CustomerOrderDataset]
 
     def get_form(self, request, obj=None, change=False, **kwargs):
         # Unfold's ``ModelAdmin.get_fieldsets`` swaps in ``add_fieldsets``

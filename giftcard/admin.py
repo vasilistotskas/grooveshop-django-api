@@ -11,11 +11,13 @@ from unfold.contrib.filters.admin import (
     RangeDateTimeFilter,
 )
 from unfold.dataclasses import ActionDialog
+from unfold.datasets import BaseDataset
 from unfold.decorators import action, display
 from unfold.forms import BaseDialogForm
 from unfold.sections import TableSection
 
 from admin.base import BaseModelAdmin
+from admin.datasets import RelatedDatasetAdmin
 from admin.displays import money
 from admin.export import ExportActionMixin
 from giftcard.enum import GiftCardStatus, GiftCardTransactionKind
@@ -47,6 +49,24 @@ class TransactionsTableSection(TableSection):
     fields = ["pk", "kind", "amount", "order", "created_at"]
 
 
+class LedgerDatasetAdmin(RelatedDatasetAdmin):
+    parent_field = "gift_card"
+    list_display = ("kind", "amount", "order", "created_by", "created_at")
+    ordering = ("-created_at",)
+
+    def get_queryset(self, request):
+        return (
+            super().get_queryset(request).select_related("order", "created_by")
+        )
+
+
+class LedgerDataset(BaseDataset):
+    model = GiftCardTransaction
+    model_admin = LedgerDatasetAdmin
+    title = _("Ledger")
+    tab = True
+
+
 @admin.register(GiftCard)
 class GiftCardAdmin(BaseModelAdmin):
     list_display = (
@@ -69,6 +89,7 @@ class GiftCardAdmin(BaseModelAdmin):
     autocomplete_fields = ("issued_to",)
     list_select_related = ("issued_to",)
     list_sections = [TransactionsTableSection]
+    change_form_datasets = [LedgerDataset]
     readonly_fields = (
         "uuid",
         "code",

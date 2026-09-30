@@ -25,10 +25,12 @@ from unfold.contrib.filters.admin import (
     RelatedDropdownFilter,
     SliderNumericFilter,
 )
+from unfold.datasets import BaseDataset
 from unfold.decorators import action, display
 from unfold.enums import ActionVariant
 
 from admin.base import BaseModelAdmin, BaseTranslatableAdmin
+from admin.datasets import RelatedDatasetAdmin
 from admin.displays import (
     REVIEW_STATUS_VARIANT,
     change_link,
@@ -696,43 +698,20 @@ class StockReservationInline(TabularInline):
         return "pending", _("Pending checkout")
 
 
-class StockLogInline(TabularInline):
-    """Display recent stock operation history for this product."""
-
-    from order.models.stock_log import StockLog
-
-    model = StockLog
-    extra = 0
-    can_delete = False
-    max_num = 20  # Limit to 20 records instead of slicing queryset
-
-    fields = (
-        "operation_display",
+class StockLogDatasetAdmin(RelatedDatasetAdmin):
+    parent_field = "product"
+    list_display = (
+        "operation_type",
         "quantity_change",
         "stock_levels",
         "order_link",
         "performed_by_display",
-        "timestamp_display",
+        "created_at",
     )
-    readonly_fields = fields
-
-    tab = True
-    verbose_name = _("Stock Activity Log")
-    verbose_name_plural = _("Stock Activity Logs (Recent 20)")
+    ordering = ("-created_at",)
 
     def get_queryset(self, request):
-        """Show last 20 stock operations, ordered by most recent."""
-        qs = super().get_queryset(request)
-        return qs.select_related("order", "performed_by").order_by(
-            "-created_at"
-        )
-
-    def has_add_permission(self, request, obj=None):
-        return False
-
-    @admin.display(description=_("Operation"))
-    def operation_display(self, obj):
-        return obj.get_operation_type_display()
+        return super().get_queryset(request).select_related("performed_by")
 
     @admin.display(description=_("Change"))
     def quantity_change(self, obj):
@@ -740,7 +719,7 @@ class StockLogInline(TabularInline):
 
     @admin.display(description=_("Stock Level"))
     def stock_levels(self, obj):
-        return f"{obj.stock_before} -> {obj.stock_after}"
+        return f"{obj.stock_before} → {obj.stock_after}"
 
     @admin.display(description=_("Related Order"))
     def order_link(self, obj):
@@ -751,17 +730,25 @@ class StockLogInline(TabularInline):
                 obj.order_id,
                 _("Order #%(id)s") % {"id": obj.order_id},
             )
-        return (obj.reason or "—")[:45]
+        return obj.reason or "—"
 
     @admin.display(description=_("By"))
     def performed_by_display(self, obj):
         if obj.performed_by:
-            return (obj.performed_by.email or obj.performed_by.username)[:20]
+            return obj.performed_by.email or obj.performed_by.username
         return _("System")
 
-    @admin.display(description=_("Time"))
-    def timestamp_display(self, obj):
-        return format_dt(obj.created_at, fmt="d/m H:i")
+
+class StockLogDataset(BaseDataset):
+    """Every stock movement of the product, paged (the inline this
+    replaces claimed "recent 20" and rendered them all)."""
+
+    from order.models.stock_log import StockLog
+
+    model = StockLog
+    model_admin = StockLogDatasetAdmin
+    title = _("Stock activity")
+    tab = True
 
 
 class ProductRelationInline(TabularInline):
@@ -847,10 +834,10 @@ class ProductAdmin(
         ProductAttributeInline,
         ProductImageInline,
         StockReservationInline,
-        StockLogInline,
         TaggedItemInline,
         ProductRelationInline,
     ]
+    change_form_datasets = [StockLogDataset]
     readonly_fields = (
         "id",
         "uuid",

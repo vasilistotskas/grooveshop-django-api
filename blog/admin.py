@@ -108,6 +108,7 @@ class BlogCommentInline(TabularInline):
     model = BlogComment
     extra = 0
     fields = ("user", "content_preview", "approved", "created_at")
+    autocomplete_fields = ("user",)
     readonly_fields = ("content_preview", "created_at")
     show_change_link = True
 
@@ -142,6 +143,7 @@ class BlogAuthorAdmin(BaseTranslatableAdmin):
         "translations__bio",
     )
     list_select_related = ["user"]
+    autocomplete_fields = ("user",)
     readonly_fields = ["id", "total_likes_received", "posts_count"]
 
     fieldsets = (
@@ -716,6 +718,7 @@ class BlogCommentAdmin(BaseTranslatableAdmin):
         ),
     )
 
+    autocomplete_fields = ("post", "user")
     readonly_fields = ["engagement_display"]
 
     def get_queryset(self, request):

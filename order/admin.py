@@ -1338,6 +1338,7 @@ class OrderItemAdmin(BaseModelAdmin):
         "product__id",
         "notes",
     ]
+    autocomplete_fields = ("order", "product")
     readonly_fields = [
         "id",
         "created_at",

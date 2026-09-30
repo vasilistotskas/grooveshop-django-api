@@ -171,7 +171,7 @@ class CartAdmin(BaseModelAdmin):
         "user__last_name",
     )
     date_hierarchy = "last_activity"
-    raw_id_fields = ["user"]
+    autocomplete_fields = ("user",)
     list_select_related = ["user"]
     readonly_fields = [
         "id",
@@ -334,6 +334,7 @@ class CartItemAdmin(BaseModelAdmin):
         "product__translations__name",
     )
     list_select_related = ["cart", "cart__user", "product"]
+    autocomplete_fields = ("cart", "product")
     readonly_fields = [
         "id",
         "created_at",

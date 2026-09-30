@@ -314,7 +314,7 @@ class NotificationAdmin(BaseTranslatableAdmin):
         else:
             expiry = _("no expiry")
         return (
-            f"{format_dt(obj.created_at, fmt="d/m")} "
+            f"{format_dt(obj.created_at, fmt='d/m')} "
             f"({relative_time(obj.created_at)}) · {expiry}"
         )
 
@@ -387,6 +387,7 @@ class NotificationUserAdmin(BaseModelAdmin):
         "user__username",
         "notification__translations__title",
     ]
+    autocomplete_fields = ("user",)
     readonly_fields = (
         "uuid",
         "created_at",
@@ -474,7 +475,7 @@ class NotificationUserAdmin(BaseModelAdmin):
     def timing_display(self, obj):
         status = _("Expired") if obj.notification.is_expired() else _("Active")
         return (
-            f"{format_dt(obj.created_at, fmt="d/m")} "
+            f"{format_dt(obj.created_at, fmt='d/m')} "
             f"({relative_time(obj.created_at)}) · {status}"
         )
 

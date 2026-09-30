@@ -211,6 +211,7 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
         "order__email",
         "order__id",
     )
+    autocomplete_fields = ("order",)
     readonly_fields = (
         "uuid",
         "delivery_request_id",

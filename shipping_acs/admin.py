@@ -189,6 +189,7 @@ class AcsShipmentAdmin(BaseModelAdmin):
         ("created_at", RangeDateTimeFilter),
     )
     search_fields = ("voucher_no", "order__id", "order__email")
+    autocomplete_fields = ("order",)
     readonly_fields = (
         "voucher_no",
         "shipment_state",

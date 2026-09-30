@@ -863,6 +863,8 @@ class ProductAdmin(
         "view_count",
         "likes_count",
         "stock_reservation_summary",
+        # Stamped from the saving admin (``Product._history_user``).
+        "changed_by",
     )
     list_select_related = ["category", "vat", "brand", "changed_by"]
     autocomplete_fields = ["category", "vat", "variant_group", "brand"]
@@ -1851,6 +1853,7 @@ class ProductReviewAdmin(BaseTranslatableAdmin):
         # Removed product__translations__name - too expensive with 1.2M products
     ]
     list_select_related = ["product", "user"]
+    autocomplete_fields = ("product", "user")
     readonly_fields = ("created_at", "updated_at", "uuid")
     list_filter_submit = True
 
@@ -1999,6 +2002,7 @@ class ProductFavouriteAdmin(BaseModelAdmin):
         "product__sku",
     ]
     list_select_related = ["user", "product"]
+    autocomplete_fields = ("product", "user")
     readonly_fields = ("created_at", "updated_at", "uuid")
 
     def get_queryset(self, request):
@@ -2133,6 +2137,7 @@ class ProductImageAdmin(BaseTranslatableAdmin):
         "translations__title",
     ]
     list_select_related = ["product"]
+    autocomplete_fields = ("product",)
     readonly_fields = ("created_at", "updated_at", "uuid")
     ordering = ["product", "-is_main", "sort_order"]
 

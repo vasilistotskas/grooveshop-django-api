@@ -655,6 +655,7 @@ class UserAddressAdmin(BaseModelAdmin):
     ]
 
     list_select_related = ["user", "country", "region"]
+    autocomplete_fields = ("user",)
     readonly_fields = ["id", "created_at", "updated_at"]
 
     fieldsets = (

@@ -65,3 +65,34 @@ def test_a_test_claimed_by_two_shards_is_refused():
             {1: {"tests/a.py::t": 1.0}, 2: {"tests/a.py::t": 2.0}},
             expected=2,
         )
+
+
+def _run(run_id, **overrides):
+    return {
+        "databaseId": run_id,
+        "workflowName": "CI",
+        "headBranch": "main",
+        "event": "push",
+        "conclusion": "success",
+        **overrides,
+    }
+
+
+def test_the_newest_successful_main_push_run_is_picked():
+    runs = [
+        _run(6, workflowName="Publish Docker image"),
+        _run(5, headBranch="fix/x"),
+        _run(4, event="pull_request"),
+        _run(3, conclusion="failure"),
+        _run(2),
+        _run(1),
+    ]
+
+    assert merge_test_durations.latest_successful_run(runs) == "2"
+
+
+def test_no_successful_main_run_is_an_error_not_a_guess():
+    with pytest.raises(LookupError):
+        merge_test_durations.latest_successful_run(
+            [_run(1, conclusion="failure")]
+        )

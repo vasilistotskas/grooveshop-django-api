@@ -24,11 +24,10 @@ ADMIN_FILES = (
         if ".venv" not in p.parts and "node_modules" not in p.parts
     )
     + sorted((BASE_DIR / "admin").rglob("*.py"))
-    + sorted((BASE_DIR / "core/templates/admin/dashboard").rglob("*.html"))
-    + [
-        BASE_DIR / "core/templates/admin/index.html",
-        BASE_DIR / "core/templates/admin/platform_index.html",
-    ]
+    # Every admin template: pages are built from Unfold's components,
+    # never from hand-rolled markup that drifts from the theme.
+    + sorted((BASE_DIR / "core/templates/admin").rglob("*.html"))
+    + sorted((BASE_DIR / "core/templates/unfold").rglob("*.html"))
 )
 
 # Pictographs, dingbats, transport, supplemental symbols — the emoji
@@ -59,6 +58,9 @@ def _first_emoji(line: str) -> str | None:
 
 _BANNED = {
     "inline style attribute": re.compile(r'style\s*=\s*["\']'),
+    "inline <style> block (styles come from Unfold and the Tailwind build)": (
+        re.compile(r"<style\b")
+    ),
     "raw tailwind gray token (use base-*)": re.compile(r"text-gray-\d"),
     "hand-rolled pill markup": re.compile(r"rounded-full"),
     # Colours come from the theme (CSS variables, Unfold variants), so

@@ -118,6 +118,9 @@ class BlogCommentViewSet(BaseModelViewSet):
         "level",
         "lft",
         "approved",
+        # Annotated by ``BlogCommentQuerySet.with_engagement``.
+        "likes_count",
+        "replies_count",
     ]
     ordering = ["-created_at"]
     search_fields = [

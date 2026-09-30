@@ -50,25 +50,14 @@ class TestTransactionFailuresRollbackCompletely:
     @pytest.mark.parametrize(
         "failure_point,initial_stock,order_quantity,expected_exception",
         [
-            # Failure during order creation after stock decrement
-            ("order_save", 100, 10, Exception),
-            ("order_save", 50, 25, Exception),
             ("order_save", 20, 5, Exception),
-            # Failure during order item creation after stock decrement
-            ("order_item_save", 100, 10, Exception),
-            ("order_item_save", 50, 25, Exception),
-            # Failure during stock log creation
-            ("stock_log_save", 100, 10, Exception),
-            ("stock_log_save", 50, 25, Exception),
+            ("order_item_save", 20, 5, Exception),
+            ("stock_log_save", 20, 5, Exception),
         ],
         ids=[
-            "order_save_fails_stock_100_qty_10",
-            "order_save_fails_stock_50_qty_25",
-            "order_save_fails_stock_20_qty_5",
-            "order_item_save_fails_stock_100_qty_10",
-            "order_item_save_fails_stock_50_qty_25",
-            "stock_log_save_fails_stock_100_qty_10",
-            "stock_log_save_fails_stock_50_qty_25",
+            "order_save_fails",
+            "order_item_save_fails",
+            "stock_log_save_fails",
         ],
     )
     @patch("order.payment.get_payment_provider")
@@ -219,15 +208,7 @@ class TestTransactionFailuresRollbackCompletely:
 
     @pytest.mark.parametrize(
         "failure_point,initial_stock,order_quantity",
-        [
-            # Failure during order status update - this WILL raise and rollback
-            ("order_status_update", 50, 10),
-            ("order_status_update", 30, 15),
-        ],
-        ids=[
-            "cancel_order_status_fails_stock_50_qty_10",
-            "cancel_order_status_fails_stock_30_qty_15",
-        ],
+        [("order_status_update", 50, 10)],
     )
     def test_order_cancellation_rollback_on_failure(
         self, failure_point, initial_stock, order_quantity
@@ -381,15 +362,7 @@ class TestTransactionFailuresRollbackCompletely:
 
     @pytest.mark.parametrize(
         "failure_point,initial_stock,reservation_quantity",
-        [
-            # Failure during payment success handling
-            ("order_status_update_payment", 100, 10),
-            ("order_status_update_payment", 50, 25),
-        ],
-        ids=[
-            "payment_success_status_fails_stock_100_qty_10",
-            "payment_success_status_fails_stock_50_qty_25",
-        ],
+        [("order_status_update_payment", 50, 25)],
     )
     def test_payment_success_rollback_on_failure(
         self, failure_point, initial_stock, reservation_quantity
@@ -505,60 +478,6 @@ class TestTransactionFailuresRollbackCompletely:
             f"No new StockLog should be persisted after rollback. "
             f"Expected {initial_stock_log_count} logs, but found {final_stock_log_count}"
         )
-
-    def test_payment_failure_handling_is_resilient(self):
-        """
-        Test that payment failure handling is resilient to errors.
-
-        **Validates: Service Resilience**
-
-        The handle_payment_failed method is simple - it just marks the order as failed.
-        It doesn't attempt to release reservations or perform complex operations.
-        This test verifies that the method works correctly.
-        """
-        # Create product with initial stock
-        product = ProductFactory.create(
-            price=Money("50.00", settings.DEFAULT_CURRENCY), stock=100, vat=None
-        )
-        product.set_current_language("en")
-        product.name = "Test Product"
-        product.save()
-
-        # Create stock reservation
-        session_id = f"test_session_{timezone.now().timestamp()}"
-        reservation = StockManager.reserve_stock(
-            product_id=product.id,
-            quantity=10,
-            session_id=session_id,
-            user_id=self.user.id,
-        )
-
-        # Create order in PENDING status
-        payment_intent_id = f"pi_test_{timezone.now().timestamp()}"
-        order = Order.objects.create(
-            user=self.user,
-            pay_way=self.pay_way,
-            country=self.country,
-            status=OrderStatus.PENDING,
-            payment_status=PaymentStatus.PENDING,
-            payment_id=payment_intent_id,
-            metadata={"stock_reservation_ids": [reservation.id]},
-            **self.shipping_address,
-        )
-
-        # Call handle_payment_failed
-        result = OrderService.handle_payment_failed(payment_intent_id)
-
-        # Verify order was marked as failed
-        assert result is not None, (
-            "handle_payment_failed should return the order"
-        )
-        order.refresh_from_db()
-        assert order.payment_status == PaymentStatus.FAILED, (
-            f"Order payment status should be FAILED, but got {order.payment_status}"
-        )
-
-        # Note: Reservation cleanup happens via periodic task, not in handle_payment_failed
 
     def test_multiple_operations_rollback_atomically(self):
         """

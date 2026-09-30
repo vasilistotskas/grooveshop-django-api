@@ -1,36 +1,24 @@
 from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
 from djangorestframework_camel_case.util import camel_to_underscore
-from drf_spectacular.extensions import OpenApiFilterExtension
-from drf_spectacular.plumbing import build_parameter_type
-from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import OpenApiParameter
 
 from core.filters.core import TimeStampFilterMixin
-from core.utils.string_case import snake_to_camel
 
 
 class CamelCaseFilterMixin:
+    """Accept camelCase query parameters for snake_case filters.
+
+    Only the incoming ``data`` is converted. The filters themselves stay
+    keyed by their snake_case names: ``BaseFilterSet.__init__`` copies
+    the class's ``base_filters`` into ``self.filters``, and that copy is
+    all a filterset reads afterwards.
+    """
+
     def __init__(self, data=None, *args, **kwargs):
         if data is not None:
             data = self._convert_data_to_snake_case(data)
 
         super().__init__(data, *args, **kwargs)
-
-        self._camel_case_fields = {}
-
-        if hasattr(self, "base_filters"):
-            new_filters = {}
-            for snake_name, filter_instance in self.base_filters.items():
-                camel_name = snake_to_camel(snake_name)
-
-                if camel_name != snake_name:
-                    new_filters[camel_name] = filter_instance
-                    self._camel_case_fields[camel_name] = snake_name
-                else:
-                    new_filters[snake_name] = filter_instance
-
-            self.base_filters = new_filters
 
     def _convert_data_to_snake_case(self, data):
         if not data:
@@ -109,36 +97,3 @@ class CamelCasePublishableTimeStampFilterSet(
             "published_at": ["gte", "lte", "date"],
             "is_published": ["exact"],
         }
-
-
-class CamelCaseFilterExtension(OpenApiFilterExtension):
-    target_class = "core.filters.camel_case_filters.CamelCaseFilterMixin"
-    priority = 1
-
-    def get_schema_operation_parameters(self, auto_schema, *args, **kwargs):
-        parameters = []
-
-        for camel_name, filter_field in self.target.base_filters.items():
-            help_text = getattr(filter_field, "help_text", "")
-
-            if isinstance(filter_field, filters.DateTimeFilter):
-                schema_type = OpenApiTypes.DATETIME
-            elif isinstance(filter_field, filters.BooleanFilter):
-                schema_type = OpenApiTypes.BOOL
-            elif isinstance(filter_field, filters.NumberFilter):
-                schema_type = OpenApiTypes.NUMBER
-            elif isinstance(filter_field, filters.UUIDFilter):
-                schema_type = OpenApiTypes.UUID
-            else:
-                schema_type = OpenApiTypes.STR
-
-            parameters.append(
-                build_parameter_type(
-                    name=camel_name,
-                    schema=schema_type,
-                    location=OpenApiParameter.QUERY,
-                    description=help_text,
-                )
-            )
-
-        return parameters

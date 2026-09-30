@@ -34,7 +34,10 @@ def _earlier(**kwargs) -> Order:
     by design — which made this suite pass or fail on the draw (CI
     shard 1, 2026-09-17). Pinned to a status that counts.
     """
-    order = cast(Order, OrderFactory(status=OrderStatus.PENDING, **kwargs))
+    order = cast(
+        Order,
+        OrderFactory(num_order_items=0, status=OrderStatus.PENDING, **kwargs),
+    )
     _backdate(order, days=3)
     return order
 
@@ -42,7 +45,7 @@ def _earlier(**kwargs) -> Order:
 @pytest.mark.django_db
 class TestIsFirstOrder:
     def test_the_only_order_is_the_first(self) -> None:
-        order = OrderFactory()
+        order = OrderFactory(num_order_items=0)
 
         assert order.is_first_order is True
 
@@ -51,7 +54,7 @@ class TestIsFirstOrder:
     ) -> None:
         user = UserAccountFactory()
         earlier = _earlier(user=user)
-        later = OrderFactory(user=user)
+        later = OrderFactory(num_order_items=0, user=user)
 
         assert later.is_first_order is False
         assert earlier.is_first_order is True
@@ -59,26 +62,32 @@ class TestIsFirstOrder:
     def test_a_canceled_earlier_order_does_not_count(self) -> None:
         # A checkout that never completed is not a prior purchase.
         user = UserAccountFactory()
-        canceled = OrderFactory(user=user, status=OrderStatus.CANCELED)
+        canceled = OrderFactory(
+            num_order_items=0, user=user, status=OrderStatus.CANCELED
+        )
         _backdate(canceled, days=3)
-        later = OrderFactory(user=user)
+        later = OrderFactory(num_order_items=0, user=user)
 
         assert later.is_first_order is True
 
     def test_guests_are_matched_by_email_case_insensitively(self) -> None:
         _earlier(user=None, email="Repeat@Example.com")
-        later = OrderFactory(user=None, email="repeat@example.com")
+        later = OrderFactory(
+            num_order_items=0, user=None, email="repeat@example.com"
+        )
 
         assert later.is_first_order is False
 
     def test_a_different_guest_email_is_a_first_order(self) -> None:
         _earlier(user=None, email="one@example.com")
-        later = OrderFactory(user=None, email="two@example.com")
+        later = OrderFactory(
+            num_order_items=0, user=None, email="two@example.com"
+        )
 
         assert later.is_first_order is True
 
     def test_another_accounts_order_does_not_count(self) -> None:
         _earlier(user=UserAccountFactory())
-        later = OrderFactory(user=UserAccountFactory())
+        later = OrderFactory(num_order_items=0, user=UserAccountFactory())
 
         assert later.is_first_order is True

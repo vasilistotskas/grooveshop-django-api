@@ -242,9 +242,8 @@ class StripePaymentIntentMetadataTestCase(TestCase):
 
     @mock.patch("order.payment.stripe.PaymentIntent.create")
     @mock.patch("order.payment.PaymentIntent.sync_from_stripe_data")
-    @mock.patch("order.payment.settings")
     def test_process_payment_with_comprehensive_metadata(
-        self, mock_settings, mock_sync, mock_stripe_create
+        self, mock_sync, mock_stripe_create
     ):
         """
         Test payment intent creation with comprehensive metadata.
@@ -256,9 +255,6 @@ class StripePaymentIntentMetadataTestCase(TestCase):
         - All metadata fields are properly formatted
         """
         # Setup
-        mock_settings.STRIPE_TEST_SECRET_KEY = "test_api_key"
-        mock_settings.DJSTRIPE_WEBHOOK_SECRET = "test_webhook_secret"
-        mock_settings.STRIPE_LIVE_MODE = False
 
         mock_payment_intent = mock.Mock()
         mock_payment_intent.id = "pi_test_123"
@@ -294,9 +290,8 @@ class StripePaymentIntentMetadataTestCase(TestCase):
 
     @mock.patch("order.payment.stripe.PaymentIntent.create")
     @mock.patch("order.payment.PaymentIntent.sync_from_stripe_data")
-    @mock.patch("order.payment.settings")
     def test_process_payment_with_idempotency_key(
-        self, mock_settings, mock_sync, mock_stripe_create
+        self, mock_sync, mock_stripe_create
     ):
         """
         Test payment intent creation with idempotency key.
@@ -307,9 +302,6 @@ class StripePaymentIntentMetadataTestCase(TestCase):
         - Idempotency key is passed to Stripe API
         """
         # Setup
-        mock_settings.STRIPE_TEST_SECRET_KEY = "test_api_key"
-        mock_settings.DJSTRIPE_WEBHOOK_SECRET = "test_webhook_secret"
-        mock_settings.STRIPE_LIVE_MODE = False
 
         mock_payment_intent = mock.Mock()
         mock_payment_intent.id = "pi_test_123"
@@ -340,9 +332,8 @@ class StripePaymentIntentMetadataTestCase(TestCase):
 
     @mock.patch("order.payment.stripe.PaymentIntent.create")
     @mock.patch("order.payment.PaymentIntent.sync_from_stripe_data")
-    @mock.patch("order.payment.settings")
     def test_process_payment_without_idempotency_key(
-        self, mock_settings, mock_sync, mock_stripe_create
+        self, mock_sync, mock_stripe_create
     ):
         """
         Test payment intent creation without idempotency key.
@@ -353,9 +344,6 @@ class StripePaymentIntentMetadataTestCase(TestCase):
         - Backward compatibility is maintained
         """
         # Setup
-        mock_settings.STRIPE_TEST_SECRET_KEY = "test_api_key"
-        mock_settings.DJSTRIPE_WEBHOOK_SECRET = "test_webhook_secret"
-        mock_settings.STRIPE_LIVE_MODE = False
 
         mock_payment_intent = mock.Mock()
         mock_payment_intent.id = "pi_test_123"
@@ -380,9 +368,8 @@ class StripePaymentIntentMetadataTestCase(TestCase):
 
     @mock.patch("order.payment.stripe.PaymentIntent.create")
     @mock.patch("order.payment.PaymentIntent.sync_from_stripe_data")
-    @mock.patch("order.payment.settings")
     def test_process_payment_with_cart_item_ids_as_string(
-        self, mock_settings, mock_sync, mock_stripe_create
+        self, mock_sync, mock_stripe_create
     ):
         """
         Test payment intent with cart_item_ids provided as string.
@@ -392,9 +379,6 @@ class StripePaymentIntentMetadataTestCase(TestCase):
         - String is stored directly in metadata
         """
         # Setup
-        mock_settings.STRIPE_TEST_SECRET_KEY = "test_api_key"
-        mock_settings.DJSTRIPE_WEBHOOK_SECRET = "test_webhook_secret"
-        mock_settings.STRIPE_LIVE_MODE = False
 
         mock_payment_intent = mock.Mock()
         mock_payment_intent.id = "pi_test_123"
@@ -419,9 +403,8 @@ class StripePaymentIntentMetadataTestCase(TestCase):
 
     @mock.patch("order.payment.stripe.PaymentIntent.create")
     @mock.patch("order.payment.PaymentIntent.sync_from_stripe_data")
-    @mock.patch("order.payment.settings")
     def test_process_payment_without_optional_metadata(
-        self, mock_settings, mock_sync, mock_stripe_create
+        self, mock_sync, mock_stripe_create
     ):
         """
         Test payment intent creation without optional metadata fields.
@@ -433,9 +416,6 @@ class StripePaymentIntentMetadataTestCase(TestCase):
         - Backward compatibility is maintained
         """
         # Setup
-        mock_settings.STRIPE_TEST_SECRET_KEY = "test_api_key"
-        mock_settings.DJSTRIPE_WEBHOOK_SECRET = "test_webhook_secret"
-        mock_settings.STRIPE_LIVE_MODE = False
 
         mock_payment_intent = mock.Mock()
         mock_payment_intent.id = "pi_test_123"
@@ -465,9 +445,8 @@ class StripePaymentIntentMetadataTestCase(TestCase):
 
     @mock.patch("order.payment.stripe.PaymentIntent.create")
     @mock.patch("order.payment.PaymentIntent.sync_from_stripe_data")
-    @mock.patch("order.payment.settings")
     def test_process_payment_with_all_parameters(
-        self, mock_settings, mock_sync, mock_stripe_create
+        self, mock_sync, mock_stripe_create
     ):
         """
         Test payment intent creation with all possible parameters.
@@ -479,9 +458,6 @@ class StripePaymentIntentMetadataTestCase(TestCase):
         - All parameters work together correctly
         """
         # Setup
-        mock_settings.STRIPE_TEST_SECRET_KEY = "test_api_key"
-        mock_settings.DJSTRIPE_WEBHOOK_SECRET = "test_webhook_secret"
-        mock_settings.STRIPE_LIVE_MODE = False
 
         mock_payment_intent = mock.Mock()
         mock_payment_intent.id = "pi_test_123"
@@ -526,9 +502,8 @@ class StripePaymentIntentMetadataTestCase(TestCase):
 
     @mock.patch("order.payment.stripe.PaymentIntent.create")
     @mock.patch("order.payment.PaymentIntent.sync_from_stripe_data")
-    @mock.patch("order.payment.settings")
     def test_process_payment_with_empty_cart_item_ids_list(
-        self, mock_settings, mock_sync, mock_stripe_create
+        self, mock_sync, mock_stripe_create
     ):
         """
         Test payment intent with empty cart_item_ids list.
@@ -538,9 +513,6 @@ class StripePaymentIntentMetadataTestCase(TestCase):
         - Payment intent creation succeeds
         """
         # Setup
-        mock_settings.STRIPE_TEST_SECRET_KEY = "test_api_key"
-        mock_settings.DJSTRIPE_WEBHOOK_SECRET = "test_webhook_secret"
-        mock_settings.STRIPE_LIVE_MODE = False
 
         mock_payment_intent = mock.Mock()
         mock_payment_intent.id = "pi_test_123"

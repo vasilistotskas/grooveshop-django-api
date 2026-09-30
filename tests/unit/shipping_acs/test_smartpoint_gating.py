@@ -17,13 +17,8 @@ def _patch_setting_get(value: bool):
     """Patch ``Setting.get`` so the carrier reads our chosen value for
     ``ACS_SMARTPOINT_ENABLED`` without touching the ``Setting`` table.
 
-    Earlier ``Setting.objects.get_or_create`` + ``.save()`` flaked under
-    CI's parallel xdist run: the autouse ``_reseed_extra_settings``
-    fixture (conftest.py) rewrites the same ``EXTRA_SETTINGS_DEFAULTS``
-    rows for every test on every worker, and the resulting savepoint-
-    visibility interaction occasionally caused ``Setting.get`` to
-    return the seeded default of ``False`` instead of the just-written
-    ``True``. Patching the read site bypasses the round-trip entirely.
+    Patching the read site keeps the test off the ``Setting`` table
+    entirely.
 
     The stub returns ``default`` for any non-ACS key so we don't reach
     for ``Setting.get.__func__`` — which can crash under pytest-xdist

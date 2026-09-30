@@ -1,469 +1,184 @@
-import uuid
+"""``BlogCategoryFilter`` (blog/filters/category.py) through the list.
+
+Every case asserts the exact set of categories returned from one
+dataset, so a filter the view does not apply — or a parameter
+django-filter does not know — fails instead of passing on the
+unfiltered list.
+"""
+
 from datetime import timedelta
 
-from django.test import TransactionTestCase
+from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from blog.factories.category import BlogCategoryFactory
 from blog.factories.post import BlogPostFactory
 from blog.models.category import BlogCategory
 
+URL = reverse("blog-category-list")
+SLUG_MARK = "flt"
 
-class BlogCategoryFilterTest(TransactionTestCase):
-    """
-    Test blog category filtering functionality.
 
-    Note: Uses TransactionTestCase for proper MPTT tree rebuilding.
-    Each test creates its own isolated data with unique slugs.
-    """
+class BlogCategoryFilterTest(TestCase):
+    client_class = APIClient
 
     @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-
-    def setUp(self):
-        self.client = APIClient()
-        self.now = timezone.now()
-
-        # Use unique prefix for all slugs to avoid conflicts with parallel tests
-        self.test_id = uuid.uuid4().hex[:6]
-
-        self.root1 = BlogCategoryFactory(
-            parent=None, slug=f"root1-{self.test_id}", sort_order=1
+    def _category(
+        cls, name, description, *, parent=None, sort_order, days_old, image=""
+    ):
+        # Created directly: the factory writes random names in every
+        # language, which a substring filter could match by chance.
+        category = BlogCategory.objects.create(
+            parent=parent, slug=f"{name.lower()}-{SLUG_MARK}", image=image
         )
-        self.root1.created_at = self.now - timedelta(days=90)
-        self.root1.save()
-        self.root1.set_current_language("en")
-        self.root1.name = f"Technology-{self.test_id}"
-        self.root1.description = "All about tech and gadgets"
-        self.root1.save()
+        category.set_current_language("en")
+        category.name = name
+        category.description = description
+        category.save()
+        # ``SortableModel.save`` numbers a new row itself, so the order
+        # this dataset needs is set afterwards, like the creation date.
+        BlogCategory.objects.filter(pk=category.pk).update(
+            created_at=cls.now - timedelta(days=days_old),
+            sort_order=sort_order,
+        )
+        return category
 
-        self.root2 = BlogCategoryFactory(
-            parent=None,
-            slug=f"root2-{self.test_id}",
+    @classmethod
+    def setUpTestData(cls):
+        cls.now = timezone.now()
+        cls.tech = cls._category(
+            "Technology", "All about gadgets", sort_order=1, days_old=90
+        )
+        cls.travel = cls._category(
+            "Travel",
+            "Guides and tips",
             sort_order=2,
-            image="uploads/blog/root2.jpg",
+            days_old=60,
+            image="uploads/blog/travel.jpg",
         )
-        self.root2.created_at = self.now - timedelta(days=60)
-        self.root2.save()
-        self.root2.set_current_language("en")
-        self.root2.name = f"Travel-{self.test_id}"
-        self.root2.description = "Travel guides and tips"
-        self.root2.save()
-
-        self.root3 = BlogCategoryFactory(
-            parent=None, slug=f"root3-{self.test_id}", sort_order=3
+        cls.life = cls._category(
+            "Lifestyle", "Wellness", sort_order=3, days_old=30
         )
-        self.root3.created_at = self.now - timedelta(days=30)
-        self.root3.save()
-        self.root3.set_current_language("en")
-        self.root3.name = f"Lifestyle-{self.test_id}"
-        self.root3.description = "Lifestyle and wellness"
-        self.root3.save()
-
-        self.child1_1 = BlogCategoryFactory(
-            parent=self.root1,
-            slug=f"child1_1-{self.test_id}",
+        cls.software = cls._category(
+            "Software",
+            "Development and programming",
+            parent=cls.tech,
             sort_order=1,
-            image="uploads/blog/child1_1.jpg",
+            days_old=45,
+            image="uploads/blog/software.jpg",
         )
-        self.child1_1.created_at = self.now - timedelta(days=45)
-        self.child1_1.save()
-        self.child1_1.set_current_language("en")
-        self.child1_1.name = f"Software-{self.test_id}"
-        self.child1_1.description = "Software development and programming"
-        self.child1_1.save()
-
-        self.child1_2 = BlogCategoryFactory(
-            parent=self.root1, slug=f"child1_2-{self.test_id}", sort_order=2
+        cls.hardware = cls._category(
+            "Hardware",
+            "Components",
+            parent=cls.tech,
+            sort_order=2,
+            days_old=40,
         )
-        self.child1_2.created_at = self.now - timedelta(days=40)
-        self.child1_2.save()
-        self.child1_2.set_current_language("en")
-        self.child1_2.name = f"Hardware-{self.test_id}"
-        self.child1_2.description = "Computer hardware and components"
-        self.child1_2.save()
-
-        self.child2_1 = BlogCategoryFactory(
-            parent=self.root2, slug=f"child2_1-{self.test_id}", sort_order=1
-        )
-        self.child2_1.created_at = self.now - timedelta(days=20)
-        self.child2_1.save()
-        self.child2_1.set_current_language("en")
-        self.child2_1.name = f"Europe-{self.test_id}"
-        self.child2_1.description = "European travel destinations"
-        self.child2_1.save()
-
-        self.grandchild1_1_1 = BlogCategoryFactory(
-            parent=self.child1_1,
-            slug=f"grandchild1_1_1-{self.test_id}",
+        cls.europe = cls._category(
+            "Europe",
+            "Destinations",
+            parent=cls.travel,
             sort_order=1,
+            days_old=20,
         )
-        self.grandchild1_1_1.created_at = self.now - timedelta(days=10)
-        self.grandchild1_1_1.save()
-        self.grandchild1_1_1.set_current_language("en")
-        self.grandchild1_1_1.name = f"Python-{self.test_id}"
-        self.grandchild1_1_1.description = "Python programming language"
-        self.grandchild1_1_1.save()
-
+        cls.python = cls._category(
+            "Python",
+            "A programming language",
+            parent=cls.software,
+            sort_order=1,
+            days_old=10,
+        )
         BlogCategory.objects.rebuild()
 
-        for i in range(2):
-            BlogPostFactory(category=self.root2, is_published=True)
+        for category, posts in (
+            (cls.travel, 2),
+            (cls.software, 3),
+            (cls.europe, 1),
+            (cls.python, 4),
+        ):
+            for _ in range(posts):
+                BlogPostFactory(category=category, image=None)
 
-        for i in range(3):
-            BlogPostFactory(category=self.child1_1, is_published=True)
+    def _categories(self, params):
+        response = self.client.get(URL, params)
+        self.assertEqual(response.status_code, 200, response.data)
+        return [row["id"] for row in response.data["results"]]
 
-        BlogPostFactory(category=self.child2_1, is_published=True)
+    def test_each_filter_selects_exactly_its_categories(self):
+        tech, travel, life = self.tech.id, self.travel.id, self.life.id
+        software, hardware = self.software.id, self.hardware.id
+        europe, python = self.europe.id, self.python.id
+        everything = {tech, travel, life, software, hardware, europe, python}
+        cases = [
+            (
+                {"created_after": self.now - timedelta(days=50)},
+                {life, software, hardware, europe, python},
+            ),
+            (
+                {"created_before": self.now - timedelta(days=35)},
+                {tech, travel, software, hardware},
+            ),
+            ({"uuid": str(self.software.uuid)}, {software}),
+            ({"sort_order": 1}, {tech, software, europe, python}),
+            ({"parent": tech}, {software, hardware}),
+            ({"parent__isnull": "true"}, {tech, travel, life}),
+            (
+                {"parent__isnull": "false"},
+                {software, hardware, europe, python},
+            ),
+            ({"level": 0}, {tech, travel, life}),
+            ({"level": 1}, {software, hardware, europe}),
+            ({"level__gte": 1}, {software, hardware, europe, python}),
+            ({"level__lte": 1}, everything - {python}),
+            ({"name": "tech"}, {tech}),
+            ({"description": "programming"}, {software, python}),
+            ({"slug__icontains": SLUG_MARK}, everything),
+            ({"has_image": "true"}, {travel, software}),
+            ({"has_image": "false"}, everything - {travel, software}),
+            ({"has_posts": "true"}, {travel, software, europe, python}),
+            ({"has_posts": "false"}, {tech, life, hardware}),
+            ({"min_post_count": 2}, {travel, software, python}),
+            ({"max_post_count": 1}, {tech, life, hardware, europe}),
+            (
+                {"has_recursive_posts": "true"},
+                {tech, travel, software, europe, python},
+            ),
+            ({"has_recursive_posts": "false"}, {life, hardware}),
+            ({"min_recursive_post_count": 5}, {tech, software}),
+            ({"is_leaf": "true"}, {life, hardware, europe, python}),
+            ({"has_children": "true"}, {tech, travel, software}),
+            ({"ancestor_of": python}, {tech, software}),
+            ({"descendant_of": tech}, {software, hardware, python}),
+            # The camelCase spelling the storefront sends.
+            (
+                {
+                    "createdAfter": self.now - timedelta(days=50),
+                    "hasImage": "true",
+                    "hasPosts": "true",
+                    "sortOrderMax": 2,
+                },
+                {software},
+            ),
+            (
+                {"parentIsnull": "true", "hasPosts": "true", "level": 0},
+                {travel},
+            ),
+            (
+                {
+                    "createdAfter": self.now - timedelta(days=25),
+                    "description": "programming",
+                    "hasChildren": "false",
+                },
+                {python},
+            ),
+        ]
+        for params, expected in cases:
+            with self.subTest(params=params):
+                self.assertEqual(set(self._categories(params)), expected)
 
-        for i in range(4):
-            BlogPostFactory(category=self.grandchild1_1_1, is_published=True)
-
-    def test_timestamp_filters(self):
-        url = reverse("blog-category-list")
-
-        created_after = self.now - timedelta(days=50)
-        response = self.client.get(
-            url, {"created_after": created_after.isoformat()}
+    def test_filters_combine_with_ordering(self):
+        self.assertEqual(
+            self._categories({"isLeaf": "true", "ordering": "-createdAt"}),
+            [self.python.id, self.europe.id, self.life.id, self.hardware.id],
         )
-        self.assertEqual(response.status_code, 200)
-
-        result_ids = [r["id"] for r in response.data["results"]]
-        self.assertIn(self.root3.id, result_ids)
-        self.assertIn(self.child1_1.id, result_ids)
-        self.assertIn(self.child1_2.id, result_ids)
-        self.assertIn(self.child2_1.id, result_ids)
-        self.assertIn(self.grandchild1_1_1.id, result_ids)
-
-        created_before = self.now - timedelta(days=35)
-        response = self.client.get(
-            url, {"created_before": created_before.isoformat()}
-        )
-        self.assertEqual(response.status_code, 200)
-
-        result_ids = [r["id"] for r in response.data["results"]]
-        expected_old_categories = [
-            self.root1.id,
-            self.root2.id,
-            self.child1_1.id,
-            self.child1_2.id,
-        ]
-        for cat_id in expected_old_categories:
-            self.assertIn(cat_id, result_ids)
-
-    def test_uuid_and_sort_order_filters(self):
-        url = reverse("blog-category-list")
-
-        response = self.client.get(url, {"uuid": str(self.child1_1.uuid)})
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-        self.assertIn(self.child1_1.id, result_ids)
-        category_found = any(
-            r["id"] == self.child1_1.id for r in response.data["results"]
-        )
-        self.assertTrue(category_found)
-
-        response = self.client.get(url, {"sort_order": 1})
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-        expected_categories = [
-            self.root1.id,
-            self.child1_1.id,
-            self.child2_1.id,
-            self.grandchild1_1_1.id,
-        ]
-        for cat_id in expected_categories:
-            self.assertIn(cat_id, result_ids)
-
-        response = self.client.get(url, {"sort_order_min": 2})
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-        self.assertIn(self.root2.id, result_ids)
-        self.assertIn(self.root3.id, result_ids)
-        self.assertIn(self.child1_2.id, result_ids)
-
-    def test_hierarchy_filters(self):
-        url = reverse("blog-category-list")
-
-        response = self.client.get(url, {"parent": self.root1.id})
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-        expected_children = [self.child1_1.id, self.child1_2.id]
-        for cat_id in expected_children:
-            self.assertIn(cat_id, result_ids)
-
-        response = self.client.get(url, {"parent__isnull": "true"})
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-        expected_roots = [self.root1.id, self.root2.id, self.root3.id]
-        for cat_id in expected_roots:
-            self.assertIn(cat_id, result_ids)
-
-        response = self.client.get(url, {"parent__isnull": "false"})
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-        expected_non_roots = [
-            self.child1_1.id,
-            self.child1_2.id,
-            self.child2_1.id,
-            self.grandchild1_1_1.id,
-        ]
-        for cat_id in expected_non_roots:
-            self.assertIn(cat_id, result_ids)
-
-    def test_level_filters(self):
-        url = reverse("blog-category-list")
-
-        response = self.client.get(url, {"level": 0})
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-        expected_level_0 = [self.root1.id, self.root2.id, self.root3.id]
-        for cat_id in expected_level_0:
-            self.assertIn(cat_id, result_ids)
-
-        response = self.client.get(url, {"level": 1})
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-        expected_level_1 = [
-            self.child1_1.id,
-            self.child1_2.id,
-            self.child2_1.id,
-        ]
-        for cat_id in expected_level_1:
-            self.assertIn(cat_id, result_ids)
-
-        response = self.client.get(url, {"level__gte": 1})
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-        self.assertIn(self.child1_1.id, result_ids)
-        self.assertIn(self.grandchild1_1_1.id, result_ids)
-
-        response = self.client.get(url, {"level__lte": 1})
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-        self.assertIn(self.root1.id, result_ids)
-        self.assertIn(self.child1_1.id, result_ids)
-
-    def test_content_filters(self):
-        url = reverse("blog-category-list")
-
-        response = self.client.get(url, {"name": "tech"})
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-        self.assertIn(self.root1.id, result_ids)
-
-        response = self.client.get(url, {"description": "programming"})
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-        self.assertIn(self.child1_1.id, result_ids)
-        self.assertIn(self.grandchild1_1_1.id, result_ids)
-
-        response = self.client.get(url, {"slug__icontains": self.test_id})
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-        expected_categories = [
-            self.root1.id,
-            self.root2.id,
-            self.root3.id,
-            self.child1_1.id,
-            self.child1_2.id,
-            self.child2_1.id,
-            self.grandchild1_1_1.id,
-        ]
-        for cat_id in expected_categories:
-            self.assertIn(cat_id, result_ids)
-
-    def test_image_filter(self):
-        url = reverse("blog-category-list")
-
-        response = self.client.get(url, {"has_image": "true"})
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-        self.assertIn(self.root2.id, result_ids)
-        self.assertIn(self.child1_1.id, result_ids)
-
-        response = self.client.get(url, {"has_image": "false"})
-        self.assertEqual(response.status_code, 200)
-
-    def test_post_count_filters(self):
-        url = reverse("blog-category-list")
-
-        response = self.client.get(url, {"has_posts": "true"})
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-        expected_with_posts = [
-            self.root2.id,
-            self.child1_1.id,
-            self.child2_1.id,
-            self.grandchild1_1_1.id,
-        ]
-        for cat_id in expected_with_posts:
-            self.assertIn(cat_id, result_ids)
-
-        response = self.client.get(url, {"has_posts": "false"})
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-        expected_without_posts = [
-            self.root1.id,
-            self.root3.id,
-            self.child1_2.id,
-        ]
-        for cat_id in expected_without_posts:
-            self.assertIn(cat_id, result_ids)
-
-        response = self.client.get(url, {"min_post_count": 2})
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-        expected_min_2_posts = [
-            self.root2.id,
-            self.child1_1.id,
-            self.grandchild1_1_1.id,
-        ]
-        for cat_id in expected_min_2_posts:
-            self.assertIn(cat_id, result_ids)
-
-        response = self.client.get(url, {"max_post_count": 2})
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-        self.assertIn(self.root2.id, result_ids)
-        self.assertIn(self.child2_1.id, result_ids)
-
-    def test_recursive_post_filters(self):
-        url = reverse("blog-category-list")
-
-        response = self.client.get(url, {"has_recursive_posts": "true"})
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-        self.assertIn(self.root1.id, result_ids)
-        self.assertIn(self.root2.id, result_ids)
-        self.assertIn(self.child1_1.id, result_ids)
-
-        response = self.client.get(url, {"has_recursive_posts": "false"})
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-        self.assertIn(self.root3.id, result_ids)
-        self.assertIn(self.child1_2.id, result_ids)
-
-        response = self.client.get(url, {"min_recursive_post_count": 5})
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-        self.assertIn(self.root1.id, result_ids)
-
-    def test_tree_structure_filters(self):
-        url = reverse("blog-category-list")
-
-        response = self.client.get(url, {"is_leaf": "true"})
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-        expected_leaf_nodes = [
-            self.root3.id,
-            self.child1_2.id,
-            self.child2_1.id,
-            self.grandchild1_1_1.id,
-        ]
-        for cat_id in expected_leaf_nodes:
-            self.assertIn(cat_id, result_ids)
-
-        response = self.client.get(url, {"has_children": "true"})
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-        expected_with_children = [
-            self.root1.id,
-            self.root2.id,
-            self.child1_1.id,
-        ]
-        for cat_id in expected_with_children:
-            self.assertIn(cat_id, result_ids)
-
-        response = self.client.get(
-            url, {"ancestor_of": self.grandchild1_1_1.id}
-        )
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-        expected_ancestors = [self.root1.id, self.child1_1.id]
-        for cat_id in expected_ancestors:
-            self.assertIn(cat_id, result_ids)
-
-        response = self.client.get(url, {"descendant_of": self.root1.id})
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-        expected_descendants = [
-            self.child1_1.id,
-            self.child1_2.id,
-            self.grandchild1_1_1.id,
-        ]
-        for cat_id in expected_descendants:
-            self.assertIn(cat_id, result_ids)
-
-    def test_camel_case_filters(self):
-        url = reverse("blog-category-list")
-
-        created_after = self.now - timedelta(days=50)
-        response = self.client.get(
-            url,
-            {
-                "createdAfter": created_after.isoformat(),
-                "hasImage": "true",
-                "hasPosts": "true",
-                "sortOrderMax": 2,
-            },
-        )
-        self.assertEqual(response.status_code, 200)
-
-        result_ids = [r["id"] for r in response.data["results"]]
-        self.assertIn(self.child1_1.id, result_ids)
-
-        response = self.client.get(url, {"parentIsnull": "true"})
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-        self.assertIn(self.root1.id, result_ids)
-        self.assertIn(self.root2.id, result_ids)
-        self.assertIn(self.root3.id, result_ids)
-
-    def test_complex_filter_combinations(self):
-        url = reverse("blog-category-list")
-
-        response = self.client.get(
-            url, {"parentIsnull": "true", "hasPosts": "true", "level": 0}
-        )
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-        self.assertIn(self.root2.id, result_ids)
-
-        created_after = self.now - timedelta(days=25)
-        response = self.client.get(
-            url,
-            {
-                "createdAfter": created_after.isoformat(),
-                "description": "programming",
-                "hasChildren": "false",
-            },
-        )
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-        self.assertIn(self.grandchild1_1_1.id, result_ids)
-
-    def test_filter_with_ordering(self):
-        url = reverse("blog-category-list")
-
-        response = self.client.get(
-            url,
-            {
-                "isLeaf": "true",
-                "slug__icontains": self.test_id,
-                "ordering": "-createdAt",
-            },
-        )
-        self.assertEqual(response.status_code, 200)
-
-        results = response.data["results"]
-        # Verify our test categories are in the results in correct order
-        result_ids = [r["id"] for r in results]
-        self.assertIn(self.grandchild1_1_1.id, result_ids)
-        self.assertIn(self.child2_1.id, result_ids)
-        self.assertIn(self.root3.id, result_ids)
-        self.assertIn(self.child1_2.id, result_ids)
-
-    # No tearDown needed - TransactionTestCase handles cleanup

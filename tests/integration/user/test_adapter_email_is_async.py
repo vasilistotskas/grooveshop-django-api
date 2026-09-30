@@ -18,6 +18,7 @@ from unittest.mock import patch
 
 import pytest
 from allauth.core.context import request_context
+from celery.exceptions import Retry
 from django.contrib.auth.models import AnonymousUser
 from django.core import mail
 from django.test import RequestFactory
@@ -56,17 +57,22 @@ class TestAllauthMailIsDispatched:
         )
         assert queued.called, "nothing queued; the mail would never go out"
 
-    def test_a_refusing_smtp_server_does_not_reach_the_caller(self):
-        """The exact production failure, reproduced: the send raises,
-        the caller returns normally."""
+    def test_a_busy_smtp_server_is_a_retry_in_the_task(self):
+        """The exact production failure, reproduced where it now lands:
+        the queued task, which retries it rather than failing a request.
+        (That the request itself never talks to SMTP is the test above.)
+        Eager Celery runs the task inline, so the retry surfaces here."""
         user = UserAccountFactory()
 
-        with patch.object(
-            mail.EmailMultiAlternatives,
-            "send",
-            side_effect=smtplib.SMTPConnectError(421, b"Server busy"),
+        with (
+            patch.object(
+                mail.EmailMultiAlternatives,
+                "send",
+                side_effect=smtplib.SMTPConnectError(421, b"Server busy"),
+            ),
+            pytest.raises(Retry),
         ):
-            _send(user)  # must not raise
+            _send(user)
 
     def test_subject_and_both_bodies_survive_the_hand_off(self):
         """A blank email is a worse outcome than a slow one."""

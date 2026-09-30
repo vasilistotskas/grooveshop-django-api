@@ -393,46 +393,18 @@ class BlogCommentFilterTest(APITestCase):
         self.assertIn(self.reply1_1.id, result_ids)
         self.assertIn(self.reply1_1_1.id, result_ids)
 
-    def test_activity_filters(self):
+    def test_ranking_by_likes_and_by_replies(self):
         url = reverse("blog-comment-list")
 
-        response = self.client.get(
-            url,
-            {
-                "most_liked": "true",
-                "post": self.post1.id,
-            },
-        )
-        self.assertEqual(response.status_code, 200)
-        results = response.data["results"]
-
-        comment_ids = [r["id"] for r in results]
-        self.assertIn(
-            self.comment1.id,
-            comment_ids,
-            f"comment1 (ID: {self.comment1.id}) not found in results",
-        )
-
-        self.assertGreater(
-            len(results), 0, "most_liked filter should return results"
-        )
-
-        response = self.client.get(
-            url,
-            {
-                "most_replied": "true",
-                "post": self.post1.id,
-            },
-        )
-        self.assertEqual(response.status_code, 200)
-        results = response.data["results"]
-
-        comment_ids = [r["id"] for r in results]
-        self.assertIn(
-            self.comment1.id,
-            comment_ids,
-            f"comment1 (ID: {self.comment1.id}) not found in most_replied results",
-        )
+        for ordering in ("-likesCount", "-repliesCount"):
+            with self.subTest(ordering=ordering):
+                response = self.client.get(
+                    url, {"ordering": ordering, "post": self.post1.id}
+                )
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(
+                    response.data["results"][0]["id"], self.comment1.id
+                )
 
     def test_camel_case_filters(self):
         url = reverse("blog-comment-list")

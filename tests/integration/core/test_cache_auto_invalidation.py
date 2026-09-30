@@ -13,12 +13,13 @@ its own row, so editing the Greek description never touches ``PayWay``
 — a receiver bound only to the master model would look correct and fire
 on none of the edits that actually go stale.
 
-``transaction=True`` throughout, deliberately. The suite's autouse
+The classes asserting deferral, coalescing or rollback are
+``transaction=True``, deliberately. The suite's autouse
 ``_run_transaction_on_commit_immediately`` fixture rewrites
 ``transaction.on_commit`` into a direct call, and that fixture skips
-itself for transactional tests. Without it the deferral, coalescing and
-rollback assertions below would all pass vacuously — they would be
-measuring the fixture, not the code.
+itself for transactional tests. Without real commits those assertions
+would be measuring the fixture, not the code. Failure isolation and
+cross-transaction batching hold either way, so they skip the flush.
 """
 
 from __future__ import annotations
@@ -35,7 +36,7 @@ from core.cache.invalidation import (
 )
 from pay_way.models import PayWay
 
-pytestmark = pytest.mark.django_db(transaction=True)
+real_commits = pytest.mark.django_db(transaction=True)
 
 
 @pytest.fixture(autouse=True)
@@ -70,6 +71,7 @@ def _codes(purge_mock) -> list[str]:
     return list(purge_mock.call_args.args[0])
 
 
+@real_commits
 class TestWritesInvalidate:
     def test_saving_a_pay_way_purges_its_surface_on_commit(self, purge):
         with transaction.atomic():
@@ -78,17 +80,6 @@ class TestWritesInvalidate:
 
         assert _codes(purge) == ["pay_way"]
         assert pay_way.pk is not None
-
-    def test_the_shipping_options_payload_is_invalidated_too(self):
-        """``/api/v1/shipping/options`` embeds each option's eligible
-        pay-ways, rendered as badges on the delivery step, and is cached
-        under the ``shipping`` surface. ``CacheService.purge`` expands
-        ``related`` itself, so assert the declaration rather than
-        re-testing the expansion."""
-        from core.cache.registry import expand_with_related, get_surface
-
-        assert "shipping" in get_surface("pay_way").related
-        assert "shipping" in expand_with_related(["pay_way"])
 
     def test_editing_only_a_translation_purges_too(self, purge):
         """A translation row written on its own, with the master
@@ -156,6 +147,7 @@ class TestWritesInvalidate:
         assert _codes(purge) == ["pay_way"]
 
 
+@real_commits
 class TestCoalescing:
     def test_one_edit_across_three_languages_purges_once(self, purge):
         """Master plus three translation rows is ONE logical edit.
@@ -203,6 +195,7 @@ class TestCoalescing:
         assert _codes(purge) == ["pay_way"]
 
 
+@pytest.mark.django_db
 class TestFailureIsolation:
     def test_a_failing_purge_does_not_break_the_write(self):
         """The write has already committed by the time ``_flush`` runs;
@@ -230,6 +223,17 @@ class TestFailureIsolation:
 
 
 class TestWiring:
+    def test_the_shipping_options_payload_is_invalidated_too(self):
+        """``/api/v1/shipping/options`` embeds each option's eligible
+        pay-ways, rendered as badges on the delivery step, and is cached
+        under the ``shipping`` surface. ``CacheService.purge`` expands
+        ``related`` itself, so assert the declaration rather than
+        re-testing the expansion."""
+        from core.cache.registry import expand_with_related, get_surface
+
+        assert "shipping" in get_surface("pay_way").related
+        assert "shipping" in expand_with_related(["pay_way"])
+
     def test_the_pay_way_surface_declares_its_models(self):
         """A surface with no ``invalidated_by`` is purge-on-demand only
         — the exact bug this closes."""
@@ -278,6 +282,7 @@ class TestWiring:
                 apps.get_model(label)  # raises LookupError on a typo
 
 
+@pytest.mark.django_db
 class TestBatching:
     """A commit only records its stale surfaces and queues one delayed
     purge; every commit inside the delay rides it. A catalogue import

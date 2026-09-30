@@ -33,12 +33,8 @@ def _make_png_upload(name: str = "logo.png") -> SimpleUploadedFile:
     return SimpleUploadedFile(name, buf.read(), content_type="image/png")
 
 
-# Mock ``Setting.get`` instead of writing rows via ``update_or_create``
-# — the latter races the ``_reseed_extra_settings`` autouse fixture
-# under xdist parallel workers, leading to flaky reads. See
-# ``project_settings_update_or_create_flake.md`` and the matching
-# pattern in ``test_free_shipping_info.py`` / ``test_create_payment_
-# intent_shipping.py``.
+# Mock ``Setting.get`` instead of writing rows via ``update_or_create``,
+# the same pattern as ``test_free_shipping_info.py``.
 def _setting_get_with_smartpoint_enabled(name: str, default=None):
     if name == "ACS_SMARTPOINT_ENABLED":
         return True

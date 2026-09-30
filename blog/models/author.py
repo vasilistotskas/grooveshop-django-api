@@ -1,5 +1,3 @@
-from typing import Literal
-
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -55,10 +53,28 @@ class BlogAuthor(TranslatableModel, TimeStampMixinModel, UUIDModel):
 
         return BlogPost.objects.filter(author=self).published()
 
+    # Both read the ``BlogAuthorQuerySet.with_engagement`` annotation
+    # when the row carries it, and query otherwise.
     @property
     def number_of_posts(self) -> int:
+        if "number_of_posts" in self.__dict__:
+            return self.__dict__["number_of_posts"]
         return self.published_posts.count()
 
+    @number_of_posts.setter
+    def number_of_posts(self, value: int) -> None:
+        self.__dict__["number_of_posts"] = value
+
     @property
-    def total_likes_received(self) -> int | Literal[0]:
-        return sum([post.likes.count() for post in self.published_posts])
+    def total_likes_received(self) -> int:
+        if "total_likes_received" in self.__dict__:
+            return self.__dict__["total_likes_received"]
+        from blog.models.post import BlogPost
+
+        return BlogPost.likes.through.objects.filter(
+            blogpost__in=self.published_posts
+        ).count()
+
+    @total_likes_received.setter
+    def total_likes_received(self, value: int) -> None:
+        self.__dict__["total_likes_received"] = value

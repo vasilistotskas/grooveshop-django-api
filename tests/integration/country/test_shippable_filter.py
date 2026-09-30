@@ -1,11 +1,8 @@
 """``GET /api/v1/country?shippable=true`` — countries the current store
 has an active ``ShippingRate`` for.
 
-Plain pytest-style (not ``APITestCase``/``TestCase``): the autouse
-``_reseed_countries``/``_reseed_shipping_providers`` fixtures
-(``tests/conftest.py``) only fire for ``@pytest.mark.django_db``
-function tests, so this file builds its own rate data explicitly
-rather than leaning on those or the migration-seeded GR row.
+This file builds its own rate data explicitly rather than leaning on
+the migration-seeded GR row, so each case states the rates it needs.
 
 The main test suite strips multi-tenancy (no ``TenantMainMiddleware``,
 see ``tests/conftest.py``'s own docstring), so ``connection.schema_

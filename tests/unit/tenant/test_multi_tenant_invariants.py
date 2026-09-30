@@ -6,8 +6,8 @@ to catch a regression that silently bypasses tenant scoping (the
 class of bug the multi-tenant hardening was built around).
 
 Tests in this file deliberately avoid real schema creation: we use the
-``tenant_factory`` / ``bind_tenant`` fixtures from
-``tests/unit/tenant/conftest.py`` so the unit suite stays sub-second.
+``store_tenant`` helper and the ``bind_tenant`` fixture so the unit
+suite stays sub-second.
 End-to-end isolation (two real schemas, real ORM writes) lives in
 ``tests/integration/tenant/test_multi_tenant_invariants.py``.
 """

@@ -135,12 +135,26 @@ class BoxNowWebhookView(APIView):
         # 2. Parse outer envelope (JSON parse is fine here — we need the      #
         #    fields; we extract the raw data substring separately).           #
         # ------------------------------------------------------------------ #
+        # Decoded as strict UTF-8 first (RFC 8259 §8.1), not left to
+        # json.loads, which sniffs UTF-16/32 from bytes: a UTF-16 body
+        # parses, while the signed-data extractor below walks the raw
+        # bytes and could find an ASCII "data" object smuggled inside a
+        # string value. RecursionError: a body nested deeper than the
+        # decoder's stack.
         try:
-            envelope: dict = json.loads(raw_body)
-        except json.JSONDecodeError as exc:
+            envelope = json.loads(raw_body.decode("utf-8"))
+        except (ValueError, RecursionError) as exc:
             logger.warning(
                 "BoxNow webhook: invalid JSON body | error=%s | body_len=%d",
                 exc,
+                len(raw_body),
+            )
+            return Response(status=400)
+        if not isinstance(envelope, dict):
+            logger.warning(
+                "BoxNow webhook: body is not a JSON object | type=%s"
+                " | body_len=%d",
+                type(envelope).__name__,
                 len(raw_body),
             )
             return Response(status=400)

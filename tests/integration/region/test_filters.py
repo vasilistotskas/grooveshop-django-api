@@ -1,14 +1,17 @@
 import random
 import string
 import uuid
+from datetime import timedelta
 
 from django.conf import settings
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from country.factories import CountryFactory
 from region.factories import RegionFactory
+from region.models import Region
 from tests.utils import TestURLFixerMixin
 
 languages = [
@@ -20,6 +23,9 @@ default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 class RegionFilterTestCase(TestURLFixerMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
+        # Whole-list assertions below count only this class's regions;
+        # the seeded GR/CY ones return when the class transaction ends.
+        Region.objects.all().delete()
         cls.test_id = uuid.uuid4().hex[:4].upper()
 
         # EVERY unique column here is drawn from an ISO 3166-1
@@ -224,49 +230,49 @@ class RegionFilterTestCase(TestURLFixerMixin, APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_filter_by_created_at_after(self):
-        new_region = RegionFactory(
-            alpha=f"T{self.test_id[:3]}1",
-            country=self.country_gr,
+    def _age(self, region, *, days):
+        past = timezone.now() - timedelta(days=days)
+        Region.objects.filter(pk=region.pk).update(
+            created_at=past, updated_at=past
         )
 
-        response = self.client.get(
-            self.get_region_list_url(),
-            {"created_at_after": new_region.created_at.isoformat()},
-        )
+    def _listed_uuids(self, params):
+        response = self.client.get(self.get_region_list_url(), params)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        return {item["uuid"] for item in response.data["results"]}
 
-        uuids = [item["uuid"] for item in response.data["results"]]
-        self.assertIn(str(new_region.uuid), uuids)
+    def test_filter_by_created_after(self):
+        self._age(self.region_attica, days=3)
 
-    def test_filter_by_created_at_before(self):
-        from datetime import timedelta
-
-        from django.utils import timezone
-
-        future_date = timezone.now() + timedelta(days=1)
-
-        response = self.client.get(
-            self.get_region_list_url(),
-            {"created_at_before": future_date.isoformat()},
+        uuids = self._listed_uuids(
+            {"createdAfter": (timezone.now() - timedelta(days=1)).isoformat()}
         )
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        self.assertGreater(len(response.data["results"]), 0)
+        self.assertNotIn(str(self.region_attica.uuid), uuids)
+        self.assertIn(str(self.region_crete.uuid), uuids)
 
-    def test_filter_by_updated_at_after(self):
+    def test_filter_by_created_before(self):
+        self._age(self.region_attica, days=3)
+
+        uuids = self._listed_uuids(
+            {"createdBefore": (timezone.now() - timedelta(days=1)).isoformat()}
+        )
+
+        self.assertEqual(uuids, {str(self.region_attica.uuid)})
+
+    def test_filter_by_updated_after(self):
+        self._age(self.region_attica, days=3)
+        self._age(self.region_crete, days=3)
         self.region_attica.set_current_language("en")
         self.region_attica.name = "Updated Attica"
         self.region_attica.save()
 
-        response = self.client.get(
-            self.get_region_list_url(),
-            {"updated_at_after": self.region_attica.updated_at.isoformat()},
+        uuids = self._listed_uuids(
+            {"updatedAfter": (timezone.now() - timedelta(days=1)).isoformat()}
         )
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        uuids = [item["uuid"] for item in response.data["results"]]
         self.assertIn(str(self.region_attica.uuid), uuids)
+        self.assertNotIn(str(self.region_crete.uuid), uuids)
 
     def test_ordering_by_sort_order(self):
         response = self.client.get(

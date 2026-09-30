@@ -14,7 +14,6 @@ from unittest.mock import MagicMock
 
 import pytest
 from django.core.exceptions import ValidationError
-from django.db import connection
 from django.test import override_settings
 
 from core.utils.tenant_urls import (
@@ -30,23 +29,6 @@ from core.utils.tenant_urls import (
     storefront_path,
     tenant_storefront_locales,
 )
-
-
-@pytest.fixture
-def bind_tenant(monkeypatch):
-    def _bind(t):
-        monkeypatch.setattr(connection, "tenant", t, raising=False)
-        # Pin `schema_name` at its current value so monkeypatch restores
-        # it at teardown. `schema_context.__exit__` calls
-        # `set_tenant(previous)`, a real mutation of the shared
-        # connection that monkeypatch does not otherwise track — without
-        # this the worker is left outside the public schema and the next
-        # test to create a Tenant fails somewhere unrelated.
-        monkeypatch.setattr(
-            connection, "schema_name", connection.schema_name, raising=False
-        )
-
-    yield _bind
 
 
 def _fake_tenant(primary_domain: str, schema_name: str = "tenant_a"):

@@ -12,7 +12,12 @@ from __future__ import annotations
 
 from datetime import date
 
-from django.test import RequestFactory, TestCase, override_settings
+from django.test import (
+    RequestFactory,
+    SimpleTestCase,
+    TestCase,
+    override_settings,
+)
 from django.urls import NoReverseMatch, resolve, reverse
 
 # The classifier itself lives in tenant/billing.py and is pinned by
@@ -20,6 +25,7 @@ from django.urls import NoReverseMatch, resolve, reverse
 # PAGE's shaping and gating.
 from admin.platform_billing import _billing_rows, _billing_table
 from admin.platform_site import platform_admin_site
+from tests.utils.staff import store_tenant
 
 _TODAY = date(2026, 8, 22)
 
@@ -27,18 +33,10 @@ _TODAY = date(2026, 8, 22)
 class TestBillingRows(TestCase):
     @classmethod
     def setUpTestData(cls):
-        from tenant.models import Tenant
-
-        cls.store = Tenant(
-            schema_name="billing_rows_tenant",
-            name="Billing Rows Tenant",
-            slug="billing-rows-tenant",
-            owner_email="owner-billing-rows@example.com",
-            plan="pro",
-            paid_until=date(2030, 1, 1),
+        store_tenant("public", name="Platform")
+        cls.store = store_tenant(
+            "billing_rows_tenant", plan="pro", paid_until=date(2030, 1, 1)
         )
-        cls.store.auto_create_schema = False
-        cls.store.save()
 
     def test_excludes_the_public_row(self):
         """`public` is the control plane itself, not a billable store."""
@@ -77,7 +75,7 @@ class TestBillingRows(TestCase):
         assert table["rows"][0][3] == "—"
 
 
-class TestPlanBillingRouting(TestCase):
+class TestPlanBillingRouting(SimpleTestCase):
     def test_lives_on_the_platform_namespace(self):
         match = resolve("/admin/plan-billing/", urlconf="tenant.urls_public")
         assert match.namespace == "platform_admin"
@@ -108,7 +106,6 @@ class TestPlanBillingPage(TestCase):
     @classmethod
     def setUpTestData(cls):
         from tenant.models import (
-            Tenant,
             TenantMembershipRole,
             UserTenantMembership,
         )
@@ -119,17 +116,12 @@ class TestPlanBillingPage(TestCase):
             username="billingoperator",
             password="testpass123",
         )
-        cls.store = Tenant(
-            schema_name="billing_page_tenant",
-            name="Billing Page Tenant",
-            slug="billing-page-tenant",
-            owner_email="owner-billing-page@example.com",
+        cls.store = store_tenant(
+            "billing_page_tenant",
             store_name="Billing Page Store",
             plan="enterprise",
             paid_until=date(2026, 8, 1),
         )
-        cls.store.auto_create_schema = False
-        cls.store.save()
 
         # The strongest non-platform identity: staff + OWNER membership.
         cls.merchant = UserAccount.objects.create_user(

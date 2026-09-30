@@ -14,10 +14,13 @@ from django.contrib.auth import get_user_model
 from django.test import Client
 from rest_framework import status
 
-from blog.models.post import BlogPost, BlogPostTranslation
-from product.models.product import Product, ProductTranslation
+from blog.factories.post import BlogPostFactory
+from blog.models.post import BlogPostTranslation
+from product.factories.product import ProductFactory
+from product.models.product import ProductTranslation
 from search.models import SearchClick, SearchQuery
 from tests.conftest import requires_meilisearch
+from tests.utils.meilisearch import LiveSearchIndex, unique_marker
 
 User = get_user_model()
 
@@ -39,260 +42,6 @@ def admin_client(db):
     )
     client.force_login(admin_user)
     return client
-
-
-@pytest.fixture
-def authenticated_user(db):
-    """Create an authenticated user for testing."""
-    return User.objects.create_user(
-        username="testuser", email="test@example.com", password="testpass123"
-    )
-
-
-@pytest.fixture
-def sample_products(db):
-    """Create sample products for testing."""
-    products = []
-    translations = []
-    for i in range(5):
-        product = Product.objects.create()
-        # Create English translation using Parler's API
-        translation = ProductTranslation.objects.create(
-            master=product,
-            language_code="en",
-            name=f"Test Product {i}",
-            description=f"Description for product {i}",
-        )
-        products.append(product)
-        translations.append(translation)
-    return {"products": products, "translations": translations}
-
-
-@pytest.fixture
-def sample_blog_posts(db):
-    """Create sample blog posts for testing."""
-    posts = []
-    translations = []
-    for i in range(3):
-        post = BlogPost.objects.create()
-        # Create English translation using Parler's API
-        translation = BlogPostTranslation.objects.create(
-            master=post,
-            language_code="en",
-            title=f"Test Blog Post {i}",
-            subtitle=f"Subtitle {i}",
-            body=f"Body content for post {i}",
-        )
-        posts.append(post)
-        translations.append(translation)
-    return {"posts": posts, "translations": translations}
-
-
-@pytest.mark.django_db
-class TestSearchQueryRecordCreation:
-    """
-    For any search request (product, blog, or federated), a SearchQuery model
-    record should be created with query, language_code, content_type,
-    results_count, and timestamp fields populated.
-
-    NOTE: This property is tested comprehensively in test_analytics_middleware.py
-    which tests the middleware directly. These tests verify the integration works
-    end-to-end through the view layer.
-    """
-
-    @pytest.mark.parametrize(
-        "content_type,query,language_code",
-        [
-            ("product", "laptop", "en"),
-            ("blog_post", "article", "en"),
-            ("federated", "search term", "en"),
-        ],
-    )
-    def test_middleware_creates_search_query_records(
-        self,
-        content_type,
-        query,
-        language_code,
-    ):
-        """
-        Test that middleware creates SearchQuery records with all required fields.
-
-        This is a simplified integration test. The comprehensive property validation
-        with 20+ parameterized test cases is in test_analytics_middleware.py where
-        the middleware is tested directly.
-        """
-        # Create SearchQuery directly to test the model
-        search_query = SearchQuery.objects.create(
-            query=query,
-            language_code=language_code,
-            content_type=content_type,
-            results_count=5,
-            estimated_total_hits=50,
-            processing_time_ms=100,
-        )
-
-        # Verify all required fields are populated
-        assert search_query.query == query
-        assert search_query.language_code == language_code
-        assert search_query.content_type == content_type
-        assert search_query.results_count == 5
-        assert search_query.estimated_total_hits == 50
-        assert search_query.processing_time_ms == 100
-        assert search_query.timestamp is not None
-
-        # Verify optional fields exist
-        assert hasattr(search_query, "user")
-        assert hasattr(search_query, "session_key")
-        assert hasattr(search_query, "ip_address")
-        assert hasattr(search_query, "user_agent")
-
-    def test_search_query_model_fields_exist(self):
-        """Test that SearchQuery model has all required fields."""
-        # Create a minimal SearchQuery
-        search_query = SearchQuery.objects.create(
-            query="test",
-            language_code="en",
-            content_type="product",
-            results_count=0,
-            estimated_total_hits=0,
-        )
-
-        # Verify all required fields exist and are accessible
-        assert search_query.id is not None
-        assert search_query.query == "test"
-        assert search_query.language_code == "en"
-        assert search_query.content_type == "product"
-        assert search_query.results_count == 0
-        assert search_query.estimated_total_hits == 0
-        assert search_query.timestamp is not None
-
-        # Verify optional fields exist (can be None)
-        assert hasattr(search_query, "processing_time_ms")
-        assert hasattr(search_query, "user")
-        assert hasattr(search_query, "session_key")
-        assert hasattr(search_query, "ip_address")
-        assert hasattr(search_query, "user_agent")
-
-
-@pytest.mark.django_db
-class TestSearchClickRecordCreation:
-    """
-    For any search result click event, a SearchClick model record should be
-    created with search_query foreign key, result_id, result_type, position,
-    and timestamp.
-    """
-
-    @pytest.mark.parametrize(
-        "result_type,result_id,position",
-        [
-            ("product", "1", 0),
-            ("product", "2", 1),
-            ("product", "10", 5),
-            ("blog_post", "1", 0),
-            ("blog_post", "5", 3),
-            ("product", "100", 10),
-            ("blog_post", "50", 7),
-        ],
-    )
-    def test_click_creates_search_click_record(
-        self,
-        result_type,
-        result_id,
-        position,
-    ):
-        """
-        Test that any click creates SearchClick record with all required fields.
-
-        This property test validates that click tracking works for any result type,
-        ID, and position in the search results.
-        """
-        # Create a SearchQuery first
-        search_query = SearchQuery.objects.create(
-            query="test query",
-            language_code="en",
-            content_type="federated",
-            results_count=10,
-            estimated_total_hits=100,
-        )
-
-        # Record initial count
-        initial_count = SearchClick.objects.count()
-
-        # Create SearchClick
-        search_click = SearchClick.objects.create(
-            search_query=search_query,
-            result_id=result_id,
-            result_type=result_type,
-            position=position,
-        )
-
-        # Verify SearchClick was created
-        assert SearchClick.objects.count() == initial_count + 1, (
-            "SearchClick should be created"
-        )
-
-        # Verify all required fields are populated
-        assert search_click.search_query == search_query, (
-            "search_query foreign key should be set"
-        )
-
-        assert search_click.result_id == result_id, (
-            f"result_id mismatch: expected '{result_id}', got '{search_click.result_id}'"
-        )
-
-        assert search_click.result_type == result_type, (
-            f"result_type mismatch: expected '{result_type}', got '{search_click.result_type}'"
-        )
-
-        assert search_click.position == position, (
-            f"position mismatch: expected {position}, got {search_click.position}"
-        )
-
-        assert search_click.timestamp is not None, "timestamp should be set"
-
-    def test_multiple_clicks_on_same_query(self):
-        """Test that multiple clicks on the same query are tracked separately."""
-        # Create a SearchQuery
-        search_query = SearchQuery.objects.create(
-            query="laptop",
-            language_code="en",
-            content_type="product",
-            results_count=5,
-            estimated_total_hits=50,
-        )
-
-        initial_count = SearchClick.objects.count()
-
-        # Create multiple clicks
-        SearchClick.objects.create(
-            search_query=search_query,
-            result_id="1",
-            result_type="product",
-            position=0,
-        )
-        SearchClick.objects.create(
-            search_query=search_query,
-            result_id="2",
-            result_type="product",
-            position=1,
-        )
-        SearchClick.objects.create(
-            search_query=search_query,
-            result_id="3",
-            result_type="product",
-            position=2,
-        )
-
-        # Verify all clicks were created
-        assert SearchClick.objects.count() == initial_count + 3, (
-            "All clicks should be tracked separately"
-        )
-
-        # Verify they're all linked to the same query
-        clicks = SearchClick.objects.filter(search_query=search_query)
-        assert clicks.count() == 3, (
-            "All clicks should be linked to the search query"
-        )
 
 
 @pytest.mark.django_db
@@ -581,336 +330,87 @@ class TestAnalyticsMetricsCompleteness:
 @requires_meilisearch
 @pytest.mark.django_db
 class TestAnalyticsLoggingFailuresDontBreakSearch:
-    """
-    For any search request, if analytics logging fails, the search should
-    still complete successfully and return results.
+    """A search whose analytics row cannot be written still answers.
 
-    NOTE: These tests require a running Meilisearch instance.
-    They are skipped in CI environments where Meilisearch is not available.
+    ``SearchAnalyticsMiddleware`` persists the ``SearchQuery`` row after
+    the view has answered; a failure there must be swallowed, never turn
+    into an error or an emptied result list.
     """
+
+    @pytest.fixture
+    def indexed(self, db):
+        """One product and one post whose text is a unique marker."""
+        marker = unique_marker()
+        with LiveSearchIndex() as index:
+            product = ProductFactory(
+                active=True,
+                translations=[
+                    ProductTranslation(language_code="en", name=marker)
+                ],
+            ).translations.get()
+            post = BlogPostFactory(
+                is_published=True,
+                translations=[
+                    BlogPostTranslation(
+                        language_code="en", title=marker, subtitle="", body=""
+                    )
+                ],
+            ).translations.get()
+            index.add(product, post)
+            yield marker, {"product": product.id, "post": post.id}
 
     @pytest.mark.parametrize(
-        "endpoint,query",
+        "endpoint,expected",
         [
-            ("/api/v1/search/product", "laptop"),
-            ("/api/v1/search/blog/post", "article"),
-            ("/api/v1/search/federated", "search term"),
+            ("/api/v1/search/product", ["product"]),
+            ("/api/v1/search/blog/post", ["post"]),
+            ("/api/v1/search/federated", ["product", "post"]),
         ],
     )
     def test_search_succeeds_when_analytics_logging_fails(
-        self,
-        api_client,
-        endpoint,
-        query,
-        sample_products,
-        sample_blog_posts,
+        self, api_client, indexed, endpoint, expected
     ):
-        """
-        Test that search succeeds even if analytics logging fails.
+        marker, ids = indexed
 
-        This property test validates that analytics failures are handled
-        gracefully and don't impact the core search functionality.
-        """
-        # Mock Meilisearch to return results
-        with patch("meili._client.client.client.index") as mock_index:
-            mock_search = Mock()
-            mock_search.search.return_value = {
-                "hits": [
-                    {"id": "1", "name": "Test Product", "language_code": "en"}
-                ],
-                "estimatedTotalHits": 1,
-                "processingTimeMs": 50,
-            }
-            mock_index.return_value = mock_search
-
-            # Mock multi_search for federated
-            with patch(
-                "meili._client.client.search_client.multi_search"
-            ) as mock_multi_search:
-                mock_multi_search.return_value = {
-                    "hits": [
-                        {
-                            "id": "1",
-                            "name": "Test Product",
-                            "language_code": "en",
-                            "_federation": {
-                                "indexUid": "ProductTranslation",
-                                "queriesPosition": 0,
-                                "weightedRankingScore": 0.9,
-                            },
-                        }
-                    ],
-                    "estimatedTotalHits": 1,
-                    "processingTimeMs": 50,
-                }
-
-                # Mock SearchQuery.objects.create to raise an exception
-                with patch.object(
-                    SearchQuery.objects,
-                    "create",
-                    side_effect=Exception("Database error"),
-                ):
-                    # Make search request
-                    response = api_client.get(
-                        endpoint, {"query": query, "language_code": "en"}
-                    )
-
-                    # Verify search still succeeds
-                    assert response.status_code == status.HTTP_200_OK, (
-                        f"Search should succeed even if analytics logging fails, got {response.status_code}"
-                    )
-
-                    # Verify response contains results
-                    data = response.json()
-                    assert "results" in data or "error" not in data, (
-                        "Search response should contain results or not have an error"
-                    )
-
-    def test_search_succeeds_when_middleware_fails(
-        self,
-        api_client,
-        sample_products,
-    ):
-        """
-        Test that search succeeds even if middleware completely fails.
-
-        This test validates that the core search functionality doesn't depend
-        on analytics middleware succeeding. The middleware is designed to fail
-        gracefully without impacting search results.
-        """
-        with patch("meili._client.client.client.index") as mock_index:
-            mock_search = Mock()
-            mock_search.search.return_value = {
-                "hits": [],
-                "estimatedTotalHits": 0,
-                "processingTimeMs": 50,
-            }
-            mock_index.return_value = mock_search
-
-            # Mock SearchQuery.objects.create to fail (simulating middleware failure)
-            with patch.object(
-                SearchQuery.objects,
-                "create",
-                side_effect=Exception("Middleware error"),
-            ):
-                # Make search request
-                response = api_client.get(
-                    "/api/v1/search/product",
-                    {"query": "laptop", "language_code": "en"},
-                )
-
-                # Search should still work (200 or 400, but not 500)
-                assert response.status_code in [
-                    status.HTTP_200_OK,
-                    status.HTTP_400_BAD_REQUEST,
-                ], (
-                    f"Search should handle middleware failures gracefully, got {response.status_code}"
-                )
-
-    def test_search_with_database_connection_error(
-        self,
-        api_client,
-        sample_products,
-    ):
-        """Test that search handles database errors gracefully."""
-        with patch("meili._client.client.client.index") as mock_index:
-            mock_search = Mock()
-            mock_search.search.return_value = {
-                "hits": [],
-                "estimatedTotalHits": 0,
-                "processingTimeMs": 50,
-            }
-            mock_index.return_value = mock_search
-
-            # Mock database save to fail
-            with patch(
-                "django.db.models.Model.save", side_effect=Exception("DB error")
-            ):
-                # Make search request
-                response = api_client.get(
-                    "/api/v1/search/product",
-                    {"query": "laptop", "language_code": "en"},
-                )
-
-                # Search should still return a response (might be error, but shouldn't crash)
-                assert response.status_code in [
-                    status.HTTP_200_OK,
-                    status.HTTP_400_BAD_REQUEST,
-                    status.HTTP_500_INTERNAL_SERVER_ERROR,
-                ], "Search should handle database errors gracefully"
-
-
-@requires_meilisearch
-@pytest.mark.django_db
-class TestFederatedSearchEndToEnd:
-    """
-    End-to-end integration tests for federated search flow.
-
-    Tests the complete federated search flow including:
-    - Multi-index querying with federation mode
-    - Result weighting and merging
-    - Content filtering (active products, published blog posts)
-    - Verbatim query pass-through (Greeklish matches indexed shadow fields)
-    - Analytics tracking integration
-
-    NOTE: These tests require a running Meilisearch instance.
-    They are skipped in CI environments where Meilisearch is not available.
-
-    Validates: Requirements 1.1-1.11, 2.8
-    """
-
-    def test_federated_search_complete_flow(
-        self,
-        api_client,
-        sample_products,
-        sample_blog_posts,
-    ):
-        """
-        Test complete federated search flow from request to response.
-
-        This end-to-end test validates:
-        1. Request parsing and validation
-        2. Multi-search API call with federation
-        4. Result enrichment with Django objects
-        5. Content type tagging
-        6. Response serialization
-        """
-        # Get the translation IDs for mocking
-        product_translation = sample_products["translations"][0]
-        blog_translation = sample_blog_posts["translations"][0]
-
-        # Mock Meilisearch multi_search to return federated results
-        # Use the correct import path from search.views
-        with patch(
-            "search.views.meili_client.search_client.multi_search"
-        ) as mock_multi_search:
-            # Simulate federated search response from Meilisearch
-            mock_multi_search.return_value = {
-                "hits": [
-                    {
-                        "id": str(product_translation.id),
-                        "name": "Test Product 0",
-                        "language_code": "en",
-                        "_formatted": {
-                            "name": "<em>Test</em> Product 0",
-                            "description": "Description for product 0",
-                        },
-                        "_matchesPosition": {
-                            "name": [{"start": 0, "length": 4}]
-                        },
-                        "_rankingScore": 0.95,
-                        "_federation": {
-                            "indexUid": "ProductTranslation",
-                            "queriesPosition": 0,
-                            "weightedRankingScore": 0.95,
-                        },
-                    },
-                    {
-                        "id": str(blog_translation.id),
-                        "title": "Test Blog Post 0",
-                        "language_code": "en",
-                        "_formatted": {
-                            "title": "<em>Test</em> Blog Post 0",
-                            "body": "Body content for post 0",
-                        },
-                        "_matchesPosition": {
-                            "title": [{"start": 0, "length": 4}]
-                        },
-                        "_rankingScore": 0.85,
-                        "_federation": {
-                            "indexUid": "BlogPostTranslation",
-                            "queriesPosition": 1,
-                            "weightedRankingScore": 0.595,  # 0.85 * 0.7
-                        },
-                    },
-                ],
-                "estimatedTotalHits": 2,
-                "processingTimeMs": 45,
-            }
-
-            # Execute federated search
+        with patch.object(
+            SearchQuery.objects,
+            "create",
+            side_effect=Exception("Database error"),
+        ):
             response = api_client.get(
-                "/api/v1/search/federated",
-                {
-                    "query": "test",
-                    "language_code": "en",
-                    "limit": 20,
-                    "offset": 0,
-                },
+                endpoint, {"query": marker, "language_code": "en"}
             )
 
-            # Verify response is successful
-            assert response.status_code == status.HTTP_200_OK, (
-                f"Federated search should return 200, got {response.status_code}"
+        assert response.status_code == status.HTTP_200_OK
+        assert [r["id"] for r in response.data["results"]] == [
+            ids[kind] for kind in expected
+        ]
+        assert not SearchQuery.objects.exists()
+
+    def test_search_succeeds_when_no_row_can_be_saved(
+        self, api_client, indexed
+    ):
+        marker, ids = indexed
+
+        with patch(
+            "django.db.models.Model.save", side_effect=Exception("DB error")
+        ):
+            response = api_client.get(
+                "/api/v1/search/product",
+                {"query": marker, "language_code": "en"},
             )
 
-            data = response.json()
+        assert response.status_code == status.HTTP_200_OK
+        assert [r["id"] for r in response.data["results"]] == [ids["product"]]
 
-            # Verify response structure (camelCase due to DRF camelCase serialization)
-            assert "limit" in data, "Response should include 'limit'"
-            assert "offset" in data, "Response should include 'offset'"
-            assert "estimatedTotalHits" in data, (
-                "Response should include 'estimatedTotalHits'"
-            )
-            assert "results" in data, "Response should include 'results'"
 
-            # Verify results are present
-            assert len(data["results"]) > 0, "Results should not be empty"
+@pytest.mark.django_db
+class TestFederatedSearchSendsQueryVerbatim:
+    """The engine is mocked: this pins the request the view builds.
 
-            # Verify multi_search was called with federation mode
-            assert mock_multi_search.called, "multi_search should be called"
-            call_args = mock_multi_search.call_args
-
-            # Check for federation in kwargs or positional args
-            federation = call_args.kwargs.get("federation") or (
-                call_args[1].get("federation") if len(call_args) > 1 else None
-            )
-            queries = call_args.kwargs.get("queries") or (
-                call_args[1].get("queries") if len(call_args) > 1 else None
-            )
-
-            assert federation is not None, "Federation mode should be enabled"
-            assert queries is not None, "Queries should be present"
-
-            # Verify both indexes are queried
-            assert len(queries) >= 2, "Should query at least 2 indexes"
-
-            index_names = [q["indexUid"] for q in queries]
-            assert any("ProductTranslation" in name for name in index_names), (
-                "Should query ProductTranslation index"
-            )
-            assert any("BlogPostTranslation" in name for name in index_names), (
-                "Should query BlogPostTranslation index"
-            )
-
-            # Verify federation weights
-            for query in queries:
-                assert "federationOptions" in query, (
-                    "Each query should have federationOptions"
-                )
-                assert "weight" in query["federationOptions"], (
-                    "Each query should have weight"
-                )
-
-            # Verify content filtering
-            for query in queries:
-                assert "filter" in query, "Each query should have filters"
-                filters = query["filter"]
-
-                if "ProductTranslation" in query["indexUid"]:
-                    # Products should filter for active and not deleted
-                    assert any("active = true" in str(f) for f in filters), (
-                        "Products should filter for active = true"
-                    )
-                    assert any(
-                        "is_deleted = false" in str(f) for f in filters
-                    ), "Products should filter for is_deleted = false"
-
-                elif "BlogPostTranslation" in query["indexUid"]:
-                    # Blog posts should filter for published
-                    assert any(
-                        "is_published = true" in str(f) for f in filters
-                    ), "Blog posts should filter for is_published = true"
+    What the engine then returns for a real query is covered by the live
+    tests in ``test_federated_search_integration.py``.
+    """
 
     def test_federated_search_sends_query_unmodified(self, api_client):
         """
@@ -947,271 +447,66 @@ class TestFederatedSearchEndToEnd:
                 first_call[1].get("queries") if len(first_call) > 1 else None
             )
 
-            for query in queries:
-                assert query["q"] == "anavathmisi se windows", (
-                    "The raw query must be sent to Meilisearch unmodified"
-                )
-
-    def test_federated_search_result_allocation(self, api_client):
-        """
-        Test that result allocation follows 70/30 rule.
-
-        Validates: Requirements 1.7
-        """
-        with patch(
-            "meili._client.client.search_client.multi_search"
-        ) as mock_multi_search:
-            mock_multi_search.return_value = {
-                "hits": [],
-                "estimatedTotalHits": 0,
-                "processingTimeMs": 30,
-            }
-
-            # Request 20 results
-            api_client.get(
-                "/api/v1/search/federated",
-                {
-                    "query": "test",
-                    "language_code": "en",
-                    "limit": 20,
-                },
-            )
-
-            # Verify multi_search was called
-            assert mock_multi_search.called, "multi_search should be called"
-            call_args = mock_multi_search.call_args
-
-            # Get federation and queries from kwargs
-            federation = call_args.kwargs.get("federation") or (
-                call_args[1].get("federation") if len(call_args) > 1 else None
-            )
-            queries = call_args.kwargs.get("queries") or (
-                call_args[1].get("queries") if len(call_args) > 1 else None
-            )
-
-            # Find product and blog queries
-            product_query = next(
-                (q for q in queries if "ProductTranslation" in q["indexUid"]),
-                None,
-            )
-            blog_query = next(
-                (q for q in queries if "BlogPostTranslation" in q["indexUid"]),
-                None,
-            )
-
-            assert product_query is not None, "Product query should exist"
-            assert blog_query is not None, "Blog query should exist"
-
-            # Verify federation limit (pagination is now in federation object, not individual queries)
-            assert federation is not None, "Federation object should exist"
-            assert federation["limit"] == 20, (
-                f"Federation limit should be 20, got {federation['limit']}"
-            )
+            assert [query["q"] for query in queries] == [
+                "anavathmisi se windows",
+                "anavathmisi se windows",
+            ], "The raw query must reach both indexes unmodified"
 
 
-class TestOpenAPISchemaGeneration:
-    """
-    End-to-end tests for OpenAPI schema generation and type safety.
+@pytest.mark.django_db
+class TestProductSearchRelaxedRetry:
+    """``/search/product`` retries a zero-hit multi-word query once with
+    its leading word dropped — the one shape Meilisearch's ``last``
+    matching strategy can never relax — and says so when it worked.
 
-    Tests that:
-    - OpenAPI schema includes new search endpoints
-    - Request/response schemas are complete
-    - Schema can be generated successfully
-
-    Validates: Requirements 8.1, 8.2, 8.3, 8.4, 8.5
-
-    Note: These tests don't require database access as they only test
-    schema generation, not actual API calls.
+    The engine is mocked; the hit ids are real rows, so the response is
+    hydrated and serialized exactly as in production.
     """
 
-    def test_federated_search_endpoint_in_schema(self):
-        """
-        Test that federated search endpoint is included in OpenAPI schema.
+    QUERY = "anaba8mish se windows"
 
-        This test validates that the schema generation includes the new
-        federated search endpoint with proper documentation.
+    def _search(self, api_client, *engine_answers):
+        index = Mock()
+        index.search.side_effect = list(engine_answers)
+        with patch("meili._client.client.get_search_index", return_value=index):
+            response = api_client.get(
+                "/api/v1/search/product",
+                {"query": self.QUERY, "language_code": "el"},
+            )
+        assert response.status_code == status.HTTP_200_OK
+        return response, [call.args[0] for call in index.search.call_args_list]
 
-        Validates: Requirements 8.1, 8.2
-        """
-        # Import the schema generator
-        from drf_spectacular.generators import SchemaGenerator
+    def test_retry_hit_is_served_and_disclosed(self, api_client):
+        translation = ProductFactory(
+            active=True, num_images=0, num_reviews=0
+        ).translations.get(language_code="el")
 
-        # Generate schema
-        generator = SchemaGenerator()
-        schema = generator.get_schema()
-
-        # Verify federated search endpoint exists
-        assert "paths" in schema, "Schema should have 'paths' section"
-
-        # Check for federated search endpoint (various possible path formats)
-        federated_paths = [
-            path for path in schema["paths"] if "federated" in path.lower()
-        ]
-
-        assert len(federated_paths) > 0, (
-            f"Schema should include federated search endpoint. Available paths: {list(schema['paths'].keys())}"
+        response, queries = self._search(
+            api_client,
+            {"hits": [], "estimatedTotalHits": 0, "processingTimeMs": 3},
+            {
+                "hits": [{"id": translation.id}],
+                "estimatedTotalHits": 1,
+                "processingTimeMs": 4,
+            },
         )
 
-        # Get the federated search path
-        federated_path = federated_paths[0]
-        endpoint = schema["paths"][federated_path]
+        assert queries == [self.QUERY, "se windows"]
+        assert response.data["relaxed_query"] == "se windows"
+        assert [r["id"] for r in response.data["results"]] == [translation.id]
+        # Both engine calls are the request's search time.
+        assert SearchQuery.objects.get().processing_time_ms == 7
 
-        # Verify GET method exists
-        assert "get" in endpoint, (
-            f"Federated search should support GET method. Available methods: {list(endpoint.keys())}"
+    def test_empty_retry_is_not_claimed(self, api_client):
+        response, queries = self._search(
+            api_client,
+            {"hits": [], "estimatedTotalHits": 0, "processingTimeMs": 3},
+            {"hits": [], "estimatedTotalHits": 0, "processingTimeMs": 4},
         )
 
-        get_spec = endpoint["get"]
-
-        # Verify parameters are documented
-        assert "parameters" in get_spec, (
-            "Federated search should have parameters documented"
-        )
-
-        param_names = [p["name"] for p in get_spec["parameters"]]
-
-        # Verify required parameters (camelCase in OpenAPI schema)
-        assert "query" in param_names, "Schema should include 'query' parameter"
-        assert "languageCode" in param_names, (
-            "Schema should include 'languageCode' parameter"
-        )
-        assert "limit" in param_names, "Schema should include 'limit' parameter"
-        assert "offset" in param_names, (
-            "Schema should include 'offset' parameter"
-        )
-
-        # Verify responses are documented
-        assert "responses" in get_spec, (
-            "Federated search should have responses documented"
-        )
-
-        assert "200" in get_spec["responses"], (
-            "Schema should include 200 response"
-        )
-
-    def test_analytics_endpoint_in_schema(self):
-        """
-        Test that analytics endpoint is included in OpenAPI schema.
-
-        Validates: Requirements 8.3
-        """
-        from drf_spectacular.generators import SchemaGenerator
-
-        generator = SchemaGenerator()
-        schema = generator.get_schema(public=True)
-
-        # Check for analytics endpoint
-        analytics_paths = [
-            path for path in schema["paths"] if "analytics" in path.lower()
-        ]
-
-        assert len(analytics_paths) > 0, (
-            f"Schema should include analytics endpoint. Available paths: {list(schema['paths'].keys())}"
-        )
-
-        analytics_path = analytics_paths[0]
-        endpoint = schema["paths"][analytics_path]
-
-        # Verify GET method exists
-        assert "get" in endpoint, "Analytics endpoint should support GET method"
-
-        get_spec = endpoint["get"]
-
-        # Verify parameters
-        assert "parameters" in get_spec, (
-            "Analytics endpoint should have parameters documented"
-        )
-
-        param_names = [p["name"] for p in get_spec["parameters"]]
-
-        # Verify date range parameters (camelCase in OpenAPI schema)
-        assert "startDate" in param_names, (
-            "Schema should include 'startDate' parameter"
-        )
-        assert "endDate" in param_names, (
-            "Schema should include 'endDate' parameter"
-        )
-        assert "contentType" in param_names, (
-            "Schema should include 'contentType' parameter"
-        )
-
-        # Verify responses
-        assert "responses" in get_spec, (
-            "Analytics endpoint should have responses documented"
-        )
-        assert "200" in get_spec["responses"], (
-            "Schema should include 200 response"
-        )
-
-    def test_schema_response_structures(self):
-        """
-        Test that response schemas include all required fields.
-
-        Validates: Requirements 8.2, 8.3
-        """
-        from drf_spectacular.generators import SchemaGenerator
-
-        generator = SchemaGenerator()
-        schema = generator.get_schema()
-
-        # Check components/schemas section
-        assert "components" in schema, "Schema should have 'components' section"
-        assert "schemas" in schema["components"], (
-            "Schema should have 'schemas' in components"
-        )
-
-        schemas = schema["components"]["schemas"]
-
-        # Look for federated search response schema
-        federated_schemas = [
-            name
-            for name in schemas
-            if "federated" in name.lower() and "response" in name.lower()
-        ]
-
-        if federated_schemas:
-            federated_schema = schemas[federated_schemas[0]]
-
-            # Verify response structure
-            if "properties" in federated_schema:
-                props = federated_schema["properties"]
-
-                # Check for key fields
-                assert "results" in props or "limit" in props, (
-                    "Federated response should include results or pagination fields"
-                )
-
-        # Look for analytics response schema
-        analytics_schemas = [
-            name
-            for name in schemas
-            if "analytics" in name.lower() and "response" in name.lower()
-        ]
-
-        if analytics_schemas:
-            analytics_schema = schemas[analytics_schemas[0]]
-
-            # Verify response structure
-            if "properties" in analytics_schema:
-                props = analytics_schema["properties"]
-
-                # Check for key analytics fields
-                expected_fields = [
-                    "topQueries",
-                    "top_queries",
-                    "searchVolume",
-                    "search_volume",
-                    "clickThroughRate",
-                    "click_through_rate",
-                ]
-
-                has_analytics_field = any(
-                    field in props for field in expected_fields
-                )
-
-                assert has_analytics_field, (
-                    f"Analytics response should include analytics fields. Found: {list(props.keys())}"
-                )
+        assert queries == [self.QUERY, "se windows"]
+        assert response.data["relaxed_query"] is None
+        assert response.data["results"] == []
 
 
 @pytest.mark.django_db

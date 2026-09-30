@@ -42,13 +42,7 @@ class B2BInvoicingGateTestCase(TestCase):
         for ``B2B_INVOICING_ENABLED`` without touching the ``Setting``
         table.
 
-        Earlier ``Setting.objects.update_or_create`` flaked under CI's
-        parallel xdist run (the autouse ``_reseed_extra_settings``
-        fixture in conftest.py rewrites the same ``EXTRA_SETTINGS_DEFAULTS``
-        rows for every test on every worker, and the resulting savepoint-
-        visibility interaction occasionally caused ``Setting.get`` to
-        return the seeded default of ``True`` instead of the just-written
-        ``False``). Patching the read site bypasses the round-trip
+        Patching the read site keeps the test off the ``Setting`` table
         entirely.
 
         The stub falls back to ``default`` for any non-B2B key so we

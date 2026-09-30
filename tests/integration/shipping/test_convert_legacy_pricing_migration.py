@@ -118,11 +118,11 @@ class TestFrozenHistoricalDefaults:
 @pytest.mark.django_db
 class TestExistingSettingValuesAreCopiedVerbatim:
     def test_a_retuned_flat_rate_setting_is_copied(self, convert):
-        # The autouse ``_reseed_shipping_providers`` fixture already ran
-        # ``convert_legacy_pricing`` once (before this test body) at
-        # whatever Setting values existed then — clear the row it
-        # created so THIS test's ``get_or_create`` sees a fresh insert
-        # at the values set below, not a no-op against the old one.
+        # The shipping migrations already ran ``convert_legacy_pricing``
+        # once, at the Setting values that existed then, and the seed
+        # restore keeps that row — clear it so THIS test's
+        # ``get_or_create`` sees a fresh insert at the values set below,
+        # not a no-op against the old one.
         ShippingRate.objects.filter(
             provider__code="flat_rate", country_id="GR"
         ).delete()

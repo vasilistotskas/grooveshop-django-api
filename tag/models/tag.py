@@ -44,7 +44,10 @@ class Tag(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         return Tag.objects.all()
 
     def get_usage_count(self):
-        """Get the number of times this tag is used."""
+        """Get the number of times this tag is used; the list annotation
+        (``TagQuerySet.with_usage``) when present."""
+        if "usage_count" in self.__dict__:
+            return self.__dict__["usage_count"]
         return self.taggeditem_set.count()
 
     def get_content_types(self):

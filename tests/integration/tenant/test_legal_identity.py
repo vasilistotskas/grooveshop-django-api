@@ -48,15 +48,11 @@ def seller_settings(request):
     as None``, while the same file passed 13/13 in isolation and the
     whole ``tests/integration/tenant`` directory passed 147/147.
 
-    The mechanism is the autouse ``_reseed_extra_settings`` fixture in
-    ``tests/conftest.py`` rewriting every ``EXTRA_SETTINGS_DEFAULTS``
-    row for every DB test on every worker, against a table these tests
-    then write to inside their own transaction. The resulting
-    savepoint-visibility interaction is documented as a known flake
-    class in this repo and was already fixed the same way elsewhere —
-    ``tests/unit/order/test_b2b_invoicing_gate.py`` and
-    ``tests/unit/shipping_acs/test_smartpoint_gating.py`` both patch
-    the read site rather than round-trip the row.
+    The cause was a since-removed conftest fixture that rewrote every
+    ``EXTRA_SETTINGS_DEFAULTS`` row before each DB test. Stubbing the
+    read site, as ``tests/unit/order/test_b2b_invoicing_gate.py`` and
+    ``tests/unit/shipping_acs/test_smartpoint_gating.py`` also do,
+    keeps these tests independent of the ``Setting`` table either way.
 
     Everything under test reads through exactly one accessor
     (``tenant/legal_identity.py`` calls ``Setting.get`` for each seller

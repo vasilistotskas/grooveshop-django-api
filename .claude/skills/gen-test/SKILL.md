@@ -64,10 +64,16 @@ These conventions are non-negotiable — every generated test must follow them:
 2. **Use `setUpTestData()`** (class method) for read-only test data; use `setUp()` only when tests modify data
 3. **Use `reverse()`** for all URL generation — never hardcode URL paths
 4. **Use `self.client.force_authenticate(user=user)`** for authentication
-5. **Assert response structure**: check `results`, `count`, `links` keys in list responses
-6. **Assert field presence**: verify expected fields exist in response data
+5. **Assert exact outcomes**: the exact set of ids a filter returns, the exact
+   values written — never "the result is a list", `status in (200, 400)`, or a
+   `for row in results: assert …` loop that passes on an empty list
+6. **Prove a filter applies**: include a row it must exclude; django-filter
+   silently ignores an undeclared parameter, so inclusion alone passes
+   against the unfiltered list
 7. **Status code constants**: use `status.HTTP_200_OK` not `200`
-8. **Query counting**: use `count_queries` fixture or `assertNumQueries` for manager/view tests
+8. **Query counting**: `django_assert_max_num_queries` / `assertNumQueries`,
+   or two `CaptureQueriesContext` measurements compared for a cost that must
+   not grow with the data
 
 ## Output Checklist
 

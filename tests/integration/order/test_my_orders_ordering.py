@@ -31,8 +31,12 @@ def test_my_orders_sort_both_ways_and_by_status():
     user = UserAccountFactory()
     client = APIClient()
     client.force_authenticate(user=user)
-    older = OrderFactory(user=user, status=OrderStatus.PENDING)
-    newer = OrderFactory(user=user, status=OrderStatus.COMPLETED)
+    older = OrderFactory(
+        num_order_items=0, user=user, status=OrderStatus.PENDING
+    )
+    newer = OrderFactory(
+        num_order_items=0, user=user, status=OrderStatus.COMPLETED
+    )
     Order.objects.filter(pk=older.pk).update(
         created_at=timezone.now() - timedelta(days=2)
     )

@@ -44,4 +44,8 @@ class BlogTag(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
 
     @property
     def get_posts_count(self) -> int:
-        return self.blog_posts.count()
+        """Published posts carrying this tag; the list annotation
+        (``BlogTagQuerySet.with_engagement``) when present."""
+        if "posts_count" in self.__dict__:
+            return self.__dict__["posts_count"]
+        return self.blog_posts.published().count()

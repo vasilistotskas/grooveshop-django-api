@@ -6,6 +6,8 @@ queries whatever the seed count.
 from __future__ import annotations
 
 import pytest
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 
 from product.enum.relation import RelationType
 from product.factories.category import ProductCategoryFactory
@@ -14,7 +16,6 @@ from product.factories.variant_group import ProductVariantGroupFactory
 from product.models import ProductRelation
 from recommendation.enum import StrategyCode
 from recommendation.strategies import get_strategy
-from tests.utils import count_queries
 
 pytestmark = pytest.mark.django_db
 
@@ -82,12 +83,12 @@ class TestCurated:
             )
         strategy = get_strategy(StrategyCode.CURATED)
 
-        with count_queries() as one:
+        with CaptureQueriesContext(connection) as one:
             strategy.candidates_for([seeds[0].id], 4)
-        with count_queries() as three:
+        with CaptureQueriesContext(connection) as three:
             out = strategy.candidates_for([s.id for s in seeds], 4)
 
-        assert one.count == three.count == 1
+        assert len(one) == len(three) == 1
         assert set(out) == {s.id for s in seeds}
 
     def test_limit_applies_per_seed(self):
@@ -125,12 +126,12 @@ class TestVariantGroup:
         seeds = [_product(variant_group=group) for _ in range(3)]
         strategy = get_strategy(StrategyCode.VARIANT_GROUP)
 
-        with count_queries() as one:
+        with CaptureQueriesContext(connection) as one:
             strategy.candidates_for([seeds[0].id], 4)
-        with count_queries() as three:
+        with CaptureQueriesContext(connection) as three:
             strategy.candidates_for([s.id for s in seeds], 4)
 
-        assert one.count == three.count == 2
+        assert len(one) == len(three) == 2
 
 
 class TestCategory:
@@ -187,12 +188,12 @@ class TestCategory:
         _product(category=tree["sibling"])
         strategy = get_strategy(StrategyCode.CATEGORY)
 
-        with count_queries() as one:
+        with CaptureQueriesContext(connection) as one:
             strategy.candidates_for([lonely.id], 4)
-        with count_queries() as three:
+        with CaptureQueriesContext(connection) as three:
             strategy.candidates_for([s.id for s in seeds], 4)
 
-        assert one.count == three.count == 3
+        assert len(one) == len(three) == 3
 
 
 class TestPopular:
@@ -212,10 +213,10 @@ class TestPopular:
         _product()
         strategy = get_strategy(StrategyCode.POPULAR)
 
-        with count_queries() as one:
+        with CaptureQueriesContext(connection) as one:
             strategy.candidates_for([seeds[0].id], 4)
-        with count_queries() as three:
+        with CaptureQueriesContext(connection) as three:
             out = strategy.candidates_for([s.id for s in seeds], 4)
 
-        assert one.count == three.count == 1
+        assert len(one) == len(three) == 1
         assert set(out) == {s.id for s in seeds}

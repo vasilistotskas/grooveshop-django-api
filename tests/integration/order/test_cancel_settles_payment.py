@@ -179,7 +179,7 @@ def test_settle_never_touches_a_settled_state():
     assert order.payment_status == PaymentStatus.CANCELED
 
 
-@pytest.mark.django_db(transaction=True)
+@pytest.mark.django_db
 def test_backfill_settles_only_canceled_unpaid_rows():
     executor = MigrationExecutor(connection)
     settle = (
@@ -191,16 +191,24 @@ def test_backfill_settles_only_canceled_unpaid_rows():
     )
 
     stale = OrderFactory(
-        status=OrderStatus.CANCELED, payment_status=PaymentStatus.PENDING
+        status=OrderStatus.CANCELED,
+        payment_status=PaymentStatus.PENDING,
+        num_order_items=0,
     )
     failed = OrderFactory(
-        status=OrderStatus.CANCELED, payment_status=PaymentStatus.FAILED
+        status=OrderStatus.CANCELED,
+        payment_status=PaymentStatus.FAILED,
+        num_order_items=0,
     )
     refunded = OrderFactory(
-        status=OrderStatus.CANCELED, payment_status=PaymentStatus.REFUNDED
+        status=OrderStatus.CANCELED,
+        payment_status=PaymentStatus.REFUNDED,
+        num_order_items=0,
     )
     live = OrderFactory(
-        status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
+        status=OrderStatus.PENDING,
+        payment_status=PaymentStatus.PENDING,
+        num_order_items=0,
     )
 
     settle(executor.loader.project_state().apps, connection.schema_editor())
@@ -215,7 +223,7 @@ def test_backfill_settles_only_canceled_unpaid_rows():
     assert statuses[live.pk] == PaymentStatus.PENDING
 
 
-@pytest.mark.django_db(transaction=True)
+@pytest.mark.django_db
 def test_returned_backfill_settles_only_returned_unpaid_rows():
     executor = MigrationExecutor(connection)
     settle = (
@@ -227,16 +235,24 @@ def test_returned_backfill_settles_only_returned_unpaid_rows():
     )
 
     stale = OrderFactory(
-        status=OrderStatus.RETURNED, payment_status=PaymentStatus.PENDING
+        status=OrderStatus.RETURNED,
+        payment_status=PaymentStatus.PENDING,
+        num_order_items=0,
     )
     failed = OrderFactory(
-        status=OrderStatus.RETURNED, payment_status=PaymentStatus.FAILED
+        status=OrderStatus.RETURNED,
+        payment_status=PaymentStatus.FAILED,
+        num_order_items=0,
     )
     paid = OrderFactory(
-        status=OrderStatus.RETURNED, payment_status=PaymentStatus.COMPLETED
+        status=OrderStatus.RETURNED,
+        payment_status=PaymentStatus.COMPLETED,
+        num_order_items=0,
     )
     delivered_cod = OrderFactory(
-        status=OrderStatus.DELIVERED, payment_status=PaymentStatus.PENDING
+        status=OrderStatus.DELIVERED,
+        payment_status=PaymentStatus.PENDING,
+        num_order_items=0,
     )
 
     settle(executor.loader.project_state().apps, connection.schema_editor())

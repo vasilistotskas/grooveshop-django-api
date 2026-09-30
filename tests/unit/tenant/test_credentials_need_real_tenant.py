@@ -23,6 +23,7 @@ import re
 from django_tenants.utils import get_tenant_model  # noqa: F401
 
 from tenant.credentials import _get_tenant_field
+from tests.utils.staff import store_tenant
 
 
 class _FakeTenant:
@@ -43,8 +44,8 @@ def test_fake_tenant_reads_every_field_as_unconfigured(bind_tenant):
     assert _get_tenant_field("stripe_secret_key") == ""
 
 
-def test_real_tenant_row_reads_the_value(tenant_factory, bind_tenant):
-    tenant = tenant_factory("creds-probe")
+def test_real_tenant_row_reads_the_value(db, bind_tenant):
+    tenant = store_tenant("creds_probe")
     tenant.store_name = "Probe Store"
     bind_tenant(tenant)
     assert _get_tenant_field("store_name") == "Probe Store"

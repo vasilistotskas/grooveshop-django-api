@@ -356,3 +356,32 @@ class TestPayWaysPerOption:
         assert response.json()
         for opt in response.json():
             assert isinstance(opt["payWays"], list)
+
+
+def test_a_pay_way_lookup_failure_still_lists_every_option(
+    boxnow_configured_tenant,
+):
+    """The pay-way list is advertising copy on the delivery card: if
+    resolving it raises, the shopper still gets every shipping option,
+    each advertising no pay way rather than a 500."""
+    from unittest.mock import patch
+
+    ShippingProvider.objects.filter(code="boxnow").update(is_active=True)
+    client = APIClient()
+    url = reverse("shipping-options")
+    expected = [
+        (opt["providerCode"], opt["kind"])
+        for opt in client.get(url, {"country_code": "GR"}).json()
+    ]
+    assert ("boxnow", "pickup_point") in expected
+
+    with patch(
+        "pay_way.services.PayWayService.filter_by_carrier",
+        side_effect=RuntimeError("pay-way rules exploded"),
+    ):
+        response = client.get(url, {"country_code": "GR"})
+
+    assert response.status_code == status.HTTP_200_OK
+    body = response.json()
+    assert [(opt["providerCode"], opt["kind"]) for opt in body] == expected
+    assert [opt["payWays"] for opt in body] == [[]] * len(expected)

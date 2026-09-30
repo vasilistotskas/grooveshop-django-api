@@ -10,32 +10,30 @@ from country.factories import CountryFactory
 from region.factories import RegionFactory
 from user.factories.account import UserAccountFactory
 from user.factories.address import UserAddressFactory
-from user.models.address import UserAddress
 
 User = get_user_model()
 
 
 class UserAddressFilterTest(APITestCase):
-    def setUp(self):
-        UserAddress.objects.all().delete()
-        User.objects.all().delete()
+    @classmethod
+    def setUpTestData(cls):
 
-        self.user = UserAccountFactory(num_addresses=0)
-        self.other_user = UserAccountFactory(num_addresses=0)
+        cls.user = UserAccountFactory(num_addresses=0)
+        cls.other_user = UserAccountFactory(num_addresses=0)
 
-        self.usa = CountryFactory(alpha_2="US", alpha_3="USA")
-        self.canada = CountryFactory(alpha_2="CA", alpha_3="CAN")
-        self.greece = CountryFactory(alpha_2="GR", alpha_3="GRC")
+        cls.usa = CountryFactory(alpha_2="US", alpha_3="USA")
+        cls.canada = CountryFactory(alpha_2="CA", alpha_3="CAN")
+        cls.greece = CountryFactory(alpha_2="GR", alpha_3="GRC")
 
-        self.ny_region = RegionFactory(country=self.usa, alpha="NY")
-        self.ca_region = RegionFactory(country=self.usa, alpha="CA")
-        self.on_region = RegionFactory(country=self.canada, alpha="ON")
-        self.att_region = RegionFactory(country=self.greece, alpha="ATT")
+        cls.ny_region = RegionFactory(country=cls.usa, alpha="NY")
+        cls.ca_region = RegionFactory(country=cls.usa, alpha="CA")
+        cls.on_region = RegionFactory(country=cls.canada, alpha="ON")
+        cls.att_region = RegionFactory(country=cls.greece, alpha="ATT")
 
-        self.now = timezone.now()
+        cls.now = timezone.now()
 
-        self.home_address = UserAddressFactory(
-            user=self.user,
+        cls.home_address = UserAddressFactory(
+            user=cls.user,
             title="Home Address",
             first_name="John",
             last_name="Doe",
@@ -43,19 +41,19 @@ class UserAddressFilterTest(APITestCase):
             street_number="123",
             city="New York",
             zipcode="10001",
-            country=self.usa,
-            region=self.ny_region,
+            country=cls.usa,
+            region=cls.ny_region,
             floor=FloorChoicesEnum.GROUND_FLOOR,
             location_type=LocationChoicesEnum.HOME,
             phone="+1234567890",
             notes="Primary residence",
             is_main=True,
         )
-        self.home_address.created_at = self.now - timedelta(days=30)
-        self.home_address.save()
+        cls.home_address.created_at = cls.now - timedelta(days=30)
+        cls.home_address.save()
 
-        self.work_address = UserAddressFactory(
-            user=self.user,
+        cls.work_address = UserAddressFactory(
+            user=cls.user,
             title="Work Office",
             first_name="John",
             last_name="Doe",
@@ -63,19 +61,19 @@ class UserAddressFilterTest(APITestCase):
             street_number="456",
             city="Los Angeles",
             zipcode="90210",
-            country=self.usa,
-            region=self.ca_region,
+            country=cls.usa,
+            region=cls.ca_region,
             floor=FloorChoicesEnum.FIRST_FLOOR,
             location_type=LocationChoicesEnum.OFFICE,
             phone="+1555123456",
             notes="",
             is_main=False,
         )
-        self.work_address.created_at = self.now - timedelta(days=15)
-        self.work_address.save()
+        cls.work_address.created_at = cls.now - timedelta(days=15)
+        cls.work_address.save()
 
-        self.vacation_address = UserAddressFactory(
-            user=self.user,
+        cls.vacation_address = UserAddressFactory(
+            user=cls.user,
             title="Vacation Home",
             first_name="Jane",
             last_name="Smith",
@@ -83,19 +81,19 @@ class UserAddressFilterTest(APITestCase):
             street_number="789",
             city="Toronto",
             zipcode="M5V 3A8",
-            country=self.canada,
-            region=self.on_region,
+            country=cls.canada,
+            region=cls.on_region,
             floor=FloorChoicesEnum.SECOND_FLOOR,
             location_type=LocationChoicesEnum.OTHER,
             phone="+1416555789",
             notes="Summer vacation spot",
             is_main=False,
         )
-        self.vacation_address.created_at = self.now - timedelta(days=5)
-        self.vacation_address.save()
+        cls.vacation_address.created_at = cls.now - timedelta(days=5)
+        cls.vacation_address.save()
 
-        self.other_user_address = UserAddressFactory(
-            user=self.other_user,
+        cls.other_user_address = UserAddressFactory(
+            user=cls.other_user,
             title="Other Home",
             first_name="Alice",
             last_name="Johnson",
@@ -103,17 +101,18 @@ class UserAddressFilterTest(APITestCase):
             street_number="321",
             city="Athens",
             zipcode="10431",
-            country=self.greece,
-            region=self.att_region,
+            country=cls.greece,
+            region=cls.att_region,
             floor=FloorChoicesEnum.THIRD_FLOOR,
             location_type=LocationChoicesEnum.HOME,
             phone="+302101234567",
             notes="Greek residence",
             is_main=True,
         )
-        self.other_user_address.created_at = self.now - timedelta(days=10)
-        self.other_user_address.save()
+        cls.other_user_address.created_at = cls.now - timedelta(days=10)
+        cls.other_user_address.save()
 
+    def setUp(self):
         self.client.force_authenticate(user=self.user)
 
     def test_timestamp_filters(self):
@@ -456,6 +455,3 @@ class UserAddressFilterTest(APITestCase):
         result_ids = [r["id"] for r in response.data["results"]]
         self.assertEqual(len(result_ids), 1)
         self.assertIn(self.work_address.id, result_ids)
-
-    def tearDown(self):
-        UserAddress.objects.all().delete()

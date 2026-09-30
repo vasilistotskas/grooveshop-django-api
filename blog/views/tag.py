@@ -59,6 +59,9 @@ class BlogTagViewSet(BaseModelViewSet):
         "updated_at",
         "sort_order",
         "name",
+        # Annotated by ``BlogTagQuerySet.with_engagement``.
+        "posts_count",
+        "total_likes",
     ]
     ordering = ["sort_order", "-created_at"]
     search_fields = ["translations__name"]

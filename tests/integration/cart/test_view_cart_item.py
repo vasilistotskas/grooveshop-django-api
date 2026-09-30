@@ -1,6 +1,8 @@
 import uuid
 
 from django.contrib.auth import get_user_model
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -9,7 +11,7 @@ from cart.factories.cart import CartFactory
 from cart.factories.item import CartItemFactory
 from cart.models import CartItem
 from product.factories.product import ProductFactory
-from tests.utils import TestURLFixerMixin, count_queries
+from tests.utils import TestURLFixerMixin
 from user.factories.account import UserAccountFactory
 
 User = get_user_model()
@@ -76,7 +78,7 @@ class CartItemViewSetTest(TestURLFixerMixin, APITestCase):
 
     def test_list_no_n_plus_one(self):
         """Query count must not grow with the number of cart items (G0088)."""
-        with count_queries() as small:
+        with CaptureQueriesContext(connection) as small:
             self.client.get(self.list_url)
 
         for _ in range(3):
@@ -85,13 +87,13 @@ class CartItemViewSetTest(TestURLFixerMixin, APITestCase):
             )
             CartItemFactory(cart=self.cart, product=product, quantity=1)
 
-        with count_queries() as large:
+        with CaptureQueriesContext(connection) as large:
             self.client.get(self.list_url)
 
         self.assertEqual(
-            small.count,
-            large.count,
-            f"Query count grew from {small.count} to {large.count} when "
+            len(small),
+            len(large),
+            f"Query count grew from {len(small)} to {len(large)} when "
             f"cart items grew — N+1 regression.",
         )
 

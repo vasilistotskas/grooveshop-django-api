@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import pytest
 from django.contrib.admin import site as admin_site
-from django.db import connection
 from django.test import RequestFactory
 
 from tenant.auth_backends import PLATFORM_IDENTITY_ATTR
@@ -23,49 +22,19 @@ from tenant.models import (
     TenantMembershipRole,
     UserTenantMembership,
 )
+from tests.utils.staff import store_tenant
 from user.factories.account import UserAccountFactory
 from user.models import UserAccount
 
 
 @pytest.fixture
 def tenant(db):
-    t = Tenant(
-        schema_name="selfservice_tenant",
-        name="Selfservice Tenant",
-        slug="selfservice-tenant",
-        owner_email="owner-selfservice@example.com",
-        store_name="Selfservice Store",
-    )
-    t.auto_create_schema = False
-    t.save()
-    return t
+    return store_tenant("selfservice_tenant", store_name="Selfservice Store")
 
 
 @pytest.fixture
 def other_tenant(db):
-    t = Tenant(
-        schema_name="selfservice_other",
-        name="Selfservice Other",
-        slug="selfservice-other",
-        owner_email="owner-selfservice-other@example.com",
-    )
-    t.auto_create_schema = False
-    t.save()
-    return t
-
-
-@pytest.fixture
-def bind_tenant(monkeypatch):
-    def _bind(t):
-        monkeypatch.setattr(connection, "tenant", t, raising=False)
-        monkeypatch.setattr(
-            connection,
-            "schema_name",
-            t.schema_name if t is not None else "public",
-            raising=False,
-        )
-
-    return _bind
+    return store_tenant("selfservice_other")
 
 
 def _request(user):
@@ -93,24 +62,26 @@ class TestTenantAdminScoping:
         return admin_site._registry[Tenant]
 
     def test_operator_sees_only_their_own_store(
-        self, tenant, other_tenant, bind_tenant
+        self, tenant, other_tenant, bind_tenant_and_schema
     ):
         user = _store_operator(tenant)
-        bind_tenant(tenant)
+        bind_tenant_and_schema(tenant)
         qs = self._admin().get_queryset(_request(user))
         assert list(qs.values_list("pk", flat=True)) == [tenant.pk]
 
     def test_superuser_sees_every_store(
-        self, tenant, other_tenant, bind_tenant
+        self, tenant, other_tenant, bind_tenant_and_schema
     ):
-        bind_tenant(tenant)
+        bind_tenant_and_schema(tenant)
         qs = self._admin().get_queryset(_request(_superuser()))
         pks = set(qs.values_list("pk", flat=True))
         assert {tenant.pk, other_tenant.pk} <= pks
 
-    def test_platform_fields_are_read_only(self, tenant, bind_tenant):
+    def test_platform_fields_are_read_only(
+        self, tenant, bind_tenant_and_schema
+    ):
         user = _store_operator(tenant)
-        bind_tenant(tenant)
+        bind_tenant_and_schema(tenant)
         readonly = set(self._admin().get_readonly_fields(_request(user)))
         for platform_field in (
             "schema_name",
@@ -127,9 +98,11 @@ class TestTenantAdminScoping:
                 f"{platform_field} is editable by a merchant"
             )
 
-    def test_their_own_settings_stay_editable(self, tenant, bind_tenant):
+    def test_their_own_settings_stay_editable(
+        self, tenant, bind_tenant_and_schema
+    ):
         user = _store_operator(tenant)
-        bind_tenant(tenant)
+        bind_tenant_and_schema(tenant)
         readonly = set(self._admin().get_readonly_fields(_request(user)))
         for own_field in (
             "store_name",
@@ -142,23 +115,27 @@ class TestTenantAdminScoping:
                 f"{own_field} is their own to set but was read-only"
             )
 
-    def test_cannot_create_or_delete_stores(self, tenant, bind_tenant):
+    def test_cannot_create_or_delete_stores(
+        self, tenant, bind_tenant_and_schema
+    ):
         user = _store_operator(tenant)
-        bind_tenant(tenant)
+        bind_tenant_and_schema(tenant)
         request = _request(user)
         assert self._admin().has_add_permission(request) is False
         assert self._admin().has_delete_permission(request) is False
 
-    def test_domains_are_not_offered(self, tenant, bind_tenant):
+    def test_domains_are_not_offered(self, tenant, bind_tenant_and_schema):
         """Domains steer routing and TLS — platform-controlled."""
         user = _store_operator(tenant)
-        bind_tenant(tenant)
+        bind_tenant_and_schema(tenant)
         assert self._admin().get_inlines(_request(user), None) == []
 
-    def test_lifecycle_actions_are_withheld(self, tenant, bind_tenant):
+    def test_lifecycle_actions_are_withheld(
+        self, tenant, bind_tenant_and_schema
+    ):
         """A merchant must not be able to suspend or destroy their store."""
         user = _store_operator(tenant)
-        bind_tenant(tenant)
+        bind_tenant_and_schema(tenant)
         actions = self._admin().get_actions(_request(user))
         for name in (
             "suspend_tenants",
@@ -168,21 +145,27 @@ class TestTenantAdminScoping:
         ):
             assert name not in actions
 
-    def test_superuser_keeps_lifecycle_actions(self, tenant, bind_tenant):
-        bind_tenant(tenant)
+    def test_superuser_keeps_lifecycle_actions(
+        self, tenant, bind_tenant_and_schema
+    ):
+        bind_tenant_and_schema(tenant)
         actions = self._admin().get_actions(_request(_superuser()))
         assert "suspend_tenants" in actions
         assert "destroy_tenants" in actions
 
-    def test_module_is_reachable_on_a_tenant_host(self, tenant, bind_tenant):
+    def test_module_is_reachable_on_a_tenant_host(
+        self, tenant, bind_tenant_and_schema
+    ):
         """Previously public-only, which made self-service impossible."""
         user = _store_operator(tenant)
-        bind_tenant(tenant)
+        bind_tenant_and_schema(tenant)
         assert self._admin().has_module_permission(_request(user)) is True
 
-    def test_module_is_hidden_from_staff_role(self, tenant, bind_tenant):
+    def test_module_is_hidden_from_staff_role(
+        self, tenant, bind_tenant_and_schema
+    ):
         user = _store_operator(tenant, TenantMembershipRole.STAFF)
-        bind_tenant(tenant)
+        bind_tenant_and_schema(tenant)
         assert not self._admin().has_module_permission(_request(user))
 
 
@@ -192,7 +175,7 @@ class TestMembershipAdminScoping:
         return admin_site._registry[UserTenantMembership]
 
     def test_operator_sees_only_their_own_team(
-        self, tenant, other_tenant, bind_tenant
+        self, tenant, other_tenant, bind_tenant_and_schema
     ):
         user = _store_operator(tenant)
         stranger = UserAccountFactory(is_staff=True)
@@ -201,22 +184,28 @@ class TestMembershipAdminScoping:
             tenant=other_tenant,
             role=TenantMembershipRole.OWNER,
         )
-        bind_tenant(tenant)
+        bind_tenant_and_schema(tenant)
         qs = self._admin().get_queryset(_request(user))
         assert set(qs.values_list("tenant_id", flat=True)) == {tenant.pk}
 
-    def test_admin_may_reach_the_team_page(self, tenant, bind_tenant):
+    def test_admin_may_reach_the_team_page(
+        self, tenant, bind_tenant_and_schema
+    ):
         user = _store_operator(tenant, TenantMembershipRole.ADMIN)
-        bind_tenant(tenant)
+        bind_tenant_and_schema(tenant)
         assert self._admin().has_module_permission(_request(user)) is True
 
-    def test_staff_may_not_reach_the_team_page(self, tenant, bind_tenant):
+    def test_staff_may_not_reach_the_team_page(
+        self, tenant, bind_tenant_and_schema
+    ):
         """ "cannot ... invite other staff" (TenantMembershipRole)."""
         user = _store_operator(tenant, TenantMembershipRole.STAFF)
-        bind_tenant(tenant)
+        bind_tenant_and_schema(tenant)
         assert not self._admin().has_module_permission(_request(user))
 
-    def test_an_admin_cannot_edit_the_owner(self, tenant, bind_tenant):
+    def test_an_admin_cannot_edit_the_owner(
+        self, tenant, bind_tenant_and_schema
+    ):
         """ "OWNER ... cannot be demoted/removed by other admins"."""
         admin_user = _store_operator(tenant, TenantMembershipRole.ADMIN)
         owner_row = UserTenantMembership.objects.create(
@@ -224,25 +213,27 @@ class TestMembershipAdminScoping:
             tenant=tenant,
             role=TenantMembershipRole.OWNER,
         )
-        bind_tenant(tenant)
+        bind_tenant_and_schema(tenant)
         request = _request(admin_user)
         assert not self._admin().has_change_permission(request, owner_row)
         assert not self._admin().has_delete_permission(request, owner_row)
 
-    def test_an_owner_may_edit_an_owner(self, tenant, bind_tenant):
+    def test_an_owner_may_edit_an_owner(self, tenant, bind_tenant_and_schema):
         owner = _store_operator(tenant, TenantMembershipRole.OWNER)
         other_owner = UserTenantMembership.objects.create(
             user=UserAccountFactory(is_staff=True),
             tenant=tenant,
             role=TenantMembershipRole.OWNER,
         )
-        bind_tenant(tenant)
+        bind_tenant_and_schema(tenant)
         assert self._admin().has_change_permission(_request(owner), other_owner)
 
-    def test_an_admin_cannot_mint_an_owner(self, tenant, bind_tenant):
+    def test_an_admin_cannot_mint_an_owner(
+        self, tenant, bind_tenant_and_schema
+    ):
         """Otherwise ADMIN is indistinguishable from OWNER."""
         admin_user = _store_operator(tenant, TenantMembershipRole.ADMIN)
-        bind_tenant(tenant)
+        bind_tenant_and_schema(tenant)
         field = UserTenantMembership._meta.get_field("role")
         formfield = self._admin().formfield_for_choice_field(
             field, _request(admin_user)
@@ -251,7 +242,7 @@ class TestMembershipAdminScoping:
         assert TenantMembershipRole.OWNER not in values
 
     def test_cannot_grant_membership_in_another_store(
-        self, tenant, other_tenant, bind_tenant
+        self, tenant, other_tenant, bind_tenant_and_schema
     ):
         """The tenant dropdown is narrowed to their own store.
 
@@ -259,7 +250,7 @@ class TestMembershipAdminScoping:
         at another merchant and walk into that store's admin.
         """
         user = _store_operator(tenant, TenantMembershipRole.ADMIN)
-        bind_tenant(tenant)
+        bind_tenant_and_schema(tenant)
         db_field = UserTenantMembership._meta.get_field("tenant")
         formfield = self._admin().formfield_for_foreignkey(
             db_field, _request(user)
@@ -269,9 +260,9 @@ class TestMembershipAdminScoping:
         ]
 
     def test_platform_console_keeps_every_store(
-        self, tenant, other_tenant, bind_tenant
+        self, tenant, other_tenant, bind_tenant_and_schema
     ):
-        bind_tenant(None)
+        bind_tenant_and_schema(None)
         db_field = UserTenantMembership._meta.get_field("tenant")
         formfield = self._admin().formfield_for_foreignkey(
             db_field, _request(_superuser())
@@ -279,9 +270,9 @@ class TestMembershipAdminScoping:
         pks = set(formfield.queryset.values_list("pk", flat=True))
         assert {tenant.pk, other_tenant.pk} <= pks
 
-    def test_an_owner_can_mint_an_owner(self, tenant, bind_tenant):
+    def test_an_owner_can_mint_an_owner(self, tenant, bind_tenant_and_schema):
         owner = _store_operator(tenant, TenantMembershipRole.OWNER)
-        bind_tenant(tenant)
+        bind_tenant_and_schema(tenant)
         field = UserTenantMembership._meta.get_field("role")
         formfield = self._admin().formfield_for_choice_field(
             field, _request(owner)
@@ -302,16 +293,16 @@ class TestUserAdminPrivilegeFields:
         return admin_site._registry[UserAccount]
 
     def test_privilege_fields_are_read_only_for_non_superusers(
-        self, tenant, bind_tenant
+        self, tenant, bind_tenant_and_schema
     ):
         user = _store_operator(tenant)
-        bind_tenant(tenant)
+        bind_tenant_and_schema(tenant)
         readonly = set(self._admin().get_readonly_fields(_request(user)))
         for field in ("is_staff", "is_superuser", "groups", "user_permissions"):
             assert field in readonly, f"{field} was editable by a merchant"
 
-    def test_superuser_may_still_set_them(self, tenant, bind_tenant):
-        bind_tenant(tenant)
+    def test_superuser_may_still_set_them(self, tenant, bind_tenant_and_schema):
+        bind_tenant_and_schema(tenant)
         readonly = set(
             self._admin().get_readonly_fields(_request(_superuser()))
         )

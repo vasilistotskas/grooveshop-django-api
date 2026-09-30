@@ -32,12 +32,6 @@ from shipping.models import ShippingProvider
 
 class FilterByShippingKindTests(TestCase):
     def setUp(self):
-        # ``shipping/migrations/0002_seed_providers`` leaves ``acs`` and
-        # ``boxnow`` rows in every test DB, INACTIVE, and the
-        # ``_reseed_shipping_providers`` fixture that restores them is
-        # keyed on the ``django_db`` marker a ``TestCase`` does not
-        # carry. So each test states its own carrier landscape through
-        # ``_activate`` rather than inheriting either state.
         self.courier_cash = PayWayFactory(
             active=True,
             provider_code="cash_on_delivery",
@@ -49,26 +43,22 @@ class FilterByShippingKindTests(TestCase):
 
     # -- helpers -----------------------------------------------------
 
-    def _activate(self, code: str, **flags):
-        """Force a provider row into the state this test needs.
+    @staticmethod
+    def _activate(code: str, **flags):
+        """Switch on the seeded, inactive ``acs``/``boxnow`` row.
 
-        NOT ``ShippingProviderFactory``: its ``django_get_or_create``
-        on ``code`` returns the row ``shipping/migrations/
-        0002_seed_providers`` already created and silently DROPS the
-        keyword flags, so ``is_active=True`` never lands. That made
-        these tests pass serially against a test DB whose rows a
-        ``transaction=True`` test had flushed, and fail under
-        ``-n auto`` where the seeded rows are intact.
+        ``shipping/migrations/0002_seed_providers`` leaves both rows in
+        every test DB, INACTIVE, so each test states its own carrier
+        landscape here. NOT ``ShippingProviderFactory``: its
+        ``django_get_or_create`` on ``code`` returns the seeded row and
+        silently DROPS the keyword flags, so ``is_active=True`` never
+        lands.
         """
         flags.setdefault("supports_home_delivery", code == "acs")
         flags.setdefault("supports_pickup_point", code == "boxnow")
-        updated = ShippingProvider.objects.filter(code=code).update(
+        ShippingProvider.objects.filter(code=code).update(
             is_active=True, **flags
         )
-        if not updated:
-            ShippingProvider.objects.create(
-                code=code, name=code, is_active=True, **flags
-            )
         return ShippingProvider.objects.get(code=code)
 
     @staticmethod

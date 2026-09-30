@@ -102,7 +102,9 @@ class TestCategoryMainImagePath:
 
 @pytest.mark.django_db
 class TestNoNPlusOne:
-    def test_main_image_is_prefetched_for_a_list(self, count_queries):
+    def test_main_image_is_prefetched_for_a_list(
+        self, django_assert_max_num_queries
+    ):
         """Serializing N categories must not cost N image queries.
 
         Asserted on the queryset rather than the view so the number is
@@ -111,7 +113,7 @@ class TestNoNPlusOne:
         for _ in range(10):
             _with_main_image(ProductCategoryFactory())
 
-        with count_queries(max_queries=6):
+        with django_assert_max_num_queries(6):
             paths = [
                 category.main_image_path
                 for category in ProductCategory.objects.for_list()

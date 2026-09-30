@@ -4,7 +4,7 @@ Single source of truth for a store's shipping price, availability and
 weight cap — see ``docs/order-system.md``. ``ShippingRateFactory``
 requires an explicit ``country`` (see its docstring); these tests use
 ``CountryFactory`` for a country that has nothing to do with the GR
-row the ``_reseed_shipping_providers`` autouse fixture seeds.
+row the shipping migrations seed.
 """
 
 from __future__ import annotations

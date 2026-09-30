@@ -228,7 +228,7 @@ class TestStockReservationModel:
 
         product = ProductFactory()
         expires_at = timezone.now() + timedelta(minutes=15)
-        order = OrderFactory()
+        order = OrderFactory(num_order_items=0)
 
         reservation = StockReservation.objects.create(
             product=product,

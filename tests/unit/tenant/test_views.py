@@ -20,6 +20,7 @@ from tenant.models import (
     TenantMembershipRole,
     UserTenantMembership,
 )
+from tests.utils.staff import store_tenant
 
 User = get_user_model()
 
@@ -37,10 +38,8 @@ def auth_client():
 
 class TestTenantResolve:
     @pytest.mark.django_db
-    def test_returns_tenant_config_for_primary_domain(
-        self, resolve_client, tenant_factory
-    ):
-        tenant = tenant_factory("resolve-primary")
+    def test_returns_tenant_config_for_primary_domain(self, resolve_client, db):
+        tenant = store_tenant("resolve_primary")
         TenantDomain.objects.create(
             tenant=tenant,
             domain="resolve-primary.example",
@@ -54,9 +53,9 @@ class TestTenantResolve:
 
     @pytest.mark.django_db
     def test_returns_tenant_config_for_secondary_domain(
-        self, resolve_client, tenant_factory
+        self, resolve_client, db
     ):
-        tenant = tenant_factory("resolve-secondary")
+        tenant = store_tenant("resolve_secondary")
         TenantDomain.objects.create(
             tenant=tenant,
             domain="resolve-secondary.example",
@@ -78,10 +77,8 @@ class TestTenantResolve:
         assert response.json()["primaryDomain"] == "resolve-secondary.example"
 
     @pytest.mark.django_db
-    def test_api_domain_prefers_explicit_api_row(
-        self, resolve_client, tenant_factory
-    ):
-        tenant = tenant_factory("resolve-apirow")
+    def test_api_domain_prefers_explicit_api_row(self, resolve_client, db):
+        tenant = store_tenant("resolve_apirow")
         TenantDomain.objects.create(
             tenant=tenant,
             domain="resolve-apirow.example",
@@ -101,9 +98,9 @@ class TestTenantResolve:
 
     @pytest.mark.django_db
     def test_api_domain_derives_from_primary_without_explicit_row(
-        self, resolve_client, tenant_factory
+        self, resolve_client, db
     ):
-        tenant = tenant_factory("resolve-apider")
+        tenant = store_tenant("resolve_apider")
         TenantDomain.objects.create(
             tenant=tenant,
             domain="resolve-apider.example",
@@ -117,14 +114,14 @@ class TestTenantResolve:
 
     @pytest.mark.django_db
     def test_assets_and_static_domain_empty_without_explicit_rows(
-        self, resolve_client, tenant_factory
+        self, resolve_client, db
     ):
         """Asset/static hosts are platform-shared by default — they do
         NOT derive from the primary domain (a derived host pointed at
         DNS that need not exist). Empty means "use the platform
         origin"; a dedicated white-label host is an explicit
         ``assets*``/``static*`` TenantDomain row (next test)."""
-        tenant = tenant_factory("resolve-assetsder")
+        tenant = store_tenant("resolve_assetsder")
         TenantDomain.objects.create(
             tenant=tenant,
             domain="resolve-assetsder.example",
@@ -139,9 +136,9 @@ class TestTenantResolve:
 
     @pytest.mark.django_db
     def test_assets_and_static_domain_prefer_explicit_rows(
-        self, resolve_client, tenant_factory
+        self, resolve_client, db
     ):
-        tenant = tenant_factory("resolve-assetsrow")
+        tenant = store_tenant("resolve_assetsrow")
         TenantDomain.objects.create(
             tenant=tenant,
             domain="resolve-assetsrow.example",
@@ -174,8 +171,8 @@ class TestTenantResolve:
         assert response.status_code == 400
 
     @pytest.mark.django_db
-    def test_inactive_tenant_returns_404(self, resolve_client, tenant_factory):
-        tenant = tenant_factory("resolve-inactive")
+    def test_inactive_tenant_returns_404(self, resolve_client, db):
+        tenant = store_tenant("resolve_inactive")
         tenant.is_active = False
         tenant.save(update_fields=["is_active"])
         TenantDomain.objects.create(
@@ -196,7 +193,7 @@ class TestMyMemberships:
         assert response.status_code in (401, 403)
 
     @pytest.mark.django_db
-    def test_lists_only_caller_memberships(self, auth_client, tenant_factory):
+    def test_lists_only_caller_memberships(self, auth_client, db):
         user = User.objects.create_user(
             username="memberships-alice",
             email="memberships-alice@example.com",
@@ -207,8 +204,8 @@ class TestMyMemberships:
             email="memberships-bob@example.com",
             password="p",
         )
-        tenant_a = tenant_factory("memb-a")
-        tenant_b = tenant_factory("memb-b")
+        tenant_a = store_tenant("memb_a")
+        tenant_b = store_tenant("memb_b")
         TenantDomain.objects.create(
             tenant=tenant_a, domain="memb-a.example", is_primary=True
         )
@@ -239,13 +236,13 @@ class TestMyMemberships:
         assert role_by_schema["memb_b"] == "member"
 
     @pytest.mark.django_db
-    def test_omits_inactive_memberships(self, auth_client, tenant_factory):
+    def test_omits_inactive_memberships(self, auth_client, db):
         user = User.objects.create_user(
             username="memb-inactive",
             email="memb-inactive@example.com",
             password="p",
         )
-        tenant = tenant_factory("memb-inactive-t")
+        tenant = store_tenant("memb_inactive_t")
         TenantDomain.objects.create(
             tenant=tenant, domain="memb-inactive.example", is_primary=True
         )
@@ -263,13 +260,13 @@ class TestMyMemberships:
         assert response.json() == []
 
     @pytest.mark.django_db
-    def test_omits_inactive_tenants(self, auth_client, tenant_factory):
+    def test_omits_inactive_tenants(self, auth_client, db):
         user = User.objects.create_user(
             username="memb-tenant-off",
             email="memb-tenant-off@example.com",
             password="p",
         )
-        tenant = tenant_factory("memb-tenant-off-t")
+        tenant = store_tenant("memb_tenant_off_t")
         tenant.is_active = False
         tenant.save(update_fields=["is_active"])
         TenantDomain.objects.create(
@@ -292,14 +289,14 @@ class TestMyMemberships:
 class TestTenantResolveOnPublicSchema:
     @pytest.mark.django_db
     def test_always_queries_public_schema(
-        self, resolve_client, tenant_factory, monkeypatch
+        self, resolve_client, db, monkeypatch
     ):
         # Even if a request arrives with a tenant bound to connection
         # (e.g. because middleware ran before the URL dispatch in some
         # edge case), resolve must hit public — it IS the lookup that
         # drives tenant resolution, so it cannot itself depend on a
         # tenant already being selected.
-        tenant = tenant_factory("resolve-public-check")
+        tenant = store_tenant("resolve_public_check")
         TenantDomain.objects.create(
             tenant=tenant, domain="public-check.example", is_primary=True
         )
@@ -331,8 +328,8 @@ class TestTenantResolveChatApiKey:
     the cache must hold exactly the public payload.
     """
 
-    def _tenant_with_key(self, tenant_factory, slug, domain):
-        tenant = tenant_factory(slug)
+    def _tenant_with_key(self, slug, domain):
+        tenant = store_tenant(slug.replace("-", "_"))
         tenant.chat_api_key = "tenant-chat-key"
         tenant.acp_bearer_token = "tenant-acp-token"
         tenant.save(update_fields=["chat_api_key", "acp_bearer_token"])
@@ -343,12 +340,10 @@ class TestTenantResolveChatApiKey:
 
     @pytest.mark.django_db
     def test_chat_api_key_requires_the_internal_secret(
-        self, resolve_client, tenant_factory, settings
+        self, resolve_client, db, settings
     ):
         settings.AGENT_GATEWAY_INTERNAL_SECRET = "gw-secret"
-        tenant = self._tenant_with_key(
-            tenant_factory, "chat-key-tenant", "chat-key.example"
-        )
+        tenant = self._tenant_with_key("chat-key-tenant", "chat-key.example")
         url = "/api/v1/tenant/resolve?domain=chat-key.example"
 
         public = resolve_client.get(url)
@@ -375,14 +370,12 @@ class TestTenantResolveChatApiKey:
 
     @pytest.mark.django_db
     def test_secret_variant_is_never_cacheable(
-        self, resolve_client, tenant_factory, settings
+        self, resolve_client, db, settings
     ):
         """The body varies on X-Internal-Token; a shared cache must key
         on it and never store the secret-bearing response."""
         settings.AGENT_GATEWAY_INTERNAL_SECRET = "gw-secret"
-        self._tenant_with_key(
-            tenant_factory, "chat-key-vary", "chat-key-vary.example"
-        )
+        self._tenant_with_key("chat-key-vary", "chat-key-vary.example")
         url = "/api/v1/tenant/resolve?domain=chat-key-vary.example"
 
         public = resolve_client.get(url)
@@ -395,14 +388,12 @@ class TestTenantResolveChatApiKey:
 
     @pytest.mark.django_db
     def test_chat_api_key_withheld_when_no_internal_secret_configured(
-        self, resolve_client, tenant_factory, settings
+        self, resolve_client, db, settings
     ):
         # An empty AGENT_GATEWAY_INTERNAL_SECRET must never match an
         # empty header — the secret stays withheld entirely.
         settings.AGENT_GATEWAY_INTERNAL_SECRET = ""
-        self._tenant_with_key(
-            tenant_factory, "chat-key-nosecret", "chat-nosecret.example"
-        )
+        self._tenant_with_key("chat-key-nosecret", "chat-nosecret.example")
         response = resolve_client.get(
             "/api/v1/tenant/resolve?domain=chat-nosecret.example",
             HTTP_X_INTERNAL_TOKEN="",
@@ -411,10 +402,10 @@ class TestTenantResolveChatApiKey:
 
     @pytest.mark.django_db
     def test_keyless_tenant_serves_empty_key_to_the_gateway(
-        self, resolve_client, tenant_factory, settings
+        self, resolve_client, db, settings
     ):
         settings.AGENT_GATEWAY_INTERNAL_SECRET = "gw-secret"
-        tenant = tenant_factory("chat-keyless")
+        tenant = store_tenant("chat_keyless")
         TenantDomain.objects.create(
             tenant=tenant, domain="chat-keyless.example", is_primary=True
         )
@@ -436,10 +427,10 @@ class TestInternalDomains:
 
     @pytest.mark.django_db
     def test_internal_token_returns_domains_with_service_subdomains(
-        self, resolve_client, tenant_factory, settings
+        self, resolve_client, db, settings
     ):
         settings.AGENT_GATEWAY_INTERNAL_SECRET = "gw-secret"
-        tenant = tenant_factory("domains-feed")
+        tenant = store_tenant("domains_feed")
         TenantDomain.objects.create(
             tenant=tenant, domain="feed.example", is_primary=True
         )
@@ -463,13 +454,11 @@ class TestInternalDomains:
         } <= domains
 
     @pytest.mark.django_db
-    def test_suspended_tenants_excluded(
-        self, resolve_client, tenant_factory, settings
-    ):
+    def test_suspended_tenants_excluded(self, resolve_client, db, settings):
         from django.utils import timezone
 
         settings.AGENT_GATEWAY_INTERNAL_SECRET = "gw-secret"
-        tenant = tenant_factory("domains-suspended")
+        tenant = store_tenant("domains_suspended")
         tenant.suspended_at = timezone.now()
         tenant.save(update_fields=["suspended_at"])
         TenantDomain.objects.create(
@@ -483,9 +472,7 @@ class TestInternalDomains:
         assert "suspended.example" not in response.json()["domains"]
 
     @pytest.mark.django_db
-    def test_middleware_serves_feed_on_unresolvable_host(
-        self, tenant_factory, settings
-    ):
+    def test_middleware_serves_feed_on_unresolvable_host(self, db, settings):
         # Cluster-internal callers dial backend-service directly — a
         # Host no TenantDomain matches. The pre-tenant-resolution
         # middleware must answer anyway.
@@ -495,7 +482,7 @@ class TestInternalDomains:
         from tenant.internal import InternalDomainsMiddleware
 
         settings.AGENT_GATEWAY_INTERNAL_SECRET = "gw-secret"
-        tenant = tenant_factory("domains-mw")
+        tenant = store_tenant("domains_mw")
         TenantDomain.objects.create(
             tenant=tenant, domain="mw-feed.example", is_primary=True
         )

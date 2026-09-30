@@ -1,8 +1,10 @@
 """
 Search analytics middleware for tracking search queries.
 
-This middleware automatically tracks search queries to /api/search/* endpoints
-and creates SearchQuery records without blocking the response.
+Records every successful (HTTP 200) response from a search-query
+endpoint (``/api/v1/search/product``, ``/search/blog/post``,
+``/search/federated``) as a ``SearchQuery`` row, written by a Celery task
+so the response is never blocked.
 """
 
 from __future__ import annotations
@@ -25,17 +27,14 @@ class SearchAnalyticsMiddleware(MiddlewareMixin):
     """
     Middleware to track search queries and results.
 
-    This middleware intercepts requests to /api/search/* endpoints and
-    creates SearchQuery records with metadata about the query and results.
+    Matches any path containing ``/search/`` except the non-query
+    ``/search/trending`` and ``/search/analytics`` endpoints, and records
+    only HTTP 200 responses — so ``/search/click`` (202) is skipped too.
 
-    Features:
-    - Tracks all search endpoints (product, blog, federated)
-    - Extracts query parameters and results metadata
-    - Dispatches a Celery task to persist the record without blocking the response
-    - Handles failures gracefully (logs but doesn't break requests)
-    - Captures user information (authenticated user, session, IP, user agent)
-
-    Requirements: 2.1, 2.2, 2.7, 2.8
+    - Extracts the query parameters and the results metadata
+    - Dispatches a Celery task to persist the record
+    - Logs, never raises, when tracking fails
+    - Captures the user, session key, IP and user agent
     """
 
     def __init__(self, get_response: Callable[[HttpRequest], HttpResponseBase]):
@@ -78,7 +77,7 @@ class SearchAnalyticsMiddleware(MiddlewareMixin):
         """
         Track search query without blocking the response.
 
-        Dispatches a Celery task via on_commit so the DB write is fully
+        Dispatches a Celery task with ``.delay()`` so the DB write is
         decoupled from the request/response cycle.
 
         Args:
@@ -218,11 +217,13 @@ class SearchAnalyticsMiddleware(MiddlewareMixin):
         """
         Extract client IP address from request.
 
-        The app runs behind a single trusted reverse proxy (Traefik in K8s).
-        REMOTE_ADDR is the proxy address (a private/loopback IP), so we use
-        the *rightmost* entry in X-Forwarded-For — the one appended by our
-        trusted proxy — rather than the leftmost, which an attacker can spoof.
-        If REMOTE_ADDR is not a private IP we trust it directly.
+        Prefers ``trusted_client_ip`` (the visitor Cloudflare vouched
+        for). Otherwise: the app runs behind a single trusted reverse
+        proxy (Traefik in K8s). REMOTE_ADDR is the proxy address (a
+        private/loopback IP), so we use the *rightmost* entry in
+        X-Forwarded-For — the one appended by our trusted proxy — rather
+        than the leftmost, which an attacker can spoof. If REMOTE_ADDR is
+        not a private IP we trust it directly.
 
         Args:
             request: The HTTP request

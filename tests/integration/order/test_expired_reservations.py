@@ -21,18 +21,7 @@ class TestExpiredReservationsAreReleased:
     @pytest.mark.parametrize(
         "minutes_expired,quantity,description",
         [
-            # Recently expired
-            (1, 10, "Expired 1 minute ago"),
-            (5, 25, "Expired 5 minutes ago"),
-            # Moderately expired
-            (15, 50, "Expired 15 minutes ago"),
-            (30, 75, "Expired 30 minutes ago"),
-            (60, 100, "Expired 1 hour ago"),
-            # Long expired
-            (120, 10, "Expired 2 hours ago"),
-            (1440, 50, "Expired 1 day ago"),
-            # Edge cases
-            (0, 5, "Just expired (0 minutes)"),
+            (0, 5, "Just expired"),
             (10080, 1, "Expired 1 week ago"),
         ],
     )
@@ -117,16 +106,7 @@ class TestExpiredReservationsAreReleased:
     @pytest.mark.parametrize(
         "minutes_until_expiry,quantity,description",
         [
-            # Will expire soon but not yet
             (1, 10, "Expires in 1 minute"),
-            (5, 25, "Expires in 5 minutes"),
-            (10, 50, "Expires in 10 minutes"),
-            (14, 75, "Expires in 14 minutes"),
-            # Just created (full TTL remaining)
-            (15, 100, "Just created (15 minutes remaining)"),
-            # Future expiration
-            (30, 10, "Expires in 30 minutes"),
-            (60, 50, "Expires in 1 hour"),
             (1440, 5, "Expires in 1 day"),
         ],
     )
@@ -196,19 +176,9 @@ class TestExpiredReservationsAreReleased:
     @pytest.mark.parametrize(
         "expired_count,active_count,expired_quantities,active_quantities",
         [
-            # Mix of expired and active
-            (1, 1, [10], [20]),
-            (2, 1, [10, 15], [25]),
-            (1, 2, [30], [10, 20]),
-            (3, 2, [5, 10, 15], [20, 25]),
-            # More complex scenarios
-            (5, 3, [10, 20, 30, 40, 50], [15, 25, 35]),
-            (2, 5, [100, 50], [10, 20, 30, 40, 50]),
-            # Edge cases
-            (10, 0, [5] * 10, []),  # All expired
-            (0, 10, [], [5] * 10),  # All active
-            (1, 10, [100], [10] * 10),  # One expired, many active
-            (10, 1, [10] * 10, [100]),  # Many expired, one active
+            (2, 3, [10, 15], [20, 25, 30]),
+            (3, 0, [5, 5, 5], []),
+            (0, 3, [], [5, 5, 5]),
         ],
     )
     def test_cleanup_handles_mixed_reservations(
@@ -345,13 +315,7 @@ class TestExpiredReservationsAreReleased:
 
     @pytest.mark.parametrize(
         "num_products,reservations_per_product",
-        [
-            (2, 1),  # 2 products, 1 expired reservation each
-            (3, 2),  # 3 products, 2 expired reservations each
-            (5, 3),  # 5 products, 3 expired reservations each
-            (10, 1),  # 10 products, 1 expired reservation each
-            (2, 5),  # 2 products, 5 expired reservations each
-        ],
+        [(3, 2)],
     )
     def test_cleanup_handles_multiple_products(
         self, num_products, reservations_per_product

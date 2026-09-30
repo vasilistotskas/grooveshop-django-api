@@ -22,13 +22,13 @@ tenant-config validation for EVERY tenant and 503 the whole storefront
 from __future__ import annotations
 
 from django.core.exceptions import ValidationError
-from django.test import TestCase
+from django.test import SimpleTestCase
 
 from tenant.models import Tenant
 from tenant.serializers import TenantConfigSerializer
 
 
-class OpenAIPixelIdValidationTests(TestCase):
+class OpenAIPixelIdValidationTests(SimpleTestCase):
     def _tenant(self, pixel_id: str) -> Tenant:
         return Tenant(
             schema_name="public",
@@ -70,7 +70,7 @@ class OpenAIPixelIdValidationTests(TestCase):
         self.assertIn("openai_pixel_id", ctx.exception.message_dict)
 
 
-class OpenAIPixelIdContractTests(TestCase):
+class OpenAIPixelIdContractTests(SimpleTestCase):
     def test_field_is_optional_not_required(self):
         field = TenantConfigSerializer().fields["openai_pixel_id"]
 
@@ -86,17 +86,8 @@ class OpenAIPixelIdContractTests(TestCase):
     def test_field_reads_the_model_attribute(self):
         # Reads through the declared field rather than the whole
         # serializer: several sibling SerializerMethodFields traverse
-        # related managers and need a SAVED tenant, and saving one with
-        # ``schema_name="public"`` would have django-tenants create a
-        # schema — far too much machinery to prove one CharField is
-        # bound to the right attribute.
-        tenant = Tenant(
-            schema_name="public",
-            name="t",
-            slug="t",
-            owner_email="t@example.com",
-            openai_pixel_id="8MktrqpXN1MRdD2NUfkXmU",
-        )
+        # related managers and need a SAVED tenant.
+        tenant = Tenant(openai_pixel_id="8MktrqpXN1MRdD2NUfkXmU")
 
         field = TenantConfigSerializer().fields["openai_pixel_id"]
 

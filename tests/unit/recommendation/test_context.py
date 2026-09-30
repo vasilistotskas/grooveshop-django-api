@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import pytest
 from django.contrib.contenttypes.models import ContentType
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 
 from product.factories.product import ProductFactory
 from recommendation.context import (
@@ -15,7 +17,6 @@ from recommendation.context import (
     tenant_context,
 )
 from tag.factories.tagged_item import TaggedProductFactory
-from tests.utils import count_queries
 
 pytestmark = pytest.mark.django_db
 
@@ -38,22 +39,25 @@ def test_build_cost_does_not_depend_on_the_content_type_cache():
     switch, so a ``get_for_model`` in the build would be one query or
     none depending on what ran before — and a query-budget test that
     compares two requests would flap on it."""
+    # The connection's first cursor also sets django-tenants'
+    # search_path; pay that before measuring, as a live one has.
+    build_tenant_context()
     ContentType.objects.clear_cache()
-    with count_queries() as cold:
+    with CaptureQueriesContext(connection) as cold:
         build_tenant_context()
-    with count_queries() as warm:
+    with CaptureQueriesContext(connection) as warm:
         build_tenant_context()
 
-    assert cold.count == warm.count
+    assert len(cold) == len(warm)
 
 
 def test_context_is_cached_until_invalidated():
     tenant_context()
-    with count_queries() as cached:
+    with CaptureQueriesContext(connection) as cached:
         tenant_context()
-    assert cached.count == 0
+    assert len(cached) == 0
 
     invalidate_tenant_context()
-    with count_queries() as rebuilt:
+    with CaptureQueriesContext(connection) as rebuilt:
         tenant_context()
-    assert rebuilt.count > 0
+    assert len(rebuilt) > 0

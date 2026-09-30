@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from django.db.models import OuterRef
+
+from core.db.aggregates import subquery_count
 from core.managers import (
     TranslatableOptimizedManager,
     TranslatableOptimizedQuerySet,
@@ -36,13 +39,36 @@ class BlogAuthorQuerySet(TranslatableOptimizedQuerySet):
             "blog_posts__translations",
         )
 
+    def with_engagement(self) -> Self:
+        """Annotate ``number_of_posts`` and ``total_likes_received``.
+
+        Both count PUBLISHED posts only — the figures the author
+        serializers show — and are what the filters and ``?ordering=``
+        read, so a list never ranks or filters by a number it does not
+        display.
+        """
+        from blog.models.post import BlogPost
+
+        published = BlogPost.objects.published()
+        return self.annotate(
+            number_of_posts=subquery_count(
+                published.filter(author=OuterRef("pk")), "author"
+            ),
+            total_likes_received=subquery_count(
+                BlogPost.likes.through.objects.filter(
+                    blogpost__in=published, blogpost__author=OuterRef("pk")
+                ),
+                "blogpost__author",
+            ),
+        )
+
     def for_list(self) -> Self:
         """
         Optimized queryset for list views.
 
-        Includes user and translations.
+        Includes user, translations and the engagement counts.
         """
-        return self.with_user().with_translations()
+        return self.with_user().with_translations().with_engagement()
 
     def for_detail(self) -> Self:
         """

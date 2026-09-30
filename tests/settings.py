@@ -75,11 +75,19 @@ from settings import REDIS_URL  # noqa: E402
 # matches production, so the suite exercises the tenant-scoped keys it
 # ships with. ``VERSION`` and ``TIMEOUT`` stay at Django's defaults
 # rather than following ``DEFAULT_CACHE_*`` from the environment.
+#
+# The database name joins the worker id because two pytest sessions on
+# one machine (a full run beside a targeted one, each with its own
+# ``DB_NAME``) otherwise share a namespace — and clear each other's.
+TEST_NAMESPACE = (
+    f"{DATABASES['default']['NAME']}"  # noqa: F405
+    f"_{environ.get('PYTEST_XDIST_WORKER', 'master')}"
+)
 CACHES = {
     "default": {
         "BACKEND": "tests.cache.WorkerScopedCache",
         "LOCATION": REDIS_URL,
-        "KEY_PREFIX": f"test_{environ.get('PYTEST_XDIST_WORKER', 'master')}",
+        "KEY_PREFIX": f"test_{TEST_NAMESPACE}",
         "KEY_FUNCTION": "tenant.cache.make_tenant_key",
     },
 }
@@ -91,13 +99,10 @@ CACHES = {
 # images there, 4.5 million files by 2026-09-26, and a test that walks
 # the repository took past its timeout on that tree alone. The private
 # root follows (``tenant.storage.private_media_root``: MEDIA_ROOT with a
-# ``_private`` suffix). Per worker, so one worker's wipe cannot delete
-# another's files mid-test.
+# ``_private`` suffix). Per namespace, so one worker's or session's
+# wipe cannot delete another's files mid-test.
 MEDIA_ROOT = str(
-    Path(gettempdir())
-    / "grooveshop-tests"
-    / environ.get("PYTEST_XDIST_WORKER", "master")
-    / "mediafiles"
+    Path(gettempdir()) / "grooveshop-tests" / TEST_NAMESPACE / "mediafiles"
 )
 for _root in (MEDIA_ROOT, MEDIA_ROOT + "_private"):
     rmtree(_root, ignore_errors=True)

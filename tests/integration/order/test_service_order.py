@@ -3,141 +3,54 @@ from unittest.mock import patch
 
 import pytest
 from django.conf import settings
-from django.contrib.auth import get_user_model
-from django.db import transaction
 from django.test import TestCase
 from djmoney.money import Money
 
 from order.enum.status import OrderStatus, PaymentStatus
-from order.exceptions import (
-    InvalidStatusTransitionError,
-    PaymentError,
-)
+from order.exceptions import OrderCancellationError, PaymentError
 from order.factories.order import OrderFactory
-from order.models.order import Order
 from order.services import OrderService
 from order.stock import StockManager
 from product.factories.product import ProductFactory
-
-User = get_user_model()
-
+from tests.utils.shipping import enable_rate
+from user.factories.account import UserAccountFactory
 
 pytestmark = pytest.mark.assert_english
 
 
+def _eur(amount: str) -> Money:
+    return Money(Decimal(amount), settings.DEFAULT_CURRENCY)
+
+
 class OrderServiceTestCase(TestCase):
-    def setUp(self):
-        self.order = OrderFactory()
-
     def test_get_order_by_id(self):
-        result = OrderService.get_order_by_id(self.order.id)
+        order = OrderFactory(num_order_items=0)
 
-        self.assertEqual(result.id, self.order.id)
-
-        result = OrderService.get_order_by_id(self.order.id)
-
-        self.assertEqual(result.id, self.order.id)
+        self.assertEqual(OrderService.get_order_by_id(order.id).id, order.id)
 
     def test_get_order_by_uuid(self):
-        result = OrderService.get_order_by_uuid(str(self.order.uuid))
+        order = OrderFactory(num_order_items=0)
 
-        self.assertEqual(result.id, self.order.id)
+        result = OrderService.get_order_by_uuid(str(order.uuid))
 
-        result = OrderService.get_order_by_uuid(str(self.order.uuid))
+        self.assertEqual(result.id, order.id)
 
-        self.assertEqual(result.id, self.order.id)
-
-    def test_update_order_status_valid(self):
-        with transaction.atomic():
-            order = OrderFactory()
-            order.status = OrderStatus.PENDING.value
-            order.save(update_fields=["status"])
-
-            order.refresh_from_db()
-            self.assertEqual(order.status, OrderStatus.PENDING.value)
-
-            updated_order = OrderService.update_order_status(
-                order=order, new_status=OrderStatus.PROCESSING.value
-            )
-
-            self.assertEqual(updated_order.status, OrderStatus.PROCESSING.value)
-
-            order.refresh_from_db()
-            self.assertEqual(order.status, OrderStatus.PROCESSING.value)
-
-            transaction.set_rollback(True)
-
-    def test_update_order_status_invalid(self):
-        with transaction.atomic():
-            order = OrderFactory()
-            order.status = OrderStatus.PENDING.value
-            order.save(update_fields=["status"])
-
-            order.refresh_from_db()
-            self.assertEqual(order.status, OrderStatus.PENDING.value)
-
-            with self.assertRaises(InvalidStatusTransitionError):
-                OrderService.update_order_status(
-                    order=order, new_status=OrderStatus.COMPLETED.value
-                )
-
-            order.refresh_from_db()
-            self.assertEqual(order.status, OrderStatus.PENDING.value)
-
-            transaction.set_rollback(True)
-
-    def test_get_user_orders(self):
-        with transaction.atomic():
-            User = get_user_model()
-            test_user = User.objects.create_user(
-                username="testuser_orders",
-                email="testuser_orders@example.com",
-                password="password123",
-            )
-
-            order1 = OrderFactory.build(user=test_user)
-            order1.save()
-            order2 = OrderFactory.build(user=test_user)
-            order2.save()
-
-            other_user = User.objects.create_user(
-                username="other_user",
-                email="other_user@example.com",
-                password="password123",
-            )
-            other_order = OrderFactory.build(user=other_user)
-            other_order.save()
-
-            self.assertEqual(Order.objects.filter(user=test_user).count(), 2)
-
-            user_orders = OrderService.get_user_orders(test_user.id)
-
-            self.assertEqual(user_orders.count(), 2)
-
-            user_order_ids = [order.id for order in user_orders]
-            self.assertIn(order1.id, user_order_ids)
-            self.assertIn(order2.id, user_order_ids)
-
-            self.assertNotIn(other_order.id, user_order_ids)
-
-            transaction.set_rollback(True)
-
-    @patch("order.signals.order_canceled.send")
-    def test_cancel_order(self, mock_signal):
-        order = OrderFactory()
-
-        order.status = OrderStatus.PENDING.value
-        order.save(update_fields=["status"])
-
-        product = ProductFactory(stock=10)
-        test_currency = order.shipping_price.currency
-
-        order.items.create(
-            product=product,
-            price=Money(amount=Decimal("50.00"), currency=test_currency),
-            quantity=3,
+    def test_get_user_orders_returns_only_that_users_orders(self):
+        user = UserAccountFactory(num_addresses=0)
+        own = [OrderFactory(user=user, num_order_items=0) for _ in range(2)]
+        OrderFactory(
+            user=UserAccountFactory(num_addresses=0), num_order_items=0
         )
 
+        result = OrderService.get_user_orders(user.id)
+
+        self.assertEqual({o.id for o in result}, {o.id for o in own})
+
+    @patch("order.signals.order_canceled.send")
+    def test_cancel_order_restores_the_stock_it_took(self, _mock_signal):
+        order = OrderFactory(status=OrderStatus.PENDING, num_order_items=0)
+        product = ProductFactory(stock=10)
+        order.items.create(product=product, price=_eur("50.00"), quantity=3)
         # Take the stock the way checkout does. A raw ``product.stock = 7``
         # is indistinguishable from an admin editing the product: it logs
         # against no order (product/signals.py), and cancelling an order
@@ -149,154 +62,94 @@ class OrderServiceTestCase(TestCase):
             reason="test: order created",
         )
 
-        product.refresh_from_db()
-        self.assertEqual(product.stock, 7)
-
         canceled_order, refund_info = OrderService.cancel_order(
-            order=order,
-            reason="Test cancellation",
-            refund_payment=False,
-            canceled_by=None,
+            order=order, reason="Test cancellation", refund_payment=False
         )
 
-        self.assertEqual(canceled_order.status, OrderStatus.CANCELED.value)
+        self.assertEqual(canceled_order.status, OrderStatus.CANCELED)
         self.assertIsNone(refund_info)
-
         product.refresh_from_db()
         self.assertEqual(product.stock, 10)
 
     @patch("order.signals.handlers.order_canceled.send")
-    def test_cancel_order_with_refund(self, mock_signal):
-        order = OrderFactory()
-        order.status = OrderStatus.PENDING.value
-        order.payment_status = PaymentStatus.COMPLETED
-        order.payment_id = "test_payment_123"
-
-        test_currency = order.shipping_price.currency
-        order.paid_amount = Money(
-            amount=Decimal("100.00"), currency=test_currency
+    def test_cancel_paid_order_refunds_it(self, _mock_signal):
+        order = OrderFactory(
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.COMPLETED,
+            payment_id="test_payment_123",
+            paid_amount=_eur("100.00"),
+            num_order_items=0,
         )
-
-        order.save(
-            update_fields=[
-                "status",
-                "payment_status",
-                "payment_id",
-                "paid_amount",
-            ]
-        )
-
-        product = ProductFactory(stock=10)
         order.items.create(
-            product=product,
-            price=Money(amount=Decimal("50.00"), currency=test_currency),
-            quantity=2,
+            product=ProductFactory(stock=10), price=_eur("50.00"), quantity=2
         )
-
-        self.assertIsNotNone(order.pay_way, "Order must have a payment method")
-        self.assertIsNotNone(order.payment_id, "Order must have a payment ID")
-        self.assertTrue(order.is_paid, "Order must be marked as paid")
 
         with patch.object(OrderService, "refund_order") as mock_refund:
             mock_refund.return_value = (
                 True,
                 {"refund_id": "refund_123", "status": PaymentStatus.REFUNDED},
             )
-
             canceled_order, refund_info = OrderService.cancel_order(
-                order=order,
-                reason="Customer requested",
-                refund_payment=True,
-                canceled_by=order.user.id if order.user else None,
+                order=order, reason="Customer requested", refund_payment=True
             )
 
-            self.assertEqual(canceled_order.status, OrderStatus.CANCELED.value)
-            self.assertIsNotNone(refund_info)
-            self.assertTrue(refund_info["refunded"])
-            self.assertIn("refund_id", refund_info)
+        self.assertEqual(canceled_order.status, OrderStatus.CANCELED)
+        self.assertTrue(refund_info["refunded"])
+        self.assertEqual(refund_info["refund_id"], "refund_123")
+        mock_refund.assert_called_once()
 
-            mock_refund.assert_called_once()
-
-    def test_calculate_shipping_cost(self):
-        from tests.utils.shipping import enable_rate
-
+    def test_shipping_cost_is_waived_above_the_free_threshold(self):
+        order = OrderFactory(num_order_items=0)
         enable_rate(
-            self.order.country,
+            order.country,
             provider_code="flat_rate",
             price=Decimal("5.00"),
             free_shipping_threshold=Decimal("100.00"),
         )
 
-        order_value = Money(
-            amount=Decimal("49.99"), currency=settings.DEFAULT_CURRENCY
-        )
-        shipping_cost = OrderService.shipping_cost(
-            order_value=order_value,
-            country_id=self.order.country_id,
-            shipping_provider_code="flat_rate",
-            shipping_kind="home_delivery",
-        )
-        self.assertTrue(shipping_cost.amount > 0)
+        def quote(order_value):
+            return OrderService.shipping_cost(
+                order_value=order_value,
+                country_id=order.country_id,
+                shipping_provider_code="flat_rate",
+                shipping_kind="home_delivery",
+            )
 
-        order_value = Money(
-            amount=Decimal("500.00"), currency=settings.DEFAULT_CURRENCY
-        )
-        shipping_cost = OrderService.shipping_cost(
-            order_value=order_value,
-            country_id=self.order.country_id,
-            shipping_provider_code="flat_rate",
-            shipping_kind="home_delivery",
-        )
-        self.assertEqual(shipping_cost.amount, 0)
+        self.assertEqual(quote(_eur("49.99")), _eur("5.00"))
+        self.assertEqual(quote(_eur("500.00")), _eur("0.00"))
 
     @patch("order.payment.get_payment_provider")
-    def test_refund_order(self, mock_get_provider):
-        order = OrderFactory()
-        order.payment_status = PaymentStatus.COMPLETED
-        order.payment_id = "test_payment_123"
-        test_currency = order.shipping_price.currency
-        order.paid_amount = Money(
-            amount=Decimal("100.00"), currency=test_currency
+    def test_refund_order_full(self, mock_get_provider):
+        order = OrderFactory(
+            payment_status=PaymentStatus.COMPLETED,
+            payment_id="test_payment_123",
+            paid_amount=_eur("100.00"),
+            num_order_items=0,
         )
-        order.save()
-
-        mock_provider = mock_get_provider.return_value
-        mock_provider.refund_payment.return_value = (
+        mock_get_provider.return_value.refund_payment.return_value = (
             True,
-            {
-                "refund_id": "refund_123",
-                "status": PaymentStatus.REFUNDED,
-            },
+            {"refund_id": "refund_123", "status": PaymentStatus.REFUNDED},
         )
 
         success, response = OrderService.refund_order(
-            order=order,
-            amount=None,
-            reason="Test refund",
-            refunded_by=order.user.id if order.user else None,
+            order=order, amount=None, reason="Test refund"
         )
 
         self.assertTrue(success)
-        self.assertIn("refund_id", response)
+        self.assertEqual(response["refund_id"], "refund_123")
         self.assertEqual(order.payment_status, PaymentStatus.REFUNDED)
-
-        self.assertIn("refunds", order.metadata)
         self.assertEqual(len(order.metadata["refunds"]), 1)
         self.assertEqual(order.metadata["refunds"][0]["amount"], "full")
 
     @patch("order.payment.get_payment_provider")
     def test_refund_order_partial(self, mock_get_provider):
-        order = OrderFactory()
-        order.payment_status = PaymentStatus.COMPLETED
-        order.payment_id = "test_payment_123"
-        test_currency = order.shipping_price.currency
-        order.paid_amount = Money(
-            amount=Decimal("100.00"), currency=test_currency
+        order = OrderFactory(
+            payment_status=PaymentStatus.COMPLETED,
+            payment_id="test_payment_123",
+            paid_amount=_eur("100.00"),
+            num_order_items=0,
         )
-        order.save()
-
-        mock_provider = mock_get_provider.return_value
-        mock_provider.refund_payment.return_value = (
+        mock_get_provider.return_value.refund_payment.return_value = (
             True,
             {
                 "refund_id": "refund_456",
@@ -304,23 +157,20 @@ class OrderServiceTestCase(TestCase):
             },
         )
 
-        refund_amount = Money(amount=Decimal("25.00"), currency=test_currency)
         success, _response = OrderService.refund_order(
-            order=order,
-            amount=refund_amount,
-            reason="Partial refund",
-            refunded_by=order.user.id if order.user else None,
+            order=order, amount=_eur("25.00"), reason="Partial refund"
         )
 
         self.assertTrue(success)
         self.assertEqual(order.payment_status, PaymentStatus.PARTIALLY_REFUNDED)
         self.assertEqual(order.metadata["refunds"][0]["amount"], "25.00")
 
-    def test_refund_order_not_paid(self):
-        order = OrderFactory()
-        order.payment_status = PaymentStatus.PENDING
-        order.payment_id = "test_payment_123"
-        order.save(update_fields=["payment_status", "payment_id"])
+    def test_refund_order_refuses_an_unpaid_order(self):
+        order = OrderFactory(
+            payment_status=PaymentStatus.PENDING,
+            payment_id="test_payment_123",
+            num_order_items=0,
+        )
 
         with self.assertRaises(PaymentError) as context:
             OrderService.refund_order(order=order)
@@ -330,14 +180,15 @@ class OrderServiceTestCase(TestCase):
         )
 
     @patch("order.payment.get_payment_provider")
-    def test_get_payment_status(self, mock_get_provider):
-        order = OrderFactory()
-        order.payment_id = "test_payment_123"
-        order.payment_status = PaymentStatus.PENDING
-        order.save()
-
-        mock_provider = mock_get_provider.return_value
-        mock_provider.get_payment_status.return_value = (
+    def test_get_payment_status_persists_the_provider_status(
+        self, mock_get_provider
+    ):
+        order = OrderFactory(
+            payment_id="test_payment_123",
+            payment_status=PaymentStatus.PENDING,
+            num_order_items=0,
+        )
+        mock_get_provider.return_value.get_payment_status.return_value = (
             PaymentStatus.COMPLETED,
             {
                 "payment_id": "test_payment_123",
@@ -350,14 +201,11 @@ class OrderServiceTestCase(TestCase):
 
         self.assertEqual(status_enum, PaymentStatus.COMPLETED)
         self.assertEqual(status_data["payment_id"], "test_payment_123")
-
         order.refresh_from_db()
         self.assertEqual(order.payment_status, PaymentStatus.COMPLETED)
 
-    def test_add_tracking_info(self):
-        order = OrderFactory()
-        order.status = OrderStatus.PROCESSING.value
-        order.save()
+    def test_add_tracking_info_ships_a_processing_order(self):
+        order = OrderFactory(status=OrderStatus.PROCESSING, num_order_items=0)
 
         updated_order = OrderService.add_tracking_info(
             order=order,
@@ -368,4 +216,26 @@ class OrderServiceTestCase(TestCase):
 
         self.assertEqual(updated_order.tracking_number, "TRACK123")
         self.assertEqual(updated_order.shipping_carrier, "DHL")
-        self.assertEqual(updated_order.status, OrderStatus.SHIPPED.value)
+        self.assertEqual(updated_order.status, OrderStatus.SHIPPED)
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "status",
+    [
+        OrderStatus.SHIPPED,
+        OrderStatus.DELIVERED,
+        OrderStatus.COMPLETED,
+        OrderStatus.CANCELED,
+        OrderStatus.RETURNED,
+        OrderStatus.REFUNDED,
+    ],
+)
+def test_cancel_order_refuses_an_order_past_processing(status):
+    order = OrderFactory(status=status, num_order_items=0)
+
+    with pytest.raises(OrderCancellationError, match="cannot be canceled"):
+        OrderService.cancel_order(order=order, refund_payment=False)
+
+    order.refresh_from_db()
+    assert order.status == status

@@ -96,18 +96,6 @@ def _mark_confirmation_sent(order_id: int) -> None:
     cache.delete(_confirmation_lock_key(order_id))
 
 
-def _release_confirmation_email(order_id: int) -> None:
-    """Clear the confirmation-email permanent flags so an admin or test
-    can trigger a resend. Also releases any lingering Redis lock."""
-    with transaction.atomic():
-        order = Order.objects.select_for_update().filter(id=order_id).first()
-        if order is None or not order.metadata:
-            return
-        if order.metadata.pop(CONFIRMATION_EMAIL_SENT_AT_KEY, None) is not None:
-            order.save(update_fields=["metadata"])
-    cache.delete(_confirmation_lock_key(order_id))
-
-
 @celery_app.task(
     base=MonitoredTask, bind=True, max_retries=3, default_retry_delay=300
 )

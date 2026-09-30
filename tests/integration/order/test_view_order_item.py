@@ -34,9 +34,13 @@ class OrderItemViewSetTestCase(TestURLFixerMixin, APITestCase):
 
         cls.pay_way = PayWayFactory()
 
-        cls.order = OrderFactory(user=cls.user, pay_way=cls.pay_way)
+        cls.order = OrderFactory(
+            num_order_items=0, user=cls.user, pay_way=cls.pay_way
+        )
 
-        cls.other_order = OrderFactory(user=cls.other_user, pay_way=cls.pay_way)
+        cls.other_order = OrderFactory(
+            num_order_items=0, user=cls.other_user, pay_way=cls.pay_way
+        )
 
         cls.product = ProductFactory(
             active=True, num_images=0, num_reviews=0, stock=20
@@ -70,11 +74,9 @@ class OrderItemViewSetTestCase(TestURLFixerMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("results", response.data)
 
-        self.assertGreaterEqual(len(response.data["results"]), 1)
-
-        user_order_ids = [order.id for order in [self.order]]
-        for result in response.data["results"]:
-            self.assertIn(result["order"], user_order_ids)
+        self.assertEqual(
+            [r["id"] for r in response.data["results"]], [self.order_item.id]
+        )
 
     def test_list_uses_correct_serializer(self):
         self.client.force_authenticate(user=self.user)
@@ -305,8 +307,9 @@ class OrderItemViewSetTestCase(TestURLFixerMixin, APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        for result in response.data["results"]:
-            self.assertEqual(result["order"], self.order.id)
+        self.assertEqual(
+            [r["id"] for r in response.data["results"]], [self.order_item.id]
+        )
 
     def test_filter_by_product(self):
         self.client.force_authenticate(user=self.user)
@@ -329,8 +332,9 @@ class OrderItemViewSetTestCase(TestURLFixerMixin, APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        for result in response.data["results"]:
-            self.assertGreaterEqual(result["quantity"], 2)
+        self.assertEqual(
+            [r["id"] for r in response.data["results"]], [self.order_item.id]
+        )
 
     def test_filter_by_refund_status(self):
         self.client.force_authenticate(user=self.user)
@@ -340,8 +344,9 @@ class OrderItemViewSetTestCase(TestURLFixerMixin, APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        for result in response.data["results"]:
-            self.assertFalse(result["is_refunded"])
+        self.assertEqual(
+            [r["id"] for r in response.data["results"]], [self.order_item.id]
+        )
 
     def test_search_functionality(self):
         self.client.force_authenticate(user=self.user)
@@ -414,7 +419,9 @@ class RefundActionTests(TestURLFixerMixin, APITestCase):
         self.product = ProductFactory(
             active=True, num_images=0, num_reviews=0, stock=20
         )
-        self.order = OrderFactory(user=self.user, pay_way=self.pay_way)
+        self.order = OrderFactory(
+            num_order_items=0, user=self.user, pay_way=self.pay_way
+        )
         self.order_item = self.order.items.create(
             product=self.product,
             price=Money("50.00", "EUR"),

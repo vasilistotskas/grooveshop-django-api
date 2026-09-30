@@ -4,7 +4,9 @@ from typing import TYPE_CHECKING
 
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
+from django.db.models import OuterRef
 
+from core.db.aggregates import subquery_count
 from core.managers import (
     TranslatableOptimizedManager,
     TranslatableOptimizedQuerySet,
@@ -25,6 +27,20 @@ class TagQuerySet(TranslatableOptimizedQuerySet):
 
     def active(self) -> Self:
         return self.filter(active=True)
+
+    def with_usage(self) -> Self:
+        """Annotate ``usage_count``: the objects the tag is attached to,
+        which the filters and ``?ordering=`` read."""
+        from tag.models.tagged_item import TaggedItem
+
+        return self.annotate(
+            usage_count=subquery_count(
+                TaggedItem.objects.filter(tag=OuterRef("pk")), "tag"
+            )
+        )
+
+    def for_list(self) -> Self:
+        return super().for_list().with_usage()
 
     def inactive(self) -> Self:
         return self.filter(active=False)

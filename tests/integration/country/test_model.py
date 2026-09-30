@@ -1,50 +1,46 @@
 import os
 
-from django.conf import settings
 from django.core.files.storage import default_storage
+from django.db import connection
 from django.test import TestCase
 
 from country.factories import CountryFactory
-
-languages = [
-    lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
-]
-default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
+from country.models import Country
 
 
 class CountryModelTestCase(TestCase):
-    def setUp(self):
-        self.country = CountryFactory(
-            alpha_2="GR",
-            alpha_3="GRC",
-            iso_cc=300,
-            phone_code=30,
-            num_regions=0,
+    @classmethod
+    def setUpTestData(cls):
+        # ISO 3166-1 reserves XA-XZ for user assignment, so no seeded
+        # country can come back from the factory's get-or-create.
+        cls.country = CountryFactory(
+            alpha_2="XA", alpha_3="XAA", iso_cc=900, num_regions=0
         )
 
-    def test_fields(self):
-        self.assertEqual(self.country.alpha_2, "GR")
-        self.assertEqual(self.country.alpha_3, "GRC")
-        self.assertEqual(self.country.iso_cc, 300)
-        self.assertEqual(self.country.phone_code, 30)
+    def test_save_uppercases_the_codes(self):
+        country = Country.objects.create(alpha_2="xb", alpha_3="xbb")
+
+        country.refresh_from_db()
+        self.assertEqual((country.alpha_2, country.alpha_3), ("XB", "XBB"))
+
+    def test_factory_stores_the_flag_image(self):
         self.assertTrue(default_storage.exists(self.country.image_flag.path))
 
-    def test_str_representation(self):
+    def test_str_is_the_translated_name(self):
         self.assertEqual(
-            str(self.country),
-            self.country.safe_translation_getter("name") or "",
+            str(self.country), self.country.safe_translation_getter("name")
         )
 
-    def test_get_ordering_queryset(self):
-        queryset = self.country.get_ordering_queryset()
-        self.assertTrue(queryset.exists())
-        self.assertTrue(self.country in queryset)
+    def test_ordering_queryset_spans_every_country(self):
+        self.assertQuerySetEqual(
+            self.country.get_ordering_queryset(),
+            Country.objects.all(),
+            ordered=False,
+        )
 
     def test_main_image_path(self):
-        from django.db import connection
-
-        expected_filename = (
+        self.assertEqual(
+            self.country.main_image_path,
             f"media/{connection.schema_name}/uploads/country/"
-            f"{os.path.basename(self.country.image_flag.name)}"
+            f"{os.path.basename(self.country.image_flag.name)}",
         )
-        self.assertEqual(self.country.main_image_path, expected_filename)

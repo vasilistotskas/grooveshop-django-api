@@ -25,6 +25,10 @@ User = get_user_model()
 
 class CostRangeFilterTestCase(TestCase):
     def setUp(self):
+        # Counts or orders every pay-way, so start without the rows
+        # ``pay_way/migrations/0019_seed_default_pay_ways`` seeds.
+        PayWay.objects.all().delete()
+
         self.factory = RequestFactory()
         self.request = self.factory.get("/admin/pay_way/payway/")
         self.model_admin = Mock()
@@ -225,6 +229,10 @@ class PaymentTypeFilterTestCase(TestCase):
 
 class ConfigurationStatusFilterTestCase(TestCase):
     def setUp(self):
+        # Counts or orders every pay-way, so start without the rows
+        # ``pay_way/migrations/0019_seed_default_pay_ways`` seeds.
+        PayWay.objects.all().delete()
+
         self.factory = RequestFactory()
         self.request = self.factory.get("/admin/pay_way/payway/")
         self.model_admin = Mock()
@@ -239,6 +247,28 @@ class ConfigurationStatusFilterTestCase(TestCase):
         self.no_config_needed = PayWay.objects.create(
             settlement=PaySettlement.COURIER_CASH, configuration=None
         )
+        self.online_null_config = PayWay.objects.create(
+            settlement=PaySettlement.ONLINE, configuration=None
+        )
+        # Configuration on a method that collects without a PSP is
+        # irrelevant: it never counts as "configured".
+        self.offline_with_config = PayWay.objects.create(
+            settlement=PaySettlement.OFFLINE_TRANSFER,
+            configuration={"iban": "GR00"},
+        )
+
+    def _filtered_ids(self, value):
+        # Django hands a list filter the query string's value LIST and
+        # keeps its last item; a bare string would be read as its last
+        # character and silently match no lookup.
+        filter_instance = ConfigurationStatusFilter(
+            self.request,
+            {"configuration_status": [value]},
+            PayWay,
+            self.model_admin,
+        )
+        queryset = filter_instance.queryset(self.request, PayWay.objects.all())
+        return set(queryset.values_list("id", flat=True))
 
     def test_filter_title(self):
         filter_instance = ConfigurationStatusFilter(
@@ -264,45 +294,30 @@ class ConfigurationStatusFilterTestCase(TestCase):
         actual_keys = [lookup[0] for lookup in lookups]
         self.assertEqual(actual_keys, expected_keys)
 
-    def test_queryset_configured_filter(self):
-        filter_instance = ConfigurationStatusFilter(
-            self.request,
-            {"configuration_status": "configured"},
-            PayWay,
-            self.model_admin,
+    def test_configured_is_online_with_a_non_empty_configuration(self):
+        self.assertEqual(
+            self._filtered_ids("configured"), {self.configured_payment.id}
         )
-        queryset = filter_instance.queryset(self.request, PayWay.objects.all())
 
-        self.assertIsNotNone(queryset)
-        self.assertTrue(queryset.count() >= 0)
-
-    def test_queryset_not_configured_filter(self):
-        filter_instance = ConfigurationStatusFilter(
-            self.request,
-            {"configuration_status": "not_configured"},
-            PayWay,
-            self.model_admin,
+    def test_not_configured_is_online_with_null_or_empty_configuration(self):
+        self.assertEqual(
+            self._filtered_ids("not_configured"),
+            {self.not_configured_payment.id, self.online_null_config.id},
         )
-        queryset = filter_instance.queryset(self.request, PayWay.objects.all())
 
-        self.assertIsNotNone(queryset)
-        self.assertTrue(queryset.count() >= 0)
-
-    def test_queryset_no_config_needed_filter(self):
-        filter_instance = ConfigurationStatusFilter(
-            self.request,
-            {"configuration_status": "no_config_needed"},
-            PayWay,
-            self.model_admin,
+    def test_no_config_needed_is_every_non_online_settlement(self):
+        self.assertEqual(
+            self._filtered_ids("no_config_needed"),
+            {self.no_config_needed.id, self.offline_with_config.id},
         )
-        queryset = filter_instance.queryset(self.request, PayWay.objects.all())
-
-        self.assertIsNotNone(queryset)
-        self.assertTrue(queryset.count() >= 0)
 
 
 class PayWayAdminTestCase(TestCase):
     def setUp(self):
+        # Counts or orders every pay-way, so start without the rows
+        # ``pay_way/migrations/0019_seed_default_pay_ways`` seeds.
+        PayWay.objects.all().delete()
+
         self.factory = RequestFactory()
         self.site = AdminSite()
         self.admin = PayWayAdmin(PayWay, self.site)
@@ -481,6 +496,27 @@ class PayWayAdminTestCase(TestCase):
         result = self.admin.configuration_preview(self.payway)
 
         self.assertEqual(result, "No configuration")
+
+    def test_configuration_preview_truncates_after_three_keys(self):
+        self.payway.configuration = {
+            "api_key": "k",
+            "merchant_id": "m",
+            "source_code": "s",
+            "webhook_key": "w",
+            "client_secret": "c",
+        }
+        result = self.admin.configuration_preview(self.payway)
+
+        self.assertEqual(
+            result,
+            "Configuration keys: api_key, merchant_id, source_code, "
+            "... and 2 more",
+        )
+
+    def test_sort_order_display_without_a_position(self):
+        self.payway.sort_order = None
+
+        self.assertEqual(self.admin.sort_order_display(self.payway), "-")
 
     def test_effective_cost_display(self):
         result = self.admin.effective_cost_display(self.payway)

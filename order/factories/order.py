@@ -246,7 +246,12 @@ class OrderFactory(factory.django.DjangoModelFactory):
 
         if extracted is not None:
             if extracted > 0:
-                OrderItemFactory.create_batch(extracted, order=self)
+                # One distinct product per line: ``OrderItemFactory`` is
+                # get-or-create on (order, product), so lines sharing a
+                # product collapse into one.
+                OrderItemFactory.create_batch_for_order(
+                    order=self, count=extracted
+                )
         else:
             count = random.randint(1, 5)
             OrderItemFactory.create_batch_for_order(order=self, count=count)

@@ -56,7 +56,7 @@ def authenticated_user(db):
     )
 
 
-@pytest.mark.django_db(transaction=True)
+@pytest.mark.django_db
 class TestSearchAnalyticsMiddleware:
     """Test suite for SearchAnalyticsMiddleware."""
 
@@ -377,7 +377,7 @@ class TestSearchAnalyticsMiddleware:
         assert len(search_query.query) == 500
 
 
-@pytest.mark.django_db(transaction=True)
+@pytest.mark.django_db
 class TestSearchAnalyticsMiddlewareEdgeCases:
     """Test edge cases and error conditions."""
 

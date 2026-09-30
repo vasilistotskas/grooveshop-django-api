@@ -1,4 +1,7 @@
+from datetime import timedelta
+
 import pytest
+from django.utils import timezone
 
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
@@ -6,6 +9,12 @@ from order.models import OrderHistory
 from order.services import OrderService
 from product.factories import ProductFactory
 from user.factories import UserAccountFactory
+
+
+def _paid_order(payment_id):
+    """The order a success event settled, or None when none matched."""
+    outcome = OrderService.handle_payment_succeeded(payment_id)
+    return outcome.order if outcome else None
 
 
 @pytest.mark.django_db
@@ -121,7 +130,7 @@ class TestPaymentConfirmationActualTransition:
         initial_history_count = OrderHistory.objects.filter(order=order).count()
 
         # Execute payment success handler
-        result = OrderService.handle_payment_succeeded(payment_id)
+        result = _paid_order(payment_id)
 
         # Verify handler found the order
         assert result is not None, (
@@ -206,7 +215,7 @@ class TestPaymentConfirmationActualTransition:
         with patch(
             "order.services.OrderService._dispatch_shipment_creation_task"
         ) as mock_dispatch:
-            result = OrderService.handle_payment_succeeded(payment_id)
+            result = _paid_order(payment_id)
 
         assert result is not None
         mock_dispatch.assert_not_called()
@@ -259,7 +268,7 @@ class TestPaymentConfirmationActualTransition:
         )
 
         # Execute payment success
-        result = OrderService.handle_payment_succeeded(payment_id)
+        result = _paid_order(payment_id)
 
         # Verify transition occurred
         assert result is not None
@@ -307,7 +316,7 @@ class TestPaymentConfirmationActualTransition:
             )
 
         # Execute payment success
-        result = OrderService.handle_payment_succeeded(payment_id)
+        result = _paid_order(payment_id)
 
         # Verify transition occurred
         assert result is not None
@@ -316,14 +325,12 @@ class TestPaymentConfirmationActualTransition:
         assert order.payment_status == PaymentStatus.COMPLETED
 
     @pytest.mark.parametrize(
-        "concurrent_orders",
+        "num_orders",
         [2, 3, 5],
     )
-    def test_payment_success_for_multiple_concurrent_orders(
-        self, concurrent_orders
-    ):
+    def test_payment_success_for_multiple_orders(self, num_orders):
         """
-        Test payment success handling for multiple orders processed concurrently.
+        Test payment success handling for several orders in turn.
 
         This test verifies that:
         - Multiple orders can be processed independently
@@ -338,8 +345,8 @@ class TestPaymentConfirmationActualTransition:
         orders_data = []
         test_id = str(uuid.uuid4())[:8]  # Unique test run identifier
 
-        for i in range(concurrent_orders):
-            payment_id = f"pi_test_concurrent_{test_id}_{i}"
+        for i in range(num_orders):
+            payment_id = f"pi_test_multiple_{test_id}_{i}"
             product = ProductFactory(stock=10)
 
             # Build order without saving to avoid LazyFunction regeneration
@@ -364,7 +371,7 @@ class TestPaymentConfirmationActualTransition:
 
         # Process all payment successes
         for data in orders_data:
-            result = OrderService.handle_payment_succeeded(data["payment_id"])
+            result = _paid_order(data["payment_id"])
             assert result is not None, (
                 f"Failed to process payment {data['payment_id']}"
             )
@@ -390,7 +397,7 @@ class TestPaymentConfirmationActualTransition:
         - No errors are raised
         """
         # Attempt to process payment for non-existent order
-        result = OrderService.handle_payment_succeeded("pi_nonexistent_12345")
+        result = _paid_order("pi_nonexistent_12345")
 
         # Verify handler returns None
         assert result is None, (
@@ -424,7 +431,7 @@ class TestPaymentConfirmationActualTransition:
         )
 
         # Execute payment success
-        result = OrderService.handle_payment_succeeded(payment_id_format)
+        result = _paid_order(payment_id_format)
 
         # Verify transition occurred
         assert result is not None
@@ -441,34 +448,24 @@ class TestPaymentConfirmationActualTransition:
         - Timestamp reflects the time of the transition
         """
         payment_id = "pi_test_timestamp"
+        initial_timestamp = timezone.now() - timedelta(hours=1)
         order = OrderFactory(
             status=OrderStatus.PENDING,
             payment_status=PaymentStatus.PENDING,
             payment_id=payment_id,
             num_order_items=1,
+            status_updated_at=initial_timestamp,
         )
 
-        # Record initial timestamp (may be None)
-        initial_timestamp = order.status_updated_at
-
-        # Wait a moment to ensure timestamp difference
-        import time
-
-        time.sleep(0.1)
-
         # Execute payment success
-        result = OrderService.handle_payment_succeeded(payment_id)
+        result = _paid_order(payment_id)
 
         # Verify timestamp was updated
         assert result is not None
         order.refresh_from_db()
-        assert order.status_updated_at is not None, (
-            "status_updated_at should be set after status transition"
+        assert order.status_updated_at > initial_timestamp, (
+            "status_updated_at should be updated after status transition"
         )
-        if initial_timestamp is not None:
-            assert order.status_updated_at > initial_timestamp, (
-                "status_updated_at should be updated after status transition"
-            )
 
     @pytest.mark.parametrize(
         "metadata_scenario",
@@ -503,7 +500,7 @@ class TestPaymentConfirmationActualTransition:
         )
 
         # Execute payment success
-        result = OrderService.handle_payment_succeeded(payment_id)
+        result = _paid_order(payment_id)
 
         # Verify metadata is preserved
         assert result is not None
@@ -534,9 +531,9 @@ class TestPaymentConfirmationActualTransition:
         )
 
         # Process payment success multiple times
-        result1 = OrderService.handle_payment_succeeded(payment_id)
-        result2 = OrderService.handle_payment_succeeded(payment_id)
-        result3 = OrderService.handle_payment_succeeded(payment_id)
+        result1 = _paid_order(payment_id)
+        result2 = _paid_order(payment_id)
+        result3 = _paid_order(payment_id)
 
         # Verify all calls succeeded
         assert result1 is not None
@@ -557,9 +554,7 @@ class TestPaymentConfirmationActualTransition:
             new_value__status=OrderStatus.PROCESSING.value,
         ).count()
 
-        # Should be 1 or 0 depending on implementation
-        # (some implementations may not create duplicate history entries)
-        assert status_transitions <= 1, (
+        assert status_transitions == 1, (
             "Should not create duplicate status transition history entries"
         )
 
@@ -607,7 +602,7 @@ class TestIntegrationWithWebhooks:
 
         # Simulate webhook event processing by calling the service directly
         # (In production, this would be called by the dj-stripe signal handler)
-        result = OrderService.handle_payment_succeeded(payment_id)
+        result = _paid_order(payment_id)
 
         # Verify status transition
         assert result is not None

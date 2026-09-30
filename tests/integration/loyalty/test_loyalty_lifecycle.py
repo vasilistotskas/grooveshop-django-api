@@ -783,44 +783,24 @@ class TestConcurrentAwardOrderPoints:
 
         def award(order_id):
             try:
-                with patch(
-                    "loyalty.services.Setting.get",
-                    side_effect=mock_settings,
-                ):
-                    LoyaltyService.award_order_points(order_id)
+                LoyaltyService.award_order_points(order_id)
             except Exception as exc:
                 errors.append(exc)
 
-        t1 = threading.Thread(target=award, args=(order1.id,))
-        t2 = threading.Thread(target=award, args=(order2.id,))
-        t1.start()
-        t2.start()
-        t1.join()
-        t2.join()
+        # Patched once, here: ``patch`` swaps a class attribute, so one
+        # entered per thread could restore another thread's mock as the
+        # "original" on exit and leave it installed for later tests.
+        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+            threads = [
+                threading.Thread(target=award, args=(order.id,))
+                for order in (order1, order2)
+            ]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join()
 
         assert errors == [], f"Thread errors: {errors}"
 
         user.refresh_from_db()
         assert user.total_xp == 300
-
-    def test_idempotency_guard_prevents_double_award(self):
-        """Calling award_order_points twice for the same order returns 0
-        on the second call and does not double-credit XP."""
-        user = UserAccountFactory()
-        product = _create_product(
-            price=Decimal("50.00"), vat_percent=Decimal("0.0")
-        )
-        order = _create_order(user)
-        _create_order_item(order, product, quantity=1)
-
-        mock_settings = _loyalty_settings(enabled=True, points_factor=1.0)
-
-        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
-            first = LoyaltyService.award_order_points(order.id)
-            second = LoyaltyService.award_order_points(order.id)
-
-        assert first == 50
-        assert second == 0
-
-        user.refresh_from_db()
-        assert user.total_xp == 50

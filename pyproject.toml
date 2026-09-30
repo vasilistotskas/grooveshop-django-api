@@ -114,6 +114,7 @@ core = "sysmon"
 concurrency = ["multiprocessing", "thread"]
 omit = [
     "*/tests/*",
+    "*/tests_mt/*",
     "*/migrations/*",
     "*/management/*",
     "*/factories/*",

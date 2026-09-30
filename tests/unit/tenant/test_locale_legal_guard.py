@@ -21,6 +21,7 @@ from django.core.exceptions import ValidationError
 
 from page_config.legal_documents import LEGAL_DOCUMENT_SLUGS
 from tenant.models import Tenant
+from tests.utils.staff import store_tenant
 
 GREEK_ONLY = {slug: {"el"} for slug in LEGAL_DOCUMENT_SLUGS}
 BOTH = {slug: {"el", "en"} for slug in LEGAL_DOCUMENT_SLUGS}
@@ -28,18 +29,9 @@ BOTH = {slug: {"el", "en"} for slug in LEGAL_DOCUMENT_SLUGS}
 
 @pytest.fixture
 def tenant(db) -> Tenant:
-    # `auto_create_schema = False`: creating a schema per test is ~50x
-    # slower and this guard never reads one (the coverage reader is
-    # patched, and `schema_exists` is what decides whether it runs).
-    instance = Tenant(
-        schema_name="guardtest",
-        name="Guard Test",
-        default_locale="el",
-        available_locales=["el"],
+    return store_tenant(
+        "guardtest", default_locale="el", available_locales=["el"]
     )
-    instance.auto_create_schema = False
-    instance.save()
-    return instance
 
 
 def _run_clean(tenant: Tenant, coverage: dict[str, set[str]]) -> None:

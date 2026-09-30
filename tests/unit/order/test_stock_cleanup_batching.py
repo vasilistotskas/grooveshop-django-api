@@ -76,15 +76,8 @@ def test_an_empty_backlog_is_a_no_op():
     assert StockManager.cleanup_expired_reservations() == 0
 
 
-@pytest.mark.django_db(transaction=True)
 def test_an_earlier_batch_survives_a_later_batch_failing(monkeypatch):
     """Each batch must commit on its own — the point of batching.
-
-    `transaction=True` is required and is not incidental: under the
-    default marker every test runs inside one outer transaction, so an
-    inner `atomic()` is a savepoint whether or not the method is
-    decorated, and the two behaviours are indistinguishable. Only a real
-    commit can show the difference.
 
     The method carried `@transaction.atomic`. Django opens a transaction
     at the OUTERMOST atomic block and inner blocks only create
@@ -93,6 +86,10 @@ def test_an_earlier_batch_survives_a_later_batch_failing(monkeypatch):
     when it is not. So no batch committed independently, every row lock
     was held until the method returned, and one late failure discarded
     all the earlier work.
+
+    No real commit is needed to see that: the decorator's own block
+    rolls back when the failure propagates through it, taking the
+    earlier batches with it even when it is itself a savepoint.
     """
     monkeypatch.setattr(StockManager, "CLEANUP_BATCH_SIZE", 2)
     product = ProductFactory(num_images=0, num_reviews=0, stock=100)

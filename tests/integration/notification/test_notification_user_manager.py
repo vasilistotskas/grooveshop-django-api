@@ -1,6 +1,5 @@
 from datetime import timedelta
 
-import pytest
 from django.test import TestCase
 from django.utils import timezone
 
@@ -18,94 +17,94 @@ from notification.models.user import NotificationUser
 from user.factories.account import UserAccountFactory
 
 
-@pytest.mark.django_db
 class TestNotificationUserQuerySet(TestCase):
-    def setUp(self):
-        self.now = timezone.now()
+    @classmethod
+    def setUpTestData(cls):
+        cls.now = timezone.now()
 
-        self.user1 = UserAccountFactory()
-        self.user2 = UserAccountFactory()
+        cls.user1 = UserAccountFactory()
+        cls.user2 = UserAccountFactory()
 
-        self.order_notification = NotificationFactory(
+        cls.order_notification = NotificationFactory(
             kind=NotificationKindEnum.INFO,
             category=NotificationCategoryEnum.ORDER,
             priority=NotificationPriorityEnum.HIGH,
-            expiry_date=self.now + timedelta(days=7),
+            expiry_date=cls.now + timedelta(days=7),
         )
 
-        self.cart_notification = NotificationFactory(
+        cls.cart_notification = NotificationFactory(
             kind=NotificationKindEnum.SUCCESS,
             category=NotificationCategoryEnum.CART,
             priority=NotificationPriorityEnum.NORMAL,
-            expiry_date=self.now + timedelta(days=7),
+            expiry_date=cls.now + timedelta(days=7),
         )
 
-        self.security_notification = NotificationFactory(
+        cls.security_notification = NotificationFactory(
             kind=NotificationKindEnum.WARNING,
             category=NotificationCategoryEnum.SECURITY,
             priority=NotificationPriorityEnum.URGENT,
-            expiry_date=self.now + timedelta(days=7),
+            expiry_date=cls.now + timedelta(days=7),
         )
 
-        self.expired_notification = NotificationFactory(
+        cls.expired_notification = NotificationFactory(
             kind=NotificationKindEnum.ERROR,
             category=NotificationCategoryEnum.SYSTEM,
             priority=NotificationPriorityEnum.CRITICAL,
-            expiry_date=self.now - timedelta(days=1),
+            expiry_date=cls.now - timedelta(days=1),
         )
 
-        self.promo_notification = NotificationFactory(
+        cls.promo_notification = NotificationFactory(
             kind=NotificationKindEnum.INFO,
             category=NotificationCategoryEnum.PROMOTION,
             priority=NotificationPriorityEnum.LOW,
-            expiry_date=self.now + timedelta(days=30),
+            expiry_date=cls.now + timedelta(days=30),
         )
 
-        self.seen_notification_user = NotificationUserFactory(
-            user=self.user1,
-            notification=self.order_notification,
+        cls.seen_notification_user = NotificationUserFactory(
+            user=cls.user1,
+            notification=cls.order_notification,
             seen=True,
-            seen_at=self.now - timedelta(hours=2),
+            seen_at=cls.now - timedelta(hours=2),
         )
 
-        self.unseen_notification_user = NotificationUserFactory(
-            user=self.user1,
-            notification=self.cart_notification,
+        cls.unseen_notification_user = NotificationUserFactory(
+            user=cls.user1,
+            notification=cls.cart_notification,
             seen=False,
             seen_at=None,
         )
 
-        self.user2_seen_notification = NotificationUserFactory(
-            user=self.user2,
-            notification=self.security_notification,
+        cls.user2_seen_notification = NotificationUserFactory(
+            user=cls.user2,
+            notification=cls.security_notification,
             seen=True,
-            seen_at=self.now - timedelta(hours=1),
+            seen_at=cls.now - timedelta(hours=1),
         )
 
-        self.user2_unseen_notification = NotificationUserFactory(
-            user=self.user2,
-            notification=self.promo_notification,
+        cls.user2_unseen_notification = NotificationUserFactory(
+            user=cls.user2,
+            notification=cls.promo_notification,
             seen=False,
             seen_at=None,
         )
 
-        self.expired_notification_user = NotificationUserFactory(
-            user=self.user1,
-            notification=self.expired_notification,
+        cls.expired_notification_user = NotificationUserFactory(
+            user=cls.user1,
+            notification=cls.expired_notification,
             seen=False,
             seen_at=None,
         )
 
-        old_date = self.now - timedelta(days=10)
-        self.old_notification_user = NotificationUserFactory(
-            user=self.user1,
-            notification=self.security_notification,
+        old_date = cls.now - timedelta(days=10)
+        cls.old_notification_user = NotificationUserFactory(
+            user=cls.user1,
+            notification=cls.security_notification,
             seen=True,
             seen_at=old_date,
         )
-        NotificationUser.objects.filter(
-            id=self.old_notification_user.id
-        ).update(created_at=old_date)
+        NotificationUser.objects.filter(id=cls.old_notification_user.id).update(
+            created_at=old_date
+        )
 
     def test_seen_notifications(self):
         seen_notifications = NotificationUser.objects.seen()
@@ -390,53 +389,53 @@ class TestNotificationUserQuerySet(TestCase):
         self.assertEqual(len(user1_active_unseen_high_priority), 0)
 
 
-@pytest.mark.django_db
 class TestNotificationUserManager(TestCase):
-    def setUp(self):
-        self.now = timezone.now()
+    @classmethod
+    def setUpTestData(cls):
+        cls.now = timezone.now()
 
-        self.user1 = UserAccountFactory()
-        self.user2 = UserAccountFactory()
+        cls.user1 = UserAccountFactory()
+        cls.user2 = UserAccountFactory()
 
-        self.notification1 = NotificationFactory(
+        cls.notification1 = NotificationFactory(
             kind=NotificationKindEnum.INFO,
             priority=NotificationPriorityEnum.HIGH,
         )
 
-        self.notification2 = NotificationFactory(
+        cls.notification2 = NotificationFactory(
             kind=NotificationKindEnum.SUCCESS,
             priority=NotificationPriorityEnum.NORMAL,
         )
 
-        self.notification3 = NotificationFactory(
+        cls.notification3 = NotificationFactory(
             kind=NotificationKindEnum.WARNING,
             priority=NotificationPriorityEnum.URGENT,
         )
 
-        self.seen_notification_user = NotificationUserFactory(
-            user=self.user1,
-            notification=self.notification1,
+        cls.seen_notification_user = NotificationUserFactory(
+            user=cls.user1,
+            notification=cls.notification1,
             seen=True,
-            seen_at=self.now - timedelta(hours=2),
+            seen_at=cls.now - timedelta(hours=2),
         )
 
-        self.unseen_notification_user1 = NotificationUserFactory(
-            user=self.user1,
-            notification=self.notification2,
+        cls.unseen_notification_user1 = NotificationUserFactory(
+            user=cls.user1,
+            notification=cls.notification2,
             seen=False,
             seen_at=None,
         )
 
-        self.unseen_notification_user2 = NotificationUserFactory(
-            user=self.user1,
-            notification=self.notification3,
+        cls.unseen_notification_user2 = NotificationUserFactory(
+            user=cls.user1,
+            notification=cls.notification3,
             seen=False,
             seen_at=None,
         )
 
-        self.user2_notification = NotificationUserFactory(
-            user=self.user2,
-            notification=self.notification1,
+        cls.user2_notification = NotificationUserFactory(
+            user=cls.user2,
+            notification=cls.notification1,
             seen=False,
             seen_at=None,
         )

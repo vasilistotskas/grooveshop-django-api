@@ -1,10 +1,11 @@
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from django.utils import translation
 from djmoney.money import Money
 
 from country.factories import CountryFactory
-from order.enum.status import OrderStatus
+from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
 from order.serializers.item import OrderItemDetailSerializer
 from order.serializers.order import (
@@ -97,8 +98,10 @@ class OrderDetailSerializerTestCase(TestCase):
             },
         )
 
-        serializer = OrderDetailSerializer(instance=self.order)
-        timeline = serializer.data["order_timeline"]
+        with translation.override("en"):
+            timeline = OrderDetailSerializer(instance=self.order).data[
+                "order_timeline"
+            ]
         change_types = [entry["change_type"] for entry in timeline]
         descriptions = [entry["description"] for entry in timeline]
 
@@ -122,7 +125,7 @@ class OrderDetailSerializerTestCase(TestCase):
         )
 
         self.assertIn("STATUS", change_types)
-        self.assertIn("PENDING → PROCESSING", descriptions)
+        self.assertIn("Pending → Processing", descriptions)
 
         payment_descs = [
             entry["description"]
@@ -131,12 +134,47 @@ class OrderDetailSerializerTestCase(TestCase):
         ]
         self.assertTrue(payment_descs, "PAYMENT entry missing")
         payment_desc = payment_descs[-1]
-        self.assertIn("PENDING → COMPLETED", payment_desc)
-        self.assertIn("viva_wallet", payment_desc)
+        self.assertEqual(payment_desc, "Pending → Completed (viva_wallet)")
         self.assertNotIn(
             "internal-token-do-not-expose",
             payment_desc,
             "PAYMENT description must not surface the payment_id token",
+        )
+
+    def test_timeline_renders_translated_status_labels(self):
+        """Stored values are enum codes (``PENDING``); older payment
+        rows hold lowercase ones. The customer reads the label, in the
+        request language."""
+        from order.models.history import OrderHistory
+
+        OrderHistory.log_payment_update(
+            order=self.order,
+            previous_value={"payment_status": "pending"},
+            new_value={"payment_status": "completed", "provider": "stripe"},
+        )
+        OrderHistory.log_status_change(
+            order=self.order,
+            previous_status="PENDING",
+            new_status="NOT_A_STATUS",
+        )
+
+        with translation.override("el"):
+            timeline = OrderDetailSerializer(instance=self.order).data[
+                "order_timeline"
+            ]
+        descriptions = [entry["description"] for entry in timeline[1:]]
+
+        with translation.override("el"):
+            pending = str(PaymentStatus.PENDING.label)
+            completed = str(PaymentStatus.COMPLETED.label)
+            order_pending = str(OrderStatus.PENDING.label)
+        self.assertNotEqual(completed, "Completed")
+        self.assertEqual(
+            descriptions,
+            [
+                f"{order_pending} → NOT_A_STATUS",
+                f"{pending} → {completed} (stripe)",
+            ],
         )
 
 

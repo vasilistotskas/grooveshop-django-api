@@ -11,12 +11,13 @@ from recommendation.models import RecommendationSlot
 from recommendation.presets import PRESETS
 from tenant.models import StoreVertical
 from tenant.provisioning import _seed_recommendation_slots
+from tests.utils.staff import store_tenant
 
 pytestmark = pytest.mark.django_db
 
 
-def test_slots_follow_the_tenant_vertical(tenant_factory):
-    tenant = tenant_factory("vertical-plants-tenant")
+def test_slots_follow_the_tenant_vertical(db):
+    tenant = store_tenant("vertical_plants_tenant")
     tenant.vertical = StoreVertical.PLANTS_GARDEN
     tenant.save(update_fields=["vertical"])
 
@@ -28,6 +29,6 @@ def test_slots_follow_the_tenant_vertical(tenant_factory):
     assert str(cart.price_band_ratio) == expected["price_band_ratio"]
 
 
-def test_a_new_tenant_defaults_to_general(tenant_factory):
-    tenant = tenant_factory("vertical-default-tenant")
+def test_a_new_tenant_defaults_to_general(db):
+    tenant = store_tenant("vertical_default_tenant")
     assert tenant.vertical == StoreVertical.GENERAL

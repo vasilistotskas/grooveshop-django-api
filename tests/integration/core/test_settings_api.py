@@ -7,9 +7,8 @@ Covers:
   - Non-whitelisted key accessible for admin staff (200)
   - Admin-only list endpoint requires authentication
   - CONTACT_EMAIL is in the whitelist and accessible anonymously
-  - Setting.get() isolation: each test gets a fresh row so writes in
-    one test do not bleed into another (DummyCache configured in conftest
-    ensures every read hits the DB).
+  - Setting.get() returns the value most recently written (conftest
+    routes django-extra-settings through a no-op cache).
 """
 
 from __future__ import annotations
@@ -67,9 +66,8 @@ STOREFRONT_FEATURE_TOGGLES = (
 def test_storefront_feature_toggles_ship_enabled():
     """Every storefront gate defaults ON — a merchant opts OUT.
 
-    Read from EXTRA_SETTINGS_DEFAULTS rather than a DB row: the rows
-    are seeded at app-ready time and a TransactionTestCase on the same
-    xdist worker can truncate them mid-run.
+    Read from EXTRA_SETTINGS_DEFAULTS, the config the rows are seeded
+    from.
     """
     from django.conf import settings as dj_settings
 
@@ -107,13 +105,8 @@ class TestGetSettingByKeyPublicAccess:
         """Every storefront UI / merchant feature toggle the storefront
         gates on must be readable anonymously.
 
-        Asserts membership of PUBLIC_SETTING_KEYS only — never the
-        seeded VALUE. extra_settings rows are created at app-ready
-        time, not by a fixture, so a TransactionTestCase running
-        earlier on the same xdist worker truncates them without
-        restoring, and ``value`` then comes back null (CI, 2026-08-26).
-        The defaults themselves are asserted in the EXTRA_SETTINGS
-        config, and the gates pass their own ``default=True``.
+        Asserts membership of PUBLIC_SETTING_KEYS only; the defaults
+        themselves are asserted from the EXTRA_SETTINGS config above.
         """
         client = _anon_client()
         url = reverse("api-settings-get")
@@ -239,41 +232,14 @@ class TestSettingValueIsolation:
 
         from extra_settings.models import Setting
 
-        obj, _ = Setting.objects.get_or_create(
-            name="GIFT_CARD_MIN_AMOUNT",
-            defaults={"value_type": "decimal", "value_decimal": "10.00"},
-        )
-        # Overwrite via the ORM to simulate an admin change.  Set
-        # ``value_type`` explicitly because ``get_or_create`` may have
-        # returned an existing row seeded with a different type from a
-        # previous test run.
-        obj.value_type = "decimal"
-        obj.value_decimal = Decimal("99.99")
-        obj.save(update_fields=["value_type", "value_decimal"])
+        setting = Setting.objects.get(name="GIFT_CARD_MIN_AMOUNT")
+        setting.value_decimal = Decimal("99.99")
+        setting.save(update_fields=["value_decimal"])
 
-        # Read back from the DB directly rather than via ``Setting.get``
-        # — the latter goes through extra_settings's cache layer which,
-        # under parallel xdist + a shared Redis backend, can briefly
-        # serve a stale value from another worker.  The conftest
-        # ``_reseed_extra_settings`` fixture clears the cache before
-        # each test, but that does not protect a read-after-write
-        # within the same test instance from racing a sibling worker's
-        # cache write.  Refreshing the row from the DB asserts the
-        # invariant we actually care about: the write hit Postgres.
-        obj.refresh_from_db()
-        assert obj.value_type == "decimal"
-        assert obj.value_decimal == Decimal("99.99")
+        assert Setting.get("GIFT_CARD_MIN_AMOUNT") == Decimal("99.99")
 
     def test_contact_email_default_is_empty_string(self):
         """CONTACT_EMAIL default is '' so callers fall back gracefully."""
         from extra_settings.models import Setting
 
-        # get_or_create with empty string default
-        Setting.objects.get_or_create(
-            name="CONTACT_EMAIL",
-            defaults={"value_type": "string", "value_string": ""},
-        )
-        val = Setting.get("CONTACT_EMAIL", default="")
-        # Either an empty string (default) or whatever admin set — just
-        # confirm the key resolves without raising.
-        assert isinstance(val, str)
+        assert Setting.get("CONTACT_EMAIL", default=None) == ""

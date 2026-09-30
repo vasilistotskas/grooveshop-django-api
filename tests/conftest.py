@@ -1,5 +1,5 @@
 import functools
-import importlib
+import logging
 import os
 from types import SimpleNamespace
 
@@ -7,10 +7,16 @@ import pytest
 from django.conf import settings
 from django.contrib.sites.models import Site
 from django.core.cache import caches
-from django.db import connection, connections, reset_queries
+from django.db import connection, connections
+from django.test import TestCase, TransactionTestCase
+from django_tenants.utils import get_public_schema_name
 from hypothesis import HealthCheck
 from hypothesis import settings as hypothesis_settings
+from pytest_django.fixtures import validate_django_db
 from redis.exceptions import ConnectionError as RedisConnectionError
+
+# The logger Django reports a failed robust ``on_commit`` callback to.
+_on_commit_logger = logging.getLogger("django.db.backends.base")
 
 # Hypothesis profiles for different environments
 hypothesis_settings.register_profile(
@@ -173,6 +179,29 @@ from tenant.models import Tenant as _Tenant  # noqa: E402
 
 _Tenant.auto_create_schema = False
 
+# For the same reason the test database is migrated for the shared
+# (public) schema only. django-tenants' ``migrate`` goes on to migrate
+# every tenant row's schema, and the seeded ``webside`` tenant made that
+# a second full schema per worker database, used by no test here: half
+# the time it takes to build one. ``tests_mt`` has its own conftest.
+from django_tenants.management.commands.migrate_schemas import (  # noqa: E402
+    MigrateSchemasCommand as _MigrateSchemasCommand,
+)
+
+_migrate_every_schema = _MigrateSchemasCommand.handle
+
+
+def _migrate_the_public_schema_only(self, *args, **options):
+    return _migrate_every_schema(self, *args, **{**options, "shared": True})
+
+
+_MigrateSchemasCommand.handle = _migrate_the_public_schema_only
+
+# Migration-seeded rows survive every ``flush`` — see the module.
+from tests import migration_seed  # noqa: E402
+
+migration_seed.connect()
+
 # ``--store-durations`` (CI's per-shard ``.test_durations``) drops a
 # setup or teardown only above 10 minutes. Creating an xdist worker's
 # test database takes 4-5 on a runner and is billed to whichever test
@@ -329,6 +358,12 @@ def _reset_worker_cache():
                 return
 
 
+@pytest.fixture(scope="session", autouse=True)
+def _start_with_an_empty_worker_cache():
+    """Drop whatever an interrupted earlier run left in this namespace."""
+    _reset_worker_cache()
+
+
 @pytest.fixture(autouse=True)
 def clear_caches():
     yield
@@ -375,51 +410,115 @@ def _assert_english_locale_if_marked(request):
         yield
 
 
-@pytest.fixture(autouse=True)
-def _run_transaction_on_commit_immediately(request, monkeypatch):
-    """Execute ``transaction.on_commit`` callbacks synchronously in tests.
+def _is_transactional(request) -> bool:
+    """Whether the test really commits, and ends with a ``flush``.
 
-    Signal handlers and Celery dispatches across the codebase wrap work in
-    ``transaction.on_commit`` so that workers see committed rows (production
-    correctness). Django's ``TestCase`` wraps every test in a savepoint that
-    is rolled back at the end — the outer transaction never commits, so the
-    callbacks would never run, and tests asserting on dispatch behaviour
-    would see empty mocks.
-
-    This fixture replaces ``transaction.on_commit`` with a direct call for
-    the duration of each test. Tests that explicitly ``@patch`` it to verify
-    deferral still work because the per-test patch takes precedence.
-
-    Skipped when the test explicitly uses ``transaction=True`` django_db
-    mode (TransactionTestCase), since those commit normally.
+    pytest-django's own rule (``pytest_django.fixtures._django_db_helper``)
+    for pytest-style tests; a Django ``TransactionTestCase`` (not a
+    ``TestCase``) says so through its class instead.
     """
     marker = request.node.get_closest_marker("django_db")
-    if marker and marker.kwargs.get("transaction", False):
+    transactional = reset_sequences = False
+    if marker is not None:
+        transactional, reset_sequences, *_ = validate_django_db(marker)
+    if transactional or reset_sequences:
+        return True
+    if {"transactional_db", "live_server", "django_db_reset_sequences"} & set(
+        request.fixturenames
+    ):
+        return True
+    cls = request.node.cls
+    return (
+        cls is not None
+        and issubclass(cls, TransactionTestCase)
+        and not issubclass(cls, TestCase)
+    )
+
+
+def _seed_bypassing_options(item) -> list[str]:
+    """The options *item* uses that ``tests/migration_seed.py`` cannot
+    serve: after them a worker's seed is gone, or its sequences sit
+    under rows the restore put back."""
+    marker = item.get_closest_marker("django_db")
+    if marker is not None:
+        _, reset_sequences, _, serialized_rollback, available_apps = (
+            validate_django_db(marker)
+        )
+    else:
+        cls = getattr(item, "cls", None)
+        if cls is None or not issubclass(cls, TransactionTestCase):
+            return []
+        reset_sequences = cls.reset_sequences
+        serialized_rollback = cls.serialized_rollback
+        available_apps = cls.available_apps
+    fixtures = set(getattr(item, "fixturenames", ()))
+    return [
+        name
+        for name, used in (
+            ("reset_sequences", reset_sequences),
+            ("serialized_rollback", serialized_rollback),
+            ("available_apps", available_apps is not None),
+            (
+                "django_db_reset_sequences",
+                "django_db_reset_sequences" in fixtures,
+            ),
+            (
+                "django_db_serialized_rollback",
+                "django_db_serialized_rollback" in fixtures,
+            ),
+        )
+        if used
+    ]
+
+
+def pytest_collection_modifyitems(config, items):
+    offenders = [
+        f"{item.nodeid}: {', '.join(options)}"
+        for item in items
+        if (options := _seed_bypassing_options(item))
+    ]
+    if offenders:
+        raise pytest.UsageError(
+            "These tests use database options the migration-seed restore "
+            "cannot serve (see tests/migration_seed.py):\n  "
+            + "\n  ".join(offenders)
+        )
+
+
+@pytest.fixture(autouse=True)
+def _run_transaction_on_commit_immediately(request, monkeypatch):
+    """Run ``transaction.on_commit`` callbacks when they are registered.
+
+    Signal handlers and Celery dispatches wrap their work in
+    ``transaction.on_commit`` so workers only ever see committed rows.
+    A ``TestCase``-style test runs inside a transaction that is rolled
+    back, never committed, so without this the callbacks would never run
+    and every dispatch would go unobserved.
+
+    The stand-in is Django's own autocommit branch
+    (``BaseDatabaseWrapper.on_commit``): the callback runs at once, its
+    exception propagates unless it was registered ``robust=True``, and a
+    robust one's failure is logged. A test that patches ``on_commit``
+    itself to observe the deferral still wins. Transactional tests are
+    left alone — they commit for real.
+    """
+    if _is_transactional(request):
         return
 
     from django.db import transaction as _tx
 
     def _immediate(func, using=None, robust=False):
-        # Swallow callback exceptions. Under CELERY_TASK_ALWAYS_EAGER, a
-        # ``task.delay()`` inside an on_commit callback actually executes
-        # the task body — some tasks (e.g. PDF invoicing via WeasyPrint)
-        # need native libs that aren't available in the test environment
-        # and raise Celery Retry exceptions. In production, ``.delay()``
-        # only enqueues; the task body runs in a worker. Swallowing here
-        # makes the fixture behave like ``on_commit(..., robust=True)``.
+        if not robust:
+            func()
+            return
         try:
             func()
-        except Exception:  # pragma: no cover - swallow like robust=True
-            pass
+        except Exception:
+            _on_commit_logger.exception(
+                "Error calling %s in on_commit().", func.__qualname__
+            )
 
     monkeypatch.setattr(_tx, "on_commit", _immediate)
-
-
-@pytest.fixture(autouse=True)
-def reset_db_queries():
-    reset_queries()
-    yield
-    reset_queries()
 
 
 @pytest.fixture(autouse=True)
@@ -451,43 +550,16 @@ def _close_db_connections_after_test(request):
 
 
 @pytest.fixture(scope="session", autouse=True)
-def close_db_connections_on_teardown(request):
-    """Close all database connections at the end of the test session to prevent teardown warnings."""
+def close_db_connections_on_teardown():
+    """Close every connection at session end, before the databases go."""
     yield
-
-    def close_connections():
-        for conn in connections.all():
-            conn.close()
-
-    request.addfinalizer(close_connections)
+    connections.close_all()
 
 
 @pytest.fixture(autouse=True)
-def _django_clear_site_cache(request):
-    """Clear Site cache if DB access is allowed."""
-    if request.node.get_closest_marker("django_db"):
-        Site.objects.clear_cache()
-
-
-@pytest.fixture
-def debug_query_count():
-    connection.force_debug_cursor = True
-    yield
-    connection.force_debug_cursor = False
-
-
-@pytest.fixture(autouse=True)
-def _django_clear_cache(request):
-    """Clear this worker's cache namespace before tests that use the DB.
-
-    Uses the worker-scoped clear (not a global FLUSHDB) so a before-test
-    clear on one worker cannot evict another worker's live keys.
-    """
-    if request.node.get_closest_marker("django_db"):
-        try:
-            _reset_worker_cache()
-        except Exception:
-            pass
+def _django_clear_site_cache():
+    """Forget ``Site`` rows a previous test cached and then rolled back."""
+    Site.objects.clear_cache()
 
 
 @pytest.fixture(autouse=True)
@@ -503,295 +575,6 @@ def _reset_payment_events_redis_client():
     payment_events_module._redis_client = None
 
 
-@pytest.fixture(autouse=True)
-def _reseed_extra_settings(request):
-    """Reset every ``EXTRA_SETTINGS_DEFAULTS`` row to its declared
-    baseline before each DB test.
-
-    Why **reset** and not just **re-seed**: tests that mutate a
-    setting (e.g. ``Setting.objects.update_or_create(name="ACS_SMARTPOINT_ENABLED",
-    ...)``) and run with ``@pytest.mark.django_db(transaction=True)``
-    commit the change to the shared test database. Under ``-n auto``
-    a subsequent test on a different worker reads the mutated value
-    and the assertion flakes. The previous version called
-    ``Setting.set_defaults_from_settings()`` which uses
-    ``get_or_create`` and only writes on creation — it restored
-    missing rows after a ``flush`` but didn't undo value mutations.
-
-    This version uses ``update_or_create`` keyed on ``name`` and
-    rewrites ``value_<type>`` to the declared default every time, so
-    each test starts from the same baseline regardless of what any
-    prior test did. The cost is one tiny UPDATE per declared setting
-    (~30 rows) per test — dwarfed by the EAGER signal cascades the
-    same tests trigger.
-
-    Notes:
-
-    * ``value_type`` is normalised the same way ``extra_settings``
-      does in its own ``set_defaults`` — strips the ``Setting.TYPE_``
-      prefix if present and lowercases — so both the long and short
-      forms in ``EXTRA_SETTINGS_DEFAULTS`` are accepted.
-    * Settings not declared in ``EXTRA_SETTINGS_DEFAULTS`` (rare —
-      ad-hoc admin-created rows) are left alone.
-    * The DummyCache patch above neutralises ``extra_settings``'s
-      caching; combined with this reset, every ``Setting.get`` is a
-      direct, current-test DB read with no cross-worker leakage.
-    """
-    if not request.node.get_closest_marker("django_db"):
-        return
-    from django.conf import settings as _dj_settings
-
-    try:
-        from extra_settings.models import Setting
-
-        for default in getattr(_dj_settings, "EXTRA_SETTINGS_DEFAULTS", ()):
-            name = default.get("name")
-            value_type = (
-                default.get("type", "string")
-                .replace("Setting.TYPE_", "")
-                .lower()
-            )
-            value = default.get("value")
-            if not name or value is None:
-                continue
-            Setting.objects.update_or_create(
-                name=name,
-                defaults={
-                    "value_type": value_type,
-                    f"value_{value_type}": value,
-                },
-            )
-    except Exception:
-        # Fixture is best-effort — a transient DB connection error
-        # must not mask the real failure of the test itself.
-        pass
-
-
-@functools.cache
-def _seeded_region_and_country_codes() -> tuple[frozenset, frozenset]:
-    """Every alpha-2 and region code the seed migrations create."""
-    countries = importlib.import_module(
-        "country.migrations.0012_seed_iso_countries"
-    )
-    default_regions = importlib.import_module(
-        "region.migrations.0009_seed_default_regions"
-    )
-    cyprus_regions = importlib.import_module(
-        "region.migrations.0010_seed_cyprus_regions"
-    )
-    return (
-        frozenset(row[0] for row in countries.ISO_COUNTRIES),
-        frozenset(
-            row[0]
-            for row in (
-                *default_regions.DEFAULT_REGIONS,
-                *cyprus_regions.CYPRUS_REGIONS,
-            )
-        ),
-    )
-
-
-def _country_seed_is_intact() -> bool:
-    from country.models import Country
-    from region.models import Region
-
-    country_codes, region_codes = _seeded_region_and_country_codes()
-    return Country.objects.filter(alpha_2__in=country_codes).count() == len(
-        country_codes
-    ) and Region.objects.filter(alpha__in=region_codes).count() == len(
-        region_codes
-    )
-
-
-@pytest.fixture(autouse=True)
-def _reseed_countries(request):
-    """Restore the ``Country`` + ``Region`` seed rows for every DB test.
-
-    Same problem as ``_reseed_extra_settings`` above: ``country`` and
-    ``region`` had no data migration until seed migrations added one,
-    and any test marked ``@pytest.mark.django_db(transaction=True)``
-    flushes every table on teardown — including these rows, which
-    unlike ``ShippingProvider``/``Setting`` had no reseed fixture of
-    their own until ``_reseed_shipping_providers`` below started
-    depending on GR existing to create its ``ShippingRate`` rows.
-    Requested as a parameter (not just ``autouse`` ordering) by that
-    fixture so this always runs first.
-
-    Runs all four seed migrations in dependency order — GR (0010),
-    then the full ISO 3166-1 seed (0012, which also corrects GR's
-    ``iso_cc`` and, as a side effect, brings back CY and the other 247
-    countries), then each app's own default/Cyprus regions. Bringing
-    CY back this way used to make ``OrderFactory``/``UserAddressFactory``'s
-    RANDOM country picker (``get_or_create_country()``) occasionally
-    hand an ACS voucher test a Faker postcode CY's strict 4-digit
-    format rejects — those helpers now deterministically prefer GR
-    first instead of picking randomly, which is what actually closes
-    that gap; this fixture flushing back to "only GR" was never the
-    fix, just an accident that hid it.
-    """
-    if request.node.get_closest_marker("django_db"):
-        try:
-            from django.apps import apps as django_apps
-
-            # The seeds re-check every one of ~270 rows with a query
-            # each. Before EVERY DB test that roughly doubled CI's
-            # test time, while the rows are almost always still there:
-            # only a flushing test removes them. Two counts settle it.
-            if _country_seed_is_intact():
-                return
-
-            for module_name, func_name in (
-                (
-                    "country.migrations.0010_seed_default_country",
-                    "seed_default_country",
-                ),
-                (
-                    "region.migrations.0009_seed_default_regions",
-                    "seed_default_regions",
-                ),
-                # Must run after the two above: it corrects GR's
-                # iso_cc only when the row still carries
-                # 0010_seed_default_country's own (wrong) 297, and CY's
-                # region seed depends on CY already existing.
-                (
-                    "country.migrations.0012_seed_iso_countries",
-                    "seed_iso_countries",
-                ),
-                (
-                    "region.migrations.0010_seed_cyprus_regions",
-                    "seed_cyprus_regions",
-                ),
-            ):
-                module = importlib.import_module(module_name)
-                getattr(module, func_name)(
-                    django_apps, SimpleNamespace(connection=connection)
-                )
-        except Exception:
-            # Fixture is best-effort — a transient DB connection error
-            # must not mask the real failure of the test itself.
-            pass
-
-
-@pytest.fixture(autouse=True)
-def _reseed_shipping_providers(request, _reseed_countries):
-    """Restore the ``ShippingProvider`` + ``ShippingRate`` seed rows for
-    every DB test.
-
-    The ``shipping/migrations/0002_seed_providers.py`` data migration
-    only runs once at DB creation. Same issue as the
-    ``_reseed_extra_settings`` fixture above: any test marked
-    ``@pytest.mark.django_db(transaction=True)`` flushes every table on
-    teardown, wiping the ``acs`` / ``boxnow`` / ``flat_rate`` rows —
-    and, now, the GR ``ShippingRate`` rows those seed migrations imply.
-
-    Subsequent tests that ``ShippingProvider.objects.get(code="acs")``
-    (e.g. via the carrier registry, the order serializer, or the
-    ``available_options`` view) then explode with ``DoesNotExist`` —
-    one or two unlucky tests at random per ``-n auto`` run.
-
-    ``metadata`` carries no ``supported_countries`` key — that concept
-    is gone; ``convert_legacy_pricing`` below (and production) fall
-    back to GR when it's absent, matching a store that has never
-    touched the key.
-
-    Idempotent: ``update_or_create``/``get_or_create`` is a no-op when
-    the seed rows are still in place, restorative when they are not.
-    """
-    if request.node.get_closest_marker("django_db"):
-        try:
-            from shipping.models import ShippingProvider
-
-            ShippingProvider.objects.update_or_create(
-                code="boxnow",
-                defaults={
-                    "name": "BOX NOW",
-                    "is_active": False,
-                    "supports_home_delivery": False,
-                    "supports_pickup_point": True,
-                    "live_mode": False,
-                    "priority": 20,
-                    "metadata": {
-                        "locker_picker_kind": "boxnow_widget",
-                        "tagline_key": "shipping.method.boxnow.tagline",
-                        "tagline_color": "info",
-                        "logo": "/img/shipping/boxnow.png",
-                        "uses_generic_picker": False,
-                    },
-                },
-            )
-            ShippingProvider.objects.update_or_create(
-                code="acs",
-                defaults={
-                    "name": "ACS Courier",
-                    "is_active": False,
-                    "supports_home_delivery": True,
-                    "supports_pickup_point": True,
-                    "live_mode": False,
-                    "priority": 10,
-                    # Mirror the seed in ``shipping/migrations/
-                    # 0004_seed_provider_metadata.py``. Keep these in
-                    # sync — the metadata-driven config tests rely on
-                    # the keys being present on every test row, and
-                    # production reads the same keys.
-                    "metadata": {
-                        "locker_picker_kind": "acs_db_picker",
-                        "logo": "/img/shipping/acs.png",
-                        "shop_kinds_by_country": {
-                            "GR": [7, 8],
-                            "CY": [7],
-                        },
-                        "nearest_limit": 20,
-                        "min_weight_kg": "0.5",
-                        "max_weight_kg": "999",
-                        "default_voucher_language": "GR",
-                        "print_type": 1,
-                    },
-                },
-            )
-            # The flat-rate row is re-seeded by its migration's own
-            # callable rather than a copy of its defaults, so the two
-            # cannot drift. ``tenant.provisioning`` activates it, and a
-            # flushed worker DB used to make ``seed_tenant_defaults``
-            # report "default carrier" as a failed step.
-            from django.apps import apps as django_apps
-
-            flat_rate_seed = importlib.import_module(
-                "shipping.migrations.0009_seed_flat_rate_provider"
-            )
-            flat_rate_seed.seed_flat_rate(
-                django_apps, SimpleNamespace(connection=connection)
-            )
-
-            # GR ``ShippingRate`` rows for every kind each seeded
-            # provider supports — same "frozen historical default"
-            # function the real migration runs, so a test that asserts
-            # a specific price (3.00 / 50.00 flat_rate, 2.50 / 30.00
-            # boxnow, 3.50 / 40.00 acs) matches what a real deploy's
-            # conversion produced.
-            rate_seed = importlib.import_module(
-                "shipping.migrations.0011_convert_legacy_pricing_to_rates"
-            )
-            # Same cost argument as ``_reseed_countries``: the rates
-            # only go missing after a flush, so skip the conversion
-            # while every seeded provider still has its GR rate.
-            from shipping.models import ShippingRate
-
-            seeded = set(
-                ShippingRate.objects.filter(
-                    country_id="GR",
-                    provider__code__in=rate_seed._PROVIDER_CODES,
-                ).values_list("provider__code", flat=True)
-            )
-            if seeded != set(rate_seed._PROVIDER_CODES):
-                rate_seed.convert_legacy_pricing(
-                    django_apps, SimpleNamespace(connection=connection)
-                )
-        except Exception:
-            # The fixture is best-effort — a transient DB connection
-            # error must not mask the real failure of the test itself.
-            pass
-
-
 @pytest.fixture
 def bind_tenant(monkeypatch):
     """Attach a tenant (or a lightweight stand-in) to ``connection.tenant``
@@ -802,10 +585,9 @@ def bind_tenant(monkeypatch):
     helpers (``tenant.credentials``) then treat every third-party
     integration as unconfigured. Tests exercising tenant-scoped
     behaviour bind a fake tenant here; ``monkeypatch`` unwinds it after
-    the test so parallel xdist workers never see leaked state. Several
-    test modules also declare their own local copy of this fixture
-    (same shape) — either is fine, the local one simply shadows this
-    one for that module.
+    the test so parallel xdist workers never see leaked state. For code
+    that reads ``connection.schema_name`` rather than the tenant, use
+    ``bind_tenant_and_schema``.
 
     Only for stand-ins and for code that never switches schema. A real
     ``Tenant`` whose code path enters ``schema_context`` (every eager
@@ -816,10 +598,11 @@ def bind_tenant(monkeypatch):
     attribute alone leaves the worker outside the public schema.
     """
 
-    def _bind(t):
+    def _bind(t, *, with_schema=False):
         monkeypatch.setattr(connection, "tenant", t, raising=False)
-        # Also pin `schema_name` to whatever it is right now. This is a
-        # no-op during the test, but it makes monkeypatch RESTORE it at
+        # Also pin `schema_name` — to whatever it is right now unless
+        # `with_schema` asks for the tenant's. Unchanged, this is a no-op
+        # during the test, but it makes monkeypatch RESTORE it at
         # teardown — which matters because any code path that enters
         # `schema_context` (every eager `TenantTask`) rewrites
         # `connection.schema_name` on exit via `set_tenant(previous)`.
@@ -828,11 +611,22 @@ def bind_tenant(monkeypatch):
         # create a real Tenant died with "Can't create tenant outside the
         # public schema" — a failure with no visible connection to
         # whichever test actually leaked.
-        monkeypatch.setattr(
-            connection, "schema_name", connection.schema_name, raising=False
+        schema = (
+            getattr(t, "schema_name", None) or get_public_schema_name()
+            if with_schema
+            else connection.schema_name
         )
+        monkeypatch.setattr(connection, "schema_name", schema, raising=False)
 
     return _bind
+
+
+@pytest.fixture
+def bind_tenant_and_schema(bind_tenant):
+    """``bind_tenant`` that also moves ``connection.schema_name`` onto the
+    tenant's schema (``public`` for ``None``), for code that reads the
+    schema rather than ``connection.tenant``."""
+    return functools.partial(bind_tenant, with_schema=True)
 
 
 @pytest.fixture
@@ -847,8 +641,6 @@ def acs_configured_tenant(bind_tenant):
     credential helper only ever ``getattr()``s the specific field
     names off ``connection.tenant``.
     """
-    from types import SimpleNamespace
-
     tenant = SimpleNamespace(
         schema_name="test-acs-tenant",
         acs_api_key="TEST_ACS_KEY",
@@ -883,8 +675,6 @@ def boxnow_configured_tenant(bind_tenant):
     exercising BoxNow availability need an active tenant with
     ``Tenant.box_now_*`` fields set.
     """
-    from types import SimpleNamespace
-
     tenant = SimpleNamespace(
         schema_name="test-boxnow-tenant", **_BOXNOW_TENANT_FIELDS
     )
@@ -902,8 +692,6 @@ def acs_and_boxnow_configured_tenant(bind_tenant):
     second call would clobber the first. Use this combined fixture
     instead.
     """
-    from types import SimpleNamespace
-
     tenant = SimpleNamespace(
         schema_name="test-acs-boxnow-tenant",
         acs_api_key="TEST_ACS_KEY",
@@ -917,67 +705,6 @@ def acs_and_boxnow_configured_tenant(bind_tenant):
     )
     bind_tenant(tenant)
     return tenant
-
-
-@pytest.fixture
-def count_queries():
-    class QueryCounter:
-        def __init__(self, max_queries=None):
-            self.max_queries = max_queries
-            self.query_count = 0
-
-        def __enter__(self):
-            connection.force_debug_cursor = True
-            reset_queries()
-            return self
-
-        def __exit__(self, exc_type, exc_val, exc_tb):
-            self.query_count = len(connection.queries)
-            if (
-                self.max_queries is not None
-                and self.query_count > self.max_queries
-            ):
-                pytest.fail(
-                    f"Too many queries: {self.query_count} > {self.max_queries}"
-                )
-            connection.force_debug_cursor = False
-
-    return QueryCounter
-
-
-class QueryCountAssertionMixin:
-    def assertMaxQueries(self, num, func=None, *args, **kwargs):
-        conn = connection
-        old_debug_cursor = conn.force_debug_cursor
-        conn.force_debug_cursor = True
-
-        try:
-            reset_queries()
-            func(*args, **kwargs) if func else None
-            queries = len(conn.queries)
-            assert queries <= num, (
-                f"Expected a maximum of {num} queries, but {queries} were performed"
-            )
-        finally:
-            conn.force_debug_cursor = old_debug_cursor
-
-    def assertNumQueries(self, num, func=None, *args, **kwargs):
-        conn = connection
-        old_debug_cursor = conn.force_debug_cursor
-        conn.force_debug_cursor = True
-
-        try:
-            reset_queries()
-            func(*args, **kwargs) if func else None
-            queries = len(conn.queries)
-            assert queries == num, (
-                f"Expected exactly {num} queries, but {queries} were performed"
-            )
-        finally:
-            conn.force_debug_cursor = old_debug_cursor
-
-
-pytest.QueryCountAssertionMixin = QueryCountAssertionMixin
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -1051,6 +778,21 @@ def provision_meilisearch_indexes(attempts: int = 3) -> None:
                 meili_client.flush_tasks()
                 if remaining == 0:
                     raise
+
+
+@pytest.fixture(scope="session")
+def openapi_schema() -> dict:
+    """The OpenAPI document ``manage.py spectacular`` writes, built once.
+
+    The command is this same call plus rendering
+    (``drf_spectacular/management/commands/spectacular.py``), and one
+    generation takes seconds — it used to run once per test. Shared by
+    every test in the session: read it, never mutate it.
+    """
+    from drf_spectacular.settings import spectacular_settings
+
+    generator = spectacular_settings.DEFAULT_GENERATOR_CLASS()
+    return generator.get_schema(request=None, public=True)
 
 
 @pytest.fixture(scope="session")

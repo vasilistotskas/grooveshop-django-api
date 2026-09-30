@@ -16,16 +16,19 @@ default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
 
 class RegionViewSetTestCase(APITestCase):
-    def setUp(self):
-        self.admin_user = UserAccountFactory(
+    @classmethod
+    def setUpTestData(cls):
+        # ``test_list`` compares the whole list; the seeded regions
+        # return when the class transaction ends.
+        Region.objects.all().delete()
+        cls.admin_user = UserAccountFactory(
             num_addresses=0, is_superuser=True, is_staff=True
         )
+        cls.country = CountryFactory(num_regions=0)
+        cls.region = RegionFactory(alpha="GRC", country=cls.country)
+
+    def setUp(self):
         self.client.force_authenticate(user=self.admin_user)
-        self.country = CountryFactory(num_regions=0)
-        self.region = RegionFactory(
-            alpha="GRC",
-            country=self.country,
-        )
 
     def get_region_detail_url(self, pk):
         return reverse("region-detail", args=[pk])

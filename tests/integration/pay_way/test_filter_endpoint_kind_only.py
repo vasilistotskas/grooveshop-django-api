@@ -30,6 +30,8 @@ from shipping.models import ShippingProvider
 
 class PayWayKindOnlyEndpointTests(APITestCase):
     def setUp(self):
+        # Counts or orders every pay-way, so start without the rows
+        # ``pay_way/migrations/0019_seed_default_pay_ways`` seeds.
         PayWay.objects.all().delete()
 
         self.courier_cash = PayWayFactory(
@@ -40,42 +42,23 @@ class PayWayKindOnlyEndpointTests(APITestCase):
         self.pay_on_the_go = PayWayFactory.create_carrier_terminal_payment()
         self.online = PayWayFactory.create_online_payment()
 
-        self.boxnow = self._activate(
-            "boxnow",
+        # ``shipping/migrations/0002_seed_providers`` leaves both rows
+        # INACTIVE. NOT ``ShippingProviderFactory``: its
+        # ``django_get_or_create`` on ``code`` returns the seeded row and
+        # silently DROPS these flags, which makes every assertion here
+        # pass vacuously, since an inactive carrier is not a candidate
+        # and the filter falls through.
+        ShippingProvider.objects.filter(code="boxnow").update(
+            is_active=True,
             supports_home_delivery=False,
             supports_pickup_point=True,
         )
-        self.acs = self._activate(
-            "acs",
+        ShippingProvider.objects.filter(code="acs").update(
+            is_active=True,
             supports_home_delivery=True,
             supports_pickup_point=False,
         )
         self.url = reverse("payway-list")
-
-    @staticmethod
-    def _activate(code: str, **flags):
-        """Force a provider row into the state this test needs.
-
-        Both states occur across xdist workers, so neither can be
-        assumed: ``shipping/migrations/0002_seed_providers`` leaves
-        ``acs``/``boxnow`` rows in a fresh test DB, and a
-        ``transaction=True`` test flushes them for every later test on
-        that worker's reused DB.
-
-        NOT ``ShippingProviderFactory``: its ``django_get_or_create``
-        on ``code`` returns the seeded row and silently DROPS these
-        flags, leaving both carriers inactive — which makes every
-        assertion here pass vacuously, since an inactive carrier is
-        not a candidate and the filter falls through.
-        """
-        updated = ShippingProvider.objects.filter(code=code).update(
-            is_active=True, **flags
-        )
-        if not updated:
-            ShippingProvider.objects.create(
-                code=code, name=code, is_active=True, **flags
-            )
-        return ShippingProvider.objects.get(code=code)
 
     @staticmethod
     def _configured():

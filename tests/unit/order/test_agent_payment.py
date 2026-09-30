@@ -186,6 +186,40 @@ class ConfirmAgentPaymentEndpointTestCase(APITestCase):
         self.assertEqual(token_kwarg["order_uuid"], str(order.uuid))
 
     @override_settings(AGENT_STRIPE_DELEGATED_ENABLED=True)
+    @mock.patch("order.views.order.get_payment_provider")
+    def test_unsettled_charge_records_the_intent_without_paying(
+        self, mock_get
+    ) -> None:
+        """A charge Stripe has not settled yet (e.g. ``processing``)
+        keeps the intent id on the order for the webhook to settle, but
+        must not mark the order paid."""
+        order = self._guest_stripe_order()
+        mock_get.return_value.confirm_delegated_payment.return_value = (
+            True,
+            {
+                "payment_id": "pi_agent_pending",
+                "status": PaymentStatus.PROCESSING,
+                "amount": "47.50",
+                "currency": str(settings.DEFAULT_CURRENCY),
+                "provider": "stripe",
+            },
+        )
+        response = self.client.post(
+            self._url(order), {"sharedPaymentToken": SPT}, format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["payment_id"], "pi_agent_pending")
+        row = (
+            Order.objects.filter(pk=order.pk)
+            .values("payment_status", "payment_id", "paid_amount")
+            .first()
+        )
+        self.assertEqual(row["payment_status"], PaymentStatus.PENDING)
+        self.assertEqual(row["payment_id"], "pi_agent_pending")
+        self.assertEqual(row["paid_amount"], Decimal("0.00"))
+
+    @override_settings(AGENT_STRIPE_DELEGATED_ENABLED=True)
     def test_non_stripe_pay_way_rejected(self) -> None:
         pay_way = PayWayFactory.create_offline_payment(
             provider_code="cash_on_delivery", requires_confirmation=False

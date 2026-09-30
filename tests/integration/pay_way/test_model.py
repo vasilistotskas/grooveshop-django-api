@@ -1,13 +1,17 @@
 from django.conf import settings
-from django.test import TransactionTestCase
+from django.test import TestCase
 from djmoney.money import Money
 
 from pay_way.enum.settlement import PaySettlement
 from pay_way.models import PayWay
 
 
-class PayWayModelTestCase(TransactionTestCase):
+class PayWayModelTestCase(TestCase):
     def setUp(self):
+        # Counts or orders every pay-way, so start without the rows
+        # ``pay_way/migrations/0019_seed_default_pay_ways`` seeds.
+        PayWay.objects.all().delete()
+
         self.credit_card = PayWay.objects.create(
             active=True,
             cost=Money(0, settings.DEFAULT_CURRENCY),

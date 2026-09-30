@@ -84,7 +84,6 @@ class TestConcurrentAppendsDoNotCollide:
         Before the fix this produced ``sort_order == [0, 0]`` on two runs
         out of three.
         """
-        BlogTag.objects.all().delete()
         ready = threading.Barrier(2)
         errors: list[Exception] = []
 

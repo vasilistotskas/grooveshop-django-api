@@ -9,13 +9,13 @@ the new validator would reject.
 from __future__ import annotations
 
 from importlib import import_module
-from unittest.mock import patch
 
 import pytest
 from django.apps import apps
 
 from notification.factories import NotificationFactory
-from tenant.models import Tenant, TenantDomain
+from tenant.models import TenantDomain
+from tests.utils.staff import store_tenant
 
 migration = import_module(
     "notification.migrations.0017_notification_link_storefront_path"
@@ -52,14 +52,7 @@ def test_neutral_link(old, new):
 
 @pytest.mark.django_db
 def test_rewrites_rows_for_the_migrated_schema():
-    with patch.object(Tenant, "auto_create_schema", False):
-        tenant = Tenant(
-            schema_name="notif_mig",
-            name="Notif Mig",
-            slug="notif-mig",
-            owner_email="owner-notif-mig@example.com",
-        )
-        tenant.save()
+    tenant = store_tenant("notif_mig")
     TenantDomain.objects.create(
         tenant=tenant, domain="shop.example", is_primary=True
     )

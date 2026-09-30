@@ -825,14 +825,17 @@ def handle_stripe_payment_succeeded(sender, **kwargs):
     # NO try/except around the processing section: any error must
     # propagate so dj-stripe's outer atomic rolls back the mark + Event
     # row and Stripe redelivers (G0231).
-    order = OrderService.handle_payment_succeeded(payment_intent_id)
+    outcome = OrderService.handle_payment_succeeded(payment_intent_id)
 
-    if order:
+    # A stale event, a repeat, or a charge on a canceled order changes
+    # nothing to confirm: no history row, no "order confirmed" email.
+    if outcome and outcome.applied:
+        order = outcome.order
         OrderHistory.log_payment_update(
             order=order,
-            previous_value={"payment_status": "pending"},
+            previous_value={"payment_status": outcome.previous_payment_status},
             new_value={
-                "payment_status": "completed",
+                "payment_status": PaymentStatus.COMPLETED,
                 "payment_id": payment_intent_id,
             },
         )
@@ -900,14 +903,19 @@ def handle_stripe_payment_failed(sender, **kwargs):
         if already_processed:
             return
 
-        order = OrderService.handle_payment_failed(payment_intent_id)
+        outcome = OrderService.handle_payment_failed(payment_intent_id)
 
-        if order:
+        # A stale failure against a settled payment, or a repeat, must
+        # not tell a customer who paid that their payment failed.
+        if outcome and outcome.applied:
+            order = outcome.order
             OrderHistory.log_payment_update(
                 order=order,
-                previous_value={"payment_status": "pending"},
+                previous_value={
+                    "payment_status": outcome.previous_payment_status
+                },
                 new_value={
-                    "payment_status": "failed",
+                    "payment_status": PaymentStatus.FAILED,
                     "payment_id": payment_intent_id,
                 },
             )
@@ -1368,6 +1376,7 @@ def handle_stripe_checkout_completed(sender, **kwargs):
                 order.save(update_fields=["metadata"])
                 return
 
+            previous_payment_status = order.payment_status
             order.mark_as_paid(
                 payment_id=payment_intent_id, payment_method="stripe"
             )
@@ -1375,9 +1384,9 @@ def handle_stripe_checkout_completed(sender, **kwargs):
 
             OrderHistory.log_payment_update(
                 order=order,
-                previous_value={"payment_status": "pending"},
+                previous_value={"payment_status": previous_payment_status},
                 new_value={
-                    "payment_status": "completed",
+                    "payment_status": PaymentStatus.COMPLETED,
                     "payment_id": payment_intent_id,
                     "checkout_session_id": session_id,
                 },

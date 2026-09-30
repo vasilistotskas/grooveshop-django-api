@@ -2,10 +2,12 @@ from datetime import timedelta
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
+from django.db.models.signals import post_save
 from django.template import TemplateDoesNotExist
 from django.test import TestCase as DjangoTestCase
 from django.test import override_settings
 from django.utils import timezone
+from factory.django import mute_signals
 
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
@@ -13,7 +15,7 @@ from order.models.order import Order
 from order.tasks import (
     CONFIRMATION_EMAIL_SENT_AT_KEY,
     _confirmation_already_sent,
-    _release_confirmation_email,
+    _confirmation_lock_key,
     check_pending_orders,
     generate_order_invoice,
     send_admin_new_order_email,
@@ -25,24 +27,30 @@ from order.tasks import (
 from pay_way.factories import PayWayFactory
 
 
+def _quiet_order(num_order_items=0, **fields):
+    """Create an order without its creation handlers.
+
+    ``order_created`` would run the confirmation-email task eagerly and
+    reserve its dedupe flag (and email the merchant) before the test
+    calls the task it is actually about.
+    """
+    with mute_signals(post_save):
+        return OrderFactory.create(num_order_items=num_order_items, **fields)
+
+
 @pytest.mark.django_db
 class OrderTasksSimpleTestCase(DjangoTestCase):
     def setUp(self):
         # Pin both status and payment_status so the status-update /
         # shipping-notification tests start from a deterministic state
         # (the factory's defaults are random across all enum values).
-        self.order = OrderFactory.create(
+        self.order = _quiet_order(
             email="customer@example.com",
             first_name="John",
             last_name="Doe",
             status=OrderStatus.PENDING,
             payment_status=PaymentStatus.PENDING,
         )
-        # Order creation fires the order_created signal → the confirmation
-        # email task runs eagerly (CELERY_TASK_ALWAYS_EAGER + on_commit fires
-        # immediately in tests) and reserves the dedupe flag. Release it so
-        # tests that call the task directly see a fresh run.
-        _release_confirmation_email(self.order.id)
 
     @patch("order.tasks.OrderHistory.log_note")
     @patch("order.tasks.EmailMultiAlternatives")
@@ -77,6 +85,84 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         self.assertFalse(result)
         mock_logger.assert_called_once()
 
+    # ``order.tasks.cache`` is mocked in the three tests below for the
+    # reason spelled out in the worker-kill test: the lock key collides
+    # across xdist workers on the shared Redis.
+
+    @patch("order.tasks.cache")
+    @patch("order.tasks.EmailMultiAlternatives")
+    @patch("order.tasks.render_to_string", return_value="content")
+    def test_confirmation_send_failure_schedules_a_retry(
+        self, mock_render, mock_email, mock_cache
+    ):
+        """A failed send is retried later with the error attached, and
+        the order is not marked as emailed in the meantime."""
+        from celery.exceptions import Retry
+
+        mock_cache.add.return_value = True
+        error = ConnectionError("SMTP relay unreachable")
+        mock_email.return_value.send.side_effect = error
+
+        with self.assertRaises(Retry) as raised:
+            send_order_confirmation_email.apply(args=[self.order.id])
+
+        self.assertIs(raised.exception.exc, error)
+        self.assertEqual(raised.exception.when, 300)
+        mock_email.return_value.send.assert_called_once()
+        self.order.refresh_from_db()
+        self.assertIsNone(
+            (self.order.metadata or {}).get(CONFIRMATION_EMAIL_SENT_AT_KEY)
+        )
+
+    @patch("order.tasks.cache")
+    @patch("order.tasks.EmailMultiAlternatives")
+    @patch("order.tasks.render_to_string", return_value="content")
+    def test_confirmation_send_gives_up_after_its_retries(
+        self, mock_render, mock_email, mock_cache
+    ):
+        """On the last attempt it stops retrying: the lock is released so
+        an admin can resend, and the order is NOT marked as emailed —
+        nothing was sent."""
+        mock_cache.add.return_value = True
+        mock_email.return_value.send.side_effect = ConnectionError(
+            "SMTP relay unreachable"
+        )
+
+        result = send_order_confirmation_email.apply(
+            args=[self.order.id],
+            retries=send_order_confirmation_email.max_retries,
+        ).get()
+
+        self.assertFalse(result)
+        mock_email.return_value.send.assert_called_once()
+        mock_cache.delete.assert_called_once_with(
+            _confirmation_lock_key(self.order.id)
+        )
+        self.order.refresh_from_db()
+        self.assertIsNone(
+            (self.order.metadata or {}).get(CONFIRMATION_EMAIL_SENT_AT_KEY)
+        )
+
+    @patch("order.tasks.cache")
+    @patch("order.tasks.EmailMultiAlternatives")
+    def test_order_deleted_while_taking_the_lock_sends_nothing(
+        self, mock_email, mock_cache
+    ):
+        """The order passed the existence check, then vanished before
+        the full fetch: a clean ``False``, no email, no retry."""
+        order_id = self.order.id
+
+        def _lock_after_the_order_is_gone(*args, **kwargs):
+            Order.objects.filter(pk=order_id).delete()
+            return True
+
+        mock_cache.add.side_effect = _lock_after_the_order_is_gone
+
+        result = send_order_confirmation_email.apply(args=[order_id]).get()
+
+        self.assertFalse(result)
+        mock_email.assert_not_called()
+
     @override_settings(
         SITE_NAME="GrooveShop",
         INFO_EMAIL="support@example.com",
@@ -105,13 +191,12 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
             pay_way.instructions = html_instr
         pay_way.save()
 
-        order = OrderFactory.create(
+        order = _quiet_order(
             email="cod@example.com",
             status=OrderStatus.PENDING,
             payment_status=PaymentStatus.PENDING,
             pay_way=pay_way,
         )
-        _release_confirmation_email(order.id)
 
         with patch("order.tasks.EmailMultiAlternatives") as mock_email:
             instance = MagicMock()
@@ -166,12 +251,11 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         Renders the REAL templates (render_to_string is NOT mocked), same
         approach as the WYSIWYG-safety test above.
         """
-        order = OrderFactory.create(
+        order = _quiet_order(
             email="tenant-branded@example.com",
             status=OrderStatus.PENDING,
             payment_status=PaymentStatus.PENDING,
         )
-        _release_confirmation_email(order.id)
 
         with patch("order.tasks.EmailMultiAlternatives") as mock_email:
             instance = MagicMock()
@@ -202,12 +286,11 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         live send included that key, so the template's per-tenant logo
         branch was dead code (see ``core/utils/email_context.py``).
         """
-        order = OrderFactory.create(
+        order = _quiet_order(
             email="logo-tenant@example.com",
             status=OrderStatus.PENDING,
             payment_status=PaymentStatus.PENDING,
         )
-        _release_confirmation_email(order.id)
 
         with patch("order.tasks.EmailMultiAlternatives") as mock_email:
             instance = MagicMock()
@@ -225,12 +308,11 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         must still render the platform's static fallback logo exactly
         as before this change.
         """
-        order = OrderFactory.create(
+        order = _quiet_order(
             email="no-logo-tenant@example.com",
             status=OrderStatus.PENDING,
             payment_status=PaymentStatus.PENDING,
         )
-        _release_confirmation_email(order.id)
 
         with patch("order.tasks.EmailMultiAlternatives") as mock_email:
             instance = MagicMock()
@@ -662,7 +744,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
     def test_check_pending_orders_success(
         self, mock_render, mock_email, mock_log_note
     ):
-        pending_order = OrderFactory.create(
+        pending_order = _quiet_order(
             status=OrderStatus.PENDING,
             email="old@example.com",
             pay_way=PayWayFactory.create_online_payment(),
@@ -676,7 +758,6 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         mock_render.return_value = "Email content"
         mock_email_instance = MagicMock()
         mock_email.return_value = mock_email_instance
-        mock_email.reset_mock()
 
         result = check_pending_orders()
 
@@ -704,7 +785,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         failed — an ops problem (surfaced by shipping alerts), not a
         customer action. "Complete your order" must never reach them
         (prod orders 31/36/38/39 got exactly that in April 2026)."""
-        cod_order = OrderFactory.create(
+        cod_order = _quiet_order(
             status=OrderStatus.PENDING,
             email="cod@example.com",
             pay_way=PayWayFactory.create_offline_payment(),
@@ -714,7 +795,6 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         Order.objects.filter(pk=cod_order.pk).update(
             created_at=timezone.now() - timedelta(days=2)
         )
-        mock_email.reset_mock()
 
         result = check_pending_orders()
 
@@ -734,7 +814,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
     def test_check_pending_orders_skips_max_reminders(
         self, mock_render, mock_email, mock_log_note
     ):
-        OrderFactory.create(
+        _quiet_order(
             status=OrderStatus.PENDING,
             email="maxed@example.com",
             created_at=timezone.now() - timedelta(days=10),
@@ -742,10 +822,6 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
             last_reminder_sent_at=timezone.now() - timedelta(days=8),
             pay_way=PayWayFactory.create_online_payment(),
         )
-        # Reset — OrderFactory.create fires order_created which eagerly
-        # runs the confirmation-email task. We're asserting on
-        # check_pending_orders behaviour, not factory side-effects.
-        mock_email.reset_mock()
 
         result = check_pending_orders()
 
@@ -765,7 +841,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
     def test_check_pending_orders_respects_cooldown(
         self, mock_render, mock_email, mock_log_note
     ):
-        OrderFactory.create(
+        _quiet_order(
             status=OrderStatus.PENDING,
             email="cooldown@example.com",
             created_at=timezone.now() - timedelta(days=5),
@@ -773,11 +849,6 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
             last_reminder_sent_at=timezone.now() - timedelta(hours=12),
             pay_way=PayWayFactory.create_online_payment(),
         )
-        # Reset the mock — OrderFactory.create fires order_created which
-        # eagerly runs the confirmation-email task (CELERY_TASK_ALWAYS_EAGER
-        # + on_commit-immediate fixture). We're asserting on what
-        # check_pending_orders does, not on order creation side-effects.
-        mock_email.reset_mock()
 
         result = check_pending_orders()
 
@@ -809,18 +880,14 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
     ):
         """One undeliverable reminder must not starve the rest: the
         failing order is logged and skipped, later orders still send."""
-        # Set the render stub BEFORE order creation: the decorator
-        # patch is already active while the order_created signal sends
-        # the confirmation email eagerly, and a MagicMock body would
-        # make that send fail and pollute the patched logger.
         mock_render.return_value = "Email content"
         pay_way = PayWayFactory.create_online_payment()
-        failing = OrderFactory.create(
+        failing = _quiet_order(
             status=OrderStatus.PENDING,
             email="fail@example.com",
             pay_way=pay_way,
         )
-        healthy = OrderFactory.create(
+        healthy = _quiet_order(
             status=OrderStatus.PENDING,
             email="ok@example.com",
             pay_way=pay_way,
@@ -829,8 +896,6 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         Order.objects.filter(pk__in=[failing.pk, healthy.pk]).update(
             created_at=timezone.now() - timedelta(days=2)
         )
-        # Only errors logged by check_pending_orders itself count.
-        mock_logger.reset_mock()
 
         class _FlakySend:
             """Raises only for the failing order's recipient."""
@@ -862,18 +927,13 @@ class OrderTasksIntegrationTestCase(DjangoTestCase):
         # Pin status + payment_status: OrderFactory's defaults are random
         # (see factories/order.py:180), so fix them for deterministic
         # email-sequence assertions.
-        self.order = OrderFactory.create(
+        self.order = _quiet_order(
             email="integration@example.com",
             status=OrderStatus.PROCESSING,
             payment_status=PaymentStatus.PENDING,
             tracking_number="INT123",
             shipping_carrier="FedEx",
         )
-        # Order creation triggered the order_created signal which already
-        # ran the confirmation-email task eagerly and set the dedupe flag.
-        # Release it so the test calling send_order_confirmation_email
-        # directly sees a fresh run.
-        _release_confirmation_email(self.order.id)
 
     @patch("order.tasks.EmailMultiAlternatives")
     @patch("order.tasks.render_to_string")
@@ -926,7 +986,7 @@ class OrderTasksIntegrationTestCase(DjangoTestCase):
 @pytest.mark.django_db
 class SendAdminNewOrderEmailTestCase(DjangoTestCase):
     def setUp(self):
-        self.order = OrderFactory.create(
+        self.order = _quiet_order(
             email="customer@example.com",
             first_name="John",
             last_name="Doe",

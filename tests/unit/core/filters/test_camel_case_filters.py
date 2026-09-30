@@ -6,8 +6,8 @@ from django_filters import rest_framework as filters
 from core.filters.camel_case_filters import (
     CamelCaseFilterMixin,
     CamelCaseTimeStampFilterSet,
-    snake_to_camel,
 )
+from core.utils.string_case import snake_to_camel
 
 
 class MockModel(models.Model):
@@ -84,29 +84,26 @@ class MockFilterSet(CamelCaseFilterMixin, filters.FilterSet):
 
 
 class TestCamelCaseFilterMixin(TestCase):
-    def test_filter_name_conversion(self):
+    def test_filters_stay_keyed_by_snake_case_name(self):
         filterset = MockFilterSet()
 
-        self.assertIn("createdAfter", filterset.base_filters)
-        self.assertIn("sortOrder", filterset.base_filters)
-        self.assertIn("isPublished", filterset.base_filters)
+        for name in ("created_after", "sort_order", "is_published"):
+            self.assertIn(name, filterset.filters)
 
-        self.assertNotIn("created_after", filterset.base_filters)
-        self.assertNotIn("sort_order", filterset.base_filters)
-        self.assertNotIn("is_published", filterset.base_filters)
+    def test_camel_case_params_reach_snake_case_filters(self):
+        query_dict = QueryDict(mutable=True)
+        query_dict["createdAfter"] = "2024-01-01"
+        query_dict["sortOrder"] = "1"
+        query_dict["isPublished"] = "true"
 
-    def test_field_name_preservation(self):
-        filterset = MockFilterSet()
+        filterset = MockFilterSet(data=query_dict)
 
-        self.assertEqual(
-            filterset.base_filters["createdAfter"].field_name, "created_at"
-        )
-        self.assertEqual(
-            filterset.base_filters["sortOrder"].field_name, "sort_order"
-        )
-        self.assertEqual(
-            filterset.base_filters["isPublished"].field_name, "is_published"
-        )
+        self.assertEqual(filterset.data["created_after"], "2024-01-01")
+        self.assertEqual(filterset.data["sort_order"], "1")
+        self.assertEqual(filterset.data["is_published"], "true")
+        self.assertTrue(filterset.form.is_valid(), filterset.form.errors)
+        self.assertEqual(filterset.form.cleaned_data["sort_order"], 1)
+        self.assertIs(filterset.form.cleaned_data["is_published"], True)
 
     def test_query_dict_conversion(self):
         query_dict = QueryDict(mutable=True)
@@ -138,36 +135,31 @@ class TestCamelCaseFilterMixin(TestCase):
 
         self.assertIsNotNone(filterset.data)
 
-    def test_camel_case_fields_mapping(self):
-        filterset = MockFilterSet()
-
-        expected_mapping = {
-            "createdAfter": "created_after",
-            "createdAt": "created_at",
-            "sortOrder": "sort_order",
-            "isPublished": "is_published",
-        }
-
-        self.assertEqual(filterset._camel_case_fields, expected_mapping)
-
 
 class TestCamelCaseTimeStampFilterSet(TestCase):
-    def test_timestamp_filters_camelized(self):
+    def test_timestamp_filters_accept_camel_case_params(self):
         class TestFilterSet(CamelCaseTimeStampFilterSet):
             class Meta:
                 model = MockModel
                 fields = ["created_at", "updated_at"]
 
-        filterset = TestFilterSet()
+        filterset = TestFilterSet(
+            data={"createdAfter": "2024-01-01", "updatedBefore": "2024-02-01"}
+        )
 
-        self.assertIn("createdAfter", filterset.base_filters)
-        self.assertIn("createdBefore", filterset.base_filters)
-        self.assertIn("updatedAfter", filterset.base_filters)
-        self.assertIn("updatedBefore", filterset.base_filters)
-
+        for name in (
+            "created_after",
+            "created_before",
+            "updated_after",
+            "updated_before",
+        ):
+            self.assertIn(name, filterset.filters)
         self.assertEqual(
-            filterset.base_filters["createdAfter"].field_name, "created_at"
+            filterset.filters["created_after"].field_name, "created_at"
         )
         self.assertEqual(
-            filterset.base_filters["updatedBefore"].field_name, "updated_at"
+            filterset.filters["updated_before"].field_name, "updated_at"
         )
+        self.assertTrue(filterset.form.is_valid(), filterset.form.errors)
+        self.assertIsNotNone(filterset.form.cleaned_data["created_after"])
+        self.assertIsNotNone(filterset.form.cleaned_data["updated_before"])

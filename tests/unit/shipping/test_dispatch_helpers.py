@@ -34,11 +34,26 @@ def _attach_provider(order, code):
     return provider
 
 
+def _defer_on_commit(monkeypatch):
+    """Restore Django's deferral, which the suite's conftest replaces
+    with an immediate call: these tests are about what the enclosing
+    transaction does to the callback."""
+    monkeypatch.setattr(
+        transaction,
+        "on_commit",
+        lambda func, using=None, robust=False: transaction.get_connection(
+            using
+        ).on_commit(func, robust),
+    )
+
+
 def test_create_shipment_row_dispatches_to_boxnow_carrier():
     """When the order has provider=boxnow, the BoxNow carrier's
     create_shipment_row hook is invoked with the right kind + payload."""
     order = OrderFactory(
-        status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
+        status=OrderStatus.PENDING,
+        payment_status=PaymentStatus.PENDING,
+        num_order_items=0,
     )
     _attach_provider(order, "boxnow")
 
@@ -60,17 +75,32 @@ def test_create_shipment_row_no_op_when_provider_unset():
     """Orders with no FK + no legacy method → adapter lookup returns
     None → service is a no-op (does not crash)."""
     order = OrderFactory(
-        status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
+        status=OrderStatus.PENDING,
+        payment_status=PaymentStatus.PENDING,
+        num_order_items=0,
     )  # no shipping_provider set
-    # Should not raise.
-    ShippingService.create_shipment_row_for_order(order)
+
+    with (
+        patch(
+            "shipping_boxnow.carrier.BoxNowCarrier.create_shipment_row"
+        ) as boxnow_hook,
+        patch(
+            "shipping_acs.carrier.AcsCarrier.create_shipment_row"
+        ) as acs_hook,
+    ):
+        ShippingService.create_shipment_row_for_order(order)
+
+    boxnow_hook.assert_not_called()
+    acs_hook.assert_not_called()
 
 
 def test_dispatch_task_dispatches_to_boxnow_via_provider_fk():
     """Orders with shipping_provider=boxnow attached dispatch through
     the BoxNow carrier's Celery task hook."""
     order = OrderFactory(
-        status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
+        status=OrderStatus.PENDING,
+        payment_status=PaymentStatus.PENDING,
+        num_order_items=0,
     )
     _attach_provider(order, "boxnow")
 
@@ -84,7 +114,9 @@ def test_dispatch_task_dispatches_to_boxnow_via_provider_fk():
 
 def test_dispatch_task_dispatches_to_acs_via_provider_fk():
     order = OrderFactory(
-        status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
+        status=OrderStatus.PENDING,
+        payment_status=PaymentStatus.PENDING,
+        num_order_items=0,
     )
     _attach_provider(order, "acs")
 
@@ -100,15 +132,28 @@ def test_dispatch_task_no_op_for_orders_without_provider():
     """Orders without a shipping_provider attached (e.g. legacy data,
     home delivery without a courier) must silently no-op."""
     order = OrderFactory(
-        status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
+        status=OrderStatus.PENDING,
+        payment_status=PaymentStatus.PENDING,
+        num_order_items=0,
     )  # no shipping_provider
 
-    # Should not raise; nothing to assert beyond "no exception".
-    ShippingService.dispatch_create_shipment_task(order)
+    with (
+        patch(
+            "shipping_boxnow.carrier.BoxNowCarrier.dispatch_create_shipment_task"
+        ) as boxnow_dispatch,
+        patch(
+            "shipping_acs.carrier.AcsCarrier.dispatch_create_shipment_task"
+        ) as acs_dispatch,
+    ):
+        ShippingService.dispatch_create_shipment_task(order)
+
+    boxnow_dispatch.assert_not_called()
+    acs_dispatch.assert_not_called()
 
 
-@pytest.mark.django_db(transaction=True)
-def test_dispatch_task_does_not_fire_when_outer_txn_rolls_back():
+def test_dispatch_task_does_not_fire_when_outer_txn_rolls_back(
+    monkeypatch, django_capture_on_commit_callbacks
+):
     """Regression for commit 59527a87: dispatch must be wrapped in
     ``transaction.on_commit`` so the courier task never enqueues for
     an order whose creating transaction never committed.
@@ -119,14 +164,18 @@ def test_dispatch_task_does_not_fire_when_outer_txn_rolls_back():
     asserts the carrier's per-provider dispatcher was never reached.
     """
     order = OrderFactory(
-        status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
+        status=OrderStatus.PENDING,
+        payment_status=PaymentStatus.PENDING,
+        num_order_items=0,
     )
     _attach_provider(order, "boxnow")
+    _defer_on_commit(monkeypatch)
 
     with (
         patch(
             "shipping_boxnow.carrier.BoxNowCarrier.dispatch_create_shipment_task"
         ) as mock_dispatch,
+        django_capture_on_commit_callbacks(execute=True),
         transaction.atomic(),
     ):
         ShippingService.dispatch_create_shipment_task(order)
@@ -138,23 +187,29 @@ def test_dispatch_task_does_not_fire_when_outer_txn_rolls_back():
     )
 
 
-@pytest.mark.django_db(transaction=True)
-def test_dispatch_task_fires_when_outer_txn_commits():
+def test_dispatch_task_fires_when_outer_txn_commits(
+    monkeypatch, django_capture_on_commit_callbacks
+):
     """Positive case: when the outer atomic block commits cleanly,
     the on_commit callback runs and the carrier's dispatcher is
     invoked exactly once."""
     order = OrderFactory(
-        status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
+        status=OrderStatus.PENDING,
+        payment_status=PaymentStatus.PENDING,
+        num_order_items=0,
     )
     _attach_provider(order, "boxnow")
+    _defer_on_commit(monkeypatch)
 
     with (
         patch(
             "shipping_boxnow.carrier.BoxNowCarrier.dispatch_create_shipment_task"
         ) as mock_dispatch,
+        django_capture_on_commit_callbacks(execute=True),
         transaction.atomic(),
     ):
         ShippingService.dispatch_create_shipment_task(order)
-        # Atomic block exited cleanly → on_commit fires here.
+        # The block exits cleanly, so the callback stays queued and the
+        # capture runs it as the test transaction's commit would.
 
     assert mock_dispatch.call_count == 1

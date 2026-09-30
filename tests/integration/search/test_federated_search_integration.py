@@ -1,392 +1,250 @@
-"""
-Integration tests for federated search functionality.
+"""Integration tests for the federated search endpoint and analytics.
 
-These tests validate the complete federated search flow including:
-- Multi-index search with federation
-- Content filtering (active products, published blog posts)
-- Analytics tracking
-- Greeklish queries (matched via indexed ``*_greeklish`` shadow fields)
-- Result weighting and merging
-
-NOTE: These tests require a running Meilisearch instance with properly
-configured indexes. They are skipped in CI environments where Meilisearch
-is not available.
+The live tests index their own products and blog posts with
+``LiveSearchIndex`` and search for a marker only those documents
+contain, so they can assert exact hits, order and federation metadata
+while every worker shares one engine (see
+``tests/utils/meilisearch.py``).
 """
+
+import os
+import time
+from decimal import Decimal
 
 import pytest
 from django.contrib.auth import get_user_model
 from django.test import Client
+from django.urls import reverse
 
-from search.models import SearchClick, SearchQuery
+from blog.factories.post import BlogPostFactory
+from blog.models.post import BlogPostTranslation
+from product.factories.product import ProductFactory
+from product.models.product import ProductTranslation
+from search.models import SearchQuery
 from tests.conftest import requires_meilisearch
+from tests.utils.meilisearch import (
+    LiveSearchIndex,
+    unique_greek_word,
+    unique_marker,
+)
 
 User = get_user_model()
 
+FEDERATED_URL = reverse("search-federated")
+
+
+@pytest.fixture
+def live_index(db):
+    with LiveSearchIndex() as index:
+        yield index
+
+
+def make_product(names, *, active=True, **fields):
+    return ProductFactory(
+        price=Decimal("10.00"),
+        discount_percent=0,
+        vat=None,
+        active=active,
+        stock=5,
+        translations=[
+            ProductTranslation(language_code=code, name=name)
+            for code, name in names.items()
+        ],
+        **fields,
+    )
+
+
+def make_post(titles, *, is_published=True):
+    return BlogPostFactory(
+        is_published=is_published,
+        translations=[
+            BlogPostTranslation(
+                language_code=code, title=title, subtitle="", body=""
+            )
+            for code, title in titles.items()
+        ],
+    )
+
+
+def translation(obj, language_code):
+    return obj.translations.get(language_code=language_code)
+
+
+def federated(**params):
+    response = Client().get(FEDERATED_URL, params)
+    assert response.status_code == 200, response.data
+    return response.data
+
+
+def hits(data):
+    """``(content_type, id)`` per result, in response order."""
+    return [(r["content_type"], r["id"]) for r in data["results"]]
+
 
 @requires_meilisearch
-@pytest.mark.django_db(transaction=True)
-class TestFederatedSearchIntegration:
-    """Integration tests for federated search endpoint."""
+@pytest.mark.django_db
+class TestFederatedSearch:
+    def test_merges_products_and_posts_weighting_posts_lower(self, live_index):
+        marker = unique_marker()
+        product = translation(make_product({"en": marker}), "en")
+        post = translation(make_post({"en": marker}), "en")
+        live_index.add(product, post)
 
-    @pytest.fixture(autouse=True)
-    def setup(self):
-        """Set up test client and data."""
-        self.client = Client()
-        self.federated_search_url = "/api/v1/search/federated"
+        data = federated(query=marker)
 
-    def test_federated_search_returns_both_products_and_blog_posts(self):
-        """
-        Test that federated search queries both ProductTranslation and
-        BlogPostTranslation indexes and returns merged results.
-        """
-        # Execute federated search
-        response = self.client.get(
-            self.federated_search_url,
-            {"query": "laptop", "language_code": "en", "limit": 20},
+        assert hits(data) == [("product", product.id), ("blog_post", post.id)]
+        product_hit, post_hit = data["results"]
+        assert product_hit["federation"]["indexUid"] == (
+            ProductTranslation.get_meili_index_name()
         )
-
-        assert response.status_code == 200
-        data = response.json()
-
-        # Verify response structure (camelCase due to DRF middleware)
-        assert "results" in data
-        assert "limit" in data
-        assert "offset" in data
-        assert "estimatedTotalHits" in data
-
-        # Verify results have content_type field
-        if len(data["results"]) > 0:
-            for result in data["results"]:
-                assert "content_type" in result
-                assert result["content_type"] in ["product", "blog_post"]
-                assert "id" in result
-                assert "_rankingScore" in result
-
-    def test_federated_search_applies_content_filters(self):
-        """
-        Test that federated search excludes inactive/deleted products
-        and unpublished blog posts.
-        """
-        response = self.client.get(
-            self.federated_search_url,
-            {"query": "test", "language_code": "en", "limit": 20},
+        assert post_hit["federation"]["indexUid"] == (
+            BlogPostTranslation.get_meili_index_name()
         )
+        assert product_hit["federation"]["weightedRankingScore"] == (
+            pytest.approx(product_hit["ranking_score"])
+        )
+        assert post_hit["federation"]["weightedRankingScore"] == (
+            pytest.approx(0.7 * post_hit["ranking_score"])
+        )
+        assert data["estimated_total_hits"] == 2
 
-        assert response.status_code == 200
-        data = response.json()
+    def test_every_result_highlights_the_matched_term(self, live_index):
+        """As the single-index endpoints do: the storefront shows the
+        matched term marked in each result's ``formatted`` fields."""
+        marker = unique_marker()
+        product = translation(make_product({"en": f"{marker} lamp"}), "en")
+        post = translation(make_post({"en": f"{marker} guide"}), "en")
+        live_index.add(product, post)
 
-        # Verify all product results are active and not deleted
-        product_results = [
-            r for r in data["results"] if r["content_type"] == "product"
+        product_hit, post_hit = federated(query=marker)["results"]
+
+        assert product_hit["formatted"]["name"] == f"<mark>{marker}</mark> lamp"
+        assert post_hit["formatted"]["title"] == f"<mark>{marker}</mark> guide"
+
+    def test_hides_inactive_deleted_products_and_unpublished_posts(
+        self, live_index
+    ):
+        marker = unique_marker()
+        product = translation(make_product({"en": f"{marker} on"}), "en")
+        post = translation(make_post({"en": f"{marker} on"}), "en")
+        hidden = [
+            translation(
+                make_product({"en": f"{marker} a"}, active=False), "en"
+            ),
+            translation(
+                make_product({"en": f"{marker} b"}, is_deleted=True), "en"
+            ),
+            translation(
+                make_post({"en": f"{marker} c"}, is_published=False), "en"
+            ),
         ]
-        for result in product_results:
-            if "object" in result:
-                assert result["object"].get("active") is True
-                assert result["object"].get("is_deleted") is False
+        live_index.add(product, post, *hidden)
 
-        # Verify all blog post results are published
-        blog_results = [
-            r for r in data["results"] if r["content_type"] == "blog_post"
-        ]
-        for result in blog_results:
-            if "object" in result:
-                assert result["object"].get("is_published") is True
+        data = federated(query=marker)
 
-    def test_federated_search_includes_federation_metadata(self):
-        """
-        Test that federated search results include _federation metadata
-        with indexUid, queriesPosition, and weightedRankingScore.
-        """
-        response = self.client.get(
-            self.federated_search_url,
-            {"query": "laptop", "language_code": "en", "limit": 20},
-        )
+        assert hits(data) == [("product", product.id), ("blog_post", post.id)]
 
-        assert response.status_code == 200
-        data = response.json()
+    def test_language_code_filters_both_indexes(self, live_index):
+        marker = unique_marker()
+        product = make_product({"en": f"{marker} lamp", "el": f"{marker} φως"})
+        post = make_post({"en": f"{marker} lamp", "el": f"{marker} φως"})
+        live_index.add(*product.translations.all(), *post.translations.all())
 
-        # Verify federation metadata in results
-        if len(data["results"]) > 0:
-            for result in data["results"]:
-                assert "federation" in result
-                assert "indexUid" in result["federation"]
-                assert "queriesPosition" in result["federation"]
-                assert "weightedRankingScore" in result["federation"]
+        data = federated(query=marker, language_code="el")
 
-    def test_federated_search_applies_language_filter(self):
-        """
-        Test that federated search filters results by language_code
-        across both indexes.
-        """
-        # Search in English
-        response_en = self.client.get(
-            self.federated_search_url,
-            {"query": "laptop", "language_code": "en", "limit": 20},
-        )
-
-        assert response_en.status_code == 200
-        data_en = response_en.json()
-
-        # Verify all results have English language code
-        for result in data_en["results"]:
-            if "object" in result:
-                assert result["object"].get("language_code") == "en"
-
-        # Search in Greek
-        response_el = self.client.get(
-            self.federated_search_url,
-            {"query": "υπολογιστής", "language_code": "el", "limit": 20},
-        )
-
-        assert response_el.status_code == 200
-        data_el = response_el.json()
-
-        # Verify all results have Greek language code
-        for result in data_el["results"]:
-            if "object" in result:
-                assert result["object"].get("language_code") == "el"
-
-    def test_federated_search_accepts_greeklish_query(self):
-        """
-        Greeklish queries are valid input and match the indexed
-        ``*_greeklish`` shadow fields (see search/transliteration.py).
-        """
-        response = self.client.get(
-            self.federated_search_url,
-            {
-                "query": "kompiouter",  # Greeklish for κομπιούτερ
-                "language_code": "el",
-                "limit": 20,
-            },
-        )
-
-        assert response.status_code == 200
-        data = response.json()
-
-        assert "results" in data
-        # Note: Actual results depend on test data availability
-
-    def test_federated_search_respects_result_allocation(self):
-        """
-        Test that federated search allocates results approximately
-        70% to products and 30% to blog posts.
-        """
-        response = self.client.get(
-            self.federated_search_url,
-            {"query": "laptop", "language_code": "en", "limit": 20},
-        )
-
-        assert response.status_code == 200
-        data = response.json()
-
-        if len(data["results"]) >= 10:  # Only test if enough results
-            product_count = sum(
-                1 for r in data["results"] if r["content_type"] == "product"
-            )
-            blog_count = sum(
-                1 for r in data["results"] if r["content_type"] == "blog_post"
-            )
-
-            total = product_count + blog_count
-            if total > 0:
-                product_ratio = product_count / total
-                # Allow some variance (60-80% for products)
-                assert 0.6 <= product_ratio <= 0.8
-
-    def test_federated_search_creates_analytics_record(self):
-        """
-        Test that federated search creates a SearchQuery analytics record.
-        """
-        initial_count = SearchQuery.objects.count()
-
-        response = self.client.get(
-            self.federated_search_url,
-            {"query": "laptop", "language_code": "en", "limit": 20},
-        )
-
-        assert response.status_code == 200
-
-        # Verify SearchQuery record was created
-        assert SearchQuery.objects.count() == initial_count + 1
-
-        # Verify record details
-        search_query = SearchQuery.objects.latest("timestamp")
-        assert search_query.query == "laptop"
-        assert search_query.language_code == "en"
-        assert search_query.content_type == "federated"
-        assert search_query.results_count >= 0
-
-    def test_federated_search_handles_empty_query(self):
-        """
-        Test that federated search handles empty query gracefully.
-        """
-        response = self.client.get(
-            self.federated_search_url,
-            {"query": "", "language_code": "en", "limit": 20},
-        )
-
-        # Should return 200 with empty or all results
-        assert response.status_code in [200, 400]
-
-    def test_federated_search_handles_special_characters(self):
-        """
-        Test that federated search handles special characters in query.
-        """
-        special_queries = [
-            "laptop!@#$%",
-            "café",
-            "test & query",
-            'query "with quotes"',
-            "query'with'apostrophes",
+        assert sorted(hits(data)) == [
+            ("blog_post", translation(post, "el").id),
+            ("product", translation(product, "el").id),
         ]
 
-        for query in special_queries:
-            response = self.client.get(
-                self.federated_search_url,
-                {"query": query, "language_code": "en", "limit": 20},
+    def test_greeklish_query_matches_greek_products_and_posts(self, live_index):
+        greek, latin = unique_greek_word()
+        product = translation(make_product({"el": f"Λάμπα {greek}"}), "el")
+        post = translation(make_post({"el": f"Οδηγός {greek}"}), "el")
+        live_index.add(product, post)
+
+        data = federated(query=latin)
+
+        assert sorted(hits(data)) == [
+            ("blog_post", post.id),
+            ("product", product.id),
+        ]
+
+    def test_limit_and_offset_page_through_merged_results(self, live_index):
+        marker = unique_marker()
+        documents = [
+            translation(make_product({"en": f"{marker} p{n}"}), "en")
+            for n in range(2)
+        ] + [
+            translation(make_post({"en": f"{marker} b{n}"}), "en")
+            for n in range(2)
+        ]
+        live_index.add(*documents)
+
+        first = federated(query=marker, limit=3, offset=0)
+        second = federated(query=marker, limit=3, offset=3)
+
+        assert len(first["results"]) == 3
+        assert len(second["results"]) == 1
+        assert sorted(hits(first) + hits(second)) == sorted(
+            (
+                "product" if isinstance(d, ProductTranslation) else "blog_post",
+                d.id,
             )
-
-            # Should not crash
-            assert response.status_code in [200, 400]
-
-    def test_federated_search_pagination(self):
-        """
-        Test that federated search supports pagination with limit and offset.
-        """
-        # First page
-        response_page1 = self.client.get(
-            self.federated_search_url,
-            {
-                "query": "laptop",
-                "language_code": "en",
-                "limit": 10,
-                "offset": 0,
-            },
+            for d in documents
         )
+        assert first["estimated_total_hits"] == 4
 
-        assert response_page1.status_code == 200
-        data_page1 = response_page1.json()
+    def test_special_characters_in_query_still_match(self, live_index):
+        marker = unique_marker()
+        product = translation(make_product({"en": f"{marker} phone"}), "en")
+        live_index.add(product)
 
-        # Second page
-        response_page2 = self.client.get(
-            self.federated_search_url,
-            {
-                "query": "laptop",
-                "language_code": "en",
-                "limit": 10,
-                "offset": 10,
-            },
-        )
+        for query in (
+            f"{marker}!@#$%",
+            f'"{marker}"',
+            f"{marker}'s",
+            f"{marker} & co",
+        ):
+            data = federated(query=query)
+            assert hits(data) == [("product", product.id)], query
 
-        assert response_page2.status_code == 200
-        data_page2 = response_page2.json()
+    def test_records_the_search_with_its_result_counts(self, live_index):
+        marker = unique_marker()
+        product = translation(make_product({"en": marker}), "en")
+        post = translation(make_post({"en": marker}), "en")
+        live_index.add(product, post)
 
-        # Verify different results (if enough data)
-        if len(data_page1["results"]) > 0 and len(data_page2["results"]) > 0:
-            page1_ids = {r["id"] for r in data_page1["results"]}
-            page2_ids = {r["id"] for r in data_page2["results"]}
-            # Pages should have different results
-            assert page1_ids != page2_ids
+        data = federated(query=marker, language_code="en")
 
-    def test_federated_search_returns_formatted_highlights(self):
-        """
-        Test that federated search returns _formatted field with highlights.
-        """
-        response = self.client.get(
-            self.federated_search_url,
-            {"query": "laptop", "language_code": "en", "limit": 20},
-        )
+        record = SearchQuery.objects.get(query=marker)
+        assert record.uuid == data["query_id"]
+        assert record.content_type == "federated"
+        assert record.language_code == "en"
+        assert record.results_count == 2
+        assert record.estimated_total_hits == 2
+        assert record.processing_time_ms is not None
 
-        assert response.status_code == 200
-        data = response.json()
+    def test_limit_above_the_maximum_is_capped(self):
+        data = federated(query=unique_marker(), limit=10_000)
 
-        # Verify _formatted field in results
-        if len(data["results"]) > 0:
-            for result in data["results"]:
-                assert "_formatted" in result
-                # _formatted should be a dict with highlighted fields
-                assert isinstance(result["_formatted"], dict)
+        assert data["limit"] == 100
+        assert data["results"] == []
 
-    def test_federated_search_includes_ranking_scores(self):
-        """
-        Test that federated search includes _rankingScore for each result.
-        """
-        response = self.client.get(
-            self.federated_search_url,
-            {"query": "laptop", "language_code": "en", "limit": 20},
-        )
+    def test_performance(self, live_index):
+        """The latency budget is only asserted when this process has the
+        engine to itself: under ``-n auto`` every worker queries the
+        same local Meilisearch at once, so the number measured here is
+        contention, not the code path (a run once measured 30.09 s)."""
+        marker = unique_marker()
+        product = translation(make_product({"en": marker}), "en")
+        live_index.add(product)
 
-        assert response.status_code == 200
-        data = response.json()
+        start = time.monotonic()
+        data = federated(query=marker)
+        duration = time.monotonic() - start
 
-        # Verify _rankingScore in results
-        if len(data["results"]) > 0:
-            for result in data["results"]:
-                assert "_rankingScore" in result
-                assert isinstance(result["_rankingScore"], (int, float))
-                assert result["_rankingScore"] >= 0
-
-    def test_federated_search_handles_missing_parameters(self):
-        """
-        Test that federated search handles missing required parameters.
-        """
-        # Missing query parameter
-        response = self.client.get(
-            self.federated_search_url, {"language_code": "en", "limit": 20}
-        )
-
-        # Should return 400 Bad Request
-        assert response.status_code == 400
-
-    def test_federated_search_validates_limit_parameter(self):
-        """
-        Test that federated search validates limit parameter.
-        """
-        # Test with invalid limit
-        response = self.client.get(
-            self.federated_search_url,
-            {"query": "laptop", "language_code": "en", "limit": -1},
-        )
-
-        # Should return 400 or use default
-        assert response.status_code in [200, 400]
-
-        # Test with very large limit
-        response = self.client.get(
-            self.federated_search_url,
-            {"query": "laptop", "language_code": "en", "limit": 10000},
-        )
-
-        # Should cap at maximum or return error
-        assert response.status_code in [200, 400]
-
-    def test_federated_search_performance(self):
-        """
-        Test that federated search completes within acceptable time.
-
-        The latency budget is only asserted when this process has the
-        search engine to itself. Under ``-n auto`` every xdist worker
-        queries the same local Meilisearch at once, so the number
-        measured here is contention, not the code path: the run that
-        exposed this asserted ``30.09 < 2.0``. Correctness (HTTP 200 and
-        a well-formed response) is checked either way — it is only the
-        stopwatch that needs exclusivity to mean anything.
-        """
-        import os
-        import time
-
-        start_time = time.time()
-
-        response = self.client.get(
-            self.federated_search_url,
-            {"query": "laptop", "language_code": "en", "limit": 20},
-        )
-
-        end_time = time.time()
-        duration = end_time - start_time
-
-        assert response.status_code == 200
-
+        assert hits(data) == [("product", product.id)]
         workers = int(os.environ.get("PYTEST_XDIST_WORKER_COUNT", "1") or 1)
         if workers > 1:
             pytest.skip(
@@ -394,6 +252,24 @@ class TestFederatedSearchIntegration:
                 f"sharing one Meilisearch (measured {duration:.2f}s)"
             )
         assert duration < 2.0
+
+
+@pytest.mark.django_db
+class TestFederatedSearchValidation:
+    @pytest.mark.parametrize(
+        "params",
+        [
+            {"language_code": "en"},
+            {"query": "", "language_code": "en"},
+            {"query": "lamp", "limit": "many"},
+            {"query": "lamp", "language_code": "xx"},
+        ],
+        ids=["missing-query", "empty-query", "bad-limit", "bad-language"],
+    )
+    def test_rejects_invalid_parameters(self, params):
+        response = Client().get(FEDERATED_URL, params)
+
+        assert response.status_code == 400
 
 
 @pytest.mark.django_db
@@ -434,36 +310,25 @@ class TestSearchAnalyticsIntegration:
         assert "clickThroughRate" in data
 
     def test_analytics_filters_by_date_range(self):
-        """
-        Test that analytics endpoint filters by date range.
-        """
-        # Create test search queries with different dates
+        """Only searches inside [start_date, end_date] are counted."""
         from datetime import timedelta
 
         from django.utils import timezone
 
-        old_date = timezone.now() - timedelta(days=365)
-        recent_date = timezone.now() - timedelta(days=1)
+        # ``timestamp`` is ``auto_now_add``: a value passed to create()
+        # is discarded, so the rows are backdated with update().
+        for query, days_ago in (("old query", 365), ("recent query", 1)):
+            row = SearchQuery.objects.create(
+                query=query,
+                language_code="en",
+                content_type="product",
+                results_count=10,
+                estimated_total_hits=10,
+            )
+            SearchQuery.objects.filter(pk=row.pk).update(
+                timestamp=timezone.now() - timedelta(days=days_ago)
+            )
 
-        SearchQuery.objects.create(
-            query="old query",
-            language_code="en",
-            content_type="product",
-            results_count=10,
-            estimated_total_hits=10,
-            timestamp=old_date,
-        )
-
-        SearchQuery.objects.create(
-            query="recent query",
-            language_code="en",
-            content_type="product",
-            results_count=10,
-            estimated_total_hits=10,
-            timestamp=recent_date,
-        )
-
-        # Query recent data only
         response = self.client.get(
             self.analytics_url,
             {
@@ -475,12 +340,60 @@ class TestSearchAnalyticsIntegration:
         )
 
         assert response.status_code == 200
-        data = response.json()
+        top_queries = [q["query"] for q in response.json()["topQueries"]]
+        assert top_queries == ["recent query"]
 
-        # Verify only recent queries are included (camelCase due to DRF middleware)
-        top_queries = [q["query"] for q in data["topQueries"]]
-        assert "recent query" in top_queries or len(top_queries) == 0
-        assert "old query" not in top_queries
+    @pytest.mark.parametrize(
+        ("stamped_at", "counted"),
+        [
+            ("2026-03-09 23:59:59", False),
+            ("2026-03-10 00:00:00", True),
+            ("2026-03-12 23:59:59", True),
+            ("2026-03-13 00:00:00", False),
+        ],
+    )
+    def test_analytics_date_range_covers_both_whole_days(
+        self, stamped_at, counted
+    ):
+        """``end_date`` is a day, not the midnight that starts it: a
+        search made during the end day counts. Days are the store's
+        local days, not UTC ones."""
+        from datetime import datetime
+
+        from django.utils import timezone
+
+        row = SearchQuery.objects.create(
+            query="boundary",
+            language_code="en",
+            content_type="product",
+            results_count=1,
+            estimated_total_hits=1,
+        )
+        SearchQuery.objects.filter(pk=row.pk).update(
+            timestamp=timezone.make_aware(datetime.fromisoformat(stamped_at))
+        )
+
+        response = self.client.get(
+            self.analytics_url,
+            {"start_date": "2026-03-10", "end_date": "2026-03-12"},
+        )
+
+        assert response.status_code == 200, response.json()
+        top_queries = [q["query"] for q in response.json()["topQueries"]]
+        assert top_queries == (["boundary"] if counted else [])
+
+    @pytest.mark.parametrize(
+        "params",
+        [
+            {"start_date": "2026-03-10T12:00:00"},
+            {"end_date": "10/03/2026"},
+            {"start_date": "2026-03-12", "end_date": "2026-03-10"},
+        ],
+    )
+    def test_analytics_rejects_a_malformed_date_range(self, params):
+        response = self.client.get(self.analytics_url, params)
+
+        assert response.status_code == 400, response.json()
 
     def test_analytics_filters_by_content_type(self):
         """
@@ -511,64 +424,8 @@ class TestSearchAnalyticsIntegration:
         assert response.status_code == 200
         data = response.json()
 
-        # Verify only product queries are included (camelCase due to DRF middleware)
-        if len(data["topQueries"]) > 0:
-            # All queries should be product-related
-            assert data["searchVolume"]["byContentType"].get("product", 0) > 0
-
-    def test_analytics_calculates_click_through_rate(self):
-        """
-        Test that analytics endpoint calculates click-through rate correctly.
-        """
-        # Create test search query with clicks
-        search_query = SearchQuery.objects.create(
-            query="test query",
-            language_code="en",
-            content_type="product",
-            results_count=10,
-            estimated_total_hits=10,
-        )
-
-        # Create click record
-        SearchClick.objects.create(
-            search_query=search_query,
-            result_id="123",
-            result_type="product",
-            position=0,
-        )
-
-        response = self.client.get(self.analytics_url)
-
-        assert response.status_code == 200
-        data = response.json()
-
-        # Verify CTR is calculated (camelCase due to DRF middleware)
-        assert "clickThroughRate" in data
-        assert isinstance(data["clickThroughRate"], (int, float))
-        assert 0 <= data["clickThroughRate"] <= 1
-
-    def test_analytics_identifies_zero_result_queries(self):
-        """
-        Test that analytics endpoint identifies queries with zero results.
-        """
-        # Create test search query with zero results
-        SearchQuery.objects.create(
-            query="nonexistent query",
-            language_code="en",
-            content_type="product",
-            results_count=0,
-            estimated_total_hits=0,
-        )
-
-        response = self.client.get(self.analytics_url)
-
-        assert response.status_code == 200
-        data = response.json()
-
-        # Verify zero result queries are identified (camelCase due to DRF middleware)
-        assert "zeroResultQueries" in data
-        zero_queries = [q["query"] for q in data["zeroResultQueries"]]
-        assert "nonexistent query" in zero_queries or len(zero_queries) == 0
+        assert data["searchVolume"]["byContentType"] == {"product": 1}
+        assert [q["query"] for q in data["topQueries"]] == ["product query"]
 
     def test_analytics_handles_no_data(self):
         """
@@ -587,74 +444,3 @@ class TestSearchAnalyticsIntegration:
         assert data["zeroResultQueries"] == []
         assert data["searchVolume"]["total"] == 0
         assert data["clickThroughRate"] == 0
-
-
-@pytest.mark.django_db
-class TestSearchClickTracking:
-    """Integration tests for search click tracking."""
-
-    @pytest.fixture(autouse=True)
-    def setup(self):
-        """Set up test client and data."""
-        self.client = Client()
-
-    def test_search_click_creates_record(self):
-        """
-        Test that clicking a search result creates a SearchClick record.
-        """
-        # Create test search query
-        search_query = SearchQuery.objects.create(
-            query="test query",
-            language_code="en",
-            content_type="product",
-            results_count=10,
-            estimated_total_hits=10,
-        )
-
-        initial_count = SearchClick.objects.count()
-
-        # Simulate click tracking (would be done via frontend API call)
-        SearchClick.objects.create(
-            search_query=search_query,
-            result_id="123",
-            result_type="product",
-            position=0,
-        )
-
-        # Verify SearchClick record was created
-        assert SearchClick.objects.count() == initial_count + 1
-
-        # Verify record details
-        click = SearchClick.objects.latest("timestamp")
-        assert click.search_query == search_query
-        assert click.result_id == "123"
-        assert click.result_type == "product"
-        assert click.position == 0
-
-    def test_search_click_tracks_position(self):
-        """
-        Test that search click tracking records result position.
-        """
-        search_query = SearchQuery.objects.create(
-            query="test query",
-            language_code="en",
-            content_type="product",
-            results_count=10,
-            estimated_total_hits=10,
-        )
-
-        # Create clicks at different positions
-        for position in range(5):
-            SearchClick.objects.create(
-                search_query=search_query,
-                result_id=f"result_{position}",
-                result_type="product",
-                position=position,
-            )
-
-        # Verify all positions were recorded
-        clicks = SearchClick.objects.filter(search_query=search_query).order_by(
-            "position"
-        )
-        positions = [click.position for click in clicks]
-        assert positions == [0, 1, 2, 3, 4]

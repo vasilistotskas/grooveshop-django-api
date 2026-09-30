@@ -42,7 +42,7 @@ def _write_po(tmp_path: Path) -> Path:
     return tmp_path / "locale"
 
 
-@pytest.mark.django_db(transaction=True)
+@pytest.mark.django_db
 def test_additive_mode_preserves_rosetta_edit(tmp_path, settings):
     """A prior Rosetta edit must survive the command by default."""
     settings.LOCALE_PATHS = [_write_po(tmp_path)]
@@ -65,7 +65,7 @@ def test_additive_mode_preserves_rosetta_edit(tmp_path, settings):
     )
 
 
-@pytest.mark.django_db(transaction=True)
+@pytest.mark.django_db
 def test_additive_mode_seeds_missing_msgids(tmp_path, settings):
     """Rows absent from the DB are still imported from .po."""
     settings.LOCALE_PATHS = [_write_po(tmp_path)]
@@ -84,7 +84,7 @@ def test_additive_mode_seeds_missing_msgids(tmp_path, settings):
     assert created.msgstr == "Η πληρωμή επιβεβαιώθηκε — Παραγγελία #{order_id}"
 
 
-@pytest.mark.django_db(transaction=True)
+@pytest.mark.django_db
 def test_force_overwrites_rosetta_edit(tmp_path, settings):
     """--force restores the old destructive behaviour on demand."""
     settings.LOCALE_PATHS = [_write_po(tmp_path)]

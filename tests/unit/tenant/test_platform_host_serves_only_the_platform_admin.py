@@ -26,6 +26,7 @@ from django.urls import Resolver404, resolve
 from django.utils import translation
 
 from admin.admin import MyAdminSite
+from admin.platform_site import PlatformAdminSite
 
 _LANGUAGES = [code for code, _name in settings.LANGUAGES]
 _ADMIN_PATHS = [
@@ -63,8 +64,7 @@ def test_the_platform_admin_is_still_reachable(language):
     with translation.override(language):
         site = _resolved_site("/admin/login/", "tenant.urls_public")
 
-    assert site is not None, "the platform admin login stopped resolving"
-    assert site is not MyAdminSite
+    assert site is PlatformAdminSite
 
 
 @pytest.mark.parametrize("language", _LANGUAGES)

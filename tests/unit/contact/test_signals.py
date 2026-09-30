@@ -1,6 +1,8 @@
 import contextlib
 from unittest.mock import patch
 
+import pytest
+from celery.exceptions import Retry
 from django.core import mail
 from django.db import connection
 from django.test import TestCase, override_settings
@@ -109,21 +111,14 @@ class TestContactSignals(TestCase):
         DEFAULT_FROM_EMAIL="noreply@example.com",
     )
     @patch("contact.tasks.send_mail")
-    @patch("contact.tasks.logger")
-    def test_email_failure_logged(self, mock_logger, mock_send_mail):
-        # send_mail now lives in the Celery task. With CELERY_TASK_ALWAYS_EAGER
-        # the task runs synchronously and Celery's autoretry_for=(Exception,)
-        # would normally swallow + retry; the conftest fires on_commit
-        # callbacks with try/except so the SMTP failure doesn't propagate
-        # back to the test. We just need to verify the task attempted to
-        # send — error logging happens via Celery's MonitoredTask.on_failure,
-        # not in-task.
+    def test_a_failed_send_is_retried(self, mock_send_mail):
+        # Eager Celery runs the task inline, so its ``autoretry_for``
+        # surfaces here as the ``Retry`` a worker would schedule.
         mock_send_mail.side_effect = Exception("SMTP server error")
 
-        Contact.objects.create(**self.contact_data)
+        with pytest.raises(Retry):
+            Contact.objects.create(**self.contact_data)
 
-        # send_mail was attempted exactly once (autoretry retries are
-        # invisible because the task body is the same call).
         assert mock_send_mail.called
 
     @override_settings(

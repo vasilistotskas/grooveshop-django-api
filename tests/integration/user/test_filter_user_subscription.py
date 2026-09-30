@@ -16,49 +16,47 @@ User = get_user_model()
 
 
 class UserSubscriptionFilterTest(APITestCase):
-    def setUp(self):
-        UserSubscription.objects.all().delete()
-        SubscriptionTopic.objects.all().delete()
-        User.objects.all().delete()
+    @classmethod
+    def setUpTestData(cls):
 
-        self.user = UserAccountFactory()
-        self.other_user = UserAccountFactory()
+        cls.user = UserAccountFactory()
+        cls.other_user = UserAccountFactory()
 
-        self.now = timezone.now()
+        cls.now = timezone.now()
 
-        self.newsletter_topic = SubscriptionTopicFactory(
+        cls.newsletter_topic = SubscriptionTopicFactory(
             slug="weekly-newsletter",
             category=SubscriptionTopic.TopicCategory.NEWSLETTER,
             is_active=True,
         )
-        self.newsletter_topic.set_current_language("en")
-        self.newsletter_topic.name = "Weekly Newsletter"
-        self.newsletter_topic.description = "Get our weekly updates"
-        self.newsletter_topic.save()
+        cls.newsletter_topic.set_current_language("en")
+        cls.newsletter_topic.name = "Weekly Newsletter"
+        cls.newsletter_topic.description = "Get our weekly updates"
+        cls.newsletter_topic.save()
 
-        self.marketing_topic = SubscriptionTopicFactory(
+        cls.marketing_topic = SubscriptionTopicFactory(
             slug="marketing-campaigns",
             category=SubscriptionTopic.TopicCategory.MARKETING,
             is_active=True,
         )
-        self.marketing_topic.set_current_language("en")
-        self.marketing_topic.name = "Marketing Updates"
-        self.marketing_topic.description = "Special offers and promotions"
-        self.marketing_topic.save()
+        cls.marketing_topic.set_current_language("en")
+        cls.marketing_topic.name = "Marketing Updates"
+        cls.marketing_topic.description = "Special offers and promotions"
+        cls.marketing_topic.save()
 
-        self.product_topic = SubscriptionTopicFactory(
+        cls.product_topic = SubscriptionTopicFactory(
             slug="product-updates",
             category=SubscriptionTopic.TopicCategory.PRODUCT,
             is_active=True,
         )
-        self.product_topic.set_current_language("en")
-        self.product_topic.name = "Product News"
-        self.product_topic.description = "Latest product features"
-        self.product_topic.save()
+        cls.product_topic.set_current_language("en")
+        cls.product_topic.name = "Product News"
+        cls.product_topic.description = "Latest product features"
+        cls.product_topic.save()
 
-        self.active_subscription = UserSubscriptionFactory(
-            user=self.user,
-            topic=self.newsletter_topic,
+        cls.active_subscription = UserSubscriptionFactory(
+            user=cls.user,
+            topic=cls.newsletter_topic,
             status=UserSubscription.SubscriptionStatus.ACTIVE,
             confirmation_token="",
             metadata={
@@ -66,50 +64,49 @@ class UserSubscriptionFilterTest(APITestCase):
                 "preferences": {"frequency": "weekly"},
             },
         )
-        self.active_subscription.created_at = self.now - timedelta(days=30)
-        self.active_subscription.subscribed_at = self.now - timedelta(days=30)
-        self.active_subscription.save()
+        cls.active_subscription.created_at = cls.now - timedelta(days=30)
+        cls.active_subscription.subscribed_at = cls.now - timedelta(days=30)
+        cls.active_subscription.save()
 
-        self.pending_subscription = UserSubscriptionFactory(
-            user=self.user,
-            topic=self.marketing_topic,
+        cls.pending_subscription = UserSubscriptionFactory(
+            user=cls.user,
+            topic=cls.marketing_topic,
             status=UserSubscription.SubscriptionStatus.PENDING,
             confirmation_token="abc123token",
             metadata={},
         )
-        self.pending_subscription.created_at = self.now - timedelta(days=15)
-        self.pending_subscription.subscribed_at = self.now - timedelta(days=15)
-        self.pending_subscription.save()
+        cls.pending_subscription.created_at = cls.now - timedelta(days=15)
+        cls.pending_subscription.subscribed_at = cls.now - timedelta(days=15)
+        cls.pending_subscription.save()
 
-        self.unsubscribed_subscription = UserSubscriptionFactory(
-            user=self.user,
-            topic=self.product_topic,
+        cls.unsubscribed_subscription = UserSubscriptionFactory(
+            user=cls.user,
+            topic=cls.product_topic,
             status=UserSubscription.SubscriptionStatus.UNSUBSCRIBED,
             confirmation_token="",
             metadata={"unsubscribe_reason": "too_frequent"},
         )
-        self.unsubscribed_subscription.created_at = self.now - timedelta(days=5)
-        self.unsubscribed_subscription.subscribed_at = self.now - timedelta(
+        cls.unsubscribed_subscription.created_at = cls.now - timedelta(days=5)
+        cls.unsubscribed_subscription.subscribed_at = cls.now - timedelta(
             days=5
         )
-        self.unsubscribed_subscription.unsubscribed_at = self.now - timedelta(
+        cls.unsubscribed_subscription.unsubscribed_at = cls.now - timedelta(
             days=2
         )
-        self.unsubscribed_subscription.save()
+        cls.unsubscribed_subscription.save()
 
-        self.other_user_subscription = UserSubscriptionFactory(
-            user=self.other_user,
-            topic=self.newsletter_topic,
+        cls.other_user_subscription = UserSubscriptionFactory(
+            user=cls.other_user,
+            topic=cls.newsletter_topic,
             status=UserSubscription.SubscriptionStatus.ACTIVE,
             confirmation_token="",
             metadata={"source": "mobile_app"},
         )
-        self.other_user_subscription.created_at = self.now - timedelta(days=10)
-        self.other_user_subscription.subscribed_at = self.now - timedelta(
-            days=10
-        )
-        self.other_user_subscription.save()
+        cls.other_user_subscription.created_at = cls.now - timedelta(days=10)
+        cls.other_user_subscription.subscribed_at = cls.now - timedelta(days=10)
+        cls.other_user_subscription.save()
 
+    def setUp(self):
         self.client.force_authenticate(user=self.user)
 
     def test_timestamp_filters(self):
@@ -408,7 +405,3 @@ class UserSubscriptionFilterTest(APITestCase):
         self.assertNotIn(self.active_subscription.id, result_ids)
         self.assertNotIn(self.pending_subscription.id, result_ids)
         self.assertNotIn(self.unsubscribed_subscription.id, result_ids)
-
-    def tearDown(self):
-        UserSubscription.objects.all().delete()
-        SubscriptionTopic.objects.all().delete()

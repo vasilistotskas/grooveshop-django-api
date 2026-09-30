@@ -1,6 +1,5 @@
 from datetime import timedelta
 
-import pytest
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from django.utils import timezone
@@ -20,22 +19,10 @@ from user.factories.account import UserAccountFactory
 User = get_user_model()
 
 
-@pytest.mark.django_db(transaction=True)
 class OrderItemFilterTest(APITestCase):
-    """
-    Use ``transaction=True`` so each test method runs in a real transaction
-    that's flushed at teardown — defends against leftover rows from a
-    sibling ``TransactionTestCase`` whose own flush was interrupted under
-    parallel xdist load. Earlier the class used the default ``TestCase``
-    rollback, which left the DB in an unknown state when this class ran
-    after `test_concurrent_stock*.py` and intermittently inflated row
-    counts on `test_camel_case_filters` / `test_filter_with_ordering`.
-    """
-
-    def setUp(self):
-        OrderItem.objects.all().delete()
-
-        self.admin_user = UserAccountFactory(
+    @classmethod
+    def setUpTestData(cls):
+        cls.admin_user = UserAccountFactory(
             email="admin@example.com",
             first_name="Admin",
             last_name="User",
@@ -43,48 +30,46 @@ class OrderItemFilterTest(APITestCase):
             is_staff=True,
             is_superuser=True,
         )
-        self.client.force_authenticate(user=self.admin_user)
-
-        self.user1 = UserAccountFactory(
+        cls.user1 = UserAccountFactory(
             email="john.doe@example.com", first_name="John", last_name="Doe"
         )
-        self.user2 = UserAccountFactory(
+        cls.user2 = UserAccountFactory(
             email="jane.smith@example.com", first_name="Jane", last_name="Smith"
         )
 
-        self.category1 = ProductCategoryFactory()
-        self.category2 = ProductCategoryFactory()
+        cls.category1 = ProductCategoryFactory()
+        cls.category2 = ProductCategoryFactory()
 
-        self.product1 = ProductFactory(
+        cls.product1 = ProductFactory(
             sku="PROD001",
-            category=self.category1,
+            category=cls.category1,
             active=True,
             price=Money(25, "EUR"),
         )
-        self.product1.set_current_language("en")
-        self.product1.name = "UniqueTestProduct"
-        self.product1.save()
-        self.product2 = ProductFactory(
+        cls.product1.set_current_language("en")
+        cls.product1.name = "UniqueTestProduct"
+        cls.product1.save()
+        cls.product2 = ProductFactory(
             sku="PROD002",
-            category=self.category1,
+            category=cls.category1,
             active=True,
             price=Money(50, "EUR"),
         )
-        self.product3 = ProductFactory(
+        cls.product3 = ProductFactory(
             sku="PROD003",
-            category=self.category2,
+            category=cls.category2,
             active=False,
             price=Money(75, "EUR"),
         )
 
-        self.now = timezone.now()
+        cls.now = timezone.now()
 
         country = CountryFactory()
         region = RegionFactory()
         pay_way = PayWayFactory()
 
-        self.order1 = Order.objects.create(
-            user=self.user1,
+        cls.order1 = Order.objects.create(
+            user=cls.user1,
             status=OrderStatus.PENDING,
             payment_status=PaymentStatus.PENDING,
             first_name="John",
@@ -100,12 +85,12 @@ class OrderItemFilterTest(APITestCase):
             shipping_price=Money(10, "EUR"),
             paid_amount=Money(0, "EUR"),
         )
-        Order.objects.filter(id=self.order1.id).update(
-            created_at=self.now - timedelta(hours=1)
+        Order.objects.filter(id=cls.order1.id).update(
+            created_at=cls.now - timedelta(hours=1)
         )
 
-        self.order2 = Order.objects.create(
-            user=self.user1,
+        cls.order2 = Order.objects.create(
+            user=cls.user1,
             status=OrderStatus.COMPLETED,
             payment_status=PaymentStatus.COMPLETED,
             first_name="John",
@@ -121,12 +106,12 @@ class OrderItemFilterTest(APITestCase):
             shipping_price=Money(10, "EUR"),
             paid_amount=Money(100, "EUR"),
         )
-        Order.objects.filter(id=self.order2.id).update(
-            created_at=self.now - timedelta(days=2)
+        Order.objects.filter(id=cls.order2.id).update(
+            created_at=cls.now - timedelta(days=2)
         )
 
-        self.order3 = Order.objects.create(
-            user=self.user2,
+        cls.order3 = Order.objects.create(
+            user=cls.user2,
             status=OrderStatus.SHIPPED,
             payment_status=PaymentStatus.COMPLETED,
             first_name="Jane",
@@ -142,13 +127,13 @@ class OrderItemFilterTest(APITestCase):
             shipping_price=Money(15, "EUR"),
             paid_amount=Money(200, "EUR"),
         )
-        Order.objects.filter(id=self.order3.id).update(
-            created_at=self.now - timedelta(days=1)
+        Order.objects.filter(id=cls.order3.id).update(
+            created_at=cls.now - timedelta(days=1)
         )
 
-        self.item1 = OrderItem.objects.create(
-            order=self.order1,
-            product=self.product1,
+        cls.item1 = OrderItem.objects.create(
+            order=cls.order1,
+            product=cls.product1,
             price=Money(25, "EUR"),
             quantity=2,
             original_quantity=2,
@@ -156,13 +141,13 @@ class OrderItemFilterTest(APITestCase):
             refunded_quantity=0,
             notes="Standard item",
         )
-        OrderItem.objects.filter(id=self.item1.id).update(
-            created_at=self.now - timedelta(hours=1)
+        OrderItem.objects.filter(id=cls.item1.id).update(
+            created_at=cls.now - timedelta(hours=1)
         )
 
-        self.item2 = OrderItem.objects.create(
-            order=self.order1,
-            product=self.product2,
+        cls.item2 = OrderItem.objects.create(
+            order=cls.order1,
+            product=cls.product2,
             price=Money(50, "EUR"),
             quantity=1,
             original_quantity=1,
@@ -170,13 +155,13 @@ class OrderItemFilterTest(APITestCase):
             refunded_quantity=0,
             notes="",
         )
-        OrderItem.objects.filter(id=self.item2.id).update(
-            created_at=self.now - timedelta(hours=1)
+        OrderItem.objects.filter(id=cls.item2.id).update(
+            created_at=cls.now - timedelta(hours=1)
         )
 
-        self.item3 = OrderItem.objects.create(
-            order=self.order2,
-            product=self.product1,
+        cls.item3 = OrderItem.objects.create(
+            order=cls.order2,
+            product=cls.product1,
             price=Money(25, "EUR"),
             quantity=10,
             original_quantity=10,
@@ -184,13 +169,13 @@ class OrderItemFilterTest(APITestCase):
             refunded_quantity=10,
             notes="Customer requested refund",
         )
-        OrderItem.objects.filter(id=self.item3.id).update(
-            created_at=self.now - timedelta(days=2)
+        OrderItem.objects.filter(id=cls.item3.id).update(
+            created_at=cls.now - timedelta(days=2)
         )
 
-        self.item4 = OrderItem.objects.create(
-            order=self.order2,
-            product=self.product2,
+        cls.item4 = OrderItem.objects.create(
+            order=cls.order2,
+            product=cls.product2,
             price=Money(50, "EUR"),
             quantity=4,
             original_quantity=4,
@@ -198,13 +183,13 @@ class OrderItemFilterTest(APITestCase):
             refunded_quantity=2,
             notes="Partial refund processed",
         )
-        OrderItem.objects.filter(id=self.item4.id).update(
-            created_at=self.now - timedelta(days=2)
+        OrderItem.objects.filter(id=cls.item4.id).update(
+            created_at=cls.now - timedelta(days=2)
         )
 
-        self.item5 = OrderItem.objects.create(
-            order=self.order3,
-            product=self.product3,
+        cls.item5 = OrderItem.objects.create(
+            order=cls.order3,
+            product=cls.product3,
             price=Money(150, "EUR"),
             quantity=1,
             original_quantity=1,
@@ -212,13 +197,13 @@ class OrderItemFilterTest(APITestCase):
             refunded_quantity=0,
             notes="",
         )
-        OrderItem.objects.filter(id=self.item5.id).update(
-            created_at=self.now - timedelta(days=1)
+        OrderItem.objects.filter(id=cls.item5.id).update(
+            created_at=cls.now - timedelta(days=1)
         )
 
-        self.old_item = OrderItem.objects.create(
-            order=self.order3,
-            product=self.product1,
+        cls.old_item = OrderItem.objects.create(
+            order=cls.order3,
+            product=cls.product1,
             price=Money(25, "EUR"),
             quantity=1,
             original_quantity=1,
@@ -226,9 +211,12 @@ class OrderItemFilterTest(APITestCase):
             refunded_quantity=0,
             notes="Old item",
         )
-        OrderItem.objects.filter(id=self.old_item.id).update(
-            created_at=self.now - timedelta(days=10)
+        OrderItem.objects.filter(id=cls.old_item.id).update(
+            created_at=cls.now - timedelta(days=10)
         )
+
+    def setUp(self):
+        self.client.force_authenticate(user=self.admin_user)
 
     def test_basic_filters(self):
         url = reverse("order-item-list")
@@ -651,6 +639,3 @@ class OrderItemFilterTest(APITestCase):
         items_by_quantity_desc.sort(key=lambda x: x[1], reverse=True)
 
         self.assertEqual(results[0]["id"], items_by_quantity_desc[0][0].id)
-
-    def tearDown(self):
-        OrderItem.objects.all().delete()

@@ -439,5 +439,32 @@ class PayWayFilterTest(APITestCase):
         self.assertNotIn(self.bank_transfer.id, result_ids)
         self.assertNotIn(self.cash_payment.id, result_ids)
 
+    def test_has_icon_filter(self):
+        """An empty icon path counts as no icon, same as a NULL one."""
+        PayWay.objects.filter(
+            pk__in=[self.bank_transfer.pk, self.cash_payment.pk]
+        ).update(icon="")
+        url = reverse("payway-list")
+
+        def ids(params):
+            response = self.client.get(url, params)
+            self.assertEqual(response.status_code, 200)
+            return sorted(r["id"] for r in response.data["results"])
+
+        self.assertEqual(
+            ids({"hasIcon": "false"}),
+            sorted([self.bank_transfer.id, self.cash_payment.id]),
+        )
+        self.assertEqual(
+            ids({"hasIcon": "true"}),
+            sorted(
+                [
+                    self.stripe_payment.id,
+                    self.paypal_payment.id,
+                    self.high_cost_payment.id,
+                ]
+            ),
+        )
+
     def tearDown(self):
         PayWay.objects.all().delete()

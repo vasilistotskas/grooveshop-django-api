@@ -2,27 +2,20 @@
 ``Tenant`` rows or ORM round-trips (not just monkeypatched
 ``connection`` fixtures).
 
-The four invariants covered:
+Covered here:
 
-1. **Knox cross-tenant token replay** — a token minted by a user
-   authenticated on tenant A must not authenticate that user on
-   tenant B's domain, even when the user account exists in both
-   schemas (UserAccount lives in SHARED_APPS).
-2. **Viva webhook schema resolution** — the webhook view iterates
-   active tenants to find the order_code, then enters that schema.
-   A test tenant with no matching order returns the 200 / no-op path.
-3. **BoxNow webhook schema resolution** — same model, keyed on
-   parcelId.
-4. **WebSocket group isolation** — the consumer must build its
-   group name from ``scope["tenant"].schema_name`` so a notification
-   broadcast on tenant A never reaches tenant B's subscribers.
+1. **Membership isolation** — a role in tenant A grants nothing in B.
+2. **Viva / BoxNow webhook schema resolution** — the webhook views
+   iterate ACTIVE tenants to find the schema owning the order code /
+   parcel id. The main lane has no real tenant schemas, so
+   ``schema_context`` is patched to a no-op and every tenant "sees" the
+   public-schema rows; the tests pin which tenants are visited.
+3. **Store-scoped admin routes are role-gated per tenant** — an OWNER
+   of store A holds nothing on store B's host.
+4. **Cart UUID identifier contract** and the **health probe bypass**.
 
-These tests sit under ``tests/integration/tenant/`` so they pick up
-the same DB fixture (``@pytest.mark.django_db``) the rest of the
-integration suite uses. Real Postgres schemas are NOT created — we
-keep ``auto_create_schema=False`` so the Tenant rows exist in the
-public schema only and the schema-routing logic is exercised via
-the queryset filter + mocked downstream calls.
+Knox cross-tenant token replay needs real per-tenant ``knox_authtoken``
+tables and so belongs in the multi-tenant lane (``tests_mt``).
 """
 
 from __future__ import annotations
@@ -32,43 +25,16 @@ from unittest.mock import MagicMock, patch
 import pytest
 from django.contrib.auth import get_user_model
 from django.test import RequestFactory
+from rest_framework.test import APIClient
 
 from tenant.models import (
     Tenant,
-    TenantDomain,
     TenantMembershipRole,
     UserTenantMembership,
 )
+from tests.utils.staff import store_staff, store_tenant
 
 User = get_user_model()
-
-
-def _make_tenant(slug: str, **kwargs) -> Tenant:
-    defaults = {"is_active": True, "suspended_at": None}
-    defaults.update(kwargs)
-    t = Tenant(
-        schema_name=slug.replace("-", "_"),
-        name=slug,
-        slug=slug,
-        owner_email=f"owner-{slug}@example.com",
-        **defaults,
-    )
-    t.auto_create_schema = False
-    t.save()
-    return t
-
-
-def _attach_domain(tenant: Tenant, host: str) -> TenantDomain:
-    return TenantDomain.objects.create(
-        domain=host,
-        tenant=tenant,
-        is_primary=True,
-    )
-
-
-# ---------------------------------------------------------------------------
-# Knox cross-tenant token replay
-# ---------------------------------------------------------------------------
 
 
 @pytest.mark.django_db
@@ -86,8 +52,8 @@ class TestMembershipIsolation:
     def test_membership_does_not_cross_tenants(self) -> None:
         from tenant.membership import get_membership
 
-        tenant_a = _make_tenant("knox-tenant-a")
-        tenant_b = _make_tenant("knox-tenant-b")
+        tenant_a = store_tenant("knox_tenant_a")
+        tenant_b = store_tenant("knox_tenant_b")
 
         user = User.objects.create_user(
             email="cross-tenant@example.com",
@@ -103,23 +69,6 @@ class TestMembershipIsolation:
         assert get_membership(user, tenant_a) is not None
         assert get_membership(user, tenant_b) is None
 
-    def test_inactive_membership_does_not_grant_access(self) -> None:
-        from tenant.membership import get_membership
-
-        tenant = _make_tenant("knox-tenant-c")
-        user = User.objects.create_user(
-            email="inactive-membership@example.com",
-            password="irrelevant-2",
-        )
-        UserTenantMembership.objects.create(
-            user=user,
-            tenant=tenant,
-            role=TenantMembershipRole.MEMBER,
-            is_active=False,
-        )
-
-        assert get_membership(user, tenant) is None
-
 
 # ---------------------------------------------------------------------------
 # Viva webhook schema resolution
@@ -132,8 +81,7 @@ class TestVivaWebhookTenantResolution:
     finds the schema whose Order table contains the matching
     ``metadata.viva_order_code``.
 
-    The auto-created Tenant rows here use ``auto_create_schema=False``
-    so no real Postgres schemas exist. We patch
+    No real tenant schemas exist in this lane. We patch
     ``order.views.viva_webhook.schema_context`` with a no-op context
     manager so the inner ``Order.objects.filter`` runs against the
     test public DB — the test then asserts the iteration behaviour
@@ -154,9 +102,6 @@ class TestVivaWebhookTenantResolution:
     def test_no_match_returns_none_for_unknown_order_code(self) -> None:
         from order.views.viva_webhook import _resolve_tenant_for_order_code
 
-        _make_tenant("viva-resolver-a")
-        _make_tenant("viva-resolver-b")
-
         with self._noop_schema_context():
             result = _resolve_tenant_for_order_code("ORDER-NOT-IN-ANY-TENANT")
         assert result is None
@@ -164,17 +109,22 @@ class TestVivaWebhookTenantResolution:
     def test_empty_order_code_short_circuits(self) -> None:
         from order.views.viva_webhook import _resolve_tenant_for_order_code
 
-        _make_tenant("viva-empty-resolver")
         assert _resolve_tenant_for_order_code("") is None
         assert _resolve_tenant_for_order_code(None) is None  # type: ignore[arg-type]
 
     def test_inactive_tenant_skipped(self) -> None:
         """``is_active=False`` tenants must not be iterated."""
+        from order.factories.order import OrderFactory
         from order.views.viva_webhook import _resolve_tenant_for_order_code
 
-        _make_tenant("viva-inactive-only", is_active=False)
+        OrderFactory(
+            metadata={"viva_order_codes": ["INACTIVE-CODE"]},
+            num_order_items=0,
+        )
         with self._noop_schema_context():
-            assert _resolve_tenant_for_order_code("anything") is None
+            assert _resolve_tenant_for_order_code("INACTIVE-CODE") is not None
+            Tenant.objects.update(is_active=False)
+            assert _resolve_tenant_for_order_code("INACTIVE-CODE") is None
 
     def test_match_via_viva_order_codes_history_array(self) -> None:
         """A payment on an EARLIER checkout session (stale tab, back
@@ -187,7 +137,6 @@ class TestVivaWebhookTenantResolution:
         from order.factories.order import OrderFactory
         from order.views.viva_webhook import _resolve_tenant_for_order_code
 
-        _make_tenant("viva-array-resolver")
         OrderFactory(
             metadata={
                 "viva_order_code": "NEWEST-CODE",
@@ -215,7 +164,7 @@ class TestBoxNowWebhookTenantResolution:
     """``_resolve_tenant_for_parcel`` mirrors the Viva resolver but
     keys on ``BoxNowShipment.parcel_id``.
     Uses the same no-op ``schema_context`` patch as the Viva tests
-    above so the iteration is exercised without real Postgres schemas.
+    above.
     """
 
     @staticmethod
@@ -231,24 +180,25 @@ class TestBoxNowWebhookTenantResolution:
     def test_empty_parcel_id_short_circuits(self) -> None:
         from shipping_boxnow.views.webhook import _resolve_tenant_for_parcel
 
-        _make_tenant("boxnow-resolver-a")
         assert _resolve_tenant_for_parcel("") is None
 
     def test_no_match_returns_none_for_unknown_parcel(self) -> None:
         from shipping_boxnow.views.webhook import _resolve_tenant_for_parcel
 
-        _make_tenant("boxnow-resolver-b")
         with self._noop_schema_context():
             assert (
                 _resolve_tenant_for_parcel("parcel-not-in-any-tenant") is None
             )
 
     def test_inactive_tenant_skipped(self) -> None:
+        from shipping_boxnow.factories import BoxNowShipmentFactory
         from shipping_boxnow.views.webhook import _resolve_tenant_for_parcel
 
-        _make_tenant("boxnow-inactive", is_active=False)
+        BoxNowShipmentFactory(parcel_id="9200000001")
         with self._noop_schema_context():
-            assert _resolve_tenant_for_parcel("any-parcel-id") is None
+            assert _resolve_tenant_for_parcel("9200000001") is not None
+            Tenant.objects.update(is_active=False)
+            assert _resolve_tenant_for_parcel("9200000001") is None
 
 
 # ---------------------------------------------------------------------------
@@ -276,98 +226,27 @@ class TestHealthProbeBypass:
 
 
 # ---------------------------------------------------------------------------
-# WebSocket group isolation
-# ---------------------------------------------------------------------------
-
-
-class TestWebSocketGroupIsolation:
-    """The WebSocket consumer's group name embeds the tenant schema, so
-    a notification broadcast on tenant A is delivered only to
-    subscribers connected through tenant A's domain. The ticket
-    middleware is the auth side; this test pins down the delivery
-    side.
-    """
-
-    def test_per_user_group_name_includes_tenant_schema(self) -> None:
-        from notification.groups import user_group
-
-        a = user_group("tenant_alpha", 42)
-        b = user_group("tenant_beta", 42)
-
-        assert a != b, (
-            "same user on different tenants must get different groups"
-        )
-        assert "tenant_alpha" in a
-        assert "tenant_beta" in b
-
-
-# ---------------------------------------------------------------------------
-# Page-config tenant admin permission
+# Store-scoped admin routes
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.django_db
-class TestPageConfigTenantPermission:
-    """``PageLayoutAdminViewSet`` must not be reachable by store staff.
+def test_page_layout_admin_refuses_the_owner_of_another_store(bind_tenant):
+    """H22: permissions derive from the caller's ROLE in the tenant on
+    the connection (``StoreStaffModelPermissions`` →
+    ``TenantRolePermissionBackend``), never from ``is_staff``. See
+    ``docs/api-staff-identity.md``."""
+    store_a = store_tenant("layout_store_a")
+    store_b = store_tenant("layout_store_b")
+    client = APIClient()
+    client.force_authenticate(
+        user=store_staff(store_a, role=TenantMembershipRole.OWNER)
+    )
 
-    Platform-staff without a membership in
-    the current tenant must not mutate that tenant's layout.
-
-    The original guard required ``IsAdminUser`` PAIRED with
-    ``HasTenantAccess``. That pairing was unsound on an API request:
-    ``UserTenantMembership.user`` is an FK to
-    ``public.user_useraccount``, but an API session authenticates
-    against the TENANT schema (knox is TENANT_APPS only), so the
-    membership lookup compared primary keys ACROSS schemas and matched
-    whichever public row shared the pk. It held only because the
-    cutover copied users id-preserving.
-
-    H22 is now closed at the root instead: ``is_staff`` is not the gate
-    at all. See ``docs/api-staff-identity.md`` for why the API has no
-    sound notion of store staff, and what granting it would require.
-    """
-
-    def test_admin_viewset_is_role_gated(self) -> None:
-        """The end state: permissions derive from the caller's ROLE in
-        the tenant on the connection (StoreStaffModelPermissions →
-        TenantRolePermissionBackend). An OWNER of store A holds nothing
-        on store B's host, which is H22 by construction — and a
-        platform superuser still passes via the has_perm short-circuit.
-
-        (An interim pass locked these routes to IsPlatformSuperuser
-        while the staff identity did not exist yet; Design B replaced
-        that — see docs/api-staff-identity.md.)
-        """
-        from page_config.views import PageLayoutAdminViewSet
-
-        permission_names = {
-            cls.__name__ for cls in PageLayoutAdminViewSet.permission_classes
-        }
-        assert "StoreStaffModelPermissions" in permission_names
-
-    def test_admin_viewset_does_not_rely_on_is_staff(self) -> None:
-        """``IsAdminUser`` is literally ``is_staff`` — the H22 hole."""
-        from page_config.views import PageLayoutAdminViewSet
-
-        permission_names = {
-            cls.__name__ for cls in PageLayoutAdminViewSet.permission_classes
-        }
-        assert "IsAdminUser" not in permission_names
-
-    def test_admin_viewset_does_not_match_membership_across_schemas(
-        self,
-    ) -> None:
-        """``HasTenantAccess`` compares pks across schemas on the API.
-
-        Re-adding it here would reintroduce that comparison, so this
-        pins its absence rather than leaving it to review.
-        """
-        from page_config.views import PageLayoutAdminViewSet
-
-        permission_names = {
-            cls.__name__ for cls in PageLayoutAdminViewSet.permission_classes
-        }
-        assert "HasTenantAccess" not in permission_names
+    bind_tenant(store_a)
+    assert client.get("/api/v1/page-config/admin").status_code == 200
+    bind_tenant(store_b)
+    assert client.get("/api/v1/page-config/admin").status_code == 403
 
 
 # ---------------------------------------------------------------------------

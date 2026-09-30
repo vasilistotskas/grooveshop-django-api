@@ -1,4 +1,4 @@
-from django.db.models import Count, Q
+from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
 
@@ -61,10 +61,6 @@ class TagFilter(
         help_text=_("Filter tags that are/aren't used"),
     )
 
-    most_used = filters.BooleanFilter(
-        method="filter_most_used",
-        help_text=_("Order tags by usage count (most used first)"),
-    )
     unused = filters.BooleanFilter(
         method="filter_unused",
         help_text=_("Filter tags not used anywhere"),
@@ -96,46 +92,40 @@ class TagFilter(
             )
         return queryset
 
+    # The counting filters read ``TagQuerySet.with_usage``, which the
+    # list queryset already carries; ``_used`` adds it otherwise.
+
+    @staticmethod
+    def _used(queryset):
+        if "usage_count" in queryset.query.annotations:
+            return queryset
+        return queryset.with_usage()
+
     def filter_min_usage_count(self, queryset, name, value):
-        """Filter tags with minimum usage count."""
-        if value is not None:
-            return queryset.annotate(
-                usage_count=Count("taggeditem", distinct=True)
-            ).filter(usage_count__gte=value)
-        return queryset
+        """Filter tags used at least X times."""
+        if value is None:
+            return queryset
+        return self._used(queryset).filter(usage_count__gte=value)
 
     def filter_max_usage_count(self, queryset, name, value):
-        """Filter tags with maximum usage count."""
-        if value is not None:
-            return queryset.annotate(
-                usage_count=Count("taggeditem", distinct=True)
-            ).filter(usage_count__lte=value)
-        return queryset
+        """Filter tags used at most X times."""
+        if value is None:
+            return queryset
+        return self._used(queryset).filter(usage_count__lte=value)
 
     def filter_has_usage(self, queryset, name, value):
-        """Filter tags based on whether they are used."""
-        if value is True:
-            return queryset.annotate(
-                usage_count=Count("taggeditem", distinct=True)
-            ).filter(usage_count__gt=0)
-        elif value is False:
-            return queryset.annotate(
-                usage_count=Count("taggeditem", distinct=True)
-            ).filter(usage_count=0)
-        return queryset
-
-    def filter_most_used(self, queryset, name, value):
-        """Order tags by usage count."""
-        if value is True:
-            return queryset.annotate(
-                usage_count=Count("taggeditem", distinct=True)
-            ).order_by("-usage_count", "sort_order")
-        return queryset
+        """Filter tags that are/aren't used."""
+        if value is None:
+            return queryset
+        used = self._used(queryset)
+        return (
+            used.filter(usage_count__gt=0)
+            if value
+            else used.filter(usage_count=0)
+        )
 
     def filter_unused(self, queryset, name, value):
         """Filter tags not used anywhere."""
-        if value is True:
-            return queryset.annotate(
-                usage_count=Count("taggeditem", distinct=True)
-            ).filter(usage_count=0)
-        return queryset
+        if value is not True:
+            return queryset
+        return self._used(queryset).filter(usage_count=0)

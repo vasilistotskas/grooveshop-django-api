@@ -14,27 +14,9 @@ from __future__ import annotations
 import logging
 from types import SimpleNamespace
 
-import pytest
 from django.db import connection
 
 from core.logging import TenantContextFilter
-
-
-@pytest.fixture
-def bind_tenant(monkeypatch):
-    def _bind(t):
-        monkeypatch.setattr(connection, "tenant", t, raising=False)
-        # Pin `schema_name` at its current value so monkeypatch restores
-        # it at teardown. `schema_context.__exit__` calls
-        # `set_tenant(previous)`, a real mutation of the shared
-        # connection that monkeypatch does not otherwise track — without
-        # this the worker is left outside the public schema and the next
-        # test to create a Tenant fails somewhere unrelated.
-        monkeypatch.setattr(
-            connection, "schema_name", connection.schema_name, raising=False
-        )
-
-    return _bind
 
 
 def _record():

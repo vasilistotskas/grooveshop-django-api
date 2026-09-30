@@ -507,105 +507,45 @@ class TestSignalSideEffects(TestCase):
 
 ## 6. Query Counting
 
-Detect N+1 queries in managers and views.
+Detect N+1 queries with the tools Django and pytest-django ship — there is
+no project-specific counter.
 
-### Using count_queries Fixture (pytest style)
-
-The conftest `count_queries` fixture returns a `QueryCounter` with a `query_count` attribute:
+### A ceiling or an exact count (pytest style)
 
 ```python
-import pytest
-
-
 @pytest.mark.django_db
-def test_for_list_query_count(count_queries):
-    from your_app.factories import YourModelFactory
-
+def test_for_list_query_count(django_assert_max_num_queries):
     YourModelFactory.create_batch(5)
 
-    with count_queries(max_queries=5) as counter:
+    with django_assert_max_num_queries(5):
         list(YourModel.objects.for_list())
-
-    assert counter.query_count <= 5  # conftest fixture uses .query_count
 ```
 
-### Using assertNumQueries (TestCase style)
+`django_assert_num_queries(n)` asserts an exact count. In a `TestCase`,
+use `self.assertNumQueries(n)`.
+
+### A cost that must not grow with the data
+
+Compare two measurements instead of hard-coding a number:
 
 ```python
-class TestYourModelQueries(TestCase):
-    def setUp(self):
-        YourModelFactory.create_batch(5)
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 
-    def test_for_list_optimized(self):
-        with self.assertNumQueries(3):
-            list(YourModel.objects.for_list())
 
-    def test_for_detail_optimized(self):
-        instance = YourModel.objects.first()
-        with self.assertNumQueries(4):
-            YourModel.objects.for_detail().get(pk=instance.pk)
+def test_cost_does_not_grow_with_rows(self):
+    with CaptureQueriesContext(connection) as small:
+        self.client.get(self.list_url)
+    YourModelFactory.create_batch(10)
+    with CaptureQueriesContext(connection) as large:
+        self.client.get(self.list_url)
+
+    assert len(large) == len(small)
 ```
 
-### Using QueryCountAssertion Utility
-
-The standalone `QueryCountAssertion` class uses a `.count` attribute (not `.query_count`):
-
-```python
-from tests.utils.query_counter import QueryCountAssertion
-
-
-def test_list_endpoint_queries(self):
-    self.client.force_authenticate(user=self.user)
-
-    with QueryCountAssertion(max_queries=15) as counter:
-        response = self.client.get(self.get_list_url())
-
-    self.assertEqual(response.status_code, status.HTTP_200_OK)
-    # counter.count — number of queries executed
-    # counter.get_duplicate_queries() — detect N+1
-    # counter.get_slow_queries(threshold=0.1) — detect slow queries
-    duplicates = counter.get_duplicate_queries()
-    self.assertEqual(len(duplicates), 0, f"N+1 detected: {duplicates}")
-```
-
-### Using assert_max_queries Decorator
-
-```python
-from tests.utils.query_counter import assert_max_queries
-
-
-@assert_max_queries(15, verbose=True, fail_message="Product list N+1")
-def test_product_list(self):
-    self.client.force_authenticate(user=self.user)
-    response = self.client.get(self.get_list_url())
-    self.assertEqual(response.status_code, status.HTTP_200_OK)
-```
-
-### Using count_queries (no assertion, just counting)
-
-```python
-from tests.utils.query_counter import count_queries
-
-
-def test_inspect_query_count(self):
-    with count_queries() as counter:
-        list(YourModel.objects.for_list())
-    # Use counter.count, counter.queries, counter.get_duplicate_queries()
-    # counter.get_slow_queries(threshold=0.1) for slow query detection
-```
-
-### Query Limit Guidelines
-
-Use `get_query_limit()` from `tests.utils.query_counter` for standard limits:
-
-| Action | Max Queries |
-|--------|-------------|
-| List | 15 |
-| Detail | 10 |
-| Custom action | 12 |
-| Create | 20 |
-| Update | 15 |
-| Delete | 10 |
+Warm the connection before the first measured block when the code under
+test is the first to touch it: django-tenants issues ``SET search_path``
+on a connection's first cursor.
 
 ---
 
@@ -687,23 +627,31 @@ def test_admin_can_access_any_resource(self):
 
 ## 8. Fixtures & Conftest
 
-### Available Auto-Use Fixtures (from root conftest)
+### What the root conftest does for every test
 
-These are active for ALL tests automatically:
-- `clear_caches` — Clears Django cache after each test
-- `reset_db_queries` — Resets query log before/after each test
-- `_close_db_connections_after_test` — Prevents stale DB connections in parallel
-- `_django_clear_site_cache` — Clears Site model cache
+- Clears this worker's cache namespace after each test
+- Runs `transaction.on_commit` callbacks at once in non-transactional tests,
+  like Django's autocommit branch — exceptions propagate unless the callback
+  was registered `robust=True`
+- Keeps every migration-seeded row (countries, pay ways, shipping providers,
+  settings, …) present in every test: `tests/migration_seed.py` restores the
+  seed after each flush. Need a table without its seed? Delete it inside the
+  test's own transaction (`setUpTestData` or the test body)
+- Clears the `Site` cache and closes idle connections
 
-### Available Test Fixtures
+### Fixtures and helpers
 
-```python
-# count_queries — conftest fixture for query counting (uses .query_count)
-def test_something(count_queries):
-    with count_queries(max_queries=10) as counter:
-        # ... do work ...
-    assert counter.query_count <= 10  # conftest fixture uses .query_count
-```
+- `bind_tenant(tenant)` / `bind_tenant_and_schema(tenant)` — bind a real or
+  stand-in tenant; `acs_configured_tenant`, `boxnow_configured_tenant`,
+  `acs_and_boxnow_configured_tenant` bind carrier credentials
+- `tests.utils.staff.store_tenant(schema_name, **fields)` — a `Tenant` row
+  (no schema is ever created in this suite)
+- `openapi_schema` — the generated OpenAPI document, built once per session
+- `tests.utils.orders.courier_cash_order()` / `carrier_terminal_order()` —
+  orders whose payment method matters, built without lines unless asked
+- `tests.utils.loyalty.loyalty_settings(**values)` — patch loyalty settings
+- `OrderFactory(num_order_items=0)` whenever the lines do not matter: the
+  default builds 1-5 random lines, each with a full product graph
 
 ### Skip Markers
 
@@ -714,15 +662,17 @@ from tests.conftest import requires_meilisearch
 @requires_meilisearch
 def test_search_integration():
     """Only runs when Meilisearch is available."""
-    pass
 ```
 
-### Test Settings Overrides (already applied in conftest)
+Index real documents for it with `tests/utils/meilisearch.py`.
+
+### Test Settings Overrides (already applied)
 
 - `PASSWORD_HASHERS = ["MD5PasswordHasher"]` — Fast hashing
-- `DISABLE_CACHE = True` — No caching in tests
+- `DISABLE_CACHE = True` — No response caching in tests
 - `MEILISEARCH["OFFLINE"] = True` — No search indexing
-- `CELERY_TASK_ALWAYS_EAGER = True` — Synchronous Celery tasks
+- `CELERY_TASK_ALWAYS_EAGER = True` with `EAGER_PROPAGATES` — a failing task
+  body raises into the test
 - `DEBUG = False` — Production-like behavior
 
 ---
@@ -802,12 +752,6 @@ from unittest.mock import patch, MagicMock
 
 # Project test utilities
 from tests.utils import TestURLFixerMixin
-from tests.utils.query_counter import (
-    QueryCountAssertion,
-    assert_max_queries,
-    count_queries,
-    get_query_limit,
-)
 from tests.conftest import requires_meilisearch
 ```
 

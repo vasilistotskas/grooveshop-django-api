@@ -5,6 +5,10 @@ voucher mean a cash-on-delivery order: an online pay way with a pending
 payment is an unpaid order, which the carriers refuse to ship
 (``ShipmentAwaitingPaymentError``). Left to the draw, those tests passed
 or failed with the pay way the database happened to return.
+
+They build no order lines unless asked (``num_order_items``): the
+carriers read the shipment's weight and the order's amounts, and each
+random line costs a full product graph.
 """
 
 from __future__ import annotations
@@ -32,6 +36,7 @@ def courier_cash_pay_way() -> PayWay:
 def courier_cash_order(**kwargs):
     """An order paid in cash on delivery, so a courier may ship it unpaid."""
     kwargs.setdefault("pay_way", courier_cash_pay_way())
+    kwargs.setdefault("num_order_items", 0)
     return OrderFactory(**kwargs)
 
 
@@ -48,4 +53,5 @@ def carrier_terminal_pay_way() -> PayWay:
 def carrier_terminal_order(**kwargs):
     """An order paid at the BoxNow locker, so a parcel may ship it unpaid."""
     kwargs.setdefault("pay_way", carrier_terminal_pay_way())
+    kwargs.setdefault("num_order_items", 0)
     return OrderFactory(**kwargs)

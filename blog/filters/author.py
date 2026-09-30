@@ -1,4 +1,4 @@
-from django.db.models import Count, Q
+from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
 
@@ -73,15 +73,6 @@ class BlogAuthorFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
         help_text=_("Filter authors who have/don't have likes on their posts"),
     )
 
-    most_active = filters.BooleanFilter(
-        method="filter_most_active",
-        help_text=_("Get authors ordered by post count (most active first)"),
-    )
-    most_liked = filters.BooleanFilter(
-        method="filter_most_liked",
-        help_text=_("Get authors ordered by total likes (most liked first)"),
-    )
-
     class Meta:
         model = BlogAuthor
         fields = {
@@ -126,72 +117,54 @@ class BlogAuthorFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
             )
         return queryset
 
+    # The counting filters read ``BlogAuthorQuerySet.with_engagement``
+    # (published posts only — the figures the list shows), which the
+    # list queryset already carries; ``_engaged`` adds it otherwise.
+
+    @staticmethod
+    def _engaged(queryset):
+        if "number_of_posts" in queryset.query.annotations:
+            return queryset
+        return queryset.with_engagement()
+
     def filter_min_posts(self, queryset, name, value):
-        """Filter authors with minimum number of posts"""
+        """Filter authors with at least X published posts"""
         if value is not None and value >= 0:
-            return queryset.annotate(
-                post_count=Count("blog_posts", distinct=True)
-            ).filter(post_count__gte=value)
+            return self._engaged(queryset).filter(number_of_posts__gte=value)
         return queryset
 
     def filter_max_posts(self, queryset, name, value):
-        """Filter authors with maximum number of posts"""
+        """Filter authors with at most X published posts"""
         if value is not None and value >= 0:
-            return queryset.annotate(
-                post_count=Count("blog_posts", distinct=True)
-            ).filter(post_count__lte=value)
+            return self._engaged(queryset).filter(number_of_posts__lte=value)
         return queryset
 
     def filter_has_posts(self, queryset, name, value):
-        """Filter authors who have/don't have posts"""
-        if value is True:
-            return queryset.annotate(
-                post_count=Count("blog_posts", distinct=True)
-            ).filter(post_count__gt=0)
-        elif value is False:
-            return queryset.annotate(
-                post_count=Count("blog_posts", distinct=True)
-            ).filter(post_count=0)
-        return queryset
+        """Filter authors who have/don't have published posts"""
+        if value is None:
+            return queryset
+        engaged = self._engaged(queryset)
+        return (
+            engaged.filter(number_of_posts__gt=0)
+            if value
+            else engaged.filter(number_of_posts=0)
+        )
 
     def filter_min_total_likes(self, queryset, name, value):
-        """Filter authors with minimum total likes across all posts"""
+        """Filter authors with at least X likes across published posts"""
         if value is not None and value >= 0:
-            return queryset.annotate(
-                total_likes=Count("blog_posts__likes", distinct=True)
-            ).filter(total_likes__gte=value)
+            return self._engaged(queryset).filter(
+                total_likes_received__gte=value
+            )
         return queryset
 
     def filter_has_likes(self, queryset, name, value):
-        """Filter authors who have/don't have likes on their posts"""
-        if value is True:
-            return queryset.annotate(
-                total_likes=Count("blog_posts__likes", distinct=True)
-            ).filter(total_likes__gt=0)
-        elif value is False:
-            return queryset.annotate(
-                total_likes=Count("blog_posts__likes", distinct=True)
-            ).filter(total_likes=0)
-        return queryset
-
-    def filter_most_active(self, queryset, name, value):
-        """Order authors by post count (most active first)"""
-        if value is True:
-            return (
-                queryset.annotate(post_count=Count("blog_posts", distinct=True))
-                .filter(post_count__gt=0)
-                .order_by("-post_count", "-created_at")
-            )
-        return queryset
-
-    def filter_most_liked(self, queryset, name, value):
-        """Order authors by total likes (most liked first)"""
-        if value is True:
-            return (
-                queryset.annotate(
-                    total_likes=Count("blog_posts__likes", distinct=True)
-                )
-                .filter(total_likes__gt=0)
-                .order_by("-total_likes", "-created_at")
-            )
-        return queryset
+        """Filter authors who have/don't have likes on published posts"""
+        if value is None:
+            return queryset
+        engaged = self._engaged(queryset)
+        return (
+            engaged.filter(total_likes_received__gt=0)
+            if value
+            else engaged.filter(total_likes_received=0)
+        )

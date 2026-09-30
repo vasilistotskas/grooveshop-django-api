@@ -49,6 +49,7 @@ from core.utils.serializers import (
 )
 from order.attribution import AttributionInput
 from order.enum.create_error import OrderCreateErrorType
+from order.enum.status import OrderStatus, PaymentStatus
 from order.exceptions import (
     CartNotReadyError,
     InsufficientStockError,
@@ -57,6 +58,7 @@ from order.exceptions import (
     InvalidOrderDataError,
     InvalidStatusTransitionError,
     OrderCancellationError,
+    OrderChangedDuringPaymentError,
     PaymentAmountMismatchError,
     PaymentCurrencyMismatchError,
     PaymentNotFoundError,
@@ -158,6 +160,8 @@ serializers_config: SerializersConfig = {
     "create_payment_intent": ActionConfig(
         request=CreatePaymentIntentRequestSerializer,
         response=CreatePaymentIntentResponseSerializer,
+        # The order changed while the provider call was in flight.
+        responses={409: ErrorResponseSerializer},
         operation_id="createOrderPaymentIntent",
         summary=_("Create a payment intent for an order"),
         description=_(
@@ -202,6 +206,8 @@ serializers_config: SerializersConfig = {
     "retry_payment": ActionConfig(
         request=CreatePaymentIntentRequestSerializer,
         response=CreatePaymentIntentResponseSerializer,
+        # The order changed while the provider call was in flight.
+        responses={409: ErrorResponseSerializer},
         operation_id="retryOrderPayment",
         summary=_("Retry payment for a failed or pending order"),
         description=_(
@@ -597,6 +603,43 @@ class OrderViewSet(BaseModelViewSet):
                     ]
                 }
             )
+
+    def _payment_start_refusal(self, order) -> Response | None:
+        """Why a payment cannot be started for *order*, or ``None``.
+
+        Only an unpaid order still waiting for its payment may be
+        charged. A canceled order carries a CANCELED payment too
+        (``Order.settle_unpaid_payment``) and has released its stock;
+        charging it would take money for goods that will never ship.
+        """
+        if order.is_paid:
+            detail = _("This order has already been paid.")
+        elif order.status != OrderStatus.PENDING:
+            detail = _("This order is no longer open for payment.")
+        else:
+            return None
+        return Response({"detail": detail}, status=status.HTTP_400_BAD_REQUEST)
+
+    @staticmethod
+    def _order_changed_during_payment(order) -> Response:
+        """409 for a payment whose order changed during the provider call.
+
+        The payment just opened is left unconfirmed: its client secret
+        is not returned, so the customer can never be charged for it.
+        """
+        logger.warning(
+            "Payment not opened: order=%s changed during the provider call",
+            order.id,
+        )
+        return Response(
+            {
+                "detail": _(
+                    "This order changed while the payment was being "
+                    "prepared. Reload it and try again."
+                )
+            },
+            status=status.HTTP_409_CONFLICT,
+        )
 
     def get_throttles(self):
         # Guest checkout is AllowAny, and creating an order moves stock,
@@ -1215,11 +1258,8 @@ class OrderViewSet(BaseModelViewSet):
         """Create a payment intent for an order."""
         order = self.get_object()
 
-        if order.is_paid:
-            return Response(
-                {"detail": _("This order has already been paid.")},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        if refusal := self._payment_start_refusal(order):
+            return refusal
 
         if not order.pay_way or not provider_supports(
             order.pay_way.provider_code, "supports_payment_intent"
@@ -1257,9 +1297,12 @@ class OrderViewSet(BaseModelViewSet):
         if validated_data.get("return_url"):
             payment_data["return_url"] = validated_data["return_url"]
 
-        success, payment_response = PayWayService.process_payment(
-            pay_way=order.pay_way, order=order, **payment_data
-        )
+        try:
+            success, payment_response = PayWayService.process_payment(
+                pay_way=order.pay_way, order=order, **payment_data
+            )
+        except OrderChangedDuringPaymentError:
+            return self._order_changed_during_payment(order)
 
         if not success:
             return Response(
@@ -1296,15 +1339,10 @@ class OrderViewSet(BaseModelViewSet):
         reset the payment status to PENDING, and return the client
         secret so the frontend can re-mount Stripe Elements.
         """
-        from order.enum.status import PaymentStatus
-
         order = self.get_object()
 
-        if order.is_paid:
-            return Response(
-                {"detail": _("This order has already been paid.")},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        if refusal := self._payment_start_refusal(order):
+            return refusal
 
         retryable_statuses = {
             PaymentStatus.FAILED,
@@ -1349,9 +1387,12 @@ class OrderViewSet(BaseModelViewSet):
 
         previous_payment_id = order.payment_id
         previous_payment_status = order.payment_status
-        success, payment_response = PayWayService.process_payment(
-            pay_way=order.pay_way, order=order, **payment_data
-        )
+        try:
+            success, payment_response = PayWayService.process_payment(
+                pay_way=order.pay_way, order=order, **payment_data
+            )
+        except OrderChangedDuringPaymentError:
+            return self._order_changed_during_payment(order)
 
         if not success:
             return Response(
@@ -1371,6 +1412,14 @@ class OrderViewSet(BaseModelViewSet):
         # email concurrently with this retry flow.
         with transaction.atomic():
             locked_order = Order.objects.select_for_update().get(pk=order.pk)
+            # The service stored the new intent under its own lock; a
+            # change landing since then wins in the same way.
+            if (
+                locked_order.status,
+                locked_order.payment_status,
+                locked_order.payment_id,
+            ) != (order.status, order.payment_status, order.payment_id):
+                return self._order_changed_during_payment(order)
             if new_payment_id:
                 locked_order.payment_id = new_payment_id
             locked_order.payment_status = PaymentStatus.PENDING
@@ -1405,7 +1454,7 @@ class OrderViewSet(BaseModelViewSet):
                 "payment_id": previous_payment_id or "",
             },
             new_value={
-                "payment_status": "pending",
+                "payment_status": PaymentStatus.PENDING,
                 "payment_id": new_payment_id or "",
                 "retry": True,
             },
@@ -1430,11 +1479,8 @@ class OrderViewSet(BaseModelViewSet):
         """Create a hosted checkout session for an order."""
         order = self.get_object()
 
-        if order.is_paid:
-            return Response(
-                {"detail": _("This order has already been paid.")},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        if refusal := self._payment_start_refusal(order):
+            return refusal
 
         if not order.pay_way or not provider_supports(
             order.pay_way.provider_code, "supports_hosted_checkout"
@@ -1569,8 +1615,6 @@ class OrderViewSet(BaseModelViewSet):
         # enable-all switch for the pre-multi-tenant deployment.
         from django.db import connection as _connection
 
-        from order.enum.status import PaymentStatus
-
         tenant_enabled = getattr(
             getattr(_connection, "tenant", None),
             "agent_stripe_delegated_enabled",
@@ -1616,11 +1660,8 @@ class OrderViewSet(BaseModelViewSet):
 
         order = self.get_object()
 
-        if order.is_paid:
-            return Response(
-                {"detail": _("This order has already been paid.")},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        if refusal := self._payment_start_refusal(order):
+            return refusal
 
         if not order.pay_way or not provider_supports(
             order.pay_way.provider_code, "supports_payment_intent"
@@ -1645,6 +1686,7 @@ class OrderViewSet(BaseModelViewSet):
         request_serializer = request_serializer_class(data=request.data)
         request_serializer.is_valid(raise_exception=True)
 
+        previous_payment_status = order.payment_status
         provider = get_payment_provider(delegated_provider_code)
         # Amount owed, not the raw total — see create_checkout_session.
         success, payment_response = provider.confirm_delegated_payment(
@@ -1682,7 +1724,7 @@ class OrderViewSet(BaseModelViewSet):
 
         OrderHistory.log_payment_update(
             order=order,
-            previous_value={"payment_status": "pending"},
+            previous_value={"payment_status": previous_payment_status},
             new_value={
                 "payment_status": str(order.payment_status),
                 "payment_id": order.payment_id or "",

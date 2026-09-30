@@ -23,6 +23,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from country.factories import CountryFactory
+from country.models import Country
 from shipping.enum import ShippingKind
 from shipping.factories import ShippingRateFactory
 from shipping.interfaces import (
@@ -37,10 +38,8 @@ pytestmark = pytest.mark.django_db
 
 # ``ACS_SMARTPOINT_ENABLED`` is the only Setting ``is_kind_enabled``
 # still reads — pricing is entirely ``ShippingRate`` now. Mocked
-# rather than written via ``Setting.objects.update_or_create`` — the
-# latter races the ``_reseed_extra_settings`` autouse fixture's
-# savepoint visibility under xdist parallel workers (see
-# ``project_settings_update_or_create_flake.md``).
+# rather than written via ``Setting.objects.update_or_create``, so the
+# tests do not depend on the ``Setting`` table.
 _DEFAULT_SETTING_OVERRIDES: dict[str, object] = {
     "ACS_SMARTPOINT_ENABLED": True,
 }
@@ -95,9 +94,8 @@ def _activate_acs_only(acs_configured_tenant):
 
     Mirrors a real deploy where ops have flipped ACS on but BoxNow
     is still off (BoxNow ships disabled by default per the seed). The
-    GR rates for both are already in place — the ``_reseed_shipping_
-    providers`` autouse fixture runs ``convert_legacy_pricing`` before
-    every DB test. Yields the Setting overrides dict so individual
+    GR rates for both are already in place — the shipping migrations
+    seed them (``tests/migration_seed.py`` keeps them). Yields the Setting overrides dict so individual
     tests can mutate it (e.g. flipping ``ACS_SMARTPOINT_ENABLED`` to
     False). Also binds a tenant with ACS credentials —
     ``is_kind_enabled`` hides ACS entirely for an unconfigured tenant
@@ -164,8 +162,7 @@ def test_acs_only_emits_both_kinds(_activate_acs_only):
 def test_acs_smartpoint_disabled_hides_pickup(_activate_acs_only):
     # Flip ``ACS_SMARTPOINT_ENABLED`` to False via the mock dict the
     # fixture yields. ``Setting.get`` is patched, so the override
-    # takes effect immediately without a DB write (which would race
-    # the ``_reseed_extra_settings`` autouse fixture under xdist).
+    # takes effect immediately without a DB write.
     _activate_acs_only["ACS_SMARTPOINT_ENABLED"] = False
     info = ShippingService.free_shipping_info()
     kinds = {row["kind"] for row in info["providers"]}
@@ -230,6 +227,30 @@ def test_none_threshold_carrier_excluded(cleanup_no_threshold):
     info = ShippingService.free_shipping_info(country_code=country.alpha_2)
     codes = {row["provider_code"] for row in info["providers"]}
     assert _NoThresholdCarrier.code not in codes
+
+
+def test_rate_of_an_unregistered_carrier_is_skipped(_activate_acs_only):
+    """An active provider whose app is not installed has no adapter: its
+    rate must neither surface as a row nor drag the advertised minimum
+    below what a real carrier offers."""
+    ghost = ShippingProvider.objects.create(
+        code="ghost_carrier",
+        name="Ghost Carrier",
+        is_active=True,
+        supports_home_delivery=True,
+        supports_pickup_point=False,
+    )
+    ShippingRateFactory.create(
+        provider=ghost,
+        country=Country.objects.get(alpha_2="GR"),
+        kind=ShippingKind.HOME_DELIVERY,
+        free_shipping_threshold="5.00",
+    )
+
+    info = ShippingService.free_shipping_info(country_code="GR")
+
+    assert {row["provider_code"] for row in info["providers"]} == {"acs"}
+    assert info["min_threshold"] == Decimal("40.00")
 
 
 def test_endpoint_is_anonymous_and_returns_serialised_shape(_activate_both):

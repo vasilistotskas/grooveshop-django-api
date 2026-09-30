@@ -7,6 +7,7 @@ from drf_spectacular.utils import (
     extend_schema_view,
 )
 from rest_framework.decorators import action
+from rest_framework.generics import get_object_or_404
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
@@ -145,10 +146,24 @@ class BlogCategoryViewSet(BaseModelViewSet):
             return [IsBlogEnabled(), StoreStaffModelPermissions()]
         return [IsBlogEnabled(), AllowAny()]
 
+    # These list a fixed slice of the tree and never run the filter
+    # backends, so they must not advertise filters in the schema either.
+    UNFILTERED_ACTIONS = frozenset(
+        {"tree", "children", "descendants", "ancestors", "siblings"}
+    )
+
     def get_filterset_class(self):
         if self.action == "posts":
             return BlogPostFilter
+        if self.action in self.UNFILTERED_ACTIONS:
+            return None
         return BlogCategoryFilter
+
+    # ``DjangoFilterBackend`` reads ``view.filterset_class``, never the
+    # view's ``get_filterset_class()``.
+    @property
+    def filterset_class(self):
+        return self.get_filterset_class()
 
     ordering_fields = [
         "id",
@@ -173,6 +188,8 @@ class BlogCategoryViewSet(BaseModelViewSet):
     ]
 
     def get_queryset(self):
+        if self.action == "posts":
+            return self._posts_queryset()
         if self.request and self.request.query_params.get("tree") == "true":
             return BlogCategory.objects.for_tree()
 
@@ -193,32 +210,40 @@ class BlogCategoryViewSet(BaseModelViewSet):
         serializer = BlogCategorySerializer(queryset, many=True)
         return Response(serializer.data)
 
-    @action(detail=True, methods=["GET"])
-    def posts(self, request, pk=None, *args, **kwargs):
-        category = self.get_object()
-
-        self.search_fields = []
-
+    def _posts_queryset(self):
+        # Schema generation builds this view without a request or a pk.
+        if getattr(self, "swagger_fake_view", False):
+            return BlogPost.objects.none()
+        # Resolved here rather than with ``get_object()``, which would run
+        # the filter backends — and this action's filterset is
+        # BlogPostFilter, not the category one.
+        category = get_object_or_404(
+            BlogCategory.objects.for_detail(), pk=self.kwargs["pk"]
+        )
+        self.check_object_permissions(self.request, category)
+        if self.request.query_params.get("recursive") == "true":
+            categories = category.get_descendants(include_self=True)
+        else:
+            categories = [category]
         # ``BlogPost.objects`` (not the ``category.blog_posts`` reverse
         # accessor) so the queryset carries ``visible_to`` — the accessor
         # returns a plain QuerySet that bypasses BlogPostManager, which is
         # how drafts reached this public listing.
-        if request.query_params.get("recursive") == "true":
-            categories = category.get_descendants(include_self=True)
-            queryset = BlogPost.objects.filter(category__in=categories)
-        else:
-            queryset = BlogPost.objects.filter(category=category)
-
-        # Through ``filter_queryset`` so the ordering backend (and the
-        # BlogPostFilter this action declares) actually run — building
-        # the queryset by hand skipped both, which is why ``?ordering=``
-        # here returned the same page in both directions.
-        queryset = self.filter_queryset(
-            queryset.visible_to(request.user)
+        return (
+            BlogPost.objects.filter(category__in=categories)
+            .visible_to(self.request.user)
             .select_related("category", "author__user")
             .prefetch_related("likes", "tags")
         )
 
+    # ``queryset`` names the model this action lists, which is what the
+    # schema generator reads to validate its BlogPostFilter.
+    @action(detail=True, methods=["GET"], queryset=BlogPost.objects.none())
+    def posts(self, request, pk=None, *args, **kwargs):
+        self.search_fields = []
+        # Through ``filter_queryset`` so the ordering backend and the
+        # BlogPostFilter this action declares actually run.
+        queryset = self.filter_queryset(self.get_queryset())
         return self.paginate_and_serialize(queryset, request)
 
     @action(detail=True, methods=["GET"])

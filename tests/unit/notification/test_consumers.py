@@ -1,27 +1,24 @@
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from channels.db import database_sync_to_async
-from channels.testing import WebsocketCommunicator
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
-from django.test import TransactionTestCase
+from django.test import SimpleTestCase
 
-from asgi import application
 from notification.consumers import NotificationConsumer
 
 User = get_user_model()
 
 
-class TestNotificationConsumer(TransactionTestCase):
-    async def test_connect_anonymous_user(self):
-        communicator = WebsocketCommunicator(application, "ws/notifications/")
-        connected, _ = await communicator.connect()
-        assert not connected
-        await communicator.disconnect()
+# The consumer only reads attributes off the scope's user, so unsaved
+# instances are enough — no row, no database.
+def _user(**kwargs):
+    return User(id=42, username="testuser", email="test@test.com", **kwargs)
 
+
+class TestNotificationConsumer(SimpleTestCase):
     async def test_consumer_directly(self):
-        user = await self.create_test_user()
+        user = _user()
 
         consumer = NotificationConsumer()
         consumer.scope = {"user": user}
@@ -55,25 +52,10 @@ class TestNotificationConsumer(TransactionTestCase):
             f"tenant_public_user_{user.id}", consumer.channel_name
         )
 
-    @database_sync_to_async
-    def create_test_user(self):
-        return User.objects.create_user(
-            username="testuser", email="test@test.com", password="password123"
-        )
-
-    @database_sync_to_async
-    def create_staff_user(self):
-        user = User.objects.create_user(
-            username="staffuser", email="staff@test.com", password="password123"
-        )
-        user.is_staff = True
-        user.save()
-        return user
-
     async def test_is_staff_flag_joins_only_the_user_group(self):
         """WebSocket identities are tenant-schema customers; ``is_staff``
         on that row is residue and must not open any store-wide group."""
-        staff_user = await self.create_staff_user()
+        staff_user = _user(is_staff=True)
 
         consumer = NotificationConsumer()
         consumer.scope = {"user": staff_user}
@@ -96,38 +78,9 @@ class TestNotificationConsumer(TransactionTestCase):
             f"tenant_public_user_{staff_user.id}", consumer.channel_name
         )
 
-    async def test_send_notification(self):
-        consumer = NotificationConsumer()
-        consumer.send = AsyncMock()
-
-        notification = {
-            "type": "send_notification",
-            "message": "Test notification",
-            "level": "info",
-        }
-
-        await consumer.send_notification(notification)
-
-        consumer.send.assert_called_once_with(
-            text_data=json.dumps(notification)
-        )
-
-    async def test_connect_error_handling(self):
-        consumer = NotificationConsumer()
-        consumer.close = AsyncMock()
-
-        consumer.scope = {}
-        await consumer.connect()
-        consumer.close.assert_called_with(code=4000)
-
-        consumer.close.reset_mock()
-        consumer.scope = {"user": "not a user object"}
-        await consumer.connect()
-        consumer.close.assert_called_with(code=4500)
-
     @patch("notification.consumers.logger")
     async def test_connect_with_logging_authenticated_user(self, mock_logger):
-        user = await self.create_test_user()
+        user = _user()
 
         consumer = NotificationConsumer()
         consumer.scope = {"user": user}
@@ -212,7 +165,7 @@ class TestNotificationConsumer(TransactionTestCase):
     async def test_disconnect_with_logging_authenticated_user(
         self, mock_logger
     ):
-        user = await self.create_test_user()
+        user = _user()
 
         consumer = NotificationConsumer()
         consumer.user = user

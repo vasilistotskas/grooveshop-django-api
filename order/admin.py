@@ -1759,13 +1759,14 @@ class HasDocumentFilter(DropdownFilter):
 
 @admin.register(Invoice)
 class InvoiceAdmin(BaseModelAdmin):
-    """Read-mostly archive of rendered invoices.
+    """Read-only archive of rendered invoices.
 
-    Invoices are immutable by convention — Greek tax law forbids edits
-    once the number is allocated. This admin exposes browsing, search,
-    and per-row download. Use ``OrderAdmin``'s ``Generate invoice``
-    detail action to create invoices; ``Regenerate`` there is the only
-    way to replace one (consumes a new counter slot).
+    Greek tax law allows no edits to an issued invoice and no gaps in
+    the register, so this admin browses, searches and downloads only —
+    nobody deletes here, superusers included: a deleted row is a gap.
+    ``OrderAdmin``'s ``Generate invoice`` creates one; its ``Regenerate``
+    re-renders the PDF and snapshots in place, keeping the number and
+    issue date (``order.invoicing.generate_invoice(force=True)``).
     """
 
     list_display = (
@@ -1898,7 +1899,7 @@ class InvoiceAdmin(BaseModelAdmin):
         return False
 
     def has_delete_permission(self, request, obj=None):
-        return bool(request.user and request.user.is_superuser)
+        return False
 
     @admin.display(description=_("Order"))
     def order_link(self, obj):

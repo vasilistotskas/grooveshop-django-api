@@ -5,9 +5,8 @@ Covers:
 * ``cancel_voucher`` — cancel_started_at claim lifecycle (Wave 1F pattern)
 
 Each test patches the ACS HTTP client via ``monkeypatch`` so no real
-network calls are made.  The ``_reseed_shipping_providers`` autouse
-fixture in ``tests/conftest.py`` ensures the ACS ``ShippingProvider``
-row is always present.
+network calls are made. The ACS ``ShippingProvider`` row is seeded by
+a migration and kept by ``tests/migration_seed.py``.
 
 Design notes
 ------------

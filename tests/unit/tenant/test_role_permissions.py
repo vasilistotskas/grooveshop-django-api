@@ -16,54 +16,31 @@ came out of the public schema.
 from __future__ import annotations
 
 import pytest
-from django.db import connection
 
 from tenant.auth_backends import (
     PLATFORM_IDENTITY_ATTR,
     TenantRolePermissionBackend,
 )
 from tenant.models import (
-    Tenant,
     TenantMembershipRole,
     UserTenantMembership,
 )
+from tests.utils.staff import store_tenant
 from user.factories.account import UserAccountFactory
 
 
 @pytest.fixture
 def tenant(db):
-    t = Tenant(
-        schema_name="roleperm_tenant",
-        name="Roleperm Tenant",
-        slug="roleperm-tenant",
-        owner_email="owner-roleperm@example.com",
-        store_name="Roleperm Store",
-    )
-    t.auto_create_schema = False
-    t.save()
-    return t
+    return store_tenant("roleperm_tenant", store_name="Roleperm Store")
 
 
 @pytest.fixture
 def other_tenant(db):
-    t = Tenant(
-        schema_name="roleperm_other",
+    return store_tenant(
+        "roleperm_other",
         name="Roleperm Other",
-        slug="roleperm-other",
-        owner_email="owner-roleperm-other@example.com",
         store_name="Roleperm Other Store",
     )
-    t.auto_create_schema = False
-    t.save()
-    return t
-
-
-@pytest.fixture
-def bind_tenant(monkeypatch):
-    def _bind(t):
-        monkeypatch.setattr(connection, "tenant", t, raising=False)
-
-    return _bind
 
 
 def _staff_identity(**kwargs):

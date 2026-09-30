@@ -1,4 +1,5 @@
 from datetime import timedelta
+from unittest.mock import patch
 
 import pytest
 from django.utils import timezone
@@ -7,305 +8,27 @@ from order.stock import StockManager
 from product.factories import ProductFactory
 
 
-@pytest.fixture
-def ttl_minutes():
-    """Resolve the configured reservation TTL at test time.
-
-    Exists so these tests track changes to the
-    STOCK_RESERVATION_TTL_MINUTES extra-setting (default 30) without
-    needing per-bump edits.
-    """
-    return StockManager.get_reservation_ttl_minutes()
-
-
 @pytest.mark.django_db
-class TestStockReservationsHaveCorrectTTL:
-    """
-    Stock Reservations Have Correct TTL.
+def test_reservation_expires_after_the_configured_ttl():
+    """``expires_at`` is creation time plus the configured
+    ``STOCK_RESERVATION_TTL_MINUTES`` — read at reservation time, so a
+    tuned setting takes effect without a deploy."""
+    product = ProductFactory(stock=100, num_images=0, num_reviews=0)
 
-    This test suite validates that all stock reservations are created
-    with an expiration time of created_at + the configured TTL
-    (STOCK_RESERVATION_TTL_MINUTES, default 30), regardless of when
-    they are created.
-    """
-
-    @pytest.mark.parametrize(
-        "quantity,description",
-        [
-            # Test various quantities
-            (1, "Single unit reservation"),
-            (10, "Ten units reservation"),
-            (25, "Quarter stock reservation"),
-            (50, "Half stock reservation"),
-            (75, "Large order reservation"),
-            (100, "Full stock reservation"),
-            # Test edge cases
-            (5, "Small quantity"),
-            (99, "Almost full stock"),
-            (33, "Odd number quantity"),
-        ],
-    )
-    def test_reservation_ttl_matches_configured_value(
-        self, quantity, description, ttl_minutes
+    with patch.object(
+        StockManager, "get_reservation_ttl_minutes", return_value=7
     ):
-        """
-        Reservation expires_at = created_at + configured TTL minutes.
-
-        The concrete TTL is pulled from
-        StockManager.get_reservation_ttl_minutes() (backed by the
-        STOCK_RESERVATION_TTL_MINUTES extra-setting) so that bumping
-        the default does not require per-test edits.
-        """
-        # Setup: Create product with sufficient stock
-        product = ProductFactory(stock=100)
-        session_id = f"cart-{quantity}-{description}"
-
-        # Record time before reservation
-        time_before = timezone.now()
-
-        # Create reservation
+        before = timezone.now()
         reservation = StockManager.reserve_stock(
             product_id=product.id,
-            quantity=quantity,
-            session_id=session_id,
+            quantity=10,
+            session_id="cart-ttl",
             user_id=None,
         )
+        after = timezone.now()
 
-        # Record time after reservation
-        time_after = timezone.now()
-
-        # Calculate expected expiration time
-        expected_expires_at = reservation.created_at + timedelta(
-            minutes=ttl_minutes
-        )
-
-        # Verify: expires_at equals created_at + configured TTL
-        time_diff = abs(
-            (reservation.expires_at - expected_expires_at).total_seconds()
-        )
-        assert time_diff < 1, (
-            f"Reservation TTL incorrect for {description}. "
-            f"Expected expires_at: {expected_expires_at}, "
-            f"Actual expires_at: {reservation.expires_at}, "
-            f"Difference: {time_diff} seconds"
-        )
-
-        # Also verify the TTL is approximately the configured value
-        actual_ttl_minutes = (
-            reservation.expires_at - reservation.created_at
-        ).total_seconds() / 60
-
-        assert abs(actual_ttl_minutes - float(ttl_minutes)) < 0.05, (
-            f"TTL not approximately {ttl_minutes} minutes for {description}. "
-            f"Expected: ~{ttl_minutes} minutes, "
-            f"Actual: {actual_ttl_minutes:.4f} minutes"
-        )
-
-        # Verify reservation was created within test execution time
-        assert time_before <= reservation.created_at <= time_after, (
-            f"Reservation created_at outside expected range for {description}"
-        )
-
-    @pytest.mark.parametrize(
-        "stock,quantity,session_suffix",
-        [
-            (100, 1, "single-unit"),
-            (100, 10, "ten-units"),
-            (100, 50, "half-stock"),
-            (100, 100, "full-stock"),
-            (50, 25, "quarter-stock"),
-            (200, 75, "large-order"),
-        ],
+    assert (
+        before + timedelta(minutes=7)
+        <= reservation.expires_at
+        <= after + timedelta(minutes=7)
     )
-    def test_ttl_consistent_across_quantities(
-        self, stock, quantity, session_suffix, ttl_minutes
-    ):
-        """
-        TTL equals the configured value regardless of quantity.
-
-        Independent of the quantity being reserved or the total stock
-        available, the expiration always matches the configured
-        STOCK_RESERVATION_TTL_MINUTES.
-        """
-        # Setup: Create product with specified stock
-        product = ProductFactory(stock=stock)
-        session_id = f"cart-quantity-{session_suffix}"
-
-        # Record time before reservation
-        time_before = timezone.now()
-
-        # Create reservation
-        reservation = StockManager.reserve_stock(
-            product_id=product.id,
-            quantity=quantity,
-            session_id=session_id,
-            user_id=None,
-        )
-
-        # Record time after reservation
-        time_after = timezone.now()
-
-        # Calculate expected expiration range
-        expected_min = time_before + timedelta(minutes=ttl_minutes)
-        expected_max = time_after + timedelta(minutes=ttl_minutes)
-
-        # Verify: expires_at is within expected range
-        assert expected_min <= reservation.expires_at <= expected_max, (
-            f"Reservation TTL incorrect for quantity {quantity}. "
-            f"Expected between {expected_min} and {expected_max}, "
-            f"Got: {reservation.expires_at}"
-        )
-
-        # Verify: TTL is approximately the configured value
-        actual_ttl = (
-            reservation.expires_at - reservation.created_at
-        ).total_seconds()
-        expected_ttl = ttl_minutes * 60
-
-        # Allow 2 seconds tolerance for test execution time
-        assert abs(actual_ttl - expected_ttl) < 2, (
-            f"TTL not {ttl_minutes} minutes for quantity {quantity}. "
-            f"Expected: {expected_ttl}s, Actual: {actual_ttl}s"
-        )
-
-    def test_multiple_reservations_have_independent_ttls(self, ttl_minutes):
-        """
-        Test that multiple reservations created at different times have
-        independent TTLs based on their own creation times.
-
-        This ensures that each reservation's TTL is calculated from its own
-        created_at timestamp, not from some global reference time.
-        """
-        product = ProductFactory(stock=100)
-
-        # Create first reservation
-        reservation1 = StockManager.reserve_stock(
-            product_id=product.id,
-            quantity=10,
-            session_id="cart-1",
-            user_id=None,
-        )
-        # Refresh from database to ensure we have the latest data
-        reservation1.refresh_from_db()
-        expected_expires1 = reservation1.created_at + timedelta(
-            minutes=ttl_minutes
-        )
-
-        # Small delay to ensure different timestamps
-        import time
-
-        time.sleep(0.2)
-
-        # Create second reservation
-        reservation2 = StockManager.reserve_stock(
-            product_id=product.id,
-            quantity=10,
-            session_id="cart-2",
-            user_id=None,
-        )
-        # Refresh from database to ensure we have the latest data
-        reservation2.refresh_from_db()
-        expected_expires2 = reservation2.created_at + timedelta(
-            minutes=ttl_minutes
-        )
-
-        # Small delay to ensure different timestamps
-        time.sleep(0.2)
-
-        # Create third reservation
-        reservation3 = StockManager.reserve_stock(
-            product_id=product.id,
-            quantity=10,
-            session_id="cart-3",
-            user_id=None,
-        )
-        # Refresh from database to ensure we have the latest data
-        reservation3.refresh_from_db()
-        expected_expires3 = reservation3.created_at + timedelta(
-            minutes=ttl_minutes
-        )
-
-        # Verify each reservation has correct independent TTL
-        # Allow 2 seconds tolerance for database operations and parallel test execution
-        assert (
-            abs((reservation1.expires_at - expected_expires1).total_seconds())
-            < 2
-        ), (
-            f"Reservation 1 TTL incorrect: expected {expected_expires1}, got {reservation1.expires_at}, created_at: {reservation1.created_at}"
-        )
-
-        assert (
-            abs((reservation2.expires_at - expected_expires2).total_seconds())
-            < 2
-        ), (
-            f"Reservation 2 TTL incorrect: expected {expected_expires2}, got {reservation2.expires_at}, created_at: {reservation2.created_at}"
-        )
-
-        assert (
-            abs((reservation3.expires_at - expected_expires3).total_seconds())
-            < 2
-        ), (
-            f"Reservation 3 TTL incorrect: expected {expected_expires3}, got {reservation3.expires_at}, created_at: {reservation3.created_at}"
-        )
-
-        # Verify the reservations were created at different times
-        assert reservation2.created_at > reservation1.created_at, (
-            "Reservation 2 should be created after Reservation 1"
-        )
-
-        assert reservation3.created_at > reservation2.created_at, (
-            "Reservation 3 should be created after Reservation 2"
-        )
-
-        # Verify the reservations expire at different times
-        assert reservation2.expires_at > reservation1.expires_at, (
-            "Reservation 2 should expire after Reservation 1"
-        )
-
-        assert reservation3.expires_at > reservation2.expires_at, (
-            "Reservation 3 should expire after Reservation 2"
-        )
-
-    def test_ttl_uses_configured_constant(self):
-        """
-        Test that TTL uses StockManager.get_reservation_ttl_minutes() constant.
-
-        This ensures the TTL is configurable and not hardcoded in multiple places.
-        """
-        product = ProductFactory(stock=100)
-
-        # Get the configured TTL
-        configured_ttl_minutes = StockManager.get_reservation_ttl_minutes()
-
-        # Create reservation
-        reservation = StockManager.reserve_stock(
-            product_id=product.id,
-            quantity=10,
-            session_id="cart-config-test",
-            user_id=None,
-        )
-
-        # Calculate expected expiration using the constant
-        expected_expires_at = reservation.created_at + timedelta(
-            minutes=configured_ttl_minutes
-        )
-
-        # Verify reservation uses the configured TTL
-        time_diff = abs(
-            (reservation.expires_at - expected_expires_at).total_seconds()
-        )
-        assert time_diff < 1, (
-            f"Reservation does not use configured TTL constant. "
-            f"Expected TTL: {configured_ttl_minutes} minutes, "
-            f"Time difference: {time_diff}s"
-        )
-
-        # Sanity: the configured value is a positive integer. The exact
-        # number is owned by EXTRA_SETTINGS_DEFAULTS in settings.py and
-        # may be tuned without rewriting this test.
-        assert (
-            isinstance(configured_ttl_minutes, int)
-            and configured_ttl_minutes > 0
-        ), (
-            f"STOCK_RESERVATION_TTL_MINUTES should be a positive int, got {configured_ttl_minutes!r}"
-        )

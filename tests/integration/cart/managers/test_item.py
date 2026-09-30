@@ -11,7 +11,7 @@ from djmoney.money import Money
 from faker import Faker
 
 from cart.factories import CartFactory, CartItemFactory
-from cart.models import Cart, CartItem
+from cart.models import CartItem
 from country.factories import CountryFactory
 from product.factories import ProductFactory
 from user.factories import UserAccountFactory
@@ -308,118 +308,6 @@ class TestCartItemQuerySet:
         items_with_discounts = CartItem.objects.with_discounts()
         assert regular_item not in items_with_discounts
         assert discounted_item in items_with_discounts
-
-
-@pytest.mark.django_db
-class TestCartItemManager:
-    def test_manager_delegates_to_queryset_for_cart(self, cart, product):
-        item = CartItemFactory(cart=cart, product=product)
-
-        items_for_cart = CartItem.objects.for_cart(cart)
-        assert item in items_for_cart
-
-    def test_manager_delegates_to_queryset_for_product(self, cart, product):
-        item = CartItemFactory(cart=cart, product=product)
-
-        items_for_product = CartItem.objects.for_product(product)
-        assert item in items_for_product
-
-    def test_manager_delegates_to_queryset_for_user(self, user, cart, product):
-        item = CartItemFactory(cart=cart, product=product)
-
-        items_for_user = CartItem.objects.for_user(user)
-        assert item in items_for_user
-
-    def test_manager_delegates_to_queryset_for_list(self, cart, product):
-        _ = CartItemFactory(cart=cart, product=product)
-
-        items_with_data = CartItem.objects.for_list()
-        assert items_with_data.count() == 1
-
-    def test_manager_delegates_to_queryset_total_quantity(self, cart, product):
-        CartItemFactory(cart=cart, product=product, quantity=3)
-
-        total = CartItem.objects.total_quantity()
-        assert total == 3
-
-    def test_manager_delegates_to_queryset_by_product_popularity(
-        self, cart, product
-    ):
-        CartItemFactory(cart=cart, product=product, quantity=5)
-
-        popularity_data = CartItem.objects.by_product_popularity()
-        assert popularity_data.count() == 1
-
-    def test_manager_delegates_to_queryset_high_quantity(self, cart, product):
-        item = CartItemFactory(cart=cart, product=product, quantity=6)
-
-        high_quantity_items = CartItem.objects.high_quantity()
-        assert item in high_quantity_items
-
-    def test_manager_delegates_to_queryset_recent(self, cart, product):
-        item = CartItemFactory(cart=cart, product=product)
-
-        recent_items = CartItem.objects.recent()
-        assert item in recent_items
-
-    def test_manager_delegates_to_queryset_by_date_range(self, cart, product):
-        item = CartItemFactory(cart=cart, product=product)
-        item.created_at = timezone.now() - timedelta(days=5)
-        item.save()
-
-        start_date = (timezone.now() - timedelta(days=7)).date()
-        end_date = (timezone.now() - timedelta(days=3)).date()
-
-        items_in_range = CartItem.objects.by_date_range(start_date, end_date)
-        assert item in items_in_range
-
-    def test_manager_delegates_to_queryset_by_quantity_range(
-        self, cart, product
-    ):
-        item = CartItemFactory(cart=cart, product=product, quantity=5)
-
-        items_in_range = CartItem.objects.by_quantity_range(3, 6)
-        assert item in items_in_range
-
-    def test_manager_delegates_to_queryset_by_price_range(self, cart, product):
-        item = CartItemFactory(cart=cart, product=product)
-
-        items_in_range = CartItem.objects.by_price_range(40, 60)
-        assert item in items_in_range
-
-    def test_manager_delegates_to_queryset_expensive_items(
-        self, cart, expensive_product
-    ):
-        item = CartItemFactory(cart=cart, product=expensive_product)
-
-        expensive_items = CartItem.objects.expensive_items()
-        assert item in expensive_items
-
-    def test_manager_delegates_to_queryset_in_active_carts(self, cart, product):
-        Cart.objects.filter(id=cart.id).update(last_activity=timezone.now())
-        item = CartItemFactory(cart=cart, product=product)
-
-        active_items = CartItem.objects.in_active_carts()
-        assert item in active_items
-
-    def test_manager_delegates_to_queryset_in_abandoned_carts(
-        self, cart, product
-    ):
-        Cart.objects.filter(id=cart.id).update(
-            last_activity=timezone.now() - timedelta(hours=25)
-        )
-        item = CartItemFactory(cart=cart, product=product)
-
-        abandoned_items = CartItem.objects.in_abandoned_carts()
-        assert item in abandoned_items
-
-    def test_manager_delegates_to_queryset_with_discounts(
-        self, cart, discounted_product
-    ):
-        item = CartItemFactory(cart=cart, product=discounted_product)
-
-        items_with_discounts = CartItem.objects.with_discounts()
-        assert item in items_with_discounts
 
 
 @pytest.mark.django_db

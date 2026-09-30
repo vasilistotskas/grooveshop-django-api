@@ -1,4 +1,4 @@
-from django.db.models import Count, Q
+from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
 
@@ -74,14 +74,6 @@ class BlogTagFilter(
         help_text=_("Filter tags used in posts that have/don't have likes"),
     )
 
-    most_used = filters.BooleanFilter(
-        method="filter_most_used",
-        help_text=_("Order tags by usage count (most used first)"),
-    )
-    most_liked = filters.BooleanFilter(
-        method="filter_most_liked",
-        help_text=_("Order tags by total likes on posts using them"),
-    )
     unused = filters.BooleanFilter(
         method="filter_unused",
         help_text=_("Filter tags not used in any posts"),
@@ -113,74 +105,58 @@ class BlogTagFilter(
             )
         return queryset
 
+    # The counting filters read ``BlogTagQuerySet.with_engagement``,
+    # which the list queryset already carries; ``_engaged`` adds it
+    # otherwise.
+
+    @staticmethod
+    def _engaged(queryset):
+        if "posts_count" in queryset.query.annotations:
+            return queryset
+        return queryset.with_engagement()
+
     def filter_min_posts(self, queryset, name, value):
-        """Filter tags with minimum number of posts."""
-        if value is not None:
-            return queryset.annotate(
-                post_count=Count("blog_posts", distinct=True)
-            ).filter(post_count__gte=value)
-        return queryset
+        """Filter tags with at least X posts."""
+        if value is None:
+            return queryset
+        return self._engaged(queryset).filter(posts_count__gte=value)
 
     def filter_max_posts(self, queryset, name, value):
-        """Filter tags with maximum number of posts."""
-        if value is not None:
-            return queryset.annotate(
-                post_count=Count("blog_posts", distinct=True)
-            ).filter(post_count__lte=value)
-        return queryset
+        """Filter tags with at most X posts."""
+        if value is None:
+            return queryset
+        return self._engaged(queryset).filter(posts_count__lte=value)
 
     def filter_has_posts(self, queryset, name, value):
-        """Filter tags based on whether they have posts."""
-        if value is True:
-            return queryset.annotate(
-                post_count=Count("blog_posts", distinct=True)
-            ).filter(post_count__gt=0)
-        elif value is False:
-            return queryset.annotate(
-                post_count=Count("blog_posts", distinct=True)
-            ).filter(post_count=0)
-        return queryset
+        """Filter tags that have/don't have posts."""
+        if value is None:
+            return queryset
+        engaged = self._engaged(queryset)
+        return (
+            engaged.filter(posts_count__gt=0)
+            if value
+            else engaged.filter(posts_count=0)
+        )
 
     def filter_min_total_likes(self, queryset, name, value):
-        """Filter tags with minimum total likes across all posts."""
-        if value is not None:
-            return queryset.annotate(
-                total_likes=Count("blog_posts__likes", distinct=True)
-            ).filter(total_likes__gte=value)
-        return queryset
+        """Filter tags whose posts have at least X likes in total."""
+        if value is None:
+            return queryset
+        return self._engaged(queryset).filter(total_likes__gte=value)
 
     def filter_has_liked_posts(self, queryset, name, value):
-        """Filter tags based on whether they're used in posts with likes."""
-        if value is True:
-            return queryset.annotate(
-                total_likes=Count("blog_posts__likes", distinct=True)
-            ).filter(total_likes__gt=0)
-        elif value is False:
-            return queryset.annotate(
-                total_likes=Count("blog_posts__likes", distinct=True)
-            ).filter(total_likes=0)
-        return queryset
-
-    def filter_most_used(self, queryset, name, value):
-        """Order tags by usage count."""
-        if value is True:
-            return queryset.annotate(
-                post_count=Count("blog_posts", distinct=True)
-            ).order_by("-post_count", "sort_order")
-        return queryset
-
-    def filter_most_liked(self, queryset, name, value):
-        """Order tags by total likes on posts using them."""
-        if value is True:
-            return queryset.annotate(
-                total_likes=Count("blog_posts__likes", distinct=True)
-            ).order_by("-total_likes", "sort_order")
-        return queryset
+        """Filter tags used in posts that have/don't have likes."""
+        if value is None:
+            return queryset
+        engaged = self._engaged(queryset)
+        return (
+            engaged.filter(total_likes__gt=0)
+            if value
+            else engaged.filter(total_likes=0)
+        )
 
     def filter_unused(self, queryset, name, value):
         """Filter tags not used in any posts."""
-        if value is True:
-            return queryset.annotate(
-                post_count=Count("blog_posts", distinct=True)
-            ).filter(post_count=0)
-        return queryset
+        if value is not True:
+            return queryset
+        return self._engaged(queryset).filter(posts_count=0)

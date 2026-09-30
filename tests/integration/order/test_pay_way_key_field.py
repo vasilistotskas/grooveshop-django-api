@@ -40,7 +40,10 @@ class PayWayKeyFieldTests(APITestCase):
         # by-uuid route only when ``order.user`` is None and the
         # uuid is echoed back, which is the real success-page flow.
         self.order = OrderFactory(
-            pay_way=self.pay_way, payment_method="acs_cod", user=None
+            num_order_items=0,
+            pay_way=self.pay_way,
+            payment_method="acs_cod",
+            user=None,
         )
 
     def test_both_tiers_expose_it(self):
@@ -100,7 +103,9 @@ class PayWayKeyFieldTests(APITestCase):
         required enum with no blank member, so this payload would have
         failed ``parseDataAs`` and 422'd the order page outright.
         """
-        order = OrderFactory(pay_way=None, payment_method="", user=None)
+        order = OrderFactory(
+            num_order_items=0, pay_way=None, payment_method="", user=None
+        )
 
         response = self.client.get(
             reverse("order-retrieve-by-uuid", kwargs={"uuid": str(order.uuid)}),

@@ -23,8 +23,6 @@ loadfile``), which the last one relies on.
 
 from __future__ import annotations
 
-import os
-
 from django.conf import settings
 from django.core.cache import caches
 from django.db.models.signals import post_delete, post_save
@@ -32,8 +30,6 @@ from django.test import SimpleTestCase, override_settings
 
 from core.cache.invalidation import _dispatch_uid, _iter_declared_models
 from tests.cache import WorkerScopedCache
-
-_WORKER_PREFIX = f"test_{os.environ.get('PYTEST_XDIST_WORKER', 'master')}"
 
 _LOCMEM = {
     "default": {
@@ -89,7 +85,7 @@ def test_the_default_cache_is_the_worker_scoped_redis_backend():
     backend = caches["default"]
 
     assert type(backend) is WorkerScopedCache
-    assert backend.key_prefix == _WORKER_PREFIX
+    assert backend.key_prefix == f"test_{settings.TEST_NAMESPACE}"
     assert (
         settings.CACHES["default"]["BACKEND"] == "tests.cache.WorkerScopedCache"
     )
@@ -113,4 +109,4 @@ def test_the_first_test_after_a_class_override_is_back_on_redis():
     backend = caches["default"]
 
     assert type(backend) is WorkerScopedCache
-    assert backend.key_prefix == _WORKER_PREFIX
+    assert backend.key_prefix == f"test_{settings.TEST_NAMESPACE}"

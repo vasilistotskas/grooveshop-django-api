@@ -20,7 +20,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from tenant.models import Tenant
+from tests.utils.staff import store_tenant
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -44,20 +44,6 @@ def _loyalty_runtime(enabled: bool):
     )
 
 
-def _make_tenant(slug: str, **kwargs) -> Tenant:
-    """Persist a Tenant row without triggering schema creation."""
-    t = Tenant(
-        schema_name=slug.replace("-", "_"),
-        name=slug,
-        slug=slug,
-        owner_email=f"owner-{slug}@example.com",
-        **kwargs,
-    )
-    t.auto_create_schema = False
-    t.save()
-    return t
-
-
 # ---------------------------------------------------------------------------
 # Blog feature flag tests
 # ---------------------------------------------------------------------------
@@ -68,7 +54,7 @@ class TestBlogFeatureFlag:
     """``blog_enabled`` flag gates all blog endpoints with 404."""
 
     def test_list_posts_when_blog_enabled(self, monkeypatch):
-        tenant = _make_tenant("ff-blog-on", blog_enabled=True)
+        tenant = store_tenant("ff_blog_on", blog_enabled=True)
         monkeypatch.setattr(connection, "tenant", tenant, raising=False)
 
         client = APIClient()
@@ -78,7 +64,7 @@ class TestBlogFeatureFlag:
         assert response.status_code == status.HTTP_200_OK
 
     def test_list_posts_when_blog_disabled(self, monkeypatch):
-        tenant = _make_tenant("ff-blog-off", blog_enabled=False)
+        tenant = store_tenant("ff_blog_off", blog_enabled=False)
         monkeypatch.setattr(connection, "tenant", tenant, raising=False)
 
         client = APIClient()
@@ -87,7 +73,7 @@ class TestBlogFeatureFlag:
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
     def test_list_categories_when_blog_enabled(self, monkeypatch):
-        tenant = _make_tenant("ff-blogcat-on", blog_enabled=True)
+        tenant = store_tenant("ff_blogcat_on", blog_enabled=True)
         monkeypatch.setattr(connection, "tenant", tenant, raising=False)
 
         client = APIClient()
@@ -96,7 +82,7 @@ class TestBlogFeatureFlag:
         assert response.status_code == status.HTTP_200_OK
 
     def test_list_categories_when_blog_disabled(self, monkeypatch):
-        tenant = _make_tenant("ff-blogcat-off", blog_enabled=False)
+        tenant = store_tenant("ff_blogcat_off", blog_enabled=False)
         monkeypatch.setattr(connection, "tenant", tenant, raising=False)
 
         client = APIClient()
@@ -105,7 +91,7 @@ class TestBlogFeatureFlag:
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
     def test_list_authors_when_blog_disabled(self, monkeypatch):
-        tenant = _make_tenant("ff-blogauth-off", blog_enabled=False)
+        tenant = store_tenant("ff_blogauth_off", blog_enabled=False)
         monkeypatch.setattr(connection, "tenant", tenant, raising=False)
 
         client = APIClient()
@@ -114,7 +100,7 @@ class TestBlogFeatureFlag:
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
     def test_list_comments_when_blog_disabled(self, monkeypatch):
-        tenant = _make_tenant("ff-blogcmt-off", blog_enabled=False)
+        tenant = store_tenant("ff_blogcmt_off", blog_enabled=False)
         monkeypatch.setattr(connection, "tenant", tenant, raising=False)
 
         client = APIClient()
@@ -123,7 +109,7 @@ class TestBlogFeatureFlag:
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
     def test_list_tags_when_blog_disabled(self, monkeypatch):
-        tenant = _make_tenant("ff-blogtag-off", blog_enabled=False)
+        tenant = store_tenant("ff_blogtag_off", blog_enabled=False)
         monkeypatch.setattr(connection, "tenant", tenant, raising=False)
 
         client = APIClient()
@@ -134,7 +120,7 @@ class TestBlogFeatureFlag:
     def test_blog_disabled_is_404_not_403(self, monkeypatch):
         """Disabled feature must look like a missing route, not a
         permission error — 404 hides plan information from callers."""
-        tenant = _make_tenant("ff-blog-404", blog_enabled=False)
+        tenant = store_tenant("ff_blog_404", blog_enabled=False)
         monkeypatch.setattr(connection, "tenant", tenant, raising=False)
 
         client = APIClient()
@@ -168,7 +154,7 @@ class TestLoyaltyFeatureFlag:
         """When loyalty is enabled, the tier ladder is readable."""
         from user.factories.account import UserAccountFactory
 
-        tenant = _make_tenant("ff-loyal-on", loyalty_enabled=True)
+        tenant = store_tenant("ff_loyal_on", loyalty_enabled=True)
         monkeypatch.setattr(connection, "tenant", tenant, raising=False)
 
         user = UserAccountFactory()
@@ -189,7 +175,7 @@ class TestLoyaltyFeatureFlag:
         CUSTOMER's points stays authenticated (see the summary tests
         below).
         """
-        tenant = _make_tenant("ff-loyal-anon", loyalty_enabled=True)
+        tenant = store_tenant("ff_loyal_anon", loyalty_enabled=True)
         monkeypatch.setattr(connection, "tenant", tenant, raising=False)
 
         client = APIClient()
@@ -208,7 +194,7 @@ class TestLoyaltyFeatureFlag:
         every other commercial gate: ``LOYALTY_ENABLED`` ships False, so
         an absent row is "off" rather than "on".
         """
-        tenant = _make_tenant("ff-loyal-runtime-off", loyalty_enabled=True)
+        tenant = store_tenant("ff_loyal_runtime_off", loyalty_enabled=True)
         monkeypatch.setattr(connection, "tenant", tenant, raising=False)
 
         client = APIClient()
@@ -218,7 +204,7 @@ class TestLoyaltyFeatureFlag:
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
     def test_tiers_when_loyalty_disabled(self, monkeypatch):
-        tenant = _make_tenant("ff-loyal-off", loyalty_enabled=False)
+        tenant = store_tenant("ff_loyal_off", loyalty_enabled=False)
         monkeypatch.setattr(connection, "tenant", tenant, raising=False)
 
         client = APIClient()
@@ -230,7 +216,7 @@ class TestLoyaltyFeatureFlag:
         """Even authenticated requests get 404 when feature disabled."""
         from user.factories.account import UserAccountFactory
 
-        tenant = _make_tenant("ff-loyal-sum-off", loyalty_enabled=False)
+        tenant = store_tenant("ff_loyal_sum_off", loyalty_enabled=False)
         monkeypatch.setattr(connection, "tenant", tenant, raising=False)
 
         user = UserAccountFactory()
@@ -244,7 +230,7 @@ class TestLoyaltyFeatureFlag:
         """When loyalty is enabled, unauthenticated requests are
         rejected by ``IsAuthenticated`` — the feature gate must NOT
         bypass auth."""
-        tenant = _make_tenant("ff-loyal-auth", loyalty_enabled=True)
+        tenant = store_tenant("ff_loyal_auth", loyalty_enabled=True)
         monkeypatch.setattr(connection, "tenant", tenant, raising=False)
 
         client = APIClient()
@@ -257,7 +243,7 @@ class TestLoyaltyFeatureFlag:
         )
 
     def test_loyalty_disabled_is_404_not_403(self, monkeypatch):
-        tenant = _make_tenant("ff-loyal-404", loyalty_enabled=False)
+        tenant = store_tenant("ff_loyal_404", loyalty_enabled=False)
         monkeypatch.setattr(connection, "tenant", tenant, raising=False)
 
         client = APIClient()

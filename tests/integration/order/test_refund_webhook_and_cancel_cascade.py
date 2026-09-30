@@ -51,6 +51,7 @@ def _build_charge_event(
 class TestChargeRefundedWebhook:
     def test_full_refund_flips_payment_status_to_refunded(self):
         order = OrderFactory(
+            num_order_items=0,
             payment_id="pi_full_refund_1",
             status=OrderStatus.DELIVERED,
             payment_status=PaymentStatus.COMPLETED,
@@ -69,6 +70,7 @@ class TestChargeRefundedWebhook:
 
     def test_partial_refund_flips_payment_status_to_partially_refunded(self):
         order = OrderFactory(
+            num_order_items=0,
             payment_id="pi_partial_refund_1",
             status=OrderStatus.DELIVERED,
             payment_status=PaymentStatus.COMPLETED,
@@ -87,6 +89,7 @@ class TestChargeRefundedWebhook:
 
     def test_redelivery_is_idempotent(self):
         order = OrderFactory(
+            num_order_items=0,
             payment_id="pi_idempotent_1",
             status=OrderStatus.DELIVERED,
             payment_status=PaymentStatus.COMPLETED,
@@ -132,6 +135,7 @@ class TestChargeRefundedWebhook:
         the customer's refund-confirmation email exactly once. The
         idempotency flag prevents a redelivery from emailing twice."""
         order = OrderFactory(
+            num_order_items=0,
             payment_id="pi_email_once_1",
             status=OrderStatus.DELIVERED,
             payment_status=PaymentStatus.COMPLETED,
@@ -177,6 +181,7 @@ class TestCancelOrderCascadesToShipment:
 
     def test_cascade_calls_cancel_shipment(self):
         order = OrderFactory(
+            num_order_items=0,
             status=OrderStatus.PROCESSING,
             payment_status=PaymentStatus.PENDING,
         )
@@ -195,6 +200,7 @@ class TestCancelOrderCascadesToShipment:
 
     def test_cascade_records_dispatched_status_in_metadata(self):
         order = OrderFactory(
+            num_order_items=0,
             status=OrderStatus.PROCESSING,
             payment_status=PaymentStatus.PENDING,
         )
@@ -211,6 +217,7 @@ class TestCancelOrderCascadesToShipment:
 
     def test_cascade_swallows_carrier_error_so_order_still_cancels(self):
         order = OrderFactory(
+            num_order_items=0,
             status=OrderStatus.PROCESSING,
             payment_status=PaymentStatus.PENDING,
         )
@@ -234,6 +241,7 @@ class TestCancelOrderCascadesToShipment:
         the cascade still records the attempt but ShippingService
         returns False on the missing-adapter no-op path."""
         order = OrderFactory(
+            num_order_items=0,
             status=OrderStatus.PROCESSING,
             payment_status=PaymentStatus.PENDING,
         )

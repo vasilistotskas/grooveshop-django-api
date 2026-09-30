@@ -1,5 +1,7 @@
 import pytest
 from django.contrib.auth import get_user_model
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -11,7 +13,6 @@ from product.serializers.favourite import (
     ProductFavouriteDetailSerializer,
     ProductFavouriteSerializer,
 )
-from tests.utils import count_queries
 from user.factories.account import UserAccountFactory
 
 pytestmark = pytest.mark.assert_english
@@ -50,20 +51,20 @@ class ProductFavouriteViewSetTestCase(APITestCase):
         """Query count must not grow with the number of favourites (G0301)."""
         url = self.get_product_favourite_list_url()
 
-        with count_queries() as small:
+        with CaptureQueriesContext(connection) as small:
             self.client.get(url)
 
         for _ in range(3):
             product = ProductFactory(num_images=1, num_reviews=2)
             ProductFavouriteFactory(product=product, user=self.user)
 
-        with count_queries() as large:
+        with CaptureQueriesContext(connection) as large:
             self.client.get(url)
 
         self.assertEqual(
-            small.count,
-            large.count,
-            f"Query count grew from {small.count} to {large.count} when "
+            len(small),
+            len(large),
+            f"Query count grew from {len(small)} to {len(large)} when "
             f"favourites grew — N+1 regression.",
         )
 

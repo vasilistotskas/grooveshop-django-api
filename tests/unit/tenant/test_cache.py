@@ -31,6 +31,7 @@ from tenant.cache import (
     tenant_resolve_key,
 )
 from tenant.models import TenantDomain
+from tests.utils.staff import store_tenant
 
 
 class TestMakeTenantKey:
@@ -179,15 +180,13 @@ class TestTenantSaveBumpsTheGeneration:
     """``Tenant.save`` moves the counter in the same UPDATE, relatively,
     so it only ever goes up."""
 
-    def test_an_insert_starts_at_zero(self, tenant_factory):
-        tenant = tenant_factory("gen-insert")
+    def test_an_insert_starts_at_zero(self, db):
+        tenant = store_tenant("gen_insert")
         assert tenant.cache_generation == 0
         assert _generation(tenant) == 0
 
-    def test_an_update_bumps_and_the_instance_holds_the_integer(
-        self, tenant_factory
-    ):
-        tenant = tenant_factory("gen-update")
+    def test_an_update_bumps_and_the_instance_holds_the_integer(self, db):
+        tenant = store_tenant("gen_update")
         tenant.store_name = "Renamed"
         tenant.save()
 
@@ -195,22 +194,20 @@ class TestTenantSaveBumpsTheGeneration:
         assert tenant.cache_generation == 1
         assert _generation(tenant) == 1
 
-    def test_a_narrow_update_bumps_too(self, tenant_factory):
-        tenant = tenant_factory("gen-narrow")
+    def test_a_narrow_update_bumps_too(self, db):
+        tenant = store_tenant("gen_narrow")
         tenant.favicon_url = "https://example.com/f.ico"
         tenant.save(update_fields=["favicon_url"])
         assert _generation(tenant) == 1
 
-    def test_an_empty_update_fields_stays_a_no_op(self, tenant_factory):
-        tenant = tenant_factory("gen-empty")
+    def test_an_empty_update_fields_stays_a_no_op(self, db):
+        tenant = store_tenant("gen_empty")
         tenant.save(update_fields=[])
         assert tenant.cache_generation == 0
         assert _generation(tenant) == 0
 
-    def test_a_stale_copy_never_writes_an_older_generation_back(
-        self, tenant_factory
-    ):
-        tenant = tenant_factory("gen-stale")
+    def test_a_stale_copy_never_writes_an_older_generation_back(self, db):
+        tenant = store_tenant("gen_stale")
         stale = type(tenant).objects.get(pk=tenant.pk)
 
         tenant.save()
@@ -223,17 +220,15 @@ class TestTenantSaveBumpsTheGeneration:
         stale.save()
         assert _generation(tenant) == 3
 
-    def test_a_rolled_back_save_leaves_the_generation(self, tenant_factory):
-        tenant = tenant_factory("gen-rollback")
+    def test_a_rolled_back_save_leaves_the_generation(self, db):
+        tenant = store_tenant("gen_rollback")
         with pytest.raises(RuntimeError), transaction.atomic():
             tenant.save()
             raise RuntimeError
         assert _generation(tenant) == 0
 
-    def test_a_failed_save_leaves_an_integer_on_the_instance(
-        self, tenant_factory
-    ):
-        tenant = tenant_factory("gen-failed")
+    def test_a_failed_save_leaves_an_integer_on_the_instance(self, db):
+        tenant = store_tenant("gen_failed")
         with (
             patch(
                 "django.db.models.Model.save",
@@ -247,15 +242,15 @@ class TestTenantSaveBumpsTheGeneration:
 
 @pytest.mark.django_db
 class TestDomainWritesBumpTheGeneration:
-    def test_adding_a_domain_bumps(self, tenant_factory):
-        tenant = tenant_factory("gen-domain-add")
+    def test_adding_a_domain_bumps(self, db):
+        tenant = store_tenant("gen_domain_add")
         TenantDomain.objects.create(
             tenant=tenant, domain="gen-domain-add.example", is_primary=True
         )
         assert _generation(tenant) == 1
 
-    def test_changing_and_removing_a_domain_bump(self, tenant_factory):
-        tenant = tenant_factory("gen-domain-change")
+    def test_changing_and_removing_a_domain_bump(self, db):
+        tenant = store_tenant("gen_domain_change")
         domain = TenantDomain.objects.create(
             tenant=tenant, domain="gen-domain-change.example", is_primary=True
         )
@@ -266,9 +261,9 @@ class TestDomainWritesBumpTheGeneration:
         domain.delete()
         assert _generation(tenant) == 3
 
-    def test_only_the_owning_tenant_moves(self, tenant_factory):
-        owner = tenant_factory("gen-domain-owner")
-        bystander = tenant_factory("gen-domain-bystander")
+    def test_only_the_owning_tenant_moves(self, db):
+        owner = store_tenant("gen_domain_owner")
+        bystander = store_tenant("gen_domain_bystander")
         TenantDomain.objects.create(
             tenant=owner, domain="gen-domain-owner.example", is_primary=True
         )
@@ -301,11 +296,11 @@ class TestTenantSchemaWritesBumpTheGeneration:
             pay_way.delete()
             assert bump.called, "post_delete receiver not connected"
 
-    def test_a_pay_way_change_bumps_the_schemas_tenant(self, tenant_factory):
+    def test_a_pay_way_change_bumps_the_schemas_tenant(self, db):
         from tenant.signals import bump_generation_on_pay_way_change
 
-        tenant = tenant_factory("gen-payway")
-        bystander = tenant_factory("gen-payway-bystander")
+        tenant = store_tenant("gen_payway")
+        bystander = store_tenant("gen_payway_bystander")
         with patch("tenant.signals.connection") as conn:
             conn.schema_name = tenant.schema_name
             bump_generation_on_pay_way_change(None, None)
@@ -313,14 +308,12 @@ class TestTenantSchemaWritesBumpTheGeneration:
         assert _generation(tenant) == 1
         assert _generation(bystander) == 0
 
-    def test_an_agent_setting_bumps_and_another_setting_does_not(
-        self, tenant_factory
-    ):
+    def test_an_agent_setting_bumps_and_another_setting_does_not(self, db):
         from types import SimpleNamespace
 
         from tenant.signals import bump_generation_on_agent_setting_change
 
-        tenant = tenant_factory("gen-setting")
+        tenant = store_tenant("gen_setting")
         with patch("tenant.signals.connection") as conn:
             conn.schema_name = tenant.schema_name
             bump_generation_on_agent_setting_change(
@@ -332,12 +325,12 @@ class TestTenantSchemaWritesBumpTheGeneration:
             )
         assert _generation(tenant) == 1
 
-    def test_a_public_schema_write_bumps_nothing(self, tenant_factory):
+    def test_a_public_schema_write_bumps_nothing(self, db):
         """Seed and fixture loads run in public, which owns no
         storefront's pay-ways or settings."""
         from tenant.signals import bump_generation_on_pay_way_change
 
-        tenant = tenant_factory("gen-public")
+        tenant = store_tenant("gen_public")
         with patch("tenant.signals.connection") as conn:
             conn.schema_name = "public"
             bump_generation_on_pay_way_change(None, None)
@@ -352,9 +345,9 @@ class TestInvalidationNeverDependsOnADelete:
     delete during an outage is a logged no-op)."""
 
     def test_a_changed_store_is_served_although_no_delete_landed(
-        self, tenant_factory, deletes_are_lost
+        self, db, deletes_are_lost
     ):
-        tenant = tenant_factory("stale-store")
+        tenant = store_tenant("stale_store")
         TenantDomain.objects.create(
             tenant=tenant, domain="stale-store.example", is_primary=True
         )
@@ -376,9 +369,9 @@ class TestInvalidationNeverDependsOnADelete:
         assert cache.get(stale_key) is not None
 
     def test_a_suspended_store_stops_resolving_at_once(
-        self, tenant_factory, deletes_are_lost
+        self, db, deletes_are_lost
     ):
-        tenant = tenant_factory("stale-suspended")
+        tenant = store_tenant("stale_suspended")
         TenantDomain.objects.create(
             tenant=tenant, domain="stale-suspended.example", is_primary=True
         )
@@ -393,12 +386,12 @@ class TestInvalidationNeverDependsOnADelete:
         assert client.get(url).status_code == 404
 
     def test_a_sibling_domain_changes_the_primary_payload(
-        self, tenant_factory, deletes_are_lost
+        self, db, deletes_are_lost
     ):
         """``assetsDomain`` prefers an explicit prefixed sibling row, so a
         new sibling changes what the PRIMARY domain resolves to
         (staging 2026-08-19)."""
-        tenant = tenant_factory("stale-sibling")
+        tenant = store_tenant("stale_sibling")
         TenantDomain.objects.create(
             tenant=tenant, domain="stale-sibling.example", is_primary=True
         )
@@ -417,12 +410,10 @@ class TestInvalidationNeverDependsOnADelete:
             == "assets.stale-sibling.example"
         )
 
-    def test_a_removed_domain_is_no_longer_trusted(
-        self, tenant_factory, deletes_are_lost
-    ):
+    def test_a_removed_domain_is_no_longer_trusted(self, db, deletes_are_lost):
         from tenant.middleware import tenant_domain_set
 
-        tenant = tenant_factory("stale-origin")
+        tenant = store_tenant("stale_origin")
         TenantDomain.objects.create(
             tenant=tenant, domain="stale-origin.example", is_primary=True
         )
@@ -438,13 +429,11 @@ class TestInvalidationNeverDependsOnADelete:
 
         assert tenant_domain_set(tenant) == {"stale-origin.example"}
 
-    def test_a_reader_that_raced_the_write_cannot_poison_the_new_key(
-        self, tenant_factory
-    ):
+    def test_a_reader_that_raced_the_write_cannot_poison_the_new_key(self, db):
         """A reader that loaded the row BEFORE the commit and stored its
         payload AFTER it writes under the old generation, which nobody
         reads any more — the race a delete-on-commit never closed."""
-        tenant = tenant_factory("stale-race")
+        tenant = store_tenant("stale_race")
         TenantDomain.objects.create(
             tenant=tenant, domain="stale-race.example", is_primary=True
         )
@@ -464,10 +453,8 @@ class TestReadsStayAvailableWhileRedisIsDown:
     """Resolve runs on every storefront request, so an outage must cost
     the cache, never the answer."""
 
-    def test_resolve_answers_from_the_database(
-        self, tenant_factory, redis_down
-    ):
-        tenant = tenant_factory("down-resolve")
+    def test_resolve_answers_from_the_database(self, db, redis_down):
+        tenant = store_tenant("down_resolve")
         TenantDomain.objects.create(
             tenant=tenant, domain="down-resolve.example", is_primary=True
         )
@@ -484,12 +471,10 @@ class TestReadsStayAvailableWhileRedisIsDown:
         assert first.json()["schemaName"] == tenant.schema_name
         assert second.json()["storeName"] == "Renamed while Redis is down"
 
-    def test_the_origin_check_answers_from_the_database(
-        self, tenant_factory, redis_down
-    ):
+    def test_the_origin_check_answers_from_the_database(self, db, redis_down):
         from tenant.middleware import origin_belongs_to_tenant
 
-        tenant = tenant_factory("down-origin")
+        tenant = store_tenant("down_origin")
         TenantDomain.objects.create(
             tenant=tenant, domain="down-origin.example", is_primary=True
         )

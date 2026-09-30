@@ -20,6 +20,7 @@ Exception Hierarchy:
     └── PaymentError
         ├── PaymentNotFoundError
         ├── PaymentVerificationError
+        ├── OrderChangedDuringPaymentError
         └── WebhookVerificationError
 """
 
@@ -344,6 +345,26 @@ class PaymentNotFoundError(PaymentError):
         """
         self.payment_id = payment_id
         super().__init__(f"Payment intent with ID {payment_id} not found")
+
+
+class OrderChangedDuringPaymentError(PaymentError):
+    """
+    Raised when an order changed while a payment was being opened for it.
+
+    The provider call runs without the order row lock. If a cancel, or a
+    webhook for the order's previous payment, landed meanwhile, that
+    change wins: the new payment is not recorded, and its client secret
+    must not reach the customer, so it can never be confirmed.
+
+    Attributes:
+        order_id (int): The ID of the order that changed
+    """
+
+    def __init__(self, order_id: int):
+        self.order_id = order_id
+        super().__init__(
+            f"Order {order_id} changed while a payment was being opened"
+        )
 
 
 class PaymentVerificationError(PaymentError):

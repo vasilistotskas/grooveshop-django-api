@@ -373,6 +373,53 @@ class TranslationsModelViewSet(TranslationsProcessingMixin, ModelViewSet):
         return super().partial_update(request, *args, **kwargs)
 
 
+# Apply an extra action's ``@action(...)`` arguments when the view is
+# wired by hand, as DRF's router does.
+#
+# The URL confs call ``ViewSet.as_view({"post": "retry_payment"})``
+# directly, and only the router merges the action's decorator
+# arguments (``throttle_classes``, ``permission_classes``,
+# ``pagination_class``, ``queryset``, ...) into the view it builds
+# (``SimpleRouter.get_routes``: ``initkwargs.update(action.kwargs)``).
+# Without this, every one of them was silently ignored. CRUD methods
+# carry no such arguments, so only ``@action`` functions (``mapping``)
+# contribute, and an explicit ``as_view`` keyword still wins.
+#
+# One route may map several actions (``POST``/``DELETE`` on
+# ``cart/coupon``). They must agree on everything that changes
+# behaviour; the per-action presentation (``name``, ``description``,
+# drf-spectacular's ``schema``) cannot describe both, so it is left to
+# each function's own annotations.
+#
+# A comment, not a docstring: drf-spectacular describes an operation
+# with the first docstring in the view's MRO (``plumbing.get_doc``), so
+# a docstring here became the public description of every hand-wired
+# viewset that has none of its own.
+class RouterActionOverridesMixin:
+    PRESENTATION_KWARGS = frozenset({"name", "description", "schema"})
+
+    @classmethod
+    def as_view(cls, actions=None, **initkwargs):
+        declared = [
+            action.kwargs
+            for name in dict.fromkeys((actions or {}).values())
+            if hasattr(action := getattr(cls, name, None), "mapping")
+        ]
+        merged: dict = {}
+        for key in {key for kwargs in declared for key in kwargs}:
+            values = [kwargs[key] for kwargs in declared if key in kwargs]
+            if len(values) == len(declared) and all(
+                value == values[0] for value in values
+            ):
+                merged[key] = values[0]
+            elif key not in cls.PRESENTATION_KWARGS:
+                raise ImproperlyConfigured(
+                    f"{cls.__name__} routes {sorted(actions.values())} "
+                    f"through one view but they disagree on {key!r}."
+                )
+        return super().as_view(actions, **{**merged, **initkwargs})
+
+
 @extend_schema_view(
     list=extend_schema(
         parameters=[
@@ -389,6 +436,7 @@ class TranslationsModelViewSet(TranslationsProcessingMixin, ModelViewSet):
     partial_update=extend_schema(parameters=[LANGUAGE_PARAMETER]),
 )
 class BaseModelViewSet(
+    RouterActionOverridesMixin,
     RequestResponseSerializerMixin,
     TranslationsModelViewSet,
     PaginationModelViewSet,

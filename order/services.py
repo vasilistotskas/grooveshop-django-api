@@ -1,4 +1,5 @@
 import logging
+from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any, ClassVar
 
@@ -64,7 +65,23 @@ _SHIPMENT_DISPATCHABLE_STATUSES: frozenset[str] = frozenset(
     }
 )
 
-__all__ = ["OrderService"]
+
+@dataclass(frozen=True, slots=True)
+class PaymentEventOutcome:
+    """What a provider payment event did to its order.
+
+    ``applied`` is False when the event changed nothing the customer
+    should hear about: a stale event against a settled payment, a repeat
+    of one already applied, or a charge on a canceled order (booked for a
+    manual refund by ``OrderService.record_payment_after_cancel``).
+    """
+
+    order: Order
+    previous_payment_status: str
+    applied: bool
+
+
+__all__ = ["OrderService", "PaymentEventOutcome"]
 
 
 def _log_price_drift_if_needed(cart_item, current_price) -> None:
@@ -2097,12 +2114,18 @@ class OrderService:
         """Add each item from a past order back into the user's active cart.
 
         Items with insufficient stock or inactive products are recorded in
-        `skipped_items` rather than rejecting the whole reorder. Quantities
-        are capped at current stock.
+        `skipped_items` rather than rejecting the whole reorder. The cart
+        line (existing quantity plus the reordered one) is capped at
+        current stock; a shortfall is reported with reason ``partial``.
         """
         from cart.models import Cart, CartItem
 
         cart, _created = Cart.objects.get_or_create(user=user)
+        # Serialise reorders into one cart: each would otherwise read "no
+        # line yet" for a product and the second insert would break the
+        # one-line-per-product constraint. Lines stay locked below too,
+        # because add-to-cart writes them without this lock.
+        cart = Cart.objects.select_for_update().get(pk=cart.pk)
 
         added: list[dict[str, Any]] = []
         skipped: list[dict[str, Any]] = []
@@ -2134,18 +2157,16 @@ class OrderService:
                 )
                 continue
 
-            to_add = min(requested, available)
-
-            existing = CartItem.objects.filter(
-                cart=cart, product=product
-            ).first()
-            if existing:
-                existing.quantity += to_add
-                existing.save(update_fields=["quantity"])
-            else:
-                CartItem.objects.create(
-                    cart=cart, product=product, quantity=to_add
-                )
+            existing = (
+                CartItem.objects.select_for_update()
+                .filter(cart=cart, product=product)
+                .first()
+            )
+            # Cap the MERGED line at stock, as add-to-cart and the
+            # guest→user cart merge do; a line already holding it all
+            # takes nothing more and is never reduced.
+            in_cart = existing.quantity if existing else 0
+            to_add = max(0, min(requested, available - in_cart))
 
             entry = {
                 "product_id": product.id,
@@ -2155,6 +2176,16 @@ class OrderService:
             }
             if to_add < requested:
                 skipped.append(entry)
+            if to_add == 0:
+                continue
+
+            if existing:
+                existing.quantity += to_add
+                existing.save(update_fields=["quantity"])
+            else:
+                CartItem.objects.create(
+                    cart=cart, product=product, quantity=to_add
+                )
             added.append(entry)
 
         return {
@@ -2937,7 +2968,9 @@ class OrderService:
 
     @classmethod
     @transaction.atomic
-    def handle_payment_succeeded(cls, payment_intent_id: str) -> Order | None:
+    def handle_payment_succeeded(
+        cls, payment_intent_id: str
+    ) -> PaymentEventOutcome | None:
         # Acquire a row lock and hydrate related objects in one query.
         # ``for_detail()`` adds COUNT/SUM annotations which Postgres
         # rejects under FOR UPDATE (aggregate in locked query). We
@@ -2987,12 +3020,13 @@ class OrderService:
             )
             return None
 
+        previous = order.payment_status
         if cls.is_payment_after_cancel(order):
             cls.record_payment_after_cancel(
                 order, payment_id=payment_intent_id, payment_method="stripe"
             )
             publish_payment_status(order)
-            return order
+            return PaymentEventOutcome(order, previous, applied=False)
 
         # Guard: a stale or out-of-order "payment succeeded" event must not
         # un-refund or un-cancel an order that is already in a settled state.
@@ -3012,7 +3046,7 @@ class OrderService:
                 order.id,
                 order.payment_status,
             )
-            return order
+            return PaymentEventOutcome(order, previous, applied=False)
 
         order.mark_as_paid(
             payment_id=payment_intent_id, payment_method="stripe"
@@ -3059,11 +3093,15 @@ class OrderService:
 
         publish_payment_status(order)
         logger.info("Order %s marked as paid successfully", order.id)
-        return order
+        return PaymentEventOutcome(
+            order, previous, applied=previous != PaymentStatus.COMPLETED
+        )
 
     @classmethod
     @transaction.atomic
-    def handle_payment_failed(cls, payment_intent_id: str) -> Order | None:
+    def handle_payment_failed(
+        cls, payment_intent_id: str
+    ) -> PaymentEventOutcome | None:
         from order.payment_events import publish_payment_status
 
         # ``of=("self",)`` — see ``handle_payment_succeeded`` for why.
@@ -3090,21 +3128,24 @@ class OrderService:
         # event delivery order, so a delayed payment_intent.payment_failed
         # could arrive after charge.refunded already moved the order to
         # REFUNDED.  FAILED is only written from non-settled states.
-        if order.payment_status in SETTLED_PAYMENT_STATUSES:
+        previous = order.payment_status
+        if previous in SETTLED_PAYMENT_STATUSES:
             logger.warning(
                 "Ignoring stale payment_failed for order %s: "
                 "payment_status already %s",
                 order.id,
                 order.payment_status,
             )
-            return order
+            return PaymentEventOutcome(order, previous, applied=False)
 
         order.payment_status = PaymentStatus.FAILED
         order.save(update_fields=["payment_status"])
 
         publish_payment_status(order)
         logger.info("Order %s payment marked as failed", order.id)
-        return order
+        return PaymentEventOutcome(
+            order, previous, applied=previous != PaymentStatus.FAILED
+        )
 
     @classmethod
     def shipping_cost(

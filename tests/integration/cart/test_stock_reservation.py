@@ -149,15 +149,6 @@ class CartStockReservationTest(TestURLFixerMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("detail", response.data)
 
-    def test_release_reservations_invalid_type(self):
-        """Test releasing reservations with invalid parameter type."""
-        response = self.client.post(
-            self.release_url, {"reservation_ids": "not-a-list"}, format="json"
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("detail", response.data)
-
     def test_release_reservations_nonexistent_ids(self):
         """Test releasing reservations with non-existent IDs."""
         # Try to release non-existent reservations

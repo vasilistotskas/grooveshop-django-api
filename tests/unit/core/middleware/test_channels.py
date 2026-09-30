@@ -14,7 +14,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from channels.db import database_sync_to_async
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
-from django.test import TransactionTestCase
+from django.test import SimpleTestCase, TransactionTestCase
 from knox.models import get_token_model
 
 from core.middleware.channels import (
@@ -51,25 +51,15 @@ def _make_getdel_patcher(return_value):
 # ---------------------------------------------------------------------------
 
 
-class TestAuthenticateTicket(TransactionTestCase):
-    @database_sync_to_async
-    def _create_user(self, *, active=True):
-        user = User.objects.create_user(
-            username=f"ws_test_{User.objects.count()}",
-            email=f"ws_{User.objects.count()}@example.com",
-            password="hunter2",
-        )
-        if not active:
-            user.is_active = False
-            user.save(update_fields=["is_active"])
-        return user
+def _patch_prefixed_key(key="ws:ticket:abc"):
+    return patch(
+        "core.middleware.channels.cache.make_and_validate_key",
+        return_value=key,
+    )
 
-    @database_sync_to_async
-    def _create_token(self, user):
-        token_obj, _ = Token.objects.create(user=user)
-        return token_obj
 
-    # -- empty / None ticket -------------------------------------------------
+class TestAuthenticateTicketWithoutUser(SimpleTestCase):
+    """Paths that return before the user lookup, so touch no database."""
 
     async def test_empty_string_returns_anonymous(self):
         result = await authenticate_ticket("")
@@ -82,39 +72,44 @@ class TestAuthenticateTicket(TransactionTestCase):
     # -- GETDEL returns None (ticket not in cache or already consumed) -------
 
     async def test_missing_cache_entry_returns_anonymous(self):
-        with (
-            patch(
-                "core.middleware.channels.cache.make_and_validate_key",
-                return_value="ws:ticket:abc",
-            ),
-            _make_getdel_patcher(None),
-        ):
+        with _patch_prefixed_key(), _make_getdel_patcher(None):
             result = await authenticate_ticket("abc")
         self.assertIsInstance(result, AnonymousUser)
 
     # -- GETDEL returns garbled value ----------------------------------------
 
     async def test_invalid_cache_value_returns_anonymous(self):
-        with (
-            patch(
-                "core.middleware.channels.cache.make_and_validate_key",
-                return_value="ws:ticket:abc",
-            ),
-            _make_getdel_patcher(b"not-an-int"),
-        ):
+        with _patch_prefixed_key(), _make_getdel_patcher(b"not-an-int"):
             result = await authenticate_ticket("abc")
         self.assertIsInstance(result, AnonymousUser)
+
+
+class TestAuthenticateTicket(TransactionTestCase):
+    """The user lookup runs under ``database_sync_to_async``, whose
+    ``close_old_connections()`` closes a connection held inside a test
+    transaction, so these rows must be really committed."""
+
+    @database_sync_to_async
+    def _create_user(self, *, active=True):
+        user = User.objects.create_user(
+            username="ws_test",
+            email="ws@example.com",
+            password="hunter2",
+        )
+        if not active:
+            user.is_active = False
+            user.save(update_fields=["is_active"])
+        return user
+
+    @database_sync_to_async
+    def _create_token(self, user):
+        token_obj, _ = Token.objects.create(user=user)
+        return token_obj
 
     # -- user does not exist -------------------------------------------------
 
     async def test_nonexistent_user_returns_anonymous(self):
-        with (
-            patch(
-                "core.middleware.channels.cache.make_and_validate_key",
-                return_value="ws:ticket:abc",
-            ),
-            _make_getdel_patcher(b"99999999"),
-        ):
+        with _patch_prefixed_key(), _make_getdel_patcher(b"99999999"):
             result = await authenticate_ticket("abc")
         self.assertIsInstance(result, AnonymousUser)
 
@@ -125,10 +120,7 @@ class TestAuthenticateTicket(TransactionTestCase):
         await self._create_token(user)
 
         with (
-            patch(
-                "core.middleware.channels.cache.make_and_validate_key",
-                return_value="ws:ticket:abc",
-            ),
+            _patch_prefixed_key(),
             _make_getdel_patcher(str(user.pk).encode()),
         ):
             result = await authenticate_ticket("abc")
@@ -140,59 +132,27 @@ class TestAuthenticateTicket(TransactionTestCase):
         user = await self._create_user()
         # Deliberately do NOT create a Knox token.
         with (
-            patch(
-                "core.middleware.channels.cache.make_and_validate_key",
-                return_value="ws:ticket:abc",
-            ),
+            _patch_prefixed_key(),
             _make_getdel_patcher(str(user.pk).encode()),
         ):
             result = await authenticate_ticket("abc")
         self.assertIsInstance(result, AnonymousUser)
 
-    # -- happy path ----------------------------------------------------------
+    # -- happy path: GETDEL on the prefixed key returns the user -------------
 
     async def test_valid_ticket_returns_user(self):
         user = await self._create_user()
         await self._create_token(user)
 
+        prefixed = "redis:1:ws:ticket:myticket"
         with (
-            patch(
-                "core.middleware.channels.cache.make_and_validate_key",
-                return_value="ws:ticket:abc",
-            ),
-            _make_getdel_patcher(str(user.pk).encode()),
+            _patch_prefixed_key(prefixed),
+            _make_getdel_patcher(str(user.pk).encode()) as get_client,
         ):
-            result = await authenticate_ticket("abc")
+            result = await authenticate_ticket("myticket")
 
         self.assertEqual(result.pk, user.pk)
-
-    # -- GETDEL is called with the prefixed key ------------------------------
-
-    async def test_getdel_uses_prefixed_key(self):
-        user = await self._create_user()
-        await self._create_token(user)
-
-        prefixed = "redis:1:ws:ticket:myticket"
-        mock_redis = MagicMock()
-        mock_redis.getdel.return_value = str(user.pk).encode()
-
-        with (
-            patch(
-                "core.middleware.channels.cache.make_and_validate_key",
-                return_value=prefixed,
-            ),
-            patch(
-                "core.middleware.channels.cache._cache.get_client",
-                return_value=mock_redis,
-                # See _make_getdel_patcher: the attribute exists only on
-                # the Redis-backed CustomCache, and the resolved backend
-                # here may be LocMem.
-                create=True,
-            ),
-        ):
-            await authenticate_ticket("myticket")
-
-        mock_redis.getdel.assert_called_once_with(prefixed)
+        get_client.return_value.getdel.assert_called_once_with(prefixed)
 
 
 # ---------------------------------------------------------------------------
@@ -200,7 +160,7 @@ class TestAuthenticateTicket(TransactionTestCase):
 # ---------------------------------------------------------------------------
 
 
-class TestTokenAuthMiddleware(TransactionTestCase):
+class TestTokenAuthMiddleware(SimpleTestCase):
     async def _middleware(self):
         async def inner(scope, receive, send):
             pass

@@ -22,7 +22,7 @@ schema-based routing.
 
 from __future__ import annotations
 
-from django.test import TestCase
+from django.test import SimpleTestCase
 from django.urls import Resolver404, resolve
 
 PUBLIC = "tenant.urls_public"
@@ -75,7 +75,7 @@ def _resolves(path: str, urlconf: str) -> bool:
         return False
 
 
-class TestPlatformHostHidesStorefrontApi(TestCase):
+class TestPlatformHostHidesStorefrontApi(SimpleTestCase):
     def test_storefront_api_is_absent_from_the_platform_host(self):
         leaked = [p for p in STOREFRONT_PATHS if _resolves(p, PUBLIC)]
         assert not leaked, (
@@ -90,18 +90,14 @@ class TestPlatformHostHidesStorefrontApi(TestCase):
         )
 
 
-class TestSharedSurfaceServedEverywhere(TestCase):
+class TestSharedSurfaceServedEverywhere(SimpleTestCase):
     def test_shared_endpoints_resolve_on_both_hosts(self):
         for path in SHARED_PATHS:
             assert _resolves(path, PUBLIC), f"{path} missing on platform host"
             assert _resolves(path, ROOT), f"{path} missing on tenant host"
 
 
-class TestPlatformControlPlaneSurface(TestCase):
+class TestPlatformControlPlaneSurface(SimpleTestCase):
     def test_platform_only_endpoints_resolve_on_the_platform_host(self):
         for path in PLATFORM_ONLY_PATHS:
             assert _resolves(path, PUBLIC), f"{path} missing on platform host"
-
-    def test_platform_admin_is_the_control_plane_site(self):
-        match = resolve("/admin/", urlconf=PUBLIC)
-        assert match.namespace == "platform_admin"

@@ -11087,6 +11087,16 @@ msgstr "Δεν έχετε δικαίωμα πρόσβασης σε αυτό το
 msgid "This order has already been paid."
 msgstr "Αυτή η παραγγελία έχει ήδη πληρωθεί."
 
+#: .\order\views\order.py
+msgid "This order is no longer open for payment."
+msgstr "Αυτή η παραγγελία δεν δέχεται πλέον πληρωμή."
+
+#: .\order\views\order.py
+msgid ""
+"This order changed while the payment was being prepared. "
+"Reload it and try again."
+msgstr "Η παραγγελία άλλαξε όσο ετοιμαζόταν η πληρωμή. Ανανεώστε τη σελίδα και δοκιμάστε ξανά."
+
 #: .\order\views\order.py:1141 .\order\views\order.py:1513
 msgid "This order is not configured for Stripe payments."
 msgstr "Αυτή η παραγγελία δεν είναι διαμορφωμένη για πληρωμές Stripe."
@@ -14055,6 +14065,10 @@ msgstr "Μη έγκυρη μορφή start_date. Χρησιμοποιήστε μ
 #: .\search\views.py:896
 msgid "Invalid end_date format. Use ISO format: YYYY-MM-DD"
 msgstr "Μη έγκυρη μορφή end_date. Χρησιμοποιήστε μορφή ISO: YYYY-MM-DD"
+
+#: .\search\views.py
+msgid "start_date must not be after end_date."
+msgstr "Η start_date δεν μπορεί να είναι μετά την end_date."
 
 #: .\search\views.py:907
 msgid "Invalid content_type. Must be 'product', 'blog_post', or 'federated'"

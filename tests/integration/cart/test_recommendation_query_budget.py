@@ -19,6 +19,8 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from djmoney.money import Money
 from rest_framework.test import APITestCase
@@ -26,7 +28,7 @@ from rest_framework.test import APITestCase
 from cart.factories.cart import CartFactory
 from cart.factories.item import CartItemFactory
 from product.factories.product import ProductFactory
-from tests.utils import TestURLFixerMixin, count_queries
+from tests.utils import TestURLFixerMixin
 from user.factories.account import UserAccountFactory
 
 
@@ -61,15 +63,15 @@ class CartRecommendationQueryBudgetTest(TestURLFixerMixin, APITestCase):
     def test_cart_detail_cost_does_not_grow_with_recommendations(self):
         url = reverse("cart-detail")
         self._add_recommendable(1)
-        with count_queries() as few:
+        with CaptureQueriesContext(connection) as few:
             self.client.get(url)
 
         self._add_recommendable(3)
-        with count_queries() as many:
+        with CaptureQueriesContext(connection) as many:
             self.client.get(url)
 
-        assert many.count == few.count, (
-            f"cart detail cost grew from {few.count} to {many.count} "
+        assert len(many) == len(few), (
+            f"cart detail cost grew from {len(few)} to {len(many)} "
             f"queries when three more recommendable products existed — "
             f"the recommendation queryset is missing for_list()"
         )
@@ -89,18 +91,18 @@ class CartRecommendationQueryBudgetTest(TestURLFixerMixin, APITestCase):
         response = self.client.get(url)
         assert response.status_code == 200, response.status_code
         assert response.data["recommendations"], "no recommendations to cost"
-        with count_queries() as few:
+        with CaptureQueriesContext(connection) as few:
             cache.clear()
             self.client.get(url)
 
         self._add_recommendable(2)
-        with count_queries() as many:
+        with CaptureQueriesContext(connection) as many:
             cache.clear()
             self.client.get(url)
 
-        assert many.count == few.count, (
-            f"cart-item detail cost grew from {few.count} to "
-            f"{many.count} queries — this serializer is also the "
+        assert len(many) == len(few), (
+            f"cart-item detail cost grew from {len(few)} to "
+            f"{len(many)} queries — this serializer is also the "
             f"add-to-cart and quantity-change response"
         )
 
@@ -169,12 +171,12 @@ class CartCouponPrefetchBudgetTest(TestURLFixerMixin, APITestCase):
         carts = list(Cart.objects.for_list())
         assert len(carts) >= 4
 
-        with count_queries() as counter:
+        with CaptureQueriesContext(connection) as counter:
             for cart in carts:
                 [row.code.code for row in cart.applied_codes.all()]
 
-        assert counter.count == 0, (
-            f"reading applied coupon codes cost {counter.count} queries "
+        assert len(counter) == 0, (
+            f"reading applied coupon codes cost {len(counter)} queries "
             f"across {len(carts)} prefetched carts — the prefetch is "
             f"either missing or bypassed (values_list ignores it)"
         )

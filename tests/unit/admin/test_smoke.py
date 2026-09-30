@@ -45,12 +45,14 @@ def _registry_entries():
 
 _REGISTRY_ENTRIES = _registry_entries()
 
-# Pre-existing add-view bugs, unrelated to the Phase 1 export-machinery
-# relocation this test module ships alongside. Only the add-form
-# assertion below is skipped for these — the changelist assertion
-# still runs (and passes) for every one of them. Tracked for a later
-# phase of the admin overhaul; remove an entry once its bug is fixed.
-_KNOWN_ADD_FORM_BUGS = {}
+# No registered admin reads the request in ``get_search_fields``, so the
+# admins without any can be dropped at collection time instead of each
+# collecting a test that returns before asserting anything.
+_SEARCHABLE_ENTRIES = [
+    entry
+    for entry in _REGISTRY_ENTRIES
+    if entry.values[1].get_search_fields(RequestFactory().get("/"))
+]
 
 
 def _changelist_url(model) -> str:
@@ -82,7 +84,7 @@ def logged_in_client(superuser):
     return client
 
 
-@pytest.mark.parametrize("model,model_admin", _REGISTRY_ENTRIES)
+@pytest.mark.parametrize("model,model_admin", _SEARCHABLE_ENTRIES)
 def test_search_fields_resolve(superuser, model, model_admin):
     """Every admin's search must execute without raising.
 
@@ -96,9 +98,6 @@ def test_search_fields_resolve(superuser, model, model_admin):
     """
     request = RequestFactory().get(_changelist_url(model), {"q": "power bank"})
     request.user = superuser
-    if not model_admin.get_search_fields(request):
-        return
-
     queryset = model_admin.get_queryset(request)
     results, _ = model_admin.get_search_results(request, queryset, "power bank")
     list(results[:1])
@@ -114,10 +113,5 @@ def test_changelist_and_add_render(
     request = RequestFactory().get(_changelist_url(model))
     request.user = superuser
     if model_admin.has_add_permission(request):
-        opts = model._meta
-        label = f"{opts.app_label}.{opts.model_name}"
-        if label in _KNOWN_ADD_FORM_BUGS:
-            pytest.skip(_KNOWN_ADD_FORM_BUGS[label])
-
         add_response = logged_in_client.get(_add_url(model))
         assert add_response.status_code == 200

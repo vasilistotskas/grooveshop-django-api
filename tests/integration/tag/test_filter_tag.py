@@ -1,164 +1,158 @@
+"""``TagFilter`` (tag/filters/tag.py) through ``/api/v1/tag``.
+
+Every case asserts the exact set of tags returned from one fixed
+dataset, so an undeclared parameter — which django-filter ignores
+silently — fails instead of passing on the unfiltered list.
+"""
+
+from __future__ import annotations
+
+import pytest
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
-from rest_framework.test import APITestCase
+from rest_framework.test import APIClient
 
 from product.factories.product import ProductFactory
-from tag.factories.tag import TagFactory
 from tag.factories.tagged_item import TaggedProductFactory
+from tag.models import Tag
+
+pytestmark = pytest.mark.django_db
+
+URL = reverse("tag-list")
 
 
-class TagFilterTest(APITestCase):
-    def setUp(self):
-        self.tag1 = TagFactory(active=True)
-        self.tag2 = TagFactory(active=False)
-        self.product = ProductFactory()
+def _tag(label, *, active=True, sort_order):
+    # One Greek label only: the factory's random labels in the other
+    # languages could match a substring filter by chance.
+    tag = Tag.objects.create(active=active, sort_order=sort_order)
+    tag.set_current_language("el")
+    tag.label = label
+    tag.save()
+    return tag
 
-        TaggedProductFactory(tag=self.tag1, content_object=self.product)
 
-    def test_active_filter(self):
-        url = reverse("tag-list")
+@pytest.fixture
+def tags():
+    """python: on 2 products. django: on 1. archive: unused.
+    hidden: inactive, on 1."""
+    python = _tag("Python", sort_order=1)
+    django = _tag("Django", sort_order=2)
+    archive = _tag("Archive", sort_order=3)
+    hidden = _tag("Hidden", active=False, sort_order=4)
 
-        response = self.client.get(url, {"active": "true"})
-        self.assertEqual(response.status_code, 200)
-        self.assertIsInstance(response.data["results"], list)
+    first, second = ProductFactory.create_batch(2, num_images=0, num_reviews=0)
+    for tag, product in (
+        (python, first),
+        (python, second),
+        (django, first),
+        (hidden, second),
+    ):
+        TaggedProductFactory(tag=tag, content_object=product)
 
-        for tag_data in response.data["results"]:
-            self.assertTrue(tag_data["active"])
+    return {"python": python, "archive": archive, "product": first}
 
-        response = self.client.get(url, {"active": "false"})
-        self.assertEqual(response.status_code, 200)
-        self.assertIsInstance(response.data["results"], list)
 
-        for tag_data in response.data["results"]:
-            self.assertFalse(tag_data["active"])
+def _labels(params) -> set[str]:
+    response = APIClient().get(URL, params)
+    assert response.status_code == 200, response.data
+    return {
+        tag["translations"]["el"]["label"] for tag in response.data["results"]
+    }
 
-    def test_label_filters(self):
-        url = reverse("tag-list")
 
-        response = self.client.get(url, {"label__icontains": "test"})
-        self.assertEqual(response.status_code, 200)
-        self.assertIsInstance(response.data["results"], list)
+@pytest.mark.parametrize(
+    ("params", "expected"),
+    [
+        ({"active": "true"}, {"Python", "Django", "Archive"}),
+        ({"active": "false"}, {"Hidden"}),
+        ({"label": "yth"}, {"Python"}),
+        ({"label__startswith": "dj"}, {"Django"}),
+        ({"label__exact": "Django"}, {"Django"}),
+        ({"has_usage": "true"}, {"Python", "Django", "Hidden"}),
+        ({"has_usage": "false"}, {"Archive"}),
+        ({"unused": "true"}, {"Archive"}),
+        ({"min_usage_count": 2}, {"Python"}),
+        ({"max_usage_count": 0}, {"Archive"}),
+        ({"content_type": "product"}, {"Python", "Django", "Hidden"}),
+        ({"content_type__app_label": "blog"}, set()),
+        # The camelCase spelling the storefront sends reaches the same
+        # filters.
+        ({"hasUsage": "false"}, {"Archive"}),
+        ({"minUsageCount": 2}, {"Python"}),
+        ({"active": "true", "has_usage": "true"}, {"Python", "Django"}),
+    ],
+)
+def test_each_filter_selects_exactly_its_tags(tags, params, expected):
+    assert _labels(params) == expected
 
-        response = self.client.get(url, {"label__icontains": "tag"})
-        self.assertEqual(response.status_code, 200)
-        self.assertIsInstance(response.data["results"], list)
 
-        response = self.client.get(url, {"label__istartswith": "t"})
-        self.assertEqual(response.status_code, 200)
-        self.assertIsInstance(response.data["results"], list)
+def test_object_id_selects_the_tags_on_that_object(tags):
+    assert _labels({"object_id": tags["product"].id}) == {"Python", "Django"}
 
-    def test_usage_count_filters(self):
-        url = reverse("tag-list")
 
-        response = self.client.get(url, {"has_usage": "true"})
-        self.assertEqual(response.status_code, 200)
-        self.assertIsInstance(response.data["results"], list)
+def test_uuid_selects_one_tag(tags):
+    assert _labels({"uuid": str(tags["archive"].uuid)}) == {"Archive"}
 
-        response = self.client.get(url, {"min_usage_count": 1})
-        self.assertEqual(response.status_code, 200)
-        self.assertIsInstance(response.data["results"], list)
 
-        response = self.client.get(url, {"max_usage_count": 10})
-        self.assertEqual(response.status_code, 200)
-        self.assertIsInstance(response.data["results"], list)
+def test_ranking_by_usage(tags):
+    response = APIClient().get(URL, {"ordering": "-usageCount"})
 
-    def test_content_type_filters(self):
-        url = reverse("tag-list")
+    labels = [
+        tag["translations"]["el"]["label"] for tag in response.data["results"]
+    ]
+    assert labels[0] == "Python"
+    assert labels[-1] == "Archive"
 
-        response = self.client.get(url, {"content_type": "product"})
-        self.assertEqual(response.status_code, 200)
-        self.assertIsInstance(response.data["results"], list)
 
-        response = self.client.get(url, {"content_type__app_label": "product"})
-        self.assertEqual(response.status_code, 200)
-        self.assertIsInstance(response.data["results"], list)
+def test_has_label_splits_labelled_from_unlabelled_tags(tags):
+    """A blank label and no translation at all both count as unlabelled;
+    a tag is labelled only when none of its translations is blank."""
+    blank = _tag("", sort_order=5)
+    bare = Tag.objects.create(active=True, sort_order=6)
 
-        response = self.client.get(url, {"object_id": self.product.id})
-        self.assertEqual(response.status_code, 200)
-        self.assertIsInstance(response.data["results"], list)
+    def ids(params):
+        response = APIClient().get(URL, params)
+        assert response.status_code == 200, response.data
+        return sorted(tag["id"] for tag in response.data["results"])
 
-    def test_timestamp_filters(self):
-        url = reverse("tag-list")
+    assert ids({"has_label": "false"}) == sorted([blank.id, bare.id])
+    assert _labels({"hasLabel": "true"}) == {
+        "Python",
+        "Django",
+        "Archive",
+        "Hidden",
+    }
 
-        response = self.client.get(
-            url, {"created_after": "2024-01-01T00:00:00Z"}
+
+def test_the_listed_usage_counts(tags):
+    response = APIClient().get(URL, {"ordering": "sortOrder"})
+
+    assert response.status_code == 200, response.data
+    counts = {
+        tag["translations"]["el"]["label"]: tag["usage_count"]
+        for tag in response.data["results"]
+    }
+    assert counts == {
+        "Python": "2",
+        "Django": "1",
+        "Archive": "0",
+        "Hidden": "1",
+    }
+
+
+def test_listing_costs_the_same_queries_for_one_tag_or_many(
+    tags, django_assert_num_queries
+):
+    """The counts come from the list annotation, not a query per tag."""
+    client = APIClient()
+    with CaptureQueriesContext(connection) as three_tags:
+        client.get(URL)
+    for sort_order in range(10, 20):
+        TaggedProductFactory(
+            tag=_tag(f"Extra {sort_order}", sort_order=sort_order),
+            content_object=tags["product"],
         )
-        self.assertEqual(response.status_code, 200)
-        self.assertIsInstance(response.data["results"], list)
 
-        response = self.client.get(
-            url, {"created_before": "2025-12-31T23:59:59Z"}
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertIsInstance(response.data["results"], list)
-
-    def test_uuid_and_sort_order_filters(self):
-        url = reverse("tag-list")
-
-        response = self.client.get(url, {"uuid": str(self.tag1.uuid)})
-        self.assertEqual(response.status_code, 200)
-        self.assertIsInstance(response.data["results"], list)
-
-        response = self.client.get(url, {"sort_order__gte": 1})
-        self.assertEqual(response.status_code, 200)
-        self.assertIsInstance(response.data["results"], list)
-
-    def test_camel_case_filters(self):
-        url = reverse("tag-list")
-
-        response = self.client.get(url, {"isActive": "true"})
-        self.assertEqual(response.status_code, 200)
-        self.assertIsInstance(response.data["results"], list)
-
-        response = self.client.get(url, {"hasUsage": "false"})
-        self.assertEqual(response.status_code, 200)
-        self.assertIsInstance(response.data["results"], list)
-
-    def test_complex_filter_combinations(self):
-        url = reverse("tag-list")
-
-        response = self.client.get(
-            url,
-            {"active": "true", "label__icontains": "T", "has_usage": "true"},
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertIsInstance(response.data["results"], list)
-
-        response = self.client.get(
-            url, {"min_usage_count": 1, "active": "true"}
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertIsInstance(response.data["results"], list)
-
-    def test_special_filters(self):
-        url = reverse("tag-list")
-
-        response = self.client.get(url, {"most_used": "true"})
-        self.assertEqual(response.status_code, 200)
-        self.assertIsInstance(response.data["results"], list)
-
-        response = self.client.get(url, {"unused": "true"})
-        self.assertEqual(response.status_code, 200)
-        self.assertIsInstance(response.data["results"], list)
-
-    def test_filter_with_ordering(self):
-        url = reverse("tag-list")
-
-        response = self.client.get(
-            url, {"active": "true", "ordering": "sort_order"}
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertIsInstance(response.data["results"], list)
-
-    def test_has_label_filter(self):
-        tag_without_label = TagFactory(active=True)
-        tag_without_label.translations.all().delete()
-
-        url = reverse("tag-list")
-
-        response = self.client.get(url, {"has_label": "true"})
-        self.assertEqual(response.status_code, 200)
-        self.assertIsInstance(response.data["results"], list)
-
-        response = self.client.get(url, {"has_label": "false"})
-        self.assertEqual(response.status_code, 200)
-        self.assertIsInstance(response.data["results"], list)
+    with django_assert_num_queries(len(three_tags)):
+        client.get(URL)

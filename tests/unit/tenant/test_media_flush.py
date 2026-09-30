@@ -14,6 +14,7 @@ import pytest
 import requests
 
 from tenant.media_flush import flush_tenant_media
+from tests.utils.staff import store_tenant
 
 pytestmark = pytest.mark.django_db
 
@@ -66,24 +67,11 @@ class TestFlushTenantMedia:
 
 
 class TestSuspendDispatchesFlush:
-    def _tenant(self, schema="media_flush_tenant"):
-        from tenant.models import Tenant
-
-        t = Tenant(
-            schema_name=schema,
-            name="Media Flush Tenant",
-            slug="media-flush-tenant",
-            owner_email="owner-media-flush@example.com",
-        )
-        t.auto_create_schema = False
-        t.save()
-        return t
-
     def test_suspend_dispatches_media_flush(self):
         from tenant.lifecycle import suspend_tenant
         from tenant.models import SuspendedReason
 
-        tenant = self._tenant()
+        tenant = store_tenant("media_flush_tenant")
         with mock.patch("tenant.tasks.flush_tenant_media_task.delay") as delay:
             assert (
                 suspend_tenant(tenant, reason=SuspendedReason.BILLING) is True
@@ -94,7 +82,7 @@ class TestSuspendDispatchesFlush:
         from tenant.lifecycle import suspend_tenant
         from tenant.models import SuspendedReason
 
-        tenant = self._tenant("media_flush_resuspend")
+        tenant = store_tenant("media_flush_resuspend")
         suspend_tenant(tenant, reason=SuspendedReason.MANUAL)
         # Already suspended — a second call is a no-op and must not flush.
         with mock.patch("tenant.tasks.flush_tenant_media_task.delay") as delay:
@@ -107,7 +95,7 @@ class TestSuspendDispatchesFlush:
         from tenant.lifecycle import suspend_tenant
         from tenant.models import SuspendedReason
 
-        tenant = self._tenant("media_flush_broker_down")
+        tenant = store_tenant("media_flush_broker_down")
         with mock.patch(
             "tenant.tasks.flush_tenant_media_task.delay",
             side_effect=RuntimeError("broker down"),

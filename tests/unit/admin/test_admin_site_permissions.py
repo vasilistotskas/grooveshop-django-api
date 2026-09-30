@@ -18,42 +18,16 @@ from django.test import RequestFactory
 
 from tenant.auth_backends import PLATFORM_STAFF_BACKEND_PATH
 from tenant.models import (
-    Tenant,
     TenantMembershipRole,
     UserTenantMembership,
 )
+from tests.utils.staff import store_tenant
 from user.factories.account import UserAccountFactory
 
 
 @pytest.fixture
 def tenant(db):
-    t = Tenant(
-        schema_name="adminsite_tenant",
-        name="Adminsite Tenant",
-        slug="adminsite-tenant",
-        owner_email="owner-adminsite@example.com",
-        store_name="Adminsite Store",
-    )
-    t.auto_create_schema = False
-    t.save()
-    return t
-
-
-@pytest.fixture
-def bind_tenant(monkeypatch):
-    def _bind(t):
-        monkeypatch.setattr(connection, "tenant", t, raising=False)
-        # Pin `schema_name` at its current value so monkeypatch restores
-        # it at teardown. `schema_context.__exit__` calls
-        # `set_tenant(previous)`, a real mutation of the shared
-        # connection that monkeypatch does not otherwise track — without
-        # this the worker is left outside the public schema and the next
-        # test to create a Tenant fails somewhere unrelated.
-        monkeypatch.setattr(
-            connection, "schema_name", connection.schema_name, raising=False
-        )
-
-    return _bind
+    return store_tenant("adminsite_tenant", store_name="Adminsite Store")
 
 
 def _request_for(user, *, platform_session=True):

@@ -260,6 +260,28 @@ class TestTransactionMustBelongToTheOrder:
             "an unrelated transaction of the same amount settled the order"
         )
 
+    def test_the_orders_payment_id_is_not_an_order_code_it_issued(self):
+        """``payment_id`` holds a Viva TransactionId once an order is paid,
+        never an orderCode, and orders are never resolved by it: a
+        transaction naming it has not been shown to belong here."""
+        order = _order()
+        Order.objects.filter(pk=order.pk).update(payment_id="txn-earlier")
+        order.refresh_from_db()
+        expected = order.calculate_order_total_amount()
+
+        with _verified(
+            PaymentStatus.COMPLETED,
+            str(expected.amount),
+            order_code="txn-earlier",
+        ):
+            outcome = _handle_payment_created(
+                order, {"StatusId": "F"}, "txn-not-ours"
+            )
+
+        order.refresh_from_db()
+        assert outcome == VivaWebhookEvent.OUTCOME_SKIPPED
+        assert order.payment_status == PaymentStatus.PENDING
+
     def test_a_response_without_an_order_code_is_retried_not_acked(self):
         """Viva documents orderCode in the Retrieve Transaction response,
         so its absence is an abnormal answer. Raising has Viva redeliver;

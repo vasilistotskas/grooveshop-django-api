@@ -43,10 +43,10 @@ def _resolve_tenant_candidates(order_code: str) -> list:
     Viva webhooks land in the public schema (no tenant routing exists at
     the HTTP layer for machine-to-machine callers), so ownership is
     found by iterating tenants and looking the order up via
-    ``viva_order_code_q`` — matching both the latest
-    the ``viva_order_codes`` history
-    array, because every ``create_checkout_session`` mints a fresh code
-    and a shopper on a stale tab may pay an earlier one.
+    ``viva_order_code_q`` — matching any code in the
+    ``viva_order_codes`` history array, because every
+    ``create_checkout_session`` mints a fresh code and a shopper on a
+    stale tab may pay an earlier one.
 
     Returns ALL matches, not the first, because the order code lives in
     merchant-editable ``Order.metadata`` and is therefore NOT proof of
@@ -978,19 +978,14 @@ def order_viva_codes(order) -> set[str]:
 
     The mirror of :func:`viva_order_code_q`, evaluated in Python: each
     ``create_checkout_session`` mints a fresh code and appends it to
-    ``metadata['viva_order_codes']``, with the most recent also mirrored
-    in the singular key.
+    ``metadata['viva_order_codes']``.
     """
+    # Exactly what the resolver matches, nothing more: ``payment_id``
+    # holds a TransactionId once an order is paid, never an orderCode.
     metadata = order.metadata or {}
-    codes = {
+    return {
         str(code) for code in (metadata.get("viva_order_codes") or []) if code
     }
-    # ``_resolve_tenant_candidates`` also resolves an order by
-    # ``payment_id``, so a code stored there counts as issued too — the
-    # two must agree on what "belongs to this order" means.
-    if order.payment_id:
-        codes.add(str(order.payment_id))
-    return codes
 
 
 def _transaction_belongs_to_order(order, verified_data) -> bool:
@@ -1317,7 +1312,7 @@ def _handle_payment_created(order, event_data, transaction_id):
         order=order,
         previous_value={"payment_status": previous_payment_status},
         new_value={
-            "payment_status": "completed",
+            "payment_status": PaymentStatus.COMPLETED,
             "payment_id": transaction_id,
             "provider": "viva_wallet",
         },
@@ -1385,7 +1380,7 @@ def _handle_payment_failed(order, event_data, transaction_id):
         order=order,
         previous_value={"payment_status": previous_payment_status},
         new_value={
-            "payment_status": "failed",
+            "payment_status": PaymentStatus.FAILED,
             "payment_id": transaction_id,
             "provider": "viva_wallet",
         },
@@ -1451,7 +1446,7 @@ def _handle_reversal_created(order, event_data, transaction_id):
             "payment_status": previous_payment_status,
         },
         new_value={
-            "payment_status": "refunded",
+            "payment_status": PaymentStatus.REFUNDED,
             "reversal_transaction_id": transaction_id,
             "provider": "viva_wallet",
         },

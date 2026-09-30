@@ -6449,6 +6449,16 @@ msgstr ""
 msgid "This order has already been paid."
 msgstr ""
 
+#: .\order\views\order.py
+msgid "This order is no longer open for payment."
+msgstr ""
+
+#: .\order\views\order.py
+msgid ""
+"This order changed while the payment was being prepared. "
+"Reload it and try again."
+msgstr ""
+
 #: .\order\views\order.py:688
 msgid "This order is not configured for Stripe payments."
 msgstr ""
@@ -8028,6 +8038,10 @@ msgstr ""
 
 #: .\search\views.py:710
 msgid "Invalid end_date format. Use ISO format: YYYY-MM-DD"
+msgstr ""
+
+#: .\search\views.py
+msgid "start_date must not be after end_date."
 msgstr ""
 
 #: .\search\views.py:721

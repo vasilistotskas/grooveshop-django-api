@@ -39,9 +39,8 @@ class PayWayFilterExcludesEndpointTests(APITestCase):
             settlement=PaySettlement.OFFLINE_TRANSFER,
         )
 
-        # Reuse the seeded "boxnow" / "acs" providers from the
-        # conftest reseed fixture — using ``get_or_create`` semantics
-        # to stay deterministic under -n auto.
+        # Reuse the migration-seeded "boxnow" / "acs" providers; the
+        # factory's ``get_or_create`` on ``code`` returns them.
         self.boxnow = ShippingProviderFactory(
             code="boxnow",
             supports_home_delivery=False,

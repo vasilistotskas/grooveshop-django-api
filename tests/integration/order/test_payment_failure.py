@@ -75,6 +75,9 @@ class TestPaymentFailureKeepsStockDuringRetryWindow:
         assert result is not None
         order.refresh_from_db()
         assert order.payment_status == PaymentStatus.FAILED
+        # The link survives too: it is how the auto-cancel after the
+        # grace window finds the reservation to release.
+        assert order.metadata["stock_reservation_ids"] == [reservation.id]
 
         reservation.refresh_from_db()
         assert not reservation.consumed, (

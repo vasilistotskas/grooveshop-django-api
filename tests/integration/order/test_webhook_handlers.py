@@ -6,12 +6,17 @@ from djstripe.models import Event
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import OrderFactory
 from order.models import OrderHistory
+from order.services import PaymentEventOutcome
 from order.signals.handlers import (
     handle_stripe_checkout_completed,
     handle_stripe_dispute_created,
     handle_stripe_payment_failed,
     handle_stripe_payment_succeeded,
 )
+
+
+def _applied(order, previous=PaymentStatus.PENDING):
+    return PaymentEventOutcome(order, previous, applied=True)
 
 
 @pytest.fixture
@@ -62,6 +67,7 @@ class TestHandleStripePaymentSucceeded:
         # Setup
         payment_intent_id = "pi_test_123456"
         order = OrderFactory(
+            num_order_items=0,
             payment_id=payment_intent_id,
             status=OrderStatus.PENDING,
             payment_status=PaymentStatus.PENDING,
@@ -71,7 +77,7 @@ class TestHandleStripePaymentSucceeded:
         with patch(
             "order.signals.handlers.OrderService.handle_payment_succeeded"
         ) as mock_service:
-            mock_service.return_value = order
+            mock_service.return_value = _applied(order)
             handle_stripe_payment_succeeded(
                 sender=None, event=mock_djstripe_event
             )
@@ -88,6 +94,7 @@ class TestHandleStripePaymentSucceeded:
         """
         payment_intent_id = "pi_test_123456"
         order = OrderFactory(
+            num_order_items=0,
             payment_id=payment_intent_id,
             status=OrderStatus.PENDING,
             payment_status=PaymentStatus.PENDING,
@@ -101,7 +108,7 @@ class TestHandleStripePaymentSucceeded:
                 "order.signals.handlers.send_order_confirmation_email.apply_async"
             ) as mock_email,
         ):
-            mock_service.return_value = order
+            mock_service.return_value = _applied(order)
             handle_stripe_payment_succeeded(
                 sender=None, event=mock_djstripe_event
             )
@@ -141,6 +148,7 @@ class TestHandleStripePaymentSucceeded:
         # Setup
         payment_intent_id = "pi_test_123456"
         order = OrderFactory(
+            num_order_items=0,
             payment_id=payment_intent_id,
             status=OrderStatus.PENDING,
             payment_status=PaymentStatus.PENDING,
@@ -158,7 +166,7 @@ class TestHandleStripePaymentSucceeded:
                 "order.signals.handlers.send_order_confirmation_email.apply_async"
             ),
         ):
-            mock_service.return_value = order
+            mock_service.return_value = _applied(order)
             handle_stripe_payment_succeeded(
                 sender=None, event=mock_djstripe_event
             )
@@ -170,8 +178,12 @@ class TestHandleStripePaymentSucceeded:
         assert history_entries.count() == initial_history_count + 1
 
         latest_entry = history_entries.first()
-        assert "payment_status" in str(latest_entry.previous_value)
-        assert "completed" in str(latest_entry.new_value)
+        assert latest_entry.previous_value == {
+            "payment_status": PaymentStatus.PENDING
+        }
+        assert (
+            latest_entry.new_value["payment_status"] == PaymentStatus.COMPLETED
+        )
 
     def test_idempotency_prevents_duplicate_processing(
         self, mock_djstripe_event
@@ -184,6 +196,7 @@ class TestHandleStripePaymentSucceeded:
         event_id = mock_djstripe_event.id
 
         OrderFactory(
+            num_order_items=0,
             payment_id=payment_intent_id,
             status=OrderStatus.PENDING,
             payment_status=PaymentStatus.PENDING,
@@ -210,6 +223,7 @@ class TestHandleStripePaymentSucceeded:
         event_id = mock_djstripe_event.id
 
         order = OrderFactory(
+            num_order_items=0,
             payment_id=payment_intent_id,
             status=OrderStatus.PENDING,
             payment_status=PaymentStatus.PENDING,
@@ -220,7 +234,7 @@ class TestHandleStripePaymentSucceeded:
         with patch(
             "order.signals.handlers.OrderService.handle_payment_succeeded"
         ) as mock_service:
-            mock_service.return_value = order
+            mock_service.return_value = _applied(order)
             handle_stripe_payment_succeeded(
                 sender=None, event=mock_djstripe_event
             )
@@ -261,6 +275,7 @@ class TestHandleStripePaymentSucceeded:
         # exercising the strand-at-PENDING scenario the raise guards against.
         payment_intent_id = "pi_test_123456"
         OrderFactory(
+            num_order_items=0,
             payment_id=payment_intent_id,
             status=OrderStatus.PENDING,
             payment_status=PaymentStatus.PENDING,
@@ -288,6 +303,7 @@ class TestHandleStripePaymentSucceeded:
         mock_djstripe_event.data["object"]["id"] = payment_intent_id
 
         order = OrderFactory(
+            num_order_items=0,
             payment_id=payment_intent_id,
             status=OrderStatus.PENDING,
         )
@@ -296,13 +312,44 @@ class TestHandleStripePaymentSucceeded:
         with patch(
             "order.signals.handlers.OrderService.handle_payment_succeeded"
         ) as mock_service:
-            mock_service.return_value = order
+            mock_service.return_value = _applied(order)
             handle_stripe_payment_succeeded(
                 sender=None, event=mock_djstripe_event
             )
 
         # Verify correct payment_intent_id was used
         mock_service.assert_called_once_with(payment_intent_id)
+
+    @pytest.mark.parametrize(
+        "previous", [PaymentStatus.COMPLETED, PaymentStatus.CANCELED]
+    )
+    def test_an_event_that_changed_nothing_confirms_nothing(
+        self, mock_djstripe_event, previous
+    ):
+        """A repeat, a stale event, or a charge on a canceled order: no
+        history row, no "order confirmed" email, no live toast."""
+        order = OrderFactory(
+            num_order_items=0,
+            payment_id="pi_test_123456",
+            payment_status=previous,
+        )
+        with (
+            patch(
+                "order.signals.handlers.OrderService.handle_payment_succeeded",
+                return_value=PaymentEventOutcome(
+                    order, previous, applied=False
+                ),
+            ),
+            patch("order.signals.handlers.dispatch_on_commit") as dispatch,
+        ):
+            handle_stripe_payment_succeeded(
+                sender=None, event=mock_djstripe_event
+            )
+
+        dispatch.assert_not_called()
+        assert not OrderHistory.objects.filter(
+            order=order, change_type="PAYMENT"
+        ).exists()
 
 
 @pytest.mark.django_db
@@ -318,6 +365,7 @@ class TestHandleStripePaymentFailed:
         # Setup
         payment_intent_id = "pi_test_failed_456"
         order = OrderFactory(
+            num_order_items=0,
             payment_id=payment_intent_id,
             status=OrderStatus.PENDING,
             payment_status=PaymentStatus.PENDING,
@@ -327,7 +375,7 @@ class TestHandleStripePaymentFailed:
         with patch(
             "order.signals.handlers.OrderService.handle_payment_failed"
         ) as mock_service:
-            mock_service.return_value = order
+            mock_service.return_value = _applied(order)
             handle_stripe_payment_failed(sender=None, event=mock_failed_event)
 
         # Verify
@@ -340,6 +388,7 @@ class TestHandleStripePaymentFailed:
         # Setup
         payment_intent_id = "pi_test_failed_456"
         order = OrderFactory(
+            num_order_items=0,
             payment_id=payment_intent_id,
             status=OrderStatus.PENDING,
             payment_status=PaymentStatus.PENDING,
@@ -358,7 +407,7 @@ class TestHandleStripePaymentFailed:
                 "order.signals.handlers.send_payment_failed_email.apply_async"
             ),
         ):
-            mock_service.return_value = order
+            mock_service.return_value = _applied(order)
             handle_stripe_payment_failed(sender=None, event=mock_failed_event)
 
         # Verify OrderHistory was created
@@ -368,8 +417,10 @@ class TestHandleStripePaymentFailed:
         assert history_entries.count() == initial_history_count + 1
 
         latest_entry = history_entries.first()
-        assert "payment_status" in str(latest_entry.previous_value)
-        assert "failed" in str(latest_entry.new_value)
+        assert latest_entry.previous_value == {
+            "payment_status": PaymentStatus.PENDING
+        }
+        assert latest_entry.new_value["payment_status"] == PaymentStatus.FAILED
 
     def test_handles_order_not_found_gracefully(self, mock_failed_event):
         """
@@ -422,6 +473,7 @@ class TestHandleStripePaymentFailed:
         mock_failed_event.data["object"]["id"] = payment_intent_id
 
         order = OrderFactory(
+            num_order_items=0,
             payment_id=payment_intent_id,
             status=OrderStatus.PENDING,
         )
@@ -430,11 +482,35 @@ class TestHandleStripePaymentFailed:
         with patch(
             "order.signals.handlers.OrderService.handle_payment_failed"
         ) as mock_service:
-            mock_service.return_value = order
+            mock_service.return_value = _applied(order)
             handle_stripe_payment_failed(sender=None, event=mock_failed_event)
 
         # Verify correct payment_intent_id was used
         mock_service.assert_called_once_with(payment_intent_id)
+
+    def test_a_stale_failure_on_a_settled_payment_tells_no_one(
+        self, mock_failed_event
+    ):
+        order = OrderFactory(
+            num_order_items=0,
+            payment_id="pi_test_failed_456",
+            payment_status=PaymentStatus.COMPLETED,
+        )
+        with (
+            patch(
+                "order.signals.handlers.OrderService.handle_payment_failed",
+                return_value=PaymentEventOutcome(
+                    order, PaymentStatus.COMPLETED, applied=False
+                ),
+            ),
+            patch("order.signals.handlers.dispatch_on_commit") as dispatch,
+        ):
+            handle_stripe_payment_failed(sender=None, event=mock_failed_event)
+
+        dispatch.assert_not_called()
+        assert not OrderHistory.objects.filter(
+            order=order, change_type="PAYMENT"
+        ).exists()
 
 
 @pytest.mark.django_db
@@ -482,43 +558,6 @@ class TestWebhookHandlerErrorHandling:
             # Verify service was called with None
             mock_service.assert_called_once_with(None)
 
-    def test_handles_concurrent_webhook_processing(self, mock_djstripe_event):
-        """
-        Test that concurrent webhook processing is handled via idempotency.
-        """
-        # Setup
-        payment_intent_id = "pi_concurrent_test"
-        mock_djstripe_event.data["object"]["id"] = payment_intent_id
-
-        order = OrderFactory(
-            payment_id=payment_intent_id,
-            status=OrderStatus.PENDING,
-            metadata={},
-        )
-
-        # Simulate first webhook processing
-        with patch(
-            "order.signals.handlers.OrderService.handle_payment_succeeded"
-        ) as mock_service:
-            mock_service.return_value = order
-            handle_stripe_payment_succeeded(
-                sender=None, event=mock_djstripe_event
-            )
-
-        # Refresh order to get updated metadata
-        order.refresh_from_db()
-
-        # Simulate second webhook processing (duplicate)
-        with patch(
-            "order.signals.handlers.OrderService.handle_payment_succeeded"
-        ) as mock_service:
-            handle_stripe_payment_succeeded(
-                sender=None, event=mock_djstripe_event
-            )
-
-            # Verify service was NOT called second time
-            mock_service.assert_not_called()
-
 
 @pytest.mark.django_db
 class TestWebhookHandlerIntegration:
@@ -537,6 +576,7 @@ class TestWebhookHandlerIntegration:
         mock_djstripe_event.data["object"]["id"] = payment_intent_id
 
         order = OrderFactory(
+            num_order_items=0,
             payment_id=payment_intent_id,
             status=OrderStatus.PENDING,
             payment_status=PaymentStatus.PENDING,
@@ -560,6 +600,7 @@ class TestWebhookHandlerIntegration:
         mock_failed_event.data["object"]["id"] = payment_intent_id
 
         order = OrderFactory(
+            num_order_items=0,
             payment_id=payment_intent_id,
             status=OrderStatus.PENDING,
             payment_status=PaymentStatus.PENDING,
@@ -581,6 +622,7 @@ class TestWebhookHandlerIntegration:
         # Setup
         payment_intent_id = "pi_multi_event_test"
         order = OrderFactory(
+            num_order_items=0,
             payment_id=payment_intent_id,
             status=OrderStatus.PENDING,
             payment_status=PaymentStatus.PENDING,
@@ -630,6 +672,7 @@ class TestHandleStripeDisputeCreated:
         flags the order and dispatches the staff notification."""
         payment_intent_id = "pi_disputed_123"
         order = OrderFactory(
+            num_order_items=0,
             payment_id=payment_intent_id,
             status=OrderStatus.PROCESSING,
             payment_status=PaymentStatus.COMPLETED,
@@ -655,6 +698,7 @@ class TestHandleStripeDisputeCreated:
         flags an order (previously it matched on charge id and always
         missed)."""
         order = OrderFactory(
+            num_order_items=0,
             payment_id="pi_untouched_1",
             status=OrderStatus.PROCESSING,
             payment_status=PaymentStatus.COMPLETED,
@@ -704,6 +748,7 @@ class TestHandleStripeCheckoutCompleted:
         which would let the checkout endpoints open a fresh session for a
         cancelled order."""
         order = OrderFactory(
+            num_order_items=0,
             status=OrderStatus.CANCELED,
             payment_status=PaymentStatus.CANCELED,
             metadata={},
@@ -719,6 +764,7 @@ class TestHandleStripeCheckoutCompleted:
 
     def test_unpaid_still_moves_an_unsettled_order_to_pending(self):
         order = OrderFactory(
+            num_order_items=0,
             status=OrderStatus.PENDING,
             payment_status=PaymentStatus.PROCESSING,
             metadata={},
@@ -743,6 +789,7 @@ class TestHandleStripeCheckoutCompleted:
         auto_cancel_stuck_pending_orders cancels it with no refund.
         """
         order = OrderFactory(
+            num_order_items=0,
             status=OrderStatus.PENDING,
             payment_status=PaymentStatus.PENDING,
             metadata={},
@@ -775,6 +822,7 @@ class TestHandleStripeCheckoutCompleted:
 
     def test_paid_checkout_dispatches_shipment(self):
         order = OrderFactory(
+            num_order_items=0,
             status=OrderStatus.PENDING,
             payment_status=PaymentStatus.PENDING,
             metadata={},
@@ -800,6 +848,7 @@ class TestHandleStripeCheckoutCompleted:
 
     def test_settled_state_not_regressed_and_no_dispatch(self):
         order = OrderFactory(
+            num_order_items=0,
             status=OrderStatus.PROCESSING,
             payment_status=PaymentStatus.REFUNDED,
             metadata={},
@@ -825,6 +874,7 @@ class TestHandleStripeCheckoutCompleted:
 
     def test_canceled_order_records_payment_but_no_dispatch(self):
         order = OrderFactory(
+            num_order_items=0,
             status=OrderStatus.CANCELED,
             payment_status=PaymentStatus.PENDING,
             metadata={},

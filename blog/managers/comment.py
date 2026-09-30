@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from django.db.models import OuterRef
+
+from core.db.aggregates import subquery_count
 from core.managers import TreeTranslatableManager, TreeTranslatableQuerySet
 
 if TYPE_CHECKING:
@@ -44,11 +47,33 @@ class BlogCommentQuerySet(TreeTranslatableQuerySet):
         """Prefetch likes."""
         return self.prefetch_related("likes")
 
+    def with_engagement(self) -> Self:
+        """Annotate ``likes_count`` and ``replies_count`` (approved
+        replies) — read by ``BlogComment``'s properties of those names
+        and by ``?ordering=``."""
+        from blog.models.comment import BlogComment
+
+        return self.annotate(
+            likes_count=subquery_count(
+                BlogComment.likes.through.objects.filter(
+                    blogcomment=OuterRef("pk")
+                ),
+                "blogcomment",
+            ),
+            replies_count=subquery_count(
+                BlogComment.objects.filter(
+                    parent=OuterRef("pk"), approved=True
+                ),
+                "parent",
+            ),
+        )
+
     def for_list(self) -> Self:
         """
         Optimized queryset for list views.
 
-        Includes user, post, parent, translations, children, and likes.
+        Includes user, post, parent, translations, children, likes and
+        the engagement counts.
         """
         return (
             self.with_user()
@@ -58,6 +83,7 @@ class BlogCommentQuerySet(TreeTranslatableQuerySet):
             .with_children()
             .with_likes()
             .with_post_translations()
+            .with_engagement()
         )
 
     def for_detail(self) -> Self:

@@ -18,36 +18,29 @@ migrations.
 
 from __future__ import annotations
 
+import logging
+from unittest.mock import patch
+
 import pytest
 from django.db import connection
 
 from admin.platform_dashboard import _tenant_rows, _tenants_table
 from order.enum.status import PaymentStatus
 from order.factories.order import OrderFactory
-from tenant.models import Tenant
+from tests.utils.staff import store_tenant
 
 pytestmark = pytest.mark.django_db
 
 
-def _make_tenant_with_real_schema(slug: str) -> Tenant:
-    schema_name = slug.replace("-", "_")
+def _store_with_empty_schema(schema_name: str):
     with connection.cursor() as cursor:
         cursor.execute(f"CREATE SCHEMA IF NOT EXISTS {schema_name}")
-
-    tenant = Tenant(
-        schema_name=schema_name,
-        name=slug,
-        slug=slug,
-        owner_email=f"owner-{slug}@example.com",
-    )
-    tenant.auto_create_schema = False
-    tenant.save()
-    return tenant
+    return store_tenant(schema_name)
 
 
 class TestTenantRowsRevenue:
     def test_revenue_sums_only_completed_orders(self):
-        tenant = _make_tenant_with_real_schema("revenue-rows-store")
+        tenant = _store_with_empty_schema("revenue_rows_store")
 
         OrderFactory(
             payment_status=PaymentStatus.COMPLETED,
@@ -73,7 +66,7 @@ class TestTenantRowsRevenue:
         assert row["revenue"] == pytest.approx(50.0)
 
     def test_no_completed_orders_reports_zero_not_none(self):
-        tenant = _make_tenant_with_real_schema("revenue-rows-empty")
+        tenant = _store_with_empty_schema("revenue_rows_empty")
 
         OrderFactory(
             payment_status=PaymentStatus.PENDING,
@@ -89,14 +82,7 @@ class TestTenantRowsRevenue:
         assert row["revenue"] == 0.0
 
     def test_missing_schema_leaves_revenue_none(self):
-        tenant = Tenant(
-            schema_name="revenue_rows_no_schema",
-            name="revenue-rows-no-schema",
-            slug="revenue-rows-no-schema",
-            owner_email="owner-revenue-rows-no-schema@example.com",
-        )
-        tenant.auto_create_schema = False
-        tenant.save()
+        tenant = store_tenant("revenue_rows_no_schema")
 
         row = next(
             r for r in _tenant_rows() if r["schema"] == tenant.schema_name
@@ -104,6 +90,28 @@ class TestTenantRowsRevenue:
 
         assert row["orders"] is None
         assert row["revenue"] is None
+
+    def test_unreadable_schema_logs_the_tenant_schema(self, caplog):
+        tenant = _store_with_empty_schema("revenue_rows_unreadable")
+
+        with (
+            patch(
+                "django_tenants.utils.tenant_context",
+                side_effect=RuntimeError("schema unreadable"),
+            ),
+            caplog.at_level(logging.ERROR, logger="admin.platform_dashboard"),
+        ):
+            row = next(
+                r for r in _tenant_rows() if r["schema"] == tenant.schema_name
+            )
+
+        assert row["revenue"] is None
+        messages = [
+            record.getMessage()
+            for record in caplog.records
+            if record.name == "admin.platform_dashboard"
+        ]
+        assert any(tenant.schema_name in message for message in messages)
 
 
 class TestTenantsTableRevenueColumn:
@@ -132,7 +140,8 @@ class TestTenantsTableRevenueColumn:
         revenue_index = table["headers"].index("Revenue")
         assert table["rows"][0][revenue_index] == "€1.234,50"
 
-    def test_blank_revenue_renders_a_dash(self):
+    def test_unreadable_figures_render_a_dash_not_zero(self):
+        """ "0 orders" would read as a real figure for a broken store."""
         table = _tenants_table(
             [
                 {
@@ -148,5 +157,6 @@ class TestTenantsTableRevenueColumn:
             ]
         )
 
-        revenue_index = table["headers"].index("Revenue")
-        assert table["rows"][0][revenue_index] == "—"
+        row = table["rows"][0]
+        assert row[table["headers"].index("Orders")] == "—"
+        assert row[table["headers"].index("Revenue")] == "—"

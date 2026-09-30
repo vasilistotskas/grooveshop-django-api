@@ -365,8 +365,15 @@ class IndexMixin(models.Model):
 
         # Optionally include primary key
         if getattr(meta, "include_pk_in_search", False):
-            pk_field = meta.primary_key
-            field = self._meta.get_field(pk_field)
+            # ``"pk"`` (the default) is an alias, not a field name —
+            # ``get_field("pk")`` raises. Resolve it the way
+            # ``meili.tasks._get_document_pk`` does.
+            pk_field = getattr(meta, "primary_key", "pk")
+            field = (
+                self._meta.pk
+                if pk_field == "pk"
+                else self._meta.get_field(pk_field)
+            )
             if isinstance(field, Field):
                 data[pk_field] = field.value_to_string(self)
             else:

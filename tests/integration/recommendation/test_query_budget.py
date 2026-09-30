@@ -15,6 +15,8 @@ from __future__ import annotations
 from decimal import Decimal
 
 import pytest
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from djmoney.money import Money
 from rest_framework.test import APIClient
@@ -22,7 +24,6 @@ from rest_framework.test import APIClient
 from product.factories.category import ProductCategoryFactory
 from product.factories.product import ProductFactory
 from recommendation.enum import Surface
-from tests.utils import count_queries
 
 pytestmark = pytest.mark.django_db
 
@@ -46,9 +47,9 @@ def _product(**kwargs):
 
 def _measure(client, query):
     client.get(URL, query)
-    with count_queries() as counted:
+    with CaptureQueriesContext(connection) as counted:
         response = client.get(URL, query)
-    return counted.count, response
+    return len(counted), response
 
 
 def test_cost_does_not_grow_with_the_number_of_candidates():

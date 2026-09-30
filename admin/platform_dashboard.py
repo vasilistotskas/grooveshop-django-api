@@ -92,7 +92,7 @@ def _tenant_rows() -> list[dict[str, Any]]:
                 # genuinely took no money.
                 logger.exception(
                     "Platform dashboard: could not read revenue for tenant %s",
-                    row.get("schema_name"),
+                    row["schema"],
                 )
         rows.append(row)
     return rows

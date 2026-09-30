@@ -24,25 +24,11 @@ from django.contrib.messages import storage as messages_storage
 
 from tenant.admin import TenantAdmin
 from tenant.models import Tenant, TenantDomain, UserTenantMembership
+from tests.utils.staff import store_tenant
 
 User = get_user_model()
 
 pytestmark = pytest.mark.django_db
-
-
-def _make_tenant(slug: str, **kwargs) -> Tenant:
-    defaults = {"is_active": True, "suspended_at": None}
-    defaults.update(kwargs)
-    t = Tenant(
-        schema_name=slug.replace("-", "_"),
-        name=slug,
-        slug=slug,
-        owner_email=f"owner-{slug}@example.com",
-        **defaults,
-    )
-    t.auto_create_schema = False
-    t.save()
-    return t
 
 
 def _admin_request():
@@ -68,7 +54,7 @@ def _form(tenant):
 
 class TestSaveRelatedProvisionsOnAdd:
     def test_provisions_api_domain_and_owner_membership(self):
-        tenant = _make_tenant("new-store-happy-path")
+        tenant = store_tenant("new_store_happy_path")
         TenantDomain.objects.create(
             domain="new-store-happy-path.example.com",
             tenant=tenant,
@@ -95,7 +81,7 @@ class TestSaveRelatedProvisionsOnAdd:
     def test_no_primary_domain_warns_and_does_not_crash(self):
         """No inline domain entered — ``ensure_api_domain`` no-ops;
         the admin must surface a warning, not raise."""
-        tenant = _make_tenant("new-store-no-domain")
+        tenant = store_tenant("new_store_no_domain")
         User.objects.create_user(
             email=tenant.owner_email,
             username="newstorenodomain",
@@ -112,7 +98,7 @@ class TestSaveRelatedProvisionsOnAdd:
         assert UserTenantMembership.objects.filter(tenant=tenant).exists()
 
     def test_owner_not_registered_yet_warns_and_does_not_crash(self):
-        tenant = _make_tenant("new-store-no-owner")
+        tenant = store_tenant("new_store_no_owner")
         TenantDomain.objects.create(
             domain="new-store-no-owner.example.com",
             tenant=tenant,
@@ -129,7 +115,7 @@ class TestSaveRelatedProvisionsOnAdd:
         assert not UserTenantMembership.objects.filter(tenant=tenant).exists()
 
     def test_provisioning_failure_is_reported_not_raised(self):
-        tenant = _make_tenant("new-store-provision-fails")
+        tenant = store_tenant("new_store_provision_fails")
         TenantDomain.objects.create(
             domain="new-store-provision-fails.example.com",
             tenant=tenant,
@@ -161,7 +147,7 @@ class TestSaveRelatedProvisionsOnAdd:
 
 class TestSaveRelatedSkipsOnChange:
     def test_editing_an_existing_tenant_never_provisions(self):
-        tenant = _make_tenant("existing-store-edit")
+        tenant = store_tenant("existing_store_edit")
         TenantDomain.objects.create(
             domain="existing-store-edit.example.com",
             tenant=tenant,

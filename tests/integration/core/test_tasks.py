@@ -35,7 +35,6 @@ from core.tasks import (
 from user.factories.account import UserAccountFactory
 
 
-@pytest.mark.django_db
 class TestMonitoredTask:
     @patch("core.tasks.logger")
     def test_on_success_logs_completion(self, mock_logger):
@@ -102,7 +101,6 @@ class TestClearExpiredSessionsTask:
         )
 
 
-@pytest.mark.django_db
 class TestClearAllCacheTask:
     @patch("core.tasks.management.call_command")
     @patch("core.tasks.logger")
@@ -276,9 +274,9 @@ class TestACommandFailureIsATaskFailure:
             task()
 
 
-@pytest.mark.django_db(transaction=True)
+@pytest.mark.django_db
 class TestCleanupAbandonedCartsTask:
-    def test_cleanup_abandoned_carts_removes_old_empty_carts(self, db):
+    def test_cleanup_abandoned_carts_removes_old_empty_carts(self):
         from cart.factories import CartItemFactory
 
         user = UserAccountFactory()
@@ -317,22 +315,16 @@ class TestCleanupAbandonedCartsTask:
 
         assert Cart.objects.filter(id=old_cart_with_items.id).exists()
 
-    def test_cleanup_abandoned_carts_no_carts_to_delete(self, db):
-        Cart.objects.filter(
-            user=None,
-            items__isnull=True,
-            last_activity__lt=timezone.now() - timedelta(days=7),
-        ).delete()
-
+    def test_cleanup_abandoned_carts_no_carts_to_delete(self):
         result = cleanup_abandoned_carts()
 
         assert result["status"] == "success"
         assert result["deleted_count"] == 0
 
 
-@pytest.mark.django_db(transaction=True)
+@pytest.mark.django_db
 class TestCleanupOldGuestCartsTask:
-    def test_cleanup_old_guest_carts_removes_old_carts(self, db):
+    def test_cleanup_old_guest_carts_removes_old_carts(self):
         user = UserAccountFactory()
         user_cart = Cart.objects.create(user=user)
 
@@ -359,7 +351,7 @@ class TestCleanupOldGuestCartsTask:
 
         assert Cart.objects.filter(id=user_cart.id).exists()
 
-    def test_cleanup_old_guest_carts_removes_old_non_empty_carts(self, db):
+    def test_cleanup_old_guest_carts_removes_old_non_empty_carts(self):
         # Regression: a guest cart that still held items after abandonment
         # was never cleaned by anything (both jobs filtered
         # items__isnull=True), so it lingered forever. The 30-day job now
@@ -381,18 +373,13 @@ class TestCleanupOldGuestCartsTask:
         assert result["status"] == "success"
         assert not Cart.objects.filter(id=old_cart.id).exists()
 
-    def test_cleanup_old_guest_carts_no_carts_to_delete(self, db):
-        Cart.objects.filter(
-            user=None, last_activity__lt=timezone.now() - timedelta(days=30)
-        ).delete()
-
+    def test_cleanup_old_guest_carts_no_carts_to_delete(self):
         result = cleanup_old_guest_carts()
 
         assert result["status"] == "success"
         assert result["deleted_count"] == 0
 
 
-@pytest.mark.django_db
 class TestClearLogFilesTask:
     @pytest.fixture(autouse=True)
     def setup_teardown(self):
@@ -553,7 +540,7 @@ class TestClearLogFilesTask:
         mock_logger.exception.assert_called()
 
 
-@pytest.mark.django_db(transaction=True)
+@pytest.mark.django_db
 class TestSendInactiveUserNotificationsTask:
     @patch("core.tasks.EmailMultiAlternatives")
     @patch("core.tasks.render_to_string")
@@ -563,7 +550,7 @@ class TestSendInactiveUserNotificationsTask:
         DEFAULT_FROM_EMAIL="noreply@example.com",
     )
     def test_send_inactive_user_notifications_success(
-        self, mock_logger, mock_render, mock_email_cls, db
+        self, mock_logger, mock_render, mock_email_cls
     ):
         # Pin English locale on the inactive recipients — the task
         # renders the subject under ``translation.override(get_user_
@@ -619,7 +606,7 @@ class TestSendInactiveUserNotificationsTask:
         return_value="https://cdn.example.com/tenant-logo.svg",
     )
     def test_send_inactive_user_notifications_includes_tenant_logo(
-        self, _mock_logo_url, mock_logger, mock_render, mock_email_cls, db
+        self, _mock_logo_url, mock_logger, mock_render, mock_email_cls
     ):
         """``build_email_context`` (routed through by every email task,
         including this re-engagement send) must surface the active
@@ -645,7 +632,7 @@ class TestSendInactiveUserNotificationsTask:
     @patch("core.tasks.render_to_string")
     @patch("core.tasks.logger")
     def test_send_inactive_user_notifications_no_tenant_logo_falls_back(
-        self, mock_logger, mock_render, mock_email_cls, db
+        self, mock_logger, mock_render, mock_email_cls
     ):
         """Byte-parity guard: without an active tenant (this test's
         default context counts as PLATFORM), ``SITE_LOGO_URL`` resolves
@@ -671,7 +658,7 @@ class TestSendInactiveUserNotificationsTask:
     @patch("core.tasks.render_to_string")
     @patch("core.tasks.logger")
     def test_send_inactive_user_notifications_with_failures(
-        self, mock_logger, mock_render, mock_email_cls, db
+        self, mock_logger, mock_render, mock_email_cls
     ):
         UserAccountFactory(
             last_login=timezone.now() - timedelta(days=70),
@@ -703,7 +690,7 @@ class TestSendInactiveUserNotificationsTask:
     @patch("core.tasks.render_to_string")
     @patch("core.tasks.logger")
     def test_send_inactive_user_notifications_too_many_failures(
-        self, mock_logger, mock_render, mock_email_cls, db
+        self, mock_logger, mock_render, mock_email_cls
     ):
         mock_render.return_value = "<html>Test email</html>"
         failing_msg = MagicMock()
@@ -720,6 +707,7 @@ class TestSendInactiveUserNotificationsTask:
         result = send_inactive_user_notifications()
 
         assert result["emails_sent"] == 0
+        assert result["total_users"] == 51, "the run did not stop at the cap"
         assert len(result["failed_details"]) == 10
         mock_logger.error.assert_any_call(
             "Too many email failures, stopping task"
@@ -728,7 +716,7 @@ class TestSendInactiveUserNotificationsTask:
     @patch("core.tasks.EmailMultiAlternatives")
     @patch("core.tasks.render_to_string")
     def test_the_soft_time_limit_stops_the_run(
-        self, mock_render, mock_email_cls, db
+        self, mock_render, mock_email_cls
     ):
         """Celery raises the soft limit INSIDE the task, exactly once.
 
@@ -771,7 +759,6 @@ class TestSendInactiveUserNotificationsTask:
         assert not never_reached.send.called, "the loop kept going"
 
 
-@pytest.mark.django_db
 class TestMonitorSystemHealthTask:
     @patch("core.tasks.connections")
     @patch("core.tasks.cache")
@@ -960,7 +947,6 @@ class TestMonitorSystemHealthTask:
         assert not getattr(monitor_system_health, "autoretry_for", ())
 
 
-@pytest.mark.django_db
 class TestBackupDatabaseTask:
     @patch("core.tasks.management.call_command")
     @patch("core.tasks.Path")
@@ -1036,7 +1022,6 @@ class TestBackupDatabaseTask:
         assert result["backup_file"] is None
 
 
-@pytest.mark.django_db
 class TestScheduledDatabaseBackupTask:
     @patch("core.tasks.backup_database_task")
     @patch("core.tasks.cleanup_old_backups")
@@ -1072,7 +1057,6 @@ class TestScheduledDatabaseBackupTask:
         mock_mail_admins.assert_called_once()
 
 
-@pytest.mark.django_db
 class TestCleanupOldBackupsTask:
     @patch("core.tasks.Path")
     @patch("core.tasks.logger")
@@ -1158,7 +1142,6 @@ class TestCleanupOldBackupsTask:
         mock_logger.error.assert_called()
 
 
-@pytest.mark.django_db
 class TestValidateTaskConfiguration:
     @override_settings(
         DEFAULT_FROM_EMAIL="test@example.com",
@@ -1187,10 +1170,10 @@ class TestValidateTaskConfiguration:
             validate_task_configuration()
 
 
-@pytest.mark.django_db(transaction=True)
+@pytest.mark.django_db
 class TestTaskIntegration:
     @patch("core.tasks.management.call_command")
-    def test_multiple_cleanup_tasks_workflow(self, mock_call_command, db):
+    def test_multiple_cleanup_tasks_workflow(self, mock_call_command):
         cart = Cart.objects.create(user=None)
 
         session_result = clear_expired_sessions_task()

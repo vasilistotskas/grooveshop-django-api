@@ -15,6 +15,10 @@ default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
 class PayWayViewSetTestCase(APITestCase):
     def setUp(self):
+        # Counts or orders every pay-way, so start without the rows
+        # ``pay_way/migrations/0019_seed_default_pay_ways`` seeds.
+        PayWay.objects.all().delete()
+
         from django.contrib.auth import get_user_model
 
         User = get_user_model()

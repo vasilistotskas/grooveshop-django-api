@@ -180,12 +180,30 @@ class ContactAttachmentThrottle(UserOrIpRateThrottle):
     fail_closed = True
 
 
+class AnonIpRateThrottle(ResilientThrottleMixin, AnonRateThrottle):
+    """The anonymous half of an Anon/User pair, keyed on the visitor.
+
+    Anon-only by design: ``None`` for an authenticated request, whose
+    ``UserRateThrottle`` sibling covers it. The address is the proven
+    client IP, for the reason ``UserOrIpRateThrottle`` gives: DRF's
+    ``get_ident`` is Traefik's peer, a Cloudflare edge node, so keying
+    on it would let one guest exhaust every guest's checkout budget.
+    """
+
+    def get_cache_key(self, request, view):
+        user = getattr(request, "user", None)
+        if user is not None and user.is_authenticated:
+            return None
+        ident = trusted_client_ip(request) or self.get_ident(request)
+        return self.cache_format % {"scope": self.scope, "ident": ident}
+
+
 class PaymentAttemptThrottle(ResilientThrottleMixin, UserRateThrottle):
     scope = "payment"
     fail_closed = True
 
 
-class PaymentAttemptAnonThrottle(ResilientThrottleMixin, AnonRateThrottle):
+class PaymentAttemptAnonThrottle(AnonIpRateThrottle):
     scope = "payment_anon"
     fail_closed = True
 
@@ -195,7 +213,7 @@ class OrderCreateThrottle(ResilientThrottleMixin, UserRateThrottle):
     fail_closed = True
 
 
-class OrderCreateAnonThrottle(ResilientThrottleMixin, AnonRateThrottle):
+class OrderCreateAnonThrottle(AnonIpRateThrottle):
     """Anonymous checkout is a stock- and money-moving endpoint.
 
     Creating an order reserves or decrements stock, can mint a courier
@@ -212,7 +230,7 @@ class CartMutationThrottle(ResilientThrottleMixin, UserRateThrottle):
     scope = "cart_mutation"
 
 
-class CartMutationAnonThrottle(ResilientThrottleMixin, AnonRateThrottle):
+class CartMutationAnonThrottle(AnonIpRateThrottle):
     scope = "cart_mutation_anon"
 
     def get_cache_key(self, request, view):

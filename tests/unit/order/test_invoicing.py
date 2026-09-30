@@ -33,10 +33,9 @@ from product.factories.product import ProductFactory
 from vat.factories import VatFactory
 
 
-class InvoiceCounterAtomicTestCase(TransactionTestCase):
+class InvoiceCounterTestCase(TestCase):
     """The counter is the only source of truth for invoice numbers —
-    Greek tax law forbids gaps. Verify concurrent allocation hands out
-    distinct numbers even from different threads."""
+    Greek tax law forbids gaps."""
 
     def test_allocate_creates_counter_on_first_call(self) -> None:
         self.assertFalse(InvoiceCounter.objects.filter(year=2026).exists())
@@ -63,11 +62,14 @@ class InvoiceCounterAtomicTestCase(TransactionTestCase):
         self.assertEqual(InvoiceCounter.allocate(2026), "INV-2026-000001")
         self.assertEqual(InvoiceCounter.allocate(2025), "INV-2025-000002")
 
-    def test_concurrent_allocation_never_duplicates(self) -> None:
-        # Spawn a handful of threads racing on the counter row. With
-        # select_for_update holding the row lock, each allocation must
-        # see a distinct number — no gaps and no duplicates.
-        N = 10
+
+class InvoiceCounterConcurrencyTestCase(TransactionTestCase):
+    """Concurrent allocation from threads, each on its own connection,
+    so the rows must really be committed for the others to see them."""
+
+    N = 10
+
+    def _race(self) -> list[str]:
         results: list[str] = []
         errors: list[BaseException] = []
 
@@ -81,18 +83,36 @@ class InvoiceCounterAtomicTestCase(TransactionTestCase):
             finally:
                 connection.close()
 
-        threads = [threading.Thread(target=worker) for _ in range(N)]
+        threads = [threading.Thread(target=worker) for _ in range(self.N)]
         for t in threads:
             t.start()
         for t in threads:
             t.join()
 
         self.assertFalse(errors, f"Thread errors: {errors}")
-        self.assertEqual(len(results), N)
-        self.assertEqual(len(set(results)), N, "Duplicate numbers issued")
-        # Numbers should be 1..N in some order (no gaps allowed).
+        self.assertEqual(len(results), self.N)
+        self.assertEqual(len(set(results)), self.N, "Duplicate numbers issued")
+        return results
+
+    def test_concurrent_first_allocation_never_duplicates(self) -> None:
+        # No row yet: every thread races ``get_or_create``'s INSERT, and
+        # the losers must fall back to locking the winner's row.
+        results = self._race()
         extracted = sorted(int(n.split("-")[-1]) for n in results)
-        self.assertEqual(extracted, list(range(1, N + 1)))
+        self.assertEqual(extracted, list(range(1, self.N + 1)))
+
+    def test_concurrent_allocation_on_existing_row_never_duplicates(
+        self,
+    ) -> None:
+        # The steady state: the row exists, so only ``select_for_update``
+        # serialises the read-increment-write.
+        InvoiceCounter.objects.create(year=2026, next_number=41)
+        results = self._race()
+        extracted = sorted(int(n.split("-")[-1]) for n in results)
+        self.assertEqual(extracted, list(range(41, 41 + self.N)))
+        self.assertEqual(
+            InvoiceCounter.objects.get(year=2026).next_number, 41 + self.N
+        )
 
 
 class VatBreakdownTestCase(TestCase):

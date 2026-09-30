@@ -9,12 +9,15 @@ exercises the DB hydration path directly, so it needs no live Meilisearch.
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 import pytest
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 
 from product.factories.product import ProductFactory
 from product.models.product import ProductTranslation
 from search.serializers import ProductTranslationSerializer
-from tests.utils import count_queries
 
 
 def _serialize_hits(pks):
@@ -33,14 +36,45 @@ def _en_translation_pks(products):
 @pytest.mark.django_db
 def test_search_result_enrichment_is_constant_query():
     products = ProductFactory.create_batch(2, num_images=1, num_reviews=2)
-    with count_queries() as small:
+    with CaptureQueriesContext(connection) as small:
         _serialize_hits(_en_translation_pks(products))
 
     products += ProductFactory.create_batch(3, num_images=1, num_reviews=2)
-    with count_queries() as large:
+    with CaptureQueriesContext(connection) as large:
         _serialize_hits(_en_translation_pks(products))
 
-    assert small.count == large.count, (
-        f"Search enrichment query count grew from {small.count} to "
-        f"{large.count} when hits grew — N+1 regression."
+    assert len(small) == len(large), (
+        f"Search enrichment query count grew from {len(small)} to "
+        f"{len(large)} when hits grew — N+1 regression."
+    )
+
+
+@pytest.mark.django_db
+def test_a_zero_price_is_serialized_as_zero_not_null():
+    """A free product costs 0.0, as every other product endpoint says;
+    null would mean "no price". ``Money(0)`` is falsy, which is the trap.
+    A priced product carries its amounts as floats."""
+    free = ProductFactory(
+        price=Decimal("0.00"),
+        discount_percent=Decimal("0.00"),
+        num_images=0,
+        num_reviews=0,
+    )
+    priced = ProductFactory(
+        price=Decimal("20.00"),
+        discount_percent=Decimal("0.00"),
+        num_images=0,
+        num_reviews=0,
+    )
+
+    by_master = {
+        row["master"]: row
+        for row in _serialize_hits(_en_translation_pks([free, priced]))
+    }
+
+    assert by_master[free.id]["price"] == 0.0
+    assert by_master[free.id]["final_price"] == 0.0
+    assert by_master[priced.id]["price"] == 20.0
+    assert by_master[priced.id]["final_price"] == float(
+        priced.final_price.amount
     )

@@ -8,14 +8,14 @@ from order.enum.status import OrderStatus
 from order.factories.item import OrderItemFactory
 from order.factories.order import OrderFactory
 from order.models.history import OrderHistory, OrderItemHistory
+from product.factories.product import ProductFactory
 
 
 @pytest.mark.django_db
 class OrderHistoryTestCase(TestCase):
     def setUp(self):
-        self.order = OrderFactory()
+        self.order = OrderFactory(num_order_items=0)
         self.user = None
-
         self.request = None
 
     def test_log_status_change(self):
@@ -163,7 +163,12 @@ class OrderHistoryTestCase(TestCase):
 @pytest.mark.django_db
 class OrderItemHistoryTestCase(TestCase):
     def setUp(self):
-        self.order_item = OrderItemFactory()
+        self.order_item = OrderItemFactory(
+            order=OrderFactory(num_order_items=0),
+            product=ProductFactory(num_images=0, num_reviews=0),
+            price=Money("50.00", settings.DEFAULT_CURRENCY),
+            quantity=2,
+        )
         self.user = None
 
     def test_log_quantity_change(self):
@@ -225,10 +230,13 @@ class OrderItemHistoryTestCase(TestCase):
         self.assertEqual(result.order_item, self.order_item)
         self.assertEqual(result.user, self.user)
         self.assertEqual(result.change_type, "REFUND")
-        self.assertEqual(result.new_value["refund_quantity"], 1)
-        self.assertIn("refund_amount", result.new_value)
         self.assertEqual(
-            result.new_value["currency"], settings.DEFAULT_CURRENCY
+            result.new_value,
+            {
+                "refund_quantity": 1,
+                "refund_amount": 50.0,
+                "currency": settings.DEFAULT_CURRENCY,
+            },
         )
         self.assertIn("Refund processed for 1 items", result.description)
         self.assertIn("Damaged item", result.description)

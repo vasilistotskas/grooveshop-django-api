@@ -32,6 +32,7 @@ class TestVivaReversalVerification:
         # what the handler must refuse — the fixture has to name a real
         # one for the happy path to be reachable.
         return OrderFactory(
+            num_order_items=0,
             status=OrderStatus.PROCESSING,
             payment_status=PaymentStatus.COMPLETED,
             payment_id="viva_txn_1",
@@ -109,6 +110,7 @@ class TestVivaPaymentFailedVerification:
         # See the note above: the order must have issued the code its
         # verified transaction reports.
         return OrderFactory(
+            num_order_items=0,
             status=OrderStatus.PENDING,
             payment_status=PaymentStatus.PENDING,
             payment_id="viva_txn_2",

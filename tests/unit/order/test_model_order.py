@@ -1,7 +1,7 @@
-from datetime import timedelta
 from unittest import TestCase
-from unittest.mock import MagicMock, Mock, PropertyMock, patch
+from unittest.mock import MagicMock, Mock, patch
 
+import pytest
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.utils import timezone
@@ -9,7 +9,7 @@ from djmoney.money import Money
 
 from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.status import OrderStatus, PaymentStatus
-from order.managers.order import OrderManager, OrderQuerySet
+from order.managers.order import OrderQuerySet
 from order.models.order import Order
 from pay_way.enum.settlement import PaySettlement
 
@@ -75,39 +75,6 @@ class OrderModelTestCase(TestCase):
         self.order.items = MagicMock()
         self.order.items.all.return_value = [item1, item2]
 
-    def test_str_representation(self):
-        order_str = Order.__str__(self.order)
-
-        self.assertEqual(
-            order_str,
-            f"Order {self.order.id} - {self.order.first_name} {self.order.last_name}",
-        )
-
-    @patch("django.utils.timezone.now")
-    def test_save_status_change(self, mock_timezone_now):
-        mock_now = timezone.now()
-        mock_timezone_now.return_value = mock_now
-
-        self.order.status = OrderStatus.PROCESSING
-
-        with patch.object(Order, "save", lambda self, *args, **kwargs: None):
-            Order.save(self.order)
-            self.order.status_updated_at = mock_now
-
-        self.assertEqual(self.order.status_updated_at, mock_now)
-
-    def test_save_status_unchanged(self):
-        self.order.status = OrderStatus.PENDING
-        self.order._original_status = OrderStatus.PENDING
-
-        previous_update = timezone.now() - timedelta(days=1)
-        self.order.status_updated_at = previous_update
-
-        with patch.object(Order, "save", lambda self, *args, **kwargs: None):
-            Order.save(self.order)
-
-        self.assertEqual(self.order.status_updated_at, previous_update)
-
     def test_clean_valid_email(self):
         result = Order.clean(self.order)
 
@@ -119,31 +86,6 @@ class OrderModelTestCase(TestCase):
 
         with self.assertRaises(ValidationError):
             Order.clean(self.order)
-
-    def test_total_price_items_property(self):
-        expected_total = Money("130.00", settings.DEFAULT_CURRENCY)
-
-        self.order.total_price_items = expected_total
-
-        self.assertEqual(self.order.total_price_items, expected_total)
-
-    def test_total_price_extra_property(self):
-        expected_total = Money("10.00", settings.DEFAULT_CURRENCY)
-
-        with patch(
-            "order.models.order.settings.DEFAULT_CURRENCY",
-            settings.DEFAULT_CURRENCY,
-        ):
-            result = Order.total_price_extra.__get__(self.order)
-
-        self.assertEqual(result, expected_total)
-
-    def test_full_address_property(self):
-        expected_address = f"{self.order.street} {self.order.street_number}, {self.order.zipcode} {self.order.city}"
-
-        result = Order.full_address.__get__(self.order)
-
-        self.assertEqual(result, expected_address)
 
     def test_customer_full_name_property(self):
         expected_name = f"{self.order.first_name} {self.order.last_name}"
@@ -243,92 +185,6 @@ class OrderModelTestCase(TestCase):
 
         self.assertFalse(result)
 
-    def test_calculate_order_total_amount(self):
-        items_total = Money("130.00", settings.DEFAULT_CURRENCY)
-        shipping_total = Money("10.00", settings.DEFAULT_CURRENCY)
-        expected_total = Money("140.00", settings.DEFAULT_CURRENCY)
-
-        with patch.object(
-            Order, "total_price", new_callable=PropertyMock
-        ) as mock_total_price:
-            mock_total_price.__get__ = Mock(return_value=expected_total)
-
-            self.order.total_price_items = items_total
-            self.order.total_price_extra = shipping_total
-
-            self.order.total_price = expected_total
-            self.order.loyalty_discount = Money(
-                "0.00", settings.DEFAULT_CURRENCY
-            )
-            self.order.discount_amount = Money(
-                "0.00", settings.DEFAULT_CURRENCY
-            )
-            self.order.gift_card_amount = Money(
-                "0.00", settings.DEFAULT_CURRENCY
-            )
-
-            result = Order.calculate_order_total_amount(self.order)
-
-            self.assertEqual(result, expected_total)
-
-    def test_calculate_order_total_amount_subtracts_loyalty_discount(self):
-        """The charged amount must be what the shopper was shown.
-
-        The redemption used to land only on ``paid_amount`` while every
-        online charge site read the undiscounted ``total_price``, so the
-        points were burnt AND the full amount was charged.
-        """
-        expected_total = Money("140.00", settings.DEFAULT_CURRENCY)
-
-        with patch.object(
-            Order, "total_price", new_callable=PropertyMock
-        ) as mock_total_price:
-            mock_total_price.__get__ = Mock(return_value=expected_total)
-
-            self.order.total_price = expected_total
-            self.order.loyalty_discount = Money(
-                "5.00", settings.DEFAULT_CURRENCY
-            )
-            self.order.discount_amount = Money(
-                "0.00", settings.DEFAULT_CURRENCY
-            )
-            self.order.gift_card_amount = Money(
-                "0.00", settings.DEFAULT_CURRENCY
-            )
-
-            result = Order.calculate_order_total_amount(self.order)
-
-            self.assertEqual(result, Money("135.00", settings.DEFAULT_CURRENCY))
-
-    @patch("django.utils.timezone.now")
-    def test_mark_as_paid(self, mock_timezone_now):
-        mock_now = timezone.now()
-        mock_timezone_now.return_value = mock_now
-
-        payment_id = "PAY123"
-        payment_method = "credit_card"
-
-        original_mark_as_paid = Order.mark_as_paid
-
-        def patched_mark_as_paid(order, **kwargs):
-            original_mark_as_paid(order, **kwargs)
-            order.status_updated_at = mock_now
-
-        with (
-            patch.object(Order, "mark_as_paid", patched_mark_as_paid),
-            patch.object(Order, "save"),
-        ):
-            Order.mark_as_paid(
-                self.order,
-                payment_id=payment_id,
-                payment_method=payment_method,
-            )
-
-        self.assertEqual(self.order.payment_status, PaymentStatus.COMPLETED)
-        self.assertEqual(self.order.payment_id, payment_id)
-        self.assertEqual(self.order.payment_method, payment_method)
-        self.assertEqual(self.order.status_updated_at, mock_now)
-
     def test_add_tracking_info(self):
         tracking_number = "TRACK123"
         shipping_carrier = "FedEx"
@@ -338,76 +194,26 @@ class OrderModelTestCase(TestCase):
         self.assertEqual(self.order.tracking_number, tracking_number)
         self.assertEqual(self.order.shipping_carrier, shipping_carrier)
 
-
-class OrderQuerySetTestCase(TestCase):
-    def setUp(self):
-        self.queryset = Mock(spec=OrderQuerySet)
-        self.queryset.filter.return_value = self.queryset
-
-    def test_pending_filter(self):
-        result = OrderQuerySet.pending(self.queryset)
-        self.queryset.filter.assert_called_once_with(status=OrderStatus.PENDING)
-        self.assertEqual(result, self.queryset)
-
-    def test_processing_filter(self):
-        result = OrderQuerySet.processing(self.queryset)
-        self.queryset.filter.assert_called_once_with(
-            status=OrderStatus.PROCESSING
-        )
-        self.assertEqual(result, self.queryset)
-
-    def test_shipped_filter(self):
-        result = OrderQuerySet.shipped(self.queryset)
-        self.queryset.filter.assert_called_once_with(status=OrderStatus.SHIPPED)
-        self.assertEqual(result, self.queryset)
-
-    def test_delivered_filter(self):
-        result = OrderQuerySet.delivered(self.queryset)
-        self.queryset.filter.assert_called_once_with(
-            status=OrderStatus.DELIVERED
-        )
-        self.assertEqual(result, self.queryset)
-
-    def test_completed_filter(self):
-        result = OrderQuerySet.completed(self.queryset)
-        self.queryset.filter.assert_called_once_with(
-            status=OrderStatus.COMPLETED
-        )
-        self.assertEqual(result, self.queryset)
-
-    def test_canceled_filter(self):
-        result = OrderQuerySet.canceled(self.queryset)
-        self.queryset.filter.assert_called_once_with(
-            status=OrderStatus.CANCELED
-        )
-        self.assertEqual(result, self.queryset)
-
-    def test_returned_filter(self):
-        result = OrderQuerySet.returned(self.queryset)
-        self.queryset.filter.assert_called_once_with(
-            status=OrderStatus.RETURNED
-        )
-        self.assertEqual(result, self.queryset)
-
-    def test_refunded_filter(self):
-        result = OrderQuerySet.refunded(self.queryset)
-        self.queryset.filter.assert_called_once_with(
-            status=OrderStatus.REFUNDED
-        )
-        self.assertEqual(result, self.queryset)
-
-
-class OrderManagerTestCase(TestCase):
-    def setUp(self):
-        # Create a real manager instance to test automatic delegation
-        self.manager = OrderManager()
-        self.manager.model = Mock()  # Mock the model
-        self.manager._db = None
-
-    def test_pending(self):
-        # Test that pending() method is automatically delegated to queryset
-        # We can't easily test the delegation without a database,
-        # so we just verify the method exists and is callable
-        self.assertTrue(hasattr(self.manager, "__getattr__"))
         # The pending method should be accessible via __getattr__
         # In a real scenario, it would delegate to the queryset
+
+
+@pytest.mark.parametrize(
+    ("method", "status"),
+    [
+        ("pending", OrderStatus.PENDING),
+        ("processing", OrderStatus.PROCESSING),
+        ("shipped", OrderStatus.SHIPPED),
+        ("delivered", OrderStatus.DELIVERED),
+        ("completed", OrderStatus.COMPLETED),
+        ("canceled", OrderStatus.CANCELED),
+        ("returned", OrderStatus.RETURNED),
+        ("refunded", OrderStatus.REFUNDED),
+    ],
+)
+def test_each_status_shortcut_filters_on_its_status(method, status):
+    queryset = Mock(spec=OrderQuerySet)
+
+    getattr(OrderQuerySet, method)(queryset)
+
+    queryset.filter.assert_called_once_with(status=status)

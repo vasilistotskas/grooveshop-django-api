@@ -1,4 +1,3 @@
-import json
 import uuid
 from decimal import Decimal
 from unittest.mock import patch
@@ -7,10 +6,11 @@ from django.conf import settings
 from django.urls import reverse
 from djmoney.money import Money
 from rest_framework import status
-from rest_framework.test import APIClient, APITestCase
+from rest_framework.test import APITestCase
 
+from cart.factories import CartFactory, CartItemFactory
 from country.factories import CountryFactory
-from order.enum.status import OrderStatus
+from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
 from order.models.order import Order
 from pay_way.factories import PayWayFactory
@@ -19,34 +19,31 @@ from region.factories import RegionFactory
 from tests.utils.shipping import enable_rate
 from user.factories.account import UserAccountFactory
 
-User = UserAccountFactory._meta.model
-
 
 class CheckoutAPITestCase(APITestCase):
-    def setUp(self):
-        self.client = APIClient()
-        self.user = UserAccountFactory(num_addresses=0)
-        self.country = CountryFactory(num_regions=0)
-        self.region = RegionFactory(country=self.country)
-        # A ShippingRate is per-country now — this ad-hoc country has
-        # none until this call.
-        enable_rate(self.country)
-        # Create offline payment method for testing offline checkout flow
-        self.pay_way = PayWayFactory.create_offline_payment(
+    """Order-first checkout (``POST /order`` with an offline pay way)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = UserAccountFactory(num_addresses=0)
+        cls.country = CountryFactory(num_regions=0)
+        cls.region = RegionFactory(country=cls.country)
+        # A ShippingRate is per-country — this ad-hoc country has none
+        # until this call.
+        enable_rate(cls.country)
+        cls.pay_way = PayWayFactory.create_offline_payment(
             provider_code="cash", requires_confirmation=False
         )
-
-        self.product1 = ProductFactory.create(
+        cls.product1 = ProductFactory.create(
             stock=20, num_images=0, num_reviews=0, active=True
         )
-        self.product2 = ProductFactory.create(
+        cls.product2 = ProductFactory.create(
             stock=15, num_images=0, num_reviews=0, active=True
         )
+        cls.checkout_url = reverse("order-list")
 
-        self.currency = str(self.product1.price.currency)
-
-        self.checkout_url = reverse("order-list")
-        self.checkout_data = {
+    def _checkout_data(self, **overrides):
+        data = {
             "email": "customer@example.com",
             "first_name": "John",
             "last_name": "Doe",
@@ -58,596 +55,216 @@ class CheckoutAPITestCase(APITestCase):
             "country_id": self.country.alpha_2,
             "region_id": self.region.alpha,
             "pay_way_id": self.pay_way.id,
-            "shipping_price": "10.00",
             "shipping_kind": "home_delivery",
-            "items": [
-                {"product": self.product1.id, "quantity": 2},
-                {"product": self.product2.id, "quantity": 1},
-            ],
         }
+        data.update(overrides)
+        return data
 
-    def test_checkout_successful(self):
-        """Test successful order creation with offline payment flow."""
-        from cart.factories import CartFactory, CartItemFactory
+    def _cart(self, user=None, items=None):
+        cart = CartFactory(user=user)
+        for product, quantity in items or (
+            (self.product1, 2),
+            (self.product2, 1),
+        ):
+            CartItemFactory(cart=cart, product=product, quantity=quantity)
+        return cart
 
-        # Create a cart with items
-        cart = CartFactory(user=None)
-        CartItemFactory(cart=cart, product=self.product1, quantity=2)
-        CartItemFactory(cart=cart, product=self.product2, quantity=1)
-
-        # Use offline payment (no payment_intent_id required)
-        checkout_data = self.checkout_data.copy()
-
-        initial_order_count = Order.objects.count()
-
-        response = self.client.post(
+    def _post(self, data, cart):
+        return self.client.post(
             self.checkout_url,
-            data=json.dumps(checkout_data),
-            content_type="application/json",
+            data,
+            format="json",
             HTTP_X_CART_ID=str(cart.uuid),
         )
 
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+    def test_guest_checkout_creates_an_unowned_order(self):
+        cart = self._cart()
 
-        # Verify order was created
-        self.assertEqual(Order.objects.count(), initial_order_count + 1)
+        response = self._post(self._checkout_data(), cart)
 
-        # Verify order details
-        created_order = Order.objects.latest("id")
-        self.assertEqual(created_order.email, self.checkout_data["email"])
         self.assertEqual(
-            created_order.first_name, self.checkout_data["first_name"]
+            response.status_code, status.HTTP_201_CREATED, response.data
         )
+        self.assertIsNone(response.data["user"])
+        order = Order.objects.get(id=response.data["id"])
+        self.assertEqual(order.email, "customer@example.com")
+        self.assertEqual((order.first_name, order.last_name), ("John", "Doe"))
+        self.assertEqual(order.status, OrderStatus.PENDING)
         self.assertEqual(
-            created_order.last_name, self.checkout_data["last_name"]
+            dict(order.items.values_list("product_id", "quantity")),
+            {self.product1.id: 2, self.product2.id: 1},
         )
 
-    def test_checkout_insufficient_stock(self):
-        """Test order creation fails when cart has insufficient stock."""
-        from cart.factories import CartFactory, CartItemFactory
+    def test_signed_in_checkout_creates_the_shoppers_order(self):
+        self.client.force_authenticate(user=self.user)
+        cart = self._cart(user=self.user)
 
-        product_limited = ProductFactory.create(
+        response = self._post(self._checkout_data(), cart)
+
+        self.assertEqual(
+            response.status_code, status.HTTP_201_CREATED, response.data
+        )
+        self.assertEqual(response.data["user"], self.user.id)
+        self.assertEqual(
+            Order.objects.get(id=response.data["id"]).user_id, self.user.id
+        )
+
+    def test_insufficient_stock_is_refused_without_touching_stock(self):
+        scarce = ProductFactory.create(
             stock=5, num_images=0, num_reviews=0, active=True
         )
+        cart = self._cart(items=((scarce, 10),))
 
-        # Create a cart with items exceeding stock
-        cart = CartFactory(user=None)
-        CartItemFactory(cart=cart, product=product_limited, quantity=10)
-
-        data = self.checkout_data.copy()
-        data["payment_intent_id"] = "pi_test123"
-
-        response = self.client.post(
-            self.checkout_url,
-            data=json.dumps(data),
-            content_type="application/json",
-            HTTP_X_CART_ID=str(cart.uuid),
-        )
+        response = self._post(self._checkout_data(), cart)
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        # Error should be in cart validation
         self.assertIn("cart", response.data)
+        scarce.refresh_from_db()
+        self.assertEqual(scarce.stock, 5)
 
-        product_limited.refresh_from_db()
-        self.assertEqual(product_limited.stock, 5)
+    def test_invalid_email_is_a_field_error(self):
+        cart = self._cart()
 
-    @patch("order.services.OrderService.create_order_from_cart")
-    def test_checkout_authenticated_user(self, mock_create_order):
-        """Test authenticated user can create order with payment-first flow."""
-        from cart.factories import CartFactory, CartItemFactory
-
-        self.client.force_authenticate(user=self.user)
-
-        # Create the mock order FIRST: OrderFactory triggers the
-        # order_created signal which schedules clear_cart for self.user
-        # via transaction.on_commit. In tests that callback fires before
-        # the POST, deleting any cart the test had pre-created.
-        mock_order = OrderFactory(
-            user=self.user,
-            email=self.checkout_data["email"],
-            payment_id="pi_test123",
-        )
-        mock_create_order.return_value = mock_order
-
-        # Now create the cart that the request will actually use.
-        cart = CartFactory(user=self.user)
-        CartItemFactory(cart=cart, product=self.product1, quantity=2)
-        CartItemFactory(cart=cart, product=self.product2, quantity=1)
-
-        # Add payment_intent_id to checkout data
-        checkout_data = self.checkout_data.copy()
-        checkout_data["payment_intent_id"] = "pi_test123"
-
-        response = self.client.post(
-            self.checkout_url,
-            data=json.dumps(checkout_data),
-            content_type="application/json",
-            HTTP_X_CART_ID=str(cart.uuid),
-        )
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-
-        # Verify the order was created with the authenticated user
-        self.assertEqual(response.data["user"], self.user.id)
-
-    def test_checkout_invalid_data(self):
-        """Test order creation fails with invalid email."""
-        from cart.factories import CartFactory, CartItemFactory
-
-        # Create a cart
-        cart = CartFactory(user=None)
-        CartItemFactory(cart=cart, product=self.product1, quantity=2)
-
-        invalid_data = self.checkout_data.copy()
-        invalid_data["email"] = "invalid-email"
-        invalid_data["payment_intent_id"] = "pi_test123"
-
-        response = self.client.post(
-            self.checkout_url,
-            data=json.dumps(invalid_data),
-            content_type="application/json",
-            HTTP_X_CART_ID=str(cart.uuid),
-        )
+        response = self._post(self._checkout_data(email="invalid-email"), cart)
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        # Error should be about invalid email in shipping address validation
-        self.assertTrue("email" in response.data or "detail" in response.data)
+        self.assertIn("email", response.data)
+        self.assertFalse(Order.objects.filter(email="invalid-email").exists())
 
 
-class OrderViewSetTestCase(APITestCase):
-    def setUp(self):
-        self.client = APIClient()
+class GuestOrderAccessTestCase(APITestCase):
+    """A guest order is reachable only through its unguessable UUID."""
 
-        self.user = User.objects.create_user(
-            username="testuser",
-            email="test@example.com",
-            password="testpassword",
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = UserAccountFactory(num_addresses=0)
+        cls.admin_user = UserAccountFactory(
+            is_staff=True, is_superuser=True, num_addresses=0
         )
-
-        self.admin_user = User.objects.create_user(
-            username="adminuser",
-            email="admin@example.com",
-            password="adminpassword",
-            is_staff=True,
-            is_superuser=True,
-        )
-
-        self.order1 = OrderFactory(user=self.user)
-        self.order2 = OrderFactory(user=self.user)
-        self.order3 = OrderFactory()
-
-        product = ProductFactory(stock=10)
-        self.order1.items.create(
-            product=product,
-            price=Money(
-                amount=Decimal("50.00"), currency=settings.DEFAULT_CURRENCY
-            ),
-            quantity=2,
-        )
-
-        self.orders_url = reverse("order-list")
-        self.order1_url = reverse("order-detail", kwargs={"pk": self.order1.pk})
-        self.order_uuid_url = reverse(
-            "order-retrieve-by-uuid", kwargs={"uuid": str(self.order1.uuid)}
-        )
-        self.my_orders_url = reverse("order-my-orders")
-        self.cancel_order_url = reverse(
-            "order-cancel", kwargs={"pk": self.order1.pk}
-        )
-        self.add_tracking = reverse(
-            "order-add-tracking", kwargs={"pk": self.order1.pk}
-        )
-        self.update_status_url = reverse(
-            "order-update-status", kwargs={"pk": self.order1.pk}
-        )
-
-    def test_list_orders_unauthenticated(self):
-        # Anonymous requests must receive 401, not 200-with-empty-results.
-        # IsOwnerOrAdmin.has_permission returns False for anonymous users,
-        # which DRF translates to 401 when authentication classes are present.
-        self.client.force_authenticate(user=None)
-        response = self.client.get(self.orders_url)
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
-
-    def test_list_orders_regular_user_sees_only_own_orders(self):
-        # Non-staff authenticated users must only see their own orders.
-        # get_queryset filters by user for non-staff, preventing cross-user
-        # IDOR enumeration of the order list.
-        other_user = User.objects.create_user(
-            username="otheruser",
-            email="other@example.com",
-            password="otherpassword",
-        )
-        other_order = OrderFactory(user=other_user)
-
-        self.client.force_authenticate(user=self.user)
-        response = self.client.get(self.orders_url)
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        result_ids = {o["id"] for o in response.data["results"]}
-        # Must contain own orders
-        self.assertIn(self.order1.id, result_ids)
-        self.assertIn(self.order2.id, result_ids)
-        # Must NOT contain another user's order
-        self.assertNotIn(other_order.id, result_ids)
-
-    def test_list_orders_admin(self):
-        self.client.force_authenticate(user=self.admin_user)
-
-        response = self.client.get(self.orders_url)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-
-        self.assertEqual(len(response.data["results"]), Order.objects.count())
-
-    def test_retrieve_order_by_id(self):
-        self.client.force_authenticate(user=self.admin_user)
-
-        response = self.client.get(self.order1_url)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-
-        self.assertEqual(response.data["id"], self.order1.id)
-
-    def test_retrieve_order_by_uuid(self):
-        self.client.force_authenticate(user=self.admin_user)
-
-        response = self.client.get(self.order_uuid_url)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-
-        self.assertEqual(response.data["uuid"], str(self.order1.uuid))
-
-    def test_my_orders(self):
-        self.client.force_authenticate(user=self.user)
-
-        response = self.client.get(self.my_orders_url)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-
-        self.assertGreaterEqual(len(response.data["results"]), 1)
-
-        order_ids = [order["id"] for order in response.data["results"]]
-        self.assertNotIn(self.order3.id, order_ids)
-
-    def test_cancel_order(self):
-        self.client.force_authenticate(user=self.admin_user)
-
-        self.order1.status = OrderStatus.PENDING.value
-        self.order1.save()
-
-        response = self.client.post(self.cancel_order_url)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-
-        self.order1.refresh_from_db()
-        self.assertEqual(self.order1.status, OrderStatus.CANCELED.value)
-
-    def test_add_tracking(self):
-        self.client.force_authenticate(user=self.admin_user)
-
-        self.order1.status = OrderStatus.PROCESSING.value
-        self.order1.save()
-
-        tracking_data = {
-            "tracking_number": "TRACK123456",
-            "shipping_carrier": "FedEx",
-        }
-
-        response = self.client.post(
-            self.add_tracking,
-            data=json.dumps(tracking_data),
-            content_type="application/json",
-        )
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-
-        self.order1.refresh_from_db()
-        self.assertEqual(self.order1.tracking_number, "TRACK123456")
-        self.assertEqual(self.order1.shipping_carrier, "FedEx")
-
-    def test_update_order_status(self):
-        self.client.force_authenticate(user=self.admin_user)
-
-        self.order1.status = OrderStatus.PENDING.value
-        self.order1.save()
-
-        status_data = {"status": OrderStatus.PROCESSING.value}
-
-        response = self.client.post(
-            self.update_status_url,
-            data=json.dumps(status_data),
-            content_type="application/json",
-        )
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-
-        self.order1.refresh_from_db()
-        self.assertEqual(self.order1.status, OrderStatus.PROCESSING.value)
-
-    def test_update_order_status_invalid_transition(self):
-        self.client.force_authenticate(user=self.admin_user)
-
-        self.order1.status = OrderStatus.PENDING.value
-        self.order1.save()
-
-        status_data = {"status": OrderStatus.COMPLETED.value}
-
-        response = self.client.post(
-            self.update_status_url,
-            data=json.dumps(status_data),
-            content_type="application/json",
-        )
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
-        self.order1.refresh_from_db()
-        self.assertEqual(self.order1.status, OrderStatus.PENDING.value)
-
-
-class GuestOrderTestCase(APITestCase):
-    """Test case for guest (unauthenticated) order functionality."""
-
-    def setUp(self):
-        self.client = APIClient()
-        self.user = UserAccountFactory(num_addresses=0)
-        self.admin_user = User.objects.create_user(
-            username="adminuser",
-            email="admin@example.com",
-            password="adminpassword",
-            is_staff=True,
-            is_superuser=True,
-        )
-
-        self.country = CountryFactory(num_regions=0)
-        self.region = RegionFactory(country=self.country)
-        # A ShippingRate is per-country now — this ad-hoc country has
-        # none until this call.
-        enable_rate(self.country)
-        self.pay_way = PayWayFactory(active=True)
-
-        self.product1 = ProductFactory.create(
-            stock=20, num_images=0, num_reviews=0, active=True
-        )
-        self.product2 = ProductFactory.create(
-            stock=15, num_images=0, num_reviews=0, active=True
-        )
-
-        self.checkout_url = reverse("order-list")
-        self.guest_checkout_data = {
-            "email": "guest@example.com",
-            "first_name": "Guest",
-            "last_name": "User",
-            "phone": "+12025550195",
-            "street": "Guest Street",
-            "street_number": "456",
-            "city": "GuestCity",
-            "zipcode": "54321",
-            "country_id": self.country.alpha_2,
-            "region_id": self.region.alpha,
-            "pay_way_id": self.pay_way.id,
-            "shipping_price": "10.00",
-            "shipping_kind": "home_delivery",
-            "items": [
-                {"product": self.product1.id, "quantity": 1},
-                {"product": self.product2.id, "quantity": 1},
-            ],
-        }
-
-    @patch("order.signals.order_created.send")
-    @patch("order.services.OrderService.create_order_from_cart")
-    def test_guest_can_create_order(self, mock_create_order, mock_signal):
-        """Test that a guest (unauthenticated) user can create an order with payment-first flow."""
-        from cart.factories import CartFactory, CartItemFactory
-
-        self.client.force_authenticate(user=None)
-
-        # Create a guest cart
-        cart = CartFactory(user=None)
-        CartItemFactory(cart=cart, product=self.product1, quantity=1)
-        CartItemFactory(cart=cart, product=self.product2, quantity=1)
-
-        # Create mock order to return
-        mock_order = OrderFactory(
+        cls.guest_order = OrderFactory(
             user=None,
             email="guest@example.com",
-            first_name="Guest",
-            last_name="User",
-            payment_id="pi_test123",
+            status=OrderStatus.PENDING,
+            num_order_items=0,
         )
-        mock_create_order.return_value = mock_order
-
-        # Add payment_intent_id to checkout data
-        checkout_data = self.guest_checkout_data.copy()
-        checkout_data["payment_intent_id"] = "pi_test123"
-
-        response = self.client.post(
-            self.checkout_url,
-            data=json.dumps(checkout_data),
-            content_type="application/json",
-            HTTP_X_CART_ID=str(cart.uuid),
+        cls.user_order = OrderFactory(
+            user=cls.user,
+            email=cls.user.email,
+            status=OrderStatus.PENDING,
+            num_order_items=0,
         )
 
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-
-        # Verify order details
-        self.assertIsNone(response.data["user"])
-        self.assertEqual(response.data["email"], "guest@example.com")
-        self.assertEqual(response.data["first_name"], "Guest")
-        self.assertEqual(response.data["last_name"], "User")
-
-    def test_guest_can_retrieve_order_by_uuid(self):
-        """Test that a guest can retrieve their order using UUID."""
-        guest_order = OrderFactory(user=None, email="guest@example.com")
-
-        order_uuid_url = reverse(
-            "order-retrieve-by-uuid", kwargs={"uuid": str(guest_order.uuid)}
+    def _by_uuid_url(self, order):
+        return reverse(
+            "order-retrieve-by-uuid", kwargs={"uuid": str(order.uuid)}
         )
 
-        self.client.force_authenticate(user=None)
-        response = self.client.get(order_uuid_url)
+    def test_guest_can_retrieve_their_order_by_uuid(self):
+        response = self.client.get(self._by_uuid_url(self.guest_order))
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["uuid"], str(guest_order.uuid))
+        self.assertEqual(response.data["uuid"], str(self.guest_order.uuid))
         self.assertEqual(response.data["email"], "guest@example.com")
         self.assertIsNone(response.data["user"])
 
     def test_path_uuid_is_authoritative_over_query_param(self):
-        """The path param is the endpoint's identity — a stray/stale
-        ``?uuid=`` query (legacy callers duplicated it there) must not
-        override it and break access to the correctly-addressed order."""
-        guest_order = OrderFactory(user=None, email="guest@example.com")
-
-        order_uuid_url = reverse(
-            "order-retrieve-by-uuid", kwargs={"uuid": str(guest_order.uuid)}
-        )
-
-        self.client.force_authenticate(user=None)
+        """The path param is the endpoint's identity — a stray ``?uuid=``
+        query must not override it and break access to the correctly
+        addressed order."""
         response = self.client.get(
-            order_uuid_url,
+            self._by_uuid_url(self.guest_order),
             {"uuid": "00000000-0000-0000-0000-000000000000"},
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["uuid"], str(guest_order.uuid))
+        self.assertEqual(response.data["uuid"], str(self.guest_order.uuid))
 
-    def test_guest_cannot_retrieve_authenticated_user_order(self):
-        """Test that a guest cannot retrieve an order that belongs to a registered user."""
-        user_order = OrderFactory(user=self.user, email=self.user.email)
-
-        order_uuid_url = reverse(
-            "order-retrieve-by-uuid", kwargs={"uuid": str(user_order.uuid)}
-        )
-
-        self.client.force_authenticate(user=None)
-        response = self.client.get(order_uuid_url)
+    def test_guest_cannot_retrieve_a_registered_users_order(self):
+        response = self.client.get(self._by_uuid_url(self.user_order))
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_guest_can_cancel_their_order(self):
-        """Test that a guest can cancel their own order using UUID."""
-        guest_order = OrderFactory(
-            user=None, email="guest@example.com", status=OrderStatus.PENDING
+    def test_guest_can_cancel_their_order_with_its_uuid(self):
+        url = (
+            reverse("order-cancel", kwargs={"pk": self.guest_order.pk})
+            + f"?uuid={self.guest_order.uuid}"
         )
 
-        cancel_url = (
-            reverse("order-cancel", kwargs={"pk": guest_order.pk})
-            + f"?uuid={guest_order.uuid}"
-        )
-
-        self.client.force_authenticate(user=None)
         response = self.client.post(
-            cancel_url,
-            data=json.dumps({"reason": "Changed my mind"}),
-            content_type="application/json",
+            url, {"reason": "Changed my mind"}, format="json"
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.guest_order.refresh_from_db()
+        self.assertEqual(self.guest_order.status, OrderStatus.CANCELED)
 
-        guest_order.refresh_from_db()
-        self.assertEqual(guest_order.status, OrderStatus.CANCELED)
+    def test_guest_cannot_cancel_by_integer_pk_alone(self):
+        """Regression for the guest-order IDOR: the cancel/payment
+        actions are keyed by sequential integer pk, so access must
+        require the order's UUID (via ?uuid=). Missing or wrong -> 403."""
+        cancel_url = reverse("order-cancel", kwargs={"pk": self.guest_order.pk})
 
-    def test_guest_cannot_cancel_order_without_uuid(self):
-        """A guest order must not be cancelable by integer pk alone.
+        for url in (cancel_url, cancel_url + f"?uuid={uuid.uuid4()}"):
+            with self.subTest(url=url):
+                response = self.client.post(
+                    url, {"reason": "IDOR attempt"}, format="json"
+                )
+                self.assertEqual(
+                    response.status_code, status.HTTP_403_FORBIDDEN
+                )
 
-        Regression for the guest-order IDOR: the cancel/payment actions
-        are keyed by sequential integer pk, so access must require the
-        order's unguessable UUID (via ?uuid=). Missing or wrong UUID -> 403.
-        """
-        guest_order = OrderFactory(
-            user=None, email="guest@example.com", status=OrderStatus.PENDING
-        )
-        cancel_url = reverse("order-cancel", kwargs={"pk": guest_order.pk})
+        self.guest_order.refresh_from_db()
+        self.assertEqual(self.guest_order.status, OrderStatus.PENDING)
 
-        self.client.force_authenticate(user=None)
-
-        # No uuid at all.
+    def test_guest_cannot_cancel_a_registered_users_order(self):
         response = self.client.post(
-            cancel_url,
-            data=json.dumps({"reason": "IDOR attempt"}),
-            content_type="application/json",
-        )
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-
-        # Wrong uuid.
-        response = self.client.post(
-            cancel_url + f"?uuid={uuid.uuid4()}",
-            data=json.dumps({"reason": "IDOR attempt"}),
-            content_type="application/json",
-        )
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-
-        guest_order.refresh_from_db()
-        self.assertEqual(guest_order.status, OrderStatus.PENDING)
-
-    def test_guest_cannot_cancel_authenticated_user_order(self):
-        """Test that a guest cannot cancel an order that belongs to a registered user."""
-        user_order = OrderFactory(
-            user=self.user, email=self.user.email, status=OrderStatus.PENDING
-        )
-
-        cancel_url = reverse("order-cancel", kwargs={"pk": user_order.pk})
-
-        self.client.force_authenticate(user=None)
-        response = self.client.post(
-            cancel_url,
-            data=json.dumps({"reason": "Trying to cancel"}),
-            content_type="application/json",
+            reverse("order-cancel", kwargs={"pk": self.user_order.pk}),
+            {"reason": "Trying to cancel"},
+            format="json",
         )
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.user_order.refresh_from_db()
+        self.assertEqual(self.user_order.status, OrderStatus.PENDING)
 
-        user_order.refresh_from_db()
-        self.assertEqual(user_order.status, OrderStatus.PENDING)
-
-    def test_authenticated_user_cannot_access_guest_order_by_id(self):
-        """Test that an authenticated user cannot access a guest order by ID."""
-        guest_order = OrderFactory(user=None, email="guest@example.com")
-
-        order_detail_url = reverse(
-            "order-detail", kwargs={"pk": guest_order.pk}
-        )
-
+    def test_signed_in_user_cannot_retrieve_a_guest_order_by_id(self):
         self.client.force_authenticate(user=self.user)
-        response = self.client.get(order_detail_url)
+
+        response = self.client.get(
+            reverse("order-detail", kwargs={"pk": self.guest_order.pk})
+        )
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_admin_can_access_guest_order(self):
-        """Test that admin users can access guest orders."""
-        guest_order = OrderFactory(user=None, email="guest@example.com")
+    def test_admin_can_retrieve_a_guest_order(self):
+        self.client.force_authenticate(user=self.admin_user)
 
-        order_detail_url = reverse(
-            "order-detail", kwargs={"pk": guest_order.pk}
+        response = self.client.get(
+            reverse("order-detail", kwargs={"pk": self.guest_order.pk})
         )
 
-        self.client.force_authenticate(user=self.admin_user)
-        response = self.client.get(order_detail_url)
-
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["id"], guest_order.id)
+        self.assertEqual(response.data["id"], self.guest_order.id)
         self.assertIsNone(response.data["user"])
 
-    def test_guest_order_with_payment_intent(self):
-        """Test that a guest can create a payment intent for their order."""
-        stripe_pay_way = PayWayFactory(provider_code="stripe")
-        guest_order = OrderFactory(
+    def test_guest_can_create_a_payment_intent_with_the_uuid(self):
+        order = OrderFactory(
             user=None,
             email="guest@example.com",
-            pay_way=stripe_pay_way,
-            payment_status="pending",
+            pay_way=PayWayFactory(provider_code="stripe"),
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+            num_order_items=0,
         )
-
-        product = ProductFactory(stock=10)
-        guest_order.items.create(
-            product=product,
-            price=Money(
-                amount=Decimal("50.00"), currency=settings.DEFAULT_CURRENCY
-            ),
+        order.items.create(
+            product=ProductFactory(stock=10, num_images=0, num_reviews=0),
+            price=Money(Decimal("50.00"), settings.DEFAULT_CURRENCY),
             quantity=2,
         )
-
-        guest_order.refresh_from_db()
-
-        payment_intent_url = (
-            reverse(
-                "order-create-payment-intent", kwargs={"pk": guest_order.pk}
-            )
-            + f"?uuid={guest_order.uuid}"
+        url = (
+            reverse("order-create-payment-intent", kwargs={"pk": order.pk})
+            + f"?uuid={order.uuid}"
         )
-
-        self.client.force_authenticate(user=None)
 
         with patch(
             "pay_way.services.PayWayService.process_payment"
@@ -663,30 +280,66 @@ class GuestOrderTestCase(APITestCase):
                     "client_secret": "pi_test123_secret",
                 },
             )
+            response = self.client.post(url, {}, format="json")
 
+        self.assertEqual(
+            response.status_code, status.HTTP_200_OK, response.data
+        )
+        self.assertEqual(response.data["payment_id"], "pi_test123")
+
+    def test_payment_intent_forwards_the_named_fields_to_the_provider(self):
+        """``paymentMethodId`` / ``customerId`` / ``returnUrl`` reach the
+        PSP call as keyword arguments, next to ``paymentData``."""
+        order = OrderFactory(
+            user=None,
+            pay_way=PayWayFactory(provider_code="stripe"),
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+            num_order_items=0,
+        )
+        url = (
+            reverse("order-create-payment-intent", kwargs={"pk": order.pk})
+            + f"?uuid={order.uuid}"
+        )
+
+        with patch(
+            "pay_way.services.PayWayService.process_payment",
+            return_value=(
+                True,
+                {
+                    "payment_id": "pi_named",
+                    "status": "requires_payment_method",
+                    "amount": "10.00",
+                    "currency": "EUR",
+                    "provider": "stripe",
+                    "client_secret": "pi_named_secret",
+                },
+            ),
+        ) as mock_payment:
             response = self.client.post(
-                payment_intent_url,
-                data=json.dumps({}),
-                content_type="application/json",
+                url,
+                {
+                    "paymentMethodId": "pm_123",
+                    "customerId": "cus_123",
+                    "returnUrl": "https://shop.example/checkout/return",
+                    "paymentData": {"save_card": "true"},
+                },
+                format="json",
             )
 
-            self.assertEqual(response.status_code, status.HTTP_200_OK)
-            self.assertIn("payment_id", response.data)
-
-    def test_guest_cannot_list_orders(self):
-        """Test that guests cannot list orders (no access to list endpoint)."""
-        self.client.force_authenticate(user=None)
-
-        orders_url = reverse("order-list")
-        response = self.client.get(orders_url)
-
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
-
-    def test_guest_cannot_access_my_orders(self):
-        """Test that guests cannot access my_orders endpoint."""
-        self.client.force_authenticate(user=None)
-
-        my_orders_url = reverse("order-my-orders")
-        response = self.client.get(my_orders_url)
-
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(
+            response.status_code, status.HTTP_200_OK, response.data
+        )
+        mock_payment.assert_called_once()
+        kwargs = mock_payment.call_args.kwargs
+        self.assertEqual(kwargs.pop("order").pk, order.pk)
+        self.assertEqual(kwargs.pop("pay_way").pk, order.pay_way_id)
+        self.assertEqual(
+            kwargs,
+            {
+                "save_card": "true",
+                "payment_method_id": "pm_123",
+                "customer_id": "cus_123",
+                "return_url": "https://shop.example/checkout/return",
+            },
+        )

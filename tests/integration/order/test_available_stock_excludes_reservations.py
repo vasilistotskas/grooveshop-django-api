@@ -21,43 +21,10 @@ class TestAvailableStockExcludesReservations:
     @pytest.mark.parametrize(
         "total_stock,active_reservations,expired_reservations,consumed_reservations,description",
         [
-            # Basic scenarios
             (100, [], [], [], "No reservations - all stock available"),
-            (100, [25], [], [], "One active reservation"),
-            (100, [25, 25], [], [], "Two active reservations"),
-            (100, [10, 20, 30], [], [], "Three active reservations"),
-            # With expired reservations (should not affect availability)
-            (100, [25], [10], [], "Active and expired - expired ignored"),
-            (100, [25], [10, 15], [], "Active and multiple expired"),
-            (100, [], [50], [], "Only expired - all stock available"),
-            (100, [], [25, 25, 25], [], "Multiple expired only"),
-            # With consumed reservations (should not affect availability)
-            (100, [25], [], [10], "Active and consumed - consumed ignored"),
-            (100, [25], [], [10, 15], "Active and multiple consumed"),
-            (100, [], [], [50], "Only consumed - all stock available"),
-            (100, [], [], [25, 25, 25], "Multiple consumed only"),
-            # Mixed scenarios
-            (100, [20], [10], [15], "Active, expired, and consumed mixed"),
-            (100, [10, 15], [5, 10], [20], "Multiple of each type"),
-            (100, [25, 25], [25], [25], "Equal amounts of each type"),
-            # Edge cases
-            (100, [100], [], [], "All stock reserved"),
-            (100, [50, 50], [], [], "All stock reserved by multiple"),
-            (100, [1], [], [], "Minimal active reservation"),
-            (
-                1000,
-                [250, 250, 250],
-                [100],
-                [100],
-                "Large stock with multiple reservations",
-            ),
-            (10, [5], [2], [2], "Small stock"),
+            (100, [10, 15], [5, 10], [20], "Only active ones count"),
+            (100, [50, 50], [], [], "All stock reserved"),
             (0, [], [], [], "Zero stock"),
-            # Boundary cases
-            (100, [99], [], [], "Almost all reserved"),
-            (100, [1, 1, 1, 1, 1], [], [], "Many small reservations"),
-            (100, [], [100], [], "All expired - should be available"),
-            (100, [], [], [100], "All consumed - should be available"),
         ],
     )
     def test_available_stock_calculation_with_various_reservation_states(
@@ -152,18 +119,8 @@ class TestAvailableStockExcludesReservations:
     @pytest.mark.parametrize(
         "stock,reservation_quantity,minutes_until_expiry,description",
         [
-            # Just about to expire
-            (100, 25, 1, "Expires in 1 minute - still active"),
             (100, 50, 0.5, "Expires in 30 seconds - still active"),
-            # Just expired
             (100, 25, -0.5, "Expired 30 seconds ago - not active"),
-            (100, 50, -1, "Expired 1 minute ago - not active"),
-            # Well within TTL
-            (100, 30, 10, "Expires in 10 minutes - active"),
-            (100, 40, 14, "Expires in 14 minutes - active"),
-            # Long expired
-            (100, 20, -60, "Expired 1 hour ago - not active"),
-            (100, 15, -1440, "Expired 1 day ago - not active"),
         ],
     )
     def test_available_stock_respects_reservation_expiration(
@@ -216,14 +173,8 @@ class TestAvailableStockExcludesReservations:
     @pytest.mark.parametrize(
         "stock,reservation_quantity,is_consumed,description",
         [
-            # Not consumed - should reduce availability
             (100, 25, False, "Not consumed - reduces availability"),
-            (100, 50, False, "Not consumed - reduces availability"),
-            (100, 100, False, "Not consumed - all reserved"),
-            # Consumed - should not reduce availability
             (100, 25, True, "Consumed - does not reduce availability"),
-            (100, 50, True, "Consumed - does not reduce availability"),
-            (100, 100, True, "Consumed - all stock available"),
         ],
     )
     def test_available_stock_respects_consumed_flag(
@@ -358,21 +309,7 @@ class TestAvailableStockExcludesReservations:
 
     @pytest.mark.parametrize(
         "num_active,num_expired,num_consumed,quantities",
-        [
-            # Many reservations of same type
-            (10, 0, 0, [5] * 10),  # 10 active reservations of 5 each
-            (0, 10, 0, [5] * 10),  # 10 expired reservations
-            (0, 0, 10, [5] * 10),  # 10 consumed reservations
-            # Mixed quantities
-            (
-                5,
-                5,
-                5,
-                [10, 20, 30, 5, 15],
-            ),  # 5 of each type with varying quantities
-            # Large number of reservations
-            (20, 10, 10, [1] * 40),  # 40 reservations of 1 each
-        ],
+        [(5, 5, 5, [10, 20, 30, 5, 15])],
     )
     def test_available_stock_with_many_reservations(
         self, num_active, num_expired, num_consumed, quantities

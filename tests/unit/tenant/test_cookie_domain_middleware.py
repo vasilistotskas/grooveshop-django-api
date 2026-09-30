@@ -9,6 +9,7 @@ from django.http import HttpResponse
 from django.test import RequestFactory
 
 from tenant.middleware import TenantCookieDomainMiddleware
+from tests.utils.staff import store_tenant
 
 
 @pytest.fixture
@@ -41,9 +42,9 @@ def _tenant_response() -> HttpResponse:
     ],
 )
 def test_rewrites_session_and_csrf_domains(
-    middleware, monkeypatch, tenant_factory, host, expected
+    middleware, monkeypatch, db, host, expected
 ):
-    tenant = tenant_factory(f"cookie-{host.replace('.', '-')}"[:40])
+    tenant = store_tenant(f"cookie_{host.replace('.', '_')}")
     monkeypatch.setattr(connection, "tenant", tenant, raising=False)
 
     request = RequestFactory().get("/", HTTP_HOST=host)

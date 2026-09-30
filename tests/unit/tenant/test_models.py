@@ -14,28 +14,9 @@ from tenant.models import (
     TenantMembershipRole,
     UserTenantMembership,
 )
+from tests.utils.staff import store_tenant
 
 User = get_user_model()
-
-
-def _make_test_tenant(slug: str, schema_name: str) -> Tenant:
-    """Create a Tenant row without hitting django-tenants' schema hook.
-
-    django-tenants normally issues ``CREATE SCHEMA`` on save; in unit
-    tests we only want the Python object + the ``tenant_tenant`` row —
-    the DB router is disabled in conftest, so the schema never gets
-    queried. Setting ``auto_create_schema=False`` on the instance
-    overrides the class default so ``save()`` skips the hook.
-    """
-    tenant = Tenant(
-        schema_name=schema_name,
-        name=slug.replace("-", " ").title(),
-        slug=slug,
-        owner_email=f"owner-{slug}@example.com",
-    )
-    tenant.auto_create_schema = False
-    tenant.save()
-    return tenant
 
 
 @pytest.fixture
@@ -45,10 +26,7 @@ def tenant(db) -> Tenant:
     Unique schema_name + slug avoid collisions with the ``webside`` row
     seeded by migration 0002 and with other tests running in parallel.
     """
-    tenant = _make_test_tenant(
-        slug="unit-test-tenant-1",
-        schema_name="unit_test_tenant_1",
-    )
+    tenant = store_tenant("unit_test_tenant_1", name="Unit Test Tenant")
     TenantDomain.objects.create(
         tenant=tenant, domain="test-1.example.com", is_primary=True
     )
@@ -71,7 +49,7 @@ def test_membership_str_contains_user_tenant_and_role(tenant, user):
     )
     label = str(membership)
     assert "alice" in label or "alice@example.com" in label
-    assert "Test Tenant" in label
+    assert "Unit Test Tenant" in label
     assert "member" in label
 
 
@@ -133,8 +111,8 @@ def test_unique_user_tenant_constraint(tenant, user):
 
 @pytest.mark.django_db
 def test_same_user_can_belong_to_two_tenants(user):
-    tenant_a = _make_test_tenant("unit-two-a", "unit_two_a")
-    tenant_b = _make_test_tenant("unit-two-b", "unit_two_b")
+    tenant_a = store_tenant("unit_two_a")
+    tenant_b = store_tenant("unit_two_b")
     m_a = UserTenantMembership.objects.create(
         user=user, tenant=tenant_a, role=TenantMembershipRole.MEMBER
     )
@@ -159,9 +137,7 @@ def _unsaved_tenant(**kwargs) -> Tenant:
         "owner_email": "owner@clean.example.com",
     }
     defaults.update(kwargs)
-    t = Tenant(**defaults)
-    t.auto_create_schema = False
-    return t
+    return Tenant(**defaults)
 
 
 def test_stripe_publishable_key_empty_is_valid():

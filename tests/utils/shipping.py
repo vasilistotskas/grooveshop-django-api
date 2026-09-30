@@ -1,8 +1,8 @@
 """Give a test's own country an active ``ShippingRate``.
 
 ``CountryFactory`` mints a country with a random alpha-2 code — never
-``GR``, the one country the ``_reseed_shipping_providers`` autouse
-fixture seeds a rate for (see ``tests/conftest.py``). A checkout test
+``GR``, the one country the shipping migrations seed a rate for (kept
+by ``tests/migration_seed.py``). A checkout test
 built around such a country now needs its own rate, or every quote and
 every order-creation path rejects it as unavailable
 (``ShippingUnavailableError``) — exactly the gate this feature added.

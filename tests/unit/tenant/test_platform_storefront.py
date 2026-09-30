@@ -25,6 +25,7 @@ from django.db import IntegrityError, transaction
 
 from tenant.models import Tenant
 from tenant.serializers import TenantConfigSerializer
+from tests.utils.staff import store_tenant
 
 NEW_FIELDS = (
     "is_platform_storefront",
@@ -42,36 +43,23 @@ class TestPublicSerializerShape:
         assert field.read_only is False
 
 
-def _tenant(slug: str, **overrides) -> Tenant:
-    tenant = Tenant(
-        schema_name=slug.replace("-", "_"),
-        name=slug,
-        slug=slug,
-        owner_email=f"owner-{slug}@example.com",
-        **overrides,
-    )
-    tenant.auto_create_schema = False
-    tenant.save()
-    return tenant
-
-
 @pytest.mark.django_db
 class TestSinglePlatformStorefront:
     def test_a_second_flagged_tenant_is_refused_by_the_database(self):
-        _tenant("platform-store-a", is_platform_storefront=True)
+        store_tenant("platform_store_a", is_platform_storefront=True)
 
         with pytest.raises(IntegrityError), transaction.atomic():
-            _tenant("platform-store-b", is_platform_storefront=True)
+            store_tenant("platform_store_b", is_platform_storefront=True)
 
     def test_unflagged_tenants_are_unconstrained(self):
-        _tenant("plain-store-a")
-        _tenant("plain-store-b")
+        store_tenant("plain_store_a")
+        store_tenant("plain_store_b")
 
         assert Tenant.objects.filter(is_platform_storefront=True).count() == 0
 
     def test_seo_fields_default_empty_and_round_trip(self):
-        tenant = _tenant(
-            "seo-store",
+        tenant = store_tenant(
+            "seo_store",
             seo_author="Store Owner",
             google_site_verification="gsv-token",
             pinterest_domain_verify="pin-token",
@@ -84,5 +72,5 @@ class TestSinglePlatformStorefront:
         assert data["pinterest_domain_verify"] == "pin-token"
         assert data["is_platform_storefront"] is False
 
-        plain = _tenant("plain-seo-store")
+        plain = store_tenant("plain_seo_store")
         assert TenantConfigSerializer(plain).data["seo_author"] == ""

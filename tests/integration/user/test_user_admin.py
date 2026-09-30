@@ -12,7 +12,6 @@ from country.factories import CountryFactory
 from region.factories import RegionFactory
 from user.admin import (
     AddressCountFilter,
-    GroupAdmin,
     SocialMediaFilter,
     SubscriptionCountFilter,
     SubscriptionTopicAdmin,
@@ -279,23 +278,7 @@ class TestInlineClasses:
 
 
 @pytest.mark.django_db
-class TestGroupAdmin:
-    def test_group_admin_inheritance(self):
-        site = AdminSite()
-        admin = GroupAdmin(Group, site)
-
-        assert hasattr(admin, "list_display")
-        assert hasattr(admin, "search_fields")
-
-
-@pytest.mark.django_db
 class TestUserAdmin:
-    def setUp(self):
-        self.site = AdminSite()
-        self.admin = UserAdmin(UserAccount, self.site)
-        self.country = CountryFactory()
-        self.region = RegionFactory(country=self.country)
-
     def test_user_admin_configuration(self, admin_request):
         admin = UserAdmin(UserAccount, AdminSite())
 
@@ -608,7 +591,7 @@ class TestSubscriptionTopicAdmin:
         assert "2/2" in result
 
 
-@pytest.mark.django_db(transaction=True)
+@pytest.mark.django_db
 class TestUserSubscriptionAdmin:
     def test_user_subscription_admin_configuration(self):
         admin = UserSubscriptionAdmin(UserSubscription, AdminSite())

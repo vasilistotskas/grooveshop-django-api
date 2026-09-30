@@ -29,6 +29,7 @@ from tenant.models import (
     TenantMembershipRole,
     UserTenantMembership,
 )
+from tests.utils.staff import store_tenant
 
 User = get_user_model()
 
@@ -57,8 +58,8 @@ class TestPreLoginHasNoMembershipGate:
     """
 
     @pytest.mark.django_db
-    def test_allows_login_without_any_membership(self, tenant_factory, user):
-        tenant = tenant_factory("prelogin-nomembership")
+    def test_allows_login_without_any_membership(self, db, user):
+        tenant = store_tenant("prelogin_nomembership")
         # No membership row exists for this user anywhere.
         assert not UserTenantMembership.objects.filter(user=user).exists()
 
@@ -80,9 +81,9 @@ class TestPreLoginHasNoMembershipGate:
             )
 
     @pytest.mark.django_db
-    def test_allows_login_with_inactive_membership(self, tenant_factory, user):
+    def test_allows_login_with_inactive_membership(self, db, user):
         """An inactive STAFF grant is irrelevant to shopper login."""
-        tenant = tenant_factory("prelogin-inactive")
+        tenant = store_tenant("prelogin_inactive")
         UserTenantMembership.objects.create(
             user=user,
             tenant=tenant,
@@ -114,9 +115,9 @@ class TestSignupGrantsNoMembership:
 
     @pytest.mark.django_db
     def test_email_signup_creates_no_membership(
-        self, tenant_factory, bind_tenant, monkeypatch
+        self, db, bind_tenant, monkeypatch
     ):
-        tenant = tenant_factory("signup-email")
+        tenant = store_tenant("signup_email")
         bind_tenant(tenant)
 
         adapter = TenantAccountAdapter()
@@ -145,9 +146,9 @@ class TestSignupGrantsNoMembership:
 
     @pytest.mark.django_db
     def test_social_signup_creates_no_membership(
-        self, tenant_factory, bind_tenant, monkeypatch
+        self, db, bind_tenant, monkeypatch
     ):
-        tenant = tenant_factory("signup-social")
+        tenant = store_tenant("signup_social")
         bind_tenant(tenant)
 
         new_user = User.objects.create_user(
@@ -181,10 +182,8 @@ class TestTenantAwareEmailFormatting:
     """
 
     @pytest.mark.django_db
-    def test_format_email_subject_uses_tenant_store_name(
-        self, tenant_factory, bind_tenant
-    ):
-        tenant = tenant_factory("adapter-subject-1")
+    def test_format_email_subject_uses_tenant_store_name(self, db, bind_tenant):
+        tenant = store_tenant("adapter_subject_1")
         tenant.store_name = "Branded Store"
         tenant.save()
         bind_tenant(tenant)
@@ -211,10 +210,8 @@ class TestTenantAwareEmailFormatting:
         )
 
     @pytest.mark.django_db
-    def test_get_from_email_uses_tenant_from_email(
-        self, tenant_factory, bind_tenant
-    ):
-        tenant = tenant_factory("adapter-from-1")
+    def test_get_from_email_uses_tenant_from_email(self, db, bind_tenant):
+        tenant = store_tenant("adapter_from_1")
         tenant.from_email = "shop@brand.com"
         tenant.store_name = "Brand Shop"
         tenant.save()
@@ -230,9 +227,9 @@ class TestTenantAwareEmailFormatting:
 
     @pytest.mark.django_db
     def test_get_from_email_falls_back_to_default_from_email(
-        self, tenant_factory, bind_tenant, settings
+        self, db, bind_tenant, settings
     ):
-        tenant = tenant_factory("adapter-from-2")
+        tenant = store_tenant("adapter_from_2")
         tenant.from_email = ""
         tenant.store_name = "Adapter Store"
         tenant.save()
@@ -310,7 +307,7 @@ class TestHeadlessGetFrontendUrl:
 
     @pytest.mark.django_db
     def test_tenant_context_rewrites_scheme_and_host_keeps_path_and_query(
-        self, tenant_factory, settings
+        self, db, settings
     ):
         settings.ACCOUNT_DEFAULT_HTTP_PROTOCOL = "https"
         settings.HEADLESS_FRONTEND_URLS = {
@@ -318,7 +315,7 @@ class TestHeadlessGetFrontendUrl:
                 "https://platform.example/account/password/reset/key/{key}?x=1"
             ),
         }
-        tenant = tenant_factory("headless-reset")
+        tenant = store_tenant("headless_reset")
         TenantDomain.objects.create(
             tenant=tenant, domain="tenant-b.example", is_primary=True
         )
@@ -353,16 +350,14 @@ class TestHeadlessGetFrontendUrl:
         assert url == "https://platform.example/account/signup"
 
     @pytest.mark.django_db
-    def test_no_tenant_domain_row_returns_url_unchanged(
-        self, tenant_factory, settings
-    ):
+    def test_no_tenant_domain_row_returns_url_unchanged(self, db, settings):
         # Tenant resolves but has no primary domain row (defensive —
         # shouldn't happen in practice, mirrors get_tenant_base_url's
         # fallback behaviour).
         settings.HEADLESS_FRONTEND_URLS = {
             "account_signup": "https://platform.example/account/signup",
         }
-        tenant = tenant_factory("headless-no-domain")
+        tenant = store_tenant("headless_no_domain")
         adapter = self._adapter_with_host("irrelevant.example")
 
         with patch(
@@ -460,9 +455,7 @@ class TestSocialLoginProviderFilter:
                 outcome = exc
         return outcome, sentinel, tenant, fallback
 
-    def test_get_app_refuses_a_disabled_provider_before_the_tenant_lookup(
-        self,
-    ):
+    def test_get_app_refuses_a_disabled_provider_before_the_tenant_lookup(self):
         """A tenant-specific ``SocialApp`` used to win before the
         whitelist was consulted, so a merchant-disabled provider still
         started OAuth when its URL was hit directly."""

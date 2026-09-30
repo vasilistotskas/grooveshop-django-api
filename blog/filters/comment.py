@@ -176,15 +176,6 @@ class BlogCommentFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
         ),
     )
 
-    most_liked = filters.BooleanFilter(
-        method="filter_most_liked",
-        help_text=_("Order comments by most likes first"),
-    )
-    most_replied = filters.BooleanFilter(
-        method="filter_most_replied",
-        help_text=_("Order comments by most approved replies first"),
-    )
-
     class Meta:
         model = BlogComment
         fields = {
@@ -378,21 +369,3 @@ class BlogCommentFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
             return queryset.filter(id__in=descendant_ids)
         except BlogComment.DoesNotExist:
             return queryset.none()
-
-    def filter_most_liked(self, queryset, name, value):
-        """Order comments by most likes."""
-        if value is True:
-            return queryset.annotate(
-                like_count=Count("likes", distinct=True)
-            ).order_by("-like_count", "-created_at")
-        return queryset
-
-    def filter_most_replied(self, queryset, name, value):
-        """Order comments by most approved replies."""
-        if value is True:
-            return queryset.annotate(
-                approved_reply_count=Count(
-                    "children", filter=Q(children__approved=True), distinct=True
-                )
-            ).order_by("-approved_reply_count", "-created_at")
-        return queryset

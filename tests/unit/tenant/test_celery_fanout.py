@@ -15,13 +15,14 @@ from unittest.mock import patch
 import pytest
 
 from tenant.celery import run_for_all_tenants
+from tests.utils.staff import store_tenant
 
 
 class TestRunForAllTenants:
     @pytest.mark.django_db
-    def test_dispatches_one_send_per_active_tenant(self, tenant_factory):
-        tenant_factory("fanout-active-a")
-        tenant_factory("fanout-active-b")
+    def test_dispatches_one_send_per_active_tenant(self, db):
+        store_tenant("fanout_active_a")
+        store_tenant("fanout_active_b")
 
         with patch("core.celery_app.send_task") as send:
             run_for_all_tenants("order.tasks.check_pending_orders")
@@ -35,9 +36,9 @@ class TestRunForAllTenants:
         assert "fanout_active_b" in schemas
 
     @pytest.mark.django_db
-    def test_skips_inactive_tenants(self, tenant_factory):
-        active = tenant_factory("fanout-on")
-        inactive = tenant_factory("fanout-off")
+    def test_skips_inactive_tenants(self, db):
+        active = store_tenant("fanout_on")
+        inactive = store_tenant("fanout_off")
         inactive.is_active = False
         inactive.save(update_fields=["is_active"])
 
@@ -52,8 +53,8 @@ class TestRunForAllTenants:
         assert inactive.schema_name not in schemas
 
     @pytest.mark.django_db
-    def test_excludes_public_schema(self, tenant_factory):
-        tenant_factory("fanout-tenant-x")
+    def test_excludes_public_schema(self, db):
+        store_tenant("fanout_tenant_x")
 
         with patch("core.celery_app.send_task") as send:
             run_for_all_tenants("order.tasks.check_pending_orders")
@@ -65,8 +66,8 @@ class TestRunForAllTenants:
         assert "public" not in schemas
 
     @pytest.mark.django_db
-    def test_passes_task_name_and_kwargs(self, tenant_factory):
-        tenant_factory("fanout-kwargs")
+    def test_passes_task_name_and_kwargs(self, db):
+        store_tenant("fanout_kwargs")
 
         with patch("core.celery_app.send_task") as send:
             run_for_all_tenants("core.tasks.clear_old_history_task", days=90)
@@ -263,12 +264,12 @@ class TestFanoutReturnIsSerializable:
     """
 
     @pytest.mark.django_db
-    def test_return_value_is_json_serializable(self, tenant_factory):
+    def test_return_value_is_json_serializable(self, db):
         import json
 
         from kombu.serialization import dumps
 
-        tenant_factory("fanout-json-a")
+        store_tenant("fanout_json_a")
 
         with patch("core.celery_app.send_task") as send:
             send.return_value.id = "00000000-0000-0000-0000-000000000001"
@@ -300,12 +301,10 @@ class TestFanoutHonoursIgnoreResult:
     """
 
     @pytest.mark.django_db
-    def test_every_dispatch_carries_the_tasks_own_ignore_result(
-        self, tenant_factory
-    ):
+    def test_every_dispatch_carries_the_tasks_own_ignore_result(self, db):
         from core import celery_app
 
-        tenant_factory("fanout-ignore")
+        store_tenant("fanout_ignore")
         task_name = "order.tasks.check_pending_orders"
         expected = celery_app.tasks[task_name].ignore_result
 
@@ -321,12 +320,12 @@ class TestFanoutHonoursIgnoreResult:
             )
 
     @pytest.mark.django_db
-    def test_a_task_that_opts_out_is_respected(self, tenant_factory):
+    def test_a_task_that_opts_out_is_respected(self, db):
         """A future chord/group member sets ``ignore_result=False`` on
         itself; the fan-out must carry that, not the global default."""
         from core import celery_app
 
-        tenant_factory("fanout-opt-out")
+        store_tenant("fanout_opt_out")
         task_name = "order.tasks.check_pending_orders"
         task = celery_app.tasks[task_name]
         original = task.ignore_result

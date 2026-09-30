@@ -63,6 +63,8 @@ class TagViewSet(BaseModelViewSet):
         "updated_at",
         "sort_order",
         "translations__label",
+        # Annotated by ``TagQuerySet.with_usage``.
+        "usage_count",
     ]
     ordering = ["sort_order", "-created_at"]
     search_fields = ["translations__label"]

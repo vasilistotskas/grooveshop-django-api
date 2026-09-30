@@ -13,11 +13,12 @@ from __future__ import annotations
 from decimal import Decimal
 
 import pytest
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 
 from promotion.enum import PromotionTrigger
 from promotion.factories.promotion import PromotionFactory
 from promotion.services import PromotionEngine
-from tests.utils import count_queries
 
 pytestmark = pytest.mark.django_db
 
@@ -42,15 +43,15 @@ def test_cost_does_not_grow_with_the_number_of_live_promotions(
     cart, _items = make_cart([(50, 1)])
 
     _live_promotions(2)
-    with count_queries() as few:
+    with CaptureQueriesContext(connection) as few:
         PromotionEngine.evaluate(cart)
 
     _live_promotions(6)
-    with count_queries() as many:
+    with CaptureQueriesContext(connection) as many:
         PromotionEngine.evaluate(cart)
 
-    assert many.count == few.count, (
-        f"evaluate() grew from {few.count} to {many.count} queries with "
+    assert len(many) == len(few), (
+        f"evaluate() grew from {len(few)} to {len(many)} queries with "
         f"six more live promotions — the candidate queryset is missing "
         f"its prefetches, or _matching_items is bypassing them"
     )
@@ -88,15 +89,15 @@ def test_free_gift_promotions_do_not_each_cost_a_query(
     cart, _items = make_cart([(50, 1)])
 
     _live_gift_promotions(2)
-    with count_queries() as few:
+    with CaptureQueriesContext(connection) as few:
         PromotionEngine.evaluate(cart)
 
     _live_gift_promotions(6)
-    with count_queries() as many:
+    with CaptureQueriesContext(connection) as many:
         PromotionEngine.evaluate(cart)
 
-    assert many.count == few.count, (
-        f"evaluate() grew from {few.count} to {many.count} queries with "
+    assert len(many) == len(few), (
+        f"evaluate() grew from {len(few)} to {len(many)} queries with "
         f"six more FREE_GIFT promotions — _gift_entitlement is "
         f"re-querying instead of reading the prefetched rows"
     )
@@ -134,15 +135,15 @@ def test_category_scoped_promotions_do_not_each_cost_a_descendant_query(
     cart, _items = make_cart([(50, 1)])
 
     _category_promotions(2)
-    with count_queries() as few:
+    with CaptureQueriesContext(connection) as few:
         PromotionEngine.evaluate(cart)
 
     _category_promotions(6)
-    with count_queries() as many:
+    with CaptureQueriesContext(connection) as many:
         PromotionEngine.evaluate(cart)
 
-    assert many.count == few.count, (
-        f"evaluate() grew from {few.count} to {many.count} queries with "
+    assert len(many) == len(few), (
+        f"evaluate() grew from {len(few)} to {len(many)} queries with "
         f"six more category-scoped promotions — descendant expansion is "
         f"still running once per promotion"
     )

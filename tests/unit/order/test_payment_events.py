@@ -5,8 +5,6 @@ from __future__ import annotations
 import json
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from order.payment_events import (
     PAYMENT_STATUS_CHANNEL_PREFIX,
     payment_status_channel,
@@ -29,7 +27,6 @@ def test_payment_status_channel_is_tenant_scoped():
     )
 
 
-@pytest.mark.django_db(transaction=True)
 def test_publish_payment_status_fires_redis_publish_with_expected_payload():
     order = MagicMock()
     order.id = 17
@@ -65,7 +62,6 @@ def test_publish_payment_status_fires_redis_publish_with_expected_payload():
         }
 
 
-@pytest.mark.django_db(transaction=True)
 def test_publish_payment_status_swallows_redis_errors():
     """A broken Redis must not propagate into the webhook handler."""
     order = MagicMock()

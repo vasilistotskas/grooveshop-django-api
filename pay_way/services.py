@@ -1,6 +1,7 @@
 import logging
 from typing import Any
 
+from django.db import transaction
 from django.db.models import Q, QuerySet
 from django.utils.translation import gettext_lazy as _
 from djmoney.money import Money
@@ -9,6 +10,7 @@ from order.enum.status import (
     SETTLED_PAYMENT_STATUSES,
     PaymentStatus,
 )
+from order.exceptions import OrderChangedDuringPaymentError
 from order.models import Order
 from order.payment import get_payment_provider
 from order.signals import order_refunded
@@ -283,16 +285,7 @@ class PayWayService:
         )
 
         if success:
-            order.payment_method = (
-                pay_way.safe_translation_getter("name", any_language=True) or ""
-            )
-            order.payment_status = payment_data.get(
-                "status", PaymentStatus.PROCESSING
-            )
-            order.payment_id = payment_data.get("payment_id", "")
-            order.save(
-                update_fields=["payment_method", "payment_status", "payment_id"]
-            )
+            PayWayService._record_opened_payment(order, pay_way, payment_data)
 
             if order.payment_status == PaymentStatus.COMPLETED:
                 order.mark_as_paid(
@@ -301,6 +294,42 @@ class PayWayService:
                 )
 
         return success, payment_data
+
+    @staticmethod
+    def _record_opened_payment(
+        order: Order, pay_way: PayWay, payment_data: dict[str, Any]
+    ) -> None:
+        """Store the payment the provider just opened on *order*.
+
+        The provider call ran without the row lock, so the row is locked
+        and compared with what *order* was read as. A change that landed
+        meanwhile (a cancel, a webhook for the previous payment) wins:
+        overwriting it would reopen a canceled order's payment.
+
+        Raises:
+            OrderChangedDuringPaymentError: the order changed meanwhile.
+        """
+        with transaction.atomic():
+            locked = Order.objects.select_for_update().get(pk=order.pk)
+            if (locked.status, locked.payment_status, locked.payment_id) != (
+                order.status,
+                order.payment_status,
+                order.payment_id,
+            ):
+                raise OrderChangedDuringPaymentError(order.id)
+            locked.payment_method = (
+                pay_way.safe_translation_getter("name", any_language=True) or ""
+            )
+            locked.payment_status = payment_data.get(
+                "status", PaymentStatus.PROCESSING
+            )
+            locked.payment_id = payment_data.get("payment_id", "")
+            locked.save(
+                update_fields=["payment_method", "payment_status", "payment_id"]
+            )
+        order.payment_method = locked.payment_method
+        order.payment_status = locked.payment_status
+        order.payment_id = locked.payment_id
 
     @staticmethod
     def check_payment_status(

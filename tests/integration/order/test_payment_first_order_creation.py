@@ -1,7 +1,5 @@
 from unittest.mock import MagicMock, patch
 
-import pytest
-from django.contrib.auth import get_user_model
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -15,6 +13,7 @@ from order.exceptions import (
     InvalidOrderDataError,
     PaymentNotFoundError,
 )
+from order.models.order import Order
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
@@ -22,22 +21,47 @@ from region.factories import RegionFactory
 from tests.utils.shipping import enable_rate
 from user.factories.account import UserAccountFactory
 
-User = get_user_model()
+PAYMENT_INTENT_ID = "pi_test_123abc"
 
 
-@pytest.mark.django_db
 class TestPaymentFirstOrderCreation(APITestCase):
-    """Test cases for payment-first order creation flow."""
+    """``POST /order`` with a Stripe payment intent (payment-first)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = UserAccountFactory(num_addresses=0)
+        cls.pay_way = PayWayFactory(
+            provider_code="stripe",
+            settlement=PaySettlement.ONLINE,
+            active=True,
+        )
+        cls.country = CountryFactory()
+        cls.region = RegionFactory(country=cls.country)
+        # A ShippingRate is per-country — this ad-hoc country has none
+        # until this call.
+        enable_rate(cls.country)
+
+        cls.product1 = ProductFactory(
+            active=True, stock=10, num_images=0, num_reviews=0
+        )
+        cls.product2 = ProductFactory(
+            active=True, stock=5, num_images=0, num_reviews=0
+        )
+        cls.cart = CartFactory(user=cls.user)
+        CartItemFactory(cart=cls.cart, product=cls.product1, quantity=2)
+        CartItemFactory(cart=cls.cart, product=cls.product2, quantity=1)
+        cls.guest_cart = CartFactory(user=None)
+        CartItemFactory(cart=cls.guest_cart, product=cls.product1, quantity=1)
+
+        cls.create_url = reverse("order-list")
 
     def setUp(self):
-        """Set up test fixtures."""
         super().setUp()
-
         # These tests run outside any tenant context (public schema),
         # where stripe_credentials() has no fallback at all — provide a
-        # stand-in tenant key so the "stripe" pay-way below is treated
-        # as configured (this suite tests order-creation flow, not
-        # Stripe credential resolution).
+        # stand-in tenant key so the "stripe" pay-way is treated as
+        # configured (this suite tests order creation, not Stripe
+        # credential resolution).
         patcher = patch(
             "tenant.credentials.stripe_credentials",
             return_value={
@@ -49,57 +73,9 @@ class TestPaymentFirstOrderCreation(APITestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
 
-        # Create users
-        self.user = UserAccountFactory()
-        self.guest_user = None
-
-        # Create payment method (online payment for Stripe)
-        self.pay_way = PayWayFactory(
-            provider_code="stripe",
-            settlement=PaySettlement.ONLINE,
-            active=True,
-        )
-
-        # Create location data
-        self.country = CountryFactory()
-        self.region = RegionFactory(country=self.country)
-        # A ShippingRate is per-country now — this ad-hoc country has
-        # none until this call.
-        enable_rate(self.country)
-
-        # Create products with stock
-        self.product1 = ProductFactory(
-            active=True, stock=10, num_images=0, num_reviews=0
-        )
-        self.product2 = ProductFactory(
-            active=True, stock=5, num_images=0, num_reviews=0
-        )
-
-        # Create cart for authenticated user
-        self.cart = CartFactory(user=self.user)
-        self.cart_item1 = CartItemFactory(
-            cart=self.cart, product=self.product1, quantity=2
-        )
-        self.cart_item2 = CartItemFactory(
-            cart=self.cart, product=self.product2, quantity=1
-        )
-
-        # Create guest cart
-        self.guest_cart = CartFactory(user=None)
-        self.guest_cart_item = CartItemFactory(
-            cart=self.guest_cart, product=self.product1, quantity=1
-        )
-
-        # API endpoint
-        self.create_url = reverse("order-list")
-
-        # Valid payment intent ID (mocked)
-        self.payment_intent_id = "pi_test_123abc"
-
-    def _get_valid_order_data(self, payment_intent_id=None):
-        """Helper to generate valid order creation data."""
-        return {
-            "payment_intent_id": payment_intent_id or self.payment_intent_id,
+    def _order_data(self, **overrides):
+        data = {
+            "payment_intent_id": PAYMENT_INTENT_ID,
             "pay_way_id": self.pay_way.id,
             "first_name": "John",
             "last_name": "Doe",
@@ -108,355 +84,155 @@ class TestPaymentFirstOrderCreation(APITestCase):
             "street_number": "123",
             "city": "Athens",
             "zipcode": "12345",
-            "country_id": self.country.alpha_2,  # Country uses alpha_2 as PK
-            "region_id": self.region.alpha,  # Region uses alpha as PK
+            "country_id": self.country.alpha_2,
+            "region_id": self.region.alpha,
             "phone": "+306900000000",
-            "notes": "Test order",
             "shipping_kind": "home_delivery",
         }
+        data.update(overrides)
+        return data
 
-    @patch("order.payment.get_payment_provider")
-    @patch("order.services.OrderService.validate_cart_for_checkout")
-    @patch("order.services.OrderService.validate_shipping_address")
-    def test_create_order_with_valid_payment_intent(
-        self,
-        mock_validate_address,
-        mock_validate_cart,
-        mock_get_payment_provider,
-    ):
-        """Test successful order creation with valid payment intent."""
-        # Setup mocks
-        mock_validate_cart.return_value = {
-            "valid": True,
-            "errors": [],
-            "warnings": [],
-        }
-        mock_validate_address.return_value = None
+    def _post(self, data, cart=None):
+        return self.client.post(
+            self.create_url,
+            data,
+            format="json",
+            HTTP_X_CART_ID=str((cart or self.cart).uuid),
+        )
 
-        # Mock payment provider to return successful payment status
-        mock_provider = MagicMock()
-        mock_provider.get_payment_status.return_value = (
+    def _provider_confirming_payment(self):
+        provider = MagicMock()
+        provider.get_payment_status.return_value = (
             PaymentStatus.COMPLETED,
             {},
         )
-        mock_get_payment_provider.return_value = mock_provider
+        return provider
 
-        # Authenticate and make request with X-Cart-Id header
+    @patch("order.payment.get_payment_provider")
+    def test_creates_the_order_for_the_signed_in_shopper(
+        self, mock_get_provider
+    ):
+        mock_get_provider.return_value = self._provider_confirming_payment()
         self.client.force_authenticate(user=self.user)
-        data = self._get_valid_order_data()
-        response = self.client.post(
-            self.create_url,
-            data,
-            format="json",
-            HTTP_X_CART_ID=str(self.cart.uuid),
+
+        response = self._post(self._order_data())
+
+        self.assertEqual(
+            response.status_code, status.HTTP_201_CREATED, response.data
+        )
+        self.assertEqual(response.data["status"], OrderStatus.PENDING)
+        self.assertEqual(response.data["payment_id"], PAYMENT_INTENT_ID)
+        self.assertEqual(response.data["user"], self.user.id)
+        order = Order.objects.get(id=response.data["id"])
+        self.assertEqual(str(order.uuid), response.data["uuid"])
+        self.assertEqual(
+            dict(order.items.values_list("product_id", "quantity")),
+            {self.product1.id: 2, self.product2.id: 1},
+        )
+        mock_get_provider.return_value.get_payment_status.assert_called_with(
+            PAYMENT_INTENT_ID
         )
 
-        # Assertions
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertIn("id", response.data)
-        self.assertIn("uuid", response.data)
-        self.assertEqual(response.data["status"], OrderStatus.PENDING.value)
-        self.assertEqual(response.data["payment_id"], self.payment_intent_id)
-        self.assertEqual(response.data["user"], self.user.id)
+    @patch("order.payment.get_payment_provider")
+    def test_creates_a_guest_order_from_the_guest_cart(self, mock_get_provider):
+        mock_get_provider.return_value = self._provider_confirming_payment()
 
-        # Validate cart is called (may be called multiple times - view and service)
-        self.assertTrue(mock_validate_cart.called)
-        self.assertTrue(mock_validate_address.called)
-        self.assertTrue(mock_get_payment_provider.called)
+        response = self._post(self._order_data(), cart=self.guest_cart)
 
-    def test_create_order_without_payment_intent_id(self):
+        self.assertEqual(
+            response.status_code, status.HTTP_201_CREATED, response.data
+        )
+        self.assertIsNone(response.data["user"])
+        self.assertEqual(response.data["payment_id"], PAYMENT_INTENT_ID)
+        order = Order.objects.get(id=response.data["id"])
+        self.assertEqual(
+            list(order.items.values_list("product_id", "quantity")),
+            [(self.product1.id, 1)],
+        )
+
+    def test_intentless_online_order_is_refused(self):
         """Intent-less online orders are refused unless deductions
         (promotions / loyalty / gift cards) fully cover the total."""
         self.client.force_authenticate(user=self.user)
-        data = self._get_valid_order_data()
+        data = self._order_data()
         del data["payment_intent_id"]
 
-        response = self.client.post(
-            self.create_url,
-            data,
-            format="json",
-            HTTP_X_CART_ID=str(self.cart.uuid),
-        )
+        response = self._post(data)
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.data["error"]["type"], "invalid_order_data")
         self.assertIn("payment_intent_id", response.data["field_errors"])
 
-    @patch("order.services.OrderService.validate_cart_for_checkout")
-    def test_create_order_with_invalid_cart(self, mock_validate_cart):
-        """Test that order creation fails when cart validation fails."""
-        mock_validate_cart.return_value = {
-            "valid": False,
-            "errors": ["Product out of stock", "Price mismatch"],
-            "warnings": [],
-        }
-
+    def test_request_field_errors_are_reported_per_field(self):
         self.client.force_authenticate(user=self.user)
-        data = self._get_valid_order_data()
+        for field, data in (
+            ("first_name", self._order_data(first_name="")),
+            ("email", self._order_data(email="invalid-email")),
+            ("pay_way_id", self._order_data(pay_way_id=None)),
+            ("pay_way_id", self._order_data(pay_way_id=99999)),
+        ):
+            with self.subTest(field=field, value=data[field]):
+                response = self._post(data)
 
-        response = self.client.post(
-            self.create_url,
-            data,
-            format="json",
-            HTTP_X_CART_ID=str(self.cart.uuid),
-        )
+                self.assertEqual(
+                    response.status_code, status.HTTP_400_BAD_REQUEST
+                )
+                self.assertIn(field, response.data)
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("cart", response.data)
-
-    def test_create_order_with_missing_shipping_address_fields(self):
-        """Test that order creation fails with incomplete shipping address."""
-        self.client.force_authenticate(user=self.user)
-        data = self._get_valid_order_data()
-        del data["first_name"]  # Remove required field
-
-        response = self.client.post(
-            self.create_url,
-            data,
-            format="json",
-            HTTP_X_CART_ID=str(self.cart.uuid),
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
-    def test_create_order_with_invalid_email(self):
-        """Test that order creation fails with invalid email format."""
-        self.client.force_authenticate(user=self.user)
-        data = self._get_valid_order_data()
-        data["email"] = "invalid-email"  # Invalid email format
-
-        response = self.client.post(
-            self.create_url,
-            data,
-            format="json",
-            HTTP_X_CART_ID=str(self.cart.uuid),
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
-    def test_create_order_without_pay_way_id(self):
-        """Test that order creation fails without payment method."""
-        self.client.force_authenticate(user=self.user)
-        data = self._get_valid_order_data()
-        del data["pay_way_id"]
-
-        response = self.client.post(
-            self.create_url,
-            data,
-            format="json",
-            HTTP_X_CART_ID=str(self.cart.uuid),
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("pay_way_id", response.data)
-
-    def test_create_order_with_invalid_pay_way_id(self):
-        """Test that order creation fails with non-existent payment method."""
-        self.client.force_authenticate(user=self.user)
-        data = self._get_valid_order_data()
-        data["pay_way_id"] = 99999  # Non-existent ID
-
-        response = self.client.post(
-            self.create_url,
-            data,
-            format="json",
-            HTTP_X_CART_ID=str(self.cart.uuid),
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("pay_way_id", response.data)
+        self.assertFalse(Order.objects.filter(user=self.user).exists())
 
     @patch("order.services.OrderService.create_order_from_cart")
-    @patch("order.services.OrderService.validate_cart_for_checkout")
-    @patch("order.services.OrderService.validate_shipping_address")
-    def test_create_order_handles_insufficient_stock_error(
-        self,
-        mock_validate_address,
-        mock_validate_cart,
-        mock_create_order,
+    def test_insufficient_stock_error_maps_to_a_typed_400(
+        self, mock_create_order
     ):
-        """Test that InsufficientStockError is handled correctly."""
-        mock_validate_cart.return_value = {
-            "valid": True,
-            "errors": [],
-            "warnings": [],
-        }
-        mock_validate_address.return_value = None
         mock_create_order.side_effect = InsufficientStockError(
             product_id=self.product1.id, available=5, requested=10
         )
-
         self.client.force_authenticate(user=self.user)
-        data = self._get_valid_order_data()
 
-        response = self.client.post(
-            self.create_url,
-            data,
-            format="json",
-            HTTP_X_CART_ID=str(self.cart.uuid),
-        )
+        response = self._post(self._order_data())
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("detail", response.data)
-        self.assertIn("error", response.data)
-        self.assertEqual(response.data["error"]["type"], "insufficient_stock")
-        self.assertEqual(response.data["error"]["product_id"], self.product1.id)
-        self.assertEqual(response.data["error"]["available"], 5)
-        self.assertEqual(response.data["error"]["requested"], 10)
+        self.assertEqual(
+            response.data["error"],
+            {
+                "type": "insufficient_stock",
+                "product_id": self.product1.id,
+                "available": 5,
+                "requested": 10,
+            },
+        )
 
     @patch("order.services.OrderService.create_order_from_cart")
-    @patch("order.services.OrderService.validate_cart_for_checkout")
-    @patch("order.services.OrderService.validate_shipping_address")
-    def test_create_order_handles_invalid_order_data_error(
-        self,
-        mock_validate_address,
-        mock_validate_cart,
-        mock_create_order,
+    def test_invalid_order_data_error_maps_to_a_typed_400(
+        self, mock_create_order
     ):
-        """Test that InvalidOrderDataError is handled correctly."""
-        mock_validate_cart.return_value = {
-            "valid": True,
-            "errors": [],
-            "warnings": [],
-        }
-        mock_validate_address.return_value = None
         mock_create_order.side_effect = InvalidOrderDataError(
             "Invalid order data",
             field_errors={"product": ["Product not found"]},
         )
-
         self.client.force_authenticate(user=self.user)
-        data = self._get_valid_order_data()
 
-        response = self.client.post(
-            self.create_url,
-            data,
-            format="json",
-            HTTP_X_CART_ID=str(self.cart.uuid),
-        )
+        response = self._post(self._order_data())
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("detail", response.data)
-        self.assertIn("error", response.data)
         self.assertEqual(response.data["error"]["type"], "invalid_order_data")
-        self.assertIn("field_errors", response.data)
+        self.assertEqual(
+            response.data["field_errors"], {"product": ["Product not found"]}
+        )
 
     @patch("order.services.OrderService.create_order_from_cart")
-    @patch("order.services.OrderService.validate_cart_for_checkout")
-    @patch("order.services.OrderService.validate_shipping_address")
-    def test_create_order_handles_payment_not_found_error(
-        self,
-        mock_validate_address,
-        mock_validate_cart,
-        mock_create_order,
+    def test_payment_not_found_error_maps_to_a_typed_400(
+        self, mock_create_order
     ):
-        """Test that PaymentNotFoundError is handled correctly."""
-        mock_validate_cart.return_value = {
-            "valid": True,
-            "errors": [],
-            "warnings": [],
-        }
-        mock_validate_address.return_value = None
         mock_create_order.side_effect = PaymentNotFoundError(
-            payment_id=self.payment_intent_id
+            payment_id=PAYMENT_INTENT_ID
         )
-
         self.client.force_authenticate(user=self.user)
-        data = self._get_valid_order_data()
 
-        response = self.client.post(
-            self.create_url,
-            data,
-            format="json",
-            HTTP_X_CART_ID=str(self.cart.uuid),
-        )
+        response = self._post(self._order_data())
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("detail", response.data)
-        self.assertIn("error", response.data)
         self.assertEqual(response.data["error"]["type"], "payment_not_found")
-
-    @patch("order.payment.get_payment_provider")
-    @patch("order.services.OrderService.validate_cart_for_checkout")
-    @patch("order.services.OrderService.validate_shipping_address")
-    def test_create_guest_order_with_valid_data(
-        self,
-        mock_validate_address,
-        mock_validate_cart,
-        mock_get_payment_provider,
-    ):
-        """Test successful guest order creation."""
-        mock_validate_cart.return_value = {
-            "valid": True,
-            "errors": [],
-            "warnings": [],
-        }
-        mock_validate_address.return_value = None
-
-        # Mock payment provider to return successful payment status
-        mock_provider = MagicMock()
-        mock_provider.get_payment_status.return_value = (
-            PaymentStatus.COMPLETED,
-            {},
-        )
-        mock_get_payment_provider.return_value = mock_provider
-
-        # Make request without authentication (guest) with X-Cart-Id header
-        data = self._get_valid_order_data()
-        response = self.client.post(
-            self.create_url,
-            data,
-            format="json",
-            HTTP_X_CART_ID=str(self.guest_cart.uuid),
-        )
-
-        # Assertions
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertIn("id", response.data)
-        self.assertIn("uuid", response.data)
-        self.assertEqual(response.data["status"], OrderStatus.PENDING.value)
-        self.assertEqual(response.data["payment_id"], self.payment_intent_id)
-        self.assertIsNone(response.data["user"])  # Guest order has no user
-
-    @patch("order.payment.get_payment_provider")
-    @patch("order.services.OrderService.validate_cart_for_checkout")
-    @patch("order.services.OrderService.validate_shipping_address")
-    def test_create_order_with_cart_integer_id(
-        self,
-        mock_validate_address,
-        mock_validate_cart,
-        mock_get_payment_provider,
-    ):
-        """Test order creation using cart integer ID in X-Cart-Id header."""
-        mock_validate_cart.return_value = {
-            "valid": True,
-            "errors": [],
-            "warnings": [],
-        }
-        mock_validate_address.return_value = None
-
-        # Mock payment provider to return successful payment status
-        mock_provider = MagicMock()
-        mock_provider.get_payment_status.return_value = (
-            PaymentStatus.COMPLETED,
-            {},
-        )
-        mock_get_payment_provider.return_value = mock_provider
-
-        # Authenticate and make request with cart integer ID in header
-        self.client.force_authenticate(user=self.user)
-        data = self._get_valid_order_data()
-        response = self.client.post(
-            self.create_url,
-            data,
-            format="json",
-            HTTP_X_CART_ID=str(self.cart.uuid),
-        )
-
-        # Assertions
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertIn("id", response.data)
-        self.assertIn("uuid", response.data)
-        self.assertEqual(response.data["status"], OrderStatus.PENDING.value)
-        self.assertEqual(response.data["payment_id"], self.payment_intent_id)
-        self.assertEqual(response.data["user"], self.user.id)

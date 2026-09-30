@@ -1,393 +1,165 @@
+"""``BlogAuthorFilter`` (blog/filters/author.py) through the author list.
+
+Every case asserts the exact set of authors returned from one dataset,
+so a filter the view does not apply — or a parameter django-filter
+does not know — fails instead of passing on the unfiltered list.
+"""
+
 from datetime import timedelta
 
-import pytest
-from django.test import TransactionTestCase
+from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from blog.factories.author import BlogAuthorFactory
 from blog.factories.post import BlogPostFactory
 from blog.models.author import BlogAuthor
 from user.factories.account import UserAccountFactory
-from user.models.account import UserAccount
+
+URL = reverse("blog-author-list")
 
 
-@pytest.mark.django_db(transaction=True)
-class BlogAuthorFilterTest(TransactionTestCase):
-    def setUp(self):
-        BlogAuthor.objects.all().delete()
-        UserAccount.objects.all().delete()
+class BlogAuthorFilterTest(TestCase):
+    client_class = APIClient
 
-        self.client = APIClient()
-
-        self.now = timezone.now()
-
-        self.user1 = UserAccountFactory(
-            first_name="John", last_name="Doe", email="john.doe@example.com"
+    @classmethod
+    def _author(cls, first, last, email, *, website, bio, days_old):
+        user = UserAccountFactory(
+            first_name=first, last_name=last, email=email, num_addresses=0
         )
-        self.user2 = UserAccountFactory(
-            first_name="Jane", last_name="Smith", email="jane.smith@example.com"
+        # Created directly: the factory writes a random bio in every
+        # language, which a substring filter could match by chance.
+        author = BlogAuthor.objects.create(user=user, website=website)
+        author.set_current_language("en")
+        author.bio = bio
+        author.save()
+        BlogAuthor.objects.filter(pk=author.pk).update(
+            created_at=cls.now - days_old
         )
-        self.user3 = UserAccountFactory(
-            first_name="Bob",
-            last_name="Johnson",
-            email="bob.johnson@example.com",
-        )
-        self.user4 = UserAccountFactory(
-            first_name="Alice",
-            last_name="Williams",
-            email="alice.williams@example.com",
-        )
+        return author
 
-        self.like_users = []
-        for i in range(20):
-            user = UserAccountFactory(
-                first_name=f"LikeUser{i}",
-                last_name=f"Test{i}",
-                email=f"likeuser{i}@test.com",
-            )
-            self.like_users.append(user)
-
-        self.author1 = BlogAuthorFactory(
-            user=self.user1, website="https://johndoe.com"
+    @classmethod
+    def setUpTestData(cls):
+        cls.now = timezone.now()
+        cls.john = cls._author(
+            "John",
+            "Doe",
+            "john.doe@example.com",
+            website="https://johndoe.com",
+            bio="Senior tech writer",
+            days_old=timedelta(days=90),
         )
-        self.author1.created_at = self.now - timedelta(days=90)
-        self.author1.save()
-        self.author1.set_current_language("en")
-        self.author1.bio = "Senior tech writer with 10 years experience"
-        self.author1.save()
-
-        self.author2 = BlogAuthorFactory(
-            user=self.user2,
+        cls.jane = cls._author(
+            "Jane",
+            "Smith",
+            "jane.smith@example.com",
             website="",
+            bio="Freelance travel blogger",
+            days_old=timedelta(days=30),
         )
-        self.author2.created_at = self.now - timedelta(days=30)
-        self.author2.save()
-        self.author2.set_current_language("en")
-        self.author2.bio = "Freelance blogger specializing in travel"
-        self.author2.save()
-
-        self.author3 = BlogAuthorFactory(
-            user=self.user3, website="https://bobjohnson.io"
+        cls.bob = cls._author(
+            "Bob",
+            "Johnson",
+            "bob.johnson@example.com",
+            website="https://bobjohnson.io",
+            bio="Tech enthusiast",
+            days_old=timedelta(days=7),
         )
-        self.author3.created_at = self.now - timedelta(days=7)
-        self.author3.save()
-        self.author3.set_current_language("en")
-        self.author3.bio = "Tech enthusiast and software developer"
-        self.author3.save()
-
-        self.author4 = BlogAuthorFactory(
-            user=self.user4,
+        cls.alice = cls._author(
+            "Alice",
+            "Williams",
+            "alice.williams@example.com",
             website="",
-        )
-        self.author4.created_at = self.now - timedelta(hours=1)
-        self.author4.save()
-        self.author4.set_current_language("en")
-        self.author4.bio = "New to blogging"
-        self.author4.save()
-
-        self.author1_posts = []
-        for i in range(5):
-            post = BlogPostFactory(author=self.author1, is_published=True)
-            for j in range(10):
-                user_index = (i * 10 + j) % len(self.like_users)
-                post.likes.add(self.like_users[user_index])
-            self.author1_posts.append(post)
-
-        self.author2_posts = []
-        for i in range(3):
-            post = BlogPostFactory(author=self.author2, is_published=True)
-            for j in range(5):
-                user_index = (i * 5 + j) % len(self.like_users)
-                post.likes.add(self.like_users[user_index])
-            self.author2_posts.append(post)
-
-        self.author3_post = BlogPostFactory(
-            author=self.author3, is_published=True
+            bio="New to blogging",
+            days_old=timedelta(hours=1),
         )
 
-    def test_timestamp_filters(self):
-        url = reverse("blog-author-list")
+        readers = UserAccountFactory.create_batch(3, num_addresses=0)
+        # john: 3 posts, 3 likes each. jane: 2 posts, 1 like each.
+        # bob: 1 unliked post. alice: nothing.
+        for author, posts, likers in (
+            (cls.john, 3, readers),
+            (cls.jane, 2, readers[:1]),
+            (cls.bob, 1, []),
+        ):
+            for _ in range(posts):
+                post = BlogPostFactory(author=author, image=None)
+                post.likes.add(*likers)
 
-        created_after = self.now - timedelta(days=60)
-        response = self.client.get(
-            url, {"created_after": created_after.isoformat()}
+    def _authors(self, params) -> set:
+        response = self.client.get(URL, params)
+        self.assertEqual(response.status_code, 200, response.data)
+        return {row["id"] for row in response.data["results"]}
+
+    def test_each_filter_selects_exactly_its_authors(self):
+        john, jane, bob, alice = (
+            self.john.id,
+            self.jane.id,
+            self.bob.id,
+            self.alice.id,
         )
-        self.assertEqual(response.status_code, 200)
-
-        result_ids = [r["id"] for r in response.data["results"]]
-        expected_authors = [self.author2.id, self.author3.id, self.author4.id]
-
-        for author_id in expected_authors:
-            self.assertIn(author_id, result_ids)
-
-        created_before = self.now - timedelta(days=14)
-        response = self.client.get(
-            url, {"created_before": created_before.isoformat()}
-        )
-        self.assertEqual(response.status_code, 200)
-
-        result_ids = [r["id"] for r in response.data["results"]]
-        expected_authors = [self.author1.id, self.author2.id]
-
-        for author_id in expected_authors:
-            self.assertIn(author_id, result_ids)
-
-    def test_uuid_filter(self):
-        url = reverse("blog-author-list")
-
-        response = self.client.get(url, {"uuid": str(self.author2.uuid)})
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-        self.assertIn(self.author2.id, result_ids)
-        author_found = any(
-            r["id"] == self.author2.id for r in response.data["results"]
-        )
-        self.assertTrue(author_found)
-
-    def test_user_filters(self):
-        url = reverse("blog-author-list")
-
-        response = self.client.get(url, {"user": self.user1.id})
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-        self.assertIn(self.author1.id, result_ids)
-
-        response = self.client.get(url, {"user_email": "jane"})
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-        self.assertIn(self.author2.id, result_ids)
-
-        response = self.client.get(url, {"first_name": "ob"})
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-        self.assertIn(self.author3.id, result_ids)
-
-        response = self.client.get(url, {"last_name": "williams"})
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-        self.assertIn(self.author4.id, result_ids)
-
-    def test_full_name_filter(self):
-        url = reverse("blog-author-list")
-
-        response = self.client.get(url, {"full_name": "John"})
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-        self.assertIn(self.author1.id, result_ids)
-        self.assertIn(self.author3.id, result_ids)
-
-        response = self.client.get(url, {"full_name": "Jane Smith"})
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-        self.assertIn(self.author2.id, result_ids)
-
-    def test_website_filters(self):
-        url = reverse("blog-author-list")
-
-        response = self.client.get(url, {"has_website": "true"})
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-
-        authors_with_website = [self.author1.id, self.author3.id]
-        for author_id in authors_with_website:
-            self.assertIn(author_id, result_ids)
-
-        response = self.client.get(url, {"has_website": "false"})
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-
-        authors_without_website = [self.author2.id, self.author4.id]
-        for author_id in authors_without_website:
-            self.assertIn(author_id, result_ids)
-
-        response = self.client.get(url, {"website": "johnson"})
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-        self.assertIn(self.author3.id, result_ids)
-
-    def test_bio_filter(self):
-        url = reverse("blog-author-list")
-
-        response = self.client.get(url, {"bio": "tech"})
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-
-        expected_authors = [self.author1.id, self.author3.id]
-        for author_id in expected_authors:
-            self.assertIn(author_id, result_ids)
-
-    def test_post_count_filters(self):
-        url = reverse("blog-author-list")
-
-        response = self.client.get(url, {"min_posts": 3})
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-
-        self.assertIn(self.author1.id, result_ids)
-        self.assertIn(self.author2.id, result_ids)
-
-        response = self.client.get(url, {"max_posts": 1})
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-
-        self.assertIn(self.author3.id, result_ids)
-        self.assertIn(self.author4.id, result_ids)
-
-        response = self.client.get(url, {"has_posts": "true"})
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-
-        authors_with_posts = [self.author1.id, self.author2.id, self.author3.id]
-        for author_id in authors_with_posts:
-            self.assertIn(author_id, result_ids)
-
-        response = self.client.get(url, {"has_posts": "false"})
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-
-        self.assertIn(self.author4.id, result_ids)
-
-    def test_like_count_filters(self):
-        url = reverse("blog-author-list")
-
-        response = self.client.get(url, {"min_total_likes": 20})
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-
-        self.assertIn(self.author1.id, result_ids)
-
-        response = self.client.get(url, {"has_likes": "true"})
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-
-        authors_with_likes = [self.author1.id, self.author2.id]
-        for author_id in authors_with_likes:
-            self.assertIn(author_id, result_ids)
-
-        response = self.client.get(url, {"has_likes": "false"})
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-
-        authors_without_likes = [self.author3.id, self.author4.id]
-        for author_id in authors_without_likes:
-            self.assertIn(author_id, result_ids)
-
-    def test_special_filters(self):
-        url = reverse("blog-author-list")
-
-        response = self.client.get(url, {"most_active": "true"})
-        self.assertEqual(response.status_code, 200)
-        results = response.data["results"]
-
-        expected_authors_with_posts = [
-            self.author1.id,
-            self.author2.id,
-            self.author3.id,
+        cases = [
+            (
+                {"created_after": self.now - timedelta(days=60)},
+                {jane, bob, alice},
+            ),
+            ({"created_before": self.now - timedelta(days=14)}, {john, jane}),
+            ({"uuid": str(self.jane.uuid)}, {jane}),
+            ({"user": self.john.user_id}, {john}),
+            ({"user_email": "jane"}, {jane}),
+            ({"first_name": "ob"}, {bob}),
+            ({"last_name": "williams"}, {alice}),
+            ({"full_name": "John"}, {john, bob}),
+            ({"full_name": "Jane Smith"}, {jane}),
+            ({"has_website": "true"}, {john, bob}),
+            ({"has_website": "false"}, {jane, alice}),
+            ({"website": "johnson"}, {bob}),
+            ({"bio": "tech"}, {john, bob}),
+            ({"min_posts": 2}, {john, jane}),
+            ({"max_posts": 1}, {bob, alice}),
+            ({"has_posts": "true"}, {john, jane, bob}),
+            ({"has_posts": "false"}, {alice}),
+            ({"min_total_likes": 9}, {john}),
+            ({"has_likes": "true"}, {john, jane}),
+            ({"has_likes": "false"}, {bob, alice}),
+            # The camelCase spelling the storefront sends.
+            ({"hasWebsite": "true", "minPosts": 1}, {john, bob}),
+            ({"userEmail": "alice"}, {alice}),
+            (
+                {
+                    "createdAfter": self.now - timedelta(days=35),
+                    "hasWebsite": "true",
+                    "bio": "tech",
+                },
+                {bob},
+            ),
         ]
-        result_ids = [r["id"] for r in results]
+        for params, expected in cases:
+            with self.subTest(params=params):
+                self.assertEqual(self._authors(params), expected)
 
-        for author_id in expected_authors_with_posts:
-            self.assertIn(
-                author_id,
-                result_ids,
-                f"Author {author_id} should be in results",
-            )
+    def test_ordering_by_newest_first(self):
+        response = self.client.get(URL, {"ordering": "-createdAt"})
 
-        self.assertIn(self.author1.id, result_ids)
-        self.assertIn(self.author2.id, result_ids)
-        self.assertIn(self.author3.id, result_ids)
-
-        response = self.client.get(url, {"most_liked": "true"})
-        self.assertEqual(response.status_code, 200)
-        results = response.data["results"]
-
-        expected_authors_with_likes = [self.author1.id, self.author2.id]
-        result_ids = [r["id"] for r in results]
-
-        for author_id in expected_authors_with_likes:
-            self.assertIn(
-                author_id,
-                result_ids,
-                f"Author {author_id} should be in results",
-            )
-
-    def test_camel_case_filters(self):
-        url = reverse("blog-author-list")
-
-        created_after = self.now - timedelta(days=60)
-        response = self.client.get(
-            url,
-            {
-                "createdAfter": created_after.isoformat(),
-                "hasWebsite": "true",
-                "minPosts": 2,
-            },
+        self.assertEqual(
+            [row["id"] for row in response.data["results"]],
+            [self.alice.id, self.bob.id, self.jane.id, self.john.id],
         )
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
 
-        self.assertGreaterEqual(len(result_ids), 0)
+    def test_ranking_by_published_posts(self):
+        response = self.client.get(URL, {"ordering": "-numberOfPosts"})
 
-        self.assertEqual(response.status_code, 200)
-
-        response = self.client.get(url, {"userEmail": "alice"})
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-        self.assertIn(self.author4.id, result_ids)
-
-    def test_complex_filter_combinations(self):
-        url = reverse("blog-author-list")
-
-        created_after = self.now - timedelta(days=35)
-        response = self.client.get(
-            url,
-            {
-                "createdAfter": created_after.isoformat(),
-                "hasWebsite": "true",
-                "hasPosts": "true",
-                "bio": "tech",
-            },
+        self.assertEqual(
+            [row["id"] for row in response.data["results"]],
+            [self.john.id, self.jane.id, self.bob.id, self.alice.id],
         )
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
 
-        self.assertIn(self.author3.id, result_ids)
+    def test_ranking_by_likes_counts_every_like_not_every_liker(self):
+        """John's 3 readers liked each of his 3 posts: 9 likes, 3 likers."""
+        response = self.client.get(URL, {"ordering": "-totalLikesReceived"})
 
-        response = self.client.get(
-            url, {"minPosts": 2, "minTotalLikes": 10, "hasWebsite": "true"}
+        rows = response.data["results"]
+        self.assertEqual(
+            [row["id"] for row in rows[:2]], [self.john.id, self.jane.id]
         )
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-
-        self.assertIn(self.author1.id, result_ids)
-
-    def test_filter_with_ordering(self):
-        url = reverse("blog-author-list")
-
-        response = self.client.get(url, {"ordering": "-createdAt"})
-        self.assertEqual(response.status_code, 200)
-
-        results = response.data["results"]
-
-        test_author_results = []
-        for result in results:
-            if result["id"] in [
-                self.author1.id,
-                self.author2.id,
-                self.author3.id,
-                self.author4.id,
-            ]:
-                test_author_results.append(result)
-
-        self.assertEqual(len(test_author_results), 4)
-
-        self.assertEqual(test_author_results[0]["id"], self.author4.id)
-        self.assertEqual(test_author_results[1]["id"], self.author3.id)
-        self.assertEqual(test_author_results[2]["id"], self.author2.id)
-        self.assertEqual(test_author_results[3]["id"], self.author1.id)
-
-    def tearDown(self):
-        BlogAuthor.objects.all().delete()
-        UserAccount.objects.all().delete()
+        self.assertEqual(rows[0]["total_likes_received"], 9)

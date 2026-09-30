@@ -46,7 +46,8 @@ class ReleaseReservationsValidationTest(TestURLFixerMixin, APITestCase):
         response = self.client.post(
             self.url, {"reservationIds": [1, 2, 3]}, format="json"
         )
-        assert response.status_code in (200, 400), response.status_code
+        assert response.status_code == 200, response.status_code
+        assert response.json()["releasedCount"] == 0
 
     def test_an_over_long_id_list_is_refused(self):
         """Unbounded, this endpoint is one release attempt per id.

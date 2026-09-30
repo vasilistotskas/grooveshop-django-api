@@ -75,8 +75,10 @@ federation rather than failing the whole search.
   you the results belong to a broader query than the one asked.
 - `results` — each item is the serialized product or blog-post translation
   **flattened**, not wrapped in an `object` key. Every item carries
-  `contentType`, `rankingScore`, `formatted`, `matchesPosition`, and
-  `federation` (`indexUid`, `queriesPosition`, `weightedRankingScore`).
+  `contentType`, `rankingScore`, `formatted` (every attribute, the matched
+  terms wrapped in `<mark>`, as the single-index endpoints do),
+  `matchesPosition`, and `federation` (`indexUid`, `queriesPosition`,
+  `weightedRankingScore`).
 
 There is **no `processingTimeMs`** on any search response. Meilisearch
 reports one, but `meili/querysets.py` does not forward it.
@@ -169,6 +171,11 @@ Most popular queries from the last 24 hours, cached 5 minutes per
 | `startDate` | `YYYY-MM-DD` | No | all history |
 | `endDate` | `YYYY-MM-DD` | No | now |
 | `contentType` | string | No | — (`product`, `blog_post`, `federated`) |
+
+Both dates are whole days in the store's timezone, and both are included:
+`endDate=2026-03-12` counts every search made on the 12th. A date that is
+not `YYYY-MM-DD` (a datetime included) or a `startDate` after `endDate` is
+a 400.
 
 Returns `dateRange`, `topQueries` (top 20 with `count`, `avgResults`,
 `clickThroughRate`), `zeroResultQueries`, `searchVolume`

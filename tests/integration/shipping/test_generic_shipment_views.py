@@ -104,6 +104,34 @@ def test_shipment_cancel_dispatches_to_acs_adapter_for_admin():
     assert mock_cancel.called
 
 
+def test_shipment_cancel_404_when_the_carrier_has_no_shipment():
+    """A carrier is attached but no parcel was ever booked: nothing to
+    cancel, and the carrier API is never called."""
+    admin = UserAccountFactory(is_staff=True, is_superuser=True)
+    order = OrderFactory(user=admin, num_order_items=0)
+    order.shipping_provider = ShippingProvider.objects.get(code="acs")
+    order.shipping_kind = "home_delivery"
+    order.save(update_fields=["shipping_provider", "shipping_kind"])
+
+    client = APIClient()
+    client.force_authenticate(user=admin)
+    with patch(
+        "shipping_acs.services.AcsService.cancel_voucher"
+    ) as mock_cancel:
+        response = client.post(
+            reverse("order-shipment-cancel", kwargs={"pk": order.id}),
+            {"reason": "never shipped"},
+            format="json",
+            HTTP_ACCEPT_LANGUAGE="en",
+        )
+
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+    assert response.json()["detail"] == (
+        "No carrier shipment found for this order."
+    )
+    mock_cancel.assert_not_called()
+
+
 def test_order_detail_exposes_shipment_provider_code():
     """The new SerializerMethodField returns 'acs' / 'boxnow' / null
     so frontends can switch on a single key."""

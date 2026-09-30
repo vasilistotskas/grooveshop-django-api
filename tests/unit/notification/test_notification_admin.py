@@ -23,17 +23,9 @@ User = get_user_model()
 
 
 class NotificationStatusFilterTestCase(TestCase):
-    def setUp(self):
-        self.factory = RequestFactory()
-        self.request = self.factory.get("/")
-        self.request.user = Mock()
-
-        self.model_admin = Mock()
-        self.filter = NotificationStatusFilter(
-            self.request, {}, Notification, self.model_admin
-        )
-
-        self.notification_active = Notification.objects.create(
+    @classmethod
+    def setUpTestData(cls):
+        cls.notification_active = Notification.objects.create(
             title="Active Notification",
             message="Active message",
             kind="INFO",
@@ -43,7 +35,7 @@ class NotificationStatusFilterTestCase(TestCase):
             expiry_date=timezone.now() + timedelta(days=7),
         )
 
-        self.notification_expired = Notification.objects.create(
+        cls.notification_expired = Notification.objects.create(
             title="Expired Notification",
             message="Expired message",
             kind="WARNING",
@@ -53,7 +45,7 @@ class NotificationStatusFilterTestCase(TestCase):
             expiry_date=timezone.now() - timedelta(days=1),
         )
 
-        self.notification_urgent = Notification.objects.create(
+        cls.notification_urgent = Notification.objects.create(
             title="Urgent Notification",
             message="Urgent message",
             kind="ERROR",
@@ -62,7 +54,7 @@ class NotificationStatusFilterTestCase(TestCase):
             notification_type="security_alert",
         )
 
-        self.notification_with_link = Notification.objects.create(
+        cls.notification_with_link = Notification.objects.create(
             title="Notification with Link",
             message="Link message",
             kind="INFO",
@@ -70,6 +62,14 @@ class NotificationStatusFilterTestCase(TestCase):
             priority="NORMAL",
             notification_type="promotion",
             link="/",
+        )
+
+    def setUp(self):
+        self.request = RequestFactory().get("/")
+        self.request.user = Mock()
+        self.model_admin = Mock()
+        self.filter = NotificationStatusFilter(
+            self.request, {}, Notification, self.model_admin
         )
 
     def test_lookups(self):
@@ -148,6 +148,21 @@ class NotificationStatusFilterTestCase(TestCase):
 
                 self.assertIn(expected_notification, result)
 
+    def test_queryset_payment_selects_only_payment_notifications(self):
+        payment = Notification.objects.create(
+            title="Payment Notification",
+            message="Payment message",
+            kind="INFO",
+            category="PAYMENT",
+            priority="NORMAL",
+            notification_type="payment",
+        )
+        self.filter.used_parameters = {"notification_status": "payment"}
+
+        result = self.filter.queryset(self.request, Notification.objects.all())
+
+        self.assertEqual(list(result), [payment])
+
     def test_queryset_recent(self):
         self.filter.used_parameters = {"notification_status": "recent"}
         queryset = Notification.objects.all()
@@ -166,23 +181,15 @@ class NotificationStatusFilterTestCase(TestCase):
 
 
 class NotificationUserStatusFilterTestCase(TestCase):
-    def setUp(self):
-        self.factory = RequestFactory()
-        self.request = self.factory.get("/")
-        self.request.user = Mock()
-
-        self.model_admin = Mock()
-        self.filter = NotificationUserStatusFilter(
-            self.request, {}, NotificationUser, self.model_admin
-        )
-
-        self.user = User.objects.create_user(
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.create_user(
             username="testuser",
             email="test@example.com",
             password="testpass123",
         )
 
-        self.notification = Notification.objects.create(
+        cls.notification = Notification.objects.create(
             title="Test Notification",
             message="Test message",
             kind="INFO",
@@ -191,7 +198,7 @@ class NotificationUserStatusFilterTestCase(TestCase):
             notification_type="general",
         )
 
-        self.notification_urgent = Notification.objects.create(
+        cls.notification_urgent = Notification.objects.create(
             title="Urgent Notification",
             message="Urgent message",
             kind="ERROR",
@@ -200,15 +207,23 @@ class NotificationUserStatusFilterTestCase(TestCase):
             notification_type="security_alert",
         )
 
-        self.notification_user_seen = NotificationUser.objects.create(
-            user=self.user,
-            notification=self.notification,
+        cls.notification_user_seen = NotificationUser.objects.create(
+            user=cls.user,
+            notification=cls.notification,
             seen=True,
             seen_at=timezone.now(),
         )
 
-        self.notification_user_unseen = NotificationUser.objects.create(
-            user=self.user, notification=self.notification_urgent, seen=False
+        cls.notification_user_unseen = NotificationUser.objects.create(
+            user=cls.user, notification=cls.notification_urgent, seen=False
+        )
+
+    def setUp(self):
+        self.request = RequestFactory().get("/")
+        self.request.user = Mock()
+        self.model_admin = Mock()
+        self.filter = NotificationUserStatusFilter(
+            self.request, {}, NotificationUser, self.model_admin
         )
 
     def test_lookups(self):
@@ -258,12 +273,9 @@ class NotificationUserStatusFilterTestCase(TestCase):
 
 
 class NotificationAdminTestCase(TestCase):
-    def setUp(self):
-        self.factory = RequestFactory()
-        self.site = AdminSite()
-        self.admin = NotificationAdmin(Notification, self.site)
-
-        self.notification = Notification.objects.create(
+    @classmethod
+    def setUpTestData(cls):
+        cls.notification = Notification.objects.create(
             title="Test Notification",
             message="Test notification message",
             kind="INFO",
@@ -274,18 +286,22 @@ class NotificationAdminTestCase(TestCase):
             expiry_date=timezone.now() + timedelta(days=7),
         )
 
-        self.user = User.objects.create_user(
+        cls.user = User.objects.create_user(
             username="testuser",
             email="test@example.com",
             password="testpass123",
         )
 
-        self.notification_user = NotificationUser.objects.create(
-            user=self.user,
-            notification=self.notification,
+        cls.notification_user = NotificationUser.objects.create(
+            user=cls.user,
+            notification=cls.notification,
             seen=True,
             seen_at=timezone.now(),
         )
+
+    def setUp(self):
+        self.factory = RequestFactory()
+        self.admin = NotificationAdmin(Notification, AdminSite())
 
     def test_get_queryset(self):
         request = self.factory.get("/")
@@ -394,18 +410,15 @@ class NotificationAdminTestCase(TestCase):
 
 
 class NotificationUserAdminTestCase(TestCase):
-    def setUp(self):
-        self.factory = RequestFactory()
-        self.site = AdminSite()
-        self.admin = NotificationUserAdmin(NotificationUser, self.site)
-
-        self.user = User.objects.create_user(
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.create_user(
             username="testuser",
             email="test@example.com",
             password="testpass123",
         )
 
-        self.notification = Notification.objects.create(
+        cls.notification = Notification.objects.create(
             title="Test Notification",
             message="Test message",
             kind="INFO",
@@ -414,23 +427,15 @@ class NotificationUserAdminTestCase(TestCase):
             notification_type="general",
         )
 
-        self.notification_user = NotificationUser.objects.create(
-            user=self.user,
-            notification=self.notification,
+        cls.notification_user = NotificationUser.objects.create(
+            user=cls.user,
+            notification=cls.notification,
             seen=True,
             seen_at=timezone.now(),
         )
 
-    def test_get_queryset(self):
-        request = self.factory.get("/")
-        request.user = Mock()
-
-        queryset = self.admin.get_queryset(request)
-
-        self.assertTrue(
-            hasattr(queryset, "_prefetch_related_lookups")
-            or hasattr(queryset, "query")
-        )
+    def setUp(self):
+        self.admin = NotificationUserAdmin(NotificationUser, AdminSite())
 
     def test_user_info(self):
         result = self.admin.user_info(self.notification_user)
@@ -477,100 +482,3 @@ class NotificationUserAdminTestCase(TestCase):
         )
         result = self.admin.user_notification_analytics(unsaved)
         self.assertEqual(result, "Available after creation.")
-
-
-class NotificationAdminIntegrationTestCase(TestCase):
-    def setUp(self):
-        self.factory = RequestFactory()
-        self.site = AdminSite()
-        self.notification_admin = NotificationAdmin(Notification, self.site)
-        self.notification_user_admin = NotificationUserAdmin(
-            NotificationUser, self.site
-        )
-
-        self.user = User.objects.create_user(
-            username="adminuser",
-            email="admin@example.com",
-            password="adminpass123",
-        )
-
-        self.notifications = []
-        priorities = ["LOW", "NORMAL", "HIGH", "URGENT", "CRITICAL"]
-        categories = ["SYSTEM", "ORDER", "PAYMENT", "SECURITY", "PROMOTION"]
-
-        for i, (priority, category) in enumerate(zip(priorities, categories)):
-            notification = Notification.objects.create(
-                title=f"Test Notification {i + 1}",
-                message=f"Test message {i + 1}",
-                kind="INFO",
-                category=category,
-                priority=priority,
-                notification_type="general",
-            )
-            self.notifications.append(notification)
-
-            NotificationUser.objects.create(
-                user=self.user,
-                notification=notification,
-                seen=i % 2 == 0,
-            )
-
-    def test_admin_display_methods_integration(self):
-        for notification in self.notifications:
-            notification_info = self.notification_admin.notification_info(
-                notification
-            )
-            kind_label = self.notification_admin.kind_label(notification)
-            category_label = self.notification_admin.category_label(
-                notification
-            )
-            priority_label = self.notification_admin.priority_label(
-                notification
-            )
-            expiry_status = self.notification_admin.expiry_status(notification)
-
-            self.assertIsInstance(notification_info, str)
-            self.assertIn(notification.title, notification_info)
-
-            self.assertEqual(kind_label, ("INFO", "Info"))
-            self.assertEqual(category_label[0], notification.category)
-            self.assertEqual(priority_label[0], notification.priority)
-            self.assertEqual(expiry_status, ("active", "Active"))
-
-    def test_filter_functionality(self):
-        request = self.factory.get("/")
-        request.user = Mock()
-
-        status_filter = NotificationStatusFilter(
-            request, {}, Notification, self.notification_admin
-        )
-
-        filter_tests = [
-            ("urgent", lambda n: n.priority in ["URGENT", "CRITICAL"]),
-            ("system", lambda n: n.category == "SYSTEM"),
-            ("order", lambda n: n.category == "ORDER"),
-            ("payment", lambda n: n.category == "PAYMENT"),
-        ]
-
-        for filter_value, condition_func in filter_tests:
-            status_filter.used_parameters = {
-                "notification_status": filter_value
-            }
-            filtered_queryset = status_filter.queryset(
-                request, Notification.objects.all()
-            )
-
-            for notification in filtered_queryset:
-                self.assertTrue(condition_func(notification))
-
-    def test_queryset_optimization(self):
-        request = self.factory.get("/")
-        request.user = Mock()
-
-        notification_queryset = self.notification_admin.get_queryset(request)
-        self.assertTrue(
-            hasattr(notification_queryset, "_prefetch_related_lookups")
-        )
-
-        user_queryset = self.notification_user_admin.get_queryset(request)
-        self.assertTrue(hasattr(user_queryset, "query"))

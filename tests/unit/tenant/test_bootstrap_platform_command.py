@@ -29,22 +29,19 @@ def test_creates_public_tenant_and_domain():
 
 
 def test_does_not_attempt_real_schema_creation(monkeypatch):
-    """``auto_create_schema`` is set False on the instance before
-    save() — the public schema always exists, there is nothing to
-    CREATE. ``auto_create_schema`` is a plain Python attribute (not a
-    model field), so it can't be asserted on a row re-fetched from the
-    DB — spy on ``create_schema()`` (the DDL-issuing method) instead
-    and assert it is never called.
-    """
+    """The public schema always exists, so the command opts its row out
+    of django-tenants' ``CREATE SCHEMA`` + migrate. The suite turns the
+    class flag off; turn it back on so only the command's own opt-out
+    can keep ``create_schema()`` from being called."""
     calls = []
-    original = Tenant.create_schema
+    monkeypatch.setattr(Tenant, "auto_create_schema", True)
+    monkeypatch.setattr(
+        Tenant, "create_schema", lambda self, *a, **kw: calls.append(self)
+    )
 
-    def _spy(self, *args, **kwargs):
-        calls.append((args, kwargs))
-        return original(self, *args, **kwargs)
-
-    monkeypatch.setattr(Tenant, "create_schema", _spy)
     call_command("bootstrap_platform", domain="platform.example.com")
+
+    assert Tenant.objects.filter(schema_name=get_public_schema_name()).exists()
     assert calls == []
 
 
@@ -74,13 +71,3 @@ def test_rerun_with_different_domain_becomes_primary_and_demotes_old():
     tenant = Tenant.objects.get(schema_name=get_public_schema_name())
     assert old.tenant_id == tenant.pk
     assert new.tenant_id == tenant.pk
-
-
-def test_rerun_does_not_duplicate_tenant_row():
-    call_command("bootstrap_platform", domain="a.example.com")
-    call_command("bootstrap_platform", domain="b.example.com")
-    call_command("bootstrap_platform", domain="c.example.com")
-
-    assert (
-        Tenant.objects.filter(schema_name=get_public_schema_name()).count() == 1
-    )

@@ -13,6 +13,7 @@ from djmoney.money import Money
 
 from loyalty.models import PointsTransaction
 from loyalty.services import LoyaltyService
+from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.item import OrderItemFactory
 from order.factories.order import OrderFactory
 from product.factories import ProductFactory
@@ -28,7 +29,12 @@ _B2B_MARKER = {
 
 
 def _completed_order(user, *, metadata=None):
-    order = OrderFactory(user=user, metadata=metadata or {})
+    order = OrderFactory(
+        user=user,
+        metadata=metadata or {},
+        status=OrderStatus.COMPLETED,
+        payment_status=PaymentStatus.COMPLETED,
+    )
     product = ProductFactory(
         price=Money(Decimal("100.00"), "EUR"),
         discount_percent=Decimal(0),

@@ -86,12 +86,9 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         }
 
     Stock Reservation Tracking:
-        The stock_reservation_ids field stores a list of StockReservation IDs that were
-        converted to this order. This provides an audit trail linking temporary stock
-        reservations during checkout to the final order, enabling:
-        - Tracking which reservations were consumed by this order
-        - Debugging stock discrepancies
-        - Audit compliance for inventory management
+        ``metadata["stock_reservation_ids"]`` lists the StockReservation IDs
+        converted to this order, linking checkout-time reservations to the
+        final order (audit trail, stock-discrepancy debugging).
     """
 
     id = models.BigAutoField(primary_key=True)
@@ -334,15 +331,6 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         default=ShippingKind.HOME_DELIVERY,
         db_index=True,
         help_text=_("Generic fulfilment kind, independent of provider."),
-    )
-    stock_reservation_ids = models.JSONField(
-        _("Stock Reservation IDs"),
-        default=list,
-        blank=True,
-        help_text=_(
-            "List of stock reservation IDs that were converted to this order. "
-            "Provides audit trail linking reservations to final orders."
-        ),
     )
     reminder_count = models.PositiveSmallIntegerField(
         _("Reminder Count"),
@@ -698,10 +686,12 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         """
         Return the sum of (price * quantity) for all order items.
 
-        Uses the ``items_total`` annotation from ``with_total_amounts()``
-        when available (set by ``for_list()`` and related querysets) to
-        avoid issuing extra DB queries.  Falls back to an aggregation query
-        only when the annotation is absent (e.g. ad-hoc lookups).
+        Uses the ``items_total`` / ``items_currencies`` annotations from
+        ``with_total_amounts()`` when available (set by ``for_list()`` and
+        related querysets) to avoid extra DB queries. Falls back to an
+        aggregation query only when they are absent (e.g. ad-hoc lookups).
+        Either way the total carries the items' own currency, and lines in
+        different currencies raise ``ValueError``.
 
         The annotation is a ``SUM`` over the items, so an order with none
         carries it as ``NULL``: presence of the key, not its value, says
@@ -710,31 +700,37 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         """
         default_currency = getattr(settings, "DEFAULT_CURRENCY", "EUR")
 
-        # Use pre-computed annotation when present (avoids 2 extra queries).
         if "items_total" in self.__dict__:
-            currency = (
-                self.shipping_price.currency
-                if self.shipping_price
-                else default_currency
+            items_total = self.__dict__["items_total"]
+            currencies = set(self.__dict__.get("items_currencies") or ())
+        else:
+            items_total = self.items.aggregate(
+                total=Sum(F("price") * F("quantity"))
+            )["total"]
+            currencies = (
+                set(
+                    self.items.order_by()
+                    .values_list("price_currency", flat=True)
+                    .distinct()
+                )
+                if items_total
+                else set()
             )
-            return Money(
-                amount=self.__dict__["items_total"] or 0, currency=currency
-            )
-
-        # Fallback: aggregate from the related manager (2 queries).
-        result = self.items.aggregate(total=Sum(F("price") * F("quantity")))
-        items_total = result.get("total")
 
         if not items_total:
             if self.shipping_price:
                 return Money(0, self.shipping_price.currency)
             return Money(0, default_currency)
 
-        # Get currency from the price_currency field via a single query.
-        currency_row = self.items.values_list(
-            "price_currency", flat=True
-        ).first()
-        currency = currency_row or default_currency
+        # ``SUM`` ignores ``price_currency``, so a line in another
+        # currency would be added in silently. Refuse it, as
+        # ``total_price`` refuses items and extras that disagree.
+        if len(currencies) > 1:
+            raise ValueError(
+                "Order items have different currencies: "
+                + ", ".join(sorted(currencies))
+            )
+        currency = next(iter(currencies), None) or default_currency
 
         return Money(amount=items_total, currency=currency)
 

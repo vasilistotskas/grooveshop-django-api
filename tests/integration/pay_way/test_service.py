@@ -1,6 +1,7 @@
 from unittest import mock
 
 from django.test import TestCase
+from django.utils.translation import gettext as _
 
 from order.enum.status import PaymentStatus
 from order.factories import OrderFactory
@@ -53,6 +54,31 @@ class PayWayServiceTestCase(TestCase):
         )
         self.assertIsNone(provider)
         mock_get_payment_provider.assert_not_called()
+
+    def test_unknown_provider_code_fails_the_payment_cleanly(self):
+        """An online pay way whose code names no registered PSP resolves
+        to no provider, and the payment is refused without touching the
+        order — never an uncaught ``ValueError``."""
+        unknown = PayWayFactory(
+            active=True,
+            provider_code="not_a_psp",
+            settlement=PaySettlement.ONLINE,
+        )
+
+        self.assertIsNone(PayWayService.get_provider_for_pay_way(unknown))
+
+        success, data = PayWayService.process_payment(
+            pay_way=unknown, order=self.order
+        )
+
+        self.assertFalse(success)
+        self.assertEqual(
+            str(data["error"]), str(_("Payment provider not available"))
+        )
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.payment_status, PaymentStatus.PENDING)
+        self.assertEqual(self.order.payment_id, "")
+        self.assertEqual(self.order.payment_method, "")
 
     @mock.patch("pay_way.services.PayWayService.get_provider_for_pay_way")
     def test_process_offline_payment_without_confirmation(

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from django.contrib.postgres.aggregates import ArrayAgg
 from django.db.models import Count, ExpressionWrapper, F, Prefetch, Sum
 from djmoney.models.fields import MoneyField
 
@@ -82,14 +83,22 @@ class OrderQuerySet(SoftDeleteQuerySetMixin, OptimizedQuerySet):
         )
 
     def with_total_amounts(self) -> Self:
-        """Annotate with calculated total amounts."""
+        """Annotate with calculated total amounts.
+
+        ``items_currencies`` travels with the sum because ``SUM`` ignores
+        ``price_currency``: ``Order.total_price_items`` labels the total
+        with it and refuses lines that disagree.
+        """
         return self.annotate(
             items_total=Sum(
                 ExpressionWrapper(
                     F("items__price") * F("items__quantity"),
                     output_field=MoneyField(max_digits=11, decimal_places=2),
                 )
-            )
+            ),
+            items_currencies=ArrayAgg(
+                "items__price_currency", distinct=True, default=[]
+            ),
         )
 
     def for_list(self) -> Self:

@@ -5,7 +5,7 @@ Keep this file synchronised when invariants change. Cross-references
 are file paths + line numbers; the system has enough load-bearing
 "don't undo this" pieces that drift here is expensive.
 
-Last refresh: 2026-09-27 (order acquisition source, admin payment-method column; before that: no mint before payment, payment-after-cancel ahead of the settled guard, admin status read-only, ACS pickup-list `blocked_unprinted`, postcode refusal). See git log for changes since.
+Last refresh: 2026-09-30 (every payment start refuses a non-PENDING order, a change during the provider call wins with 409, webhook history/emails only for an applied event, BoxNow webhook 400 for a non-object, non-UTF-8 or too-deep body; before that: order acquisition source, admin payment-method column, then no mint before payment, payment-after-cancel ahead of the settled guard, admin status read-only, ACS pickup-list `blocked_unprinted`, postcode refusal). See git log for changes since.
 
 ## 1. Overview
 
@@ -82,6 +82,7 @@ No explicit table — flips are direct assignments. Common paths:
 |---|---|
 | `PENDING → COMPLETED` | `Order.mark_as_paid()` (called by Stripe + Viva success handlers, COD reconcile) |
 | `PENDING → FAILED` | `OrderService.handle_payment_failed` (Stripe `payment_intent.payment_failed`) |
+| `FAILED / PENDING / CANCELED → PENDING` | `POST /order/{id}/retry-payment` (`OrderViewSet.retry_payment`) mints a fresh Stripe PaymentIntent and reopens the payment — **only while `Order.status` is `PENDING`**. A CANCELED payment on a PENDING order (an intent canceled while the order waits) is retryable. Every endpoint that starts a payment (`create_payment_intent`, `create_checkout_session`, `retry-payment`, `confirm_agent_payment`) shares `OrderViewSet._payment_start_refusal`: a paid order gets 400 "This order has already been paid.", a CANCELED or otherwise advanced one 400 "This order is no longer open for payment." — before the provider is called, because `cancel_order` settles an unpaid payment to CANCELED too, and reopening it let a charge land on a dead order. The provider call itself runs unlocked; `PayWayService._record_opened_payment` then locks the row and, if its status, payment status or payment id changed meanwhile (a cancel, a webhook for the previous intent), raises `OrderChangedDuringPaymentError` — the view answers 409 and the new intent's client secret is never returned, so it can never be confirmed. |
 | `COMPLETED → REFUNDED` | `OrderService.refund_order()` (admin) OR `handle_stripe_charge_refunded` (full refund webhook) |
 | `COMPLETED → PARTIALLY_REFUNDED` | `handle_stripe_charge_refunded` (partial refund) |
 | `PENDING → CANCELED` | Viva refund webhook |
@@ -266,9 +267,20 @@ charge.succeeded → handle_stripe_payment_succeeded
                  │   ├── update_order_status(PROCESSING)
                  │   └── _dispatch_shipment_creation_task (on_commit)
                  │
+                 │   └── returns PaymentEventOutcome(order, previous_payment_status, applied)
+                 │
+                 │   only when outcome.applied:
+                 ├── OrderHistory PAYMENT row (previous = the real prior status)
                  ├── send_order_confirmation_email.delay(order.id)  ← order_received template
                  └── notify_payment_confirmed_live.delay(order.id)
 ```
+
+`applied` is False for a stale event against a settled payment, a
+repeat of one already applied, and a charge on a canceled order
+(`record_payment_after_cancel` books it and alerts ops): none of them
+gets a history row or a customer email. `handle_payment_failed` returns
+the same outcome, so a late failure never tells a customer who paid
+that their payment failed.
 
 The `_suppress_customer_status_notifications(PROCESSING)` call is
 load-bearing: without it the customer receives both an
@@ -531,6 +543,7 @@ accepting Cyprus orders at the Greek flat rate.
   row left in `pending_creation` by a business error, once its data is
   fixed — the counterpart of ACS's "Issue ACS voucher now".
 - Webhook handler: `BoxNowService.apply_webhook_event` — idempotent on `webhook_message_id`.
+- The webhook view (`shipping_boxnow/views/webhook.py`) answers 400 (BoxNow does not retry) to any body it cannot read as a JSON object: bytes that are not UTF-8 (decoded strictly first, RFC 8259 §8.1 — `json.loads` on bytes would sniff UTF-16/32, while the signed-data extractor walks the raw bytes), invalid JSON, JSON nested past the decoder's stack, or valid JSON that is not an object (`[]`, `"x"`, `null`). Those used to raise inside the unauthenticated view and return 500, which BoxNow retries.
 
 ### 5.3 Adding a new carrier
 

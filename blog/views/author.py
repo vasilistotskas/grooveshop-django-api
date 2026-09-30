@@ -80,10 +80,19 @@ class BlogAuthorViewSet(BaseModelViewSet):
             return BlogPostFilter
         return BlogAuthorFilter
 
+    # ``DjangoFilterBackend`` reads ``view.filterset_class``, never the
+    # view's ``get_filterset_class()``.
+    @property
+    def filterset_class(self):
+        return self.get_filterset_class()
+
     def get_queryset(self):
         if self.action == "posts":
             from rest_framework.generics import get_object_or_404
 
+            # Schema generation builds this view without a pk.
+            if getattr(self, "swagger_fake_view", False):
+                return BlogPost.objects.none()
             author = get_object_or_404(BlogAuthor, id=self.kwargs["pk"])
             # ``BlogPost.objects`` (not ``author.blog_posts``) so the
             # queryset carries ``visible_to``: the reverse accessor returns
@@ -109,6 +118,9 @@ class BlogAuthorViewSet(BaseModelViewSet):
         "user__email",
         "user__created_at",
         "website",
+        # Annotated by ``BlogAuthorQuerySet.with_engagement``.
+        "number_of_posts",
+        "total_likes_received",
     ]
     ordering = ["-created_at", "user__first_name", "user__last_name"]
     # ``posts`` lists BlogPost rows, so it sorts by the post contract —
@@ -123,7 +135,9 @@ class BlogAuthorViewSet(BaseModelViewSet):
         "translations__bio",
     ]
 
-    @action(detail=True, methods=["GET"])
+    # ``queryset`` names the model this action lists, which is what the
+    # schema generator reads to validate its BlogPostFilter.
+    @action(detail=True, methods=["GET"], queryset=BlogPost.objects.none())
     def posts(self, request, pk=None, *args, **kwargs):
         self.search_fields = []
 

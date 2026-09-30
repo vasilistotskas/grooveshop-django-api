@@ -24,13 +24,6 @@ class TestOrderFactories(TestCase):
         self.assertIsNotNone(order.first_name)
         self.assertIsNotNone(order.last_name)
 
-    def test_order_factory_with_items(self):
-        with mock.patch(
-            "order.factories.item.OrderItemFactory.create_batch"
-        ) as mock_create_batch:
-            order = OrderFactory.create(num_order_items=3)
-            mock_create_batch.assert_called_once_with(3, order=order)
-
     def test_order_factory_with_specific_status(self):
         order = OrderFactory.create(status=OrderStatus.PROCESSING)
 
@@ -80,32 +73,6 @@ class TestOrderFactories(TestCase):
         self.assertIsNotNone(history.order)
         self.assertIsNotNone(history.user_agent)
 
-    def test_order_history_status_change(self):
-        with mock.patch("order.models.history.OrderHistory.log_note"):
-            order = OrderFactory.create()
-
-        with mock.patch(
-            "order.factories.history.OrderHistoryFactory.set_change_type_specific_data"
-        ):
-            history = OrderHistoryFactory.create_status_change(
-                order=order,
-                old_status=OrderStatus.PENDING,
-                new_status=OrderStatus.PROCESSING,
-            )
-
-            history.previous_value = {"status": OrderStatus.PENDING}
-            history.new_value = {"status": OrderStatus.PROCESSING}
-            history.description = f"Status changed from {OrderStatus.PENDING} to {OrderStatus.PROCESSING}"
-            history.save()
-
-        self.assertEqual(history.change_type, "STATUS")
-        self.assertEqual(
-            history.previous_value.get("status"), OrderStatus.PENDING
-        )
-        self.assertEqual(
-            history.new_value.get("status"), OrderStatus.PROCESSING
-        )
-
     def test_order_item_history_factory(self):
         with mock.patch("order.models.history.OrderHistory.log_note"):
             order = OrderFactory.create()
@@ -117,97 +84,51 @@ class TestOrderFactories(TestCase):
         self.assertIsNotNone(history.id)
         self.assertIsNotNone(history.order_item)
 
-    def test_order_item_history_quantity_change(self):
-        with mock.patch("order.models.history.OrderHistory.log_note"):
-            order = OrderFactory.create()
-            item = OrderItemFactory.create(order=order)
+    def test_order_factory_builds_the_requested_items(self):
+        order = OrderFactory.create(num_order_items=3)
 
-        with mock.patch(
-            "order.factories.history.OrderItemHistoryFactory.set_change_type_specific_data"
-        ):
-            history = OrderItemHistoryFactory.create_quantity_change(
-                order_item=item, old_quantity=2, new_quantity=5
-            )
+        self.assertEqual(order.items.count(), 3)
 
-            history.previous_value = {"quantity": 2}
-            history.new_value = {"quantity": 5}
-            history.description = "Quantity changed from 2 to 5"
-            history.save()
+    def test_a_status_change_keeps_the_requested_statuses(self):
+        history = OrderHistoryFactory.create_status_change(
+            order=OrderFactory.create(num_order_items=0),
+            old_status=OrderStatus.PENDING,
+            new_status=OrderStatus.PROCESSING,
+        )
+        history.refresh_from_db()
 
-        self.assertEqual(history.change_type, "QUANTITY")
-        self.assertEqual(history.previous_value.get("quantity"), 2)
-        self.assertEqual(history.new_value.get("quantity"), 5)
+        self.assertEqual(history.change_type, "STATUS")
+        self.assertEqual(history.previous_value, {"status": "PENDING"})
+        self.assertEqual(history.new_value, {"status": "PROCESSING"})
+        self.assertEqual(
+            history.safe_translation_getter("description"),
+            "Status changed from PENDING to PROCESSING",
+        )
 
-    @mock.patch("order.models.history.OrderHistory.log_note")
-    def test_creating_multiple_factories(self, mock_log_note):
-        with mock.patch(
-            "order.factories.item.OrderItemFactory.create_batch_for_order"
-        ):
-            order = OrderFactory.create_completed_order()
+    def test_a_quantity_change_keeps_the_requested_quantities(self):
+        item = OrderItemFactory.create(
+            order=OrderFactory.create(num_order_items=0)
+        )
 
-            OrderItem.objects.filter(order=order).delete()
-            item1 = OrderItemFactory.create(order=order)
-            item2 = OrderItemFactory.create(order=order)
+        history = OrderItemHistoryFactory.create_quantity_change(
+            order_item=item, old_quantity=2, new_quantity=5
+        )
+        history.refresh_from_db()
 
-            histories = OrderHistoryFactory.create_for_order(order, count=3)
+        self.assertEqual(history.previous_value, {"quantity": 2})
+        self.assertEqual(history.new_value, {"quantity": 5})
+        self.assertEqual(
+            history.safe_translation_getter("description"),
+            "Quantity changed from 2 to 5",
+        )
 
-            item1_histories = OrderItemHistoryFactory.create_for_order_item(
-                item1, count=2
-            )
-            item2_histories = OrderItemHistoryFactory.create_for_order_item(
-                item2, count=2
-            )
+    def test_explicit_values_win_over_the_generated_ones(self):
+        history = OrderHistoryFactory.create(
+            order=OrderFactory.create(num_order_items=0),
+            change_type="PAYMENT",
+            previous_value={"payment_status": "PENDING"},
+            new_value={"payment_status": "COMPLETED"},
+        )
+        history.refresh_from_db()
 
-            self.assertGreaterEqual(order.items.count(), 1)
-            self.assertEqual(len(histories), 3)
-            self.assertEqual(len(item1_histories), 2)
-            self.assertEqual(len(item2_histories), 2)
-
-    def test_factory_method_arguments(self):
-        with mock.patch(
-            "order.factories.order.OrderFactory.create_with_consistent_status_data"
-        ) as mock_method:
-            OrderFactory.create_shipped_order(test_param=123)
-
-            mock_method.assert_called_once()
-            _args, kwargs = mock_method.call_args
-            self.assertEqual(kwargs.get("status"), OrderStatus.SHIPPED)
-            self.assertEqual(kwargs.get("test_param"), 123)
-
-        with mock.patch(
-            "order.factories.order.OrderFactory.create_with_consistent_status_data"
-        ) as mock_method:
-            OrderFactory.create_pending_order(test_param=456)
-
-            mock_method.assert_called_once()
-            _args, kwargs = mock_method.call_args
-            self.assertEqual(kwargs.get("status"), OrderStatus.PENDING)
-            self.assertEqual(
-                kwargs.get("payment_status"), PaymentStatus.PENDING
-            )
-            self.assertEqual(kwargs.get("test_param"), 456)
-
-        with mock.patch(
-            "order.factories.order.OrderFactory.create_with_consistent_status_data"
-        ) as mock_method:
-            OrderFactory.create_completed_order()
-
-            mock_method.assert_called_once()
-            _args, kwargs = mock_method.call_args
-            self.assertEqual(kwargs.get("status"), OrderStatus.COMPLETED)
-
-        with mock.patch(
-            "order.factories.order.OrderFactory.create_with_consistent_status_data"
-        ) as mock_method:
-            mock_order = mock.MagicMock()
-            mock_order.items.exists.return_value = False
-            mock_method.return_value = mock_order
-
-            OrderFactory.create_refunded_order()
-
-            mock_method.assert_called_once()
-            _args, kwargs = mock_method.call_args
-            self.assertEqual(kwargs.get("status"), OrderStatus.REFUNDED)
-            self.assertEqual(
-                kwargs.get("payment_status"), PaymentStatus.REFUNDED
-            )
+        self.assertEqual(history.new_value, {"payment_status": "COMPLETED"})

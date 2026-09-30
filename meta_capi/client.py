@@ -125,7 +125,8 @@ class MetaCapiClient:
         Raises:
             MetaCapiConfigError: pixel ID / token missing
             MetaCapiTransientError: 5xx, network failure, rate limit
-            MetaCapiError: 4xx schema reject (non-retryable)
+            MetaCapiError: 4xx schema reject, or a payload the SDK
+                cannot normalise (non-retryable)
         """
         if not events:
             return MetaCapiResponse(
@@ -159,15 +160,26 @@ class MetaCapiClient:
             partner_agent=self.partner_agent,
             pixel_id=self.pixel_id,
         )
-        params = request.get_params()
+        # The SDK normalises and hashes user data while serialising, and
+        # raises on a value it cannot normalise. Resending cannot fix the
+        # payload, so it is permanent; the SDK message quotes the value
+        # (customer PII) and is kept out of ours, which the log stores.
+        try:
+            params = request.get_params()
+        except (ValueError, TypeError) as exc:
+            raise MetaCapiError(
+                "Meta CAPI payload rejected by the SDK normaliser "
+                f"({type(exc).__name__})"
+            ) from exc
 
         try:
             response = AdsPixel(self.pixel_id, api=api).create_event(
                 fields=[], params=params
             )
         except FacebookRequestError as exc:
-            status = getattr(exc, "http_status", None) or 0
-            body = getattr(exc, "body", None) or {}
+            # Methods on the SDK exception, not attributes.
+            status = exc.http_status() or 0
+            body = exc.body() or {}
             err = body.get("error", {}) if isinstance(body, dict) else {}
             fbtrace_id = err.get("fbtrace_id", "")
             message = (

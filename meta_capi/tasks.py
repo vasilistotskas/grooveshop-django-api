@@ -7,13 +7,15 @@ Why every CAPI dispatch is async:
   neck) is asking for tail-latency pain.
 * Meta's API has occasional 5xx blips and rate-limit responses. The
   Celery retry-with-backoff pattern handles both cleanly.
-* On startup with bad credentials we log + skip rather than crash.
+* Bad credentials (``MetaCapiConfigError``) mark the log row FAILED
+  and log, without retrying or crashing.
 
 Idempotency: each task is keyed by ``event_id``. If a row in
-``MetaCapiEventLog`` with that id is already ``SENT`` we short-circuit.
-This makes Stripe webhook redeliveries safe — a retried
-``payment_intent.succeeded`` lands the same event_id again and we
-just record the second attempt as ``SKIPPED``.
+``MetaCapiEventLog`` with that id is already ``SENT`` we short-circuit:
+the repeat is logged and returns without touching the row or calling
+Meta. This makes payment-webhook redeliveries safe, and lets the
+offline pay-way Purchase (sent at ``order_created``) coexist with a
+later ``order_paid`` for the same order.
 """
 
 from __future__ import annotations
@@ -157,8 +159,9 @@ def _dispatch(
 def dispatch_purchase_event(self, order_id: int) -> None:
     """Send Purchase to Meta for ``order_id``.
 
-    Wired to ``order_paid`` signal via on_commit so the order is
-    guaranteed visible by the time this runs.
+    Scheduled on commit by ``meta_capi.signals`` — on ``order_paid``,
+    and on ``order_created`` for offline (COD) pay-ways — so the order
+    is guaranteed visible by the time this runs.
     """
     from order.models.order import Order
 

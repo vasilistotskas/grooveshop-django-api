@@ -667,12 +667,10 @@ class TestStockManagerReleaseReservation:
             user_id=None,
         )
 
-        original_updated_at = reservation.updated_at
-
-        # Wait a tiny bit to ensure timestamp difference
-        import time
-
-        time.sleep(0.01)
+        original_updated_at = timezone.now() - timedelta(hours=1)
+        StockReservation.objects.filter(id=reservation.id).update(
+            updated_at=original_updated_at
+        )
 
         # Release the reservation
         StockManager.release_reservation(reservation_id=reservation.id)
@@ -1048,12 +1046,10 @@ class TestStockManagerConvertReservationToSale:
             user_id=None,
         )
 
-        original_updated_at = reservation.updated_at
-
-        # Wait a tiny bit to ensure timestamp difference
-        import time
-
-        time.sleep(0.01)
+        original_updated_at = timezone.now() - timedelta(hours=1)
+        StockReservation.objects.filter(id=reservation.id).update(
+            updated_at=original_updated_at
+        )
 
         order = OrderFactory(num_order_items=0)
 
@@ -1646,15 +1642,14 @@ class TestStockManagerDecrementStock:
 
     def test_decrement_stock_updates_product_timestamp(self):
         """Test that decrementing stock updates the product's updated_at timestamp."""
-        import time
-
         from order.factories import OrderFactory
+        from product.models.product import Product
 
         product = ProductFactory(stock=100)
-        original_updated_at = product.updated_at
-
-        # Wait a tiny bit to ensure timestamp difference
-        time.sleep(0.01)
+        original_updated_at = timezone.now() - timedelta(hours=1)
+        Product.objects.filter(id=product.id).update(
+            updated_at=original_updated_at
+        )
 
         order = OrderFactory(num_order_items=0)
 
@@ -1729,8 +1724,7 @@ class TestStockManagerCleanupExpiredReservations:
         # Run cleanup
         count = StockManager.cleanup_expired_reservations()
 
-        # Verify count includes our expired reservations (may include others from parallel tests)
-        assert count >= 2
+        assert count == 2
 
         # Verify expired reservations are marked as consumed
         expired_reservation.refresh_from_db()
@@ -1817,11 +1811,8 @@ class TestStockManagerCleanupExpiredReservations:
             consumed=False,
         )
 
-        # Run cleanup
-        StockManager.cleanup_expired_reservations()
+        assert StockManager.cleanup_expired_reservations() == 0
 
-        # Verify our active reservations were NOT cleaned
-        # (count may be > 0 if other parallel tests created expired reservations)
         active_count = StockReservation.objects.filter(
             product=product, consumed=False
         ).count()
@@ -1841,11 +1832,8 @@ class TestStockManagerCleanupExpiredReservations:
             consumed=True,  # Already consumed
         )
 
-        # Run cleanup
-        StockManager.cleanup_expired_reservations()
+        assert StockManager.cleanup_expired_reservations() == 0
 
-        # Verify our already-consumed reservation was not affected
-        # (count may be > 0 if other parallel tests created expired reservations)
         consumed_reservation.refresh_from_db()
         assert consumed_reservation.consumed is True
 
@@ -1870,7 +1858,7 @@ class TestStockManagerCleanupExpiredReservations:
 
         # Run cleanup
         count = StockManager.cleanup_expired_reservations()
-        assert count >= 1  # At least our expired reservation was cleaned
+        assert count == 1
 
         # After cleanup, available stock should still be 100
         available_after = StockManager.get_available_stock(product.id)
@@ -1912,8 +1900,7 @@ class TestStockManagerCleanupExpiredReservations:
         # Run cleanup
         count = StockManager.cleanup_expired_reservations()
 
-        # Verify both our reservations were cleaned (count may include others from parallel tests)
-        assert count >= 2
+        assert count == 2
 
         expired_1.refresh_from_db()
         assert expired_1.consumed is True
@@ -1939,7 +1926,7 @@ class TestStockManagerCleanupExpiredReservations:
 
         # Run cleanup
         count = StockManager.cleanup_expired_reservations()
-        assert count >= 1  # At least our expired reservation was cleaned
+        assert count == 1
 
         # Verify log has correct user
         log = StockLog.objects.filter(
@@ -1964,7 +1951,7 @@ class TestStockManagerCleanupExpiredReservations:
 
         # Run cleanup
         count = StockManager.cleanup_expired_reservations()
-        assert count >= 1  # At least our expired reservation was cleaned
+        assert count == 1
 
         # Verify log has no user
         log = StockLog.objects.filter(
@@ -1981,8 +1968,7 @@ class TestStockManagerCleanupExpiredReservations:
         initial_count = StockReservation.objects.filter(product=product).count()
         assert initial_count == 0
 
-        # Run cleanup - this may clean up reservations from other tests
-        StockManager.cleanup_expired_reservations()
+        assert StockManager.cleanup_expired_reservations() == 0
 
         # Verify still no reservations for our product (none were created)
         final_count = StockReservation.objects.filter(product=product).count()
@@ -2002,12 +1988,10 @@ class TestStockManagerCleanupExpiredReservations:
             consumed=False,
         )
 
-        original_updated_at = reservation.updated_at
-
-        # Wait a tiny bit to ensure timestamp difference
-        import time
-
-        time.sleep(0.01)
+        original_updated_at = timezone.now() - timedelta(hours=1)
+        StockReservation.objects.filter(id=reservation.id).update(
+            updated_at=original_updated_at
+        )
 
         # Run cleanup
         StockManager.cleanup_expired_reservations()
@@ -2056,20 +2040,12 @@ class TestStockManagerCleanupExpiredReservations:
         # Run cleanup
         count = StockManager.cleanup_expired_reservations()
 
-        # Verify cleanup behavior - check the specific reservation's state
-        # Note: count may include expired reservations from other parallel tests,
-        # so we only verify the specific reservation's consumed state
         reservation.refresh_from_db()
-        if should_cleanup:
-            assert count >= 1  # At least our reservation was cleaned up
-            assert reservation.consumed is True
-        else:
-            # Our reservation should NOT be consumed regardless of count
-            # (count may be > 0 if other tests created expired reservations)
-            assert reservation.consumed is False
+        assert count == (1 if should_cleanup else 0)
+        assert reservation.consumed is should_cleanup
 
-    def test_cleanup_expired_reservations_atomic_transaction(self):
-        """Test that cleanup is atomic (all or nothing)."""
+    def test_cleanup_expired_reservations_releases_every_expired(self):
+        """Test that cleanup releases every expired reservation."""
         product = ProductFactory(stock=100)
 
         # Create multiple expired reservations
@@ -2088,8 +2064,7 @@ class TestStockManagerCleanupExpiredReservations:
         # Run cleanup
         count = StockManager.cleanup_expired_reservations()
 
-        # Verify at least our 5 were cleaned (count may include others from parallel tests)
-        assert count >= 5
+        assert count == 5
 
         # Verify all our reservations are marked as consumed
         consumed_count = StockReservation.objects.filter(

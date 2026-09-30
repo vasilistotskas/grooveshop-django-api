@@ -160,12 +160,14 @@ def test_a_failed_broker_handoff_leaves_the_notification_retryable(
     def _broker_down(*args, **kwargs):
         raise OSError("broker unreachable")
 
-    # `tests/conftest.py` runs on_commit callbacks immediately and
-    # swallows their exceptions, mirroring `on_commit(robust=True)`, so
-    # the OSError is not observable here — the marker is.
-    with patch(
-        "shipping_acs.tasks.acs_send_arrival_notification.apply_async",
-        side_effect=_broker_down,
+    # The hook is registered non-robust, so the outage reaches the
+    # poller (whose task then retries) — and the marker stays unset.
+    with (
+        patch(
+            "shipping_acs.tasks.acs_send_arrival_notification.apply_async",
+            side_effect=_broker_down,
+        ),
+        pytest.raises(OSError, match="broker unreachable"),
     ):
         AcsService.poll_shipment_tracking(shipment)
 

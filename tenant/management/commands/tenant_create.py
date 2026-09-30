@@ -155,8 +155,8 @@ class Command(BaseCommand):
 
             # ``ensure_api_domain`` derives + creates the ``api.<domain>``
             # row (see tenant/provisioning.py for why it is not optional).
-            # Explicit --extra-domains still win: get_or_create below is a
-            # no-op if the operator already listed it.
+            # Listing it in --extra-domains as well is harmless: the
+            # get_or_create below is then a no-op for that row.
             from tenant.provisioning import (
                 ensure_api_domain,
                 ensure_site,
@@ -178,10 +178,12 @@ class Command(BaseCommand):
                 f"  Schema '{schema_name}' created with migrations applied."
             )
 
-            # Provision an OWNER membership for the tenant owner (creating
-            # the UserAccount row if they don't already exist in the shared
-            # user table). Without this the owner cannot log into the new
-            # tenant — the pre_login adapter would reject the credentials.
+            # Provision an OWNER membership for the tenant owner's existing
+            # public-schema UserAccount. No account is created: an owner
+            # who has not registered yet is skipped with a warning (see
+            # ``_provision_owner_membership``). Without a membership the
+            # owner cannot log into the new tenant — the pre_login
+            # adapter would reject the credentials.
             self._provision_owner_membership(tenant, options["owner_email"])
 
             # Seed default data in tenant schema. ``seed_tenant_defaults``

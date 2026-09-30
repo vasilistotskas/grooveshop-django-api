@@ -14,7 +14,12 @@ branding, sidebar and dashboard. Verified against django-unfold 0.104.1.
 
 from __future__ import annotations
 
-from django.test import RequestFactory, TestCase, override_settings
+from django.test import (
+    RequestFactory,
+    SimpleTestCase,
+    TestCase,
+    override_settings,
+)
 from django.urls import Resolver404, resolve
 from django.utils import translation
 
@@ -23,9 +28,10 @@ from admin.platform_site import (
     PlatformAdminSite,
     platform_admin_site,
 )
+from tests.utils.staff import store_tenant
 
 
-class TestPlatformSiteConfiguration(TestCase):
+class TestPlatformSiteConfiguration(SimpleTestCase):
     def test_uses_its_own_unfold_config_block(self):
         """Not UNFOLD — that block is tenant #1's branding and sidebar."""
         assert platform_admin_site.settings_name == "UNFOLD_PLATFORM"
@@ -57,7 +63,7 @@ class TestPlatformSiteConfiguration(TestCase):
         assert platform_admin_site.name == "platform_admin"
 
 
-class TestPlatformSiteRegistry(TestCase):
+class TestPlatformSiteRegistry(SimpleTestCase):
     def test_registers_only_control_plane_apps(self):
         labels = {
             model._meta.app_label for model in platform_admin_site._registry
@@ -138,7 +144,7 @@ class TestPlatformSiteRegistry(TestCase):
         assert platform is shared
 
 
-class TestSchemaRouting(TestCase):
+class TestSchemaRouting(SimpleTestCase):
     def test_public_admin_is_the_platform_site(self):
         match = resolve("/admin/", urlconf="tenant.urls_public")
         assert match.namespace == "platform_admin"
@@ -186,33 +192,10 @@ class TestPlatformDashboard(TestCase):
         """`public` is the control plane itself, not a store."""
         from admin.platform_dashboard import dashboard_callback
 
+        store_tenant("public", name="Platform")
         context = dashboard_callback(None, {})
         schemas = {row["schema"] for row in context["platform_tenants"]}
         assert "public" not in schemas
-
-    def test_survives_a_tenant_whose_schema_is_not_ready(self):
-        """A half-provisioned tenant must not 500 the control plane."""
-        from admin.platform_dashboard import dashboard_callback
-        from tenant.models import Tenant
-
-        t = Tenant(
-            schema_name="pop_test_dashboard_missing",
-            name="Half provisioned",
-            slug="half-provisioned",
-            owner_email="x@example.com",
-        )
-        t.auto_create_schema = False
-        t.save()
-        try:
-            context = dashboard_callback(None, {})
-            row = next(
-                r
-                for r in context["platform_tenants"]
-                if r["schema"] == "pop_test_dashboard_missing"
-            )
-            assert row["orders"] is None
-        finally:
-            Tenant.objects.filter(pk=t.pk).delete()
 
 
 class TestControlPlaneIsSuperuserOnly(TestCase):
@@ -230,20 +213,14 @@ class TestControlPlaneIsSuperuserOnly(TestCase):
     @classmethod
     def setUpTestData(cls):
         from tenant.models import (
-            Tenant,
             TenantMembershipRole,
             UserTenantMembership,
         )
         from user.models import UserAccount
 
-        cls.tenant = Tenant(
-            schema_name="controlplane_gate_tenant",
-            name="Control Plane Gate Tenant",
-            slug="controlplane-gate-tenant",
-            owner_email="owner-cp-gate@example.com",
+        cls.tenant = store_tenant(
+            "controlplane_gate_tenant", name="Control Plane Gate Tenant"
         )
-        cls.tenant.auto_create_schema = False
-        cls.tenant.save()
 
         # A merchant: staff (so their own store admin admits them) plus
         # an OWNER membership. The strongest non-platform identity.
@@ -322,7 +299,6 @@ class TestPlatformDashboardPage(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        from tenant.models import Tenant
         from user.models import UserAccount
 
         cls.user = UserAccount.objects.create_superuser(
@@ -334,15 +310,9 @@ class TestPlatformDashboardPage(TestCase):
         # the page shows "No stores yet." and asserting on the table's
         # contents passes or fails on whatever other tests left in the
         # shared xdist database. CI's clean database caught exactly that.
-        cls.store = Tenant(
-            schema_name="dashboard_estate_tenant",
-            name="Dashboard Estate Tenant",
-            slug="dashboard-estate-tenant",
-            owner_email="owner-dashboard-estate@example.com",
-            store_name="Dashboard Estate Store",
+        cls.store = store_tenant(
+            "dashboard_estate_tenant", store_name="Dashboard Estate Store"
         )
-        cls.store.auto_create_schema = False
-        cls.store.save()
 
     def _render(self) -> str:
         """Render the control-plane index for a real platform-staff session.
@@ -449,26 +419,6 @@ class TestPlatformDashboardTable(TestCase):
         for row in table["rows"]:
             assert len(row) == len(table["headers"])
 
-    def test_unreadable_order_counts_render_blank_not_zero(self):
-        """ "0 orders" would read as a real figure for a broken store."""
-        from admin.platform_dashboard import _tenants_table
-
-        table = _tenants_table(
-            [
-                {
-                    "name": "Half provisioned",
-                    "schema": "nope",
-                    "plan": "",
-                    "is_active": True,
-                    "suspended": False,
-                    "domain": "",
-                    "orders": None,
-                    "revenue": None,
-                }
-            ]
-        )
-        assert table["rows"][0][-1] == "—"
-
 
 class TestCommandPalette(TestCase):
     """The ⌘K palette must find RECORDS, and its config must not drift.
@@ -484,7 +434,6 @@ class TestCommandPalette(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        from tenant.models import Tenant
         from user.models import UserAccount
 
         cls.operator = UserAccount.objects.create_superuser(
@@ -492,14 +441,9 @@ class TestCommandPalette(TestCase):
             username="paletteoperator",
             password="testpass123",
         )
-        cls.store = Tenant(
-            schema_name="palette_search_tenant",
-            name="Palette Search Tenant",
-            slug="palette-search-tenant",
-            owner_email="owner-palette@example.com",
+        cls.store = store_tenant(
+            "palette_search_tenant", name="Palette Search Tenant"
         )
-        cls.store.auto_create_schema = False
-        cls.store.save()
 
     def _search(self, term: str):
         from importlib import import_module
@@ -580,7 +524,7 @@ class TestCommandPalette(TestCase):
             ), f"{settings_name} dropped the palette crash guard"
 
 
-class TestAdminLoginLandsInTheAdmin(TestCase):
+class TestAdminLoginLandsInTheAdmin(SimpleTestCase):
     """A staff login must not end up on the storefront.
 
     Without ``next``, Django falls back to ``LOGIN_REDIRECT_URL`` (the

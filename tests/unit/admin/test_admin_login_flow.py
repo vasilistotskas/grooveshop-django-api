@@ -8,7 +8,7 @@ for narrower ``has_permission()``-level unit tests.
 NOTE on "host" semantics: ``tests/conftest.py`` strips
 ``django_tenants.middleware.main.TenantMainMiddleware`` and sets
 ``DATABASE_ROUTERS = []`` for the WHOLE test session — no test in this
-suite gets real hostname-based schema routing (see the ``bind_tenant``
+suite gets real hostname-based schema routing (see the ``bind_tenant_and_schema``
 fixture docstring in ``tests/conftest.py``). These tests simulate
 "being on tenant X's host" the same way the rest of the suite does:
 binding ``connection.tenant`` directly. ``SERVER_NAME`` is set on each
@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import pytest
 from django.core.management import call_command
-from django.db import connection
 from django.test import Client
 from django.urls import reverse
 from django_tenants.utils import get_public_schema_name
@@ -30,6 +29,7 @@ from tenant.models import (
     TenantMembershipRole,
     UserTenantMembership,
 )
+from tests.utils.staff import store_tenant
 from user.factories.account import UserAccountFactory
 
 pytestmark = pytest.mark.django_db
@@ -40,57 +40,12 @@ INDEX_URL = "/admin/"
 
 @pytest.fixture
 def tenant_a(db):
-    t = Tenant(
-        schema_name="loginflow_tenant_a",
-        name="Login Flow Tenant A",
-        slug="loginflow-tenant-a",
-        owner_email="owner-a@example.com",
-    )
-    t.auto_create_schema = False
-    t.save()
-    return t
+    return store_tenant("loginflow_tenant_a")
 
 
 @pytest.fixture
 def tenant_b(db):
-    t = Tenant(
-        schema_name="loginflow_tenant_b",
-        name="Login Flow Tenant B",
-        slug="loginflow-tenant-b",
-        owner_email="owner-b@example.com",
-    )
-    t.auto_create_schema = False
-    t.save()
-    return t
-
-
-@pytest.fixture
-def bind_tenant(monkeypatch):
-    """Bind ``connection.tenant`` (and ``.schema_name``) for one test.
-
-    The views exercised here (``PlatformStaffBackend``, the admin
-    login form, ``password_change``) call REAL
-    ``django_tenants.utils.schema_context()`` internally, whose
-    ``__exit__`` restores the PREVIOUS ``connection.tenant``/
-    ``schema_name`` via a real ``connection.set_tenant()`` call — a
-    genuine, persistent mutation of the shared connection object, not
-    something ``monkeypatch`` tracks on its own. Patching
-    ``schema_name`` too (alongside ``tenant``) makes sure monkeypatch's
-    teardown restores BOTH attributes, so this doesn't leak
-    ``connection.schema_name`` into whichever test runs next in the
-    same xdist worker.
-    """
-
-    def _bind(t):
-        monkeypatch.setattr(connection, "tenant", t, raising=False)
-        monkeypatch.setattr(
-            connection,
-            "schema_name",
-            getattr(t, "schema_name", None) or get_public_schema_name(),
-            raising=False,
-        )
-
-    return _bind
+    return store_tenant("loginflow_tenant_b")
 
 
 def _login(client, *, username, password, server_name):
@@ -106,7 +61,7 @@ def _login(client, *, username, password, server_name):
 
 class TestAdminLoginFlow:
     def test_staff_with_membership_reaches_admin_index(
-        self, tenant_a, bind_tenant
+        self, tenant_a, bind_tenant_and_schema
     ):
         staff = UserAccountFactory(is_staff=True, plain_password="pw12345")
         UserTenantMembership.objects.create(
@@ -115,7 +70,7 @@ class TestAdminLoginFlow:
             role=TenantMembershipRole.STAFF,
             is_active=True,
         )
-        bind_tenant(tenant_a)
+        bind_tenant_and_schema(tenant_a)
 
         client = Client()
         response = _login(
@@ -133,7 +88,7 @@ class TestAdminLoginFlow:
         assert index_response.status_code == 200
 
     def test_staff_without_membership_login_ok_but_admin_denied(
-        self, tenant_a, tenant_b, bind_tenant
+        self, tenant_a, tenant_b, bind_tenant_and_schema
     ):
         staff = UserAccountFactory(is_staff=True, plain_password="pw12345")
         UserTenantMembership.objects.create(
@@ -147,7 +102,7 @@ class TestAdminLoginFlow:
         # PlatformStaffBackend only checks is_active/is_staff on the
         # PUBLIC row — not tenant membership — so authentication
         # succeeds regardless of which tenant is bound.
-        bind_tenant(tenant_b)
+        bind_tenant_and_schema(tenant_b)
         response = _login(
             client,
             username=staff.email,
@@ -166,13 +121,13 @@ class TestAdminLoginFlow:
         assert "login" in index_response.url
 
     def test_tenant_schema_customer_credentials_rejected(
-        self, tenant_a, bind_tenant
+        self, tenant_a, bind_tenant_and_schema
     ):
         # Stands in for a tenant-schema customer: an ordinary,
         # non-staff UserAccount. PlatformStaffBackend only matches
         # PUBLIC-schema is_staff users, so this never authenticates.
         customer = UserAccountFactory(is_staff=False, plain_password="pw12345")
-        bind_tenant(tenant_a)
+        bind_tenant_and_schema(tenant_a)
 
         client = Client()
         response = _login(
@@ -184,11 +139,13 @@ class TestAdminLoginFlow:
         assert response.status_code == 200  # re-renders the login form
         assert response.context["form"].errors
 
-    def test_superuser_passes_on_any_tenant_host(self, tenant_a, bind_tenant):
+    def test_superuser_passes_on_any_tenant_host(
+        self, tenant_a, bind_tenant_and_schema
+    ):
         superuser = UserAccountFactory(
             is_staff=True, is_superuser=True, plain_password="pw12345"
         )
-        bind_tenant(tenant_a)
+        bind_tenant_and_schema(tenant_a)
 
         client = Client()
         _login(
@@ -203,14 +160,14 @@ class TestAdminLoginFlow:
         assert index_response.status_code == 200
 
     def test_force_login_non_platform_backend_denied_even_for_staff_superuser(
-        self, tenant_a, bind_tenant
+        self, tenant_a, bind_tenant_and_schema
     ):
         """A session NOT authenticated via PlatformStaffBackend is
         denied regardless of is_staff/is_superuser — the backend-
         session guard is authoritative (closes the pk-collision
         ambiguity a plain role/flag check can't)."""
         staff = UserAccountFactory(is_staff=True, is_superuser=True)
-        bind_tenant(tenant_a)
+        bind_tenant_and_schema(tenant_a)
 
         client = Client()
         client.force_login(
@@ -225,7 +182,7 @@ class TestAdminLoginFlow:
 
 class TestPlatformHostFlow:
     def test_bootstrap_platform_then_login_and_tenant_admin_writable(
-        self, bind_tenant
+        self, bind_tenant_and_schema
     ):
         call_command("bootstrap_platform", domain="platform.example.com")
         public_tenant = Tenant.objects.get(schema_name=get_public_schema_name())
@@ -241,7 +198,7 @@ class TestPlatformHostFlow:
         # connection.tenant is the resolved Tenant row, including for
         # the public schema (django_tenants sets request.tenant/
         # connection.tenant to the actual row regardless of schema).
-        bind_tenant(public_tenant)
+        bind_tenant_and_schema(public_tenant)
 
         client = Client()
         response = _login(
@@ -276,7 +233,7 @@ class TestAdminPasswordChange:
     to.
     """
 
-    def test_get_renders_form(self, tenant_a, bind_tenant):
+    def test_get_renders_form(self, tenant_a, bind_tenant_and_schema):
         staff = UserAccountFactory(is_staff=True, plain_password="pw12345")
         UserTenantMembership.objects.create(
             user=staff,
@@ -284,7 +241,7 @@ class TestAdminPasswordChange:
             role=TenantMembershipRole.STAFF,
             is_active=True,
         )
-        bind_tenant(tenant_a)
+        bind_tenant_and_schema(tenant_a)
 
         client = Client()
         _login(
@@ -298,7 +255,7 @@ class TestAdminPasswordChange:
         )
         assert response.status_code == 200
 
-    def test_post_changes_password(self, tenant_a, bind_tenant):
+    def test_post_changes_password(self, tenant_a, bind_tenant_and_schema):
         staff = UserAccountFactory(is_staff=True, plain_password="pw12345")
         UserTenantMembership.objects.create(
             user=staff,
@@ -306,7 +263,7 @@ class TestAdminPasswordChange:
             role=TenantMembershipRole.STAFF,
             is_active=True,
         )
-        bind_tenant(tenant_a)
+        bind_tenant_and_schema(tenant_a)
 
         client = Client()
         _login(

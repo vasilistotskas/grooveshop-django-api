@@ -24,7 +24,7 @@ Run targeted tests for modified apps in the grooveshop-django-api project.
 | `search/` | `tests/unit/search/` | `tests/integration/search/` | `uv run pytest tests/unit/search/ tests/integration/search/` |
 | `meili/` | `tests/unit/meili/` | `tests/integration/meili/` | `uv run pytest tests/unit/meili/ tests/integration/meili/` |
 | `notification/` | `tests/unit/notification/` | `tests/integration/notification/` | `uv run pytest tests/unit/notification/ tests/integration/notification/` |
-| `loyalty/` | `tests/unit/test_loyalty/` | `tests/integration/loyalty/` | `uv run pytest tests/unit/test_loyalty/ tests/integration/loyalty/` |
+| `loyalty/` | `tests/unit/loyalty/` | `tests/integration/loyalty/` | `uv run pytest tests/unit/loyalty/ tests/integration/loyalty/` |
 | `core/` | `tests/unit/core/` | `tests/integration/core/` | `uv run pytest tests/unit/core/ tests/integration/core/` |
 | `country/` | `tests/unit/country/` | `tests/integration/country/` | `uv run pytest tests/unit/country/ tests/integration/country/` |
 | `region/` | `tests/unit/region/` | `tests/integration/region/` | `uv run pytest tests/unit/region/ tests/integration/region/` |
@@ -92,4 +92,6 @@ signal to check for contention first.
 - Test timeout is 600 seconds per test
 - Password hashing uses MD5 (faster than default bcrypt)
 - Coverage minimum is 50% (`fail_under = 50`)
-- The `count_queries` fixture uses `.query_count` attribute; the standalone `QueryCountAssertion` uses `.count`
+- Query counts use Django's `CaptureQueriesContext` (`len(ctx)`) and pytest-django's `django_assert_num_queries` / `django_assert_max_num_queries`
+- Running tests beside another pytest session: give it its own `DB_NAME=…` (or `-n0`), or the two truncate each other's `test_<DB_NAME>_gwN` databases
+- Durations that are exact multiples of ~30 s on Windows mean the Docker Desktop `localhost` IPv6 stall — rerun with `REDIS_HOST=127.0.0.1`

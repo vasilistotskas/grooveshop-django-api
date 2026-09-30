@@ -46,7 +46,7 @@ class SnapshotOnWriteTests(TestCase):
         )
 
     def test_a_new_order_records_the_chosen_key(self):
-        order = OrderFactory(pay_way=self.courier_cash)
+        order = OrderFactory(num_order_items=0, pay_way=self.courier_cash)
 
         order.refresh_from_db()
         self.assertEqual(order.pay_way_key, PayWayEnum.PAY_ON_DELIVERY.value)
@@ -54,7 +54,7 @@ class SnapshotOnWriteTests(TestCase):
     def test_changing_the_pay_way_moves_the_snapshot(self):
         """An operator re-pointing an order in the admin means the
         label should follow — it is a correction, not history."""
-        order = OrderFactory(pay_way=self.courier_cash)
+        order = OrderFactory(num_order_items=0, pay_way=self.courier_cash)
 
         order.pay_way = self.card
         order.save()
@@ -64,7 +64,7 @@ class SnapshotOnWriteTests(TestCase):
 
     def test_renaming_the_pay_way_does_not_rewrite_history(self):
         """The case ``pay_way`` migration 0022 actually created."""
-        order = OrderFactory(pay_way=self.courier_cash)
+        order = OrderFactory(num_order_items=0, pay_way=self.courier_cash)
         self.assertEqual(order.pay_way_key, PayWayEnum.PAY_ON_DELIVERY.value)
 
         self.courier_cash.translations.update(
@@ -82,7 +82,7 @@ class SnapshotOnWriteTests(TestCase):
         )
 
     def test_the_snapshot_survives_deleting_the_pay_way(self):
-        order = OrderFactory(pay_way=self.courier_cash)
+        order = OrderFactory(num_order_items=0, pay_way=self.courier_cash)
         self.courier_cash.delete()
 
         order.refresh_from_db()
@@ -94,7 +94,7 @@ class SnapshotOnWriteTests(TestCase):
         """``update_fields`` drops any column it does not name, so the
         write has to be added to the set — exactly what bit
         ``updated_at`` for every partial save before it was fixed."""
-        order = OrderFactory(pay_way=self.courier_cash)
+        order = OrderFactory(num_order_items=0, pay_way=self.courier_cash)
         Order.objects.filter(pk=order.pk).update(pay_way_key="")
         order.refresh_from_db()
         self.assertEqual(order.pay_way_key, "")
@@ -106,7 +106,7 @@ class SnapshotOnWriteTests(TestCase):
         self.assertEqual(order.pay_way_key, PayWayEnum.PAY_ON_DELIVERY.value)
 
     def test_an_order_with_no_pay_way_keeps_an_empty_snapshot(self):
-        order = OrderFactory(pay_way=None)
+        order = OrderFactory(num_order_items=0, pay_way=None)
 
         order.refresh_from_db()
 
@@ -115,7 +115,7 @@ class SnapshotOnWriteTests(TestCase):
     def test_clearing_the_pay_way_leaves_the_snapshot_intact(self):
         """Nulling the FK is precisely when the snapshot earns its
         keep; it must not be nulled along with it."""
-        order = OrderFactory(pay_way=self.courier_cash)
+        order = OrderFactory(num_order_items=0, pay_way=self.courier_cash)
 
         order.pay_way = None
         order.save()
@@ -135,7 +135,7 @@ class SnapshotCostsNoQueriesToReadTests(TestCase):
 
     def test_reading_the_key_hits_no_extra_query(self):
         pay_way = _pay_way(PayWayEnum.PAY_ON_DELIVERY.value)
-        OrderFactory(pay_way=pay_way)
+        OrderFactory(num_order_items=0, pay_way=pay_way)
         cache.clear()
 
         orders = list(Order.objects.for_list())

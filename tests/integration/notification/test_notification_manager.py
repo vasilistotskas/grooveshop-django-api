@@ -1,6 +1,5 @@
 from datetime import timedelta
 
-import pytest
 from django.test import TestCase
 from django.utils import timezone
 
@@ -14,66 +13,66 @@ from notification.managers import NotificationQuerySet
 from notification.models.notification import Notification
 
 
-@pytest.mark.django_db
 class TestNotificationQuerySet(TestCase):
-    def setUp(self):
-        self.now = timezone.now()
+    @classmethod
+    def setUpTestData(cls):
+        cls.now = timezone.now()
 
-        self.active_notification_1 = NotificationFactory(
+        cls.active_notification_1 = NotificationFactory(
             kind=NotificationKindEnum.INFO,
             category=NotificationCategoryEnum.ORDER,
             priority=NotificationPriorityEnum.HIGH,
-            expiry_date=self.now + timedelta(days=7),
+            expiry_date=cls.now + timedelta(days=7),
         )
 
-        self.active_notification_2 = NotificationFactory(
+        cls.active_notification_2 = NotificationFactory(
             kind=NotificationKindEnum.SUCCESS,
             category=NotificationCategoryEnum.CART,
             priority=NotificationPriorityEnum.NORMAL,
             expiry_date=None,
         )
 
-        self.expired_notification = NotificationFactory(
+        cls.expired_notification = NotificationFactory(
             kind=NotificationKindEnum.WARNING,
             category=NotificationCategoryEnum.SECURITY,
             priority=NotificationPriorityEnum.URGENT,
-            expiry_date=self.now - timedelta(days=1),
+            expiry_date=cls.now - timedelta(days=1),
         )
 
-        self.critical_notification = NotificationFactory(
+        cls.critical_notification = NotificationFactory(
             kind=NotificationKindEnum.ERROR,
             category=NotificationCategoryEnum.SYSTEM,
             priority=NotificationPriorityEnum.CRITICAL,
-            expiry_date=self.now + timedelta(days=30),
+            expiry_date=cls.now + timedelta(days=30),
         )
 
-        self.promo_notification = NotificationFactory(
+        cls.promo_notification = NotificationFactory(
             kind=NotificationKindEnum.INFO,
             category=NotificationCategoryEnum.PROMOTION,
             priority=NotificationPriorityEnum.LOW,
             link="/promo",
         )
 
-        self.active_notification_1.link = ""
-        self.active_notification_1.save()
+        cls.active_notification_1.link = ""
+        cls.active_notification_1.save()
 
-        self.active_notification_2.link = ""
-        self.active_notification_2.save()
+        cls.active_notification_2.link = ""
+        cls.active_notification_2.save()
 
-        self.expired_notification.link = ""
-        self.expired_notification.save()
+        cls.expired_notification.link = ""
+        cls.expired_notification.save()
 
-        self.critical_notification.link = ""
-        self.critical_notification.save()
+        cls.critical_notification.link = ""
+        cls.critical_notification.save()
 
-        old_date = self.now - timedelta(days=100)
-        self.old_expired_notification = NotificationFactory(
+        old_date = cls.now - timedelta(days=100)
+        cls.old_expired_notification = NotificationFactory(
             kind=NotificationKindEnum.WARNING,
             category=NotificationCategoryEnum.ACCOUNT,
             priority=NotificationPriorityEnum.NORMAL,
-            expiry_date=self.now - timedelta(days=95),
+            expiry_date=cls.now - timedelta(days=95),
         )
-        Notification.objects.filter(id=self.old_expired_notification.id).update(
+        Notification.objects.filter(id=cls.old_expired_notification.id).update(
             created_at=old_date
         )
 
@@ -250,36 +249,36 @@ class TestNotificationQuerySet(TestCase):
         self.assertNotIn(self.expired_notification, high_priority_active)
 
 
-@pytest.mark.django_db
 class TestNotificationManager(TestCase):
-    def setUp(self):
-        self.now = timezone.now()
+    @classmethod
+    def setUpTestData(cls):
+        cls.now = timezone.now()
 
-        self.active_notification = NotificationFactory(
+        cls.active_notification = NotificationFactory(
             kind=NotificationKindEnum.INFO,
             priority=NotificationPriorityEnum.HIGH,
-            expiry_date=self.now + timedelta(days=7),
+            expiry_date=cls.now + timedelta(days=7),
         )
 
-        self.expired_notification = NotificationFactory(
+        cls.expired_notification = NotificationFactory(
             kind=NotificationKindEnum.WARNING,
             priority=NotificationPriorityEnum.URGENT,
-            expiry_date=self.now - timedelta(days=1),
+            expiry_date=cls.now - timedelta(days=1),
         )
 
-        self.critical_notification = NotificationFactory(
+        cls.critical_notification = NotificationFactory(
             kind=NotificationKindEnum.ERROR,
             priority=NotificationPriorityEnum.CRITICAL,
-            expiry_date=self.now + timedelta(days=30),
+            expiry_date=cls.now + timedelta(days=30),
         )
 
-        old_date = self.now - timedelta(days=100)
-        self.old_expired_notification = NotificationFactory(
+        old_date = cls.now - timedelta(days=100)
+        cls.old_expired_notification = NotificationFactory(
             kind=NotificationKindEnum.WARNING,
             priority=NotificationPriorityEnum.NORMAL,
-            expiry_date=self.now - timedelta(days=95),
+            expiry_date=cls.now - timedelta(days=95),
         )
-        Notification.objects.filter(id=self.old_expired_notification.id).update(
+        Notification.objects.filter(id=cls.old_expired_notification.id).update(
             created_at=old_date
         )
 

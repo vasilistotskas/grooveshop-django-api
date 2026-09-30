@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta
+from datetime import date, datetime, time, timedelta
 from urllib.parse import unquote
 from uuid import uuid4
 
@@ -9,6 +9,7 @@ from django.conf import settings as django_settings
 from django.core.cache import caches
 from django.db.models import Avg, Count, Max
 from django.utils import timezone
+from django.utils.functional import Promise
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from extra_settings.models import Setting
@@ -28,6 +29,7 @@ from core.api.permissions import IsStoreStaff
 from core.api.serializers import ErrorResponseSerializer
 from core.api.throttling import SearchClickThrottle, SearchThrottle
 from meili._client import client as meili_client
+from meili.querysets import HIGHLIGHT_POST_TAG, HIGHLIGHT_PRE_TAG
 from product.models.product import ProductTranslation
 from search.models import SearchClick, SearchQuery
 from search.serializers import (
@@ -684,6 +686,11 @@ def federated_search(request):
             "showMatchesPosition": True,
             "showRankingScore": True,
             "attributesToRetrieve": ["*"],
+            # As IndexQuerySet sends for the single-index endpoints:
+            # without it no hit carries ``_formatted``.
+            "attributesToHighlight": ["*"],
+            "highlightPreTag": HIGHLIGHT_PRE_TAG,
+            "highlightPostTag": HIGHLIGHT_POST_TAG,
             "federationOptions": {"weight": 1.0},
         }
     ]
@@ -696,6 +703,9 @@ def federated_search(request):
                 "showMatchesPosition": True,
                 "showRankingScore": True,
                 "attributesToRetrieve": ["*"],
+                "attributesToHighlight": ["*"],
+                "highlightPreTag": HIGHLIGHT_PRE_TAG,
+                "highlightPostTag": HIGHLIGHT_POST_TAG,
                 "federationOptions": {"weight": 0.7},
             }
         )
@@ -878,6 +888,20 @@ def search_click(request):
     return Response({"detail": _("Accepted.")}, status=status.HTTP_202_ACCEPTED)
 
 
+def _analytics_day(value: str | None, invalid: str | Promise) -> date | None:
+    """Parse an analytics ``YYYY-MM-DD`` bound; ``None`` when absent."""
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(value)
+    except ValueError:
+        raise ValidationError({"error": invalid}) from None
+
+
+def _start_of_local_day(day: date) -> datetime:
+    return timezone.make_aware(datetime.combine(day, time.min))
+
+
 @extend_schema(  # ty: ignore[invalid-argument-type]
     summary=_("Get search analytics metrics"),
     description=_(
@@ -957,38 +981,29 @@ def search_analytics(request):
     # Build base queryset
     queries_qs = SearchQuery.objects.all()
 
-    # Apply date range filters
-    if start_date_str:
-        try:
-            start_date = datetime.fromisoformat(start_date_str)
-            # Make timezone-aware if naive
-            if timezone.is_naive(start_date):
-                start_date = timezone.make_aware(start_date)
-            queries_qs = queries_qs.filter(timestamp__gte=start_date)
-        except ValueError:
-            raise ValidationError(
-                {
-                    "error": _(
-                        "Invalid start_date format. Use ISO format: YYYY-MM-DD"
-                    )
-                }
-            )
-
-    if end_date_str:
-        try:
-            end_date = datetime.fromisoformat(end_date_str)
-            # Make timezone-aware if naive
-            if timezone.is_naive(end_date):
-                end_date = timezone.make_aware(end_date)
-            queries_qs = queries_qs.filter(timestamp__lte=end_date)
-        except ValueError:
-            raise ValidationError(
-                {
-                    "error": _(
-                        "Invalid end_date format. Use ISO format: YYYY-MM-DD"
-                    )
-                }
-            )
+    # Apply date range filters. Both bounds are whole local days, so
+    # the range is half-open: from the start day's first instant up to,
+    # not including, the first instant of the day after end_date.
+    start_date = _analytics_day(
+        start_date_str,
+        _("Invalid start_date format. Use ISO format: YYYY-MM-DD"),
+    )
+    end_date = _analytics_day(
+        end_date_str,
+        _("Invalid end_date format. Use ISO format: YYYY-MM-DD"),
+    )
+    if start_date and end_date and start_date > end_date:
+        raise ValidationError(
+            {"error": _("start_date must not be after end_date.")}
+        )
+    if start_date:
+        queries_qs = queries_qs.filter(
+            timestamp__gte=_start_of_local_day(start_date)
+        )
+    if end_date:
+        queries_qs = queries_qs.filter(
+            timestamp__lt=_start_of_local_day(end_date + timedelta(days=1))
+        )
 
     # Apply content type filter
     if content_type_filter:

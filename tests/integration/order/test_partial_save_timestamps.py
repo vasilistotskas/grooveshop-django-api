@@ -44,7 +44,7 @@ from pay_way.factories import PayWayFactory
 class TestPartialSaveKeepsUpdatedAtHonest:
     def test_partial_save_bumps_updated_at(self):
         """The mechanism, in isolation."""
-        order = OrderFactory(status=OrderStatus.PENDING)
+        order = OrderFactory(num_order_items=0, status=OrderStatus.PENDING)
         Order.objects.filter(pk=order.pk).update(
             updated_at=timezone.now() - timedelta(hours=3)
         )
@@ -71,7 +71,7 @@ class TestPartialSaveKeepsUpdatedAtHonest:
         end of ``save()`` consumed the transition so it could never be
         written afterwards.
         """
-        order = OrderFactory(status=OrderStatus.PENDING)
+        order = OrderFactory(num_order_items=0, status=OrderStatus.PENDING)
         Order.objects.filter(pk=order.pk).update(status_updated_at=None)
         order.refresh_from_db()
 
@@ -91,6 +91,7 @@ class TestFailedPaymentKeepsItsGraceWindow:
     def _order_placed_an_hour_ago(self):
         pay_way = PayWayFactory(settlement=PaySettlement.ONLINE, active=True)
         order = OrderFactory(
+            num_order_items=0,
             status=OrderStatus.PENDING,
             payment_status=PaymentStatus.PENDING,
             pay_way=pay_way,

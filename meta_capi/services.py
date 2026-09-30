@@ -169,7 +169,13 @@ def _build_user_data(order: Order) -> Any:
 
     return UserData(
         email=(order.email or "").strip().lower() or None,
-        phone=str(order.phone) if order.phone else None,
+        # An invalid number is stored as its raw input, with no country
+        # code: its hash could never match, and the SDK refuses to
+        # normalise it at send time, which would lose the whole event.
+        # A valid one renders as E.164, without any extension.
+        phone=(
+            str(order.phone) if order.phone and order.phone.is_valid() else None
+        ),
         first_name=(order.first_name or "").strip().lower() or None,
         last_name=(order.last_name or "").strip().lower() or None,
         city=(order.city or "").strip().lower() or None,

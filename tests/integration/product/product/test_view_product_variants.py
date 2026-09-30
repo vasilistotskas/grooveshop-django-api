@@ -1,3 +1,5 @@
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -10,7 +12,6 @@ from product.factories.product import ProductFactory
 from product.factories.product_attribute import ProductAttributeFactory
 from product.factories.variant_group import ProductVariantGroupFactory
 from product.models.product_attribute import ProductAttribute
-from tests.utils import count_queries
 from vat.factories import VatFactory
 
 
@@ -162,7 +163,7 @@ class ProductVariantsActionTestCase(APITestCase):
 
     def test_no_n_plus_one_queries(self):
         """Query count must not grow with the number of siblings."""
-        with count_queries() as small:
+        with CaptureQueriesContext(connection) as small:
             self.client.get(self.url(self.white_product.pk))
 
         # Add three more colour variants to the same group.
@@ -183,13 +184,13 @@ class ProductVariantsActionTestCase(APITestCase):
                 product=product, attribute_value=extra_value
             )
 
-        with count_queries() as large:
+        with CaptureQueriesContext(connection) as large:
             self.client.get(self.url(self.white_product.pk))
 
         self.assertEqual(
-            small.count,
-            large.count,
-            f"Query count grew from {small.count} to {large.count} when "
+            len(small),
+            len(large),
+            f"Query count grew from {len(small)} to {len(large)} when "
             f"siblings doubled — N+1 regression.",
         )
 

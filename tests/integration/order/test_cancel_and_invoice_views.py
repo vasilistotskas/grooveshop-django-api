@@ -36,23 +36,31 @@ class CancelOrderStateTransitionTestCase(APITestCase):
         order raising ``OrderCancellationError`` must surface as 400,
         not 500 — the frontend relies on 400 to switch to its
         conflict-refresh UX."""
-        order = OrderFactory(user=self.user, status=OrderStatus.SHIPPED)
+        order = OrderFactory(
+            user=self.user, status=OrderStatus.SHIPPED, num_order_items=0
+        )
         response = self.client.post(self._url(order.pk), data={})
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("detail", response.data)
 
     def test_cancelling_canceled_order_returns_400(self) -> None:
-        order = OrderFactory(user=self.user, status=OrderStatus.CANCELED)
+        order = OrderFactory(
+            user=self.user, status=OrderStatus.CANCELED, num_order_items=0
+        )
         response = self.client.post(self._url(order.pk), data={})
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_cancelling_pending_order_succeeds(self) -> None:
-        order = OrderFactory(user=self.user, status=OrderStatus.PENDING)
+        order = OrderFactory(
+            user=self.user, status=OrderStatus.PENDING, num_order_items=0
+        )
         response = self.client.post(self._url(order.pk), data={})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_cancelling_processing_order_succeeds(self) -> None:
-        order = OrderFactory(user=self.user, status=OrderStatus.PROCESSING)
+        order = OrderFactory(
+            user=self.user, status=OrderStatus.PROCESSING, num_order_items=0
+        )
         response = self.client.post(self._url(order.pk), data={})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
@@ -106,12 +114,9 @@ class OrderInvoiceEndpointTestCase(APITestCase):
     def test_other_user_cannot_fetch_invoice(self) -> None:
         """Ownership check — ``IsOwnerOrAdminOrGuest`` applies via the
         viewset's standard ``get_object``."""
-        order = OrderFactory(user=UserAccountFactory())
+        order = OrderFactory(user=UserAccountFactory(), num_order_items=0)
         response = self.client.get(self._url(order.pk))
-        self.assertIn(
-            response.status_code,
-            (status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND),
-        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     @patch(
         "order.invoicing._render_pdf_bytes",
@@ -188,9 +193,6 @@ class OrderInvoiceDownloadEndpointTestCase(APITestCase):
         self.assertTrue(body.startswith(b"%PDF-"))
 
     def test_other_user_cannot_download(self) -> None:
-        order = OrderFactory(user=UserAccountFactory())
+        order = OrderFactory(user=UserAccountFactory(), num_order_items=0)
         response = self.client.get(self._url(order.pk))
-        self.assertIn(
-            response.status_code,
-            (status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND),
-        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)

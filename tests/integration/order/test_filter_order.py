@@ -19,10 +19,10 @@ User = get_user_model()
 
 
 class OrderFilterTest(APITestCase):
-    def setUp(self):
-        Order.objects.all().delete()
+    @classmethod
+    def setUpTestData(cls):
 
-        self.admin_user = UserAccountFactory(
+        cls.admin_user = UserAccountFactory(
             email="admin@example.com",
             first_name="Admin",
             last_name="User",
@@ -30,42 +30,41 @@ class OrderFilterTest(APITestCase):
             is_staff=True,
             is_superuser=True,
         )
-        self.client.force_authenticate(user=self.admin_user)
 
-        self.user1 = UserAccountFactory(
+        cls.user1 = UserAccountFactory(
             email="user1@example.com",
             first_name="John",
             last_name="Doe",
             is_active=True,
         )
-        self.user2 = UserAccountFactory(
+        cls.user2 = UserAccountFactory(
             email="user2@example.com",
             first_name="Jane",
             last_name="Smith",
             is_active=True,
         )
-        self.inactive_user = UserAccountFactory(
+        cls.inactive_user = UserAccountFactory(
             email="inactive@example.com",
             first_name="Inactive",
             last_name="User",
             is_active=False,
         )
 
-        self.country1 = CountryFactory(alpha_2="US")
-        self.country2 = CountryFactory(alpha_2="DE")
-        self.region1 = RegionFactory(country=self.country1)
-        self.region2 = RegionFactory(country=self.country2)
+        cls.country1 = CountryFactory(alpha_2="US")
+        cls.country2 = CountryFactory(alpha_2="DE")
+        cls.region1 = RegionFactory(country=cls.country1)
+        cls.region2 = RegionFactory(country=cls.country2)
 
-        self.pay_way1 = PayWayFactory(settlement=PaySettlement.ONLINE)
-        self.pay_way2 = PayWayFactory(settlement=PaySettlement.COURIER_CASH)
+        cls.pay_way1 = PayWayFactory(settlement=PaySettlement.ONLINE)
+        cls.pay_way2 = PayWayFactory(settlement=PaySettlement.COURIER_CASH)
 
-        self.now = timezone.now()
+        cls.now = timezone.now()
 
-        self.pending_order = OrderFactory.build(
-            user=self.user1,
-            country=self.country1,
-            region=self.region1,
-            pay_way=self.pay_way1,
+        cls.pending_order = OrderFactory.build(
+            user=cls.user1,
+            country=cls.country1,
+            region=cls.region1,
+            pay_way=cls.pay_way1,
             status=OrderStatus.PENDING,
             payment_status=PaymentStatus.PENDING,
             first_name="John",
@@ -83,16 +82,16 @@ class OrderFilterTest(APITestCase):
             payment_id="",
             status_updated_at=None,
         )
-        self.pending_order.save()
-        Order.objects.filter(id=self.pending_order.id).update(
-            created_at=self.now - timedelta(hours=1)
+        cls.pending_order.save()
+        Order.objects.filter(id=cls.pending_order.id).update(
+            created_at=cls.now - timedelta(hours=1)
         )
 
-        self.processing_order = OrderFactory.build(
-            user=self.user1,
-            country=self.country1,
-            region=self.region1,
-            pay_way=self.pay_way1,
+        cls.processing_order = OrderFactory.build(
+            user=cls.user1,
+            country=cls.country1,
+            region=cls.region1,
+            pay_way=cls.pay_way1,
             status=OrderStatus.PROCESSING,
             payment_status=PaymentStatus.COMPLETED,
             first_name="John",
@@ -108,18 +107,18 @@ class OrderFilterTest(APITestCase):
             shipping_price=Money(15, "EUR"),
             tracking_number="",
             payment_id="pay_123456",
-            status_updated_at=self.now - timedelta(minutes=30),
+            status_updated_at=cls.now - timedelta(minutes=30),
         )
-        self.processing_order.save()
-        Order.objects.filter(id=self.processing_order.id).update(
-            created_at=self.now - timedelta(hours=2)
+        cls.processing_order.save()
+        Order.objects.filter(id=cls.processing_order.id).update(
+            created_at=cls.now - timedelta(hours=2)
         )
 
-        self.shipped_order = OrderFactory.build(
-            user=self.user2,
-            country=self.country2,
-            region=self.region2,
-            pay_way=self.pay_way2,
+        cls.shipped_order = OrderFactory.build(
+            user=cls.user2,
+            country=cls.country2,
+            region=cls.region2,
+            pay_way=cls.pay_way2,
             status=OrderStatus.SHIPPED,
             payment_status=PaymentStatus.COMPLETED,
             first_name="Jane",
@@ -136,18 +135,18 @@ class OrderFilterTest(APITestCase):
             tracking_number="TRACK123456",
             payment_id="pay_789012",
             shipping_carrier="DHL",
-            status_updated_at=self.now - timedelta(hours=6),
+            status_updated_at=cls.now - timedelta(hours=6),
         )
-        self.shipped_order.save()
-        Order.objects.filter(id=self.shipped_order.id).update(
-            created_at=self.now - timedelta(days=1)
+        cls.shipped_order.save()
+        Order.objects.filter(id=cls.shipped_order.id).update(
+            created_at=cls.now - timedelta(days=1)
         )
 
-        self.completed_order = OrderFactory.build(
-            user=self.user2,
-            country=self.country2,
-            region=self.region2,
-            pay_way=self.pay_way1,
+        cls.completed_order = OrderFactory.build(
+            user=cls.user2,
+            country=cls.country2,
+            region=cls.region2,
+            pay_way=cls.pay_way1,
             status=OrderStatus.COMPLETED,
             payment_status=PaymentStatus.COMPLETED,
             first_name="Jane",
@@ -164,18 +163,18 @@ class OrderFilterTest(APITestCase):
             tracking_number="TRACK789012",
             payment_id="pay_345678",
             shipping_carrier="FEDEX",
-            status_updated_at=self.now - timedelta(days=2),
+            status_updated_at=cls.now - timedelta(days=2),
         )
-        self.completed_order.save()
-        Order.objects.filter(id=self.completed_order.id).update(
-            created_at=self.now - timedelta(days=7)
+        cls.completed_order.save()
+        Order.objects.filter(id=cls.completed_order.id).update(
+            created_at=cls.now - timedelta(days=7)
         )
 
-        self.canceled_order = OrderFactory.build(
+        cls.canceled_order = OrderFactory.build(
             user=None,
-            country=self.country1,
-            region=self.region1,
-            pay_way=self.pay_way2,
+            country=cls.country1,
+            region=cls.region1,
+            pay_way=cls.pay_way2,
             status=OrderStatus.CANCELED,
             payment_status=PaymentStatus.FAILED,
             first_name="Guest",
@@ -191,12 +190,15 @@ class OrderFilterTest(APITestCase):
             shipping_price=Money(12, "EUR"),
             tracking_number="",
             payment_id="",
-            status_updated_at=self.now - timedelta(days=5),
+            status_updated_at=cls.now - timedelta(days=5),
         )
-        self.canceled_order.save()
-        Order.objects.filter(id=self.canceled_order.id).update(
-            created_at=self.now - timedelta(days=35)
+        cls.canceled_order.save()
+        Order.objects.filter(id=cls.canceled_order.id).update(
+            created_at=cls.now - timedelta(days=35)
         )
+
+    def setUp(self):
+        self.client.force_authenticate(user=self.admin_user)
 
     def test_basic_filters(self):
         url = reverse("order-list")
@@ -384,37 +386,21 @@ class OrderFilterTest(APITestCase):
 
         response = self.client.get(url, {"active_orders": "true"})
         self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-        active_statuses = OrderStatus.get_active_statuses()
-        expected_count = sum(
-            1
-            for order in [
-                self.pending_order,
-                self.processing_order,
-                self.shipped_order,
-                self.completed_order,
-                self.canceled_order,
-            ]
-            if order.status in active_statuses
+        self.assertEqual(
+            {r["id"] for r in response.data["results"]},
+            {
+                self.pending_order.id,
+                self.processing_order.id,
+                self.shipped_order.id,
+            },
         )
-        self.assertEqual(len(result_ids), expected_count)
 
         response = self.client.get(url, {"final_orders": "true"})
         self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-        final_statuses = OrderStatus.get_final_statuses()
-        expected_count = sum(
-            1
-            for order in [
-                self.pending_order,
-                self.processing_order,
-                self.shipped_order,
-                self.completed_order,
-                self.canceled_order,
-            ]
-            if order.status in final_statuses
+        self.assertEqual(
+            {r["id"] for r in response.data["results"]},
+            {self.completed_order.id, self.canceled_order.id},
         )
-        self.assertEqual(len(result_ids), expected_count)
 
         response = self.client.get(url, {"recent_orders": "true"})
         self.assertEqual(response.status_code, 200)
@@ -578,6 +564,3 @@ class OrderFilterTest(APITestCase):
 
         self.assertEqual(results[0]["id"], self.pending_order.id)
         self.assertEqual(results[1]["id"], self.processing_order.id)
-
-    def tearDown(self):
-        Order.objects.all().delete()

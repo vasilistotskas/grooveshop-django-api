@@ -14,6 +14,8 @@ from datetime import timedelta
 from decimal import Decimal
 
 import pytest
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 from djmoney.money import Money
 
@@ -36,7 +38,6 @@ from promotion.services import (
     CouponService,
     PromotionEngine,
 )
-from tests.utils import count_queries
 from user.factories.account import UserAccountFactory
 
 
@@ -500,7 +501,7 @@ class TestQueryBudget:
         # Warm the per-schema caches (content types, lazy search_path)
         # before measuring — see the query-budget note in project memory.
         CouponPickerService.available(cart)
-        with count_queries() as two_codes:
+        with CaptureQueriesContext(connection) as two_codes:
             CouponPickerService.available(cart)
 
         for index in range(6):
@@ -511,11 +512,11 @@ class TestQueryBudget:
             )
 
         CouponPickerService.available(cart)
-        with count_queries() as eight_codes:
+        with CaptureQueriesContext(connection) as eight_codes:
             options = CouponPickerService.available(cart)
         assert len(options) == 8
-        assert eight_codes.count == two_codes.count, (
-            f"the picker grew from {two_codes.count} to "
-            f"{eight_codes.count} queries with six more coupons — it is "
+        assert len(eight_codes) == len(two_codes), (
+            f"the picker grew from {len(two_codes)} to "
+            f"{len(eight_codes)} queries with six more coupons — it is "
             f"evaluating per code instead of collecting once"
         )

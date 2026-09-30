@@ -20,13 +20,19 @@ pytestmark = pytest.mark.django_db
 
 def test_paid_delivered_orders_are_completed_silently():
     paid = OrderFactory(
-        status=OrderStatus.DELIVERED, payment_status=PaymentStatus.COMPLETED
+        num_order_items=0,
+        status=OrderStatus.DELIVERED,
+        payment_status=PaymentStatus.COMPLETED,
     )
     cod_waiting = OrderFactory(
-        status=OrderStatus.DELIVERED, payment_status=PaymentStatus.PENDING
+        num_order_items=0,
+        status=OrderStatus.DELIVERED,
+        payment_status=PaymentStatus.PENDING,
     )
     shipped = OrderFactory(
-        status=OrderStatus.SHIPPED, payment_status=PaymentStatus.COMPLETED
+        num_order_items=0,
+        status=OrderStatus.SHIPPED,
+        payment_status=PaymentStatus.COMPLETED,
     )
 
     result = complete_paid_delivered_orders()

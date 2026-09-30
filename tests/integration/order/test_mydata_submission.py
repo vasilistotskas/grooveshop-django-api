@@ -56,13 +56,7 @@ def _enable_mydata(test_case: TestCase) -> None:
     """Patch the myDATA integration boundary so the rest of the call
     chain sees "enabled and configured".
 
-    Sidesteps the ``Setting.objects.update_or_create`` → ``Setting.get``
-    round-trip that flaked under CI's parallel xdist run: the autouse
-    ``_reseed_extra_settings`` fixture (conftest.py) rewrites the same
-    ``EXTRA_SETTINGS_DEFAULTS`` rows on every worker for every test,
-    and the resulting savepoint-visibility interaction occasionally
-    causes ``Setting.get`` to return the seeded default instead of the
-    just-written test value. Patching ``load_config`` +
+    Patching ``load_config`` +
     ``_resolve_issuer_vat`` removes the dependency on ``Setting``
     entirely for these tests — the same boundary the service-level
     docstring already calls out as "kept separate so tests can

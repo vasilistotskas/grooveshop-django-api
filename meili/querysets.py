@@ -40,6 +40,12 @@ class Point(NamedTuple):
     lng: float | str
 
 
+# The markup every search endpoint wraps a matched term in; the
+# federated search sends the same pair (search/views.py).
+HIGHLIGHT_PRE_TAG = "<mark>"
+HIGHLIGHT_POST_TAG = "</mark>"
+
+
 @dataclass(slots=True)
 class QueryState:
     """
@@ -58,8 +64,8 @@ class QueryState:
     crop_length: int = 10
     crop_marker: str = "..."
     attributes_to_highlight: list[str] = field(default_factory=lambda: ["*"])
-    highlight_pre_tag: str = "<mark>"
-    highlight_post_tag: str = "</mark>"
+    highlight_pre_tag: str = HIGHLIGHT_PRE_TAG
+    highlight_post_tag: str = HIGHLIGHT_POST_TAG
     show_matches_position: bool = True
     sort: list[str] = field(default_factory=list)
     matching_strategy: Literal["last", "all", "frequency"] = "last"

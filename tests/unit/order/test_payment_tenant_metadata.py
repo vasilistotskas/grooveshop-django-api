@@ -15,42 +15,9 @@ from unittest import mock
 
 import pytest
 from django.conf import settings
-from django.db import connection
 from djmoney.money import Money
 
 from order.payment import StripePaymentProvider
-
-
-@pytest.fixture
-def bind_tenant(monkeypatch):
-    """Mimic ``django_tenants.TenantMainMiddleware.set_tenant``.
-
-    The real middleware sets both ``connection.tenant`` and
-    ``connection.schema_name``; the payment code reads the latter.
-    Binding only the tenant leaves ``schema_name`` on its prior value
-    ("public" in the test DB), which would mask real bugs.
-    """
-    original_schema = getattr(connection, "schema_name", "public")
-
-    def _bind(t):
-        if t is None:
-            monkeypatch.setattr(connection, "tenant", None, raising=False)
-            monkeypatch.setattr(
-                connection, "schema_name", "public", raising=False
-            )
-            return
-        monkeypatch.setattr(connection, "tenant", t, raising=False)
-        monkeypatch.setattr(
-            connection,
-            "schema_name",
-            getattr(t, "schema_name", "public"),
-            raising=False,
-        )
-
-    yield _bind
-    monkeypatch.setattr(
-        connection, "schema_name", original_schema, raising=False
-    )
 
 
 @pytest.fixture
@@ -82,9 +49,9 @@ class TestProcessPaymentMetadata:
     @mock.patch("order.payment.PaymentIntent.sync_from_stripe_data")
     @mock.patch("order.payment.stripe.PaymentIntent.create")
     def test_includes_tenant_schema_in_metadata(
-        self, mock_create, _mock_sync, amount, bind_tenant
+        self, mock_create, _mock_sync, amount, bind_tenant_and_schema
     ):
-        bind_tenant(_fake_tenant(schema_name="webside"))
+        bind_tenant_and_schema(_fake_tenant(schema_name="webside"))
         mock_create.return_value = _stub_stripe_payment_intent()
 
         provider = StripePaymentProvider()
@@ -98,9 +65,11 @@ class TestProcessPaymentMetadata:
     @mock.patch("order.payment.PaymentIntent.sync_from_stripe_data")
     @mock.patch("order.payment.stripe.PaymentIntent.create")
     def test_includes_stripe_connect_id_when_present(
-        self, mock_create, _mock_sync, amount, bind_tenant
+        self, mock_create, _mock_sync, amount, bind_tenant_and_schema
     ):
-        bind_tenant(_fake_tenant(schema_name="tenant-b", connect_id="acct_123"))
+        bind_tenant_and_schema(
+            _fake_tenant(schema_name="tenant-b", connect_id="acct_123")
+        )
         mock_create.return_value = _stub_stripe_payment_intent()
 
         provider = StripePaymentProvider()
@@ -112,9 +81,11 @@ class TestProcessPaymentMetadata:
     @mock.patch("order.payment.PaymentIntent.sync_from_stripe_data")
     @mock.patch("order.payment.stripe.PaymentIntent.create")
     def test_omits_stripe_connect_id_when_blank(
-        self, mock_create, _mock_sync, amount, bind_tenant
+        self, mock_create, _mock_sync, amount, bind_tenant_and_schema
     ):
-        bind_tenant(_fake_tenant(schema_name="webside", connect_id=""))
+        bind_tenant_and_schema(
+            _fake_tenant(schema_name="webside", connect_id="")
+        )
         mock_create.return_value = _stub_stripe_payment_intent()
 
         provider = StripePaymentProvider()
@@ -127,7 +98,12 @@ class TestProcessPaymentMetadata:
     @mock.patch("order.payment.stripe.PaymentIntent.create")
     @mock.patch("tenant.credentials.stripe_credentials")
     def test_defaults_to_public_when_no_tenant(
-        self, mock_creds, mock_create, _mock_sync, amount, bind_tenant
+        self,
+        mock_creds,
+        mock_create,
+        _mock_sync,
+        amount,
+        bind_tenant_and_schema,
     ):
         # When Celery / tests run outside a tenant request the schema
         # falls back to "public" so finance still has a value to key on.
@@ -139,7 +115,7 @@ class TestProcessPaymentMetadata:
             "publishable_key": "pk_test_dummy_tenant_key",
             "live_mode": False,
         }
-        bind_tenant(None)
+        bind_tenant_and_schema(None)
         mock_create.return_value = _stub_stripe_payment_intent()
 
         provider = StripePaymentProvider()
@@ -152,8 +128,10 @@ class TestProcessPaymentMetadata:
 class TestRefundMetadata:
     @mock.patch("order.payment.Refund.sync_from_stripe_data")
     @mock.patch("order.payment.stripe.Refund.create")
-    def test_includes_tenant_schema(self, mock_refund, _mock_sync, bind_tenant):
-        bind_tenant(_fake_tenant(schema_name="tenant-c"))
+    def test_includes_tenant_schema(
+        self, mock_refund, _mock_sync, bind_tenant_and_schema
+    ):
+        bind_tenant_and_schema(_fake_tenant(schema_name="tenant-c"))
         mock_refund.return_value = mock.Mock(id="re_1", status="succeeded")
 
         provider = StripePaymentProvider()
@@ -166,9 +144,9 @@ class TestRefundMetadata:
 class TestCheckoutSessionMetadata:
     @mock.patch("order.payment.stripe.checkout.Session.create")
     def test_session_and_payment_intent_both_tagged(
-        self, mock_session, amount, bind_tenant
+        self, mock_session, amount, bind_tenant_and_schema
     ):
-        bind_tenant(_fake_tenant(schema_name="webside"))
+        bind_tenant_and_schema(_fake_tenant(schema_name="webside"))
         mock_session.return_value = mock.Mock(
             id="cs_1", url="https://stripe/cs_1"
         )

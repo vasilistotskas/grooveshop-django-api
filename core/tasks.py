@@ -44,6 +44,11 @@ _SECRET_KEYS = frozenset(
 )
 _ARG_TRUNCATE = 500
 
+# ``send_inactive_user_notifications`` stops once MORE than this many
+# sends have failed in one run: that many failures points at the mail
+# backend, not at individual users, and the next run resumes anyway.
+_MAX_REENGAGEMENT_FAILURES = 50
+
 
 def _safe_repr(value: Any, key: str | None = None) -> str:
     """Return a truncated repr of *value*, masking secret-looking keys."""
@@ -508,8 +513,9 @@ def send_inactive_user_notifications() -> dict[str, Any]:
     """
     Send re-engagement emails to inactive users.
 
-    Limits to MAX_REENGAGEMENT_EMAILS per user with a 90-day cooldown
-    between sends.  Uses iterator() for memory-efficient processing.
+    Limits to ``REENGAGEMENT_EMAIL_MAX_COUNT`` emails per user with a
+    ``REENGAGEMENT_EMAIL_COOLDOWN_DAYS`` cooldown between sends (both
+    extra settings). Uses iterator() for memory-efficient processing.
 
     Returns:
         Dictionary with task execution statistics
@@ -636,7 +642,7 @@ def send_inactive_user_notifications() -> dict[str, Any]:
                 }
             )
 
-            if len(failed_emails) > 50:
+            if len(failed_emails) > _MAX_REENGAGEMENT_FAILURES:
                 logger.error("Too many email failures, stopping task")
                 break
 

@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from django.db.models import OuterRef
+
+from core.db.aggregates import subquery_count
 from core.managers import (
     TranslatableOptimizedManager,
     TranslatableOptimizedQuerySet,
@@ -46,7 +49,30 @@ class BlogTagQuerySet(TranslatableOptimizedQuerySet):
         ``SortableModel.move_up``/``move_down`` skipped inactive
         neighbours and produced gaps.
         """
-        return self.active_only().with_translations()
+        return self.active_only().with_translations().with_engagement()
+
+    def with_engagement(self) -> Self:
+        """Annotate ``posts_count`` and ``total_likes`` (every like on the
+        tag's posts), which the serializer shows and the filters and
+        ``?ordering=`` read.
+
+        Both count PUBLISHED posts only, like the author counts: a draft
+        is not something the public can find through the tag.
+        """
+        from blog.models.post import BlogPost
+
+        published = BlogPost.objects.published()
+        return self.annotate(
+            posts_count=subquery_count(
+                published.filter(tags=OuterRef("pk")), "tags"
+            ),
+            total_likes=subquery_count(
+                BlogPost.likes.through.objects.filter(
+                    blogpost__in=published, blogpost__tags=OuterRef("pk")
+                ),
+                "blogpost__tags",
+            ),
+        )
 
     def for_detail(self) -> Self:
         """

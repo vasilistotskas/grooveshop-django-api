@@ -76,6 +76,25 @@ class TestSettingGates:
 
         assert response.status_code == status.HTTP_200_OK
 
+    def test_schema_introspection_bypasses_the_gate(self):
+        """drf-spectacular's mocked views must see every gated route
+        whatever the merchant toggled, without reading the setting: the
+        OpenAPI contract cannot vary by toggle, nor touch the DB."""
+        from types import SimpleNamespace
+
+        from django.test import RequestFactory
+
+        from tenant.permissions import IsProductReviewsEnabled
+
+        request = RequestFactory().get("/")
+        with patch("extra_settings.models.Setting.get") as setting_get:
+            granted = IsProductReviewsEnabled().has_permission(
+                request, SimpleNamespace(swagger_fake_view=True)
+            )
+
+        assert granted is True
+        setting_get.assert_not_called()
+
     def test_feedback_gate(self):
         client = APIClient()
         url = reverse("feedback")

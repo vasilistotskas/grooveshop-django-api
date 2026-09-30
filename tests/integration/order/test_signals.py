@@ -1,5 +1,5 @@
 from decimal import Decimal
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from django.conf import settings
 from django.test import TestCase
@@ -24,7 +24,9 @@ from product.factories.product import ProductFactory
 
 class OrderSignalsTestCase(TestCase):
     def setUp(self):
-        self.order = OrderFactory(status=OrderStatus.PENDING.value)
+        self.order = OrderFactory(
+            status=OrderStatus.PENDING.value, num_order_items=0
+        )
         self.product = ProductFactory(stock=10)
         self.order_item = self.order.items.create(
             product=self.product,
@@ -139,8 +141,8 @@ class OrderSignalsTestCase(TestCase):
             ).exists()
         )
 
-    @patch("order.tasks.send_shipping_notification_email.delay")
-    @patch("order.tasks.send_order_status_update_email.delay")
+    @patch("order.tasks.send_shipping_notification_email.apply_async")
+    @patch("order.tasks.send_order_status_update_email.apply_async")
     def test_processing_transition_sends_no_customer_email(
         self, mock_status_email, mock_shipping_email
     ):
@@ -162,38 +164,55 @@ class OrderSignalsTestCase(TestCase):
         mock_status_email.assert_not_called()
         mock_shipping_email.assert_not_called()
 
-    def test_order_status_changed_to_paid(self):
-        old_status = OrderStatus.PENDING.value
-        new_status = OrderStatus.PROCESSING.value
+    def test_processing_on_a_paid_order_fires_order_paid(self):
+        from order.signals import order_paid
 
         Order.objects.filter(id=self.order.id).update(
-            payment_status=PaymentStatus.COMPLETED
+            payment_status=PaymentStatus.COMPLETED,
+            paid_amount=Money("100.00", settings.DEFAULT_CURRENCY),
         )
         self.order.refresh_from_db()
-
-        with patch(
-            "order.tasks.send_order_confirmation_email.delay"
-        ) as _mock_task:
+        receiver = Mock()
+        order_paid.connect(receiver)
+        try:
             order_status_changed.send(
                 sender=Order,
                 order=self.order,
-                old_status=old_status,
-                new_status=new_status,
+                old_status=OrderStatus.PENDING.value,
+                new_status=OrderStatus.PROCESSING.value,
             )
+        finally:
+            order_paid.disconnect(receiver)
 
-    def test_order_status_changed_to_canceled(self):
-        old_status = OrderStatus.PENDING.value
-        new_status = OrderStatus.CANCELED.value
+        receiver.assert_called_once()
+        self.assertEqual(receiver.call_args.kwargs["order"], self.order)
 
-        with patch(
-            "order.tasks.send_order_status_update_email.delay"
-        ) as _mock_task:
+    @patch("order.tasks.send_order_status_update_email.apply_async")
+    def test_canceled_transition_emails_and_fires_order_canceled(
+        self, mock_status_email
+    ):
+        receiver = Mock()
+        order_canceled.connect(receiver)
+        try:
             order_status_changed.send(
                 sender=Order,
                 order=self.order,
-                old_status=old_status,
-                new_status=new_status,
+                old_status=OrderStatus.PENDING.value,
+                new_status=OrderStatus.CANCELED.value,
             )
+        finally:
+            order_canceled.disconnect(receiver)
+
+        receiver.assert_called_once()
+        self.assertEqual(
+            receiver.call_args.kwargs["previous_status"],
+            OrderStatus.PENDING.value,
+        )
+        mock_status_email.assert_called_once()
+        self.assertEqual(
+            mock_status_email.call_args.kwargs["args"],
+            [self.order.id, OrderStatus.CANCELED.value],
+        )
 
     def test_order_status_changed_to_shipped(self):
         # Reflect a real transition: the order row is already SHIPPED by
@@ -273,21 +292,16 @@ class OrderSignalsTestCase(TestCase):
             ).exists()
         )
 
-        quantity_history_exists = OrderHistory.objects.filter(
-            order=self.order, new_value__contains="quantity"
-        ).exists()
-
-        if not quantity_history_exists:
-            pass
-        else:
-            self.assertTrue(
-                OrderHistory.objects.filter(
-                    order=self.order,
-                    change_type="ITEM_UPDATED",
-                    previous_value={"quantity": original_quantity},
-                    new_value={"quantity": new_quantity},
-                ).exists()
-            )
+        self.assertTrue(
+            OrderHistory.objects.filter(
+                order=self.order,
+                change_type="NOTE",
+                new_value__note__endswith=(
+                    f"quantity updated from {original_quantity} "
+                    f"to {new_quantity}"
+                ),
+            ).exists()
+        )
 
     def test_handle_order_item_saved_price_changed(self):
         original_price = self.order_item.price
@@ -349,7 +363,18 @@ class OrderSignalsTestCase(TestCase):
         self.order.document_type = "INVOICE"
         self.order.save()
 
-        order_completed.send(sender=Order, order=self.order)
+        # The invoice PDF needs WeasyPrint's native libraries; here it is
+        # enough that the handler queues it.
+        with patch(
+            "order.signals.handlers.generate_order_invoice"
+        ) as generate_invoice:
+            order_completed.send(sender=Order, order=self.order)
+
+        generate_invoice.apply_async.assert_called_once()
+        self.assertEqual(
+            generate_invoice.apply_async.call_args.kwargs["args"],
+            [self.order.id],
+        )
 
         self.assertTrue(
             OrderHistory.objects.filter(
@@ -465,21 +490,25 @@ class OrderSignalsTestCase(TestCase):
         )
 
     def test_handle_order_returned(self):
-        return_items = [{"product_name": self.product.name, "quantity": 1}]
-
         order_returned.send(
             sender=Order,
             order=self.order,
-            items=return_items,
+            items=[{"product_name": "Widget", "quantity": 1}],
             reason="Wrong size",
         )
 
-        note_exists = OrderHistory.objects.filter(
-            order=self.order,
-            change_type="NOTE",
-        ).exists()
-
-        self.assertTrue(note_exists)
+        self.assertTrue(
+            OrderHistory.objects.filter(
+                order=self.order,
+                change_type="NOTE",
+                new_value={
+                    "note": (
+                        "Order returned. Items: Widget (qty: 1). "
+                        "Reason: Wrong size"
+                    )
+                },
+            ).exists()
+        )
 
     @patch(
         "order.signals.handlers.send_shipping_notification_email.apply_async"

@@ -4,7 +4,7 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
-from django.db import transaction
+from django.db import models, transaction
 from django.db.models import F, Sum
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -15,6 +15,31 @@ from loyalty.models.tier import LoyaltyTier
 from loyalty.models.transaction import PointsTransaction
 
 logger = logging.getLogger(__name__)
+
+
+def _reversal_due(order_id: int) -> bool:
+    """Whether *order_id* was canceled or refunded.
+
+    Both queue ``reverse_order_points`` once they commit, so points
+    granted after that ran would never be taken back. Read fresh, under
+    the caller's user-row lock, which the reversal takes too.
+    """
+    from order.enum.status import OrderStatus, PaymentStatus
+    from order.models.order import Order
+
+    return (
+        Order.objects.filter(pk=order_id)
+        .filter(
+            models.Q(status=OrderStatus.CANCELED)
+            | models.Q(
+                payment_status__in=(
+                    PaymentStatus.REFUNDED,
+                    PaymentStatus.PARTIALLY_REFUNDED,
+                )
+            )
+        )
+        .exists()
+    )
 
 
 class LoyaltyService:
@@ -148,6 +173,13 @@ class LoyaltyService:
         # check below before either commits, double-awarding points.
         User.objects.select_for_update().get(pk=order.user_id)
 
+        if _reversal_due(order.id):
+            logger.info(
+                "Order %s was canceled or refunded — no points to award",
+                order_id,
+            )
+            return 0
+
         # Idempotency check — skip if EARN transactions already exist for this order
         if PointsTransaction.objects.get_earn_transactions_for_order(
             order
@@ -203,10 +235,12 @@ class LoyaltyService:
     @classmethod
     @transaction.atomic
     def reverse_order_points(cls, order_id: int) -> int:
-        """Reverse all EARN transactions for an order.
+        """Reverse all EARN and BONUS transactions for an order.
 
         Returns total points reversed. Creates ADJUST transactions that negate
-        the original EARN amounts, clamping to prevent negative balance.
+        the original EARN amounts, then the new-customer BONUS granted for
+        this order, clamping to prevent negative balance. Only the EARN
+        reversal comes off XP: the bonus never added any.
         """
         if not cls.is_enabled():
             return 0
@@ -237,8 +271,16 @@ class LoyaltyService:
             reference_order=order,
             transaction_type=TransactionType.REDEEM,
         )
+        bonus_transactions = PointsTransaction.objects.filter(
+            reference_order=order,
+            transaction_type=TransactionType.BONUS,
+        )
 
-        if not earn_transactions.exists() and not redeem_transactions.exists():
+        if (
+            not earn_transactions.exists()
+            and not redeem_transactions.exists()
+            and not bonus_transactions.exists()
+        ):
             return 0
 
         # Check if already reversed — skip if ADJUST transactions exist for this order
@@ -303,6 +345,21 @@ class LoyaltyService:
         # locked above, so this cannot race the award path's increment.
         user.total_xp = max(0, user.total_xp - total_reversed)
         user.save(update_fields=["total_xp"])
+
+        for bonus_tx in bonus_transactions:
+            reversal_amount = min(bonus_tx.points, current_balance)
+            if reversal_amount > 0:
+                PointsTransaction.objects.create(
+                    user=user,
+                    points=-reversal_amount,
+                    transaction_type=TransactionType.ADJUST,
+                    reference_order=order,
+                    description=(
+                        f"New customer bonus reversed for order #{order.id}"
+                    ),
+                )
+                current_balance -= reversal_amount
+                total_reversed += reversal_amount
 
         # Recalculate the tier from the just-updated XP on this fresh instance.
         cls.recalculate_tier(user)
@@ -609,6 +666,9 @@ class LoyaltyService:
         # Lock the user row so two concurrent first orders can't both pass the
         # "no prior EARN" check and each award the bonus.
         User.objects.select_for_update().get(pk=user.pk)
+
+        if _reversal_due(order.pk):
+            return 0
 
         # Check if user has any prior EARN transactions (excluding current order)
         if (

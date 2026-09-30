@@ -9,7 +9,6 @@ answers "what may a STAFF do" from the same policy as the admin.
 from __future__ import annotations
 
 import pytest
-from django.db import connection
 from django.test import RequestFactory
 from rest_framework.test import APIClient
 
@@ -21,10 +20,10 @@ from tenant.api_tokens import PlatformStaffTokenAuthentication
 from tenant.auth_backends import PLATFORM_IDENTITY_ATTR
 from tenant.models import (
     PlatformStaffToken,
-    Tenant,
     TenantMembershipRole,
     UserTenantMembership,
 )
+from tests.utils.staff import store_tenant
 from user.factories.account import UserAccountFactory
 from user.models import UserAccount
 
@@ -35,23 +34,7 @@ PASSWORD = "staff-api-pass-123"
 
 @pytest.fixture
 def tenant(db):
-    t = Tenant(
-        schema_name="staffapi_tenant",
-        name="Staffapi Tenant",
-        slug="staffapi-tenant",
-        owner_email="owner-staffapi@example.com",
-    )
-    t.auto_create_schema = False
-    t.save()
-    return t
-
-
-@pytest.fixture
-def bind_tenant(monkeypatch):
-    def _bind(t):
-        monkeypatch.setattr(connection, "tenant", t, raising=False)
-
-    return _bind
+    return store_tenant("staffapi_tenant")
 
 
 def _staff(*, tenant=None, role=TenantMembershipRole.OWNER, **kwargs):
@@ -203,14 +186,7 @@ class TestStoreStaffModelPermissions:
         assert self._check(user, "POST") is False
 
     def test_role_does_not_cross_tenants(self, tenant, bind_tenant):
-        other = Tenant(
-            schema_name="staffapi_other",
-            name="Staffapi Other",
-            slug="staffapi-other",
-            owner_email="owner-staffapi-other@example.com",
-        )
-        other.auto_create_schema = False
-        other.save()
+        other = store_tenant("staffapi_other")
 
         user = self._operator(tenant, TenantMembershipRole.OWNER)
         bind_tenant(other)
@@ -232,3 +208,19 @@ class TestStoreStaffModelPermissions:
         assert (
             StoreStaffChangePermission().has_permission(request, view) is True
         )
+
+    def test_change_permission_refuses_an_anonymous_caller(self):
+        """Refused before the view is consulted: an anonymous POST to a
+        refund/cancel action never reaches a queryset lookup."""
+        from unittest.mock import Mock
+
+        from django.contrib.auth.models import AnonymousUser
+
+        view = Mock(spec=["get_queryset"], queryset=None)
+        request = RequestFactory().post("/")
+        request.user = AnonymousUser()
+
+        assert (
+            StoreStaffChangePermission().has_permission(request, view) is False
+        )
+        view.get_queryset.assert_not_called()

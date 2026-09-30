@@ -14,22 +14,10 @@ from rest_framework.test import APIClient
 
 from tenant.lifecycle import SUSPEND_COOLDOWN
 from tenant.models import Tenant
+from tests.utils.staff import store_tenant
 from user.factories.account import UserAccountFactory
 
 pytestmark = [pytest.mark.django_db, pytest.mark.urls("tenant.urls_public")]
-
-
-def _tenant(schema_name: str, **kwargs) -> Tenant:
-    tenant = Tenant(
-        schema_name=schema_name,
-        name=schema_name,
-        slug=schema_name.replace("_", "-"),
-        owner_email=f"owner-{schema_name}@example.com",
-        **kwargs,
-    )
-    tenant.auto_create_schema = False
-    tenant.save()
-    return tenant
 
 
 @pytest.fixture
@@ -48,7 +36,6 @@ def operator_client():
 @pytest.fixture
 def no_destroy_side_effects():
     with (
-        patch.object(Tenant, "auto_create_schema", False),
         patch("tenant.offboarding.latest_invoice_year", return_value=None),
         patch("tenant.offboarding.purge_search_indexes", return_value=0),
         patch("tenant.offboarding.purge_tenant_files", return_value={}),
@@ -62,7 +49,7 @@ def no_destroy_side_effects():
 def test_destroying_a_live_tenant_is_refused(
     operator_client, no_destroy_side_effects
 ):
-    tenant = _tenant("api_live", is_active=True)
+    tenant = store_tenant("api_live", is_active=True)
     response = operator_client.delete(
         reverse("tenant-admin-detail", args=[tenant.pk])
     )
@@ -74,7 +61,7 @@ def test_destroying_a_live_tenant_is_refused(
 def test_destroying_inside_the_cooldown_is_refused(
     operator_client, no_destroy_side_effects
 ):
-    tenant = _tenant(
+    tenant = store_tenant(
         "api_recent",
         is_active=False,
         suspended_at=timezone.now() - timedelta(hours=1),
@@ -89,7 +76,7 @@ def test_destroying_inside_the_cooldown_is_refused(
 def test_destroying_a_protected_tenant_is_refused(
     operator_client, no_destroy_side_effects
 ):
-    tenant = _tenant(
+    tenant = store_tenant(
         "api_protected",
         is_active=False,
         is_protected=True,
@@ -106,7 +93,7 @@ def test_destroying_a_protected_tenant_is_refused(
 def test_suspended_past_cooldown_is_destroyed(
     operator_client, no_destroy_side_effects
 ):
-    tenant = _tenant(
+    tenant = store_tenant(
         "api_destroyable",
         is_active=False,
         suspended_at=timezone.now() - SUSPEND_COOLDOWN - timedelta(hours=1),
@@ -154,7 +141,7 @@ class TestIsActiveCannotBeWrittenThroughTheSerializer:
     """
 
     def test_patching_is_active_is_ignored(self, operator_client):
-        tenant = _tenant("api_patch_active", is_active=True)
+        tenant = store_tenant("api_patch_active", is_active=True)
 
         response = operator_client.patch(
             reverse("tenant-admin-detail", args=[tenant.pk]),
@@ -167,7 +154,7 @@ class TestIsActiveCannotBeWrittenThroughTheSerializer:
         assert tenant.is_active is True, "the field is still writable"
 
     def test_patching_a_protected_tenant_is_ignored(self, operator_client):
-        tenant = _tenant(
+        tenant = store_tenant(
             "api_patch_protected", is_active=True, is_protected=True
         )
 
@@ -185,7 +172,7 @@ class TestTheLifecycleRoutes:
     def test_suspend_records_the_anchor_and_flushes_media(
         self, operator_client
     ):
-        tenant = _tenant("api_suspend", is_active=True)
+        tenant = store_tenant("api_suspend", is_active=True)
 
         with patch("tenant.lifecycle._dispatch_media_flush") as flush:
             response = operator_client.post(
@@ -203,7 +190,7 @@ class TestTheLifecycleRoutes:
         flush.assert_called_once_with(tenant.schema_name)
 
     def test_suspend_requires_a_reason(self, operator_client):
-        tenant = _tenant("api_suspend_noreason", is_active=True)
+        tenant = store_tenant("api_suspend_noreason", is_active=True)
 
         response = operator_client.post(
             reverse("tenant-admin-suspend", args=[tenant.pk]),
@@ -216,7 +203,7 @@ class TestTheLifecycleRoutes:
         assert tenant.is_active is True
 
     def test_suspend_refuses_a_protected_tenant(self, operator_client):
-        tenant = _tenant(
+        tenant = store_tenant(
             "api_suspend_protected", is_active=True, is_protected=True
         )
 
@@ -232,7 +219,7 @@ class TestTheLifecycleRoutes:
 
     def test_activate_clears_the_anchor_with_the_flag(self, operator_client):
         """Leaving the anchor is what spent the cooldown in advance."""
-        tenant = _tenant(
+        tenant = store_tenant(
             "api_activate",
             is_active=False,
             suspended_at=timezone.now() - timedelta(days=30),
@@ -253,7 +240,7 @@ class TestTheLifecycleRoutes:
         """The end-to-end consequence, not just the field values."""
         from tenant.lifecycle import destroy_refusal, suspend_tenant
 
-        tenant = _tenant(
+        tenant = store_tenant(
             "api_fresh_cooldown",
             is_active=False,
             suspended_at=timezone.now() - timedelta(days=30),

@@ -9,11 +9,17 @@ every AI agent into one shared bucket.
 
 from __future__ import annotations
 
+import pytest
 from django.contrib.auth.models import AnonymousUser
 from django.test import TestCase, override_settings
 from rest_framework.test import APIRequestFactory
 
-from core.api.throttling import CartMutationAnonThrottle, SearchThrottle
+from core.api.throttling import (
+    CartMutationAnonThrottle,
+    OrderCreateAnonThrottle,
+    PaymentAttemptAnonThrottle,
+    SearchThrottle,
+)
 
 SECRET = "gateway-shared-secret"
 CART_UUID = "521b14f2-da94-48eb-9426-9cfa922606f8"
@@ -131,3 +137,38 @@ class UserOrIpRateThrottleIdentityTestCase(TestCase):
         and the old un-spoofable identity is used instead."""
         forged = self._key(**{"cf-connecting-ip": "203.0.113.9"})
         assert "203.0.113.9" not in forged
+
+
+@pytest.mark.parametrize(
+    "throttle_class",
+    [
+        PaymentAttemptAnonThrottle,
+        OrderCreateAnonThrottle,
+        CartMutationAnonThrottle,
+    ],
+)
+@override_settings(ORIGIN_VERIFY_SECRET=EDGE_SECRET)
+def test_anon_halves_key_on_the_proven_visitor(throttle_class):
+    """Guests paying or checking out through the same Cloudflare edge
+    node reach Django from one address. Keyed on it, one guest's burst
+    would lock every other guest out of payment and checkout."""
+    factory = APIRequestFactory()
+    throttle = throttle_class()
+
+    def key(client_ip):
+        request = factory.post(
+            "/api/v1/order",
+            headers={
+                "x-origin-verify": EDGE_SECRET,
+                "cf-connecting-ip": client_ip,
+                "x-forwarded-for": "172.70.1.1",
+            },
+        )
+        request.user = AnonymousUser()
+        return throttle.get_cache_key(request, view=None)
+
+    first, second = key("203.0.113.9"), key("198.51.100.77")
+
+    assert first != second
+    assert "203.0.113.9" in first
+    assert "198.51.100.77" in second

@@ -14,7 +14,7 @@ from country.models import Country
 from order.attribution import AGENT_PROTOCOLS, CLICK_ID_PARAMS
 from order.enum.create_error import OrderCreateErrorType
 from order.enum.document_type import OrderCreateDocumentTypeEnum
-from order.enum.status import OrderStatus
+from order.enum.status import OrderStatus, PaymentStatus
 from order.models.attribution import OrderAttribution
 from order.models.order import Order
 from order.serializers.item import (
@@ -671,7 +671,20 @@ class OrderDetailSerializer(OrderSerializer):
         }
 
     @staticmethod
-    def _describe_history_entry(history) -> str:
+    def _status_label(choices, value) -> str:
+        """The translated label of a stored status code.
+
+        History stores the enum value; payment rows written before the
+        values were made uniform hold it lowercased. An unknown value
+        is shown as stored rather than dropped.
+        """
+        try:
+            return str(choices(str(value).upper()).label)
+        except ValueError:
+            return str(value)
+
+    @classmethod
+    def _describe_history_entry(cls, history) -> str:
         """Render a customer-readable description for an OrderHistory row.
 
         ``OrderHistory.log_*`` helpers store a short generic
@@ -694,7 +707,10 @@ class OrderDetailSerializer(OrderSerializer):
                 new_value.get("status") if isinstance(new_value, dict) else None
             )
             if prev and new:
-                return f"{prev} → {new}"
+                return (
+                    f"{cls._status_label(OrderStatus, prev)} → "
+                    f"{cls._status_label(OrderStatus, new)}"
+                )
             return history.description
 
         if change_type == "PAYMENT":
@@ -712,9 +728,12 @@ class OrderDetailSerializer(OrderSerializer):
                 )
                 parts = []
                 if prev_status and new_status:
-                    parts.append(f"{prev_status} → {new_status}")
+                    parts.append(
+                        f"{cls._status_label(PaymentStatus, prev_status)} → "
+                        f"{cls._status_label(PaymentStatus, new_status)}"
+                    )
                 elif new_status:
-                    parts.append(str(new_status))
+                    parts.append(cls._status_label(PaymentStatus, new_status))
                 if provider:
                     parts.append(f"({provider})")
                 if parts:

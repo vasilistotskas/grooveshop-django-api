@@ -13,13 +13,12 @@ from user.models.subscription import SubscriptionTopic, UserSubscription
 
 
 class SubscriptionTopicFilterTest(APITestCase):
-    def setUp(self):
-        UserSubscription.objects.all().delete()
-        SubscriptionTopic.objects.all().delete()
+    @classmethod
+    def setUpTestData(cls):
 
-        self.now = timezone.now()
+        cls.now = timezone.now()
 
-        self.newsletter_topic = SubscriptionTopicFactory(
+        cls.newsletter_topic = SubscriptionTopicFactory(
             slug="weekly-newsletter",
             category=SubscriptionTopic.TopicCategory.NEWSLETTER,
             is_active=True,
@@ -27,15 +26,15 @@ class SubscriptionTopicFilterTest(APITestCase):
             requires_confirmation=False,
             set_translations=False,
         )
-        self.newsletter_topic.created_at = self.now - timedelta(days=30)
-        self.newsletter_topic.save()
+        cls.newsletter_topic.created_at = cls.now - timedelta(days=30)
+        cls.newsletter_topic.save()
 
-        self.newsletter_topic.set_current_language("en")
-        self.newsletter_topic.name = "Weekly Newsletter"
-        self.newsletter_topic.description = "Get our weekly updates and news"
-        self.newsletter_topic.save()
+        cls.newsletter_topic.set_current_language("en")
+        cls.newsletter_topic.name = "Weekly Newsletter"
+        cls.newsletter_topic.description = "Get our weekly updates and news"
+        cls.newsletter_topic.save()
 
-        self.marketing_topic = SubscriptionTopicFactory(
+        cls.marketing_topic = SubscriptionTopicFactory(
             slug="marketing-campaigns",
             category=SubscriptionTopic.TopicCategory.MARKETING,
             is_active=True,
@@ -43,17 +42,17 @@ class SubscriptionTopicFilterTest(APITestCase):
             requires_confirmation=True,
             set_translations=False,
         )
-        self.marketing_topic.created_at = self.now - timedelta(days=15)
-        self.marketing_topic.save()
+        cls.marketing_topic.created_at = cls.now - timedelta(days=15)
+        cls.marketing_topic.save()
 
-        self.marketing_topic.set_current_language("en")
-        self.marketing_topic.name = "Marketing Updates"
-        self.marketing_topic.description = (
+        cls.marketing_topic.set_current_language("en")
+        cls.marketing_topic.name = "Marketing Updates"
+        cls.marketing_topic.description = (
             "Special offers and promotional content"
         )
-        self.marketing_topic.save()
+        cls.marketing_topic.save()
 
-        self.product_topic = SubscriptionTopicFactory(
+        cls.product_topic = SubscriptionTopicFactory(
             slug="product-updates",
             category=SubscriptionTopic.TopicCategory.PRODUCT,
             is_active=False,
@@ -61,15 +60,15 @@ class SubscriptionTopicFilterTest(APITestCase):
             requires_confirmation=False,
             set_translations=False,
         )
-        self.product_topic.created_at = self.now - timedelta(days=5)
-        self.product_topic.save()
+        cls.product_topic.created_at = cls.now - timedelta(days=5)
+        cls.product_topic.save()
 
-        self.product_topic.set_current_language("en")
-        self.product_topic.name = "Product News"
-        self.product_topic.description = "Latest product features and updates"
-        self.product_topic.save()
+        cls.product_topic.set_current_language("en")
+        cls.product_topic.name = "Product News"
+        cls.product_topic.description = "Latest product features and updates"
+        cls.product_topic.save()
 
-        self.system_topic = SubscriptionTopicFactory(
+        cls.system_topic = SubscriptionTopicFactory(
             slug="system-notifications",
             category=SubscriptionTopic.TopicCategory.SYSTEM,
             is_active=True,
@@ -77,19 +76,20 @@ class SubscriptionTopicFilterTest(APITestCase):
             requires_confirmation=False,
             set_translations=False,
         )
-        self.system_topic.created_at = self.now - timedelta(hours=2)
-        self.system_topic.save()
+        cls.system_topic.created_at = cls.now - timedelta(hours=2)
+        cls.system_topic.save()
 
-        self.system_topic.set_current_language("en")
-        self.system_topic.name = "System Alerts"
-        self.system_topic.description = (
+        cls.system_topic.set_current_language("en")
+        cls.system_topic.name = "System Alerts"
+        cls.system_topic.description = (
             "Important system notifications and maintenance updates"
         )
-        self.system_topic.save()
+        cls.system_topic.save()
 
-        self.user1 = UserAccountFactory()
-        self.user2 = UserAccountFactory()
+        cls.user1 = UserAccountFactory()
+        cls.user2 = UserAccountFactory()
 
+    def setUp(self):
         self.client.force_authenticate(user=self.user1)
 
     def test_timestamp_filters(self):
@@ -265,16 +265,9 @@ class SubscriptionTopicFilterTest(APITestCase):
 
     def test_has_subscribers_filter(self):
         url = reverse("user-subscription-topic-list")
-
         UserSubscription.objects.all().delete()
-
-        try:
-            UserSubscriptionFactory(
-                user=self.user1, topic=self.newsletter_topic
-            )
-            UserSubscriptionFactory(user=self.user1, topic=self.marketing_topic)
-        except Exception:
-            self.skipTest("Subscription creation failed due to constraints")
+        UserSubscriptionFactory(user=self.user1, topic=self.newsletter_topic)
+        UserSubscriptionFactory(user=self.user1, topic=self.marketing_topic)
 
         response = self.client.get(url, {"has_subscribers": "true"})
         self.assertEqual(response.status_code, 200)
@@ -370,7 +363,3 @@ class SubscriptionTopicFilterTest(APITestCase):
         result_ids = [r["id"] for r in response.data["results"]]
         self.assertEqual(len(result_ids), 1)
         self.assertIn(self.newsletter_topic.id, result_ids)
-
-    def tearDown(self):
-        UserSubscription.objects.all().delete()
-        SubscriptionTopic.objects.all().delete()

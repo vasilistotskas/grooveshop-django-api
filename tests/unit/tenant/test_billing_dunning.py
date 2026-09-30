@@ -17,6 +17,7 @@ from django.utils import timezone
 from tenant.billing import billing_state, run_billing_cycle, target_stage
 from tenant.lifecycle import activate_tenant, suspend_tenant
 from tenant.models import SuspendedReason, Tenant
+from tests.utils.staff import store_tenant
 
 _TODAY = date(2026, 8, 22)
 
@@ -34,34 +35,7 @@ _SEQ = iter(range(10_000))
 
 
 def _make_tenant(**kwargs) -> Tenant:
-    """Saved Tenant without Postgres DDL (no schema is ever created)."""
-    n = next(_SEQ)
-    defaults = {
-        "schema_name": f"dunning_t{n}",
-        "name": f"Dunning Tenant {n}",
-        "slug": f"dunning-tenant-{n}",
-        "owner_email": f"owner-dunning-{n}@example.com",
-        "plan": "pro",
-    }
-    defaults.update(kwargs)
-    t = Tenant(**defaults)
-    t.auto_create_schema = False
-    t.save()
-    return t
-
-
-@pytest.fixture(autouse=True)
-def _no_schema_ddl():
-    """``_make_tenant`` disables ``auto_create_schema`` on its own
-    instance only — but ``run_billing_cycle`` iterates a fresh queryset
-    whose instances carry the class default (True), so the warn/suspend
-    saves walked into django-tenants' schema healing (``create_schema``
-    → full ``migrate_schemas`` replay, ~90s per test). Patching the
-    class attribute keeps every code path DDL-free, which is this
-    module's stated contract.
-    """
-    with patch.object(Tenant, "auto_create_schema", False):
-        yield
+    return store_tenant(f"dunning_t{next(_SEQ)}", **{"plan": "pro", **kwargs})
 
 
 # ---------------------------------------------------------------------------

@@ -27,7 +27,7 @@ from pay_way.factories import PayWayFactory
 
 class IsCollectedOnDeliveryFieldTests(TestCase):
     def _field(self, pay_way) -> bool:
-        order = OrderFactory(pay_way=pay_way)
+        order = OrderFactory(num_order_items=0, pay_way=pay_way)
         return OrderSerializer(order).data["is_collected_on_delivery"]
 
     def test_true_for_courier_cash_on_delivery(self):
@@ -56,7 +56,7 @@ class IsCollectedOnDeliveryFieldTests(TestCase):
 
     def test_it_disagrees_with_is_online_payment_for_bank_transfer(self):
         pay_way = PayWayFactory(settlement=PaySettlement.OFFLINE_TRANSFER)
-        order = OrderFactory(pay_way=pay_way)
+        order = OrderFactory(num_order_items=0, pay_way=pay_way)
 
         data = OrderSerializer(order).data
 
@@ -72,7 +72,7 @@ class IsCollectedOnDeliveryFieldTests(TestCase):
 
     def test_present_on_the_serialized_payload(self):
         pay_way = PayWayFactory(settlement=PaySettlement.COURIER_CASH)
-        order = OrderFactory(pay_way=pay_way)
+        order = OrderFactory(num_order_items=0, pay_way=pay_way)
 
         # Guards the field tuple, not just the method: it has to be in
         # BOTH the list and detail field sets or the success page reads

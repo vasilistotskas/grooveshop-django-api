@@ -16,7 +16,6 @@ from datetime import timedelta
 import pytest
 from django.urls import reverse
 from django.utils import timezone
-from drf_spectacular.generators import SchemaGenerator
 from rest_framework.test import APIClient
 
 from blog.factories import (
@@ -101,9 +100,9 @@ class TestCategoryPosts:
         ]
 
 
-@pytest.fixture(scope="module")
-def paths():
-    return SchemaGenerator().get_schema(request=None, public=True)["paths"]
+@pytest.fixture
+def paths(openapi_schema):
+    return openapi_schema["paths"]
 
 
 class TestSchema:

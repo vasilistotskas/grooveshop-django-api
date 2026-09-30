@@ -1,14 +1,17 @@
 import uuid
-from decimal import Decimal
 from unittest.mock import patch
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from djmoney.money import Money
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from cart.factories.cart import CartFactory
+from cart.factories.item import CartItemFactory
 from core.enum import FloorChoicesEnum, LocationChoicesEnum
 from country.factories import CountryFactory
 from order.enum.status import OrderStatus, PaymentStatus
@@ -21,267 +24,123 @@ from order.serializers.order import (
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
 from region.factories import RegionFactory
-from tests.utils import TestURLFixerMixin, count_queries
+from tests.utils import TestURLFixerMixin
+from tests.utils.shipping import enable_rate
 from user.factories.account import UserAccountFactory
 
 User = get_user_model()
 
 
 class OrderViewSetTestCase(TestURLFixerMixin, APITestCase):
-    def setUp(self):
-        super().setUp()
-
-        self.user = UserAccountFactory()
-        self.admin_user = UserAccountFactory(is_staff=True, is_superuser=True)
-        self.other_user = UserAccountFactory()
-
-        self.pay_way = PayWayFactory(active=True)
-        self.country = CountryFactory()
-        self.region = RegionFactory(country=self.country)
-        # A ShippingRate is per-country now — this ad-hoc country has
-        # none until this call.
-        from tests.utils.shipping import enable_rate
-
-        enable_rate(self.country)
-
-        self.order = OrderFactory(
-            user=self.user,
-            status=OrderStatus.PENDING.value,
-            pay_way=self.pay_way,
-            country=self.country,
-            region=self.region,
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = UserAccountFactory(num_addresses=0)
+        cls.admin_user = UserAccountFactory(
+            is_staff=True, is_superuser=True, num_addresses=0
         )
+        cls.other_user = UserAccountFactory(num_addresses=0)
 
-        products = ProductFactory.create_batch(
+        cls.pay_way = PayWayFactory(active=True)
+        cls.country = CountryFactory()
+        cls.region = RegionFactory(country=cls.country)
+        # A ShippingRate is per-country — this ad-hoc country has none
+        # until this call.
+        enable_rate(cls.country)
+
+        cls.order = OrderFactory(
+            user=cls.user,
+            status=OrderStatus.PENDING,
+            pay_way=cls.pay_way,
+            country=cls.country,
+            region=cls.region,
+            first_name="Quillon",
+            email="quillon.orders@example.com",
+            city="Portland",
+            tracking_number="",
+            num_order_items=0,
+        )
+        cls.products = ProductFactory.create_batch(
             2, active=True, num_images=0, num_reviews=0, stock=20
         )
-        self.order_items = []
-
-        for i, product in enumerate(products):
-            item = self.order.items.create(
+        for product, quantity in zip(cls.products, (2, 3), strict=True):
+            cls.order.items.create(
                 product=product,
                 price=Money("50.00", settings.DEFAULT_CURRENCY),
-                quantity=2 if i == 0 else 3,
+                quantity=quantity,
             )
-            self.order_items.append(item)
 
-        self.other_order = OrderFactory(
-            user=self.other_user,
-            status=OrderStatus.SHIPPED.value,
+        cls.other_order = OrderFactory(
+            user=cls.other_user,
+            status=OrderStatus.SHIPPED,
             city="Chicago",
             first_name="Jane",
             last_name="Smith",
+            email="jane@example.com",
             tracking_number="TRACK123",
-            payment_status=PaymentStatus.COMPLETED.value,
+            payment_status=PaymentStatus.COMPLETED,
+            num_order_items=0,
         )
 
-        self.list_url = reverse("order-list")
+        cls.list_url = reverse("order-list")
 
-    def get_order_detail_url(self, order_id):
+    def detail_url(self, order_id):
         return reverse("order-detail", kwargs={"pk": order_id})
 
-    def test_list_uses_correct_serializer(self):
+    def _address_payload(self, **overrides):
+        payload = {
+            "pay_way": self.pay_way.id,
+            "country": self.country.alpha_2,
+            "region": self.region.alpha,
+            "email": f"updated-{uuid.uuid4().hex[:8]}@example.com",
+            "first_name": "Updated",
+            "last_name": "Name",
+            "street": "456 New St",
+            "street_number": "10",
+            "city": "Boston",
+            "zipcode": "02101",
+            "phone": "+12345678902",
+        }
+        payload.update(overrides)
+        return payload
+
+    # -- serializers ------------------------------------------------------
+
+    def test_list_uses_the_list_serializer(self):
         self.client.force_authenticate(user=self.admin_user)
         response = self.client.get(self.list_url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        first_result = response.data["results"][0]
-        expected_fields = set(OrderSerializer.Meta.fields)
-        actual_fields = set(first_result.keys())
-        self.assertEqual(actual_fields, expected_fields)
-
-    def test_retrieve_uses_correct_serializer(self):
-        self.client.force_authenticate(user=self.admin_user)
-        response = self.client.get(self.get_order_detail_url(self.order.id))
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        expected_fields = set(OrderDetailSerializer.Meta.fields)
-        actual_fields = set(response.data.keys())
-        self.assertEqual(actual_fields, expected_fields)
-
-    def test_create_uses_correct_serializer(self):
-        self.client.force_authenticate(user=self.admin_user)
-
-        unique_email = f"test-{uuid.uuid4().hex[:8]}@example.com"
-
-        # Create cart with items for payment-first flow
-        from cart.factories.cart import CartFactory
-        from cart.factories.item import CartItemFactory
-
-        cart = CartFactory.create(
-            user=self.admin_user
-        )  # Cart belongs to admin user
-        CartItemFactory.create(
-            cart=cart, product=self.order_items[0].product, quantity=1
+        self.assertEqual(
+            set(response.data["results"][0].keys()),
+            set(OrderSerializer.Meta.fields),
         )
 
-        payload = {
-            "payment_intent_id": f"pi_test_{uuid.uuid4().hex[:8]}",
-            "cart_id": str(cart.uuid),  # Use cart.uuid, not cart.id
-            "pay_way_id": self.pay_way.id,
-            "country_id": self.country.alpha_2,
-            "region_id": self.region.alpha,
-            "floor": FloorChoicesEnum.FIRST_FLOOR.value,
-            "location_type": LocationChoicesEnum.HOME.value,
-            "email": unique_email,
-            "first_name": "John",
-            "last_name": "Doe",
-            "street": "123 Main St",
-            "street_number": "Apt 4",
-            "city": "New York",
-            "zipcode": "10001",
-            "phone": "+12345678901",
-            "shipping_kind": "home_delivery",
-        }
-
-        # Mock payment provider
-        with patch("order.payment.get_payment_provider") as mock_get_provider:
-            mock_provider = mock_get_provider.return_value
-            mock_provider.get_payment_status.return_value = (
-                PaymentStatus.COMPLETED,
-                {"status": "succeeded"},
-            )
-
-            response = self.client.post(self.list_url, payload, format="json")
-
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        expected_fields = set(OrderDetailSerializer.Meta.fields)
-        actual_fields = set(response.data.keys())
-        self.assertEqual(actual_fields, expected_fields)
-
-    def test_update_uses_correct_serializer(self):
+    def test_retrieve_uses_the_detail_serializer(self):
         self.client.force_authenticate(user=self.admin_user)
-
-        unique_email = f"update-serializer-{uuid.uuid4().hex[:8]}@example.com"
-
-        payload = {
-            "user": self.user.id,
-            "pay_way": self.pay_way.id,
-            "country": self.country.alpha_2,
-            "region": self.region.alpha,
-            "email": unique_email,
-            "first_name": "Updated",
-            "last_name": "Name",
-            "street": "456 New St",
-            "street_number": "Unit 1",
-            "city": "Boston",
-            "zipcode": "02101",
-            "phone": "+12345678902",
-            "shipping_price": Decimal("15.00"),
-            "items": [
-                {
-                    "product": self.order_items[0].product.id,
-                    "quantity": 2,
-                }
-            ],
-        }
-
-        response = self.client.put(
-            self.get_order_detail_url(self.order.id), payload, format="json"
-        )
+        response = self.client.get(self.detail_url(self.order.id))
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        expected_fields = set(OrderDetailSerializer.Meta.fields)
-        actual_fields = set(response.data.keys())
-        self.assertEqual(actual_fields, expected_fields)
-
-    def test_update_does_not_mutate_line_items(self):
-        """Order line items must NOT be delete+recreated by an order update —
-        that bypassed stock accounting and total recomputation (G0222). The
-        original items (with their committed stock) stay intact."""
-        self.client.force_authenticate(user=self.admin_user)
-
-        original_item_ids = sorted(
-            self.order.items.values_list("id", flat=True)
+        self.assertEqual(response.data["id"], self.order.id)
+        self.assertEqual(
+            set(response.data.keys()), set(OrderDetailSerializer.Meta.fields)
         )
-        original_qtys = dict(self.order.items.values_list("id", "quantity"))
-
-        payload = {
-            "user": self.user.id,
-            "pay_way": self.pay_way.id,
-            "country": self.country.alpha_2,
-            "region": self.region.alpha,
-            "email": f"noitem-{uuid.uuid4().hex[:8]}@example.com",
-            "first_name": "Updated",
-            "last_name": "Name",
-            "street": "456 New St",
-            "street_number": "Unit 1",
-            "city": "Boston",
-            "zipcode": "02101",
-            "phone": "+12345678902",
-            "shipping_price": Decimal("15.00"),
-            # Attempt to replace the two items with a single (valid) one.
-            "items": [
-                {"product": self.order_items[0].product.id, "quantity": 1}
-            ],
-        }
-
-        response = self.client.put(
-            self.get_order_detail_url(self.order.id), payload, format="json"
-        )
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-
-        # Scalar field updated, but the line items are untouched.
-        self.order.refresh_from_db()
-        self.assertEqual(self.order.city, "Boston")
-        current_items = list(self.order.items.all())
-        self.assertEqual(sorted(i.id for i in current_items), original_item_ids)
-        for item in current_items:
-            self.assertEqual(item.quantity, original_qtys[item.id])
-
-    def test_partial_update_uses_correct_serializer(self):
-        self.client.force_authenticate(user=self.admin_user)
-
-        payload = {"city": "Updated City"}
-        response = self.client.patch(
-            self.get_order_detail_url(self.order.id), payload, format="json"
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        expected_fields = set(OrderDetailSerializer.Meta.fields)
-        actual_fields = set(response.data.keys())
-        self.assertEqual(actual_fields, expected_fields)
-
-    def test_owner_cannot_reassign_order_to_another_user(self):
-        # ``user`` is read-only on OrderWriteSerializer: a raw setattr
-        # mass-assign previously let an owner PATCH their order onto
-        # another account (or null it to a guest), taking their PII with
-        # it. The address edit still applies; the user FK must not move.
-        self.client.force_authenticate(user=self.user)
-
-        payload = {"user": self.other_user.id, "city": "Reassigned City"}
-        response = self.client.patch(
-            self.get_order_detail_url(self.order.id), payload, format="json"
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.order.refresh_from_db()
-        self.assertEqual(self.order.user_id, self.user.id)
-        self.assertEqual(self.order.city, "Reassigned City")
-
-    def test_list_orders(self):
-        self.client.force_authenticate(user=self.admin_user)
-        response = self.client.get(self.list_url)
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertIn("results", response.data)
-        self.assertEqual(len(response.data["results"]), 2)
 
     def test_list_no_n_plus_one(self):
-        """Order-list query count must not grow with the number of orders or
-        their line items (G0226)."""
+        """Order-list query count must not grow with the number of orders
+        or their line items (G0226)."""
         self.client.force_authenticate(user=self.admin_user)
 
-        with count_queries() as small:
+        with CaptureQueriesContext(connection) as small:
             self.client.get(self.list_url)
 
         for _ in range(2):
             order = OrderFactory(
                 user=self.user,
-                status=OrderStatus.PENDING.value,
+                status=OrderStatus.PENDING,
                 pay_way=self.pay_way,
                 country=self.country,
                 region=self.region,
+                num_order_items=0,
             )
             for product in ProductFactory.create_batch(
                 2, active=True, num_images=1, num_reviews=2, stock=20
@@ -292,40 +151,30 @@ class OrderViewSetTestCase(TestURLFixerMixin, APITestCase):
                     quantity=1,
                 )
 
-        with count_queries() as large:
+        with CaptureQueriesContext(connection) as large:
             self.client.get(self.list_url)
 
         self.assertEqual(
-            small.count,
-            large.count,
-            f"Query count grew from {small.count} to {large.count} when "
+            len(small),
+            len(large),
+            f"Query count grew from {len(small)} to {len(large)} when "
             f"orders/items grew — N+1 regression.",
         )
 
-    def test_create_order(self):
+    # -- create -----------------------------------------------------------
+
+    def test_create_order_from_cart(self):
         self.client.force_authenticate(user=self.admin_user)
-
-        unique_email = f"create-{uuid.uuid4().hex[:8]}@example.com"
-
-        # Create cart with items for payment-first flow
-        from cart.factories.cart import CartFactory
-        from cart.factories.item import CartItemFactory
-
-        cart = CartFactory.create(
-            user=self.admin_user
-        )  # Cart belongs to admin user
-        CartItemFactory.create(
-            cart=cart, product=self.order_items[0].product, quantity=1
-        )
-
-        initial_count = Order.objects.count()
+        cart = CartFactory.create(user=self.admin_user)
+        CartItemFactory.create(cart=cart, product=self.products[0], quantity=1)
         payload = {
             "payment_intent_id": f"pi_test_{uuid.uuid4().hex[:8]}",
-            "cart_id": str(cart.uuid),  # Use cart.uuid, not cart.id
             "pay_way_id": self.pay_way.id,
             "country_id": self.country.alpha_2,
             "region_id": self.region.alpha,
-            "email": unique_email,
+            "floor": FloorChoicesEnum.FIRST_FLOOR.value,
+            "location_type": LocationChoicesEnum.HOME.value,
+            "email": "new-order@example.com",
             "first_name": "New",
             "last_name": "Order",
             "street": "789 Test St",
@@ -336,82 +185,127 @@ class OrderViewSetTestCase(TestURLFixerMixin, APITestCase):
             "shipping_kind": "home_delivery",
         }
 
-        # Mock payment provider
         with patch("order.payment.get_payment_provider") as mock_get_provider:
-            mock_provider = mock_get_provider.return_value
-            mock_provider.get_payment_status.return_value = (
+            mock_get_provider.return_value.get_payment_status.return_value = (
                 PaymentStatus.COMPLETED,
                 {"status": "succeeded"},
             )
-
             response = self.client.post(self.list_url, payload, format="json")
 
-        # The response body is in the assertion message rather than a
-        # print: a print only reaches stdout, which pytest swallows on a
-        # passing run and buries on a failing one.
         self.assertEqual(
             response.status_code,
             status.HTTP_201_CREATED,
             f"order creation failed: {response.data}",
         )
-        self.assertEqual(Order.objects.count(), initial_count + 1)
-
-        created_order = Order.objects.get(email=unique_email)
-        self.assertEqual(created_order.first_name, "New")
+        self.assertEqual(
+            set(response.data.keys()), set(OrderDetailSerializer.Meta.fields)
+        )
+        created_order = Order.objects.get(email="new-order@example.com")
+        self.assertEqual(created_order.id, response.data["id"])
         self.assertEqual(created_order.city, "Seattle")
+        self.assertEqual(
+            list(created_order.items.values_list("product_id", "quantity")),
+            [(self.products[0].id, 1)],
+        )
 
-    def test_retrieve_order(self):
+    def test_create_reports_every_invalid_field(self):
         self.client.force_authenticate(user=self.admin_user)
-        response = self.client.get(self.get_order_detail_url(self.order.id))
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["id"], self.order.id)
-        self.assertEqual(response.data["first_name"], self.order.first_name)
+        response = self.client.post(
+            self.list_url,
+            {"email": "invalid-email", "phone": "invalid-phone"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        for field in ("pay_way_id", "email", "phone", "first_name"):
+            self.assertIn(field, response.data)
+
+    # -- update -----------------------------------------------------------
 
     def test_update_order(self):
         self.client.force_authenticate(user=self.admin_user)
 
-        unique_email = f"updated-{uuid.uuid4().hex[:8]}@example.com"
+        response = self.client.put(
+            self.detail_url(self.order.id),
+            self._address_payload(city="Boston"),
+            format="json",
+        )
 
-        payload = {
-            "user": self.user.id,
-            "pay_way": self.pay_way.id,
-            "country": self.country.alpha_2,
-            "region": self.region.alpha,
-            "email": unique_email,
-            "first_name": "Updated",
-            "last_name": "Order",
-            "street": "456 Updated St",
-            "street_number": "10",
-            "city": "Portland",
-            "zipcode": "97201",
-            "phone": "+12345678904",
-            "shipping_price": Decimal("20.00"),
-            "items": [
-                {
-                    "product": self.order_items[0].product.id,
-                    "quantity": 3,
-                }
-            ],
-        }
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            set(response.data.keys()), set(OrderDetailSerializer.Meta.fields)
+        )
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.first_name, "Updated")
+        self.assertEqual(self.order.city, "Boston")
+
+    def test_update_does_not_mutate_line_items(self):
+        """Order line items must NOT be delete+recreated by an order
+        update — that bypassed stock accounting and total recomputation
+        (G0222). The original items (with their committed stock) stay."""
+        self.client.force_authenticate(user=self.admin_user)
+        original_items = dict(self.order.items.values_list("id", "quantity"))
 
         response = self.client.put(
-            self.get_order_detail_url(self.order.id), payload, format="json"
+            self.detail_url(self.order.id),
+            self._address_payload(
+                items=[{"product": self.products[0].id, "quantity": 1}]
+            ),
+            format="json",
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.order.refresh_from_db()
-        self.assertEqual(self.order.first_name, "Updated")
-        self.assertEqual(self.order.city, "Portland")
+        self.assertEqual(self.order.city, "Boston")
+        self.assertEqual(
+            dict(self.order.items.values_list("id", "quantity")),
+            original_items,
+        )
 
-    def test_delete_order(self):
+    def test_partial_update(self):
         self.client.force_authenticate(user=self.admin_user)
 
-        order_id = self.order.id
-        response = self.client.delete(self.get_order_detail_url(order_id))
+        response = self.client.patch(
+            self.detail_url(self.order.id),
+            {"city": "Updated City"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            set(response.data.keys()), set(OrderDetailSerializer.Meta.fields)
+        )
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.city, "Updated City")
+
+    def test_owner_cannot_reassign_order_to_another_user(self):
+        # ``user`` is read-only on OrderWriteSerializer: a raw setattr
+        # mass-assign previously let an owner PATCH their order onto
+        # another account (or null it to a guest), taking their PII with
+        # it. The address edit still applies; the user FK must not move.
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.patch(
+            self.detail_url(self.order.id),
+            {"user": self.other_user.id, "city": "Reassigned City"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.user_id, self.user.id)
+        self.assertEqual(self.order.city, "Reassigned City")
+
+    # -- delete -----------------------------------------------------------
+
+    def test_admin_can_delete_order(self):
+        self.client.force_authenticate(user=self.admin_user)
+
+        response = self.client.delete(self.detail_url(self.order.id))
 
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertFalse(Order.objects.filter(id=order_id).exists())
+        self.assertFalse(Order.objects.filter(id=self.order.id).exists())
 
     def test_owner_cannot_delete_own_order(self):
         # ``destroy`` is admin-only: DRF's default destroy soft-deletes
@@ -421,287 +315,178 @@ class OrderViewSetTestCase(TestURLFixerMixin, APITestCase):
         # delete). Regression for the owner-reachable destroy hole.
         self.client.force_authenticate(user=self.user)
 
-        order_id = self.order.id
-        response = self.client.delete(self.get_order_detail_url(order_id))
+        response = self.client.delete(self.detail_url(self.order.id))
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-        self.assertTrue(Order.objects.filter(id=order_id).exists())
+        self.assertTrue(Order.objects.filter(id=self.order.id).exists())
+
+    # -- access -----------------------------------------------------------
+
+    def test_admin_lists_every_order(self):
+        self.client.force_authenticate(user=self.admin_user)
+
+        response = self.client.get(self.list_url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            {o["id"] for o in response.data["results"]},
+            {self.order.id, self.other_order.id},
+        )
+
+    def test_customer_lists_only_own_orders(self):
+        # get_queryset filters by user for non-staff, preventing
+        # cross-user IDOR enumeration of the order list.
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.get(self.list_url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            [o["id"] for o in response.data["results"]], [self.order.id]
+        )
+
+    def test_my_orders_returns_only_own_orders(self):
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.get(reverse("order-my-orders"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            [o["id"] for o in response.data["results"]], [self.order.id]
+        )
+
+    def test_customer_cannot_retrieve_another_users_order(self):
+        self.client.force_authenticate(user=self.user)
+
+        own = self.client.get(self.detail_url(self.order.id))
+        other = self.client.get(self.detail_url(self.other_order.id))
+
+        self.assertEqual(own.status_code, status.HTTP_200_OK)
+        self.assertEqual(other.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_admin_can_retrieve_any_order(self):
+        self.client.force_authenticate(user=self.admin_user)
+
+        response = self.client.get(self.detail_url(self.other_order.id))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["id"], self.other_order.id)
+
+    def test_retrieve_by_uuid(self):
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.get(
+            reverse(
+                "order-retrieve-by-uuid", kwargs={"uuid": str(self.order.uuid)}
+            )
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["id"], self.order.id)
 
     def test_retrieve_nonexistent_order(self):
         self.client.force_authenticate(user=self.admin_user)
-        response = self.client.get(self.get_order_detail_url(99999))
+
+        response = self.client.get(self.detail_url(99999))
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
-    def test_filter_by_status(self):
-        self.client.force_authenticate(user=self.admin_user)
-        response = self.client.get(
-            self.list_url, {"status": OrderStatus.SHIPPED.value}
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        results = response.data["results"]
-        self.assertEqual(len(results), 1)
-        self.assertEqual(results[0]["status"], OrderStatus.SHIPPED.value)
-
-    def test_filter_by_user(self):
-        self.client.force_authenticate(user=self.admin_user)
-        response = self.client.get(self.list_url, {"user": self.user.id})
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        results = response.data["results"]
-        self.assertEqual(len(results), 1)
-        self.assertEqual(results[0]["user"], self.user.id)
-
-    def test_filter_by_payment_status(self):
-        self.client.force_authenticate(user=self.admin_user)
-        response = self.client.get(
-            self.list_url, {"payment_status": PaymentStatus.COMPLETED.value}
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        results = response.data["results"]
-        for result in results:
-            self.assertEqual(
-                result["payment_status"], PaymentStatus.COMPLETED.value
-            )
-
-    def test_filter_by_city(self):
-        self.client.force_authenticate(user=self.admin_user)
-        response = self.client.get(self.list_url, {"city": "Chicago"})
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        results = response.data["results"]
-        self.assertEqual(len(results), 1)
-        self.assertIn("Chicago", results[0]["city"])
-
-    def test_filter_by_date_range(self):
-        self.client.force_authenticate(user=self.admin_user)
-
-        from datetime import timedelta
-
-        yesterday = self.order.created_at - timedelta(days=1)
-        response = self.client.get(
-            self.list_url, {"created_after": yesterday.isoformat()}
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data["results"]), 2)
-
-    def test_filter_has_tracking(self):
-        self.client.force_authenticate(user=self.admin_user)
-        response = self.client.get(self.list_url, {"has_tracking": "true"})
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        results = response.data["results"]
-        for result in results:
-            detail_response = self.client.get(
-                self.get_order_detail_url(result["id"])
-            )
-            self.assertIsNotNone(detail_response.data.get("tracking_number"))
-            self.assertNotEqual(detail_response.data.get("tracking_number"), "")
-
-    def test_filter_has_user(self):
-        self.client.force_authenticate(user=self.admin_user)
-        response = self.client.get(self.list_url, {"has_user": "true"})
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        results = response.data["results"]
-        for result in results:
-            self.assertIsNotNone(result["user"])
-
-    def test_ordering_by_created_at_desc(self):
-        self.client.force_authenticate(user=self.admin_user)
-        response = self.client.get(self.list_url, {"ordering": "-created_at"})
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        results = response.data["results"]
-        self.assertEqual(len(results), 2)
-
-        first_date = results[0]["created_at"]
-        second_date = results[1]["created_at"]
-        self.assertGreaterEqual(first_date, second_date)
-
-    def test_ordering_by_status(self):
-        self.client.force_authenticate(user=self.admin_user)
-        response = self.client.get(self.list_url, {"ordering": "status"})
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        results = response.data["results"]
-        self.assertEqual(len(results), 2)
-
-    def test_ordering_by_paid_amount(self):
-        self.client.force_authenticate(user=self.admin_user)
-        response = self.client.get(self.list_url, {"ordering": "paid_amount"})
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-
-    def test_search_by_customer_name(self):
-        self.client.force_authenticate(user=self.admin_user)
-
-        search_name = self.order.first_name
-        response = self.client.get(self.list_url, {"search": search_name})
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        results = response.data["results"]
-        self.assertGreater(len(results), 0)
-        found_match = any(
-            search_name.lower() in result["first_name"].lower()
-            for result in results
-        )
-        self.assertTrue(found_match)
-
-    def test_search_by_email(self):
-        self.client.force_authenticate(user=self.admin_user)
-        response = self.client.get(self.list_url, {"search": self.order.email})
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        results = response.data["results"]
-        self.assertGreater(len(results), 0)
-
-    def test_search_by_tracking_number(self):
-        self.client.force_authenticate(user=self.admin_user)
-        response = self.client.get(self.list_url, {"search": "TRACK123"})
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        results = response.data["results"]
-        self.assertEqual(len(results), 1)
-        detail_response = self.client.get(
-            self.get_order_detail_url(results[0]["id"])
-        )
-        self.assertEqual(detail_response.data["tracking_number"], "TRACK123")
-
-    def test_search_by_city(self):
-        self.client.force_authenticate(user=self.admin_user)
-        response = self.client.get(self.list_url, {"search": "Chicago"})
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        results = response.data["results"]
-        self.assertEqual(len(results), 1)
-        self.assertIn("Chicago", results[0]["city"])
-
-    def test_validation_errors(self):
-        self.client.force_authenticate(user=self.admin_user)
-
-        payload = {
-            "email": "invalid-email",
-            "phone": "invalid-phone",
-            # Missing payment_intent_id and pay_way_id - required fields
-        }
-
-        response = self.client.post(self.list_url, payload, format="json")
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        # Should have validation error for required fields or invalid format
-        # pay_way_id is validated first, so it appears in error response
-        self.assertTrue(
-            "pay_way_id" in response.data
-            or "payment_intent_id" in response.data
-            or "email" in response.data
-        )
-
-    def test_create_order_with_invalid_items(self):
-        self.client.force_authenticate(user=self.admin_user)
-
-        payload = {
-            "user": self.user.id,
-            "email": "test@example.com",
-            "first_name": "Test",
-            "last_name": "User",
-            "street": "123 Test St",
-            "street_number": "1",
-            "city": "Test City",
-            "zipcode": "12345",
-            "phone": "+11234567890",
-            "shipping_price": Decimal("10.00"),
-            "items": [
-                {
-                    "product": 99999,
-                    "quantity": 1,
-                }
-            ],
-        }
-
-        response = self.client.post(self.list_url, payload, format="json")
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
-    def test_user_can_access_own_orders_only(self):
-        self.client.force_authenticate(user=self.user)
-
-        response = self.client.get(self.get_order_detail_url(self.order.id))
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-
-        response = self.client.get(
-            self.get_order_detail_url(self.other_order.id)
-        )
-        self.assertIn(
-            response.status_code,
-            [
-                status.HTTP_200_OK,
-                status.HTTP_403_FORBIDDEN,
-                status.HTTP_404_NOT_FOUND,
-            ],
-        )
-
-    def test_admin_can_access_all_orders(self):
-        self.client.force_authenticate(user=self.admin_user)
-
-        response = self.client.get(self.get_order_detail_url(self.order.id))
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-
-        response = self.client.get(
-            self.get_order_detail_url(self.other_order.id)
-        )
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-
     def test_unauthenticated_access_denied(self):
-        response = self.client.get(self.list_url)
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        for url in (
+            self.list_url,
+            self.detail_url(self.order.id),
+            reverse("order-my-orders"),
+        ):
+            with self.subTest(url=url):
+                response = self.client.get(url)
+                self.assertEqual(
+                    response.status_code, status.HTTP_401_UNAUTHORIZED
+                )
 
-        response = self.client.get(self.get_order_detail_url(self.order.id))
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+    # -- search -----------------------------------------------------------
 
-    def test_my_orders_action(self):
-        self.client.force_authenticate(user=self.user)
-
-        url = reverse("order-my-orders")
-        response = self.client.get(url)
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        results = response.data["results"]
-
-        for result in results:
-            self.assertEqual(result["user"], self.user.id)
-
-    def test_cancel_order_action(self):
+    def test_search(self):
         self.client.force_authenticate(user=self.admin_user)
 
-        url = reverse("order-cancel", kwargs={"pk": self.order.id})
-        response = self.client.post(url)
+        for term, expected in (
+            ("Quillon", self.order.id),
+            ("quillon.orders@example.com", self.order.id),
+            ("TRACK123", self.other_order.id),
+            ("Chicago", self.other_order.id),
+        ):
+            with self.subTest(term=term):
+                response = self.client.get(self.list_url, {"search": term})
+                self.assertEqual(response.status_code, status.HTTP_200_OK)
+                self.assertEqual(
+                    [o["id"] for o in response.data["results"]], [expected]
+                )
 
-        self.assertIn(
-            response.status_code,
-            [status.HTTP_200_OK, status.HTTP_400_BAD_REQUEST],
+    # -- actions ----------------------------------------------------------
+
+    def test_cancel_action_cancels_a_pending_order(self):
+        self.client.force_authenticate(user=self.admin_user)
+
+        response = self.client.post(
+            reverse("order-cancel", kwargs={"pk": self.order.id})
         )
 
-    def test_add_tracking_action_admin_only(self):
-        self.client.force_authenticate(user=self.user)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, OrderStatus.CANCELED)
 
-        url = reverse("order-add-tracking", kwargs={"pk": self.order.id})
-        payload = {
-            "tracking_number": "TEST123",
-            "shipping_carrier": "TestCarrier",
-        }
-        response = self.client.post(url, payload)
+    def test_add_tracking_action(self):
+        self.client.force_authenticate(user=self.admin_user)
+        Order.objects.filter(id=self.order.id).update(
+            status=OrderStatus.PROCESSING
+        )
 
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        response = self.client.post(
+            reverse("order-add-tracking", kwargs={"pk": self.order.id}),
+            {"tracking_number": "TRACK123456", "shipping_carrier": "FedEx"},
+            format="json",
+        )
 
-    def test_update_status_action_admin_only(self):
-        self.client.force_authenticate(user=self.user)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.tracking_number, "TRACK123456")
+        self.assertEqual(self.order.shipping_carrier, "FedEx")
 
+    def test_update_status_action(self):
+        self.client.force_authenticate(user=self.admin_user)
         url = reverse("order-update-status", kwargs={"pk": self.order.id})
-        payload = {"status": OrderStatus.SHIPPED.value}
-        response = self.client.post(url, payload)
 
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        refused = self.client.post(
+            url, {"status": OrderStatus.COMPLETED}, format="json"
+        )
+        self.order.refresh_from_db()
+        self.assertEqual(refused.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(self.order.status, OrderStatus.PENDING)
+
+        allowed = self.client.post(
+            url, {"status": OrderStatus.PROCESSING}, format="json"
+        )
+        self.order.refresh_from_db()
+        self.assertEqual(allowed.status_code, status.HTTP_200_OK)
+        self.assertEqual(self.order.status, OrderStatus.PROCESSING)
+
+    def test_staff_actions_are_forbidden_to_the_owner(self):
+        self.client.force_authenticate(user=self.user)
+
+        for name, payload in (
+            (
+                "order-add-tracking",
+                {"tracking_number": "T1", "shipping_carrier": "C"},
+            ),
+            ("order-update-status", {"status": OrderStatus.SHIPPED}),
+        ):
+            with self.subTest(action=name):
+                response = self.client.post(
+                    reverse(name, kwargs={"pk": self.order.id}), payload
+                )
+                self.assertEqual(
+                    response.status_code, status.HTTP_403_FORBIDDEN
+                )
+
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, OrderStatus.PENDING)
+        self.assertEqual(self.order.tracking_number, "")

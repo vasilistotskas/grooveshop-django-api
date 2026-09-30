@@ -20,6 +20,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
 
+from core.api.views import RouterActionOverridesMixin
 from core.utils.views import cache_methods
 from shipping_acs import config as acs_config
 from shipping_acs.models import AcsStation
@@ -30,7 +31,9 @@ from shipping_acs.serializers import (
 
 
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
-class AcsStationViewSet(viewsets.ReadOnlyModelViewSet):
+class AcsStationViewSet(
+    RouterActionOverridesMixin, viewsets.ReadOnlyModelViewSet
+):
     """List / retrieve ACS stations and Smartpoint lockers."""
 
     queryset = AcsStation.objects.filter(is_active=True)

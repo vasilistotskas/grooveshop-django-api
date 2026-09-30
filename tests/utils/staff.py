@@ -22,9 +22,11 @@ from user.factories.account import UserAccountFactory
 
 
 def store_tenant(schema_name: str, **kwargs) -> Tenant:
-    """Persist a ``Tenant`` row without creating a Postgres schema."""
+    """Persist a ``Tenant`` row; no Postgres schema is created, because
+    ``tests/conftest.py`` turns ``Tenant.auto_create_schema`` off for the
+    whole suite."""
     slug = schema_name.replace("_", "-")
-    tenant = Tenant(
+    return Tenant.objects.create(
         schema_name=schema_name,
         name=kwargs.pop("name", slug),
         slug=kwargs.pop("slug", slug),
@@ -32,9 +34,6 @@ def store_tenant(schema_name: str, **kwargs) -> Tenant:
         store_name=kwargs.pop("store_name", f"{slug} store"),
         **kwargs,
     )
-    tenant.auto_create_schema = False
-    tenant.save()
-    return tenant
 
 
 def bind_store_tenant(tenant: Tenant | None):

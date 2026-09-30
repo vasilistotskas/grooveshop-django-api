@@ -19,13 +19,46 @@ from __future__ import annotations
 from collections.abc import Callable
 from functools import wraps
 
+from django.contrib.admin.utils import get_fields_from_path
+from django.db import models
 from parler.admin import TranslatableAdmin, TranslatableTabularInline
 from tinymce.models import HTMLField
 from tinymce.widgets import AdminTinyMCE
 from unfold.admin import BaseInlineMixin, ModelAdmin
+from unfold.contrib.filters.admin import (
+    AllValuesCheckboxFilter,
+    BooleanRadioFilter,
+    ChoicesDropdownFilter,
+    RangeDateFilter,
+    RangeDateTimeFilter,
+    RelatedDropdownFilter,
+)
 from unfold.mixins import FormFieldModelAdminMixin
 
 from admin.mixins import WithheldOnTenantHostModelAdmin
+
+
+def unfold_filter_for(field: models.Field) -> type:
+    """The Unfold list filter for a ``list_filter`` entry given by name.
+
+    Django's own filters are links that apply on click, while Unfold's
+    are form fields sent together by "Apply" (``list_filter_submit``):
+    in one sheet holding both, clicking a link navigated away and lost
+    every selection not applied yet. Order matters: a field with
+    ``choices`` is a choice whatever its type, and ``DateTimeField``
+    subclasses ``DateField``.
+    """
+    if field.flatchoices:
+        return ChoicesDropdownFilter
+    if isinstance(field, models.BooleanField):
+        return BooleanRadioFilter
+    if isinstance(field, models.DateTimeField):
+        return RangeDateTimeFilter
+    if isinstance(field, models.DateField):
+        return RangeDateFilter
+    if field.is_relation:
+        return RelatedDropdownFilter
+    return AllValuesCheckboxFilter
 
 
 def _own_copy(method: Callable) -> Callable:
@@ -152,6 +185,20 @@ class BaseModelAdmin(WithheldOnTenantHostModelAdmin, ModelAdmin):
     formfield_overrides = {
         HTMLField: {"widget": AdminTinyMCE},
     }
+
+    def get_list_filter(self, request):
+        """Every plain field name in ``list_filter`` as its Unfold filter
+        (``unfold_filter_for``); explicit ``(field, Filter)`` pairs and
+        filter classes are kept as declared."""
+        return [
+            (
+                entry,
+                unfold_filter_for(get_fields_from_path(self.model, entry)[-1]),
+            )
+            if isinstance(entry, str)
+            else entry
+            for entry in super().get_list_filter(request)
+        ]
 
 
 class BaseTranslatableAdmin(TranslatableAdmin, BaseModelAdmin):

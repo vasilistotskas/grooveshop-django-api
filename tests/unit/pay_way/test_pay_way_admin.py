@@ -7,11 +7,10 @@ from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import RequestFactory, TestCase
 from django.utils.translation import gettext
+from unfold.contrib.filters.admin import RangeNumericFilter
 
 from pay_way.admin import (
     ConfigurationStatusFilter,
-    CostRangeFilter,
-    FreeThresholdFilter,
     PaymentTypeFilter,
     PayWayAdmin,
 )
@@ -23,126 +22,48 @@ pytestmark = pytest.mark.assert_english
 User = get_user_model()
 
 
-class CostRangeFilterTestCase(TestCase):
+class MoneyRangeFiltersTestCase(TestCase):
+    """``cost`` and ``free_threshold`` filter through Unfold's field range
+    filter (``?cost_from=``/``?cost_to=``), not hand-written subclasses."""
+
     def setUp(self):
-        # Counts or orders every pay-way, so start without the rows
+        # Counts every pay-way, so start without the rows
         # ``pay_way/migrations/0019_seed_default_pay_ways`` seeds.
         PayWay.objects.all().delete()
-
-        self.factory = RequestFactory()
-        self.request = self.factory.get("/admin/pay_way/payway/")
-        self.model_admin = Mock()
-
-        self.free_payment = PayWay.objects.create(cost=Decimal("0.00"))
-        self.free_payment.set_current_language("en")
-        self.free_payment.name = "Free Payment"
-        self.free_payment.save()
-
-        self.low_cost_payment = PayWay.objects.create(cost=Decimal("2.50"))
-        self.low_cost_payment.set_current_language("en")
-        self.low_cost_payment.name = "Low Cost Payment"
-        self.low_cost_payment.save()
-
-        self.high_cost_payment = PayWay.objects.create(cost=Decimal("10.00"))
-        self.high_cost_payment.set_current_language("en")
-        self.high_cost_payment.name = "High Cost Payment"
-        self.high_cost_payment.save()
-
-    def test_filter_title(self):
-        filter_instance = CostRangeFilter(
-            self.request, {}, PayWay, self.model_admin
+        self.request = RequestFactory().get("/admin/pay_way/payway/")
+        self.free = PayWay.objects.create(
+            cost=Decimal("0.00"), free_threshold=Decimal("0.00")
         )
-        self.assertEqual(str(filter_instance.title), gettext("Cost Range"))
-
-    def test_filter_parameter_name(self):
-        filter_instance = CostRangeFilter(
-            self.request, {}, PayWay, self.model_admin
+        self.low = PayWay.objects.create(
+            cost=Decimal("2.50"), free_threshold=Decimal("50.00")
         )
-        self.assertEqual(filter_instance.parameter_name, "cost_range")
-
-    def test_queryset_with_from_value(self):
-        filter_instance = CostRangeFilter(
-            self.request, {"cost_range_from": "2.00"}, PayWay, self.model_admin
+        self.high = PayWay.objects.create(
+            cost=Decimal("10.00"), free_threshold=Decimal("100.00")
         )
-        queryset = filter_instance.queryset(self.request, PayWay.objects.all())
 
-        self.assertIn(self.low_cost_payment, queryset)
-        self.assertIn(self.high_cost_payment, queryset)
-        self.assertNotIn(self.free_payment, queryset)
-
-    def test_queryset_with_to_value(self):
-        filter_instance = CostRangeFilter(
-            self.request, {"cost_range_to": "5.00"}, PayWay, self.model_admin
-        )
-        queryset = filter_instance.queryset(self.request, PayWay.objects.all())
-
-        self.assertIn(self.free_payment, queryset)
-        self.assertIn(self.low_cost_payment, queryset)
-        self.assertNotIn(self.high_cost_payment, queryset)
-
-    def test_queryset_with_range(self):
-        filter_instance = CostRangeFilter(
+    def _filtered(self, field: str, params: dict) -> list:
+        range_filter = RangeNumericFilter(
+            PayWay._meta.get_field(field),
             self.request,
-            {"cost_range_from": "2.00", "cost_range_to": "5.00"},
+            dict(params),
             PayWay,
-            self.model_admin,
+            Mock(),
+            field,
         )
-        queryset = filter_instance.queryset(self.request, PayWay.objects.all())
+        return list(range_filter.queryset(self.request, PayWay.objects.all()))
 
-        self.assertNotIn(self.free_payment, queryset)
-        self.assertIn(self.low_cost_payment, queryset)
-        self.assertNotIn(self.high_cost_payment, queryset)
+    def test_cost_range(self):
+        rows = self._filtered("cost", {"cost_from": "2.00", "cost_to": "5.00"})
+        self.assertEqual(rows, [self.low])
 
-    def test_queryset_no_filter(self):
-        filter_instance = CostRangeFilter(
-            self.request, {}, PayWay, self.model_admin
-        )
-        queryset = filter_instance.queryset(self.request, PayWay.objects.all())
+    def test_free_threshold_from(self):
+        rows = self._filtered("free_threshold", {"free_threshold_from": "75"})
+        self.assertEqual(rows, [self.high])
 
-        self.assertEqual(queryset.count(), 3)
-
-
-class FreeThresholdFilterTestCase(TestCase):
-    def setUp(self):
-        self.factory = RequestFactory()
-        self.request = self.factory.get("/admin/pay_way/payway/")
-        self.model_admin = Mock()
-
-        self.no_threshold = PayWay.objects.create(
-            free_threshold=Decimal("0.00")
-        )
-        self.low_threshold = PayWay.objects.create(
-            free_threshold=Decimal("50.00")
-        )
-        self.high_threshold = PayWay.objects.create(
-            free_threshold=Decimal("100.00")
-        )
-
-    def test_filter_title(self):
-        filter_instance = FreeThresholdFilter(
-            self.request, {}, PayWay, self.model_admin
-        )
-        self.assertEqual(
-            str(filter_instance.title), gettext("Free Threshold Range")
-        )
-
-    def test_filter_parameter_name(self):
-        filter_instance = FreeThresholdFilter(
-            self.request, {}, PayWay, self.model_admin
-        )
-        self.assertEqual(filter_instance.parameter_name, "free_threshold_range")
-
-    def test_queryset_filtering(self):
-        filter_instance = FreeThresholdFilter(
-            self.request,
-            {"free_threshold_range_from": "75.00"},
-            PayWay,
-            self.model_admin,
-        )
-        queryset = filter_instance.queryset(self.request, PayWay.objects.all())
-
-        self.assertIn(self.high_threshold, queryset)
-        self.assertNotIn(self.low_threshold, queryset)
+    def test_the_admin_wires_both(self):
+        list_filter = PayWayAdmin(PayWay, AdminSite()).list_filter
+        self.assertIn(("cost", RangeNumericFilter), list_filter)
+        self.assertIn(("free_threshold", RangeNumericFilter), list_filter)
 
 
 class PaymentTypeFilterTestCase(TestCase):
@@ -369,8 +290,7 @@ class PayWayAdminTestCase(TestCase):
         self.assertIn("active", self.admin.list_filter)
         self.assertIn(PaymentTypeFilter, self.admin.list_filter)
         self.assertIn(ConfigurationStatusFilter, self.admin.list_filter)
-        self.assertIn(CostRangeFilter, self.admin.list_filter)
-        self.assertIn(FreeThresholdFilter, self.admin.list_filter)
+        self.assertIn(("cost", RangeNumericFilter), self.admin.list_filter)
 
     def test_search_fields(self):
         expected_fields = [
@@ -675,8 +595,7 @@ class PayWayAdminIntegrationTestCase(TestCase):
 
         self.assertIn(PaymentTypeFilter, self.admin.list_filter)
         self.assertIn(ConfigurationStatusFilter, self.admin.list_filter)
-        self.assertIn(CostRangeFilter, self.admin.list_filter)
-        self.assertIn(FreeThresholdFilter, self.admin.list_filter)
+        self.assertIn(("cost", RangeNumericFilter), self.admin.list_filter)
 
     def test_admin_display_methods_integration(self):
         display_methods = [

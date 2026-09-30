@@ -10,6 +10,7 @@ from django.utils.html import format_html_join
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import TabularInline
 from unfold.contrib.filters.admin import (
+    AutocompleteSelectFilter,
     DropdownFilter,
     RangeDateFilter,
     RangeDateTimeFilter,
@@ -64,45 +65,17 @@ USER_SUBSCRIPTION_STATUS_VARIANT: dict[str, str] = {
 
 
 class SubscriptionCountFilter(RangeNumericListFilter):
+    """Over ``subscription_count``, which ``UserAdmin`` always annotates."""
+
     title = _("Subscription Count")
     parameter_name = "subscription_count"
 
-    def queryset(self, request, queryset):
-        filters = {}
-
-        value_from = self.used_parameters.get(f"{self.parameter_name}_from")
-        if value_from:
-            filters["subscription_count__gte"] = value_from
-
-        value_to = self.used_parameters.get(f"{self.parameter_name}_to")
-        if value_to:
-            filters["subscription_count__lte"] = value_to
-
-        return queryset.filter(**filters) if filters else queryset
-
-    def expected_parameters(self):
-        return [f"{self.parameter_name}_from", f"{self.parameter_name}_to"]
-
 
 class AddressCountFilter(RangeNumericListFilter):
+    """Over ``address_count``, which ``UserAdmin`` always annotates."""
+
     title = _("Address Count")
     parameter_name = "address_count"
-
-    def queryset(self, request, queryset):
-        filters = {}
-
-        value_from = self.used_parameters.get(f"{self.parameter_name}_from")
-        if value_from:
-            filters["address_count__gte"] = value_from
-
-        value_to = self.used_parameters.get(f"{self.parameter_name}_to")
-        if value_to:
-            filters["address_count__lte"] = value_to
-
-        return queryset.filter(**filters) if filters else queryset
-
-    def expected_parameters(self):
-        return [f"{self.parameter_name}_from", f"{self.parameter_name}_to"]
 
 
 class UserStatusFilter(DropdownFilter):
@@ -279,8 +252,8 @@ class UserAdmin(ExportActionMixin, BaseModelAdmin):
         "is_active",
         "is_staff",
         "is_superuser",
-        ("country", RelatedDropdownFilter),
-        ("region", RelatedDropdownFilter),
+        ("country", AutocompleteSelectFilter),
+        ("region", AutocompleteSelectFilter),
         SubscriptionCountFilter,
         AddressCountFilter,
         ("created_at", RangeDateTimeFilter),
@@ -666,8 +639,8 @@ class UserAddressAdmin(BaseModelAdmin):
         "is_main",
         "floor",
         "location_type",
-        ("country", RelatedDropdownFilter),
-        ("region", RelatedDropdownFilter),
+        ("country", AutocompleteSelectFilter),
+        ("region", AutocompleteSelectFilter),
         ("created_at", RangeDateTimeFilter),
     ]
 
@@ -956,7 +929,9 @@ class UserSubscriptionAdmin(BaseModelAdmin):
 
     @display(description=_("Subscription"), ordering="created_at")
     def subscription_info(self, obj):
-        return f"#{obj.id} — {format_dt(obj.created_at, fmt="SHORT_DATE_FORMAT")}"
+        return (
+            f"#{obj.id} — {format_dt(obj.created_at, fmt='SHORT_DATE_FORMAT')}"
+        )
 
     @display(description=_("User"))
     def user_info(self, obj):

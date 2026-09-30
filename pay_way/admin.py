@@ -6,7 +6,7 @@ from unfold.admin import TabularInline
 from unfold.contrib.filters.admin import (
     DropdownFilter,
     RangeDateTimeFilter,
-    RangeNumericListFilter,
+    RangeNumericFilter,
 )
 from unfold.decorators import action, display
 from unfold.enums import ActionVariant
@@ -43,9 +43,6 @@ class PayWayShippingExclusionInline(TabularInline):
 
     model = PayWayShippingExclusion
     extra = 0
-    # ``country`` has no autocomplete: the country admin is
-    # platform-only, so a tenant-schema session would get a 403 from
-    # its autocomplete endpoint. A plain select always works.
     fields = (
         "shipping_provider",
         "shipping_kind",
@@ -53,51 +50,9 @@ class PayWayShippingExclusionInline(TabularInline):
         "pay_way",
         "note",
     )
-    autocomplete_fields = ("pay_way", "shipping_provider")
+    autocomplete_fields = ("pay_way", "shipping_provider", "country")
     verbose_name = _("Payment-method exclusion")
     verbose_name_plural = _("Payment-method exclusions")
-
-
-class CostRangeFilter(RangeNumericListFilter):
-    title = _("Cost Range")
-    parameter_name = "cost_range"
-
-    def queryset(self, request, queryset):
-        filters = {}
-        value_from = self.used_parameters.get(f"{self.parameter_name}_from")
-        if value_from and value_from != "":
-            filters["cost__gte"] = value_from
-        value_to = self.used_parameters.get(f"{self.parameter_name}_to")
-        if value_to and value_to != "":
-            filters["cost__lte"] = value_to
-        return queryset.filter(**filters) if filters else queryset
-
-    def expected_parameters(self):
-        return [
-            f"{self.parameter_name}_from",
-            f"{self.parameter_name}_to",
-        ]
-
-
-class FreeThresholdFilter(RangeNumericListFilter):
-    title = _("Free Threshold Range")
-    parameter_name = "free_threshold_range"
-
-    def queryset(self, request, queryset):
-        filters = {}
-        value_from = self.used_parameters.get(f"{self.parameter_name}_from")
-        if value_from and value_from != "":
-            filters["free_threshold__gte"] = value_from
-        value_to = self.used_parameters.get(f"{self.parameter_name}_to")
-        if value_to and value_to != "":
-            filters["free_threshold__lte"] = value_to
-        return queryset.filter(**filters) if filters else queryset
-
-    def expected_parameters(self):
-        return [
-            f"{self.parameter_name}_from",
-            f"{self.parameter_name}_to",
-        ]
 
 
 class PaymentTypeFilter(DropdownFilter):
@@ -176,8 +131,8 @@ class PayWayAdmin(BaseTranslatableAdmin):
         "active",
         PaymentTypeFilter,
         ConfigurationStatusFilter,
-        CostRangeFilter,
-        FreeThresholdFilter,
+        ("cost", RangeNumericFilter),
+        ("free_threshold", RangeNumericFilter),
         ("created_at", RangeDateTimeFilter),
         ("updated_at", RangeDateTimeFilter),
     ]

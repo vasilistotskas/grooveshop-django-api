@@ -21,10 +21,10 @@ from parler.admin import TranslatableAdmin
 from simple_history.admin import SimpleHistoryAdmin
 from unfold.admin import TabularInline
 from unfold.contrib.filters.admin import (
+    AutocompleteSelectFilter,
     DropdownFilter,
     RangeDateTimeFilter,
     RangeNumericFilter,
-    RangeNumericListFilter,
     RelatedDropdownFilter,
     SliderNumericFilter,
 )
@@ -42,6 +42,7 @@ from admin.displays import (
     relative_time,
 )
 from admin.export import ExportActionMixin
+from admin.filters import AnnotatedRangeFilter, LikesCountFilter
 from core.forms.measurement import MeasurementWidget
 from core.units import WeightUnits
 from order.models.order import Order
@@ -228,62 +229,12 @@ class PopularityFilter(DropdownFilter):
         return queryset.filter(**filter_kwargs)
 
 
-class LikesCountFilter(RangeNumericListFilter):
-    title = _("Likes count")
-    parameter_name = "likes_count"
-
-    def queryset(self, request, queryset):
-        # Short-circuit when the filter is unused. Django admin
-        # invokes every ``list_filter``'s ``queryset()`` on every
-        # page load — without this guard ``with_likes_count()``
-        # added a ``LEFT JOIN productfavourite`` + GROUP BY to the
-        # main product fetch + the date-hierarchy DATE_TRUNC + the
-        # COUNT query, costing ~2s extra per changelist load.
-        value_from = self.used_parameters.get(f"{self.parameter_name}_from")
-        value_to = self.used_parameters.get(f"{self.parameter_name}_to")
-        if not value_from and not value_to:
-            return queryset
-
-        queryset = queryset.with_likes_count()
-        filters = {}
-        if value_from:
-            filters["likes_count__gte"] = value_from
-        if value_to:
-            filters["likes_count__lte"] = value_to
-        return queryset.filter(**filters)
-
-    def expected_parameters(self):
-        return [
-            f"{self.parameter_name}_from",
-            f"{self.parameter_name}_to",
-        ]
-
-
-class ReviewAverageFilter(RangeNumericListFilter):
+class ReviewAverageFilter(AnnotatedRangeFilter):
     title = _("Review Rating")
     parameter_name = "review_average"
 
-    def queryset(self, request, queryset):
-        # Short-circuit when the filter is unused — same rationale
-        # as ``LikesCountFilter`` above.
-        value_from = self.used_parameters.get(f"{self.parameter_name}_from")
-        value_to = self.used_parameters.get(f"{self.parameter_name}_to")
-        if not value_from and not value_to:
-            return queryset
-
-        queryset = queryset.with_review_average()
-        filters = {}
-        if value_from:
-            filters["review_average__gte"] = value_from
-        if value_to:
-            filters["review_average__lte"] = value_to
-        return queryset.filter(**filters)
-
-    def expected_parameters(self):
-        return [
-            f"{self.parameter_name}_from",
-            f"{self.parameter_name}_to",
-        ]
+    def annotate(self, queryset):
+        return queryset.with_review_average()
 
 
 class StockReservationStatusFilter(DropdownFilter):
@@ -2037,8 +1988,8 @@ class ProductFavouriteAdmin(BaseModelAdmin):
     )
     list_filter = [
         ("created_at", RangeDateTimeFilter),
-        ("user", RelatedDropdownFilter),
-        ("product", RelatedDropdownFilter),
+        ("user", AutocompleteSelectFilter),
+        ("product", AutocompleteSelectFilter),
         ("product__category", RelatedDropdownFilter),
     ]
     search_fields = [
@@ -2173,7 +2124,7 @@ class ProductImageAdmin(BaseTranslatableAdmin):
     )
     list_filter = [
         "is_main",
-        ("product", RelatedDropdownFilter),
+        ("product", AutocompleteSelectFilter),
         ("created_at", RangeDateTimeFilter),
     ]
     search_fields = [

@@ -100,7 +100,7 @@ class TestTotalItemsFilter:
         filter_instance = TotalItemsFilter(
             admin_request, {}, Cart, CartAdmin(Cart, AdminSite())
         )
-        assert filter_instance.parameter_name == "total_items"
+        assert filter_instance.parameter_name == "items_quantity_total"
 
     def _filtered(self, admin_request, params):
         filter_instance = TotalItemsFilter(
@@ -124,11 +124,15 @@ class TestTotalItemsFilter:
         big = CartFactory(user=UserAccountFactory(email="big@example.com"))
         CartItemFactory(cart=big, product=ProductFactory(), quantity=9)
 
-        at_least_five = self._filtered(admin_request, {"total_items_from": "5"})
+        at_least_five = self._filtered(
+            admin_request, {"items_quantity_total_from": "5"}
+        )
         assert big in at_least_five
         assert small not in at_least_five
 
-        at_most_four = self._filtered(admin_request, {"total_items_to": "4"})
+        at_most_four = self._filtered(
+            admin_request, {"items_quantity_total_to": "4"}
+        )
         assert small in at_most_four
         assert big not in at_most_four
 
@@ -136,7 +140,8 @@ class TestTotalItemsFilter:
         cart = CartFactory(user=UserAccountFactory())
         assert cart in self._filtered(admin_request, {})
         assert cart in self._filtered(
-            admin_request, {"total_items_from": "", "total_items_to": ""}
+            admin_request,
+            {"items_quantity_total_from": "", "items_quantity_total_to": ""},
         )
 
 

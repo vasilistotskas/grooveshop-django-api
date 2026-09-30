@@ -82,7 +82,6 @@ class TestRegionStatusFilter(TestCase):
             ("has_name", "Has Name"),
             ("no_name", "No Name"),
             ("recent", "Recently Added"),
-            ("by_continent", "Group by Continent"),
         ]
 
         self.assertEqual(list(lookups), expected_lookups)

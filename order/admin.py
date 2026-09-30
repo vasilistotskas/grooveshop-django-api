@@ -14,6 +14,7 @@ from unfold.contrib.filters.admin import (
     AutocompleteSelectFilter,
     ChoicesDropdownFilter,
     DropdownFilter,
+    MultipleChoicesDropdownFilter,
     RangeDateFilter,
     RangeDateTimeFilter,
     RelatedDropdownFilter,
@@ -38,7 +39,7 @@ from admin.displays import (
 from admin.mixins import IsSuperuserOnlyModelAdmin
 from order.attribution import source_label
 from order.enum.document_type import OrderDocumentTypeEnum
-from order.enum.status import OrderStatus, PaymentStatus
+from order.enum.status import OrderStatus
 from order.invoicing import generate_invoice
 from order.models.attribution import OrderAttribution
 from order.models.history import OrderHistory, OrderItemHistory
@@ -85,95 +86,6 @@ MYDATA_STATUS_VARIANT: dict[str, str] = {
 }
 
 
-class OrderStatusGroupFilter(DropdownFilter):
-    title = _("Status Group")
-    parameter_name = "status_group"
-
-    def lookups(self, request, model_admin):
-        return [
-            ("active", _("Active Orders (Pending/Processing)")),
-            ("fulfillment", _("In Fulfillment (Shipped/Delivered)")),
-            ("completed", _("Completed Orders")),
-            ("problematic", _("Problematic (Canceled/Returned/Refunded)")),
-        ]
-
-    def queryset(self, request, queryset):
-        filter_value = self.value()
-
-        match filter_value:
-            case "active":
-                filter_kwargs = {
-                    "status__in": [OrderStatus.PENDING, OrderStatus.PROCESSING]
-                }
-            case "fulfillment":
-                filter_kwargs = {
-                    "status__in": [OrderStatus.SHIPPED, OrderStatus.DELIVERED]
-                }
-            case "completed":
-                filter_kwargs = {"status": OrderStatus.COMPLETED}
-            case "problematic":
-                filter_kwargs = {
-                    "status__in": [
-                        OrderStatus.CANCELED,
-                        OrderStatus.RETURNED,
-                        OrderStatus.REFUNDED,
-                    ]
-                }
-            case _:
-                return queryset
-
-        return queryset.filter(**filter_kwargs)
-
-
-class PaymentStatusFilter(DropdownFilter):
-    title = _("Payment Status")
-    parameter_name = "payment_status_filter"
-
-    def lookups(self, request, model_admin):
-        return [
-            ("completed", _("Completed")),
-            ("pending", _("Pending")),
-            ("processing", _("Processing")),
-            ("failed", _("Failed")),
-            ("refunded", _("Refunded")),
-            ("partially_refunded", _("Partially Refunded")),
-            ("canceled", _("Canceled")),
-            ("needs_attention", _("Needs Attention (Failed/Pending)")),
-        ]
-
-    def queryset(self, request, queryset):
-        filter_value = self.value()
-
-        match filter_value:
-            case "completed":
-                filter_kwargs = {"payment_status": PaymentStatus.COMPLETED}
-            case "pending":
-                filter_kwargs = {"payment_status": PaymentStatus.PENDING}
-            case "processing":
-                filter_kwargs = {"payment_status": PaymentStatus.PROCESSING}
-            case "failed":
-                filter_kwargs = {"payment_status": PaymentStatus.FAILED}
-            case "refunded":
-                filter_kwargs = {"payment_status": PaymentStatus.REFUNDED}
-            case "partially_refunded":
-                filter_kwargs = {
-                    "payment_status": PaymentStatus.PARTIALLY_REFUNDED
-                }
-            case "canceled":
-                filter_kwargs = {"payment_status": PaymentStatus.CANCELED}
-            case "needs_attention":
-                filter_kwargs = {
-                    "payment_status__in": [
-                        PaymentStatus.FAILED,
-                        PaymentStatus.PENDING,
-                    ]
-                }
-            case _:
-                return queryset
-
-        return queryset.filter(**filter_kwargs)
-
-
 class OrderSourceFilter(DropdownFilter):
     """The sources orders were actually attributed to, by name.
 
@@ -218,50 +130,6 @@ def _attribution_field(field: str, description):
 
     _field.__name__ = f"attribution_{field}"
     return _field
-
-
-class DocumentTypeFilter(DropdownFilter):
-    title = _("Document Type")
-    parameter_name = "document_type_filter"
-
-    def lookups(self, request, model_admin):
-        return [
-            ("receipt", _("Receipt")),
-            ("invoice", _("Invoice")),
-            ("proforma", _("Proforma Invoice")),
-            ("shipping_label", _("Shipping Label")),
-            ("return_label", _("Return Label")),
-            ("credit_note", _("Credit Note")),
-        ]
-
-    def queryset(self, request, queryset):
-        filter_value = self.value()
-
-        match filter_value:
-            case "receipt":
-                filter_kwargs = {"document_type": OrderDocumentTypeEnum.RECEIPT}
-            case "invoice":
-                filter_kwargs = {"document_type": OrderDocumentTypeEnum.INVOICE}
-            case "proforma":
-                filter_kwargs = {
-                    "document_type": OrderDocumentTypeEnum.PROFORMA
-                }
-            case "shipping_label":
-                filter_kwargs = {
-                    "document_type": OrderDocumentTypeEnum.SHIPPING_LABEL
-                }
-            case "return_label":
-                filter_kwargs = {
-                    "document_type": OrderDocumentTypeEnum.RETURN_LABEL
-                }
-            case "credit_note":
-                filter_kwargs = {
-                    "document_type": OrderDocumentTypeEnum.CREDIT_NOTE
-                }
-            case _:
-                return queryset
-
-        return queryset.filter(**filter_kwargs)
 
 
 class WholesaleOrderFilter(DropdownFilter):
@@ -483,22 +351,21 @@ class OrderAdmin(BaseModelAdmin):
         "created",
     ]
     list_filter = [
-        OrderStatusGroupFilter,
-        PaymentStatusFilter,
-        DocumentTypeFilter,
+        # Multi-select: a status "group" (active, problematic, needs
+        # attention) is just several statuses picked together.
+        ("status", MultipleChoicesDropdownFilter),
+        ("payment_status", MultipleChoicesDropdownFilter),
+        "document_type",
         WholesaleOrderFilter,
         RecentOrdersFilter,
         ("attribution__source_type", ChoicesDropdownFilter),
         OrderSourceFilter,
-        "status",
-        "payment_status",
         ("created_at", RangeDateTimeFilter),
         ("status_updated_at", RangeDateTimeFilter),
-        ("country", RelatedDropdownFilter),
-        ("region", RelatedDropdownFilter),
+        ("country", AutocompleteSelectFilter),
+        ("region", AutocompleteSelectFilter),
         ("pay_way", RelatedDropdownFilter),
         "payment_method",
-        "document_type",
         # Filter Orders by carrier via the registry FK — denser than
         # a flat enum (shows the provider name) and the same lookup
         # support uses for ticket triage.
@@ -1457,7 +1324,7 @@ class OrderItemAdmin(BaseModelAdmin):
     list_filter = [
         "order__status",
         "order__payment_status",
-        ("product", RelatedDropdownFilter),
+        ("product", AutocompleteSelectFilter),
         ("quantity", SliderNumericFilter),
         "is_refunded",
         ("created_at", RangeDateTimeFilter),
@@ -1599,8 +1466,8 @@ class OrderHistoryAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
     ]
     list_filter = [
         "change_type",
-        ("order", RelatedDropdownFilter),
-        ("user", RelatedDropdownFilter),
+        ("order", AutocompleteSelectFilter),
+        ("user", AutocompleteSelectFilter),
         ("created_at", RangeDateTimeFilter),
     ]
     search_fields = [

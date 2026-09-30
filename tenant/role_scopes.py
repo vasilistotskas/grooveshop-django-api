@@ -62,6 +62,13 @@ PLATFORM_ONLY_APP_LABELS: frozenset[str] = frozenset(
     }
 )
 
+# Platform-owned reference data every store READS: its own forms (an
+# order's or an address's country and region) pick from it. Stores are
+# granted ``view`` on it and nothing else, and the store admin keeps it
+# out of the sidebar (``admin.mixins.WithheldOnTenantHostModelAdmin``);
+# only the platform edits it.
+REFERENCE_DATA_APP_LABELS: frozenset[str] = frozenset({"country", "region"})
+
 # Shared apps that nonetheless present STORE data on a tenant host.
 #
 # These live in both SHARED_APPS and TENANT_APPS, so each schema has its

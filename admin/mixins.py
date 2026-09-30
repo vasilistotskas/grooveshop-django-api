@@ -153,7 +153,16 @@ class WithheldOnTenantHostModelAdmin:
         return super().has_module_permission(request)
 
     def has_view_permission(self, request, obj=None) -> bool:
-        if self._withheld_on_tenant_host(request):
+        # Reference data stays READABLE: a store's own forms pick a
+        # country or region from it (the autocomplete endpoint checks
+        # the target admin's view permission). Everything else of the
+        # platform's is refused outright.
+        from tenant.role_scopes import REFERENCE_DATA_APP_LABELS
+
+        if (
+            self._withheld_on_tenant_host(request)
+            and self.model._meta.app_label not in REFERENCE_DATA_APP_LABELS
+        ):
             return False
         return super().has_view_permission(request, obj)
 

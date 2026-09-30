@@ -26,7 +26,6 @@ class RegionStatusFilter(DropdownFilter):
             ("has_name", _("Has Name")),
             ("no_name", _("No Name")),
             ("recent", _("Recently Added")),
-            ("by_continent", _("Group by Continent")),
         ]
 
     def queryset(self, request, queryset):

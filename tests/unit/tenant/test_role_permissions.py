@@ -259,7 +259,7 @@ class TestModulePerms:
         bind_tenant(tenant)
         backend = TenantRolePermissionBackend()
         assert backend.has_module_perms(user, "order")
-        assert not backend.has_module_perms(user, "country")
+        assert not backend.has_module_perms(user, "sites")
 
     def test_module_perms_follow_the_role(self, tenant, bind_tenant):
         user = _staff_identity()

@@ -11,13 +11,7 @@ from shipping.models import ShippingProvider, ShippingRate
 
 
 class ShippingRateInline(TabularInline):
-    """Per-(country, kind) price, free-threshold and weight cap.
-
-    ``country`` has no ``autocomplete_fields`` entry — the country
-    admin is platform-only, so a tenant-schema admin session hitting
-    its autocomplete endpoint gets a 403. A plain select is slower to
-    scroll through ~250 rows but always works.
-    """
+    """Per-(country, kind) price, free-threshold and weight cap."""
 
     model = ShippingRate
     extra = 0
@@ -29,6 +23,7 @@ class ShippingRateInline(TabularInline):
         "max_weight_grams",
         "is_active",
     )
+    autocomplete_fields = ("country",)
     verbose_name = pgettext_lazy("shipping", "Rate")
     verbose_name_plural = _("Rates")
 

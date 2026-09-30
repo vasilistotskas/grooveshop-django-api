@@ -9,6 +9,7 @@ from django.utils.text import Truncator
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import TabularInline
 from unfold.contrib.filters.admin import (
+    AutocompleteSelectFilter,
     DropdownFilter,
     RangeDateTimeFilter,
     RangeNumericListFilter,
@@ -21,6 +22,7 @@ from unfold.enums import ActionVariant
 from admin.base import BaseTranslatableAdmin
 from admin.displays import change_link, header_two_line
 from admin.export import ExportActionMixin
+from admin.filters import AnnotatedRangeFilter, LikesCountFilter
 from blog.models.author import BlogAuthor
 from blog.models.category import BlogCategory
 from blog.models.comment import BlogComment
@@ -45,120 +47,27 @@ SEO_SCORE_VARIANT: dict[str, str] = {
 }
 
 
-class LikesCountFilter(RangeNumericListFilter):
-    title = _("Likes")
-    parameter_name = "likes_count"
-
-    def queryset(self, request, queryset):
-        # Short-circuit when the filter is unused. Django admin
-        # invokes every ``list_filter``'s ``queryset()`` on every
-        # page load — without this guard ``with_likes_count()``
-        # added a ``LEFT JOIN blog_blogpost_likes`` + GROUP BY to
-        # the main fetch, exploding the BlogPost changelist from
-        # ~80 to >1000 queries.
-        value_from = self.used_parameters.get(f"{self.parameter_name}_from")
-        value_to = self.used_parameters.get(f"{self.parameter_name}_to")
-        if not value_from and not value_to:
-            return queryset
-
-        queryset = queryset.with_likes_count()
-        filters = {}
-        if value_from:
-            filters["likes_count__gte"] = value_from
-        if value_to:
-            filters["likes_count__lte"] = value_to
-        return queryset.filter(**filters)
-
-    def expected_parameters(self):
-        return [
-            f"{self.parameter_name}_from",
-            f"{self.parameter_name}_to",
-        ]
-
-
-class CommentsCountFilter(RangeNumericListFilter):
+class CommentsCountFilter(AnnotatedRangeFilter):
     title = _("Comments")
     parameter_name = "comments_count"
 
-    def queryset(self, request, queryset):
-        # Short-circuit — same rationale as ``LikesCountFilter`` above.
-        value_from = self.used_parameters.get(f"{self.parameter_name}_from")
-        value_to = self.used_parameters.get(f"{self.parameter_name}_to")
-        if not value_from and not value_to:
-            return queryset
-
-        queryset = queryset.with_comments_count(approved_only=True)
-        filters = {}
-        if value_from:
-            filters["comments_count__gte"] = value_from
-        if value_to:
-            filters["comments_count__lte"] = value_to
-        return queryset.filter(**filters)
-
-    def expected_parameters(self):
-        return [
-            f"{self.parameter_name}_from",
-            f"{self.parameter_name}_to",
-        ]
+    def annotate(self, queryset):
+        return queryset.with_comments_count(approved_only=True)
 
 
-class TagsCountFilter(RangeNumericListFilter):
+class TagsCountFilter(AnnotatedRangeFilter):
     title = _("Tags")
     parameter_name = "tags_count"
 
-    def queryset(self, request, queryset):
-        # Short-circuit — same rationale as ``LikesCountFilter`` above.
-        value_from = self.used_parameters.get(f"{self.parameter_name}_from")
-        value_to = self.used_parameters.get(f"{self.parameter_name}_to")
-        if not value_from and not value_to:
-            return queryset
-
-        queryset = queryset.with_tags_count(active_only=True)
-        filters = {}
-        if value_from:
-            filters["tags_count__gte"] = value_from
-        if value_to:
-            filters["tags_count__lte"] = value_to
-        return queryset.filter(**filters)
-
-    def expected_parameters(self):
-        return [
-            f"{self.parameter_name}_from",
-            f"{self.parameter_name}_to",
-        ]
+    def annotate(self, queryset):
+        return queryset.with_tags_count(active_only=True)
 
 
 class PostsCountFilter(RangeNumericListFilter):
+    """Over ``posts_count``, which ``BlogTagAdmin`` always annotates."""
+
     title = _("Posts")
     parameter_name = "posts_count"
-
-    def queryset(self, request, queryset):
-        # Short-circuit — same rationale as ``LikesCountFilter`` above.
-        value_from = self.used_parameters.get(f"{self.parameter_name}_from")
-        value_to = self.used_parameters.get(f"{self.parameter_name}_to")
-        if not value_from and not value_to:
-            return queryset
-
-        if hasattr(queryset.model, "blog_posts"):
-            queryset = queryset.annotate(
-                posts_count_annotation=Count("blog_posts", distinct=True)
-            )
-        else:
-            queryset = queryset.annotate(
-                posts_count_annotation=Count("posts", distinct=True)
-            )
-        filters = {}
-        if value_from:
-            filters["posts_count_annotation__gte"] = value_from
-        if value_to:
-            filters["posts_count_annotation__lte"] = value_to
-        return queryset.filter(**filters)
-
-    def expected_parameters(self):
-        return [
-            f"{self.parameter_name}_from",
-            f"{self.parameter_name}_to",
-        ]
 
 
 class PublishStatusFilter(DropdownFilter):
@@ -304,7 +213,7 @@ class BlogTagAdmin(BaseTranslatableAdmin):
     list_display = (
         "name_display",
         "active",
-        "posts_count",
+        "posts_count_display",
         "sort_order",
     )
     list_filter = ("active", PostsCountFilter)
@@ -335,7 +244,7 @@ class BlogTagAdmin(BaseTranslatableAdmin):
         return (
             super()
             .get_queryset(request)
-            .annotate(posts_count_ann=Count("blog_posts", distinct=True))
+            .annotate(posts_count=Count("blog_posts", distinct=True))
         )
 
     @admin.display(description=_("Name"), ordering="translations__name")
@@ -344,11 +253,9 @@ class BlogTagAdmin(BaseTranslatableAdmin):
             "Unnamed Tag"
         )
 
-    @admin.display(description=_("Posts"), ordering="posts_count_ann")
-    def posts_count(self, obj):
-        # Always annotated by ``get_queryset``; a ``getattr`` default
-        # would run its COUNT on every row even so.
-        return obj.posts_count_ann
+    @admin.display(description=_("Posts"), ordering="posts_count")
+    def posts_count_display(self, obj):
+        return obj.posts_count
 
 
 @admin.register(BlogCategory)
@@ -764,8 +671,8 @@ class BlogCommentAdmin(BaseTranslatableAdmin):
     list_filter = (
         "approved",
         ("created_at", RangeDateTimeFilter),
-        ("post", RelatedDropdownFilter),
-        ("user", RelatedDropdownFilter),
+        ("post", AutocompleteSelectFilter),
+        ("user", AutocompleteSelectFilter),
     )
     list_select_related = ["post", "user", "parent"]
     list_editable = ("approved",)

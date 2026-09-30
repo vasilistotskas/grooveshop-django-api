@@ -46,12 +46,16 @@ def _count(client) -> int:
 def _seed(size: int) -> None:
     from contact.factories import ContactFactory
     from order.factories.order import OrderFactory
+    from product.enum.review import ReviewStatus
     from product.factories.product import ProductFactory
     from product.factories.review import ProductReviewFactory
 
     OrderFactory.create_batch(size, num_order_items=0)
     ProductFactory.create_batch(size, active=True, stock=3)
-    ProductReviewFactory.create_batch(size)
+    # Pinned: the factory cycles statuses process-wide, so a one-review
+    # seed had no NEW review (and no pending-reviews prefetch) whenever
+    # earlier tests on the same worker left the cycle elsewhere.
+    ProductReviewFactory.create_batch(size, status=ReviewStatus.NEW)
     ContactFactory.create_batch(size)
 
 

@@ -33,9 +33,12 @@ from unfold.contrib.filters.admin import (
     RangeDateTimeFilter,
     RelatedDropdownFilter,
 )
+from unfold.fields import UnfoldAdminJSONSchemaField
 from unfold.mixins import FormFieldModelAdminMixin
+from unfold.widgets import UnfoldAdminJSONSchemaWidget
 
 from admin.mixins import WithheldOnTenantHostModelAdmin
+from core.json_schema import schema_validator
 
 
 def unfold_filter_for(field: models.Field) -> type:
@@ -185,6 +188,25 @@ class BaseModelAdmin(WithheldOnTenantHostModelAdmin, ModelAdmin):
     formfield_overrides = {
         HTMLField: {"widget": AdminTinyMCE},
     }
+
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        """A JSON field with a schema edits through Unfold's schema form.
+
+        Unfold's own ``JSONSchemaField`` model field is not used: it
+        resolves its schema once at import, cannot be deconstructed for
+        migrations, and skips validation silently without ``jsonschema``.
+        The schema lives on the model field's validator instead
+        (``core.json_schema``); the validator also runs on save.
+        """
+        validator = schema_validator(db_field)
+        if isinstance(db_field, models.JSONField) and validator is not None:
+            return db_field.formfield(
+                form_class=UnfoldAdminJSONSchemaField,
+                schema=validator.schema,
+                widget=UnfoldAdminJSONSchemaWidget,
+                **kwargs,
+            )
+        return super().formfield_for_dbfield(db_field, request, **kwargs)
 
     def get_list_filter(self, request):
         """Every plain field name in ``list_filter`` as its Unfold filter

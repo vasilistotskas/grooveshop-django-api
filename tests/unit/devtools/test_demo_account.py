@@ -317,19 +317,21 @@ class TestLocales(TestCase):
         `save()` does not run — hence the `full_clean` in the step."""
         from django.conf import settings as django_conf
 
-        from tenant.validators import validate_available_locales
+        from tenant.models import Tenant
 
         allowed = {code for code, _label in django_conf.LANGUAGES}
         locales = list(dict.fromkeys(["el", "en"]))
         assert set(locales) <= allowed, (locales, allowed)
-        validate_available_locales(locales)
+        Tenant._meta.get_field("available_locales").run_validators(locales)
 
     def test_the_default_locale_is_never_duplicated(self):
         """A store whose default IS `en` would otherwise be given it
         twice, which the validator rejects."""
-        from tenant.validators import validate_available_locales
+        from tenant.models import Tenant
 
-        validate_available_locales(list(dict.fromkeys(["en", "en"])))
+        Tenant._meta.get_field("available_locales").run_validators(
+            list(dict.fromkeys(["en", "en"]))
+        )
 
 
 class TestEnglishLegalDocuments(TestCase):

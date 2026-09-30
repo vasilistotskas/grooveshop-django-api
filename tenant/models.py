@@ -12,11 +12,10 @@ from django_tenants.models import DomainMixin, TenantMixin, _check_schema_name
 from knox.models import AbstractAuthToken
 from simple_history.models import HistoricalRecords
 
+from core.json_schema import JSONSchemaValidator
 from core.models import TimeStampMixinModel, UUIDModel
 from tenant.validators import (
-    validate_available_locales,
     validate_reserved_schema_name,
-    validate_theme_metadata,
 )
 
 
@@ -202,7 +201,9 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         _("Available Locales"),
         default=list,
         blank=True,
-        validators=[validate_available_locales],
+        validators=[
+            JSONSchemaValidator("tenant.json_schemas.available_locales")
+        ],
         help_text=_(
             'Locales this store serves, e.g. ["el", "en"]. Empty '
             "means single-language on the default locale — the "
@@ -331,7 +332,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         _("Theme Metadata"),
         default=dict,
         blank=True,
-        validators=[validate_theme_metadata],
+        validators=[JSONSchemaValidator("tenant.json_schemas.theme_metadata")],
         help_text=_(
             "Per-token theme overrides on top of the preset. Legal "
             "keys: radius, fontSans, container, colors.primaryScale / "
@@ -497,12 +498,13 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
     )
 
     # Extra CSP origins for the storefront.
-    # Each entry must be a string starting with https://, http://localhost,
-    # or wss:// so that only safe origins can be added.
     allowed_csp_sources = models.JSONField(
         _("Allowed CSP sources"),
         default=list,
         blank=True,
+        validators=[
+            JSONSchemaValidator("tenant.json_schemas.allowed_csp_sources")
+        ],
         help_text=_(
             "Additional origins allowed by the storefront CSP "
             "(connect-src, img-src, script-src, frame-src). "
@@ -1210,10 +1212,8 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         self._validate_schema_name()
         self._validate_stripe_publishable_key()
         self._validate_stripe_secret_key()
-        self._validate_theme_metadata()
         self._validate_available_locales()
         self._validate_legal_documents_for_new_locales()
-        self._validate_allowed_csp_sources()
         self._validate_meta_pixel_id()
         self._validate_tiktok_pixel_id()
         self._validate_openai_pixel_id()
@@ -1245,13 +1245,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
             raise ValidationError({"schema_name": exc.messages}) from exc
 
     def _validate_available_locales(self) -> None:
-        # Field validators only run in full_clean()/DRF; mirror the
-        # shape check here, then add the cross-field rule the field
-        # validator cannot see.
-        try:
-            validate_available_locales(self.available_locales)
-        except ValidationError as exc:
-            raise ValidationError({"available_locales": exc.messages}) from exc
+        # The cross-field rule the field's schema cannot see.
         locales = self.available_locales or []
         if locales and self.default_locale not in locales:
             raise ValidationError(
@@ -1378,50 +1372,6 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
                         )
                     }
                 )
-
-    def _validate_theme_metadata(self) -> None:
-        # Field validators only run in full_clean()/DRF; mirror the
-        # check here so admin actions and direct clean() calls get the
-        # same guarantee as the sibling validators.
-        try:
-            validate_theme_metadata(self.theme_metadata)
-        except ValidationError as exc:
-            raise ValidationError({"theme_metadata": exc.messages}) from exc
-
-    def _validate_allowed_csp_sources(self) -> None:
-        sources = self.allowed_csp_sources
-        if not sources:
-            return
-        if not isinstance(sources, list):
-            raise ValidationError(
-                {
-                    "allowed_csp_sources": _(
-                        "allowed_csp_sources must be a list of strings."
-                    )
-                }
-            )
-        _VALID_PREFIXES = (
-            "https://",
-            "http://localhost",
-            "wss://",
-        )
-        bad = [
-            s
-            for s in sources
-            if not isinstance(s, str)
-            or not any(s.startswith(p) for p in _VALID_PREFIXES)
-        ]
-        if bad:
-            raise ValidationError(
-                {
-                    "allowed_csp_sources": _(
-                        "Each CSP source must start with 'https://', "
-                        "'http://localhost', or 'wss://'. "
-                        "Invalid entries: %(bad)s"
-                    )
-                    % {"bad": ", ".join(str(b) for b in bad)}
-                }
-            )
 
     def _validate_meta_pixel_id(self) -> None:
         """Meta Pixel IDs are numeric strings only."""

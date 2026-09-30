@@ -8,6 +8,7 @@ from django.db.models import F, Q
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 
+from core.json_schema import JSONSchemaValidator
 from core.models import TimeStampMixinModel
 from product.enum.relation import RelationType
 from recommendation.enum import AttachMatch, EventKind, StrategyCode, Surface
@@ -19,10 +20,10 @@ class RecommendationSlot(TimeStampMixinModel):
 
     One row per ``Surface`` per tenant, seeded from a vertical preset
     at provisioning (``recommendation/presets.py``) and edited in admin.
-    ``strategy_chain`` and ``weights`` are JSON lists/dicts validated
-    by ``recommendation/schemas.py`` — the ``page_config`` idiom for
-    ordered configuration — rather than a widget-heavy relation table,
-    because a chain is edited a handful of times per store, ever.
+    ``strategy_chain`` and ``weights`` are JSON validated against
+    ``recommendation/json_schemas.py`` rather than a widget-heavy
+    relation table, because a chain is edited a handful of times per
+    store, ever.
 
     ``min_fill`` is the guard against a broken-looking strip: below it
     the engine returns nothing and the storefront renders nothing.
@@ -38,6 +39,9 @@ class RecommendationSlot(TimeStampMixinModel):
         _("Strategy chain"),
         default=list,
         encoder=DjangoJSONEncoder,
+        validators=[
+            JSONSchemaValidator("recommendation.json_schemas.strategy_chain")
+        ],
         help_text=_(
             "Ordered list of strategy codes. Each fills the remaining "
             "slots in turn; a strategy that cannot answer for this "
@@ -51,6 +55,7 @@ class RecommendationSlot(TimeStampMixinModel):
         # ``blank`` the admin form and ``full_clean`` refuse it.
         blank=True,
         encoder=DjangoJSONEncoder,
+        validators=[JSONSchemaValidator("recommendation.json_schemas.weights")],
         help_text=_(
             "Strategy code → weight in 0..1. Missing codes default to "
             "1.0. Updated nightly from attach rate on plans that learn."
@@ -87,28 +92,30 @@ class RecommendationSlot(TimeStampMixinModel):
         return self.get_surface_display()
 
     def clean(self) -> None:
-        # Model-level so the admin's ModelForm surfaces a bad chain as a
-        # field error instead of a 500 from save_model — and so a
-        # shell or a preset seeding a bad row is caught the same way.
+        """The rules the field schemas cannot express: every weighted
+        code is in the chain, and ``min_fill`` fits in ``limit``.
+        Weights are stored as floats."""
         from django.core.exceptions import ValidationError
 
-        from recommendation.schemas import (
-            validate_strategy_chain,
-            validate_weights,
-        )
-
         errors: dict[str, list[str]] = {}
-        try:
-            self.strategy_chain = validate_strategy_chain(self.strategy_chain)
-        except ValidationError as exc:
-            errors["strategy_chain"] = exc.messages
-        else:
-            try:
-                self.weights = validate_weights(
-                    self.weights, self.strategy_chain
-                )
-            except ValidationError as exc:
-                errors["weights"] = exc.messages
+        if isinstance(self.weights, dict) and isinstance(
+            self.strategy_chain, list
+        ):
+            stray = sorted(set(self.weights) - set(self.strategy_chain))
+            if stray:
+                errors["weights"] = [
+                    str(
+                        _("Weighted strategies not in the chain: %(codes)s")
+                        % {"codes": ", ".join(stray)}
+                    )
+                ]
+            elif all(
+                isinstance(weight, int | float) and not isinstance(weight, bool)
+                for weight in self.weights.values()
+            ):
+                self.weights = {
+                    code: float(weight) for code, weight in self.weights.items()
+                }
         if self.min_fill > self.limit:
             errors["min_fill"] = [
                 str(_("Minimum fill cannot exceed the limit."))

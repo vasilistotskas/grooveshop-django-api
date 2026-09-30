@@ -14,7 +14,6 @@ from recommendation.presets import (
     seed_recommendation_slots,
     slot_defaults,
 )
-from recommendation.schemas import validate_strategy_chain, validate_weights
 from tenant.models import StoreVertical
 
 
@@ -29,10 +28,9 @@ def test_every_preset_configures_every_surface_validly(vertical):
     assert set(PRESETS[vertical]) == set(Surface.values)
     for surface in Surface.values:
         defaults = slot_defaults(surface, vertical)
-        chain = validate_strategy_chain(defaults["strategy_chain"])
-        validate_weights(defaults["weights"], chain)
-        assert defaults["min_fill"] <= defaults["limit"]
-        RecommendationSlot(surface=surface, **defaults).clean()
+        RecommendationSlot(surface=surface, **defaults).full_clean(
+            exclude=["surface"]
+        )
 
 
 def test_curated_leads_or_follows_only_variant_group_on_every_pdp():

@@ -66,7 +66,16 @@ def _message(error: SchemaError) -> str:
         f"[{part}]" if isinstance(part, int) else f".{part}"
         for part in error.absolute_path
     ).lstrip(".")
-    return f"{path}: {error.message}" if path else error.message
+    message = error.message
+    # ``anyOf: [{required: [a]}, {required: [b]}]`` means "a or b", but
+    # jsonschema reports it as "is not valid under any of the given
+    # schemas" with the whole value quoted.
+    if error.validator == "anyOf" and all(
+        set(option) == {"required"} for option in error.validator_value
+    ):
+        names = [name for o in error.validator_value for name in o["required"]]
+        message = "needs one of: " + ", ".join(names)
+    return f"{path}: {message}" if path else message
 
 
 def schema_validator(field: Any) -> JSONSchemaValidator | None:

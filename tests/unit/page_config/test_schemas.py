@@ -33,7 +33,7 @@ def test_valid_hero_carousel_props():
 def test_unknown_prop_rejected():
     with pytest.raises(ValidationError) as exc_info:
         validate_section_props("hero_carousel", {"onClick": "alert(1)"})
-    assert "unknown prop" in str(exc_info.value)
+    assert "'onClick' was unexpected" in str(exc_info.value)
 
 
 def test_link_scheme_enforced():
@@ -590,7 +590,7 @@ def test_contact_panel_props():
         )
     # The addresses come from STORE_OFFICES; a page cannot carry a
     # second copy of them.
-    with pytest.raises(ValidationError, match="unknown prop"):
+    with pytest.raises(ValidationError, match="not allowed"):
         validate_section_props(
             "contact_panel", {"offices": [{"label": "Θεσσαλονίκη"}]}
         )
@@ -837,7 +837,7 @@ def test_trust_badges_need_a_mark_and_a_known_kind():
             {"items": [{"kind": "award", "label": "x", "icon": "i-x"}]},
         )
     # A badge with neither a logo nor an icon is a bare word in a row of marks.
-    with pytest.raises(ValidationError, match="image_url or icon"):
+    with pytest.raises(ValidationError, match="needs one of: image_url, icon"):
         validate_section_props(
             "trust_badges", {"items": [{"kind": "custom", "label": "Εγγύηση"}]}
         )
@@ -870,3 +870,46 @@ def test_stats_strip_is_the_hero_proof_row_as_its_own_band():
             "stats_strip",
             {"items": [{"value": str(i), "label": "x"} for i in range(5)]},
         )
+
+
+@pytest.mark.django_db
+class TestTheAdminPath:
+    """The admin saves through ``PageSection.clean()``; it used to save
+    section JSON unchecked."""
+
+    def _section(self, **kwargs):
+        from page_config.models import PageLayout, PageSection
+
+        layout, _created = PageLayout.objects.get_or_create(
+            page_type="custom-schema-test",
+            defaults={"title": "Schema test"},
+        )
+        return PageSection(
+            layout=layout, component_type="hero_banner", **kwargs
+        )
+
+    def test_bad_props_are_refused(self):
+        section = self._section(props={"heading": 5, "align": "diagonal"})
+        with pytest.raises(ValidationError) as exc_info:
+            section.full_clean(exclude=["sort_order"])
+        assert set(exc_info.value.message_dict) == {"props"}
+
+    def test_a_default_locale_override_is_refused(self):
+        section = self._section(i18n={"el": {"title": "Διπλό"}})
+        with pytest.raises(ValidationError) as exc_info:
+            section.full_clean(exclude=["sort_order"])
+        assert set(exc_info.value.message_dict) == {"i18n"}
+
+    def test_a_saved_section_edits_through_its_schema(self):
+        from unfold.fields import UnfoldAdminJSONSchemaField
+
+        from page_config.admin import PageSectionForm
+
+        section = self._section(props={"heading": "Hi"})
+        section.save()
+
+        form = PageSectionForm(instance=section)
+
+        assert isinstance(form.fields["props"], UnfoldAdminJSONSchemaField)
+        assert "stats" in form.fields["props"].schema["properties"]
+        assert isinstance(form.fields["i18n"], UnfoldAdminJSONSchemaField)

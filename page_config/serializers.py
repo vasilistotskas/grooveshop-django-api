@@ -124,10 +124,9 @@ class PageSectionWriteSerializer(serializers.ModelSerializer):
         )
 
     def validate(self, attrs):
-        # Mirror of the storefront's render-time props contracts
-        # (shared/pageSections.ts): typos and out-of-range values fail
-        # HERE with a readable error instead of silently rendering
-        # component defaults.
+        # The section contract (page_config.section_schemas): typos and
+        # out-of-range values fail HERE with a readable error instead of
+        # silently rendering component defaults.
         from django.core.exceptions import (
             ValidationError as DjangoValidationError,
         )

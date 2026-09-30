@@ -1,11 +1,15 @@
+from django import forms
 from django.conf import settings
 from django.contrib import admin, messages
+from django.core.serializers.json import DjangoJSONEncoder
 from django.db.models import Count
 from django.utils.html import escape, format_html_join
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
-from unfold.admin import TabularInline
+from unfold.admin import StackedInline
 from unfold.decorators import action
+from unfold.fields import UnfoldAdminJSONSchemaField
+from unfold.widgets import UnfoldAdminJSONSchemaWidget
 
 from admin.base import (
     BaseModelAdmin,
@@ -31,12 +35,49 @@ from page_config.models import (
     PageLayout,
     PageSection,
 )
+from page_config.section_schemas import (
+    SECTION_PROPS,
+    i18n_schema,
+    props_schema,
+)
 
 
-class PageSectionInline(TabularInline):
+class PageSectionForm(forms.ModelForm):
+    """A saved section edits ``props`` and ``i18n`` through its type's
+    schema (``page_config.section_schemas``). A new row is plain JSON
+    until its type is saved: the schema depends on the type, and Unfold
+    builds its editors once, when the page loads."""
+
+    class Meta:
+        model = PageSection
+        fields = ("component_type", "title", "is_visible", "props", "i18n")
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        component_type = self.instance.component_type
+        if self.instance.pk is None or component_type not in SECTION_PROPS:
+            return
+        for name, schema in (
+            ("props", props_schema(component_type)),
+            ("i18n", i18n_schema(component_type)),
+        ):
+            field = self.fields[name]
+            self.fields[name] = UnfoldAdminJSONSchemaField(
+                schema=schema,
+                widget=UnfoldAdminJSONSchemaWidget,
+                encoder=DjangoJSONEncoder,
+                required=False,
+                label=field.label,
+                help_text=field.help_text,
+            )
+
+
+class PageSectionInline(StackedInline):
     model = PageSection
+    form = PageSectionForm
     extra = 0
     tab = True
+    collapsible = True
     fields = (
         "component_type",
         "title",
@@ -76,7 +117,7 @@ class PageLayoutAdmin(BaseTranslatableAdmin):
             {
                 "fields": ("seo_title", "seo_description", "seo_keywords"),
                 "description": _(
-                    "The storefront's <title> and meta description for "
+                    "The storefront's page title and meta description for "
                     "this page. Left empty, the page keeps its built-in "
                     "title and the store description."
                 ),

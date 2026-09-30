@@ -1,7 +1,7 @@
 """Plan & Billing reference page for the platform control plane.
 
 A custom Unfold page (``UnfoldSiteViewMixin`` — verified against
-django-unfold 0.104.1) mounted only on ``PlatformAdminSite``, so it is
+django-unfold 0.108.0) mounted only on ``PlatformAdminSite``, so it is
 structurally absent from every merchant admin rather than
 reachable-but-403.
 

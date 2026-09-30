@@ -9,7 +9,7 @@ tenant #1's name and logo (production, 2026-08-21).
 ``PlatformAdminSite`` sets ``settings_name = "UNFOLD_PLATFORM"``;
 ``unfold.settings.get_config()`` resolves that name against settings and
 merges it over ``CONFIG_DEFAULTS``, so the site carries its own
-branding, sidebar and dashboard. Verified against django-unfold 0.104.1.
+branding, sidebar and dashboard. Verified against django-unfold 0.108.0.
 """
 
 from __future__ import annotations
@@ -47,7 +47,7 @@ class TestPlatformSiteConfiguration(SimpleTestCase):
         from unfold.settings import get_config
 
         config = get_config(platform_admin_site.settings_name)
-        assert config["SITE_HEADER"] == "Grooveshop Platform"
+        assert config["SITE_HEADER"] == "GrooveShop Platform"
         assert "Webside" not in str(config["SITE_HEADER"])
         assert "Webside" not in str(config["SITE_TITLE"])
 
@@ -428,7 +428,7 @@ class TestCommandPalette(TestCase):
     cost a 500ms-debounced round trip to ``/admin/search/``, but only
     sidebar APP TITLES were matched — typing a tenant's name, domain or
     a user's email returned nothing, and Enter on the empty result list
-    hit django-unfold 0.104.1's unguarded ``selectItem`` (client-side
+    hit django-unfold's unguarded ``selectItem`` (still in 0.108.0) (client-side
     TypeError; guarded by ``unfold_command_palette_fix.js``).
     """
 
@@ -507,7 +507,7 @@ class TestCommandPalette(TestCase):
         assert not missing, f"whitelisted but not registered: {missing}"
 
     def test_the_palette_crash_guard_ships_on_both_sites(self):
-        """django-unfold 0.104.1's ``selectItem`` dereferences the
+        """django-unfold's ``selectItem`` (0.108.0) dereferences the
         highlighted row without checking one exists; the guard script
         must load wherever the palette renders."""
         from unfold.settings import get_config

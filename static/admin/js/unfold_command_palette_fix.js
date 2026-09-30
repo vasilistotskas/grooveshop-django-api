@@ -1,7 +1,7 @@
 /**
  * Crash guard for django-unfold's ⌘K command palette.
  *
- * django-unfold 0.104.1 (latest at time of writing; unfixed on
+ * django-unfold 0.108.0 (re-checked 2026-09-30; also unfixed on
  * upstream ``main``) ships an unguarded ``selectItem`` in the
  * ``searchCommand`` Alpine component:
  *

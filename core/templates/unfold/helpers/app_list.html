@@ -1,23 +1,20 @@
 {% comment %}
-Override of django-unfold's `unfold/helpers/app_list.html` that adds
-support for nested sidebar items.
+django-unfold 0.108.0's `unfold/helpers/app_list.html`, verbatim except
+for ONE delta: each item renders through the recursive
+`unfold/helpers/app_list_item.html`, so an item carrying its own `items`
+list becomes a collapsible subtree. Unfold's Python layer
+(`UnfoldAdminSite._get_navigation_items`) already recurses into child
+`items` — permissions, `active`, `link_callback`, badges — only the
+upstream template renders one level.
 
-Unfold's Python layer (`UnfoldAdminSite._get_navigation_items`) already
-recursively processes child `items` arrays — applying `has_permission`,
-`active`, `link_callback`, and `badge` to each level. Only the upstream
-template renders flat (one level), so a custom template is enough to
-unlock subtree navigation. We render each item via the recursive
-`unfold/helpers/app_list_item.html` partial; an item that carries its
-own `items` list becomes a collapsible subtree (Alpine.js drives the
-expand/collapse exactly like top-level collapsible groups do).
-
-Keep this file in sync when bumping django-unfold past 0.92.x — diff
-against the upstream `app_list.html` to pick up new top-level features.
+On every django-unfold bump: diff the new upstream `app_list.html`
+against this file and carry every change except the delta above;
+`tests/unit/admin/test_sidebar_templates.py` renders both levels.
 {% endcomment %}
 {% load i18n unfold %}
 
 {% if sidebar_navigation %}
-    <div id="nav-sidebar-apps" class="h-0 grow overflow-auto" data-simplebar>
+    <div id="nav-sidebar-apps" class="h-0 grow overflow-auto scrollbar-default-hover">
         {% for group in sidebar_navigation %}
             {% if group.items %}
                 {% has_nav_item_active group.items as has_active %}
@@ -41,7 +38,7 @@ against the upstream `app_list.html` to pick up new top-level features.
                         </h2>
                     {% endif %}
 
-                    <ol class="flex flex-col gap-0.5 px-6" {% if group.collapsible %}x-show="navigationOpen"{% endif %}>
+                    <ol class="flex flex-col px-6" {% if group.collapsible %}x-show="navigationOpen"{% endif %}>
                         {% for item in group.items %}
                             {% include "unfold/helpers/app_list_item.html" with item=item depth=0 %}
                         {% endfor %}
@@ -54,7 +51,7 @@ against the upstream `app_list.html` to pick up new top-level features.
     {% include "unfold/helpers/app_list_all.html" %}
 {% else %}
     <p>
-        {% trans "You don't have permission to view or edit anything." as error_message %}
+        {% trans "You don’t have permission to view or edit anything." as error_message %}
         {% include "unfold/helpers/messages/error.html" with error=error_message %}
     </p>
 {% endif %}

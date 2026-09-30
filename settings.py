@@ -2866,7 +2866,7 @@ _ADMIN_DOCS_LINKS = [
 
 UNFOLD_PLATFORM = {
     "SITE_TITLE": _("Platform Admin"),
-    "SITE_HEADER": "Grooveshop Platform",
+    "SITE_HEADER": "GrooveShop Platform",
     "SITE_SUBHEADER": _("Control plane"),
     "SITE_SYMBOL": "hub",
     "SHOW_HISTORY": True,
@@ -3096,22 +3096,10 @@ UNFOLD = {
     "SITE_SUBHEADER": getenv("UNFOLD_SITE_SUBHEADER", "Commerce control"),
     "SITE_SYMBOL": "storefront",
     "SITE_URL": "/",
-    "SITE_ICON": {
-        "light": lambda request: static("icon-light.svg"),
-        "dark": lambda request: static("icon-dark.svg"),
-    },
-    "SITE_LOGO": {
-        "light": lambda request: static("logo-light.svg"),
-        "dark": lambda request: static("logo-dark.svg"),
-    },
-    "SITE_FAVICONS": [
-        {
-            "rel": "icon",
-            "sizes": "32x32",
-            "type": "image/svg+xml",
-            "href": lambda request: static("favicon/favicon.svg"),
-        },
-    ],
+    # Each store's own marks; see ``admin/branding.py`` for the rule.
+    "SITE_ICON": "admin.branding.site_icon",
+    "SITE_LOGO": "admin.branding.site_logo",
+    "SITE_FAVICONS": "admin.branding.site_favicons",
     "SHOW_HISTORY": True,
     "SHOW_VIEW_ON_SITE": True,
     "SHOW_BACK_BUTTON": True,
@@ -3172,15 +3160,9 @@ UNFOLD = {
         "search_models": "core.utils.admin.command_search_models",
         "show_history": True,
     },
-    "LOGIN": {
-        "redirect_after": lambda request: reverse_lazy(
-            "admin:index", urlconf=ROOT_URLCONF
-        ),
-    },
     "STYLES": [
         lambda request: static("css/styles.css"),
         lambda request: static("css/admin.css"),
-        "https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200",
     ],
     # Loads on every admin page. ``tinymce_save_sync.js`` patches the
     # missing django-tinymce ↔ unfold form-submit handoff so that
@@ -3192,8 +3174,8 @@ UNFOLD = {
     # textarea value, not the edited iframe content.
     #
     # ``unfold_command_palette_fix.js`` guards the ⌘K palette's
-    # ``selectItem`` against Enter-with-no-results (upstream crash in
-    # django-unfold 0.104.1 — see the file header).
+    # ``selectItem`` against Enter-with-no-results (upstream crash,
+    # still present in django-unfold 0.108.0 — see the file header).
     "SCRIPTS": [
         lambda request: static("admin/js/tinymce_save_sync.js"),
         lambda request: static("admin/js/unfold_command_palette_fix.js"),
@@ -3220,9 +3202,6 @@ UNFOLD = {
             # ── Catalog (catalog management) ──────────────────────────
             {
                 "title": _("Catalog"),
-                # Per-store section: hidden on the platform console, whose
-                # schema holds none of these models (they 403 there).
-                "permission": "admin.permissions.is_store_section",
                 "separator": True,
                 "collapsible": True,
                 "items": [
@@ -3290,9 +3269,6 @@ UNFOLD = {
             # ── Blog (content management) ─────────────────────────────
             {
                 "title": _("Blog"),
-                # Per-store section: hidden on the platform console, whose
-                # schema holds none of these models (they 403 there).
-                "permission": "admin.permissions.is_store_section",
                 "separator": True,
                 "collapsible": True,
                 "items": [
@@ -3345,9 +3321,6 @@ UNFOLD = {
             # ── Sales (day-to-day order operations) ───────────────────
             {
                 "title": _("Sales"),
-                # Per-store section: hidden on the platform console, whose
-                # schema holds none of these models (they 403 there).
-                "permission": "admin.permissions.is_store_section",
                 "separator": True,
                 "collapsible": True,
                 "items": [
@@ -3475,9 +3448,6 @@ UNFOLD = {
             # ── Shipping (carrier-facing fulfilment) ─────────────────
             {
                 "title": _("Shipping"),
-                # Per-store section: hidden on the platform console, whose
-                # schema holds none of these models (they 403 there).
-                "permission": "admin.permissions.is_store_section",
                 "separator": True,
                 "collapsible": True,
                 "items": [
@@ -3558,9 +3528,6 @@ UNFOLD = {
             # ── Loyalty ──────────────────────────────────────────────
             {
                 "title": _("Loyalty"),
-                # Per-store section: hidden on the platform console, whose
-                # schema holds none of these models (they 403 there).
-                "permission": "admin.permissions.is_store_section",
                 "separator": True,
                 "collapsible": True,
                 "items": [
@@ -3594,7 +3561,6 @@ UNFOLD = {
                 "title": _("Newsletter"),
                 "separator": True,
                 "collapsible": True,
-                "permission": "admin.permissions.is_staff",
                 "items": [
                     {
                         "title": _("Subscription Topics"),
@@ -3603,7 +3569,6 @@ UNFOLD = {
                             "admin:user_subscriptiontopic_changelist",
                             urlconf=ROOT_URLCONF,
                         ),
-                        "permission": "admin.permissions.is_staff",
                     },
                 ],
             },
@@ -3616,7 +3581,6 @@ UNFOLD = {
                 "title": _("Settings"),
                 "separator": True,
                 "collapsible": True,
-                "permission": "admin.permissions.is_staff",
                 "items": [
                     {
                         "title": _("Extra Settings"),
@@ -3625,14 +3589,13 @@ UNFOLD = {
                             "admin:extra_settings_setting_changelist",
                             urlconf=ROOT_URLCONF,
                         ),
-                        "permission": "admin.permissions.is_staff",
                     },
                 ],
             },
             # ──────────────────────────────────────────────────────────
-            # SYSTEM ZONE — superuser-only. One parent group with four
-            # nested subtrees (Configuration / Audit & Logs /
-            # Reconciliation / Background Jobs). The nested rendering
+            # SYSTEM ZONE — superuser-only. One parent group with three
+            # nested subtrees (Security & Access / Audit & Logs /
+            # Reconciliation). The nested rendering
             # is provided by our `core/templates/unfold/helpers/
             # app_list{,_item}.html` overrides — unfold's Python layer
             # already recursively processes child `items` arrays
@@ -3645,32 +3608,6 @@ UNFOLD = {
                 "collapsible": True,
                 "permission": "admin.permissions.is_superuser",
                 "items": [
-                    {
-                        "title": _("Configuration"),
-                        "icon": "tune",
-                        "permission": "admin.permissions.is_superuser",
-                        "items": [
-                            {
-                                "title": _("Shipping Providers"),
-                                "icon": "local_shipping",
-                                "link": reverse_lazy(
-                                    "admin:shipping_shippingprovider_changelist",
-                                    urlconf=ROOT_URLCONF,
-                                ),
-                                "permission": "admin.permissions.is_superuser",
-                            },
-                            # ``auth.Group`` is deliberately NOT here. It
-                            # is a PLATFORM_ONLY app label
-                            # (tenant/role_scopes.py): store access is
-                            # derived from UserTenantMembership roles and
-                            # no Group is created anywhere in the
-                            # codebase, so the section listed a table
-                            # nothing reads — while offering a store
-                            # admin who reached it a way to mint
-                            # themselves any permission that exists.
-                            # Groups live on the control plane only.
-                        ],
-                    },
                     {
                         "title": _("Security & Access"),
                         "icon": "security",

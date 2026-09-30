@@ -24,7 +24,7 @@ dependencies = [
   "django-cors-headers==4.9.0",
   "django-simple-history==3.13.0",
   "django-filter==26.1",
-  "django-unfold==0.104.1",
+  "django-unfold==0.108.0",
   "django-money==3.6.1",
   "django-mptt==0.18.0",
   "django-parler==2.4.0",
@@ -37,6 +37,7 @@ dependencies = [
   "djangorestframework-camel-case==1.4.2",
   "drf-spectacular==0.30.0",
   "fido2==2.2.1",
+  "jsonschema==4.26.0",
   "filetype==1.2.0",
   "flower==2.1.0",
   "gunicorn==26.2.0",
@@ -485,16 +486,6 @@ call-non-callable = "ignore"
 too-many-positional-arguments = "ignore"
 unsupported-operator = "ignore"
 invalid-return-type = "ignore"
-
-# django-unfold's @action decorator is annotated as `-> Action`
-# but actually returns the inner decorator callable, so ty flags
-# every `@action(...)` usage as call-non-callable. Suppress for
-# all per-app admin modules until upstream stubs are fixed.
-[[tool.ty.overrides]]
-include = ["**/admin.py"]
-
-[tool.ty.overrides.rules]
-call-non-callable = "ignore"
 
 # Stripe SDK uses `Unpack[TypedDict]` for **kwargs on create() methods
 # (e.g. SessionCreateParams). We build payload dicts incrementally with

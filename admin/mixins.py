@@ -20,7 +20,7 @@ class AdminSiteLoginNextMixin:
     ``https://webside.gr/account`` on 2026-08-21.
 
     Unfold documents ``UNFOLD["LOGIN"]["redirect_after"]`` for this, but
-    0.104.1 (the current release) only DECLARES the key — the single
+    0.108.0 (re-checked 2026-09-30) still only DECLARES the key — the single
     occurrence in the package is its ``None`` default, and nothing reads
     it. So put ``next`` on the URL instead, which every layer below
     already understands.

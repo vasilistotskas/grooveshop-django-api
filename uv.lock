@@ -1219,14 +1219,14 @@ wheels = [
 
 [[package]]
 name = "django-unfold"
-version = "0.104.1"
+version = "0.108.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "django" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/12/41/0685cfdad4cf77a571e48227c78a9b8ae6d15679c2e9c9e724142a26cc3a/django_unfold-0.104.1.tar.gz", hash = "sha256:13b52e8100f2d844568cf08a2057cacd3686bc1083e0e491d05fc688025c966f", size = 1126154, upload-time = "2026-08-12T07:43:46.027Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/48/30/f539fe86cd247d9468f84ec21468fd3ae91f5215e0f0c3264a600cc34cdb/django_unfold-0.108.0.tar.gz", hash = "sha256:f791e6b3ca8a6f84da3a9bdc09ea8f6269194f317fcd2b871bb123c815fa557a", size = 1163440, upload-time = "2026-09-24T07:27:27.342Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/37/25/d9165c8b4e1deb37d0ac68bfe837c59a4ddb895f5df8b9c97b4bd433ab23/django_unfold-0.104.1-py3-none-any.whl", hash = "sha256:4eece526e1e80f5133632acae260cc53ab2f52020ff9f64bb98d9c9c738d9888", size = 1254159, upload-time = "2026-08-12T07:43:44.565Z" },
+    { url = "https://files.pythonhosted.org/packages/9a/cb/29cd61b8ff07602eb2c9966f298e5da05ef510f99efa46487d15a1529b55/django_unfold-0.108.0-py3-none-any.whl", hash = "sha256:6cb928bc0d9a9487075334084f738c44729b36e6c6fd0b9bfbdd6a504c1e827d", size = 1291690, upload-time = "2026-09-24T07:27:25.784Z" },
 ]
 
 [[package]]
@@ -1545,6 +1545,7 @@ dependencies = [
     { name = "filetype" },
     { name = "flower" },
     { name = "gunicorn" },
+    { name = "jsonschema" },
     { name = "measurement" },
     { name = "meilisearch" },
     { name = "nh3" },
@@ -1615,7 +1616,7 @@ requires-dist = [
     { name = "django-stubs-ext", specifier = "==6.0.9" },
     { name = "django-tenants", specifier = ">=3.14.0,<4.0.0" },
     { name = "django-tinymce", specifier = "==5.0.0" },
-    { name = "django-unfold", specifier = "==0.104.1" },
+    { name = "django-unfold", specifier = "==0.108.0" },
     { name = "djangorestframework", specifier = "==3.18.0" },
     { name = "djangorestframework-camel-case", specifier = "==1.4.2" },
     { name = "drf-spectacular", specifier = "==0.30.0" },
@@ -1624,6 +1625,7 @@ requires-dist = [
     { name = "filetype", specifier = "==1.2.0" },
     { name = "flower", specifier = "==2.1.0" },
     { name = "gunicorn", specifier = "==26.2.0" },
+    { name = "jsonschema", specifier = "==4.26.0" },
     { name = "measurement", specifier = "==3.2.2" },
     { name = "meilisearch", specifier = "==0.43.0" },
     { name = "nh3", specifier = ">=0.3.6" },

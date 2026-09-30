@@ -1016,7 +1016,7 @@ class TenantAdmin(BaseModelAdmin):
         ``destroy_tenants`` still run in full on that second POST — this
         only adds a step before them, it does not replace them.
 
-        The changelist/index URLs are resolved against
+        The changelist URL is resolved against
         ``self.admin_site.name`` rather than hardcoded in the template:
         this action is platform-only (``get_actions`` strips it for
         merchants), reached exclusively through ``PlatformAdminSite``
@@ -1033,7 +1033,6 @@ class TenantAdmin(BaseModelAdmin):
             "changelist_url": reverse(
                 f"{site_name}:{opts.app_label}_{opts.model_name}_changelist"
             ),
-            "index_url": reverse(f"{site_name}:index"),
         }
         return render(
             request, "admin/tenant/destroy_confirmation.html", context

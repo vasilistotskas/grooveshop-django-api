@@ -856,6 +856,7 @@ class CartViewSet(BaseModelViewSet):
             PayWay.objects.active(),
             provider_code=shipping_provider_code,
             shipping_kind=shipping_kind,
+            country_code=country_id,
         )
         if not allowed.filter(id=pay_way.id).exists():
             logger.info(

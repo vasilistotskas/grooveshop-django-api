@@ -552,6 +552,7 @@ class OrderViewSet(BaseModelViewSet):
             PayWay.objects.active(),
             provider_code=validated_data.get("shipping_provider_code"),
             shipping_kind=validated_data.get("shipping_kind"),
+            country_code=validated_data.get("country_id"),
         )
         if not allowed.filter(id=pay_way.id).exists():
             # Log the rejection so "why can't the customer place this

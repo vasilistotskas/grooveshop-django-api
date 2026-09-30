@@ -111,6 +111,15 @@ class PayWayFilter(
             "``home_delivery`` checkout needs."
         ),
     )
+    country = filters.CharFilter(
+        method="filter_carrier_compat",
+        help_text=_(
+            "ISO 3166-1 alpha-2 delivery country. Drops the pay ways an "
+            "operator excluded for that country (e.g. BoxNow PAY ON THE "
+            "GO in Cyprus). Has no effect without ``shippingKind``; "
+            "when omitted only the every-country exclusions apply."
+        ),
+    )
 
     class Meta:
         model = PayWay
@@ -145,7 +154,7 @@ class PayWayFilter(
         return queryset
 
     def filter_carrier_compat(self, queryset, name, value):
-        """Both ``shippingProviderCode`` and ``shippingKind`` route to
+        """``shippingProviderCode``, ``shippingKind`` and ``country`` route to
         this method. ``shippingKind`` is the required half: with a
         provider code we apply that carrier's rules, without one we
         apply the rules every carrier serving the kind agrees on.
@@ -165,15 +174,18 @@ class PayWayFilter(
         # so we read snake_case keys.
         provider_code = self.data.get("shipping_provider_code")
         shipping_kind = self.data.get("shipping_kind")
+        country_code = self.data.get("country") or None
         if not shipping_kind:
             return queryset
         if not provider_code:
             return PayWayService.filter_by_shipping_kind(
                 queryset,
                 shipping_kind=shipping_kind,
+                country_code=country_code,
             )
         return PayWayService.filter_by_carrier(
             queryset,
             provider_code=provider_code,
             shipping_kind=shipping_kind,
+            country_code=country_code,
         )

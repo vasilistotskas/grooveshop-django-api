@@ -1,7 +1,7 @@
 import logging
 from typing import Any
 
-from django.db.models import QuerySet
+from django.db.models import Q, QuerySet
 from django.utils.translation import gettext_lazy as _
 from djmoney.money import Money
 
@@ -59,11 +59,32 @@ class PayWayService:
         }
 
     @staticmethod
+    def _exclusions(
+        provider_code: str, kind: str, country_code: str | None
+    ) -> QuerySet:
+        """Pay-way ids switched off for (provider, kind) in a country.
+
+        Rows with no country apply everywhere; a row with a country
+        applies only when it matches ``country_code``.
+        """
+        from pay_way.models import PayWayShippingExclusion
+
+        scope = Q(country__isnull=True)
+        if country_code:
+            scope |= Q(country_id=country_code.upper())
+        return PayWayShippingExclusion.objects.filter(
+            scope,
+            shipping_provider__code=provider_code,
+            shipping_kind=kind,
+        ).values("pay_way_id")
+
+    @staticmethod
     def filter_by_carrier(
         queryset: QuerySet,
         *,
         provider_code: str | None,
         shipping_kind: str | None,
+        country_code: str | None = None,
     ) -> QuerySet:
         """Filter PayWays compatible with the chosen carrier + kind.
 
@@ -84,6 +105,12 @@ class PayWayService:
             queryset: Base PayWay queryset.
             provider_code: ``ShippingProvider.code`` value, or None.
             shipping_kind: ``ShippingKind`` value, or None.
+            country_code: ISO alpha-2 delivery country, or None. An
+                exclusion row with a country applies only to that
+                country; a row without one applies to every country.
+                With no country known, only the every-country rows
+                apply: a country-scoped rule cannot be evaluated
+                without a country, so it is not guessed at.
 
         Returns:
             Filtered queryset. Empty/unknown inputs short-circuit to
@@ -106,12 +133,9 @@ class PayWayService:
 
         # Layer 1: admin-configured exclusions. Subquery so callers
         # composing paginated queries don't pay an extra round trip.
-        from pay_way.models import PayWayShippingExclusion
-
-        excluded_ids = PayWayShippingExclusion.objects.filter(
-            shipping_provider__code=provider_code,
-            shipping_kind=kind_enum.value,
-        ).values("pay_way_id")
+        excluded_ids = PayWayService._exclusions(
+            provider_code, kind_enum.value, country_code
+        )
         queryset = queryset.exclude(id__in=excluded_ids)
 
         # Layer 2: carrier-specific hard constraints. Default
@@ -125,6 +149,7 @@ class PayWayService:
         queryset: QuerySet,
         *,
         shipping_kind: str | None,
+        country_code: str | None = None,
     ) -> QuerySet:
         """Filter PayWays for a kind whose carrier is not yet known.
 
@@ -150,11 +175,13 @@ class PayWayService:
         serves the kind there is no shipping option to pair a payment
         with, so the queryset passes through unchanged — same
         short-circuit convention as :meth:`filter_by_carrier`.
+
+        ``country_code`` scopes the exclusions exactly as it does in
+        :meth:`filter_by_carrier`.
         """
         if not shipping_kind:
             return queryset
 
-        from pay_way.models import PayWayShippingExclusion
         from shipping.enum import ShippingKind
         from shipping.interfaces import get_provider, is_registered
         from shipping.models import ShippingProvider
@@ -184,10 +211,9 @@ class PayWayService:
             return queryset
 
         for code, adapter in candidates:
-            excluded_ids = PayWayShippingExclusion.objects.filter(
-                shipping_provider__code=code,
-                shipping_kind=kind_enum.value,
-            ).values("pay_way_id")
+            excluded_ids = PayWayService._exclusions(
+                code, kind_enum.value, country_code
+            )
             queryset = queryset.exclude(id__in=excluded_ids)
             queryset = adapter.filter_pay_ways(queryset, kind=kind_enum)
 

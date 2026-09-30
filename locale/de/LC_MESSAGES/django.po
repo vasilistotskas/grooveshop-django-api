@@ -9780,3 +9780,11 @@ msgstr "BoxNow-Locker-Synchronisierung abgeschlossen: %(created)d erstellt, %(up
 #: .\core\templates\invoices\invoice.html:255
 msgid "Discount (incl. VAT)"
 msgstr "Rabatt (inkl. MwSt.)"
+
+#: .\pay_way\models.py
+msgid "Delivery country this exclusion applies to. Leave empty to exclude the pay way for every country."
+msgstr "Lieferland, für das dieser Ausschluss gilt. Leer lassen, um die Zahlungsart für alle Länder auszuschließen."
+
+#: .\pay_way\filters.py
+msgid "ISO 3166-1 alpha-2 delivery country. Drops the pay ways an operator excluded for that country (e.g. BoxNow PAY ON THE GO in Cyprus). Has no effect without ``shippingKind``; when omitted only the every-country exclusions apply."
+msgstr "Lieferland (ISO 3166-1 alpha-2). Entfernt die Zahlungsarten, die der Betreiber für dieses Land ausgeschlossen hat (z. B. BoxNow PAY ON THE GO in Zypern). Ohne ``shippingKind`` wirkungslos; wenn weggelassen, gelten nur die Ausschlüsse für alle Länder."

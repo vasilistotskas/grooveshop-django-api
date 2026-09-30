@@ -43,7 +43,16 @@ class PayWayShippingExclusionInline(TabularInline):
 
     model = PayWayShippingExclusion
     extra = 0
-    fields = ("shipping_provider", "shipping_kind", "pay_way", "note")
+    # ``country`` has no autocomplete: the country admin is
+    # platform-only, so a tenant-schema session would get a 403 from
+    # its autocomplete endpoint. A plain select always works.
+    fields = (
+        "shipping_provider",
+        "shipping_kind",
+        "country",
+        "pay_way",
+        "note",
+    )
     autocomplete_fields = ("pay_way", "shipping_provider")
     verbose_name = _("Payment-method exclusion")
     verbose_name_plural = _("Payment-method exclusions")

@@ -221,6 +221,7 @@ class PayWayShippingExclusionFactory(factory.django.DjangoModelFactory):
         "shipping.factories.ShippingProviderFactory"
     )
     shipping_kind = factory.Iterator([kind.value for kind in ShippingKind])
+    country = None
     note = ""
 
     class Meta:
@@ -231,4 +232,5 @@ class PayWayShippingExclusionFactory(factory.django.DjangoModelFactory):
             "pay_way",
             "shipping_provider",
             "shipping_kind",
+            "country",
         )

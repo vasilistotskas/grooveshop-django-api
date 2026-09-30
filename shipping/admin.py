@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.db.models import Count
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import pgettext_lazy
 from unfold.admin import TabularInline
 
 from admin.base import BaseModelAdmin
@@ -28,7 +29,7 @@ class ShippingRateInline(TabularInline):
         "max_weight_grams",
         "is_active",
     )
-    verbose_name = _("Rate")
+    verbose_name = pgettext_lazy("shipping", "Rate")
     verbose_name_plural = _("Rates")
 
 

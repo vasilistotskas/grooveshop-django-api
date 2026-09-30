@@ -3,6 +3,67 @@
 
 
 
+## v3.90.0 (2026-09-30)
+
+### Bug fixes
+
+* fix(i18n): give each meaning of "Rate" its own translation context
+
+A review's star rating, a shipping price and a VAT percentage all
+shared one msgid "Rate". Greek had translated it for reviews, so every
+Greek invoice headed its VAT breakdown "Βαθμολογία" (a review score),
+and the German catalog had it the other way round: "Satz" on the
+review field.
+
+The invoice column and the shipping-rate inline now carry pgettext
+contexts ("VAT rate", "shipping"), the same pattern order/enum/
+attribution.py uses. The review field keeps the plain msgid:
+- VAT rate: el "Συντελεστής", de "Satz"
+- shipping: el "Τιμή αποστολής", de "Tarif"
+- review: el "Βαθμολογία", de "Bewertung"
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01PngXH78Bkz46AsAHrnws9t ([`1451753`](https://github.com/vasilistotskas/grooveshop-django-api/commit/14517530efb29cf964f81f66c5b4b01f5394e118))
+
+### Chores
+
+* chore(ty): exclude Claude Code subagent worktrees from type checking (#94)
+
+Claude Code creates subagent worktrees under .claude/worktrees/: a full
+second copy of this repository nested inside it. ty scanned them as
+first-party code, and the duplicate package names broke its import
+resolution (318 unresolved-import diagnostics in the copy, none in the
+real code). Exclude them from ty and from git.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`33459f8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/33459f88d0e1c75bdf91f238a6df8dfef1f45a9d))
+
+* chore(deps): sync uv.lock to 3.89.7 [skip ci] ([`6993877`](https://github.com/vasilistotskas/grooveshop-django-api/commit/69938779f785f92aabd0ea81bdcef406aba3e94e))
+
+### Features
+
+* feat(pay_way): scope a pay-way exclusion to one delivery country (#95)
+
+The webside store is opening Cyprus, which is BoxNow lockers only. For
+Cyprus the owner wants card payment (Viva) alone, not BOX NOW PAY ON
+THE GO, while Greece must keep offering PAY ON THE GO on lockers. A
+PayWayShippingExclusion row used to disable a pay way for a
+(provider, kind) in every country, so the two could not differ.
+
+Add a nullable country FK to PayWayShippingExclusion: NULL keeps the
+every-country meaning (existing rows are unchanged), a country limits
+the row to that country. The unique constraint now includes country
+with nulls_distinct=False so one every-country row per combination
+stays unique. The migration is additive.
+
+PayWayService.filter_by_carrier and filter_by_shipping_kind take
+country_code; with no country only the every-country rows apply. Every
+caller passes the delivery country: the shipping options' embedded pay
+ways, the pay-way list (new `country` query param), payment-intent
+creation and order creation, which reject the method with the existing
+400 shape. The exclusion inline shows and edits the country.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`01f5e5c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/01f5e5c1eaec91ac5ffbdaac0bc33bf2fbdd9408))
+
 ## v3.89.7 (2026-09-29)
 
 ### Bug fixes

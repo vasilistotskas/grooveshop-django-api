@@ -334,26 +334,34 @@ class UserAdmin(ExportActionMixin, BaseModelAdmin):
 
     fieldsets = (
         (
-            _("Account Credentials"),
-            {"fields": ("email", "username", "password"), "classes": ("wide",)},
+            _("Account"),
+            {
+                "classes": ("tab",),
+                "fields": (
+                    "email",
+                    "username",
+                    "password",
+                ),
+            },
         ),
         (
-            _("Personal Information"),
+            _("Profile"),
             {
+                "classes": ("tab",),
                 "fields": (
                     "first_name",
                     "last_name",
                     "phone",
                     "birth_date",
                     "image",
+                    "bio",
                 ),
-                "classes": ("wide",),
             },
         ),
-        (_("Bio & Description"), {"fields": ("bio",), "classes": ("wide",)}),
         (
-            _("Location & Address"),
+            _("Address"),
             {
+                "classes": ("tab",),
                 "fields": (
                     "address",
                     "city",
@@ -362,12 +370,12 @@ class UserAdmin(ExportActionMixin, BaseModelAdmin):
                     "country",
                     "region",
                 ),
-                "classes": ("wide",),
             },
         ),
         (
-            _("Social Media & Website"),
+            _("Social"),
             {
+                "classes": ("tab",),
                 "fields": (
                     "website",
                     "linkedin",
@@ -378,12 +386,12 @@ class UserAdmin(ExportActionMixin, BaseModelAdmin):
                     "youtube",
                     "social_links_summary",
                 ),
-                "classes": ("wide",),
             },
         ),
         (
-            _("Account Permissions"),
+            _("Permissions"),
             {
+                "classes": ("tab",),
                 "fields": (
                     "is_active",
                     "is_staff",
@@ -391,33 +399,22 @@ class UserAdmin(ExportActionMixin, BaseModelAdmin):
                     "groups",
                     "user_permissions",
                 ),
-                "classes": ("wide",),
             },
         ),
         (
-            _("Subscriptions & Engagement"),
+            _("Loyalty & Engagement"),
             {
-                "fields": ("engagement_metrics",),
-                "classes": ("collapse",),
-            },
-        ),
-        (
-            _("Loyalty & Rewards"),
-            {
+                "classes": ("tab",),
                 "fields": (
                     "loyalty_points_balance",
                     "loyalty_total_xp",
                     "loyalty_level",
                     "loyalty_tier_name",
+                    "engagement_metrics",
+                    "id",
+                    "created_at",
+                    "updated_at",
                 ),
-                "classes": ("wide",),
-            },
-        ),
-        (
-            _("System Information"),
-            {
-                "fields": ("id", "created_at", "updated_at"),
-                "classes": ("collapse",),
             },
         ),
     )

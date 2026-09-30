@@ -239,7 +239,7 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
                     "parcel_id",
                     "label_url",
                 ),
-                "classes": ("wide",),
+                "classes": ("tab",),
             },
         ),
         (
@@ -250,7 +250,7 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
                     "locker",
                     "locker_external_id",
                 ),
-                "classes": ("wide",),
+                "classes": ("tab",),
                 "description": _(
                     "Edit 'Locker External ID' directly to override the "
                     "locker for stage testing (e.g. set to '4' per BoxNow's "
@@ -269,7 +269,7 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
                     "amount_to_be_collected",
                     "allow_return",
                 ),
-                "classes": ("wide",),
+                "classes": ("tab",),
             },
         ),
         (
@@ -281,14 +281,14 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
                     "last_event_at",
                     "cancel_requested_at",
                 ),
-                "classes": ("wide",),
+                "classes": ("tab",),
             },
         ),
         (
             _("Diagnostics"),
             {
                 "fields": ("metadata",),
-                "classes": ("collapse",),
+                "classes": ("tab",),
             },
         ),
     )

@@ -415,60 +415,53 @@ class BlogPostAdmin(ExportActionMixin, BaseTranslatableAdmin):
         (
             _("Content"),
             {
-                "fields": ("title", "subtitle", "body"),
-                "classes": ("wide",),
-            },
-        ),
-        (
-            _("Media"),
-            {
-                "fields": ("image",),
-                "classes": ("wide",),
-            },
-        ),
-        (
-            _("Organization"),
-            {
-                "fields": ("slug", "category", "tags"),
-                "classes": ("wide",),
+                "classes": ("tab",),
+                "fields": (
+                    "title",
+                    "subtitle",
+                    "body",
+                    "image",
+                ),
             },
         ),
         (
             _("Publishing"),
             {
+                "classes": ("tab",),
                 "fields": (
+                    "slug",
+                    "category",
+                    "tags",
                     "author",
                     "featured",
                     "is_published",
                     "published_at",
                 ),
-                "classes": ("wide",),
-            },
-        ),
-        (
-            _("Engagement"),
-            {
-                "fields": ("view_count", "engagement_display"),
-                "classes": ("collapse",),
             },
         ),
         (
             _("SEO"),
             {
+                "classes": ("tab",),
                 "fields": (
                     "seo_title",
                     "seo_description",
                     "seo_keywords",
                     "seo_score",
                 ),
-                "classes": ("collapse",),
             },
         ),
         (
-            _("System"),
+            _("Statistics"),
             {
-                "fields": ("id", "created_at", "updated_at"),
-                "classes": ("collapse",),
+                "classes": ("tab",),
+                "fields": (
+                    "view_count",
+                    "engagement_display",
+                    "id",
+                    "created_at",
+                    "updated_at",
+                ),
             },
         ),
     )

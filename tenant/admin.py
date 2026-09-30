@@ -412,18 +412,21 @@ class TenantAdmin(BaseModelAdmin):
                 level=messages.INFO,
             )
 
+    # Eight tabs, not seventeen collapsed sections: Unfold gives every
+    # tabbed fieldset its own tab, and the tab bar does not wrap.
     fieldsets = [
         (
-            None,
+            _("Store"),
             {
+                "classes": ["tab"],
                 "fields": [
                     "name",
                     "slug",
                     "schema_name",
                     "owner_email",
                     "is_active",
-                    # Sits here rather than under Features on purpose:
-                    # it gates no storefront behaviour, it declares what
+                    # Here rather than under Features on purpose: it
+                    # gates no storefront behaviour, it declares what
                     # KIND of tenant this row is.
                     "is_demo",
                     "is_protected",
@@ -434,24 +437,28 @@ class TenantAdmin(BaseModelAdmin):
                     "suspended_at",
                     "suspended_reason",
                     "uuid",
-                ]
+                    "created_at",
+                    "updated_at",
+                ],
             },
         ),
         (
             _("Plan & Billing"),
             {
+                "classes": ["tab"],
                 "fields": [
                     "plan",
                     "paid_until",
                     "billing_notice_stage",
                     "billing_notice_term",
                     "stripe_connect_account_id",
-                ]
+                ],
             },
         ),
         (
             _("Branding"),
             {
+                "classes": ["tab"],
                 "fields": [
                     "store_name",
                     "store_description",
@@ -460,16 +467,6 @@ class TenantAdmin(BaseModelAdmin):
                     "logo_light_url",
                     "logo_dark_url",
                     "favicon_url",
-                    "seo_author",
-                    "google_site_verification",
-                    "pinterest_domain_verify",
-                ]
-            },
-        ),
-        (
-            _("Theme"),
-            {
-                "fields": [
                     "primary_color",
                     "neutral_color",
                     "accent_hex",
@@ -479,30 +476,48 @@ class TenantAdmin(BaseModelAdmin):
                     "info_hex",
                     "theme_preset",
                     "theme_metadata",
-                ]
+                    "socials_discord",
+                    "socials_facebook",
+                    "socials_instagram",
+                    "socials_linkedin",
+                    "socials_pinterest",
+                    "socials_reddit",
+                    "socials_tiktok",
+                    "socials_twitter",
+                    "socials_youtube",
+                ],
             },
         ),
         (
             _("Features"),
             {
+                "classes": ["tab"],
                 "fields": [
                     "loyalty_enabled",
                     "blog_enabled",
                     "promotions_enabled",
                     "gift_cards_enabled",
-                    "agent_commerce_enabled",
                     # Was absent entirely, so the wholesale plan gate
                     # could only be flipped from a shell — every other
                     # plan gate is here.
                     "b2b_enabled",
                     "recommendations_enabled",
-                ]
+                    "agent_commerce_enabled",
+                    "agent_hosted_payment_enabled",
+                    "agent_stripe_delegated_enabled",
+                    "chat_api_key",
+                    "acp_bearer_token",
+                ],
             },
         ),
         (
-            _("Analytics"),
+            _("Marketing"),
             {
+                "classes": ["tab"],
                 "fields": [
+                    "seo_author",
+                    "google_site_verification",
+                    "pinterest_domain_verify",
                     "meta_pixel_id",
                     "tiktok_pixel_id",
                     "ga_tracking_id",
@@ -514,78 +529,32 @@ class TenantAdmin(BaseModelAdmin):
                     "meta_capi_access_token",
                     "meta_capi_dataset_id",
                 ],
-                "classes": ["collapse"],
             },
         ),
         (
-            _("Social Links"),
+            _("Email & Security"),
             {
-                "fields": [
-                    "socials_discord",
-                    "socials_facebook",
-                    "socials_instagram",
-                    "socials_linkedin",
-                    "socials_pinterest",
-                    "socials_reddit",
-                    "socials_tiktok",
-                    "socials_twitter",
-                    "socials_youtube",
-                ],
-                "classes": ["collapse"],
-            },
-        ),
-        (
-            _("Email"),
-            {
+                "classes": ["tab"],
                 "fields": [
                     "from_email",
                     "from_email_verified",
                     "contact_email",
+                    "totp_issuer",
+                    "allowed_csp_sources",
+                    "cloudflare_zone_id",
+                    "cloudflare_api_token",
                 ],
-                "classes": ["collapse"],
-            },
-        ),
-        (
-            _("Authentication"),
-            {
-                "fields": ["totp_issuer"],
-                "classes": ["collapse"],
-            },
-        ),
-        (
-            _("Agentic Commerce"),
-            {
-                "fields": [
-                    "chat_api_key",
-                    "acp_bearer_token",
-                    "agent_hosted_payment_enabled",
-                    "agent_stripe_delegated_enabled",
-                ],
-                "classes": ["collapse"],
-            },
-        ),
-        (
-            _("Security"),
-            {
-                "fields": ["allowed_csp_sources"],
-                "classes": ["collapse"],
-            },
-        ),
-        (
-            _("Edge cache — Cloudflare"),
-            {
-                "fields": ["cloudflare_zone_id", "cloudflare_api_token"],
-                "classes": ["collapse"],
                 "description": _(
-                    "Only for a store on its own domain in its own "
-                    "Cloudflare account. Leave empty on a platform "
-                    "hostname."
+                    "The Cloudflare fields are only for a store on its own "
+                    "domain in its own Cloudflare account. Leave them empty "
+                    "on a platform hostname."
                 ),
             },
         ),
         (
-            _("Payments — Viva Wallet"),
+            _("Payments"),
             {
+                "classes": ["tab"],
                 "fields": [
                     "viva_wallet_merchant_id",
                     "viva_wallet_api_key",
@@ -594,13 +563,15 @@ class TenantAdmin(BaseModelAdmin):
                     "viva_wallet_webhook_verification_key",
                     "viva_wallet_source_code",
                     "viva_wallet_live_mode",
+                    "stripe_publishable_key",
+                    "stripe_secret_key",
                 ],
-                "classes": ["collapse"],
             },
         ),
         (
-            _("Shipping — ACS"),
+            _("Shipping"),
             {
+                "classes": ["tab"],
                 "fields": [
                     "acs_api_key",
                     "acs_company_id",
@@ -609,14 +580,6 @@ class TenantAdmin(BaseModelAdmin):
                     "acs_user_password",
                     "acs_billing_code",
                     "acs_station_origin",
-                ],
-                "classes": ["collapse"],
-            },
-        ),
-        (
-            _("Shipping — BoxNow"),
-            {
-                "fields": [
                     "box_now_partner_id",
                     "box_now_client_id",
                     "box_now_client_secret",
@@ -624,24 +587,6 @@ class TenantAdmin(BaseModelAdmin):
                     "box_now_notify_phone",
                     "box_now_webhook_secret",
                 ],
-                "classes": ["collapse"],
-            },
-        ),
-        (
-            _("Payments — Stripe"),
-            {
-                "fields": [
-                    "stripe_publishable_key",
-                    "stripe_secret_key",
-                ],
-                "classes": ["collapse"],
-            },
-        ),
-        (
-            _("Timestamps"),
-            {
-                "fields": ["created_at", "updated_at"],
-                "classes": ["collapse"],
             },
         ),
     ]

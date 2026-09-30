@@ -210,6 +210,75 @@ class AcsShipmentAdmin(BaseModelAdmin):
         "created_at",
         "updated_at",
     )
+    fieldsets = (
+        (
+            _("Shipment"),
+            {
+                "classes": ("tab",),
+                "fields": (
+                    "order",
+                    "voucher_no",
+                    "shipment_state",
+                    "delivery_kind",
+                    "pickup_list",
+                    "label_printed_at",
+                    "cancel_requested_at",
+                    "arrival_notified_at",
+                ),
+            },
+        ),
+        (
+            _("Destination"),
+            {
+                "classes": ("tab",),
+                "fields": (
+                    "station_destination",
+                    "station_destination_external_id",
+                    "station_branch_destination",
+                ),
+            },
+        ),
+        (
+            _("Parcel & COD"),
+            {
+                "classes": ("tab",),
+                "fields": (
+                    "weight_grams",
+                    "item_quantity",
+                    "charge_type",
+                    "cod_amount",
+                    "cod_payment_way",
+                    "delivery_products",
+                ),
+            },
+        ),
+        (
+            _("Tracking"),
+            {
+                "classes": ("tab",),
+                "fields": (
+                    "last_polled_at",
+                    "last_event_at",
+                    "stale_alert_sent",
+                    "delivery_date",
+                    "delivery_flag",
+                    "returned_flag",
+                    "raw_shipment_status",
+                ),
+            },
+        ),
+        (
+            _("Diagnostics"),
+            {
+                "classes": ("tab",),
+                "fields": (
+                    "metadata",
+                    "created_at",
+                    "updated_at",
+                ),
+            },
+        ),
+    )
     inlines = [AcsTrackingEventInline]
     # Changelist-level, and deliberately on the SHIPMENT admin rather
     # than AcsPickupListAdmin: that one is IsSuperuserOnlyModelAdmin, so

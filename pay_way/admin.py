@@ -173,50 +173,44 @@ class PayWayAdmin(BaseTranslatableAdmin):
 
     fieldsets = (
         (
-            _("Basic Information"),
-            {"fields": ("active", "sort_order"), "classes": ("wide",)},
-        ),
-        (
-            _("Display & Branding"),
-            {"fields": ("name", "icon"), "classes": ("wide",)},
-        ),
-        (
-            _("Content"),
-            {"fields": ("description", "instructions"), "classes": ("wide",)},
-        ),
-        (
-            _("Payment Configuration"),
+            _("General"),
             {
+                "classes": ("tab",),
+                "fields": (
+                    "active",
+                    "sort_order",
+                    "name",
+                    "icon",
+                    "description",
+                    "instructions",
+                ),
+            },
+        ),
+        (
+            _("Payment"),
+            {
+                "classes": ("tab",),
                 "fields": (
                     "provider_code",
                     "settlement",
+                    "cost",
+                    "free_threshold",
+                    "effective_cost_display",
                 ),
-                "classes": ("wide",),
             },
         ),
         (
-            _("Pricing"),
+            _("System"),
             {
-                "fields": ("cost", "free_threshold", "effective_cost_display"),
-                "classes": ("wide",),
-            },
-        ),
-        (
-            _("Advanced Configuration"),
-            {
+                "classes": ("tab",),
                 "fields": (
                     "configuration",
                     "configuration_preview",
                     "is_configured_status",
+                    "id",
+                    "created_at",
+                    "updated_at",
                 ),
-                "classes": ("collapse",),
-            },
-        ),
-        (
-            _("System Information"),
-            {
-                "fields": ("id", "created_at", "updated_at"),
-                "classes": ("collapse",),
             },
         ),
     )

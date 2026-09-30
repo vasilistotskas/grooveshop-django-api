@@ -1,12 +1,12 @@
 import secrets
-from typing import cast
 
 from django import forms
 from django.contrib import admin, messages
-from django.db.models import Count
+from django.db.models import Count, Prefetch
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect
 from django.urls import reverse
+from django.utils import formats
 from django.utils.translation import gettext_lazy as _
 from unfold.contrib.filters.admin import (
     RangeDateTimeFilter,
@@ -18,6 +18,7 @@ from unfold.forms import BaseDialogForm
 from unfold.sections import TableSection
 
 from admin.base import BaseModelAdmin, BaseTranslatableAdmin
+from admin.displays import money
 from admin.export import ExportActionMixin
 from promotion.enum import BenefitType, TargetScope
 from promotion.models import (
@@ -63,7 +64,7 @@ class GenerateCodesForm(BaseDialogForm):
 
 
 class RedemptionsTableSection(TableSection):
-    verbose_name = _("Latest redemptions")
+    verbose_name = _("Redemptions")
     height = 300
     related_name = "redemptions"
     fields = ["pk", "order", "user", "email", "amount", "created_at"]
@@ -192,6 +193,16 @@ class PromotionAdmin(BaseTranslatableAdmin):
             super()
             .get_queryset(request)
             .annotate(redemptions_total=Count("redemptions", distinct=True))
+            .prefetch_related(
+                "translations",
+                # The redemptions section, newest first, with the page.
+                Prefetch(
+                    "redemptions",
+                    queryset=PromotionRedemption.objects.select_related(
+                        "order", "user"
+                    ).order_by("-created_at"),
+                ),
+            )
         )
 
     @display(description=_("Name"), header=True)
@@ -204,9 +215,12 @@ class PromotionAdmin(BaseTranslatableAdmin):
     @display(description=_("Benefit"))
     def benefit_display(self, obj):
         if obj.benefit_type == BenefitType.PERCENTAGE:
-            return f"-{obj.benefit_value}%"
+            value = formats.number_format(
+                obj.benefit_value, decimal_pos=0, use_l10n=True
+            )
+            return f"-{value}%"
         if obj.benefit_type == BenefitType.FIXED_AMOUNT:
-            return f"-{obj.benefit_value} €"
+            return f"-{money(obj.benefit_value)}"
         return obj.get_benefit_type_display()
 
     @display(
@@ -234,7 +248,7 @@ class PromotionAdmin(BaseTranslatableAdmin):
     def redemptions_count(self, obj):
         return obj.redemptions_total
 
-    @admin.action(description=_("Activate selected promotions"))
+    @action(description=_("Activate selected promotions"))
     def activate_promotions(self, request, queryset):
         updated = queryset.update(is_active=True)
         self.message_user(
@@ -243,7 +257,7 @@ class PromotionAdmin(BaseTranslatableAdmin):
             messages.SUCCESS,
         )
 
-    @admin.action(description=_("Deactivate selected promotions"))
+    @action(description=_("Deactivate selected promotions"))
     def deactivate_promotions(self, request, queryset):
         updated = queryset.update(is_active=False)
         self.message_user(
@@ -255,20 +269,12 @@ class PromotionAdmin(BaseTranslatableAdmin):
     @action(
         description=_("Generate codes"),
         icon="confirmation_number",
-        # cast: unfold's ActionDialog TypedDict declares plain ``str``
-        # keys, but every unfold example (and its own templates) feeds
-        # lazy strings through — evaluating them at import time would
-        # freeze the admin locale instead.
-        dialog=cast(
-            "ActionDialog",
-            {
-                "title": _("Bulk-generate coupon codes"),
-                "description": _(
-                    "Creates unique random codes attached to this promotion."
-                ),
-                "form_class": GenerateCodesForm,
-                "form_submit_text": None,
-            },
+        dialog=ActionDialog(
+            title=_("Bulk-generate coupon codes"),
+            description=_(
+                "Creates unique random codes attached to this promotion."
+            ),
+            form_class=GenerateCodesForm,
         ),
     )
     def generate_codes(

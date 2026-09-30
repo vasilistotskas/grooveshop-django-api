@@ -31,7 +31,12 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
+from django.contrib.admin import AdminSite
+from django.db.models import Model
+from django.urls import reverse
 from django.utils import formats, timezone
+from django.utils.html import format_html
+from django.utils.safestring import SafeString
 from django.utils.timesince import timesince
 from django.utils.translation import gettext_lazy as _
 from unfold.decorators import display
@@ -172,6 +177,28 @@ def relative_time(dt: datetime | None, now: datetime | None = None) -> str:
     if dt is None:
         return "—"
     return timesince(dt, now, depth=1)
+
+
+# ── Links ─────────────────────────────────────────────────────────────
+
+
+def change_link(
+    admin_site: AdminSite, model: type[Model], pk: Any, text: Any
+) -> SafeString:
+    """A link to a row's change page on the site serving this admin.
+
+    Takes the model and primary key rather than the row, so a list
+    column can link through a foreign key's id without loading the
+    related row. Resolved on ``admin_site``'s own namespace: a
+    hard-coded ``/admin/...`` path broke on the control plane and under
+    a translated admin prefix.
+    """
+    opts = model._meta
+    url = reverse(
+        f"{admin_site.name}:{opts.app_label}_{opts.model_name}_change",
+        args=[pk],
+    )
+    return format_html('<a href="{}">{}</a>', url, text)
 
 
 # ── Two-line "header" helpers (for @display(header=True)) ─────────────

@@ -6,7 +6,7 @@ from django.contrib.admin.sites import AdminSite
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.test import RequestFactory
-from django.utils import timezone
+from django.utils import formats, timezone
 
 from country.factories import CountryFactory
 from region.factories import RegionFactory
@@ -392,7 +392,12 @@ class TestUserAdmin:
 
         result = admin.last_activity(user)
 
-        assert user.updated_at.strftime("%d/%m/%Y %H:%M") in result
+        assert (
+            formats.date_format(
+                timezone.localtime(user.updated_at), "SHORT_DATETIME_FORMAT"
+            )
+            in result
+        )
 
     @pytest.mark.assert_english
     def test_last_activity_never(self, admin_request):

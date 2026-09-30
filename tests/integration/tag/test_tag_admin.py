@@ -5,7 +5,7 @@ from django.contrib.admin.sites import AdminSite
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.test import RequestFactory
-from django.utils import translation
+from django.utils import formats, timezone, translation
 
 from product.factories import ProductFactory
 from tag.admin import (
@@ -183,7 +183,9 @@ class TestTagAdmin:
 
         result = tag_admin.created_display(tag)
 
-        assert result == tag.created_at.strftime("%d/%m/%Y %H:%M")
+        assert result == formats.date_format(
+            timezone.localtime(tag.created_at), "SHORT_DATETIME_FORMAT"
+        )
 
     @patch.object(TagAdmin, "message_user")
     def test_activate_tags_action(

@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.contrib import admin, messages
+from django.db.models import Count
 from django.utils.html import escape, format_html_join
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
@@ -177,9 +178,19 @@ class NavigationColumnAdmin(BaseTranslatableAdmin):
     fields = ("menu", "label", "icon", "sort_order")
     inlines = [NavigationLinkInline]
 
-    @admin.display(description=_("Links"))
+    list_select_related = ("menu",)
+
+    def get_queryset(self, request):
+        return (
+            super()
+            .get_queryset(request)
+            .prefetch_related("translations")
+            .annotate(links_total=Count("links"))
+        )
+
+    @admin.display(description=_("Links"), ordering="links_total")
     def link_count(self, obj: NavigationColumn) -> int:
-        return obj.links.count()
+        return obj.links_total
 
 
 class NavigationColumnInline(BaseTranslatableTabularInline):
@@ -260,6 +271,9 @@ class ContentPageAdmin(BaseTranslatableAdmin):
     )
 
     inlines = [ContentPageTranslationInline]
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).prefetch_related("translations")
 
     @admin.display(description=_("Title"), ordering="translations__title")
     def title_display(self, obj):

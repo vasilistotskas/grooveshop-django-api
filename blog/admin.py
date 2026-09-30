@@ -19,7 +19,7 @@ from unfold.decorators import action, display
 from unfold.enums import ActionVariant
 
 from admin.base import BaseTranslatableAdmin
-from admin.displays import header_two_line
+from admin.displays import change_link, header_two_line
 from admin.export import ExportActionMixin
 from blog.models.author import BlogAuthor
 from blog.models.category import BlogCategory
@@ -264,6 +264,7 @@ class BlogAuthorAdmin(BaseTranslatableAdmin):
             super()
             .get_queryset(request)
             .annotate(posts_count_ann=Count("blog_posts", distinct=True))
+            .with_engagement()
         )
 
     @display(description=_("User"), header=True, ordering="user__last_name")
@@ -279,9 +280,11 @@ class BlogAuthorAdmin(BaseTranslatableAdmin):
         bio = obj.safe_translation_getter("bio", any_language=True) or ""
         return Truncator(unescape(strip_tags(bio))).chars(50)
 
-    @admin.display(description=_("Posts"))
+    @admin.display(description=_("Posts"), ordering="posts_count_ann")
     def posts_count(self, obj):
-        return getattr(obj, "posts_count_ann", obj.blog_posts.count())
+        # Always annotated by ``get_queryset``; a ``getattr`` default
+        # would run its COUNT on every row even so.
+        return obj.posts_count_ann
 
     @admin.display(description=_("Website"))
     def website_link(self, obj):
@@ -341,9 +344,11 @@ class BlogTagAdmin(BaseTranslatableAdmin):
             "Unnamed Tag"
         )
 
-    @admin.display(description=_("Posts"))
+    @admin.display(description=_("Posts"), ordering="posts_count_ann")
     def posts_count(self, obj):
-        return getattr(obj, "posts_count_ann", obj.blog_posts.count())
+        # Always annotated by ``get_queryset``; a ``getattr`` default
+        # would run its COUNT on every row even so.
+        return obj.posts_count_ann
 
 
 @admin.register(BlogCategory)
@@ -807,21 +812,14 @@ class BlogCommentAdmin(BaseTranslatableAdmin):
     readonly_fields = ["engagement_display"]
 
     def get_queryset(self, request):
-        # NOTE: I tried annotating ``likes_count`` and ``replies_count``
-        # to short-circuit the per-row property fallback (35 extra
-        # queries on a 30-comment page), but the resulting JOIN +
-        # GROUP BY on the main fetch was empirically more expensive
-        # than the 35 single-row COUNTs (~1ms each). Left here as a
-        # paper trail for the next person who's tempted. If we ever
-        # add a real ``BlogCommentQuerySet.with_likes_count()`` using
-        # ``Subquery`` (cheaper than JOIN explosion), wire it in here.
-        # The model properties already check ``__dict__`` first
-        # (see ``blog/models/comment.py``) so an annotation by name
-        # will short-circuit them.
+        """Engagement counts (``with_engagement``: one subquery each,
+        read by the model's ``likes_count``/``replies_count``)."""
         return (
             super()
             .get_queryset(request)
             .select_related("post", "user", "parent")
+            .prefetch_related("translations", "post__translations")
+            .with_engagement()
         )
 
     @admin.display(description=_("Content"))
@@ -845,15 +843,11 @@ class BlogCommentAdmin(BaseTranslatableAdmin):
     def post_link(self, obj):
         if not obj.post:
             return "—"
-        title = (
-            obj.post.safe_translation_getter("title", any_language=True)
-            or f"Post {obj.post.id}"
-        )
-        title_display = title[:30] + "..." if len(title) > 30 else title
-        return format_html(
-            '<a href="{url}">{title}</a>',
-            url=f"/admin/blog/blogpost/{obj.post.id}/change/",
-            title=title_display,
+        title = obj.post.safe_translation_getter(
+            "title", any_language=True
+        ) or _("Post %(id)s") % {"id": obj.post_id}
+        return change_link(
+            self.admin_site, BlogPost, obj.post_id, Truncator(title).chars(33)
         )
 
     @admin.display(description=_("Engagement"))

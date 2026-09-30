@@ -13,7 +13,6 @@ from django.http import HttpResponse
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils import timezone
-from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import StackedInline, TabularInline
 from unfold.contrib.filters.admin import (
@@ -25,8 +24,9 @@ from unfold.decorators import action
 from unfold.enums import ActionVariant
 
 from admin.base import BaseModelAdmin
-from admin.displays import SHIPMENT_STATE_VARIANT, choice_label
+from admin.displays import SHIPMENT_STATE_VARIANT, change_link, choice_label
 from admin.mixins import IsSuperuserOnlyModelAdmin
+from order.models.order import Order
 from shipping_acs.enum.shipment_state import AcsShipmentState
 from shipping_acs.models import (
     AcsCodPayout,
@@ -355,10 +355,8 @@ class AcsShipmentAdmin(BaseModelAdmin):
 
     @admin.display(description=_("Order"))
     def order_link(self, obj: AcsShipment) -> str:
-        return format_html(
-            '<a href="{url}">#{id}</a>',
-            url=reverse("admin:order_order_change", args=[obj.order_id]),
-            id=obj.order_id,
+        return change_link(
+            self.admin_site, Order, obj.order_id, f"#{obj.order_id}"
         )
 
     @action(

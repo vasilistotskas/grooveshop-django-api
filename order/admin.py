@@ -28,6 +28,7 @@ from admin.displays import (
     ORDER_STATUS_VARIANT,
     PAYMENT_STATUS_VARIANT,
     SHIPMENT_STATE_VARIANT,
+    change_link,
     choice_label,
     format_dt,
     header_two_line,
@@ -1534,10 +1535,11 @@ class OrderItemAdmin(BaseModelAdmin):
 
     @admin.display(description=_("Order"))
     def order_link(self, obj):
-        return format_html(
-            '<a href="{url}">Order #{id}</a>',
-            url=f"/admin/order/order/{obj.order.id}/change/",
-            id=obj.order.id,
+        return change_link(
+            self.admin_site,
+            Order,
+            obj.order_id,
+            _("Order #%(id)s") % {"id": obj.order_id},
         )
 
     @display(
@@ -1629,10 +1631,11 @@ class OrderHistoryAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
 
     @admin.display(description=_("Order"))
     def order_link(self, obj):
-        return format_html(
-            '<a href="{url}">Order #{id}</a>',
-            url=f"/admin/order/order/{obj.order.id}/change/",
-            id=obj.order.id,
+        return change_link(
+            self.admin_site,
+            Order,
+            obj.order_id,
+            _("Order #%(id)s") % {"id": obj.order_id},
         )
 
     @admin.display(description=_("Description"))
@@ -1689,7 +1692,7 @@ class OrderItemHistoryAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
         "description",
         "created_at",
     ]
-    list_select_related = ["order_item", "order_item__order", "user"]
+    list_select_related = ["order_item", "user"]
 
     change_type_label = choice_label(
         "change_type",
@@ -1708,10 +1711,19 @@ class OrderItemHistoryAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
     @admin.display(description=_("Order Item"))
     def order_item_link(self, obj):
         return format_html(
-            '<a href="{url}">Item #{item_id}</a> (Order #{order_id})',
-            url=f"/admin/order/orderitem/{obj.order_item.id}/change/",
-            item_id=obj.order_item.id,
-            order_id=obj.order_item.order.id,
+            "{} ({})",
+            change_link(
+                self.admin_site,
+                OrderItem,
+                obj.order_item_id,
+                _("Item #%(id)s") % {"id": obj.order_item_id},
+            ),
+            change_link(
+                self.admin_site,
+                Order,
+                obj.order_item.order_id,
+                _("Order #%(id)s") % {"id": obj.order_item.order_id},
+            ),
         )
 
     @admin.display(description=_("Description"))
@@ -1943,10 +1955,8 @@ class InvoiceAdmin(BaseModelAdmin):
     def order_link(self, obj):
         if not obj.order_id:
             return "—"
-        return format_html(
-            '<a href="{url}">#{id}</a>',
-            url=reverse("admin:order_order_change", args=[obj.order_id]),
-            id=obj.order_id,
+        return change_link(
+            self.admin_site, Order, obj.order_id, f"#{obj.order_id}"
         )
 
     @admin.display(description=_("Total"))

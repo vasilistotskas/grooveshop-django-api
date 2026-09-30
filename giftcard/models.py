@@ -181,7 +181,9 @@ class GiftCard(TimeStampMixinModel, UUIDModel):
         ]
 
     def __str__(self):
-        return f"{self.code} ({self.balance})"
+        # The code alone: the balance is a SUM over the ledger, and a
+        # card is named in lists, filters and selects by the dozen.
+        return self.code
 
     def save(self, *args, **kwargs):
         self.code = self.code.strip().upper()
@@ -189,10 +191,17 @@ class GiftCard(TimeStampMixinModel, UUIDModel):
 
     @property
     def balance(self) -> Money:
-        """Derived: the signed sum of the ledger, floored at zero."""
-        total = self.transactions.aggregate(total=Sum("amount"))[
-            "total"
-        ] or Decimal(0)
+        """Derived: the signed sum of the ledger, floored at zero.
+
+        A list queryset annotates ``ledger_total`` (``GiftCardAdmin``) so
+        a page of cards costs no SUM per row.
+        """
+        if "ledger_total" in self.__dict__:
+            total = self.__dict__["ledger_total"] or Decimal(0)
+        else:
+            total = self.transactions.aggregate(total=Sum("amount"))[
+                "total"
+            ] or Decimal(0)
         currency = self.initial_value.currency
         return Money(max(total, Decimal(0)), currency)
 

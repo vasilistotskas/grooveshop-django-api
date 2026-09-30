@@ -2,7 +2,6 @@ import logging
 
 from django.contrib import admin, messages
 from django.urls import reverse
-from django.utils.html import conditional_escape, format_html
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import StackedInline, TabularInline
 from unfold.contrib.filters.admin import (
@@ -13,8 +12,9 @@ from unfold.decorators import action, display
 from unfold.enums import ActionVariant
 
 from admin.base import BaseModelAdmin
-from admin.displays import SHIPMENT_STATE_VARIANT, choice_label
+from admin.displays import SHIPMENT_STATE_VARIANT, change_link, choice_label
 from admin.mixins import IsSuperuserOnlyModelAdmin
+from order.models.order import Order
 from shipping_boxnow.enum.parcel_state import BoxNowParcelState
 from shipping_boxnow.models import (
     BoxNowLocker,
@@ -314,10 +314,9 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
 
     @admin.display(description=_("Order"))
     def order_link(self, obj):
-        url = reverse("admin:order_order_change", args=[obj.order_id])
-        safe_url = conditional_escape(url)
-        safe_id = conditional_escape(str(obj.order_id))
-        return format_html('<a href="{}">#{}</a>', safe_url, safe_id)
+        return change_link(
+            self.admin_site, Order, obj.order_id, f"#{obj.order_id}"
+        )
 
     # ── List (bulk) actions ─────────────────────────────────────────
 

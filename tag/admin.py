@@ -303,11 +303,23 @@ class TaggedItemAdmin(BaseModelAdmin):
     )
 
     def get_queryset(self, request):
+        from django.contrib.contenttypes.prefetch import GenericPrefetch
+
+        from product.models.product import Product
+
+        # Products are the taggable model (``TaggedModel``); their names
+        # are translations, prefetched with the tagged row itself.
         return (
             super()
             .get_queryset(request)
             .select_related("tag", "content_type")
-            .prefetch_related("tag__translations")
+            .prefetch_related(
+                "tag__translations",
+                GenericPrefetch(
+                    "content_object",
+                    [Product.objects.prefetch_related("translations")],
+                ),
+            )
         )
 
     @admin.display(description=_("Tag"), ordering="tag__translations__label")
@@ -318,11 +330,7 @@ class TaggedItemAdmin(BaseModelAdmin):
 
     @admin.display(description=_("Content Object"))
     def content_object_display(self, obj):
-        try:
-            content_object = obj.content_object
-        except Exception:
-            return "—"
-        return str(content_object) if content_object else "—"
+        return str(obj.content_object) if obj.content_object else "—"
 
     @admin.display(description=_("Content Type"), ordering="content_type")
     def content_type_display(self, obj):

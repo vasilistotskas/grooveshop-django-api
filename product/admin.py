@@ -34,6 +34,7 @@ from unfold.enums import ActionVariant
 from admin.base import BaseModelAdmin, BaseTranslatableAdmin
 from admin.displays import (
     REVIEW_STATUS_VARIANT,
+    change_link,
     choice_label,
     format_dt,
     header_two_line,
@@ -43,6 +44,7 @@ from admin.displays import (
 from admin.export import ExportActionMixin
 from core.forms.measurement import MeasurementWidget
 from core.units import WeightUnits
+from order.models.order import Order
 from product.enum.category import CategoryImageTypeEnum
 from product.enum.review import ReviewStatus
 from product.forms import ApplyDiscountForm
@@ -60,6 +62,7 @@ from product.models.review import ProductReview
 from product.models.variant_group import ProductVariantGroup
 from product.signals import reindex_products_by_pk
 from tag.admin import TaggedItemInline
+from user.models.account import UserAccount
 
 # ── Local (single-app) TextChoices/synthetic-status variant maps ──────
 # Stock status and reservation status are derived states (not backed
@@ -794,10 +797,11 @@ class StockLogInline(TabularInline):
     @admin.display(description=_("Related Order"))
     def order_link(self, obj):
         if obj.order_id:
-            return format_html(
-                '<a href="{url}">Order #{id}</a>',
-                url=reverse("admin:order_order_change", args=[obj.order_id]),
-                id=obj.order_id,
+            return change_link(
+                self.admin_site,
+                Order,
+                obj.order_id,
+                _("Order #%(id)s") % {"id": obj.order_id},
             )
         return (obj.reason or "—")[:45]
 
@@ -1964,21 +1968,15 @@ class ProductReviewAdmin(BaseTranslatableAdmin):
             return "-"
         name = obj.product.safe_translation_getter(
             "name", any_language=True
-        ) or str(obj.product.id)
-        return format_html(
-            '<a href="{url}">{name}</a>',
-            url=reverse("admin:product_product_change", args=[obj.product.id]),
-            name=name,
-        )
+        ) or str(obj.product_id)
+        return change_link(self.admin_site, Product, obj.product_id, name)
 
     @admin.display(description=_("User"))
     def user_link(self, obj):
         if not obj.user:
             return "-"
-        return format_html(
-            '<a href="{url}">{email}</a>',
-            url=reverse("admin:user_useraccount_change", args=[obj.user.id]),
-            email=obj.user.email,
+        return change_link(
+            self.admin_site, UserAccount, obj.user_id, obj.user.email
         )
 
     @admin.display(description=_("Rating"))

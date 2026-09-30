@@ -4,6 +4,7 @@ import pytest
 from django.contrib.admin.sites import AdminSite
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import RequestFactory, TestCase
+from django.utils import formats, timezone
 
 from admin.base import BaseTranslatableAdmin
 from country.admin import CountryAdmin, CountryStatusFilter
@@ -272,8 +273,12 @@ class CountryAdminTestCase(TestCase):
     def test_created_display(self):
         result = self.admin.created_display(self.country)
 
-        date_str = self.country.created_at.strftime("%d/%m/%Y")
-        self.assertIn(date_str, result)
+        self.assertIn(
+            formats.date_format(
+                timezone.localtime(self.country.created_at), "SHORT_DATE_FORMAT"
+            ),
+            result,
+        )
 
     def test_update_sort_order_action(self):
         request = self.factory.post("/admin/country/country/")

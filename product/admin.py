@@ -3,14 +3,13 @@ from decimal import Decimal
 from uuid import uuid4
 
 from django.contrib import admin, messages
-from django.contrib.admin import helpers
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.db.models import Count, F, Prefetch, Q, Sum
 from django.db.models.functions import TruncDay
-from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
-from django.urls import path, reverse, reverse_lazy
+from django.template.response import TemplateResponse
+from django.urls import path, reverse
 from django.utils import formats, timezone
 from django.utils.html import format_html, format_html_join
 from django.utils.translation import gettext_lazy as _
@@ -1283,145 +1282,68 @@ class ProductAdmin(
         permissions=["change"],
     )
     def apply_custom_discount(self, request, queryset):
-        is_action_post = "_selected_action" in request.POST
-        is_form_post = "discount_percent" in request.POST
+        """Ask for the percentage, then apply it to the selection.
 
-        if is_action_post and not is_form_post:
-            selected_ids = list(queryset.values_list("id", flat=True))
-            request.session["selected_product_ids"] = selected_ids
-
-            total_count = queryset.count()
+        A bulk action over a selection cannot open an Unfold dialog, so
+        this is Django's intermediate-page pattern (``delete_selected``):
+        the page re-posts the action and the selection, and Django hands
+        the action the queryset built from that POST. Never the session
+        — it is shared across tabs, and a selection stored there by one
+        tab was discounted from another.
+        """
+        form = ApplyDiscountForm(
+            request.POST if "discount_percent" in request.POST else None
+        )
+        if not form.is_valid():
             active_count = queryset.filter(active=True).count()
-            inactive_count = total_count - active_count
-
-            form = ApplyDiscountForm()
-
-            context = {
-                **self.admin_site.each_context(request),
-                "title": _("Apply Custom Discount"),
-                "form": form,
-                "queryset": queryset,
-                "total_count": total_count,
-                "active_count": active_count,
-                "inactive_count": inactive_count,
-                "opts": self.model._meta,
-                "has_view_permission": self.has_view_permission(request),
-                "has_change_permission": self.has_change_permission(request),
-                "breadcrumbs_items": [
-                    {"title": _("Home"), "link": "admin:index"},
-                    {
-                        "title": self.model._meta.verbose_name_plural.title(),
-                        "link": "admin:product_product_changelist",
-                    },
-                    {"title": _("Apply Custom Discount")},
-                ],
-            }
-
-            return render(request, "admin/product/apply_discount.html", context)
-
-        if is_form_post:
-            # The POSTed selection, not `request.session`. The template
-            # re-posts one `_selected_action` per product, so Django has
-            # already built the right queryset — and it was thrown away
-            # in favour of a session key that is shared across TABS.
-            # Open the action on three clearance SKUs in one tab, then
-            # on the whole catalogue in another, come back to the first
-            # and submit: the discount landed on everything. The key was
-            # also only deleted on the success path, so an abandoned run
-            # left it armed for the next one.
-            selected_ids = request.POST.getlist(helpers.ACTION_CHECKBOX_NAME)
-
-            if selected_ids:
-                queryset = Product.objects.filter(id__in=selected_ids)
-            else:
-                messages.error(
-                    request, _("No products selected. Please try again.")
-                )
-                return HttpResponseRedirect(
-                    reverse_lazy("admin:product_product_changelist")
-                )
-
-            form = ApplyDiscountForm(request.POST)
-
-            if form.is_valid():
-                discount_percent = form.cleaned_data["discount_percent"]
-                apply_to_inactive = form.cleaned_data["apply_to_inactive"]
-
-                if not apply_to_inactive:
-                    queryset = queryset.filter(active=True)
-
-                # Saved one at a time, not `queryset.update()`. A bulk
-                # UPDATE emits no `post_save`, so simple-history writes
-                # no row, `post_create_historical_record_callback` never
-                # runs, `product_price_lowered` is never sent, and NOT
-                # ONE price-drop alert reaches the customers who
-                # explicitly subscribed to it. Measured: a bulk discount
-                # fires 0 post_save receivers where an instance save
-                # fires 1. `final_price` and `discount_percent` are also
-                # indexed Meilisearch fields, so search kept the
-                # pre-discount price until an unrelated save.
-                #
-                # The cost is bounded by the operator's selection, which
-                # this action already renders on a confirmation page.
-                updated = 0
-                with transaction.atomic():
-                    for product in queryset.select_for_update():
-                        product.discount_percent = discount_percent
-                        product.save(update_fields=["discount_percent"])
-                        updated += 1
-
-                if "selected_product_ids" in request.session:
-                    del request.session["selected_product_ids"]
-
-                self.message_user(
-                    request,
-                    ngettext(
-                        "Applied %(discount)s%% discount to %(count)d product.",
-                        "Applied %(discount)s%% discount to %(count)d products.",
-                        updated,
-                    )
-                    % {"count": updated, "discount": discount_percent},
-                    messages.SUCCESS,
-                )
-
-                return HttpResponseRedirect(
-                    reverse_lazy("admin:product_product_changelist")
-                )
-            else:
-                total_count = queryset.count()
-                active_count = queryset.filter(active=True).count()
-                inactive_count = total_count - active_count
-
-                context = {
+            total_count = queryset.count()
+            return TemplateResponse(
+                request,
+                "admin/product/apply_discount.html",
+                {
                     **self.admin_site.each_context(request),
                     "title": _("Apply Custom Discount"),
+                    "opts": self.model._meta,
                     "form": form,
                     "queryset": queryset,
                     "total_count": total_count,
                     "active_count": active_count,
-                    "inactive_count": inactive_count,
-                    "opts": self.model._meta,
-                    "has_view_permission": self.has_view_permission(request),
-                    "has_change_permission": self.has_change_permission(
-                        request
-                    ),
-                    "breadcrumbs_items": [
-                        {"title": _("Home"), "link": "admin:index"},
-                        {
-                            "title": self.model._meta.verbose_name_plural.title(),
-                            "link": "admin:product_product_changelist",
-                        },
-                        {"title": _("Apply Custom Discount")},
-                    ],
-                }
+                    "inactive_count": total_count - active_count,
+                },
+            )
 
-                return render(
-                    request, "admin/product/apply_discount.html", context
-                )
+        discount_percent = form.cleaned_data["discount_percent"]
+        if not form.cleaned_data["apply_to_inactive"]:
+            queryset = queryset.filter(active=True)
 
-        return HttpResponseRedirect(
-            reverse_lazy("admin:product_product_changelist")
+        # Saved one at a time, not `queryset.update()`. A bulk UPDATE
+        # emits no `post_save`, so simple-history writes no row,
+        # `post_create_historical_record_callback` never runs,
+        # `product_price_lowered` is never sent, and NOT ONE price-drop
+        # alert reaches the customers who explicitly subscribed to it.
+        # `final_price` and `discount_percent` are also indexed
+        # Meilisearch fields, so search kept the pre-discount price until
+        # an unrelated save. The cost is bounded by the operator's
+        # selection, which the confirmation page shows.
+        updated = 0
+        with transaction.atomic():
+            for product in queryset.select_for_update():
+                product.discount_percent = discount_percent
+                product.save(update_fields=["discount_percent"])
+                updated += 1
+
+        self.message_user(
+            request,
+            ngettext(
+                "Applied %(discount)s%% discount to %(count)d product.",
+                "Applied %(discount)s%% discount to %(count)d products.",
+                updated,
+            )
+            % {"count": updated, "discount": discount_percent},
+            messages.SUCCESS,
         )
+        # None: Django returns to the changelist, filters kept.
+        return None
 
     @action(
         description=_("Clear discount from selected products"),

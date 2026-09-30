@@ -181,3 +181,27 @@ def test_clearing_a_discount_also_fires(
     assert product.pk in fired
     product.refresh_from_db()
     assert product.discount_percent == Decimal(0)
+
+
+def test_the_discount_page_renders_for_the_selection(client, operator):
+    from django.urls import reverse
+
+    chosen = _make_product(active=True)
+    _make_product(active=False)
+    client.force_login(
+        operator, backend="tenant.auth_backends.PlatformStaffBackend"
+    )
+
+    response = client.post(
+        reverse("admin:product_product_changelist"),
+        {
+            "action": "apply_custom_discount",
+            helpers.ACTION_CHECKBOX_NAME: [str(chosen.pk)],
+        },
+    )
+
+    assert response.status_code == 200
+    html = response.content.decode()
+    assert 'name="discount_percent"' in html
+    assert f'name="_selected_action" value="{chosen.pk}"' in html
+    assert response.context["total_count"] == 1

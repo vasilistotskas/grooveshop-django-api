@@ -26,7 +26,7 @@ from admin.filters import AnnotatedRangeFilter, LikesCountFilter
 from blog.models.author import BlogAuthor
 from blog.models.category import BlogCategory
 from blog.models.comment import BlogComment
-from blog.models.post import BlogPost, BlogPostTranslation
+from blog.models.post import BlogPost
 from blog.models.tag import BlogTag
 
 # ── Local (single-app) variant maps ────────────────────────────────────
@@ -93,15 +93,6 @@ class PublishStatusFilter(DropdownFilter):
                 is_published=True, published_at__gt=timezone.now()
             )
         return queryset
-
-
-class BlogPostTranslationInline(TabularInline):
-    model = BlogPostTranslation
-    extra = 0
-    fields = ("language_code", "title", "subtitle")
-    show_change_link = True
-
-    tab = True
 
 
 class BlogCommentInline(TabularInline):
@@ -413,7 +404,6 @@ class BlogPostAdmin(ExportActionMixin, BaseTranslatableAdmin):
         "unmark_as_featured",
         "publish_posts",
         "unpublish_posts",
-        "increment_view_count",
         "reset_view_count",
         "export_csv",
         "export_xml",
@@ -483,7 +473,7 @@ class BlogPostAdmin(ExportActionMixin, BaseTranslatableAdmin):
         ),
     )
 
-    inlines = [BlogPostTranslationInline, BlogCommentInline]
+    inlines = [BlogCommentInline]
 
     def get_queryset(self, request):
         return (
@@ -616,22 +606,6 @@ class BlogPostAdmin(ExportActionMixin, BaseTranslatableAdmin):
             request,
             _("%(count)d posts were successfully unpublished.")
             % {"count": updated},
-        )
-
-    @action(
-        description=_("Increment view count by 100"),
-        variant=ActionVariant.INFO,
-        icon="visibility",
-    )
-    def increment_view_count(self, request, queryset):
-        for post in queryset:
-            post.view_count += 100
-            post.save(update_fields=["view_count"])
-
-        self.message_user(
-            request,
-            _("View count increased by 100 for %(count)d posts.")
-            % {"count": queryset.count()},
         )
 
     @action(

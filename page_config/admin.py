@@ -24,7 +24,6 @@ from page_config.legal_documents import (
 )
 from page_config.models import (
     ContentPage,
-    ContentPageTranslation,
     NavigationColumn,
     NavigationLink,
     NavigationMenu,
@@ -210,15 +209,6 @@ class NavigationMenuLinkInline(NavigationLinkInline):
     verbose_name_plural = _("Links")
 
 
-class ContentPageTranslationInline(TabularInline):
-    model = ContentPageTranslation
-    extra = 0
-    fields = ("language_code", "title")
-    show_change_link = True
-
-    tab = True
-
-
 @admin.register(ContentPage)
 class ContentPageAdmin(BaseTranslatableAdmin):
     list_display = (
@@ -263,8 +253,6 @@ class ContentPageAdmin(BaseTranslatableAdmin):
             },
         ),
     )
-
-    inlines = [ContentPageTranslationInline]
 
     def get_queryset(self, request):
         return super().get_queryset(request).prefetch_related("translations")

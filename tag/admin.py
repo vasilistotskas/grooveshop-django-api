@@ -107,17 +107,6 @@ class ContentTypeFilter(DropdownFilter):
         return queryset
 
 
-class TagInLine(GenericTabularInline):
-    model = TaggedItem
-    autocomplete_fields = ["tag"]
-    extra = 0
-    fields = ("tag",)
-    verbose_name = _("Tag")
-    verbose_name_plural = _("Tags")
-    tab = True
-    collapsible = True
-
-
 @admin.register(Tag)
 class TagAdmin(BaseTranslatableAdmin):
     list_display = (
@@ -145,7 +134,6 @@ class TagAdmin(BaseTranslatableAdmin):
     actions = [
         "activate_tags",
         "deactivate_tags",
-        "analyze_usage",
     ]
 
     fieldsets = (
@@ -218,25 +206,6 @@ class TagAdmin(BaseTranslatableAdmin):
             )
             % {"count": updated},
             messages.WARNING,
-        )
-
-    @action(
-        description=_("Analyze tag usage"),
-        variant=ActionVariant.PRIMARY,
-        icon="analytics",
-    )
-    def analyze_usage(self, request, queryset):
-        total = queryset.count()
-        active = queryset.filter(active=True).count()
-        used = queryset.filter(taggeditem__isnull=False).distinct().count()
-        self.message_user(
-            request,
-            _(
-                "Analysis complete: %(total)d total tags, %(active)d "
-                "active, %(used)d in use."
-            )
-            % {"total": total, "active": active, "used": used},
-            messages.INFO,
         )
 
 

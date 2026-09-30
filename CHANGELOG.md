@@ -3,6 +3,25 @@
 
 
 
+## v3.90.1 (2026-09-30)
+
+### Bug fixes
+
+* fix(deps): bump pyjwt 2.13.0 -> 2.15.1
+
+Closes ten Dependabot advisories (one critical: the asymmetric-PEM
+detection bypass that re-opens HS/RS key confusion). PyJWT arrives only
+through django-allauth[idp-oidc], whose pyjwt[crypto]<3 range already
+admits it, so the change is lock-only. The 2.14/2.15 changelogs are
+security hardening and error-type fixes, with no API break; this repo
+calls no jwt API itself.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`bd09fda`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bd09fdae98b3c792be8ea405bf08a02aee6603e5))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.90.0 [skip ci] ([`bd1c220`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bd1c2205b0f1ecf7a32513cf76c0070dc8c6c4cb))
+
 ## v3.90.0 (2026-09-30)
 
 ### Bug fixes

@@ -21,16 +21,13 @@ purpose, including what is NOT enforced. When enforcement is automated
     {# ────────────────────────────────────────────────────────────── #}
     {# Header                                                          #}
     {# ────────────────────────────────────────────────────────────── #}
-    {% url 'admin:tenant_tenant_changelist' as tenants_url %}
     <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
         <div>
             {% component "unfold/components/title.html" %}{% trans "Plan & Billing" %}{% endcomponent %}
             {% component "unfold/components/text.html" with class="mt-1" %}{% trans "Each store's commercial terms, and how the platform records and enforces them." %}{% endcomponent %}
         </div>
         <div class="flex flex-wrap gap-2">
-            {% if tenants_url %}
-                {% component "unfold/components/button.html" with href=tenants_url icon="storefront" variant="default" %}{% trans "Tenants" %}{% endcomponent %}
-            {% endif %}
+            {% component "unfold/components/button.html" with href=tenants_url icon="storefront" variant="default" %}{% trans "Tenants" %}{% endcomponent %}
         </div>
     </div>
 
@@ -38,39 +35,9 @@ purpose, including what is NOT enforced. When enforcement is automated
     {# Billing counters                                                #}
     {# ────────────────────────────────────────────────────────────── #}
     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-
-        {% component "unfold/components/card.html" %}
-            <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-orange-50 dark:bg-orange-950 text-orange-600 dark:text-orange-300">
-                {% component "unfold/components/icon.html" %}schedule{% endcomponent %}
-            </div>
-            <div class="font-semibold mt-4 text-2xl text-important">{{ billing_trial_count }}</div>
-            {% component "unfold/components/text.html" with class="mt-1" %}{% trans "Trials" %}{% endcomponent %}
-        {% endcomponent %}
-
-        {% component "unfold/components/card.html" %}
-            <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-green-50 dark:bg-green-950 text-green-600 dark:text-green-300">
-                {% component "unfold/components/icon.html" %}check_circle{% endcomponent %}
-            </div>
-            <div class="font-semibold mt-4 text-2xl text-important">{{ billing_paid_count }}</div>
-            {% component "unfold/components/text.html" with class="mt-1" %}{% trans "Paid & current" %}{% endcomponent %}
-        {% endcomponent %}
-
-        {% component "unfold/components/card.html" %}
-            <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-orange-50 dark:bg-orange-950 text-orange-600 dark:text-orange-300">
-                {% component "unfold/components/icon.html" %}hourglass_top{% endcomponent %}
-            </div>
-            <div class="font-semibold mt-4 text-2xl text-important">{{ billing_expiring_count }}</div>
-            {% component "unfold/components/text.html" with class="mt-1" %}{% blocktranslate with days=expiry_warning_days %}Expiring within {{ days }} days{% endblocktranslate %}{% endcomponent %}
-        {% endcomponent %}
-
-        {% component "unfold/components/card.html" %}
-            <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-red-50 dark:bg-red-950 text-red-600 dark:text-red-300">
-                {% component "unfold/components/icon.html" %}event_busy{% endcomponent %}
-            </div>
-            <div class="font-semibold mt-4 text-2xl text-important">{{ billing_past_due_count }}</div>
-            {% component "unfold/components/text.html" with class="mt-1" %}{% trans "Past due / no term" %}{% endcomponent %}
-        {% endcomponent %}
-
+        {% for kpi in billing_kpis %}
+            {% include "admin/dashboard/components/kpi.html" with icon=kpi.icon tone=kpi.tone value=kpi.value label=kpi.label %}
+        {% endfor %}
     </div>
 
     {# ────────────────────────────────────────────────────────────── #}
@@ -97,10 +64,7 @@ purpose, including what is NOT enforced. When enforcement is automated
             <div class="flex flex-col gap-3 text-sm">
                 {% component "unfold/components/text.html" %}{% trans "Every store carries exactly one plan — a commercial label set by platform staff, here on the tenant's Plan & Billing section or at provisioning (tenant_create --plan). New stores start on Trial." %}{% endcomponent %}
                 <div class="flex flex-wrap gap-2">
-                    {% include "unfold/helpers/label.html" with text=_("Trial") type="warning" icon="schedule" %}
-                    {% include "unfold/helpers/label.html" with text=_("Basic") type="info" icon="storefront" %}
-                    {% include "unfold/helpers/label.html" with text=_("Pro") type="primary" icon="rocket_launch" %}
-                    {% include "unfold/helpers/label.html" with text=_("Enterprise") type="success" icon="workspace_premium" %}
+                    {% for badge in plan_badges %}{{ badge }}{% endfor %}
                 </div>
                 {% component "unfold/components/text.html" %}{% trans "A plan does not switch any feature on or off by itself: the loyalty and blog toggles are separate per-store flags, also platform-controlled. Changing a plan changes the label and nothing else." %}{% endcomponent %}
             </div>

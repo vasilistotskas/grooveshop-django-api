@@ -47,6 +47,14 @@ def plan_badge(tenant: Tenant) -> SafeString:
     return label(tenant.get_plan_display(), variant, icon)
 
 
+def plan_badges() -> list[SafeString]:
+    """Every plan's badge, in plan order."""
+    return [
+        label(TenantPlan(plan).label, variant, icon)
+        for plan, (icon, variant) in PLAN_BADGES.items()
+    ]
+
+
 def status_badge(tenant: Tenant) -> SafeString:
     """Suspended is distinct from inactive - different operations.
 

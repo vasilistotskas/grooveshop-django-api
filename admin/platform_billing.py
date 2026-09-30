@@ -113,19 +113,48 @@ class PlanBillingView(UnfoldSiteViewMixin, TemplateView):
 
         context = super().get_context_data(**kwargs)
 
+        from django.urls import reverse
+
+        from tenant.admin_labels import BILLING_BADGES, plan_badges
+
         today = timezone.localdate()
         rows = _billing_rows(today)
         states = [row["state"] for row in rows]
         conf = billing_config()
+        counters = [
+            ("trial", _("Trials"), states.count("trial")),
+            ("paid", _("Paid & current"), states.count("paid")),
+            (
+                "expiring",
+                _("Expiring within %(days)d days")
+                % {"days": conf["WARN_DAYS"]},
+                states.count("expiring"),
+            ),
+            (
+                "past_due",
+                _("Past due / no term"),
+                states.count("past_due") + states.count("unbilled"),
+            ),
+        ]
         context.update(
             {
                 "billing_rows": rows,
                 "billing_table": _billing_table(rows),
-                "billing_trial_count": states.count("trial"),
-                "billing_paid_count": states.count("paid"),
-                "billing_expiring_count": states.count("expiring"),
-                "billing_past_due_count": states.count("past_due")
-                + states.count("unbilled"),
+                # Tone and icon from the same vocabulary as the badges.
+                "billing_kpis": [
+                    {
+                        "label": text,
+                        "value": value,
+                        "tone": BILLING_BADGES[state][1],
+                        "icon": BILLING_BADGES[state][2],
+                    }
+                    for state, text, value in counters
+                ],
+                "plan_badges": plan_badges(),
+                # This page exists only on the platform site.
+                "tenants_url": reverse(
+                    f"{self.admin_site.name}:tenant_tenant_changelist"
+                ),
                 "expiry_warning_days": conf["WARN_DAYS"],
                 "billing_grace_days": conf["GRACE_DAYS"],
                 "billing_auto_suspend": conf["AUTO_SUSPEND"],

@@ -168,6 +168,26 @@ class TestPlanBillingPage(TestCase):
         assert self.store.store_name in html
 
     @override_settings(ROOT_URLCONF="tenant.urls_public")
+    def test_links_to_the_tenants_list_on_its_own_site(self):
+        """The button reversed ``admin:``, which the platform host does
+        not mount, so ``{% url ... as %}`` swallowed the error and the
+        button never rendered."""
+        response = self._view()(self._request(self.operator))
+        response.render()
+        assert 'href="/admin/tenant/tenant/"' in response.content.decode()
+
+    @override_settings(ROOT_URLCONF="tenant.urls_public")
+    def test_counters_use_the_badge_vocabulary(self):
+        from tenant.admin_labels import BILLING_BADGES
+
+        response = self._view()(self._request(self.operator))
+        kpis = response.context_data["billing_kpis"]
+        assert [(k["tone"], k["icon"]) for k in kpis] == [
+            BILLING_BADGES[state][1:]
+            for state in ("trial", "paid", "expiring", "past_due")
+        ]
+
+    @override_settings(ROOT_URLCONF="tenant.urls_public")
     def test_no_template_comment_is_emitted(self):
         response = self._view()(self._request(self.operator))
         response.render()

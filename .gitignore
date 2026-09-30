@@ -150,6 +150,8 @@ NOTES.MD
 
 # Per-user Claude agent memory (not shared)
 .claude/agent-memory/
+# Claude Code subagent worktrees (local git worktrees of this repo)
+.claude/worktrees/
 
 # Windows artifact: `cmd > NUL` in Git Bash creates a real file named NUL
 # instead of writing to the null device. Both repos have accumulated one.

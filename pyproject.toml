@@ -426,6 +426,10 @@ invalid-attribute-override = "ignore"
 [tool.ty.src]
 exclude = [
     "**/migrations/**",
+    # Claude Code subagent worktrees: a full second copy of the project
+    # nested inside it, whose duplicate package names break import
+    # resolution for the real code.
+    ".claude/worktrees/",
 ]
 
 # Tests: factory_boy, DRF test client, Celery eager tasks, Mock/patch.

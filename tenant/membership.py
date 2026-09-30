@@ -109,8 +109,19 @@ def tenant_plan_allows(flag: str) -> bool:
     return bool(getattr(tenant, flag, True))
 
 
+_NO_MEMBERSHIP = object()
+
+
 def get_membership(user: Any, tenant: Any | None = None) -> Any | None:
-    """Return the active membership for user+tenant, or None."""
+    """Return the active membership for user+tenant, or None.
+
+    Remembered on the user object, which lives for one request: the
+    admin site's ``has_permission`` runs several times per page, and the
+    permission backend and ``is_store_staff`` ask again, so one admin
+    page used to run the same SELECT four times. Keyed by tenant pk
+    because one process serves many tenants and a user may hold a
+    different role in each.
+    """
     if user is None or not getattr(user, "is_authenticated", False):
         return None
 
@@ -118,9 +129,14 @@ def get_membership(user: Any, tenant: Any | None = None) -> Any | None:
     if tenant is None:
         return None
 
+    cache_attr = f"_membership_{tenant.pk}"
+    cached = getattr(user, cache_attr, None)
+    if cached is not None:
+        return None if cached is _NO_MEMBERSHIP else cached
+
     from tenant.models import UserTenantMembership
 
-    return (
+    membership = (
         UserTenantMembership.objects.filter(
             user=user,
             tenant=tenant,
@@ -129,6 +145,12 @@ def get_membership(user: Any, tenant: Any | None = None) -> Any | None:
         .only("id", "role", "tenant_id", "user_id")
         .first()
     )
+    setattr(
+        user,
+        cache_attr,
+        _NO_MEMBERSHIP if membership is None else membership,
+    )
+    return membership
 
 
 def is_platform_superuser(user: Any) -> bool:

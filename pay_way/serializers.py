@@ -9,7 +9,6 @@ from core.api.schema import generate_schema_multi_lang
 from core.utils.serializers import TranslatedFieldExtended
 from pay_way.enum.settlement import PaySettlement
 from pay_way.models import PayWay
-from tenant.membership import is_store_staff
 
 
 @extend_schema_field(generate_schema_multi_lang(PayWay))
@@ -55,23 +54,6 @@ class PayWaySerializer(
             "updated_at",
             "uuid",
             "icon_filename",
-        )
-
-
-class PayWayDetailSerializer(PayWaySerializer):
-    configuration = serializers.JSONField(read_only=True)
-
-    def to_representation(self, instance):
-        ret = super().to_representation(instance)
-        request = self.context.get("request")
-        if not request or not is_store_staff(request.user):
-            ret.pop("configuration", None)
-        return ret
-
-    class Meta(PayWaySerializer.Meta):
-        fields = (
-            *PayWaySerializer.Meta.fields,
-            "configuration",
         )
 
 
@@ -121,6 +103,5 @@ class PayWayWriteSerializer(
             "sort_order",
             "provider_code",
             "settlement",
-            "configuration",
         )
         read_only_fields = ("sort_order",)

@@ -83,12 +83,6 @@ class PayWayFilter(
         method="filter_has_icon",
         help_text=_("Filter payment methods that have/don't have an icon"),
     )
-    has_configuration = filters.BooleanFilter(
-        method="filter_has_configuration",
-        help_text=_(
-            "Filter payment methods that have/don't have configuration"
-        ),
-    )
     shipping_provider_code = filters.CharFilter(
         method="filter_carrier_compat",
         help_text=_(
@@ -144,13 +138,6 @@ class PayWayFilter(
             return queryset.filter(
                 models.Q(icon__isnull=True) | models.Q(icon__exact="")
             )
-        return queryset
-
-    def filter_has_configuration(self, queryset, name, value):
-        if value is True:
-            return queryset.exclude(configuration__isnull=True)
-        elif value is False:
-            return queryset.filter(configuration__isnull=True)
         return queryset
 
     def filter_carrier_compat(self, queryset, name, value):

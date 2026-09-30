@@ -53,23 +53,6 @@ class PayWayTranslationFactory(factory.django.DjangoModelFactory):
         django_get_or_create = ("language_code", "master", "name")
 
 
-def generate_stripe_config():
-    return {
-        "api_key": "sk_test_" + fake.lexify(text="?" * 24),
-        "public_key": "pk_test_" + fake.lexify(text="?" * 24),
-        "webhook_secret": "whsec_" + fake.lexify(text="?" * 24),
-    }
-
-
-def generate_bank_transfer_config():
-    return {
-        "account_number": fake.numerify(text="##########"),
-        "routing_number": fake.numerify(text="#########"),
-        "bank_name": fake.company(),
-        "account_holder": fake.name(),
-    }
-
-
 def generate_provider_data():
     """Draw one coherent OFFLINE pay-way identity.
 
@@ -82,19 +65,12 @@ def generate_provider_data():
     flake depending on the random seed. Tests that want an online
     pay-way call ``create_online_payment`` and mock the credentials.
     """
-    providers = [
-        ("bank_transfer", True, generate_bank_transfer_config),
-        ("cash", False, lambda: None),
-        ("", False, lambda: None),
-    ]
+    providers = [("bank_transfer", True), ("cash", False), ("", False)]
 
-    provider_code, requires_confirmation, build_config = random.choice(
-        providers
-    )
+    provider_code, requires_confirmation = random.choice(providers)
     return {
         "provider_code": provider_code,
         "requires_confirmation": requires_confirmation,
-        "configuration": build_config(),
     }
 
 
@@ -112,11 +88,10 @@ class PayWayFactory(factory.django.DjangoModelFactory):
         width=256,
         height=256,
     )
-    # ONE draw feeds all three fields. They were three independent
-    # LazyFunction calls into generate_provider_data(), which handed out
-    # incoherent rows — a "cash" pay-way carrying a bank-transfer
-    # configuration, or an offline code marked is_online_payment=True
-    # (which then failed at checkout with "Unknown payment provider").
+    # ONE draw feeds both fields. They were independent LazyFunction
+    # calls into generate_provider_data(), which handed out incoherent
+    # rows — an offline code marked is_online_payment=True (which then
+    # failed at checkout with "Unknown payment provider").
     provider_data = factory.LazyFunction(generate_provider_data)
     provider_code = factory.LazyAttribute(
         lambda o: o.provider_data["provider_code"]
@@ -130,9 +105,6 @@ class PayWayFactory(factory.django.DjangoModelFactory):
             if o.provider_data["requires_confirmation"]
             else PaySettlement.COURIER_CASH.value
         )
-    )
-    configuration = factory.LazyAttribute(
-        lambda o: o.provider_data["configuration"]
     )
 
     class Meta:
@@ -157,13 +129,6 @@ class PayWayFactory(factory.django.DjangoModelFactory):
 
     @classmethod
     def create_online_payment(cls, provider_code="stripe", **kwargs):
-        # "stripe" is the only online code whose credential shape this
-        # factory knows; any other gets no configuration unless the
-        # caller passes one.
-        kwargs.setdefault(
-            "configuration",
-            generate_stripe_config() if provider_code == "stripe" else None,
-        )
         kwargs.setdefault("active", True)
         return cls.create(
             provider_code=provider_code,
@@ -175,12 +140,6 @@ class PayWayFactory(factory.django.DjangoModelFactory):
     def create_offline_payment(
         cls, provider_code="bank_transfer", requires_confirmation=True, **kwargs
     ):
-        kwargs.setdefault(
-            "configuration",
-            generate_bank_transfer_config()
-            if provider_code == "bank_transfer"
-            else None,
-        )
         kwargs.setdefault("active", True)
         # ``requires_confirmation`` is kept as the parameter name so the
         # existing call sites read unchanged, but it now selects a
@@ -207,7 +166,6 @@ class PayWayFactory(factory.django.DjangoModelFactory):
         and only courier-cash may ride an ACS one.
         """
         kwargs.setdefault("active", True)
-        kwargs.setdefault("configuration", None)
         return cls.create(
             provider_code=provider_code,
             settlement=PaySettlement.CARRIER_TERMINAL.value,

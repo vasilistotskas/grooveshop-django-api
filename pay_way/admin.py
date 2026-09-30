@@ -1,5 +1,4 @@
 from django.contrib import admin
-from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import TabularInline
 from unfold.contrib.filters.admin import (
@@ -88,34 +87,6 @@ class PaymentTypeFilter(DropdownFilter):
         return queryset
 
 
-class ConfigurationStatusFilter(DropdownFilter):
-    title = _("Configuration Status")
-    parameter_name = "configuration_status"
-
-    def lookups(self, request, model_admin):
-        return [
-            ("configured", _("Configured")),
-            ("not_configured", _("Not Configured")),
-            ("no_config_needed", _("No Configuration Needed")),
-        ]
-
-    def queryset(self, request, queryset):
-        # Only ONLINE settlement needs provider configuration — the
-        # other three collect money without us calling a PSP.
-        online = Q(settlement=PaySettlement.ONLINE.value)
-        if self.value() == "configured":
-            return queryset.filter(online, configuration__isnull=False).exclude(
-                configuration={}
-            )
-        elif self.value() == "not_configured":
-            return queryset.filter(online).filter(
-                Q(configuration__isnull=True) | Q(configuration={})
-            )
-        elif self.value() == "no_config_needed":
-            return queryset.exclude(online)
-        return queryset
-
-
 @admin.register(PayWay)
 class PayWayAdmin(BaseTranslatableAdmin):
     list_display = (
@@ -130,7 +101,6 @@ class PayWayAdmin(BaseTranslatableAdmin):
     list_filter = [
         "active",
         PaymentTypeFilter,
-        ConfigurationStatusFilter,
         ("cost", RangeNumericFilter),
         ("free_threshold", RangeNumericFilter),
         ("created_at", RangeDateTimeFilter),
@@ -150,18 +120,8 @@ class PayWayAdmin(BaseTranslatableAdmin):
         "id",
         "created_at",
         "updated_at",
-        "configuration",
-        "configuration_preview",
         "effective_cost_display",
-        "is_configured_status",
     ]
-
-    def get_readonly_fields(self, request, obj=None):
-        fields = list(super().get_readonly_fields(request, obj))
-        # Superusers may edit the raw configuration JSON directly.
-        if request.user.is_superuser and "configuration" in fields:
-            fields.remove("configuration")
-        return fields
 
     ordering = ["sort_order", "id"]
 
@@ -205,9 +165,6 @@ class PayWayAdmin(BaseTranslatableAdmin):
             {
                 "classes": ("tab",),
                 "fields": (
-                    "configuration",
-                    "configuration_preview",
-                    "is_configured_status",
                     "id",
                     "created_at",
                     "updated_at",
@@ -253,26 +210,11 @@ class PayWayAdmin(BaseTranslatableAdmin):
             }
         return _("No threshold")
 
-    @admin.display(description=_("Configuration Preview"))
-    def configuration_preview(self, obj):
-        if not obj.configuration:
-            return _("No configuration")
-        keys = list(obj.configuration.keys())
-        if len(keys) > 3:
-            shown = [*keys[:3], _("... and %(n)d more") % {"n": len(keys) - 3}]
-        else:
-            shown = keys
-        return _("Configuration keys: %(keys)s") % {"keys": ", ".join(shown)}
-
     @admin.display(description=_("Effective Cost"))
     def effective_cost_display(self, obj):
         if obj.cost:
             return f"{obj.effective_cost} {obj.cost.currency}"
         return "0"
-
-    @admin.display(description=_("Ready Status"))
-    def is_configured_status(self, obj):
-        return _("Ready to use") if obj.is_configured else _("Requires setup")
 
     @admin.display(description=_("Order"))
     def sort_order_display(self, obj):

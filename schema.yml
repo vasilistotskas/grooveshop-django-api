@@ -18013,18 +18013,6 @@ paths:
           - type: number
         description: Φίλτρο ανά ελάχιστο όριο δωρεάν
       - in: query
-        name: hasConfiguration
-        schema:
-          oneOf:
-          - type: string
-            enum:
-            - 'true'
-            - 'false'
-            - '1'
-            - '0'
-          - type: boolean
-        description: Φίλτρο μεθόδων πληρωμής με/χωρίς διαμόρφωση
-      - in: query
         name: hasIcon
         schema:
           oneOf:
@@ -18343,7 +18331,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PayWayDetail'
+                $ref: '#/components/schemas/PayWay'
           description: ''
   /api/v1/pay_way/{id}:
     get:
@@ -18400,7 +18388,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PayWayDetail'
+                $ref: '#/components/schemas/PayWay'
           description: ''
     put:
       operationId: updatePayWay
@@ -18473,7 +18461,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PayWayDetail'
+                $ref: '#/components/schemas/PayWay'
           description: ''
     patch:
       operationId: partialUpdatePayWay
@@ -18545,7 +18533,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PayWayDetail'
+                $ref: '#/components/schemas/PayWay'
           description: ''
     delete:
       operationId: destroyPayWay
@@ -42444,15 +42432,6 @@ components:
             * `courier_cash` - Cash or card to the courier on delivery
             * `carrier_terminal` - Paid to the carrier before pickup
             * `offline_transfer` - Settled off-platform (e.g. bank transfer)
-        configuration:
-          nullable: true
-          title: Διαμόρφωση Παρόχου
-          description: Provider-specific non-secret configuration only (display options,
-            callback URLs, feature flags). Secrets — API keys, webhook secrets, OAuth
-            client_secrets — live on the Tenant model fields (stripe_secret_key, viva_wallet_*,
-            acs_*, box_now_*, meta_capi_*) so they can be scoped per-tenant and rotated
-            independently. Keys matching common secret patterns are rejected at save
-            time.
     PatchedProductCategoryImageBulkUpdateRequest:
       type: object
       properties:
@@ -43178,130 +43157,6 @@ components:
       - translations
       - updatedAt
       - uuid
-    PayWayDetail:
-      type: object
-      description: Serializer that saves :class:`TranslatedFieldsField` automatically.
-      properties:
-        translations:
-          type: object
-          properties:
-            el:
-              type: object
-              properties:
-                name:
-                  type: string
-                description:
-                  type: string
-                instructions:
-                  type: string
-            en:
-              type: object
-              properties:
-                name:
-                  type: string
-                description:
-                  type: string
-                instructions:
-                  type: string
-            de:
-              type: object
-              properties:
-                name:
-                  type: string
-                description:
-                  type: string
-                instructions:
-                  type: string
-        id:
-          type: integer
-          readOnly: true
-        active:
-          type: boolean
-          title: Ενεργή
-        cost:
-          type: number
-          format: double
-          maximum: 1000000000
-          minimum: -1000000000
-          exclusiveMaximum: true
-          exclusiveMinimum: true
-        freeThreshold:
-          type: number
-          format: double
-          maximum: 1000000000
-          minimum: -1000000000
-          exclusiveMaximum: true
-          exclusiveMinimum: true
-        icon:
-          type: string
-          format: uri
-          nullable: true
-          title: Εικονίδιο
-        sortOrder:
-          type: integer
-          readOnly: true
-          nullable: true
-          title: Σειρά ταξινόμησης
-        mainImagePath:
-          type: string
-          readOnly: true
-        createdAt:
-          type: string
-          format: date-time
-          readOnly: true
-          title: Δημιουργήθηκε στις
-        updatedAt:
-          type: string
-          format: date-time
-          readOnly: true
-          title: Ενημερώθηκε στις
-        uuid:
-          type: string
-          format: uuid
-          readOnly: true
-        iconFilename:
-          type: string
-          readOnly: true
-        providerCode:
-          type: string
-          title: Κωδικός παρόχου
-          description: Κωδικός που χρησιμοποιείται για την αναγνώριση του παρόχου
-            πληρωμών στο σύστημα (π.χ. 'stripe', 'paypal')
-          maxLength: 50
-        settlement:
-          allOf:
-          - $ref: '#/components/schemas/SettlementEnum'
-          description: |-
-            How the money changes hands. This is the authoritative discriminator for the shipping layer: a carrier declares which settlements it can physically perform, and the voucher's payment mode derives from it. Do not re-derive it from the deprecated booleans below.
-
-            * `online` - Paid online at checkout
-            * `courier_cash` - Cash or card to the courier on delivery
-            * `carrier_terminal` - Paid to the carrier before pickup
-            * `offline_transfer` - Settled off-platform (e.g. bank transfer)
-        isOnlinePayment:
-          type: boolean
-          title: Είναι online πληρωμή
-          description: Deprecated mirror of ``settlement == ONLINE``. Dropped in the
-            release after settlement lands.
-        requiresConfirmation:
-          type: boolean
-          title: Απαιτείται Επιβεβαίωση
-          description: Deprecated mirror of ``settlement == OFFLINE_TRANSFER``. Dropped
-            in the release after settlement lands.
-        configuration:
-          readOnly: true
-      required:
-      - configuration
-      - cost
-      - createdAt
-      - freeThreshold
-      - iconFilename
-      - id
-      - mainImagePath
-      - sortOrder
-      - translations
-      - updatedAt
-      - uuid
     PayWayKeyEnum:
       enum:
       - CREDIT_CARD
@@ -43398,15 +43253,6 @@ components:
             * `courier_cash` - Cash or card to the courier on delivery
             * `carrier_terminal` - Paid to the carrier before pickup
             * `offline_transfer` - Settled off-platform (e.g. bank transfer)
-        configuration:
-          nullable: true
-          title: Διαμόρφωση Παρόχου
-          description: Provider-specific non-secret configuration only (display options,
-            callback URLs, feature flags). Secrets — API keys, webhook secrets, OAuth
-            client_secrets — live on the Tenant model fields (stripe_secret_key, viva_wallet_*,
-            acs_*, box_now_*, meta_capi_*) so they can be scoped per-tenant and rotated
-            independently. Keys matching common secret patterns are rejected at save
-            time.
       required:
       - cost
       - translations

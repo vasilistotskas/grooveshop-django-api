@@ -46,14 +46,11 @@ class PayWayFilterTest(APITestCase):
         # through: what these tests filter on is the *field*, and an
         # ungated code keeps the row visible in the shopper-facing list
         # (``is_provider_configured`` hides stripe/viva without keys).
-        # Its configuration is explicit — only "stripe" gets one from the
-        # factory — because test_configuration_filters asserts it has one.
         self.paypal_payment = PayWayFactory.create_online_payment(
             provider_code="paypal",
             active=True,
             cost=Money(Decimal("3.00"), "EUR"),
             free_threshold=Money(Decimal("75.00"), "EUR"),
-            configuration={"merchant_id": "test_merchant"},
         )
         self.paypal_payment.created_at = self.now - timedelta(days=15)
         self.paypal_payment.updated_at = self.now - timedelta(days=2)
@@ -77,7 +74,6 @@ class PayWayFilterTest(APITestCase):
             cost=Money(Decimal("0.00"), "EUR"),
             free_threshold=Money(Decimal("0.00"), "EUR"),
             settlement=PaySettlement.COURIER_CASH,
-            configuration=None,
         )
         self.cash_payment.created_at = self.now - timedelta(days=60)
         self.cash_payment.updated_at = self.now - timedelta(days=30)
@@ -220,22 +216,6 @@ class PayWayFilterTest(APITestCase):
         self.assertIn(self.cash_payment.id, result_ids)
         self.assertIn(self.high_cost_payment.id, result_ids)
         self.assertNotIn(self.bank_transfer.id, result_ids)
-
-    def test_configuration_filters(self):
-        url = reverse("payway-list")
-
-        response = self.client.get(url, {"has_configuration": "true"})
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-        self.assertIn(self.stripe_payment.id, result_ids)
-        self.assertIn(self.paypal_payment.id, result_ids)
-        self.assertIn(self.bank_transfer.id, result_ids)
-        self.assertNotIn(self.cash_payment.id, result_ids)
-
-        response = self.client.get(url, {"has_configuration": "false"})
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-        self.assertIn(self.cash_payment.id, result_ids)
 
     def test_translation_filters(self):
         url = reverse("payway-list")
@@ -428,7 +408,6 @@ class PayWayFilterTest(APITestCase):
             url,
             {
                 "active": "true",
-                "has_configuration": "true",
                 "is_online_payment": "true",
             },
         )

@@ -51,10 +51,6 @@ class PageSectionInline(TabularInline):
 
 @admin.register(PageLayout)
 class PageLayoutAdmin(BaseTranslatableAdmin):
-    compressed_fields = True
-    warn_unsaved_form = True
-    list_fullwidth = True
-
     list_display = (
         "page_type",
         "title",
@@ -118,8 +114,6 @@ class NavigationMenuAdmin(BaseModelAdmin):
     and links edited through the inlines below.
     """
 
-    compressed_fields = True
-    warn_unsaved_form = True
     list_display = ("slot", "entry_count", "updated_at")
     fields = ("slot",)
 

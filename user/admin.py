@@ -820,6 +820,7 @@ class UserSubscriptionAdmin(BaseModelAdmin):
         "subscription_dates",
         "created_at",
     ]
+    date_hierarchy = "created_at"
 
     list_filter = [
         "status",
@@ -1030,6 +1031,7 @@ class UserDataExportAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
         "expires_at",
         "created_at",
     )
+    date_hierarchy = "created_at"
     list_filter = (
         "status",
         ("created_at", RangeDateTimeFilter),

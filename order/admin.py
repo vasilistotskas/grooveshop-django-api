@@ -1465,6 +1465,7 @@ class OrderHistoryAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
         "ip_address",
         "created_at",
     ]
+    date_hierarchy = "created_at"
     list_filter = [
         "change_type",
         ("order", AutocompleteSelectFilter),
@@ -1531,6 +1532,7 @@ class OrderItemHistoryAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
         "user_display",
         "created_at",
     ]
+    date_hierarchy = "created_at"
     list_filter = [
         "change_type",
         # AutocompleteSelectFilter — lazy XHR dropdown, no pre-fetch
@@ -1881,6 +1883,7 @@ class VivaWebhookEventAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
         "status_id",
         "received_at",
     )
+    date_hierarchy = "received_at"
     list_filter = (
         "event_type_id",
         "outcome",

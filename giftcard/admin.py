@@ -290,6 +290,7 @@ class GiftCardPurchaseAdmin(BaseModelAdmin):
         "status",
         "created_at",
     )
+    date_hierarchy = "created_at"
     list_filter = (
         "status",
         ("created_at", RangeDateTimeFilter),

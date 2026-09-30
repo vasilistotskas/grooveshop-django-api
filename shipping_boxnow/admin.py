@@ -821,6 +821,7 @@ class BoxNowParcelEventAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
         "display_name",
         "received_at",
     )
+    date_hierarchy = "event_time"
     list_filter = (
         "event_type",
         "parcel_state",

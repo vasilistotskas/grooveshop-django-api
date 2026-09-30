@@ -1209,6 +1209,7 @@ class TenantArchiveAdmin(BaseModelAdmin):
         "display_retention",
         "data_exported",
     ]
+    date_hierarchy = "created_at"
     list_filter = ["data_exported", "destroyed_at"]
     search_fields = ["schema_name", "tenant_name", "destroyed_by"]
     ordering = ["-destroyed_at"]

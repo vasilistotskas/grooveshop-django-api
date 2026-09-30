@@ -1831,6 +1831,7 @@ class ProductReviewAdmin(BaseTranslatableAdmin):
         "status_label",
         "created_display",
     )
+    date_hierarchy = "created_at"
     list_filter = [
         "status",
         ("rate", SliderNumericFilter),
@@ -1851,7 +1852,6 @@ class ProductReviewAdmin(BaseTranslatableAdmin):
     list_select_related = ["product", "user"]
     autocomplete_fields = ("product", "user")
     readonly_fields = ("created_at", "updated_at", "uuid")
-    list_filter_submit = True
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
@@ -1985,6 +1985,7 @@ class ProductFavouriteAdmin(BaseModelAdmin):
         "product_display",
         "created_display",
     )
+    date_hierarchy = "created_at"
     list_filter = [
         ("created_at", RangeDateTimeFilter),
         ("user", AutocompleteSelectFilter),

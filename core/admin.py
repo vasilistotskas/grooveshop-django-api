@@ -373,6 +373,7 @@ class CachePurgeLogAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
         "total_blocked",
         "dry_run",
     )
+    date_hierarchy = "created_at"
     list_filter = ("dry_run", "schema_name", "created_at")
     search_fields = ("actor_email", "schema_name")
     readonly_fields = (

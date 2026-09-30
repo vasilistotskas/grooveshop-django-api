@@ -43,6 +43,7 @@ class PayWayShippingExclusionInline(TabularInline):
 
     model = PayWayShippingExclusion
     extra = 0
+    tab = True
     fields = (
         "shipping_provider",
         "shipping_kind",

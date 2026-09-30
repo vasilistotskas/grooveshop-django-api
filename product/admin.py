@@ -614,6 +614,7 @@ class ProductAttributeInline(TabularInline):
     autocomplete_fields = ["attribute_value"]
 
     tab = True
+    per_page = 20
     verbose_name = _("Product Attribute")
     verbose_name_plural = _("Product Attributes")
 
@@ -633,6 +634,7 @@ class ProductImageInline(TabularInline):
     fields = ("image", "is_main")
 
     tab = True
+    per_page = 20
     show_change_link = True
 
 
@@ -655,6 +657,7 @@ class StockReservationInline(TabularInline):
     readonly_fields = fields
 
     tab = True
+    per_page = 20
     verbose_name = _("Active Stock Reservation")
     verbose_name_plural = _("Active Stock Reservations")
 

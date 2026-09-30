@@ -294,3 +294,4 @@ class TaggedItemInline(GenericTabularInline):
     ct_field = "content_type"
     ct_fk_field = "object_id"
     tab = True
+    per_page = 20

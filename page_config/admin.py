@@ -36,6 +36,7 @@ from page_config.models import (
 class PageSectionInline(TabularInline):
     model = PageSection
     extra = 0
+    tab = True
     fields = (
         "component_type",
         "title",

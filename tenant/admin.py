@@ -37,6 +37,7 @@ from django.shortcuts import render
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from unfold.admin import TabularInline
 from unfold.contrib.filters.admin import ChoicesRadioFilter
 from unfold.decorators import action, display
 from unfold.enums import ActionVariant
@@ -61,9 +62,10 @@ from tenant.models import (
 )
 
 
-class TenantDomainInline(admin.TabularInline):
+class TenantDomainInline(TabularInline):
     model = TenantDomain
     extra = 1
+    tab = True
 
 
 def self_service_tenant(request):

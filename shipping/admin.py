@@ -16,6 +16,7 @@ class ShippingRateInline(TabularInline):
 
     model = ShippingRate
     extra = 0
+    tab = True
     fields = (
         "country",
         "kind",

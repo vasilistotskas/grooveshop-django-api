@@ -18,8 +18,8 @@ from django.utils.translation import ngettext
 from django_tenants.utils import get_public_schema_name
 from unfold.components import register_component
 
-from admin.dashboard.base import DashboardWidget, link_cell
-from admin.displays import format_dt, money
+from admin.dashboard.base import DashboardWidget
+from admin.displays import format_dt, link_cell, money
 from tenant.admin_labels import plan_badge, status_badge
 
 

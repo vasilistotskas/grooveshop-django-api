@@ -28,13 +28,11 @@ from admin.dashboard.base import (
     chart_json,
     color,
     doughnut_chart,
-    label_cell,
-    link_cell,
     percent,
     percent_text,
 )
 from admin.dashboard.store import queries
-from admin.displays import ORDER_STATUS_VARIANT, money
+from admin.displays import ORDER_STATUS_VARIANT, label_cell, link_cell, money
 from order.enum.status import OrderStatus
 
 REVENUE_PERIOD_LABELS = {

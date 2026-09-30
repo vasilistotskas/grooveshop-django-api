@@ -33,6 +33,7 @@ from typing import Any
 
 from django.contrib.admin import AdminSite
 from django.db.models import Model
+from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import formats, timezone
 from django.utils.html import format_html
@@ -199,6 +200,32 @@ def change_link(
         args=[pk],
     )
     return format_html('<a href="{}">{}</a>', url, text)
+
+
+# ── Table cells (Unfold's table.html escapes plain content) ─────────────
+
+
+def link_cell(href: str, text: Any) -> SafeString:
+    """A table cell holding Unfold's link component.
+
+    Unfold's ``table.html`` escapes plain cell content, so markup must
+    arrive already rendered (and ``text`` is escaped here).
+    """
+    return render_to_string(
+        "unfold/components/link.html",
+        {
+            "href": href,
+            "children": format_html("{}", text),
+            "class": "font-medium text-primary-600 dark:text-primary-500",
+        },
+    )
+
+
+def label_cell(text: Any, variant: str) -> SafeString:
+    return render_to_string(
+        "unfold/helpers/label.html",
+        {"text": text, "variant": variant, "size": "md"},
+    )
 
 
 # ── Two-line "header" helpers (for @display(header=True)) ─────────────

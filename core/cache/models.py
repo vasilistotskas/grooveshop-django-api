@@ -73,6 +73,8 @@ class CachePurgeLog(models.Model):
         verbose_name = _("Cache purge log")
         verbose_name_plural = _("Cache purge logs")
         ordering = ("-created_at",)
+        # Gates the cache management page (``MyAdminSite.clear_cache_view``).
+        permissions = [("purge_cache", _("Can purge caches"))]
         indexes = [
             models.Index(fields=["-created_at"], name="cachelog_created_idx"),
         ]

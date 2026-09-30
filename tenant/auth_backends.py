@@ -259,8 +259,11 @@ def _permissions_for_role(role: str) -> set[str]:
         # granted": a store's own row and its own team. Object scoping
         # (own tenant only) is enforced in the ModelAdmin — this only
         # makes the pages reachable. add/delete Tenant and anything on
-        # TenantDomain stay platform-only.
+        # TenantDomain stay platform-only. Purging the store's own caches
+        # (keys are tenant-prefixed) is a settings-level operation, so
+        # STAFF does not get it.
         perms |= {
+            "core.purge_cache",
             "tenant.view_tenant",
             "tenant.change_tenant",
             "tenant.view_usertenantmembership",

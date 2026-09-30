@@ -1,237 +1,129 @@
-{% extends "unfold/layouts/base.html" %}
+{% extends "admin/base_site.html" %}
+{% load i18n unfold %}
 
-{% load admin_urls i18n unfold %}
+{% block breadcrumbs %}{% endblock %}
 
-{% block breadcrumbs %}
-    <div class="px-4 lg:px-8">
-        <div class="container mb-6 mx-auto -my-3 lg:mb-12">
-            <ul class="flex flex-wrap">
-                {% url 'admin:index' as link %}
-                {% trans 'Home' as name %}
-                {% include 'unfold/helpers/breadcrumb_item.html' with link=link name=name %}
-
-                {% trans 'Cache Management' as name %}
-                {% include 'unfold/helpers/breadcrumb_item.html' with name=name %}
-            </ul>
-        </div>
-    </div>
-{% endblock %}
-
-{% block title %}{% trans "Cache Management" %}{% endblock %}
+{% block title %}{{ title }} | {{ site_title|default:_("Django site admin") }}{% endblock %}
 
 {% block content %}
-<div class="flex flex-col gap-6">
-    <div class="flex flex-col gap-2">
-        <h1 class="text-2xl font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-            {% component "unfold/components/icon.html" with class="text-primary-600 dark:text-primary-400" %}database{% endcomponent %}
-            {% trans "Cache Management" %}
-        </h1>
-        <p class="text-sm text-gray-600 dark:text-gray-400">
-            {% blocktrans %}
-            Selectively purge specific surfaces of the cache. Each surface
-            covers both the Django Redis cache and the Nuxt SSR cache so
-            invalidation always reaches the storefront.
+    <div class="flex flex-col gap-6">
+        {% component "unfold/components/text.html" %}
+            {% blocktrans trimmed %}
+                Selectively purge specific surfaces of the cache. Each surface
+                covers both the Django Redis cache and the Nuxt SSR cache so
+                invalidation always reaches the storefront.
             {% endblocktrans %}
-        </p>
+        {% endcomponent %}
+
         {% if not nuxt_configured %}
-        <div class="rounded-md bg-amber-50 dark:bg-amber-900/20 p-3 border border-amber-200 dark:border-amber-800">
-            <div class="flex gap-2 text-xs text-amber-800 dark:text-amber-200 leading-relaxed">
-                {% component "unfold/components/icon.html" with class="text-amber-500 dark:text-amber-400 flex-shrink-0 text-xl" %}info{% endcomponent %}
-                <div>
-                    {% blocktrans %}
-                    Nuxt purge endpoint is not configured. Set
-                    <code>NUXT_INTERNAL_BASE_URL</code> and
-                    <code>NUXT_CACHE_PURGE_TOKEN</code> for cross-service
-                    invalidation. Django keys are still being purged
-                    locally.
-                    {% endblocktrans %}
+            {% blocktrans trimmed asvar nuxt_warning %}
+                The Nuxt purge endpoint is not configured (NUXT_INTERNAL_BASE_URL
+                and NUXT_CACHE_PURGE_TOKEN). Django keys are still purged.
+            {% endblocktrans %}
+            {% include "unfold/helpers/messages/warning.html" with message=nuxt_warning %}
+        {% endif %}
+
+        {% trans "Purge every cache surface (excluding Heavy)?" as confirm_all %}
+        <form method="post" class="flex flex-col gap-6"
+              data-confirm-all="{{ confirm_all }}"
+              x-on:submit="if ($event.submitter?.value === 'purge_all' && !confirm($el.dataset.confirmAll)) $event.preventDefault()"
+              x-data="{
+                  count: 0,
+                  keys: 0,
+                  recount() {
+                      const boxes = [...$root.querySelectorAll('input[name=surfaces]:checked')];
+                      this.count = boxes.length;
+                      this.keys = boxes.reduce((sum, box) => sum + Number(box.closest('[data-keys]').dataset.keys), 0);
+                  },
+                  setAll(checked) {
+                      $root.querySelectorAll('input[name=surfaces]').forEach((box) => { box.checked = checked; });
+                      this.recount();
+                  },
+              }"
+              x-on:change="recount()">
+            {% csrf_token %}
+
+            {% component "unfold/components/card.html" with size="md" %}
+                <div class="flex flex-wrap gap-3 items-center">
+                    {% component "unfold/components/button.html" with variant="ghost" type="button" extra_attrs="x-on:click='setAll(true)'" %}
+                        {% trans "Select all" %}
+                    {% endcomponent %}
+                    {% component "unfold/components/button.html" with variant="ghost" type="button" extra_attrs="x-on:click='setAll(false)'" %}
+                        {% trans "Select none" %}
+                    {% endcomponent %}
+
+                    <div class="*:mb-0">
+                        {% include "unfold/helpers/field.html" with field=form.include_related %}
+                    </div>
+
+                    {% component "unfold/components/text.html" with class="ml-auto" %}
+                        {% trans "Selected:" %}
+                        <strong x-text="count">0</strong> {% trans "surfaces" %},
+                        <strong x-text="keys">0</strong> {% trans "Django keys" %}
+                    {% endcomponent %}
                 </div>
-            </div>
-        </div>
+            {% endcomponent %}
+
+            {% for group_name, surfaces in groups %}
+                <section class="flex flex-col gap-3">
+                    {% component "unfold/components/title.html" %}
+                        {{ group_name|title }}
+                    {% endcomponent %}
+
+                    <div class="gap-4 grid grid-cols-1 lg:grid-cols-3 md:grid-cols-2">
+                        {% for surface in surfaces %}
+                            <label for="{{ surface.checkbox.id_for_label }}" data-keys="{{ surface.count }}" class="cursor-pointer flex">
+                                {% component "unfold/components/card.html" with size="md" class="has-checked:border-primary-600" %}
+                                    <div class="flex gap-3 items-start">
+                                        {{ surface.checkbox.tag }}
+
+                                        {% component "unfold/components/icon.html" with class="text-primary-600 dark:text-primary-500" %}{{ surface.icon }}{% endcomponent %}
+
+                                        <div class="flex flex-col gap-1 min-w-0">
+                                            <div class="flex gap-2 items-center">
+                                                <strong class="text-important truncate">{{ surface.label }}</strong>
+                                                {% if surface.danger %}
+                                                    {% trans "Heavy" as heavy %}
+                                                    {% include "unfold/helpers/label.html" with text=heavy variant="danger" %}
+                                                {% endif %}
+                                            </div>
+                                            {% component "unfold/components/text.html" %}{{ surface.description }}{% endcomponent %}
+                                        </div>
+                                    </div>
+
+                                    <div class="border-base-200 border-t flex justify-between mt-3 pt-2 dark:border-base-800">
+                                        {% component "unfold/components/text.html" %}
+                                            <strong class="text-important">{{ surface.count }}</strong> {% trans "Django keys" %}
+                                        {% endcomponent %}
+                                        {% if surface.related %}
+                                            {% component "unfold/components/text.html" %}→ {{ surface.related|join:", " }}{% endcomponent %}
+                                        {% endif %}
+                                    </div>
+                                {% endcomponent %}
+                            </label>
+                        {% endfor %}
+                    </div>
+                </section>
+            {% endfor %}
+
+            {% component "unfold/components/card.html" with size="md" class="bottom-2 sticky" %}
+                <div class="flex flex-wrap gap-3 justify-end">
+                    {% component "unfold/components/button.html" with name="action" value="dry_run" submit=1 variant="default" icon="preview" %}
+                        {% trans "Dry run" %}
+                    {% endcomponent %}
+                    {% component "unfold/components/button.html" with name="action" value="purge" submit=1 icon="delete_sweep" %}
+                        {% trans "Purge selected" %}
+                    {% endcomponent %}
+                    {% component "unfold/components/button.html" with name="action" value="purge_all" submit=1 variant="danger" icon="cleaning_services" %}
+                        {% trans "Purge all" %}
+                    {% endcomponent %}
+                </div>
+            {% endcomponent %}
+        </form>
+
+        {% if recent_logs.rows %}
+            {% trans "Recent activity" as recent_title %}
+            {% component "unfold/components/table.html" with table=recent_logs title=recent_title %}{% endcomponent %}
         {% endif %}
     </div>
-
-    <form method="post" id="cache-purge-form" class="flex flex-col gap-6">
-        {% csrf_token %}
-
-        <div class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm p-4 flex flex-wrap items-center gap-3">
-            <button type="button" id="select-all" class="text-sm font-medium text-primary-600 dark:text-primary-400 hover:underline">
-                {% trans "Select all" %}
-            </button>
-            <button type="button" id="select-none" class="text-sm font-medium text-gray-600 dark:text-gray-400 hover:underline">
-                {% trans "Select none" %}
-            </button>
-            <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 ml-auto">
-                <input type="checkbox" name="include_related" id="include-related" checked
-                    class="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500" />
-                <span>{% trans "Include related surfaces" %}</span>
-            </label>
-            <span class="text-sm text-gray-500 dark:text-gray-400 hidden md:inline">|</span>
-            <span class="text-sm text-gray-700 dark:text-gray-300">
-                {% trans "Selected:" %}
-                <strong id="selected-count" class="text-gray-900 dark:text-white">0</strong>
-                {% trans "surfaces" %} —
-                <strong id="selected-keys" class="text-gray-900 dark:text-white">0</strong>
-                {% trans "Django keys" %}
-            </span>
-        </div>
-
-        {% for group_name, surfaces in groups %}
-        <section class="flex flex-col gap-3">
-            <h2 class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                {{ group_name|title }}
-            </h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {% for surface in surfaces %}
-                <label class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm p-4 flex flex-col gap-3 cursor-pointer hover:border-primary-400 dark:hover:border-primary-500 transition has-checked:border-primary-500 dark:has-checked:border-primary-400 has-checked:ring-1 has-checked:ring-primary-500">
-                    <div class="flex items-start gap-3">
-                        <input
-                            type="checkbox"
-                            name="surfaces"
-                            value="{{ surface.code }}"
-                            data-count="{{ surface.count }}"
-                            class="surface-checkbox mt-1 rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500" />
-                        <div class="flex items-center justify-center w-10 h-10 rounded-lg
-                            {% if surface.danger %}bg-red-50 dark:bg-red-900/30{% else %}bg-blue-50 dark:bg-blue-900/30{% endif %}">
-                            {% component "unfold/components/icon.html" with class="text-blue-600 dark:text-blue-400" %}
-                            {{ surface.icon }}
-                            {% endcomponent %}
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <div class="flex items-center gap-2">
-                                <h3 class="text-sm font-semibold text-gray-900 dark:text-white truncate">
-                                    {{ surface.label }}
-                                </h3>
-                                {% if surface.danger %}
-                                <span class="inline-flex items-center rounded-full bg-red-50 dark:bg-red-900/20 px-1.5 py-0.5 text-[10px] font-medium text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800">
-                                    {% trans "Heavy" %}
-                                </span>
-                                {% endif %}
-                            </div>
-                            <p class="text-xs text-gray-600 dark:text-gray-400 mt-1 leading-relaxed">
-                                {{ surface.description }}
-                            </p>
-                        </div>
-                    </div>
-                    <div class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 border-t border-gray-100 dark:border-gray-800 pt-2">
-                        <span>
-                            <strong class="text-gray-900 dark:text-white">{{ surface.count }}</strong>
-                            {% trans "Django keys" %}
-                        </span>
-                        {% if surface.related %}
-                        <span class="text-[11px]">
-                            {% trans "→" %} {{ surface.related|join:", " }}
-                        </span>
-                        {% endif %}
-                    </div>
-                </label>
-                {% endfor %}
-            </div>
-        </section>
-        {% endfor %}
-
-        <div class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm p-4 flex flex-wrap gap-3 items-center justify-end sticky bottom-2">
-            {% component "unfold/components/button.html" with name="action" value="dry_run" submit=1 variant="default" %}
-                {% component "unfold/components/icon.html" with class="mr-1" %}preview{% endcomponent %}
-                {% trans "Dry run" %}
-            {% endcomponent %}
-            {% component "unfold/components/button.html" with name="action" value="purge" submit=1 variant="primary" %}
-                {% component "unfold/components/icon.html" with class="mr-1" %}delete_sweep{% endcomponent %}
-                {% trans "Purge selected" %}
-            {% endcomponent %}
-            {% trans "Purge every cache surface (excluding Heavy)?" as confirm_all_msg %}
-            <button type="submit" name="action" value="purge_all"
-                data-confirm-message="{{ confirm_all_msg }}"
-                class="inline-flex items-center justify-center rounded-md border border-transparent bg-red-600 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 dark:bg-red-700 dark:hover:bg-red-600 dark:focus:ring-offset-gray-900">
-                {% component "unfold/components/icon.html" with class="mr-1" %}cleaning_services{% endcomponent %}
-                {% trans "Purge all" %}
-            </button>
-        </div>
-    </form>
-
-    {% if recent_logs %}
-    <section class="flex flex-col gap-3">
-        <h2 class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-            {% trans "Recent activity" %}
-        </h2>
-        <div class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
-            <table class="w-full text-sm">
-                <thead class="bg-gray-50 dark:bg-gray-800 text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                    <tr>
-                        <th class="text-left px-4 py-2">{% trans "When" %}</th>
-                        <th class="text-left px-4 py-2">{% trans "Actor" %}</th>
-                        <th class="text-left px-4 py-2">{% trans "Surfaces" %}</th>
-                        <th class="text-right px-4 py-2">{% trans "Django" %}</th>
-                        <th class="text-right px-4 py-2">{% trans "Nuxt" %}</th>
-                        <th class="text-right px-4 py-2">{% trans "Blocked" %}</th>
-                        <th class="text-right px-4 py-2">{% trans "Mode" %}</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-                    {% for log in recent_logs %}
-                    <tr>
-                        <td class="px-4 py-2 text-gray-700 dark:text-gray-300 whitespace-nowrap">{{ log.created_at|date:"Y-m-d H:i:s" }}</td>
-                        {# actor_email, never the FK: this table lives only in the public schema, so resolving `actor` from a tenant host names whoever shares that id there. #}
-                        <td class="px-4 py-2 text-gray-700 dark:text-gray-300">{{ log.actor_email|default:"—" }}</td>
-                        <td class="px-4 py-2 text-gray-700 dark:text-gray-300">{{ log.surfaces|join:", " }}</td>
-                        <td class="px-4 py-2 text-right text-gray-900 dark:text-white">{{ log.total_django }}</td>
-                        <td class="px-4 py-2 text-right text-gray-900 dark:text-white">{{ log.total_nuxt }}</td>
-                        <td class="px-4 py-2 text-right text-gray-500 dark:text-gray-400">{{ log.total_blocked }}</td>
-                        <td class="px-4 py-2 text-right">
-                            {% if log.dry_run %}
-                            <span class="inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-800 px-2 py-0.5 text-xs font-medium text-gray-700 dark:text-gray-300">{% trans "Dry run" %}</span>
-                            {% else %}
-                            <span class="inline-flex items-center rounded-full bg-green-50 dark:bg-green-900/20 px-2 py-0.5 text-xs font-medium text-green-700 dark:text-green-300">{% trans "Live" %}</span>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </section>
-    {% endif %}
-</div>
-
-<script>
-(function () {
-    const form = document.getElementById('cache-purge-form');
-    if (!form) return;
-
-    const checkboxes = form.querySelectorAll('.surface-checkbox');
-    const selectedCount = document.getElementById('selected-count');
-    const selectedKeys = document.getElementById('selected-keys');
-
-    function recompute() {
-        let n = 0, k = 0;
-        for (const cb of checkboxes) {
-            if (cb.checked) {
-                n += 1;
-                k += parseInt(cb.dataset.count || '0', 10);
-            }
-        }
-        selectedCount.textContent = n;
-        selectedKeys.textContent = k;
-    }
-
-    document.getElementById('select-all').addEventListener('click', () => {
-        checkboxes.forEach((cb) => { cb.checked = true; });
-        recompute();
-    });
-    document.getElementById('select-none').addEventListener('click', () => {
-        checkboxes.forEach((cb) => { cb.checked = false; });
-        recompute();
-    });
-    checkboxes.forEach((cb) => cb.addEventListener('change', recompute));
-    recompute();
-
-    form.querySelectorAll('[data-confirm-message]').forEach((btn) => {
-        btn.addEventListener('click', (event) => {
-            if (!window.confirm(btn.dataset.confirmMessage)) {
-                event.preventDefault();
-            }
-        });
-    });
-})();
-</script>
 {% endblock %}

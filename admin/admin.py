@@ -3,19 +3,61 @@ from __future__ import annotations
 import logging
 
 from django.contrib import messages
-from django.http import JsonResponse
+from django.core.exceptions import PermissionDenied
 from django.shortcuts import redirect, render
 from django.urls import path
 from django.utils.translation import gettext_lazy as _
 from unfold.sites import UnfoldAdminSite
 
-from admin.forms import PlatformAdminAuthenticationForm
+from admin.displays import format_dt, label_cell
+from admin.forms import CachePurgeForm, PlatformAdminAuthenticationForm
 from admin.mixins import AdminSiteLoginNextMixin
 from core.cache import CacheService
 from core.cache.nuxt import is_configured as nuxt_purge_configured
 from core.cache.registry import iter_surfaces
 
 logger = logging.getLogger(__name__)
+
+
+def _require_purge_permission(request) -> None:
+    """The cache pages are behind ``core.purge_cache`` (store ADMIN and
+    OWNER, and platform superusers), not merely the admin login."""
+    if not request.user.has_perm("core.purge_cache"):
+        raise PermissionDenied
+
+
+def _purge_log_table(logs) -> dict:
+    """Unfold's table component for the recent purges.
+
+    ``actor_email``, never the ``actor`` FK: the log lives only in the
+    public schema, so resolving the FK from a tenant host names whoever
+    shares that id there.
+    """
+    return {
+        "headers": [
+            _("When"),
+            _("Actor"),
+            _("Surfaces"),
+            _("Django"),
+            _("Nuxt"),
+            _("Blocked"),
+            _("Mode"),
+        ],
+        "rows": [
+            [
+                format_dt(log.created_at),
+                log.actor_email or "—",
+                ", ".join(log.surfaces or []),
+                log.total_django,
+                log.total_nuxt,
+                log.total_blocked,
+                label_cell(_("Dry run"), "info")
+                if log.dry_run
+                else label_cell(_("Live"), "success"),
+            ]
+            for log in logs
+        ],
+    }
 
 
 class MyAdminSite(AdminSiteLoginNextMixin, UnfoldAdminSite):
@@ -122,15 +164,11 @@ class MyAdminSite(AdminSiteLoginNextMixin, UnfoldAdminSite):
                 self.admin_view(self.clear_cache_view),
                 name="clear-cache",
             ),
-            path(
-                "clear-cache/preview/",
-                self.admin_view(self.cache_preview_view),
-                name="cache-preview",
-            ),
         ]
         return custom_urls + urls
 
     def clear_cache_view(self, request):
+        _require_purge_permission(request)
         if request.method == "POST":
             return self._handle_purge(request)
 
@@ -156,10 +194,15 @@ class MyAdminSite(AdminSiteLoginNextMixin, UnfoldAdminSite):
                 ),
             )
             counts = {}
+        form = CachePurgeForm(surfaces=surfaces)
+        checkboxes = {
+            option.data["value"]: option for option in form["surfaces"]
+        }
         groups: dict[str, list] = {}
         for surface in surfaces:
             groups.setdefault(surface.group, []).append(
                 {
+                    "checkbox": checkboxes[surface.code],
                     "code": surface.code,
                     "label": surface.label,
                     "description": surface.description,
@@ -182,37 +225,22 @@ class MyAdminSite(AdminSiteLoginNextMixin, UnfoldAdminSite):
         recent_logs = CachePurgeLog.objects.visible_here()[:20]
         context = {
             **self.each_context(request),
+            "form": form,
             "groups": sorted(groups.items()),
-            "recent_logs": recent_logs,
+            "recent_logs": _purge_log_table(recent_logs),
             "nuxt_configured": nuxt_purge_configured(),
             "title": _("Cache Management"),
         }
         return render(request, "admin/clear_cache.html", context)
 
-    def cache_preview_view(self, request):
-        """Return live counts for a comma-separated list of surface codes."""
-
-        codes = [c for c in request.GET.get("codes", "").split(",") if c]
-        try:
-            counts = CacheService.count(codes)
-        except Exception:
-            # Same reasoning as clear_cache_view: the detail goes to the
-            # log, and the response says only that it is unavailable.
-            logger.exception("Cache preview counts unavailable")
-            return JsonResponse(
-                {
-                    "error": "cache_unavailable",
-                    "counts": {},
-                    "total": None,
-                },
-                status=503,
-            )
-        return JsonResponse({"counts": counts, "total": sum(counts.values())})
-
     def _handle_purge(self, request):
-        codes = request.POST.getlist("surfaces")
+        form = CachePurgeForm(request.POST, surfaces=iter_surfaces())
+        if not form.is_valid():
+            messages.error(request, _("Unknown cache surface."))
+            return redirect("admin:clear-cache")
+        codes = form.cleaned_data["surfaces"]
+        include_related = form.cleaned_data["include_related"]
         action = request.POST.get("action", "purge")
-        include_related = request.POST.get("include_related") == "on"
         dry_run = action == "dry_run"
 
         if action == "purge_all":

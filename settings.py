@@ -2858,7 +2858,7 @@ ROSETTA_ACCESS_CONTROL_FUNCTION = (
 # local checkout renders no link at all rather than one to a site that
 # may not carry this build's pages yet; production sets the platform
 # docs host in backend-config.
-_ADMIN_DOCS_LINKS = [
+ADMIN_DOCS_LINKS = [
     {
         "icon": "help",
         "title": _("Help & Guides"),
@@ -2869,6 +2869,42 @@ _ADMIN_DOCS_LINKS = [
     if url
 ]
 
+# Platform ops consoles, listed in the store admin's site menu for
+# platform superusers only, and only when the URL is configured. In dev,
+# set ADMIN_FLOWER_URL=http://localhost:5556 etc. in `.env`; production
+# usually does not expose these surfaces at all.
+ADMIN_OPS_LINKS = [
+    {
+        "icon": entry["icon"],
+        "title": entry["title"],
+        "link": entry["link"],
+        "attrs": {"target": "_blank", "rel": "noopener"},
+    }
+    for entry in [
+        {
+            "icon": "monitoring",
+            "title": _("Flower (Celery)"),
+            "link": getenv("ADMIN_FLOWER_URL", "").strip(),
+        },
+        {
+            "icon": "mark_email_unread",
+            "title": _("Mailpit"),
+            "link": getenv("ADMIN_MAILPIT_URL", "").strip(),
+        },
+        {
+            "icon": "search",
+            "title": _("Meilisearch"),
+            "link": getenv("ADMIN_MEILISEARCH_URL", "").strip(),
+        },
+        {
+            "icon": "router",
+            "title": _("RabbitMQ"),
+            "link": getenv("ADMIN_RABBITMQ_URL", "").strip(),
+        },
+    ]
+    if entry["link"]
+]
+
 UNFOLD_PLATFORM = {
     "SITE_TITLE": _("Platform Admin"),
     "SITE_HEADER": "GrooveShop Platform",
@@ -2876,7 +2912,7 @@ UNFOLD_PLATFORM = {
     "SITE_SYMBOL": "hub",
     "SHOW_HISTORY": True,
     "SHOW_VIEW_ON_SITE": False,
-    "SITE_DROPDOWN": [*_ADMIN_DOCS_LINKS],
+    "SITE_DROPDOWN": [*ADMIN_DOCS_LINKS],
     "ENVIRONMENT": "admin.permissions.platform_environment",
     # ⌘K command palette. Without this block the palette falls back to
     # unfold's defaults (``search_models: False``) and only matches
@@ -3993,75 +4029,9 @@ UNFOLD = {
             ],
         },
     ],
-    "SITE_DROPDOWN": [
-        {
-            "icon": "translate",
-            "title": _("Rosetta"),
-            "link": reverse_lazy(
-                "rosetta-file-list-redirect", urlconf=ROOT_URLCONF
-            ),
-        },
-        {
-            "icon": "cached",
-            "title": _("Cache"),
-            "link": reverse_lazy("admin:clear-cache", urlconf=ROOT_URLCONF),
-        },
-        {
-            "icon": "email",
-            "title": _("Email Templates"),
-            "link": reverse_lazy(
-                "email_templates:management", urlconf=ROOT_URLCONF
-            ),
-        },
-        # API Swagger always works — same Django process serves both
-        # the admin and the schema, so reverse_lazy gives the right
-        # URL in dev and prod regardless of host. The route name is
-        # `swagger-ui` and matches `/api/v1/schema/swagger-ui` (no
-        # trailing slash); using reverse_lazy avoids hard-coding it.
-        {
-            "icon": "schema",
-            "title": _("API Swagger"),
-            "link": reverse_lazy("swagger-ui", urlconf=ROOT_URLCONF),
-            "attrs": {"target": "_blank", "rel": "noopener"},
-        },
-        # Ops links — only render when the env var is explicitly set.
-        # In dev, set ADMIN_FLOWER_URL=http://localhost:5556 etc. in
-        # `.env`. In production these surfaces are usually NOT exposed
-        # publicly, so the default is to hide the link entirely
-        # rather than show a broken localhost shortcut.
-        *[
-            {
-                "icon": entry["icon"],
-                "title": entry["title"],
-                "link": entry["link"],
-                "attrs": {"target": "_blank", "rel": "noopener"},
-            }
-            for entry in [
-                *_ADMIN_DOCS_LINKS,
-                {
-                    "icon": "monitoring",
-                    "title": _("Flower (Celery)"),
-                    "link": getenv("ADMIN_FLOWER_URL", "").strip(),
-                },
-                {
-                    "icon": "mark_email_unread",
-                    "title": _("Mailpit"),
-                    "link": getenv("ADMIN_MAILPIT_URL", "").strip(),
-                },
-                {
-                    "icon": "search",
-                    "title": _("Meilisearch"),
-                    "link": getenv("ADMIN_MEILISEARCH_URL", "").strip(),
-                },
-                {
-                    "icon": "router",
-                    "title": _("RabbitMQ"),
-                    "link": getenv("ADMIN_RABBITMQ_URL", "").strip(),
-                },
-            ]
-            if entry["link"]
-        ],
-    ],
+    # Built per request: each tool is listed only for whoever can open
+    # it (admin/navigation.py).
+    "SITE_DROPDOWN": "admin.navigation.store_site_dropdown",
 }
 
 SESSION_CACHE_ALIAS = "default"

@@ -1,4 +1,4 @@
-from django.contrib import admin, messages
+from django.contrib import admin
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from unfold.contrib.filters.admin import (
@@ -6,8 +6,7 @@ from unfold.contrib.filters.admin import (
     RangeDateTimeFilter,
     RangeNumericFilter,
 )
-from unfold.decorators import action, display
-from unfold.enums import ActionVariant
+from unfold.decorators import display
 
 from admin.base import BaseTranslatableAdmin
 from admin.displays import format_dt, header_two_line
@@ -82,9 +81,6 @@ class CountryAdmin(BaseTranslatableAdmin):
     list_per_page = 50
     ordering = ["sort_order", "alpha_2"]
     inlines = [RegionInline]
-    actions = [
-        "update_sort_order",
-    ]
 
     fieldsets = (
         (
@@ -184,21 +180,3 @@ class CountryAdmin(BaseTranslatableAdmin):
     @display(description=_("Created"), ordering="created_at")
     def created_display(self, obj):
         return format_dt(obj.created_at)
-
-    @action(
-        description=str(_("Update sort order")),
-        variant=ActionVariant.INFO,
-        icon="sort",
-    )
-    def update_sort_order(self, request, queryset):
-        countries = list(queryset.order_by("alpha_2"))
-        for index, country in enumerate(countries):
-            country.sort_order = index
-            country.save(update_fields=["sort_order"])
-
-        count = len(countries)
-        self.message_user(
-            request,
-            _("Updated sort order for %(count)d countries.") % {"count": count},
-            messages.SUCCESS,
-        )

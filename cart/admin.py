@@ -461,7 +461,7 @@ class CartItemAdmin(BaseModelAdmin):
         return _("No discounts applied")
 
     @action(
-        description=str(_("Increase quantity by 1")),
+        description=_("Increase quantity by 1"),
         variant=ActionVariant.PRIMARY,
         icon="add",
     )
@@ -475,7 +475,7 @@ class CartItemAdmin(BaseModelAdmin):
         )
 
     @action(
-        description=str(_("Decrease quantity by 1")),
+        description=_("Decrease quantity by 1"),
         variant=ActionVariant.WARNING,
         icon="remove",
     )
@@ -492,7 +492,7 @@ class CartItemAdmin(BaseModelAdmin):
         )
 
     @action(
-        description=str(_("Remove from cart")),
+        description=_("Remove from cart"),
         variant=ActionVariant.DANGER,
         icon="delete",
     )

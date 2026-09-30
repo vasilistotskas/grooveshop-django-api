@@ -97,7 +97,7 @@ class TestRowActionsReturnAResponse:
             patch("shipping_acs.tasks.reconcile_acs_cod_payouts.delay") as task,
             patch("django.contrib.messages.info"),
         ):
-            response = admin.run_reconciliation(_request(), 1)
+            response = admin.run_reconciliation(_request())
 
         task.assert_called_once_with()
         assert response.status_code == 302

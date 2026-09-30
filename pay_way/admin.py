@@ -167,9 +167,6 @@ class PayWayAdmin(BaseTranslatableAdmin):
     actions = [
         "activate_payment_methods",
         "deactivate_payment_methods",
-        "move_up_in_order",
-        "move_down_in_order",
-        "reset_sort_order",
     ]
 
     inlines = [PayWayShippingExclusionInline]
@@ -289,7 +286,7 @@ class PayWayAdmin(BaseTranslatableAdmin):
         return "-"
 
     @action(
-        description=str(_("Activate selected payment methods")),
+        description=_("Activate selected payment methods"),
         variant=ActionVariant.SUCCESS,
         icon="check_circle",
     )
@@ -302,7 +299,7 @@ class PayWayAdmin(BaseTranslatableAdmin):
         )
 
     @action(
-        description=str(_("Deactivate selected payment methods")),
+        description=_("Deactivate selected payment methods"),
         variant=ActionVariant.WARNING,
         icon="cancel",
     )
@@ -331,51 +328,3 @@ class PayWayAdmin(BaseTranslatableAdmin):
             pay_way.save(update_fields=["active"])
             changed += 1
         return changed
-
-    @action(
-        description=str(_("Move selected items up in sort order")),
-        variant=ActionVariant.INFO,
-        icon="keyboard_arrow_up",
-    )
-    def move_up_in_order(self, request, queryset):
-        moved_count = 0
-        for obj in queryset.order_by("sort_order"):
-            if obj.sort_order and obj.sort_order > 0:
-                obj.move_up()
-                moved_count += 1
-        self.message_user(
-            request,
-            _("%(count)d payment methods moved up in sort order.")
-            % {"count": moved_count},
-        )
-
-    @action(
-        description=str(_("Move selected items down in sort order")),
-        variant=ActionVariant.INFO,
-        icon="keyboard_arrow_down",
-    )
-    def move_down_in_order(self, request, queryset):
-        moved_count = 0
-        for obj in queryset.order_by("-sort_order"):
-            obj.move_down()
-            moved_count += 1
-        self.message_user(
-            request,
-            _("%(count)d payment methods moved down in sort order.")
-            % {"count": moved_count},
-        )
-
-    @action(
-        description=str(_("Reset sort order to default")),
-        variant=ActionVariant.INFO,
-        icon="sort",
-    )
-    def reset_sort_order(self, request, queryset):
-        for index, obj in enumerate(queryset.order_by("id"), start=1):
-            obj.sort_order = index * 10
-            obj.save(update_fields=["sort_order"])
-        self.message_user(
-            request,
-            _("Sort order has been reset for %(count)d payment methods.")
-            % {"count": queryset.count()},
-        )

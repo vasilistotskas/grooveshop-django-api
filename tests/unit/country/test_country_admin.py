@@ -1,4 +1,4 @@
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 import pytest
 from django.contrib.admin.sites import AdminSite
@@ -278,36 +278,6 @@ class CountryAdminTestCase(TestCase):
             ),
             result,
         )
-
-    def test_update_sort_order_action(self):
-        request = self.factory.post("/admin/country/country/")
-        request.user = Mock()
-        request._messages = Mock()
-
-        Country.objects.get_or_create(
-            alpha_2="AA", defaults={"alpha_3": "AAA", "iso_cc": 1}
-        )
-        # "BB" is Barbados — real and seeded now, but this action only
-        # cares that SOME two extra rows exist for the bulk re-sort.
-        Country.objects.get_or_create(
-            alpha_2="BB", defaults={"alpha_3": "BBB", "iso_cc": 2}
-        )
-
-        queryset = Country.objects.all()
-
-        with patch.object(self.admin, "message_user") as mock_message:
-            self.admin.update_sort_order(request, queryset)
-
-            mock_message.assert_called_once()
-            args = mock_message.call_args[0]
-            self.assertEqual(args[0], request)
-            self.assertIn("Updated sort order", args[1])
-
-        countries = list(Country.objects.order_by("sort_order"))
-        self.assertIsNotNone(countries[0].sort_order)
-        self.assertIsNotNone(countries[1].sort_order)
-        alpha_2_values = [c.alpha_2 for c in countries]
-        self.assertEqual(alpha_2_values, sorted(alpha_2_values))
 
 
 class CountryAdminIntegrationTestCase(TestCase):

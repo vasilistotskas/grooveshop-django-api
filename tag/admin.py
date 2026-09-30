@@ -145,7 +145,6 @@ class TagAdmin(BaseTranslatableAdmin):
     actions = [
         "activate_tags",
         "deactivate_tags",
-        "update_sort_order",
         "analyze_usage",
     ]
 
@@ -186,7 +185,7 @@ class TagAdmin(BaseTranslatableAdmin):
         return format_dt(obj.created_at)
 
     @action(
-        description=str(_("Activate selected tags")),
+        description=_("Activate selected tags"),
         variant=ActionVariant.SUCCESS,
         icon="check_circle",
     )
@@ -204,7 +203,7 @@ class TagAdmin(BaseTranslatableAdmin):
         )
 
     @action(
-        description=str(_("Deactivate selected tags")),
+        description=_("Deactivate selected tags"),
         variant=ActionVariant.WARNING,
         icon="cancel",
     )
@@ -222,27 +221,7 @@ class TagAdmin(BaseTranslatableAdmin):
         )
 
     @action(
-        description=str(_("Update sort order")),
-        variant=ActionVariant.INFO,
-        icon="sort",
-    )
-    def update_sort_order(self, request, queryset):
-        ordered = queryset.annotate(
-            usage_count=models.Count("taggeditem")
-        ).order_by("-usage_count", "translations__label")
-        updated = 0
-        for idx, tag in enumerate(ordered):
-            tag.sort_order = idx
-            tag.save(update_fields=["sort_order"])
-            updated += 1
-        self.message_user(
-            request,
-            _("Updated sort order for %(count)d tags.") % {"count": updated},
-            messages.SUCCESS,
-        )
-
-    @action(
-        description=str(_("Analyze tag usage")),
+        description=_("Analyze tag usage"),
         variant=ActionVariant.PRIMARY,
         icon="analytics",
     )

@@ -220,18 +220,6 @@ class TestTagAdmin:
         mock_message_user.assert_called_once()
 
     @patch.object(TagAdmin, "message_user")
-    def test_update_sort_order_action(
-        self, mock_message_user, tag_admin, admin_request
-    ):
-        tag1 = TagFactory()
-        tag2 = TagFactory()
-        queryset = Tag.objects.filter(id__in=[tag1.id, tag2.id])
-
-        tag_admin.update_sort_order(admin_request, queryset)
-
-        mock_message_user.assert_called_once()
-
-    @patch.object(TagAdmin, "message_user")
     def test_analyze_usage_action(
         self, mock_message_user, tag_admin, admin_request
     ):

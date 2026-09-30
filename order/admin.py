@@ -775,7 +775,7 @@ class OrderAdmin(BaseModelAdmin):
         return f"{format_dt(obj.created_at)} ({relative_time(obj.created_at)})"
 
     @action(
-        description=str(_("Mark selected orders as processing")),
+        description=_("Mark selected orders as processing"),
         variant=ActionVariant.PRIMARY,
         icon="play_arrow",
     )
@@ -788,7 +788,7 @@ class OrderAdmin(BaseModelAdmin):
         )
 
     @action(
-        description=str(_("Mark selected orders as shipped")),
+        description=_("Mark selected orders as shipped"),
         variant=ActionVariant.INFO,
         icon="local_shipping",
     )
@@ -801,7 +801,7 @@ class OrderAdmin(BaseModelAdmin):
         )
 
     @action(
-        description=str(_("Mark selected orders as delivered")),
+        description=_("Mark selected orders as delivered"),
         variant=ActionVariant.SUCCESS,
         icon="check_circle",
     )
@@ -814,7 +814,7 @@ class OrderAdmin(BaseModelAdmin):
         )
 
     @action(
-        description=str(_("Mark selected orders as completed")),
+        description=_("Mark selected orders as completed"),
         variant=ActionVariant.SUCCESS,
         icon="task_alt",
     )
@@ -827,7 +827,7 @@ class OrderAdmin(BaseModelAdmin):
         )
 
     @action(
-        description=str(_("Mark selected orders as returned")),
+        description=_("Mark selected orders as returned"),
         variant=ActionVariant.WARNING,
         icon="assignment_return",
     )
@@ -843,7 +843,7 @@ class OrderAdmin(BaseModelAdmin):
         )
 
     @action(
-        description=str(_("Mark selected orders as refunded")),
+        description=_("Mark selected orders as refunded"),
         variant=ActionVariant.WARNING,
         icon="currency_exchange",
     )
@@ -886,7 +886,7 @@ class OrderAdmin(BaseModelAdmin):
                 )
 
     @action(
-        description=str(_("Cancel selected orders and restore stock")),
+        description=_("Cancel selected orders and restore stock"),
         variant=ActionVariant.DANGER,
         icon="cancel",
     )
@@ -974,7 +974,7 @@ class OrderAdmin(BaseModelAdmin):
         return redirect(reverse("admin:order_order_change", args=[object_id]))
 
     @action(
-        description=str(_("Generate invoice")),
+        description=_("Generate invoice"),
         variant=ActionVariant.PRIMARY,
         icon="receipt_long",
     )
@@ -1034,7 +1034,7 @@ class OrderAdmin(BaseModelAdmin):
         return self._redirect_to_order_change(object_id)
 
     @action(
-        description=str(_("Regenerate invoice (same number)")),
+        description=_("Regenerate invoice (same number)"),
         variant=ActionVariant.WARNING,
         icon="refresh",
     )
@@ -1076,7 +1076,7 @@ class OrderAdmin(BaseModelAdmin):
         return self._redirect_to_order_change(object_id)
 
     @action(
-        description=str(_("Send invoice to myDATA")),
+        description=_("Send invoice to myDATA"),
         variant=ActionVariant.PRIMARY,
         icon="cloud_upload",
     )
@@ -1131,7 +1131,7 @@ class OrderAdmin(BaseModelAdmin):
         return self._redirect_to_order_change(object_id)
 
     @action(
-        description=str(_("Cancel invoice in myDATA")),
+        description=_("Cancel invoice in myDATA"),
         variant=ActionVariant.DANGER,
         icon="cancel",
     )
@@ -1174,7 +1174,7 @@ class OrderAdmin(BaseModelAdmin):
         return self._redirect_to_order_change(object_id)
 
     @action(
-        description=str(_("Download shipping voucher (PDF)")),
+        description=_("Download shipping voucher (PDF)"),
         variant=ActionVariant.PRIMARY,
         icon="download",
     )
@@ -1283,7 +1283,7 @@ class OrderAdmin(BaseModelAdmin):
         return response
 
     @action(
-        description=str(_("Customer's orders")),
+        description=_("Customer's orders"),
         icon="person_search",
         variant=ActionVariant.INFO,
     )

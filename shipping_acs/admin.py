@@ -230,7 +230,7 @@ class AcsShipmentAdmin(BaseModelAdmin):
     )
 
     @action(
-        description=str(_("Print labels for selected shipments")),
+        description=_("Print labels for selected shipments"),
         icon="print",
         variant=ActionVariant.PRIMARY,
     )
@@ -296,7 +296,7 @@ class AcsShipmentAdmin(BaseModelAdmin):
         return response
 
     @action(
-        description=str(_("Re-poll tracking for selected shipments")),
+        description=_("Re-poll tracking for selected shipments"),
         icon="refresh",
         variant=ActionVariant.INFO,
     )
@@ -365,7 +365,7 @@ class AcsShipmentAdmin(BaseModelAdmin):
         )
 
     @action(
-        description=str(_("Issue ACS pickup list now")),
+        description=_("Issue ACS pickup list now"),
         variant=ActionVariant.PRIMARY,
     )
     def issue_pickup_list_now(self, request):
@@ -417,7 +417,7 @@ class AcsShipmentAdmin(BaseModelAdmin):
         return changelist
 
     @action(
-        description=str(_("Re-poll ACS tracking")),
+        description=_("Re-poll ACS tracking"),
         variant=ActionVariant.INFO,
     )
     def repoll_tracking(self, request, object_id):
@@ -428,7 +428,7 @@ class AcsShipmentAdmin(BaseModelAdmin):
         return _back_to_changelist(self)
 
     @action(
-        description=str(_("Issue ACS voucher now")),
+        description=_("Issue ACS voucher now"),
         variant=ActionVariant.PRIMARY,
     )
     def issue_voucher_now(self, request, object_id):
@@ -567,13 +567,14 @@ class AcsCodPayoutAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
         "created_at",
         "updated_at",
     )
-    actions_row = ["run_reconciliation"]
+    # Reconciles every payout, not a row: a list action, not a row one.
+    actions_list = ["run_reconciliation"]
 
     @action(
-        description=str(_("Run COD reconciliation now")),
+        description=_("Run COD reconciliation now"),
         variant=ActionVariant.PRIMARY,
     )
-    def run_reconciliation(self, request, object_id):
+    def run_reconciliation(self, request):
         from shipping_acs.tasks import reconcile_acs_cod_payouts
 
         reconcile_acs_cod_payouts.delay()

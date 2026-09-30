@@ -3,7 +3,6 @@ from datetime import timedelta
 import pytest
 from django.contrib.admin.sites import AdminSite
 from django.contrib.auth import get_user_model
-from django.contrib.messages.storage.fallback import FallbackStorage
 from django.test import RequestFactory, TestCase, override_settings
 from django.utils import formats, timezone
 from django.utils.translation import gettext
@@ -391,31 +390,6 @@ class TestRegionAdmin(TestCase):
         self.assertIn("Yes", result)
         self.assertIn("1", result)
 
-    def test_update_sort_order_action(self):
-        Region.objects.create(alpha="TX", country=self.country)
-        Region.objects.create(alpha="FL", country=self.country)
-
-        queryset = Region.objects.filter(country=self.country)
-
-        self.request.session = {}
-        messages = FallbackStorage(self.request)
-        self.request._messages = messages
-
-        self.admin.update_sort_order(self.request, queryset)
-
-        updated_regions = Region.objects.filter(country=self.country).order_by(
-            "sort_order"
-        )
-        regions_list = list(updated_regions)
-
-        self.assertEqual(regions_list[0].alpha, "CA")
-        self.assertEqual(regions_list[1].alpha, "FL")
-        self.assertEqual(regions_list[2].alpha, "TX")
-
-        self.assertEqual(regions_list[0].sort_order, 0)
-        self.assertEqual(regions_list[1].sort_order, 1)
-        self.assertEqual(regions_list[2].sort_order, 2)
-
     def test_method_short_descriptions(self):
         from django.utils.translation import gettext_lazy as _
 
@@ -470,7 +444,6 @@ class TestRegionAdminIntegration(TestCase):
             "completeness_badge",
             "created_display",
             "region_analytics",
-            "update_sort_order",
         ]
 
         for method_name in required_methods:
@@ -486,9 +459,6 @@ class TestRegionAdminIntegration(TestCase):
         fieldsets = self.admin.fieldsets
         self.assertIsInstance(fieldsets, tuple)
         self.assertGreater(len(fieldsets), 1)
-
-    def test_actions_configuration(self):
-        self.assertIn("update_sort_order", self.admin.actions)
 
 
 class TestRegionAdminEdgeCases(TestCase):
@@ -533,20 +503,6 @@ class TestRegionAdminEdgeCases(TestCase):
         result = self.admin.completeness_badge(minimal_region)
 
         self.assertIn("%", result)
-
-    def test_sort_order_action_empty_queryset(self):
-        empty_queryset = Region.objects.none()
-
-        self.request.session = {}
-        messages = FallbackStorage(self.request)
-        self.request._messages = messages
-
-        try:
-            self.admin.update_sort_order(self.request, empty_queryset)
-        except Exception as e:
-            self.fail(
-                f"update_sort_order should handle empty queryset gracefully: {e}"
-            )
 
     def test_display_methods_with_none_values(self):
         country = Country.objects.get_or_create(

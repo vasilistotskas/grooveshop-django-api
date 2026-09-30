@@ -561,7 +561,7 @@ class BlogPostAdmin(ExportActionMixin, BaseTranslatableAdmin):
         }
 
     @action(
-        description=str(_("Mark selected posts as featured")),
+        description=_("Mark selected posts as featured"),
         variant=ActionVariant.PRIMARY,
         icon="star",
     )
@@ -575,7 +575,7 @@ class BlogPostAdmin(ExportActionMixin, BaseTranslatableAdmin):
         )
 
     @action(
-        description=str(_("Remove featured mark from selected posts")),
+        description=_("Remove featured mark from selected posts"),
         variant=ActionVariant.WARNING,
         icon="star_border",
     )
@@ -589,7 +589,7 @@ class BlogPostAdmin(ExportActionMixin, BaseTranslatableAdmin):
         )
 
     @action(
-        description=str(_("Publish selected posts")),
+        description=_("Publish selected posts"),
         variant=ActionVariant.SUCCESS,
         icon="publish",
     )
@@ -605,7 +605,7 @@ class BlogPostAdmin(ExportActionMixin, BaseTranslatableAdmin):
         )
 
     @action(
-        description=str(_("Unpublish selected posts")),
+        description=_("Unpublish selected posts"),
         variant=ActionVariant.WARNING,
         icon="unpublished",
     )
@@ -619,7 +619,7 @@ class BlogPostAdmin(ExportActionMixin, BaseTranslatableAdmin):
         )
 
     @action(
-        description=str(_("Increment view count by 100")),
+        description=_("Increment view count by 100"),
         variant=ActionVariant.INFO,
         icon="visibility",
     )
@@ -635,7 +635,7 @@ class BlogPostAdmin(ExportActionMixin, BaseTranslatableAdmin):
         )
 
     @action(
-        description=str(_("Reset view count to zero")),
+        description=_("Reset view count to zero"),
         variant=ActionVariant.WARNING,
         icon="visibility_off",
     )
@@ -768,7 +768,7 @@ class BlogCommentAdmin(BaseTranslatableAdmin):
         }
 
     @action(
-        description=str(_("Approve selected comments")),
+        description=_("Approve selected comments"),
         variant=ActionVariant.SUCCESS,
         icon="check_circle",
     )
@@ -782,7 +782,7 @@ class BlogCommentAdmin(BaseTranslatableAdmin):
         )
 
     @action(
-        description=str(_("Unapprove selected comments")),
+        description=_("Unapprove selected comments"),
         variant=ActionVariant.WARNING,
         icon="cancel",
     )
@@ -796,7 +796,7 @@ class BlogCommentAdmin(BaseTranslatableAdmin):
         )
 
     @action(
-        description=str(_("Mark as spam and delete")),
+        description=_("Mark as spam and delete"),
         variant=ActionVariant.DANGER,
         icon="report",
     )

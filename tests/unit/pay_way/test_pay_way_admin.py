@@ -324,9 +324,6 @@ class PayWayAdminTestCase(TestCase):
         expected_actions = [
             "activate_payment_methods",
             "deactivate_payment_methods",
-            "move_up_in_order",
-            "move_down_in_order",
-            "reset_sort_order",
         ]
         self.assertEqual(self.admin.actions, expected_actions)
 
@@ -513,44 +510,6 @@ class PayWayAdminTestCase(TestCase):
 
         message = mock_message.call_args[0][1]
         self.assertIn("0", str(message))
-
-    def test_move_up_in_order_action(self):
-        other_payway = PayWay.objects.create(sort_order=2)
-
-        request = self.factory.post("/admin/pay_way/payway/")
-        request.user = self.user
-        request._messages = Mock()
-
-        queryset = PayWay.objects.filter(id=other_payway.id)
-
-        with patch.object(self.admin, "message_user") as mock_message:
-            self.admin.move_up_in_order(request, queryset)
-
-            mock_message.assert_called_once()
-
-    def test_move_down_in_order_action(self):
-        request = self.factory.post("/admin/pay_way/payway/")
-        request.user = self.user
-        request._messages = Mock()
-
-        queryset = PayWay.objects.filter(id=self.payway.id)
-
-        with patch.object(self.admin, "message_user") as mock_message:
-            self.admin.move_down_in_order(request, queryset)
-
-            mock_message.assert_called_once()
-
-    def test_reset_sort_order_action(self):
-        request = self.factory.post("/admin/pay_way/payway/")
-        request.user = self.user
-        request._messages = Mock()
-
-        queryset = PayWay.objects.all()
-
-        with patch.object(self.admin, "message_user") as mock_message:
-            self.admin.reset_sort_order(request, queryset)
-
-            mock_message.assert_called_once()
 
 
 class PayWayAdminIntegrationTestCase(TestCase):

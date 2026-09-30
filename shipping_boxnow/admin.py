@@ -1,6 +1,7 @@
 import logging
 
 from django.contrib import admin, messages
+from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import StackedInline, TabularInline
@@ -322,7 +323,7 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
     # ── List (bulk) actions ─────────────────────────────────────────
 
     @action(
-        description=str(_("Cancel parcels via BoxNow API")),
+        description=_("Cancel parcels via BoxNow API"),
         variant=ActionVariant.DANGER,
         icon="cancel",
     )
@@ -373,7 +374,7 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
             )
 
     @action(
-        description=str(_("Re-fetch label URL from BoxNow")),
+        description=_("Re-fetch label URL from BoxNow"),
         variant=ActionVariant.INFO,
         icon="download",
     )
@@ -418,7 +419,7 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
             )
 
     @action(
-        description=str(_("Download voucher PDFs (zip)")),
+        description=_("Download voucher PDFs (zip)"),
         variant=ActionVariant.PRIMARY,
         icon="folder_zip",
     )
@@ -495,7 +496,7 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
     # ── Detail actions ──────────────────────────────────────────────
 
     @action(
-        description=str(_("Download BoxNow voucher (PDF)")),
+        description=_("Download BoxNow voucher (PDF)"),
         variant=ActionVariant.PRIMARY,
         icon="download",
     )
@@ -572,7 +573,7 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
         return response
 
     @action(
-        description=str(_("Create BoxNow parcel now")),
+        description=_("Create BoxNow parcel now"),
         variant=ActionVariant.PRIMARY,
         icon="local_shipping",
     )
@@ -626,7 +627,7 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
         return redirect(change_url)
 
     @action(
-        description=str(_("Cancel parcel via BoxNow API")),
+        description=_("Cancel parcel via BoxNow API"),
         variant=ActionVariant.DANGER,
         icon="cancel",
     )
@@ -766,20 +767,16 @@ class BoxNowLockerAdmin(BaseModelAdmin):
             },
         ),
     )
-    actions = ["sync_from_boxnow"]
+    actions_list = ["sync_from_boxnow"]
 
     @action(
-        description=str(_("Sync lockers from BoxNow API")),
+        description=_("Sync lockers from BoxNow API"),
         variant=ActionVariant.INFO,
         icon="sync",
     )
-    def sync_from_boxnow(self, request, queryset):
-        """
-        Trigger a full locker sync from the BoxNow destination API.
-
-        The queryset is intentionally ignored — ``sync_lockers()`` always
-        fetches and upserts the full set of active APM locations.
-        """
+    def sync_from_boxnow(self, request):
+        """Fetch and upsert every active APM location from BoxNow's
+        destination API — the whole set, never a selection."""
         from shipping_boxnow.services import BoxNowService
 
         try:
@@ -804,6 +801,11 @@ class BoxNowLockerAdmin(BaseModelAdmin):
                 request,
                 _("Locker sync failed: %(err)s") % {"err": str(exc)},
             )
+        return redirect(
+            reverse(
+                f"{self.admin_site.name}:shipping_boxnow_boxnowlocker_changelist"
+            )
+        )
 
 
 # ── BoxNowParcelEvent admin ─────────────────────────────────────────────────

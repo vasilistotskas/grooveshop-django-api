@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from django.contrib import admin, messages
+from django.contrib import admin
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -9,8 +9,7 @@ from unfold.contrib.filters.admin import (
     RangeDateTimeFilter,
     RelatedDropdownFilter,
 )
-from unfold.decorators import action, display
-from unfold.enums import ActionVariant
+from unfold.decorators import display
 
 from admin.base import BaseTranslatableAdmin, BaseTranslatableTabularInline
 from admin.displays import format_dt
@@ -88,7 +87,6 @@ class RegionAdmin(BaseTranslatableAdmin):
     list_select_related = ["country"]
     list_per_page = 50
     ordering = ["country__alpha_2", "sort_order", "alpha"]
-    actions = ["update_sort_order"]
 
     fieldsets = (
         (
@@ -193,26 +191,3 @@ class RegionAdmin(BaseTranslatableAdmin):
             if obj.sort_order is not None
             else _("Not set"),
         }
-
-    @action(
-        description=str(_("Update sort order")),
-        variant=ActionVariant.INFO,
-        icon="sort",
-    )
-    def update_sort_order(self, request, queryset):
-        countries = set(queryset.values_list("country", flat=True))
-        updated = 0
-        for country_id in countries:
-            regions = list(
-                Region.objects.filter(country_id=country_id).order_by("alpha")
-            )
-            for index, region in enumerate(regions):
-                region.sort_order = index
-                region.save(update_fields=["sort_order"])
-                updated += 1
-
-        self.message_user(
-            request,
-            _("Updated sort order for %(count)d regions.") % {"count": updated},
-            messages.SUCCESS,
-        )

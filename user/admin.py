@@ -537,7 +537,7 @@ class UserAdmin(ExportActionMixin, BaseModelAdmin):
         return str(tier) if tier else _("No tier")
 
     @action(
-        description=str(_("Adjust loyalty points for this user")),
+        description=_("Adjust loyalty points for this user"),
         permissions=("change",),
         variant=ActionVariant.INFO,
         icon="loyalty",
@@ -964,7 +964,7 @@ class UserSubscriptionAdmin(BaseModelAdmin):
         return False
 
     @action(
-        description=str(_("Resend confirmation")),
+        description=_("Resend confirmation"),
         variant=ActionVariant.INFO,
         icon="forward_to_inbox",
     )
@@ -999,7 +999,7 @@ class UserSubscriptionAdmin(BaseModelAdmin):
         )
 
     @action(
-        description=str(_("Deactivate selected subscriptions")),
+        description=_("Deactivate selected subscriptions"),
         variant=ActionVariant.WARNING,
         icon="cancel",
     )

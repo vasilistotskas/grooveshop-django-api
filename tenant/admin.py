@@ -687,7 +687,7 @@ class TenantAdmin(BaseModelAdmin):
     # ------------------------------------------------------------------
 
     @action(
-        description=str(_("Provision Stripe webhook")),
+        description=_("Provision Stripe webhook"),
         icon="webhook",
     )
     def provision_stripe_webhook(self, request, queryset):
@@ -746,7 +746,7 @@ class TenantAdmin(BaseModelAdmin):
     # ------------------------------------------------------------------
 
     @action(
-        description=str(_("Export store data (before destroying)")),
+        description=_("Export store data (before destroying)"),
         icon="download",
     )
     def export_tenant_data_action(self, request, queryset):
@@ -791,7 +791,7 @@ class TenantAdmin(BaseModelAdmin):
     # ------------------------------------------------------------------
 
     @action(
-        description=str(_("Suspend selected tenants")),
+        description=_("Suspend selected tenants"),
         variant=ActionVariant.WARNING,
         icon="pause_circle",
     )
@@ -837,7 +837,7 @@ class TenantAdmin(BaseModelAdmin):
     # ------------------------------------------------------------------
 
     @action(
-        description=str(_("Activate selected tenants")),
+        description=_("Activate selected tenants"),
         variant=ActionVariant.SUCCESS,
         icon="play_circle",
     )
@@ -879,7 +879,7 @@ class TenantAdmin(BaseModelAdmin):
     # ------------------------------------------------------------------
 
     @action(
-        description=str(_("Permanently destroy tenant + drop schema")),
+        description=_("Permanently destroy tenant + drop schema"),
         variant=ActionVariant.DANGER,
         icon="delete_forever",
     )

@@ -422,7 +422,7 @@ class AttributeAdmin(BaseTranslatableAdmin):
         )
 
     @action(
-        description=str(_("Activate selected attributes")),
+        description=_("Activate selected attributes"),
         variant=ActionVariant.SUCCESS,
         icon="check_circle",
     )
@@ -441,7 +441,7 @@ class AttributeAdmin(BaseTranslatableAdmin):
         )
 
     @action(
-        description=str(_("Deactivate selected attributes")),
+        description=_("Deactivate selected attributes"),
         variant=ActionVariant.WARNING,
         icon="cancel",
     )
@@ -566,7 +566,7 @@ class AttributeValueAdmin(BaseTranslatableAdmin):
         )
 
     @action(
-        description=str(_("Activate selected values")),
+        description=_("Activate selected values"),
         variant=ActionVariant.SUCCESS,
         icon="check_circle",
     )
@@ -585,7 +585,7 @@ class AttributeValueAdmin(BaseTranslatableAdmin):
         )
 
     @action(
-        description=str(_("Deactivate selected values")),
+        description=_("Deactivate selected values"),
         variant=ActionVariant.WARNING,
         icon="cancel",
     )
@@ -1227,7 +1227,7 @@ class ProductAdmin(
         )
 
     @action(
-        description=str(_("Activate selected products")),
+        description=_("Activate selected products"),
         variant=ActionVariant.SUCCESS,
         icon="check_circle",
     )
@@ -1252,7 +1252,7 @@ class ProductAdmin(
         )
 
     @action(
-        description=str(_("Deactivate selected products")),
+        description=_("Deactivate selected products"),
         variant=ActionVariant.WARNING,
         icon="cancel",
     )
@@ -1277,7 +1277,7 @@ class ProductAdmin(
         )
 
     @action(
-        description=str(_("Apply custom discount to selected products")),
+        description=_("Apply custom discount to selected products"),
         variant=ActionVariant.INFO,
         icon="local_offer",
         permissions=["change"],
@@ -1424,7 +1424,7 @@ class ProductAdmin(
         )
 
     @action(
-        description=str(_("Clear discount from selected products")),
+        description=_("Clear discount from selected products"),
         variant=ActionVariant.DANGER,
         icon="cancel",
     )
@@ -1452,7 +1452,7 @@ class ProductAdmin(
         )
 
     @action(
-        description=str(_("Duplicate as draft")),
+        description=_("Duplicate as draft"),
         icon="content_copy",
         variant=ActionVariant.INFO,
     )
@@ -1942,7 +1942,7 @@ class ProductReviewAdmin(BaseTranslatableAdmin):
         return format_dt(obj.created_at)
 
     @action(
-        description=str(_("Approve selected reviews")),
+        description=_("Approve selected reviews"),
         variant=ActionVariant.SUCCESS,
         icon="check_circle",
     )
@@ -1960,7 +1960,7 @@ class ProductReviewAdmin(BaseTranslatableAdmin):
         )
 
     @action(
-        description=str(_("Reject selected reviews")),
+        description=_("Reject selected reviews"),
         variant=ActionVariant.DANGER,
         icon="cancel",
     )

@@ -6,6 +6,7 @@ from functools import lru_cache
 from typing import Any
 
 from django.http import HttpRequest
+from django.utils.functional import SimpleLazyObject
 
 from core.utils.tenant_urls import (
     get_tenant_base_url,
@@ -39,42 +40,39 @@ def get_version_from_toml() -> str:
 
 
 def metadata(request: HttpRequest) -> dict[str, Any]:
+    """Site metadata for templates rendered with a request.
+
+    Every value that costs anything is a ``SimpleLazyObject`` (the way
+    ``django.contrib.auth``'s processor hands out ``user``): a context
+    processor runs for EVERY template rendered with a ``RequestContext``,
+    and Unfold renders each ``{% component %}`` that way. Computed
+    eagerly, the admin dashboard resolved the tenant's contact email -
+    two ``extra_settings`` queries when the setting is unset, since
+    extra-settings never caches a default - 59 times per page for
+    values no admin template reads. Only the allauth account emails and
+    the API landing page (``base.html``/``home.html``) do.
     """
-    Context processor that adds site metadata to template context.
 
-    Provides site information and request details (for superusers only).
-
-    Args:
-        request: HTTP request object
-
-    Returns:
-        Dictionary with site metadata and optional request details
-    """
-    site_name = tenant_site_name()
-    site_description = os.getenv("SITE_DESCRIPTION", "Grooveshop Description")
-    site_keywords = os.getenv("SITE_KEYWORDS", "Grooveshop Keywords")
-    site_author = os.getenv("SITE_AUTHOR", "Grooveshop Author")
-
-    request_details: dict[str, Any] = {}
-    if (
-        request.user
-        and request.user.is_authenticated
-        and request.user.is_superuser
-    ):
-        request_details = {
-            "headers": dict(request.headers),
-            "cookies": request.COOKIES,
-            "meta": request.META,
-        }
+    def request_details() -> dict[str, Any]:
+        user = getattr(request, "user", None)
+        if user is not None and user.is_authenticated and user.is_superuser:
+            return {
+                "headers": dict(request.headers),
+                "cookies": request.COOKIES,
+                "meta": request.META,
+            }
+        return {}
 
     return {
         "VERSION": get_version_from_toml(),
-        "SITE_NAME": site_name,
-        "SITE_DESCRIPTION": site_description,
-        "SITE_KEYWORDS": site_keywords,
-        "SITE_AUTHOR": site_author,
-        "SITE_URL": get_tenant_base_url(),
-        "INFO_EMAIL": tenant_contact_email(),
-        "STATIC_BASE_URL": get_tenant_static_base_url(),
-        "REQUEST_DETAILS": request_details,
+        "SITE_NAME": SimpleLazyObject(tenant_site_name),
+        "SITE_DESCRIPTION": os.getenv(
+            "SITE_DESCRIPTION", "Grooveshop Description"
+        ),
+        "SITE_KEYWORDS": os.getenv("SITE_KEYWORDS", "Grooveshop Keywords"),
+        "SITE_AUTHOR": os.getenv("SITE_AUTHOR", "Grooveshop Author"),
+        "SITE_URL": SimpleLazyObject(get_tenant_base_url),
+        "INFO_EMAIL": SimpleLazyObject(tenant_contact_email),
+        "STATIC_BASE_URL": SimpleLazyObject(get_tenant_static_base_url),
+        "REQUEST_DETAILS": SimpleLazyObject(request_details),
     }

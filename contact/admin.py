@@ -309,7 +309,7 @@ class ContactAdmin(ExportActionMixin, BaseModelAdmin):
 
     @admin.display(description=_("Timing"), ordering="created_at")
     def contact_timing(self, obj):
-        return f"{format_dt(obj.created_at, fmt='%d/%m/%Y')} ({relative_time(obj.created_at)})"
+        return f"{format_dt(obj.created_at, fmt="SHORT_DATE_FORMAT")} ({relative_time(obj.created_at)})"
 
     @display(
         description=_("Priority"),
@@ -402,4 +402,4 @@ class FeedbackAdmin(ExportActionMixin, BaseModelAdmin):
 
     @admin.display(description=_("Timing"), ordering="created_at")
     def feedback_timing(self, obj):
-        return f"{format_dt(obj.created_at, fmt='%d/%m/%Y')} ({relative_time(obj.created_at)})"
+        return f"{format_dt(obj.created_at, fmt="SHORT_DATE_FORMAT")} ({relative_time(obj.created_at)})"

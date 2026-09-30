@@ -1,0 +1,20 @@
+{% load i18n unfold %}
+{% trans "Conversion" as title %}
+{% trans "Last 30 days, relative to carts started" as description %}
+{% component "unfold/components/card.html" with title=title description=description %}
+    {% if has_data %}
+        <div class="flex flex-col gap-4">
+            {% for step in steps %}
+                {% component "unfold/components/progress.html" with title=step.title description=step.description value=step.value %}{% endcomponent %}
+            {% endfor %}
+        </div>
+        {% component "unfold/components/separator.html" with class="my-4" %}{% endcomponent %}
+        <div class="flex items-center justify-between">
+            <p class="font-medium text-sm">{% trans "Carts that ended in a paid order" %}</p>
+            {% include "unfold/helpers/label.html" with text=overall variant="primary" %}
+        </div>
+    {% else %}
+        {% trans "No carts or orders in the last 30 days" as empty_text %}
+        {% include "admin/dashboard/components/empty_state.html" with icon="filter_alt" text=empty_text %}
+    {% endif %}
+{% endcomponent %}

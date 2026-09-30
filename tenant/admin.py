@@ -28,8 +28,6 @@ Lifecycle actions also write ``LogEntry``/``HistoricalRecords`` rows
 
 from __future__ import annotations
 
-from typing import Any
-
 from django import forms
 from django.contrib import admin, messages
 from django.contrib.admin.helpers import ACTION_CHECKBOX_NAME
@@ -38,13 +36,14 @@ from django.forms.models import ModelChoiceIterator
 from django.shortcuts import render
 from django.urls import reverse
 from django.utils import timezone
-from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from unfold.contrib.filters.admin import ChoicesRadioFilter
 from unfold.decorators import action, display
 from unfold.enums import ActionVariant
 
 from admin.base import BaseModelAdmin
+from admin.displays import format_dt, header_two_line
+from tenant.admin_labels import billing_badge, label, plan_badge, status_badge
 from tenant.lifecycle import (
     SUSPEND_COOLDOWN,
     activate_tenant,
@@ -90,46 +89,6 @@ def self_service_tenant(request):
     from tenant.membership import get_current_tenant
 
     return get_current_tenant()
-
-
-# Plan presentation: an icon and a colour per tier, so the estate reads
-# at a glance instead of as a column of lowercase words.
-#
-# Rendered through Unfold's own ``label.html`` rather than hand-written
-# markup: that template already accepts ``icon`` (``@display(label=...)``
-# does NOT — the decorator only carries a value->colour map, verified
-# against unfold 0.104.1), and reusing it means the badges inherit
-# Unfold's palette and dark-mode classes instead of duplicating them
-# here where they would silently drift on upgrade.
-_PLAN_BADGES: dict[str, tuple[str, str]] = {
-    "trial": ("schedule", "warning"),
-    "basic": ("storefront", "info"),
-    "pro": ("rocket_launch", "primary"),
-    "enterprise": ("workspace_premium", "success"),
-}
-
-# Billing state presentation: (label, unfold label tone, material icon),
-# keyed by ``tenant.billing.billing_state()``'s return value. Canonical
-# home for this map — the Plan & Billing page (admin/platform_billing.py)
-# imports it from here (mirroring how it already borrows ``_PLAN_BADGES``)
-# so the two surfaces cannot drift as states change.
-_STATE_BADGES: dict[str, tuple[Any, str, str]] = {
-    "suspended": (_("Suspended"), "danger", "pause_circle"),
-    "past_due": (_("Past due"), "danger", "event_busy"),
-    "expiring": (_("Expires soon"), "warning", "hourglass_top"),
-    "trial": (_("Trial"), "warning", "schedule"),
-    "unbilled": (_("No term recorded"), "info", "contract"),
-    "paid": (_("Paid"), "success", "check_circle"),
-}
-
-
-def _unfold_label(text, tone: str, icon: str | None = None) -> str:
-    from django.template.loader import render_to_string
-
-    return render_to_string(
-        "unfold/helpers/label.html",
-        {"text": text, "type": tone, "icon": icon},
-    )
 
 
 def _public_schema_context():
@@ -227,44 +186,27 @@ class TenantAdmin(BaseModelAdmin):
         ``header=True`` renders two lines plus a leading avatar — the
         store's logo when it has one, otherwise its initials. On a
         control plane listing every merchant, the logo is the fastest
-        way to identify a row.
+        way to identify a row. Domains are prefetched (``get_queryset``).
         """
-        primary = obj.domains.filter(is_primary=True).first()
-        name = obj.store_name or obj.name
-        avatar = (
-            {"path": obj.logo_light_url, "squared": True}
-            if obj.logo_light_url
-            else None
+        primary = next(
+            (domain for domain in obj.domains.all() if domain.is_primary),
+            None,
         )
-        return [
+        name = obj.store_name or obj.name
+        return header_two_line(
             name,
             primary.domain if primary else obj.schema_name,
-            "".join(word[:1] for word in name.split()[:2]).upper(),
-            avatar,
-        ]
+            image_path=obj.logo_light_url or None,
+            squared=True,
+        )
 
     @display(description=_("Plan"), ordering="plan")
     def display_plan(self, obj):
-        icon, tone = _PLAN_BADGES.get(obj.plan, ("help", "info"))
-        return mark_safe(_unfold_label(obj.get_plan_display(), tone, icon))
+        return plan_badge(obj)
 
     @display(description=_("Status"), ordering="is_active")
     def display_status(self, obj):
-        """Suspended is distinct from inactive — different operations.
-
-        A suspended store is mid-lifecycle (24h cooldown before it can
-        be destroyed); an inactive one was simply switched off. Showing
-        both as a bare boolean hid that difference.
-        """
-        if obj.suspended_at is not None:
-            return mark_safe(
-                _unfold_label(_("Suspended"), "danger", "pause_circle")
-            )
-        if not obj.is_active:
-            return mark_safe(
-                _unfold_label(_("Inactive"), "warning", "visibility_off")
-            )
-        return mark_safe(_unfold_label(_("Live"), "success", "check_circle"))
+        return status_badge(obj)
 
     @display(description=_("Billing"))
     def display_billing_state(self, obj):
@@ -273,53 +215,30 @@ class TenantAdmin(BaseModelAdmin):
         past-due store is visible without leaving the Tenants list."""
         from tenant.billing import billing_state
 
-        state = billing_state(obj, timezone.localdate())
-        label, tone, icon = _STATE_BADGES[state]
-        return mark_safe(_unfold_label(str(label), tone, icon))
+        return billing_badge(billing_state(obj, timezone.localdate()))
 
-    @display(description=_("Last activity"))
+    @display(description=_("Last order"))
     def display_last_activity(self, obj):
-        """Latest order in the tenant's OWN schema.
+        """The store's latest order, from its ``TenantStatsSnapshot``.
 
-        Same ``tenant_context`` + schema-existence guard as the
-        platform dashboard's estate table
-        (``admin/platform_dashboard.py::_tenant_rows``) — a
-        half-provisioned or not-yet-migrated schema must read as
-        "cannot tell" ("—"), not a misleading blank/zero. The
-        platform's own row is skipped outright: ``order`` is a
-        TENANT_APPS-only app, so the public schema has no orders table
-        to query at all.
+        Read inside the store's schema by ``refresh_stats_snapshot``
+        rather than here: this column used to switch schema per row. "—"
+        until the first refresh, and for the platform's own row, which
+        has no orders.
         """
-        from django_tenants.utils import get_public_schema_name
-
-        from admin.platform_dashboard import _schema_exists
-
-        if obj.schema_name == get_public_schema_name():
+        snapshot = getattr(obj, "stats_snapshot", None)
+        if snapshot is None or snapshot.last_order_at is None:
             return "—"
-        if not _schema_exists(obj.schema_name):
-            return "—"
-
-        from django.apps import apps
-        from django_tenants.utils import tenant_context
-
-        from admin.displays import format_dt
-
-        try:
-            with tenant_context(obj):
-                Order = apps.get_model("order", "Order")
-                latest = (
-                    Order.objects.order_by("-created_at")
-                    .values_list("created_at", flat=True)
-                    .first()
-                )
-        except Exception:
-            return "—"
-
-        return format_dt(latest) if latest is not None else "—"
+        return format_dt(snapshot.last_order_at)
 
     def get_queryset(self, request):
         """A store operator sees only their own row."""
-        qs = super().get_queryset(request)
+        qs = (
+            super()
+            .get_queryset(request)
+            .select_related("stats_snapshot")
+            .prefetch_related("domains")
+        )
         scope = self_service_tenant(request)
         if scope is None:
             return qs
@@ -1306,11 +1225,11 @@ class TenantArchiveAdmin(BaseModelAdmin):
     @display(description=_("Retention"))
     def display_retention(self, obj):
         if obj.purged_at is not None:
-            return _unfold_label(_("Purged"), "success", "delete_sweep")
+            return label(_("Purged"), "success", "delete_sweep")
         if obj.retention_until is None:
-            return _unfold_label(_("Nothing retained"), "info", "block")
+            return label(_("Nothing retained"), "info", "block")
         tone = "danger" if obj.retention_expired else "warning"
-        return _unfold_label(
+        return label(
             _("Until %(date)s") % {"date": obj.retention_until},
             tone,
             "gavel",

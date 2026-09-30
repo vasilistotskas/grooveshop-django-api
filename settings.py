@@ -154,8 +154,8 @@ SHARED_APPS = [
     # ones an earlier TENANT_APPS entry created.
     "django_celery_beat",
     "django_celery_results",
-    # Platform-wide Setting table — read by admin dashboard in public
-    # schema. Also in TENANT_APPS so per-tenant settings can override.
+    # Platform-wide Setting table. Also in TENANT_APPS so per-tenant
+    # settings can override.
     "extra_settings",
     # Global reference data (identical across ALL tenants)
     "country",
@@ -572,8 +572,8 @@ if ENABLE_DEBUG_TOOLBAR:
         "debug_toolbar.panels.staticfiles.StaticFilesPanel",
         "debug_toolbar.panels.templates.TemplatesPanel",
         # Cache panel reveals get/set/hit/miss on Redis — critical for
-        # validating that the admin dashboard cache (5 min TTL on
-        # ``admin:dashboard:data:v4``) is actually warm under load.
+        # validating that the admin dashboard's cached queries
+        # (``admin:dashboard:*``) are actually warm under load.
         "debug_toolbar.panels.cache.CachePanel",
         "debug_toolbar.panels.signals.SignalsPanel",
         "debug_toolbar.panels.redirects.RedirectsPanel",
@@ -1204,6 +1204,11 @@ def get_celery_beat_schedule():
         "check-low-stock-products": {
             "task": "tenant.tasks.fanout_check_low_stock_products",
             "schedule": SCHEDULE_PRESETS["every_hour"],
+        },
+        # The control plane's per-store figures (TenantStatsSnapshot).
+        "refresh-tenant-stats": {
+            "task": "tenant.tasks.fanout_refresh_stats_snapshots",
+            "schedule": SCHEDULE_PRESETS["every_30_min"],
         },
         "send-checkout-abandonment-emails": {
             "task": "tenant.tasks.fanout_send_checkout_abandonment_emails",
@@ -2873,7 +2878,6 @@ UNFOLD_PLATFORM = {
     "SHOW_VIEW_ON_SITE": False,
     "SITE_DROPDOWN": [*_ADMIN_DOCS_LINKS],
     "ENVIRONMENT": "admin.permissions.platform_environment",
-    "DASHBOARD_CALLBACK": "admin.platform_dashboard.dashboard_callback",
     # ⌘K command palette. Without this block the palette falls back to
     # unfold's defaults (``search_models: False``) and only matches
     # sidebar APP TITLES — typing a tenant name, domain or user email
@@ -3180,7 +3184,6 @@ UNFOLD = {
         lambda request: static("admin/js/tinymce_save_sync.js"),
         lambda request: static("admin/js/unfold_command_palette_fix.js"),
     ],
-    "DASHBOARD_CALLBACK": "admin.dashboard.dashboard_callback",
     "SIDEBAR": {
         "show_search": True,
         "show_all_applications": False,
@@ -3432,7 +3435,7 @@ UNFOLD = {
                             "admin:contact_contact_changelist",
                             urlconf=ROOT_URLCONF,
                         ),
-                        "badge": "admin.badges.unread_messages_badge",
+                        "badge": "admin.badges.new_messages_badge",
                         "badge_variant": "info",
                     },
                     {

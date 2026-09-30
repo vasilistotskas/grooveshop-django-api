@@ -956,7 +956,7 @@ class UserSubscriptionAdmin(BaseModelAdmin):
 
     @display(description=_("Subscription"), ordering="created_at")
     def subscription_info(self, obj):
-        return f"#{obj.id} — {format_dt(obj.created_at, fmt='%d/%m/%Y')}"
+        return f"#{obj.id} — {format_dt(obj.created_at, fmt="SHORT_DATE_FORMAT")}"
 
     @display(description=_("User"))
     def user_info(self, obj):

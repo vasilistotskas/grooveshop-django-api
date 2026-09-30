@@ -25,6 +25,7 @@ from django.urls import NoReverseMatch, resolve, reverse
 # PAGE's shaping and gating.
 from admin.platform_billing import _billing_rows, _billing_table
 from admin.platform_site import platform_admin_site
+from tenant.models import Tenant
 from tests.utils.staff import store_tenant
 
 _TODAY = date(2026, 8, 22)
@@ -49,7 +50,7 @@ class TestBillingRows(TestCase):
             for r in _billing_rows(_TODAY)
             if r["schema"] == "billing_rows_tenant"
         )
-        assert row["plan"] == "pro"
+        assert row["tenant"].plan == "pro"
         assert row["state"] == "paid"
 
     def test_table_is_shaped_for_the_unfold_component(self):
@@ -62,11 +63,10 @@ class TestBillingRows(TestCase):
         table = _billing_table(
             [
                 {
+                    "tenant": Tenant(plan="basic"),
                     "name": "No Term Store",
                     "schema": "no_term",
                     "domain": "",
-                    "plan": "basic",
-                    "plan_display": "Basic",
                     "paid_until": None,
                     "state": "unbilled",
                 }

@@ -80,9 +80,9 @@ class IsSuperuserOnlyModelAdmin:
         )
 
     def has_view_permission(self, request, obj=None) -> bool:
-        return super().has_view_permission(
-            request, obj
-        ) and self._is_superuser(request)
+        return super().has_view_permission(request, obj) and self._is_superuser(
+            request
+        )
 
     def has_add_permission(self, request) -> bool:
         return super().has_add_permission(request) and self._is_superuser(

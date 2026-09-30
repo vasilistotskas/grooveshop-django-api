@@ -1,0 +1,19 @@
+{% comment %}
+A card holding Unfold's table component. `table` is {headers, rows} as
+unfold/components/table.html takes it; cells that carry markup arrive
+pre-rendered (admin.dashboard.base.link_cell / label_cell) because the
+table escapes plain content. Rendered only when `visible` is not False.
+{% endcomment %}
+{% load i18n unfold %}
+{% if visible is not False %}
+    {% if action_href %}
+        {% capture as action silent %}{% component "unfold/components/link.html" with href=action_href class="font-medium text-primary-600 text-sm dark:text-primary-500" %}{% trans "View all" %}{% endcomponent %}{% endcapture %}
+    {% endif %}
+    {% component "unfold/components/card.html" with title=title description=description action=action class=class %}
+        {% if table.rows %}
+            {% component "unfold/components/table.html" with table=table card_included=1 %}{% endcomponent %}
+        {% else %}
+            {% include "admin/dashboard/components/empty_state.html" with icon=empty_icon text=empty_text %}
+        {% endif %}
+    {% endcomponent %}
+{% endif %}

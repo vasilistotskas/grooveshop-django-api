@@ -17,11 +17,19 @@ from django.conf import settings
 
 BASE_DIR = Path(settings.BASE_DIR)
 
-ADMIN_FILES = sorted(
-    p
-    for p in BASE_DIR.glob("*/admin.py")
-    if ".venv" not in p.parts and "node_modules" not in p.parts
-) + sorted((BASE_DIR / "admin").glob("*.py"))
+ADMIN_FILES = (
+    sorted(
+        p
+        for p in BASE_DIR.glob("*/admin.py")
+        if ".venv" not in p.parts and "node_modules" not in p.parts
+    )
+    + sorted((BASE_DIR / "admin").rglob("*.py"))
+    + sorted((BASE_DIR / "core/templates/admin/dashboard").rglob("*.html"))
+    + [
+        BASE_DIR / "core/templates/admin/index.html",
+        BASE_DIR / "core/templates/admin/platform_index.html",
+    ]
+)
 
 # Pictographs, dingbats, transport, supplemental symbols — the emoji
 # blocks that used to decorate status pills. Plain typography (arrows,
@@ -53,6 +61,9 @@ _BANNED = {
     "inline style attribute": re.compile(r'style\s*=\s*["\']'),
     "raw tailwind gray token (use base-*)": re.compile(r"text-gray-\d"),
     "hand-rolled pill markup": re.compile(r"rounded-full"),
+    # Colours come from the theme (CSS variables, Unfold variants), so
+    # dark mode recolours them; a literal only suits one theme.
+    "hex colour literal": re.compile(r"#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{3})\b"),
 }
 
 

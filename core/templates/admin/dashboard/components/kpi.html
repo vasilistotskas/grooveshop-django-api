@@ -1,0 +1,24 @@
+{% comment %}
+One figure with its label. `tone` is one of Unfold's label variants
+(primary, success, info, warning, danger) - the icon tile uses the same
+classes as unfold/helpers/label.html, so tones match every status pill
+in the admin. Optional: `badge` {text, variant, icon}, `href`, `footer`.
+{% endcomment %}
+{% load unfold %}
+{% component "unfold/components/card.html" with href=href footer=footer %}
+    <div class="flex items-start justify-between gap-3">
+        <div class="flex h-10 items-center justify-center rounded-default w-10
+            {% if tone == "success" %}bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400
+            {% elif tone == "info" %}bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400
+            {% elif tone == "warning" %}bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-400
+            {% elif tone == "danger" %}bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400
+            {% else %}bg-primary-100 text-primary-700 dark:bg-primary-500/20 dark:text-primary-400{% endif %}">
+            <span class="material-symbols-outlined">{{ icon }}</span>
+        </div>
+        {% if badge %}
+            {% include "unfold/helpers/label.html" with text=badge.text variant=badge.variant icon=badge.icon %}
+        {% endif %}
+    </div>
+    {% component "unfold/components/title.html" with class="mt-4" %}{{ value }}{% endcomponent %}
+    <p class="font-medium mt-1 text-sm">{{ label }}</p>
+{% endcomponent %}

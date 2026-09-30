@@ -1,0 +1,8 @@
+{% load unfold %}
+{% component "unfold/components/card.html" with title=title description=description class=class %}
+    {% if has_data %}
+        {% component "unfold/components/chart/bar.html" with data=data options=options class="h-[300px]" %}{% endcomponent %}
+    {% else %}
+        {% include "admin/dashboard/components/empty_state.html" with icon="bar_chart" text=empty_text class="h-[300px]" %}
+    {% endif %}
+{% endcomponent %}

@@ -175,29 +175,6 @@ class TestSchemaRouting(SimpleTestCase):
         )
 
 
-class TestPlatformDashboard(TestCase):
-    def test_reports_the_tenant_estate(self):
-        from admin.platform_dashboard import dashboard_callback
-
-        context = dashboard_callback(None, {})
-        for key in (
-            "platform_tenant_count",
-            "platform_active_count",
-            "platform_suspended_count",
-            "platform_tenants",
-        ):
-            assert key in context, f"dashboard missing {key}"
-
-    def test_excludes_the_public_row_from_the_estate(self):
-        """`public` is the control plane itself, not a store."""
-        from admin.platform_dashboard import dashboard_callback
-
-        store_tenant("public", name="Platform")
-        context = dashboard_callback(None, {})
-        schemas = {row["schema"] for row in context["platform_tenants"]}
-        assert "public" not in schemas
-
-
 class TestControlPlaneIsSuperuserOnly(TestCase):
     """A store operator must not reach the control plane.
 
@@ -359,11 +336,12 @@ class TestPlatformDashboardPage(TestCase):
 
     @override_settings(ROOT_URLCONF="tenant.urls_public")
     def test_does_not_render_the_store_dashboard(self):
-        html = self._render()
+        with translation.override("en"):
+            html = self._render()
         for merchant_only in (
-            "Overview of revenue",
-            "Pending Orders",
-            "New Product",
+            "Revenue, orders and customer activity",
+            "Pending orders",
+            "New product",
         ):
             assert merchant_only not in html, (
                 f"the store dashboard leaked onto the control plane: "
@@ -381,7 +359,7 @@ class TestPlatformDashboardPage(TestCase):
         """
         html = self._render()
         assert self.store.store_name in html
-        assert self.store.schema_name in html
+        assert f"/tenant/tenant/{self.store.pk}/change/" in html
 
     @override_settings(ROOT_URLCONF="tenant.urls_public")
     def test_renders_the_curated_sidebar(self):
@@ -408,16 +386,6 @@ class TestPlatformDashboardPage(TestCase):
         html = self._render()
         for prose in ("AdminSite.index()", "endcomment", "merchant"):
             assert prose not in html, f"template comment leaked: {prose!r}"
-
-
-class TestPlatformDashboardTable(TestCase):
-    def test_is_shaped_for_the_unfold_table_component(self):
-        from admin.platform_dashboard import dashboard_callback
-
-        table = dashboard_callback(None, {})["platform_tenants_table"]
-        assert "headers" in table and "rows" in table
-        for row in table["rows"]:
-            assert len(row) == len(table["headers"])
 
 
 class TestCommandPalette(TestCase):

@@ -5,13 +5,14 @@ from uuid import uuid4
 import admin_thumbnails
 from django.contrib import admin, messages
 from django.contrib.admin import helpers
+from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.db.models import Count, F, Prefetch, Q, Sum
 from django.db.models.functions import TruncDay
-from django.http import Http404, HttpResponseRedirect
-from django.shortcuts import redirect, render
+from django.http import HttpResponseRedirect
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import path, reverse, reverse_lazy
-from django.utils import timezone
+from django.utils import formats, timezone
 from django.utils.html import format_html, format_html_join
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
@@ -464,7 +465,7 @@ class AttributeAdmin(BaseTranslatableAdmin):
     @display(description=_("Created"), ordering="created_at")
     def created_display(self, obj):
         return (
-            f"{format_dt(obj.created_at, fmt='%d/%m/%Y')} "
+            f"{format_dt(obj.created_at, fmt='SHORT_DATE_FORMAT')} "
             f"({relative_time(obj.created_at)})"
         )
 
@@ -608,7 +609,7 @@ class AttributeValueAdmin(BaseTranslatableAdmin):
     @display(description=_("Created"), ordering="created_at")
     def created_display(self, obj):
         return (
-            f"{format_dt(obj.created_at, fmt='%d/%m/%Y')} "
+            f"{format_dt(obj.created_at, fmt='SHORT_DATE_FORMAT')} "
             f"({relative_time(obj.created_at)})"
         )
 
@@ -808,7 +809,7 @@ class StockLogInline(TabularInline):
 
     @admin.display(description=_("Time"))
     def timestamp_display(self, obj):
-        return format_dt(obj.created_at, fmt="%d/%m %H:%M")
+        return format_dt(obj.created_at, fmt="d/m H:i")
 
 
 class ProductRelationInline(TabularInline):
@@ -1210,7 +1211,7 @@ class ProductAdmin(
     @display(description=_("Created"), ordering="created_at")
     def created_display(self, obj):
         return (
-            f"{format_dt(obj.created_at, fmt='%d/%m/%Y')} "
+            f"{format_dt(obj.created_at, fmt='SHORT_DATE_FORMAT')} "
             f"({relative_time(obj.created_at)})"
         )
 
@@ -1584,96 +1585,137 @@ class ProductAdmin(
         return custom_urls + urls
 
     def stock_history_view(self, request, product_id):
-        """Per-product stock history with a 90-day time-series chart.
+        """A product's stock movements: a daily chart and the latest entries.
 
-        Renders a Chart.js stacked bar chart grouped by day and by
-        StockLog.operation_type (RESERVE/RELEASE/DECREMENT/INCREMENT),
-        plus a table of the most recent entries.
+        Built from the dashboard's chart and table helpers
+        (``admin.dashboard.base``) so it follows the theme; Unfold's
+        header builds the breadcrumbs from ``opts`` and ``original``.
         """
+        from admin.dashboard.base import (
+            bar_chart_options,
+            chart_json,
+            color,
+            label_cell,
+            link_cell,
+        )
         from order.models.stock_log import StockLog
 
-        try:
-            product = Product.objects.get(pk=product_id)
-        except Product.DoesNotExist as exc:
-            raise Http404(_("Product not found")) from exc
+        product = get_object_or_404(Product, pk=product_id)
+        if not self.has_view_permission(request, product):
+            raise PermissionDenied
 
+        windows = (7, 30, 90, 180, 365)
         try:
             window_days = int(request.GET.get("days") or 90)
         except TypeError, ValueError:
             window_days = 90
-        window_days = max(7, min(window_days, 365))
-        since = timezone.now() - timedelta(days=window_days)
+        if window_days not in windows:
+            window_days = 90
+        today = timezone.localdate()
+        days = [
+            today - timedelta(days=n) for n in range(window_days - 1, -1, -1)
+        ]
 
-        rows = (
-            StockLog.objects.filter(
-                product_id=product_id, created_at__gte=since
+        totals: dict[tuple, int] = {
+            (row["day"].date(), row["operation_type"]): int(row["total"] or 0)
+            for row in StockLog.objects.filter(
+                product_id=product.pk, created_at__date__gte=days[0]
             )
             .annotate(day=TruncDay("created_at"))
             .values("day", "operation_type")
-            .annotate(total=Sum("quantity_delta"), entries=Count("id"))
-            .order_by("day")
-        )
-
-        operation_types = ["RESERVE", "RELEASE", "DECREMENT", "INCREMENT"]
-        buckets: dict[str, dict[str, int]] = {}
-        for row in rows:
-            day_key = row["day"].date().isoformat() if row["day"] else ""
-            if not day_key:
-                continue
-            buckets.setdefault(day_key, {op: 0 for op in operation_types})[
-                row["operation_type"]
-            ] = int(row["total"] or 0)
-
-        labels: list[str] = []
-        cursor = since.date()
-        end = timezone.now().date()
-        while cursor <= end:
-            labels.append(cursor.isoformat())
-            cursor += timedelta(days=1)
-
-        def _series(op):
-            return [buckets.get(day, {}).get(op, 0) for day in labels]
-
-        dataset_colors = {
-            "RESERVE": "#f59e0b",
-            "RELEASE": "#6366f1",
-            "DECREMENT": "#ef4444",
-            "INCREMENT": "#10b981",
+            .annotate(total=Sum("quantity_delta"))
         }
-        datasets = [
-            {
-                "label": op.title(),
-                "data": _series(op),
-                "backgroundColor": dataset_colors[op],
-                "stack": "stock-ops",
-            }
-            for op in operation_types
-        ]
+        operation_colors = {
+            StockLog.OPERATION_RESERVE: color("orange-400"),
+            StockLog.OPERATION_RELEASE: color("primary-400"),
+            StockLog.OPERATION_DECREMENT: color("red-500"),
+            StockLog.OPERATION_INCREMENT: color("green-500"),
+        }
+        operation_variants = {
+            StockLog.OPERATION_RESERVE: "warning",
+            StockLog.OPERATION_RELEASE: "primary",
+            StockLog.OPERATION_DECREMENT: "danger",
+            StockLog.OPERATION_INCREMENT: "success",
+        }
+        chart = {
+            "labels": [formats.date_format(day, "d/m") for day in days],
+            "datasets": [
+                {
+                    "label": str(label),
+                    "type": "bar",
+                    "data": [totals.get((day, code), 0) for day in days],
+                    "backgroundColor": operation_colors[code],
+                    "stack": "stock",
+                    "borderRadius": 4,
+                    "maxBarThickness": 24,
+                }
+                for code, label in StockLog.OPERATION_TYPE_CHOICES
+            ],
+        }
 
-        recent_logs = (
-            StockLog.objects.filter(product_id=product_id)
-            .select_related("order", "performed_by")
+        logs = (
+            StockLog.objects.filter(product_id=product.pk)
+            .select_related("performed_by")
             .order_by("-created_at")[:50]
         )
+        rows = [
+            [
+                format_dt(log.created_at),
+                label_cell(
+                    log.get_operation_type_display(),
+                    operation_variants[log.operation_type],
+                ),
+                {"content": f"{log.quantity_delta:+d}", "class": "text-right"},
+                {"content": log.stock_before, "class": "text-right"},
+                {"content": log.stock_after, "class": "text-right"},
+                log.reason or "—",
+                link_cell(
+                    reverse("admin:order_order_change", args=[log.order_id]),
+                    f"#{log.order_id}",
+                )
+                if log.order_id
+                else "—",
+                log.performed_by or _("System"),
+            ]
+            for log in logs
+        ]
 
-        product_name = (
-            product.safe_translation_getter("name", any_language=True)
-            or f"Product #{product.id}"
-        )
+        if product.stock == 0:
+            stock_state = (_("Out of stock"), "danger")
+        elif 0 < product.stock <= product.low_stock_threshold:
+            stock_state = (_("Low stock"), "warning")
+        else:
+            stock_state = (_("In stock"), "success")
 
         context = {
             **self.admin_site.each_context(request),
-            "title": _("Stock History — %(name)s") % {"name": product_name},
-            "product": product,
-            "product_name": product_name,
-            "window_days": window_days,
-            "chart_labels": labels,
-            "chart_datasets": datasets,
-            "recent_logs": recent_logs,
+            "title": _("Stock history"),
             "opts": self.model._meta,
-            "change_url": reverse(
-                "admin:product_product_change", args=[product.pk]
+            "original": product,
+            "product": product,
+            "stock_state": stock_state,
+            "window_days": window_days,
+            "windows": windows,
+            "has_activity": bool(totals),
+            "chart_data": chart_json(chart),
+            "chart_options": chart_json(
+                bar_chart_options(
+                    legend=True, currency_axis=False, stacked=True
+                )
             ),
+            "table": {
+                "headers": [
+                    _("When"),
+                    _("Operation"),
+                    {"content": _("Change"), "class": "text-right"},
+                    {"content": _("Before"), "class": "text-right"},
+                    {"content": _("After"), "class": "text-right"},
+                    _("Reason"),
+                    _("Order"),
+                    _("By"),
+                ],
+                "rows": rows,
+            },
         }
         return render(request, "admin/product/stock_history.html", context)
 
@@ -1811,7 +1853,7 @@ class ProductCategoryAdmin(BaseTranslatableAdmin):
 
     @admin.display(description=_("Created"), ordering="created_at")
     def created_display(self, instance):
-        return format_dt(instance.created_at, fmt="%Y-%m-%d")
+        return format_dt(instance.created_at, fmt="Y-m-d")
 
     @admin.display(description=_("Direct Products"), ordering="products_count")
     def products_count_display(self, instance):

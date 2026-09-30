@@ -1,0 +1,8 @@
+{% load unfold %}
+{% component "unfold/components/card.html" with title=title description=description %}
+    {% if chart %}
+        {% include "admin/dashboard/components/doughnut.html" with data=chart.data options=chart.options class="h-[300px]" %}
+    {% else %}
+        {% include "admin/dashboard/components/empty_state.html" with icon="donut_large" text=empty_text class="h-[300px]" %}
+    {% endif %}
+{% endcomponent %}

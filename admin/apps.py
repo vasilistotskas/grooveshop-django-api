@@ -6,14 +6,16 @@ class MyAdminConfig(AdminConfig):
 
     def ready(self):
         super().ready()
+        # Importing the widget modules registers their Unfold components
+        # and their cached queries; connect the queries' invalidation.
+        import admin.dashboard.platform
+        import admin.dashboard.store.widgets  # noqa: F401
+        from admin.dashboard.cache import connect_invalidation
         from admin.log_actors import patch_admin_history_actors
-        from admin.signals import (
-            _connect_dashboard_invalidation,
-            _connect_tenant_aware_last_login,
-        )
+        from admin.signals import _connect_tenant_aware_last_login
         from admin.third_party import patch_djstripe_search_fields
 
-        _connect_dashboard_invalidation()
+        connect_invalidation()
         _connect_tenant_aware_last_login()
         patch_djstripe_search_fields()
 

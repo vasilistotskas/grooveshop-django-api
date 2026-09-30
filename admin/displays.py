@@ -26,10 +26,13 @@ gettext-translated.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+import re
+from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
+from django.utils import formats, timezone
+from django.utils.timesince import timesince
 from django.utils.translation import gettext_lazy as _
 from unfold.decorators import display
 
@@ -136,63 +139,39 @@ def choice_label(
 
 
 # ── Money + date formatting ───────────────────────────────────────────
+# Everything follows the ACTIVE locale (Greek grouping "1.234,56" under
+# el, "1,234.56" under en) and the current timezone - these used to be
+# hard-coded to Greek separators and to strftime on UTC datetimes.
 
 
 def money(amount: Decimal | float | None, currency: str = "€") -> str:
-    """Format a money amount with Greek thousands separator.
-
-    Returns ``€0,00`` for None / zero so the cell isn't empty.
-    """
-
-    if amount is None:
-        amount = 0
-    val = float(amount)
-    # Greek convention: dot for thousands, comma for decimals.
-    formatted = (
-        f"{val:,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
+    """A money amount in the active locale; ``None`` reads as zero."""
+    return currency + formats.number_format(
+        amount or 0, decimal_pos=2, use_l10n=True, force_grouping=True
     )
-    return f"{currency}{formatted}"
 
 
 def format_dt(
     dt: datetime | None,
     *,
-    fmt: str = "%d/%m/%Y %H:%M",
+    fmt: str = "SHORT_DATETIME_FORMAT",
     placeholder: str = "—",
 ) -> str:
-    """Format a datetime in 24-hour Greek-locale style by default.
+    """A datetime in the current timezone and the active locale.
 
-    The default format `dd/mm/yyyy HH:MM` matches the Greek storefront
-    convention. Pass ``fmt="%d/%m"`` for compact list cells.
+    ``fmt`` is a Django format name (``SHORT_DATE_FORMAT``) or a Django
+    date-format string (``"d/m H:i"``), not an ``strftime`` pattern.
     """
-
     if dt is None:
         return placeholder
-    return dt.strftime(fmt)
+    return formats.date_format(timezone.localtime(dt), fmt)
 
 
 def relative_time(dt: datetime | None, now: datetime | None = None) -> str:
-    """Return a compact relative-time string (e.g. ``5λ``, ``3ω``, ``2η``).
-
-    Uses Greek single-character suffixes for very short labels suited
-    to dense list cells: λ=λεπτά, ω=ώρες, η=ημέρες.
-    """
-
+    """How long ago, in the active language ("3 hours")."""
     if dt is None:
         return "—"
-    if now is None:
-        from django.utils import timezone
-
-        now = timezone.now()
-    delta: timedelta = now - dt
-    seconds = delta.total_seconds()
-    if seconds < 60:
-        return str(_("τώρα"))
-    if seconds < 3600:
-        return f"{int(seconds // 60)}λ"
-    if seconds < 86400:
-        return f"{int(seconds // 3600)}ω"
-    return f"{int(seconds // 86400)}η"
+    return timesince(dt, now, depth=1)
 
 
 # ── Two-line "header" helpers (for @display(header=True)) ─────────────
@@ -204,6 +183,7 @@ def header_two_line(
     initials: str | None = None,
     *,
     image_path: str | None = None,
+    squared: bool = False,
 ) -> list[Any]:
     """Build the list that ``@display(header=True)`` expects.
 
@@ -218,18 +198,20 @@ def header_two_line(
 
     row = [primary, secondary or "", initials or _initials_from(primary)]
     if image_path:
-        row.append({"path": image_path, "squared": False})
+        row.append({"path": image_path, "squared": squared})
     return row
 
 
 def _initials_from(name: str | None) -> str:
-    """Two-letter initials for a name string ("Vasileios T" → "VT")."""
+    """Two-letter initials from a name's words ("Public (Platform)" → "PP")."""
 
-    if not name:
+    words = [
+        word
+        for word in (re.sub(r"\W", "", part) for part in (name or "").split())
+        if word
+    ]
+    if not words:
         return "?"
-    parts = [p for p in name.strip().split() if p]
-    if not parts:
-        return "?"
-    if len(parts) == 1:
-        return parts[0][:2].upper()
-    return (parts[0][0] + parts[-1][0]).upper()
+    if len(words) == 1:
+        return words[0][:2].upper()
+    return (words[0][0] + words[-1][0]).upper()

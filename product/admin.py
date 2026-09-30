@@ -2,7 +2,6 @@ from datetime import timedelta
 from decimal import Decimal
 from uuid import uuid4
 
-import admin_thumbnails
 from django.contrib import admin, messages
 from django.contrib.admin import helpers
 from django.core.exceptions import PermissionDenied
@@ -14,7 +13,6 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import path, reverse, reverse_lazy
 from django.utils import formats, timezone
 from django.utils.html import format_html, format_html_join
-from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import ngettext
 from parler.admin import TranslatableAdmin
@@ -627,11 +625,11 @@ class ProductAttributeInline(TabularInline):
         )
 
 
-@admin_thumbnails.thumbnail("image")
 class ProductImageInline(TabularInline):
+    # Unfold's inline image widget previews the current file itself.
     model = ProductImage
     extra = 0
-    fields = ("image_thumbnail", "image", "is_main")
+    fields = ("image", "is_main")
 
     tab = True
     show_change_link = True
@@ -1677,11 +1675,10 @@ class ProductAdmin(
         return render(request, "admin/product/stock_history.html", context)
 
 
-@admin_thumbnails.thumbnail("image")
 class ProductCategoryImageInline(TabularInline):
     model = ProductCategoryImage
     extra = 0
-    fields = ("image_thumbnail", "image", "image_type", "active")
+    fields = ("image", "image_type", "active")
 
     tab = True
     show_change_link = True
@@ -1699,7 +1696,6 @@ class ProductCategoryAdmin(BaseTranslatableAdmin):
         "category_info",
         "active",
         "subcategories_display",
-        "image_preview",
         "created_display",
         "products_count_display",
         "recursive_products_display",
@@ -1787,26 +1783,26 @@ class ProductCategoryAdmin(BaseTranslatableAdmin):
     def get_prepopulated_fields(self, request, obj=None):
         return {"slug": ("name",)}
 
-    @admin.display(description=_("Category"), ordering="translations__name")
+    @display(
+        description=_("Category"), ordering="translations__name", header=True
+    )
     def category_info(self, instance):
         name = instance.safe_translation_getter("name", any_language=True) or _(
             "Unnamed Category"
         )
-        return f"{name} (level {instance.level})"
+        main_image = instance.main_image
+        return header_two_line(
+            name,
+            _("Level %(level)s") % {"level": instance.level},
+            image_path=main_image.image.url
+            if main_image and main_image.image
+            else None,
+            squared=True,
+        )
 
     @admin.display(description=_("Subcategories"), ordering="children_count")
     def subcategories_display(self, instance):
         return getattr(instance, "children_count", 0)
-
-    @admin.display(description=_("Image"))
-    def image_preview(self, instance):
-        main_image = instance.main_image
-        if main_image and main_image.image:
-            return format_html(
-                '<img src="{url}" class="h-10 w-10 rounded object-cover" />',
-                url=main_image.image.url,
-            )
-        return "—"
 
     @admin.display(description=_("Created"), ordering="created_at")
     def created_display(self, instance):
@@ -2033,12 +2029,10 @@ class ProductFavouriteAdmin(BaseModelAdmin):
 
 
 @admin.register(ProductCategoryImage)
-@admin_thumbnails.thumbnail("image")
 class ProductCategoryImageAdmin(BaseTranslatableAdmin):
     ordering_field = "sort_order"
     hide_ordering_field = True
     list_display = (
-        "image_thumbnail",
         "category_name",
         "image_type_label",
         "active",
@@ -2098,14 +2092,18 @@ class ProductCategoryImageAdmin(BaseTranslatableAdmin):
         return (
             super()
             .get_queryset(request)
-            .prefetch_related("category__translations")
+            .prefetch_related("category__translations", "translations")
         )
 
-    @admin.display(description=_("Category"))
+    @display(description=_("Category"), header=True)
     def category_name(self, obj):
-        return obj.category.safe_translation_getter(
-            "name", any_language=True
-        ) or _("Unnamed Category")
+        return header_two_line(
+            obj.category.safe_translation_getter("name", any_language=True)
+            or _("Unnamed Category"),
+            obj.safe_translation_getter("title", any_language=True),
+            image_path=obj.image.url if obj.image else None,
+            squared=True,
+        )
 
     image_type_label = choice_label(
         "image_type",
@@ -2115,12 +2113,10 @@ class ProductCategoryImageAdmin(BaseTranslatableAdmin):
 
 
 @admin.register(ProductImage)
-@admin_thumbnails.thumbnail("image")
 class ProductImageAdmin(BaseTranslatableAdmin):
     ordering_field = "sort_order"
     hide_ordering_field = True
     list_display = (
-        "image_thumbnail",
         "product_name",
         "is_main",
         "sort_order",
@@ -2182,12 +2178,15 @@ class ProductImageAdmin(BaseTranslatableAdmin):
             .prefetch_related("product__translations")
         )
 
-    @admin.display(description=_("Product"))
+    @display(description=_("Product"), header=True)
     def product_name(self, obj):
-        name = obj.product.safe_translation_getter(
-            "name", any_language=True
-        ) or _("Unnamed Product")
-        return f"{name} (#{obj.product.sku[:8]})"
+        return header_two_line(
+            obj.product.safe_translation_getter("name", any_language=True)
+            or _("Unnamed Product"),
+            obj.product.sku,
+            image_path=obj.image.url if obj.image else None,
+            squared=True,
+        )
 
 
 @admin.register(ProductVariantGroup)
@@ -2288,18 +2287,21 @@ class ProductVariantGroupAdmin(BaseTranslatableAdmin):
         variants = obj.variants.all()
         if not variants:
             return _("No products assigned yet.")
+        links = (
+            change_link(
+                self.admin_site,
+                Product,
+                variant.pk,
+                "{} (#{})".format(
+                    variant.safe_translation_getter("name", any_language=True)
+                    or variant.sku,
+                    variant.pk,
+                ),
+            )
+            for variant in variants
+        )
         return format_html_join(
-            mark_safe("<br>"),
-            '<a href="{}">{} (#{})</a>',
-            (
-                (
-                    reverse("admin:product_product_change", args=[v.pk]),
-                    v.safe_translation_getter("name", any_language=True)
-                    or v.sku,
-                    v.pk,
-                )
-                for v in variants
-            ),
+            "", '<span class="block">{}</span>', ((link,) for link in links)
         )
 
 

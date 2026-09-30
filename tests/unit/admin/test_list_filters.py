@@ -39,17 +39,27 @@ def test_a_field_name_maps_to_its_unfold_filter(model, name, expected):
     assert unfold_filter_for(model._meta.get_field(name)) is expected
 
 
+def _filter_class(entry):
+    if isinstance(entry, str):
+        return None
+    return entry[1] if isinstance(entry, tuple) else entry
+
+
 def test_no_first_party_sheet_keeps_a_django_filter():
+    """Every filter renders through Unfold's templates, so the whole
+    sheet is one form sent by "Apply" — a Django ``SimpleListFilter``
+    subclass is a link that applies on click."""
     request = RequestFactory().get("/admin/")
-    plain = [
+    django_filters = [
         f"{model._meta.label}: {entry}"
         for site in (django_admin.site, platform_admin_site)
         for model, model_admin in site._registry.items()
         if isinstance(model_admin, BaseModelAdmin)
         for entry in model_admin.get_list_filter(request)
-        if isinstance(entry, str)
+        if (cls := _filter_class(entry)) is None
+        or not cls.template.startswith("unfold/")
     ]
-    assert plain == []
+    assert django_filters == [], "; ".join(django_filters)
 
 
 @pytest.mark.django_db

@@ -1,6 +1,5 @@
 from django.contrib import admin, messages
 from django.db import models
-from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from unfold.contrib.filters.admin import (
     DropdownFilter,
@@ -11,7 +10,7 @@ from unfold.decorators import action, display
 from unfold.enums import ActionVariant
 
 from admin.base import BaseTranslatableAdmin
-from admin.displays import format_dt
+from admin.displays import format_dt, header_two_line
 from country.models import Country
 from region.admin import RegionInline
 
@@ -55,7 +54,6 @@ class CountryStatusFilter(DropdownFilter):
 class CountryAdmin(BaseTranslatableAdmin):
     list_display = (
         "country_info",
-        "flag_display",
         "codes_display",
         "contact_info",
         "completeness_badge",
@@ -137,20 +135,17 @@ class CountryAdmin(BaseTranslatableAdmin):
         ),
     )
 
-    @display(description=_("Country"), ordering="alpha_2")
+    @display(description=_("Country"), ordering="alpha_2", header=True)
     def country_info(self, obj):
         name = obj.safe_translation_getter("name", any_language=True) or _(
             "Unnamed Country"
         )
-        return f"{name} ({obj.alpha_2})"
-
-    @admin.display(description=_("Flag"), empty_value="—")
-    def flag_display(self, obj):
-        if not obj.image_flag:
-            return None
-        return format_html(
-            '<img src="{url}" width="32" height="22" alt="" />',
-            url=obj.image_flag.url,
+        return header_two_line(
+            name,
+            obj.alpha_2,
+            obj.alpha_2,
+            image_path=obj.image_flag.url if obj.image_flag else None,
+            contained=True,
         )
 
     @display(description=_("Codes"))

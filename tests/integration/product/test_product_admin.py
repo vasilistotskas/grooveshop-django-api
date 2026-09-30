@@ -251,17 +251,7 @@ class TestProductImageInline:
 
         assert inline.model == ProductImage
         assert inline.extra == 0
-        assert "image_thumbnail" in inline.fields
-        assert "image_thumbnail" in inline.readonly_fields
-
-    def test_image_thumbnail_with_image(self, admin_request):
-        product = ProductFactory()
-        product_image = ProductImageFactory(product=product)
-        inline = ProductImageInline(Product, AdminSite())
-
-        result = inline.image_thumbnail(product_image)
-
-        assert len(result) > 0
+        assert inline.fields == ("image", "is_main")
 
 
 @pytest.mark.django_db
@@ -282,8 +272,7 @@ class TestProductCategoryImageInline:
 
         assert inline.model == ProductCategoryImage
         assert inline.extra == 0
-        assert "image_thumbnail" in inline.fields
-        assert "image_thumbnail" in inline.readonly_fields
+        assert inline.fields == ("image", "image_type", "active")
 
 
 @pytest.mark.django_db
@@ -294,14 +283,12 @@ class TestCategoryAdmin:
         category.name = "Bedding & Bath"
         category.save()
 
-        result = category_admin.category_info(category)
+        title, subtitle, *_ = category_admin.category_info(category)
 
-        category_name = category.safe_translation_getter(
+        assert title == category.safe_translation_getter(
             "name", any_language=True
         )
-
-        assert category_name in result
-        assert f"level {category.level}" in result
+        assert str(category.level) in str(subtitle)
 
     def test_subcategories_display(self, category_admin, admin_request):
         parent = ProductCategoryFactory()
@@ -313,13 +300,6 @@ class TestCategoryAdmin:
         result = category_admin.subcategories_display(refreshed)
 
         assert result == 2
-
-    def test_image_preview_with_image(self, category_admin):
-        category = ProductCategoryFactory()
-
-        result = category_admin.image_preview(category)
-
-        assert len(result) >= 0
 
     def test_created_display(self, category_admin):
         from django.utils import timezone
@@ -569,13 +549,12 @@ class TestFavouriteAdmin:
 
 @pytest.mark.django_db
 class TestProductCategoryImageAdmin:
-    def test_image_thumbnail(self, category_image_admin):
-        category = ProductCategoryFactory()
-        category_image = ProductCategoryImageFactory(category=category)
+    def test_category_name_shows_the_image(self, category_image_admin):
+        category_image = ProductCategoryImageFactory()
 
-        result = category_image_admin.image_thumbnail(category_image)
+        image = category_image_admin.category_name(category_image)[3]
 
-        assert len(result) >= 0
+        assert image["path"] == category_image.image.url
 
     def test_category_name_display(self, category_image_admin):
         category = ProductCategoryFactory()
@@ -603,13 +582,12 @@ class TestProductCategoryImageAdmin:
 
 @pytest.mark.django_db
 class TestProductImageAdmin:
-    def test_image_thumbnail(self, product_image_admin):
-        product = ProductFactory()
-        product_image = ProductImageFactory(product=product)
+    def test_product_name_shows_the_image(self, product_image_admin):
+        product_image = ProductImageFactory()
 
-        result = product_image_admin.image_thumbnail(product_image)
+        image = product_image_admin.product_name(product_image)[3]
 
-        assert len(result) >= 0
+        assert image["path"] == product_image.image.url
 
     def test_product_name_display(self, product_image_admin):
         product = ProductFactory()

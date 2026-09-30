@@ -211,6 +211,7 @@ def header_two_line(
     *,
     image_path: str | None = None,
     squared: bool = False,
+    contained: bool = False,
 ) -> list[Any]:
     """Build the list that ``@display(header=True)`` expects.
 
@@ -221,11 +222,17 @@ def header_two_line(
     the avatar circle — the "broken product images" bug on the prod
     changelist, 2026-07-12. Initials are always included as the
     template-level fallback when the image is absent.
+
+    ``contained`` shows the whole image uncropped in a wider box
+    (Unfold's ``as_background``): for logos, flags and icons, which the
+    default round avatar would crop.
     """
 
     row = [primary, secondary or "", initials or _initials_from(primary)]
     if image_path:
-        row.append({"path": image_path, "squared": squared})
+        row.append(
+            {"path": image_path, "squared": squared, "as_background": contained}
+        )
     return row
 
 

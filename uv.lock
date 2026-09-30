@@ -935,15 +935,6 @@ wheels = [
 ]
 
 [[package]]
-name = "django-admin-thumbnails"
-version = "1.0.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "django" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/30/cb/ff506351ed5418a36b76d2a1e8670085c587f3a9cc8ffa1108137f1a6a40/django_admin_thumbnails-1.0.0.tar.gz", hash = "sha256:d665bfdfdf3dd2e95b09cec4d98fa9336fcbab0b3a4ab5d7a6e7e6fa576cbf80", size = 13553, upload-time = "2025-11-21T18:29:51.219Z" }
-
-[[package]]
 name = "django-allauth"
 version = "65.19.2"
 source = { registry = "https://pypi.org/simple" }
@@ -1518,7 +1509,6 @@ dependencies = [
     { name = "disposable-email-domains" },
     { name = "dj-stripe" },
     { name = "django" },
-    { name = "django-admin-thumbnails" },
     { name = "django-allauth", extra = ["idp-oidc"] },
     { name = "django-celery-beat" },
     { name = "django-celery-results" },
@@ -1598,7 +1588,6 @@ requires-dist = [
     { name = "disposable-email-domains", specifier = "==0.0.247" },
     { name = "dj-stripe", specifier = "==2.11.0" },
     { name = "django", specifier = "==6.0.8" },
-    { name = "django-admin-thumbnails", specifier = "==1.0.0" },
     { name = "django-allauth", extras = ["idp-oidc"], specifier = "==65.19.2" },
     { name = "django-celery-beat", specifier = "==2.9.0" },
     { name = "django-celery-results", specifier = "==2.6.0" },

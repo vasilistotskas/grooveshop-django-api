@@ -1,6 +1,5 @@
 from django.contrib import admin
 from django.db.models import Q
-from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import TabularInline
 from unfold.contrib.filters.admin import (
@@ -12,6 +11,7 @@ from unfold.decorators import action, display
 from unfold.enums import ActionVariant
 
 from admin.base import BaseTranslatableAdmin
+from admin.displays import header_two_line
 from pay_way.enum.settlement import PaySettlement
 from pay_way.models import PayWay, PayWayShippingExclusion
 
@@ -123,7 +123,6 @@ class PayWayAdmin(BaseTranslatableAdmin):
         "payment_type_display",
         "cost_display",
         "free_threshold_display",
-        "icon_preview",
         "sort_order_display",
     )
 
@@ -225,14 +224,18 @@ class PayWayAdmin(BaseTranslatableAdmin):
         ),
     )
 
-    @admin.display(description=_("Name"))
+    @display(description=_("Name"), header=True)
     def name_display(self, obj):
         # ``display_name``, not the raw translation: the column stores a
         # PayWayEnum key, so this list showed "PAY_ON_DELIVERY". Note
         # ``search_fields`` still queries ``translations__name`` — it is
         # a DB lookup and cannot see a Python property, so staff search
         # by key, not by label.
-        return obj.display_name or _("Unnamed Payment Method")
+        return header_two_line(
+            obj.display_name or _("Unnamed Payment Method"),
+            image_path=obj.icon.url if obj.icon else None,
+            contained=True,
+        )
 
     @admin.display(description=_("Provider"))
     def provider_code_display(self, obj):
@@ -257,15 +260,6 @@ class PayWayAdmin(BaseTranslatableAdmin):
                 "currency": obj.free_threshold.currency,
             }
         return _("No threshold")
-
-    @admin.display(description=_("Icon"))
-    def icon_preview(self, obj):
-        if obj.icon:
-            return format_html(
-                '<img src="{url}" class="h-8 max-w-16 object-contain" />',
-                url=obj.icon.url,
-            )
-        return _("No icon")
 
     @admin.display(description=_("Configuration Preview"))
     def configuration_preview(self, obj):

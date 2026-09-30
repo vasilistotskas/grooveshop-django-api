@@ -151,18 +151,25 @@ class AcsShipmentOrderInline(StackedInline):
 # ── Filters ────────────────────────────────────────────────────────────────
 
 
-class AcsShipmentStateFilter(DropdownFilter):
-    title = _("Shipment state")
-    parameter_name = "shipment_state"
+class LabelPrintedFilter(DropdownFilter):
+    """ "Not printed" is the pre-flight view for the 16:30 manifest run:
+    ACS rejects a pickup list that contains any unprinted voucher, so
+    this is where you find them first."""
+
+    title = _("Label")
+    parameter_name = "label_printed"
 
     def lookups(self, request, model_admin):
-        return AcsShipmentState.choices
+        return [("yes", _("Printed")), ("no", _("Not printed"))]
 
     def queryset(self, request, queryset):
-        value = self.value()
-        if value:
-            return queryset.filter(shipment_state=value)
-        return queryset
+        match self.value():
+            case "yes":
+                return queryset.filter(label_printed_at__isnull=False)
+            case "no":
+                return queryset.filter(label_printed_at__isnull=True)
+            case _:
+                return queryset
 
 
 # ── Admins ─────────────────────────────────────────────────────────────────
@@ -180,12 +187,9 @@ class AcsShipmentAdmin(BaseModelAdmin):
         "last_polled_at",
     )
     list_filter = (
-        AcsShipmentStateFilter,
+        "shipment_state",
         "delivery_kind",
-        # "Label printed at: empty" is the pre-flight view for the 16:30
-        # manifest run — ACS rejects a pickup list that contains any
-        # unprinted voucher, so this is where you find them first.
-        ("label_printed_at", admin.EmptyFieldListFilter),
+        LabelPrintedFilter,
         ("created_at", RangeDateTimeFilter),
     )
     search_fields = ("voucher_no", "order__id", "order__email")

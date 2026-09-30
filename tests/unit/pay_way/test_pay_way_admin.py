@@ -281,7 +281,6 @@ class PayWayAdminTestCase(TestCase):
             "payment_type_display",
             "cost_display",
             "free_threshold_display",
-            "icon_preview",
             "sort_order_display",
         )
         self.assertEqual(self.admin.list_display, expected_fields)
@@ -334,7 +333,7 @@ class PayWayAdminTestCase(TestCase):
     def test_name_display(self):
         result = self.admin.name_display(self.payway)
 
-        self.assertEqual(result, "PayPal Payment")
+        self.assertEqual(result[0], "PayPal Payment")
 
     def test_provider_code_display(self):
         result = self.admin.provider_code_display(self.payway)
@@ -391,19 +390,18 @@ class PayWayAdminTestCase(TestCase):
 
         self.assertIn("#0", result)
 
-    def test_icon_preview(self):
-        result = self.admin.icon_preview(self.payway)
-        self.assertEqual(result, "No icon")
+    def test_name_display_without_icon_has_no_image(self):
+        self.assertEqual(len(self.admin.name_display(self.payway)), 3)
 
-    def test_icon_preview_with_icon(self):
+    def test_name_display_shows_the_icon_uncropped(self):
         self.payway.icon = SimpleUploadedFile(
             "icon.png", b"fake_image_data", content_type="image/png"
         )
         self.payway.save()
 
-        result = self.admin.icon_preview(self.payway)
-        self.assertIn("<img", result)
-        self.assertIn("src=", result)
+        image = self.admin.name_display(self.payway)[3]
+        self.assertEqual(image["path"], self.payway.icon.url)
+        self.assertTrue(image["as_background"])
 
     def test_configuration_preview(self):
         result = self.admin.configuration_preview(self.payway)
@@ -605,7 +603,6 @@ class PayWayAdminIntegrationTestCase(TestCase):
             "cost_display",
             "free_threshold_display",
             "sort_order_display",
-            "icon_preview",
             "configuration_preview",
             "effective_cost_display",
             "is_configured_status",

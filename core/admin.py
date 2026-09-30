@@ -19,6 +19,8 @@ from django_celery_beat.models import (
 )
 from extra_settings.models import Setting
 from unfold.admin import ModelAdmin
+from unfold.contrib.filters.admin import DropdownFilter
+from unfold.decorators import display
 from unfold.widgets import UnfoldAdminSelectWidget, UnfoldAdminTextInputWidget
 
 from admin.base import BaseModelAdmin
@@ -196,13 +198,11 @@ def setting_category(name: str) -> str:
     return "Other"
 
 
-class SettingCategoryFilter(admin.SimpleListFilter):
+class SettingCategoryFilter(DropdownFilter):
     """Group the flat settings list into functional areas.
 
-    Rendered as an unfold dropdown via the admin's
-    ``list_filter``; the categories come from the shared
-    ``SETTING_CATEGORIES`` prefix map so the badge column and the
-    filter can never disagree.
+    The categories come from the shared ``SETTING_CATEGORIES`` prefix
+    map so the category column and the filter can never disagree.
     """
 
     title = _("Category")
@@ -246,8 +246,8 @@ class SettingAdmin(BaseModelAdmin):
 
     list_display = [
         "name_display",
-        "category_badge",
-        "value_type_badge",
+        "category_label",
+        "value_type_label",
         "value_preview",
         "description_preview",
     ]
@@ -256,12 +256,7 @@ class SettingAdmin(BaseModelAdmin):
     search_fields = ["name", "description"]
 
     class Media:
-        css = {
-            "all": (
-                "extra_settings/css/setting_badges.css",
-                "extra_settings/css/extra_settings_admin.css",
-            )
-        }
+        css = {"all": ("extra_settings/css/extra_settings_admin.css",)}
         js = ("extra_settings/js/extra_settings_admin.js",)
 
     # Use fieldsets for better control over field rendering
@@ -315,24 +310,13 @@ class SettingAdmin(BaseModelAdmin):
     def name_display(self, obj):
         return obj.name
 
-    @admin.display(description=_("Category"))
-    def category_badge(self, obj):
-        from django.utils.html import format_html
+    @display(description=_("Category"), label=True)
+    def category_label(self, obj):
+        return _(setting_category(obj.name))
 
-        return format_html(
-            '<span class="setting-type-badge" data-type="{category}">'
-            "{category}</span>",
-            category=setting_category(obj.name),
-        )
-
-    @admin.display(description=_("Type"))
-    def value_type_badge(self, obj):
-        from django.utils.html import format_html
-
-        return format_html(
-            '<span class="setting-type-badge" data-type="{type}">{type}</span>',
-            type=obj.value_type,
-        )
+    @display(description=_("Type"), label=True, ordering="value_type")
+    def value_type_label(self, obj):
+        return obj.get_value_type_display()
 
     @admin.display(description=_("Current Value"))
     def value_preview(self, obj):
@@ -350,9 +334,7 @@ class SettingAdmin(BaseModelAdmin):
         return desc[:60] + "…" if len(desc) > 60 else desc
 
 
-class PeriodicTaskAdmin(
-    BasePeriodicTaskAdmin, BaseModelAdmin
-):
+class PeriodicTaskAdmin(BasePeriodicTaskAdmin, BaseModelAdmin):
     form = UnfoldPeriodicTaskForm
 
 
@@ -360,9 +342,7 @@ class IntervalScheduleAdmin(BaseModelAdmin):
     pass
 
 
-class CrontabScheduleAdmin(
-    BaseCrontabScheduleAdmin, BaseModelAdmin
-):
+class CrontabScheduleAdmin(BaseCrontabScheduleAdmin, BaseModelAdmin):
     pass
 
 
@@ -370,9 +350,7 @@ class SolarScheduleAdmin(BaseModelAdmin):
     pass
 
 
-class ClockedScheduleAdmin(
-    BaseClockedScheduleAdmin, BaseModelAdmin
-):
+class ClockedScheduleAdmin(BaseClockedScheduleAdmin, BaseModelAdmin):
     pass
 
 

@@ -17,7 +17,11 @@ def test_header_two_line_puts_image_dict_at_index_three():
 
     assert len(row) == 4
     assert row[2] == "OT"  # initials fallback stays at index 2
-    assert row[3] == {"path": "/media/p.jpg", "squared": False}
+    assert row[3] == {
+        "path": "/media/p.jpg",
+        "squared": False,
+        "as_background": False,
+    }
 
 
 def test_header_two_line_without_image_is_three_elements():

@@ -32,7 +32,7 @@ import tempfile
 from pathlib import Path
 
 ARTIFACT_PREFIX = "test-durations-shard-"
-WORKFLOW = "ci.yml"
+WORKFLOW_NAME = "CI"
 
 
 def merge(shards: dict[int, dict[str, float]], expected: int) -> dict:
@@ -61,23 +61,40 @@ def _gh(*args: str) -> str:
     ).stdout
 
 
-def _latest_successful_run() -> str:
-    return _gh(
-        "run",
-        "list",
-        "--workflow",
-        WORKFLOW,
-        "--branch",
-        "main",
-        "--status",
-        "success",
-        "--limit",
-        "1",
-        "--json",
-        "databaseId",
-        "--jq",
-        ".[0].databaseId",
-    ).strip()
+def latest_successful_run(runs: list[dict]) -> str:
+    """The newest successful CI run pushed to ``main``, from a listing.
+
+    ``gh run list`` returns newest first. Raises ``LookupError`` when the
+    listing holds none.
+    """
+    for run in runs:
+        if (
+            run.get("workflowName") == WORKFLOW_NAME
+            and run.get("headBranch") == "main"
+            and run.get("event") == "push"
+            and run.get("conclusion") == "success"
+        ):
+            return str(run["databaseId"])
+    raise LookupError(f"no successful {WORKFLOW_NAME} run on main")
+
+
+def _recent_runs() -> list[dict]:
+    # The repository-wide listing, filtered by ``latest_successful_run``.
+    # GitHub's per-workflow runs endpoint (``--workflow``, which
+    # ``--branch`` / ``--status`` only narrow further) stopped returning
+    # new runs of this workflow after 2026-09-08, so it handed back a
+    # three-week-old run whose artifacts had expired, while the
+    # repository listing stayed current.
+    return json.loads(
+        _gh(
+            "run",
+            "list",
+            "--limit",
+            "100",
+            "--json",
+            "databaseId,workflowName,headBranch,event,conclusion",
+        )
+    )
 
 
 def _download(run_id: str, into: Path) -> dict[int, dict[str, float]]:
@@ -105,7 +122,7 @@ def main() -> int:
     parser.add_argument("--output", type=Path, default=Path(".test_durations"))
     args = parser.parse_args()
 
-    run_id = args.run_id or _latest_successful_run()
+    run_id = args.run_id or latest_successful_run(_recent_runs())
     with tempfile.TemporaryDirectory() as tmp:
         shards = _download(run_id, Path(tmp))
     try:

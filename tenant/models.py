@@ -14,6 +14,10 @@ from simple_history.models import HistoricalRecords
 
 from core.json_schema import JSONSchemaValidator
 from core.models import TimeStampMixinModel, UUIDModel
+from core.utils.tenant_urls import (
+    STOREFRONT_DEFAULT_LOCALE,
+    storefront_language_choices,
+)
 from tenant.validators import (
     validate_reserved_schema_name,
 )
@@ -192,10 +196,16 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         _("Store Description"), blank=True, default=""
     )
     default_locale = models.CharField(
-        _("Default Locale"), max_length=10, default="el"
+        _("Default Locale"),
+        max_length=10,
+        choices=storefront_language_choices,
+        default=STOREFRONT_DEFAULT_LOCALE,
     )
     default_currency = models.CharField(
-        _("Default Currency"), max_length=3, default="EUR"
+        _("Default Currency"),
+        max_length=3,
+        choices=settings.CURRENCY_CHOICES,
+        default="EUR",
     )
     available_locales = models.JSONField(
         _("Available Locales"),

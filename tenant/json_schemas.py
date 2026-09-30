@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from django.conf import settings
+from core.utils.tenant_urls import STOREFRONT_LOCALES
 
 _HEX = {"type": "string", "pattern": "^#[0-9a-fA-F]{6}$"}
 
@@ -91,12 +91,14 @@ def theme_metadata() -> dict[str, Any]:
 
 
 def available_locales() -> dict[str, Any]:
-    """Empty = single-language on ``default_locale``. That it contains
-    ``default_locale`` otherwise is a cross-field rule
-    (``Tenant.clean``)."""
+    """Locales the storefront has routes for (``STOREFRONT_LOCALES``,
+    narrower than ``settings.LANGUAGES``: Django carries ``de`` content,
+    the storefront has no ``/de``). Empty = single-language on
+    ``default_locale``; that it contains ``default_locale`` otherwise
+    is a cross-field rule (``Tenant.clean``)."""
     return {
         "type": "array",
-        "items": {"enum": [code for code, _label in settings.LANGUAGES]},
+        "items": {"enum": list(STOREFRONT_LOCALES)},
         "uniqueItems": True,
     }
 

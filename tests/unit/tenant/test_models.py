@@ -628,3 +628,18 @@ def test_theme_metadata_bad_font_mono_raises():
     t = _unsaved_tenant(theme_metadata={"fontMono": "comic-sans"})
     with pytest.raises(ValidationError):
         t.clean_fields()
+
+
+def test_locales_are_limited_to_the_storefront_ones():
+    """Django carries ``de`` content, but the storefront has no ``/de``
+    routes: a store serving it would link visitors to 404s."""
+    from core.utils.tenant_urls import STOREFRONT_LOCALES
+
+    t = _unsaved_tenant(default_locale="de", available_locales=["el", "de"])
+    with pytest.raises(ValidationError) as exc_info:
+        t.clean_fields()
+    assert {"default_locale", "available_locales"} <= set(
+        exc_info.value.message_dict
+    )
+    choices = Tenant._meta.get_field("default_locale").choices
+    assert [code for code, _label in choices] == list(STOREFRONT_LOCALES)

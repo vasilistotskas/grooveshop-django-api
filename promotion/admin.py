@@ -35,6 +35,48 @@ def _generate_code(prefix: str, length: int) -> str:
     return f"{prefix}{random_part}" if prefix else random_part
 
 
+def _create_codes(
+    promotion: Promotion,
+    count: int,
+    *,
+    prefix: str,
+    length: int,
+    usage_limit: int | None,
+) -> int:
+    """Insert *count* new random codes; returns how many were created.
+
+    Only the candidates are checked against the table, never the whole
+    code list (every code of every promotion used to be loaded to find
+    free ones). A code another request inserts between the check and
+    the insert is skipped by the unique constraint and replaced on the
+    next round.
+    """
+    created = 0
+    while created < count:
+        candidates = {
+            _generate_code(prefix, length) for _ in range(count - created)
+        }
+        taken = set(
+            PromotionCode.objects.filter(code__in=candidates).values_list(
+                "code", flat=True
+            )
+        )
+        fresh = candidates - taken
+        PromotionCode.objects.bulk_create(
+            [
+                PromotionCode(
+                    promotion=promotion, code=code, usage_limit=usage_limit
+                )
+                for code in fresh
+            ],
+            ignore_conflicts=True,
+        )
+        created += PromotionCode.objects.filter(
+            promotion=promotion, code__in=fresh
+        ).count()
+    return created
+
+
 class GenerateCodesForm(BaseDialogForm):
     count = forms.IntegerField(
         label=_("Number of codes"), min_value=1, max_value=10000, initial=100
@@ -285,32 +327,24 @@ class PromotionAdmin(BaseTranslatableAdmin):
         # dialog form and follows the redirect client-side.
         promotion = Promotion.objects.get(pk=object_id)
         data = form.cleaned_data
-        existing = set(PromotionCode.objects.values_list("code", flat=True))
-        new_codes: list[PromotionCode] = []
-        seen: set[str] = set()
-        while len(new_codes) < data["count"]:
-            code = _generate_code(data["prefix"], data["length"])
-            if code in existing or code in seen:
-                continue
-            seen.add(code)
-            new_codes.append(
-                PromotionCode(
-                    promotion=promotion,
-                    code=code,
-                    usage_limit=data.get("usage_limit"),
-                )
-            )
-        PromotionCode.objects.bulk_create(new_codes)
+        created = _create_codes(
+            promotion,
+            data["count"],
+            prefix=data["prefix"],
+            length=data["length"],
+            usage_limit=data.get("usage_limit"),
+        )
         self.message_user(
             request,
             _("%(count)d codes generated for %(name)s.")
-            % {"count": len(new_codes), "name": promotion},
+            % {"count": created, "name": promotion},
             messages.SUCCESS,
         )
         return HttpResponse(
             headers={
                 "HX-Redirect": reverse(
-                    "admin:promotion_promotion_change", args=[object_id]
+                    f"{self.admin_site.name}:promotion_promotion_change",
+                    args=[object_id],
                 ),
             }
         )

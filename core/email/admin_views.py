@@ -1,18 +1,19 @@
 """Admin views for email template management."""
 
-import json
 import logging
 from typing import Any
 
-from django.conf import settings
-from django.http import HttpRequest, JsonResponse
+from django.contrib import admin
+from django.core.exceptions import PermissionDenied
+from django.http import HttpRequest, HttpResponse
+from django.template.response import TemplateResponse
 from django.utils.translation import gettext_lazy as _
 from django.views.decorators.http import require_http_methods
 from django.views.generic import TemplateView
 
-from order.models import Order
-
+from .forms import EmailPreviewForm
 from .preview_service import EmailTemplatePreviewService
+from .registry import EmailTemplateRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -21,226 +22,81 @@ logger = logging.getLogger(__name__)
 # runs the tenant-membership gate. Do NOT fall back to
 # ``staff_member_required`` here — it only checks the global
 # ``is_staff`` flag and would let a merchant read another store's
-# orders.
+# orders. On top of that gate, previews render real orders, so both
+# views need ``order.view_order``.
+
+
+def _require_order_access(request: HttpRequest) -> None:
+    if not request.user.has_perm("order.view_order"):
+        raise PermissionDenied
+
+
+def _preview_form(
+    registry: EmailTemplateRegistry, data=None
+) -> EmailPreviewForm:
+    return EmailPreviewForm(
+        data,
+        template_names=[t.name for t in registry.get_all_templates()],
+    )
 
 
 class EmailTemplateManagementView(TemplateView):
-    """
-    Main admin view for email template management.
-    """
-
     template_name = "admin/email_template_management.html"
 
+    def dispatch(self, request, *args, **kwargs):
+        _require_order_access(request)
+        return super().dispatch(request, *args, **kwargs)
+
     def get_context_data(self, **kwargs) -> dict[str, Any]:
-        """
-        Get context data for the template.
-
-        Returns:
-            Context dictionary
-        """
         context = super().get_context_data(**kwargs)
-
-        # Unfold renders its chrome (sidebar navigation, site dropdown,
-        # environment badge, theme state) from the admin site's
-        # ``each_context``. Plain TemplateViews don't get it, which left
-        # this page with a half-populated shell.
-        from django.contrib import admin
-
+        # Unfold renders its chrome (sidebar, site menu, environment
+        # badge) from the admin site's ``each_context``; a plain
+        # TemplateView does not get it.
         context.update(admin.site.each_context(self.request))
-
-        from .registry import EmailTemplateRegistry
-
-        # Get all templates grouped by category
         registry = EmailTemplateRegistry()
-        templates = registry.get_all_templates()
-        categories = registry.get_categories()
-
-        # Group templates by category
-        templates_by_category = {}
-        for category in categories:
-            templates_by_category[category] = registry.get_by_category(category)
-
-        # Get recent orders for real data testing
-        recent_orders = Order.objects.order_by("-created_at")[:10].values(
-            "id",
-            "first_name",
-            "last_name",
-            "status",
-            "created_at",
-            "paid_amount",
-        )
-
-        # Get available languages from Django settings
-        available_languages = [
-            {"code": code, "name": str(name)}
-            for code, name in settings.LANGUAGES
-        ]
-
         context.update(
             {
                 "title": _("Email Template Management"),
-                "templates": templates,
-                "templates_by_category": templates_by_category,
-                "categories": categories,
-                "recent_orders": list(recent_orders),
-                "available_languages": available_languages,
+                "form": _preview_form(registry),
+                "templates_by_category": {
+                    category: registry.get_by_category(category)
+                    for category in registry.get_categories()
+                },
             }
         )
-
         return context
 
 
 @require_http_methods(["POST"])
-def preview_template_ajax(request: HttpRequest) -> JsonResponse:
-    """
-    AJAX endpoint for template preview.
-
-    Args:
-        request: HTTP request with JSON data
-
-    Returns:
-        JSON response with preview data
-    """
-    try:
-        data = json.loads(request.body)
-        template_name = data.get("template_name")
-        order_id = data.get("order_id")
-        language = data.get("language", "el")
-        format_type = data.get("format_type", "html")
-
-        if not template_name:
-            return JsonResponse(
-                {"success": False, "error": "Template name is required"}
-            )
-
-        # Convert order_id to int if provided
-        if order_id:
-            try:
-                order_id = int(order_id)
-            except ValueError, TypeError:
-                order_id = None
-
-        # Generate preview
-        preview_service = EmailTemplatePreviewService()
-        preview = preview_service.generate_preview(
-            template_name=template_name, order_id=order_id, language=language
+def preview_template(request: HttpRequest) -> HttpResponse:
+    """The preview panel's fragment, posted by htmx from the page's form."""
+    _require_order_access(request)
+    form = _preview_form(EmailTemplateRegistry(), request.POST)
+    if not form.is_valid():
+        return TemplateResponse(
+            request,
+            "admin/email_templates/preview.html",
+            {"error": _("Select a template to preview.")},
         )
 
-        # Build result
-        if preview.error:
-            result = {"success": False, "error": preview.error}
-        else:
-            result = {
-                "success": True,
-                "rendered_content": preview.html_content
-                if format_type == "html"
-                else preview.text_content,
-                "format_type": format_type,
-                "language": language,
-                "data_source": "real" if order_id else "sample",
-            }
-
-        return JsonResponse(result)
-
-    except json.JSONDecodeError:
-        return JsonResponse({"success": False, "error": "Invalid JSON data"})
-    except Exception:
-        logger.exception("Error previewing template")
-        return JsonResponse(
-            {"success": False, "error": "An unexpected error occurred"}
+    data = form.cleaned_data
+    preview = EmailTemplatePreviewService().generate_preview(
+        template_name=data["template"],
+        order_id=data["order"],
+        language=data["language"],
+    )
+    if preview.error:
+        logger.warning(
+            "Email preview failed for %s: %s", data["template"], preview.error
         )
-
-
-@require_http_methods(["GET"])
-def get_template_info(request: HttpRequest, template_name: str) -> JsonResponse:
-    """
-    Get detailed information about a specific template.
-
-    Args:
-        request: HTTP request
-        template_name: Name of the template
-
-    Returns:
-        JSON response with template information
-    """
-    try:
-        from .registry import EmailTemplateRegistry
-
-        registry = EmailTemplateRegistry()
-        template_info = registry.get_template(template_name)
-
-        if not template_info:
-            return JsonResponse(
-                {
-                    "success": False,
-                    "error": f"Template '{template_name}' not found",
-                }
-            )
-
-        return JsonResponse(
-            {
-                "success": True,
-                "template_info": {
-                    "name": template_info.name,
-                    "path": template_info.path,
-                    "category": template_info.category,
-                    "description": template_info.description,
-                    "order_statuses": [
-                        status.value for status in template_info.order_statuses
-                    ],
-                    "has_html": template_info.has_html,
-                    "has_text": template_info.has_text,
-                    "is_used": template_info.is_used,
-                    "last_modified": template_info.last_modified.isoformat(),
-                },
-            }
-        )
-
-    except Exception:
-        logger.exception("Error getting template info for %s", template_name)
-        return JsonResponse(
-            {"success": False, "error": "An unexpected error occurred"}
-        )
-
-
-@require_http_methods(["GET"])
-def get_order_data(request: HttpRequest, order_id: int) -> JsonResponse:
-    """
-    Get order data for preview.
-
-    Args:
-        request: HTTP request
-        order_id: Order ID
-
-    Returns:
-        JSON response with order data
-    """
-    try:
-        order = (
-            Order.objects.select_related()
-            .prefetch_related("items__product")
-            .get(id=order_id)
-        )
-
-        order_data = {
-            "id": order.id,
-            "status": order.status,
-            "first_name": order.first_name,
-            "last_name": order.last_name,
-            "email": order.email,
-            "paid_amount": str(order.paid_amount),
-            "created_at": order.created_at.isoformat(),
-            "items_count": order.items.count(),
-        }
-
-        return JsonResponse({"success": True, "order": order_data})
-
-    except Order.DoesNotExist:
-        return JsonResponse(
-            {"success": False, "error": f"Order {order_id} not found"}
-        )
-    except Exception:
-        logger.exception("Error getting order data for %s", order_id)
-        return JsonResponse(
-            {"success": False, "error": "An unexpected error occurred"}
-        )
+    return TemplateResponse(
+        request,
+        "admin/email_templates/preview.html",
+        {
+            "error": preview.error,
+            "format": data["format"],
+            "subject": preview.subject,
+            "html": preview.html_content,
+            "text": preview.text_content,
+        },
+    )

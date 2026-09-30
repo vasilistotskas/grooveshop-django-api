@@ -8,7 +8,11 @@ User = get_user_model()
 
 
 class UserAccountFactory(factory.django.DjangoModelFactory):
-    email = factory.Faker("email")
+    # A sequence, not ``Faker("email")``: ``django_get_or_create`` is on
+    # email, so two random emails that collided (about 1 in 20,000 for
+    # four users) handed back the SAME account, and a test asserting two
+    # distinct users failed at random.
+    email = factory.Sequence(lambda n: f"factory-user-{n}@example.org")
     plain_password = factory.Faker("password")
     password = factory.LazyAttribute(
         lambda o: make_password(

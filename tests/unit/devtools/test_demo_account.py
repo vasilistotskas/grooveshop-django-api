@@ -235,8 +235,12 @@ class TestAdapterGuards(TestCase):
         from django.contrib.auth import get_user_model
 
         adapter = self._adapter({demo_account.RETAIL_EMAIL})
+        # A fixed username: a generated ``{Adjective}{Noun}`` one could
+        # resemble the password, which the similarity validator refuses.
         user = get_user_model().objects.create_user(
-            email="real@example.com", password="OriginalPass-1"
+            email="real@example.com",
+            username="real-shopper",
+            password="OriginalPass-1",
         )
         assert adapter.clean_password("ReplacementPass-2", user=user)
 

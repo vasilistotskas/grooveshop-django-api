@@ -104,3 +104,19 @@ def test_no_view_permission_means_no_rows():
     dataset_admin.extra_context = {"object": str(product.pk)}
 
     assert not dataset_admin.get_queryset(request).exists()
+
+
+def test_the_order_page_opens_with_its_summary(client):
+    from order.enum.status import OrderStatus
+
+    customer = UserAccountFactory()
+    order = OrderFactory(user=customer, status=OrderStatus.PROCESSING)
+
+    response = client.get(reverse("admin:order_order_change", args=[order.pk]))
+
+    assert response.status_code == 200
+    titles = [str(card["title"]) for card in response.context["order_summary"]]
+    assert len(titles) == 6
+    html = response.content.decode()
+    assert order.get_status_display() in html
+    assert f"/user/useraccount/{customer.pk}/change/" in html

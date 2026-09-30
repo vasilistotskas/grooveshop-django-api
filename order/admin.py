@@ -9,6 +9,7 @@ from django.urls import path, reverse
 from django.utils import timezone
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import ngettext
 from unfold.admin import TabularInline
 from unfold.contrib.filters.admin import (
     AutocompleteSelectFilter,
@@ -33,6 +34,7 @@ from admin.displays import (
     choice_label,
     format_dt,
     header_two_line,
+    label_cell,
     money,
     relative_time,
 )
@@ -50,6 +52,7 @@ from order.models.stock_log import StockLog
 from order.models.viva_webhook_event import VivaWebhookEvent
 from order.payment import payment_provider_label
 from order.services import OrderService
+from user.models import UserAccount
 
 logger = logging.getLogger(__name__)
 
@@ -679,6 +682,81 @@ class OrderAdmin(BaseModelAdmin):
         description=_("Payment"),
     )
 
+    # The facts an operator opens an order for, above the tabs.
+    change_form_before_template = "admin/order/order_summary.html"
+
+    def render_change_form(
+        self, request, context, add=False, change=False, form_url="", obj=None
+    ):
+        if obj is not None:
+            context["order_summary"] = self._summary(obj)
+        return super().render_change_form(
+            request, context, add, change, form_url, obj
+        )
+
+    def _summary(self, order) -> list[dict]:
+        shipment = self.shipment_state(order)
+        invoice = Invoice.objects.filter(order=order).first()
+        return [
+            {
+                "title": _("Status"),
+                "value": label_cell(
+                    order.get_status_display(),
+                    ORDER_STATUS_VARIANT.get(order.status, "default"),
+                ),
+                "footer": relative_time(order.status_updated_at),
+            },
+            {
+                "title": _("Payment"),
+                "value": label_cell(
+                    order.get_payment_status_display(),
+                    PAYMENT_STATUS_VARIANT.get(order.payment_status, "default"),
+                ),
+                "footer": self.payment_method_label(order),
+            },
+            {
+                "title": _("Total"),
+                "value": self._total(order),
+                # ``get_object`` reads ``get_queryset``, which annotates it.
+                "footer": ngettext(
+                    "%(count)d item", "%(count)d items", order.item_count
+                )
+                % {"count": order.item_count},
+            },
+            {
+                "title": _("Customer"),
+                "value": change_link(
+                    self.admin_site,
+                    UserAccount,
+                    order.user_id,
+                    order.customer_full_name,
+                )
+                if order.user_id
+                else order.customer_full_name,
+                "footer": order.email,
+            },
+            {
+                "title": _("Shipment"),
+                "value": label_cell(
+                    shipment[1],
+                    SHIPMENT_STATE_VARIANT.get(shipment[0], "default"),
+                )
+                if shipment
+                else "—",
+                "footer": self.shipping_info(order),
+            },
+            {
+                "title": _("Invoice"),
+                "value": invoice.invoice_number if invoice else "—",
+                "footer": label_cell(
+                    invoice.get_mydata_status_display(),
+                    MYDATA_STATUS_VARIANT.get(invoice.mydata_status, "default"),
+                )
+                if invoice
+                else "",
+            },
+        ]
+
     attribution_source_type = _attribution_field(
         "source_type", _("Source type")
     )
@@ -722,23 +800,24 @@ class OrderAdmin(BaseModelAdmin):
     def customer(self, obj):
         return header_two_line(obj.customer_full_name, obj.email)
 
-    @display(description=_("Order"), ordering="created_at")
-    def order_summary(self, obj):
-        item_count = getattr(obj, "item_count", 0)
-        total_qty = getattr(obj, "total_items_quantity", 0) or 0
-
+    @staticmethod
+    def _total(obj) -> str:
         try:
             # Post-discount figure — what the customer actually owes.
-            total = money(obj.calculate_order_total_amount().amount)
+            return money(obj.calculate_order_total_amount().amount)
         except ValueError:
-            total = _(
+            return _(
                 "items %(items)s + shipping %(shipping)s (currency mismatch)"
             ) % {
                 "items": money(obj.total_price_items.amount),
                 "shipping": money(obj.total_price_extra.amount),
             }
 
-        return f"{item_count} items, qty {total_qty} — {total}"
+    @display(description=_("Order"), ordering="created_at")
+    def order_summary(self, obj):
+        item_count = getattr(obj, "item_count", 0)
+        total_qty = getattr(obj, "total_items_quantity", 0) or 0
+        return f"{item_count} items, qty {total_qty} — {self._total(obj)}"
 
     @display(description=_("Shipment"), label=SHIPMENT_STATE_VARIANT)
     def shipment_state(self, obj):

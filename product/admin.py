@@ -1468,13 +1468,8 @@ class ProductAdmin(
         (``admin.dashboard.base``) so it follows the theme; Unfold's
         header builds the breadcrumbs from ``opts`` and ``original``.
         """
-        from admin.dashboard.base import (
-            bar_chart_options,
-            chart_json,
-            color,
-            label_cell,
-            link_cell,
-        )
+        from admin.dashboard.base import bar_chart_options, chart_json, color
+        from admin.displays import label_cell, link_cell
         from order.models.stock_log import StockLog
 
         product = get_object_or_404(Product, pk=product_id)

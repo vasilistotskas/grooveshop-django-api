@@ -310,6 +310,12 @@ class PayWayShippingExclusion(TimeStampMixinModel):
     The two layers compose: exclusions here run BEFORE the carrier
     hook, so an operator-blocked combination short-circuits without
     even consulting the carrier adapter.
+
+    ``country`` scopes a row to one delivery country. ``NULL`` means
+    every country (the original behaviour, so rows that predate the
+    column keep working); a country means that country only. This is
+    how a store can offer BoxNow PAY ON THE GO in Greece yet keep a
+    Cyprus locker order card-only.
     """
 
     pay_way = models.ForeignKey(
@@ -329,6 +335,21 @@ class PayWayShippingExclusion(TimeStampMixinModel):
         max_length=32,
         choices=ShippingKind.choices,
     )
+    # Cross-schema FK to the public ``country.Country`` row, same shape
+    # as ``ShippingRate.country``: no reverse accessor into every tenant
+    # schema, PROTECT so a referenced country cannot vanish silently.
+    country = models.ForeignKey(
+        "country.Country",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="+",
+        verbose_name=_("Country"),
+        help_text=_(
+            "Delivery country this exclusion applies to. Leave empty to "
+            "exclude the pay way for every country."
+        ),
+    )
     note = models.TextField(
         _("Note"),
         blank=True,
@@ -347,8 +368,15 @@ class PayWayShippingExclusion(TimeStampMixinModel):
         ordering = ["shipping_provider", "shipping_kind", "pay_way"]
         constraints = [
             models.UniqueConstraint(
-                fields=("pay_way", "shipping_provider", "shipping_kind"),
+                fields=(
+                    "pay_way",
+                    "shipping_provider",
+                    "shipping_kind",
+                    "country",
+                ),
                 name="payway_shipping_exclusion_unique",
+                # One "every country" row per combination stays unique.
+                nulls_distinct=False,
             ),
         ]
         # Override the inherited TimeStampMixinModel indexes with

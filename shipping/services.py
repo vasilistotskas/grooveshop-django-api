@@ -345,7 +345,9 @@ class ShippingService:
                         "priority": provider.priority,
                         "logo_url": provider.logo_url_for_kind(kind.value),
                         "metadata": provider.metadata or {},
-                        "pay_ways": cls._pay_ways_for(provider.code, kind),
+                        "pay_ways": cls._pay_ways_for(
+                            provider.code, kind, country_code
+                        ),
                         "country_code": country_code,
                         "max_weight_grams": rate.max_weight_grams,
                         "exceeds_max_weight": exceeds_max_weight,
@@ -356,7 +358,11 @@ class ShippingService:
         return options
 
     @staticmethod
-    def _pay_ways_for(provider_code: str, kind: ShippingKind) -> list[dict]:
+    def _pay_ways_for(
+        provider_code: str,
+        kind: ShippingKind,
+        country_code: str | None = None,
+    ) -> list[dict]:
         """Payment methods this (provider, kind) can actually settle.
 
         Runs the pay-way rules rather than restating them: the same
@@ -384,6 +390,7 @@ class ShippingService:
                 PayWay.objects.filter(active=True),
                 provider_code=provider_code,
                 shipping_kind=kind.value,
+                country_code=country_code,
             )
             return [
                 {

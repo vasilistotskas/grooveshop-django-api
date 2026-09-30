@@ -19375,3 +19375,11 @@ msgstr "Όνομα κλειδιού ρύθμισης (π.χ. GIFT_CARD_MIN_AMOUN
 #, python-format
 msgid "BoxNow locker sync complete: %(created)d created, %(updated)d updated, %(deactivated)d deactivated, %(skipped_no_country)d skipped (no country)."
 msgstr "Ο συγχρονισμός των BoxNow lockers ολοκληρώθηκε: %(created)d νέα, %(updated)d ενημερώθηκαν, %(deactivated)d απενεργοποιήθηκαν, %(skipped_no_country)d παραλείφθηκαν (χωρίς χώρα)."
+
+#: .\pay_way\models.py
+msgid "Delivery country this exclusion applies to. Leave empty to exclude the pay way for every country."
+msgstr "Η χώρα παράδοσης στην οποία ισχύει ο αποκλεισμός. Αφήστε κενό για να αποκλειστεί ο τρόπος πληρωμής σε όλες τις χώρες."
+
+#: .\pay_way\filters.py
+msgid "ISO 3166-1 alpha-2 delivery country. Drops the pay ways an operator excluded for that country (e.g. BoxNow PAY ON THE GO in Cyprus). Has no effect without ``shippingKind``; when omitted only the every-country exclusions apply."
+msgstr "Χώρα παράδοσης (ISO 3166-1 alpha-2). Αφαιρεί τους τρόπους πληρωμής που ο διαχειριστής έχει αποκλείσει για τη χώρα αυτή (π.χ. BoxNow PAY ON THE GO στην Κύπρο). Δεν έχει επίδραση χωρίς το ``shippingKind``· αν παραλείπεται ισχύουν μόνο οι αποκλεισμοί για όλες τις χώρες."

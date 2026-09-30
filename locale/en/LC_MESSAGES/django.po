@@ -7609,6 +7609,16 @@ msgstr ""
 msgid "Rate"
 msgstr ""
 
+#: .\core\templates\invoices\invoice.html:299
+msgctxt "VAT rate"
+msgid "Rate"
+msgstr ""
+
+#: .\shipping\admin.py:32
+msgctxt "shipping"
+msgid "Rate"
+msgstr ""
+
 #: .\product\models\review.py:35
 msgid "Comment"
 msgstr ""

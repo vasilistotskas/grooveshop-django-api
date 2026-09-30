@@ -6706,9 +6706,19 @@ msgstr "Χρέωση πληρωμής"
 msgid "VAT breakdown"
 msgstr "Ανάλυση ΦΠΑ"
 
-#: .\core\templates\invoices\invoice.html:293 .\product\models\review.py:27
+#: .\product\models\review.py:27
 msgid "Rate"
 msgstr "Βαθμολογία"
+
+#: .\core\templates\invoices\invoice.html:299
+msgctxt "VAT rate"
+msgid "Rate"
+msgstr "Συντελεστής"
+
+#: .\shipping\admin.py:32
+msgctxt "shipping"
+msgid "Rate"
+msgstr "Τιμή αποστολής"
 
 #: .\core\templates\invoices\invoice.html:294
 msgid "Net"

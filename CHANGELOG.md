@@ -3,6 +3,67 @@
 
 
 
+## v3.91.0 (2026-09-30)
+
+### Bug fixes
+
+* fix(test): give every factory user a unique email
+
+UserAccountFactory gets-or-creates on email, and Faker's emails repeat
+(about 4% of 20,000 draws), so two "different" users in one test came
+back as the SAME account about 1 in 20,000 times for four users.
+tests/unit/product/alert/test_price_drop_notifications.py failed on main
+that way: its non-favouriting user was one of the favouriting ones. A
+sequence makes the default unique; explicit emails still get-or-create.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`486aa67`](https://github.com/vasilistotskas/grooveshop-django-api/commit/486aa67a5438016391bd9baf6edd6069fb43d483))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.90.1 [skip ci] ([`1475afe`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1475afe94a14005c9a06450d3db965b497ab49d3))
+
+### Features
+
+* feat: harden payments, throttles and routing; overhaul the test suite
+
+Production fixes (each with a test that failed first):
+- Hand-wired routes ignored every @action(...) argument; the new
+  RouterActionOverridesMixin applies them as DRF's router does, so the
+  payment-attempt throttles now actually run.
+- Anonymous throttles key on the proven visitor (AnonIpRateThrottle,
+  trusted_client_ip), not on the Cloudflare edge node every guest
+  shares.
+- All four payment-start endpoints refuse a paid or non-PENDING order;
+  an order that changes during the provider call wins with 409 and the
+  new intent's client secret is never returned.
+- Stripe webhooks write history and email the customer only when the
+  event was applied (PaymentEventOutcome), with the real previous
+  status; payment history stores PaymentStatus values.
+- Viva: a transaction is matched only against the order codes the order
+  issued, never its payment_id.
+- Loyalty: the new-customer bonus is reversed with its order, and no
+  points are granted once a cancel or refund is due.
+- Reorder caps each line at stock and locks the cart.
+- BoxNow webhook answers 400 to non-UTF-8, too-deep and non-object
+  bodies; Meta CAPI drops invalid phones and maps SDK normalisation
+  errors to a permanent MetaCapiError; search analytics covers whole
+  days; federated search highlights; a zero search price is 0.0; order
+  totals never mix currencies; the timeline shows translated status
+  labels.
+- Blog author/category filters are applied; ranking flags became
+  ?ordering= fields over published-only counts, with no per-row query.
+- Order.stock_reservation_ids leaves Django's state (expand step; the
+  DROP ships in the next release).
+
+Test suite: migration seeds are snapshotted once and restored after a
+flush instead of re-seeded before every test; on_commit behaves like
+Django; transactional tests only where commits matter; duplicate and
+tautological tests removed, lost assertions restored; the test database
+migrates the public schema only. Worker time 11113 s -> ~3400 s,
+coverage 82.1% -> 84.8%.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`b7a053f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b7a053fca953ab7c31b348778126b31b9ff9844e))
+
 ## v3.90.1 (2026-09-30)
 
 ### Bug fixes

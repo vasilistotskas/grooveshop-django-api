@@ -3,6 +3,24 @@
 
 
 
+## v3.91.1 (2026-09-30)
+
+### Bug fixes
+
+* fix(order): drop the retired stock_reservation_ids column
+
+Step two of two. 0060 (v3.91.0) took Order.stock_reservation_ids out of
+Django's state and made the column nullable; v3.91.0 now runs on every
+production and staging pod, so nothing selects the column any more and
+this drops it. contract_of names 0060, so migration_preflight refuses a
+deploy that would apply both at once.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`3a681b3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3a681b3f5886f155516e1979e1f1d98fac5e2092))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.91.0 [skip ci] ([`1e2f553`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1e2f5537d854f793fbd3234e5e69377c732f26ed))
+
 ## v3.91.0 (2026-09-30)
 
 ### Bug fixes

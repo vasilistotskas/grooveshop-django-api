@@ -3,6 +3,52 @@
 
 
 
+## v3.92.1 (2026-10-01)
+
+### Bug fixes
+
+* fix(tenant): tenant URLs resolve the store behind a FakeTenant, and fail closed on locales (#103) ([`fae8960`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fae896033ca805e47a696deda7593b52fc9263d2))
+
+* fix(tenant): storefront links fail closed, and read the store behind a FakeTenant
+
+`tenant_storefront_locales` gave a store whose list and default named
+nothing the storefront builds every locale, so its emails could link to
+an `/en/` page the storefront 404s for it. Such a store declared no
+second language: it now gets the unprefixed default only. `Tenant`
+validation (#102) no longer admits that data; this is the rule for what
+predates it. The storefront's `tenantAllowedLocales` changes in step.
+
+That fallback was also what made links work under `schema_context`,
+which binds django-tenants' bare `FakeTenant`: a public-schema
+`TenantTask` (no store — every locale) and a command on a store's schema
+(that store, whose locales were never read). Links now resolve the bound
+tenant first: the public schema is no store, and a store's FakeTenant is
+upgraded to its row.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01BtZU1jbJwAin2BbDRdGyfK ([`fae8960`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fae896033ca805e47a696deda7593b52fc9263d2))
+
+* fix(tenant): every tenant URL builds for the store behind a FakeTenant
+
+The order signals' on_commit dispatch re-enters `schema_context(store)`,
+which binds a bare FakeTenant: `get_tenant_base_url` found no `.domains`
+on it and fell back to the platform host, so a link built there pointed
+at NUXT_BASE_URL instead of the store — and with the previous commit,
+carried the store's locale rule on the platform's host. The storefront,
+API, assets and static helpers now all read the bound tenant through one
+resolver, so host and prefix always describe the same store.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01BtZU1jbJwAin2BbDRdGyfK
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`fae8960`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fae896033ca805e47a696deda7593b52fc9263d2))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.92.0 [skip ci] ([`1d8ce35`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1d8ce350ce782254b5c4dc706d448aad292f39b8))
+
 ## v3.92.0 (2026-10-01)
 
 ### Bug fixes

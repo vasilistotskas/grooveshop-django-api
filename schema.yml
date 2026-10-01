@@ -17908,10 +17908,10 @@ paths:
   /api/v1/pay_way:
     get:
       operationId: listPayWay
-      description: 'Ανάκτηση λίστας Τρόποι πληρωμής με δυνατότητες φιλτραρίσματος
+      description: 'Ανάκτηση λίστας Μέθοδοι πληρωμής με δυνατότητες φιλτραρίσματος
         και αναζήτησης. Υποστηρίζει πολλαπλές στρατηγικές σελιδοποίησης: pageNumber
         (προεπιλογή), cursor και limitOffset.'
-      summary: Λίστα Τρόποι πληρωμής
+      summary: Λίστα Μέθοδοι πληρωμής
       parameters:
       - in: query
         name: active

@@ -3,6 +3,28 @@
 
 
 
+## v3.92.2 (2026-10-01)
+
+### Bug fixes
+
+* fix(blog): throttle the post view count per visitor, as the product one is (#104)
+
+`update_view_count` on blog posts was a public POST with no action
+throttle, so a script could replay it and push a post up "most viewed"
+without limit; the product action already had `ViewCountThrottle`. Both
+now share the `view_count` scope — one budget per visitor across the two
+counters. The storefront relays the visitor's identity on both calls
+(storefront PR), so the bucket is the reader's, not the Nuxt pod's.
+
+
+Claude-Session: https://claude.ai/code/session_01BtZU1jbJwAin2BbDRdGyfK
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`5a2de0f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5a2de0fb09a942b238333dd10718ee07ea815d75))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.92.1 [skip ci] ([`e27baf1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e27baf1c99d21cad85c2b764e5b5368590c36a3b))
+
 ## v3.92.1 (2026-10-01)
 
 ### Bug fixes

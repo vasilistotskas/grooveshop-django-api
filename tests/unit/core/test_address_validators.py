@@ -197,9 +197,57 @@ class TestAddressErrors:
 
 
 class TestValidatePostalCodePattern:
+    """The storefront applies the same pattern as a JavaScript ``RegExp``
+    (``shared/utils/postalCode.ts``, no ``u`` flag), so a stored pattern
+    must mean the same in both engines. Python accepts syntax JavaScript
+    rejects or reads differently; the validator admits only the portable
+    subset."""
+
     def test_accepts_a_compilable_pattern(self):
         validate_postal_code_pattern(r"\d{3} ?\d{2}")
 
-    def test_rejects_a_broken_pattern(self):
+    @pytest.mark.parametrize(
+        ("alpha_2", "fmt"), sorted(SEED.GOOGLE_POSTAL_FORMATS.items())
+    )
+    def test_accepts_every_seeded_pattern(self, alpha_2, fmt):
+        validate_postal_code_pattern(fmt[0])
+
+    @pytest.mark.parametrize(
+        "pattern",
+        [
+            r"[A-Z]{1,2}\d[A-Z\d]? ?\d[A-Z]{2}",
+            r"(?:AI-)?2640",
+            r"^\d{5}$",
+            r"\d{4}(?:-\d{3})?|\d{2}\.\d{3}",
+            r"[^0]\d{4}",
+            r"\d{2,}",
+            r"(\d)\1\d",
+            r"\d{3}(?=\d)\d",
+            r"(?<=K)\d{2}",
+        ],
+    )
+    def test_accepts_portable_syntax(self, pattern):
+        validate_postal_code_pattern(pattern)
+
+    @pytest.mark.parametrize(
+        ("pattern", "why"),
+        [
+            ("(", "does not compile anywhere"),
+            (r"(?P<area>\d{2})\d{3}", "a Python-only named group"),
+            (r"(?<area>\d{2})\d{3}", "a named group Python reads differently"),
+            (r"(?i)[a-z]\d", "an inline flag JavaScript rejects"),
+            (r"\A\d{5}\Z", "string anchors JavaScript reads as letters"),
+            (r"\d{,3}", "an open lower bound JavaScript reads literally"),
+            (r"\d++", "a possessive quantifier"),
+            (r"(?>\d)\d", "an atomic group"),
+            (r"(?#area)\d{5}", "a Python comment group"),
+            (r"[[:digit:]]{5}", "a POSIX class"),
+            (r"\N{DIGIT ZERO}\d", "a named Unicode escape"),
+            (r"\d{5", "an unclosed brace JavaScript reads literally"),
+        ],
+    )
+    def test_rejects_syntax_the_storefront_reads_differently(
+        self, pattern, why
+    ):
         with pytest.raises(ValidationError):
-            validate_postal_code_pattern("(")
+            validate_postal_code_pattern(pattern)

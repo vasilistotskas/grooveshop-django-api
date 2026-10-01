@@ -6907,7 +6907,14 @@ msgstr ""
 msgid "Select a region that belongs to the selected country."
 msgstr ""
 
-#: .\core\validators\address.py:228
+#: .\core\validators\address.py:322
+#, python-format
+msgid ""
+"Use only regular-expression syntax the storefront reads the same way: "
+"“%(construct)s” is not supported."
+msgstr ""
+
+#: .\core\validators\address.py:332
 #, python-format
 msgid "Enter a valid regular expression: %(error)s"
 msgstr ""

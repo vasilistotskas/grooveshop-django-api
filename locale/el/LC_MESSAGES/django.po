@@ -7361,7 +7361,16 @@ msgstr "Επιλέξτε περιοχή για την επιλεγμένη χώ�
 msgid "Select a region that belongs to the selected country."
 msgstr "Επιλέξτε μια περιοχή που ανήκει στην επιλεγμένη χώρα."
 
-#: .\core\validators\address.py:228
+#: .\core\validators\address.py:322
+#, python-format
+msgid ""
+"Use only regular-expression syntax the storefront reads the same way: "
+"“%(construct)s” is not supported."
+msgstr ""
+"Χρησιμοποιήστε μόνο σύνταξη κανονικής έκφρασης που το κατάστημα διαβάζει "
+"με τον ίδιο τρόπο: το «%(construct)s» δεν υποστηρίζεται."
+
+#: .\core\validators\address.py:332
 #, python-format
 msgid "Enter a valid regular expression: %(error)s"
 msgstr "Εισαγάγετε έγκυρη κανονική έκφραση: %(error)s"

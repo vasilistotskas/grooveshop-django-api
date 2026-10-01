@@ -219,10 +219,114 @@ def model_address_errors(instance: Any) -> dict[str, list[StrOrPromise]]:
     return errors
 
 
+# The stored pattern also runs in the storefront, as a JavaScript RegExp
+# without the ``u`` flag (``shared/utils/postalCode.ts``). Python accepts
+# syntax JavaScript rejects (named ``(?P<…>)`` groups, inline flags) or
+# reads differently (``\A``/``\Z`` as letters, ``{,3}`` and an unclosed
+# ``{`` as text, ``[]`` as an empty class), and then the two sides
+# disagree on what a postcode is. So the pattern may use only this
+# subset, which both engines read alike.
+_ESCAPES = frozenset("dDsSwWbB") | frozenset("\\.^$|?*+()[]{}-/")
+_CLASS_ESCAPES = frozenset("dDsSwW") | frozenset("\\]^[-./")
+_GROUP_OPENERS = ("(?:", "(?=", "(?!", "(?<=", "(?<!")
+_BOUNDS = re.compile(r"\{(\d+)(?:(,)(\d*))?\}")
+
+
+def _class_end(pattern: str, start: int) -> int | None:
+    """The index after the ``[...]`` class opening at ``start``, or None
+    when it holds a construct the engines read differently."""
+    i = start + 1
+    if i < len(pattern) and pattern[i] == "^":
+        i += 1
+    if i < len(pattern) and pattern[i] == "]":
+        return None  # ``[]`` is empty in JavaScript, a literal ``]`` in Python
+    while i < len(pattern):
+        char = pattern[i]
+        if char == "]":
+            return i + 1
+        if char == "[":
+            return None  # POSIX classes, nested sets
+        if char == "\\":
+            if i + 1 >= len(pattern) or pattern[i + 1] not in _CLASS_ESCAPES:
+                return None
+            i += 2
+            continue
+        i += 1
+    return None
+
+
+def non_portable_construct(pattern: str) -> str | None:
+    """The first construct of ``pattern`` that Python's ``re`` and the
+    storefront's JavaScript ``RegExp`` do not read alike, or None."""
+    i, length = 0, len(pattern)
+    repeatable = False
+    while i < length:
+        char = pattern[i]
+        if char == "\\":
+            escaped = pattern[i + 1 : i + 2]
+            # A one-digit backreference, \1–\9; one to a missing group
+            # fails to compile below. Longer ones are octal in JavaScript.
+            next_is_digit = pattern[i + 2 : i + 3].isdigit()
+            if escaped and escaped in "123456789" and not next_is_digit:
+                i, repeatable = i + 2, True
+                continue
+            if not escaped or escaped not in _ESCAPES:
+                return pattern[i : i + 2]
+            i, repeatable = i + 2, escaped not in "bB"
+        elif char == "[":
+            end = _class_end(pattern, i)
+            if end is None:
+                return pattern[i:]
+            i, repeatable = end, True
+        elif char == "(":
+            if pattern.startswith("(?", i):
+                openers = (
+                    o for o in _GROUP_OPENERS if pattern.startswith(o, i)
+                )
+                opener = next(openers, None)
+                if opener is None:
+                    return pattern[i : i + 3]
+                i += len(opener)
+            else:
+                i += 1
+            repeatable = False
+        elif char in "*+?":
+            if not repeatable:
+                # Nothing to repeat, or a second quantifier: possessive.
+                return pattern[max(i - 1, 0) : i + 1]
+            i += 2 if pattern[i + 1 : i + 2] == "?" else 1
+            repeatable = False
+        elif char == "{":
+            bounds = _BOUNDS.match(pattern, i)
+            if not repeatable or bounds is None:
+                return pattern[i : i + 4]
+            low, comma, high = bounds.groups()
+            if comma and high and int(high) < int(low):
+                return bounds.group()
+            i = bounds.end()
+            i += 1 if pattern[i : i + 1] == "?" else 0
+            repeatable = False
+        else:
+            # ``)``, ``.`` and literals can be repeated; ``^``, ``$`` and ``|`` cannot.
+            repeatable = char not in "^$|"
+            i += 1
+    return None
+
+
 def validate_postal_code_pattern(value: str) -> None:
-    """Model validator: the stored pattern must compile."""
+    """Model validator: the stored pattern must compile, with the flags
+    matching uses, and use only syntax the storefront reads the same way."""
+    construct = non_portable_construct(value)
+    if construct is not None:
+        raise ValidationError(
+            _(
+                "Use only regular-expression syntax the storefront reads "
+                "the same way: “%(construct)s” is not supported."
+            ),
+            params={"construct": construct},
+        )
     try:
-        re.compile(value)
+        re.compile(value, re.ASCII)
     except re.error as exc:
         raise ValidationError(
             _("Enter a valid regular expression: %(error)s"),

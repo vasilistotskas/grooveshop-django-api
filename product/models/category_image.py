@@ -20,6 +20,7 @@ class ProductCategoryImage(
         "product.ProductCategory",
         related_name="images",
         on_delete=models.CASCADE,
+        verbose_name=_("Category"),
     )
     image = ImageAndSvgField(_("Image"), upload_to="uploads/categories/")
     image_type = models.CharField(

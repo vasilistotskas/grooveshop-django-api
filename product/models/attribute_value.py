@@ -21,6 +21,7 @@ class AttributeValue(
         "product.Attribute",
         on_delete=models.CASCADE,
         related_name="values",
+        verbose_name=_("Attribute"),
     )
     active = models.BooleanField(_("Active"), default=True)
 

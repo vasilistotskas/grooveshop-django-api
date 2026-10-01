@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-01 03:11+0300\n"
+"POT-Creation-Date: 2026-10-01 04:02+0300\n"
 "PO-Revision-Date: 2026-04-17 12:58+0300\n"
 "Last-Translator: Webside Admin <webside@hotmail.gr>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -57,7 +57,7 @@ msgid "Live"
 msgstr "Live"
 
 #: .\admin\admin.py:64 .\core\templates\admin\index.html:12
-#: .\core\templates\admin\index.html:21 .\settings.py:2945 .\settings.py:3233
+#: .\core\templates\admin\index.html:21 .\settings.py:2948 .\settings.py:3236
 msgid "Dashboard"
 msgstr "Πίνακας Ελέγχου"
 
@@ -167,7 +167,7 @@ msgid "Plan"
 msgstr "Πλάνο"
 
 #: .\admin\dashboard\platform.py:165 .\admin\dashboard\store\widgets.py:281
-#: .\b2b\admin.py:149 .\b2b\models\profile.py:31 .\blog\admin.py:502
+#: .\b2b\admin.py:149 .\b2b\models\profile.py:32 .\blog\admin.py:502
 #: .\core\templates\emails\order\order_canceled.html:15
 #: .\core\templates\emails\order\order_completed.html:22
 #: .\core\templates\emails\order\order_completed.txt:18
@@ -176,11 +176,11 @@ msgstr "Πλάνο"
 #: .\core\templates\emails\order\order_pending_reminder.txt:7
 #: .\core\templates\emails\order\order_shipped.html:13
 #: .\core\templates\invoices\invoice.html:226 .\giftcard\admin.py:186
-#: .\giftcard\models.py:65 .\giftcard\models.py:106 .\meta_capi\models.py:57
+#: .\giftcard\models.py:66 .\giftcard\models.py:107 .\meta_capi\models.py:59
 #: .\notification\admin.py:289 .\notification\admin.py:410
-#: .\order\admin.py:677 .\order\admin.py:702 .\order\models\order.py:150
+#: .\order\admin.py:677 .\order\admin.py:702 .\order\models\order.py:154
 #: .\product\admin.py:698 .\product\admin.py:1849
-#: .\product\models\review.py:29 .\promotion\admin.py:269
+#: .\product\models\review.py:31 .\promotion\admin.py:269
 #: .\tenant\admin.py:209 .\user\admin.py:260 .\user\admin.py:940
 #: .\user\models\data_export.py:33 .\user\models\subscription.py:198
 msgid "Status"
@@ -188,7 +188,7 @@ msgstr "Κατάσταση"
 
 #: .\admin\dashboard\platform.py:166 .\admin\dashboard\store\widgets.py:178
 #: .\core\templates\admin\index.html:26 .\order\apps.py:7
-#: .\order\models\order.py:386 .\settings.py:3367 .\settings.py:3850
+#: .\order\models\order.py:392 .\settings.py:3370 .\settings.py:3853
 #: .\tenant\models.py:1834 .\user\admin.py:274
 msgid "Orders"
 msgstr "Παραγγελίες"
@@ -321,11 +321,15 @@ msgstr "Πρόσφατες παραγγελίες"
 #: .\core\templates\emails\order\payment_failed.txt:5
 #: .\core\templates\emails\shipping_acs\stale_shipments_alert.html:14
 #: .\core\templates\emails\shipping_acs\unprinted_vouchers_alert.html:14
-#: .\core\templates\invoices\invoice.html:187 .\notification\enum.py:14
-#: .\order\admin.py:816 .\order\admin.py:1487 .\order\admin.py:1584
-#: .\order\admin.py:1908 .\order\models\attribution.py:37
-#: .\order\models\order.py:385 .\order\models\viva_webhook_event.py:57
-#: .\pay_way\admin.py:219 .\product\admin.py:1578
+#: .\core\templates\invoices\invoice.html:187 .\giftcard\models.py:255
+#: .\meta_capi\models.py:48 .\notification\enum.py:14 .\order\admin.py:816
+#: .\order\admin.py:1487 .\order\admin.py:1584 .\order\admin.py:1908
+#: .\order\models\attribution.py:37 .\order\models\history.py:37
+#: .\order\models\invoice.py:163 .\order\models\item.py:21
+#: .\order\models\order.py:391 .\order\models\stock_log.py:64
+#: .\order\models\stock_reservation.py:73
+#: .\order\models\viva_webhook_event.py:57 .\pay_way\admin.py:219
+#: .\product\admin.py:1578 .\promotion\models\redemption.py:39
 #: .\recommendation\models.py:261 .\shipping_acs\admin.py:431
 #: .\shipping_acs\models\shipment.py:44 .\shipping_boxnow\admin.py:317
 #: .\shipping_boxnow\models\shipment.py:45
@@ -366,15 +370,20 @@ msgstr "Καμία κριτική σε αναμονή"
 
 #: .\admin\dashboard\store\widgets.py:324
 #: .\admin\dashboard\store\widgets.py:437
-#: .\admin\dashboard\store\widgets.py:645 .\cart\admin.py:114
-#: .\cart\admin.py:407 .\core\templates\emails\cart\checkout_abandoned.html:15
+#: .\admin\dashboard\store\widgets.py:645 .\b2b\models\price.py:31
+#: .\cart\admin.py:114 .\cart\admin.py:407 .\cart\models\item.py:26
+#: .\core\templates\emails\cart\checkout_abandoned.html:15
 #: .\core\templates\emails\order\order_payment_confirmed.html:53
 #: .\core\templates\emails\order\order_received.html:58
 #: .\core\templates\emails\order\order_status_generic.html:86
 #: .\core\templates\emails\product\low_stock_alert.html:13
 #: .\notification\enum.py:18 .\order\admin.py:211 .\order\admin.py:1504
-#: .\product\admin.py:1085 .\product\admin.py:1827 .\product\admin.py:1932
-#: .\product\admin.py:2094 .\product\models\product.py:225
+#: .\order\models\item.py:27 .\order\models\stock_log.py:53
+#: .\order\models\stock_reservation.py:33 .\product\admin.py:1085
+#: .\product\admin.py:1827 .\product\admin.py:1932 .\product\admin.py:2094
+#: .\product\models\alert.py:41 .\product\models\favourite.py:23
+#: .\product\models\image.py:23 .\product\models\product.py:230
+#: .\product\models\product_attribute.py:21 .\product\models\review.py:21
 #: .\recommendation\models.py:142 .\recommendation\models.py:229
 msgid "Product"
 msgstr "Προϊόν"
@@ -409,7 +418,7 @@ msgstr "Από"
 
 #: .\admin\dashboard\store\widgets.py:358 .\contact\admin.py:196
 #: .\contact\admin.py:296 .\contact\admin.py:398 .\contact\models.py:18
-#: .\contact\models.py:238 .\giftcard\models.py:57 .\giftcard\models.py:146
+#: .\contact\models.py:238 .\giftcard\models.py:58 .\giftcard\models.py:148
 #: .\notification\models\notification.py:76
 msgid "Message"
 msgstr "Μήνυμα"
@@ -501,7 +510,7 @@ msgstr "Τελευταίες 14 ημέρες, χωρίς τις κενές αν�
 msgid "No searches in the last 14 days"
 msgstr "Καμία αναζήτηση τις τελευταίες 14 ημέρες"
 
-#: .\admin\dashboard\store\widgets.py:551
+#: .\admin\dashboard\store\widgets.py:551 .\search\models.py:53
 msgid "Query"
 msgstr "Ερώτημα"
 
@@ -540,7 +549,7 @@ msgstr "Ενεργά προϊόντα με απόθεμα κάτω από %(coun
 msgid "In stock"
 msgstr "Σε απόθεμα"
 
-#: .\admin\dashboard\store\widgets.py:672 .\b2b\models\profile.py:45
+#: .\admin\dashboard\store\widgets.py:672 .\b2b\models\profile.py:47
 msgid "Company name"
 msgstr "Επωνυμία εταιρείας"
 
@@ -548,7 +557,7 @@ msgstr "Επωνυμία εταιρείας"
 msgid "VAT ID (ΑΦΜ)"
 msgstr "ΑΦΜ"
 
-#: .\admin\dashboard\store\widgets.py:674 .\b2b\models\profile.py:52
+#: .\admin\dashboard\store\widgets.py:674 .\b2b\models\profile.py:54
 msgid "Tax office (ΔΟΥ)"
 msgstr "ΔΟΥ"
 
@@ -700,7 +709,7 @@ msgstr "Η εξαγωγή XML ολοκληρώθηκε επιτυχώς."
 msgid "An unexpected error occurred during XML export: %s"
 msgstr "Παρουσιάστηκε μη αναμενόμενο σφάλμα κατά την εξαγωγή XML: %s"
 
-#: .\admin\filters.py:44
+#: .\admin\filters.py:44 .\blog\models\comment.py:22 .\blog\models\post.py:41
 msgid "Likes"
 msgstr "Επισημάνσεις"
 
@@ -726,8 +735,8 @@ msgstr "API Swagger"
 
 #: .\admin\permissions.py:15 .\admin\platform_site.py:91
 #: .\core\templates\admin\platform_index.html:11
-#: .\core\templates\admin\platform_index.html:20 .\settings.py:2911
-#: .\settings.py:2941
+#: .\core\templates\admin\platform_index.html:20 .\settings.py:2914
+#: .\settings.py:2944
 msgid "Control plane"
 msgstr "Κέντρο Ελέγχου"
 
@@ -743,7 +752,7 @@ msgstr "Κατάσταση χρέωσης"
 #: .\admin\platform_billing.py:107
 #: .\core\templates\admin\platform_billing.html:16
 #: .\core\templates\admin\platform_billing.html:26
-#: .\core\templates\admin\platform_index.html:25 .\settings.py:2961
+#: .\core\templates\admin\platform_index.html:25 .\settings.py:2964
 #: .\tenant\admin.py:448
 msgid "Plan & Billing"
 msgstr "Πλάνο & Χρεώσεις"
@@ -821,7 +830,7 @@ msgstr "Αν το προϊόν είναι αυτή τη στιγμή διαθέ�
 msgid "When the product was favourited"
 msgstr "Πότε προστέθηκε το προϊόν στα αγαπημένα"
 
-#: .\b2b\admin.py:25
+#: .\b2b\admin.py:25 .\b2b\models\price.py:25 .\b2b\models\profile.py:43
 msgid "Customer group"
 msgstr "Ομάδα πελατών"
 
@@ -832,7 +841,7 @@ msgstr "Η βαθμίδα τιμών χονδρικής που λαμβάνει 
 #: .\b2b\admin.py:33
 #: .\core\templates\emails\b2b\business_profile_rejected.html:15
 #: .\core\templates\emails\b2b\business_profile_rejected.txt:3
-#: .\giftcard\admin.py:39 .\order\models\stock_log.py:85
+#: .\giftcard\admin.py:39 .\order\models\stock_log.py:87
 #: .\product\admin.py:1577 .\user\admin.py:241
 msgid "Reason"
 msgstr "Αιτία"
@@ -990,14 +999,14 @@ msgid "Service unavailable"
 msgstr "Υπηρεσία μη διαθέσιμη"
 
 #: .\b2b\models\group.py:21 .\blog\admin.py:243 .\blog\admin.py:329
-#: .\blog\models\category.py:32 .\blog\models\tag.py:16 .\contact\models.py:16
+#: .\blog\models\category.py:33 .\blog\models\tag.py:16 .\contact\models.py:16
 #: .\contact\models.py:227 .\core\admin.py:309 .\country\models.py:81
 #: .\loyalty\admin.py:29 .\loyalty\models\tier.py:80 .\pay_way\admin.py:176
 #: .\pay_way\models.py:88 .\product\models\attribute.py:33
-#: .\product\models\brand.py:17 .\product\models\category.py:39
-#: .\product\models\product.py:456 .\product\models\variant_group.py:30
-#: .\promotion\admin.py:250 .\promotion\models\promotion.py:289
-#: .\region\models.py:19 .\shipping\models\provider.py:34
+#: .\product\models\brand.py:17 .\product\models\category.py:40
+#: .\product\models\product.py:461 .\product\models\variant_group.py:30
+#: .\promotion\admin.py:250 .\promotion\models\promotion.py:294
+#: .\region\models.py:22 .\shipping\models\provider.py:34
 #: .\shipping_acs\models\station.py:50 .\shipping_boxnow\models\locker.py:59
 #: .\tag\admin.py:161 .\tenant\models.py:119 .\user\models\subscription.py:94
 msgid "Name"
@@ -1020,12 +1029,12 @@ msgstr ""
 #: .\giftcard\enum.py:6 .\notification\admin.py:71 .\notification\admin.py:295
 #: .\notification\admin.py:357 .\notification\admin.py:476
 #: .\notification\admin.py:491 .\order\admin.py:1538 .\pay_way\models.py:21
-#: .\product\models\attribute.py:20 .\product\models\attribute_value.py:25
-#: .\product\models\category.py:30 .\product\models\category_image.py:31
-#: .\product\models\product.py:112 .\product\models\variant_group.py:26
-#: .\promotion\models\code.py:50 .\promotion\models\promotion.py:157
+#: .\product\models\attribute.py:20 .\product\models\attribute_value.py:26
+#: .\product\models\category.py:30 .\product\models\category_image.py:32
+#: .\product\models\product.py:115 .\product\models\variant_group.py:26
+#: .\promotion\models\code.py:52 .\promotion\models\promotion.py:162
 #: .\tag\models\tag.py:13 .\tenant\models.py:122 .\tenant\models.py:1613
-#: .\user\models\account.py:101 .\user\models\subscription.py:68
+#: .\user\models\account.py:103 .\user\models\subscription.py:68
 #: .\user\models\subscription.py:163
 msgid "Active"
 msgstr "Ενεργή"
@@ -1046,15 +1055,15 @@ msgstr ""
 msgid "Customer Group"
 msgstr "Ομάδα Πελατών"
 
-#: .\b2b\models\group.py:52 .\settings.py:3437
+#: .\b2b\models\group.py:52 .\settings.py:3440
 msgid "Customer Groups"
 msgstr "Ομάδες Πελατών"
 
-#: .\b2b\models\price.py:32
+#: .\b2b\models\price.py:34
 msgid "Net price override"
 msgstr "Καθαρή τιμή (παράκαμψη)"
 
-#: .\b2b\models\price.py:52
+#: .\b2b\models\price.py:54
 msgid ""
 "Fixed NET (VAT-exclusive) price for this group. Wins over the group's "
 "discount percent."
@@ -1062,15 +1071,31 @@ msgstr ""
 "Σταθερή καθαρή (προ ΦΠΑ) τιμή για αυτή την ομάδα. Υπερισχύει του ποσοστού "
 "έκπτωσης της ομάδας."
 
-#: .\b2b\models\price.py:58
+#: .\b2b\models\price.py:60
 msgid "B2B Price List Item"
 msgstr "Στοιχείο Τιμοκαταλόγου B2B"
 
-#: .\b2b\models\price.py:59
+#: .\b2b\models\price.py:61
 msgid "B2B Price List Items"
 msgstr "Στοιχεία Τιμοκαταλόγου B2B"
 
-#: .\b2b\models\profile.py:47
+#: .\b2b\models\profile.py:29 .\blog\admin.py:172 .\blog\admin.py:711
+#: .\blog\models\author.py:15 .\blog\models\comment.py:30 .\cart\admin.py:236
+#: .\cart\models\cart.py:24 .\loyalty\models\transaction.py:17
+#: .\meta_capi\models.py:56 .\notification\admin.py:440
+#: .\notification\models\user.py:21 .\order\models\history.py:46
+#: .\order\models\history.py:254 .\order\models\order.py:101
+#: .\product\admin.py:1836 .\product\admin.py:1928
+#: .\product\models\alert.py:49 .\product\models\favourite.py:17
+#: .\product\models\review.py:27 .\promotion\models\redemption.py:47
+#: .\recommendation\models.py:251 .\search\models.py:95
+#: .\tenant\models.py:1599 .\tenant\models.py:1679 .\user\admin.py:498
+#: .\user\admin.py:949 .\user\models\address.py:20
+#: .\user\models\data_export.py:30 .\user\models\subscription.py:177
+msgid "User"
+msgstr "Χρήστης"
+
+#: .\b2b\models\profile.py:49
 #: .\core\templates\emails\b2b\admin_new_business_profile.html:13
 #: .\core\templates\emails\b2b\admin_new_business_profile.txt:4
 #: .\core\templates\emails\b2b\business_profile_approved.html:15
@@ -1082,63 +1107,67 @@ msgstr "Στοιχεία Τιμοκαταλόγου B2B"
 msgid "VAT number (ΑΦΜ)"
 msgstr "ΑΦΜ"
 
-#: .\b2b\models\profile.py:50
+#: .\b2b\models\profile.py:52
 msgid "Stored normalised: 9 digits, no EL/GR prefix"
 msgstr "Αποθηκεύεται κανονικοποιημένο: 9 ψηφία, χωρίς πρόθεμα EL/GR"
 
-#: .\b2b\models\profile.py:53
+#: .\b2b\models\profile.py:55
 msgid "Business activity"
 msgstr "Δραστηριότητα"
 
-#: .\b2b\models\profile.py:55
+#: .\b2b\models\profile.py:57
 msgid "Billing street"
 msgstr "Οδός τιμολόγησης"
 
-#: .\b2b\models\profile.py:58
+#: .\b2b\models\profile.py:60
 msgid "Billing street number"
 msgstr "Αριθμός οδού τιμολόγησης"
 
-#: .\b2b\models\profile.py:61
+#: .\b2b\models\profile.py:63
 msgid "Billing city"
 msgstr "Πόλη τιμολόγησης"
 
-#: .\b2b\models\profile.py:64
+#: .\b2b\models\profile.py:66
 msgid "Billing zipcode"
 msgstr "Τ.Κ. τιμολόγησης"
 
-#: .\b2b\models\profile.py:69
+#: .\b2b\models\profile.py:71
 msgid "VIES status"
 msgstr "Κατάσταση VIES"
 
-#: .\b2b\models\profile.py:75
+#: .\b2b\models\profile.py:77
 msgid "VIES checked at"
 msgstr "Έλεγχος VIES στις"
 
-#: .\b2b\models\profile.py:78
+#: .\b2b\models\profile.py:80
 msgid "VIES name"
 msgstr "Επωνυμία VIES"
 
-#: .\b2b\models\profile.py:81
+#: .\b2b\models\profile.py:83
 msgid "VIES address"
 msgstr "Διεύθυνση VIES"
 
-#: .\b2b\models\profile.py:84
+#: .\b2b\models\profile.py:86
 msgid "VIES error"
 msgstr "Σφάλμα VIES"
 
-#: .\b2b\models\profile.py:95
+#: .\b2b\models\profile.py:96
+msgid "Reviewed by"
+msgstr "Εξετάστηκε από"
+
+#: .\b2b\models\profile.py:98
 msgid "Reviewed at"
 msgstr "Εξετάστηκε στις"
 
-#: .\b2b\models\profile.py:97
+#: .\b2b\models\profile.py:100
 msgid "Rejection reason"
 msgstr "Αιτιολογία απόρριψης"
 
-#: .\b2b\models\profile.py:101
+#: .\b2b\models\profile.py:104
 msgid "Business Profile"
 msgstr "Εταιρικό Προφίλ"
 
-#: .\b2b\models\profile.py:102
+#: .\b2b\models\profile.py:105
 msgid "Business Profiles"
 msgstr "Εταιρικά Προφίλ"
 
@@ -1199,12 +1228,12 @@ msgstr "Μη έγκυρη παράμετρος ids."
 msgid "Too many ids — request at most {max} per call."
 msgstr "Πάρα πολλά ids — ζήτησε έως {max} ανά κλήση."
 
-#: .\blog\admin.py:51 .\settings.py:4017
+#: .\blog\admin.py:51 .\settings.py:4020
 msgid "Comments"
 msgstr "Σχόλια"
 
-#: .\blog\admin.py:59 .\core\cache\surfaces.py:538 .\settings.py:3276
-#: .\settings.py:4024 .\tag\admin.py:293 .\tag\apps.py:7
+#: .\blog\admin.py:59 .\blog\models\post.py:54 .\core\cache\surfaces.py:538
+#: .\settings.py:3279 .\settings.py:4027 .\tag\admin.py:293 .\tag\apps.py:7
 #: .\tag\models\tag.py:27
 msgid "Tags"
 msgstr "Ετικέτες"
@@ -1246,20 +1275,12 @@ msgstr "Βιογραφικό"
 msgid "Statistics"
 msgstr "Στατιστικά"
 
-#: .\blog\admin.py:172 .\blog\admin.py:711 .\cart\admin.py:236
-#: .\notification\admin.py:440 .\product\admin.py:1836 .\product\admin.py:1928
-#: .\recommendation\models.py:251 .\tenant\models.py:1599
-#: .\tenant\models.py:1679 .\user\admin.py:498 .\user\admin.py:949
-#: .\user\models\data_export.py:30 .\user\models\subscription.py:177
-msgid "User"
-msgstr "Χρήστης"
-
-#: .\blog\admin.py:178 .\blog\models\author.py:17 .\user\models\account.py:123
+#: .\blog\admin.py:178 .\blog\models\author.py:19 .\user\models\account.py:125
 msgid "Bio"
 msgstr "Βιογραφικό"
 
-#: .\blog\admin.py:191 .\blog\models\author.py:15 .\user\admin.py:524
-#: .\user\models\account.py:116
+#: .\blog\admin.py:191 .\blog\models\author.py:17 .\user\admin.py:524
+#: .\user\models\account.py:118
 msgid "Website"
 msgstr "Ιστότοπος"
 
@@ -1289,7 +1310,8 @@ msgstr "URL"
 msgid "Media"
 msgstr "Πολυμέσα"
 
-#: .\blog\admin.py:336
+#: .\blog\admin.py:336 .\blog\models\category.py:30
+#: .\product\models\category.py:37
 msgid "Parent"
 msgstr "Γονική κατηγορία"
 
@@ -1305,7 +1327,7 @@ msgstr "Σύνολο άρθρων (δέντρο)"
 msgid "Search by title, subtitle, slug, body, or author email/username."
 msgstr "Αναζήτηση με τίτλο, υπότιτλο, slug, κείμενο ή email/όνομα συντάκτη."
 
-#: .\blog\admin.py:416 .\blog\admin.py:702 .\blog\models\comment.py:44
+#: .\blog\admin.py:416 .\blog\admin.py:702 .\blog\models\comment.py:50
 #: .\page_config\admin.py:276 .\product\admin.py:1638 .\product\admin.py:1799
 #: .\product\admin.py:1979 .\product\admin.py:2062
 msgid "Content"
@@ -1320,12 +1342,12 @@ msgstr "Δημοσίευση"
 msgid "SEO"
 msgstr "SEO"
 
-#: .\blog\admin.py:480 .\blog\models\post.py:162
+#: .\blog\admin.py:480 .\blog\models\post.py:170
 #: .\notification\models\notification.py:75 .\page_config\admin.py:302
 #: .\page_config\models.py:170 .\page_config\models.py:238
-#: .\page_config\models.py:841 .\product\models\category_image.py:34
-#: .\product\models\image.py:27 .\shipping_boxnow\models\locker.py:58
-#: .\user\models\address.py:21
+#: .\page_config\models.py:841 .\product\models\category_image.py:35
+#: .\product\models\image.py:28 .\shipping_boxnow\models\locker.py:58
+#: .\user\models\address.py:22
 msgid "Title"
 msgstr "Τίτλος"
 
@@ -1333,17 +1355,18 @@ msgstr "Τίτλος"
 msgid "Untitled"
 msgstr "Χωρίς τίτλο"
 
-#: .\blog\admin.py:486 .\contact\models.py:233 .\core\admin.py:208
-#: .\core\admin.py:313
+#: .\blog\admin.py:486 .\blog\models\post.py:48 .\contact\models.py:233
+#: .\core\admin.py:208 .\core\admin.py:313
 #: .\core\templates\emails\subscription\confirmation.html:27
 #: .\core\templates\emails\subscription\confirmation.txt:16
 #: .\notification\admin.py:280 .\notification\models\notification.py:46
 #: .\product\admin.py:1103 .\product\admin.py:1696 .\product\admin.py:2011
+#: .\product\models\category_image.py:23 .\product\models\product.py:86
 #: .\user\admin.py:793 .\user\models\subscription.py:61 .\vat\admin.py:132
 msgid "Category"
 msgstr "Κατηγορία"
 
-#: .\blog\admin.py:495
+#: .\blog\admin.py:495 .\blog\models\post.py:61
 msgid "Author"
 msgstr "Συντάκτης"
 
@@ -1422,7 +1445,7 @@ msgstr "Σχέσεις"
 msgid "Moderation"
 msgstr "Συντονισμός"
 
-#: .\blog\admin.py:719
+#: .\blog\admin.py:719 .\blog\models\comment.py:38
 msgid "Post"
 msgstr "Άρθρο"
 
@@ -1464,7 +1487,7 @@ msgid "%(count)d comments were marked as spam and deleted."
 msgstr "%(count)d σχόλια επισημάνθηκαν ως ανεπιθύμητα (spam) και διαγράφηκαν."
 
 #: .\blog\apps.py:7 .\core\cache\surfaces.py:337 .\page_config\models.py:418
-#: .\settings.py:3310
+#: .\settings.py:3313
 msgid "Blog"
 msgstr "Blog"
 
@@ -1853,87 +1876,91 @@ msgstr "Φίλτρο ετικετών που χρησιμοποιούνται σ
 msgid "Filter tags not used in any posts"
 msgstr "Φίλτρο ετικετών που δεν χρησιμοποιούνται σε κανένα άρθρο"
 
-#: .\blog\models\author.py:23
+#: .\blog\models\author.py:25
 msgid "Blog Author"
 msgstr "Συντάκτης Blog"
 
-#: .\blog\models\author.py:24 .\settings.py:3333
+#: .\blog\models\author.py:26 .\settings.py:3336
 msgid "Blog Authors"
 msgstr "Συντάκτες Blog"
 
 #: .\blog\models\category.py:20 .\blog\models\post.py:33
 #: .\page_config\models.py:798 .\product\models\category.py:29
-#: .\product\models\product.py:105 .\tenant\models.py:120
+#: .\product\models\product.py:108 .\tenant\models.py:120
 #: .\user\models\subscription.py:53
 msgid "Slug"
 msgstr "Slug"
 
 #: .\blog\models\category.py:22 .\blog\models\post.py:35
-#: .\product\models\category_image.py:24 .\product\models\image.py:24
-#: .\user\models\account.py:99
+#: .\product\models\category_image.py:25 .\product\models\image.py:25
+#: .\user\models\account.py:101
 msgid "Image"
 msgstr "Εικόνα"
 
-#: .\blog\models\category.py:33 .\core\admin.py:329
-#: .\core\templates\invoices\invoice.html:234 .\giftcard\models.py:261
-#: .\loyalty\models\tier.py:81 .\loyalty\models\transaction.py:36
+#: .\blog\models\category.py:34 .\core\admin.py:329
+#: .\core\templates\invoices\invoice.html:234 .\giftcard\models.py:267
+#: .\loyalty\models\tier.py:81 .\loyalty\models\transaction.py:38
 #: .\order\admin.py:268 .\order\admin.py:1593 .\order\admin.py:1682
-#: .\order\models\history.py:26 .\order\models\history.py:232
-#: .\pay_way\models.py:94 .\product\models\category.py:40
-#: .\product\models\product.py:457 .\promotion\models\promotion.py:290
+#: .\order\models\history.py:26 .\order\models\history.py:234
+#: .\pay_way\models.py:94 .\product\models\category.py:41
+#: .\product\models\product.py:462 .\promotion\models\promotion.py:295
 #: .\user\models\subscription.py:99
 msgid "Description"
 msgstr "Περιγραφή"
 
-#: .\blog\models\category.py:39
+#: .\blog\models\category.py:40
 msgid "Blog Category"
 msgstr "Κατηγορία Blog"
 
-#: .\blog\models\category.py:40 .\settings.py:3325
+#: .\blog\models\category.py:41 .\settings.py:3328
 msgid "Blog Categories"
 msgstr "Κατηγορίες Blog"
 
-#: .\blog\models\comment.py:54
+#: .\blog\models\comment.py:46
+msgid "Parent Comment"
+msgstr "Γονικό σχόλιο"
+
+#: .\blog\models\comment.py:60
 msgid "Blog Comment"
 msgstr "Σχόλιο Blog"
 
-#: .\blog\models\comment.py:55 .\settings.py:3341
+#: .\blog\models\comment.py:61 .\settings.py:3344
 msgid "Blog Comments"
 msgstr "Σχόλια Blog"
 
-#: .\blog\models\post.py:55
+#: .\blog\models\post.py:63
 msgid "Featured"
 msgstr "Προβεβλημένο"
 
-#: .\blog\models\post.py:56 .\product\models\product.py:150
+#: .\blog\models\post.py:64 .\product\models\product.py:154
 msgid "View Count"
 msgstr "Προβολές"
 
-#: .\blog\models\post.py:58 .\product\models\product.py:152
+#: .\blog\models\post.py:66 .\product\models\product.py:156
 msgid "Click Score"
 msgstr "Βαθμολογία κλικ"
 
-#: .\blog\models\post.py:74
+#: .\blog\models\post.py:82
 msgid "Blog Post"
 msgstr "Άρθρο Blog"
 
-#: .\blog\models\post.py:75 .\settings.py:3315 .\settings.py:3998
+#: .\blog\models\post.py:83 .\settings.py:3318 .\settings.py:4001
 msgid "Blog Posts"
 msgstr "Άρθρα Blog"
 
-#: .\blog\models\post.py:164
+#: .\blog\models\post.py:172
 msgid "Subtitle"
 msgstr "Υπότιτλος"
 
-#: .\blog\models\post.py:166 .\page_config\models.py:842
+#: .\blog\models\post.py:174 .\page_config\models.py:842
 msgid "Body"
 msgstr "Κείμενο"
 
-#: .\blog\models\post.py:172
+#: .\blog\models\post.py:180
 msgid "Blog Post Translation"
 msgstr "Μετάφραση άρθρου"
 
-#: .\blog\models\post.py:173
+#: .\blog\models\post.py:181
 msgid "Blog Post Translations"
 msgstr "Μεταφράσεις άρθρου"
 
@@ -1941,7 +1968,7 @@ msgstr "Μεταφράσεις άρθρου"
 msgid "Blog Tag"
 msgstr "Ετικέτα Blog"
 
-#: .\blog\models\tag.py:27 .\settings.py:3351
+#: .\blog\models\tag.py:27 .\settings.py:3354
 msgid "Blog Tags"
 msgstr "Ετικέτες Blog"
 
@@ -2365,7 +2392,7 @@ msgstr "%(price)s → %(final)s"
 #: .\core\templates\emails\order\order_received.txt:33
 #: .\core\templates\emails\order\order_status_generic.html:108
 #: .\core\templates\emails\order\order_status_generic.txt:39
-#: .\order\models\invoice.py:227
+#: .\order\models\invoice.py:228
 msgid "Discount"
 msgstr "Έκπτωση"
 
@@ -2457,7 +2484,7 @@ msgstr ""
 "Τελικό σύνολο: %(final)s. Εκπτώσεις: -%(disc)s. ΦΠΑ: %(vat)s. Εξοικονόμηση: "
 "%(savings).1f%%."
 
-#: .\cart\admin.py:350 .\cart\models\item.py:47
+#: .\cart\admin.py:350 .\cart\models\item.py:53
 msgid "Cart Item"
 msgstr "Είδος Καλαθιού"
 
@@ -2469,11 +2496,12 @@ msgstr "Πληροφορίες τιμολόγησης"
 #: .\order\admin.py:281 .\order\admin.py:1606 .\order\admin.py:1695
 #: .\page_config\admin.py:134 .\page_config\admin.py:291
 #: .\pay_way\admin.py:164 .\product\admin.py:743 .\product\admin.py:1542
-#: .\settings.py:3645
+#: .\settings.py:3648
 msgid "System"
 msgstr "Σύστημα"
 
-#: .\cart\admin.py:395 .\cart\models\cart.py:30 .\notification\enum.py:17
+#: .\cart\admin.py:395 .\cart\models\cart.py:31 .\cart\models\item.py:20
+#: .\notification\enum.py:17 .\promotion\models\cart_code.py:22
 #: .\recommendation\enum.py:17 .\recommendation\models.py:239
 msgid "Cart"
 msgstr "Καλάθι"
@@ -2557,7 +2585,7 @@ msgstr "Αφαίρεση από καλάθι"
 msgid "%(count)d items were removed from carts."
 msgstr "%(count)d είδη αφαιρέθηκαν από τα καλάθια."
 
-#: .\cart\apps.py:7 .\cart\models\cart.py:31 .\settings.py:3376
+#: .\cart\apps.py:7 .\cart\models\cart.py:32 .\settings.py:3379
 msgid "Carts"
 msgstr "Καλάθια"
 
@@ -2766,35 +2794,35 @@ msgstr "Φίλτρο ανά τελευταία δραστηριότητα καλ
 msgid "Filter by cart last activity before date"
 msgstr "Φίλτρο ανά τελευταία δραστηριότητα καλαθιού πριν από ημερομηνία"
 
-#: .\cart\models\cart.py:25 .\user\admin.py:541
+#: .\cart\models\cart.py:26 .\user\admin.py:541
 msgid "Last Activity"
 msgstr "Τελευταία δραστηριότητα"
 
-#: .\cart\models\item.py:22
+#: .\cart\models\item.py:28
 #: .\core\templates\emails\cart\checkout_abandoned.html:16
 #: .\core\templates\emails\order\order_payment_confirmed.html:54
 #: .\core\templates\emails\order\order_received.html:59
 #: .\core\templates\emails\order\order_status_generic.html:87
-#: .\order\admin.py:1511 .\order\models\item.py:28
-#: .\order\models\stock_reservation.py:35
+#: .\order\admin.py:1511 .\order\models\item.py:30
+#: .\order\models\stock_reservation.py:36
 msgid "Quantity"
 msgstr "Ποσότητα"
 
-#: .\cart\models\item.py:24
+#: .\cart\models\item.py:30
 msgid "Price at Add"
 msgstr "Τιμή κατά την προσθήκη"
 
-#: .\cart\models\item.py:31
+#: .\cart\models\item.py:37
 msgid "Price of the product when added to cart (for price change validation)"
 msgstr ""
 "Τιμή του προϊόντος κατά την προσθήκη στο καλάθι (για επαλήθευση αλλαγής "
 "τιμής)"
 
-#: .\cart\models\item.py:41 .\order\models\item.py:40
+#: .\cart\models\item.py:47 .\order\models\item.py:42
 msgid "Recommendation impression"
 msgstr "Εμφάνιση σύστασης"
 
-#: .\cart\models\item.py:48
+#: .\cart\models\item.py:54
 msgid "Cart Items"
 msgstr "Αντικείμενα καλαθιού"
 
@@ -3432,7 +3460,7 @@ msgstr "Χρονισμός"
 
 #: .\contact\admin.py:315 .\notification\admin.py:285
 #: .\notification\admin.py:464 .\notification\models\notification.py:52
-#: .\promotion\models\promotion.py:171 .\shipping\models\provider.py:63
+#: .\promotion\models\promotion.py:176 .\shipping\models\provider.py:63
 msgid "Priority"
 msgstr "Προτεραιότητα"
 
@@ -3457,13 +3485,13 @@ msgid "Submitter"
 msgstr "Αποστολέας"
 
 #: .\contact\admin.py:366 .\contact\models.py:247 .\contact\models.py:248
-#: .\page_config\models.py:423 .\settings.py:3478
+#: .\page_config\models.py:423 .\settings.py:3481
 msgid "Feedback"
 msgstr "Feedback"
 
 #: .\contact\models.py:17 .\contact\models.py:228
-#: .\core\templates\invoices\invoice.html:175 .\order\models\order.py:137
-#: .\product\models\alert.py:49 .\promotion\models\redemption.py:46
+#: .\core\templates\invoices\invoice.html:175 .\order\models\order.py:141
+#: .\product\models\alert.py:51 .\promotion\models\redemption.py:50
 #: .\user\models\subscription.py:182
 msgid "Email"
 msgstr "Email"
@@ -3563,7 +3591,8 @@ msgstr "Ιστότοπος & UX"
 
 #: .\contact\models.py:217 .\core\cache\surfaces.py:238
 #: .\page_config\models.py:417 .\product\admin.py:2273 .\product\apps.py:7
-#: .\product\models\product.py:226 .\settings.py:3248
+#: .\product\models\product.py:231 .\promotion\models\promotion.py:57
+#: .\settings.py:3251
 msgid "Products"
 msgstr "Προϊόντα"
 
@@ -3702,7 +3731,7 @@ msgstr "Πληροφορίες Ρύθμισης"
 #: .\core\templates\emails\giftcard\gift_card_delivery.html:27
 #: .\core\templates\emails\giftcard\gift_card_delivery.txt:8
 #: .\product\admin.py:299 .\product\admin.py:544
-#: .\product\models\attribute_value.py:29 .\vat\models.py:45
+#: .\product\models\attribute_value.py:30 .\vat\models.py:45
 msgid "Value"
 msgstr "Τιμή"
 
@@ -3952,7 +3981,8 @@ msgstr ""
 "Λίστα/λεπτομέρειες προϊόντων, εικόνες, χαρακτηριστικά, σχετικά προϊόντα και "
 "το endpoint αναζήτησης."
 
-#: .\core\cache\surfaces.py:303 .\settings.py:3258 .\settings.py:4004
+#: .\core\cache\surfaces.py:303 .\promotion\models\promotion.py:67
+#: .\settings.py:3261 .\settings.py:4007
 msgid "Categories"
 msgstr "Κατηγορίες"
 
@@ -3981,7 +4011,7 @@ msgstr ""
 "Επιλογείς χώρας και περιφέρειας που χρησιμοποιούνται κατά την επιλογή "
 "διεύθυνσης στο checkout."
 
-#: .\core\cache\surfaces.py:397 .\loyalty\apps.py:8 .\settings.py:3569
+#: .\core\cache\surfaces.py:397 .\loyalty\apps.py:8 .\settings.py:3572
 msgid "Loyalty"
 msgstr "Πιστότητα"
 
@@ -4010,8 +4040,8 @@ msgstr ""
 "των props μιας ενότητας, μιας σελίδας περιεχομένου ή ενός μενού."
 
 #: .\core\cache\surfaces.py:504 .\notification\admin.py:80
-#: .\promotion\apps.py:8 .\promotion\models\promotion.py:199
-#: .\settings.py:3401
+#: .\promotion\apps.py:8 .\promotion\models\promotion.py:204
+#: .\settings.py:3404
 msgid "Promotions"
 msgstr "Προσφορές"
 
@@ -4089,8 +4119,8 @@ msgstr "Επιλέξτε πρότυπο για προεπισκόπηση."
 msgid "Search templates..."
 msgstr "Αναζήτηση προτύπων..."
 
-#: .\core\email\forms.py:36 .\order\models\order.py:347
-#: .\user\models\account.py:149 .\user\models\subscription.py:211
+#: .\core\email\forms.py:36 .\order\models\order.py:353
+#: .\user\models\account.py:152 .\user\models\subscription.py:211
 msgid "Language"
 msgstr "Γλώσσα"
 
@@ -4453,31 +4483,55 @@ msgstr "Σειρά ταξινόμησης"
 msgid "Created At"
 msgstr "Δημιουργήθηκε στις"
 
-#: .\core\models.py:266 .\core\models.py:558
+#: .\core\models.py:266 .\core\models.py:572
 msgid "Updated At"
 msgstr "Ενημερώθηκε στις"
 
-#: .\core\models.py:309
+#: .\core\models.py:282 .\search\models.py:47
+msgid "UUID"
+msgstr "UUID"
+
+#: .\core\models.py:311
 msgid "Published At"
 msgstr "Δημοσιεύθηκε στις"
 
-#: .\core\models.py:311
+#: .\core\models.py:313
 msgid "Is Published"
 msgstr "Δημοσιευμένο"
 
-#: .\core\models.py:535
+#: .\core\models.py:343
+msgid "Private Metadata"
+msgstr "Ιδιωτικά μεταδεδομένα"
+
+#: .\core\models.py:349 .\page_config\admin.py:127 .\page_config\models.py:175
+#: .\shipping\admin.py:120 .\shipping\models\provider.py:68
+#: .\shipping_acs\models\pickup_list.py:67
+#: .\shipping_acs\models\shipment.py:249
+#: .\shipping_boxnow\models\shipment.py:167 .\user\models\subscription.py:263
+msgid "Metadata"
+msgstr "Μεταδεδομένα"
+
+#: .\core\models.py:407
+msgid "Deleted At"
+msgstr "Διαγράφηκε στις"
+
+#: .\core\models.py:410
+msgid "Is Deleted"
+msgstr "Διαγραμμένο"
+
+#: .\core\models.py:549 .\search\models.py:62
 msgid "Language Code"
 msgstr "Κωδικός γλώσσας"
 
-#: .\core\models.py:538
+#: .\core\models.py:552
 msgid "Message ID"
 msgstr "ID μηνύματος"
 
-#: .\core\models.py:540
+#: .\core\models.py:554
 msgid "Plural Message ID"
 msgstr "ID μηνύματος πληθυντικού"
 
-#: .\core\models.py:544
+#: .\core\models.py:558
 msgid ""
 "Empty for singular entries. Set for ngettext / msgid_plural entries; in that"
 " case each plural form has its own row identified by plural_index."
@@ -4486,11 +4540,11 @@ msgstr ""
 "ngettext / msgid_plural· σε αυτή την περίπτωση κάθε πληθυντικός τύπος έχει "
 "τη δική του γραμμή που προσδιορίζεται από το plural_index."
 
-#: .\core\models.py:550
+#: .\core\models.py:564
 msgid "Plural Index"
 msgstr "Δείκτης πληθυντικού"
 
-#: .\core\models.py:553
+#: .\core\models.py:567
 msgid ""
 "0 for singular entries or for the first plural form; 1, 2, ... for "
 "subsequent plural forms defined by the language's plural rule."
@@ -4499,11 +4553,11 @@ msgstr ""
 "για τους επόμενους πληθυντικούς τύπους που ορίζονται από τον κανόνα "
 "πληθυντικού της γλώσσας."
 
-#: .\core\models.py:557 .\core\models.py:561
+#: .\core\models.py:571 .\core\models.py:575
 msgid "Translation"
 msgstr "Μετάφραση"
 
-#: .\core\models.py:562
+#: .\core\models.py:576
 msgid "Translations"
 msgstr "Μεταφράσεις"
 
@@ -4847,7 +4901,7 @@ msgid "New product"
 msgstr "Νέο προϊόν"
 
 # Greek translations added by fill_admin_greek_translations.py
-#: .\core\templates\admin\index.html:27 .\settings.py:3537
+#: .\core\templates\admin\index.html:27 .\settings.py:3540
 msgid "Customers"
 msgstr "Πελάτες"
 
@@ -4859,7 +4913,7 @@ msgstr ""
 "Οι εμπορικοί όροι κάθε καταστήματος και πώς η πλατφόρμα τους καταχωρεί και "
 "τους επιβάλλει."
 
-#: .\core\templates\admin\platform_billing.html:30 .\settings.py:2953
+#: .\core\templates\admin\platform_billing.html:30 .\settings.py:2956
 #: .\tenant\models.py:1206
 msgid "Tenants"
 msgstr "Καταστήματα"
@@ -5579,8 +5633,8 @@ msgstr "Στοιχεία δωροκάρτας"
 
 #: .\core\templates\emails\giftcard\gift_card_purchase_receipt.html:11
 #: .\core\templates\emails\giftcard\gift_card_purchase_receipt.txt:5
-#: .\giftcard\models.py:49 .\giftcard\models.py:237
-#: .\promotion\models\redemption.py:51
+#: .\giftcard\models.py:50 .\giftcard\models.py:241
+#: .\promotion\models\redemption.py:55
 msgid "Amount"
 msgstr "Ποσό"
 
@@ -5996,7 +6050,7 @@ msgstr ""
 #: .\core\templates\emails\order\order_received.txt:7
 #: .\core\templates\emails\order\payment_failed.html:14
 #: .\core\templates\emails\order\payment_failed.txt:7
-#: .\order\models\order.py:220
+#: .\order\models\order.py:224
 msgid "Payment Status"
 msgstr "Κατάσταση πληρωμής"
 
@@ -6030,15 +6084,15 @@ msgstr ""
 #: .\core\templates\emails\order\order_received.html:54
 #: .\core\templates\emails\order\order_status_generic.html:82
 #: .\core\templates\emails\order\order_status_generic.txt:32
-#: .\order\models\item.py:47
+#: .\order\models\item.py:49
 msgid "Order Items"
 msgstr "Προϊόντα Παραγγελίας"
 
 #: .\core\templates\emails\order\order_payment_confirmed.html:55
 #: .\core\templates\emails\order\order_received.html:60
 #: .\core\templates\emails\order\order_status_generic.html:88
-#: .\order\models\item.py:27 .\product\models\product.py:107
-#: .\shipping\models\rate.py:52
+#: .\order\models\item.py:29 .\product\models\product.py:110
+#: .\shipping\models\rate.py:54
 msgid "Price"
 msgstr "Τιμή"
 
@@ -6058,7 +6112,7 @@ msgstr "Υποσύνολο"
 #: .\core\templates\emails\order\order_status_generic.html:106
 #: .\core\templates\emails\order\order_status_generic.txt:38
 #: .\core\templates\invoices\invoice.html:277 .\notification\enum.py:16
-#: .\order\admin.py:849 .\order\models\invoice.py:213 .\settings.py:3489
+#: .\order\admin.py:849 .\order\models\invoice.py:214 .\settings.py:3492
 #: .\shipping\apps.py:7 .\tenant\admin.py:574
 msgid "Shipping"
 msgstr "Μεταφορικά"
@@ -6267,7 +6321,7 @@ msgstr "Μεταφορέας"
 
 #: .\core\templates\emails\order\order_shipped.html:20
 #: .\core\templates\emails\order\order_shipped.txt:7
-#: .\order\models\order.py:310
+#: .\order\models\order.py:316
 msgid "Tracking Number"
 msgstr "Αριθμός Παρακολούθησης"
 
@@ -7045,7 +7099,8 @@ msgstr "Μονάδα (μικτή)"
 
 #: .\core\templates\invoices\invoice.html:237
 #: .\core\templates\invoices\invoice.html:271
-#: .\core\templates\invoices\invoice.html:301 .\vat\apps.py:7
+#: .\core\templates\invoices\invoice.html:301 .\product\models\product.py:152
+#: .\vat\apps.py:7
 msgid "VAT"
 msgstr "ΦΠΑ"
 
@@ -7061,7 +7116,7 @@ msgstr "Προϊόν χωρίς όνομα"
 msgid "Discount (incl. VAT)"
 msgstr "Έκπτωση (με ΦΠΑ)"
 
-#: .\core\templates\invoices\invoice.html:266 .\order\models\invoice.py:195
+#: .\core\templates\invoices\invoice.html:266 .\order\models\invoice.py:196
 msgid "Subtotal (excl. VAT)"
 msgstr "Υποσύνολο (χωρίς ΦΠΑ)"
 
@@ -7272,8 +7327,10 @@ msgstr ""
 msgid "Contact & Media"
 msgstr "Επικοινωνία & Πολυμέσα"
 
-#: .\country\admin.py:134 .\country\models.py:88 .\pay_way\models.py:283
-#: .\region\admin.py:128
+#: .\country\admin.py:134 .\country\models.py:88 .\order\models\order.py:117
+#: .\pay_way\models.py:283 .\region\admin.py:128 .\region\models.py:19
+#: .\shipping\models\rate.py:46 .\user\models\account.py:89
+#: .\user\models\address.py:36
 msgid "Country"
 msgstr "Χώρα"
 
@@ -7316,7 +7373,7 @@ msgstr "Ελλιπές"
 msgid "Created"
 msgstr "Δημιουργήθηκε"
 
-#: .\country\apps.py:7 .\country\models.py:89 .\settings.py:3021
+#: .\country\apps.py:7 .\country\models.py:89 .\settings.py:3024
 msgid "Countries"
 msgstr "Χώρες"
 
@@ -7653,65 +7710,69 @@ msgstr "Λήξη"
 msgid "Pending payment"
 msgstr "Εκκρεμεί πληρωμή"
 
-#: .\giftcard\models.py:48
+#: .\giftcard\models.py:47
+msgid "Buyer"
+msgstr "Αγοραστής"
+
+#: .\giftcard\models.py:49
 msgid "Buyer Email"
 msgstr "Email αγοραστή"
 
-#: .\giftcard\models.py:50 .\giftcard\models.py:138
+#: .\giftcard\models.py:51 .\giftcard\models.py:140
 msgid "Recipient Email"
 msgstr "Email παραλήπτη"
 
-#: .\giftcard\models.py:52 .\giftcard\models.py:141
+#: .\giftcard\models.py:53 .\giftcard\models.py:143
 msgid "Recipient Name"
 msgstr "Όνομα παραλήπτη"
 
-#: .\giftcard\models.py:55 .\giftcard\models.py:144
+#: .\giftcard\models.py:56 .\giftcard\models.py:146
 msgid "Sender Name"
 msgstr "Όνομα αποστολέα"
 
-#: .\giftcard\models.py:59 .\giftcard\models.py:147
+#: .\giftcard\models.py:60 .\giftcard\models.py:149
 msgid "Deliver At"
 msgstr "Παράδοση στις"
 
-#: .\giftcard\models.py:62
+#: .\giftcard\models.py:63
 msgid "Empty means deliver immediately after payment"
 msgstr "Κενό σημαίνει παράδοση αμέσως μετά την πληρωμή"
 
-#: .\giftcard\models.py:71 .\pay_way\models.py:41
+#: .\giftcard\models.py:72 .\pay_way\models.py:41
 msgid "Provider Code"
 msgstr "Κωδικός παρόχου"
 
-#: .\giftcard\models.py:74 .\order\models\order.py:217
+#: .\giftcard\models.py:75 .\order\models\order.py:221
 msgid "Payment ID"
 msgstr "ID πληρωμής"
 
-#: .\giftcard\models.py:78
+#: .\giftcard\models.py:79
 msgid "Gift Card Purchase"
 msgstr "Αγορά δωροκάρτας"
 
-#: .\giftcard\models.py:79
+#: .\giftcard\models.py:80
 msgid "Gift Card Purchases"
 msgstr "Αγορές δωροκαρτών"
 
-#: .\giftcard\models.py:97 .\promotion\models\code.py:17
+#: .\giftcard\models.py:98 .\promotion\models\code.py:18
 #: .\shipping\models\provider.py:25
 msgid "Code"
 msgstr "Κωδικός"
 
-#: .\giftcard\models.py:100
+#: .\giftcard\models.py:101
 msgid "Crypto-random, uppercased; the bearer secret"
 msgstr "Κρυπτογραφικά τυχαίος, με κεφαλαία· το μυστικό του κατόχου"
 
-#: .\giftcard\models.py:103
+#: .\giftcard\models.py:104
 msgid "Initial Value"
 msgstr "Αρχική αξία"
 
-#: .\giftcard\models.py:112 .\order\models\stock_reservation.py:52
+#: .\giftcard\models.py:113 .\order\models\stock_reservation.py:54
 #: .\user\models\data_export.py:58
 msgid "Expires At"
 msgstr "Λήγει στις"
 
-#: .\giftcard\models.py:116
+#: .\giftcard\models.py:117
 msgid ""
 "Defaults to GIFT_CARD_VALIDITY_DAYS after issue (Greek law: 5 years); empty "
 "means never expires"
@@ -7719,11 +7780,11 @@ msgstr ""
 "Προεπιλογή: GIFT_CARD_VALIDITY_DAYS μετά την έκδοση (ελληνική νομοθεσία: 5 "
 "έτη)· κενό σημαίνει ότι δεν λήγει ποτέ"
 
-#: .\giftcard\models.py:121 .\user\models\subscription.py:204
+#: .\giftcard\models.py:122 .\user\models\subscription.py:204
 msgid "Source"
 msgstr "Πηγή"
 
-#: .\giftcard\models.py:133
+#: .\giftcard\models.py:134
 msgid ""
 "Optional account link — lets the shopper see the card under 'My gift cards'."
 " Redemption only needs the code."
@@ -7731,36 +7792,44 @@ msgstr ""
 "Προαιρετική σύνδεση λογαριασμού — επιτρέπει στον πελάτη να βλέπει την κάρτα "
 "στο «Οι δωροκάρτες μου». Για την εξαργύρωση αρκεί ο κωδικός."
 
-#: .\giftcard\models.py:149
+#: .\giftcard\models.py:137
+msgid "Issued To"
+msgstr "Εκδόθηκε σε"
+
+#: .\giftcard\models.py:151
 msgid "Delivered At"
 msgstr "Παραδόθηκε στις"
 
-#: .\giftcard\models.py:152
+#: .\giftcard\models.py:154
 msgid "Expiry Reminder Sent At"
 msgstr "Υπενθύμιση λήξης στάλθηκε στις"
 
-#: .\giftcard\models.py:156
+#: .\giftcard\models.py:158
 msgid ""
 "Stamped by the daily reminder sweep so each card is reminded exactly once"
 msgstr ""
 "Σημειώνεται από τον ημερήσιο έλεγχο υπενθυμίσεων ώστε κάθε κάρτα να λαμβάνει"
 " υπενθύμιση ακριβώς μία φορά"
 
-#: .\giftcard\models.py:169
+#: .\giftcard\models.py:168
+msgid "Purchase"
+msgstr "Αγορά"
+
+#: .\giftcard\models.py:172 .\giftcard\models.py:233
 msgid "Gift Card"
 msgstr "Δωροκάρτα"
 
-#: .\giftcard\models.py:170 .\settings.py:3419
+#: .\giftcard\models.py:173 .\settings.py:3422
 msgid "Gift Cards"
 msgstr "Δωροκάρτες"
 
-#: .\giftcard\models.py:232 .\notification\admin.py:275
+#: .\giftcard\models.py:236 .\notification\admin.py:275
 #: .\notification\models\notification.py:40 .\product\models\alert.py:33
 #: .\recommendation\models.py:216
 msgid "Kind"
 msgstr "Είδος"
 
-#: .\giftcard\models.py:241
+#: .\giftcard\models.py:245
 msgid ""
 "Signed: positive adds balance (issue/refund credit), negative removes it "
 "(redeem/expire)"
@@ -7768,15 +7837,19 @@ msgstr ""
 "Προσημασμένο: θετικό προσθέτει υπόλοιπο (έκδοση/πίστωση επιστροφής), "
 "αρνητικό αφαιρεί (εξαργύρωση/λήξη)"
 
-#: .\giftcard\models.py:258
+#: .\giftcard\models.py:263
 msgid "Admin who made a manual adjustment"
 msgstr "Διαχειριστής που έκανε χειροκίνητη προσαρμογή"
 
-#: .\giftcard\models.py:265
+#: .\giftcard\models.py:264 .\loyalty\models\transaction.py:46
+msgid "Created By"
+msgstr "Δημιουργήθηκε από"
+
+#: .\giftcard\models.py:271
 msgid "Gift Card Transaction"
 msgstr "Συναλλαγή δωροκάρτας"
 
-#: .\giftcard\models.py:266
+#: .\giftcard\models.py:272
 msgid "Gift Card Transactions"
 msgstr "Συναλλαγές δωροκάρτας"
 
@@ -7986,35 +8059,39 @@ msgstr ""
 msgid "Icon"
 msgstr "Εικονίδιο"
 
-#: .\loyalty\models\tier.py:43
+#: .\loyalty\models\tier.py:43 .\user\models\account.py:149
 msgid "Loyalty Tier"
 msgstr "Επίπεδο Πιστότητας"
 
-#: .\loyalty\models\tier.py:44 .\settings.py:3574
+#: .\loyalty\models\tier.py:44 .\settings.py:3577
 msgid "Loyalty Tiers"
 msgstr "Επίπεδα Πιστότητας"
 
-#: .\loyalty\models\transaction.py:19 .\user\admin.py:235
+#: .\loyalty\models\transaction.py:20 .\user\admin.py:235
 msgid "Points"
 msgstr "Πόντοι"
 
-#: .\loyalty\models\transaction.py:21
+#: .\loyalty\models\transaction.py:22
 msgid "Positive for earn/bonus, negative for redeem/expire/adjust"
 msgstr "Θετικό για κέρδος/μπόνους, αρνητικό για εξαργύρωση/λήξη/προσαρμογή"
 
-#: .\loyalty\models\transaction.py:25
+#: .\loyalty\models\transaction.py:26
 msgid "Transaction Type"
 msgstr "Τύπος συναλλαγής"
 
-#: .\loyalty\models\transaction.py:43
+#: .\loyalty\models\transaction.py:36
+msgid "Reference Order"
+msgstr "Σχετική παραγγελία"
+
+#: .\loyalty\models\transaction.py:45
 msgid "Admin user who created this adjustment"
 msgstr "Χρήστης διαχειριστής που δημιούργησε αυτή την προσαρμογή"
 
-#: .\loyalty\models\transaction.py:49
+#: .\loyalty\models\transaction.py:52
 msgid "Points Transaction"
 msgstr "Συναλλαγή Πόντων"
 
-#: .\loyalty\models\transaction.py:50 .\settings.py:3582
+#: .\loyalty\models\transaction.py:53 .\settings.py:3585
 msgid "Points Transactions"
 msgstr "Συναλλαγές Πόντων"
 
@@ -8257,11 +8334,11 @@ msgstr ""
 " γραμμή άμυνας έναντι διπλής αποστολής — η εργασία Celery σταματά ήδη αν "
 "υπάρχει εγγραφή με αυτό το event_id σε κατάσταση SENT."
 
-#: .\meta_capi\models.py:63
+#: .\meta_capi\models.py:65
 msgid "Meta fbtrace_id"
 msgstr "Meta fbtrace_id"
 
-#: .\meta_capi\models.py:68
+#: .\meta_capi\models.py:70
 msgid ""
 "Meta's request trace ID. Quote this when filing a support ticket so they can"
 " find the request server-side."
@@ -8270,11 +8347,11 @@ msgstr ""
 "υποστήριξης ώστε να μπορούν να εντοπίσουν το αίτημα από την πλευρά του "
 "server."
 
-#: .\meta_capi\models.py:73
+#: .\meta_capi\models.py:75
 msgid "Events received"
 msgstr "Συμβάντα που παραλήφθηκαν"
 
-#: .\meta_capi\models.py:76
+#: .\meta_capi\models.py:78
 msgid ""
 "Number of events Meta acknowledged. Should be 1; values >1 indicate batched "
 "sends, 0 indicates a validation reject we logged but Meta dropped."
@@ -8283,15 +8360,15 @@ msgstr ""
 "υποδηλώνουν ομαδικές αποστολές (batched), 0 υποδηλώνει απόρριψη επικύρωσης "
 "που καταγράψαμε αλλά η Meta απέρριψε."
 
-#: .\meta_capi\models.py:81
+#: .\meta_capi\models.py:83
 msgid "Error message"
 msgstr "Μήνυμα σφάλματος"
 
-#: .\meta_capi\models.py:83
+#: .\meta_capi\models.py:85
 msgid "Payload"
 msgstr "Payload"
 
-#: .\meta_capi\models.py:87
+#: .\meta_capi\models.py:89
 msgid ""
 "Sanitised request body (PII fields are hashed by the facebook_business SDK "
 "before serialisation). Stored for replay during incident debugging."
@@ -8300,11 +8377,11 @@ msgstr ""
 "facebook_business πριν τη σειριοποίηση). Αποθηκεύεται για επανάληψη (replay)"
 " κατά τον εντοπισμό σφαλμάτων σε περιστατικά."
 
-#: .\meta_capi\models.py:94
+#: .\meta_capi\models.py:96
 msgid "Meta CAPI Event"
 msgstr "Συμβάν Meta CAPI"
 
-#: .\meta_capi\models.py:95
+#: .\meta_capi\models.py:97
 msgid "Meta CAPI Events"
 msgstr "Συμβάντα Meta CAPI"
 
@@ -8341,7 +8418,7 @@ msgid "User Status"
 msgstr "Κατάσταση Χρήστη"
 
 #: .\notification\admin.py:124 .\notification\admin.py:456
-#: .\notification\admin.py:461 .\notification\models\user.py:27
+#: .\notification\admin.py:461 .\notification\models\user.py:29
 msgid "Seen"
 msgstr "Ορατό"
 
@@ -8384,7 +8461,7 @@ msgid "Timing Information"
 msgstr "Πληροφορίες χρονισμού"
 
 #: .\notification\admin.py:262 .\notification\admin.py:446
-#: .\notification\models\notification.py:89
+#: .\notification\models\notification.py:89 .\notification\models\user.py:27
 msgid "Notification"
 msgstr "Ειδοποίηση"
 
@@ -8471,7 +8548,7 @@ msgstr ""
 "%(category)s"
 
 #: .\notification\apps.py:7 .\notification\models\notification.py:90
-#: .\settings.py:3460
+#: .\settings.py:3463
 msgid "Notifications"
 msgstr "Ειδοποιήσεις"
 
@@ -8499,7 +8576,8 @@ msgstr "Κίνδυνος"
 msgid "Security"
 msgstr "Ασφάλεια"
 
-#: .\notification\enum.py:21 .\promotion\models\promotion.py:198
+#: .\notification\enum.py:21 .\promotion\models\code.py:15
+#: .\promotion\models\promotion.py:203 .\promotion\models\redemption.py:23
 msgid "Promotion"
 msgstr "Προσφορά"
 
@@ -8511,7 +8589,7 @@ msgstr "Λίστα επιθυμιών"
 msgid "Support"
 msgstr "Υποστήριξη"
 
-#: .\notification\enum.py:26 .\settings.py:3600
+#: .\notification\enum.py:26 .\settings.py:3603
 #: .\user\models\subscription.py:30
 msgid "Newsletter"
 msgstr "Newsletter"
@@ -8738,15 +8816,15 @@ msgstr ""
 msgid "Expiry Date"
 msgstr "Ημερομηνία Λήξης"
 
-#: .\notification\models\user.py:28
+#: .\notification\models\user.py:30
 msgid "Seen At"
 msgstr "Ορατό στις"
 
-#: .\notification\models\user.py:40
+#: .\notification\models\user.py:42
 msgid "Notification User"
 msgstr "Παραλήπτης Ειδοποίησης"
 
-#: .\notification\models\user.py:41
+#: .\notification\models\user.py:43
 msgid "Notification Users"
 msgstr "Χρήστες ειδοποίησης"
 
@@ -8873,6 +8951,7 @@ msgid "No description"
 msgstr "Χωρίς περιγραφή"
 
 #: .\order\admin.py:277 .\order\admin.py:1602 .\order\admin.py:1691
+#: .\product\models\product.py:202
 msgid "Changed By"
 msgstr "Άλλαξε από"
 
@@ -8983,7 +9062,7 @@ msgid "Shipment"
 msgstr "Αποστολή"
 
 #: .\order\admin.py:749 .\order\admin.py:1839 .\order\enum\document_type.py:7
-#: .\order\enum\document_type.py:17 .\order\models\invoice.py:401
+#: .\order\enum\document_type.py:17 .\order\models\invoice.py:402
 msgid "Invoice"
 msgstr "Τιμολόγιο"
 
@@ -9007,7 +9086,7 @@ msgstr "Ιστότοπος παραπομπής"
 msgid "Landing page"
 msgstr "Σελίδα προσγείωσης"
 
-#: .\order\admin.py:773 .\order\models\order.py:227
+#: .\order\admin.py:773 .\order\models\order.py:109
 msgid "Payment Method"
 msgstr "Μέθοδος πληρωμής"
 
@@ -9301,12 +9380,13 @@ msgstr "Πλήρης επιστροφή"
 msgid "Partial (%(refunded)s/%(qty)s)"
 msgstr "Μερική (%(refunded)s/%(qty)s)"
 
-#: .\order\admin.py:1581 .\order\admin.py:1653 .\order\models\history.py:47
-#: .\order\models\history.py:253
+#: .\order\admin.py:1581 .\order\admin.py:1653 .\order\models\history.py:49
+#: .\order\models\history.py:257
 msgid "Change Type"
 msgstr "Τύπος Αλλαγής"
 
-#: .\order\admin.py:1664 .\order\models\item.py:46
+#: .\order\admin.py:1664 .\order\models\history.py:245
+#: .\order\models\item.py:48
 msgid "Order Item"
 msgstr "Είδος Παραγγελίας"
 
@@ -9839,69 +9919,69 @@ msgstr "Σημείωση προστέθηκε"
 msgid "Refund Processed"
 msgstr "Επιστροφή ολοκληρώθηκε"
 
-#: .\order\models\history.py:22 .\order\models\history.py:228
+#: .\order\models\history.py:22 .\order\models\history.py:230
 msgid "Other Change"
 msgstr "Άλλη αλλαγή"
 
-#: .\order\models\history.py:29 .\order\models\history.py:235
+#: .\order\models\history.py:29 .\order\models\history.py:237
 msgid "Description of what changed."
 msgstr "Περιγραφή της αλλαγής."
 
-#: .\order\models\history.py:44 .\order\models\history.py:250
+#: .\order\models\history.py:45 .\order\models\history.py:253
 msgid "User who made the change, if applicable."
 msgstr "Χρήστης που έκανε την αλλαγή, αν ισχύει."
 
-#: .\order\models\history.py:52 .\order\models\history.py:258
+#: .\order\models\history.py:54 .\order\models\history.py:262
 msgid "Previous Value"
 msgstr "Προηγούμενη τιμή"
 
-#: .\order\models\history.py:55 .\order\models\history.py:261
+#: .\order\models\history.py:57 .\order\models\history.py:265
 msgid "Previous value of the changed field(s)."
 msgstr "Προηγούμενη τιμή των πεδίων που άλλαξαν."
 
-#: .\order\models\history.py:58 .\order\models\history.py:264
+#: .\order\models\history.py:60 .\order\models\history.py:268
 msgid "New Value"
 msgstr "Νέα τιμή"
 
-#: .\order\models\history.py:61 .\order\models\history.py:267
+#: .\order\models\history.py:63 .\order\models\history.py:271
 msgid "New value of the changed field(s)."
 msgstr "Νέα τιμή των πεδίων που άλλαξαν."
 
-#: .\order\models\history.py:64
+#: .\order\models\history.py:66 .\search\models.py:109
 msgid "IP Address"
 msgstr "Διεύθυνση IP"
 
-#: .\order\models\history.py:67
+#: .\order\models\history.py:69
 msgid "IP address from which the change was made."
 msgstr "Διεύθυνση IP από την οποία έγινε η αλλαγή."
 
-#: .\order\models\history.py:70
+#: .\order\models\history.py:72 .\search\models.py:117
 msgid "User Agent"
 msgstr "User Agent"
 
-#: .\order\models\history.py:72
+#: .\order\models\history.py:74
 msgid "User agent of the browser/client that made the change."
 msgstr "User agent του προγράμματος περιήγησης/client που έκανε την αλλαγή."
 
-#: .\order\models\history.py:79 .\order\models\history.py:80
-#: .\settings.py:3717 .\settings.py:3869
+#: .\order\models\history.py:81 .\order\models\history.py:82
+#: .\settings.py:3720 .\settings.py:3872
 msgid "Order History"
 msgstr "Ιστορικό Παραγγελιών"
 
-#: .\order\models\history.py:225
+#: .\order\models\history.py:227
 msgid "Quantity Change"
 msgstr "Μεταβολή ποσότητας"
 
-#: .\order\models\history.py:226
+#: .\order\models\history.py:228
 msgid "Price Update"
 msgstr "Ενημέρωση τιμής"
 
-#: .\order\models\history.py:227
+#: .\order\models\history.py:229
 msgid "Item Refund"
 msgstr "Επιστροφή χρημάτων αντικειμένου"
 
-#: .\order\models\history.py:272 .\order\models\history.py:273
-#: .\settings.py:3726
+#: .\order\models\history.py:276 .\order\models\history.py:277
+#: .\settings.py:3729
 msgid "Order Item History"
 msgstr "Ιστορικό Ειδών Παραγγελίας"
 
@@ -9933,7 +10013,7 @@ msgstr "Έτος"
 msgid "Next Number"
 msgstr "Επόμενος αριθμός"
 
-#: .\order\models\invoice.py:126 .\settings.py:3815
+#: .\order\models\invoice.py:126 .\settings.py:3818
 msgid "Invoice Counter"
 msgstr "Μετρητής Τιμολογίων"
 
@@ -9941,11 +10021,11 @@ msgstr "Μετρητής Τιμολογίων"
 msgid "Invoice Counters"
 msgstr "Μετρητές τιμολογίων"
 
-#: .\order\models\invoice.py:165
+#: .\order\models\invoice.py:166
 msgid "Invoice Number"
 msgstr "Αριθμός τιμολογίου"
 
-#: .\order\models\invoice.py:169
+#: .\order\models\invoice.py:170
 #, python-brace-format
 msgid ""
 "Sequential identifier in the form ``INV-{YEAR}-{NNNNNN}``. Gaps are not "
@@ -9954,11 +10034,11 @@ msgstr ""
 "Διαδοχικό αναγνωριστικό στη μορφή ``INV-{YEAR}-{NNNNNN}``. Δεν επιτρέπονται "
 "κενά βάσει της ελληνικής φορολογικής νομοθεσίας."
 
-#: .\order\models\invoice.py:174
+#: .\order\models\invoice.py:175
 msgid "Issue Date"
 msgstr "Ημερομηνία έκδοσης"
 
-#: .\order\models\invoice.py:177
+#: .\order\models\invoice.py:178
 msgid ""
 "Fiscal date of issue. Immutable once the invoice is rendered — used for "
 "sequential numbering and reporting."
@@ -9966,11 +10046,11 @@ msgstr ""
 "Φορολογική ημερομηνία έκδοσης. Αμετάβλητη μόλις εκδοθεί το τιμολόγιο — "
 "χρησιμοποιείται για διαδοχική αρίθμηση και αναφορές."
 
-#: .\order\models\invoice.py:182
+#: .\order\models\invoice.py:183
 msgid "Document File"
 msgstr "Αρχείο εγγράφου"
 
-#: .\order\models\invoice.py:188
+#: .\order\models\invoice.py:189
 msgid ""
 "The rendered PDF. Stored in per-tenant private storage — customer access "
 "goes through ``OrderViewSet.invoice_download`` (streamed through Django "
@@ -9982,15 +10062,15 @@ msgstr ""
 "με ταυτοποίηση Django)· το ιδιωτικό δέντρο βρίσκεται εκτός κάθε δημόσιου web"
 " root ως επιπλέον επίπεδο ασφαλείας."
 
-#: .\order\models\invoice.py:201
+#: .\order\models\invoice.py:202
 msgid "Total VAT"
 msgstr "Συνολικός ΦΠΑ"
 
-#: .\order\models\invoice.py:220 .\order\models\order.py:159
+#: .\order\models\invoice.py:221 .\order\models\order.py:163
 msgid "Payment Method Fee"
 msgstr "Έξοδα μεθόδου πληρωμής"
 
-#: .\order\models\invoice.py:233
+#: .\order\models\invoice.py:234
 msgid ""
 "Informational only — the line values are already net of the allocation, so "
 "this never enters the total arithmetic."
@@ -9998,15 +10078,15 @@ msgstr ""
 "Μόνο πληροφοριακό — οι αξίες των γραμμών είναι ήδη μειωμένες κατά την "
 "κατανομή, οπότε δεν συμμετέχει ποτέ στον υπολογισμό του συνόλου."
 
-#: .\order\models\invoice.py:238
+#: .\order\models\invoice.py:239
 msgid "Total (incl. VAT)"
 msgstr "Σύνολο (με ΦΠΑ)"
 
-#: .\order\models\invoice.py:244
+#: .\order\models\invoice.py:245
 msgid "VAT Breakdown"
 msgstr "Ανάλυση ΦΠΑ"
 
-#: .\order\models\invoice.py:247
+#: .\order\models\invoice.py:248
 msgid ""
 "Cached list of ``{rate, subtotal, vat, gross}`` rows — frozen at issue time "
 "so re-rendering the invoice always yields the same VAT table even if product"
@@ -10016,33 +10096,33 @@ msgstr ""
 "στιγμή της έκδοσης, ώστε η εκ νέου απόδοση του τιμολογίου να δίνει πάντα τον"
 " ίδιο πίνακα ΦΠΑ ακόμη κι αν αλλάξουν οι συντελεστές των προϊόντων."
 
-#: .\order\models\invoice.py:253
+#: .\order\models\invoice.py:254
 msgid "Seller Snapshot"
 msgstr "Στιγμιότυπο πωλητή"
 
-#: .\order\models\invoice.py:255
+#: .\order\models\invoice.py:256
 msgid "Seller name / VAT ID / address captured at issue time."
 msgstr "Όνομα πωλητή / ΑΦΜ / διεύθυνση, καταγεγραμμένα τη στιγμή της έκδοσης."
 
-#: .\order\models\invoice.py:258
+#: .\order\models\invoice.py:259
 msgid "Buyer Snapshot"
 msgstr "Στιγμιότυπο αγοραστή"
 
-#: .\order\models\invoice.py:261
+#: .\order\models\invoice.py:262
 msgid "Buyer name / email / billing address captured at issue time."
 msgstr ""
 "Όνομα αγοραστή / email / διεύθυνση τιμολόγησης, καταγεγραμμένα τη στιγμή της"
 " έκδοσης."
 
-#: .\order\models\invoice.py:265
+#: .\order\models\invoice.py:266
 msgid "Currency"
 msgstr "Νόμισμα"
 
-#: .\order\models\invoice.py:276
+#: .\order\models\invoice.py:277
 msgid "myDATA Status"
 msgstr "Κατάσταση myDATA"
 
-#: .\order\models\invoice.py:281
+#: .\order\models\invoice.py:282
 msgid ""
 "Lifecycle state of the invoice's AADE myDATA submission. NOT_SENT is the "
 "resting state when the myDATA integration is disabled or the invoice "
@@ -10052,11 +10132,11 @@ msgstr ""
 "NOT_SENT είναι η κατάσταση ηρεμίας όταν η ενσωμάτωση myDATA είναι "
 "απενεργοποιημένη ή το τιμολόγιο προηγείται αυτής."
 
-#: .\order\models\invoice.py:287
+#: .\order\models\invoice.py:288
 msgid "myDATA Invoice Type"
 msgstr "Τύπος τιμολογίου myDATA"
 
-#: .\order\models\invoice.py:292
+#: .\order\models\invoice.py:293
 msgid ""
 "AADE invoiceType code — e.g. 11.1 (B2C retail), 1.1 (B2B sales invoice), 5.1"
 " (linked credit note)."
@@ -10064,11 +10144,11 @@ msgstr ""
 "Κωδικός invoiceType ΑΑΔΕ — π.χ. 11.1 (λιανική B2C), 1.1 (τιμολόγιο πώλησης "
 "B2B), 5.1 (συνδεδεμένο πιστωτικό τιμολόγιο)."
 
-#: .\order\models\invoice.py:297
+#: .\order\models\invoice.py:298
 msgid "myDATA Series"
 msgstr "Σειρά myDATA"
 
-#: .\order\models\invoice.py:302
+#: .\order\models\invoice.py:303
 msgid ""
 "AADE ``series`` field — the alphanumeric part of the document's unique "
 "identifier within the issuer's register."
@@ -10076,11 +10156,11 @@ msgstr ""
 "Πεδίο ``series`` ΑΑΔΕ — το αλφαριθμητικό τμήμα του μοναδικού αναγνωριστικού "
 "του παραστατικού στο μητρώο του εκδότη."
 
-#: .\order\models\invoice.py:307
+#: .\order\models\invoice.py:308
 msgid "myDATA Serial Number (aa)"
 msgstr "Αριθμός Σειράς myDATA (aa)"
 
-#: .\order\models\invoice.py:311
+#: .\order\models\invoice.py:312
 msgid ""
 "AADE ``aa`` field — strictly-increasing integer within ``(series, year)``. "
 "Must be gapless per Greek tax law."
@@ -10088,11 +10168,11 @@ msgstr ""
 "Πεδίο ``aa`` ΑΑΔΕ — αυστηρά αύξων ακέραιος εντός ``(series, year)``. Πρέπει "
 "να είναι χωρίς κενά βάσει της ελληνικής φορολογικής νομοθεσίας."
 
-#: .\order\models\invoice.py:316
+#: .\order\models\invoice.py:317
 msgid "myDATA UID"
 msgstr "myDATA UID"
 
-#: .\order\models\invoice.py:321
+#: .\order\models\invoice.py:322
 msgid ""
 "Deterministic SHA-1 fingerprint of (issuer VAT | year | branch | invoiceType"
 " | series | aa). Sent as the request's ``uid`` so retries dedupe against "
@@ -10102,11 +10182,11 @@ msgstr ""
 "invoiceType | series | aa). Αποστέλλεται ως ``uid`` του αιτήματος ώστε οι "
 "επαναλήψεις να αποφεύγουν διπλοεγγραφές έναντι του σφάλματος 228 της ΑΑΔΕ."
 
-#: .\order\models\invoice.py:327
+#: .\order\models\invoice.py:328
 msgid "myDATA MARK"
 msgstr "myDATA MARK"
 
-#: .\order\models\invoice.py:332
+#: .\order\models\invoice.py:333
 msgid ""
 "15-digit registration number assigned by AADE. This is the legally-"
 "authoritative identifier — printed on the PDF."
@@ -10114,11 +10194,11 @@ msgstr ""
 "15ψήφιος αριθμός καταχώρισης που αποδίδεται από την ΑΑΔΕ. Αυτό είναι το "
 "νομικά έγκυρο αναγνωριστικό — εκτυπώνεται στο PDF."
 
-#: .\order\models\invoice.py:337
+#: .\order\models\invoice.py:338
 msgid "myDATA Authentication Code"
 msgstr "Κωδικός Αυθεντικοποίησης myDATA"
 
-#: .\order\models\invoice.py:342
+#: .\order\models\invoice.py:343
 msgid ""
 "Short hash AADE generates alongside the MARK; part of the ``qr_url`` query "
 "string. Populated only via licensed provider channels (kept for forward "
@@ -10128,11 +10208,11 @@ msgstr ""
 "``qr_url``. Συμπληρώνεται μόνο μέσω αδειοδοτημένων παρόχων (διατηρείται για "
 "μελλοντική συμβατότητα)."
 
-#: .\order\models\invoice.py:348
+#: .\order\models\invoice.py:349
 msgid "myDATA QR URL"
 msgstr "myDATA QR URL"
 
-#: .\order\models\invoice.py:353
+#: .\order\models\invoice.py:354
 msgid ""
 "AADE-returned URL for the PDF QR code. NEVER synthesise — AADE changes the "
 "query-string parameters between schema versions; always store the string "
@@ -10143,11 +10223,11 @@ msgstr ""
 "μεταξύ εκδόσεων schema· αποθηκεύστε πάντα ακριβώς τη συμβολοσειρά που "
 "επιστρέφουν."
 
-#: .\order\models\invoice.py:359
+#: .\order\models\invoice.py:360
 msgid "myDATA Cancellation MARK"
 msgstr "MARK Ακύρωσης myDATA"
 
-#: .\order\models\invoice.py:363
+#: .\order\models\invoice.py:364
 msgid ""
 "9-series MARK returned by a successful ``CancelInvoice`` call — proves the "
 "cancellation registered."
@@ -10155,11 +10235,11 @@ msgstr ""
 "MARK σειράς 9 που επιστρέφεται από επιτυχή κλήση ``CancelInvoice`` — "
 "αποδεικνύει ότι η ακύρωση καταχωρίστηκε."
 
-#: .\order\models\invoice.py:368
+#: .\order\models\invoice.py:369
 msgid "myDATA Error Code"
 msgstr "Κωδικός σφάλματος myDATA"
 
-#: .\order\models\invoice.py:373
+#: .\order\models\invoice.py:374
 msgid ""
 "Numeric AADE ``errorCode`` from the most recent failed submission (e.g. 101 "
 "XML syntax, 102 inactive VAT, 216/217 VAT category). Empty when last attempt"
@@ -10169,19 +10249,19 @@ msgstr ""
 "(π.χ. 101 σύνταξη XML, 102 ανενεργό ΦΠΑ, 216/217 κατηγορία ΦΠΑ). Κενό όταν η"
 " τελευταία προσπάθεια πέτυχε."
 
-#: .\order\models\invoice.py:379
+#: .\order\models\invoice.py:380
 msgid "myDATA Error Message"
 msgstr "Μήνυμα Σφάλματος myDATA"
 
-#: .\order\models\invoice.py:382
+#: .\order\models\invoice.py:383
 msgid "Human-readable message that accompanied the error code."
 msgstr "Μήνυμα σε αναγνώσιμη μορφή που συνόδευε τον κωδικό σφάλματος."
 
-#: .\order\models\invoice.py:385
+#: .\order\models\invoice.py:386
 msgid "myDATA Submitted At"
 msgstr "Υποβλήθηκε στο myDATA"
 
-#: .\order\models\invoice.py:389
+#: .\order\models\invoice.py:390
 msgid ""
 "Timestamp of the first transmission attempt — preserved across retries so "
 "reporting reflects the original send time."
@@ -10189,55 +10269,55 @@ msgstr ""
 "Χρονοσήμανση της πρώτης προσπάθειας αποστολής — διατηρείται σε όλες τις "
 "επαναλήψεις ώστε οι αναφορές να αντικατοπτρίζουν τον αρχικό χρόνο αποστολής."
 
-#: .\order\models\invoice.py:394
+#: .\order\models\invoice.py:395
 msgid "myDATA Confirmed At"
 msgstr "Επιβεβαιώθηκε στο myDATA στις"
 
-#: .\order\models\invoice.py:397
+#: .\order\models\invoice.py:398
 msgid "Timestamp AADE assigned the MARK."
 msgstr "Χρονοσήμανση απόδοσης του MARK από την ΑΑΔΕ."
 
-#: .\order\models\invoice.py:402 .\settings.py:3385 .\settings.py:3856
+#: .\order\models\invoice.py:403 .\settings.py:3388 .\settings.py:3859
 msgid "Invoices"
 msgstr "Τιμολόγια"
 
-#: .\order\models\item.py:30
+#: .\order\models\item.py:32
 msgid "Original Quantity"
 msgstr "Αρχική ποσότητα"
 
-#: .\order\models\item.py:32
+#: .\order\models\item.py:34
 msgid "Is Refunded"
 msgstr "Έχει επιστραφεί"
 
-#: .\order\models\item.py:33
+#: .\order\models\item.py:35
 msgid "Refunded Quantity"
 msgstr "Επιστραφείσα ποσότητα"
 
-#: .\order\models\item.py:34 .\shipping_acs\models\tracking_event.py:49
-#: .\user\models\address.py:59
+#: .\order\models\item.py:36 .\shipping_acs\models\tracking_event.py:49
+#: .\user\models\address.py:62
 msgid "Notes"
 msgstr "Σημειώσεις"
 
-#: .\order\models\item.py:80
+#: .\order\models\item.py:82
 msgid "Quantity must be greater than 0."
 msgstr "Η ποσότητα πρέπει να είναι μεγαλύτερη του 0."
 
-#: .\order\models\item.py:88
+#: .\order\models\item.py:90
 msgid "The quantity exceeds the available stock."
 msgstr "Η ποσότητα υπερβαίνει το διαθέσιμο απόθεμα."
 
-#: .\order\models\item.py:93
+#: .\order\models\item.py:95
 msgid "Refunded quantity cannot exceed the ordered quantity."
 msgstr ""
 "Η ποσότητα επιστροφής δεν μπορεί να υπερβαίνει την παραγγελθείσα ποσότητα."
 
-#: .\order\models\item.py:153
+#: .\order\models\item.py:155
 msgid "Invalid refund quantity. Please enter a quantity greater than 0."
 msgstr ""
 "Μη έγκυρη ποσότητα επιστροφής. Παρακαλούμε εισαγάγετε ποσότητα μεγαλύτερη "
 "από 0."
 
-#: .\order\models\item.py:164
+#: .\order\models\item.py:166
 #, python-format
 msgid ""
 "Cannot refund more than the ordered quantity. Ordered quantity: %(ordered)s,"
@@ -10247,75 +10327,81 @@ msgstr ""
 "Παραγγελθείσα ποσότητα: %(ordered)s, Επιστραφείσα ποσότητα: %(refunded)s, "
 "Ποσότητα προς επιστροφή: %(requested)s"
 
-#: .\order\models\order.py:124 .\user\models\address.py:45
+#: .\order\models\order.py:125 .\region\admin.py:121 .\region\models.py:28
+#: .\shipping_acs\models\station.py:62 .\user\models\account.py:98
+#: .\user\models\address.py:45
+msgid "Region"
+msgstr "Περιοχή"
+
+#: .\order\models\order.py:128 .\user\models\address.py:48
 msgid "Floor"
 msgstr "Όροφος"
 
-#: .\order\models\order.py:131 .\user\models\address.py:52
+#: .\order\models\order.py:135 .\user\models\address.py:55
 msgid "Location Type"
 msgstr "Τύπος τοποθεσίας"
 
-#: .\order\models\order.py:138 .\user\models\account.py:66
-#: .\user\models\address.py:22
+#: .\order\models\order.py:142 .\user\models\account.py:66
+#: .\user\models\address.py:23
 msgid "First Name"
 msgstr "Όνομα"
 
-#: .\order\models\order.py:139 .\user\models\account.py:69
-#: .\user\models\address.py:23
+#: .\order\models\order.py:143 .\user\models\account.py:69
+#: .\user\models\address.py:24
 msgid "Last Name"
 msgstr "Επώνυμο"
 
-#: .\order\models\order.py:140 .\user\models\address.py:24
+#: .\order\models\order.py:144 .\user\models\address.py:25
 msgid "Street"
 msgstr "Οδός"
 
-#: .\order\models\order.py:141 .\user\models\address.py:25
+#: .\order\models\order.py:145 .\user\models\address.py:26
 msgid "Street Number"
 msgstr "Αριθμός"
 
-#: .\order\models\order.py:142 .\shipping_acs\models\station.py:57
-#: .\user\models\account.py:74 .\user\models\address.py:26
+#: .\order\models\order.py:146 .\shipping_acs\models\station.py:57
+#: .\user\models\account.py:74 .\user\models\address.py:27
 msgid "City"
 msgstr "Πόλη"
 
-#: .\order\models\order.py:143
+#: .\order\models\order.py:147
 msgid "Zipcode"
 msgstr "Τ.Κ."
 
-#: .\order\models\order.py:144 .\user\models\account.py:81
+#: .\order\models\order.py:148 .\user\models\account.py:81
 msgid "Place"
 msgstr "Τόπος"
 
-#: .\order\models\order.py:145 .\user\models\account.py:72
-#: .\user\models\address.py:58
+#: .\order\models\order.py:149 .\user\models\account.py:72
+#: .\user\models\address.py:61
 msgid "Phone Number"
 msgstr "Αριθμός Τηλεφώνου"
 
-#: .\order\models\order.py:147
+#: .\order\models\order.py:151
 msgid "Customer Notes"
 msgstr "Σημειώσεις Πελάτη"
 
-#: .\order\models\order.py:156
+#: .\order\models\order.py:160
 msgid "Shipping Price"
 msgstr "Έξοδα αποστολής"
 
-#: .\order\models\order.py:164
+#: .\order\models\order.py:168
 msgid "Fee charged by the payment method (e.g., Cash on Delivery fee)"
 msgstr "Χρέωση από τη μέθοδο πληρωμής (π.χ. τέλος αντικαταβολής)"
 
-#: .\order\models\order.py:168
+#: .\order\models\order.py:172
 msgid "Document Type"
 msgstr "Τύπος Εγγράφου"
 
-#: .\order\models\order.py:174
+#: .\order\models\order.py:178
 msgid "Paid Amount"
 msgstr "Πληρωμένο ποσό"
 
-#: .\order\models\order.py:181
+#: .\order\models\order.py:185
 msgid "Loyalty Discount"
 msgstr "Έκπτωση πόντων"
 
-#: .\order\models\order.py:186
+#: .\order\models\order.py:190
 msgid ""
 "Amount deducted from the order total in exchange for loyalty points. "
 "Deducted by calculate_order_total_amount()."
@@ -10323,11 +10409,11 @@ msgstr ""
 "Ποσό που αφαιρείται από το σύνολο της παραγγελίας σε αντάλλαγμα για πόντους "
 "πιστότητας. Αφαιρείται από την calculate_order_total_amount()."
 
-#: .\order\models\order.py:191
+#: .\order\models\order.py:195
 msgid "Promotion Discount"
 msgstr "Έκπτωση προσφορών"
 
-#: .\order\models\order.py:196
+#: .\order\models\order.py:200
 msgid ""
 "Total discount granted by promotions/coupons, snapshotted at order creation."
 " Breakdown lives in metadata['promotions'] + PromotionRedemption rows. "
@@ -10338,11 +10424,11 @@ msgstr ""
 "metadata['promotions'] + στις γραμμές PromotionRedemption. Αφαιρείται από "
 "την calculate_order_total_amount()."
 
-#: .\order\models\order.py:203
+#: .\order\models\order.py:207
 msgid "Gift Card Amount"
 msgstr "Ποσό δωροκάρτας"
 
-#: .\order\models\order.py:208
+#: .\order\models\order.py:212
 msgid ""
 "Portion of the order settled by gift-card balance. A payment, not a discount"
 " — it never reduces the taxable order value, only what the payment provider "
@@ -10352,15 +10438,19 @@ msgstr ""
 "έκπτωση — δεν μειώνει ποτέ τη φορολογητέα αξία της παραγγελίας, μόνο το ποσό"
 " που χρεώνει ο πάροχος πληρωμής."
 
-#: .\order\models\order.py:214
+#: .\order\models\order.py:218
 msgid "Status Updated At"
 msgstr "Κατάσταση ενημερώθηκε στις"
 
-#: .\order\models\order.py:230
+#: .\order\models\order.py:233
+msgid "Payment Gateway"
+msgstr "Πύλη πληρωμής"
+
+#: .\order\models\order.py:236
 msgid "Pay Way Key"
 msgstr "Κλειδί μεθόδου πληρωμής"
 
-#: .\order\models\order.py:236
+#: .\order\models\order.py:242
 msgid ""
 "Snapshot of which payment method the shopper chose, as the ``PayWayEnum`` "
 "key. Distinct from ``payment_method``, which records the gateway that "
@@ -10381,11 +10471,11 @@ msgstr ""
 " επίσης αυτό που εμφανίζει το storefront, αφού το API δεν μπορεί να κάνει "
 "τοπικοποίηση (βλ. ``PayWay.display_name``)."
 
-#: .\order\models\order.py:256
+#: .\order\models\order.py:262
 msgid "Billing VAT ID"
 msgstr "ΑΦΜ τιμολόγησης"
 
-#: .\order\models\order.py:261
+#: .\order\models\order.py:267
 msgid ""
 "Buyer's tax number (ΑΦΜ) — required when issuing an invoice (vs. a retail "
 "receipt). 9 digits for Greek ΑΦΜ, no ``EL`` / ``GR`` prefix."
@@ -10393,11 +10483,11 @@ msgstr ""
 "ΑΦΜ αγοραστή — απαιτείται κατά την έκδοση τιμολογίου (σε αντίθεση με "
 "απόδειξη λιανικής). 9 ψηφία για ελληνικό ΑΦΜ, χωρίς πρόθεμα ``EL`` / ``GR``."
 
-#: .\order\models\order.py:267
+#: .\order\models\order.py:273
 msgid "Billing Country"
 msgstr "Χώρα τιμολόγησης"
 
-#: .\order\models\order.py:272
+#: .\order\models\order.py:278
 msgid ""
 "ISO 3166-1 alpha-2 country code of the buyer for tax purposes. Pairs with "
 "``billing_vat_id``; determines which AADE invoice type (1.1 domestic, 1.2 "
@@ -10407,43 +10497,44 @@ msgstr ""
 "Συνδυάζεται με το ``billing_vat_id``· καθορίζει ποιος τύπος τιμολογίου ΑΑΔΕ "
 "(1.1 εσωτερικού, 1.2 ενδοκοινοτικό, 1.3 τρίτης χώρας) εφαρμόζεται."
 
-#: .\order\models\order.py:283
+#: .\order\models\order.py:289
 msgid "Billing Company Name"
 msgstr "Επωνυμία εταιρείας"
 
-#: .\order\models\order.py:286
+#: .\order\models\order.py:292
 msgid "Billing Tax Office (ΔΟΥ)"
 msgstr "ΔΟΥ τιμολόγησης"
 
-#: .\order\models\order.py:289
+#: .\order\models\order.py:295
 msgid "Billing Business Activity"
 msgstr "Δραστηριότητα επιχείρησης"
 
-#: .\order\models\order.py:298
+#: .\order\models\order.py:304
 msgid "Billing Street"
 msgstr "Οδός τιμολόγησης"
 
-#: .\order\models\order.py:301
+#: .\order\models\order.py:307
 msgid "Billing Street Number"
 msgstr "Αριθμός οδού τιμολόγησης"
 
-#: .\order\models\order.py:304
+#: .\order\models\order.py:310
 msgid "Billing City"
 msgstr "Πόλη τιμολόγησης"
 
-#: .\order\models\order.py:307
+#: .\order\models\order.py:313
 msgid "Billing Zipcode"
 msgstr "Τ.Κ. τιμολόγησης"
 
-#: .\order\models\order.py:313
+#: .\order\models\order.py:319
 msgid "Shipping Carrier"
 msgstr "Εταιρεία μεταφοράς"
 
-#: .\order\models\order.py:321 .\shipping\models\provider.py:109
+#: .\order\models\order.py:327 .\shipping\models\provider.py:109
+#: .\shipping\models\rate.py:33
 msgid "Shipping Provider"
 msgstr "Πάροχος Αποστολών"
 
-#: .\order\models\order.py:323
+#: .\order\models\order.py:329
 msgid ""
 "Carrier handling this order. Null for legacy rows where fulfilment is "
 "handled outside any registered provider."
@@ -10451,49 +10542,49 @@ msgstr ""
 "Μεταφορέας που διαχειρίζεται αυτή την παραγγελία. Null για παλαιότερες "
 "εγγραφές όπου η εκπλήρωση γίνεται εκτός καταχωρημένου παρόχου."
 
-#: .\order\models\order.py:328 .\shipping\models\rate.py:47
+#: .\order\models\order.py:334 .\shipping\models\rate.py:49
 msgid "Shipping Kind"
 msgstr "Τρόπος αποστολής"
 
-#: .\order\models\order.py:333 .\order\serializers\order.py:1125
+#: .\order\models\order.py:339 .\order\serializers\order.py:1125
 msgid "Generic fulfilment kind, independent of provider."
 msgstr "Γενικός τύπος εκπλήρωσης, ανεξάρτητος από τον πάροχο."
 
-#: .\order\models\order.py:336
+#: .\order\models\order.py:342
 msgid "Reminder Count"
 msgstr "Πλήθος υπενθυμίσεων"
 
-#: .\order\models\order.py:338
+#: .\order\models\order.py:344
 msgid "Number of pending-order reminder emails sent."
 msgstr "Αριθμός emails υπενθύμισης εκκρεμούς παραγγελίας που εστάλησαν."
 
-#: .\order\models\order.py:341
+#: .\order\models\order.py:347
 msgid "Last Reminder Sent At"
 msgstr "Τελευταία Υπενθύμιση Απεστάλη Στις"
 
-#: .\order\models\order.py:344
+#: .\order\models\order.py:350
 msgid "Timestamp of the most recent reminder email."
 msgstr "Χρονοσήμανση του πιο πρόσφατου email υπενθύμισης."
 
-#: .\order\models\order.py:351
+#: .\order\models\order.py:357
 msgid "Language captured at order creation, used when rendering order emails."
 msgstr ""
 "Γλώσσα που καταγράφεται κατά τη δημιουργία της παραγγελίας, χρησιμοποιείται "
 "στην απόδοση των emails παραγγελίας."
 
-#: .\order\models\order.py:626
+#: .\order\models\order.py:632
 msgid "Enter a valid email address."
 msgstr "Εισαγάγετε έγκυρο email."
 
-#: .\order\models\order.py:629
+#: .\order\models\order.py:635
 msgid "Zipcode is required."
 msgstr "Ο ταχυδρομικός κώδικας είναι υποχρεωτικός."
 
-#: .\order\models\order.py:640
+#: .\order\models\order.py:646
 msgid "Street, street number, and city are required."
 msgstr "Η οδός, ο αριθμός και η πόλη είναι υποχρεωτικά."
 
-#: .\order\models\order.py:677
+#: .\order\models\order.py:683
 msgid ""
 "A completed payment needs the amount paid, unless discounts, loyalty points "
 "or gift cards cover the whole order total."
@@ -10522,60 +10613,64 @@ msgstr "Αύξηση"
 msgid "Product whose stock was modified"
 msgstr "Προϊόν του οποίου τροποποιήθηκε το απόθεμα"
 
-#: .\order\models\stock_log.py:61
+#: .\order\models\stock_log.py:62
 msgid "Order associated with this stock operation (if applicable)"
 msgstr ""
 "Παραγγελία που σχετίζεται με αυτή τη λειτουργία αποθέματος (αν υπάρχει)"
 
-#: .\order\models\stock_log.py:65
+#: .\order\models\stock_log.py:67
 msgid "Operation Type"
 msgstr "Τύπος λειτουργίας"
 
-#: .\order\models\stock_log.py:68
+#: .\order\models\stock_log.py:70
 msgid "Type of stock operation performed"
 msgstr "Τύπος λειτουργίας αποθέματος που εκτελέστηκε"
 
-#: .\order\models\stock_log.py:71
+#: .\order\models\stock_log.py:73
 msgid "Quantity Delta"
 msgstr "Μεταβολή ποσότητας"
 
-#: .\order\models\stock_log.py:73
+#: .\order\models\stock_log.py:75
 msgid "Change in quantity (positive for increment, negative for decrement)"
 msgstr "Μεταβολή ποσότητας (θετική για αύξηση, αρνητική για μείωση)"
 
-#: .\order\models\stock_log.py:77
+#: .\order\models\stock_log.py:79
 msgid "Stock Before"
 msgstr "Απόθεμα πριν"
 
-#: .\order\models\stock_log.py:78
+#: .\order\models\stock_log.py:80
 msgid "Stock level before the operation"
 msgstr "Επίπεδο αποθέματος πριν τη λειτουργία"
 
-#: .\order\models\stock_log.py:81
+#: .\order\models\stock_log.py:83
 msgid "Stock After"
 msgstr "Απόθεμα μετά"
 
-#: .\order\models\stock_log.py:82
+#: .\order\models\stock_log.py:84
 msgid "Stock level after the operation"
 msgstr "Επίπεδο αποθέματος μετά τη λειτουργία"
 
-#: .\order\models\stock_log.py:87
+#: .\order\models\stock_log.py:89
 msgid "Human-readable reason for the stock change"
 msgstr "Αιτιολογία σε αναγνώσιμη μορφή για τη μεταβολή αποθέματος"
 
-#: .\order\models\stock_log.py:107
+#: .\order\models\stock_log.py:109
 msgid "User who performed the operation (null for system operations)"
 msgstr "Χρήστης που εκτέλεσε τη λειτουργία (null για λειτουργίες συστήματος)"
 
-#: .\order\models\stock_log.py:115
+#: .\order\models\stock_log.py:111
+msgid "Performed By"
+msgstr "Εκτελέστηκε από"
+
+#: .\order\models\stock_log.py:118
 msgid "Stock Log"
 msgstr "Καταχώρηση Αποθέματος"
 
-#: .\order\models\stock_log.py:116 .\settings.py:3708 .\settings.py:3862
+#: .\order\models\stock_log.py:119 .\settings.py:3711 .\settings.py:3865
 msgid "Stock Logs"
 msgstr "Καταχωρήσεις Αποθέματος"
 
-#: .\order\models\stock_log.py:175
+#: .\order\models\stock_log.py:178
 #, python-brace-format
 msgid ""
 "Stock calculation error: For {operation}, stock_after must equal "
@@ -10585,7 +10680,7 @@ msgstr ""
 "ισούται με stock_before + quantity_delta. Ελήφθη: {after} != {before} + "
 "{delta}"
 
-#: .\order\models\stock_log.py:196
+#: .\order\models\stock_log.py:199
 #, python-brace-format
 msgid ""
 "Stock calculation error: For {operation}, stock_after must equal "
@@ -10599,55 +10694,59 @@ msgstr ""
 msgid "Product being reserved"
 msgstr "Προϊόν που δεσμεύεται"
 
-#: .\order\models\stock_reservation.py:36
+#: .\order\models\stock_reservation.py:37
 msgid "Number of units reserved"
 msgstr "Αριθμός δεσμευμένων μονάδων"
 
-#: .\order\models\stock_reservation.py:44
+#: .\order\models\stock_reservation.py:45
 msgid "User who made the reservation (null for guest users)"
 msgstr "Χρήστης που έκανε τη δέσμευση (null για επισκέπτες)"
 
-#: .\order\models\stock_reservation.py:47
+#: .\order\models\stock_reservation.py:46 .\product\admin.py:682
+msgid "Reserved By"
+msgstr "Δεσμεύτηκε από"
+
+#: .\order\models\stock_reservation.py:49
 msgid "Session ID"
 msgstr "ID συνεδρίας"
 
-#: .\order\models\stock_reservation.py:49
+#: .\order\models\stock_reservation.py:51
 msgid "Cart UUID or session identifier for tracking"
 msgstr "UUID καλαθιού ή αναγνωριστικό συνεδρίας για παρακολούθηση"
 
-#: .\order\models\stock_reservation.py:54
+#: .\order\models\stock_reservation.py:56
 msgid ""
 "Timestamp when reservation expires (typically 15 minutes from creation)"
 msgstr "Χρονοσήμανση λήξης της δέσμευσης (συνήθως 15 λεπτά από τη δημιουργία)"
 
-#: .\order\models\stock_reservation.py:58
+#: .\order\models\stock_reservation.py:60
 msgid "Consumed"
 msgstr "Καταναλώθηκε"
 
-#: .\order\models\stock_reservation.py:61
+#: .\order\models\stock_reservation.py:63
 msgid "True if reservation was converted to actual stock decrement"
 msgstr "True αν η δέσμευση μετατράπηκε σε πραγματική μείωση αποθέματος"
 
-#: .\order\models\stock_reservation.py:70
+#: .\order\models\stock_reservation.py:72
 msgid "Order created from this reservation (set when consumed)"
 msgstr ""
 "Παραγγελία που δημιουργήθηκε από αυτή τη δέσμευση (ορίζεται όταν "
 "καταναλωθεί)"
 
-#: .\order\models\stock_reservation.py:73
+#: .\order\models\stock_reservation.py:76
 msgid "Abandonment Notified"
 msgstr "Ενημερώθηκε για εγκατάλειψη"
 
-#: .\order\models\stock_reservation.py:76
+#: .\order\models\stock_reservation.py:79
 msgid "True if the customer has been emailed about this abandoned reservation"
 msgstr ""
 "True αν έχει σταλεί email στον πελάτη για αυτή την εγκαταλελειμμένη δέσμευση"
 
-#: .\order\models\stock_reservation.py:84
+#: .\order\models\stock_reservation.py:87
 msgid "Stock Reservation"
 msgstr "Δέσμευση αποθέματος"
 
-#: .\order\models\stock_reservation.py:85
+#: .\order\models\stock_reservation.py:88
 msgid "Stock Reservations"
 msgstr "Δεσμεύσεις αποθέματος"
 
@@ -10712,7 +10811,7 @@ msgstr "Παραλήφθηκε στις"
 msgid "Viva Webhook Event"
 msgstr "Συμβάν Viva Webhook"
 
-#: .\order\models\viva_webhook_event.py:86 .\settings.py:3753
+#: .\order\models\viva_webhook_event.py:86 .\settings.py:3756
 msgid "Viva Webhook Events"
 msgstr "Συμβάντα Viva Webhook"
 
@@ -12031,14 +12130,6 @@ msgstr ""
 "Αν μείνουν κενά, η σελίδα διατηρεί τον ενσωματωμένο τίτλο της και την "
 "περιγραφή του καταστήματος."
 
-#: .\page_config\admin.py:127 .\page_config\models.py:175
-#: .\shipping\admin.py:120 .\shipping\models\provider.py:68
-#: .\shipping_acs\models\pickup_list.py:67
-#: .\shipping_acs\models\shipment.py:249
-#: .\shipping_boxnow\models\shipment.py:167 .\user\models\subscription.py:263
-msgid "Metadata"
-msgstr "Μεταδεδομένα"
-
 #: .\page_config\admin.py:167
 msgid "Entries"
 msgstr "Καταχωρήσεις"
@@ -12111,7 +12202,7 @@ msgstr "Πλέγμα προϊόντων"
 msgid "Featured Products"
 msgstr "Προβεβλημένα Προϊόντα"
 
-#: .\page_config\models.py:49 .\product\models\category.py:48
+#: .\page_config\models.py:49 .\product\models\category.py:49
 msgid "Product Categories"
 msgstr "Κατηγορίες προϊόντος"
 
@@ -12959,7 +13050,7 @@ msgid "Attribute Information"
 msgstr "Πληροφορίες Χαρακτηριστικού"
 
 #: .\product\admin.py:404 .\product\admin.py:551
-#: .\product\models\attribute.py:39
+#: .\product\models\attribute.py:39 .\product\models\attribute_value.py:24
 msgid "Attribute"
 msgstr "Χαρακτηριστικό"
 
@@ -13019,11 +13110,11 @@ msgid_plural "%(count)d attribute values were successfully deactivated."
 msgstr[0] "%(count)d τιμή χαρακτηριστικού απενεργοποιήθηκε επιτυχώς."
 msgstr[1] "%(count)d τιμές χαρακτηριστικών απενεργοποιήθηκαν επιτυχώς."
 
-#: .\product\admin.py:619 .\product\models\product_attribute.py:31
+#: .\product\admin.py:619 .\product\models\product_attribute.py:33
 msgid "Product Attribute"
 msgstr "Χαρακτηριστικό Προϊόντος"
 
-#: .\product\admin.py:620 .\product\models\product_attribute.py:32
+#: .\product\admin.py:620 .\product\models\product_attribute.py:34
 msgid "Product Attributes"
 msgstr "Χαρακτηριστικά προϊόντος"
 
@@ -13038,10 +13129,6 @@ msgstr "Ενεργές δεσμεύσεις αποθέματος"
 #: .\product\admin.py:678
 msgid "Reservation"
 msgstr "Δέσμευση"
-
-#: .\product\admin.py:682
-msgid "Reserved By"
-msgstr "Δεσμεύτηκε από"
 
 #: .\product\admin.py:689
 #, python-format
@@ -13182,7 +13269,7 @@ msgstr "παραλλαγές"
 msgid "%(price)s -> %(final)s (-%(discount)s%%)"
 msgstr "%(price)s -> %(final)s (-%(discount)s%%)"
 
-#: .\product\admin.py:1145 .\product\models\product.py:113
+#: .\product\admin.py:1145 .\product\models\product.py:116
 msgid "Stock"
 msgstr "Απόθεμα"
 
@@ -13376,7 +13463,7 @@ msgstr[1] "%(count)d αξιολογήσεις απορρίφθηκαν."
 msgid "Image Information"
 msgstr "Πληροφορίες εικόνας"
 
-#: .\product\admin.py:2144
+#: .\product\admin.py:2144 .\product\models\product.py:98
 msgid "Variant Group"
 msgstr "Ομάδα παραλλαγών"
 
@@ -13401,6 +13488,7 @@ msgid "No products assigned yet."
 msgstr "Δεν έχουν εκχωρηθεί προϊόντα ακόμα."
 
 #: .\product\admin.py:2247 .\product\models\brand.py:20
+#: .\product\models\product.py:106
 msgid "Brand"
 msgstr "Μάρκα"
 
@@ -13627,11 +13715,11 @@ msgstr "Αναπλήρωση"
 msgid "Price drop"
 msgstr "Πτώση τιμής"
 
-#: .\product\models\alert.py:51
+#: .\product\models\alert.py:53
 msgid "Target price"
 msgstr "Στόχος τιμής"
 
-#: .\product\models\alert.py:57
+#: .\product\models\alert.py:59
 msgid ""
 "For price_drop alerts: trigger when the product's price falls to or below "
 "this value. Ignored for restock alerts."
@@ -13640,27 +13728,27 @@ msgstr ""
 "στο ή κάτω από αυτή την τιμή. Αγνοείται για ειδοποιήσεις "
 "επαναδιαθεσιμότητας."
 
-#: .\product\models\alert.py:61 .\shipping_acs\models\station.py:88
+#: .\product\models\alert.py:63 .\shipping_acs\models\station.py:88
 msgid "Is active"
 msgstr "Ενεργό"
 
-#: .\product\models\alert.py:62
+#: .\product\models\alert.py:64
 msgid "Notified at"
 msgstr "Ειδοποιήθηκε στις"
 
-#: .\product\models\alert.py:65
+#: .\product\models\alert.py:67
 msgid "Product alert"
 msgstr "Ειδοποίηση προϊόντος"
 
-#: .\product\models\alert.py:66
+#: .\product\models\alert.py:68
 msgid "Product alerts"
 msgstr "Ειδοποιήσεις προϊόντος"
 
-#: .\product\models\alert.py:102
+#: .\product\models\alert.py:104
 msgid "Either a user or an email must be provided."
 msgstr "Πρέπει να δοθεί είτε χρήστης είτε email."
 
-#: .\product\models\alert.py:108 .\product\serializers\alert.py:71
+#: .\product\models\alert.py:110 .\product\serializers\alert.py:71
 msgid "target_price is required for price-drop alerts."
 msgstr "Το target_price είναι υποχρεωτικό για ειδοποιήσεις πτώσης τιμής."
 
@@ -13678,16 +13766,17 @@ msgstr ""
 "παραλλαγής (π.χ. Χρώμα, Μνήμη) σε όλη την ομάδα παραλλαγών ενός προϊόντος "
 "αντί ως απλή προδιαγραφή μόνο για ανάγνωση."
 
-#: .\product\models\attribute.py:40 .\settings.py:3283 .\settings.py:3966
+#: .\product\models\attribute.py:40 .\settings.py:3286 .\settings.py:3969
 msgid "Attributes"
 msgstr "Χαρακτηριστικά"
 
-#: .\product\models\attribute_value.py:35
+#: .\product\models\attribute_value.py:36
+#: .\product\models\product_attribute.py:27
 msgid "Attribute Value"
 msgstr "Τιμή Χαρακτηριστικού"
 
-#: .\product\models\attribute_value.py:36 .\settings.py:3291
-#: .\settings.py:3973
+#: .\product\models\attribute_value.py:37 .\settings.py:3294
+#: .\settings.py:3976
 msgid "Attribute Values"
 msgstr "Τιμές Χαρακτηριστικών"
 
@@ -13695,51 +13784,51 @@ msgstr "Τιμές Χαρακτηριστικών"
 msgid "Brands"
 msgstr "Μάρκες"
 
-#: .\product\models\category.py:47
+#: .\product\models\category.py:48
 msgid "Product Category"
 msgstr "Κατηγορία Προϊόντος"
 
-#: .\product\models\category_image.py:26
+#: .\product\models\category_image.py:27
 msgid "Image Type"
 msgstr "Τύπος εικόνας"
 
-#: .\product\models\category_image.py:37
+#: .\product\models\category_image.py:38
 msgid "Alt Text"
 msgstr "Εναλλακτικό κείμενο"
 
-#: .\product\models\category_image.py:44
+#: .\product\models\category_image.py:45
 msgid "Product Category Image"
 msgstr "Εικόνα Κατηγορίας Προϊόντος"
 
-#: .\product\models\category_image.py:45
+#: .\product\models\category_image.py:46
 msgid "Product Category Images"
 msgstr "Εικόνες Κατηγορίας Προϊόντος"
 
-#: .\product\models\favourite.py:27
+#: .\product\models\favourite.py:29
 msgid "Product Favourite"
 msgstr "Αγαπημένο Προϊόν"
 
-#: .\product\models\favourite.py:28
+#: .\product\models\favourite.py:30
 msgid "Product Favourites"
 msgstr "Αγαπημένα προϊόντα"
 
-#: .\product\models\favourite.py:54
+#: .\product\models\favourite.py:56
 msgid "This product is already in the user's favorites."
 msgstr "Αυτό το προϊόν βρίσκεται ήδη στα αγαπημένα του χρήστη."
 
-#: .\product\models\image.py:25 .\user\models\address.py:60
+#: .\product\models\image.py:26 .\user\models\address.py:63
 msgid "Is Main"
 msgstr "Κύριο"
 
-#: .\product\models\image.py:33
+#: .\product\models\image.py:34
 msgid "Product Image"
 msgstr "Εικόνα Προϊόντος"
 
-#: .\product\models\image.py:34
+#: .\product\models\image.py:35
 msgid "Product Images"
 msgstr "Εικόνες προϊόντος"
 
-#: .\product\models\product.py:94
+#: .\product\models\product.py:95
 msgid ""
 "Links this product to its sibling variations (e.g. the same item in other "
 "colours). Members share variant selectors on the storefront."
@@ -13747,11 +13836,11 @@ msgstr ""
 "Συνδέει αυτό το προϊόν με τις αδερφές παραλλαγές του (π.χ. το ίδιο είδος σε "
 "άλλα χρώματα). Τα μέλη μοιράζονται επιλογείς παραλλαγής στο κατάστημα."
 
-#: .\product\models\product.py:115
+#: .\product\models\product.py:118
 msgid "Low Stock Threshold"
 msgstr "Όριο χαμηλού αποθέματος"
 
-#: .\product\models\product.py:118
+#: .\product\models\product.py:121
 msgid ""
 "Stock level at or below which admins get a low-stock alert. Set to 0 to "
 "disable alerts for this product."
@@ -13760,11 +13849,11 @@ msgstr ""
 "ειδοποίηση χαμηλού αποθέματος. Ορίστε 0 για απενεργοποίηση των ειδοποιήσεων "
 "για αυτό το προϊόν."
 
-#: .\product\models\product.py:122
+#: .\product\models\product.py:125
 msgid "Low Stock Alert Sent"
 msgstr "Στάλθηκε Ειδοποίηση Χαμηλού Αποθέματος"
 
-#: .\product\models\product.py:125
+#: .\product\models\product.py:128
 msgid ""
 "Internal flag — prevents duplicate alerts. Automatically cleared when stock "
 "rises above the threshold."
@@ -13772,11 +13861,11 @@ msgstr ""
 "Εσωτερική σημαία — αποτρέπει διπλές ειδοποιήσεις. Καθαρίζεται αυτόματα όταν "
 "το απόθεμα ανέβει πάνω από το όριο."
 
-#: .\product\models\product.py:129
+#: .\product\models\product.py:132
 msgid "Price-drop Alerts Enabled"
 msgstr "Ειδοποιήσεις πτώσης τιμής"
 
-#: .\product\models\product.py:132
+#: .\product\models\product.py:135
 msgid ""
 "When enabled, customers can subscribe to a one-time email when this "
 "product's price drops below a target. Disabled by default — admins opt "
@@ -13786,50 +13875,50 @@ msgstr ""
 "email όταν η τιμή αυτού του προϊόντος πέσει κάτω από έναν στόχο. "
 "Απενεργοποιημένο από προεπιλογή — οι διαχειριστές το ενεργοποιούν ανά SKU."
 
-#: .\product\models\product.py:138
+#: .\product\models\product.py:141
 msgid "Discount Percent"
 msgstr "Ποσοστό Έκπτωσης"
 
-#: .\product\models\product.py:175
+#: .\product\models\product.py:179
 msgid "Weight"
 msgstr "Βάρος"
 
-#: .\product\models\product.py:207
+#: .\product\models\product.py:212
 msgid "Points Coefficient"
 msgstr "Συντελεστής πόντων"
 
-#: .\product\models\product.py:213
+#: .\product\models\product.py:218
 msgid "Multiplier for loyalty points calculation (0 = no calculated points)"
 msgstr ""
 "Πολλαπλασιαστής για τον υπολογισμό πόντων πιστότητας (0 = χωρίς "
 "υπολογιζόμενους πόντους)"
 
-#: .\product\models\product.py:217
+#: .\product\models\product.py:222
 msgid "Bonus Points"
 msgstr "Bonus πόντοι"
 
-#: .\product\models\product.py:219
+#: .\product\models\product.py:224
 msgid "Fixed bonus points awarded on purchase"
 msgstr "Σταθεροί πόντοι μπόνους που απονέμονται κατά την αγορά"
 
-#: .\product\models\product.py:279
+#: .\product\models\product.py:284
 msgid "Discount percent cannot be greater than 0 if price is 0."
 msgstr ""
 "Το ποσοστό έκπτωσης δεν μπορεί να είναι μεγαλύτερο από 0 αν η τιμή είναι 0."
 
-#: .\product\models\product.py:292 .\product\serializers\product.py:152
+#: .\product\models\product.py:297 .\product\serializers\product.py:152
 msgid "Discount percent must be between 0 and 100."
 msgstr "Το ποσοστό έκπτωσης πρέπει να είναι μεταξύ 0 και 100."
 
-#: .\product\models\product.py:298 .\product\serializers\product.py:146
+#: .\product\models\product.py:303 .\product\serializers\product.py:146
 msgid "Stock cannot be negative."
 msgstr "Το απόθεμα δεν μπορεί να είναι αρνητικό."
 
-#: .\product\models\product.py:463
+#: .\product\models\product.py:468
 msgid "Product Translation"
 msgstr "Μετάφραση προϊόντος"
 
-#: .\product\models\product.py:464
+#: .\product\models\product.py:469
 msgid "Product Translations"
 msgstr "Μεταφράσεις προϊόντος"
 
@@ -13853,23 +13942,23 @@ msgstr "Σχέση προϊόντος"
 msgid "Product relations"
 msgstr "Σχέσεις προϊόντων"
 
-#: .\product\models\review.py:27
+#: .\product\models\review.py:29
 msgid "Rate"
 msgstr "Βαθμολογία"
 
-#: .\product\models\review.py:35
+#: .\product\models\review.py:37
 msgid "Comment"
 msgstr "Σχόλιο"
 
-#: .\product\models\review.py:41
+#: .\product\models\review.py:43
 msgid "Product Review"
 msgstr "Κριτική Προϊόντος"
 
-#: .\product\models\review.py:42
+#: .\product\models\review.py:44
 msgid "Product Reviews"
 msgstr "Κριτικές προϊόντος"
 
-#: .\product\models\review.py:82 .\product\serializers\review.py:132
+#: .\product\models\review.py:84 .\product\serializers\review.py:132
 msgid "Invalid rate value."
 msgstr "Μη έγκυρη τιμή ποσοστού."
 
@@ -14276,23 +14365,28 @@ msgstr "Στοχεύει την κατηγορία αυτού του προϊό�
 msgid "Applies to the whole order"
 msgstr "Ισχύει για ολόκληρη την παραγγελία"
 
-#: .\promotion\models\cart_code.py:30
+#: .\promotion\models\cart_code.py:28 .\promotion\models\code.py:55
+#: .\promotion\models\redemption.py:31
+msgid "Promotion Code"
+msgstr "Κωδικός προσφοράς"
+
+#: .\promotion\models\cart_code.py:32
 msgid "Cart Promotion Code"
 msgstr "Κωδικός προσφοράς καλαθιού"
 
-#: .\promotion\models\cart_code.py:31
+#: .\promotion\models\cart_code.py:33
 msgid "Cart Promotion Codes"
 msgstr "Κωδικοί προσφοράς καλαθιού"
 
-#: .\promotion\models\code.py:20
+#: .\promotion\models\code.py:21
 msgid "Case-insensitive; stored uppercase"
 msgstr "Χωρίς διάκριση πεζών/κεφαλαίων· αποθηκεύεται με κεφαλαία"
 
-#: .\promotion\models\code.py:23
+#: .\promotion\models\code.py:24
 msgid "Usage Limit"
 msgstr "Όριο χρήσης"
 
-#: .\promotion\models\code.py:27
+#: .\promotion\models\code.py:28
 msgid ""
 "Maximum number of orders that may use this specific code (1 for single-use "
 "bulk codes); empty means unlimited"
@@ -14301,17 +14395,21 @@ msgstr ""
 "συγκεκριμένο κωδικό (1 για μαζικούς κωδικούς μίας χρήσης)· κενό σημαίνει "
 "απεριόριστες"
 
-#: .\promotion\models\code.py:38
+#: .\promotion\models\code.py:39
 msgid "When set, only this customer can redeem the code (personal coupon)"
 msgstr ""
 "Όταν ορίζεται, μόνο αυτός ο πελάτης μπορεί να εξαργυρώσει τον κωδικό "
 "(προσωπικό κουπόνι)"
 
-#: .\promotion\models\code.py:42
+#: .\promotion\models\code.py:41
+msgid "Assigned To"
+msgstr "Ανατεθειμένο σε"
+
+#: .\promotion\models\code.py:44
 msgid "Assigned To Email"
 msgstr "Ανατεθειμένο σε email"
 
-#: .\promotion\models\code.py:46
+#: .\promotion\models\code.py:48
 msgid ""
 "When set, only checkouts with this email can redeem the code — covers guests"
 " without an account"
@@ -14319,11 +14417,7 @@ msgstr ""
 "Όταν ορίζεται, μόνο checkout με αυτό το email μπορούν να εξαργυρώσουν τον "
 "κωδικό — καλύπτει επισκέπτες χωρίς λογαριασμό"
 
-#: .\promotion\models\code.py:53
-msgid "Promotion Code"
-msgstr "Κωδικός προσφοράς"
-
-#: .\promotion\models\code.py:54
+#: .\promotion\models\code.py:56
 msgid "Promotion Codes"
 msgstr "Κωδικοί προσφοράς"
 
@@ -14364,7 +14458,7 @@ msgid "Only used when target scope is 'Specific products'"
 msgstr ""
 "Χρησιμοποιείται μόνο όταν το εύρος στόχευσης είναι 'Συγκεκριμένα προϊόντα'"
 
-#: .\promotion\models\promotion.py:63
+#: .\promotion\models\promotion.py:64
 msgid ""
 "Only used when target scope is 'Specific categories'; subcategories are "
 "included automatically"
@@ -14372,14 +14466,18 @@ msgstr ""
 "Χρησιμοποιείται μόνο όταν το εύρος στόχευσης είναι 'Συγκεκριμένες "
 "κατηγορίες'· οι υποκατηγορίες συμπεριλαμβάνονται αυτόματα"
 
-#: .\promotion\models\promotion.py:72
+#: .\promotion\models\promotion.py:74
 msgid ""
 "Never counted or discounted by this promotion, whatever the target scope"
 msgstr ""
 "Δεν υπολογίζονται ούτε λαμβάνουν έκπτωση από αυτή την προσφορά, ανεξάρτητα "
 "από το εύρος στόχευσης"
 
-#: .\promotion\models\promotion.py:81
+#: .\promotion\models\promotion.py:77
+msgid "Excluded Products"
+msgstr "Εξαιρούμενα προϊόντα"
+
+#: .\promotion\models\promotion.py:84
 msgid ""
 "Products in these categories (subcategories included) are never counted or "
 "discounted by this promotion"
@@ -14387,11 +14485,15 @@ msgstr ""
 "Τα προϊόντα αυτών των κατηγοριών (συμπεριλαμβανομένων των υποκατηγοριών) δεν"
 " υπολογίζονται ούτε λαμβάνουν έκπτωση από αυτή την προσφορά"
 
-#: .\promotion\models\promotion.py:86
+#: .\promotion\models\promotion.py:87
+msgid "Excluded Categories"
+msgstr "Εξαιρούμενες κατηγορίες"
+
+#: .\promotion\models\promotion.py:90
 msgid "Exclude Already-discounted Products"
 msgstr "Εξαίρεση προϊόντων που έχουν ήδη έκπτωση"
 
-#: .\promotion\models\promotion.py:89
+#: .\promotion\models\promotion.py:93
 msgid ""
 "Skip products that already carry a product-level markdown (discount percent "
 "> 0)"
@@ -14399,11 +14501,11 @@ msgstr ""
 "Παράλειψη προϊόντων που έχουν ήδη έκπτωση σε επίπεδο προϊόντος (ποσοστό "
 "έκπτωσης > 0)"
 
-#: .\promotion\models\promotion.py:94
+#: .\promotion\models\promotion.py:98
 msgid "Minimum Quantity"
 msgstr "Ελάχιστη ποσότητα"
 
-#: .\promotion\models\promotion.py:98
+#: .\promotion\models\promotion.py:102
 msgid ""
 "Minimum number of ELIGIBLE units (after scope and exclusions) the cart must "
 "contain"
@@ -14411,20 +14513,20 @@ msgstr ""
 "Ελάχιστος αριθμός ΕΠΙΛΕΞΙΜΩΝ τεμαχίων (μετά το εύρος και τις εξαιρέσεις) που"
 " πρέπει να περιέχει το καλάθι"
 
-#: .\promotion\models\promotion.py:104
+#: .\promotion\models\promotion.py:108
 msgid "Buy Quantity"
 msgstr "Ποσότητα αγοράς"
 
-#: .\promotion\models\promotion.py:108
+#: .\promotion\models\promotion.py:112
 msgid "BXGY: eligible units the shopper must buy per application"
 msgstr ""
 "BXGY: επιλέξιμα τεμάχια που πρέπει να αγοράσει ο αγοραστής ανά εφαρμογή"
 
-#: .\promotion\models\promotion.py:112
+#: .\promotion\models\promotion.py:116
 msgid "Get Quantity"
 msgstr "Ποσότητα λήψης"
 
-#: .\promotion\models\promotion.py:116
+#: .\promotion\models\promotion.py:120
 msgid ""
 "BXGY: units discounted per application. FREE_GIFT: gift units added to the "
 "order"
@@ -14432,11 +14534,11 @@ msgstr ""
 "BXGY: τεμάχια με έκπτωση ανά εφαρμογή. FREE_GIFT: τεμάχια δώρου που "
 "προστίθενται στην παραγγελία"
 
-#: .\promotion\models\promotion.py:121
+#: .\promotion\models\promotion.py:125
 msgid "Get Discount Percent"
 msgstr "Ποσοστό έκπτωσης λήψης"
 
-#: .\promotion\models\promotion.py:126
+#: .\promotion\models\promotion.py:130
 msgid ""
 "BXGY: discount applied to the 'get' units — 100 means free, 50 means half "
 "price"
@@ -14444,7 +14546,7 @@ msgstr ""
 "BXGY: έκπτωση που εφαρμόζεται στα τεμάχια 'λήψης' — 100 σημαίνει δωρεάν, 50 "
 "σημαίνει μισή τιμή"
 
-#: .\promotion\models\promotion.py:135
+#: .\promotion\models\promotion.py:139
 msgid ""
 "BXGY: the reward pool (empty = same products as the buy side). FREE_GIFT: "
 "the gift product (set exactly one)."
@@ -14452,20 +14554,24 @@ msgstr ""
 "BXGY: τα προϊόντα ανταμοιβής (κενό = τα ίδια προϊόντα με την πλευρά της "
 "αγοράς). FREE_GIFT: το προϊόν δώρου (ορίστε ακριβώς ένα)."
 
-#: .\promotion\models\promotion.py:140
+#: .\promotion\models\promotion.py:142
+msgid "Reward Products"
+msgstr "Προϊόντα ανταμοιβής"
+
+#: .\promotion\models\promotion.py:145
 msgid "Minimum Subtotal"
 msgstr "Ελάχιστο υποσύνολο"
 
-#: .\promotion\models\promotion.py:146
+#: .\promotion\models\promotion.py:151
 msgid "Cart items total (incl. VAT) required for the promotion to apply"
 msgstr ""
 "Σύνολο ειδών καλαθιού (με ΦΠΑ) που απαιτείται για να εφαρμοστεί η προσφορά"
 
-#: .\promotion\models\promotion.py:150
+#: .\promotion\models\promotion.py:155
 msgid "First Order Only"
 msgstr "Μόνο για την πρώτη παραγγελία"
 
-#: .\promotion\models\promotion.py:153
+#: .\promotion\models\promotion.py:158
 msgid ""
 "Apply only to customers with no previous orders. For guests this is checked "
 "against the checkout email and is best-effort."
@@ -14473,19 +14579,19 @@ msgstr ""
 "Εφαρμογή μόνο σε πελάτες χωρίς προηγούμενες παραγγελίες. Για επισκέπτες "
 "ελέγχεται με βάση το email του checkout και είναι κατά προσέγγιση."
 
-#: .\promotion\models\promotion.py:158
+#: .\promotion\models\promotion.py:163
 msgid "Starts At"
 msgstr "Έναρξη"
 
-#: .\promotion\models\promotion.py:159
+#: .\promotion\models\promotion.py:164
 msgid "Ends At"
 msgstr "Λήξη"
 
-#: .\promotion\models\promotion.py:161
+#: .\promotion\models\promotion.py:166
 msgid "Stackable"
 msgstr "Συνδυάσιμη"
 
-#: .\promotion\models\promotion.py:164
+#: .\promotion\models\promotion.py:169
 msgid ""
 "Stackable promotions combine with each other; a non-stackable promotion "
 "applies alone and only when it beats the combined stackable discount. "
@@ -14496,68 +14602,68 @@ msgstr ""
 "έκπτωση των συνδυάσιμων. Αγνοείται για δωρεάν μεταφορικά, τα οποία "
 "συνδυάζονται πάντα."
 
-#: .\promotion\models\promotion.py:173
+#: .\promotion\models\promotion.py:178
 msgid "Lower numbers apply first among stackable promotions"
 msgstr ""
 "Οι μικρότεροι αριθμοί εφαρμόζονται πρώτοι μεταξύ των συνδυάσιμων προσφορών"
 
-#: .\promotion\models\promotion.py:176
+#: .\promotion\models\promotion.py:181
 msgid "Maximum Discount Amount"
 msgstr "Μέγιστο ποσό έκπτωσης"
 
-#: .\promotion\models\promotion.py:181
+#: .\promotion\models\promotion.py:186
 msgid "Ceiling for the discount of a single application"
 msgstr "Ανώτατο όριο έκπτωσης για μία εφαρμογή"
 
-#: .\promotion\models\promotion.py:184
+#: .\promotion\models\promotion.py:189
 msgid "Total Usage Limit"
 msgstr "Συνολικό όριο χρήσης"
 
-#: .\promotion\models\promotion.py:187
+#: .\promotion\models\promotion.py:192
 msgid "Maximum number of orders that may use this promotion"
 msgstr ""
 "Μέγιστος αριθμός παραγγελιών που μπορούν να χρησιμοποιήσουν αυτή την "
 "προσφορά"
 
-#: .\promotion\models\promotion.py:190
+#: .\promotion\models\promotion.py:195
 msgid "Per-customer Usage Limit"
 msgstr "Όριο χρήσης ανά πελάτη"
 
-#: .\promotion\models\promotion.py:225
+#: .\promotion\models\promotion.py:230
 msgid "Percentage benefits require a value between 0 and 100."
 msgstr "Τα ποσοστιαία οφέλη απαιτούν τιμή μεταξύ 0 και 100."
 
-#: .\promotion\models\promotion.py:236
+#: .\promotion\models\promotion.py:241
 msgid "Fixed-amount benefits require a positive value."
 msgstr "Τα οφέλη σταθερού ποσού απαιτούν θετική τιμή."
 
-#: .\promotion\models\promotion.py:241
+#: .\promotion\models\promotion.py:246
 msgid "End must be after start."
 msgstr "Η λήξη πρέπει να είναι μετά την έναρξη."
 
-#: .\promotion\models\promotion.py:247
+#: .\promotion\models\promotion.py:252
 msgid "BXGY promotions need both a buy quantity and a get quantity."
 msgstr ""
 "Οι προσφορές BXGY απαιτούν τόσο ποσότητα αγοράς όσο και ποσότητα λήψης."
 
-#: .\promotion\models\promotion.py:256
+#: .\promotion\models\promotion.py:261
 msgid "Get-discount percent must be between 0 and 100."
 msgstr "Το ποσοστό έκπτωσης λήψης πρέπει να είναι μεταξύ 0 και 100."
 
-#: .\promotion\models\promotion.py:266
+#: .\promotion\models\promotion.py:271
 msgid "Free-gift promotions need a gift quantity of at least 1."
 msgstr "Οι προσφορές δωρεάν δώρου απαιτούν ποσότητα δώρου τουλάχιστον 1."
 
-#: .\promotion\models\redemption.py:49
+#: .\promotion\models\redemption.py:53
 msgid "Checkout email — used for guest per-customer limits"
 msgstr ""
 "Email του checkout — χρησιμοποιείται για τα όρια ανά πελάτη των επισκεπτών"
 
-#: .\promotion\models\redemption.py:54
+#: .\promotion\models\redemption.py:58
 msgid "Promotion Redemption"
 msgstr "Εξαργύρωση προσφοράς"
 
-#: .\promotion\models\redemption.py:55
+#: .\promotion\models\redemption.py:59
 msgid "Promotion Redemptions"
 msgstr "Εξαργυρώσεις προσφορών"
 
@@ -14888,7 +14994,7 @@ msgstr "Υποψήφιες συστάσεις"
 msgid "Seed product"
 msgstr "Προϊόν αναφοράς"
 
-#: .\recommendation\models.py:232
+#: .\recommendation\models.py:232 .\search\models.py:193
 msgid "Position"
 msgstr "Θέση"
 
@@ -15017,11 +15123,6 @@ msgstr "Πρόσφατα προστέθηκε"
 msgid "Region Information"
 msgstr "Στοιχεία Περιοχής"
 
-#: .\region\admin.py:121 .\region\models.py:25
-#: .\shipping_acs\models\station.py:62
-msgid "Region"
-msgstr "Περιοχή"
-
 #: .\region\admin.py:124
 msgid "Unnamed Region"
 msgstr "Περιφέρεια χωρίς όνομα"
@@ -15072,7 +15173,7 @@ msgstr ""
 msgid "Not set"
 msgstr "Δεν έχει οριστεί"
 
-#: .\region\apps.py:7 .\region\models.py:26 .\settings.py:3029
+#: .\region\apps.py:7 .\region\models.py:29 .\settings.py:3032
 msgid "Regions"
 msgstr "Περιοχές"
 
@@ -15115,6 +15216,43 @@ msgstr ""
 #: .\search\apps.py:7
 msgid "Search"
 msgstr "Αναζήτηση"
+
+#: .\search\models.py:69 .\tag\admin.py:91 .\tag\admin.py:283
+#: .\tag\models\tagged_item.py:25
+msgid "Content Type"
+msgstr "Τύπος Περιεχομένου"
+
+#: .\search\models.py:74
+msgid "Results Count"
+msgstr "Πλήθος αποτελεσμάτων"
+
+#: .\search\models.py:78
+msgid "Estimated Total Hits"
+msgstr "Εκτιμώμενα συνολικά αποτελέσματα"
+
+#: .\search\models.py:84
+msgid "Processing Time (ms)"
+msgstr "Χρόνος επεξεργασίας (ms)"
+
+#: .\search\models.py:103
+msgid "Session Key"
+msgstr "Κλειδί συνεδρίας"
+
+#: .\search\models.py:124 .\search\models.py:199
+msgid "Timestamp"
+msgstr "Χρονοσήμανση"
+
+#: .\search\models.py:178
+msgid "Search Query"
+msgstr "Ερώτημα αναζήτησης"
+
+#: .\search\models.py:183
+msgid "Result ID"
+msgstr "ID αποτελέσματος"
+
+#: .\search\models.py:189
+msgid "Result Type"
+msgstr "Τύπος αποτελέσματος"
 
 #: .\search\views.py:98 .\search\views.py:108
 msgid "Must be a valid integer."
@@ -15367,241 +15505,241 @@ msgstr "Αγγλικά"
 msgid "German"
 msgstr "Γερμανικά"
 
-#: .\settings.py:2864
+#: .\settings.py:2867
 msgid "Help & Guides"
 msgstr "Βοήθεια & Οδηγοί"
 
-#: .\settings.py:2886
+#: .\settings.py:2889
 msgid "Flower (Celery)"
 msgstr "Flower (Celery)"
 
-#: .\settings.py:2891
+#: .\settings.py:2894
 msgid "Mailpit"
 msgstr "Mailpit"
 
-#: .\settings.py:2896
+#: .\settings.py:2899
 msgid "Meilisearch"
 msgstr "Meilisearch"
 
-#: .\settings.py:2901
+#: .\settings.py:2904
 msgid "RabbitMQ"
 msgstr "RabbitMQ"
 
-#: .\settings.py:2909
+#: .\settings.py:2912
 msgid "Platform Admin"
 msgstr "Διαχείριση Πλατφόρμας"
 
-#: .\settings.py:2969 .\tenant\models.py:1543
+#: .\settings.py:2972 .\tenant\models.py:1543
 msgid "Tenant Domains"
 msgstr "Domains Καταστημάτων"
 
-#: .\settings.py:2977
+#: .\settings.py:2980
 msgid "Memberships"
 msgstr "Συμμετοχές"
 
-#: .\settings.py:2987
+#: .\settings.py:2990
 msgid "Identity"
 msgstr "Ταυτότητα"
 
-#: .\settings.py:2991
+#: .\settings.py:2994
 msgid "Platform Staff"
 msgstr "Προσωπικό Πλατφόρμας"
 
-#: .\settings.py:2999
+#: .\settings.py:3002
 msgid "Groups"
 msgstr "Ομάδες"
 
-#: .\settings.py:3009
+#: .\settings.py:3012
 msgid "Platform"
 msgstr "Πλατφόρμα"
 
-#: .\settings.py:3039
+#: .\settings.py:3042
 msgid "Cache Purge Log"
 msgstr "Καταχωρήσεις Καθαρισμού Cache"
 
-#: .\settings.py:3051
+#: .\settings.py:3054
 msgid "Sites"
 msgstr "Sites"
 
-#: .\settings.py:3066
+#: .\settings.py:3069
 msgid "Background Jobs"
 msgstr "Εργασίες Συστήματος"
 
-#: .\settings.py:3071
+#: .\settings.py:3074
 msgid "Periodic Tasks"
 msgstr "Περιοδικές Εργασίες"
 
-#: .\settings.py:3079
+#: .\settings.py:3082
 msgid "Crontab Schedules"
 msgstr "Προγραμματισμοί Crontab"
 
-#: .\settings.py:3087
+#: .\settings.py:3090
 msgid "Interval Schedules"
 msgstr "Προγραμματισμοί Διαστημάτων"
 
-#: .\settings.py:3095
+#: .\settings.py:3098
 msgid "Clocked Schedules"
 msgstr "Προγραμματισμοί με Ώρα"
 
-#: .\settings.py:3103
+#: .\settings.py:3106
 msgid "Solar Schedules"
 msgstr "Προγραμματισμοί Ηλιακοί"
 
-#: .\settings.py:3111
+#: .\settings.py:3114
 msgid "Task Results"
 msgstr "Αποτελέσματα εργασιών"
 
-#: .\settings.py:3119
+#: .\settings.py:3122
 msgid "Group Results"
 msgstr "Αποτελέσματα ομάδας"
 
-#: .\settings.py:3229
+#: .\settings.py:3232
 msgid "Navigation"
 msgstr "Πλοήγηση"
 
-#: .\settings.py:3243
+#: .\settings.py:3246
 msgid "Catalog"
 msgstr "Κατάλογος"
 
-#: .\settings.py:3266
+#: .\settings.py:3269
 msgid "Reviews"
 msgstr "Κριτικές"
 
-#: .\settings.py:3299 .\settings.py:3980
+#: .\settings.py:3302 .\settings.py:3983
 msgid "Variant Groups"
 msgstr "Ομάδες παραλλαγών"
 
-#: .\settings.py:3362
+#: .\settings.py:3365
 msgid "Sales"
 msgstr "Πωλήσεις"
 
-#: .\settings.py:3393
+#: .\settings.py:3396
 msgid "Payment Methods"
 msgstr "Μέθοδοι Πληρωμής"
 
-#: .\settings.py:3411
+#: .\settings.py:3414
 msgid "Coupon Codes"
 msgstr "Κωδικοί κουπονιών"
 
 # Greek translations added by fill_admin_greek_translations.py
-#: .\settings.py:3427
+#: .\settings.py:3430
 msgid "Business Customers"
 msgstr "Εταιρικοί Πελάτες"
 
-#: .\settings.py:3445
+#: .\settings.py:3448
 msgid "B2B Price Lists"
 msgstr "Τιμοκατάλογοι B2B"
 
-#: .\settings.py:3453
+#: .\settings.py:3456
 msgid "VAT Rates"
 msgstr "Συντελεστές ΦΠΑ"
 
-#: .\settings.py:3468
+#: .\settings.py:3471
 msgid "Contact Messages"
 msgstr "Μηνύματα Επικοινωνίας"
 
-#: .\settings.py:3494 .\shipping\models\provider.py:110
+#: .\settings.py:3497 .\shipping\models\provider.py:110
 msgid "Shipping Providers"
 msgstr "Πάροχοι Αποστολών"
 
-#: .\settings.py:3502 .\settings.py:3886
+#: .\settings.py:3505 .\settings.py:3889
 #: .\shipping_boxnow\models\shipment.py:202
 msgid "BoxNow Shipments"
 msgstr "Αποστολές BoxNow"
 
-#: .\settings.py:3510 .\settings.py:3919
+#: .\settings.py:3513 .\settings.py:3922
 msgid "ACS Shipments"
 msgstr "Αποστολές ACS"
 
-#: .\settings.py:3518 .\settings.py:3893 .\shipping_boxnow\models\locker.py:85
+#: .\settings.py:3521 .\settings.py:3896 .\shipping_boxnow\models\locker.py:85
 msgid "BoxNow Lockers"
 msgstr "Lockers BoxNow"
 
-#: .\settings.py:3526 .\settings.py:3926
+#: .\settings.py:3529 .\settings.py:3929
 msgid "ACS Stations"
 msgstr "Καταστήματα ACS"
 
-#: .\settings.py:3542 .\user\apps.py:7
+#: .\settings.py:3545 .\user\apps.py:7
 msgid "Users"
 msgstr "Χρήστες"
 
-#: .\settings.py:3550 .\user\models\address.py:66
+#: .\settings.py:3553 .\user\models\address.py:69
 msgid "User Addresses"
 msgstr "Διευθύνσεις Χρηστών"
 
-#: .\settings.py:3558
+#: .\settings.py:3561
 msgid "Subscriptions"
 msgstr "Συνδρομές"
 
-#: .\settings.py:3605 .\user\models\subscription.py:111
+#: .\settings.py:3608 .\user\models\subscription.py:111
 msgid "Subscription Topics"
 msgstr "Θέματα Συνδρομών"
 
-#: .\settings.py:3620 .\user\admin.py:770
+#: .\settings.py:3623 .\user\admin.py:770
 msgid "Settings"
 msgstr "Ρυθμίσεις"
 
-#: .\settings.py:3625
+#: .\settings.py:3628
 msgid "Extra Settings"
 msgstr "Πρόσθετες Ρυθμίσεις"
 
-#: .\settings.py:3651
+#: .\settings.py:3654
 msgid "Security & Access"
 msgstr "Ασφάλεια & πρόσβαση"
 
-#: .\settings.py:3656
+#: .\settings.py:3659
 msgid "User Sessions"
 msgstr "Συνεδρίες χρήστη"
 
-#: .\settings.py:3665
+#: .\settings.py:3668
 msgid "MFA Authenticators"
 msgstr "Μέθοδοι MFA"
 
-#: .\settings.py:3674
+#: .\settings.py:3677
 msgid "Social Accounts"
 msgstr "Κοινωνικοί λογαριασμοί"
 
-#: .\settings.py:3683
+#: .\settings.py:3686
 msgid "Email Addresses"
 msgstr "Διευθύνσεις email"
 
-#: .\settings.py:3692
+#: .\settings.py:3695
 msgid "API Tokens"
 msgstr "Tokens API"
 
-#: .\settings.py:3703
+#: .\settings.py:3706
 msgid "Audit & Logs"
 msgstr "Καταχωρήσεις & Logs"
 
-#: .\settings.py:3735 .\settings.py:3900
+#: .\settings.py:3738 .\settings.py:3903
 msgid "BoxNow Events"
 msgstr "Συμβάντα BoxNow"
 
-#: .\settings.py:3744 .\settings.py:3949
+#: .\settings.py:3747 .\settings.py:3952
 msgid "ACS Tracking Events"
 msgstr "Συμβάντα Παρακολούθησης ACS"
 
-#: .\settings.py:3762
+#: .\settings.py:3765
 msgid "Meta CAPI Event Log"
 msgstr "Καταχωρήσεις Meta CAPI"
 
-#: .\settings.py:3781 .\user\models\data_export.py:71
+#: .\settings.py:3784 .\user\models\data_export.py:71
 msgid "User Data Exports"
 msgstr "Εξαγωγές Δεδομένων Χρηστών"
 
-#: .\settings.py:3792
+#: .\settings.py:3795
 msgid "Reconciliation"
 msgstr "Συμφωνίες"
 
-#: .\settings.py:3797 .\settings.py:3933
+#: .\settings.py:3800 .\settings.py:3936
 msgid "ACS Pickup Lists"
 msgstr "Λίστες Παραλαβής ACS"
 
-#: .\settings.py:3806 .\settings.py:3941
+#: .\settings.py:3809 .\settings.py:3944
 msgid "ACS COD Payouts"
 msgstr "Αποδόσεις COD ACS"
 
-#: .\settings.py:4011
+#: .\settings.py:4014
 msgid "Authors"
 msgstr "Συντάκτες"
 
@@ -15654,7 +15792,7 @@ msgstr ""
 msgid "Display name shown to customers (e.g. 'ACS Courier')."
 msgstr "Όνομα εμφάνισης προς τους πελάτες (π.χ. 'ACS Courier')."
 
-#: .\shipping\models\provider.py:39 .\shipping\models\rate.py:87
+#: .\shipping\models\provider.py:39 .\shipping\models\rate.py:89
 #: .\shipping_boxnow\models\locker.py:75
 msgid "Is Active"
 msgstr "Ενεργό"
@@ -15742,7 +15880,7 @@ msgstr ""
 " την κάρτα κατ' οίκον παράδοσης για τον ίδιο μεταφορέα. Επιστρέφει στο "
 "``logo`` όταν είναι κενό."
 
-#: .\shipping\models\rate.py:57
+#: .\shipping\models\rate.py:59
 msgid ""
 "What the shopper pays for this (provider, country, kind), before "
 "``free_shipping_threshold`` or a carrier's own ``live_quote`` override it."
@@ -15751,11 +15889,11 @@ msgstr ""
 "αποστολής), πριν από το ``free_shipping_threshold`` ή τη ζωντανή τιμή "
 "(``live_quote``) του courier."
 
-#: .\shipping\models\rate.py:63
+#: .\shipping\models\rate.py:65
 msgid "Free Shipping Threshold"
 msgstr "Όριο δωρεάν μεταφορικών"
 
-#: .\shipping\models\rate.py:70
+#: .\shipping\models\rate.py:72
 msgid ""
 "Cart subtotal above which this combination ships free. Blank means this "
 "combination is never free."
@@ -15763,11 +15901,11 @@ msgstr ""
 "Το υποσύνολο καλαθιού από το οποίο και πάνω αυτός ο συνδυασμός αποστέλλεται "
 "δωρεάν. Κενό σημαίνει ότι δεν γίνεται ποτέ δωρεάν."
 
-#: .\shipping\models\rate.py:75
+#: .\shipping\models\rate.py:77
 msgid "Max Weight (grams)"
 msgstr "Μέγιστο βάρος (γραμμάρια)"
 
-#: .\shipping\models\rate.py:80
+#: .\shipping\models\rate.py:82
 msgid ""
 "Heaviest parcel this combination will carry. Blank means no cap. A cart over"
 " the cap still lists the option (flagged ``exceeds_max_weight``) rather than"
@@ -15777,7 +15915,7 @@ msgstr ""
 " Ένα καλάθι πάνω από το όριο εξακολουθεί να βλέπει την επιλογή (με την "
 "ένδειξη ``exceeds_max_weight``) αντί να εξαφανίζεται σιωπηλά."
 
-#: .\shipping\models\rate.py:91
+#: .\shipping\models\rate.py:93
 msgid ""
 "Master switch for this (provider, country, kind) — off hides it from "
 "checkout regardless of the provider's own ``is_active``."
@@ -15786,24 +15924,24 @@ msgstr ""
 "— όταν είναι κλειστός, δεν εμφανίζεται στο checkout, ανεξάρτητα από το "
 "``is_active`` του παρόχου."
 
-#: .\shipping\models\rate.py:103
+#: .\shipping\models\rate.py:105
 msgid "Shipping Rate"
 msgstr "Τιμή αποστολής"
 
-#: .\shipping\models\rate.py:104
+#: .\shipping\models\rate.py:106
 msgid "Shipping Rates"
 msgstr "Τιμές αποστολής"
 
-#: .\shipping\models\rate.py:130
+#: .\shipping\models\rate.py:132
 #, python-format
 msgid "%(provider)s does not support %(kind)s shipments."
 msgstr "Ο πάροχος %(provider)s δεν υποστηρίζει αποστολές τύπου «%(kind)s»."
 
-#: .\shipping\models\rate.py:140
+#: .\shipping\models\rate.py:142
 msgid "Price cannot be negative."
 msgstr "Η τιμή δεν μπορεί να είναι αρνητική."
 
-#: .\shipping\models\rate.py:160
+#: .\shipping\models\rate.py:162
 #, python-format
 msgid "Currency must match the store's own currency (%(currency)s)."
 msgstr ""
@@ -17471,10 +17609,6 @@ msgstr "Υψηλή χρήση (21-50)"
 msgid "Very High Usage (50+)"
 msgstr "Πολύ Υψηλή Χρήση (50+)"
 
-#: .\tag\admin.py:91 .\tag\admin.py:283
-msgid "Content Type"
-msgstr "Τύπος Περιεχομένου"
-
 #: .\tag\admin.py:176
 msgid "Activate selected tags"
 msgstr "Ενεργοποίηση επιλεγμένων ετικετών"
@@ -17502,6 +17636,7 @@ msgid "Tagged Item Information"
 msgstr "Πληροφορίες αντικειμένου με ετικέτα"
 
 #: .\tag\admin.py:273 .\tag\admin.py:292 .\tag\models\tag.py:26
+#: .\tag\models\tagged_item.py:22
 msgid "Tag"
 msgstr "Ετικέτα"
 
@@ -17580,11 +17715,15 @@ msgstr "Φίλτρο ανά ID αντικειμένου"
 msgid "Filter by multiple object IDs (comma-separated)"
 msgstr "Φίλτρο ανά πολλαπλά ID αντικειμένων (διαχωρισμένα με κόμμα)"
 
-#: .\tag\models\tagged_item.py:29
+#: .\tag\models\tagged_item.py:27
+msgid "Object ID"
+msgstr "ID αντικειμένου"
+
+#: .\tag\models\tagged_item.py:33
 msgid "Tagged Item"
 msgstr "Σχετιζόμενο Είδος"
 
-#: .\tag\models\tagged_item.py:30
+#: .\tag\models\tagged_item.py:34
 msgid "Tagged Items"
 msgstr "Αντικείμενα με ετικέτες"
 
@@ -19044,7 +19183,7 @@ msgstr "Domain Καταστήματος"
 msgid "Member"
 msgstr "Μέλος"
 
-#: .\tenant\models.py:1570 .\user\models\account.py:102
+#: .\tenant\models.py:1570 .\user\models\account.py:104
 msgid "Staff"
 msgstr "Προσωπικό"
 
@@ -19327,7 +19466,7 @@ msgstr "Υπόλοιπο πόντων"
 msgid "%(balance)d points"
 msgstr "%(balance)d πόντοι"
 
-#: .\user\admin.py:575 .\user\models\account.py:124
+#: .\user\admin.py:575 .\user\models\account.py:126
 msgid "Total XP"
 msgstr "Συνολικά XP"
 
@@ -19624,71 +19763,71 @@ msgstr "Υπάρχει ήδη χρήστης με αυτό το όνομα χρ�
 msgid "Email Address"
 msgstr "Διεύθυνση Email"
 
-#: .\user\models\account.py:76 .\user\models\address.py:27
+#: .\user\models\account.py:76 .\user\models\address.py:28
 msgid "Zip Code"
 msgstr "Ταχ. Κώδικας"
 
-#: .\user\models\account.py:103
+#: .\user\models\account.py:105
 msgid "Birth Date"
 msgstr "Ημ/νία γέννησης"
 
-#: .\user\models\account.py:105
+#: .\user\models\account.py:107
 msgid "Twitter Profile"
 msgstr "Προφίλ Twitter"
 
-#: .\user\models\account.py:108
+#: .\user\models\account.py:110
 msgid "LinkedIn Profile"
 msgstr "Προφίλ LinkedIn"
 
-#: .\user\models\account.py:111
+#: .\user\models\account.py:113
 msgid "Facebook Profile"
 msgstr "Προφίλ Facebook"
 
-#: .\user\models\account.py:114
+#: .\user\models\account.py:116
 msgid "Instagram Profile"
 msgstr "Προφίλ Instagram"
 
-#: .\user\models\account.py:118
+#: .\user\models\account.py:120
 msgid "Youtube Profile"
 msgstr "Προφίλ Youtube"
 
-#: .\user\models\account.py:121
+#: .\user\models\account.py:123
 msgid "Github Profile"
 msgstr "Προφίλ Github"
 
-#: .\user\models\account.py:126
+#: .\user\models\account.py:128
 msgid "Re-engagement Email Count"
 msgstr "Πλήθος re-engagement emails"
 
-#: .\user\models\account.py:128
+#: .\user\models\account.py:130
 msgid "Number of re-engagement emails sent to this user."
 msgstr "Αριθμός emails επανενεργοποίησης που εστάλησαν σε αυτόν τον χρήστη."
 
-#: .\user\models\account.py:131
+#: .\user\models\account.py:133
 msgid "Last Re-engagement Email At"
 msgstr "Τελευταίο re-engagement email"
 
-#: .\user\models\account.py:134
+#: .\user\models\account.py:136
 msgid "Timestamp of the most recent re-engagement email."
 msgstr "Χρονοσήμανση του πιο πρόσφατου email επανενεργοποίησης."
 
-#: .\user\models\account.py:152
+#: .\user\models\account.py:155
 msgid "Preferred language for emails and UI messages."
 msgstr "Προτιμώμενη γλώσσα για emails και μηνύματα διεπαφής."
 
-#: .\user\models\account.py:161
+#: .\user\models\account.py:164
 msgid "User Account"
 msgstr "Λογαριασμός Χρήστη"
 
-#: .\user\models\account.py:162
+#: .\user\models\account.py:165
 msgid "User Accounts"
 msgstr "Λογαριασμοί Χρηστών"
 
-#: .\user\models\address.py:65
+#: .\user\models\address.py:68
 msgid "User Address"
 msgstr "Διεύθυνση Χρήστη"
 
-#: .\user\models\address.py:107
+#: .\user\models\address.py:110
 msgid "There can only be one main address per user."
 msgstr "Μπορεί να υπάρχει μόνο μία κύρια διεύθυνση ανά χρήστη."
 
@@ -20690,9 +20829,6 @@ msgstr "ΦΠΑ"
 #~ msgid_plural "Showing last %(counter)s entries"
 #~ msgstr[0] "Εμφάνιση τελευταίας %(counter)s εγγραφής"
 #~ msgstr[1] "Εμφάνιση τελευταίων %(counter)s εγγραφών"
-
-#~ msgid "Timestamp"
-#~ msgstr "Χρονοσήμανση"
 
 #~ msgid "Delta"
 #~ msgstr "Διαφορά"

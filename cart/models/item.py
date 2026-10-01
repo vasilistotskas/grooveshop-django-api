@@ -14,10 +14,16 @@ from core.models import TimeStampMixinModel, UUIDModel
 class CartItem(TimeStampMixinModel, UUIDModel):
     id = models.BigAutoField(primary_key=True)
     cart = models.ForeignKey(
-        "cart.Cart", related_name="items", on_delete=models.CASCADE
+        "cart.Cart",
+        related_name="items",
+        on_delete=models.CASCADE,
+        verbose_name=_("Cart"),
     )
     product = models.ForeignKey(
-        "product.Product", related_name="cart_items", on_delete=models.CASCADE
+        "product.Product",
+        related_name="cart_items",
+        on_delete=models.CASCADE,
+        verbose_name=_("Product"),
     )
     quantity = models.PositiveIntegerField(_("Quantity"), default=1)
     price_at_add = MoneyField(

@@ -38,6 +38,7 @@ class ProductAlert(TimeStampMixinModel, UUIDModel):
         "product.Product",
         on_delete=models.CASCADE,
         related_name="alerts",
+        verbose_name=_("Product"),
     )
     user = models.ForeignKey(
         "user.UserAccount",
@@ -45,6 +46,7 @@ class ProductAlert(TimeStampMixinModel, UUIDModel):
         related_name="product_alerts",
         null=True,
         blank=True,
+        verbose_name=_("User"),
     )
     email = models.EmailField(_("Email"), blank=True, default="")
     target_price = MoneyField(

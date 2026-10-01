@@ -19,11 +19,13 @@ class CartPromotionCode(TimeStampMixinModel):
         "cart.Cart",
         related_name="applied_codes",
         on_delete=models.CASCADE,
+        verbose_name=_("Cart"),
     )
     code = models.ForeignKey(
         "promotion.PromotionCode",
         related_name="cart_applications",
         on_delete=models.PROTECT,
+        verbose_name=_("Promotion Code"),
     )
 
     class Meta(TypedModelMeta):

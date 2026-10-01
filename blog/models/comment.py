@@ -16,7 +16,10 @@ class BlogComment(TranslatableModel, TimeStampMixinModel, UUIDModel, MPTTModel):
     id = models.BigAutoField(primary_key=True)
     approved = models.BooleanField(_("Approved"), default=False)
     likes = models.ManyToManyField(
-        "user.UserAccount", related_name="liked_blog_comments", blank=True
+        "user.UserAccount",
+        related_name="liked_blog_comments",
+        blank=True,
+        verbose_name=_("Likes"),
     )
     user = models.ForeignKey(
         "user.UserAccount",
@@ -24,6 +27,7 @@ class BlogComment(TranslatableModel, TimeStampMixinModel, UUIDModel, MPTTModel):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
+        verbose_name=_("User"),
     )
     post = models.ForeignKey(
         "blog.BlogPost",
@@ -31,6 +35,7 @@ class BlogComment(TranslatableModel, TimeStampMixinModel, UUIDModel, MPTTModel):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
+        verbose_name=_("Post"),
     )
     parent = TreeForeignKey(
         "self",
@@ -38,6 +43,7 @@ class BlogComment(TranslatableModel, TimeStampMixinModel, UUIDModel, MPTTModel):
         null=True,
         related_name="children",
         on_delete=models.CASCADE,
+        verbose_name=_("Parent Comment"),
     )
     translations = TranslatedFields(
         content=models.TextField(

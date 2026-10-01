@@ -34,6 +34,7 @@ class OrderHistory(TranslatableModel, TimeStampMixinModel, UUIDModel):
         "order.Order",
         related_name="history",
         on_delete=models.CASCADE,
+        verbose_name=_("Order"),
     )
     user = models.ForeignKey(
         "user.UserAccount",
@@ -42,6 +43,7 @@ class OrderHistory(TranslatableModel, TimeStampMixinModel, UUIDModel):
         null=True,
         blank=True,
         help_text=_("User who made the change, if applicable."),
+        verbose_name=_("User"),
     )
     change_type = models.CharField(
         _("Change Type"),
@@ -240,6 +242,7 @@ class OrderItemHistory(TranslatableModel, TimeStampMixinModel, UUIDModel):
         "order.OrderItem",
         related_name="history",
         on_delete=models.CASCADE,
+        verbose_name=_("Order Item"),
     )
     user = models.ForeignKey(
         "user.UserAccount",
@@ -248,6 +251,7 @@ class OrderItemHistory(TranslatableModel, TimeStampMixinModel, UUIDModel):
         null=True,
         blank=True,
         help_text=_("User who made the change, if applicable."),
+        verbose_name=_("User"),
     )
     change_type = models.CharField(
         _("Change Type"),

@@ -22,11 +22,13 @@ class PriceListItem(TimeStampMixinModel, UUIDModel):
         "b2b.CustomerGroup",
         related_name="price_items",
         on_delete=models.CASCADE,
+        verbose_name=_("Customer group"),
     )
     product = models.ForeignKey(
         "product.Product",
         related_name="b2b_prices",
         on_delete=models.CASCADE,
+        verbose_name=_("Product"),
     )
     net_price = MoneyField(
         _("Net price override"),

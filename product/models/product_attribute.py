@@ -18,11 +18,13 @@ class ProductAttribute(TimeStampMixinModel):
         "product.Product",
         on_delete=models.CASCADE,
         related_name="product_attributes",
+        verbose_name=_("Product"),
     )
     attribute_value = models.ForeignKey(
         "product.AttributeValue",
         on_delete=models.CASCADE,
         related_name="product_attributes",
+        verbose_name=_("Attribute Value"),
     )
 
     objects = ProductAttributeManager()

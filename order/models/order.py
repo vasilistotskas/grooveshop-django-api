@@ -98,6 +98,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
+        verbose_name=_("User"),
     )
     pay_way = models.ForeignKey(
         "pay_way.PayWay",
@@ -105,6 +106,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
+        verbose_name=_("Payment Method"),
     )
     country = models.ForeignKey(
         "country.Country",
@@ -112,6 +114,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
+        verbose_name=_("Country"),
     )
     region = models.ForeignKey(
         "region.Region",
@@ -119,6 +122,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
+        verbose_name=_("Region"),
     )
     floor = models.CharField(
         _("Floor"),
@@ -223,8 +227,10 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         choices=PaymentStatus,
         default=PaymentStatus.PENDING,
     )
+    # The gateway that took the charge; ``pay_way`` is the method the
+    # shopper chose, labelled "Payment Method" like its admin section.
     payment_method = models.CharField(
-        _("Payment Method"), max_length=50, blank=True, default=""
+        _("Payment Gateway"), max_length=50, blank=True, default=""
     )
     pay_way_key = models.CharField(
         _("Pay Way Key"),

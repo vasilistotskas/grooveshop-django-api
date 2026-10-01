@@ -160,6 +160,7 @@ class Invoice(TimeStampMixinModel, UUIDModel):
         "order.Order",
         related_name="invoice",
         on_delete=models.PROTECT,
+        verbose_name=_("Order"),
     )
     invoice_number = models.CharField(
         _("Invoice Number"),

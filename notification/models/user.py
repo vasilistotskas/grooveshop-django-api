@@ -18,11 +18,13 @@ class NotificationUser(TimeStampMixinModel, UUIDModel):
         "user.UserAccount",
         related_name="notification_users",
         on_delete=models.CASCADE,
+        verbose_name=_("User"),
     )
     notification = models.ForeignKey(
         "notification.Notification",
         related_name="notification_users",
         on_delete=models.CASCADE,
+        verbose_name=_("Notification"),
     )
     seen = models.BooleanField(_("Seen"), default=False)
     seen_at = models.DateTimeField(_("Seen At"), null=True, blank=True)

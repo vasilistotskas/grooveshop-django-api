@@ -18,11 +18,13 @@ class OrderItem(TimeStampMixinModel, SortableModel, UUIDModel):
         "order.Order",
         related_name="items",
         on_delete=models.CASCADE,
+        verbose_name=_("Order"),
     )
     product = models.ForeignKey(
         "product.Product",
         related_name="order_items",
         on_delete=models.PROTECT,
+        verbose_name=_("Product"),
     )
     price = MoneyField(_("Price"), max_digits=11, decimal_places=2)
     quantity = models.IntegerField(_("Quantity"), default=1)

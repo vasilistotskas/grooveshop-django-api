@@ -30,6 +30,7 @@ class ShippingRate(TimeStampMixinModel):
         "shipping.ShippingProvider",
         related_name="rates",
         on_delete=models.CASCADE,
+        verbose_name=_("Shipping Provider"),
     )
     # Cross-schema FK to the public ``country.Country`` row.
     # ``PROTECT``: a country referenced by a rate must be removed from
@@ -42,6 +43,7 @@ class ShippingRate(TimeStampMixinModel):
         "country.Country",
         related_name="+",
         on_delete=models.PROTECT,
+        verbose_name=_("Country"),
     )
     kind = models.CharField(
         _("Shipping Kind"),

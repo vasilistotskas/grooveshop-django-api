@@ -12,6 +12,7 @@ class PromotionCode(TimeStampMixinModel):
         "promotion.Promotion",
         related_name="codes",
         on_delete=models.CASCADE,
+        verbose_name=_("Promotion"),
     )
     code = models.CharField(
         _("Code"),
@@ -37,6 +38,7 @@ class PromotionCode(TimeStampMixinModel):
         help_text=_(
             "When set, only this customer can redeem the code (personal coupon)"
         ),
+        verbose_name=_("Assigned To"),
     )
     assigned_to_email = models.EmailField(
         _("Assigned To Email"),

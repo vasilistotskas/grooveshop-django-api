@@ -83,6 +83,7 @@ class Product(
         related_name="products",
         null=True,
         blank=True,
+        verbose_name=_("Category"),
     )
     variant_group = models.ForeignKey(
         "product.ProductVariantGroup",
@@ -94,6 +95,7 @@ class Product(
             "Links this product to its sibling variations (e.g. the same item "
             "in other colours). Members share variant selectors on the storefront."
         ),
+        verbose_name=_("Variant Group"),
     )
     brand = models.ForeignKey(
         "product.Brand",
@@ -101,6 +103,7 @@ class Product(
         related_name="products",
         null=True,
         blank=True,
+        verbose_name=_("Brand"),
     )
     slug = models.SlugField(_("Slug"), max_length=255, unique=True)
     price = MoneyField(
@@ -146,6 +149,7 @@ class Product(
         blank=True,
         null=True,
         on_delete=models.SET_NULL,
+        verbose_name=_("VAT"),
     )
     view_count = models.PositiveBigIntegerField(_("View Count"), default=0)
     click_score = models.PositiveIntegerField(
@@ -195,6 +199,7 @@ class Product(
         # id-preserving. PostgreSQL cannot express a cross-schema FK
         # anyway. Same fix the shipping shipment histories carry.
         db_constraint=False,
+        verbose_name=_("Changed By"),
     )
     history = HistoricalRecords(
         # Same cross-schema reasoning as ``changed_by`` above — the

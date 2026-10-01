@@ -44,6 +44,7 @@ class GiftCardPurchase(TimeStampMixinModel, UUIDModel):
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
+        verbose_name=_("Buyer"),
     )
     buyer_email = models.EmailField(_("Buyer Email"))
     amount = MoneyField(_("Amount"), max_digits=11, decimal_places=2)
@@ -133,6 +134,7 @@ class GiftCard(TimeStampMixinModel, UUIDModel):
             "Optional account link — lets the shopper see the card "
             "under 'My gift cards'. Redemption only needs the code."
         ),
+        verbose_name=_("Issued To"),
     )
     recipient_email = models.EmailField(
         _("Recipient Email"), blank=True, default=""
@@ -163,6 +165,7 @@ class GiftCard(TimeStampMixinModel, UUIDModel):
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
+        verbose_name=_("Purchase"),
     )
 
     class Meta(TypedModelMeta):
@@ -227,6 +230,7 @@ class GiftCardTransaction(TimeStampMixinModel):
         GiftCard,
         related_name="transactions",
         on_delete=models.PROTECT,
+        verbose_name=_("Gift Card"),
     )
     kind = models.CharField(
         _("Kind"),
@@ -248,6 +252,7 @@ class GiftCardTransaction(TimeStampMixinModel):
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
+        verbose_name=_("Order"),
     )
     created_by = models.ForeignKey(
         "user.UserAccount",
@@ -256,6 +261,7 @@ class GiftCardTransaction(TimeStampMixinModel):
         blank=True,
         on_delete=models.SET_NULL,
         help_text=_("Admin who made a manual adjustment"),
+        verbose_name=_("Created By"),
     )
     description = models.CharField(
         _("Description"), max_length=255, blank=True, default=""

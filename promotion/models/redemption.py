@@ -20,6 +20,7 @@ class PromotionRedemption(TimeStampMixinModel):
         "promotion.Promotion",
         related_name="redemptions",
         on_delete=models.PROTECT,
+        verbose_name=_("Promotion"),
     )
     code = models.ForeignKey(
         "promotion.PromotionCode",
@@ -27,6 +28,7 @@ class PromotionRedemption(TimeStampMixinModel):
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
+        verbose_name=_("Promotion Code"),
     )
     order = models.ForeignKey(
         "order.Order",
@@ -34,6 +36,7 @@ class PromotionRedemption(TimeStampMixinModel):
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
+        verbose_name=_("Order"),
     )
     user = models.ForeignKey(
         "user.UserAccount",
@@ -41,6 +44,7 @@ class PromotionRedemption(TimeStampMixinModel):
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
+        verbose_name=_("User"),
     )
     email = models.EmailField(
         _("Email"),

@@ -30,6 +30,7 @@ class StockReservation(TimeStampMixinModel):
         related_name="stock_reservations",
         on_delete=models.CASCADE,
         help_text=_("Product being reserved"),
+        verbose_name=_("Product"),
     )
     quantity = models.PositiveIntegerField(
         _("Quantity"),
@@ -42,6 +43,7 @@ class StockReservation(TimeStampMixinModel):
         null=True,
         blank=True,
         help_text=_("User who made the reservation (null for guest users)"),
+        verbose_name=_("Reserved By"),
     )
     session_id = models.CharField(
         _("Session ID"),
@@ -68,6 +70,7 @@ class StockReservation(TimeStampMixinModel):
         null=True,
         blank=True,
         help_text=_("Order created from this reservation (set when consumed)"),
+        verbose_name=_("Order"),
     )
     abandonment_notified = models.BooleanField(
         _("Abandonment Notified"),

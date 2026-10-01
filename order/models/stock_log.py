@@ -50,6 +50,7 @@ class StockLog(TimeStampMixinModel):
         related_name="stock_logs",
         on_delete=models.CASCADE,
         help_text=_("Product whose stock was modified"),
+        verbose_name=_("Product"),
     )
     order = models.ForeignKey(
         "order.Order",
@@ -60,6 +61,7 @@ class StockLog(TimeStampMixinModel):
         help_text=_(
             "Order associated with this stock operation (if applicable)"
         ),
+        verbose_name=_("Order"),
     )
     operation_type = models.CharField(
         _("Operation Type"),
@@ -106,6 +108,7 @@ class StockLog(TimeStampMixinModel):
         help_text=_(
             "User who performed the operation (null for system operations)"
         ),
+        verbose_name=_("Performed By"),
     )
 
     # Manager

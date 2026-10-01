@@ -18,11 +18,13 @@ class ProductReview(
         "product.Product",
         related_name="reviews",
         on_delete=models.CASCADE,
+        verbose_name=_("Product"),
     )
     user = models.ForeignKey(
         "user.UserAccount",
         related_name="product_reviews",
         on_delete=models.CASCADE,
+        verbose_name=_("User"),
     )
     rate = models.PositiveSmallIntegerField(_("Rate"), choices=RateEnum)
     status = models.CharField(

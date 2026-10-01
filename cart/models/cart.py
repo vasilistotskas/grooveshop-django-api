@@ -21,6 +21,7 @@ class Cart(TimeStampMixinModel, UUIDModel):
         blank=True,
         default=None,
         on_delete=models.CASCADE,
+        verbose_name=_("User"),
     )
     last_activity = models.DateTimeField(_("Last Activity"), auto_now=True)
 

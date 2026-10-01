@@ -54,6 +54,7 @@ class Promotion(TranslatableModel, TimeStampMixinModel, UUIDModel):
         related_name="promotions",
         blank=True,
         help_text=_("Only used when target scope is 'Specific products'"),
+        verbose_name=_("Products"),
     )
     categories = models.ManyToManyField(
         "product.ProductCategory",
@@ -63,6 +64,7 @@ class Promotion(TranslatableModel, TimeStampMixinModel, UUIDModel):
             "Only used when target scope is 'Specific categories'; "
             "subcategories are included automatically"
         ),
+        verbose_name=_("Categories"),
     )
     excluded_products = models.ManyToManyField(
         "product.Product",
@@ -72,6 +74,7 @@ class Promotion(TranslatableModel, TimeStampMixinModel, UUIDModel):
             "Never counted or discounted by this promotion, whatever "
             "the target scope"
         ),
+        verbose_name=_("Excluded Products"),
     )
     excluded_categories = models.ManyToManyField(
         "product.ProductCategory",
@@ -81,6 +84,7 @@ class Promotion(TranslatableModel, TimeStampMixinModel, UUIDModel):
             "Products in these categories (subcategories included) are "
             "never counted or discounted by this promotion"
         ),
+        verbose_name=_("Excluded Categories"),
     )
     exclude_discounted_products = models.BooleanField(
         _("Exclude Already-discounted Products"),
@@ -135,6 +139,7 @@ class Promotion(TranslatableModel, TimeStampMixinModel, UUIDModel):
             "BXGY: the reward pool (empty = same products as the buy "
             "side). FREE_GIFT: the gift product (set exactly one)."
         ),
+        verbose_name=_("Reward Products"),
     )
     min_subtotal = MoneyField(
         _("Minimum Subtotal"),

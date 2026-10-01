@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-01 03:11+0300\n"
+"POT-Creation-Date: 2026-10-01 04:02+0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -52,7 +52,7 @@ msgid "Live"
 msgstr ""
 
 #: .\admin\admin.py:64 .\core\templates\admin\index.html:12
-#: .\core\templates\admin\index.html:21 .\settings.py:2945 .\settings.py:3233
+#: .\core\templates\admin\index.html:21 .\settings.py:2948 .\settings.py:3236
 msgid "Dashboard"
 msgstr ""
 
@@ -149,7 +149,7 @@ msgid "Plan"
 msgstr ""
 
 #: .\admin\dashboard\platform.py:165 .\admin\dashboard\store\widgets.py:281
-#: .\b2b\admin.py:149 .\b2b\models\profile.py:31 .\blog\admin.py:502
+#: .\b2b\admin.py:149 .\b2b\models\profile.py:32 .\blog\admin.py:502
 #: .\core\templates\emails\order\order_canceled.html:15
 #: .\core\templates\emails\order\order_completed.html:22
 #: .\core\templates\emails\order\order_completed.txt:18
@@ -158,10 +158,10 @@ msgstr ""
 #: .\core\templates\emails\order\order_pending_reminder.txt:7
 #: .\core\templates\emails\order\order_shipped.html:13
 #: .\core\templates\invoices\invoice.html:226 .\giftcard\admin.py:186
-#: .\giftcard\models.py:65 .\giftcard\models.py:106 .\meta_capi\models.py:57
+#: .\giftcard\models.py:66 .\giftcard\models.py:107 .\meta_capi\models.py:59
 #: .\notification\admin.py:289 .\notification\admin.py:410 .\order\admin.py:677
-#: .\order\admin.py:702 .\order\models\order.py:150 .\product\admin.py:698
-#: .\product\admin.py:1849 .\product\models\review.py:29
+#: .\order\admin.py:702 .\order\models\order.py:154 .\product\admin.py:698
+#: .\product\admin.py:1849 .\product\models\review.py:31
 #: .\promotion\admin.py:269 .\tenant\admin.py:209 .\user\admin.py:260
 #: .\user\admin.py:940 .\user\models\data_export.py:33
 #: .\user\models\subscription.py:198
@@ -170,7 +170,7 @@ msgstr "Status"
 
 #: .\admin\dashboard\platform.py:166 .\admin\dashboard\store\widgets.py:178
 #: .\core\templates\admin\index.html:26 .\order\apps.py:7
-#: .\order\models\order.py:386 .\settings.py:3367 .\settings.py:3850
+#: .\order\models\order.py:392 .\settings.py:3370 .\settings.py:3853
 #: .\tenant\models.py:1834 .\user\admin.py:274
 msgid "Orders"
 msgstr ""
@@ -310,11 +310,15 @@ msgstr "Order"
 #: .\core\templates\emails\order\payment_failed.txt:5
 #: .\core\templates\emails\shipping_acs\stale_shipments_alert.html:14
 #: .\core\templates\emails\shipping_acs\unprinted_vouchers_alert.html:14
-#: .\core\templates\invoices\invoice.html:187 .\notification\enum.py:14
-#: .\order\admin.py:816 .\order\admin.py:1487 .\order\admin.py:1584
-#: .\order\admin.py:1908 .\order\models\attribution.py:37
-#: .\order\models\order.py:385 .\order\models\viva_webhook_event.py:57
-#: .\pay_way\admin.py:219 .\product\admin.py:1578
+#: .\core\templates\invoices\invoice.html:187 .\giftcard\models.py:255
+#: .\meta_capi\models.py:48 .\notification\enum.py:14 .\order\admin.py:816
+#: .\order\admin.py:1487 .\order\admin.py:1584 .\order\admin.py:1908
+#: .\order\models\attribution.py:37 .\order\models\history.py:37
+#: .\order\models\invoice.py:163 .\order\models\item.py:21
+#: .\order\models\order.py:391 .\order\models\stock_log.py:64
+#: .\order\models\stock_reservation.py:73
+#: .\order\models\viva_webhook_event.py:57 .\pay_way\admin.py:219
+#: .\product\admin.py:1578 .\promotion\models\redemption.py:39
 #: .\recommendation\models.py:261 .\shipping_acs\admin.py:431
 #: .\shipping_acs\models\shipment.py:44 .\shipping_boxnow\admin.py:317
 #: .\shipping_boxnow\models\shipment.py:45
@@ -355,15 +359,20 @@ msgstr ""
 
 #: .\admin\dashboard\store\widgets.py:324
 #: .\admin\dashboard\store\widgets.py:437
-#: .\admin\dashboard\store\widgets.py:645 .\cart\admin.py:114
-#: .\cart\admin.py:407 .\core\templates\emails\cart\checkout_abandoned.html:15
+#: .\admin\dashboard\store\widgets.py:645 .\b2b\models\price.py:31
+#: .\cart\admin.py:114 .\cart\admin.py:407 .\cart\models\item.py:26
+#: .\core\templates\emails\cart\checkout_abandoned.html:15
 #: .\core\templates\emails\order\order_payment_confirmed.html:53
 #: .\core\templates\emails\order\order_received.html:58
 #: .\core\templates\emails\order\order_status_generic.html:86
 #: .\core\templates\emails\product\low_stock_alert.html:13
 #: .\notification\enum.py:18 .\order\admin.py:211 .\order\admin.py:1504
-#: .\product\admin.py:1085 .\product\admin.py:1827 .\product\admin.py:1932
-#: .\product\admin.py:2094 .\product\models\product.py:225
+#: .\order\models\item.py:27 .\order\models\stock_log.py:53
+#: .\order\models\stock_reservation.py:33 .\product\admin.py:1085
+#: .\product\admin.py:1827 .\product\admin.py:1932 .\product\admin.py:2094
+#: .\product\models\alert.py:41 .\product\models\favourite.py:23
+#: .\product\models\image.py:23 .\product\models\product.py:230
+#: .\product\models\product_attribute.py:21 .\product\models\review.py:21
 #: .\recommendation\models.py:142 .\recommendation\models.py:229
 msgid "Product"
 msgstr "Product"
@@ -402,7 +411,7 @@ msgstr ""
 
 #: .\admin\dashboard\store\widgets.py:358 .\contact\admin.py:196
 #: .\contact\admin.py:296 .\contact\admin.py:398 .\contact\models.py:18
-#: .\contact\models.py:238 .\giftcard\models.py:57 .\giftcard\models.py:146
+#: .\contact\models.py:238 .\giftcard\models.py:58 .\giftcard\models.py:148
 #: .\notification\models\notification.py:76
 msgid "Message"
 msgstr ""
@@ -495,7 +504,7 @@ msgstr ""
 msgid "No searches in the last 14 days"
 msgstr ""
 
-#: .\admin\dashboard\store\widgets.py:551
+#: .\admin\dashboard\store\widgets.py:551 .\search\models.py:53
 msgid "Query"
 msgstr ""
 
@@ -533,7 +542,7 @@ msgstr ""
 msgid "In stock"
 msgstr ""
 
-#: .\admin\dashboard\store\widgets.py:672 .\b2b\models\profile.py:45
+#: .\admin\dashboard\store\widgets.py:672 .\b2b\models\profile.py:47
 msgid "Company name"
 msgstr ""
 
@@ -541,7 +550,7 @@ msgstr ""
 msgid "VAT ID (ΑΦΜ)"
 msgstr ""
 
-#: .\admin\dashboard\store\widgets.py:674 .\b2b\models\profile.py:52
+#: .\admin\dashboard\store\widgets.py:674 .\b2b\models\profile.py:54
 msgid "Tax office (ΔΟΥ)"
 msgstr ""
 
@@ -690,7 +699,7 @@ msgstr ""
 msgid "An unexpected error occurred during XML export: %s"
 msgstr ""
 
-#: .\admin\filters.py:44
+#: .\admin\filters.py:44 .\blog\models\comment.py:22 .\blog\models\post.py:41
 msgid "Likes"
 msgstr ""
 
@@ -716,8 +725,8 @@ msgstr ""
 
 #: .\admin\permissions.py:15 .\admin\platform_site.py:91
 #: .\core\templates\admin\platform_index.html:11
-#: .\core\templates\admin\platform_index.html:20 .\settings.py:2911
-#: .\settings.py:2941
+#: .\core\templates\admin\platform_index.html:20 .\settings.py:2914
+#: .\settings.py:2944
 msgid "Control plane"
 msgstr ""
 
@@ -733,7 +742,7 @@ msgstr ""
 #: .\admin\platform_billing.py:107
 #: .\core\templates\admin\platform_billing.html:16
 #: .\core\templates\admin\platform_billing.html:26
-#: .\core\templates\admin\platform_index.html:25 .\settings.py:2961
+#: .\core\templates\admin\platform_index.html:25 .\settings.py:2964
 #: .\tenant\admin.py:448
 msgid "Plan & Billing"
 msgstr ""
@@ -813,7 +822,7 @@ msgstr ""
 msgid "When the product was favourited"
 msgstr ""
 
-#: .\b2b\admin.py:25
+#: .\b2b\admin.py:25 .\b2b\models\price.py:25 .\b2b\models\profile.py:43
 msgid "Customer group"
 msgstr ""
 
@@ -824,7 +833,7 @@ msgstr ""
 #: .\b2b\admin.py:33
 #: .\core\templates\emails\b2b\business_profile_rejected.html:15
 #: .\core\templates\emails\b2b\business_profile_rejected.txt:3
-#: .\giftcard\admin.py:39 .\order\models\stock_log.py:85
+#: .\giftcard\admin.py:39 .\order\models\stock_log.py:87
 #: .\product\admin.py:1577 .\user\admin.py:241
 msgid "Reason"
 msgstr ""
@@ -979,14 +988,14 @@ msgid "Service unavailable"
 msgstr ""
 
 #: .\b2b\models\group.py:21 .\blog\admin.py:243 .\blog\admin.py:329
-#: .\blog\models\category.py:32 .\blog\models\tag.py:16 .\contact\models.py:16
+#: .\blog\models\category.py:33 .\blog\models\tag.py:16 .\contact\models.py:16
 #: .\contact\models.py:227 .\core\admin.py:309 .\country\models.py:81
 #: .\loyalty\admin.py:29 .\loyalty\models\tier.py:80 .\pay_way\admin.py:176
 #: .\pay_way\models.py:88 .\product\models\attribute.py:33
-#: .\product\models\brand.py:17 .\product\models\category.py:39
-#: .\product\models\product.py:456 .\product\models\variant_group.py:30
-#: .\promotion\admin.py:250 .\promotion\models\promotion.py:289
-#: .\region\models.py:19 .\shipping\models\provider.py:34
+#: .\product\models\brand.py:17 .\product\models\category.py:40
+#: .\product\models\product.py:461 .\product\models\variant_group.py:30
+#: .\promotion\admin.py:250 .\promotion\models\promotion.py:294
+#: .\region\models.py:22 .\shipping\models\provider.py:34
 #: .\shipping_acs\models\station.py:50 .\shipping_boxnow\models\locker.py:59
 #: .\tag\admin.py:161 .\tenant\models.py:119 .\user\models\subscription.py:94
 msgid "Name"
@@ -1007,12 +1016,12 @@ msgstr ""
 #: .\giftcard\enum.py:6 .\notification\admin.py:71 .\notification\admin.py:295
 #: .\notification\admin.py:357 .\notification\admin.py:476
 #: .\notification\admin.py:491 .\order\admin.py:1538 .\pay_way\models.py:21
-#: .\product\models\attribute.py:20 .\product\models\attribute_value.py:25
-#: .\product\models\category.py:30 .\product\models\category_image.py:31
-#: .\product\models\product.py:112 .\product\models\variant_group.py:26
-#: .\promotion\models\code.py:50 .\promotion\models\promotion.py:157
+#: .\product\models\attribute.py:20 .\product\models\attribute_value.py:26
+#: .\product\models\category.py:30 .\product\models\category_image.py:32
+#: .\product\models\product.py:115 .\product\models\variant_group.py:26
+#: .\promotion\models\code.py:52 .\promotion\models\promotion.py:162
 #: .\tag\models\tag.py:13 .\tenant\models.py:122 .\tenant\models.py:1613
-#: .\user\models\account.py:101 .\user\models\subscription.py:68
+#: .\user\models\account.py:103 .\user\models\subscription.py:68
 #: .\user\models\subscription.py:163
 msgid "Active"
 msgstr ""
@@ -1031,29 +1040,44 @@ msgstr ""
 msgid "Customer Group"
 msgstr ""
 
-#: .\b2b\models\group.py:52 .\settings.py:3437
+#: .\b2b\models\group.py:52 .\settings.py:3440
 msgid "Customer Groups"
 msgstr ""
 
-#: .\b2b\models\price.py:32
+#: .\b2b\models\price.py:34
 msgid "Net price override"
 msgstr ""
 
-#: .\b2b\models\price.py:52
+#: .\b2b\models\price.py:54
 msgid ""
 "Fixed NET (VAT-exclusive) price for this group. Wins over the group's "
 "discount percent."
 msgstr ""
 
-#: .\b2b\models\price.py:58
+#: .\b2b\models\price.py:60
 msgid "B2B Price List Item"
 msgstr ""
 
-#: .\b2b\models\price.py:59
+#: .\b2b\models\price.py:61
 msgid "B2B Price List Items"
 msgstr ""
 
-#: .\b2b\models\profile.py:47
+#: .\b2b\models\profile.py:29 .\blog\admin.py:172 .\blog\admin.py:711
+#: .\blog\models\author.py:15 .\blog\models\comment.py:30 .\cart\admin.py:236
+#: .\cart\models\cart.py:24 .\loyalty\models\transaction.py:17
+#: .\meta_capi\models.py:56 .\notification\admin.py:440
+#: .\notification\models\user.py:21 .\order\models\history.py:46
+#: .\order\models\history.py:254 .\order\models\order.py:101
+#: .\product\admin.py:1836 .\product\admin.py:1928 .\product\models\alert.py:49
+#: .\product\models\favourite.py:17 .\product\models\review.py:27
+#: .\promotion\models\redemption.py:47 .\recommendation\models.py:251
+#: .\search\models.py:95 .\tenant\models.py:1599 .\tenant\models.py:1679
+#: .\user\admin.py:498 .\user\admin.py:949 .\user\models\address.py:20
+#: .\user\models\data_export.py:30 .\user\models\subscription.py:177
+msgid "User"
+msgstr ""
+
+#: .\b2b\models\profile.py:49
 #: .\core\templates\emails\b2b\admin_new_business_profile.html:13
 #: .\core\templates\emails\b2b\admin_new_business_profile.txt:4
 #: .\core\templates\emails\b2b\business_profile_approved.html:15
@@ -1065,65 +1089,69 @@ msgstr ""
 msgid "VAT number (ΑΦΜ)"
 msgstr ""
 
-#: .\b2b\models\profile.py:50
+#: .\b2b\models\profile.py:52
 msgid "Stored normalised: 9 digits, no EL/GR prefix"
 msgstr ""
 
-#: .\b2b\models\profile.py:53
+#: .\b2b\models\profile.py:55
 msgid "Business activity"
 msgstr ""
 
-#: .\b2b\models\profile.py:55
+#: .\b2b\models\profile.py:57
 msgid "Billing street"
 msgstr ""
 
-#: .\b2b\models\profile.py:58
+#: .\b2b\models\profile.py:60
 msgid "Billing street number"
 msgstr ""
 
-#: .\b2b\models\profile.py:61
+#: .\b2b\models\profile.py:63
 msgid "Billing city"
 msgstr ""
 
-#: .\b2b\models\profile.py:64
+#: .\b2b\models\profile.py:66
 msgid "Billing zipcode"
 msgstr ""
 
-#: .\b2b\models\profile.py:69
+#: .\b2b\models\profile.py:71
 #, fuzzy
 #| msgid "Status"
 msgid "VIES status"
 msgstr "Status"
 
-#: .\b2b\models\profile.py:75
+#: .\b2b\models\profile.py:77
 msgid "VIES checked at"
 msgstr ""
 
-#: .\b2b\models\profile.py:78
+#: .\b2b\models\profile.py:80
 msgid "VIES name"
 msgstr ""
 
-#: .\b2b\models\profile.py:81
+#: .\b2b\models\profile.py:83
 msgid "VIES address"
 msgstr ""
 
-#: .\b2b\models\profile.py:84
+#: .\b2b\models\profile.py:86
 msgid "VIES error"
 msgstr ""
 
-#: .\b2b\models\profile.py:95
+#: .\b2b\models\profile.py:96
+msgid "Reviewed by"
+msgstr ""
+
+#: .\b2b\models\profile.py:98
 msgid "Reviewed at"
 msgstr ""
 
-#: .\b2b\models\profile.py:97
+#: .\b2b\models\profile.py:100
 msgid "Rejection reason"
 msgstr ""
 
-#: .\b2b\models\profile.py:101
+#: .\b2b\models\profile.py:104
 msgid "Business Profile"
 msgstr ""
 
-#: .\b2b\models\profile.py:102
+#: .\b2b\models\profile.py:105
 msgid "Business Profiles"
 msgstr ""
 
@@ -1184,12 +1212,13 @@ msgstr ""
 msgid "Too many ids — request at most {max} per call."
 msgstr ""
 
-#: .\blog\admin.py:51 .\settings.py:4017
+#: .\blog\admin.py:51 .\settings.py:4020
 msgid "Comments"
 msgstr ""
 
-#: .\blog\admin.py:59 .\core\cache\surfaces.py:538 .\settings.py:3276
-#: .\settings.py:4024 .\tag\admin.py:293 .\tag\apps.py:7 .\tag\models\tag.py:27
+#: .\blog\admin.py:59 .\blog\models\post.py:54 .\core\cache\surfaces.py:538
+#: .\settings.py:3279 .\settings.py:4027 .\tag\admin.py:293 .\tag\apps.py:7
+#: .\tag\models\tag.py:27
 msgid "Tags"
 msgstr ""
 
@@ -1230,20 +1259,12 @@ msgstr ""
 msgid "Statistics"
 msgstr ""
 
-#: .\blog\admin.py:172 .\blog\admin.py:711 .\cart\admin.py:236
-#: .\notification\admin.py:440 .\product\admin.py:1836 .\product\admin.py:1928
-#: .\recommendation\models.py:251 .\tenant\models.py:1599
-#: .\tenant\models.py:1679 .\user\admin.py:498 .\user\admin.py:949
-#: .\user\models\data_export.py:30 .\user\models\subscription.py:177
-msgid "User"
-msgstr ""
-
-#: .\blog\admin.py:178 .\blog\models\author.py:17 .\user\models\account.py:123
+#: .\blog\admin.py:178 .\blog\models\author.py:19 .\user\models\account.py:125
 msgid "Bio"
 msgstr ""
 
-#: .\blog\admin.py:191 .\blog\models\author.py:15 .\user\admin.py:524
-#: .\user\models\account.py:116
+#: .\blog\admin.py:191 .\blog\models\author.py:17 .\user\admin.py:524
+#: .\user\models\account.py:118
 msgid "Website"
 msgstr ""
 
@@ -1273,7 +1294,8 @@ msgstr ""
 msgid "Media"
 msgstr ""
 
-#: .\blog\admin.py:336
+#: .\blog\admin.py:336 .\blog\models\category.py:30
+#: .\product\models\category.py:37
 msgid "Parent"
 msgstr ""
 
@@ -1289,7 +1311,7 @@ msgstr ""
 msgid "Search by title, subtitle, slug, body, or author email/username."
 msgstr ""
 
-#: .\blog\admin.py:416 .\blog\admin.py:702 .\blog\models\comment.py:44
+#: .\blog\admin.py:416 .\blog\admin.py:702 .\blog\models\comment.py:50
 #: .\page_config\admin.py:276 .\product\admin.py:1638 .\product\admin.py:1799
 #: .\product\admin.py:1979 .\product\admin.py:2062
 msgid "Content"
@@ -1304,12 +1326,12 @@ msgstr ""
 msgid "SEO"
 msgstr ""
 
-#: .\blog\admin.py:480 .\blog\models\post.py:162
+#: .\blog\admin.py:480 .\blog\models\post.py:170
 #: .\notification\models\notification.py:75 .\page_config\admin.py:302
 #: .\page_config\models.py:170 .\page_config\models.py:238
-#: .\page_config\models.py:841 .\product\models\category_image.py:34
-#: .\product\models\image.py:27 .\shipping_boxnow\models\locker.py:58
-#: .\user\models\address.py:21
+#: .\page_config\models.py:841 .\product\models\category_image.py:35
+#: .\product\models\image.py:28 .\shipping_boxnow\models\locker.py:58
+#: .\user\models\address.py:22
 msgid "Title"
 msgstr ""
 
@@ -1317,17 +1339,18 @@ msgstr ""
 msgid "Untitled"
 msgstr ""
 
-#: .\blog\admin.py:486 .\contact\models.py:233 .\core\admin.py:208
-#: .\core\admin.py:313
+#: .\blog\admin.py:486 .\blog\models\post.py:48 .\contact\models.py:233
+#: .\core\admin.py:208 .\core\admin.py:313
 #: .\core\templates\emails\subscription\confirmation.html:27
 #: .\core\templates\emails\subscription\confirmation.txt:16
 #: .\notification\admin.py:280 .\notification\models\notification.py:46
 #: .\product\admin.py:1103 .\product\admin.py:1696 .\product\admin.py:2011
+#: .\product\models\category_image.py:23 .\product\models\product.py:86
 #: .\user\admin.py:793 .\user\models\subscription.py:61 .\vat\admin.py:132
 msgid "Category"
 msgstr ""
 
-#: .\blog\admin.py:495
+#: .\blog\admin.py:495 .\blog\models\post.py:61
 msgid "Author"
 msgstr ""
 
@@ -1406,7 +1429,7 @@ msgstr ""
 msgid "Moderation"
 msgstr ""
 
-#: .\blog\admin.py:719
+#: .\blog\admin.py:719 .\blog\models\comment.py:38
 msgid "Post"
 msgstr ""
 
@@ -1448,7 +1471,7 @@ msgid "%(count)d comments were marked as spam and deleted."
 msgstr ""
 
 #: .\blog\apps.py:7 .\core\cache\surfaces.py:337 .\page_config\models.py:418
-#: .\settings.py:3310
+#: .\settings.py:3313
 msgid "Blog"
 msgstr ""
 
@@ -1827,87 +1850,91 @@ msgstr ""
 msgid "Filter tags not used in any posts"
 msgstr ""
 
-#: .\blog\models\author.py:23
+#: .\blog\models\author.py:25
 msgid "Blog Author"
 msgstr ""
 
-#: .\blog\models\author.py:24 .\settings.py:3333
+#: .\blog\models\author.py:26 .\settings.py:3336
 msgid "Blog Authors"
 msgstr ""
 
 #: .\blog\models\category.py:20 .\blog\models\post.py:33
 #: .\page_config\models.py:798 .\product\models\category.py:29
-#: .\product\models\product.py:105 .\tenant\models.py:120
+#: .\product\models\product.py:108 .\tenant\models.py:120
 #: .\user\models\subscription.py:53
 msgid "Slug"
 msgstr ""
 
 #: .\blog\models\category.py:22 .\blog\models\post.py:35
-#: .\product\models\category_image.py:24 .\product\models\image.py:24
-#: .\user\models\account.py:99
+#: .\product\models\category_image.py:25 .\product\models\image.py:25
+#: .\user\models\account.py:101
 msgid "Image"
 msgstr ""
 
-#: .\blog\models\category.py:33 .\core\admin.py:329
-#: .\core\templates\invoices\invoice.html:234 .\giftcard\models.py:261
-#: .\loyalty\models\tier.py:81 .\loyalty\models\transaction.py:36
+#: .\blog\models\category.py:34 .\core\admin.py:329
+#: .\core\templates\invoices\invoice.html:234 .\giftcard\models.py:267
+#: .\loyalty\models\tier.py:81 .\loyalty\models\transaction.py:38
 #: .\order\admin.py:268 .\order\admin.py:1593 .\order\admin.py:1682
-#: .\order\models\history.py:26 .\order\models\history.py:232
-#: .\pay_way\models.py:94 .\product\models\category.py:40
-#: .\product\models\product.py:457 .\promotion\models\promotion.py:290
+#: .\order\models\history.py:26 .\order\models\history.py:234
+#: .\pay_way\models.py:94 .\product\models\category.py:41
+#: .\product\models\product.py:462 .\promotion\models\promotion.py:295
 #: .\user\models\subscription.py:99
 msgid "Description"
 msgstr ""
 
-#: .\blog\models\category.py:39
+#: .\blog\models\category.py:40
 msgid "Blog Category"
 msgstr ""
 
-#: .\blog\models\category.py:40 .\settings.py:3325
+#: .\blog\models\category.py:41 .\settings.py:3328
 msgid "Blog Categories"
 msgstr ""
 
-#: .\blog\models\comment.py:54
+#: .\blog\models\comment.py:46
+msgid "Parent Comment"
+msgstr ""
+
+#: .\blog\models\comment.py:60
 msgid "Blog Comment"
 msgstr ""
 
-#: .\blog\models\comment.py:55 .\settings.py:3341
+#: .\blog\models\comment.py:61 .\settings.py:3344
 msgid "Blog Comments"
 msgstr ""
 
-#: .\blog\models\post.py:55
+#: .\blog\models\post.py:63
 msgid "Featured"
 msgstr ""
 
-#: .\blog\models\post.py:56 .\product\models\product.py:150
+#: .\blog\models\post.py:64 .\product\models\product.py:154
 msgid "View Count"
 msgstr ""
 
-#: .\blog\models\post.py:58 .\product\models\product.py:152
+#: .\blog\models\post.py:66 .\product\models\product.py:156
 msgid "Click Score"
 msgstr ""
 
-#: .\blog\models\post.py:74
+#: .\blog\models\post.py:82
 msgid "Blog Post"
 msgstr ""
 
-#: .\blog\models\post.py:75 .\settings.py:3315 .\settings.py:3998
+#: .\blog\models\post.py:83 .\settings.py:3318 .\settings.py:4001
 msgid "Blog Posts"
 msgstr ""
 
-#: .\blog\models\post.py:164
+#: .\blog\models\post.py:172
 msgid "Subtitle"
 msgstr ""
 
-#: .\blog\models\post.py:166 .\page_config\models.py:842
+#: .\blog\models\post.py:174 .\page_config\models.py:842
 msgid "Body"
 msgstr ""
 
-#: .\blog\models\post.py:172
+#: .\blog\models\post.py:180
 msgid "Blog Post Translation"
 msgstr ""
 
-#: .\blog\models\post.py:173
+#: .\blog\models\post.py:181
 msgid "Blog Post Translations"
 msgstr ""
 
@@ -1915,7 +1942,7 @@ msgstr ""
 msgid "Blog Tag"
 msgstr ""
 
-#: .\blog\models\tag.py:27 .\settings.py:3351
+#: .\blog\models\tag.py:27 .\settings.py:3354
 msgid "Blog Tags"
 msgstr ""
 
@@ -2321,7 +2348,7 @@ msgstr ""
 #: .\core\templates\emails\order\order_received.txt:33
 #: .\core\templates\emails\order\order_status_generic.html:108
 #: .\core\templates\emails\order\order_status_generic.txt:39
-#: .\order\models\invoice.py:227
+#: .\order\models\invoice.py:228
 msgid "Discount"
 msgstr ""
 
@@ -2408,7 +2435,7 @@ msgid ""
 "%(savings).1f%%."
 msgstr ""
 
-#: .\cart\admin.py:350 .\cart\models\item.py:47
+#: .\cart\admin.py:350 .\cart\models\item.py:53
 msgid "Cart Item"
 msgstr ""
 
@@ -2419,11 +2446,12 @@ msgstr ""
 #: .\cart\admin.py:364 .\core\apps.py:11 .\notification\enum.py:22
 #: .\order\admin.py:281 .\order\admin.py:1606 .\order\admin.py:1695
 #: .\page_config\admin.py:134 .\page_config\admin.py:291 .\pay_way\admin.py:164
-#: .\product\admin.py:743 .\product\admin.py:1542 .\settings.py:3645
+#: .\product\admin.py:743 .\product\admin.py:1542 .\settings.py:3648
 msgid "System"
 msgstr ""
 
-#: .\cart\admin.py:395 .\cart\models\cart.py:30 .\notification\enum.py:17
+#: .\cart\admin.py:395 .\cart\models\cart.py:31 .\cart\models\item.py:20
+#: .\notification\enum.py:17 .\promotion\models\cart_code.py:22
 #: .\recommendation\enum.py:17 .\recommendation\models.py:239
 msgid "Cart"
 msgstr ""
@@ -2502,7 +2530,7 @@ msgstr ""
 msgid "%(count)d items were removed from carts."
 msgstr ""
 
-#: .\cart\apps.py:7 .\cart\models\cart.py:31 .\settings.py:3376
+#: .\cart\apps.py:7 .\cart\models\cart.py:32 .\settings.py:3379
 msgid "Carts"
 msgstr ""
 
@@ -2701,33 +2729,33 @@ msgstr ""
 msgid "Filter by cart last activity before date"
 msgstr ""
 
-#: .\cart\models\cart.py:25 .\user\admin.py:541
+#: .\cart\models\cart.py:26 .\user\admin.py:541
 msgid "Last Activity"
 msgstr ""
 
-#: .\cart\models\item.py:22
+#: .\cart\models\item.py:28
 #: .\core\templates\emails\cart\checkout_abandoned.html:16
 #: .\core\templates\emails\order\order_payment_confirmed.html:54
 #: .\core\templates\emails\order\order_received.html:59
 #: .\core\templates\emails\order\order_status_generic.html:87
-#: .\order\admin.py:1511 .\order\models\item.py:28
-#: .\order\models\stock_reservation.py:35
+#: .\order\admin.py:1511 .\order\models\item.py:30
+#: .\order\models\stock_reservation.py:36
 msgid "Quantity"
 msgstr "Quantity"
 
-#: .\cart\models\item.py:24
+#: .\cart\models\item.py:30
 msgid "Price at Add"
 msgstr ""
 
-#: .\cart\models\item.py:31
+#: .\cart\models\item.py:37
 msgid "Price of the product when added to cart (for price change validation)"
 msgstr ""
 
-#: .\cart\models\item.py:41 .\order\models\item.py:40
+#: .\cart\models\item.py:47 .\order\models\item.py:42
 msgid "Recommendation impression"
 msgstr ""
 
-#: .\cart\models\item.py:48
+#: .\cart\models\item.py:54
 msgid "Cart Items"
 msgstr ""
 
@@ -3263,7 +3291,7 @@ msgstr ""
 
 #: .\contact\admin.py:315 .\notification\admin.py:285
 #: .\notification\admin.py:464 .\notification\models\notification.py:52
-#: .\promotion\models\promotion.py:171 .\shipping\models\provider.py:63
+#: .\promotion\models\promotion.py:176 .\shipping\models\provider.py:63
 msgid "Priority"
 msgstr ""
 
@@ -3288,13 +3316,13 @@ msgid "Submitter"
 msgstr ""
 
 #: .\contact\admin.py:366 .\contact\models.py:247 .\contact\models.py:248
-#: .\page_config\models.py:423 .\settings.py:3478
+#: .\page_config\models.py:423 .\settings.py:3481
 msgid "Feedback"
 msgstr ""
 
 #: .\contact\models.py:17 .\contact\models.py:228
-#: .\core\templates\invoices\invoice.html:175 .\order\models\order.py:137
-#: .\product\models\alert.py:49 .\promotion\models\redemption.py:46
+#: .\core\templates\invoices\invoice.html:175 .\order\models\order.py:141
+#: .\product\models\alert.py:51 .\promotion\models\redemption.py:50
 #: .\user\models\subscription.py:182
 msgid "Email"
 msgstr ""
@@ -3393,7 +3421,8 @@ msgstr ""
 
 #: .\contact\models.py:217 .\core\cache\surfaces.py:238
 #: .\page_config\models.py:417 .\product\admin.py:2273 .\product\apps.py:7
-#: .\product\models\product.py:226 .\settings.py:3248
+#: .\product\models\product.py:231 .\promotion\models\promotion.py:57
+#: .\settings.py:3251
 msgid "Products"
 msgstr ""
 
@@ -3529,7 +3558,7 @@ msgstr ""
 #: .\core\templates\emails\giftcard\gift_card_delivery.html:27
 #: .\core\templates\emails\giftcard\gift_card_delivery.txt:8
 #: .\product\admin.py:299 .\product\admin.py:544
-#: .\product\models\attribute_value.py:29 .\vat\models.py:45
+#: .\product\models\attribute_value.py:30 .\vat\models.py:45
 msgid "Value"
 msgstr ""
 
@@ -3759,7 +3788,8 @@ msgid ""
 "endpoint."
 msgstr ""
 
-#: .\core\cache\surfaces.py:303 .\settings.py:3258 .\settings.py:4004
+#: .\core\cache\surfaces.py:303 .\promotion\models\promotion.py:67
+#: .\settings.py:3261 .\settings.py:4007
 msgid "Categories"
 msgstr ""
 
@@ -3781,7 +3811,7 @@ msgstr ""
 msgid "Country and region pickers used during checkout address selection."
 msgstr ""
 
-#: .\core\cache\surfaces.py:397 .\loyalty\apps.py:8 .\settings.py:3569
+#: .\core\cache\surfaces.py:397 .\loyalty\apps.py:8 .\settings.py:3572
 msgid "Loyalty"
 msgstr ""
 
@@ -3804,7 +3834,7 @@ msgid ""
 msgstr ""
 
 #: .\core\cache\surfaces.py:504 .\notification\admin.py:80
-#: .\promotion\apps.py:8 .\promotion\models\promotion.py:199 .\settings.py:3401
+#: .\promotion\apps.py:8 .\promotion\models\promotion.py:204 .\settings.py:3404
 msgid "Promotions"
 msgstr ""
 
@@ -3866,8 +3896,8 @@ msgstr ""
 msgid "Search templates..."
 msgstr ""
 
-#: .\core\email\forms.py:36 .\order\models\order.py:347
-#: .\user\models\account.py:149 .\user\models\subscription.py:211
+#: .\core\email\forms.py:36 .\order\models\order.py:353
+#: .\user\models\account.py:152 .\user\models\subscription.py:211
 msgid "Language"
 msgstr ""
 
@@ -4202,51 +4232,77 @@ msgstr ""
 msgid "Created At"
 msgstr ""
 
-#: .\core\models.py:266 .\core\models.py:558
+#: .\core\models.py:266 .\core\models.py:572
 msgid "Updated At"
 msgstr ""
 
-#: .\core\models.py:309
-msgid "Published At"
+#: .\core\models.py:282 .\search\models.py:47
+msgid "UUID"
 msgstr ""
 
 #: .\core\models.py:311
+msgid "Published At"
+msgstr ""
+
+#: .\core\models.py:313
 msgid "Is Published"
 msgstr ""
 
-#: .\core\models.py:535
+#: .\core\models.py:343
+msgid "Private Metadata"
+msgstr ""
+
+#: .\core\models.py:349 .\page_config\admin.py:127 .\page_config\models.py:175
+#: .\shipping\admin.py:120 .\shipping\models\provider.py:68
+#: .\shipping_acs\models\pickup_list.py:67
+#: .\shipping_acs\models\shipment.py:249
+#: .\shipping_boxnow\models\shipment.py:167 .\user\models\subscription.py:263
+msgid "Metadata"
+msgstr ""
+
+#: .\core\models.py:407
+#, fuzzy
+#| msgid "Order Delivered"
+msgid "Deleted At"
+msgstr "Order Delivered"
+
+#: .\core\models.py:410
+msgid "Is Deleted"
+msgstr ""
+
+#: .\core\models.py:549 .\search\models.py:62
 msgid "Language Code"
 msgstr ""
 
-#: .\core\models.py:538
+#: .\core\models.py:552
 msgid "Message ID"
 msgstr ""
 
-#: .\core\models.py:540
+#: .\core\models.py:554
 msgid "Plural Message ID"
 msgstr ""
 
-#: .\core\models.py:544
+#: .\core\models.py:558
 msgid ""
 "Empty for singular entries. Set for ngettext / msgid_plural entries; in that "
 "case each plural form has its own row identified by plural_index."
 msgstr ""
 
-#: .\core\models.py:550
+#: .\core\models.py:564
 msgid "Plural Index"
 msgstr ""
 
-#: .\core\models.py:553
+#: .\core\models.py:567
 msgid ""
 "0 for singular entries or for the first plural form; 1, 2, ... for "
 "subsequent plural forms defined by the language's plural rule."
 msgstr ""
 
-#: .\core\models.py:557 .\core\models.py:561
+#: .\core\models.py:571 .\core\models.py:575
 msgid "Translation"
 msgstr ""
 
-#: .\core\models.py:562
+#: .\core\models.py:576
 msgid "Translations"
 msgstr ""
 
@@ -4564,7 +4620,7 @@ msgstr ""
 msgid "New product"
 msgstr "Product"
 
-#: .\core\templates\admin\index.html:27 .\settings.py:3537
+#: .\core\templates\admin\index.html:27 .\settings.py:3540
 msgid "Customers"
 msgstr ""
 
@@ -4574,7 +4630,7 @@ msgid ""
 "them."
 msgstr ""
 
-#: .\core\templates\admin\platform_billing.html:30 .\settings.py:2953
+#: .\core\templates\admin\platform_billing.html:30 .\settings.py:2956
 #: .\tenant\models.py:1206
 msgid "Tenants"
 msgstr ""
@@ -5198,8 +5254,8 @@ msgstr "Order Details"
 
 #: .\core\templates\emails\giftcard\gift_card_purchase_receipt.html:11
 #: .\core\templates\emails\giftcard\gift_card_purchase_receipt.txt:5
-#: .\giftcard\models.py:49 .\giftcard\models.py:237
-#: .\promotion\models\redemption.py:51
+#: .\giftcard\models.py:50 .\giftcard\models.py:241
+#: .\promotion\models\redemption.py:55
 msgid "Amount"
 msgstr ""
 
@@ -5607,7 +5663,7 @@ msgstr ""
 #: .\core\templates\emails\order\order_received.txt:7
 #: .\core\templates\emails\order\payment_failed.html:14
 #: .\core\templates\emails\order\payment_failed.txt:7
-#: .\order\models\order.py:220
+#: .\order\models\order.py:224
 msgid "Payment Status"
 msgstr ""
 
@@ -5641,15 +5697,15 @@ msgstr ""
 #: .\core\templates\emails\order\order_received.html:54
 #: .\core\templates\emails\order\order_status_generic.html:82
 #: .\core\templates\emails\order\order_status_generic.txt:32
-#: .\order\models\item.py:47
+#: .\order\models\item.py:49
 msgid "Order Items"
 msgstr "Order Items"
 
 #: .\core\templates\emails\order\order_payment_confirmed.html:55
 #: .\core\templates\emails\order\order_received.html:60
 #: .\core\templates\emails\order\order_status_generic.html:88
-#: .\order\models\item.py:27 .\product\models\product.py:107
-#: .\shipping\models\rate.py:52
+#: .\order\models\item.py:29 .\product\models\product.py:110
+#: .\shipping\models\rate.py:54
 msgid "Price"
 msgstr "Price"
 
@@ -5669,7 +5725,7 @@ msgstr "Subtotal"
 #: .\core\templates\emails\order\order_status_generic.html:106
 #: .\core\templates\emails\order\order_status_generic.txt:38
 #: .\core\templates\invoices\invoice.html:277 .\notification\enum.py:16
-#: .\order\admin.py:849 .\order\models\invoice.py:213 .\settings.py:3489
+#: .\order\admin.py:849 .\order\models\invoice.py:214 .\settings.py:3492
 #: .\shipping\apps.py:7 .\tenant\admin.py:574
 msgid "Shipping"
 msgstr "Shipping"
@@ -5871,7 +5927,7 @@ msgstr "Carrier"
 
 #: .\core\templates\emails\order\order_shipped.html:20
 #: .\core\templates\emails\order\order_shipped.txt:7
-#: .\order\models\order.py:310
+#: .\order\models\order.py:316
 msgid "Tracking Number"
 msgstr "Tracking Number"
 
@@ -6594,7 +6650,8 @@ msgstr ""
 
 #: .\core\templates\invoices\invoice.html:237
 #: .\core\templates\invoices\invoice.html:271
-#: .\core\templates\invoices\invoice.html:301 .\vat\apps.py:7
+#: .\core\templates\invoices\invoice.html:301 .\product\models\product.py:152
+#: .\vat\apps.py:7
 msgid "VAT"
 msgstr ""
 
@@ -6610,7 +6667,7 @@ msgstr ""
 msgid "Discount (incl. VAT)"
 msgstr ""
 
-#: .\core\templates\invoices\invoice.html:266 .\order\models\invoice.py:195
+#: .\core\templates\invoices\invoice.html:266 .\order\models\invoice.py:196
 msgid "Subtotal (excl. VAT)"
 msgstr ""
 
@@ -6813,8 +6870,10 @@ msgstr ""
 msgid "Contact & Media"
 msgstr ""
 
-#: .\country\admin.py:134 .\country\models.py:88 .\pay_way\models.py:283
-#: .\region\admin.py:128
+#: .\country\admin.py:134 .\country\models.py:88 .\order\models\order.py:117
+#: .\pay_way\models.py:283 .\region\admin.py:128 .\region\models.py:19
+#: .\shipping\models\rate.py:46 .\user\models\account.py:89
+#: .\user\models\address.py:36
 msgid "Country"
 msgstr ""
 
@@ -6859,7 +6918,7 @@ msgstr ""
 msgid "Created"
 msgstr ""
 
-#: .\country\apps.py:7 .\country\models.py:89 .\settings.py:3021
+#: .\country\apps.py:7 .\country\models.py:89 .\settings.py:3024
 msgid "Countries"
 msgstr ""
 
@@ -7168,128 +7227,146 @@ msgstr ""
 msgid "Pending payment"
 msgstr ""
 
-#: .\giftcard\models.py:48
+#: .\giftcard\models.py:47
+msgid "Buyer"
+msgstr ""
+
+#: .\giftcard\models.py:49
 msgid "Buyer Email"
 msgstr ""
 
-#: .\giftcard\models.py:50 .\giftcard\models.py:138
+#: .\giftcard\models.py:51 .\giftcard\models.py:140
 msgid "Recipient Email"
 msgstr ""
 
-#: .\giftcard\models.py:52 .\giftcard\models.py:141
+#: .\giftcard\models.py:53 .\giftcard\models.py:143
 msgid "Recipient Name"
 msgstr ""
 
-#: .\giftcard\models.py:55 .\giftcard\models.py:144
+#: .\giftcard\models.py:56 .\giftcard\models.py:146
 #, fuzzy
 #| msgid "Order Items"
 msgid "Sender Name"
 msgstr "Order Items"
 
-#: .\giftcard\models.py:59 .\giftcard\models.py:147
+#: .\giftcard\models.py:60 .\giftcard\models.py:149
 #, fuzzy
 #| msgid "Order Confirmation"
 msgid "Deliver At"
 msgstr "Order Confirmation"
 
-#: .\giftcard\models.py:62
+#: .\giftcard\models.py:63
 msgid "Empty means deliver immediately after payment"
 msgstr ""
 
-#: .\giftcard\models.py:71 .\pay_way\models.py:41
+#: .\giftcard\models.py:72 .\pay_way\models.py:41
 msgid "Provider Code"
 msgstr ""
 
-#: .\giftcard\models.py:74 .\order\models\order.py:217
+#: .\giftcard\models.py:75 .\order\models\order.py:221
 msgid "Payment ID"
 msgstr ""
 
-#: .\giftcard\models.py:78
+#: .\giftcard\models.py:79
 msgid "Gift Card Purchase"
 msgstr ""
 
-#: .\giftcard\models.py:79
+#: .\giftcard\models.py:80
 msgid "Gift Card Purchases"
 msgstr ""
 
-#: .\giftcard\models.py:97 .\promotion\models\code.py:17
+#: .\giftcard\models.py:98 .\promotion\models\code.py:18
 #: .\shipping\models\provider.py:25
 msgid "Code"
 msgstr ""
 
-#: .\giftcard\models.py:100
+#: .\giftcard\models.py:101
 msgid "Crypto-random, uppercased; the bearer secret"
 msgstr ""
 
-#: .\giftcard\models.py:103
+#: .\giftcard\models.py:104
 msgid "Initial Value"
 msgstr ""
 
-#: .\giftcard\models.py:112 .\order\models\stock_reservation.py:52
+#: .\giftcard\models.py:113 .\order\models\stock_reservation.py:54
 #: .\user\models\data_export.py:58
 msgid "Expires At"
 msgstr ""
 
-#: .\giftcard\models.py:116
+#: .\giftcard\models.py:117
 msgid ""
 "Defaults to GIFT_CARD_VALIDITY_DAYS after issue (Greek law: 5 years); empty "
 "means never expires"
 msgstr ""
 
-#: .\giftcard\models.py:121 .\user\models\subscription.py:204
+#: .\giftcard\models.py:122 .\user\models\subscription.py:204
 msgid "Source"
 msgstr ""
 
-#: .\giftcard\models.py:133
+#: .\giftcard\models.py:134
 msgid ""
 "Optional account link — lets the shopper see the card under 'My gift cards'. "
 "Redemption only needs the code."
 msgstr ""
 
-#: .\giftcard\models.py:149
+#: .\giftcard\models.py:137
+#, fuzzy
+#| msgid "Order Items"
+msgid "Issued To"
+msgstr "Order Items"
+
+#: .\giftcard\models.py:151
 #, fuzzy
 #| msgid "Order Delivered"
 msgid "Delivered At"
 msgstr "Order Delivered"
 
-#: .\giftcard\models.py:152
+#: .\giftcard\models.py:154
 msgid "Expiry Reminder Sent At"
 msgstr ""
 
-#: .\giftcard\models.py:156
+#: .\giftcard\models.py:158
 msgid ""
 "Stamped by the daily reminder sweep so each card is reminded exactly once"
 msgstr ""
 
-#: .\giftcard\models.py:169
+#: .\giftcard\models.py:168
+msgid "Purchase"
+msgstr ""
+
+#: .\giftcard\models.py:172 .\giftcard\models.py:233
 msgid "Gift Card"
 msgstr ""
 
-#: .\giftcard\models.py:170 .\settings.py:3419
+#: .\giftcard\models.py:173 .\settings.py:3422
 msgid "Gift Cards"
 msgstr ""
 
-#: .\giftcard\models.py:232 .\notification\admin.py:275
+#: .\giftcard\models.py:236 .\notification\admin.py:275
 #: .\notification\models\notification.py:40 .\product\models\alert.py:33
 #: .\recommendation\models.py:216
 msgid "Kind"
 msgstr ""
 
-#: .\giftcard\models.py:241
+#: .\giftcard\models.py:245
 msgid ""
 "Signed: positive adds balance (issue/refund credit), negative removes it "
 "(redeem/expire)"
 msgstr ""
 
-#: .\giftcard\models.py:258
+#: .\giftcard\models.py:263
 msgid "Admin who made a manual adjustment"
 msgstr ""
 
-#: .\giftcard\models.py:265
+#: .\giftcard\models.py:264 .\loyalty\models\transaction.py:46
+msgid "Created By"
+msgstr ""
+
+#: .\giftcard\models.py:271
 msgid "Gift Card Transaction"
 msgstr ""
 
-#: .\giftcard\models.py:266
+#: .\giftcard\models.py:272
 msgid "Gift Card Transactions"
 msgstr ""
 
@@ -7482,35 +7559,41 @@ msgstr ""
 msgid "Icon"
 msgstr ""
 
-#: .\loyalty\models\tier.py:43
+#: .\loyalty\models\tier.py:43 .\user\models\account.py:149
 msgid "Loyalty Tier"
 msgstr ""
 
-#: .\loyalty\models\tier.py:44 .\settings.py:3574
+#: .\loyalty\models\tier.py:44 .\settings.py:3577
 msgid "Loyalty Tiers"
 msgstr ""
 
-#: .\loyalty\models\transaction.py:19 .\user\admin.py:235
+#: .\loyalty\models\transaction.py:20 .\user\admin.py:235
 msgid "Points"
 msgstr ""
 
-#: .\loyalty\models\transaction.py:21
+#: .\loyalty\models\transaction.py:22
 msgid "Positive for earn/bonus, negative for redeem/expire/adjust"
 msgstr ""
 
-#: .\loyalty\models\transaction.py:25
+#: .\loyalty\models\transaction.py:26
 msgid "Transaction Type"
 msgstr ""
 
-#: .\loyalty\models\transaction.py:43
+#: .\loyalty\models\transaction.py:36
+#, fuzzy
+#| msgid "Order"
+msgid "Reference Order"
+msgstr "Order"
+
+#: .\loyalty\models\transaction.py:45
 msgid "Admin user who created this adjustment"
 msgstr ""
 
-#: .\loyalty\models\transaction.py:49
+#: .\loyalty\models\transaction.py:52
 msgid "Points Transaction"
 msgstr ""
 
-#: .\loyalty\models\transaction.py:50 .\settings.py:3582
+#: .\loyalty\models\transaction.py:53 .\settings.py:3585
 msgid "Points Transactions"
 msgstr ""
 
@@ -7742,47 +7825,47 @@ msgid ""
 "event_id is already SENT."
 msgstr ""
 
-#: .\meta_capi\models.py:63
+#: .\meta_capi\models.py:65
 msgid "Meta fbtrace_id"
 msgstr ""
 
-#: .\meta_capi\models.py:68
+#: .\meta_capi\models.py:70
 msgid ""
 "Meta's request trace ID. Quote this when filing a support ticket so they can "
 "find the request server-side."
 msgstr ""
 
-#: .\meta_capi\models.py:73
+#: .\meta_capi\models.py:75
 #, fuzzy
 #| msgid "Order Delivered"
 msgid "Events received"
 msgstr "Order Delivered"
 
-#: .\meta_capi\models.py:76
+#: .\meta_capi\models.py:78
 msgid ""
 "Number of events Meta acknowledged. Should be 1; values >1 indicate batched "
 "sends, 0 indicates a validation reject we logged but Meta dropped."
 msgstr ""
 
-#: .\meta_capi\models.py:81
+#: .\meta_capi\models.py:83
 msgid "Error message"
 msgstr ""
 
-#: .\meta_capi\models.py:83
+#: .\meta_capi\models.py:85
 msgid "Payload"
 msgstr ""
 
-#: .\meta_capi\models.py:87
+#: .\meta_capi\models.py:89
 msgid ""
 "Sanitised request body (PII fields are hashed by the facebook_business SDK "
 "before serialisation). Stored for replay during incident debugging."
 msgstr ""
 
-#: .\meta_capi\models.py:94
+#: .\meta_capi\models.py:96
 msgid "Meta CAPI Event"
 msgstr ""
 
-#: .\meta_capi\models.py:95
+#: .\meta_capi\models.py:97
 msgid "Meta CAPI Events"
 msgstr ""
 
@@ -7819,7 +7902,7 @@ msgid "User Status"
 msgstr ""
 
 #: .\notification\admin.py:124 .\notification\admin.py:456
-#: .\notification\admin.py:461 .\notification\models\user.py:27
+#: .\notification\admin.py:461 .\notification\models\user.py:29
 msgid "Seen"
 msgstr ""
 
@@ -7862,7 +7945,7 @@ msgid "Timing Information"
 msgstr ""
 
 #: .\notification\admin.py:262 .\notification\admin.py:446
-#: .\notification\models\notification.py:89
+#: .\notification\models\notification.py:89 .\notification\models\user.py:27
 msgid "Notification"
 msgstr ""
 
@@ -7945,7 +8028,7 @@ msgid ""
 msgstr ""
 
 #: .\notification\apps.py:7 .\notification\models\notification.py:90
-#: .\settings.py:3460
+#: .\settings.py:3463
 msgid "Notifications"
 msgstr ""
 
@@ -7973,7 +8056,8 @@ msgstr ""
 msgid "Security"
 msgstr ""
 
-#: .\notification\enum.py:21 .\promotion\models\promotion.py:198
+#: .\notification\enum.py:21 .\promotion\models\code.py:15
+#: .\promotion\models\promotion.py:203 .\promotion\models\redemption.py:23
 msgid "Promotion"
 msgstr ""
 
@@ -7985,7 +8069,7 @@ msgstr ""
 msgid "Support"
 msgstr ""
 
-#: .\notification\enum.py:26 .\settings.py:3600
+#: .\notification\enum.py:26 .\settings.py:3603
 #: .\user\models\subscription.py:30
 msgid "Newsletter"
 msgstr ""
@@ -8221,15 +8305,15 @@ msgstr ""
 msgid "Expiry Date"
 msgstr ""
 
-#: .\notification\models\user.py:28
+#: .\notification\models\user.py:30
 msgid "Seen At"
 msgstr ""
 
-#: .\notification\models\user.py:40
+#: .\notification\models\user.py:42
 msgid "Notification User"
 msgstr ""
 
-#: .\notification\models\user.py:41
+#: .\notification\models\user.py:43
 msgid "Notification Users"
 msgstr ""
 
@@ -8355,6 +8439,7 @@ msgid "No description"
 msgstr "Questions?"
 
 #: .\order\admin.py:277 .\order\admin.py:1602 .\order\admin.py:1691
+#: .\product\models\product.py:202
 msgid "Changed By"
 msgstr ""
 
@@ -8455,7 +8540,7 @@ msgid "Shipment"
 msgstr "Shipping"
 
 #: .\order\admin.py:749 .\order\admin.py:1839 .\order\enum\document_type.py:7
-#: .\order\enum\document_type.py:17 .\order\models\invoice.py:401
+#: .\order\enum\document_type.py:17 .\order\models\invoice.py:402
 msgid "Invoice"
 msgstr ""
 
@@ -8479,7 +8564,7 @@ msgstr ""
 msgid "Landing page"
 msgstr ""
 
-#: .\order\admin.py:773 .\order\models\order.py:227
+#: .\order\admin.py:773 .\order\models\order.py:109
 msgid "Payment Method"
 msgstr ""
 
@@ -8748,12 +8833,13 @@ msgstr ""
 msgid "Partial (%(refunded)s/%(qty)s)"
 msgstr ""
 
-#: .\order\admin.py:1581 .\order\admin.py:1653 .\order\models\history.py:47
-#: .\order\models\history.py:253
+#: .\order\admin.py:1581 .\order\admin.py:1653 .\order\models\history.py:49
+#: .\order\models\history.py:257
 msgid "Change Type"
 msgstr ""
 
-#: .\order\admin.py:1664 .\order\models\item.py:46
+#: .\order\admin.py:1664 .\order\models\history.py:245
+#: .\order\models\item.py:48
 msgid "Order Item"
 msgstr ""
 
@@ -9275,69 +9361,69 @@ msgstr ""
 msgid "Refund Processed"
 msgstr ""
 
-#: .\order\models\history.py:22 .\order\models\history.py:228
+#: .\order\models\history.py:22 .\order\models\history.py:230
 msgid "Other Change"
 msgstr ""
 
-#: .\order\models\history.py:29 .\order\models\history.py:235
+#: .\order\models\history.py:29 .\order\models\history.py:237
 msgid "Description of what changed."
 msgstr ""
 
-#: .\order\models\history.py:44 .\order\models\history.py:250
+#: .\order\models\history.py:45 .\order\models\history.py:253
 msgid "User who made the change, if applicable."
 msgstr ""
 
-#: .\order\models\history.py:52 .\order\models\history.py:258
+#: .\order\models\history.py:54 .\order\models\history.py:262
 msgid "Previous Value"
 msgstr ""
 
-#: .\order\models\history.py:55 .\order\models\history.py:261
+#: .\order\models\history.py:57 .\order\models\history.py:265
 msgid "Previous value of the changed field(s)."
 msgstr ""
 
-#: .\order\models\history.py:58 .\order\models\history.py:264
+#: .\order\models\history.py:60 .\order\models\history.py:268
 msgid "New Value"
 msgstr ""
 
-#: .\order\models\history.py:61 .\order\models\history.py:267
+#: .\order\models\history.py:63 .\order\models\history.py:271
 msgid "New value of the changed field(s)."
 msgstr ""
 
-#: .\order\models\history.py:64
+#: .\order\models\history.py:66 .\search\models.py:109
 msgid "IP Address"
 msgstr ""
 
-#: .\order\models\history.py:67
+#: .\order\models\history.py:69
 msgid "IP address from which the change was made."
 msgstr ""
 
-#: .\order\models\history.py:70
+#: .\order\models\history.py:72 .\search\models.py:117
 msgid "User Agent"
 msgstr ""
 
-#: .\order\models\history.py:72
+#: .\order\models\history.py:74
 msgid "User agent of the browser/client that made the change."
 msgstr ""
 
-#: .\order\models\history.py:79 .\order\models\history.py:80 .\settings.py:3717
-#: .\settings.py:3869
+#: .\order\models\history.py:81 .\order\models\history.py:82 .\settings.py:3720
+#: .\settings.py:3872
 msgid "Order History"
 msgstr ""
 
-#: .\order\models\history.py:225
+#: .\order\models\history.py:227
 msgid "Quantity Change"
 msgstr ""
 
-#: .\order\models\history.py:226
+#: .\order\models\history.py:228
 msgid "Price Update"
 msgstr ""
 
-#: .\order\models\history.py:227
+#: .\order\models\history.py:229
 msgid "Item Refund"
 msgstr ""
 
-#: .\order\models\history.py:272 .\order\models\history.py:273
-#: .\settings.py:3726
+#: .\order\models\history.py:276 .\order\models\history.py:277
+#: .\settings.py:3729
 msgid "Order Item History"
 msgstr ""
 
@@ -9371,7 +9457,7 @@ msgstr ""
 msgid "Next Number"
 msgstr "Order Items"
 
-#: .\order\models\invoice.py:126 .\settings.py:3815
+#: .\order\models\invoice.py:126 .\settings.py:3818
 msgid "Invoice Counter"
 msgstr ""
 
@@ -9379,36 +9465,36 @@ msgstr ""
 msgid "Invoice Counters"
 msgstr ""
 
-#: .\order\models\invoice.py:165
+#: .\order\models\invoice.py:166
 #, fuzzy
 #| msgid "Order Items"
 msgid "Invoice Number"
 msgstr "Order Items"
 
-#: .\order\models\invoice.py:169
+#: .\order\models\invoice.py:170
 #, python-brace-format
 msgid ""
 "Sequential identifier in the form ``INV-{YEAR}-{NNNNNN}``. Gaps are not "
 "allowed by Greek tax law."
 msgstr ""
 
-#: .\order\models\invoice.py:174
+#: .\order\models\invoice.py:175
 #, fuzzy
 #| msgid "Order Items"
 msgid "Issue Date"
 msgstr "Order Items"
 
-#: .\order\models\invoice.py:177
+#: .\order\models\invoice.py:178
 msgid ""
 "Fiscal date of issue. Immutable once the invoice is rendered — used for "
 "sequential numbering and reporting."
 msgstr ""
 
-#: .\order\models\invoice.py:182
+#: .\order\models\invoice.py:183
 msgid "Document File"
 msgstr ""
 
-#: .\order\models\invoice.py:188
+#: .\order\models\invoice.py:189
 msgid ""
 "The rendered PDF. Stored in per-tenant private storage — customer access "
 "goes through ``OrderViewSet.invoice_download`` (streamed through Django "
@@ -9416,339 +9502,349 @@ msgid ""
 "depth."
 msgstr ""
 
-#: .\order\models\invoice.py:201
+#: .\order\models\invoice.py:202
 #, fuzzy
 #| msgid "Total"
 msgid "Total VAT"
 msgstr "Total"
 
-#: .\order\models\invoice.py:220 .\order\models\order.py:159
+#: .\order\models\invoice.py:221 .\order\models\order.py:163
 msgid "Payment Method Fee"
 msgstr ""
 
-#: .\order\models\invoice.py:233
+#: .\order\models\invoice.py:234
 msgid ""
 "Informational only — the line values are already net of the allocation, so "
 "this never enters the total arithmetic."
 msgstr ""
 
-#: .\order\models\invoice.py:238
+#: .\order\models\invoice.py:239
 msgid "Total (incl. VAT)"
 msgstr ""
 
-#: .\order\models\invoice.py:244
+#: .\order\models\invoice.py:245
 msgid "VAT Breakdown"
 msgstr ""
 
-#: .\order\models\invoice.py:247
+#: .\order\models\invoice.py:248
 msgid ""
 "Cached list of ``{rate, subtotal, vat, gross}`` rows — frozen at issue time "
 "so re-rendering the invoice always yields the same VAT table even if product "
 "rates change."
 msgstr ""
 
-#: .\order\models\invoice.py:253
+#: .\order\models\invoice.py:254
 msgid "Seller Snapshot"
 msgstr ""
 
-#: .\order\models\invoice.py:255
+#: .\order\models\invoice.py:256
 msgid "Seller name / VAT ID / address captured at issue time."
 msgstr ""
 
-#: .\order\models\invoice.py:258
+#: .\order\models\invoice.py:259
 msgid "Buyer Snapshot"
 msgstr ""
 
-#: .\order\models\invoice.py:261
+#: .\order\models\invoice.py:262
 msgid "Buyer name / email / billing address captured at issue time."
 msgstr ""
 
-#: .\order\models\invoice.py:265
+#: .\order\models\invoice.py:266
 msgid "Currency"
 msgstr ""
 
-#: .\order\models\invoice.py:276
+#: .\order\models\invoice.py:277
 #, fuzzy
 #| msgid "Status"
 msgid "myDATA Status"
 msgstr "Status"
 
-#: .\order\models\invoice.py:281
+#: .\order\models\invoice.py:282
 msgid ""
 "Lifecycle state of the invoice's AADE myDATA submission. NOT_SENT is the "
 "resting state when the myDATA integration is disabled or the invoice "
 "predates it."
 msgstr ""
 
-#: .\order\models\invoice.py:287
+#: .\order\models\invoice.py:288
 msgid "myDATA Invoice Type"
 msgstr ""
 
-#: .\order\models\invoice.py:292
+#: .\order\models\invoice.py:293
 msgid ""
 "AADE invoiceType code — e.g. 11.1 (B2C retail), 1.1 (B2B sales invoice), 5.1 "
 "(linked credit note)."
 msgstr ""
 
-#: .\order\models\invoice.py:297
+#: .\order\models\invoice.py:298
 msgid "myDATA Series"
 msgstr ""
 
-#: .\order\models\invoice.py:302
+#: .\order\models\invoice.py:303
 msgid ""
 "AADE ``series`` field — the alphanumeric part of the document's unique "
 "identifier within the issuer's register."
 msgstr ""
 
-#: .\order\models\invoice.py:307
+#: .\order\models\invoice.py:308
 msgid "myDATA Serial Number (aa)"
 msgstr ""
 
-#: .\order\models\invoice.py:311
+#: .\order\models\invoice.py:312
 msgid ""
 "AADE ``aa`` field — strictly-increasing integer within ``(series, year)``. "
 "Must be gapless per Greek tax law."
 msgstr ""
 
-#: .\order\models\invoice.py:316
+#: .\order\models\invoice.py:317
 msgid "myDATA UID"
 msgstr ""
 
-#: .\order\models\invoice.py:321
+#: .\order\models\invoice.py:322
 msgid ""
 "Deterministic SHA-1 fingerprint of (issuer VAT | year | branch | invoiceType "
 "| series | aa). Sent as the request's ``uid`` so retries dedupe against AADE "
 "error 228."
 msgstr ""
 
-#: .\order\models\invoice.py:327
+#: .\order\models\invoice.py:328
 msgid "myDATA MARK"
 msgstr ""
 
-#: .\order\models\invoice.py:332
+#: .\order\models\invoice.py:333
 msgid ""
 "15-digit registration number assigned by AADE. This is the legally-"
 "authoritative identifier — printed on the PDF."
 msgstr ""
 
-#: .\order\models\invoice.py:337
+#: .\order\models\invoice.py:338
 msgid "myDATA Authentication Code"
 msgstr ""
 
-#: .\order\models\invoice.py:342
+#: .\order\models\invoice.py:343
 msgid ""
 "Short hash AADE generates alongside the MARK; part of the ``qr_url`` query "
 "string. Populated only via licensed provider channels (kept for forward "
 "compatibility)."
 msgstr ""
 
-#: .\order\models\invoice.py:348
+#: .\order\models\invoice.py:349
 msgid "myDATA QR URL"
 msgstr ""
 
-#: .\order\models\invoice.py:353
+#: .\order\models\invoice.py:354
 msgid ""
 "AADE-returned URL for the PDF QR code. NEVER synthesise — AADE changes the "
 "query-string parameters between schema versions; always store the string "
 "they return verbatim."
 msgstr ""
 
-#: .\order\models\invoice.py:359
+#: .\order\models\invoice.py:360
 msgid "myDATA Cancellation MARK"
 msgstr ""
 
-#: .\order\models\invoice.py:363
+#: .\order\models\invoice.py:364
 msgid ""
 "9-series MARK returned by a successful ``CancelInvoice`` call — proves the "
 "cancellation registered."
 msgstr ""
 
-#: .\order\models\invoice.py:368
+#: .\order\models\invoice.py:369
 msgid "myDATA Error Code"
 msgstr ""
 
-#: .\order\models\invoice.py:373
+#: .\order\models\invoice.py:374
 msgid ""
 "Numeric AADE ``errorCode`` from the most recent failed submission (e.g. 101 "
 "XML syntax, 102 inactive VAT, 216/217 VAT category). Empty when last attempt "
 "succeeded."
 msgstr ""
 
-#: .\order\models\invoice.py:379
+#: .\order\models\invoice.py:380
 msgid "myDATA Error Message"
 msgstr ""
 
-#: .\order\models\invoice.py:382
+#: .\order\models\invoice.py:383
 msgid "Human-readable message that accompanied the error code."
 msgstr ""
 
-#: .\order\models\invoice.py:385
+#: .\order\models\invoice.py:386
 msgid "myDATA Submitted At"
 msgstr ""
 
-#: .\order\models\invoice.py:389
+#: .\order\models\invoice.py:390
 msgid ""
 "Timestamp of the first transmission attempt — preserved across retries so "
 "reporting reflects the original send time."
 msgstr ""
 
-#: .\order\models\invoice.py:394
+#: .\order\models\invoice.py:395
 msgid "myDATA Confirmed At"
 msgstr ""
 
-#: .\order\models\invoice.py:397
+#: .\order\models\invoice.py:398
 msgid "Timestamp AADE assigned the MARK."
 msgstr ""
 
-#: .\order\models\invoice.py:402 .\settings.py:3385 .\settings.py:3856
+#: .\order\models\invoice.py:403 .\settings.py:3388 .\settings.py:3859
 msgid "Invoices"
 msgstr ""
 
-#: .\order\models\item.py:30
+#: .\order\models\item.py:32
 msgid "Original Quantity"
 msgstr ""
 
-#: .\order\models\item.py:32
+#: .\order\models\item.py:34
 msgid "Is Refunded"
 msgstr ""
 
-#: .\order\models\item.py:33
+#: .\order\models\item.py:35
 msgid "Refunded Quantity"
 msgstr ""
 
-#: .\order\models\item.py:34 .\shipping_acs\models\tracking_event.py:49
-#: .\user\models\address.py:59
+#: .\order\models\item.py:36 .\shipping_acs\models\tracking_event.py:49
+#: .\user\models\address.py:62
 msgid "Notes"
 msgstr ""
 
-#: .\order\models\item.py:80
+#: .\order\models\item.py:82
 msgid "Quantity must be greater than 0."
 msgstr ""
 
-#: .\order\models\item.py:88
+#: .\order\models\item.py:90
 msgid "The quantity exceeds the available stock."
 msgstr ""
 
-#: .\order\models\item.py:93
+#: .\order\models\item.py:95
 msgid "Refunded quantity cannot exceed the ordered quantity."
 msgstr ""
 
-#: .\order\models\item.py:153
+#: .\order\models\item.py:155
 msgid "Invalid refund quantity. Please enter a quantity greater than 0."
 msgstr ""
 
-#: .\order\models\item.py:164
+#: .\order\models\item.py:166
 #, python-format
 msgid ""
 "Cannot refund more than the ordered quantity. Ordered quantity: %(ordered)s, "
 "Refunded quantity: %(refunded)s, Refund quantity: %(requested)s"
 msgstr ""
 
-#: .\order\models\order.py:124 .\user\models\address.py:45
+#: .\order\models\order.py:125 .\region\admin.py:121 .\region\models.py:28
+#: .\shipping_acs\models\station.py:62 .\user\models\account.py:98
+#: .\user\models\address.py:45
+msgid "Region"
+msgstr ""
+
+#: .\order\models\order.py:128 .\user\models\address.py:48
 msgid "Floor"
 msgstr ""
 
-#: .\order\models\order.py:131 .\user\models\address.py:52
+#: .\order\models\order.py:135 .\user\models\address.py:55
 msgid "Location Type"
 msgstr ""
 
-#: .\order\models\order.py:138 .\user\models\account.py:66
-#: .\user\models\address.py:22
+#: .\order\models\order.py:142 .\user\models\account.py:66
+#: .\user\models\address.py:23
 msgid "First Name"
 msgstr ""
 
-#: .\order\models\order.py:139 .\user\models\account.py:69
-#: .\user\models\address.py:23
+#: .\order\models\order.py:143 .\user\models\account.py:69
+#: .\user\models\address.py:24
 msgid "Last Name"
 msgstr ""
 
-#: .\order\models\order.py:140 .\user\models\address.py:24
+#: .\order\models\order.py:144 .\user\models\address.py:25
 msgid "Street"
 msgstr ""
 
-#: .\order\models\order.py:141 .\user\models\address.py:25
+#: .\order\models\order.py:145 .\user\models\address.py:26
 msgid "Street Number"
 msgstr ""
 
-#: .\order\models\order.py:142 .\shipping_acs\models\station.py:57
-#: .\user\models\account.py:74 .\user\models\address.py:26
+#: .\order\models\order.py:146 .\shipping_acs\models\station.py:57
+#: .\user\models\account.py:74 .\user\models\address.py:27
 msgid "City"
 msgstr ""
 
-#: .\order\models\order.py:143
+#: .\order\models\order.py:147
 msgid "Zipcode"
 msgstr ""
 
-#: .\order\models\order.py:144 .\user\models\account.py:81
+#: .\order\models\order.py:148 .\user\models\account.py:81
 msgid "Place"
 msgstr ""
 
-#: .\order\models\order.py:145 .\user\models\account.py:72
-#: .\user\models\address.py:58
+#: .\order\models\order.py:149 .\user\models\account.py:72
+#: .\user\models\address.py:61
 msgid "Phone Number"
 msgstr ""
 
-#: .\order\models\order.py:147
+#: .\order\models\order.py:151
 msgid "Customer Notes"
 msgstr ""
 
-#: .\order\models\order.py:156
+#: .\order\models\order.py:160
 msgid "Shipping Price"
 msgstr ""
 
-#: .\order\models\order.py:164
+#: .\order\models\order.py:168
 msgid "Fee charged by the payment method (e.g., Cash on Delivery fee)"
 msgstr ""
 
-#: .\order\models\order.py:168
+#: .\order\models\order.py:172
 msgid "Document Type"
 msgstr ""
 
-#: .\order\models\order.py:174
+#: .\order\models\order.py:178
 msgid "Paid Amount"
 msgstr ""
 
-#: .\order\models\order.py:181
+#: .\order\models\order.py:185
 msgid "Loyalty Discount"
 msgstr ""
 
-#: .\order\models\order.py:186
+#: .\order\models\order.py:190
 msgid ""
 "Amount deducted from the order total in exchange for loyalty points. "
 "Deducted by calculate_order_total_amount()."
 msgstr ""
 
-#: .\order\models\order.py:191
+#: .\order\models\order.py:195
 msgid "Promotion Discount"
 msgstr ""
 
-#: .\order\models\order.py:196
+#: .\order\models\order.py:200
 msgid ""
 "Total discount granted by promotions/coupons, snapshotted at order creation. "
 "Breakdown lives in metadata['promotions'] + PromotionRedemption rows. "
 "Deducted by calculate_order_total_amount()."
 msgstr ""
 
-#: .\order\models\order.py:203
+#: .\order\models\order.py:207
 msgid "Gift Card Amount"
 msgstr ""
 
-#: .\order\models\order.py:208
+#: .\order\models\order.py:212
 msgid ""
 "Portion of the order settled by gift-card balance. A payment, not a discount "
 "— it never reduces the taxable order value, only what the payment provider "
 "charges."
 msgstr ""
 
-#: .\order\models\order.py:214
+#: .\order\models\order.py:218
 msgid "Status Updated At"
 msgstr ""
 
-#: .\order\models\order.py:230
-msgid "Pay Way Key"
+#: .\order\models\order.py:233
+msgid "Payment Gateway"
 msgstr ""
 
 #: .\order\models\order.py:236
+msgid "Pay Way Key"
+msgstr ""
+
+#: .\order\models\order.py:242
 msgid ""
 "Snapshot of which payment method the shopper chose, as the ``PayWayEnum`` "
 "key. Distinct from ``payment_method``, which records the gateway that "
@@ -9760,114 +9856,115 @@ msgid ""
 "localise (see ``PayWay.display_name``)."
 msgstr ""
 
-#: .\order\models\order.py:256
+#: .\order\models\order.py:262
 msgid "Billing VAT ID"
 msgstr ""
 
-#: .\order\models\order.py:261
+#: .\order\models\order.py:267
 msgid ""
 "Buyer's tax number (ΑΦΜ) — required when issuing an invoice (vs. a retail "
 "receipt). 9 digits for Greek ΑΦΜ, no ``EL`` / ``GR`` prefix."
 msgstr ""
 
-#: .\order\models\order.py:267
+#: .\order\models\order.py:273
 msgid "Billing Country"
 msgstr ""
 
-#: .\order\models\order.py:272
+#: .\order\models\order.py:278
 msgid ""
 "ISO 3166-1 alpha-2 country code of the buyer for tax purposes. Pairs with "
 "``billing_vat_id``; determines which AADE invoice type (1.1 domestic, 1.2 "
 "intra-EU, 1.3 third-country) applies."
 msgstr ""
 
-#: .\order\models\order.py:283
+#: .\order\models\order.py:289
 msgid "Billing Company Name"
 msgstr ""
 
-#: .\order\models\order.py:286
+#: .\order\models\order.py:292
 msgid "Billing Tax Office (ΔΟΥ)"
 msgstr ""
 
-#: .\order\models\order.py:289
+#: .\order\models\order.py:295
 msgid "Billing Business Activity"
 msgstr ""
 
-#: .\order\models\order.py:298
+#: .\order\models\order.py:304
 msgid "Billing Street"
 msgstr ""
 
-#: .\order\models\order.py:301
+#: .\order\models\order.py:307
 msgid "Billing Street Number"
 msgstr ""
 
-#: .\order\models\order.py:304
+#: .\order\models\order.py:310
 msgid "Billing City"
 msgstr ""
 
-#: .\order\models\order.py:307
+#: .\order\models\order.py:313
 msgid "Billing Zipcode"
 msgstr ""
 
-#: .\order\models\order.py:313
+#: .\order\models\order.py:319
 msgid "Shipping Carrier"
 msgstr ""
 
-#: .\order\models\order.py:321 .\shipping\models\provider.py:109
+#: .\order\models\order.py:327 .\shipping\models\provider.py:109
+#: .\shipping\models\rate.py:33
 #, fuzzy
 #| msgid "Shipping Address"
 msgid "Shipping Provider"
 msgstr "Shipping Address"
 
-#: .\order\models\order.py:323
+#: .\order\models\order.py:329
 msgid ""
 "Carrier handling this order. Null for legacy rows where fulfilment is "
 "handled outside any registered provider."
 msgstr ""
 
-#: .\order\models\order.py:328 .\shipping\models\rate.py:47
+#: .\order\models\order.py:334 .\shipping\models\rate.py:49
 #, fuzzy
 #| msgid "Shipping"
 msgid "Shipping Kind"
 msgstr "Shipping"
 
-#: .\order\models\order.py:333 .\order\serializers\order.py:1125
+#: .\order\models\order.py:339 .\order\serializers\order.py:1125
 msgid "Generic fulfilment kind, independent of provider."
 msgstr ""
 
-#: .\order\models\order.py:336
+#: .\order\models\order.py:342
 msgid "Reminder Count"
 msgstr ""
 
-#: .\order\models\order.py:338
+#: .\order\models\order.py:344
 msgid "Number of pending-order reminder emails sent."
 msgstr ""
 
-#: .\order\models\order.py:341
+#: .\order\models\order.py:347
 msgid "Last Reminder Sent At"
 msgstr ""
 
-#: .\order\models\order.py:344
+#: .\order\models\order.py:350
 msgid "Timestamp of the most recent reminder email."
 msgstr ""
 
-#: .\order\models\order.py:351
+#: .\order\models\order.py:357
 msgid "Language captured at order creation, used when rendering order emails."
 msgstr ""
 
-#: .\order\models\order.py:626
+#: .\order\models\order.py:632
 msgid "Enter a valid email address."
 msgstr ""
 
-#: .\order\models\order.py:629
+#: .\order\models\order.py:635
 msgid "Zipcode is required."
 msgstr ""
 
-#: .\order\models\order.py:640
+#: .\order\models\order.py:646
 msgid "Street, street number, and city are required."
 msgstr ""
 
-#: .\order\models\order.py:677
+#: .\order\models\order.py:683
 msgid ""
 "A completed payment needs the amount paid, unless discounts, loyalty points "
 "or gift cards cover the whole order total."
@@ -9893,68 +9990,72 @@ msgstr ""
 msgid "Product whose stock was modified"
 msgstr ""
 
-#: .\order\models\stock_log.py:61
+#: .\order\models\stock_log.py:62
 msgid "Order associated with this stock operation (if applicable)"
 msgstr ""
 
-#: .\order\models\stock_log.py:65
+#: .\order\models\stock_log.py:67
 msgid "Operation Type"
 msgstr ""
 
-#: .\order\models\stock_log.py:68
+#: .\order\models\stock_log.py:70
 msgid "Type of stock operation performed"
 msgstr ""
 
-#: .\order\models\stock_log.py:71
+#: .\order\models\stock_log.py:73
 #, fuzzy
 #| msgid "Quantity"
 msgid "Quantity Delta"
 msgstr "Quantity"
 
-#: .\order\models\stock_log.py:73
+#: .\order\models\stock_log.py:75
 msgid "Change in quantity (positive for increment, negative for decrement)"
 msgstr ""
 
-#: .\order\models\stock_log.py:77
+#: .\order\models\stock_log.py:79
 msgid "Stock Before"
 msgstr ""
 
-#: .\order\models\stock_log.py:78
+#: .\order\models\stock_log.py:80
 msgid "Stock level before the operation"
 msgstr ""
 
-#: .\order\models\stock_log.py:81
+#: .\order\models\stock_log.py:83
 msgid "Stock After"
 msgstr ""
 
-#: .\order\models\stock_log.py:82
+#: .\order\models\stock_log.py:84
 msgid "Stock level after the operation"
 msgstr ""
 
-#: .\order\models\stock_log.py:87
+#: .\order\models\stock_log.py:89
 msgid "Human-readable reason for the stock change"
 msgstr ""
 
-#: .\order\models\stock_log.py:107
+#: .\order\models\stock_log.py:109
 msgid "User who performed the operation (null for system operations)"
 msgstr ""
 
-#: .\order\models\stock_log.py:115
+#: .\order\models\stock_log.py:111
+msgid "Performed By"
+msgstr ""
+
+#: .\order\models\stock_log.py:118
 msgid "Stock Log"
 msgstr ""
 
-#: .\order\models\stock_log.py:116 .\settings.py:3708 .\settings.py:3862
+#: .\order\models\stock_log.py:119 .\settings.py:3711 .\settings.py:3865
 msgid "Stock Logs"
 msgstr ""
 
-#: .\order\models\stock_log.py:175
+#: .\order\models\stock_log.py:178
 #, python-brace-format
 msgid ""
 "Stock calculation error: For {operation}, stock_after must equal "
 "stock_before + quantity_delta. Got: {after} != {before} + {delta}"
 msgstr ""
 
-#: .\order\models\stock_log.py:196
+#: .\order\models\stock_log.py:199
 #, python-brace-format
 msgid ""
 "Stock calculation error: For {operation}, stock_after must equal "
@@ -9965,51 +10066,55 @@ msgstr ""
 msgid "Product being reserved"
 msgstr ""
 
-#: .\order\models\stock_reservation.py:36
+#: .\order\models\stock_reservation.py:37
 msgid "Number of units reserved"
 msgstr ""
 
-#: .\order\models\stock_reservation.py:44
+#: .\order\models\stock_reservation.py:45
 msgid "User who made the reservation (null for guest users)"
 msgstr ""
 
-#: .\order\models\stock_reservation.py:47
-msgid "Session ID"
+#: .\order\models\stock_reservation.py:46 .\product\admin.py:682
+msgid "Reserved By"
 msgstr ""
 
 #: .\order\models\stock_reservation.py:49
+msgid "Session ID"
+msgstr ""
+
+#: .\order\models\stock_reservation.py:51
 msgid "Cart UUID or session identifier for tracking"
 msgstr ""
 
-#: .\order\models\stock_reservation.py:54
+#: .\order\models\stock_reservation.py:56
 msgid "Timestamp when reservation expires (typically 15 minutes from creation)"
 msgstr ""
 
-#: .\order\models\stock_reservation.py:58
+#: .\order\models\stock_reservation.py:60
 msgid "Consumed"
 msgstr ""
 
-#: .\order\models\stock_reservation.py:61
+#: .\order\models\stock_reservation.py:63
 msgid "True if reservation was converted to actual stock decrement"
 msgstr ""
 
-#: .\order\models\stock_reservation.py:70
+#: .\order\models\stock_reservation.py:72
 msgid "Order created from this reservation (set when consumed)"
 msgstr ""
 
-#: .\order\models\stock_reservation.py:73
+#: .\order\models\stock_reservation.py:76
 msgid "Abandonment Notified"
 msgstr ""
 
-#: .\order\models\stock_reservation.py:76
+#: .\order\models\stock_reservation.py:79
 msgid "True if the customer has been emailed about this abandoned reservation"
 msgstr ""
 
-#: .\order\models\stock_reservation.py:84
+#: .\order\models\stock_reservation.py:87
 msgid "Stock Reservation"
 msgstr ""
 
-#: .\order\models\stock_reservation.py:85
+#: .\order\models\stock_reservation.py:88
 msgid "Stock Reservations"
 msgstr ""
 
@@ -10080,7 +10185,7 @@ msgstr "Order Delivered"
 msgid "Viva Webhook Event"
 msgstr ""
 
-#: .\order\models\viva_webhook_event.py:86 .\settings.py:3753
+#: .\order\models\viva_webhook_event.py:86 .\settings.py:3756
 msgid "Viva Webhook Events"
 msgstr ""
 
@@ -11243,14 +11348,6 @@ msgid ""
 "the page keeps its built-in title and the store description."
 msgstr ""
 
-#: .\page_config\admin.py:127 .\page_config\models.py:175
-#: .\shipping\admin.py:120 .\shipping\models\provider.py:68
-#: .\shipping_acs\models\pickup_list.py:67
-#: .\shipping_acs\models\shipment.py:249
-#: .\shipping_boxnow\models\shipment.py:167 .\user\models\subscription.py:263
-msgid "Metadata"
-msgstr ""
-
 #: .\page_config\admin.py:167
 msgid "Entries"
 msgstr ""
@@ -11321,7 +11418,7 @@ msgstr "Product"
 msgid "Featured Products"
 msgstr ""
 
-#: .\page_config\models.py:49 .\product\models\category.py:48
+#: .\page_config\models.py:49 .\product\models\category.py:49
 msgid "Product Categories"
 msgstr ""
 
@@ -12139,7 +12236,7 @@ msgid "Attribute Information"
 msgstr "Order Confirmation"
 
 #: .\product\admin.py:404 .\product\admin.py:551
-#: .\product\models\attribute.py:39
+#: .\product\models\attribute.py:39 .\product\models\attribute_value.py:24
 msgid "Attribute"
 msgstr ""
 
@@ -12201,11 +12298,11 @@ msgid_plural "%(count)d attribute values were successfully deactivated."
 msgstr[0] ""
 msgstr[1] ""
 
-#: .\product\admin.py:619 .\product\models\product_attribute.py:31
+#: .\product\admin.py:619 .\product\models\product_attribute.py:33
 msgid "Product Attribute"
 msgstr ""
 
-#: .\product\admin.py:620 .\product\models\product_attribute.py:32
+#: .\product\admin.py:620 .\product\models\product_attribute.py:34
 msgid "Product Attributes"
 msgstr ""
 
@@ -12219,10 +12316,6 @@ msgstr ""
 
 #: .\product\admin.py:678
 msgid "Reservation"
-msgstr ""
-
-#: .\product\admin.py:682
-msgid "Reserved By"
 msgstr ""
 
 #: .\product\admin.py:689
@@ -12358,7 +12451,7 @@ msgstr ""
 msgid "%(price)s -> %(final)s (-%(discount)s%%)"
 msgstr ""
 
-#: .\product\admin.py:1145 .\product\models\product.py:113
+#: .\product\admin.py:1145 .\product\models\product.py:116
 msgid "Stock"
 msgstr ""
 
@@ -12546,7 +12639,7 @@ msgstr[1] ""
 msgid "Image Information"
 msgstr ""
 
-#: .\product\admin.py:2144
+#: .\product\admin.py:2144 .\product\models\product.py:98
 msgid "Variant Group"
 msgstr ""
 
@@ -12569,6 +12662,7 @@ msgid "No products assigned yet."
 msgstr ""
 
 #: .\product\admin.py:2247 .\product\models\brand.py:20
+#: .\product\models\product.py:106
 msgid "Brand"
 msgstr ""
 
@@ -12796,41 +12890,41 @@ msgstr ""
 msgid "Price drop"
 msgstr "Price"
 
-#: .\product\models\alert.py:51
+#: .\product\models\alert.py:53
 msgid "Target price"
 msgstr ""
 
-#: .\product\models\alert.py:57
+#: .\product\models\alert.py:59
 msgid ""
 "For price_drop alerts: trigger when the product's price falls to or below "
 "this value. Ignored for restock alerts."
 msgstr ""
 
-#: .\product\models\alert.py:61 .\shipping_acs\models\station.py:88
+#: .\product\models\alert.py:63 .\shipping_acs\models\station.py:88
 msgid "Is active"
 msgstr ""
 
-#: .\product\models\alert.py:62
+#: .\product\models\alert.py:64
 msgid "Notified at"
 msgstr ""
 
-#: .\product\models\alert.py:65
+#: .\product\models\alert.py:67
 #, fuzzy
 #| msgid "Product"
 msgid "Product alert"
 msgstr "Product"
 
-#: .\product\models\alert.py:66
+#: .\product\models\alert.py:68
 #, fuzzy
 #| msgid "Product"
 msgid "Product alerts"
 msgstr "Product"
 
-#: .\product\models\alert.py:102
+#: .\product\models\alert.py:104
 msgid "Either a user or an email must be provided."
 msgstr ""
 
-#: .\product\models\alert.py:108 .\product\serializers\alert.py:71
+#: .\product\models\alert.py:110 .\product\serializers\alert.py:71
 msgid "target_price is required for price-drop alerts."
 msgstr ""
 
@@ -12845,15 +12939,16 @@ msgid ""
 "specification."
 msgstr ""
 
-#: .\product\models\attribute.py:40 .\settings.py:3283 .\settings.py:3966
+#: .\product\models\attribute.py:40 .\settings.py:3286 .\settings.py:3969
 msgid "Attributes"
 msgstr ""
 
-#: .\product\models\attribute_value.py:35
+#: .\product\models\attribute_value.py:36
+#: .\product\models\product_attribute.py:27
 msgid "Attribute Value"
 msgstr ""
 
-#: .\product\models\attribute_value.py:36 .\settings.py:3291 .\settings.py:3973
+#: .\product\models\attribute_value.py:37 .\settings.py:3294 .\settings.py:3976
 msgid "Attribute Values"
 msgstr ""
 
@@ -12861,128 +12956,128 @@ msgstr ""
 msgid "Brands"
 msgstr ""
 
-#: .\product\models\category.py:47
+#: .\product\models\category.py:48
 msgid "Product Category"
 msgstr ""
 
-#: .\product\models\category_image.py:26
+#: .\product\models\category_image.py:27
 msgid "Image Type"
 msgstr ""
 
-#: .\product\models\category_image.py:37
+#: .\product\models\category_image.py:38
 msgid "Alt Text"
 msgstr ""
 
-#: .\product\models\category_image.py:44
+#: .\product\models\category_image.py:45
 msgid "Product Category Image"
 msgstr ""
 
-#: .\product\models\category_image.py:45
+#: .\product\models\category_image.py:46
 msgid "Product Category Images"
 msgstr ""
 
-#: .\product\models\favourite.py:27
+#: .\product\models\favourite.py:29
 msgid "Product Favourite"
 msgstr ""
 
-#: .\product\models\favourite.py:28
+#: .\product\models\favourite.py:30
 msgid "Product Favourites"
 msgstr ""
 
-#: .\product\models\favourite.py:54
+#: .\product\models\favourite.py:56
 msgid "This product is already in the user's favorites."
 msgstr ""
 
-#: .\product\models\image.py:25 .\user\models\address.py:60
+#: .\product\models\image.py:26 .\user\models\address.py:63
 msgid "Is Main"
 msgstr ""
 
-#: .\product\models\image.py:33
+#: .\product\models\image.py:34
 msgid "Product Image"
 msgstr ""
 
-#: .\product\models\image.py:34
+#: .\product\models\image.py:35
 msgid "Product Images"
 msgstr ""
 
-#: .\product\models\product.py:94
+#: .\product\models\product.py:95
 msgid ""
 "Links this product to its sibling variations (e.g. the same item in other "
 "colours). Members share variant selectors on the storefront."
 msgstr ""
 
-#: .\product\models\product.py:115
+#: .\product\models\product.py:118
 msgid "Low Stock Threshold"
 msgstr ""
 
-#: .\product\models\product.py:118
+#: .\product\models\product.py:121
 msgid ""
 "Stock level at or below which admins get a low-stock alert. Set to 0 to "
 "disable alerts for this product."
 msgstr ""
 
-#: .\product\models\product.py:122
+#: .\product\models\product.py:125
 msgid "Low Stock Alert Sent"
 msgstr ""
 
-#: .\product\models\product.py:125
+#: .\product\models\product.py:128
 msgid ""
 "Internal flag — prevents duplicate alerts. Automatically cleared when stock "
 "rises above the threshold."
 msgstr ""
 
-#: .\product\models\product.py:129
+#: .\product\models\product.py:132
 msgid "Price-drop Alerts Enabled"
 msgstr ""
 
-#: .\product\models\product.py:132
+#: .\product\models\product.py:135
 msgid ""
 "When enabled, customers can subscribe to a one-time email when this "
 "product's price drops below a target. Disabled by default — admins opt "
 "products in per SKU."
 msgstr ""
 
-#: .\product\models\product.py:138
+#: .\product\models\product.py:141
 msgid "Discount Percent"
 msgstr ""
 
-#: .\product\models\product.py:175
+#: .\product\models\product.py:179
 msgid "Weight"
 msgstr ""
 
-#: .\product\models\product.py:207
+#: .\product\models\product.py:212
 msgid "Points Coefficient"
 msgstr ""
 
-#: .\product\models\product.py:213
+#: .\product\models\product.py:218
 msgid "Multiplier for loyalty points calculation (0 = no calculated points)"
 msgstr ""
 
-#: .\product\models\product.py:217
+#: .\product\models\product.py:222
 msgid "Bonus Points"
 msgstr ""
 
-#: .\product\models\product.py:219
+#: .\product\models\product.py:224
 msgid "Fixed bonus points awarded on purchase"
 msgstr ""
 
-#: .\product\models\product.py:279
+#: .\product\models\product.py:284
 msgid "Discount percent cannot be greater than 0 if price is 0."
 msgstr ""
 
-#: .\product\models\product.py:292 .\product\serializers\product.py:152
+#: .\product\models\product.py:297 .\product\serializers\product.py:152
 msgid "Discount percent must be between 0 and 100."
 msgstr ""
 
-#: .\product\models\product.py:298 .\product\serializers\product.py:146
+#: .\product\models\product.py:303 .\product\serializers\product.py:146
 msgid "Stock cannot be negative."
 msgstr ""
 
-#: .\product\models\product.py:463
+#: .\product\models\product.py:468
 msgid "Product Translation"
 msgstr ""
 
-#: .\product\models\product.py:464
+#: .\product\models\product.py:469
 msgid "Product Translations"
 msgstr ""
 
@@ -13012,23 +13107,23 @@ msgstr "Product"
 msgid "Product relations"
 msgstr ""
 
-#: .\product\models\review.py:27
+#: .\product\models\review.py:29
 msgid "Rate"
 msgstr ""
 
-#: .\product\models\review.py:35
+#: .\product\models\review.py:37
 msgid "Comment"
 msgstr ""
 
-#: .\product\models\review.py:41
+#: .\product\models\review.py:43
 msgid "Product Review"
 msgstr ""
 
-#: .\product\models\review.py:42
+#: .\product\models\review.py:44
 msgid "Product Reviews"
 msgstr ""
 
-#: .\product\models\review.py:82 .\product\serializers\review.py:132
+#: .\product\models\review.py:84 .\product\serializers\review.py:132
 msgid "Invalid rate value."
 msgstr ""
 
@@ -13420,47 +13515,52 @@ msgstr ""
 msgid "Applies to the whole order"
 msgstr ""
 
-#: .\promotion\models\cart_code.py:30
+#: .\promotion\models\cart_code.py:28 .\promotion\models\code.py:55
+#: .\promotion\models\redemption.py:31
+msgid "Promotion Code"
+msgstr ""
+
+#: .\promotion\models\cart_code.py:32
 msgid "Cart Promotion Code"
 msgstr ""
 
-#: .\promotion\models\cart_code.py:31
+#: .\promotion\models\cart_code.py:33
 msgid "Cart Promotion Codes"
 msgstr ""
 
-#: .\promotion\models\code.py:20
+#: .\promotion\models\code.py:21
 msgid "Case-insensitive; stored uppercase"
 msgstr ""
 
-#: .\promotion\models\code.py:23
+#: .\promotion\models\code.py:24
 msgid "Usage Limit"
 msgstr ""
 
-#: .\promotion\models\code.py:27
+#: .\promotion\models\code.py:28
 msgid ""
 "Maximum number of orders that may use this specific code (1 for single-use "
 "bulk codes); empty means unlimited"
 msgstr ""
 
-#: .\promotion\models\code.py:38
+#: .\promotion\models\code.py:39
 msgid "When set, only this customer can redeem the code (personal coupon)"
 msgstr ""
 
-#: .\promotion\models\code.py:42
+#: .\promotion\models\code.py:41
+msgid "Assigned To"
+msgstr ""
+
+#: .\promotion\models\code.py:44
 msgid "Assigned To Email"
 msgstr ""
 
-#: .\promotion\models\code.py:46
+#: .\promotion\models\code.py:48
 msgid ""
 "When set, only checkouts with this email can redeem the code — covers guests "
 "without an account"
 msgstr ""
 
-#: .\promotion\models\code.py:53
-msgid "Promotion Code"
-msgstr ""
-
-#: .\promotion\models\code.py:54
+#: .\promotion\models\code.py:56
 msgid "Promotion Codes"
 msgstr ""
 
@@ -13496,181 +13596,197 @@ msgstr ""
 msgid "Only used when target scope is 'Specific products'"
 msgstr ""
 
-#: .\promotion\models\promotion.py:63
+#: .\promotion\models\promotion.py:64
 msgid ""
 "Only used when target scope is 'Specific categories'; subcategories are "
 "included automatically"
 msgstr ""
 
-#: .\promotion\models\promotion.py:72
+#: .\promotion\models\promotion.py:74
 msgid ""
 "Never counted or discounted by this promotion, whatever the target scope"
 msgstr ""
 
-#: .\promotion\models\promotion.py:81
+#: .\promotion\models\promotion.py:77
+#, fuzzy
+#| msgid "Product"
+msgid "Excluded Products"
+msgstr "Product"
+
+#: .\promotion\models\promotion.py:84
 msgid ""
 "Products in these categories (subcategories included) are never counted or "
 "discounted by this promotion"
 msgstr ""
 
-#: .\promotion\models\promotion.py:86
+#: .\promotion\models\promotion.py:87
+msgid "Excluded Categories"
+msgstr ""
+
+#: .\promotion\models\promotion.py:90
 msgid "Exclude Already-discounted Products"
 msgstr ""
 
-#: .\promotion\models\promotion.py:89
+#: .\promotion\models\promotion.py:93
 msgid ""
 "Skip products that already carry a product-level markdown (discount percent "
 "> 0)"
 msgstr ""
 
-#: .\promotion\models\promotion.py:94
+#: .\promotion\models\promotion.py:98
 #, fuzzy
 #| msgid "Quantity"
 msgid "Minimum Quantity"
 msgstr "Quantity"
 
-#: .\promotion\models\promotion.py:98
+#: .\promotion\models\promotion.py:102
 msgid ""
 "Minimum number of ELIGIBLE units (after scope and exclusions) the cart must "
 "contain"
 msgstr ""
 
-#: .\promotion\models\promotion.py:104
+#: .\promotion\models\promotion.py:108
 #, fuzzy
 #| msgid "Quantity"
 msgid "Buy Quantity"
 msgstr "Quantity"
 
-#: .\promotion\models\promotion.py:108
+#: .\promotion\models\promotion.py:112
 msgid "BXGY: eligible units the shopper must buy per application"
 msgstr ""
 
-#: .\promotion\models\promotion.py:112
+#: .\promotion\models\promotion.py:116
 #, fuzzy
 #| msgid "Quantity"
 msgid "Get Quantity"
 msgstr "Quantity"
 
-#: .\promotion\models\promotion.py:116
+#: .\promotion\models\promotion.py:120
 msgid ""
 "BXGY: units discounted per application. FREE_GIFT: gift units added to the "
 "order"
 msgstr ""
 
-#: .\promotion\models\promotion.py:121
+#: .\promotion\models\promotion.py:125
 msgid "Get Discount Percent"
 msgstr ""
 
-#: .\promotion\models\promotion.py:126
+#: .\promotion\models\promotion.py:130
 msgid ""
 "BXGY: discount applied to the 'get' units — 100 means free, 50 means half "
 "price"
 msgstr ""
 
-#: .\promotion\models\promotion.py:135
+#: .\promotion\models\promotion.py:139
 msgid ""
 "BXGY: the reward pool (empty = same products as the buy side). FREE_GIFT: "
 "the gift product (set exactly one)."
 msgstr ""
 
-#: .\promotion\models\promotion.py:140
+#: .\promotion\models\promotion.py:142
+#, fuzzy
+#| msgid "Product"
+msgid "Reward Products"
+msgstr "Product"
+
+#: .\promotion\models\promotion.py:145
 #, fuzzy
 #| msgid "Subtotal"
 msgid "Minimum Subtotal"
 msgstr "Subtotal"
 
-#: .\promotion\models\promotion.py:146
+#: .\promotion\models\promotion.py:151
 msgid "Cart items total (incl. VAT) required for the promotion to apply"
 msgstr ""
 
-#: .\promotion\models\promotion.py:150
+#: .\promotion\models\promotion.py:155
 msgid "First Order Only"
 msgstr ""
 
-#: .\promotion\models\promotion.py:153
+#: .\promotion\models\promotion.py:158
 msgid ""
 "Apply only to customers with no previous orders. For guests this is checked "
 "against the checkout email and is best-effort."
 msgstr ""
 
-#: .\promotion\models\promotion.py:158
+#: .\promotion\models\promotion.py:163
 msgid "Starts At"
 msgstr ""
 
-#: .\promotion\models\promotion.py:159
+#: .\promotion\models\promotion.py:164
 msgid "Ends At"
 msgstr ""
 
-#: .\promotion\models\promotion.py:161
+#: .\promotion\models\promotion.py:166
 msgid "Stackable"
 msgstr ""
 
-#: .\promotion\models\promotion.py:164
+#: .\promotion\models\promotion.py:169
 msgid ""
 "Stackable promotions combine with each other; a non-stackable promotion "
 "applies alone and only when it beats the combined stackable discount. "
 "Ignored for free shipping, which always combines."
 msgstr ""
 
-#: .\promotion\models\promotion.py:173
+#: .\promotion\models\promotion.py:178
 msgid "Lower numbers apply first among stackable promotions"
 msgstr ""
 
-#: .\promotion\models\promotion.py:176
+#: .\promotion\models\promotion.py:181
 msgid "Maximum Discount Amount"
 msgstr ""
 
-#: .\promotion\models\promotion.py:181
+#: .\promotion\models\promotion.py:186
 msgid "Ceiling for the discount of a single application"
 msgstr ""
 
-#: .\promotion\models\promotion.py:184
+#: .\promotion\models\promotion.py:189
 #, fuzzy
 #| msgid "Total"
 msgid "Total Usage Limit"
 msgstr "Total"
 
-#: .\promotion\models\promotion.py:187
+#: .\promotion\models\promotion.py:192
 msgid "Maximum number of orders that may use this promotion"
 msgstr ""
 
-#: .\promotion\models\promotion.py:190
+#: .\promotion\models\promotion.py:195
 msgid "Per-customer Usage Limit"
 msgstr ""
 
-#: .\promotion\models\promotion.py:225
+#: .\promotion\models\promotion.py:230
 msgid "Percentage benefits require a value between 0 and 100."
 msgstr ""
 
-#: .\promotion\models\promotion.py:236
+#: .\promotion\models\promotion.py:241
 msgid "Fixed-amount benefits require a positive value."
 msgstr ""
 
-#: .\promotion\models\promotion.py:241
+#: .\promotion\models\promotion.py:246
 msgid "End must be after start."
 msgstr ""
 
-#: .\promotion\models\promotion.py:247
+#: .\promotion\models\promotion.py:252
 msgid "BXGY promotions need both a buy quantity and a get quantity."
 msgstr ""
 
-#: .\promotion\models\promotion.py:256
+#: .\promotion\models\promotion.py:261
 msgid "Get-discount percent must be between 0 and 100."
 msgstr ""
 
-#: .\promotion\models\promotion.py:266
+#: .\promotion\models\promotion.py:271
 msgid "Free-gift promotions need a gift quantity of at least 1."
 msgstr ""
 
-#: .\promotion\models\redemption.py:49
+#: .\promotion\models\redemption.py:53
 msgid "Checkout email — used for guest per-customer limits"
 msgstr ""
 
-#: .\promotion\models\redemption.py:54
+#: .\promotion\models\redemption.py:58
 msgid "Promotion Redemption"
 msgstr ""
 
-#: .\promotion\models\redemption.py:55
+#: .\promotion\models\redemption.py:59
 msgid "Promotion Redemptions"
 msgstr ""
 
@@ -13960,7 +14076,7 @@ msgstr ""
 msgid "Seed product"
 msgstr "Product"
 
-#: .\recommendation\models.py:232
+#: .\recommendation\models.py:232 .\search\models.py:193
 msgid "Position"
 msgstr ""
 
@@ -14076,11 +14192,6 @@ msgstr ""
 msgid "Region Information"
 msgstr ""
 
-#: .\region\admin.py:121 .\region\models.py:25
-#: .\shipping_acs\models\station.py:62
-msgid "Region"
-msgstr ""
-
 #: .\region\admin.py:124
 msgid "Unnamed Region"
 msgstr ""
@@ -14129,7 +14240,7 @@ msgstr ""
 msgid "Not set"
 msgstr ""
 
-#: .\region\apps.py:7 .\region\models.py:26 .\settings.py:3029
+#: .\region\apps.py:7 .\region\models.py:29 .\settings.py:3032
 msgid "Regions"
 msgstr ""
 
@@ -14168,6 +14279,43 @@ msgstr ""
 
 #: .\search\apps.py:7
 msgid "Search"
+msgstr ""
+
+#: .\search\models.py:69 .\tag\admin.py:91 .\tag\admin.py:283
+#: .\tag\models\tagged_item.py:25
+msgid "Content Type"
+msgstr ""
+
+#: .\search\models.py:74
+msgid "Results Count"
+msgstr ""
+
+#: .\search\models.py:78
+msgid "Estimated Total Hits"
+msgstr ""
+
+#: .\search\models.py:84
+msgid "Processing Time (ms)"
+msgstr ""
+
+#: .\search\models.py:103
+msgid "Session Key"
+msgstr ""
+
+#: .\search\models.py:124 .\search\models.py:199
+msgid "Timestamp"
+msgstr ""
+
+#: .\search\models.py:178
+msgid "Search Query"
+msgstr ""
+
+#: .\search\models.py:183
+msgid "Result ID"
+msgstr ""
+
+#: .\search\models.py:189
+msgid "Result Type"
 msgstr ""
 
 #: .\search\views.py:98 .\search\views.py:108
@@ -14383,249 +14531,249 @@ msgstr ""
 msgid "German"
 msgstr ""
 
-#: .\settings.py:2864
+#: .\settings.py:2867
 msgid "Help & Guides"
 msgstr ""
 
-#: .\settings.py:2886
+#: .\settings.py:2889
 msgid "Flower (Celery)"
 msgstr ""
 
-#: .\settings.py:2891
+#: .\settings.py:2894
 msgid "Mailpit"
 msgstr ""
 
-#: .\settings.py:2896
+#: .\settings.py:2899
 msgid "Meilisearch"
 msgstr ""
 
-#: .\settings.py:2901
+#: .\settings.py:2904
 msgid "RabbitMQ"
 msgstr ""
 
-#: .\settings.py:2909
+#: .\settings.py:2912
 msgid "Platform Admin"
 msgstr ""
 
-#: .\settings.py:2969 .\tenant\models.py:1543
+#: .\settings.py:2972 .\tenant\models.py:1543
 msgid "Tenant Domains"
 msgstr ""
 
-#: .\settings.py:2977
+#: .\settings.py:2980
 msgid "Memberships"
 msgstr ""
 
-#: .\settings.py:2987
+#: .\settings.py:2990
 #, fuzzy
 #| msgid "Quantity"
 msgid "Identity"
 msgstr "Quantity"
 
-#: .\settings.py:2991
+#: .\settings.py:2994
 msgid "Platform Staff"
 msgstr ""
 
-#: .\settings.py:2999
+#: .\settings.py:3002
 msgid "Groups"
 msgstr ""
 
-#: .\settings.py:3009
+#: .\settings.py:3012
 msgid "Platform"
 msgstr ""
 
-#: .\settings.py:3039
+#: .\settings.py:3042
 msgid "Cache Purge Log"
 msgstr ""
 
-#: .\settings.py:3051
+#: .\settings.py:3054
 msgid "Sites"
 msgstr ""
 
-#: .\settings.py:3066
+#: .\settings.py:3069
 msgid "Background Jobs"
 msgstr ""
 
-#: .\settings.py:3071
+#: .\settings.py:3074
 msgid "Periodic Tasks"
 msgstr ""
 
-#: .\settings.py:3079
+#: .\settings.py:3082
 msgid "Crontab Schedules"
 msgstr ""
 
-#: .\settings.py:3087
+#: .\settings.py:3090
 msgid "Interval Schedules"
 msgstr ""
 
-#: .\settings.py:3095
+#: .\settings.py:3098
 msgid "Clocked Schedules"
 msgstr ""
 
-#: .\settings.py:3103
+#: .\settings.py:3106
 msgid "Solar Schedules"
 msgstr ""
 
-#: .\settings.py:3111
+#: .\settings.py:3114
 msgid "Task Results"
 msgstr ""
 
-#: .\settings.py:3119
+#: .\settings.py:3122
 msgid "Group Results"
 msgstr ""
 
-#: .\settings.py:3229
+#: .\settings.py:3232
 msgid "Navigation"
 msgstr ""
 
-#: .\settings.py:3243
+#: .\settings.py:3246
 msgid "Catalog"
 msgstr ""
 
-#: .\settings.py:3266
+#: .\settings.py:3269
 msgid "Reviews"
 msgstr ""
 
-#: .\settings.py:3299 .\settings.py:3980
+#: .\settings.py:3302 .\settings.py:3983
 msgid "Variant Groups"
 msgstr ""
 
-#: .\settings.py:3362
+#: .\settings.py:3365
 msgid "Sales"
 msgstr ""
 
-#: .\settings.py:3393
+#: .\settings.py:3396
 msgid "Payment Methods"
 msgstr ""
 
-#: .\settings.py:3411
+#: .\settings.py:3414
 msgid "Coupon Codes"
 msgstr ""
 
-#: .\settings.py:3427
+#: .\settings.py:3430
 msgid "Business Customers"
 msgstr ""
 
-#: .\settings.py:3445
+#: .\settings.py:3448
 msgid "B2B Price Lists"
 msgstr ""
 
-#: .\settings.py:3453
+#: .\settings.py:3456
 msgid "VAT Rates"
 msgstr ""
 
-#: .\settings.py:3468
+#: .\settings.py:3471
 #, fuzzy
 #| msgid "Contact us"
 msgid "Contact Messages"
 msgstr "Contact us"
 
-#: .\settings.py:3494 .\shipping\models\provider.py:110
+#: .\settings.py:3497 .\shipping\models\provider.py:110
 #, fuzzy
 #| msgid "Shipping Address"
 msgid "Shipping Providers"
 msgstr "Shipping Address"
 
-#: .\settings.py:3502 .\settings.py:3886
+#: .\settings.py:3505 .\settings.py:3889
 #: .\shipping_boxnow\models\shipment.py:202
 msgid "BoxNow Shipments"
 msgstr ""
 
-#: .\settings.py:3510 .\settings.py:3919
+#: .\settings.py:3513 .\settings.py:3922
 msgid "ACS Shipments"
 msgstr ""
 
-#: .\settings.py:3518 .\settings.py:3893 .\shipping_boxnow\models\locker.py:85
+#: .\settings.py:3521 .\settings.py:3896 .\shipping_boxnow\models\locker.py:85
 msgid "BoxNow Lockers"
 msgstr ""
 
-#: .\settings.py:3526 .\settings.py:3926
+#: .\settings.py:3529 .\settings.py:3929
 msgid "ACS Stations"
 msgstr ""
 
-#: .\settings.py:3542 .\user\apps.py:7
+#: .\settings.py:3545 .\user\apps.py:7
 msgid "Users"
 msgstr ""
 
-#: .\settings.py:3550 .\user\models\address.py:66
+#: .\settings.py:3553 .\user\models\address.py:69
 msgid "User Addresses"
 msgstr ""
 
 # Email Template Translations
-#: .\settings.py:3558
+#: .\settings.py:3561
 #, fuzzy
 #| msgid "Questions?"
 msgid "Subscriptions"
 msgstr "Questions?"
 
-#: .\settings.py:3605 .\user\models\subscription.py:111
+#: .\settings.py:3608 .\user\models\subscription.py:111
 msgid "Subscription Topics"
 msgstr ""
 
-#: .\settings.py:3620 .\user\admin.py:770
+#: .\settings.py:3623 .\user\admin.py:770
 msgid "Settings"
 msgstr ""
 
-#: .\settings.py:3625
+#: .\settings.py:3628
 msgid "Extra Settings"
 msgstr ""
 
-#: .\settings.py:3651
+#: .\settings.py:3654
 msgid "Security & Access"
 msgstr ""
 
-#: .\settings.py:3656
+#: .\settings.py:3659
 msgid "User Sessions"
 msgstr ""
 
-#: .\settings.py:3665
+#: .\settings.py:3668
 msgid "MFA Authenticators"
 msgstr ""
 
-#: .\settings.py:3674
+#: .\settings.py:3677
 msgid "Social Accounts"
 msgstr ""
 
-#: .\settings.py:3683
+#: .\settings.py:3686
 msgid "Email Addresses"
 msgstr ""
 
-#: .\settings.py:3692
+#: .\settings.py:3695
 msgid "API Tokens"
 msgstr ""
 
-#: .\settings.py:3703
+#: .\settings.py:3706
 msgid "Audit & Logs"
 msgstr ""
 
-#: .\settings.py:3735 .\settings.py:3900
+#: .\settings.py:3738 .\settings.py:3903
 msgid "BoxNow Events"
 msgstr ""
 
-#: .\settings.py:3744 .\settings.py:3949
+#: .\settings.py:3747 .\settings.py:3952
 msgid "ACS Tracking Events"
 msgstr ""
 
-#: .\settings.py:3762
+#: .\settings.py:3765
 msgid "Meta CAPI Event Log"
 msgstr ""
 
-#: .\settings.py:3781 .\user\models\data_export.py:71
+#: .\settings.py:3784 .\user\models\data_export.py:71
 msgid "User Data Exports"
 msgstr ""
 
-#: .\settings.py:3792
+#: .\settings.py:3795
 msgid "Reconciliation"
 msgstr ""
 
-#: .\settings.py:3797 .\settings.py:3933
+#: .\settings.py:3800 .\settings.py:3936
 msgid "ACS Pickup Lists"
 msgstr ""
 
-#: .\settings.py:3806 .\settings.py:3941
+#: .\settings.py:3809 .\settings.py:3944
 msgid "ACS COD Payouts"
 msgstr ""
 
-#: .\settings.py:4011
+#: .\settings.py:4014
 msgid "Authors"
 msgstr ""
 
@@ -14667,7 +14815,7 @@ msgstr ""
 msgid "Display name shown to customers (e.g. 'ACS Courier')."
 msgstr ""
 
-#: .\shipping\models\provider.py:39 .\shipping\models\rate.py:87
+#: .\shipping\models\provider.py:39 .\shipping\models\rate.py:89
 #: .\shipping_boxnow\models\locker.py:75
 msgid "Is Active"
 msgstr ""
@@ -14733,63 +14881,63 @@ msgid ""
 "for the same carrier. Falls back to ``logo`` when blank."
 msgstr ""
 
-#: .\shipping\models\rate.py:57
+#: .\shipping\models\rate.py:59
 msgid ""
 "What the shopper pays for this (provider, country, kind), before "
 "``free_shipping_threshold`` or a carrier's own ``live_quote`` override it."
 msgstr ""
 
-#: .\shipping\models\rate.py:63
+#: .\shipping\models\rate.py:65
 #, fuzzy
 #| msgid "Shipping Address"
 msgid "Free Shipping Threshold"
 msgstr "Shipping Address"
 
-#: .\shipping\models\rate.py:70
+#: .\shipping\models\rate.py:72
 msgid ""
 "Cart subtotal above which this combination ships free. Blank means this "
 "combination is never free."
 msgstr ""
 
-#: .\shipping\models\rate.py:75
+#: .\shipping\models\rate.py:77
 msgid "Max Weight (grams)"
 msgstr ""
 
-#: .\shipping\models\rate.py:80
+#: .\shipping\models\rate.py:82
 msgid ""
 "Heaviest parcel this combination will carry. Blank means no cap. A cart over "
 "the cap still lists the option (flagged ``exceeds_max_weight``) rather than "
 "disappearing silently."
 msgstr ""
 
-#: .\shipping\models\rate.py:91
+#: .\shipping\models\rate.py:93
 msgid ""
 "Master switch for this (provider, country, kind) — off hides it from "
 "checkout regardless of the provider's own ``is_active``."
 msgstr ""
 
-#: .\shipping\models\rate.py:103
+#: .\shipping\models\rate.py:105
 #, fuzzy
 #| msgid "Shipping"
 msgid "Shipping Rate"
 msgstr "Shipping"
 
-#: .\shipping\models\rate.py:104
+#: .\shipping\models\rate.py:106
 #, fuzzy
 #| msgid "Shipping Address"
 msgid "Shipping Rates"
 msgstr "Shipping Address"
 
-#: .\shipping\models\rate.py:130
+#: .\shipping\models\rate.py:132
 #, python-format
 msgid "%(provider)s does not support %(kind)s shipments."
 msgstr ""
 
-#: .\shipping\models\rate.py:140
+#: .\shipping\models\rate.py:142
 msgid "Price cannot be negative."
 msgstr ""
 
-#: .\shipping\models\rate.py:160
+#: .\shipping\models\rate.py:162
 #, python-format
 msgid "Currency must match the store's own currency (%(currency)s)."
 msgstr ""
@@ -16308,10 +16456,6 @@ msgstr ""
 msgid "Very High Usage (50+)"
 msgstr ""
 
-#: .\tag\admin.py:91 .\tag\admin.py:283
-msgid "Content Type"
-msgstr ""
-
 #: .\tag\admin.py:176
 msgid "Activate selected tags"
 msgstr ""
@@ -16339,6 +16483,7 @@ msgid "Tagged Item Information"
 msgstr ""
 
 #: .\tag\admin.py:273 .\tag\admin.py:292 .\tag\models\tag.py:26
+#: .\tag\models\tagged_item.py:22
 msgid "Tag"
 msgstr ""
 
@@ -16414,11 +16559,15 @@ msgstr ""
 msgid "Filter by multiple object IDs (comma-separated)"
 msgstr ""
 
-#: .\tag\models\tagged_item.py:29
+#: .\tag\models\tagged_item.py:27
+msgid "Object ID"
+msgstr ""
+
+#: .\tag\models\tagged_item.py:33
 msgid "Tagged Item"
 msgstr ""
 
-#: .\tag\models\tagged_item.py:30
+#: .\tag\models\tagged_item.py:34
 msgid "Tagged Items"
 msgstr ""
 
@@ -17633,7 +17782,7 @@ msgstr ""
 msgid "Member"
 msgstr ""
 
-#: .\tenant\models.py:1570 .\user\models\account.py:102
+#: .\tenant\models.py:1570 .\user\models\account.py:104
 msgid "Staff"
 msgstr ""
 
@@ -17901,7 +18050,7 @@ msgstr ""
 msgid "%(balance)d points"
 msgstr ""
 
-#: .\user\admin.py:575 .\user\models\account.py:124
+#: .\user\admin.py:575 .\user\models\account.py:126
 #, fuzzy
 #| msgid "Total"
 msgid "Total XP"
@@ -18195,71 +18344,71 @@ msgstr ""
 msgid "Email Address"
 msgstr ""
 
-#: .\user\models\account.py:76 .\user\models\address.py:27
+#: .\user\models\account.py:76 .\user\models\address.py:28
 msgid "Zip Code"
 msgstr ""
 
-#: .\user\models\account.py:103
+#: .\user\models\account.py:105
 msgid "Birth Date"
 msgstr ""
 
-#: .\user\models\account.py:105
+#: .\user\models\account.py:107
 msgid "Twitter Profile"
 msgstr ""
 
-#: .\user\models\account.py:108
+#: .\user\models\account.py:110
 msgid "LinkedIn Profile"
 msgstr ""
 
-#: .\user\models\account.py:111
+#: .\user\models\account.py:113
 msgid "Facebook Profile"
 msgstr ""
 
-#: .\user\models\account.py:114
+#: .\user\models\account.py:116
 msgid "Instagram Profile"
 msgstr ""
 
-#: .\user\models\account.py:118
+#: .\user\models\account.py:120
 msgid "Youtube Profile"
 msgstr ""
 
-#: .\user\models\account.py:121
+#: .\user\models\account.py:123
 msgid "Github Profile"
 msgstr ""
 
-#: .\user\models\account.py:126
+#: .\user\models\account.py:128
 msgid "Re-engagement Email Count"
 msgstr ""
 
-#: .\user\models\account.py:128
+#: .\user\models\account.py:130
 msgid "Number of re-engagement emails sent to this user."
 msgstr ""
 
-#: .\user\models\account.py:131
+#: .\user\models\account.py:133
 msgid "Last Re-engagement Email At"
 msgstr ""
 
-#: .\user\models\account.py:134
+#: .\user\models\account.py:136
 msgid "Timestamp of the most recent re-engagement email."
 msgstr ""
 
-#: .\user\models\account.py:152
+#: .\user\models\account.py:155
 msgid "Preferred language for emails and UI messages."
 msgstr ""
 
-#: .\user\models\account.py:161
+#: .\user\models\account.py:164
 msgid "User Account"
 msgstr ""
 
-#: .\user\models\account.py:162
+#: .\user\models\account.py:165
 msgid "User Accounts"
 msgstr ""
 
-#: .\user\models\address.py:65
+#: .\user\models\address.py:68
 msgid "User Address"
 msgstr ""
 
-#: .\user\models\address.py:107
+#: .\user\models\address.py:110
 msgid "There can only be one main address per user."
 msgstr ""
 

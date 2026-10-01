@@ -20,6 +20,7 @@ class ProductImage(
         "product.Product",
         related_name="images",
         on_delete=models.CASCADE,
+        verbose_name=_("Product"),
     )
     image = ImageAndSvgField(_("Image"), upload_to="uploads/products/")
     is_main = models.BooleanField(_("Is Main"), default=False)

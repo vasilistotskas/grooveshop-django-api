@@ -35,22 +35,30 @@ class BlogPost(
         _("Image"), upload_to="uploads/blog/", blank=True, null=True
     )
     likes = models.ManyToManyField(
-        "user.UserAccount", related_name="liked_blog_posts", blank=True
+        "user.UserAccount",
+        related_name="liked_blog_posts",
+        blank=True,
+        verbose_name=_("Likes"),
     )
     category = models.ForeignKey(
         "blog.BlogCategory",
         related_name="blog_posts",
         on_delete=models.SET_NULL,
         null=True,
+        verbose_name=_("Category"),
     )
     tags = models.ManyToManyField(
-        "blog.BlogTag", related_name="blog_posts", blank=True
+        "blog.BlogTag",
+        related_name="blog_posts",
+        blank=True,
+        verbose_name=_("Tags"),
     )
     author = models.ForeignKey(
         "blog.BlogAuthor",
         related_name="blog_posts",
         on_delete=models.SET_NULL,
         null=True,
+        verbose_name=_("Author"),
     )
     featured = models.BooleanField(_("Featured"), default=False)
     view_count = models.PositiveBigIntegerField(_("View Count"), default=0)

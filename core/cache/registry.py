@@ -14,6 +14,15 @@ from django.utils.translation import gettext_lazy as _
 # two fields to keep the signature ergonomic at call sites.
 LazyStr = Any
 
+#: The heading the cache page shows for each ``CacheSurface.group``.
+GROUP_LABELS: dict[str, LazyStr] = {
+    "catalog": _("Catalog"),
+    "commerce": _("Commerce"),
+    "content": _("Content"),
+    "config": _("Configuration"),
+    "general": _("General"),
+}
+
 
 @dataclass(frozen=True)
 class CacheSurface:

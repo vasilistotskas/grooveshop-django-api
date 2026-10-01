@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from core.cache.registry import (
+    GROUP_LABELS,
     CacheSurface,
     _reset_for_tests,
     expand_with_related,
@@ -176,3 +177,9 @@ class TestSellerIdentityIsPurgeable:
             p for p in surface.nuxt_patterns if "tenantLegalIdentity" in p
         ]
         assert identity == ["cache:nitro:handlers:tenantLegalIdentity*"]
+
+
+def test_every_registered_group_has_a_heading():
+    """The cache page heads each group with ``GROUP_LABELS``; a group
+    without one would raise there instead of rendering."""
+    assert {surface.group for surface in iter_surfaces()} <= set(GROUP_LABELS)

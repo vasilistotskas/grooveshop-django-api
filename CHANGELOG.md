@@ -3,6 +3,56 @@
 
 
 
+## v3.92.3 (2026-10-01)
+
+### Bug fixes
+
+* fix(admin): cache page group headings are translated
+
+The page title-cased each surface's raw group key, so the Greek admin
+read "Catalog", "Commerce", "Content" and "Config". GROUP_LABELS names
+each group in the active language, and a test keeps every registered
+group covered.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_015qBbdZu4WHL8bF6yKwvxKM ([`ef37f92`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ef37f92ae1f062bd8c37c01ef3af0d9916dee898))
+
+* fix(admin): dialog forms render Unfold's widgets
+
+unfold's BaseDialogForm applies no widgets of its own, so every dialog
+field rendered as a bare Django input: no border on a transparent
+background, invisible in the dialog (loyalty points, gift-card balance,
+B2B approve/reject/import, promotion code generation). Unfold's docs
+require its widgets on action forms. A guard test walks every
+first-party dialog form.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_015qBbdZu4WHL8bF6yKwvxKM ([`cc3ec77`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cc3ec779a7f97a6994b8ca1f57c679f191bb5fab))
+
+* fix(i18n): payment methods are "Μέθοδοι πληρωμής" in the plural too
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_015qBbdZu4WHL8bF6yKwvxKM ([`2538d29`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2538d295981749158fdc79e9485851c3c0654602))
+
+* fix(admin): datasets are read-only, without bulk actions
+
+A dataset shows another record's history inside a change form (a
+product's stock movements, a customer's orders, a gift card's ledger),
+but it inherited Django's "delete selected", so a superuser could
+bulk-delete stock logs or orders from a product or customer page.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_015qBbdZu4WHL8bF6yKwvxKM ([`448db4b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/448db4b42bce39908191411301c4206eba7d74b2))
+
+### Chores
+
+* chore(api): regenerate the schema with the payment-methods plural
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_015qBbdZu4WHL8bF6yKwvxKM ([`eba0ab0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/eba0ab0d12e343420a3947ae0d79f0a8f609be45))
+
+* chore(deps): sync uv.lock to 3.92.2 [skip ci] ([`096a545`](https://github.com/vasilistotskas/grooveshop-django-api/commit/096a5456344db6cdee63f2daa206bfac1cab35a6))
+
 ## v3.92.2 (2026-10-01)
 
 ### Bug fixes

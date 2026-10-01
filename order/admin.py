@@ -9,11 +9,13 @@ from django.urls import path, reverse
 from django.utils import timezone
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import ngettext
 from unfold.admin import TabularInline
 from unfold.contrib.filters.admin import (
     AutocompleteSelectFilter,
     ChoicesDropdownFilter,
     DropdownFilter,
+    MultipleChoicesDropdownFilter,
     RangeDateFilter,
     RangeDateTimeFilter,
     RelatedDropdownFilter,
@@ -28,16 +30,18 @@ from admin.displays import (
     ORDER_STATUS_VARIANT,
     PAYMENT_STATUS_VARIANT,
     SHIPMENT_STATE_VARIANT,
+    change_link,
     choice_label,
     format_dt,
     header_two_line,
+    label_cell,
     money,
     relative_time,
 )
 from admin.mixins import IsSuperuserOnlyModelAdmin
 from order.attribution import source_label
 from order.enum.document_type import OrderDocumentTypeEnum
-from order.enum.status import OrderStatus, PaymentStatus
+from order.enum.status import OrderStatus
 from order.invoicing import generate_invoice
 from order.models.attribution import OrderAttribution
 from order.models.history import OrderHistory, OrderItemHistory
@@ -48,6 +52,7 @@ from order.models.stock_log import StockLog
 from order.models.viva_webhook_event import VivaWebhookEvent
 from order.payment import payment_provider_label
 from order.services import OrderService
+from user.models import UserAccount
 
 logger = logging.getLogger(__name__)
 
@@ -82,95 +87,6 @@ MYDATA_STATUS_VARIANT: dict[str, str] = {
     MyDataStatus.REJECTED: "danger",
     MyDataStatus.CANCELED: "warning",
 }
-
-
-class OrderStatusGroupFilter(DropdownFilter):
-    title = _("Status Group")
-    parameter_name = "status_group"
-
-    def lookups(self, request, model_admin):
-        return [
-            ("active", _("Active Orders (Pending/Processing)")),
-            ("fulfillment", _("In Fulfillment (Shipped/Delivered)")),
-            ("completed", _("Completed Orders")),
-            ("problematic", _("Problematic (Canceled/Returned/Refunded)")),
-        ]
-
-    def queryset(self, request, queryset):
-        filter_value = self.value()
-
-        match filter_value:
-            case "active":
-                filter_kwargs = {
-                    "status__in": [OrderStatus.PENDING, OrderStatus.PROCESSING]
-                }
-            case "fulfillment":
-                filter_kwargs = {
-                    "status__in": [OrderStatus.SHIPPED, OrderStatus.DELIVERED]
-                }
-            case "completed":
-                filter_kwargs = {"status": OrderStatus.COMPLETED}
-            case "problematic":
-                filter_kwargs = {
-                    "status__in": [
-                        OrderStatus.CANCELED,
-                        OrderStatus.RETURNED,
-                        OrderStatus.REFUNDED,
-                    ]
-                }
-            case _:
-                return queryset
-
-        return queryset.filter(**filter_kwargs)
-
-
-class PaymentStatusFilter(DropdownFilter):
-    title = _("Payment Status")
-    parameter_name = "payment_status_filter"
-
-    def lookups(self, request, model_admin):
-        return [
-            ("completed", _("Completed")),
-            ("pending", _("Pending")),
-            ("processing", _("Processing")),
-            ("failed", _("Failed")),
-            ("refunded", _("Refunded")),
-            ("partially_refunded", _("Partially Refunded")),
-            ("canceled", _("Canceled")),
-            ("needs_attention", _("Needs Attention (Failed/Pending)")),
-        ]
-
-    def queryset(self, request, queryset):
-        filter_value = self.value()
-
-        match filter_value:
-            case "completed":
-                filter_kwargs = {"payment_status": PaymentStatus.COMPLETED}
-            case "pending":
-                filter_kwargs = {"payment_status": PaymentStatus.PENDING}
-            case "processing":
-                filter_kwargs = {"payment_status": PaymentStatus.PROCESSING}
-            case "failed":
-                filter_kwargs = {"payment_status": PaymentStatus.FAILED}
-            case "refunded":
-                filter_kwargs = {"payment_status": PaymentStatus.REFUNDED}
-            case "partially_refunded":
-                filter_kwargs = {
-                    "payment_status": PaymentStatus.PARTIALLY_REFUNDED
-                }
-            case "canceled":
-                filter_kwargs = {"payment_status": PaymentStatus.CANCELED}
-            case "needs_attention":
-                filter_kwargs = {
-                    "payment_status__in": [
-                        PaymentStatus.FAILED,
-                        PaymentStatus.PENDING,
-                    ]
-                }
-            case _:
-                return queryset
-
-        return queryset.filter(**filter_kwargs)
 
 
 class OrderSourceFilter(DropdownFilter):
@@ -217,50 +133,6 @@ def _attribution_field(field: str, description):
 
     _field.__name__ = f"attribution_{field}"
     return _field
-
-
-class DocumentTypeFilter(DropdownFilter):
-    title = _("Document Type")
-    parameter_name = "document_type_filter"
-
-    def lookups(self, request, model_admin):
-        return [
-            ("receipt", _("Receipt")),
-            ("invoice", _("Invoice")),
-            ("proforma", _("Proforma Invoice")),
-            ("shipping_label", _("Shipping Label")),
-            ("return_label", _("Return Label")),
-            ("credit_note", _("Credit Note")),
-        ]
-
-    def queryset(self, request, queryset):
-        filter_value = self.value()
-
-        match filter_value:
-            case "receipt":
-                filter_kwargs = {"document_type": OrderDocumentTypeEnum.RECEIPT}
-            case "invoice":
-                filter_kwargs = {"document_type": OrderDocumentTypeEnum.INVOICE}
-            case "proforma":
-                filter_kwargs = {
-                    "document_type": OrderDocumentTypeEnum.PROFORMA
-                }
-            case "shipping_label":
-                filter_kwargs = {
-                    "document_type": OrderDocumentTypeEnum.SHIPPING_LABEL
-                }
-            case "return_label":
-                filter_kwargs = {
-                    "document_type": OrderDocumentTypeEnum.RETURN_LABEL
-                }
-            case "credit_note":
-                filter_kwargs = {
-                    "document_type": OrderDocumentTypeEnum.CREDIT_NOTE
-                }
-            case _:
-                return queryset
-
-        return queryset.filter(**filter_kwargs)
 
 
 class WholesaleOrderFilter(DropdownFilter):
@@ -482,22 +354,21 @@ class OrderAdmin(BaseModelAdmin):
         "created",
     ]
     list_filter = [
-        OrderStatusGroupFilter,
-        PaymentStatusFilter,
-        DocumentTypeFilter,
+        # Multi-select: a status "group" (active, problematic, needs
+        # attention) is just several statuses picked together.
+        ("status", MultipleChoicesDropdownFilter),
+        ("payment_status", MultipleChoicesDropdownFilter),
+        "document_type",
         WholesaleOrderFilter,
         RecentOrdersFilter,
         ("attribution__source_type", ChoicesDropdownFilter),
         OrderSourceFilter,
-        "status",
-        "payment_status",
         ("created_at", RangeDateTimeFilter),
         ("status_updated_at", RangeDateTimeFilter),
-        ("country", RelatedDropdownFilter),
-        ("region", RelatedDropdownFilter),
+        ("country", AutocompleteSelectFilter),
+        ("region", AutocompleteSelectFilter),
         ("pay_way", RelatedDropdownFilter),
         "payment_method",
-        "document_type",
         # Filter Orders by carrier via the registry FK — denser than
         # a flat enum (shows the provider name) and the same lookup
         # support uses for ticket triage.
@@ -811,6 +682,81 @@ class OrderAdmin(BaseModelAdmin):
         description=_("Payment"),
     )
 
+    # The facts an operator opens an order for, above the tabs.
+    change_form_before_template = "admin/order/order_summary.html"
+
+    def render_change_form(
+        self, request, context, add=False, change=False, form_url="", obj=None
+    ):
+        if obj is not None:
+            context["order_summary"] = self._summary(obj)
+        return super().render_change_form(
+            request, context, add, change, form_url, obj
+        )
+
+    def _summary(self, order) -> list[dict]:
+        shipment = self.shipment_state(order)
+        invoice = Invoice.objects.filter(order=order).first()
+        return [
+            {
+                "title": _("Status"),
+                "value": label_cell(
+                    order.get_status_display(),
+                    ORDER_STATUS_VARIANT.get(order.status, "default"),
+                ),
+                "footer": relative_time(order.status_updated_at),
+            },
+            {
+                "title": _("Payment"),
+                "value": label_cell(
+                    order.get_payment_status_display(),
+                    PAYMENT_STATUS_VARIANT.get(order.payment_status, "default"),
+                ),
+                "footer": self.payment_method_label(order),
+            },
+            {
+                "title": _("Total"),
+                "value": self._total(order),
+                # ``get_object`` reads ``get_queryset``, which annotates it.
+                "footer": ngettext(
+                    "%(count)d item", "%(count)d items", order.item_count
+                )
+                % {"count": order.item_count},
+            },
+            {
+                "title": _("Customer"),
+                "value": change_link(
+                    self.admin_site,
+                    UserAccount,
+                    order.user_id,
+                    order.customer_full_name,
+                )
+                if order.user_id
+                else order.customer_full_name,
+                "footer": order.email,
+            },
+            {
+                "title": _("Shipment"),
+                "value": label_cell(
+                    shipment[1],
+                    SHIPMENT_STATE_VARIANT.get(shipment[0], "default"),
+                )
+                if shipment
+                else "—",
+                "footer": self.shipping_info(order),
+            },
+            {
+                "title": _("Invoice"),
+                "value": invoice.invoice_number if invoice else "—",
+                "footer": label_cell(
+                    invoice.get_mydata_status_display(),
+                    MYDATA_STATUS_VARIANT.get(invoice.mydata_status, "default"),
+                )
+                if invoice
+                else "",
+            },
+        ]
+
     attribution_source_type = _attribution_field(
         "source_type", _("Source type")
     )
@@ -854,23 +800,28 @@ class OrderAdmin(BaseModelAdmin):
     def customer(self, obj):
         return header_two_line(obj.customer_full_name, obj.email)
 
-    @display(description=_("Order"), ordering="created_at")
-    def order_summary(self, obj):
-        item_count = getattr(obj, "item_count", 0)
-        total_qty = getattr(obj, "total_items_quantity", 0) or 0
-
+    @staticmethod
+    def _total(obj) -> str:
         try:
             # Post-discount figure — what the customer actually owes.
-            total = money(obj.calculate_order_total_amount().amount)
+            return money(obj.calculate_order_total_amount().amount)
         except ValueError:
-            total = _(
+            return _(
                 "items %(items)s + shipping %(shipping)s (currency mismatch)"
             ) % {
                 "items": money(obj.total_price_items.amount),
                 "shipping": money(obj.total_price_extra.amount),
             }
 
-        return f"{item_count} items, qty {total_qty} — {total}"
+    @display(description=_("Order"), ordering="created_at")
+    def order_summary(self, obj):
+        item_count = getattr(obj, "item_count", 0)
+        total_qty = getattr(obj, "total_items_quantity", 0) or 0
+        return ngettext(
+            "%(count)s item, qty %(qty)s — %(total)s",
+            "%(count)s items, qty %(qty)s — %(total)s",
+            item_count,
+        ) % {"count": item_count, "qty": total_qty, "total": self._total(obj)}
 
     @display(description=_("Shipment"), label=SHIPMENT_STATE_VARIANT)
     def shipment_state(self, obj):
@@ -907,7 +858,7 @@ class OrderAdmin(BaseModelAdmin):
         return f"{format_dt(obj.created_at)} ({relative_time(obj.created_at)})"
 
     @action(
-        description=str(_("Mark selected orders as processing")),
+        description=_("Mark selected orders as processing"),
         variant=ActionVariant.PRIMARY,
         icon="play_arrow",
     )
@@ -920,7 +871,7 @@ class OrderAdmin(BaseModelAdmin):
         )
 
     @action(
-        description=str(_("Mark selected orders as shipped")),
+        description=_("Mark selected orders as shipped"),
         variant=ActionVariant.INFO,
         icon="local_shipping",
     )
@@ -933,7 +884,7 @@ class OrderAdmin(BaseModelAdmin):
         )
 
     @action(
-        description=str(_("Mark selected orders as delivered")),
+        description=_("Mark selected orders as delivered"),
         variant=ActionVariant.SUCCESS,
         icon="check_circle",
     )
@@ -946,7 +897,7 @@ class OrderAdmin(BaseModelAdmin):
         )
 
     @action(
-        description=str(_("Mark selected orders as completed")),
+        description=_("Mark selected orders as completed"),
         variant=ActionVariant.SUCCESS,
         icon="task_alt",
     )
@@ -959,7 +910,7 @@ class OrderAdmin(BaseModelAdmin):
         )
 
     @action(
-        description=str(_("Mark selected orders as returned")),
+        description=_("Mark selected orders as returned"),
         variant=ActionVariant.WARNING,
         icon="assignment_return",
     )
@@ -975,7 +926,7 @@ class OrderAdmin(BaseModelAdmin):
         )
 
     @action(
-        description=str(_("Mark selected orders as refunded")),
+        description=_("Mark selected orders as refunded"),
         variant=ActionVariant.WARNING,
         icon="currency_exchange",
     )
@@ -1018,7 +969,7 @@ class OrderAdmin(BaseModelAdmin):
                 )
 
     @action(
-        description=str(_("Cancel selected orders and restore stock")),
+        description=_("Cancel selected orders and restore stock"),
         variant=ActionVariant.DANGER,
         icon="cancel",
     )
@@ -1106,7 +1057,7 @@ class OrderAdmin(BaseModelAdmin):
         return redirect(reverse("admin:order_order_change", args=[object_id]))
 
     @action(
-        description=str(_("Generate invoice")),
+        description=_("Generate invoice"),
         variant=ActionVariant.PRIMARY,
         icon="receipt_long",
     )
@@ -1166,7 +1117,7 @@ class OrderAdmin(BaseModelAdmin):
         return self._redirect_to_order_change(object_id)
 
     @action(
-        description=str(_("Regenerate invoice (same number)")),
+        description=_("Regenerate invoice (same number)"),
         variant=ActionVariant.WARNING,
         icon="refresh",
     )
@@ -1208,7 +1159,7 @@ class OrderAdmin(BaseModelAdmin):
         return self._redirect_to_order_change(object_id)
 
     @action(
-        description=str(_("Send invoice to myDATA")),
+        description=_("Send invoice to myDATA"),
         variant=ActionVariant.PRIMARY,
         icon="cloud_upload",
     )
@@ -1263,7 +1214,7 @@ class OrderAdmin(BaseModelAdmin):
         return self._redirect_to_order_change(object_id)
 
     @action(
-        description=str(_("Cancel invoice in myDATA")),
+        description=_("Cancel invoice in myDATA"),
         variant=ActionVariant.DANGER,
         icon="cancel",
     )
@@ -1306,7 +1257,7 @@ class OrderAdmin(BaseModelAdmin):
         return self._redirect_to_order_change(object_id)
 
     @action(
-        description=str(_("Download shipping voucher (PDF)")),
+        description=_("Download shipping voucher (PDF)"),
         variant=ActionVariant.PRIMARY,
         icon="download",
     )
@@ -1415,7 +1366,7 @@ class OrderAdmin(BaseModelAdmin):
         return response
 
     @action(
-        description=str(_("Customer's orders")),
+        description=_("Customer's orders"),
         icon="person_search",
         variant=ActionVariant.INFO,
     )
@@ -1456,7 +1407,7 @@ class OrderItemAdmin(BaseModelAdmin):
     list_filter = [
         "order__status",
         "order__payment_status",
-        ("product", RelatedDropdownFilter),
+        ("product", AutocompleteSelectFilter),
         ("quantity", SliderNumericFilter),
         "is_refunded",
         ("created_at", RangeDateTimeFilter),
@@ -1470,6 +1421,7 @@ class OrderItemAdmin(BaseModelAdmin):
         "product__id",
         "notes",
     ]
+    autocomplete_fields = ("order", "product")
     readonly_fields = [
         "id",
         "created_at",
@@ -1534,10 +1486,11 @@ class OrderItemAdmin(BaseModelAdmin):
 
     @admin.display(description=_("Order"))
     def order_link(self, obj):
-        return format_html(
-            '<a href="{url}">Order #{id}</a>',
-            url=f"/admin/order/order/{obj.order.id}/change/",
-            id=obj.order.id,
+        return change_link(
+            self.admin_site,
+            Order,
+            obj.order_id,
+            _("Order #%(id)s") % {"id": obj.order_id},
         )
 
     @display(
@@ -1595,10 +1548,11 @@ class OrderHistoryAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
         "ip_address",
         "created_at",
     ]
+    date_hierarchy = "created_at"
     list_filter = [
         "change_type",
-        ("order", RelatedDropdownFilter),
-        ("user", RelatedDropdownFilter),
+        ("order", AutocompleteSelectFilter),
+        ("user", AutocompleteSelectFilter),
         ("created_at", RangeDateTimeFilter),
     ]
     search_fields = [
@@ -1629,10 +1583,11 @@ class OrderHistoryAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
 
     @admin.display(description=_("Order"))
     def order_link(self, obj):
-        return format_html(
-            '<a href="{url}">Order #{id}</a>',
-            url=f"/admin/order/order/{obj.order.id}/change/",
-            id=obj.order.id,
+        return change_link(
+            self.admin_site,
+            Order,
+            obj.order_id,
+            _("Order #%(id)s") % {"id": obj.order_id},
         )
 
     @admin.display(description=_("Description"))
@@ -1660,6 +1615,7 @@ class OrderItemHistoryAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
         "user_display",
         "created_at",
     ]
+    date_hierarchy = "created_at"
     list_filter = [
         "change_type",
         # AutocompleteSelectFilter — lazy XHR dropdown, no pre-fetch
@@ -1689,7 +1645,7 @@ class OrderItemHistoryAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
         "description",
         "created_at",
     ]
-    list_select_related = ["order_item", "order_item__order", "user"]
+    list_select_related = ["order_item", "user"]
 
     change_type_label = choice_label(
         "change_type",
@@ -1708,10 +1664,19 @@ class OrderItemHistoryAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
     @admin.display(description=_("Order Item"))
     def order_item_link(self, obj):
         return format_html(
-            '<a href="{url}">Item #{item_id}</a> (Order #{order_id})',
-            url=f"/admin/order/orderitem/{obj.order_item.id}/change/",
-            item_id=obj.order_item.id,
-            order_id=obj.order_item.order.id,
+            "{} ({})",
+            change_link(
+                self.admin_site,
+                OrderItem,
+                obj.order_item_id,
+                _("Item #%(id)s") % {"id": obj.order_item_id},
+            ),
+            change_link(
+                self.admin_site,
+                Order,
+                obj.order_item.order_id,
+                _("Order #%(id)s") % {"id": obj.order_item.order_id},
+            ),
         )
 
     @admin.display(description=_("Description"))
@@ -1798,13 +1763,14 @@ class HasDocumentFilter(DropdownFilter):
 
 @admin.register(Invoice)
 class InvoiceAdmin(BaseModelAdmin):
-    """Read-mostly archive of rendered invoices.
+    """Read-only archive of rendered invoices.
 
-    Invoices are immutable by convention — Greek tax law forbids edits
-    once the number is allocated. This admin exposes browsing, search,
-    and per-row download. Use ``OrderAdmin``'s ``Generate invoice``
-    detail action to create invoices; ``Regenerate`` there is the only
-    way to replace one (consumes a new counter slot).
+    Greek tax law allows no edits to an issued invoice and no gaps in
+    the register, so this admin browses, searches and downloads only —
+    nobody deletes here, superusers included: a deleted row is a gap.
+    ``OrderAdmin``'s ``Generate invoice`` creates one; its ``Regenerate``
+    re-renders the PDF and snapshots in place, keeping the number and
+    issue date (``order.invoicing.generate_invoice(force=True)``).
     """
 
     list_display = (
@@ -1937,16 +1903,14 @@ class InvoiceAdmin(BaseModelAdmin):
         return False
 
     def has_delete_permission(self, request, obj=None):
-        return bool(request.user and request.user.is_superuser)
+        return False
 
     @admin.display(description=_("Order"))
     def order_link(self, obj):
         if not obj.order_id:
             return "—"
-        return format_html(
-            '<a href="{url}">#{id}</a>',
-            url=reverse("admin:order_order_change", args=[obj.order_id]),
-            id=obj.order_id,
+        return change_link(
+            self.admin_site, Order, obj.order_id, f"#{obj.order_id}"
         )
 
     @admin.display(description=_("Total"))
@@ -2003,6 +1967,7 @@ class VivaWebhookEventAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
         "status_id",
         "received_at",
     )
+    date_hierarchy = "received_at"
     list_filter = (
         "event_type_id",
         "outcome",

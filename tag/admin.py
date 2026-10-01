@@ -107,17 +107,6 @@ class ContentTypeFilter(DropdownFilter):
         return queryset
 
 
-class TagInLine(GenericTabularInline):
-    model = TaggedItem
-    autocomplete_fields = ["tag"]
-    extra = 0
-    fields = ("tag",)
-    verbose_name = _("Tag")
-    verbose_name_plural = _("Tags")
-    tab = True
-    collapsible = True
-
-
 @admin.register(Tag)
 class TagAdmin(BaseTranslatableAdmin):
     list_display = (
@@ -145,8 +134,6 @@ class TagAdmin(BaseTranslatableAdmin):
     actions = [
         "activate_tags",
         "deactivate_tags",
-        "update_sort_order",
-        "analyze_usage",
     ]
 
     fieldsets = (
@@ -186,7 +173,7 @@ class TagAdmin(BaseTranslatableAdmin):
         return format_dt(obj.created_at)
 
     @action(
-        description=str(_("Activate selected tags")),
+        description=_("Activate selected tags"),
         variant=ActionVariant.SUCCESS,
         icon="check_circle",
     )
@@ -204,7 +191,7 @@ class TagAdmin(BaseTranslatableAdmin):
         )
 
     @action(
-        description=str(_("Deactivate selected tags")),
+        description=_("Deactivate selected tags"),
         variant=ActionVariant.WARNING,
         icon="cancel",
     )
@@ -219,45 +206,6 @@ class TagAdmin(BaseTranslatableAdmin):
             )
             % {"count": updated},
             messages.WARNING,
-        )
-
-    @action(
-        description=str(_("Update sort order")),
-        variant=ActionVariant.INFO,
-        icon="sort",
-    )
-    def update_sort_order(self, request, queryset):
-        ordered = queryset.annotate(
-            usage_count=models.Count("taggeditem")
-        ).order_by("-usage_count", "translations__label")
-        updated = 0
-        for idx, tag in enumerate(ordered):
-            tag.sort_order = idx
-            tag.save(update_fields=["sort_order"])
-            updated += 1
-        self.message_user(
-            request,
-            _("Updated sort order for %(count)d tags.") % {"count": updated},
-            messages.SUCCESS,
-        )
-
-    @action(
-        description=str(_("Analyze tag usage")),
-        variant=ActionVariant.PRIMARY,
-        icon="analytics",
-    )
-    def analyze_usage(self, request, queryset):
-        total = queryset.count()
-        active = queryset.filter(active=True).count()
-        used = queryset.filter(taggeditem__isnull=False).distinct().count()
-        self.message_user(
-            request,
-            _(
-                "Analysis complete: %(total)d total tags, %(active)d "
-                "active, %(used)d in use."
-            )
-            % {"total": total, "active": active, "used": used},
-            messages.INFO,
         )
 
 
@@ -303,11 +251,23 @@ class TaggedItemAdmin(BaseModelAdmin):
     )
 
     def get_queryset(self, request):
+        from django.contrib.contenttypes.prefetch import GenericPrefetch
+
+        from product.models.product import Product
+
+        # Products are the taggable model (``TaggedModel``); their names
+        # are translations, prefetched with the tagged row itself.
         return (
             super()
             .get_queryset(request)
             .select_related("tag", "content_type")
-            .prefetch_related("tag__translations")
+            .prefetch_related(
+                "tag__translations",
+                GenericPrefetch(
+                    "content_object",
+                    [Product.objects.prefetch_related("translations")],
+                ),
+            )
         )
 
     @admin.display(description=_("Tag"), ordering="tag__translations__label")
@@ -318,11 +278,7 @@ class TaggedItemAdmin(BaseModelAdmin):
 
     @admin.display(description=_("Content Object"))
     def content_object_display(self, obj):
-        try:
-            content_object = obj.content_object
-        except Exception:
-            return "—"
-        return str(content_object) if content_object else "—"
+        return str(obj.content_object) if obj.content_object else "—"
 
     @admin.display(description=_("Content Type"), ordering="content_type")
     def content_type_display(self, obj):
@@ -338,3 +294,4 @@ class TaggedItemInline(GenericTabularInline):
     ct_field = "content_type"
     ct_fk_field = "object_id"
     tab = True
+    per_page = 20

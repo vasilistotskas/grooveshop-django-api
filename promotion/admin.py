@@ -1,12 +1,12 @@
 import secrets
-from typing import cast
 
 from django import forms
 from django.contrib import admin, messages
-from django.db.models import Count
+from django.db.models import Count, Prefetch
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect
 from django.urls import reverse
+from django.utils import formats, translation
 from django.utils.translation import gettext_lazy as _
 from unfold.contrib.filters.admin import (
     RangeDateTimeFilter,
@@ -18,6 +18,7 @@ from unfold.forms import BaseDialogForm
 from unfold.sections import TableSection
 
 from admin.base import BaseModelAdmin, BaseTranslatableAdmin
+from admin.displays import money
 from admin.export import ExportActionMixin
 from promotion.enum import BenefitType, TargetScope
 from promotion.models import (
@@ -32,6 +33,48 @@ CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # no 0/O/1/I
 def _generate_code(prefix: str, length: int) -> str:
     random_part = "".join(secrets.choice(CODE_ALPHABET) for _ in range(length))
     return f"{prefix}{random_part}" if prefix else random_part
+
+
+def _create_codes(
+    promotion: Promotion,
+    count: int,
+    *,
+    prefix: str,
+    length: int,
+    usage_limit: int | None,
+) -> int:
+    """Insert *count* new random codes; returns how many were created.
+
+    Only the candidates are checked against the table, never the whole
+    code list (every code of every promotion used to be loaded to find
+    free ones). A code another request inserts between the check and
+    the insert is skipped by the unique constraint and replaced on the
+    next round.
+    """
+    created = 0
+    while created < count:
+        candidates = {
+            _generate_code(prefix, length) for _ in range(count - created)
+        }
+        taken = set(
+            PromotionCode.objects.filter(code__in=candidates).values_list(
+                "code", flat=True
+            )
+        )
+        fresh = candidates - taken
+        PromotionCode.objects.bulk_create(
+            [
+                PromotionCode(
+                    promotion=promotion, code=code, usage_limit=usage_limit
+                )
+                for code in fresh
+            ],
+            ignore_conflicts=True,
+        )
+        created += PromotionCode.objects.filter(
+            promotion=promotion, code__in=fresh
+        ).count()
+    return created
 
 
 class GenerateCodesForm(BaseDialogForm):
@@ -63,7 +106,7 @@ class GenerateCodesForm(BaseDialogForm):
 
 
 class RedemptionsTableSection(TableSection):
-    verbose_name = _("Latest redemptions")
+    verbose_name = _("Redemptions")
     height = 300
     related_name = "redemptions"
     fields = ["pk", "order", "user", "email", "amount", "created_at"]
@@ -192,6 +235,16 @@ class PromotionAdmin(BaseTranslatableAdmin):
             super()
             .get_queryset(request)
             .annotate(redemptions_total=Count("redemptions", distinct=True))
+            .prefetch_related(
+                "translations",
+                # The redemptions section, newest first, with the page.
+                Prefetch(
+                    "redemptions",
+                    queryset=PromotionRedemption.objects.select_related(
+                        "order", "user"
+                    ).order_by("-created_at"),
+                ),
+            )
         )
 
     @display(description=_("Name"), header=True)
@@ -204,9 +257,12 @@ class PromotionAdmin(BaseTranslatableAdmin):
     @display(description=_("Benefit"))
     def benefit_display(self, obj):
         if obj.benefit_type == BenefitType.PERCENTAGE:
-            return f"-{obj.benefit_value}%"
+            value = formats.number_format(
+                obj.benefit_value, decimal_pos=0, use_l10n=True
+            )
+            return f"-{value}%"
         if obj.benefit_type == BenefitType.FIXED_AMOUNT:
-            return f"-{obj.benefit_value} €"
+            return f"-{money(obj.benefit_value)}"
         return obj.get_benefit_type_display()
 
     @display(
@@ -234,7 +290,7 @@ class PromotionAdmin(BaseTranslatableAdmin):
     def redemptions_count(self, obj):
         return obj.redemptions_total
 
-    @admin.action(description=_("Activate selected promotions"))
+    @action(description=_("Activate selected promotions"))
     def activate_promotions(self, request, queryset):
         updated = queryset.update(is_active=True)
         self.message_user(
@@ -243,7 +299,7 @@ class PromotionAdmin(BaseTranslatableAdmin):
             messages.SUCCESS,
         )
 
-    @admin.action(description=_("Deactivate selected promotions"))
+    @action(description=_("Deactivate selected promotions"))
     def deactivate_promotions(self, request, queryset):
         updated = queryset.update(is_active=False)
         self.message_user(
@@ -255,20 +311,12 @@ class PromotionAdmin(BaseTranslatableAdmin):
     @action(
         description=_("Generate codes"),
         icon="confirmation_number",
-        # cast: unfold's ActionDialog TypedDict declares plain ``str``
-        # keys, but every unfold example (and its own templates) feeds
-        # lazy strings through — evaluating them at import time would
-        # freeze the admin locale instead.
-        dialog=cast(
-            "ActionDialog",
-            {
-                "title": _("Bulk-generate coupon codes"),
-                "description": _(
-                    "Creates unique random codes attached to this promotion."
-                ),
-                "form_class": GenerateCodesForm,
-                "form_submit_text": None,
-            },
+        dialog=ActionDialog(
+            title=_("Bulk-generate coupon codes"),
+            description=_(
+                "Creates unique random codes attached to this promotion."
+            ),
+            form_class=GenerateCodesForm,
         ),
     )
     def generate_codes(
@@ -279,32 +327,24 @@ class PromotionAdmin(BaseTranslatableAdmin):
         # dialog form and follows the redirect client-side.
         promotion = Promotion.objects.get(pk=object_id)
         data = form.cleaned_data
-        existing = set(PromotionCode.objects.values_list("code", flat=True))
-        new_codes: list[PromotionCode] = []
-        seen: set[str] = set()
-        while len(new_codes) < data["count"]:
-            code = _generate_code(data["prefix"], data["length"])
-            if code in existing or code in seen:
-                continue
-            seen.add(code)
-            new_codes.append(
-                PromotionCode(
-                    promotion=promotion,
-                    code=code,
-                    usage_limit=data.get("usage_limit"),
-                )
-            )
-        PromotionCode.objects.bulk_create(new_codes)
+        created = _create_codes(
+            promotion,
+            data["count"],
+            prefix=data["prefix"],
+            length=data["length"],
+            usage_limit=data.get("usage_limit"),
+        )
         self.message_user(
             request,
             _("%(count)d codes generated for %(name)s.")
-            % {"count": len(new_codes), "name": promotion},
+            % {"count": created, "name": promotion},
             messages.SUCCESS,
         )
         return HttpResponse(
             headers={
                 "HX-Redirect": reverse(
-                    "admin:promotion_promotion_change", args=[object_id]
+                    f"{self.admin_site.name}:promotion_promotion_change",
+                    args=[object_id],
                 ),
             }
         )
@@ -337,11 +377,14 @@ class PromotionAdmin(BaseTranslatableAdmin):
             usage_limit_total=source.usage_limit_total,
             usage_limit_per_customer=source.usage_limit_per_customer,
         )
-        for translation in source.translations.all():
+        for source_translation in source.translations.all():
+            # The marker is part of the name in that language.
+            with translation.override(source_translation.language_code):
+                name = _("%(name)s (copy)") % {"name": source_translation.name}
             clone.translations.create(
-                language_code=translation.language_code,
-                name=f"{translation.name} (copy)",
-                description=translation.description,
+                language_code=source_translation.language_code,
+                name=name,
+                description=source_translation.description,
             )
         clone.products.set(source.products.all())
         clone.categories.set(source.categories.all())

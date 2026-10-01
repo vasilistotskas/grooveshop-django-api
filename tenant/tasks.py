@@ -326,3 +326,51 @@ def purge_expired_tenant_archives(self) -> dict:
             ", ".join(purged),
         )
     return {"status": "success", "purged": purged}
+
+
+@celery_app.task(base=MonitoredTask)
+def refresh_stats_snapshot() -> dict:
+    """Record this store's headline figures on its ``TenantStatsSnapshot``.
+
+    Runs inside the store's schema (``TenantTask``) - the only place its
+    orders can be read - and writes the public-schema snapshot the
+    control plane reads instead of switching schema per store per page.
+    No retries: the schedule runs it again within half an hour.
+    """
+    from django.db.models import Count, Max, Q, Sum
+    from django.utils import timezone
+
+    from order.enum.status import PaymentStatus
+    from order.models.order import Order
+    from tenant.membership import resolve_current_tenant
+    from tenant.models import TenantStatsSnapshot
+
+    tenant = resolve_current_tenant()
+    if tenant is None:
+        raise RuntimeError(
+            "refresh_stats_snapshot runs inside a store's schema; "
+            "dispatch it through fanout_refresh_stats_snapshots"
+        )
+    figures = Order.objects.aggregate(
+        orders=Count("id"),
+        revenue=Sum(
+            "paid_amount", filter=Q(payment_status=PaymentStatus.COMPLETED)
+        ),
+        last_order_at=Max("created_at"),
+    )
+    TenantStatsSnapshot.objects.update_or_create(
+        tenant=tenant,
+        defaults={
+            "orders_count": figures["orders"],
+            "revenue": figures["revenue"] or 0,
+            "last_order_at": figures["last_order_at"],
+            "refreshed_at": timezone.now(),
+        },
+    )
+    return {"schema": tenant.schema_name, "orders": figures["orders"]}
+
+
+@celery_app.task(base=TenantTask)
+def fanout_refresh_stats_snapshots():
+    """Suspended stores are skipped and keep their last snapshot."""
+    return run_for_all_tenants("tenant.tasks.refresh_stats_snapshot")

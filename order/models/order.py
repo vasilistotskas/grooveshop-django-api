@@ -8,6 +8,7 @@ from django.core.validators import validate_email
 from django.db import models
 from django.db.models import F, Sum
 from django.utils import timezone
+from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from djmoney.models.fields import MoneyField
@@ -98,6 +99,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
+        verbose_name=_("User"),
     )
     pay_way = models.ForeignKey(
         "pay_way.PayWay",
@@ -105,6 +107,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
+        verbose_name=_("Payment Method"),
     )
     country = models.ForeignKey(
         "country.Country",
@@ -112,6 +115,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
+        verbose_name=_("Country"),
     )
     region = models.ForeignKey(
         "region.Region",
@@ -119,6 +123,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
+        verbose_name=_("Region"),
     )
     floor = models.CharField(
         _("Floor"),
@@ -223,8 +228,10 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         choices=PaymentStatus,
         default=PaymentStatus.PENDING,
     )
+    # The gateway that took the charge; ``pay_way`` is the method the
+    # shopper chose, labelled "Payment Method" like its admin section.
     payment_method = models.CharField(
-        _("Payment Method"), max_length=50, blank=True, default=""
+        _("Payment Gateway"), max_length=50, blank=True, default=""
     )
     pay_way_key = models.CharField(
         _("Pay Way Key"),
@@ -477,7 +484,11 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         self._original_pay_way_id = self.pay_way_id
 
     def __str__(self) -> str:
-        return f"Order {self.id} - {self.first_name} {self.last_name}"
+        return gettext("Order %(id)s - %(first_name)s %(last_name)s") % {
+            "id": self.id,
+            "first_name": self.first_name,
+            "last_name": self.last_name,
+        }
 
     def save(self, *args: Any, **kwargs: Any) -> None:
         status_changed = bool(

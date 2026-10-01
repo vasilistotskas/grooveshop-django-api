@@ -231,6 +231,9 @@ class TestOrderChangelist:
 
         for _ in range(4):
             row()
+        # The new orders clear the cached sidebar counts, as they should;
+        # re-warm so only per-row cost is compared.
+        self._get(client)
         with CaptureQueriesContext(connection) as many:
             assert self._get(client).status_code == 200
 

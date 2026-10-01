@@ -12,6 +12,7 @@ from django.test import TestCase, override_settings
 from djmoney.models.fields import Money
 from parler.models import TranslatableModel
 
+from admin.base import BaseModelAdmin
 from admin.export import ExportActionMixin
 
 
@@ -45,10 +46,18 @@ class MockParlerMeta:
         return ["title", "description"]
 
 
+class _ExportAdmin(ExportActionMixin, BaseModelAdmin):
+    actions = ["export_csv", "export_xml"]
+
+
 class ExportActionMixinTest(TestCase):
     def setUp(self):
-        self.mixin = ExportActionMixin()
-        self.mixin.model = MockAdminModel
+        from django.contrib import admin
+
+        self.mixin = _ExportAdmin(MockAdminModel, admin.site)
+        # The actions' own gate (``permissions=["view"]``) is exercised
+        # by ``test_exporting_needs_only_view``; here it is granted.
+        self.mixin.has_view_permission = lambda request, obj=None: True
 
         self.request = HttpRequest()
         self.request.session = "session"
@@ -85,6 +94,13 @@ class ExportActionMixinTest(TestCase):
             raise models.ObjectDoesNotExist
 
         self.translatable_model_instance.get_translation = mock_get_translation
+
+    def test_exporting_needs_only_view(self):
+        """Read-only ledgers refuse ``change``; export must still work."""
+        for name in ("export_csv", "export_xml"):
+            assert getattr(ExportActionMixin, name).allowed_permissions == [
+                "view"
+            ]
 
     def test_get_exportable_fields(self):
         mock_opts = MagicMock(spec=Options)
@@ -428,12 +444,3 @@ class ExportActionMixinTest(TestCase):
             response["Content-Disposition"],
             "attachment; filename=test_model.xml",
         )
-
-    def test_get_export_formats(self):
-        formats = self.mixin.get_export_formats()
-
-        self.assertEqual(len(formats), 2)
-        self.assertEqual(formats[0]["format"], "csv")
-        self.assertEqual(formats[0]["label"], "CSV")
-        self.assertEqual(formats[1]["format"], "xml")
-        self.assertEqual(formats[1]["label"], "XML")

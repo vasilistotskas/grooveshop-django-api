@@ -4,6 +4,7 @@ from decimal import Decimal
 from django.contrib.postgres.indexes import BTreeIndex
 from django.core.validators import MinValueValidator
 from django.db import models
+from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from parler.fields import TranslationsForeignKey
@@ -53,10 +54,12 @@ class LoyaltyTier(
         ]
 
     def __str__(self):
-        return (
-            self.safe_translation_getter("name")
-            or f"Tier (level {self.required_level})"
-        )
+        name = self.safe_translation_getter("name")
+        if name:
+            return name
+        return gettext("Tier (level %(level)s)") % {
+            "level": self.required_level
+        }
 
     @property
     def main_image_path(self) -> str:

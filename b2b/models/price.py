@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
+from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from djmoney.models.fields import MoneyField
@@ -22,11 +23,13 @@ class PriceListItem(TimeStampMixinModel, UUIDModel):
         "b2b.CustomerGroup",
         related_name="price_items",
         on_delete=models.CASCADE,
+        verbose_name=_("Customer group"),
     )
     product = models.ForeignKey(
         "product.Product",
         related_name="b2b_prices",
         on_delete=models.CASCADE,
+        verbose_name=_("Product"),
     )
     net_price = MoneyField(
         _("Net price override"),
@@ -72,4 +75,8 @@ class PriceListItem(TimeStampMixinModel, UUIDModel):
         ]
 
     def __str__(self):
-        return f"{self.group} → product {self.product_id}: {self.net_price}"
+        return gettext("%(group)s → product %(product)s: %(price)s") % {
+            "group": self.group,
+            "product": self.product_id,
+            "price": self.net_price,
+        }

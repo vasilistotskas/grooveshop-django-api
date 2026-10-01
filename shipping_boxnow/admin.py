@@ -1,8 +1,8 @@
 import logging
 
 from django.contrib import admin, messages
+from django.shortcuts import redirect
 from django.urls import reverse
-from django.utils.html import conditional_escape, format_html
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import StackedInline, TabularInline
 from unfold.contrib.filters.admin import (
@@ -13,8 +13,9 @@ from unfold.decorators import action, display
 from unfold.enums import ActionVariant
 
 from admin.base import BaseModelAdmin
-from admin.displays import SHIPMENT_STATE_VARIANT, choice_label
+from admin.displays import SHIPMENT_STATE_VARIANT, change_link, choice_label
 from admin.mixins import IsSuperuserOnlyModelAdmin
+from order.models.order import Order
 from shipping_boxnow.enum.parcel_state import BoxNowParcelState
 from shipping_boxnow.models import (
     BoxNowLocker,
@@ -211,6 +212,7 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
         "order__email",
         "order__id",
     )
+    autocomplete_fields = ("order",)
     readonly_fields = (
         "uuid",
         "delivery_request_id",
@@ -237,7 +239,7 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
                     "parcel_id",
                     "label_url",
                 ),
-                "classes": ("wide",),
+                "classes": ("tab",),
             },
         ),
         (
@@ -248,7 +250,7 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
                     "locker",
                     "locker_external_id",
                 ),
-                "classes": ("wide",),
+                "classes": ("tab",),
                 "description": _(
                     "Edit 'Locker External ID' directly to override the "
                     "locker for stage testing (e.g. set to '4' per BoxNow's "
@@ -267,7 +269,7 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
                     "amount_to_be_collected",
                     "allow_return",
                 ),
-                "classes": ("wide",),
+                "classes": ("tab",),
             },
         ),
         (
@@ -279,14 +281,14 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
                     "last_event_at",
                     "cancel_requested_at",
                 ),
-                "classes": ("wide",),
+                "classes": ("tab",),
             },
         ),
         (
             _("Diagnostics"),
             {
                 "fields": ("metadata",),
-                "classes": ("collapse",),
+                "classes": ("tab",),
             },
         ),
     )
@@ -314,15 +316,14 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
 
     @admin.display(description=_("Order"))
     def order_link(self, obj):
-        url = reverse("admin:order_order_change", args=[obj.order_id])
-        safe_url = conditional_escape(url)
-        safe_id = conditional_escape(str(obj.order_id))
-        return format_html('<a href="{}">#{}</a>', safe_url, safe_id)
+        return change_link(
+            self.admin_site, Order, obj.order_id, f"#{obj.order_id}"
+        )
 
     # ── List (bulk) actions ─────────────────────────────────────────
 
     @action(
-        description=str(_("Cancel parcels via BoxNow API")),
+        description=_("Cancel parcels via BoxNow API"),
         variant=ActionVariant.DANGER,
         icon="cancel",
     )
@@ -373,7 +374,7 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
             )
 
     @action(
-        description=str(_("Re-fetch label URL from BoxNow")),
+        description=_("Re-fetch label URL from BoxNow"),
         variant=ActionVariant.INFO,
         icon="download",
     )
@@ -418,7 +419,7 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
             )
 
     @action(
-        description=str(_("Download voucher PDFs (zip)")),
+        description=_("Download voucher PDFs (zip)"),
         variant=ActionVariant.PRIMARY,
         icon="folder_zip",
     )
@@ -495,7 +496,7 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
     # ── Detail actions ──────────────────────────────────────────────
 
     @action(
-        description=str(_("Download BoxNow voucher (PDF)")),
+        description=_("Download BoxNow voucher (PDF)"),
         variant=ActionVariant.PRIMARY,
         icon="download",
     )
@@ -572,7 +573,7 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
         return response
 
     @action(
-        description=str(_("Create BoxNow parcel now")),
+        description=_("Create BoxNow parcel now"),
         variant=ActionVariant.PRIMARY,
         icon="local_shipping",
     )
@@ -626,7 +627,7 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
         return redirect(change_url)
 
     @action(
-        description=str(_("Cancel parcel via BoxNow API")),
+        description=_("Cancel parcel via BoxNow API"),
         variant=ActionVariant.DANGER,
         icon="cancel",
     )
@@ -766,20 +767,16 @@ class BoxNowLockerAdmin(BaseModelAdmin):
             },
         ),
     )
-    actions = ["sync_from_boxnow"]
+    actions_list = ["sync_from_boxnow"]
 
     @action(
-        description=str(_("Sync lockers from BoxNow API")),
+        description=_("Sync lockers from BoxNow API"),
         variant=ActionVariant.INFO,
         icon="sync",
     )
-    def sync_from_boxnow(self, request, queryset):
-        """
-        Trigger a full locker sync from the BoxNow destination API.
-
-        The queryset is intentionally ignored — ``sync_lockers()`` always
-        fetches and upserts the full set of active APM locations.
-        """
+    def sync_from_boxnow(self, request):
+        """Fetch and upsert every active APM location from BoxNow's
+        destination API — the whole set, never a selection."""
         from shipping_boxnow.services import BoxNowService
 
         try:
@@ -804,6 +801,11 @@ class BoxNowLockerAdmin(BaseModelAdmin):
                 request,
                 _("Locker sync failed: %(err)s") % {"err": str(exc)},
             )
+        return redirect(
+            reverse(
+                f"{self.admin_site.name}:shipping_boxnow_boxnowlocker_changelist"
+            )
+        )
 
 
 # ── BoxNowParcelEvent admin ─────────────────────────────────────────────────
@@ -819,6 +821,7 @@ class BoxNowParcelEventAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
         "display_name",
         "received_at",
     )
+    date_hierarchy = "event_time"
     list_filter = (
         "event_type",
         "parcel_state",

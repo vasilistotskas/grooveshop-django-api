@@ -6,7 +6,7 @@ import pytest
 from django.contrib.admin.sites import AdminSite
 from django.contrib.auth.models import User
 from django.test import RequestFactory, TestCase, override_settings
-from django.utils import timezone
+from django.utils import formats, timezone, translation
 from django.utils.translation import gettext
 from unfold.contrib.filters.admin import (
     FieldTextFilter,
@@ -400,8 +400,15 @@ class TestContactAdmin(TestCase):
         self.contact.save()
 
         result = self.admin.contact_timing(self.contact)
-        self.assertIn(self.contact.created_at.strftime("%d/%m/%Y"), result)
-        self.assertIn("ω", result)
+        self.assertIn(
+            formats.date_format(
+                timezone.localtime(self.contact.created_at), "SHORT_DATE_FORMAT"
+            ),
+            result,
+        )
+        with translation.override("en"):
+            self.assertIn("3", self.admin.contact_timing(self.contact))
+            self.assertIn("hour", self.admin.contact_timing(self.contact))
 
     @patch("contact.admin.timezone")
     def test_priority_urgent(self, mock_timezone):

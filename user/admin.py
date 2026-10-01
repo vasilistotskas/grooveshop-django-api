@@ -1,30 +1,38 @@
+from django import forms
 from django.contrib import admin, messages
 from django.contrib.auth.admin import GroupAdmin as BaseGroupAdmin
 from django.contrib.auth.models import Group
 from django.db import transaction
 from django.db.models import Count, Q
-from django.shortcuts import redirect
+from django.http import HttpResponse
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.html import format_html_join
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import TabularInline
 from unfold.contrib.filters.admin import (
+    AutocompleteSelectFilter,
     DropdownFilter,
     RangeDateFilter,
     RangeDateTimeFilter,
     RangeNumericListFilter,
     RelatedDropdownFilter,
 )
+from unfold.dataclasses import ActionDialog
+from unfold.datasets import BaseDataset
 from unfold.decorators import action, display
 from unfold.enums import ActionVariant
 from unfold.forms import (
     AdminPasswordChangeForm,
+    BaseDialogForm,
     UserChangeForm,
 )
 
 from admin.base import BaseModelAdmin, BaseTranslatableAdmin
+from admin.datasets import RelatedDatasetAdmin
 from admin.displays import (
+    ORDER_STATUS_VARIANT,
+    PAYMENT_STATUS_VARIANT,
     choice_label,
     format_dt,
     header_two_line,
@@ -35,6 +43,7 @@ from admin.mixins import IsSuperuserOnlyModelAdmin
 from loyalty.enum import TransactionType
 from loyalty.models.transaction import PointsTransaction
 from loyalty.services import LoyaltyService
+from tenant.membership import is_platform_superuser
 from user.forms import UserAccountCreationForm
 from user.models import UserAccount
 from user.models.address import UserAddress
@@ -64,45 +73,17 @@ USER_SUBSCRIPTION_STATUS_VARIANT: dict[str, str] = {
 
 
 class SubscriptionCountFilter(RangeNumericListFilter):
+    """Over ``subscription_count``, which ``UserAdmin`` always annotates."""
+
     title = _("Subscription Count")
     parameter_name = "subscription_count"
 
-    def queryset(self, request, queryset):
-        filters = {}
-
-        value_from = self.used_parameters.get(f"{self.parameter_name}_from")
-        if value_from:
-            filters["subscription_count__gte"] = value_from
-
-        value_to = self.used_parameters.get(f"{self.parameter_name}_to")
-        if value_to:
-            filters["subscription_count__lte"] = value_to
-
-        return queryset.filter(**filters) if filters else queryset
-
-    def expected_parameters(self):
-        return [f"{self.parameter_name}_from", f"{self.parameter_name}_to"]
-
 
 class AddressCountFilter(RangeNumericListFilter):
+    """Over ``address_count``, which ``UserAdmin`` always annotates."""
+
     title = _("Address Count")
     parameter_name = "address_count"
-
-    def queryset(self, request, queryset):
-        filters = {}
-
-        value_from = self.used_parameters.get(f"{self.parameter_name}_from")
-        if value_from:
-            filters["address_count__gte"] = value_from
-
-        value_to = self.used_parameters.get(f"{self.parameter_name}_to")
-        if value_to:
-            filters["address_count__lte"] = value_to
-
-        return queryset.filter(**filters) if filters else queryset
-
-    def expected_parameters(self):
-        return [f"{self.parameter_name}_from", f"{self.parameter_name}_to"]
 
 
 class UserStatusFilter(DropdownFilter):
@@ -249,6 +230,51 @@ class GroupAdmin(BaseGroupAdmin, BaseModelAdmin):  # ty: ignore[invalid-method-o
     pass
 
 
+class AdjustLoyaltyPointsForm(BaseDialogForm):
+    points = forms.IntegerField(
+        label=_("Points"),
+        min_value=-10000,
+        max_value=10000,
+        help_text=_("Positive awards points, negative removes them"),
+    )
+    reason = forms.CharField(
+        label=_("Reason"),
+        max_length=255,
+        help_text=_("Recorded on the points ledger"),
+    )
+
+
+class CustomerOrderDatasetAdmin(RelatedDatasetAdmin):
+    parent_field = "user"
+    list_display = (
+        "id",
+        "status_label",
+        "payment_status_label",
+        "paid_amount",
+        "created_at",
+    )
+    list_display_links = ("id",)
+    ordering = ("-created_at",)
+
+    status_label = choice_label(
+        "status", variants=ORDER_STATUS_VARIANT, description=_("Status")
+    )
+    payment_status_label = choice_label(
+        "payment_status",
+        variants=PAYMENT_STATUS_VARIANT,
+        description=_("Payment"),
+    )
+
+
+class CustomerOrderDataset(BaseDataset):
+    from order.models import Order
+
+    model = Order
+    model_admin = CustomerOrderDatasetAdmin
+    title = _("Orders")
+    tab = True
+
+
 @admin.register(UserAccount)
 class UserAdmin(ExportActionMixin, BaseModelAdmin):
     actions = ["export_csv", "export_xml"]
@@ -279,8 +305,8 @@ class UserAdmin(ExportActionMixin, BaseModelAdmin):
         "is_active",
         "is_staff",
         "is_superuser",
-        ("country", RelatedDropdownFilter),
-        ("region", RelatedDropdownFilter),
+        ("country", AutocompleteSelectFilter),
+        ("region", AutocompleteSelectFilter),
         SubscriptionCountFilter,
         AddressCountFilter,
         ("created_at", RangeDateTimeFilter),
@@ -343,26 +369,34 @@ class UserAdmin(ExportActionMixin, BaseModelAdmin):
 
     fieldsets = (
         (
-            _("Account Credentials"),
-            {"fields": ("email", "username", "password"), "classes": ("wide",)},
+            _("Account"),
+            {
+                "classes": ("tab",),
+                "fields": (
+                    "email",
+                    "username",
+                    "password",
+                ),
+            },
         ),
         (
-            _("Personal Information"),
+            _("Profile"),
             {
+                "classes": ("tab",),
                 "fields": (
                     "first_name",
                     "last_name",
                     "phone",
                     "birth_date",
                     "image",
+                    "bio",
                 ),
-                "classes": ("wide",),
             },
         ),
-        (_("Bio & Description"), {"fields": ("bio",), "classes": ("wide",)}),
         (
-            _("Location & Address"),
+            _("Address"),
             {
+                "classes": ("tab",),
                 "fields": (
                     "address",
                     "city",
@@ -371,12 +405,12 @@ class UserAdmin(ExportActionMixin, BaseModelAdmin):
                     "country",
                     "region",
                 ),
-                "classes": ("wide",),
             },
         ),
         (
-            _("Social Media & Website"),
+            _("Social"),
             {
+                "classes": ("tab",),
                 "fields": (
                     "website",
                     "linkedin",
@@ -387,12 +421,12 @@ class UserAdmin(ExportActionMixin, BaseModelAdmin):
                     "youtube",
                     "social_links_summary",
                 ),
-                "classes": ("wide",),
             },
         ),
         (
-            _("Account Permissions"),
+            _("Permissions"),
             {
+                "classes": ("tab",),
                 "fields": (
                     "is_active",
                     "is_staff",
@@ -400,33 +434,22 @@ class UserAdmin(ExportActionMixin, BaseModelAdmin):
                     "groups",
                     "user_permissions",
                 ),
-                "classes": ("wide",),
             },
         ),
         (
-            _("Subscriptions & Engagement"),
+            _("Loyalty & Engagement"),
             {
-                "fields": ("engagement_metrics",),
-                "classes": ("collapse",),
-            },
-        ),
-        (
-            _("Loyalty & Rewards"),
-            {
+                "classes": ("tab",),
                 "fields": (
                     "loyalty_points_balance",
                     "loyalty_total_xp",
                     "loyalty_level",
                     "loyalty_tier_name",
+                    "engagement_metrics",
+                    "id",
+                    "created_at",
+                    "updated_at",
                 ),
-                "classes": ("wide",),
-            },
-        ),
-        (
-            _("System Information"),
-            {
-                "fields": ("id", "created_at", "updated_at"),
-                "classes": ("collapse",),
             },
         ),
     )
@@ -441,6 +464,7 @@ class UserAdmin(ExportActionMixin, BaseModelAdmin):
         ),
     )
     inlines = [UserAddressInline, UserSubscriptionInline]
+    change_form_datasets = [CustomerOrderDataset]
 
     def get_form(self, request, obj=None, change=False, **kwargs):
         # Unfold's ``ModelAdmin.get_fieldsets`` swaps in ``add_fieldsets``
@@ -564,89 +588,49 @@ class UserAdmin(ExportActionMixin, BaseModelAdmin):
         return str(tier) if tier else _("No tier")
 
     @action(
-        description=str(_("Adjust loyalty points for this user")),
-        permissions=("change",),
-        variant=ActionVariant.INFO,
+        description=_("Adjust loyalty points"),
+        permissions=["change", "adjust_loyalty_points"],
         icon="loyalty",
+        dialog=ActionDialog(
+            title=_("Adjust loyalty points"),
+            description=_(
+                "Writes an adjustment row on the customer's points ledger; "
+                "it cannot be undone, only offset by another adjustment."
+            ),
+            form_class=AdjustLoyaltyPointsForm,
+        ),
     )
-    def adjust_loyalty_points(self, request, object_id):
-        """Award a flat points adjustment to the user on this change page.
-
-        Unfold detail-action signature is ``(self, request, object_id)``
-        — the URL pattern is ``<path:object_id>/<action>/``. Older code
-        took ``queryset`` and iterated it, which silently iterated the
-        id string character-by-character and awarded points to the
-        wrong users.
-
-        ``points_amount`` may be provided via POST or GET; defaults to
-        100 when absent. Only superusers may call this action.
-        """
-        change_url = reverse("admin:user_useraccount_change", args=[object_id])
-
-        if not request.user.is_superuser:
-            messages.error(
-                request,
-                _("Only superusers may adjust loyalty points directly."),
-            )
-            return redirect(change_url)
-
-        raw_amount = (
-            request.POST.get("points_amount")
-            or request.GET.get("points_amount")
-            or "100"
-        )
-        description = (
-            request.POST.get("description")
-            or request.GET.get("description")
-            or "Manual admin adjustment"
-        )
-        try:
-            points_amount = int(raw_amount)
-        except ValueError, TypeError:
-            messages.error(
-                request,
-                _("Invalid points amount: %(val)s") % {"val": raw_amount},
-            )
-            return redirect(change_url)
-
-        if not (-10000 <= points_amount <= 10000):
-            messages.error(
-                request,
-                _(
-                    "Points amount %(val)d is out of range "
-                    "(must be between -10000 and 10000)."
-                )
-                % {"val": points_amount},
-            )
-            return redirect(change_url)
-
-        try:
-            user = UserAccount.objects.get(pk=object_id)
-        except UserAccount.DoesNotExist, ValueError, TypeError:
-            messages.error(request, _("User not found."))
-            return redirect(change_url)
-
+    def adjust_loyalty_points(
+        self, request, form, object_id=None, **kwargs
+    ) -> HttpResponse:
+        user = UserAccount.objects.get(pk=object_id)
+        points = form.cleaned_data["points"]
         PointsTransaction.objects.create(
             user=user,
-            points=points_amount,
+            points=points,
             transaction_type=TransactionType.ADJUST,
-            description=description,
+            description=form.cleaned_data["reason"],
             created_by=request.user,
-        )
-        messages.warning(
-            request,
-            _(
-                "Admin adjustment of %(points)d points applied to %(user)s. "
-                "This action is logged and cannot be undone."
-            )
-            % {"points": points_amount, "user": user},
         )
         self.message_user(
             request,
             _("%(user)s received a %(points)d loyalty points adjustment.")
-            % {"user": user, "points": points_amount},
+            % {"user": user, "points": points},
+            messages.SUCCESS,
         )
-        return redirect(change_url)
+        return HttpResponse(
+            headers={
+                "HX-Redirect": reverse(
+                    f"{self.admin_site.name}:user_useraccount_change",
+                    args=[object_id],
+                ),
+            }
+        )
+
+    def has_adjust_loyalty_points_permission(self, request, object_id=None):
+        """Points are money-like: only a platform superuser adjusts
+        them by hand."""
+        return is_platform_superuser(request.user)
 
     actions_detail = ["adjust_loyalty_points"]
 
@@ -666,8 +650,8 @@ class UserAddressAdmin(BaseModelAdmin):
         "is_main",
         "floor",
         "location_type",
-        ("country", RelatedDropdownFilter),
-        ("region", RelatedDropdownFilter),
+        ("country", AutocompleteSelectFilter),
+        ("region", AutocompleteSelectFilter),
         ("created_at", RangeDateTimeFilter),
     ]
 
@@ -682,6 +666,7 @@ class UserAddressAdmin(BaseModelAdmin):
     ]
 
     list_select_related = ["user", "country", "region"]
+    autocomplete_fields = ("user",)
     readonly_fields = ["id", "created_at", "updated_at"]
 
     fieldsets = (
@@ -846,6 +831,7 @@ class UserSubscriptionAdmin(BaseModelAdmin):
         "subscription_dates",
         "created_at",
     ]
+    date_hierarchy = "created_at"
 
     list_filter = [
         "status",
@@ -956,7 +942,9 @@ class UserSubscriptionAdmin(BaseModelAdmin):
 
     @display(description=_("Subscription"), ordering="created_at")
     def subscription_info(self, obj):
-        return f"#{obj.id} — {format_dt(obj.created_at, fmt='%d/%m/%Y')}"
+        return (
+            f"#{obj.id} — {format_dt(obj.created_at, fmt='SHORT_DATE_FORMAT')}"
+        )
 
     @display(description=_("User"))
     def user_info(self, obj):
@@ -988,7 +976,7 @@ class UserSubscriptionAdmin(BaseModelAdmin):
         return False
 
     @action(
-        description=str(_("Resend confirmation")),
+        description=_("Resend confirmation"),
         variant=ActionVariant.INFO,
         icon="forward_to_inbox",
     )
@@ -1023,7 +1011,7 @@ class UserSubscriptionAdmin(BaseModelAdmin):
         )
 
     @action(
-        description=str(_("Deactivate selected subscriptions")),
+        description=_("Deactivate selected subscriptions"),
         variant=ActionVariant.WARNING,
         icon="cancel",
     )
@@ -1054,6 +1042,7 @@ class UserDataExportAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
         "expires_at",
         "created_at",
     )
+    date_hierarchy = "created_at"
     list_filter = (
         "status",
         ("created_at", RangeDateTimeFilter),

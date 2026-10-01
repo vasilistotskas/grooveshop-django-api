@@ -34,6 +34,7 @@ class ProductCategory(
         null=True,
         related_name="children",
         on_delete=models.CASCADE,
+        verbose_name=_("Parent"),
     )
     translations = TranslatedFields(
         name=models.CharField(_("Name"), max_length=255, blank=True, null=True),

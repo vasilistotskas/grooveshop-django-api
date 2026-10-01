@@ -1,7 +1,7 @@
 """Plan & Billing reference page for the platform control plane.
 
 A custom Unfold page (``UnfoldSiteViewMixin`` — verified against
-django-unfold 0.104.1) mounted only on ``PlatformAdminSite``, so it is
+django-unfold 0.108.0) mounted only on ``PlatformAdminSite``, so it is
 structurally absent from every merchant admin rather than
 reachable-but-403.
 
@@ -33,14 +33,6 @@ from unfold.views import UnfoldSiteViewMixin
 # what the automation will do.
 from tenant.billing import billing_config, billing_state
 
-# Billing states, in the order an operator should care about them.
-# Presentation per state: (label, unfold label tone, material icon).
-#
-# Canonical map lives in tenant/admin.py (the Tenants changelist's own
-# billing-state badge column) — imported lazily below to avoid a
-# module-load-time circular import, mirroring how ``_billing_table``
-# already borrows ``_PLAN_BADGES``/``_unfold_label`` from there.
-
 
 def _billing_rows(today: date) -> list[dict[str, Any]]:
     """One row per store (the public schema is the platform, not a store)."""
@@ -57,11 +49,10 @@ def _billing_rows(today: date) -> list[dict[str, Any]]:
         primary = next((d for d in tenant.domains.all() if d.is_primary), None)
         rows.append(
             {
+                "tenant": tenant,
                 "name": tenant.store_name or tenant.name,
                 "schema": tenant.schema_name,
                 "domain": primary.domain if primary else "",
-                "plan": tenant.plan,
-                "plan_display": tenant.get_plan_display(),
                 "paid_until": tenant.paid_until,
                 "state": billing_state(tenant, today),
             }
@@ -72,38 +63,24 @@ def _billing_rows(today: date) -> list[dict[str, Any]]:
 def _billing_table(rows: list[dict[str, Any]]) -> dict[str, Any]:
     """Shape rows for ``unfold/components/table.html``.
 
-    Badge cells go through ``_unfold_label`` (fixed strings only) and
-    are safe; tenant-supplied names/domains stay plain strings so the
-    component escapes them — same contract as the dashboard table.
+    Badge cells are rendered labels (``tenant.admin_labels``, the same
+    vocabulary as the Tenants list); tenant-supplied names/domains stay
+    plain strings so the component escapes them.
     """
     from django.utils.formats import date_format
-    from django.utils.safestring import mark_safe
 
-    # Same badge maps + renderer the Tenants changelist uses, so the two
-    # surfaces cannot drift as tiers/states change.
-    from tenant.admin import (
-        _PLAN_BADGES,
-        _STATE_BADGES,
-        _unfold_label,
-    )
+    from tenant.admin_labels import billing_badge, plan_badge
 
-    table_rows = []
-    for row in rows:
-        plan_icon, plan_tone = _PLAN_BADGES.get(row["plan"], ("help", "info"))
-        state_label, state_tone, state_icon = _STATE_BADGES[row["state"]]
-        table_rows.append(
-            [
-                row["name"],
-                row["domain"] or "—",
-                mark_safe(
-                    _unfold_label(row["plan_display"], plan_tone, plan_icon)
-                ),
-                date_format(row["paid_until"]) if row["paid_until"] else "—",
-                mark_safe(
-                    _unfold_label(str(state_label), state_tone, state_icon)
-                ),
-            ]
-        )
+    table_rows = [
+        [
+            row["name"],
+            row["domain"] or "—",
+            plan_badge(row["tenant"]),
+            date_format(row["paid_until"]) if row["paid_until"] else "—",
+            billing_badge(row["state"]),
+        ]
+        for row in rows
+    ]
 
     # The module-level lazy ``_``: evaluated at render time in the
     # request's locale, and — unlike a ``gettext``-under-alias local —
@@ -136,19 +113,48 @@ class PlanBillingView(UnfoldSiteViewMixin, TemplateView):
 
         context = super().get_context_data(**kwargs)
 
+        from django.urls import reverse
+
+        from tenant.admin_labels import BILLING_BADGES, plan_badges
+
         today = timezone.localdate()
         rows = _billing_rows(today)
         states = [row["state"] for row in rows]
         conf = billing_config()
+        counters = [
+            ("trial", _("Trials"), states.count("trial")),
+            ("paid", _("Paid & current"), states.count("paid")),
+            (
+                "expiring",
+                _("Expiring within %(days)d days")
+                % {"days": conf["WARN_DAYS"]},
+                states.count("expiring"),
+            ),
+            (
+                "past_due",
+                _("Past due / no term"),
+                states.count("past_due") + states.count("unbilled"),
+            ),
+        ]
         context.update(
             {
                 "billing_rows": rows,
                 "billing_table": _billing_table(rows),
-                "billing_trial_count": states.count("trial"),
-                "billing_paid_count": states.count("paid"),
-                "billing_expiring_count": states.count("expiring"),
-                "billing_past_due_count": states.count("past_due")
-                + states.count("unbilled"),
+                # Tone and icon from the same vocabulary as the badges.
+                "billing_kpis": [
+                    {
+                        "label": text,
+                        "value": value,
+                        "tone": BILLING_BADGES[state][1],
+                        "icon": BILLING_BADGES[state][2],
+                    }
+                    for state, text, value in counters
+                ],
+                "plan_badges": plan_badges(),
+                # This page exists only on the platform site.
+                "tenants_url": reverse(
+                    f"{self.admin_site.name}:tenant_tenant_changelist"
+                ),
                 "expiry_warning_days": conf["WARN_DAYS"],
                 "billing_grace_days": conf["GRACE_DAYS"],
                 "billing_auto_suspend": conf["AUTO_SUSPEND"],

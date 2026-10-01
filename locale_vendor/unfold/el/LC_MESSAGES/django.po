@@ -1,0 +1,505 @@
+# Greek translation of django-unfold's own strings, which Unfold does
+# not ship. Regenerate with `manage.py makemessages_unfold -l el`.
+msgid ""
+msgstr ""
+"Project-Id-Version: grooveshop-django-api (django-unfold)\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-01 03:32+0300\n"
+"PO-Revision-Date: 2026-10-01 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: Greek\n"
+"Language: el\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "Select record"
+msgstr "Επιλογή εγγραφής"
+
+msgid "Select action"
+msgstr "Επιλογή ενέργειας"
+
+msgid "Collapse"
+msgstr "Σύμπτυξη"
+
+msgid "Name"
+msgstr "Όνομα"
+
+msgid "Value"
+msgstr "Τιμή"
+
+msgid "Default"
+msgstr "Προεπιλογή"
+
+msgid "Code"
+msgstr "Κώδικας"
+
+msgid "Current file"
+msgstr "Τρέχον αρχείο"
+
+msgid "Reset to default"
+msgstr "Επαναφορά στην προεπιλογή"
+
+msgid "From"
+msgstr "Από"
+
+msgid "To"
+msgstr "Έως"
+
+msgid "Date from"
+msgstr "Ημερομηνία από"
+
+msgid "Date to"
+msgstr "Ημερομηνία έως"
+
+msgid "Not enough data."
+msgstr "Δεν υπάρχουν αρκετά δεδομένα."
+
+msgid "Add new item"
+msgstr "Προσθήκη νέου στοιχείου"
+
+msgid "Paragraph"
+msgstr "Παράγραφος"
+
+msgid "Underlined"
+msgstr "Υπογράμμιση"
+
+msgid "Bold"
+msgstr "Έντονα"
+
+msgid "Italic"
+msgstr "Πλάγια"
+
+msgid "Strike"
+msgstr "Διακριτή διαγραφή"
+
+msgid "Link"
+msgstr "Σύνδεσμος"
+
+msgid "Heading"
+msgstr "Επικεφαλίδα"
+
+msgid "Quote"
+msgstr "Παράθεση"
+
+msgid "Unordered list"
+msgstr "Λίστα με κουκκίδες"
+
+msgid "Ordered list"
+msgstr "Αριθμημένη λίστα"
+
+msgid "Indent increase"
+msgstr "Αύξηση εσοχής"
+
+msgid "Indent decrease"
+msgstr "Μείωση εσοχής"
+
+msgid "Undo"
+msgstr "Αναίρεση"
+
+msgid "Redo"
+msgstr "Επανάληψη"
+
+msgid "Enter an URL"
+msgstr "Εισαγάγετε μια διεύθυνση URL"
+
+msgid "Unlink"
+msgstr "Αφαίρεση συνδέσμου"
+
+msgid "Object permissions"
+msgstr "Δικαιώματα αντικειμένου"
+
+msgid "Object"
+msgstr "Αντικείμενο"
+
+msgid "Group"
+msgstr "Ομάδα"
+
+msgid "Group permissions"
+msgstr "Δικαιώματα ομάδας"
+
+msgid "Edit"
+msgstr "Επεξεργασία"
+
+msgid "Manage group"
+msgstr "Διαχείριση ομάδας"
+
+msgid "User permissions"
+msgstr "Δικαιώματα χρήστη"
+
+msgid "Manage user"
+msgstr "Διαχείριση χρήστη"
+
+msgctxt "verb"
+msgid "impersonate"
+msgstr "σύνδεση ως"
+
+#, python-format
+msgid "impersonate %(username)s"
+msgstr "σύνδεση ως %(username)s"
+
+#, python-format
+msgid "You are currently working on behalf of <em>%(user)s</em>."
+msgstr "Αυτή τη στιγμή εργάζεστε εκ μέρους του χρήστη <em>%(user)s</em>."
+
+msgid "stop impersonating"
+msgstr "διακοπή σύνδεσης ως άλλος χρήστης"
+
+msgid "hide warning"
+msgstr "απόκρυψη προειδοποίησης"
+
+msgid "Select format"
+msgstr "Επιλογή μορφής"
+
+msgid "Export"
+msgstr "Εξαγωγή"
+
+msgid "Import"
+msgstr "Εισαγωγή"
+
+#, python-format
+msgid ""
+"\n"
+"                    Export %(len)s selected item.\n"
+"                "
+msgid_plural ""
+"\n"
+"                    Export %(len)s selected items.\n"
+"                "
+msgstr[0] ""
+"\n"
+"                    Εξαγωγή %(len)s επιλεγμένου στοιχείου.\n"
+"                "
+msgstr[1] ""
+"\n"
+"                    Εξαγωγή %(len)s επιλεγμένων στοιχείων.\n"
+"                "
+
+msgid "This exporter will export the following fields"
+msgstr "Η εξαγωγή θα περιλάβει τα παρακάτω πεδία"
+
+msgid "Submit"
+msgstr "Υποβολή"
+
+msgid ""
+"Below is a preview of data to be imported. If you are satisfied with the "
+"results, click 'Confirm import'"
+msgstr ""
+"Παρακάτω είναι μια προεπισκόπηση των δεδομένων που θα εισαχθούν. Αν είστε "
+"ικανοποιημένοι με το αποτέλεσμα, πατήστε «Επιβεβαίωση εισαγωγής»"
+
+msgid "Confirm import"
+msgstr "Επιβεβαίωση εισαγωγής"
+
+msgid "Line number"
+msgstr "Αριθμός γραμμής"
+
+msgid "View traceback"
+msgstr "Προβολή traceback"
+
+msgid "New"
+msgstr "Νέο"
+
+msgid "Skipped"
+msgstr "Παραλείφθηκε"
+
+msgid "Update"
+msgstr "Ενημέρωση"
+
+msgid "Some rows failed to validate"
+msgstr "Ορισμένες γραμμές δεν πέρασαν τον έλεγχο"
+
+msgid ""
+"Please correct these errors in your data where possible, then reupload it "
+"using the form above."
+msgstr ""
+"Διορθώστε αυτά τα σφάλματα στα δεδομένα σας όπου είναι δυνατό και ανεβάστε "
+"τα ξανά με την παραπάνω φόρμα."
+
+msgid "Row"
+msgstr "Γραμμή"
+
+msgid "Non field specific"
+msgstr "Χωρίς συγκεκριμένο πεδίο"
+
+msgid "This exporter will export the following fields: "
+msgstr "Η εξαγωγή θα περιλάβει τα παρακάτω πεδία: "
+
+msgid "This importer will import the following fields: "
+msgstr "Η εισαγωγή θα περιλάβει τα παρακάτω πεδία: "
+
+msgid ""
+"Choose a date from the list below to revert to a previous version of this "
+"object"
+msgstr ""
+"Επιλέξτε μια ημερομηνία από την παρακάτω λίστα για να επαναφέρετε μια "
+"προηγούμενη έκδοση αυτού του αντικειμένου"
+
+msgid "entry"
+msgid_plural "entries"
+msgstr[0] "καταχώριση"
+msgstr[1] "καταχωρίσεις"
+
+msgid "This object doesn't have a change history."
+msgstr "Αυτό το αντικείμενο δεν έχει ιστορικό αλλαγών."
+
+msgid ""
+"Press the 'Revert' button below to revert to this version of the object."
+msgstr ""
+"Πατήστε το κουμπί «Επαναφορά» παρακάτω για να επαναφέρετε αυτή την έκδοση "
+"του αντικειμένου."
+
+msgid "Press the 'Change History' button below to edit the history."
+msgstr ""
+"Πατήστε το κουμπί «Αλλαγή ιστορικού» παρακάτω για να επεξεργαστείτε το "
+"ιστορικό."
+
+msgid "Changed by"
+msgstr "Αλλαγή από"
+
+msgid "Comment"
+msgstr "Σχόλιο"
+
+msgid "Change reason"
+msgstr "Αιτία αλλαγής"
+
+msgid "Changes"
+msgstr "Αλλαγές"
+
+msgid "Field"
+msgstr "Πεδίο"
+
+msgid "Old value"
+msgstr "Παλιά τιμή"
+
+msgid "New value"
+msgstr "Νέα τιμή"
+
+msgid "Revert"
+msgstr "Επαναφορά"
+
+msgid "Change History"
+msgstr "Αλλαγή ιστορικού"
+
+msgid "Select action to run"
+msgstr "Επιλέξτε ενέργεια για εκτέλεση"
+
+msgid ""
+"Raw passwords are not stored, so there is no way to see this user’s "
+"password, but you can change the password using <a href=\"{}\" class=\"text-"
+"primary-600 dark:text-primary-500\">this form</a>."
+msgstr ""
+"Οι κωδικοί πρόσβασης δεν αποθηκεύονται αυτούσιοι, οπότε δεν υπάρχει τρόπος "
+"να δείτε τον κωδικό αυτού του χρήστη, μπορείτε όμως να τον αλλάξετε με <a "
+"href=\"{}\" class=\"text-primary-600 dark:text-primary-500\">αυτή τη "
+"φόρμα</a>."
+
+msgid "Dataset not found. No action performed."
+msgstr "Το σύνολο δεδομένων δεν βρέθηκε. Δεν εκτελέστηκε καμία ενέργεια."
+
+msgid "Select value"
+msgstr "Επιλογή τιμής"
+
+#, python-brace-format
+msgid ""
+"Field <strong class=\"font-semibold\">{field_name}</strong> is not an "
+"autocomplete field. Please add it to the `autocomplete_fields` list."
+msgstr ""
+"Το πεδίο <strong class=\"font-semibold\">{field_name}</strong> δεν είναι "
+"πεδίο αυτόματης συμπλήρωσης. Προσθέστε το στη λίστα `autocomplete_fields`."
+
+msgid "You can not create nested object without parent"
+msgstr "Δεν μπορείτε να δημιουργήσετε εμφωλευμένο αντικείμενο χωρίς γονικό"
+
+msgid "Run"
+msgstr "Εκτέλεση"
+
+msgid "After you've created a user, you’ll be able to edit more user options."
+msgstr ""
+"Αφού δημιουργήσετε τον χρήστη, θα μπορείτε να επεξεργαστείτε περισσότερες "
+"επιλογές του."
+
+msgid "Welcome back to"
+msgstr "Καλώς ήρθατε ξανά στο"
+
+msgid "Type to search"
+msgstr "Πληκτρολογήστε για αναζήτηση"
+
+msgid "You have been successfully logged out from the administration"
+msgstr "Αποσυνδεθήκατε επιτυχώς από τη διαχείριση"
+
+msgid "Thanks for spending some quality time with the web site today."
+msgstr "Ευχαριστούμε για τον χρόνο που περάσατε σήμερα στον ιστότοπο."
+
+msgid "No data"
+msgstr "Δεν υπάρχουν δεδομένα"
+
+msgid "All applications"
+msgstr "Όλες οι εφαρμογές"
+
+msgid "True"
+msgstr "Ναι"
+
+msgid "False"
+msgstr "Όχι"
+
+msgid "Apply Filters"
+msgstr "Εφαρμογή φίλτρων"
+
+msgid "Hide counts"
+msgstr "Απόκρυψη πλήθους"
+
+msgid "Show counts"
+msgstr "Εμφάνιση πλήθους"
+
+msgid "Filters"
+msgstr "Φίλτρα"
+
+msgid "Navigate"
+msgstr "Πλοήγηση"
+
+msgid "Select"
+msgstr "Επιλογή"
+
+msgid "Recent searches"
+msgstr "Πρόσφατες αναζητήσεις"
+
+msgid "Nothing matched your search"
+msgstr "Τίποτα δεν ταίριαξε με την αναζήτησή σας"
+
+#, python-format
+msgid ""
+"\n"
+"            Found <span class=\"font-medium text-important\">%(counter)s</span> result in %(time)s seconds\n"
+"        "
+msgid_plural ""
+"\n"
+"            Found <span class=\"font-medium text-important\">%(counter)s</span> results in %(time)s seconds\n"
+"        "
+msgstr[0] ""
+"\n"
+"            Βρέθηκε <span class=\"font-medium text-important\">%(counter)s</span> αποτέλεσμα σε %(time)s δευτερόλεπτα\n"
+"        "
+msgstr[1] ""
+"\n"
+"            Βρέθηκαν <span class=\"font-medium text-important\">%(counter)s</span> αποτελέσματα σε %(time)s δευτερόλεπτα\n"
+"        "
+
+msgid "Cancel"
+msgstr "Ακύρωση"
+
+msgid "Record picture"
+msgstr "Εικόνα εγγραφής"
+
+msgid "This item will be deleted."
+msgstr "Αυτό το στοιχείο θα διαγραφεί."
+
+msgid "Click to cancel"
+msgstr "Πατήστε για ακύρωση"
+
+msgid "No results found"
+msgstr "Δεν βρέθηκαν αποτελέσματα"
+
+msgid ""
+"This page yielded into no results. Create a new item or reset your filters."
+msgstr ""
+"Αυτή η σελίδα δεν έχει αποτελέσματα. Δημιουργήστε ένα νέο στοιχείο ή "
+"επαναφέρετε τα φίλτρα σας."
+
+msgid "Reset filters"
+msgstr "Επαναφορά φίλτρων"
+
+msgid "Image preview"
+msgstr "Προεπισκόπηση εικόνας"
+
+msgid "Click to download"
+msgstr "Πατήστε για λήψη"
+
+msgid "Go back"
+msgstr "Επιστροφή"
+
+msgid "Previous"
+msgstr "Προηγούμενη"
+
+msgid "Next"
+msgstr "Επόμενη"
+
+msgid "Search apps and models..."
+msgstr "Αναζήτηση εφαρμογών και μοντέλων..."
+
+msgid "Available shortcuts"
+msgstr "Διαθέσιμες συντομεύσεις"
+
+msgid "Global shortcuts"
+msgstr "Γενικές συντομεύσεις"
+
+msgid "Open command tool"
+msgstr "Άνοιγμα εργαλείου εντολών"
+
+msgid "Open shortcuts list"
+msgstr "Άνοιγμα λίστας συντομεύσεων"
+
+msgid "Toggle sidebar"
+msgstr "Εμφάνιση/απόκρυψη πλαϊνού μενού"
+
+msgid "Toggle dark/light mode"
+msgstr "Εναλλαγή σκούρου/φωτεινού θέματος"
+
+msgid "Changelist shortcuts"
+msgstr "Συντομεύσεις λίστας"
+
+msgid "Toggle filter"
+msgstr "Εμφάνιση/απόκρυψη φίλτρων"
+
+msgid "Create new record"
+msgstr "Δημιουργία νέας εγγραφής"
+
+msgid "Command tool shortcuts"
+msgstr "Συντομεύσεις εργαλείου εντολών"
+
+msgid "Open selection"
+msgstr "Άνοιγμα επιλογής"
+
+msgid "Open selection in new tab"
+msgstr "Άνοιγμα επιλογής σε νέα καρτέλα"
+
+msgid "General"
+msgstr "Γενικά"
+
+msgid "Light"
+msgstr "Φωτεινό"
+
+msgid "Dark"
+msgstr "Σκούρο"
+
+msgid "System"
+msgstr "Σύστημα"
+
+msgid "Return to site"
+msgstr "Επιστροφή στον ιστότοπο"
+
+msgid "Choose file to upload"
+msgstr "Επιλέξτε αρχείο για μεταφόρτωση"
+
+msgid "Toggle password visibility"
+msgstr "Εμφάνιση/απόκρυψη κωδικού"
+
+#, python-format
+msgid "View selected %(model)s"
+msgstr "Προβολή επιλεγμένου: %(model)s"
+
+msgid "Add row"
+msgstr "Προσθήκη γραμμής"
+
+msgid "Welcome"
+msgstr "Καλώς ήρθατε"
+
+msgid "Select all objects on this page for an action"
+msgstr "Επιλογή όλων των αντικειμένων της σελίδας για μια ενέργεια"
+
+msgid "Date"
+msgstr "Ημερομηνία"
+
+msgid "Select currency"
+msgstr "Επιλογή νομίσματος"

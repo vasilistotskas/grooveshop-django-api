@@ -3,6 +3,7 @@ from __future__ import annotations
 from django.conf import settings
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import ngettext
 
 
 class CachePurgeLogQuerySet(models.QuerySet):
@@ -73,9 +74,16 @@ class CachePurgeLog(models.Model):
         verbose_name = _("Cache purge log")
         verbose_name_plural = _("Cache purge logs")
         ordering = ("-created_at",)
+        # Gates the cache management page (``MyAdminSite.clear_cache_view``).
+        permissions = [("purge_cache", _("Can purge caches"))]
         indexes = [
             models.Index(fields=["-created_at"], name="cachelog_created_idx"),
         ]
 
     def __str__(self) -> str:
-        return f"CachePurgeLog #{self.pk} ({len(self.surfaces or [])} surfaces)"
+        count = len(self.surfaces or [])
+        return ngettext(
+            "Cache purge #%(id)s (%(count)s surface)",
+            "Cache purge #%(id)s (%(count)s surfaces)",
+            count,
+        ) % {"id": self.pk, "count": count}

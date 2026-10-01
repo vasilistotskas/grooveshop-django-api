@@ -28,6 +28,7 @@ from django.conf import settings
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models, transaction
 from django.utils import timezone
+from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from djmoney.models.fields import MoneyField
@@ -127,7 +128,10 @@ class InvoiceCounter(models.Model):
         verbose_name_plural = _("Invoice Counters")
 
     def __str__(self) -> str:
-        return f"{self.year}: next={self.next_number}"
+        return gettext("%(year)s: next number %(number)s") % {
+            "year": self.year,
+            "number": self.next_number,
+        }
 
     @classmethod
     def allocate(cls, year: int) -> str:
@@ -160,6 +164,7 @@ class Invoice(TimeStampMixinModel, UUIDModel):
         "order.Order",
         related_name="invoice",
         on_delete=models.PROTECT,
+        verbose_name=_("Order"),
     )
     invoice_number = models.CharField(
         _("Invoice Number"),

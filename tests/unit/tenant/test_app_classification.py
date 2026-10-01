@@ -170,3 +170,29 @@ class TestAdminNotExposedToMerchants:
         from tenant.role_scopes import PLATFORM_ONLY_APP_LABELS
 
         assert "admin" in PLATFORM_ONLY_APP_LABELS
+
+
+class TestTenantOnlyAppLabels:
+    """``tenant_only_app_labels`` is what store role scopes derive from."""
+
+    def test_excludes_apps_that_also_live_in_shared(self):
+        from tenant.app_labels import tenant_only_app_labels
+
+        labels = set(tenant_only_app_labels())
+        # In BOTH lists -> has a public copy -> not tenant-only.
+        assert "user" not in labels
+        assert "extra_settings" not in labels
+        assert "tenant" not in labels
+
+    def test_includes_per_store_first_and_third_party_apps(self):
+        from tenant.app_labels import tenant_only_app_labels
+
+        labels = set(tenant_only_app_labels())
+        for app in (
+            "order",
+            "page_config",
+            "shipping_acs",
+            "shipping_boxnow",
+            "djstripe",
+        ):
+            assert app in labels, f"{app} must be treated as tenant-only"

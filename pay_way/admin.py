@@ -1,17 +1,16 @@
 from django.contrib import admin
-from django.db.models import Q
-from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import TabularInline
 from unfold.contrib.filters.admin import (
     DropdownFilter,
     RangeDateTimeFilter,
-    RangeNumericListFilter,
+    RangeNumericFilter,
 )
 from unfold.decorators import action, display
 from unfold.enums import ActionVariant
 
 from admin.base import BaseTranslatableAdmin
+from admin.displays import header_two_line
 from pay_way.enum.settlement import PaySettlement
 from pay_way.models import PayWay, PayWayShippingExclusion
 
@@ -43,9 +42,7 @@ class PayWayShippingExclusionInline(TabularInline):
 
     model = PayWayShippingExclusion
     extra = 0
-    # ``country`` has no autocomplete: the country admin is
-    # platform-only, so a tenant-schema session would get a 403 from
-    # its autocomplete endpoint. A plain select always works.
+    tab = True
     fields = (
         "shipping_provider",
         "shipping_kind",
@@ -53,51 +50,9 @@ class PayWayShippingExclusionInline(TabularInline):
         "pay_way",
         "note",
     )
-    autocomplete_fields = ("pay_way", "shipping_provider")
+    autocomplete_fields = ("pay_way", "shipping_provider", "country")
     verbose_name = _("Payment-method exclusion")
     verbose_name_plural = _("Payment-method exclusions")
-
-
-class CostRangeFilter(RangeNumericListFilter):
-    title = _("Cost Range")
-    parameter_name = "cost_range"
-
-    def queryset(self, request, queryset):
-        filters = {}
-        value_from = self.used_parameters.get(f"{self.parameter_name}_from")
-        if value_from and value_from != "":
-            filters["cost__gte"] = value_from
-        value_to = self.used_parameters.get(f"{self.parameter_name}_to")
-        if value_to and value_to != "":
-            filters["cost__lte"] = value_to
-        return queryset.filter(**filters) if filters else queryset
-
-    def expected_parameters(self):
-        return [
-            f"{self.parameter_name}_from",
-            f"{self.parameter_name}_to",
-        ]
-
-
-class FreeThresholdFilter(RangeNumericListFilter):
-    title = _("Free Threshold Range")
-    parameter_name = "free_threshold_range"
-
-    def queryset(self, request, queryset):
-        filters = {}
-        value_from = self.used_parameters.get(f"{self.parameter_name}_from")
-        if value_from and value_from != "":
-            filters["free_threshold__gte"] = value_from
-        value_to = self.used_parameters.get(f"{self.parameter_name}_to")
-        if value_to and value_to != "":
-            filters["free_threshold__lte"] = value_to
-        return queryset.filter(**filters) if filters else queryset
-
-    def expected_parameters(self):
-        return [
-            f"{self.parameter_name}_from",
-            f"{self.parameter_name}_to",
-        ]
 
 
 class PaymentTypeFilter(DropdownFilter):
@@ -132,34 +87,6 @@ class PaymentTypeFilter(DropdownFilter):
         return queryset
 
 
-class ConfigurationStatusFilter(DropdownFilter):
-    title = _("Configuration Status")
-    parameter_name = "configuration_status"
-
-    def lookups(self, request, model_admin):
-        return [
-            ("configured", _("Configured")),
-            ("not_configured", _("Not Configured")),
-            ("no_config_needed", _("No Configuration Needed")),
-        ]
-
-    def queryset(self, request, queryset):
-        # Only ONLINE settlement needs provider configuration — the
-        # other three collect money without us calling a PSP.
-        online = Q(settlement=PaySettlement.ONLINE.value)
-        if self.value() == "configured":
-            return queryset.filter(online, configuration__isnull=False).exclude(
-                configuration={}
-            )
-        elif self.value() == "not_configured":
-            return queryset.filter(online).filter(
-                Q(configuration__isnull=True) | Q(configuration={})
-            )
-        elif self.value() == "no_config_needed":
-            return queryset.exclude(online)
-        return queryset
-
-
 @admin.register(PayWay)
 class PayWayAdmin(BaseTranslatableAdmin):
     list_display = (
@@ -168,16 +95,14 @@ class PayWayAdmin(BaseTranslatableAdmin):
         "payment_type_display",
         "cost_display",
         "free_threshold_display",
-        "icon_preview",
         "sort_order_display",
     )
 
     list_filter = [
         "active",
         PaymentTypeFilter,
-        ConfigurationStatusFilter,
-        CostRangeFilter,
-        FreeThresholdFilter,
+        ("cost", RangeNumericFilter),
+        ("free_threshold", RangeNumericFilter),
         ("created_at", RangeDateTimeFilter),
         ("updated_at", RangeDateTimeFilter),
     ]
@@ -195,89 +120,71 @@ class PayWayAdmin(BaseTranslatableAdmin):
         "id",
         "created_at",
         "updated_at",
-        "configuration",
-        "configuration_preview",
         "effective_cost_display",
-        "is_configured_status",
     ]
-
-    def get_readonly_fields(self, request, obj=None):
-        fields = list(super().get_readonly_fields(request, obj))
-        # Superusers may edit the raw configuration JSON directly.
-        if request.user.is_superuser and "configuration" in fields:
-            fields.remove("configuration")
-        return fields
 
     ordering = ["sort_order", "id"]
 
     actions = [
         "activate_payment_methods",
         "deactivate_payment_methods",
-        "move_up_in_order",
-        "move_down_in_order",
-        "reset_sort_order",
     ]
 
     inlines = [PayWayShippingExclusionInline]
 
     fieldsets = (
         (
-            _("Basic Information"),
-            {"fields": ("active", "sort_order"), "classes": ("wide",)},
-        ),
-        (
-            _("Display & Branding"),
-            {"fields": ("name", "icon"), "classes": ("wide",)},
-        ),
-        (
-            _("Content"),
-            {"fields": ("description", "instructions"), "classes": ("wide",)},
-        ),
-        (
-            _("Payment Configuration"),
+            _("General"),
             {
+                "classes": ("tab",),
+                "fields": (
+                    "active",
+                    "sort_order",
+                    "name",
+                    "icon",
+                    "description",
+                    "instructions",
+                ),
+            },
+        ),
+        (
+            _("Payment"),
+            {
+                "classes": ("tab",),
                 "fields": (
                     "provider_code",
                     "settlement",
+                    "cost",
+                    "free_threshold",
+                    "effective_cost_display",
                 ),
-                "classes": ("wide",),
             },
         ),
         (
-            _("Pricing"),
+            _("System"),
             {
-                "fields": ("cost", "free_threshold", "effective_cost_display"),
-                "classes": ("wide",),
-            },
-        ),
-        (
-            _("Advanced Configuration"),
-            {
+                "classes": ("tab",),
                 "fields": (
-                    "configuration",
-                    "configuration_preview",
-                    "is_configured_status",
+                    "id",
+                    "created_at",
+                    "updated_at",
                 ),
-                "classes": ("collapse",),
-            },
-        ),
-        (
-            _("System Information"),
-            {
-                "fields": ("id", "created_at", "updated_at"),
-                "classes": ("collapse",),
             },
         ),
     )
 
-    @admin.display(description=_("Name"))
+    @display(description=_("Name"), header=True)
     def name_display(self, obj):
         # ``display_name``, not the raw translation: the column stores a
         # PayWayEnum key, so this list showed "PAY_ON_DELIVERY". Note
         # ``search_fields`` still queries ``translations__name`` — it is
         # a DB lookup and cannot see a Python property, so staff search
         # by key, not by label.
-        return obj.display_name or _("Unnamed Payment Method")
+        return header_two_line(
+            obj.display_name or _("Unnamed Payment Method"),
+            image_path=obj.icon.url if obj.icon else None,
+            contained=True,
+        )
 
     @admin.display(description=_("Provider"))
     def provider_code_display(self, obj):
@@ -303,35 +210,11 @@ class PayWayAdmin(BaseTranslatableAdmin):
             }
         return _("No threshold")
 
-    @admin.display(description=_("Icon"))
-    def icon_preview(self, obj):
-        if obj.icon:
-            return format_html(
-                '<img src="{url}" class="h-8 max-w-16 object-contain" />',
-                url=obj.icon.url,
-            )
-        return _("No icon")
-
-    @admin.display(description=_("Configuration Preview"))
-    def configuration_preview(self, obj):
-        if not obj.configuration:
-            return _("No configuration")
-        keys = list(obj.configuration.keys())
-        if len(keys) > 3:
-            shown = [*keys[:3], _("... and %(n)d more") % {"n": len(keys) - 3}]
-        else:
-            shown = keys
-        return _("Configuration keys: %(keys)s") % {"keys": ", ".join(shown)}
-
     @admin.display(description=_("Effective Cost"))
     def effective_cost_display(self, obj):
         if obj.cost:
             return f"{obj.effective_cost} {obj.cost.currency}"
         return "0"
-
-    @admin.display(description=_("Ready Status"))
-    def is_configured_status(self, obj):
-        return _("Ready to use") if obj.is_configured else _("Requires setup")
 
     @admin.display(description=_("Order"))
     def sort_order_display(self, obj):
@@ -340,7 +223,7 @@ class PayWayAdmin(BaseTranslatableAdmin):
         return "-"
 
     @action(
-        description=str(_("Activate selected payment methods")),
+        description=_("Activate selected payment methods"),
         variant=ActionVariant.SUCCESS,
         icon="check_circle",
     )
@@ -353,7 +236,7 @@ class PayWayAdmin(BaseTranslatableAdmin):
         )
 
     @action(
-        description=str(_("Deactivate selected payment methods")),
+        description=_("Deactivate selected payment methods"),
         variant=ActionVariant.WARNING,
         icon="cancel",
     )
@@ -382,51 +265,3 @@ class PayWayAdmin(BaseTranslatableAdmin):
             pay_way.save(update_fields=["active"])
             changed += 1
         return changed
-
-    @action(
-        description=str(_("Move selected items up in sort order")),
-        variant=ActionVariant.INFO,
-        icon="keyboard_arrow_up",
-    )
-    def move_up_in_order(self, request, queryset):
-        moved_count = 0
-        for obj in queryset.order_by("sort_order"):
-            if obj.sort_order and obj.sort_order > 0:
-                obj.move_up()
-                moved_count += 1
-        self.message_user(
-            request,
-            _("%(count)d payment methods moved up in sort order.")
-            % {"count": moved_count},
-        )
-
-    @action(
-        description=str(_("Move selected items down in sort order")),
-        variant=ActionVariant.INFO,
-        icon="keyboard_arrow_down",
-    )
-    def move_down_in_order(self, request, queryset):
-        moved_count = 0
-        for obj in queryset.order_by("-sort_order"):
-            obj.move_down()
-            moved_count += 1
-        self.message_user(
-            request,
-            _("%(count)d payment methods moved down in sort order.")
-            % {"count": moved_count},
-        )
-
-    @action(
-        description=str(_("Reset sort order to default")),
-        variant=ActionVariant.INFO,
-        icon="sort",
-    )
-    def reset_sort_order(self, request, queryset):
-        for index, obj in enumerate(queryset.order_by("id"), start=1):
-            obj.sort_order = index * 10
-            obj.save(update_fields=["sort_order"])
-        self.message_user(
-            request,
-            _("Sort order has been reset for %(count)d payment methods.")
-            % {"count": queryset.count()},
-        )

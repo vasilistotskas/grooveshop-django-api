@@ -234,8 +234,13 @@ def _permissions_for_role(role: str) -> set[str]:
     """The permission set a role grants inside its tenant."""
     from tenant.models import TenantMembershipRole
     from tenant.role_scopes import (
+        REFERENCE_DATA_APP_LABELS,
         operational_app_labels,
         store_app_labels,
+    )
+
+    reference = _permissions_for_apps(
+        REFERENCE_DATA_APP_LABELS, actions=("view",)
     )
 
     if role == TenantMembershipRole.STAFF:
@@ -244,18 +249,21 @@ def _permissions_for_role(role: str) -> set[str]:
         # (TenantMembershipRole). Delete is withheld as well: it is the
         # irreversible action, and nothing in that description implies
         # it.
-        return _permissions_for_apps(
+        return reference | _permissions_for_apps(
             operational_app_labels(), actions=("view", "add", "change")
         )
 
     if role in (TenantMembershipRole.ADMIN, TenantMembershipRole.OWNER):
-        perms = _permissions_for_apps(store_app_labels())
+        perms = reference | _permissions_for_apps(store_app_labels())
         # Narrow, deliberate exceptions to "platform scope is never
         # granted": a store's own row and its own team. Object scoping
         # (own tenant only) is enforced in the ModelAdmin — this only
         # makes the pages reachable. add/delete Tenant and anything on
-        # TenantDomain stay platform-only.
+        # TenantDomain stay platform-only. Purging the store's own caches
+        # (keys are tenant-prefixed) is a settings-level operation, so
+        # STAFF does not get it.
         perms |= {
+            "core.purge_cache",
             "tenant.view_tenant",
             "tenant.change_tenant",
             "tenant.view_usertenantmembership",

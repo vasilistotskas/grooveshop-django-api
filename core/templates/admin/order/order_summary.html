@@ -1,0 +1,15 @@
+{% load unfold %}
+
+{% if order_summary %}
+    <div class="gap-4 grid grid-cols-2 mb-6 lg:grid-cols-6 md:grid-cols-3">
+        {% for item in order_summary %}
+            {% component "unfold/components/card.html" with size="md" %}
+                {% component "unfold/components/text.html" %}{{ item.title }}{% endcomponent %}
+                <div class="font-semibold my-1 text-important truncate">{{ item.value }}</div>
+                {% if item.footer %}
+                    {% component "unfold/components/text.html" with class="truncate" %}{{ item.footer }}{% endcomponent %}
+                {% endif %}
+            {% endcomponent %}
+        {% endfor %}
+    </div>
+{% endif %}

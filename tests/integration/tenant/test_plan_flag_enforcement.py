@@ -35,6 +35,8 @@ from giftcard.services import GiftCardService
 from loyalty.services import LoyaltyService
 from promotion.services import PromotionEngine
 
+pytestmark = pytest.mark.assert_english
+
 # (service, plan field on Tenant, merchant setting key)
 FEATURES = [
     (GiftCardService, "gift_cards_enabled", "GIFT_CARDS_ENABLED"),

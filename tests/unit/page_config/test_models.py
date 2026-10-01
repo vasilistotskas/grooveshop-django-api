@@ -1,3 +1,4 @@
+import pytest
 from django.db import IntegrityError
 from django.test import TestCase
 from django.utils import timezone
@@ -8,6 +9,8 @@ from page_config.models import (
     PageLayout,
     PageSection,
 )
+
+pytestmark = pytest.mark.assert_english
 
 
 class TestComponentType(TestCase):

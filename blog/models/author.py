@@ -11,7 +11,9 @@ from core.models import TimeStampMixinModel, UUIDModel
 
 class BlogAuthor(TranslatableModel, TimeStampMixinModel, UUIDModel):
     id = models.BigAutoField(primary_key=True)
-    user = models.OneToOneField("user.UserAccount", on_delete=models.PROTECT)
+    user = models.OneToOneField(
+        "user.UserAccount", on_delete=models.PROTECT, verbose_name=_("User")
+    )
     website = models.URLField(_("Website"), blank=True, default="")
     translations = TranslatedFields(
         bio=RichTextField(_("Bio"), blank=True, null=True)

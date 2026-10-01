@@ -1,12 +1,13 @@
 from django.contrib import admin
-from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from unfold.contrib.filters.admin import (
+    AutocompleteSelectFilter,
     RangeDateTimeFilter,
-    RelatedDropdownFilter,
 )
+from unfold.decorators import display
 
 from admin.base import BaseModelAdmin, BaseTranslatableAdmin
+from admin.displays import header_two_line
 from admin.export import ExportActionMixin
 from loyalty.models.tier import LoyaltyTier
 from loyalty.models.transaction import PointsTransaction
@@ -18,21 +19,19 @@ class LoyaltyTierAdmin(BaseTranslatableAdmin):
     hide_ordering_field = True
 
     list_display = (
-        "name",
+        "name_display",
         "required_level",
         "points_multiplier",
-        "icon_preview",
     )
     search_fields = ("translations__name",)
     ordering = ("required_level",)
 
-    @admin.display(description=_("Icon"), empty_value="—")
-    def icon_preview(self, obj):
-        if not obj.icon:
-            return None
-        return format_html(
-            '<img src="{url}" width="64" height="32" alt="" />',
-            url=obj.icon.url,
+    @display(description=_("Name"), header=True)
+    def name_display(self, obj):
+        return header_two_line(
+            obj.safe_translation_getter("name", any_language=True),
+            image_path=obj.icon.url if obj.icon else None,
+            contained=True,
         )
 
 
@@ -49,7 +48,7 @@ class PointsTransactionAdmin(ExportActionMixin, BaseModelAdmin):
     )
     list_filter = (
         "transaction_type",
-        ("user", RelatedDropdownFilter),
+        ("user", AutocompleteSelectFilter),
         ("created_at", RangeDateTimeFilter),
     )
     search_fields = (

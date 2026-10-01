@@ -16,7 +16,6 @@ dependencies = [
   "channels[daphne]==4.3.2",
   "channels-redis==4.3.0",
   "django==6.0.8",
-  "django-admin-thumbnails==1.0.0",
   "django-allauth[idp-oidc]==65.19.2",
   "django-extra-settings==0.15.0",
   "django-celery-beat==2.9.0",
@@ -24,7 +23,7 @@ dependencies = [
   "django-cors-headers==4.9.0",
   "django-simple-history==3.13.0",
   "django-filter==26.1",
-  "django-unfold==0.104.1",
+  "django-unfold==0.108.0",
   "django-money==3.6.1",
   "django-mptt==0.18.0",
   "django-parler==2.4.0",
@@ -37,6 +36,7 @@ dependencies = [
   "djangorestframework-camel-case==1.4.2",
   "drf-spectacular==0.30.0",
   "fido2==2.2.1",
+  "jsonschema==4.26.0",
   "filetype==1.2.0",
   "flower==2.1.0",
   "gunicorn==26.2.0",
@@ -47,7 +47,7 @@ dependencies = [
   "psycopg[binary,pool]==3.3.5",
   "python-dotenv==1.2.3",
   "qrcode==8.2",
-  "urllib3==2.7.0",
+  "urllib3==2.8.0",
   "uvicorn==0.52.4",
   "celery[redis] >=5.6.3,<6.0.0",
   "disposable-email-domains==0.0.247",
@@ -262,7 +262,8 @@ override-dependencies = [
     # CVE-2026-35536, CVE-2026-31958 (HIGH) — fixed in 6.5.5
     # CVE-2026-49855, CVE-2026-49853 (HIGH) — fixed in 6.5.6
     # CVE-2026-82397 (HIGH) — fixed in 6.5.8
-    "tornado>=6.5.8",
+    # GHSA-chx6-46f5-w4vp, GHSA-c2m8-h5v5-343r (HIGH) — fixed in 6.5.9
+    "tornado>=6.5.9",
     # CVE-2026-42304 (HIGH) — DoS in twisted.names DNS compression
     # pointer chains; fixed in 26.4.0 (stable since 2026-08).
     # Extras kept inline so the resolver preserves pyopenssl/h2 etc.
@@ -485,16 +486,6 @@ call-non-callable = "ignore"
 too-many-positional-arguments = "ignore"
 unsupported-operator = "ignore"
 invalid-return-type = "ignore"
-
-# django-unfold's @action decorator is annotated as `-> Action`
-# but actually returns the inner decorator callable, so ty flags
-# every `@action(...)` usage as call-non-callable. Suppress for
-# all per-app admin modules until upstream stubs are fixed.
-[[tool.ty.overrides]]
-include = ["**/admin.py"]
-
-[tool.ty.overrides.rules]
-call-non-callable = "ignore"
 
 # Stripe SDK uses `Unpack[TypedDict]` for **kwargs on create() methods
 # (e.g. SessionCreateParams). We build payload dicts incrementally with

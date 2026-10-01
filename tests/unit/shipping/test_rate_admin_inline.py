@@ -19,12 +19,11 @@ def admin_instance():
 
 
 class TestShippingRateInline:
-    def test_no_autocomplete_for_country(self):
-        """The country admin is platform-only — a tenant-schema admin
-        session hitting its autocomplete endpoint would 403."""
-        assert "country" not in getattr(
-            ShippingRateInline, "autocomplete_fields", ()
-        )
+    def test_country_is_an_autocomplete(self):
+        """Countries are reference data every store role may view
+        (``tenant.role_scopes.REFERENCE_DATA_APP_LABELS``), so the
+        country admin's autocomplete answers on a store host."""
+        assert "country" in ShippingRateInline.autocomplete_fields
 
     def test_fields_cover_the_editable_columns(self):
         assert ShippingRateInline.fields == (

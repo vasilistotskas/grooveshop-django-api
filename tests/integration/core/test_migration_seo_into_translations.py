@@ -43,22 +43,56 @@ class _FakeSchemaEditor:
 def _state_before_copy(app_label: str, target: str):
     """Roll ``app_label`` back to ``target``; return the whole project's
     apps at that point, as ``migrate`` hands them to a RunPython (every
-    other app at its latest — the callables read ``tenant.Tenant``)."""
+    other app as far as the rollback left it — the callables read
+    ``tenant.Tenant``).
+
+    The state is built from what is still applied, not from each app's
+    leaf: a later migration of another app that depends on one of
+    ``app_label``'s newer migrations is rolled back with it, and naming
+    its leaf would pull ``app_label`` forward again."""
     executor = MigrationExecutor(connection)
     executor.migrate([(app_label, target)])
     executor.loader.build_graph()
-    nodes = [
+    graph = executor.loader.graph
+    applied = [
         node
-        for node in executor.loader.graph.leaf_nodes()
-        if node[0] != app_label
+        for node in executor.loader.applied_migrations
+        if node in graph.nodes
     ]
-    return executor.loader.project_state([*nodes, (app_label, target)]).apps
+    return executor.loader.project_state(applied).apps
 
 
 class TestProductSeoMigration(TestCase):
     copy = importlib.import_module(
         "product.migrations.0045_copy_seo_into_translations"
     )
+
+    @classmethod
+    def setUpClass(cls):
+        # Once per class, inside the class-wide transaction that
+        # tearDownClass rolls back: unapplying ``product`` past 0044
+        # reloads every model related to Product for each migration it
+        # crosses, which costs about a minute. Each test's savepoint
+        # sits on top of the rolled-back schema. Set on the class
+        # directly, not in setUpTestData, which would deep-copy the
+        # historical apps registry for every test.
+        super().setUpClass()
+        try:
+            cls.apps = _state_before_copy(
+                "product", "0044_seo_translated_fields"
+            )
+        except Exception:
+            # What TestCase.setUpClass does when setUpTestData fails.
+            cls._rollback_atomics(cls.cls_atomics)
+            raise
+        cls.Product = cls.apps.get_model("product", "Product")
+        cls.ProductTranslation = cls.apps.get_model(
+            "product", "ProductTranslation"
+        )
+        cls.ProductCategory = cls.apps.get_model("product", "ProductCategory")
+        cls.CategoryTranslation = cls.apps.get_model(
+            "product", "ProductCategoryTranslation"
+        )
 
     def setUp(self):
         # English, on purpose: the platform default is Greek, so a copy
@@ -72,15 +106,6 @@ class TestProductSeoMigration(TestCase):
         )
         tenant.auto_create_schema = False
         tenant.save()
-        self.apps = _state_before_copy("product", "0044_seo_translated_fields")
-        self.Product = self.apps.get_model("product", "Product")
-        self.ProductTranslation = self.apps.get_model(
-            "product", "ProductTranslation"
-        )
-        self.ProductCategory = self.apps.get_model("product", "ProductCategory")
-        self.CategoryTranslation = self.apps.get_model(
-            "product", "ProductCategoryTranslation"
-        )
 
     def _category(self, slug: str, **seo):
         return self.ProductCategory.objects.create(

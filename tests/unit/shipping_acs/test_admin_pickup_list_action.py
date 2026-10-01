@@ -24,7 +24,7 @@ from shipping_acs.admin import AcsShipmentAdmin
 from shipping_acs.exceptions import AcsAPIError
 from shipping_acs.models import AcsShipment
 
-pytestmark = pytest.mark.django_db
+pytestmark = [pytest.mark.django_db, pytest.mark.assert_english]
 
 
 @pytest.fixture

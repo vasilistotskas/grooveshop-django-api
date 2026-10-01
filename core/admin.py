@@ -19,8 +19,11 @@ from django_celery_beat.models import (
 )
 from extra_settings.models import Setting
 from unfold.admin import ModelAdmin
+from unfold.contrib.filters.admin import DropdownFilter
+from unfold.decorators import display
 from unfold.widgets import UnfoldAdminSelectWidget, UnfoldAdminTextInputWidget
 
+from admin.base import BaseModelAdmin
 from admin.mixins import (
     IsSuperuserOnlyModelAdmin,
     WithheldOnTenantHostModelAdmin,
@@ -195,13 +198,11 @@ def setting_category(name: str) -> str:
     return "Other"
 
 
-class SettingCategoryFilter(admin.SimpleListFilter):
+class SettingCategoryFilter(DropdownFilter):
     """Group the flat settings list into functional areas.
 
-    Rendered as an unfold dropdown via the admin's
-    ``list_filter``; the categories come from the shared
-    ``SETTING_CATEGORIES`` prefix map so the badge column and the
-    filter can never disagree.
+    The categories come from the shared ``SETTING_CATEGORIES`` prefix
+    map so the category column and the filter can never disagree.
     """
 
     title = _("Category")
@@ -236,20 +237,17 @@ class SettingCategoryFilter(admin.SimpleListFilter):
         return queryset.filter(query)
 
 
-class SettingAdmin(ModelAdmin):
+class SettingAdmin(BaseModelAdmin):
     from core.forms.settings import SettingAdminForm
 
     form = SettingAdminForm
-    compressed_fields = True
-    warn_unsaved_form = True
     list_fullwidth = False
-    list_filter_submit = True
     ordering = ["name"]
 
     list_display = [
         "name_display",
-        "category_badge",
-        "value_type_badge",
+        "category_label",
+        "value_type_label",
         "value_preview",
         "description_preview",
     ]
@@ -258,12 +256,7 @@ class SettingAdmin(ModelAdmin):
     search_fields = ["name", "description"]
 
     class Media:
-        css = {
-            "all": (
-                "extra_settings/css/setting_badges.css",
-                "extra_settings/css/extra_settings_admin.css",
-            )
-        }
+        css = {"all": ("extra_settings/css/extra_settings_admin.css",)}
         js = ("extra_settings/js/extra_settings_admin.js",)
 
     # Use fieldsets for better control over field rendering
@@ -317,24 +310,13 @@ class SettingAdmin(ModelAdmin):
     def name_display(self, obj):
         return obj.name
 
-    @admin.display(description=_("Category"))
-    def category_badge(self, obj):
-        from django.utils.html import format_html
+    @display(description=_("Category"), label=True)
+    def category_label(self, obj):
+        return _(setting_category(obj.name))
 
-        return format_html(
-            '<span class="setting-type-badge" data-type="{category}">'
-            "{category}</span>",
-            category=setting_category(obj.name),
-        )
-
-    @admin.display(description=_("Type"))
-    def value_type_badge(self, obj):
-        from django.utils.html import format_html
-
-        return format_html(
-            '<span class="setting-type-badge" data-type="{type}">{type}</span>',
-            type=obj.value_type,
-        )
+    @display(description=_("Type"), label=True, ordering="value_type")
+    def value_type_label(self, obj):
+        return obj.get_value_type_display()
 
     @admin.display(description=_("Current Value"))
     def value_preview(self, obj):
@@ -352,29 +334,23 @@ class SettingAdmin(ModelAdmin):
         return desc[:60] + "…" if len(desc) > 60 else desc
 
 
-class PeriodicTaskAdmin(
-    WithheldOnTenantHostModelAdmin, BasePeriodicTaskAdmin, ModelAdmin
-):
+class PeriodicTaskAdmin(BasePeriodicTaskAdmin, BaseModelAdmin):
     form = UnfoldPeriodicTaskForm
 
 
-class IntervalScheduleAdmin(WithheldOnTenantHostModelAdmin, ModelAdmin):
+class IntervalScheduleAdmin(BaseModelAdmin):
     pass
 
 
-class CrontabScheduleAdmin(
-    WithheldOnTenantHostModelAdmin, BaseCrontabScheduleAdmin, ModelAdmin
-):
+class CrontabScheduleAdmin(BaseCrontabScheduleAdmin, BaseModelAdmin):
     pass
 
 
-class SolarScheduleAdmin(WithheldOnTenantHostModelAdmin, ModelAdmin):
+class SolarScheduleAdmin(BaseModelAdmin):
     pass
 
 
-class ClockedScheduleAdmin(
-    WithheldOnTenantHostModelAdmin, BaseClockedScheduleAdmin, ModelAdmin
-):
+class ClockedScheduleAdmin(BaseClockedScheduleAdmin, BaseModelAdmin):
     pass
 
 
@@ -382,9 +358,7 @@ from core.cache.models import CachePurgeLog  # noqa: E402
 
 
 @admin.register(CachePurgeLog)
-class CachePurgeLogAdmin(
-    WithheldOnTenantHostModelAdmin, IsSuperuserOnlyModelAdmin, ModelAdmin
-):
+class CachePurgeLogAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
     # ``actor_email`` rather than ``actor``: this changelist is control-plane
     # only, where the cross-schema FK does resolve correctly, but showing the
     # stored string keeps one display that is right in every context and
@@ -399,6 +373,7 @@ class CachePurgeLogAdmin(
         "total_blocked",
         "dry_run",
     )
+    date_hierarchy = "created_at"
     list_filter = ("dry_run", "schema_name", "created_at")
     search_fields = ("actor_email", "schema_name")
     readonly_fields = (

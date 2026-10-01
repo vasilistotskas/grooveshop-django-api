@@ -14,11 +14,13 @@ class ProductFavourite(TimeStampMixinModel, UUIDModel):
         "user.UserAccount",
         related_name="favourite_products",
         on_delete=models.CASCADE,
+        verbose_name=_("User"),
     )
     product = models.ForeignKey(
         "product.Product",
         related_name="favourited_by",
         on_delete=models.CASCADE,
+        verbose_name=_("Product"),
     )
 
     objects: FavouriteManager = FavouriteManager()

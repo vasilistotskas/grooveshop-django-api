@@ -1,7 +1,6 @@
-from typing import cast
-
 from django import forms
 from django.contrib import admin, messages
+from django.db.models import Count, Prefetch
 from django.http import HttpRequest, HttpResponse
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
@@ -173,17 +172,13 @@ class BusinessProfileAdmin(BaseModelAdmin):
     @action(
         description=_("Approve"),
         icon="verified",
-        dialog=cast(
-            "ActionDialog",
-            {
-                "title": _("Approve business profile"),
-                "description": _(
-                    "Grants wholesale pricing for the chosen group and "
-                    "emails the customer."
-                ),
-                "form_class": ApproveForm,
-                "form_submit_text": None,
-            },
+        dialog=ActionDialog(
+            title=_("Approve business profile"),
+            description=_(
+                "Grants wholesale pricing for the chosen group and "
+                "emails the customer."
+            ),
+            form_class=ApproveForm,
         ),
     )
     def approve(
@@ -209,16 +204,12 @@ class BusinessProfileAdmin(BaseModelAdmin):
     @action(
         description=_("Reject"),
         icon="block",
-        dialog=cast(
-            "ActionDialog",
-            {
-                "title": _("Reject business profile"),
-                "description": _(
-                    "The reason is included in the email to the customer."
-                ),
-                "form_class": RejectForm,
-                "form_submit_text": None,
-            },
+        dialog=ActionDialog(
+            title=_("Reject business profile"),
+            description=_(
+                "The reason is included in the email to the customer."
+            ),
+            form_class=RejectForm,
         ),
     )
     def reject(
@@ -285,24 +276,36 @@ class CustomerGroupAdmin(BaseModelAdmin):
     actions_detail = ["import_prices"]
     ordering = ("name",)
 
-    @display(description=_("Businesses"))
+    def get_queryset(self, request):
+        """Profile counts and the price-list section, with the page."""
+        return (
+            super()
+            .get_queryset(request)
+            .annotate(profiles_total=Count("business_profiles", distinct=True))
+            .prefetch_related(
+                Prefetch(
+                    "price_items",
+                    queryset=PriceListItem.objects.select_related(
+                        "product"
+                    ).prefetch_related("product__translations"),
+                )
+            )
+        )
+
+    @display(description=_("Businesses"), ordering="profiles_total")
     def profiles_count(self, obj):
-        return obj.business_profiles.count()
+        return obj.profiles_total
 
     @action(
         description=_("Import prices"),
         icon="upload",
-        dialog=cast(
-            "ActionDialog",
-            {
-                "title": _("Import price list"),
-                "description": _(
-                    "Paste one product per line as sku;net price. "
-                    "Rows are created or updated for THIS group only."
-                ),
-                "form_class": ImportPricesForm,
-                "form_submit_text": None,
-            },
+        dialog=ActionDialog(
+            title=_("Import price list"),
+            description=_(
+                "Paste one product per line as sku;net price. "
+                "Rows are created or updated for THIS group only."
+            ),
+            form_class=ImportPricesForm,
         ),
     )
     def import_prices(

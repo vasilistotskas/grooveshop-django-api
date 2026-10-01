@@ -154,8 +154,8 @@ SHARED_APPS = [
     # ones an earlier TENANT_APPS entry created.
     "django_celery_beat",
     "django_celery_results",
-    # Platform-wide Setting table — read by admin dashboard in public
-    # schema. Also in TENANT_APPS so per-tenant settings can override.
+    # Platform-wide Setting table. Also in TENANT_APPS so per-tenant
+    # settings can override.
     "extra_settings",
     # Global reference data (identical across ALL tenants)
     "country",
@@ -542,7 +542,10 @@ if DEEPL_AUTH_KEY == "changeme" and PRODUCTION_PROFILE:
         "(current value is the insecure default 'changeme')."
     )
 
-LOCALE_PATHS = [path.join(BASE_DIR, "locale/")]
+# Unfold ships no translations; ``manage.py makemessages_unfold`` keeps
+# the project's own catalogue of its strings here, after ours.
+UNFOLD_LOCALE_PATH = path.join(BASE_DIR, "locale_vendor", "unfold")
+LOCALE_PATHS = [path.join(BASE_DIR, "locale/"), UNFOLD_LOCALE_PATH]
 
 ENABLE_DEBUG_TOOLBAR = getenv("ENABLE_DEBUG_TOOLBAR", "False") == "True"
 
@@ -572,8 +575,8 @@ if ENABLE_DEBUG_TOOLBAR:
         "debug_toolbar.panels.staticfiles.StaticFilesPanel",
         "debug_toolbar.panels.templates.TemplatesPanel",
         # Cache panel reveals get/set/hit/miss on Redis — critical for
-        # validating that the admin dashboard cache (5 min TTL on
-        # ``admin:dashboard:data:v4``) is actually warm under load.
+        # validating that the admin dashboard's cached queries
+        # (``admin:dashboard:*``) are actually warm under load.
         "debug_toolbar.panels.cache.CachePanel",
         "debug_toolbar.panels.signals.SignalsPanel",
         "debug_toolbar.panels.redirects.RedirectsPanel",
@@ -1204,6 +1207,11 @@ def get_celery_beat_schedule():
         "check-low-stock-products": {
             "task": "tenant.tasks.fanout_check_low_stock_products",
             "schedule": SCHEDULE_PRESETS["every_hour"],
+        },
+        # The control plane's per-store figures (TenantStatsSnapshot).
+        "refresh-tenant-stats": {
+            "task": "tenant.tasks.fanout_refresh_stats_snapshots",
+            "schedule": SCHEDULE_PRESETS["every_30_min"],
         },
         "send-checkout-abandonment-emails": {
             "task": "tenant.tasks.fanout_send_checkout_abandonment_emails",
@@ -2853,7 +2861,7 @@ ROSETTA_ACCESS_CONTROL_FUNCTION = (
 # local checkout renders no link at all rather than one to a site that
 # may not carry this build's pages yet; production sets the platform
 # docs host in backend-config.
-_ADMIN_DOCS_LINKS = [
+ADMIN_DOCS_LINKS = [
     {
         "icon": "help",
         "title": _("Help & Guides"),
@@ -2864,16 +2872,51 @@ _ADMIN_DOCS_LINKS = [
     if url
 ]
 
+# Platform ops consoles, listed in the store admin's site menu for
+# platform superusers only, and only when the URL is configured. In dev,
+# set ADMIN_FLOWER_URL=http://localhost:5556 etc. in `.env`; production
+# usually does not expose these surfaces at all.
+ADMIN_OPS_LINKS = [
+    {
+        "icon": entry["icon"],
+        "title": entry["title"],
+        "link": entry["link"],
+        "attrs": {"target": "_blank", "rel": "noopener"},
+    }
+    for entry in [
+        {
+            "icon": "monitoring",
+            "title": _("Flower (Celery)"),
+            "link": getenv("ADMIN_FLOWER_URL", "").strip(),
+        },
+        {
+            "icon": "mark_email_unread",
+            "title": _("Mailpit"),
+            "link": getenv("ADMIN_MAILPIT_URL", "").strip(),
+        },
+        {
+            "icon": "search",
+            "title": _("Meilisearch"),
+            "link": getenv("ADMIN_MEILISEARCH_URL", "").strip(),
+        },
+        {
+            "icon": "router",
+            "title": _("RabbitMQ"),
+            "link": getenv("ADMIN_RABBITMQ_URL", "").strip(),
+        },
+    ]
+    if entry["link"]
+]
+
 UNFOLD_PLATFORM = {
     "SITE_TITLE": _("Platform Admin"),
-    "SITE_HEADER": "Grooveshop Platform",
+    "SITE_HEADER": "GrooveShop Platform",
     "SITE_SUBHEADER": _("Control plane"),
     "SITE_SYMBOL": "hub",
     "SHOW_HISTORY": True,
     "SHOW_VIEW_ON_SITE": False,
-    "SITE_DROPDOWN": [*_ADMIN_DOCS_LINKS],
+    "SITE_DROPDOWN": [*ADMIN_DOCS_LINKS],
     "ENVIRONMENT": "admin.permissions.platform_environment",
-    "DASHBOARD_CALLBACK": "admin.platform_dashboard.dashboard_callback",
     # ⌘K command palette. Without this block the palette falls back to
     # unfold's defaults (``search_models: False``) and only matches
     # sidebar APP TITLES — typing a tenant name, domain or user email
@@ -3096,22 +3139,10 @@ UNFOLD = {
     "SITE_SUBHEADER": getenv("UNFOLD_SITE_SUBHEADER", "Commerce control"),
     "SITE_SYMBOL": "storefront",
     "SITE_URL": "/",
-    "SITE_ICON": {
-        "light": lambda request: static("icon-light.svg"),
-        "dark": lambda request: static("icon-dark.svg"),
-    },
-    "SITE_LOGO": {
-        "light": lambda request: static("logo-light.svg"),
-        "dark": lambda request: static("logo-dark.svg"),
-    },
-    "SITE_FAVICONS": [
-        {
-            "rel": "icon",
-            "sizes": "32x32",
-            "type": "image/svg+xml",
-            "href": lambda request: static("favicon/favicon.svg"),
-        },
-    ],
+    # Each store's own marks; see ``admin/branding.py`` for the rule.
+    "SITE_ICON": "admin.branding.site_icon",
+    "SITE_LOGO": "admin.branding.site_logo",
+    "SITE_FAVICONS": "admin.branding.site_favicons",
     "SHOW_HISTORY": True,
     "SHOW_VIEW_ON_SITE": True,
     "SHOW_BACK_BUTTON": True,
@@ -3172,15 +3203,9 @@ UNFOLD = {
         "search_models": "core.utils.admin.command_search_models",
         "show_history": True,
     },
-    "LOGIN": {
-        "redirect_after": lambda request: reverse_lazy(
-            "admin:index", urlconf=ROOT_URLCONF
-        ),
-    },
     "STYLES": [
         lambda request: static("css/styles.css"),
         lambda request: static("css/admin.css"),
-        "https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200",
     ],
     # Loads on every admin page. ``tinymce_save_sync.js`` patches the
     # missing django-tinymce ↔ unfold form-submit handoff so that
@@ -3192,13 +3217,12 @@ UNFOLD = {
     # textarea value, not the edited iframe content.
     #
     # ``unfold_command_palette_fix.js`` guards the ⌘K palette's
-    # ``selectItem`` against Enter-with-no-results (upstream crash in
-    # django-unfold 0.104.1 — see the file header).
+    # ``selectItem`` against Enter-with-no-results (upstream crash,
+    # still present in django-unfold 0.108.0 — see the file header).
     "SCRIPTS": [
         lambda request: static("admin/js/tinymce_save_sync.js"),
         lambda request: static("admin/js/unfold_command_palette_fix.js"),
     ],
-    "DASHBOARD_CALLBACK": "admin.dashboard.dashboard_callback",
     "SIDEBAR": {
         "show_search": True,
         "show_all_applications": False,
@@ -3220,9 +3244,6 @@ UNFOLD = {
             # ── Catalog (catalog management) ──────────────────────────
             {
                 "title": _("Catalog"),
-                # Per-store section: hidden on the platform console, whose
-                # schema holds none of these models (they 403 there).
-                "permission": "admin.permissions.is_store_section",
                 "separator": True,
                 "collapsible": True,
                 "items": [
@@ -3290,9 +3311,6 @@ UNFOLD = {
             # ── Blog (content management) ─────────────────────────────
             {
                 "title": _("Blog"),
-                # Per-store section: hidden on the platform console, whose
-                # schema holds none of these models (they 403 there).
-                "permission": "admin.permissions.is_store_section",
                 "separator": True,
                 "collapsible": True,
                 "items": [
@@ -3345,9 +3363,6 @@ UNFOLD = {
             # ── Sales (day-to-day order operations) ───────────────────
             {
                 "title": _("Sales"),
-                # Per-store section: hidden on the platform console, whose
-                # schema holds none of these models (they 403 there).
-                "permission": "admin.permissions.is_store_section",
                 "separator": True,
                 "collapsible": True,
                 "items": [
@@ -3459,7 +3474,7 @@ UNFOLD = {
                             "admin:contact_contact_changelist",
                             urlconf=ROOT_URLCONF,
                         ),
-                        "badge": "admin.badges.unread_messages_badge",
+                        "badge": "admin.badges.new_messages_badge",
                         "badge_variant": "info",
                     },
                     {
@@ -3475,9 +3490,6 @@ UNFOLD = {
             # ── Shipping (carrier-facing fulfilment) ─────────────────
             {
                 "title": _("Shipping"),
-                # Per-store section: hidden on the platform console, whose
-                # schema holds none of these models (they 403 there).
-                "permission": "admin.permissions.is_store_section",
                 "separator": True,
                 "collapsible": True,
                 "items": [
@@ -3558,9 +3570,6 @@ UNFOLD = {
             # ── Loyalty ──────────────────────────────────────────────
             {
                 "title": _("Loyalty"),
-                # Per-store section: hidden on the platform console, whose
-                # schema holds none of these models (they 403 there).
-                "permission": "admin.permissions.is_store_section",
                 "separator": True,
                 "collapsible": True,
                 "items": [
@@ -3594,7 +3603,6 @@ UNFOLD = {
                 "title": _("Newsletter"),
                 "separator": True,
                 "collapsible": True,
-                "permission": "admin.permissions.is_staff",
                 "items": [
                     {
                         "title": _("Subscription Topics"),
@@ -3603,7 +3611,6 @@ UNFOLD = {
                             "admin:user_subscriptiontopic_changelist",
                             urlconf=ROOT_URLCONF,
                         ),
-                        "permission": "admin.permissions.is_staff",
                     },
                 ],
             },
@@ -3616,7 +3623,6 @@ UNFOLD = {
                 "title": _("Settings"),
                 "separator": True,
                 "collapsible": True,
-                "permission": "admin.permissions.is_staff",
                 "items": [
                     {
                         "title": _("Extra Settings"),
@@ -3625,14 +3631,13 @@ UNFOLD = {
                             "admin:extra_settings_setting_changelist",
                             urlconf=ROOT_URLCONF,
                         ),
-                        "permission": "admin.permissions.is_staff",
                     },
                 ],
             },
             # ──────────────────────────────────────────────────────────
-            # SYSTEM ZONE — superuser-only. One parent group with four
-            # nested subtrees (Configuration / Audit & Logs /
-            # Reconciliation / Background Jobs). The nested rendering
+            # SYSTEM ZONE — superuser-only. One parent group with three
+            # nested subtrees (Security & Access / Audit & Logs /
+            # Reconciliation). The nested rendering
             # is provided by our `core/templates/unfold/helpers/
             # app_list{,_item}.html` overrides — unfold's Python layer
             # already recursively processes child `items` arrays
@@ -3645,32 +3650,6 @@ UNFOLD = {
                 "collapsible": True,
                 "permission": "admin.permissions.is_superuser",
                 "items": [
-                    {
-                        "title": _("Configuration"),
-                        "icon": "tune",
-                        "permission": "admin.permissions.is_superuser",
-                        "items": [
-                            {
-                                "title": _("Shipping Providers"),
-                                "icon": "local_shipping",
-                                "link": reverse_lazy(
-                                    "admin:shipping_shippingprovider_changelist",
-                                    urlconf=ROOT_URLCONF,
-                                ),
-                                "permission": "admin.permissions.is_superuser",
-                            },
-                            # ``auth.Group`` is deliberately NOT here. It
-                            # is a PLATFORM_ONLY app label
-                            # (tenant/role_scopes.py): store access is
-                            # derived from UserTenantMembership roles and
-                            # no Group is created anywhere in the
-                            # codebase, so the section listed a table
-                            # nothing reads — while offering a store
-                            # admin who reached it a way to mint
-                            # themselves any permission that exists.
-                            # Groups live on the control plane only.
-                        ],
-                    },
                     {
                         "title": _("Security & Access"),
                         "icon": "security",
@@ -4053,75 +4032,9 @@ UNFOLD = {
             ],
         },
     ],
-    "SITE_DROPDOWN": [
-        {
-            "icon": "translate",
-            "title": _("Rosetta"),
-            "link": reverse_lazy(
-                "rosetta-file-list-redirect", urlconf=ROOT_URLCONF
-            ),
-        },
-        {
-            "icon": "cached",
-            "title": _("Cache"),
-            "link": reverse_lazy("admin:clear-cache", urlconf=ROOT_URLCONF),
-        },
-        {
-            "icon": "email",
-            "title": _("Email Templates"),
-            "link": reverse_lazy(
-                "email_templates:management", urlconf=ROOT_URLCONF
-            ),
-        },
-        # API Swagger always works — same Django process serves both
-        # the admin and the schema, so reverse_lazy gives the right
-        # URL in dev and prod regardless of host. The route name is
-        # `swagger-ui` and matches `/api/v1/schema/swagger-ui` (no
-        # trailing slash); using reverse_lazy avoids hard-coding it.
-        {
-            "icon": "schema",
-            "title": _("API Swagger"),
-            "link": reverse_lazy("swagger-ui", urlconf=ROOT_URLCONF),
-            "attrs": {"target": "_blank", "rel": "noopener"},
-        },
-        # Ops links — only render when the env var is explicitly set.
-        # In dev, set ADMIN_FLOWER_URL=http://localhost:5556 etc. in
-        # `.env`. In production these surfaces are usually NOT exposed
-        # publicly, so the default is to hide the link entirely
-        # rather than show a broken localhost shortcut.
-        *[
-            {
-                "icon": entry["icon"],
-                "title": entry["title"],
-                "link": entry["link"],
-                "attrs": {"target": "_blank", "rel": "noopener"},
-            }
-            for entry in [
-                *_ADMIN_DOCS_LINKS,
-                {
-                    "icon": "monitoring",
-                    "title": _("Flower (Celery)"),
-                    "link": getenv("ADMIN_FLOWER_URL", "").strip(),
-                },
-                {
-                    "icon": "mark_email_unread",
-                    "title": _("Mailpit"),
-                    "link": getenv("ADMIN_MAILPIT_URL", "").strip(),
-                },
-                {
-                    "icon": "search",
-                    "title": _("Meilisearch"),
-                    "link": getenv("ADMIN_MEILISEARCH_URL", "").strip(),
-                },
-                {
-                    "icon": "router",
-                    "title": _("RabbitMQ"),
-                    "link": getenv("ADMIN_RABBITMQ_URL", "").strip(),
-                },
-            ]
-            if entry["link"]
-        ],
-    ],
+    # Built per request: each tool is listed only for whoever can open
+    # it (admin/navigation.py).
+    "SITE_DROPDOWN": "admin.navigation.store_site_dropdown",
 }
 
 SESSION_CACHE_ALIAS = "default"
@@ -4163,6 +4076,7 @@ SPECTACULAR_SETTINGS = {
         "drf_spectacular.contrib.djangorestframework_camel_case.camelize_serializer_fields",
         "drf_spectacular.hooks.postprocess_schema_enums",
         "core.api.schema.postprocess_schema_parameters_to_accept_strings",
+        "page_config.openapi.publish_section_schemas",
     ],
     "PREPROCESSING_HOOKS": [
         "drf_spectacular.hooks.preprocess_exclude_path_format",

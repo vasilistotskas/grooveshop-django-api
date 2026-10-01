@@ -15,7 +15,6 @@ from core.utils.views import cache_methods
 from pay_way.filters import PayWayFilter
 from pay_way.models import PayWay
 from pay_way.serializers import (
-    PayWayDetailSerializer,
     PayWaySerializer,
     PayWayWriteSerializer,
 )
@@ -24,7 +23,7 @@ from tenant.membership import is_store_staff
 serializers_config: SerializersConfig = {
     **crud_config(
         list=PayWaySerializer,
-        detail=PayWayDetailSerializer,
+        detail=PayWaySerializer,
         write=PayWayWriteSerializer,
     ),
 }

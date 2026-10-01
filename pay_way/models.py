@@ -1,9 +1,8 @@
 import os
-import re
 
 from django.contrib.postgres.indexes import BTreeIndex
-from django.core.exceptions import ValidationError
 from django.db import models
+from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from djmoney.models.fields import MoneyField
@@ -16,18 +15,6 @@ from pay_way.enum.pay_way import PayWayEnum
 from pay_way.enum.settlement import PaySettlement
 from pay_way.managers import PayWayManager
 from shipping.enum import ShippingKind
-
-# Secrets MUST live on the Tenant
-# model (stripe_secret_key, viva_wallet_*, acs_*, box_now_*,
-# meta_capi_*, etc.) rather than in the unencrypted
-# PayWay.configuration JSONField.
-# ``clean()`` rejects keys whose name matches a secret-shaped pattern
-# so misconfiguration via admin or fixtures is caught at save time.
-_SECRET_KEY_PATTERN = re.compile(
-    r"(api[_-]?key|secret|password|token|private[_-]?key|"
-    r"client[_-]?secret|webhook[_-]?secret)",
-    re.IGNORECASE,
-)
 
 
 class PayWay(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
@@ -95,20 +82,6 @@ class PayWay(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         help_text=_(
             "Deprecated mirror of ``settlement == OFFLINE_TRANSFER``. "
             "Dropped in the release after settlement lands."
-        ),
-    )
-    configuration = models.JSONField(
-        _("Provider Configuration"),
-        blank=True,
-        null=True,
-        help_text=_(
-            "Provider-specific non-secret configuration only "
-            "(display options, callback URLs, feature flags). "
-            "Secrets — API keys, webhook secrets, OAuth client_secrets — "
-            "live on the Tenant model fields (stripe_secret_key, "
-            "viva_wallet_*, acs_*, box_now_*, meta_capi_*) so they can "
-            "be scoped per-tenant and rotated independently. Keys "
-            "matching common secret patterns are rejected at save time."
         ),
     )
     translations = TranslatedFields(
@@ -203,18 +176,6 @@ class PayWay(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
             return ""
 
     @property
-    def has_configuration(self) -> bool:
-        return bool(self.configuration)
-
-    @property
-    def is_configured(self) -> bool:
-        # Only a provider that actually charges needs credentials;
-        # a settlement collected later has nothing to configure.
-        if PaySettlement(self.settlement) != PaySettlement.ONLINE:
-            return True
-        return self.has_configuration
-
-    @property
     def is_collected_on_delivery(self) -> bool:
         """The carrier collects money from the shopper on delivery.
 
@@ -265,30 +226,6 @@ class PayWay(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
             }
 
         super().save(*args, **kwargs)
-
-    def clean(self) -> None:
-        super().clean()
-        if not self.configuration:
-            return
-        if not isinstance(self.configuration, dict):
-            raise ValidationError(
-                {"configuration": _("Configuration must be a JSON object.")}
-            )
-        bad_keys = [
-            key
-            for key in self.configuration
-            if _SECRET_KEY_PATTERN.search(str(key))
-        ]
-        if bad_keys:
-            raise ValidationError(
-                {
-                    "configuration": _(
-                        "Secrets are not allowed in PayWay configuration. "
-                        "Move these keys to the Tenant model: %(keys)s"
-                    )
-                    % {"keys": ", ".join(bad_keys)}
-                }
-            )
 
 
 class PayWayShippingExclusion(TimeStampMixinModel):
@@ -395,7 +332,8 @@ class PayWayShippingExclusion(TimeStampMixinModel):
         ]
 
     def __str__(self) -> str:
-        return (
-            f"{self.pay_way} blocked on "
-            f"{self.shipping_provider.code}/{self.shipping_kind}"
-        )
+        return gettext("%(pay_way)s blocked on %(provider)s/%(kind)s") % {
+            "pay_way": self.pay_way,
+            "provider": self.shipping_provider.code,
+            "kind": self.shipping_kind,
+        }

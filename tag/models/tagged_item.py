@@ -18,9 +18,13 @@ logger = logging.getLogger(__name__)
 
 
 class TaggedItem(TimeStampMixinModel, UUIDModel):
-    tag = models.ForeignKey(Tag, on_delete=models.CASCADE)
-    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
-    object_id = models.PositiveIntegerField()
+    tag = models.ForeignKey(
+        Tag, on_delete=models.CASCADE, verbose_name=_("Tag")
+    )
+    content_type = models.ForeignKey(
+        ContentType, on_delete=models.CASCADE, verbose_name=_("Content Type")
+    )
+    object_id = models.PositiveIntegerField(verbose_name=_("Object ID"))
     content_object = GenericForeignKey()
 
     objects: TaggedItemManager = TaggedItemManager()

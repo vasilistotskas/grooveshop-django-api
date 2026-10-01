@@ -45,6 +45,7 @@ class MetaCapiEventLog(TimeStampMixinModel):
         null=True,
         blank=True,
         related_name="meta_capi_events",
+        verbose_name=_("Order"),
     )
     user = models.ForeignKey(
         "user.UserAccount",
@@ -52,6 +53,7 @@ class MetaCapiEventLog(TimeStampMixinModel):
         null=True,
         blank=True,
         related_name="meta_capi_events",
+        verbose_name=_("User"),
     )
     status = models.CharField(
         _("Status"),

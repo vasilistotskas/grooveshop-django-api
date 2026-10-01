@@ -9,7 +9,7 @@ tenant #1's name and logo (production, 2026-08-21).
 ``PlatformAdminSite`` sets ``settings_name = "UNFOLD_PLATFORM"``;
 ``unfold.settings.get_config()`` resolves that name against settings and
 merges it over ``CONFIG_DEFAULTS``, so the site carries its own
-branding, sidebar and dashboard. Verified against django-unfold 0.104.1.
+branding, sidebar and dashboard. Verified against django-unfold 0.108.0.
 """
 
 from __future__ import annotations
@@ -47,7 +47,7 @@ class TestPlatformSiteConfiguration(SimpleTestCase):
         from unfold.settings import get_config
 
         config = get_config(platform_admin_site.settings_name)
-        assert config["SITE_HEADER"] == "Grooveshop Platform"
+        assert config["SITE_HEADER"] == "GrooveShop Platform"
         assert "Webside" not in str(config["SITE_HEADER"])
         assert "Webside" not in str(config["SITE_TITLE"])
 
@@ -173,29 +173,6 @@ class TestSchemaRouting(SimpleTestCase):
         assert "unfold.admin" not in match.func.__module__, (
             "a per-store changelist rendered on the control plane"
         )
-
-
-class TestPlatformDashboard(TestCase):
-    def test_reports_the_tenant_estate(self):
-        from admin.platform_dashboard import dashboard_callback
-
-        context = dashboard_callback(None, {})
-        for key in (
-            "platform_tenant_count",
-            "platform_active_count",
-            "platform_suspended_count",
-            "platform_tenants",
-        ):
-            assert key in context, f"dashboard missing {key}"
-
-    def test_excludes_the_public_row_from_the_estate(self):
-        """`public` is the control plane itself, not a store."""
-        from admin.platform_dashboard import dashboard_callback
-
-        store_tenant("public", name="Platform")
-        context = dashboard_callback(None, {})
-        schemas = {row["schema"] for row in context["platform_tenants"]}
-        assert "public" not in schemas
 
 
 class TestControlPlaneIsSuperuserOnly(TestCase):
@@ -359,11 +336,12 @@ class TestPlatformDashboardPage(TestCase):
 
     @override_settings(ROOT_URLCONF="tenant.urls_public")
     def test_does_not_render_the_store_dashboard(self):
-        html = self._render()
+        with translation.override("en"):
+            html = self._render()
         for merchant_only in (
-            "Overview of revenue",
-            "Pending Orders",
-            "New Product",
+            "Revenue, orders and customer activity",
+            "Pending orders",
+            "New product",
         ):
             assert merchant_only not in html, (
                 f"the store dashboard leaked onto the control plane: "
@@ -381,7 +359,7 @@ class TestPlatformDashboardPage(TestCase):
         """
         html = self._render()
         assert self.store.store_name in html
-        assert self.store.schema_name in html
+        assert f"/tenant/tenant/{self.store.pk}/change/" in html
 
     @override_settings(ROOT_URLCONF="tenant.urls_public")
     def test_renders_the_curated_sidebar(self):
@@ -410,16 +388,6 @@ class TestPlatformDashboardPage(TestCase):
             assert prose not in html, f"template comment leaked: {prose!r}"
 
 
-class TestPlatformDashboardTable(TestCase):
-    def test_is_shaped_for_the_unfold_table_component(self):
-        from admin.platform_dashboard import dashboard_callback
-
-        table = dashboard_callback(None, {})["platform_tenants_table"]
-        assert "headers" in table and "rows" in table
-        for row in table["rows"]:
-            assert len(row) == len(table["headers"])
-
-
 class TestCommandPalette(TestCase):
     """The ⌘K palette must find RECORDS, and its config must not drift.
 
@@ -428,7 +396,7 @@ class TestCommandPalette(TestCase):
     cost a 500ms-debounced round trip to ``/admin/search/``, but only
     sidebar APP TITLES were matched — typing a tenant's name, domain or
     a user's email returned nothing, and Enter on the empty result list
-    hit django-unfold 0.104.1's unguarded ``selectItem`` (client-side
+    hit django-unfold's unguarded ``selectItem`` (still in 0.108.0) (client-side
     TypeError; guarded by ``unfold_command_palette_fix.js``).
     """
 
@@ -507,7 +475,7 @@ class TestCommandPalette(TestCase):
         assert not missing, f"whitelisted but not registered: {missing}"
 
     def test_the_palette_crash_guard_ships_on_both_sites(self):
-        """django-unfold 0.104.1's ``selectItem`` dereferences the
+        """django-unfold's ``selectItem`` (0.108.0) dereferences the
         highlighted row without checking one exists; the guard script
         must load wherever the palette renders."""
         from unfold.settings import get_config

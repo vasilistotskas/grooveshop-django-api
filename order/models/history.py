@@ -1,6 +1,7 @@
 from django.contrib.postgres.indexes import BTreeIndex
 from django.core.validators import MaxLengthValidator
 from django.db import models
+from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from parler.models import TranslatableModel, TranslatedFields
@@ -34,6 +35,7 @@ class OrderHistory(TranslatableModel, TimeStampMixinModel, UUIDModel):
         "order.Order",
         related_name="history",
         on_delete=models.CASCADE,
+        verbose_name=_("Order"),
     )
     user = models.ForeignKey(
         "user.UserAccount",
@@ -42,6 +44,7 @@ class OrderHistory(TranslatableModel, TimeStampMixinModel, UUIDModel):
         null=True,
         blank=True,
         help_text=_("User who made the change, if applicable."),
+        verbose_name=_("User"),
     )
     change_type = models.CharField(
         _("Change Type"),
@@ -93,7 +96,11 @@ class OrderHistory(TranslatableModel, TimeStampMixinModel, UUIDModel):
         ]
 
     def __str__(self):
-        return f"Order {self.order.id} - {self.get_change_type_display()} - {self.created_at}"
+        return gettext("Order %(order)s - %(change)s - %(date)s") % {
+            "order": self.order_id,
+            "change": self.get_change_type_display(),
+            "date": self.created_at,
+        }
 
     @classmethod
     def log_status_change(
@@ -240,6 +247,7 @@ class OrderItemHistory(TranslatableModel, TimeStampMixinModel, UUIDModel):
         "order.OrderItem",
         related_name="history",
         on_delete=models.CASCADE,
+        verbose_name=_("Order Item"),
     )
     user = models.ForeignKey(
         "user.UserAccount",
@@ -248,6 +256,7 @@ class OrderItemHistory(TranslatableModel, TimeStampMixinModel, UUIDModel):
         null=True,
         blank=True,
         help_text=_("User who made the change, if applicable."),
+        verbose_name=_("User"),
     )
     change_type = models.CharField(
         _("Change Type"),
@@ -285,7 +294,11 @@ class OrderItemHistory(TranslatableModel, TimeStampMixinModel, UUIDModel):
         ]
 
     def __str__(self):
-        return f"Order Item {self.order_item.id} - {self.get_change_type_display()} - {self.created_at}"
+        return gettext("Order item %(item)s - %(change)s - %(date)s") % {
+            "item": self.order_item_id,
+            "change": self.get_change_type_display(),
+            "date": self.created_at,
+        }
 
     @classmethod
     def log_quantity_change(

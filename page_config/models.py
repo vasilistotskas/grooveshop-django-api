@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from django.core.exceptions import ValidationError
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django.db.models import Q
 from django.utils import timezone
+from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from parler.fields import TranslationsForeignKey
@@ -24,7 +26,11 @@ from core.models import (
     UUIDModel,
 )
 from page_config.legal_documents import LEGAL_ROUTE_BY_SLUG
-from page_config.schemas import validate_icon_name
+from page_config.schemas import (
+    validate_icon_name,
+    validate_section_i18n,
+    validate_section_props,
+)
 
 if TYPE_CHECKING:
     from typing import Self
@@ -272,6 +278,25 @@ class PageSection(
     def get_ordering_queryset(self):
         return PageSection.objects.filter(layout=self.layout)
 
+    def clean(self) -> None:
+        """``props`` and ``i18n`` against the section's contract
+        (``page_config.section_schemas``): the schema depends on
+        ``component_type``, so it cannot be a field validator. The admin
+        saved sections unchecked before this; the API checks the same
+        in its serializer."""
+        super().clean()
+        errors: dict[str, list[str]] = {}
+        for field, validate in (
+            ("props", validate_section_props),
+            ("i18n", validate_section_i18n),
+        ):
+            try:
+                validate(self.component_type, getattr(self, field))
+            except ValidationError as exc:
+                errors[field] = exc.messages
+        if errors:
+            raise ValidationError(errors)
+
     def localized(self, locale: str) -> tuple[str, dict]:
         """``(title, props)`` as ``locale`` should render them.
 
@@ -347,7 +372,9 @@ class NavigationMenu(TimeStampMixinModel, UUIDModel):
         ordering = ["slot"]
 
     def __str__(self) -> str:
-        return f"{self.get_slot_display()} navigation"
+        return gettext("%(slot)s navigation") % {
+            "slot": self.get_slot_display()
+        }
 
     def localized(self, locale: str) -> list:
         """The menu as ``locale`` should render it.
@@ -464,7 +491,7 @@ class NavigationColumn(
 
     def __str__(self) -> str:
         label = self.safe_translation_getter("label", any_language=True)
-        return label or f"Column #{self.pk}"
+        return label or gettext("Column #%(id)s") % {"id": self.pk}
 
 
 class NavigationColumnTranslation(TranslatedFieldsModel):
@@ -699,7 +726,11 @@ class NavigationLink(
 
     def __str__(self) -> str:
         label = self.safe_translation_getter("label", any_language=True)
-        return label or self.resolved_path or f"Link #{self.pk}"
+        return (
+            label
+            or self.resolved_path
+            or gettext("Link #%(id)s") % {"id": self.pk}
+        )
 
 
 class NavigationLinkTranslation(TranslatedFieldsModel):
@@ -825,5 +856,5 @@ class ContentPageTranslation(  # ty: ignore[invalid-method-override]
         verbose_name_plural = _("Content Page Translations")
 
     def __str__(self) -> str:
-        title = self.title or "Untitled"
+        title = self.title or gettext("Untitled")
         return f"{title} ({self.language_code})"

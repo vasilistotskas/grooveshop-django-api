@@ -1,12 +1,14 @@
 import logging
 
 from django.apps import AppConfig
+from django.utils.translation import gettext_lazy as _
 
 logger = logging.getLogger(__name__)
 
 
 class CoreConfig(AppConfig):
     name = "core"
+    verbose_name = _("System")
 
     def ready(self):
         from django.core.exceptions import ImproperlyConfigured

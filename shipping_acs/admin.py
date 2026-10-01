@@ -13,7 +13,6 @@ from django.http import HttpResponse
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils import timezone
-from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import StackedInline, TabularInline
 from unfold.contrib.filters.admin import (
@@ -25,8 +24,9 @@ from unfold.decorators import action
 from unfold.enums import ActionVariant
 
 from admin.base import BaseModelAdmin
-from admin.displays import SHIPMENT_STATE_VARIANT, choice_label
+from admin.displays import SHIPMENT_STATE_VARIANT, change_link, choice_label
 from admin.mixins import IsSuperuserOnlyModelAdmin
+from order.models.order import Order
 from shipping_acs.enum.shipment_state import AcsShipmentState
 from shipping_acs.models import (
     AcsCodPayout,
@@ -151,18 +151,25 @@ class AcsShipmentOrderInline(StackedInline):
 # ── Filters ────────────────────────────────────────────────────────────────
 
 
-class AcsShipmentStateFilter(DropdownFilter):
-    title = _("Shipment state")
-    parameter_name = "shipment_state"
+class LabelPrintedFilter(DropdownFilter):
+    """ "Not printed" is the pre-flight view for the 16:30 manifest run:
+    ACS rejects a pickup list that contains any unprinted voucher, so
+    this is where you find them first."""
+
+    title = _("Label")
+    parameter_name = "label_printed"
 
     def lookups(self, request, model_admin):
-        return AcsShipmentState.choices
+        return [("yes", _("Printed")), ("no", _("Not printed"))]
 
     def queryset(self, request, queryset):
-        value = self.value()
-        if value:
-            return queryset.filter(shipment_state=value)
-        return queryset
+        match self.value():
+            case "yes":
+                return queryset.filter(label_printed_at__isnull=False)
+            case "no":
+                return queryset.filter(label_printed_at__isnull=True)
+            case _:
+                return queryset
 
 
 # ── Admins ─────────────────────────────────────────────────────────────────
@@ -179,16 +186,15 @@ class AcsShipmentAdmin(BaseModelAdmin):
         "label_printed_at",
         "last_polled_at",
     )
+    date_hierarchy = "created_at"
     list_filter = (
-        AcsShipmentStateFilter,
+        "shipment_state",
         "delivery_kind",
-        # "Label printed at: empty" is the pre-flight view for the 16:30
-        # manifest run — ACS rejects a pickup list that contains any
-        # unprinted voucher, so this is where you find them first.
-        ("label_printed_at", admin.EmptyFieldListFilter),
+        LabelPrintedFilter,
         ("created_at", RangeDateTimeFilter),
     )
     search_fields = ("voucher_no", "order__id", "order__email")
+    autocomplete_fields = ("order",)
     readonly_fields = (
         "voucher_no",
         "shipment_state",
@@ -203,6 +209,75 @@ class AcsShipmentAdmin(BaseModelAdmin):
         "metadata",
         "created_at",
         "updated_at",
+    )
+    fieldsets = (
+        (
+            _("Shipment"),
+            {
+                "classes": ("tab",),
+                "fields": (
+                    "order",
+                    "voucher_no",
+                    "shipment_state",
+                    "delivery_kind",
+                    "pickup_list",
+                    "label_printed_at",
+                    "cancel_requested_at",
+                    "arrival_notified_at",
+                ),
+            },
+        ),
+        (
+            _("Destination"),
+            {
+                "classes": ("tab",),
+                "fields": (
+                    "station_destination",
+                    "station_destination_external_id",
+                    "station_branch_destination",
+                ),
+            },
+        ),
+        (
+            _("Parcel & COD"),
+            {
+                "classes": ("tab",),
+                "fields": (
+                    "weight_grams",
+                    "item_quantity",
+                    "charge_type",
+                    "cod_amount",
+                    "cod_payment_way",
+                    "delivery_products",
+                ),
+            },
+        ),
+        (
+            _("Tracking"),
+            {
+                "classes": ("tab",),
+                "fields": (
+                    "last_polled_at",
+                    "last_event_at",
+                    "stale_alert_sent",
+                    "delivery_date",
+                    "delivery_flag",
+                    "returned_flag",
+                    "raw_shipment_status",
+                ),
+            },
+        ),
+        (
+            _("Diagnostics"),
+            {
+                "classes": ("tab",),
+                "fields": (
+                    "metadata",
+                    "created_at",
+                    "updated_at",
+                ),
+            },
+        ),
     )
     inlines = [AcsTrackingEventInline]
     # Changelist-level, and deliberately on the SHIPMENT admin rather
@@ -225,7 +300,7 @@ class AcsShipmentAdmin(BaseModelAdmin):
     )
 
     @action(
-        description=str(_("Print labels for selected shipments")),
+        description=_("Print labels for selected shipments"),
         icon="print",
         variant=ActionVariant.PRIMARY,
     )
@@ -291,7 +366,7 @@ class AcsShipmentAdmin(BaseModelAdmin):
         return response
 
     @action(
-        description=str(_("Re-poll tracking for selected shipments")),
+        description=_("Re-poll tracking for selected shipments"),
         icon="refresh",
         variant=ActionVariant.INFO,
     )
@@ -355,14 +430,12 @@ class AcsShipmentAdmin(BaseModelAdmin):
 
     @admin.display(description=_("Order"))
     def order_link(self, obj: AcsShipment) -> str:
-        return format_html(
-            '<a href="{url}">#{id}</a>',
-            url=reverse("admin:order_order_change", args=[obj.order_id]),
-            id=obj.order_id,
+        return change_link(
+            self.admin_site, Order, obj.order_id, f"#{obj.order_id}"
         )
 
     @action(
-        description=str(_("Issue ACS pickup list now")),
+        description=_("Issue ACS pickup list now"),
         variant=ActionVariant.PRIMARY,
     )
     def issue_pickup_list_now(self, request):
@@ -414,7 +487,7 @@ class AcsShipmentAdmin(BaseModelAdmin):
         return changelist
 
     @action(
-        description=str(_("Re-poll ACS tracking")),
+        description=_("Re-poll ACS tracking"),
         variant=ActionVariant.INFO,
     )
     def repoll_tracking(self, request, object_id):
@@ -425,7 +498,7 @@ class AcsShipmentAdmin(BaseModelAdmin):
         return _back_to_changelist(self)
 
     @action(
-        description=str(_("Issue ACS voucher now")),
+        description=_("Issue ACS voucher now"),
         variant=ActionVariant.PRIMARY,
     )
     def issue_voucher_now(self, request, object_id):
@@ -505,6 +578,7 @@ class AcsPickupListAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
         "voucher_count",
         "issued_by",
     )
+    date_hierarchy = "created_at"
     search_fields = ("pickup_list_no",)
     readonly_fields = (
         "pickup_list_no",
@@ -535,6 +609,7 @@ class AcsCodPayoutAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
         "shipment",
         "customer_ref_no_1",
     )
+    date_hierarchy = "cod_payment_date"
     list_filter = (
         ("cod_payment_date", RangeDateFilter),
         ("parcel_delivery_date", RangeDateTimeFilter),
@@ -564,13 +639,14 @@ class AcsCodPayoutAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
         "created_at",
         "updated_at",
     )
-    actions_row = ["run_reconciliation"]
+    # Reconciles every payout, not a row: a list action, not a row one.
+    actions_list = ["run_reconciliation"]
 
     @action(
-        description=str(_("Run COD reconciliation now")),
+        description=_("Run COD reconciliation now"),
         variant=ActionVariant.PRIMARY,
     )
-    def run_reconciliation(self, request, object_id):
+    def run_reconciliation(self, request):
         from shipping_acs.tasks import reconcile_acs_cod_payouts
 
         reconcile_acs_cod_payouts.delay()
@@ -589,6 +665,7 @@ class AcsTrackingEventAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
         "checkpoint_location",
         "received_at",
     )
+    date_hierarchy = "event_time"
     list_filter = (
         "checkpoint_action",
         ("received_at", RangeDateTimeFilter),

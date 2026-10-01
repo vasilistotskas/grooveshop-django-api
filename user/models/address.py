@@ -17,6 +17,7 @@ class UserAddress(TimeStampMixinModel, UUIDModel):
         "user.UserAccount",
         related_name="addresses",
         on_delete=models.CASCADE,
+        verbose_name=_("User"),
     )
     title = models.CharField(_("Title"), max_length=255)
     first_name = models.CharField(_("First Name"), max_length=255)
@@ -32,6 +33,7 @@ class UserAddress(TimeStampMixinModel, UUIDModel):
         blank=True,
         default=None,
         on_delete=models.SET_NULL,
+        verbose_name=_("Country"),
     )
     region = models.ForeignKey(
         "region.Region",
@@ -40,6 +42,7 @@ class UserAddress(TimeStampMixinModel, UUIDModel):
         blank=True,
         default=None,
         on_delete=models.SET_NULL,
+        verbose_name=_("Region"),
     )
     floor = models.CharField(
         _("Floor"),

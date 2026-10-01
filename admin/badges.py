@@ -1,155 +1,64 @@
-from django.apps import apps
-from django.core.cache import cache
-from django.db import ProgrammingError
+"""Sidebar badge callables (``UNFOLD["SIDEBAR"]`` ``badge`` entries).
 
-_BADGE_TTL = 60
+Every count comes from ONE cached query,
+``admin.dashboard.store.queries.sidebar_counts``, cleared by writes to
+the models behind it; a render calls up to nine of these, so the result
+is also memoised on the request. ``None`` for zero: Unfold's badge
+template shows nothing for it.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+from admin.dashboard.store.queries import sidebar_counts
 
 
-def _cached_count(key: str, label: str, model: str, **filters) -> int | None:
-    cached = cache.get(key)
-    if cached is not None:
-        return cached or None
-    try:
-        model_cls = apps.get_model(label, model)
-    except LookupError:
-        return None
-    try:
-        value = model_cls.objects.filter(**filters).count()
-    except ProgrammingError:
-        # Public (platform) schema: the badge's table lives only in
-        # tenant schemas — no badge rather than a 500 on every
-        # sidebar render.
-        return None
-    cache.set(key, value, _BADGE_TTL)
-    return value or None
+def _count(request: Any, key: str) -> int | None:
+    counts = getattr(request, "_admin_sidebar_counts", None)
+    if counts is None:
+        counts = sidebar_counts.get()
+        request._admin_sidebar_counts = counts
+    return counts[key] or None
 
 
 def pending_orders_badge(request):
-    from order.enum.status import OrderStatus
-
-    return _cached_count(
-        "admin:badge:pending_orders",
-        "order",
-        "Order",
-        status=OrderStatus.PENDING,
-    )
+    return _count(request, "pending_orders")
 
 
 def pending_reviews_badge(request):
-    from product.enum.review import ReviewStatus
-
-    return _cached_count(
-        "admin:badge:pending_reviews",
-        "product",
-        "ProductReview",
-        status=ReviewStatus.NEW,
-    )
+    return _count(request, "pending_reviews")
 
 
 def pending_comments_badge(request):
-    return _cached_count(
-        "admin:badge:pending_comments",
-        "blog",
-        "BlogComment",
-        approved=False,
-    )
+    return _count(request, "pending_comments")
 
 
-def unread_messages_badge(request):
-    return _cached_count(
-        "admin:badge:unread_messages",
-        "contact",
-        "Contact",
-    )
+def new_messages_badge(request):
+    """Contact messages received in the last 7 days."""
+    return _count(request, "new_contact_messages")
 
 
 def low_stock_badge(request):
-    """Active products with `0 < stock < 10` — the "replenish soon" band.
-
-    Out-of-stock items (`stock=0`) are intentionally excluded because
-    that's a separate operational concern (deactivate or restock); we
-    only badge the warning band so staff can act before things sell out.
-    """
-
-    return _cached_count(
-        "admin:badge:low_stock",
-        "product",
-        "Product",
-        active=True,
-        stock__gt=0,
-        stock__lt=10,
-    )
+    """Active products with ``0 < stock < 10``: replenish soon."""
+    return _count(request, "low_stock")
 
 
 def abandoned_carts_badge(request):
-    """Carts inactive 24h-30d (older = stale, ignored).
-
-    Surfaces the recovery queue right in the sidebar so the marketing
-    team can see at a glance how many follow-up emails are pending.
-    """
-
-    from datetime import timedelta
-
-    from django.utils import timezone
-
-    cached = cache.get("admin:badge:abandoned_carts")
-    if cached is not None:
-        return cached or None
-    try:
-        Cart = apps.get_model("cart", "Cart")
-    except LookupError:
-        return None
-    now = timezone.now()
-    try:
-        value = Cart.objects.filter(
-            updated_at__lt=now - timedelta(hours=24),
-            updated_at__gte=now - timedelta(days=30),
-        ).count()
-    except ProgrammingError:
-        # Public (platform) schema — cart tables are tenant-only.
-        return None
-    cache.set("admin:badge:abandoned_carts", value, _BADGE_TTL)
-    return value or None
+    """Carts idle between 24 hours and 30 days: the recovery queue."""
+    return _count(request, "abandoned_carts")
 
 
 def pending_business_profiles_badge(request):
     """B2B applications awaiting review."""
-
-    from b2b.enum import BusinessProfileStatus
-
-    return _cached_count(
-        "admin:badge:pending_business_profiles",
-        "b2b",
-        "BusinessProfile",
-        status=BusinessProfileStatus.PENDING,
-    )
+    return _count(request, "pending_business_profiles")
 
 
 def draft_blog_posts_badge(request):
-    """Editorial queue depth — unpublished blog posts."""
-
-    return _cached_count(
-        "admin:badge:draft_blog_posts",
-        "blog",
-        "BlogPost",
-        is_published=False,
-    )
+    """Unpublished blog posts."""
+    return _count(request, "draft_blog_posts")
 
 
 def live_promotions_badge(request):
-    """Promotions currently active and inside their schedule window."""
-
-    cached = cache.get("admin:badge:live_promotions")
-    if cached is not None:
-        return cached or None
-    try:
-        Promotion = apps.get_model("promotion", "Promotion")
-    except LookupError:
-        return None
-    try:
-        value = Promotion.objects.live().count()
-    except ProgrammingError:
-        # Public (platform) schema — promotion tables are tenant-only.
-        return None
-    cache.set("admin:badge:live_promotions", value, _BADGE_TTL)
-    return value or None
+    """Promotions active and inside their schedule window."""
+    return _count(request, "live_promotions")

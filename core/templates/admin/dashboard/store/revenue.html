@@ -1,0 +1,44 @@
+{% comment %}
+Revenue with a client-side window switch. Every window ships in the
+page; Alpine (bundled by Unfold, with its persist plugin) shows one and
+remembers the choice. x-init falls back to the first window when a
+remembered key no longer exists.
+{% endcomment %}
+{% load i18n unfold %}
+{% trans "Compared with the window before it" as footer %}
+{% component "unfold/components/card.html" with footer=footer %}
+    <div x-data="{ period: $persist('{{ default_period }}').as('dashboard-revenue-period') }"
+         x-init="$el.querySelector(`[data-period='${period}']`) || (period = '{{ default_period }}')">
+        <div class="flex items-start justify-between gap-3">
+            <div class="bg-green-100 flex h-10 items-center justify-center rounded-default text-green-700 w-10 dark:bg-green-500/20 dark:text-green-400">
+                <span class="material-symbols-outlined">payments</span>
+            </div>
+            {% for p in periods %}
+                {% if p.trend %}
+                    <span x-cloak x-show="period === '{{ p.key }}'">
+                        {% include "unfold/helpers/label.html" with text=p.trend.text variant=p.trend.variant icon=p.trend.icon %}
+                    </span>
+                {% endif %}
+            {% endfor %}
+        </div>
+        {% for p in periods %}
+            <div x-cloak x-show="period === '{{ p.key }}'">
+                {% component "unfold/components/title.html" with class="mt-4" %}{{ p.amount }}{% endcomponent %}
+            </div>
+        {% endfor %}
+        <div class="flex gap-2 items-center justify-between mt-1">
+            <p class="font-medium text-sm">{% trans "Revenue" %}</p>
+            <div class="bg-base-100 flex gap-0.5 p-0.5 rounded-default dark:bg-base-800" role="group" aria-label="{% trans 'Revenue period' %}">
+                {% for p in periods %}
+                    <button type="button"
+                            data-period="{{ p.key }}"
+                            x-on:click="period = '{{ p.key }}'"
+                            x-bind:class="period === '{{ p.key }}' ? 'bg-white shadow-xs text-important dark:bg-base-900' : 'text-subtle hover:text-important'"
+                            x-bind:aria-pressed="period === '{{ p.key }}'"
+                            class="cursor-pointer font-medium px-1.5 py-0.5 rounded-default text-xs transition-colors"
+                            title="{{ p.long_label }}">{{ p.short_label }}</button>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+{% endcomponent %}

@@ -26,11 +26,21 @@ gettext-translated.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+import re
+from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
+from django.contrib.admin import AdminSite
+from django.db.models import Model
+from django.template.loader import render_to_string
+from django.urls import reverse
+from django.utils import formats, timezone
+from django.utils.html import format_html
+from django.utils.safestring import SafeString
+from django.utils.timesince import timesince
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import ngettext_lazy
 from unfold.decorators import display
 
 from order.enum.attribution import OrderSourceType
@@ -136,63 +146,99 @@ def choice_label(
 
 
 # ── Money + date formatting ───────────────────────────────────────────
+# Everything follows the ACTIVE locale (Greek grouping "1.234,56" under
+# el, "1,234.56" under en) and the current timezone - these used to be
+# hard-coded to Greek separators and to strftime on UTC datetimes.
 
 
 def money(amount: Decimal | float | None, currency: str = "€") -> str:
-    """Format a money amount with Greek thousands separator.
-
-    Returns ``€0,00`` for None / zero so the cell isn't empty.
-    """
-
-    if amount is None:
-        amount = 0
-    val = float(amount)
-    # Greek convention: dot for thousands, comma for decimals.
-    formatted = (
-        f"{val:,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
+    """A money amount in the active locale; ``None`` reads as zero."""
+    return currency + formats.number_format(
+        amount or 0, decimal_pos=2, use_l10n=True, force_grouping=True
     )
-    return f"{currency}{formatted}"
 
 
 def format_dt(
     dt: datetime | None,
     *,
-    fmt: str = "%d/%m/%Y %H:%M",
+    fmt: str = "SHORT_DATETIME_FORMAT",
     placeholder: str = "—",
 ) -> str:
-    """Format a datetime in 24-hour Greek-locale style by default.
+    """A datetime in the current timezone and the active locale.
 
-    The default format `dd/mm/yyyy HH:MM` matches the Greek storefront
-    convention. Pass ``fmt="%d/%m"`` for compact list cells.
+    ``fmt`` is a Django format name (``SHORT_DATE_FORMAT``) or a Django
+    date-format string (``"d/m H:i"``), not an ``strftime`` pattern.
     """
-
     if dt is None:
         return placeholder
-    return dt.strftime(fmt)
+    return formats.date_format(timezone.localtime(dt), fmt)
+
+
+# Django's own catalogue leaves these empty in Greek, so ``timesince``
+# would answer in English under the Greek admin; ours are translated.
+TIME_STRINGS = {
+    "year": ngettext_lazy("%(num)d year", "%(num)d years", "num"),
+    "month": ngettext_lazy("%(num)d month", "%(num)d months", "num"),
+    "week": ngettext_lazy("%(num)d week", "%(num)d weeks", "num"),
+    "day": ngettext_lazy("%(num)d day", "%(num)d days", "num"),
+    "hour": ngettext_lazy("%(num)d hour", "%(num)d hours", "num"),
+    "minute": ngettext_lazy("%(num)d minute", "%(num)d minutes", "num"),
+}
 
 
 def relative_time(dt: datetime | None, now: datetime | None = None) -> str:
-    """Return a compact relative-time string (e.g. ``5λ``, ``3ω``, ``2η``).
-
-    Uses Greek single-character suffixes for very short labels suited
-    to dense list cells: λ=λεπτά, ω=ώρες, η=ημέρες.
-    """
-
+    """How long ago, in the active language ("3 hours")."""
     if dt is None:
         return "—"
-    if now is None:
-        from django.utils import timezone
+    return timesince(dt, now, time_strings=TIME_STRINGS, depth=1)
 
-        now = timezone.now()
-    delta: timedelta = now - dt
-    seconds = delta.total_seconds()
-    if seconds < 60:
-        return str(_("τώρα"))
-    if seconds < 3600:
-        return f"{int(seconds // 60)}λ"
-    if seconds < 86400:
-        return f"{int(seconds // 3600)}ω"
-    return f"{int(seconds // 86400)}η"
+
+# ── Links ─────────────────────────────────────────────────────────────
+
+
+def change_link(
+    admin_site: AdminSite, model: type[Model], pk: Any, text: Any
+) -> SafeString:
+    """A link to a row's change page on the site serving this admin.
+
+    Takes the model and primary key rather than the row, so a list
+    column can link through a foreign key's id without loading the
+    related row. Resolved on ``admin_site``'s own namespace: a
+    hard-coded ``/admin/...`` path broke on the control plane and under
+    a translated admin prefix.
+    """
+    opts = model._meta
+    url = reverse(
+        f"{admin_site.name}:{opts.app_label}_{opts.model_name}_change",
+        args=[pk],
+    )
+    return format_html('<a href="{}">{}</a>', url, text)
+
+
+# ── Table cells (Unfold's table.html escapes plain content) ─────────────
+
+
+def link_cell(href: str, text: Any) -> SafeString:
+    """A table cell holding Unfold's link component.
+
+    Unfold's ``table.html`` escapes plain cell content, so markup must
+    arrive already rendered (and ``text`` is escaped here).
+    """
+    return render_to_string(
+        "unfold/components/link.html",
+        {
+            "href": href,
+            "children": format_html("{}", text),
+            "class": "font-medium text-primary-600 dark:text-primary-500",
+        },
+    )
+
+
+def label_cell(text: Any, variant: str) -> SafeString:
+    return render_to_string(
+        "unfold/helpers/label.html",
+        {"text": text, "variant": variant, "size": "md"},
+    )
 
 
 # ── Two-line "header" helpers (for @display(header=True)) ─────────────
@@ -204,6 +250,8 @@ def header_two_line(
     initials: str | None = None,
     *,
     image_path: str | None = None,
+    squared: bool = False,
+    contained: bool = False,
 ) -> list[Any]:
     """Build the list that ``@display(header=True)`` expects.
 
@@ -214,22 +262,30 @@ def header_two_line(
     the avatar circle — the "broken product images" bug on the prod
     changelist, 2026-07-12. Initials are always included as the
     template-level fallback when the image is absent.
+
+    ``contained`` shows the whole image uncropped in a wider box
+    (Unfold's ``as_background``): for logos, flags and icons, which the
+    default round avatar would crop.
     """
 
     row = [primary, secondary or "", initials or _initials_from(primary)]
     if image_path:
-        row.append({"path": image_path, "squared": False})
+        row.append(
+            {"path": image_path, "squared": squared, "as_background": contained}
+        )
     return row
 
 
 def _initials_from(name: str | None) -> str:
-    """Two-letter initials for a name string ("Vasileios T" → "VT")."""
+    """Two-letter initials from a name's words ("Public (Platform)" → "PP")."""
 
-    if not name:
+    words = [
+        word
+        for word in (re.sub(r"\W", "", part) for part in (name or "").split())
+        if word
+    ]
+    if not words:
         return "?"
-    parts = [p for p in name.strip().split() if p]
-    if not parts:
-        return "?"
-    if len(parts) == 1:
-        return parts[0][:2].upper()
-    return (parts[0][0] + parts[-1][0]).upper()
+    if len(words) == 1:
+        return words[0][:2].upper()
+    return (words[0][0] + words[-1][0]).upper()

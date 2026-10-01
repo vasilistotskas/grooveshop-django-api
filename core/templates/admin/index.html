@@ -1,570 +1,73 @@
-{% extends "admin/base.html" %}
+{% extends "admin/base_site.html" %}
+{% comment %}
+The STORE dashboard: layout only. Every block is a widget - an Unfold
+component class in admin/dashboard/store/widgets.py rendering a partial
+under admin/dashboard/ - that loads its own data (cached queries in
+admin/dashboard/store/queries.py).
+
+{# #} is SINGLE-LINE in Django templates; use {% comment %} for prose.
+{% endcomment %}
 {% load i18n unfold %}
 
 {% block title %}{% trans "Dashboard" %} | {{ site_title }}{% endblock %}
 
-{% block branding %}
-<h1 id="site-name">
-    <a href="{% url 'admin:index' %}">{{ site_title }}</a>
-</h1>
-{% endblock %}
-
 {% block content %}
+{% url "admin:product_product_add" as new_product_url %}
+{% url "admin:order_order_changelist" as orders_url %}
+{% url "admin:user_useraccount_changelist" as customers_url %}
 <div class="flex flex-col gap-6">
-
-    {# ────────────────────────────────────────────────────────────── #}
-    {# Header                                                          #}
-    {# ────────────────────────────────────────────────────────────── #}
-    {% url 'admin:product_product_add' as new_product_url %}
-    {% url 'admin:order_order_changelist' as order_changelist_url %}
-    {% url 'admin:user_useraccount_changelist' as customers_url %}
-    {% capture as pending_orders_href silent %}{{ order_changelist_url }}?status__exact=PENDING{% endcapture %}
-    <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+    <div class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
             {% component "unfold/components/title.html" %}{% trans "Dashboard" %}{% endcomponent %}
-            {% component "unfold/components/text.html" with class="mt-1" %}{% trans "Overview of revenue, orders, and customer activity." %}{% endcomponent %}
+            {% component "unfold/components/text.html" with class="mt-1 text-subtle" %}{% trans "Revenue, orders and customer activity at a glance." %}{% endcomponent %}
         </div>
         <div class="flex flex-wrap gap-2">
-            {% component "unfold/components/button.html" with href=new_product_url icon="add_circle" variant="default" %}{% trans "New Product" %}{% endcomponent %}
-            {% component "unfold/components/button.html" with href=pending_orders_href icon="pending_actions" variant="default" %}{% trans "Pending Orders" %}{% endcomponent %}
+            {% component "unfold/components/button.html" with href=new_product_url icon="add_circle" variant="primary" %}{% trans "New product" %}{% endcomponent %}
+            {% component "unfold/components/button.html" with href=orders_url icon="receipt_long" variant="default" %}{% trans "Orders" %}{% endcomponent %}
             {% component "unfold/components/button.html" with href=customers_url icon="group" variant="default" %}{% trans "Customers" %}{% endcomponent %}
         </div>
     </div>
 
-    {# Legal-text update the platform could not apply: the merchant's #}
-    {# own pages. Shown to whoever may edit content pages.            #}
-    {% if legal_update_pages %}
-    <div class="rounded-default px-4 py-3 bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-400">
-        <div class="flex items-start gap-3">
-            {% component "unfold/components/icon.html" with class="shrink-0" %}gavel{% endcomponent %}
-            <div class="flex-1">
-                <h3 class="text-sm font-semibold mb-1">{% trans "Your legal pages need an update" %}</h3>
-                {% component "unfold/components/text.html" with class="mb-2" %}{% trans "The platform has added new text to its legal documents. These pages were not changed automatically because their text is yours. Open each one to see the text to add." %}{% endcomponent %}
-                <ul class="text-sm list-disc ml-5">
-                    {% for page in legal_update_pages %}
-                    <li>{% component "unfold/components/link.html" with href=page.url class="font-medium" %}{{ page.title }}{% endcomponent %}</li>
-                    {% endfor %}
-                </ul>
-            </div>
-        </div>
-    </div>
-    {% endif %}
+    {% component "admin/dashboard/components/alerts.html" with component_class="StoreAlerts" %}{% endcomponent %}
 
-    {# ────────────────────────────────────────────────────────────── #}
-    {# ZONE D — Superuser-only system warnings                        #}
-    {# ────────────────────────────────────────────────────────────── #}
-    {% if is_superuser %}
-
-    {# Seller-config alert: empty required INVOICE_SELLER_* settings #}
-    {% if seller_config_warnings %}
-    <div class="rounded-default px-4 py-3 bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400">
-        <div class="flex items-start gap-3">
-            {% component "unfold/components/icon.html" with class="shrink-0" %}warning{% endcomponent %}
-            <div class="flex-1">
-                <h3 class="text-sm font-semibold mb-1">{% trans "Invoice seller details are incomplete" %}</h3>
-                {% component "unfold/components/text.html" with class="mb-2" %}{% trans "The following required fields are empty. Invoices issued now will render without a legal identity and will not pass a tax audit." %}{% endcomponent %}
-                <ul class="text-sm list-disc ml-5 mb-3">
-                    {% for w in seller_config_warnings %}
-                    <li>
-                        <span class="font-medium">{{ w.label }}</span>
-                        <code class="text-xs ml-1 px-1 py-0.5 rounded bg-red-200/60 dark:bg-red-900/60">{{ w.key }}</code>
-                    </li>
-                    {% endfor %}
-                </ul>
-                {% url 'admin:extra_settings_setting_changelist' as settings_url %}
-                {% capture as seller_fix_href silent %}{{ settings_url }}?q=INVOICE_SELLER_{% endcapture %}
-                {% component "unfold/components/link.html" with href=seller_fix_href icon="arrow_forward" class="text-sm font-medium" %}{% trans "Fix in Settings" %}{% endcomponent %}
-            </div>
-        </div>
-    </div>
-    {% endif %}
-
-    {# myDATA alerts #}
-    {% if mydata_warnings.enabled %}
-        {% if mydata_warnings.missing_creds %}
-        <div class="rounded-default px-4 py-3 bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400">
-            <div class="flex items-start gap-3">
-                {% component "unfold/components/icon.html" with class="shrink-0" %}cloud_off{% endcomponent %}
-                <div class="flex-1">
-                    <h3 class="text-sm font-semibold mb-1">{% trans "myDATA integration is enabled but credentials are missing" %}</h3>
-                    {% component "unfold/components/text.html" with class="mb-2" %}{% trans "Every submission to AADE will fail until these are filled in via Settings." %}{% endcomponent %}
-                    <ul class="text-sm list-disc ml-5 mb-3">
-                        {% for key in mydata_warnings.missing_creds %}
-                        <li><code class="text-xs px-1 py-0.5 rounded bg-red-200/60 dark:bg-red-900/60">{{ key }}</code></li>
-                        {% endfor %}
-                    </ul>
-                    {% url 'admin:extra_settings_setting_changelist' as settings_url %}
-                    {% capture as mydata_fix_href silent %}{{ settings_url }}?q=MYDATA_{% endcapture %}
-                    {% component "unfold/components/link.html" with href=mydata_fix_href icon="arrow_forward" class="text-sm font-medium" %}{% trans "Fix in Settings" %}{% endcomponent %}
-                </div>
-            </div>
-        </div>
-        {% endif %}
-        {% if mydata_warnings.recent_rejected %}
-        <div class="rounded-default px-4 py-3 bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-400">
-            <div class="flex items-start gap-3">
-                {% component "unfold/components/icon.html" with class="shrink-0" %}warning{% endcomponent %}
-                <div class="flex-1">
-                    <h3 class="text-sm font-semibold mb-1">
-                        {% blocktrans count counter=mydata_warnings.recent_rejected %}{{ counter }} invoice rejected by myDATA in the last 7 days{% plural %}{{ counter }} invoices rejected by myDATA in the last 7 days{% endblocktrans %}
-                    </h3>
-                    {% url 'admin:order_invoice_changelist' as invoice_changelist_url %}
-                    {% capture as mydata_review_href silent %}{{ invoice_changelist_url }}?mydata_status__exact=REJECTED{% endcapture %}
-                    {% component "unfold/components/link.html" with href=mydata_review_href icon="arrow_forward" class="text-sm font-medium" %}{% trans "Review rejected invoices" %}{% endcomponent %}
-                </div>
-            </div>
-        </div>
-        {% endif %}
-        {% if mydata_warnings.environment == 'dev' and not mydata_warnings.missing_creds %}
-        <div class="rounded-default px-3 py-2.5 bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400">
-            <div class="flex items-center gap-2 text-sm">
-                {% component "unfold/components/icon.html" with class="text-base!" %}science{% endcomponent %}
-                <span>{% trans "myDATA is pointing at the AADE sandbox (dev). Switch MYDATA_ENVIRONMENT to 'prod' when ready." %}</span>
-            </div>
-        </div>
-        {% endif %}
-    {% endif %}
-
-    {% comment %}
-    The failed-background-task banner lives on the PLATFORM dashboard
-    now. Task results are public-schema only, so one table holds every
-    store's failures — counted here it would have blamed the whole
-    estate's failures on whichever merchant's console was open.
-    {% endcomment %}
-
-    {% endif %}{# end is_superuser #}
-
-
-    {# ────────────────────────────────────────────────────────────── #}
-    {# ZONE A — 4 Hero KPI cards                                       #}
-    {# ────────────────────────────────────────────────────────────── #}
-    {% trans "Last 30 days" as last_30d_label %}
-    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-
-        {# Revenue with client-side period switcher (7d/1m/3m/1y).      #}
-        {# All periods ship in the cached payload; Alpine (bundled by   #}
-        {# unfold, incl. the persist plugin) toggles visibility and     #}
-        {# remembers the admin's choice in localStorage. x-init resets  #}
-        {# a stale persisted key if the period set ever changes.        #}
-        {% trans "vs. prior period of equal length" as vs_prior_label %}
-        {% component "unfold/components/card.html" with footer=vs_prior_label %}
-            <div x-data="{ period: $persist('7d').as('dashboard-revenue-period') }"
-                 x-init="$el.querySelector(`[data-period='${period}']`) || (period = '7d')">
-                <div class="flex items-start justify-between">
-                    <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-300">
-                        {% component "unfold/components/icon.html" %}payments{% endcomponent %}
-                    </div>
-                    {% for p in hero.revenue_periods %}
-                        {% if p.trend_pct is not None %}
-                        <span x-cloak x-show="period === '{{ p.key }}'">
-                            {% capture as revenue_trend_text silent %}{% if p.trend_pct >= 0 %}+{% endif %}{{ p.trend_pct }}%{% endcapture %}
-                            {% if p.trend_pct >= 0 %}
-                                {% include "unfold/helpers/label.html" with variant="success" icon="trending_up" text=revenue_trend_text %}
-                            {% else %}
-                                {% include "unfold/helpers/label.html" with variant="danger" icon="trending_down" text=revenue_trend_text %}
-                            {% endif %}
-                        </span>
-                        {% endif %}
-                    {% endfor %}
-                </div>
-                {% for p in hero.revenue_periods %}
-                <div x-cloak x-show="period === '{{ p.key }}'">
-                    {% component "unfold/components/title.html" with class="mt-4!" %}€{{ p.amount|floatformat:2 }}{% endcomponent %}
-                </div>
-                {% endfor %}
-                <div class="mt-1 flex items-center justify-between gap-2">
-                    {% component "unfold/components/text.html" with class="font-medium" %}{% trans "Revenue" %}{% endcomponent %}
-                    <div class="flex gap-0.5 rounded-md bg-base-100 p-0.5 dark:bg-base-800" role="group" aria-label="{% trans 'Revenue period' %}">
-                        {% for p in hero.revenue_periods %}
-                        <button type="button"
-                                data-period="{{ p.key }}"
-                                @click="period = '{{ p.key }}'"
-                                :class="period === '{{ p.key }}' ? 'bg-white text-base-900 shadow-xs dark:bg-base-900 dark:text-base-100' : 'text-base-500 hover:text-base-700 dark:text-base-400 dark:hover:text-base-200'"
-                                :aria-pressed="period === '{{ p.key }}'"
-                                class="cursor-pointer rounded px-1.5 py-0.5 text-xs font-medium transition-colors"
-                                title="{{ p.long_label }}">{{ p.short_label }}</button>
-                        {% endfor %}
-                    </div>
-                </div>
-            </div>
-        {% endcomponent %}
-
-        {# Pending orders #}
-        {% capture as tap_triage_footer silent %}{% trans "Tap to triage" %} →{% endcapture %}
-        {% component "unfold/components/card.html" with href=pending_orders_href footer=tap_triage_footer %}
-            <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-300">
-                {% component "unfold/components/icon.html" %}pending_actions{% endcomponent %}
-            </div>
-            {% component "unfold/components/title.html" with class="mt-4!" %}{{ hero.pending_orders }}{% endcomponent %}
-            {% component "unfold/components/text.html" with class="mt-1 font-medium" %}{% trans "Pending Orders" %}{% endcomponent %}
-        {% endcomponent %}
-
-        {# New customers (30d) with sub-line of today #}
-        {% component "unfold/components/card.html" with footer=last_30d_label %}
-            <div class="flex items-start justify-between">
-                <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-sky-50 dark:bg-sky-950 text-sky-600 dark:text-sky-300">
-                    {% component "unfold/components/icon.html" %}person_add{% endcomponent %}
-                </div>
-                {% if hero.new_customers_today %}
-                    {% trans "today" as today_label %}
-                    {% capture as new_today_text silent %}+{{ hero.new_customers_today }} {{ today_label }}{% endcapture %}
-                    {% include "unfold/helpers/label.html" with variant="info" text=new_today_text %}
-                {% endif %}
-            </div>
-            {% component "unfold/components/title.html" with class="mt-4!" %}{{ hero.new_customers_30d }}{% endcomponent %}
-            {% component "unfold/components/text.html" with class="mt-1 font-medium" %}{% trans "New Customers (30d)" %}{% endcomponent %}
-        {% endcomponent %}
-
-        {# Average order value #}
-        {% component "unfold/components/card.html" with footer=last_30d_label %}
-            <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-50 dark:bg-violet-950 text-violet-600 dark:text-violet-300">
-                {% component "unfold/components/icon.html" %}receipt{% endcomponent %}
-            </div>
-            {% component "unfold/components/title.html" with class="mt-4!" %}€{{ hero.avg_order_value|floatformat:2 }}{% endcomponent %}
-            {% component "unfold/components/text.html" with class="mt-1 font-medium" %}{% trans "Average Order Value" %}{% endcomponent %}
-        {% endcomponent %}
-
+    <div class="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
+        {% component "admin/dashboard/store/revenue.html" with component_class="StoreRevenueCard" %}{% endcomponent %}
+        {% component "admin/dashboard/components/kpi.html" with component_class="StorePendingOrdersCard" %}{% endcomponent %}
+        {% component "admin/dashboard/components/kpi.html" with component_class="StoreNewCustomersCard" %}{% endcomponent %}
+        {% component "admin/dashboard/components/kpi.html" with component_class="StoreAverageOrderValueCard" %}{% endcomponent %}
     </div>
 
-
-    {# ────────────────────────────────────────────────────────────── #}
-    {# ZONE B — Operations charts (3)                                  #}
-    {# ────────────────────────────────────────────────────────────── #}
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-        {% trans "Revenue & Orders" as performance_title %}
-        {% trans "Last 14 days" as last_14d_label %}
-        {% capture as performance_action silent %}{% include "unfold/helpers/label.html" with text=last_14d_label %}{% endcapture %}
-        {% component "unfold/components/card.html" with title=performance_title action=performance_action class="lg:col-span-2" %}
-            {% component "unfold/components/chart/bar.html" with data=performance_chart_data options=performance_chart_options class="h-[320px]" %}{% endcomponent %}
-        {% endcomponent %}
-
-        {% trans "Order Status" as status_title %}
-        {% component "unfold/components/card.html" with title=status_title %}
-            <div class="h-[320px] flex items-center justify-center">
-                <canvas class="chart" data-type="doughnut" data-value="{{ status_chart_data }}" data-options="{{ status_chart_options }}"></canvas>
-            </div>
-        {% endcomponent %}
-
-        {% trans "Orders by source" as source_title %}
-        {% capture as source_action silent %}{% include "unfold/helpers/label.html" with text=last_30d_label %}{% endcapture %}
-        {% component "unfold/components/card.html" with title=source_title action=source_action %}
-            <div class="h-[320px] flex items-center justify-center">
-                <canvas class="chart" data-type="doughnut" data-value="{{ source_chart_data }}" data-options="{{ source_chart_options }}"></canvas>
-            </div>
-        {% endcomponent %}
-
+    <div class="grid gap-6 grid-cols-1 lg:grid-cols-3">
+        {% component "admin/dashboard/components/bar_chart_card.html" with component_class="StorePerformanceChart" %}{% endcomponent %}
+        {% component "admin/dashboard/components/doughnut_card.html" with component_class="StoreOrderStatusChart" %}{% endcomponent %}
     </div>
 
-
-    {# ────────────────────────────────────────────────────────────── #}
-    {# ZONE C — 3 action queues                                        #}
-    {# Stack on smaller screens; jump to 3 cols only at 2xl so each     #}
-    {# table's 4-5 columns have room without cropping date/amount.     #}
-    {# ────────────────────────────────────────────────────────────── #}
-    <div class="grid grid-cols-1 2xl:grid-cols-3 gap-6">
-
-        {# Recent orders #}
-        {% trans "Recent Orders" as orders_title %}
-        {% url 'admin:order_order_changelist' as orders_view_all_url %}
-        {% capture as orders_view_all silent %}{% component "unfold/components/link.html" with href=orders_view_all_url class="text-xs text-primary-600 dark:text-primary-400 hover:underline font-medium" %}{% trans "View all" %} →{% endcomponent %}{% endcapture %}
-        {% component "unfold/components/card.html" with title=orders_title action=orders_view_all size="md" %}
-            <div class="overflow-x-auto">
-                <table class="w-full text-xs">
-                    <thead class="bg-base-50 dark:bg-base-800 text-base-600 dark:text-base-400 uppercase">
-                        <tr>
-                            <th class="px-3 py-2 text-left font-medium">{% trans "Order #" %}</th>
-                            <th class="px-3 py-2 text-left font-medium">{% trans "Customer" %}</th>
-                            <th class="px-3 py-2 text-left font-medium">{% trans "Status" %}</th>
-                            <th class="px-3 py-2 text-left font-medium">{% trans "Total" %}</th>
-                            <th class="px-3 py-2 text-left font-medium">{% trans "Date" %}</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-base-200 dark:divide-base-800">
-                        {% for row in orders_queue %}
-                        <tr class="hover:bg-base-50 dark:hover:bg-base-800/50">
-                            <td class="px-3 py-2">
-                                {% component "unfold/components/link.html" with href=row.url class="text-primary-600 dark:text-primary-400 font-medium hover:underline" %}#{{ row.id }}{% endcomponent %}
-                            </td>
-                            <td class="px-3 py-2 text-base-700 dark:text-base-200">{{ row.email }}</td>
-                            <td class="px-3 py-2">{% include "unfold/helpers/label.html" with variant=row.status_variant text=row.status_label %}</td>
-                            <td class="px-3 py-2 font-semibold tabular-nums text-base-700 dark:text-base-200">€{{ row.amount|floatformat:2 }}</td>
-                            <td class="px-3 py-2 text-base-700 dark:text-base-200">{{ row.created_at|date:"d/m H:i" }}</td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="5" class="px-3 py-6 text-center text-base-600 dark:text-base-300">
-                                {% trans "No orders yet" %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        {% endcomponent %}
-
-        {# Pending reviews #}
-        {% trans "Pending Reviews" as reviews_title %}
-        {% url 'admin:product_productreview_changelist' as reviews_changelist_url %}
-        {% capture as reviews_view_all_href silent %}{{ reviews_changelist_url }}?status__exact=NEW{% endcapture %}
-        {% capture as reviews_view_all silent %}{% component "unfold/components/link.html" with href=reviews_view_all_href class="text-xs text-primary-600 dark:text-primary-400 hover:underline font-medium" %}{% trans "View all" %} →{% endcomponent %}{% endcapture %}
-        {% component "unfold/components/card.html" with title=reviews_title action=reviews_view_all size="md" %}
-            <div class="overflow-x-auto">
-                <table class="w-full text-xs">
-                    <thead class="bg-base-50 dark:bg-base-800 text-base-600 dark:text-base-400 uppercase">
-                        <tr>
-                            <th class="px-3 py-2 text-left font-medium">{% trans "Product" %}</th>
-                            <th class="px-3 py-2 text-left font-medium">{% trans "User" %}</th>
-                            <th class="px-3 py-2 text-left font-medium">{% trans "Rating" %}</th>
-                            <th class="px-3 py-2 text-left font-medium">{% trans "Date" %}</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-base-200 dark:divide-base-800">
-                        {% for row in reviews_queue %}
-                        <tr class="hover:bg-base-50 dark:hover:bg-base-800/50">
-                            <td class="px-3 py-2">
-                                {% component "unfold/components/link.html" with href=row.url class="text-primary-600 dark:text-primary-400 font-medium hover:underline" %}{{ row.product_name }}{% endcomponent %}
-                            </td>
-                            <td class="px-3 py-2 text-base-700 dark:text-base-200">{{ row.user_label }}</td>
-                            <td class="px-3 py-2">
-                                {% capture as rating_text silent %}★ {{ row.rate }}/10{% endcapture %}
-                                {% include "unfold/helpers/label.html" with variant="warning" text=rating_text %}
-                            </td>
-                            <td class="px-3 py-2 text-base-700 dark:text-base-200">{{ row.created_at|date:"d/m" }}</td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="4" class="px-3 py-6 text-center text-emerald-600 dark:text-emerald-400">
-                                {% component "unfold/components/icon.html" with class="align-middle mr-1" %}check_circle{% endcomponent %}
-                                {% trans "No pending reviews" %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        {% endcomponent %}
-
-        {# Recent contact messages #}
-        {% trans "Contact Messages" as messages_title %}
-        {% url 'admin:contact_contact_changelist' as messages_changelist_url %}
-        {% capture as messages_view_all silent %}{% component "unfold/components/link.html" with href=messages_changelist_url class="text-xs text-primary-600 dark:text-primary-400 hover:underline font-medium" %}{% trans "View all" %} →{% endcomponent %}{% endcapture %}
-        {% component "unfold/components/card.html" with title=messages_title action=messages_view_all size="md" %}
-            <div class="overflow-x-auto">
-                <table class="w-full text-xs">
-                    <thead class="bg-base-50 dark:bg-base-800 text-base-600 dark:text-base-400 uppercase">
-                        <tr>
-                            <th class="px-3 py-2 text-left font-medium">{% trans "From" %}</th>
-                            <th class="px-3 py-2 text-left font-medium">{% trans "Email" %}</th>
-                            <th class="px-3 py-2 text-left font-medium">{% trans "Message" %}</th>
-                            <th class="px-3 py-2 text-left font-medium">{% trans "Date" %}</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-base-200 dark:divide-base-800">
-                        {% for row in messages_queue %}
-                        <tr class="hover:bg-base-50 dark:hover:bg-base-800/50">
-                            <td class="px-3 py-2">
-                                {% component "unfold/components/link.html" with href=row.url class="text-primary-600 dark:text-primary-400 font-medium hover:underline" %}{{ row.name }}{% endcomponent %}
-                            </td>
-                            <td class="px-3 py-2 text-base-700 dark:text-base-200">{{ row.email }}</td>
-                            <td class="px-3 py-2 text-base-700 dark:text-base-200">{{ row.excerpt }}</td>
-                            <td class="px-3 py-2 text-base-700 dark:text-base-200">{{ row.created_at|date:"d/m" }}</td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="4" class="px-3 py-6 text-center text-base-600 dark:text-base-300">
-                                {% trans "No messages yet" %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        {% endcomponent %}
-
+    <div class="grid gap-6 grid-cols-1 lg:grid-cols-3">
+        {% component "admin/dashboard/components/table_card.html" with component_class="StoreRecentOrders" class="lg:col-span-2" %}{% endcomponent %}
+        {% component "admin/dashboard/components/doughnut_card.html" with component_class="StoreOrderSourceChart" %}{% endcomponent %}
     </div>
 
-
-    {# ────────────────────────────────────────────────────────────── #}
-    {# ZONE E — Growth: funnel + retention + top products             #}
-    {# ────────────────────────────────────────────────────────────── #}
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-        {# Funnel: Carts → Orders → Paid #}
-        {% trans "Conversion Funnel" as funnel_title %}
-        {% trans "Carts" as carts_label %}
-        {% trans "Orders" as orders_label %}
-        {% trans "Paid" as paid_label %}
-        {% component "unfold/components/card.html" with title=funnel_title action=last_30d_label %}
-            <div class="flex flex-col gap-3">
-                {% component "unfold/components/progress.html" with title=carts_label description=funnel.carts value=100 %}{% endcomponent %}
-                {% component "unfold/components/progress.html" with title=orders_label description=funnel.orders value=funnel.cart_to_order_pct %}{% endcomponent %}
-                {% component "unfold/components/progress.html" with title=paid_label description=funnel.paid value=funnel.overall_pct %}{% endcomponent %}
-            </div>
-            {% component "unfold/components/separator.html" with class="my-3" %}{% endcomponent %}
-            <div class="flex items-center justify-between">
-                {% component "unfold/components/text.html" with class="font-semibold" %}{% trans "End-to-end" %}{% endcomponent %}
-                {% capture as funnel_overall_text silent %}{{ funnel.overall_pct }}%{% endcapture %}
-                {% include "unfold/helpers/label.html" with variant="primary" text=funnel_overall_text %}
-            </div>
-        {% endcomponent %}
-
-        {# Retention #}
-        {% trans "Repeat Customers" as retention_title %}
-        {% component "unfold/components/card.html" with title=retention_title action=last_30d_label %}
-            {% component "unfold/components/title.html" %}{{ retention.repeat_rate_pct }}%{% endcomponent %}
-            <div class="mt-2 text-sm text-base-600 dark:text-base-300">
-                {{ retention.repeat_customers }} / {{ retention.paying_customers }}
-                {% trans "made a 2nd purchase" %}
-            </div>
-        {% endcomponent %}
-
-        {# Top Products by views #}
-        {% trans "Top Products" as top_products_title %}
-        {% url 'admin:product_product_changelist' as products_changelist_url %}
-        {% capture as top_products_href silent %}{{ products_changelist_url }}?o=-7{% endcapture %}
-        {% capture as top_products_view_all silent %}{% component "unfold/components/link.html" with href=top_products_href class="text-xs text-primary-600 dark:text-primary-400 hover:underline font-medium" %}{% trans "View all" %} →{% endcomponent %}{% endcapture %}
-        {% component "unfold/components/card.html" with title=top_products_title action=top_products_view_all size="md" %}
-            <ul class="divide-y divide-base-200 dark:divide-base-800">
-                {% for p in top_products %}
-                <li class="py-2 flex items-center justify-between gap-3">
-                    {% component "unfold/components/link.html" with href=p.url class="text-sm text-primary-600 dark:text-primary-400 hover:underline truncate" %}{{ p.name }}{% endcomponent %}
-                    {% capture as product_views_text silent %}{{ p.views }}{% endcapture %}
-                    {% include "unfold/helpers/label.html" with variant="primary" icon="visibility" text=product_views_text %}
-                </li>
-                {% empty %}
-                <li class="py-6 text-center text-base-600 dark:text-base-300 text-sm">
-                    {% trans "No products yet" %}
-                </li>
-                {% endfor %}
-            </ul>
-        {% endcomponent %}
-
+    <div class="grid gap-6 grid-cols-1 lg:grid-cols-2">
+        {% component "admin/dashboard/components/table_card.html" with component_class="StorePendingReviews" %}{% endcomponent %}
+        {% component "admin/dashboard/components/table_card.html" with component_class="StoreContactMessages" %}{% endcomponent %}
     </div>
 
-
-    {# ────────────────────────────────────────────────────────────── #}
-    {# ZONE F — Search insights                                       #}
-    {# ────────────────────────────────────────────────────────────── #}
-    {% trans "Last 30 days" as last_30d_badge %}
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-        {# KPI stack #}
-        <div class="flex flex-col gap-6">
-            {% trans "Searches" as searches_title %}
-            {% component "unfold/components/card.html" with title=searches_title action=last_30d_badge %}
-                {% component "unfold/components/title.html" %}{{ search_insights.searches_30d }}{% endcomponent %}
-                <div class="mt-2 text-sm text-base-600 dark:text-base-300">
-                    {% trans "committed queries, empty searches excluded" %}
-                </div>
-            {% endcomponent %}
-            {% trans "Zero Results" as zero_title %}
-            {% component "unfold/components/card.html" with title=zero_title action=last_30d_badge %}
-                {% component "unfold/components/title.html" %}{{ search_insights.zero_result_pct }}%{% endcomponent %}
-                <div class="mt-2 text-sm text-base-600 dark:text-base-300">
-                    {{ search_insights.zero_result_count }} {% trans "searches found nothing" %}
-                </div>
-            {% endcomponent %}
-            {% trans "Result Clicks" as clicks_title %}
-            {% component "unfold/components/card.html" with title=clicks_title action=last_30d_badge %}
-                {% if search_insights.clicks_30d is None %}
-                    {% component "unfold/components/title.html" %}—{% endcomponent %}
-                    <div class="mt-2 text-sm text-base-600 dark:text-base-300">
-                        {% trans "No click data recorded yet" %}
-                    </div>
-                {% else %}
-                    {% component "unfold/components/title.html" %}{{ search_insights.clicks_30d }}{% endcomponent %}
-                    <div class="mt-2 text-sm text-base-600 dark:text-base-300">
-                        {{ search_insights.ctr_pct }}% {% trans "click-through rate" %}
-                    </div>
-                {% endif %}
-            {% endcomponent %}
-        </div>
-
-        {# 14-day volume chart #}
-        {% trans "Search Volume" as search_volume_title %}
-        {% trans "Last 14 days" as last_14d_badge %}
-        <div class="lg:col-span-2">
-            {% component "unfold/components/card.html" with title=search_volume_title action=last_14d_badge %}
-                {% component "unfold/components/chart/bar.html" with data=search_volume_chart_data options=search_volume_chart_options class="h-[320px]" %}{% endcomponent %}
-            {% endcomponent %}
-        </div>
-
+    <div class="grid gap-6 grid-cols-1 lg:grid-cols-3">
+        {% component "admin/dashboard/store/funnel.html" with component_class="StoreFunnel" %}{% endcomponent %}
+        {% component "admin/dashboard/components/kpi.html" with component_class="StoreRepeatCustomers" %}{% endcomponent %}
+        {% component "admin/dashboard/components/table_card.html" with component_class="StoreTopProducts" %}{% endcomponent %}
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    {% component "admin/dashboard/components/table_card.html" with component_class="StoreLowStock" %}{% endcomponent %}
 
-        {# Top queries #}
-        {% trans "Top Search Queries" as top_queries_title %}
-        {% component "unfold/components/card.html" with title=top_queries_title action=last_30d_badge size="md" %}
-            <div class="overflow-x-auto">
-                <table class="w-full text-xs">
-                    <thead class="bg-base-50 dark:bg-base-800 text-base-600 dark:text-base-400 uppercase">
-                        <tr>
-                            <th class="px-3 py-2 text-left font-medium">{% trans "Query" %}</th>
-                            <th class="px-3 py-2 text-right font-medium">{% trans "Searches" %}</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-base-200 dark:divide-base-800">
-                        {% for row in search_insights.top_queries %}
-                        <tr class="hover:bg-base-50 dark:hover:bg-base-800/50">
-                            <td class="px-3 py-2 font-medium text-base-700 dark:text-base-200">{{ row.query }}</td>
-                            <td class="px-3 py-2 text-right text-base-700 dark:text-base-200">{{ row.count }}</td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="2" class="px-3 py-6 text-center text-base-600 dark:text-base-300">
-                                {% trans "No search data yet" %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        {% endcomponent %}
-
-        {# Zero-result queries — the synonym / content-gap worklist #}
-        {% trans "Zero-Result Queries" as zero_queries_title %}
-        {% component "unfold/components/card.html" with title=zero_queries_title action=last_30d_badge size="md" %}
-            {% component "unfold/components/text.html" with class="mb-3" %}{% trans "What visitors searched for and didn't find — candidates for synonyms, new content, or new products." %}{% endcomponent %}
-            <ul class="divide-y divide-base-200 dark:divide-base-800">
-                {% for row in search_insights.zero_queries %}
-                <li class="py-2 flex items-center justify-between gap-3">
-                    <span class="text-sm font-medium text-orange-700 dark:text-orange-400 truncate">{{ row.query }}</span>
-                    {% capture as zero_query_count silent %}{{ row.count }}×{% endcapture %}
-                    {% include "unfold/helpers/label.html" with variant="warning" text=zero_query_count %}
-                </li>
-                {% empty %}
-                <li class="py-6 text-center text-base-600 dark:text-base-300 text-sm">
-                    {% trans "No zero-result searches" %} 🎉
-                </li>
-                {% endfor %}
-            </ul>
-        {% endcomponent %}
-
+    <div class="grid gap-6 grid-cols-1 lg:grid-cols-3">
+        {% component "admin/dashboard/components/kpi_list.html" with component_class="StoreSearchKpis" %}{% endcomponent %}
+        {% component "admin/dashboard/components/bar_chart_card.html" with component_class="StoreSearchVolume" %}{% endcomponent %}
     </div>
 
-
-    {# ────────────────────────────────────────────────────────────── #}
-    {# ZONE D — Low stock list (superuser-only, only when present)    #}
-    {# ────────────────────────────────────────────────────────────── #}
-    {% if is_superuser and low_stock_products %}
-    {% trans "Low Stock — replenish soon" as low_stock_title %}
-    {% url 'admin:product_product_changelist' as low_stock_changelist_url %}
-    {% capture as low_stock_href silent %}{{ low_stock_changelist_url }}?stock__lt=10{% endcapture %}
-    {% capture as low_stock_view_all silent %}{% component "unfold/components/link.html" with href=low_stock_href class="text-xs text-primary-600 dark:text-primary-400 hover:underline font-medium" %}{% trans "View all" %} →{% endcomponent %}{% endcapture %}
-    {% component "unfold/components/card.html" with title=low_stock_title action=low_stock_view_all size="md" %}
-        <ul class="divide-y divide-base-200 dark:divide-base-800">
-            {% for p in low_stock_products %}
-            <li class="py-2 flex items-center justify-between gap-3">
-                {% component "unfold/components/link.html" with href=p.url class="text-sm text-primary-600 dark:text-primary-400 hover:underline truncate" %}{{ p.name }}{% endcomponent %}
-                {% capture as low_stock_count_text silent %}{{ p.stock }}{% endcapture %}
-                {% include "unfold/helpers/label.html" with variant="danger" text=low_stock_count_text %}
-            </li>
-            {% endfor %}
-        </ul>
-    {% endcomponent %}
-    {% endif %}
-
+    <div class="grid gap-6 grid-cols-1 lg:grid-cols-2">
+        {% component "admin/dashboard/components/table_card.html" with component_class="StoreTopQueries" %}{% endcomponent %}
+        {% component "admin/dashboard/components/table_card.html" with component_class="StoreZeroResultQueries" %}{% endcomponent %}
+    </div>
 </div>
 {% endblock %}

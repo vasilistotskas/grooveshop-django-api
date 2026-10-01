@@ -278,7 +278,9 @@ class UUIDModel(models.Model):
     Abstract model that adds a unique UUID field.
     """
 
-    uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
+    uuid = models.UUIDField(
+        default=uuid.uuid4, editable=False, unique=True, verbose_name=_("UUID")
+    )
 
     class Meta(TypedModelMeta):
         abstract = True
@@ -335,9 +337,17 @@ class MetaDataModel(models.Model):
     """
 
     private_metadata = JSONField(
-        blank=True, default=dict, encoder=DjangoJSONEncoder
+        blank=True,
+        default=dict,
+        encoder=DjangoJSONEncoder,
+        verbose_name=_("Private Metadata"),
     )
-    metadata = JSONField(blank=True, default=dict, encoder=DjangoJSONEncoder)
+    metadata = JSONField(
+        blank=True,
+        default=dict,
+        encoder=DjangoJSONEncoder,
+        verbose_name=_("Metadata"),
+    )
 
     class Meta(TypedModelMeta):
         indexes = [
@@ -393,8 +403,12 @@ class SoftDeleteMixin(models.Model):
     rather than being removed from the database.
     """
 
-    deleted_at = models.DateTimeField(null=True, blank=True)
-    is_deleted = models.BooleanField(default=False, db_index=True)
+    deleted_at = models.DateTimeField(
+        null=True, blank=True, verbose_name=_("Deleted At")
+    )
+    is_deleted = models.BooleanField(
+        default=False, db_index=True, verbose_name=_("Is Deleted")
+    )
 
     class Meta(TypedModelMeta):
         abstract = True

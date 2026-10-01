@@ -93,6 +93,13 @@ STOREFRONT_LOCALES: tuple[str, ...] = ("el", "en")
 STOREFRONT_DEFAULT_LOCALE = "el"
 
 
+def storefront_language_choices() -> list[tuple[str, str]]:
+    """``Tenant.default_locale``'s choices: the storefront's locales,
+    named as ``settings.LANGUAGES`` names them."""
+    names = dict(settings.LANGUAGES)
+    return [(code, names[code]) for code in STOREFRONT_LOCALES]
+
+
 def tenant_storefront_locales(tenant) -> tuple[str, ...]:
     """The locales *tenant*'s storefront is reachable in.
 

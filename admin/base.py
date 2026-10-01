@@ -2,9 +2,8 @@
 
 Centralises unfold attribute defaults so every ModelAdmin in the
 project inherits a consistent UX without each file having to re-set
-the same six flags. Use ``BaseModelAdmin`` as the base in new admins;
-existing admins can migrate incrementally — the class is a strict
-super-set, no behaviour changes when applied.
+the same flags. Every first-party admin extends ``BaseModelAdmin`` (or
+``BaseTranslatableAdmin`` for parler models).
 
 Example:
 
@@ -17,13 +16,62 @@ Example:
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from functools import wraps
+
+from django.contrib.admin.utils import get_fields_from_path
+from django.db import models
 from parler.admin import TranslatableAdmin, TranslatableTabularInline
 from tinymce.models import HTMLField
 from tinymce.widgets import AdminTinyMCE
 from unfold.admin import BaseInlineMixin, ModelAdmin
+from unfold.contrib.filters.admin import (
+    AllValuesCheckboxFilter,
+    BooleanRadioFilter,
+    ChoicesDropdownFilter,
+    RangeDateFilter,
+    RangeDateTimeFilter,
+    RelatedDropdownFilter,
+)
+from unfold.fields import UnfoldAdminJSONSchemaField
 from unfold.mixins import FormFieldModelAdminMixin
+from unfold.widgets import UnfoldAdminJSONSchemaWidget
 
 from admin.mixins import WithheldOnTenantHostModelAdmin
+from core.json_schema import schema_validator
+
+
+def unfold_filter_for(field: models.Field) -> type:
+    """The Unfold list filter for a ``list_filter`` entry given by name.
+
+    Django's own filters are links that apply on click, while Unfold's
+    are form fields sent together by "Apply" (``list_filter_submit``):
+    in one sheet holding both, clicking a link navigated away and lost
+    every selection not applied yet. Order matters: a field with
+    ``choices`` is a choice whatever its type, and ``DateTimeField``
+    subclasses ``DateField``.
+    """
+    if field.flatchoices:
+        return ChoicesDropdownFilter
+    if isinstance(field, models.BooleanField):
+        return BooleanRadioFilter
+    if isinstance(field, models.DateTimeField):
+        return RangeDateTimeFilter
+    if isinstance(field, models.DateField):
+        return RangeDateFilter
+    if field.is_relation:
+        return RelatedDropdownFilter
+    return AllValuesCheckboxFilter
+
+
+def _own_copy(method: Callable) -> Callable:
+    """A per-class wrapper around an inherited action function."""
+
+    @wraps(method)
+    def action(*args, **kwargs):
+        return method(*args, **kwargs)
+
+    return action
 
 
 class BaseModelAdmin(WithheldOnTenantHostModelAdmin, ModelAdmin):
@@ -84,6 +132,12 @@ class BaseModelAdmin(WithheldOnTenantHostModelAdmin, ModelAdmin):
     # direction, and it is right for the ones that matter (cancel a
     # parcel, publish a post, purge a payout). A genuinely read-only
     # action declares `permissions=["view"]` and says so.
+    #
+    # An inherited action (a mixin's, a third-party base's) is one
+    # function object shared by every class that inherits it. Stamping it
+    # in place from the first subclass silently set the policy for all
+    # of them, so an inherited undeclared action gets its OWN stamped
+    # wrapper on the inheriting class instead.
     _DEFAULT_ACTION_PERMISSIONS = ("change",)
 
     _ACTION_ATTRIBUTES = (
@@ -105,69 +159,12 @@ class BaseModelAdmin(WithheldOnTenantHostModelAdmin, ModelAdmin):
                     method, "allowed_permissions", None
                 ):
                     continue
+                if name not in cls.__dict__:
+                    method = _own_copy(method)
+                    setattr(cls, name, method)
                 method.allowed_permissions = list(
                     cls._DEFAULT_ACTION_PERMISSIONS
                 )
-
-    def _withheld_on_public(self, request) -> bool:
-        """True when this tenant-only model has no table in this schema.
-
-        Gated on ``request.tenant`` (set by django-tenants'
-        TenantMainMiddleware), and it only withholds when it POSITIVELY
-        knows the request is on the public schema. An earlier attempt
-        keyed on ``connection.tenant``/``get_current_tenant()`` instead
-        and defaulted to withholding when they were empty — which is the
-        state during tests, management commands and Celery work, so it
-        denied 35 perfectly valid admin changelists.
-
-        Without this, opening one of these on the platform console does
-        not 404 cleanly: the pre-multi-tenant public schema still holds
-        same-named legacy tables that TENANT_APPS migrations never touch,
-        so Django queried ``public.order_order`` and raised
-        ``column order_order.loyalty_discount_currency does not exist``.
-        Pruning that debris would not help — it would then fail on a
-        missing relation. Returning "no permission" turns a 500 into a
-        403, which is the honest answer: that model does not belong to
-        this host.
-        """
-        from django_tenants.utils import get_public_schema_name
-
-        tenant = getattr(request, "tenant", None)
-        if tenant is None:
-            return False
-        if getattr(tenant, "schema_name", None) != get_public_schema_name():
-            return False
-
-        from tenant.app_labels import tenant_only_app_labels
-
-        return self.model._meta.app_label in set(tenant_only_app_labels())
-
-    def has_module_permission(self, request) -> bool:
-        if self._withheld_on_public(request):
-            return False
-        return super().has_module_permission(request)
-
-    def has_view_permission(self, request, obj=None) -> bool:
-        # Also covers a changelist reached by typing the URL directly,
-        # which has_module_permission alone does not gate.
-        if self._withheld_on_public(request):
-            return False
-        return super().has_view_permission(request, obj)
-
-    def has_add_permission(self, request) -> bool:
-        if self._withheld_on_public(request):
-            return False
-        return super().has_add_permission(request)
-
-    def has_change_permission(self, request, obj=None) -> bool:
-        if self._withheld_on_public(request):
-            return False
-        return super().has_change_permission(request, obj)
-
-    def has_delete_permission(self, request, obj=None) -> bool:
-        if self._withheld_on_public(request):
-            return False
-        return super().has_delete_permission(request, obj)
 
     compressed_fields = True
     warn_unsaved_form = True
@@ -191,6 +188,39 @@ class BaseModelAdmin(WithheldOnTenantHostModelAdmin, ModelAdmin):
     formfield_overrides = {
         HTMLField: {"widget": AdminTinyMCE},
     }
+
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        """A JSON field with a schema edits through Unfold's schema form.
+
+        Unfold's own ``JSONSchemaField`` model field is not used: it
+        resolves its schema once at import, cannot be deconstructed for
+        migrations, and skips validation silently without ``jsonschema``.
+        The schema lives on the model field's validator instead
+        (``core.json_schema``); the validator also runs on save.
+        """
+        validator = schema_validator(db_field)
+        if isinstance(db_field, models.JSONField) and validator is not None:
+            return db_field.formfield(
+                form_class=UnfoldAdminJSONSchemaField,
+                schema=validator.schema,
+                widget=UnfoldAdminJSONSchemaWidget,
+                **kwargs,
+            )
+        return super().formfield_for_dbfield(db_field, request, **kwargs)
+
+    def get_list_filter(self, request):
+        """Every plain field name in ``list_filter`` as its Unfold filter
+        (``unfold_filter_for``); explicit ``(field, Filter)`` pairs and
+        filter classes are kept as declared."""
+        return [
+            (
+                entry,
+                unfold_filter_for(get_fields_from_path(self.model, entry)[-1]),
+            )
+            if isinstance(entry, str)
+            else entry
+            for entry in super().get_list_filter(request)
+        ]
 
 
 class BaseTranslatableAdmin(TranslatableAdmin, BaseModelAdmin):

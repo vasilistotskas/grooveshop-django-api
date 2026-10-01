@@ -2,37 +2,38 @@ from datetime import timedelta
 from decimal import Decimal
 from uuid import uuid4
 
-import admin_thumbnails
 from django.contrib import admin, messages
-from django.contrib.admin import helpers
+from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.db.models import Count, F, Prefetch, Q, Sum
 from django.db.models.functions import TruncDay
-from django.http import Http404, HttpResponseRedirect
-from django.shortcuts import redirect, render
-from django.urls import path, reverse, reverse_lazy
-from django.utils import timezone
+from django.shortcuts import get_object_or_404, redirect, render
+from django.template.response import TemplateResponse
+from django.urls import path, reverse
+from django.utils import formats, timezone
 from django.utils.html import format_html, format_html_join
-from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import ngettext
 from parler.admin import TranslatableAdmin
 from simple_history.admin import SimpleHistoryAdmin
 from unfold.admin import TabularInline
 from unfold.contrib.filters.admin import (
+    AutocompleteSelectFilter,
     DropdownFilter,
     RangeDateTimeFilter,
     RangeNumericFilter,
-    RangeNumericListFilter,
     RelatedDropdownFilter,
     SliderNumericFilter,
 )
+from unfold.datasets import BaseDataset
 from unfold.decorators import action, display
 from unfold.enums import ActionVariant
 
 from admin.base import BaseModelAdmin, BaseTranslatableAdmin
+from admin.datasets import RelatedDatasetAdmin
 from admin.displays import (
     REVIEW_STATUS_VARIANT,
+    change_link,
     choice_label,
     format_dt,
     header_two_line,
@@ -40,8 +41,10 @@ from admin.displays import (
     relative_time,
 )
 from admin.export import ExportActionMixin
+from admin.filters import AnnotatedRangeFilter, LikesCountFilter
 from core.forms.measurement import MeasurementWidget
 from core.units import WeightUnits
+from order.models.order import Order
 from product.enum.category import CategoryImageTypeEnum
 from product.enum.review import ReviewStatus
 from product.forms import ApplyDiscountForm
@@ -59,6 +62,7 @@ from product.models.review import ProductReview
 from product.models.variant_group import ProductVariantGroup
 from product.signals import reindex_products_by_pk
 from tag.admin import TaggedItemInline
+from user.models.account import UserAccount
 
 # ── Local (single-app) TextChoices/synthetic-status variant maps ──────
 # Stock status and reservation status are derived states (not backed
@@ -224,62 +228,12 @@ class PopularityFilter(DropdownFilter):
         return queryset.filter(**filter_kwargs)
 
 
-class LikesCountFilter(RangeNumericListFilter):
-    title = _("Likes count")
-    parameter_name = "likes_count"
-
-    def queryset(self, request, queryset):
-        # Short-circuit when the filter is unused. Django admin
-        # invokes every ``list_filter``'s ``queryset()`` on every
-        # page load — without this guard ``with_likes_count()``
-        # added a ``LEFT JOIN productfavourite`` + GROUP BY to the
-        # main product fetch + the date-hierarchy DATE_TRUNC + the
-        # COUNT query, costing ~2s extra per changelist load.
-        value_from = self.used_parameters.get(f"{self.parameter_name}_from")
-        value_to = self.used_parameters.get(f"{self.parameter_name}_to")
-        if not value_from and not value_to:
-            return queryset
-
-        queryset = queryset.with_likes_count()
-        filters = {}
-        if value_from:
-            filters["likes_count__gte"] = value_from
-        if value_to:
-            filters["likes_count__lte"] = value_to
-        return queryset.filter(**filters)
-
-    def expected_parameters(self):
-        return [
-            f"{self.parameter_name}_from",
-            f"{self.parameter_name}_to",
-        ]
-
-
-class ReviewAverageFilter(RangeNumericListFilter):
+class ReviewAverageFilter(AnnotatedRangeFilter):
     title = _("Review Rating")
     parameter_name = "review_average"
 
-    def queryset(self, request, queryset):
-        # Short-circuit when the filter is unused — same rationale
-        # as ``LikesCountFilter`` above.
-        value_from = self.used_parameters.get(f"{self.parameter_name}_from")
-        value_to = self.used_parameters.get(f"{self.parameter_name}_to")
-        if not value_from and not value_to:
-            return queryset
-
-        queryset = queryset.with_review_average()
-        filters = {}
-        if value_from:
-            filters["review_average__gte"] = value_from
-        if value_to:
-            filters["review_average__lte"] = value_to
-        return queryset.filter(**filters)
-
-    def expected_parameters(self):
-        return [
-            f"{self.parameter_name}_from",
-            f"{self.parameter_name}_to",
-        ]
+    def annotate(self, queryset):
+        return queryset.with_review_average()
 
 
 class StockReservationStatusFilter(DropdownFilter):
@@ -292,6 +246,7 @@ class StockReservationStatusFilter(DropdownFilter):
         return [
             ("has_reservations", _("Has Active Reservations")),
             ("no_reservations", _("No Active Reservations")),
+            # xgettext:no-python-format — "% s" here is a literal percent.
             ("high_reservations", _("High Reservations (>50% stock)")),
         ]
 
@@ -464,12 +419,12 @@ class AttributeAdmin(BaseTranslatableAdmin):
     @display(description=_("Created"), ordering="created_at")
     def created_display(self, obj):
         return (
-            f"{format_dt(obj.created_at, fmt='%d/%m/%Y')} "
+            f"{format_dt(obj.created_at, fmt='SHORT_DATE_FORMAT')} "
             f"({relative_time(obj.created_at)})"
         )
 
     @action(
-        description=str(_("Activate selected attributes")),
+        description=_("Activate selected attributes"),
         variant=ActionVariant.SUCCESS,
         icon="check_circle",
     )
@@ -488,7 +443,7 @@ class AttributeAdmin(BaseTranslatableAdmin):
         )
 
     @action(
-        description=str(_("Deactivate selected attributes")),
+        description=_("Deactivate selected attributes"),
         variant=ActionVariant.WARNING,
         icon="cancel",
     )
@@ -608,12 +563,12 @@ class AttributeValueAdmin(BaseTranslatableAdmin):
     @display(description=_("Created"), ordering="created_at")
     def created_display(self, obj):
         return (
-            f"{format_dt(obj.created_at, fmt='%d/%m/%Y')} "
+            f"{format_dt(obj.created_at, fmt='SHORT_DATE_FORMAT')} "
             f"({relative_time(obj.created_at)})"
         )
 
     @action(
-        description=str(_("Activate selected values")),
+        description=_("Activate selected values"),
         variant=ActionVariant.SUCCESS,
         icon="check_circle",
     )
@@ -632,7 +587,7 @@ class AttributeValueAdmin(BaseTranslatableAdmin):
         )
 
     @action(
-        description=str(_("Deactivate selected values")),
+        description=_("Deactivate selected values"),
         variant=ActionVariant.WARNING,
         icon="cancel",
     )
@@ -660,6 +615,7 @@ class ProductAttributeInline(TabularInline):
     autocomplete_fields = ["attribute_value"]
 
     tab = True
+    per_page = 20
     verbose_name = _("Product Attribute")
     verbose_name_plural = _("Product Attributes")
 
@@ -672,13 +628,14 @@ class ProductAttributeInline(TabularInline):
         )
 
 
-@admin_thumbnails.thumbnail("image")
 class ProductImageInline(TabularInline):
+    # Unfold's inline image widget previews the current file itself.
     model = ProductImage
     extra = 0
-    fields = ("image_thumbnail", "image", "is_main")
+    fields = ("image", "is_main")
 
     tab = True
+    per_page = 20
     show_change_link = True
 
 
@@ -701,6 +658,7 @@ class StockReservationInline(TabularInline):
     readonly_fields = fields
 
     tab = True
+    per_page = 20
     verbose_name = _("Active Stock Reservation")
     verbose_name_plural = _("Active Stock Reservations")
 
@@ -744,43 +702,20 @@ class StockReservationInline(TabularInline):
         return "pending", _("Pending checkout")
 
 
-class StockLogInline(TabularInline):
-    """Display recent stock operation history for this product."""
-
-    from order.models.stock_log import StockLog
-
-    model = StockLog
-    extra = 0
-    can_delete = False
-    max_num = 20  # Limit to 20 records instead of slicing queryset
-
-    fields = (
-        "operation_display",
+class StockLogDatasetAdmin(RelatedDatasetAdmin):
+    parent_field = "product"
+    list_display = (
+        "operation_type",
         "quantity_change",
         "stock_levels",
         "order_link",
         "performed_by_display",
-        "timestamp_display",
+        "created_at",
     )
-    readonly_fields = fields
-
-    tab = True
-    verbose_name = _("Stock Activity Log")
-    verbose_name_plural = _("Stock Activity Logs (Recent 20)")
+    ordering = ("-created_at",)
 
     def get_queryset(self, request):
-        """Show last 20 stock operations, ordered by most recent."""
-        qs = super().get_queryset(request)
-        return qs.select_related("order", "performed_by").order_by(
-            "-created_at"
-        )
-
-    def has_add_permission(self, request, obj=None):
-        return False
-
-    @admin.display(description=_("Operation"))
-    def operation_display(self, obj):
-        return obj.get_operation_type_display()
+        return super().get_queryset(request).select_related("performed_by")
 
     @admin.display(description=_("Change"))
     def quantity_change(self, obj):
@@ -788,27 +723,36 @@ class StockLogInline(TabularInline):
 
     @admin.display(description=_("Stock Level"))
     def stock_levels(self, obj):
-        return f"{obj.stock_before} -> {obj.stock_after}"
+        return f"{obj.stock_before} → {obj.stock_after}"
 
     @admin.display(description=_("Related Order"))
     def order_link(self, obj):
         if obj.order_id:
-            return format_html(
-                '<a href="{url}">Order #{id}</a>',
-                url=reverse("admin:order_order_change", args=[obj.order_id]),
-                id=obj.order_id,
+            return change_link(
+                self.admin_site,
+                Order,
+                obj.order_id,
+                _("Order #%(id)s") % {"id": obj.order_id},
             )
-        return (obj.reason or "—")[:45]
+        return obj.reason or "—"
 
     @admin.display(description=_("By"))
     def performed_by_display(self, obj):
         if obj.performed_by:
-            return (obj.performed_by.email or obj.performed_by.username)[:20]
+            return obj.performed_by.email or obj.performed_by.username
         return _("System")
 
-    @admin.display(description=_("Time"))
-    def timestamp_display(self, obj):
-        return format_dt(obj.created_at, fmt="%d/%m %H:%M")
+
+class StockLogDataset(BaseDataset):
+    """Every stock movement of the product, paged (the inline this
+    replaces claimed "recent 20" and rendered them all)."""
+
+    from order.models.stock_log import StockLog
+
+    model = StockLog
+    model_admin = StockLogDatasetAdmin
+    title = _("Stock activity")
+    tab = True
 
 
 class ProductRelationInline(TabularInline):
@@ -846,11 +790,10 @@ class ProductAdmin(
     adds CSV/XML export actions (no cooperative-``super()`` methods
     of its own) and ``SimpleHistoryAdmin`` adds the audit-history
     view — neither redefines unfold's plumbing, so both sit between
-    parler and ``BaseModelAdmin`` without breaking either chain. This
-    is the same relative ordering the project used before the unfold
-    conversion; only ``ExportModelAdmin`` (which re-extends unfold's
-    ``ModelAdmin``, duplicating ``BaseModelAdmin``'s bases) was
-    swapped for the plain ``ExportActionMixin``.
+    parler and ``BaseModelAdmin`` without breaking either chain.
+    ``BaseTranslatableAdmin`` cannot express that order (its bases are
+    parler then ``BaseModelAdmin``), which is why this one admin lists
+    the bases itself.
     """
 
     list_display = (
@@ -895,10 +838,10 @@ class ProductAdmin(
         ProductAttributeInline,
         ProductImageInline,
         StockReservationInline,
-        StockLogInline,
         TaggedItemInline,
         ProductRelationInline,
     ]
+    change_form_datasets = [StockLogDataset]
     readonly_fields = (
         "id",
         "uuid",
@@ -908,6 +851,8 @@ class ProductAdmin(
         "view_count",
         "likes_count",
         "stock_reservation_summary",
+        # Stamped from the saving admin (``Product._history_user``).
+        "changed_by",
     )
     list_select_related = ["category", "vat", "brand", "changed_by"]
     autocomplete_fields = ["category", "vat", "variant_group", "brand"]
@@ -919,6 +864,8 @@ class ProductAdmin(
         "make_inactive",
         "apply_custom_discount",
         "clear_discount",
+        "export_csv",
+        "export_xml",
     ]
     # Per-row quick action: clone a product into a new draft for the
     # catalog team to riff on without leaving the list page.
@@ -1147,7 +1094,9 @@ class ProductAdmin(
             main_image.image.url if main_image and main_image.image else None
         )
         return header_two_line(
-            name, f"SKU {obj.sku[:8]}", image_path=image_path
+            name,
+            _("SKU %(sku)s") % {"sku": obj.sku[:8]},
+            image_path=image_path,
         )
 
     @admin.display(
@@ -1167,10 +1116,9 @@ class ProductAdmin(
         group = obj.variant_group
         if group is None:
             return "—"
-        name = (
-            group.safe_translation_getter("name", any_language=True)
-            or f"Group #{group.pk}"
-        )
+        name = group.safe_translation_getter("name", any_language=True) or _(
+            "Group #%(id)s"
+        ) % {"id": group.pk}
         # len() over the prefetch cache — no per-row COUNT query.
         siblings = len(group.variants.all())
         return format_html(
@@ -1209,7 +1157,7 @@ class ProductAdmin(
     @display(description=_("Created"), ordering="created_at")
     def created_display(self, obj):
         return (
-            f"{format_dt(obj.created_at, fmt='%d/%m/%Y')} "
+            f"{format_dt(obj.created_at, fmt='SHORT_DATE_FORMAT')} "
             f"({relative_time(obj.created_at)})"
         )
 
@@ -1270,7 +1218,7 @@ class ProductAdmin(
         )
 
     @action(
-        description=str(_("Activate selected products")),
+        description=_("Activate selected products"),
         variant=ActionVariant.SUCCESS,
         icon="check_circle",
     )
@@ -1295,7 +1243,7 @@ class ProductAdmin(
         )
 
     @action(
-        description=str(_("Deactivate selected products")),
+        description=_("Deactivate selected products"),
         variant=ActionVariant.WARNING,
         icon="cancel",
     )
@@ -1320,154 +1268,77 @@ class ProductAdmin(
         )
 
     @action(
-        description=str(_("Apply custom discount to selected products")),
+        description=_("Apply custom discount to selected products"),
         variant=ActionVariant.INFO,
         icon="local_offer",
         permissions=["change"],
     )
     def apply_custom_discount(self, request, queryset):
-        is_action_post = "_selected_action" in request.POST
-        is_form_post = "discount_percent" in request.POST
+        """Ask for the percentage, then apply it to the selection.
 
-        if is_action_post and not is_form_post:
-            selected_ids = list(queryset.values_list("id", flat=True))
-            request.session["selected_product_ids"] = selected_ids
-
-            total_count = queryset.count()
+        A bulk action over a selection cannot open an Unfold dialog, so
+        this is Django's intermediate-page pattern (``delete_selected``):
+        the page re-posts the action and the selection, and Django hands
+        the action the queryset built from that POST. Never the session
+        — it is shared across tabs, and a selection stored there by one
+        tab was discounted from another.
+        """
+        form = ApplyDiscountForm(
+            request.POST if "discount_percent" in request.POST else None
+        )
+        if not form.is_valid():
             active_count = queryset.filter(active=True).count()
-            inactive_count = total_count - active_count
-
-            form = ApplyDiscountForm()
-
-            context = {
-                **self.admin_site.each_context(request),
-                "title": _("Apply Custom Discount"),
-                "form": form,
-                "queryset": queryset,
-                "total_count": total_count,
-                "active_count": active_count,
-                "inactive_count": inactive_count,
-                "opts": self.model._meta,
-                "has_view_permission": self.has_view_permission(request),
-                "has_change_permission": self.has_change_permission(request),
-                "breadcrumbs_items": [
-                    {"title": _("Home"), "link": "admin:index"},
-                    {
-                        "title": self.model._meta.verbose_name_plural.title(),
-                        "link": "admin:product_product_changelist",
-                    },
-                    {"title": _("Apply Custom Discount")},
-                ],
-            }
-
-            return render(request, "admin/product/apply_discount.html", context)
-
-        if is_form_post:
-            # The POSTed selection, not `request.session`. The template
-            # re-posts one `_selected_action` per product, so Django has
-            # already built the right queryset — and it was thrown away
-            # in favour of a session key that is shared across TABS.
-            # Open the action on three clearance SKUs in one tab, then
-            # on the whole catalogue in another, come back to the first
-            # and submit: the discount landed on everything. The key was
-            # also only deleted on the success path, so an abandoned run
-            # left it armed for the next one.
-            selected_ids = request.POST.getlist(helpers.ACTION_CHECKBOX_NAME)
-
-            if selected_ids:
-                queryset = Product.objects.filter(id__in=selected_ids)
-            else:
-                messages.error(
-                    request, _("No products selected. Please try again.")
-                )
-                return HttpResponseRedirect(
-                    reverse_lazy("admin:product_product_changelist")
-                )
-
-            form = ApplyDiscountForm(request.POST)
-
-            if form.is_valid():
-                discount_percent = form.cleaned_data["discount_percent"]
-                apply_to_inactive = form.cleaned_data["apply_to_inactive"]
-
-                if not apply_to_inactive:
-                    queryset = queryset.filter(active=True)
-
-                # Saved one at a time, not `queryset.update()`. A bulk
-                # UPDATE emits no `post_save`, so simple-history writes
-                # no row, `post_create_historical_record_callback` never
-                # runs, `product_price_lowered` is never sent, and NOT
-                # ONE price-drop alert reaches the customers who
-                # explicitly subscribed to it. Measured: a bulk discount
-                # fires 0 post_save receivers where an instance save
-                # fires 1. `final_price` and `discount_percent` are also
-                # indexed Meilisearch fields, so search kept the
-                # pre-discount price until an unrelated save.
-                #
-                # The cost is bounded by the operator's selection, which
-                # this action already renders on a confirmation page.
-                updated = 0
-                with transaction.atomic():
-                    for product in queryset.select_for_update():
-                        product.discount_percent = discount_percent
-                        product.save(update_fields=["discount_percent"])
-                        updated += 1
-
-                if "selected_product_ids" in request.session:
-                    del request.session["selected_product_ids"]
-
-                self.message_user(
-                    request,
-                    ngettext(
-                        "Applied %(discount)s%% discount to %(count)d product.",
-                        "Applied %(discount)s%% discount to %(count)d products.",
-                        updated,
-                    )
-                    % {"count": updated, "discount": discount_percent},
-                    messages.SUCCESS,
-                )
-
-                return HttpResponseRedirect(
-                    reverse_lazy("admin:product_product_changelist")
-                )
-            else:
-                total_count = queryset.count()
-                active_count = queryset.filter(active=True).count()
-                inactive_count = total_count - active_count
-
-                context = {
+            total_count = queryset.count()
+            return TemplateResponse(
+                request,
+                "admin/product/apply_discount.html",
+                {
                     **self.admin_site.each_context(request),
                     "title": _("Apply Custom Discount"),
+                    "opts": self.model._meta,
                     "form": form,
                     "queryset": queryset,
                     "total_count": total_count,
                     "active_count": active_count,
-                    "inactive_count": inactive_count,
-                    "opts": self.model._meta,
-                    "has_view_permission": self.has_view_permission(request),
-                    "has_change_permission": self.has_change_permission(
-                        request
-                    ),
-                    "breadcrumbs_items": [
-                        {"title": _("Home"), "link": "admin:index"},
-                        {
-                            "title": self.model._meta.verbose_name_plural.title(),
-                            "link": "admin:product_product_changelist",
-                        },
-                        {"title": _("Apply Custom Discount")},
-                    ],
-                }
+                    "inactive_count": total_count - active_count,
+                },
+            )
 
-                return render(
-                    request, "admin/product/apply_discount.html", context
-                )
+        discount_percent = form.cleaned_data["discount_percent"]
+        if not form.cleaned_data["apply_to_inactive"]:
+            queryset = queryset.filter(active=True)
 
-        return HttpResponseRedirect(
-            reverse_lazy("admin:product_product_changelist")
+        # Saved one at a time, not `queryset.update()`. A bulk UPDATE
+        # emits no `post_save`, so simple-history writes no row,
+        # `post_create_historical_record_callback` never runs,
+        # `product_price_lowered` is never sent, and NOT ONE price-drop
+        # alert reaches the customers who explicitly subscribed to it.
+        # `final_price` and `discount_percent` are also indexed
+        # Meilisearch fields, so search kept the pre-discount price until
+        # an unrelated save. The cost is bounded by the operator's
+        # selection, which the confirmation page shows.
+        updated = 0
+        with transaction.atomic():
+            for product in queryset.select_for_update():
+                product.discount_percent = discount_percent
+                product.save(update_fields=["discount_percent"])
+                updated += 1
+
+        self.message_user(
+            request,
+            ngettext(
+                "Applied %(discount)s%% discount to %(count)d product.",
+                "Applied %(discount)s%% discount to %(count)d products.",
+                updated,
+            )
+            % {"count": updated, "discount": discount_percent},
+            messages.SUCCESS,
         )
+        # None: Django returns to the changelist, filters kept.
+        return None
 
     @action(
-        description=str(_("Clear discount from selected products")),
+        description=_("Clear discount from selected products"),
         variant=ActionVariant.DANGER,
         icon="cancel",
     )
@@ -1495,7 +1366,7 @@ class ProductAdmin(
         )
 
     @action(
-        description=str(_("Duplicate as draft")),
+        description=_("Duplicate as draft"),
         icon="content_copy",
         variant=ActionVariant.INFO,
     )
@@ -1583,105 +1454,140 @@ class ProductAdmin(
         return custom_urls + urls
 
     def stock_history_view(self, request, product_id):
-        """Per-product stock history with a 90-day time-series chart.
+        """A product's stock movements: a daily chart and the latest entries.
 
-        Renders a Chart.js stacked bar chart grouped by day and by
-        StockLog.operation_type (RESERVE/RELEASE/DECREMENT/INCREMENT),
-        plus a table of the most recent entries.
+        Built from the dashboard's chart and table helpers
+        (``admin.dashboard.base``) so it follows the theme; Unfold's
+        header builds the breadcrumbs from ``opts`` and ``original``.
         """
+        from admin.dashboard.base import bar_chart_options, chart_json, color
+        from admin.displays import label_cell, link_cell
         from order.models.stock_log import StockLog
 
-        try:
-            product = Product.objects.get(pk=product_id)
-        except Product.DoesNotExist as exc:
-            raise Http404(_("Product not found")) from exc
+        product = get_object_or_404(Product, pk=product_id)
+        if not self.has_view_permission(request, product):
+            raise PermissionDenied
 
+        windows = (7, 30, 90, 180, 365)
         try:
             window_days = int(request.GET.get("days") or 90)
         except TypeError, ValueError:
             window_days = 90
-        window_days = max(7, min(window_days, 365))
-        since = timezone.now() - timedelta(days=window_days)
+        if window_days not in windows:
+            window_days = 90
+        today = timezone.localdate()
+        days = [
+            today - timedelta(days=n) for n in range(window_days - 1, -1, -1)
+        ]
 
-        rows = (
-            StockLog.objects.filter(
-                product_id=product_id, created_at__gte=since
+        totals: dict[tuple, int] = {
+            (row["day"].date(), row["operation_type"]): int(row["total"] or 0)
+            for row in StockLog.objects.filter(
+                product_id=product.pk, created_at__date__gte=days[0]
             )
             .annotate(day=TruncDay("created_at"))
             .values("day", "operation_type")
-            .annotate(total=Sum("quantity_delta"), entries=Count("id"))
-            .order_by("day")
-        )
-
-        operation_types = ["RESERVE", "RELEASE", "DECREMENT", "INCREMENT"]
-        buckets: dict[str, dict[str, int]] = {}
-        for row in rows:
-            day_key = row["day"].date().isoformat() if row["day"] else ""
-            if not day_key:
-                continue
-            buckets.setdefault(day_key, {op: 0 for op in operation_types})[
-                row["operation_type"]
-            ] = int(row["total"] or 0)
-
-        labels: list[str] = []
-        cursor = since.date()
-        end = timezone.now().date()
-        while cursor <= end:
-            labels.append(cursor.isoformat())
-            cursor += timedelta(days=1)
-
-        def _series(op):
-            return [buckets.get(day, {}).get(op, 0) for day in labels]
-
-        dataset_colors = {
-            "RESERVE": "#f59e0b",
-            "RELEASE": "#6366f1",
-            "DECREMENT": "#ef4444",
-            "INCREMENT": "#10b981",
+            .annotate(total=Sum("quantity_delta"))
         }
-        datasets = [
-            {
-                "label": op.title(),
-                "data": _series(op),
-                "backgroundColor": dataset_colors[op],
-                "stack": "stock-ops",
-            }
-            for op in operation_types
-        ]
+        operation_colors = {
+            StockLog.OPERATION_RESERVE: color("orange-400"),
+            StockLog.OPERATION_RELEASE: color("primary-400"),
+            StockLog.OPERATION_DECREMENT: color("red-500"),
+            StockLog.OPERATION_INCREMENT: color("green-500"),
+        }
+        operation_variants = {
+            StockLog.OPERATION_RESERVE: "warning",
+            StockLog.OPERATION_RELEASE: "primary",
+            StockLog.OPERATION_DECREMENT: "danger",
+            StockLog.OPERATION_INCREMENT: "success",
+        }
+        chart = {
+            "labels": [formats.date_format(day, "d/m") for day in days],
+            "datasets": [
+                {
+                    "label": str(label),
+                    "type": "bar",
+                    "data": [totals.get((day, code), 0) for day in days],
+                    "backgroundColor": operation_colors[code],
+                    "stack": "stock",
+                    "borderRadius": 4,
+                    "maxBarThickness": 24,
+                }
+                for code, label in StockLog.OPERATION_TYPE_CHOICES
+            ],
+        }
 
-        recent_logs = (
-            StockLog.objects.filter(product_id=product_id)
-            .select_related("order", "performed_by")
+        logs = (
+            StockLog.objects.filter(product_id=product.pk)
+            .select_related("performed_by")
             .order_by("-created_at")[:50]
         )
+        rows = [
+            [
+                format_dt(log.created_at),
+                label_cell(
+                    log.get_operation_type_display(),
+                    operation_variants[log.operation_type],
+                ),
+                {"content": f"{log.quantity_delta:+d}", "class": "text-right"},
+                {"content": log.stock_before, "class": "text-right"},
+                {"content": log.stock_after, "class": "text-right"},
+                log.reason or "—",
+                link_cell(
+                    reverse("admin:order_order_change", args=[log.order_id]),
+                    f"#{log.order_id}",
+                )
+                if log.order_id
+                else "—",
+                log.performed_by or _("System"),
+            ]
+            for log in logs
+        ]
 
-        product_name = (
-            product.safe_translation_getter("name", any_language=True)
-            or f"Product #{product.id}"
-        )
+        if product.stock == 0:
+            stock_state = (_("Out of stock"), "danger")
+        elif 0 < product.stock <= product.low_stock_threshold:
+            stock_state = (_("Low stock"), "warning")
+        else:
+            stock_state = (_("In stock"), "success")
 
         context = {
             **self.admin_site.each_context(request),
-            "title": _("Stock History — %(name)s") % {"name": product_name},
-            "product": product,
-            "product_name": product_name,
-            "window_days": window_days,
-            "chart_labels": labels,
-            "chart_datasets": datasets,
-            "recent_logs": recent_logs,
+            "title": _("Stock history"),
             "opts": self.model._meta,
-            "change_url": reverse(
-                "admin:product_product_change", args=[product.pk]
+            "original": product,
+            "product": product,
+            "stock_state": stock_state,
+            "window_days": window_days,
+            "windows": windows,
+            "has_activity": bool(totals),
+            "chart_data": chart_json(chart),
+            "chart_options": chart_json(
+                bar_chart_options(
+                    legend=True, currency_axis=False, stacked=True
+                )
             ),
+            "table": {
+                "headers": [
+                    _("When"),
+                    _("Operation"),
+                    {"content": _("Change"), "class": "text-right"},
+                    {"content": _("Before"), "class": "text-right"},
+                    {"content": _("After"), "class": "text-right"},
+                    _("Reason"),
+                    _("Order"),
+                    _("By"),
+                ],
+                "rows": rows,
+            },
         }
         return render(request, "admin/product/stock_history.html", context)
 
 
-@admin_thumbnails.thumbnail("image")
 class ProductCategoryImageInline(TabularInline):
     model = ProductCategoryImage
     extra = 0
-    fields = ("image_thumbnail", "image", "image_type", "active")
+    fields = ("image", "image_type", "active")
 
     tab = True
     show_change_link = True
@@ -1699,7 +1605,6 @@ class ProductCategoryAdmin(BaseTranslatableAdmin):
         "category_info",
         "active",
         "subcategories_display",
-        "image_preview",
         "created_display",
         "products_count_display",
         "recursive_products_display",
@@ -1787,30 +1692,30 @@ class ProductCategoryAdmin(BaseTranslatableAdmin):
     def get_prepopulated_fields(self, request, obj=None):
         return {"slug": ("name",)}
 
-    @admin.display(description=_("Category"), ordering="translations__name")
+    @display(
+        description=_("Category"), ordering="translations__name", header=True
+    )
     def category_info(self, instance):
         name = instance.safe_translation_getter("name", any_language=True) or _(
             "Unnamed Category"
         )
-        return f"{name} (level {instance.level})"
+        main_image = instance.main_image
+        return header_two_line(
+            name,
+            _("Level %(level)s") % {"level": instance.level},
+            image_path=main_image.image.url
+            if main_image and main_image.image
+            else None,
+            squared=True,
+        )
 
     @admin.display(description=_("Subcategories"), ordering="children_count")
     def subcategories_display(self, instance):
         return getattr(instance, "children_count", 0)
 
-    @admin.display(description=_("Image"))
-    def image_preview(self, instance):
-        main_image = instance.main_image
-        if main_image and main_image.image:
-            return format_html(
-                '<img src="{url}" class="h-10 w-10 rounded object-cover" />',
-                url=main_image.image.url,
-            )
-        return "—"
-
     @admin.display(description=_("Created"), ordering="created_at")
     def created_display(self, instance):
-        return format_dt(instance.created_at, fmt="%Y-%m-%d")
+        return format_dt(instance.created_at, fmt="Y-m-d")
 
     @admin.display(description=_("Direct Products"), ordering="products_count")
     def products_count_display(self, instance):
@@ -1835,6 +1740,7 @@ class ProductReviewAdmin(BaseTranslatableAdmin):
         "status_label",
         "created_display",
     )
+    date_hierarchy = "created_at"
     list_filter = [
         "status",
         ("rate", SliderNumericFilter),
@@ -1853,8 +1759,8 @@ class ProductReviewAdmin(BaseTranslatableAdmin):
         # Removed product__translations__name - too expensive with 1.2M products
     ]
     list_select_related = ["product", "user"]
+    autocomplete_fields = ("product", "user")
     readonly_fields = ("created_at", "updated_at", "uuid")
-    list_filter_submit = True
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
@@ -1913,7 +1819,10 @@ class ProductReviewAdmin(BaseTranslatableAdmin):
         comment_preview = (
             comment[:100] + "..." if len(comment) > 100 else comment
         )
-        return f"Review #{obj.id}: {comment_preview}"
+        return _("Review #%(id)s: %(comment)s") % {
+            "id": obj.id,
+            "comment": comment_preview,
+        }
 
     @admin.display(description=_("Product"))
     def product_link(self, obj):
@@ -1921,21 +1830,15 @@ class ProductReviewAdmin(BaseTranslatableAdmin):
             return "-"
         name = obj.product.safe_translation_getter(
             "name", any_language=True
-        ) or str(obj.product.id)
-        return format_html(
-            '<a href="{url}">{name}</a>',
-            url=reverse("admin:product_product_change", args=[obj.product.id]),
-            name=name,
-        )
+        ) or str(obj.product_id)
+        return change_link(self.admin_site, Product, obj.product_id, name)
 
     @admin.display(description=_("User"))
     def user_link(self, obj):
         if not obj.user:
             return "-"
-        return format_html(
-            '<a href="{url}">{email}</a>',
-            url=reverse("admin:user_useraccount_change", args=[obj.user.id]),
-            email=obj.user.email,
+        return change_link(
+            self.admin_site, UserAccount, obj.user_id, obj.user.email
         )
 
     @admin.display(description=_("Rating"))
@@ -1951,7 +1854,7 @@ class ProductReviewAdmin(BaseTranslatableAdmin):
         return format_dt(obj.created_at)
 
     @action(
-        description=str(_("Approve selected reviews")),
+        description=_("Approve selected reviews"),
         variant=ActionVariant.SUCCESS,
         icon="check_circle",
     )
@@ -1969,7 +1872,7 @@ class ProductReviewAdmin(BaseTranslatableAdmin):
         )
 
     @action(
-        description=str(_("Reject selected reviews")),
+        description=_("Reject selected reviews"),
         variant=ActionVariant.DANGER,
         icon="cancel",
     )
@@ -1994,10 +1897,11 @@ class ProductFavouriteAdmin(BaseModelAdmin):
         "product_display",
         "created_display",
     )
+    date_hierarchy = "created_at"
     list_filter = [
         ("created_at", RangeDateTimeFilter),
-        ("user", RelatedDropdownFilter),
-        ("product", RelatedDropdownFilter),
+        ("user", AutocompleteSelectFilter),
+        ("product", AutocompleteSelectFilter),
         ("product__category", RelatedDropdownFilter),
     ]
     search_fields = [
@@ -2007,6 +1911,7 @@ class ProductFavouriteAdmin(BaseModelAdmin):
         "product__sku",
     ]
     list_select_related = ["user", "product"]
+    autocomplete_fields = ("product", "user")
     readonly_fields = ("created_at", "updated_at", "uuid")
 
     def get_queryset(self, request):
@@ -2037,12 +1942,10 @@ class ProductFavouriteAdmin(BaseModelAdmin):
 
 
 @admin.register(ProductCategoryImage)
-@admin_thumbnails.thumbnail("image")
 class ProductCategoryImageAdmin(BaseTranslatableAdmin):
     ordering_field = "sort_order"
     hide_ordering_field = True
     list_display = (
-        "image_thumbnail",
         "category_name",
         "image_type_label",
         "active",
@@ -2102,14 +2005,18 @@ class ProductCategoryImageAdmin(BaseTranslatableAdmin):
         return (
             super()
             .get_queryset(request)
-            .prefetch_related("category__translations")
+            .prefetch_related("category__translations", "translations")
         )
 
-    @admin.display(description=_("Category"))
+    @display(description=_("Category"), header=True)
     def category_name(self, obj):
-        return obj.category.safe_translation_getter(
-            "name", any_language=True
-        ) or _("Unnamed Category")
+        return header_two_line(
+            obj.category.safe_translation_getter("name", any_language=True)
+            or _("Unnamed Category"),
+            obj.safe_translation_getter("title", any_language=True),
+            image_path=obj.image.url if obj.image else None,
+            squared=True,
+        )
 
     image_type_label = choice_label(
         "image_type",
@@ -2119,12 +2026,10 @@ class ProductCategoryImageAdmin(BaseTranslatableAdmin):
 
 
 @admin.register(ProductImage)
-@admin_thumbnails.thumbnail("image")
 class ProductImageAdmin(BaseTranslatableAdmin):
     ordering_field = "sort_order"
     hide_ordering_field = True
     list_display = (
-        "image_thumbnail",
         "product_name",
         "is_main",
         "sort_order",
@@ -2132,7 +2037,7 @@ class ProductImageAdmin(BaseTranslatableAdmin):
     )
     list_filter = [
         "is_main",
-        ("product", RelatedDropdownFilter),
+        ("product", AutocompleteSelectFilter),
         ("created_at", RangeDateTimeFilter),
     ]
     search_fields = [
@@ -2141,6 +2046,7 @@ class ProductImageAdmin(BaseTranslatableAdmin):
         "translations__title",
     ]
     list_select_related = ["product"]
+    autocomplete_fields = ("product",)
     readonly_fields = ("created_at", "updated_at", "uuid")
     ordering = ["product", "-is_main", "sort_order"]
 
@@ -2185,12 +2091,15 @@ class ProductImageAdmin(BaseTranslatableAdmin):
             .prefetch_related("product__translations")
         )
 
-    @admin.display(description=_("Product"))
+    @display(description=_("Product"), header=True)
     def product_name(self, obj):
-        name = obj.product.safe_translation_getter(
-            "name", any_language=True
-        ) or _("Unnamed Product")
-        return f"{name} (#{obj.product.sku[:8]})"
+        return header_two_line(
+            obj.product.safe_translation_getter("name", any_language=True)
+            or _("Unnamed Product"),
+            obj.product.sku,
+            image_path=obj.image.url if obj.image else None,
+            squared=True,
+        )
 
 
 @admin.register(ProductVariantGroup)
@@ -2291,18 +2200,21 @@ class ProductVariantGroupAdmin(BaseTranslatableAdmin):
         variants = obj.variants.all()
         if not variants:
             return _("No products assigned yet.")
+        links = (
+            change_link(
+                self.admin_site,
+                Product,
+                variant.pk,
+                "{} (#{})".format(
+                    variant.safe_translation_getter("name", any_language=True)
+                    or variant.sku,
+                    variant.pk,
+                ),
+            )
+            for variant in variants
+        )
         return format_html_join(
-            mark_safe("<br>"),
-            '<a href="{}">{} (#{})</a>',
-            (
-                (
-                    reverse("admin:product_product_change", args=[v.pk]),
-                    v.safe_translation_getter("name", any_language=True)
-                    or v.sku,
-                    v.pk,
-                )
-                for v in variants
-            ),
+            "", '<span class="block">{}</span>', ((link,) for link in links)
         )
 
 

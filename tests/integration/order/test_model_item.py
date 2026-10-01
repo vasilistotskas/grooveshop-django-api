@@ -49,7 +49,7 @@ def order_item(order, product):
 
 class TestOrderItemModel:
     def test_str_representation(self, order_item, order):
-        assert str(order_item) == f"Order {order.id} - Test Product x 5"
+        assert str(order_item) == f"Order {order.id} - Test Product × 5"
 
     def test_save_records_the_original_quantity(self, order, product):
         item = OrderItem(

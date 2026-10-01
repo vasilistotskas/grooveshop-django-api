@@ -18,10 +18,6 @@ class PayWayModelTestCase(TestCase):
             free_threshold=Money(100, settings.DEFAULT_CURRENCY),
             provider_code="stripe",
             settlement=PaySettlement.ONLINE,
-            configuration={
-                "public_key": "pk_test_123",
-                "secret_key": "sk_test_123",
-            },
         )
         self.credit_card.set_current_language("en")
         self.credit_card.name = "Credit Card"
@@ -81,12 +77,6 @@ class PayWayModelTestCase(TestCase):
 
         self.bank_transfer.set_current_language("en")
         self.assertEqual(str(self.bank_transfer), "Bank Transfer")
-
-    def test_payment_configuration(self):
-        self.assertEqual(
-            self.credit_card.configuration,
-            {"public_key": "pk_test_123", "secret_key": "sk_test_123"},
-        )
 
     def test_settlement_is_the_stored_truth(self):
         self.assertEqual(self.credit_card.settlement, PaySettlement.ONLINE)

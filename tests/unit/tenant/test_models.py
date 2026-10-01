@@ -208,21 +208,21 @@ def test_allowed_csp_sources_localhost_http_is_valid():
 def test_allowed_csp_sources_http_non_localhost_raises():
     t = _unsaved_tenant(allowed_csp_sources=["http://evil.example.com"])
     with pytest.raises(ValidationError) as exc_info:
-        t.clean()
+        t.clean_fields()
     assert "allowed_csp_sources" in exc_info.value.message_dict
 
 
 def test_allowed_csp_sources_bare_domain_raises():
     t = _unsaved_tenant(allowed_csp_sources=["example.com"])
     with pytest.raises(ValidationError) as exc_info:
-        t.clean()
+        t.clean_fields()
     assert "allowed_csp_sources" in exc_info.value.message_dict
 
 
 def test_allowed_csp_sources_non_string_entry_raises():
     t = _unsaved_tenant(allowed_csp_sources=[123])
     with pytest.raises(ValidationError) as exc_info:
-        t.clean()
+        t.clean_fields()
     assert "allowed_csp_sources" in exc_info.value.message_dict
 
 
@@ -232,7 +232,7 @@ def test_allowed_csp_sources_mixed_valid_invalid_raises():
         allowed_csp_sources=["https://ok.com", "http://evil.com"]
     )
     with pytest.raises(ValidationError) as exc_info:
-        t.clean()
+        t.clean_fields()
     assert "allowed_csp_sources" in exc_info.value.message_dict
 
 
@@ -445,13 +445,13 @@ def test_theme_metadata_known_tokens_are_valid():
 def test_theme_metadata_unknown_key_raises():
     t = _unsaved_tenant(theme_metadata={"customCss": "body{}"})
     with pytest.raises(ValidationError):
-        t.clean()
+        t.clean_fields()
 
 
 def test_theme_metadata_bad_enum_value_raises():
     t = _unsaved_tenant(theme_metadata={"fontSans": "comic-sans"})
     with pytest.raises(ValidationError):
-        t.clean()
+        t.clean_fields()
 
 
 def test_theme_metadata_bad_scale_hex_raises():
@@ -461,7 +461,7 @@ def test_theme_metadata_bad_scale_hex_raises():
         }
     )
     with pytest.raises(ValidationError):
-        t.clean()
+        t.clean_fields()
 
 
 def test_theme_metadata_dark_and_secondary_tokens_are_valid():
@@ -484,7 +484,7 @@ def test_theme_metadata_dark_colors_unknown_scale_raises():
         theme_metadata={"darkColors": {"accentScale": {"500": "#123456"}}}
     )
     with pytest.raises(ValidationError):
-        t.clean()
+        t.clean_fields()
 
 
 def test_theme_metadata_dark_colors_bad_hex_raises():
@@ -492,13 +492,13 @@ def test_theme_metadata_dark_colors_bad_hex_raises():
         theme_metadata={"darkColors": {"primaryScale": {"500": "#12345"}}}
     )
     with pytest.raises(ValidationError):
-        t.clean()
+        t.clean_fields()
 
 
 def test_theme_metadata_bad_liked_hex_raises():
     t = _unsaved_tenant(theme_metadata={"likedHex": "hotpink"})
     with pytest.raises(ValidationError):
-        t.clean()
+        t.clean_fields()
 
 
 # ---------------------------------------------------------------------------
@@ -574,7 +574,7 @@ def test_theme_metadata_font_display_is_valid():
 def test_theme_metadata_bad_font_display_raises():
     t = _unsaved_tenant(theme_metadata={"fontDisplay": "comic-sans"})
     with pytest.raises(ValidationError):
-        t.clean()
+        t.clean_fields()
 
 
 def test_theme_metadata_font_mono_is_valid():
@@ -601,13 +601,13 @@ def test_available_locales_accepts_configured_languages():
 def test_available_locales_rejects_unknown_language():
     t = _unsaved_tenant(default_locale="el", available_locales=["el", "fr"])
     with pytest.raises(ValidationError):
-        t.clean()
+        t.clean_fields()
 
 
 def test_available_locales_rejects_duplicates():
     t = _unsaved_tenant(default_locale="el", available_locales=["el", "el"])
     with pytest.raises(ValidationError):
-        t.clean()
+        t.clean_fields()
 
 
 def test_available_locales_must_contain_default_locale():
@@ -621,10 +621,25 @@ def test_available_locales_must_contain_default_locale():
 def test_available_locales_rejects_non_list():
     t = _unsaved_tenant(available_locales="el,en")
     with pytest.raises(ValidationError):
-        t.clean()
+        t.clean_fields()
 
 
 def test_theme_metadata_bad_font_mono_raises():
     t = _unsaved_tenant(theme_metadata={"fontMono": "comic-sans"})
     with pytest.raises(ValidationError):
-        t.clean()
+        t.clean_fields()
+
+
+def test_locales_are_limited_to_the_storefront_ones():
+    """Django carries ``de`` content, but the storefront has no ``/de``
+    routes: a store serving it would link visitors to 404s."""
+    from core.utils.tenant_urls import STOREFRONT_LOCALES
+
+    t = _unsaved_tenant(default_locale="de", available_locales=["el", "de"])
+    with pytest.raises(ValidationError) as exc_info:
+        t.clean_fields()
+    assert {"default_locale", "available_locales"} <= set(
+        exc_info.value.message_dict
+    )
+    choices = Tenant._meta.get_field("default_locale").choices
+    assert [code for code, _label in choices] == list(STOREFRONT_LOCALES)

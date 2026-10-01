@@ -1,8 +1,10 @@
 from django.apps import AppConfig
+from django.utils.translation import gettext_lazy as _
 
 
 class RecommendationConfig(AppConfig):
     name = "recommendation"
+    verbose_name = _("Recommendations")
 
     def ready(self):
         # Importing the package runs every @register_strategy. Nothing

@@ -1,5 +1,6 @@
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
+from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from parler.models import TranslatableModel, TranslatedFields
@@ -33,11 +34,12 @@ class BlogTag(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         ]
 
     def __str__(self):
-        tag_name = (
-            self.safe_translation_getter("name", any_language=True)
-            or "Unnamed Tag"
-        )
-        return f"{tag_name} ({'Active' if self.active else 'Inactive'})"
+        tag_name = self.safe_translation_getter(
+            "name", any_language=True
+        ) or gettext("Unnamed tag")
+        if self.active:
+            return gettext("%(name)s (active)") % {"name": tag_name}
+        return gettext("%(name)s (inactive)") % {"name": tag_name}
 
     def get_ordering_queryset(self):
         return BlogTag.objects.all()

@@ -1,5 +1,6 @@
 import os
 
+import pytest
 from django.conf import settings
 from django.core.files.storage import default_storage
 from django.test import TestCase
@@ -11,6 +12,8 @@ languages = [
     lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
 ]
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
+
+pytestmark = pytest.mark.assert_english
 
 
 class ProductImageModelTestCase(TestCase):
@@ -30,11 +33,11 @@ class ProductImageModelTestCase(TestCase):
         product_name = self.product.safe_translation_getter(
             "name", any_language=True
         )
-        main_status = "Main" if self.product_image.is_main else "Secondary"
+        main_status = "main" if self.product_image.is_main else "secondary"
 
         self.assertEqual(
             str(self.product_image),
-            f"{product_name} Image ({main_status})",
+            f"{product_name} image ({main_status})",
         )
 
     def test_get_ordering_queryset(self):

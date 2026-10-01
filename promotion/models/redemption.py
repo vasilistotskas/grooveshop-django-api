@@ -1,5 +1,6 @@
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
+from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from djmoney.models.fields import MoneyField
@@ -20,6 +21,7 @@ class PromotionRedemption(TimeStampMixinModel):
         "promotion.Promotion",
         related_name="redemptions",
         on_delete=models.PROTECT,
+        verbose_name=_("Promotion"),
     )
     code = models.ForeignKey(
         "promotion.PromotionCode",
@@ -27,6 +29,7 @@ class PromotionRedemption(TimeStampMixinModel):
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
+        verbose_name=_("Promotion Code"),
     )
     order = models.ForeignKey(
         "order.Order",
@@ -34,6 +37,7 @@ class PromotionRedemption(TimeStampMixinModel):
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
+        verbose_name=_("Order"),
     )
     user = models.ForeignKey(
         "user.UserAccount",
@@ -41,6 +45,7 @@ class PromotionRedemption(TimeStampMixinModel):
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
+        verbose_name=_("User"),
     )
     email = models.EmailField(
         _("Email"),
@@ -75,4 +80,10 @@ class PromotionRedemption(TimeStampMixinModel):
         ]
 
     def __str__(self):
-        return f"{self.promotion_id} on order {self.order_id}: {self.amount}"
+        return gettext(
+            "Promotion %(promotion)s on order %(order)s: %(amount)s"
+        ) % {
+            "promotion": self.promotion_id,
+            "order": self.order_id,
+            "amount": self.amount,
+        }

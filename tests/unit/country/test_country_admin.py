@@ -1,9 +1,10 @@
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 import pytest
 from django.contrib.admin.sites import AdminSite
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import RequestFactory, TestCase
+from django.utils import formats, timezone
 
 from admin.base import BaseTranslatableAdmin
 from country.admin import CountryAdmin, CountryStatusFilter
@@ -191,27 +192,26 @@ class CountryAdminTestCase(TestCase):
     def test_country_info(self):
         result = self.admin.country_info(self.country)
 
-        self.assertIn("Germany", result)
-        self.assertIn("DE", result)
+        self.assertEqual(result[:2], ["Germany", "DE"])
 
     def test_country_info_without_iso(self):
         result = self.admin.country_info(self.incomplete_country)
 
-        self.assertIn("Test Country", result)
-        self.assertIn("ZZ", result)
+        self.assertEqual(result[:2], ["Test Country", "ZZ"])
 
-    def test_flag_display_with_flag(self):
+    def test_country_info_shows_the_flag_uncropped(self):
         self.country.image_flag = Mock()
         self.country.image_flag.url = "/media/flags/de.png"
 
-        result = self.admin.flag_display(self.country)
+        image = self.admin.country_info(self.country)[3]
 
-        self.assertIn('<img src="/media/flags/de.png"', result)
+        self.assertEqual(image["path"], "/media/flags/de.png")
+        self.assertTrue(image["as_background"])
 
-    def test_flag_display_without_flag(self):
-        result = self.admin.flag_display(self.country_no_flag)
+    def test_country_info_without_flag_has_no_image(self):
+        result = self.admin.country_info(self.country_no_flag)
 
-        self.assertIsNone(result)
+        self.assertEqual(len(result), 3)
 
     def test_codes_display(self):
         result = self.admin.codes_display(self.country)
@@ -272,38 +272,12 @@ class CountryAdminTestCase(TestCase):
     def test_created_display(self):
         result = self.admin.created_display(self.country)
 
-        date_str = self.country.created_at.strftime("%d/%m/%Y")
-        self.assertIn(date_str, result)
-
-    def test_update_sort_order_action(self):
-        request = self.factory.post("/admin/country/country/")
-        request.user = Mock()
-        request._messages = Mock()
-
-        Country.objects.get_or_create(
-            alpha_2="AA", defaults={"alpha_3": "AAA", "iso_cc": 1}
+        self.assertIn(
+            formats.date_format(
+                timezone.localtime(self.country.created_at), "SHORT_DATE_FORMAT"
+            ),
+            result,
         )
-        # "BB" is Barbados — real and seeded now, but this action only
-        # cares that SOME two extra rows exist for the bulk re-sort.
-        Country.objects.get_or_create(
-            alpha_2="BB", defaults={"alpha_3": "BBB", "iso_cc": 2}
-        )
-
-        queryset = Country.objects.all()
-
-        with patch.object(self.admin, "message_user") as mock_message:
-            self.admin.update_sort_order(request, queryset)
-
-            mock_message.assert_called_once()
-            args = mock_message.call_args[0]
-            self.assertEqual(args[0], request)
-            self.assertIn("Updated sort order", args[1])
-
-        countries = list(Country.objects.order_by("sort_order"))
-        self.assertIsNotNone(countries[0].sort_order)
-        self.assertIsNotNone(countries[1].sort_order)
-        alpha_2_values = [c.alpha_2 for c in countries]
-        self.assertEqual(alpha_2_values, sorted(alpha_2_values))
 
 
 class CountryAdminIntegrationTestCase(TestCase):
@@ -337,20 +311,18 @@ class CountryAdminIntegrationTestCase(TestCase):
         for country in self.countries:
             with self.subTest(country=country.alpha_2):
                 country_info = self.admin.country_info(country)
-                flag_display = self.admin.flag_display(country)
                 codes_display = self.admin.codes_display(country)
                 contact_info = self.admin.contact_info(country)
                 completeness_badge = self.admin.completeness_badge(country)
                 created_display = self.admin.created_display(country)
 
-                self.assertIsInstance(country_info, str)
-                self.assertIsNone(flag_display)
+                self.assertIsInstance(country_info, list)
                 self.assertIsInstance(codes_display, str)
                 self.assertIsInstance(contact_info, str)
                 self.assertIsInstance(completeness_badge, str)
                 self.assertIsInstance(created_display, str)
 
-                self.assertIn(country.name, country_info)
+                self.assertEqual(country_info[0], country.name)
                 self.assertIn(country.alpha_2, codes_display)
                 self.assertIn("%", completeness_badge)
 
@@ -383,7 +355,6 @@ class CountryAdminIntegrationTestCase(TestCase):
         # mutating the shared class attribute (test-order flakiness).
         expected_display = (
             "country_info",
-            "flag_display",
             "codes_display",
             "contact_info",
             "completeness_badge",

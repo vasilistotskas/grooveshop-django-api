@@ -1,6 +1,7 @@
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
 from django.utils import timezone
+from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 
@@ -122,5 +123,7 @@ class BoxNowParcelEvent(TimeStampMixinModel):
         ]
 
     def __str__(self) -> str:
-        parcel_id = self.shipment.parcel_id if self.shipment_id else "unknown"
+        parcel_id = (
+            self.shipment.parcel_id if self.shipment_id else gettext("unknown")
+        )
         return f"{parcel_id} → {self.event_type} @ {self.event_time}"

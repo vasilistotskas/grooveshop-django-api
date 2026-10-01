@@ -4,6 +4,7 @@ from django.contrib.postgres.indexes import BTreeIndex
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
+from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from djmoney.models.fields import MoneyField
@@ -54,6 +55,7 @@ class Promotion(TranslatableModel, TimeStampMixinModel, UUIDModel):
         related_name="promotions",
         blank=True,
         help_text=_("Only used when target scope is 'Specific products'"),
+        verbose_name=_("Products"),
     )
     categories = models.ManyToManyField(
         "product.ProductCategory",
@@ -63,6 +65,7 @@ class Promotion(TranslatableModel, TimeStampMixinModel, UUIDModel):
             "Only used when target scope is 'Specific categories'; "
             "subcategories are included automatically"
         ),
+        verbose_name=_("Categories"),
     )
     excluded_products = models.ManyToManyField(
         "product.Product",
@@ -72,6 +75,7 @@ class Promotion(TranslatableModel, TimeStampMixinModel, UUIDModel):
             "Never counted or discounted by this promotion, whatever "
             "the target scope"
         ),
+        verbose_name=_("Excluded Products"),
     )
     excluded_categories = models.ManyToManyField(
         "product.ProductCategory",
@@ -81,6 +85,7 @@ class Promotion(TranslatableModel, TimeStampMixinModel, UUIDModel):
             "Products in these categories (subcategories included) are "
             "never counted or discounted by this promotion"
         ),
+        verbose_name=_("Excluded Categories"),
     )
     exclude_discounted_products = models.BooleanField(
         _("Exclude Already-discounted Products"),
@@ -135,6 +140,7 @@ class Promotion(TranslatableModel, TimeStampMixinModel, UUIDModel):
             "BXGY: the reward pool (empty = same products as the buy "
             "side). FREE_GIFT: the gift product (set exactly one)."
         ),
+        verbose_name=_("Reward Products"),
     )
     min_subtotal = MoneyField(
         _("Minimum Subtotal"),
@@ -209,10 +215,12 @@ class Promotion(TranslatableModel, TimeStampMixinModel, UUIDModel):
         ]
 
     def __str__(self):
-        return (
-            self.safe_translation_getter("name")
-            or f"Promotion {self.pk or ''}".strip()
-        )
+        name = self.safe_translation_getter("name")
+        if name:
+            return name
+        if self.pk is None:
+            return gettext("Promotion")
+        return gettext("Promotion %(id)s") % {"id": self.pk}
 
     def clean(self):
         super().clean()

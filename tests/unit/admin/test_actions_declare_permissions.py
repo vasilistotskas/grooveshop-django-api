@@ -77,3 +77,31 @@ def test_the_destructive_ones_specifically(label):
 
     assert label in found, f"{label} is no longer registered"
     assert found[label].allowed_permissions
+
+
+def test_every_first_party_admin_extends_the_base():
+    """The default above only protects admins built on ``BaseModelAdmin``.
+
+    A first-party admin on bare ``unfold.admin.ModelAdmin`` silently
+    fell back to fail-open actions and skipped the shared defaults;
+    seven did (tenant, contact, core). Third-party admins re-wrapped in
+    ``core/admin.py`` are out of scope - their actions are the
+    package's, not ours.
+    """
+    from pathlib import Path
+
+    from django.conf import settings
+
+    first_party = {
+        path.name
+        for path in Path(settings.BASE_DIR).iterdir()
+        if (path / "__init__.py").exists()
+    }
+    bare = sorted(
+        type(model_admin).__qualname__
+        for model_admin in django_admin.site._registry.values()
+        if type(model_admin).__module__.split(".")[0] in first_party
+        and not isinstance(model_admin, BaseModelAdmin)
+        and not type(model_admin).__name__.endswith("AdminOverride")
+    )
+    assert not bare, f"first-party admins not on BaseModelAdmin: {bare}"

@@ -5,14 +5,13 @@ from django.contrib.admin.sites import AdminSite
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.test import RequestFactory
-from django.utils import translation
+from django.utils import formats, timezone
 
 from product.factories import ProductFactory
 from tag.admin import (
     ContentTypeFilter,
     TagAdmin,
     TaggedItemAdmin,
-    TagInLine,
     TagStatusFilter,
     TagUsageFilter,
 )
@@ -42,11 +41,6 @@ def tag_admin():
 @pytest.fixture
 def tagged_item_admin():
     return TaggedItemAdmin(TaggedItem, AdminSite())
-
-
-@pytest.fixture
-def tag_inline():
-    return TagInLine(Tag, AdminSite())
 
 
 @pytest.mark.django_db
@@ -183,7 +177,9 @@ class TestTagAdmin:
 
         result = tag_admin.created_display(tag)
 
-        assert result == tag.created_at.strftime("%d/%m/%Y %H:%M")
+        assert result == formats.date_format(
+            timezone.localtime(tag.created_at), "SHORT_DATETIME_FORMAT"
+        )
 
     @patch.object(TagAdmin, "message_user")
     def test_activate_tags_action(
@@ -217,30 +213,6 @@ class TestTagAdmin:
         assert tag2.active is False
         mock_message_user.assert_called_once()
 
-    @patch.object(TagAdmin, "message_user")
-    def test_update_sort_order_action(
-        self, mock_message_user, tag_admin, admin_request
-    ):
-        tag1 = TagFactory()
-        tag2 = TagFactory()
-        queryset = Tag.objects.filter(id__in=[tag1.id, tag2.id])
-
-        tag_admin.update_sort_order(admin_request, queryset)
-
-        mock_message_user.assert_called_once()
-
-    @patch.object(TagAdmin, "message_user")
-    def test_analyze_usage_action(
-        self, mock_message_user, tag_admin, admin_request
-    ):
-        tag1 = TagFactory()
-        tag2 = TagFactory()
-        queryset = Tag.objects.filter(id__in=[tag1.id, tag2.id])
-
-        tag_admin.analyze_usage(admin_request, queryset)
-
-        mock_message_user.assert_called_once()
-
 
 @pytest.mark.django_db
 class TestTaggedItemAdmin:
@@ -270,20 +242,6 @@ class TestTaggedItemAdmin:
         result = tagged_item_admin.content_type_display(tagged_item)
 
         assert result == "Product"
-
-
-@pytest.mark.django_db
-class TestTagInLine:
-    def test_tag_inline_fields(self, tag_inline):
-
-        assert tag_inline.fields == ("tag",)
-        assert tag_inline.extra == 0
-        with translation.override("en"):
-            assert str(tag_inline.verbose_name) == "Tag"
-            assert str(tag_inline.verbose_name_plural) == "Tags"
-
-    def test_tag_inline_model(self, tag_inline):
-        assert tag_inline.model == TaggedItem
 
 
 @pytest.mark.django_db

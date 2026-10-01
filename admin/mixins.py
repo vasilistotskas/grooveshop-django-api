@@ -20,7 +20,7 @@ class AdminSiteLoginNextMixin:
     ``https://webside.gr/account`` on 2026-08-21.
 
     Unfold documents ``UNFOLD["LOGIN"]["redirect_after"]`` for this, but
-    0.104.1 (the current release) only DECLARES the key — the single
+    0.108.0 (re-checked 2026-09-30) still only DECLARES the key — the single
     occurrence in the package is its ``None`` default, and nothing reads
     it. So put ``next`` on the URL instead, which every layer below
     already understands.
@@ -63,30 +63,48 @@ class IsSuperuserOnlyModelAdmin:
     staff user could still reach the changelist by typing the URL. This
     mixin gates every admin permission method so the model becomes
     invisible and unreachable for anyone who isn't `is_superuser=True`.
+
+    Each check runs the bases' own guard FIRST (``BaseModelAdmin``'s
+    tenant-host withholding, a read-only admin's refusals) and then
+    requires a superuser, so both apply and a withheld model answers
+    before the user is even looked at.
     """
 
-    def has_module_permission(self, request) -> bool:
+    @staticmethod
+    def _is_superuser(request) -> bool:
         return bool(request.user.is_authenticated and request.user.is_superuser)
+
+    def has_module_permission(self, request) -> bool:
+        return super().has_module_permission(request) and self._is_superuser(
+            request
+        )
 
     def has_view_permission(self, request, obj=None) -> bool:
-        return bool(request.user.is_authenticated and request.user.is_superuser)
+        return super().has_view_permission(request, obj) and self._is_superuser(
+            request
+        )
 
     def has_add_permission(self, request) -> bool:
-        return bool(request.user.is_authenticated and request.user.is_superuser)
+        return super().has_add_permission(request) and self._is_superuser(
+            request
+        )
 
     def has_change_permission(self, request, obj=None) -> bool:
-        return bool(request.user.is_authenticated and request.user.is_superuser)
+        return super().has_change_permission(
+            request, obj
+        ) and self._is_superuser(request)
 
     def has_delete_permission(self, request, obj=None) -> bool:
-        return bool(request.user.is_authenticated and request.user.is_superuser)
+        return super().has_delete_permission(
+            request, obj
+        ) and self._is_superuser(request)
 
 
 class WithheldOnTenantHostModelAdmin:
     """Withhold a PLATFORM-owned model while serving a tenant host.
 
-    The mirror of ``BaseModelAdmin._withheld_on_public``. That one keeps
-    tenant-only models off the control plane; this keeps control-plane
-    models off a store's admin. Same failure shape, opposite direction:
+    The store admin registers every model, including the control plane's
+    own (the platform site copies only those — ``register_platform_models``).
     ``django_site`` lives only in ``public``, so opening it on
     ``api.<store>.gr/admin`` lists every store's domain — five rows, one
     per tenant — dressed as that merchant's own page. Reported from
@@ -97,8 +115,7 @@ class WithheldOnTenantHostModelAdmin:
     is NOT — it is withheld instead, which is why both exist.)
 
     Gated on ``request.tenant`` and it withholds only when it POSITIVELY
-    knows a real tenant is being served — the same positive-knowledge
-    rule ``_withheld_on_public`` had to learn. Keying on
+    knows a real tenant is being served. Keying on
     ``connection.schema_name`` instead would fire during tests,
     management commands and Celery work, where no tenant is bound, and
     deny valid changelists.
@@ -136,7 +153,16 @@ class WithheldOnTenantHostModelAdmin:
         return super().has_module_permission(request)
 
     def has_view_permission(self, request, obj=None) -> bool:
-        if self._withheld_on_tenant_host(request):
+        # Reference data stays READABLE: a store's own forms pick a
+        # country or region from it (the autocomplete endpoint checks
+        # the target admin's view permission). Everything else of the
+        # platform's is refused outright.
+        from tenant.role_scopes import REFERENCE_DATA_APP_LABELS
+
+        if (
+            self._withheld_on_tenant_host(request)
+            and self.model._meta.app_label not in REFERENCE_DATA_APP_LABELS
+        ):
             return False
         return super().has_view_permission(request, obj)
 

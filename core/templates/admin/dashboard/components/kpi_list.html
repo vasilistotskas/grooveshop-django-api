@@ -1,0 +1,8 @@
+{% comment %}
+Several KPI cards from one widget (`kpis`), laid out by `class`.
+{% endcomment %}
+<div class="{{ class|default:"flex flex-col gap-6" }}">
+    {% for kpi in kpis %}
+        {% include "admin/dashboard/components/kpi.html" with icon=kpi.icon tone=kpi.tone value=kpi.value label=kpi.label footer=kpi.footer href=kpi.href badge=kpi.badge %}
+    {% endfor %}
+</div>

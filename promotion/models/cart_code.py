@@ -1,5 +1,6 @@
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
+from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 
@@ -19,11 +20,13 @@ class CartPromotionCode(TimeStampMixinModel):
         "cart.Cart",
         related_name="applied_codes",
         on_delete=models.CASCADE,
+        verbose_name=_("Cart"),
     )
     code = models.ForeignKey(
         "promotion.PromotionCode",
         related_name="cart_applications",
         on_delete=models.PROTECT,
+        verbose_name=_("Promotion Code"),
     )
 
     class Meta(TypedModelMeta):
@@ -47,4 +50,7 @@ class CartPromotionCode(TimeStampMixinModel):
         ]
 
     def __str__(self):
-        return f"{self.code.code} on cart {self.cart_id}"
+        return gettext("%(code)s on cart %(cart)s") % {
+            "code": self.code.code,
+            "cart": self.cart_id,
+        }

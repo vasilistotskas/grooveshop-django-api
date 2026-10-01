@@ -25,6 +25,7 @@ from django.urls import NoReverseMatch, resolve, reverse
 # PAGE's shaping and gating.
 from admin.platform_billing import _billing_rows, _billing_table
 from admin.platform_site import platform_admin_site
+from tenant.models import Tenant
 from tests.utils.staff import store_tenant
 
 _TODAY = date(2026, 8, 22)
@@ -49,7 +50,7 @@ class TestBillingRows(TestCase):
             for r in _billing_rows(_TODAY)
             if r["schema"] == "billing_rows_tenant"
         )
-        assert row["plan"] == "pro"
+        assert row["tenant"].plan == "pro"
         assert row["state"] == "paid"
 
     def test_table_is_shaped_for_the_unfold_component(self):
@@ -62,11 +63,10 @@ class TestBillingRows(TestCase):
         table = _billing_table(
             [
                 {
+                    "tenant": Tenant(plan="basic"),
                     "name": "No Term Store",
                     "schema": "no_term",
                     "domain": "",
-                    "plan": "basic",
-                    "plan_display": "Basic",
                     "paid_until": None,
                     "state": "unbilled",
                 }
@@ -166,6 +166,26 @@ class TestPlanBillingPage(TestCase):
         response.render()
         html = response.content.decode()
         assert self.store.store_name in html
+
+    @override_settings(ROOT_URLCONF="tenant.urls_public")
+    def test_links_to_the_tenants_list_on_its_own_site(self):
+        """The button reversed ``admin:``, which the platform host does
+        not mount, so ``{% url ... as %}`` swallowed the error and the
+        button never rendered."""
+        response = self._view()(self._request(self.operator))
+        response.render()
+        assert 'href="/admin/tenant/tenant/"' in response.content.decode()
+
+    @override_settings(ROOT_URLCONF="tenant.urls_public")
+    def test_counters_use_the_badge_vocabulary(self):
+        from tenant.admin_labels import BILLING_BADGES
+
+        response = self._view()(self._request(self.operator))
+        kpis = response.context_data["billing_kpis"]
+        assert [(k["tone"], k["icon"]) for k in kpis] == [
+            BILLING_BADGES[state][1:]
+            for state in ("trial", "paid", "expiring", "past_due")
+        ]
 
     @override_settings(ROOT_URLCONF="tenant.urls_public")
     def test_no_template_comment_is_emitted(self):

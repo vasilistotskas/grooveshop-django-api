@@ -4,9 +4,9 @@
 that walk a model's non-relational fields (plus, for django-parler
 ``TranslatableModel``s, every translated field per configured
 language) and stream the selected queryset to a downloadable file.
-``ExportModelAdmin`` is the ready-to-use combination of the mixin with
-unfold's ``ModelAdmin`` for admins that only need the export actions
-and nothing else from ``BaseModelAdmin``.
+Mix it in ahead of ``BaseModelAdmin`` and list both names in
+``actions``. Exporting reads, so the actions need only ``view`` — which
+is what keeps them on read-only ledgers.
 """
 
 import csv
@@ -27,7 +27,7 @@ from django.utils.translation import gettext_lazy as _
 from djmoney.models.fields import Money
 from mptt.fields import TreeForeignKey
 from parler.models import TranslatableModel
-from unfold.admin import ModelAdmin
+from unfold.decorators import action
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +54,7 @@ class ExportActionMixin:
             and field.name not in excluded
         ]
 
+    @action(description=_("Export selected to CSV"), permissions=["view"])
     def export_csv(self, request: HttpRequest, queryset: QuerySet):
         MAX_EXPORT_ROWS = 10_000
         if queryset.count() > MAX_EXPORT_ROWS:
@@ -238,6 +239,7 @@ class ExportActionMixin:
         )
         return response
 
+    @action(description=_("Export selected to XML"), permissions=["view"])
     def export_xml(self, request: HttpRequest, queryset: QuerySet):
         MAX_EXPORT_ROWS = 10_000
         if queryset.count() > MAX_EXPORT_ROWS:
@@ -297,16 +299,3 @@ class ExportActionMixin:
                 status=500,
                 content_type="text/plain",
             )
-
-    def get_export_formats(self) -> list:
-        return [
-            {"format": "csv", "label": "CSV"},
-            {"format": "xml", "label": "XML"},
-        ]
-
-
-class ExportModelAdmin(ExportActionMixin, ModelAdmin):
-    actions = [
-        "export_csv",
-        "export_xml",
-    ]

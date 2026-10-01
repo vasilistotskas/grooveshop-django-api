@@ -1,6 +1,9 @@
+import pytest
 from django.test import TestCase
 
 from vat.factories import VatFactory
+
+pytestmark = pytest.mark.assert_english
 
 
 class VatModelTestCase(TestCase):

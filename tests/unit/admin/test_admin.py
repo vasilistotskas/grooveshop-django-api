@@ -30,7 +30,6 @@ class MyAdminSiteUrlsTests(TestCase):
     def test_get_urls_includes_custom_routes(self):
         url_patterns = [str(url.pattern) for url in self.admin_site.get_urls()]
         self.assertIn("clear-cache/", url_patterns)
-        self.assertIn("clear-cache/preview/", url_patterns)
 
 
 class ClearCacheViewGetTests(TestCase):
@@ -135,17 +134,3 @@ class CachePreviewViewTests(TestCase):
         self.admin_user = User.objects.create_superuser(
             username="admin", email="admin@example.com", password="x"
         )
-
-    @patch("admin.admin.CacheService")
-    def test_preview_returns_json_with_counts(self, cache_service):
-        cache_service.count.return_value = {"pay_way": 5, "shipping": 2}
-        request = self.factory.get(
-            "/admin/clear-cache/preview/?codes=pay_way,shipping"
-        )
-        request.user = self.admin_user
-
-        response = self.admin_site.cache_preview_view(request)
-
-        self.assertEqual(response.status_code, 200)
-        cache_service.count.assert_called_once_with(["pay_way", "shipping"])
-        self.assertIn(b'"total": 7', response.content)

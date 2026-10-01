@@ -1,21 +1,24 @@
 from decimal import Decimal
-from typing import cast
 
 from django import forms
 from django.contrib import admin, messages
+from django.db.models import Prefetch, Sum
 from django.http import HttpRequest, HttpResponse
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 from unfold.contrib.filters.admin import (
+    AutocompleteSelectFilter,
     RangeDateTimeFilter,
-    RelatedDropdownFilter,
 )
 from unfold.dataclasses import ActionDialog
+from unfold.datasets import BaseDataset
 from unfold.decorators import action, display
 from unfold.forms import BaseDialogForm
 from unfold.sections import TableSection
 
 from admin.base import BaseModelAdmin
+from admin.datasets import RelatedDatasetAdmin
+from admin.displays import money
 from admin.export import ExportActionMixin
 from giftcard.enum import GiftCardStatus, GiftCardTransactionKind
 from giftcard.models import GiftCard, GiftCardPurchase, GiftCardTransaction
@@ -46,6 +49,24 @@ class TransactionsTableSection(TableSection):
     fields = ["pk", "kind", "amount", "order", "created_at"]
 
 
+class LedgerDatasetAdmin(RelatedDatasetAdmin):
+    parent_field = "gift_card"
+    list_display = ("kind", "amount", "order", "created_by", "created_at")
+    ordering = ("-created_at",)
+
+    def get_queryset(self, request):
+        return (
+            super().get_queryset(request).select_related("order", "created_by")
+        )
+
+
+class LedgerDataset(BaseDataset):
+    model = GiftCardTransaction
+    model_admin = LedgerDatasetAdmin
+    title = _("Ledger")
+    tab = True
+
+
 @admin.register(GiftCard)
 class GiftCardAdmin(BaseModelAdmin):
     list_display = (
@@ -68,6 +89,7 @@ class GiftCardAdmin(BaseModelAdmin):
     autocomplete_fields = ("issued_to",)
     list_select_related = ("issued_to",)
     list_sections = [TransactionsTableSection]
+    change_form_datasets = [LedgerDataset]
     readonly_fields = (
         "uuid",
         "code",
@@ -137,9 +159,28 @@ class GiftCardAdmin(BaseModelAdmin):
         obj.uuid = card.uuid
         obj.code = card.code
 
-    @display(description=_("Balance"))
+    def get_queryset(self, request):
+        """The ledger sum (``GiftCard.balance``) and the ledger section's
+        rows, fetched with the page rather than once per card."""
+        return (
+            super()
+            .get_queryset(request)
+            .annotate(ledger_total=Sum("transactions__amount"))
+            .prefetch_related(
+                Prefetch(
+                    "transactions",
+                    queryset=GiftCardTransaction.objects.select_related(
+                        "order"
+                    ),
+                )
+            )
+        )
+
+    @display(
+        description=_("Balance"), formatting="price", ordering="ledger_total"
+    )
     def balance_display(self, obj):
-        return obj.balance
+        return money(obj.balance.amount)
 
     @display(
         description=_("Status"),
@@ -156,17 +197,13 @@ class GiftCardAdmin(BaseModelAdmin):
     @action(
         description=_("Adjust balance"),
         icon="tune",
-        dialog=cast(
-            "ActionDialog",
-            {
-                "title": _("Adjust gift card balance"),
-                "description": _(
-                    "Writes an ADJUST row on the ledger — the card "
-                    "history stays auditable."
-                ),
-                "form_class": AdjustBalanceForm,
-                "form_submit_text": None,
-            },
+        dialog=ActionDialog(
+            title=_("Adjust gift card balance"),
+            description=_(
+                "Writes an ADJUST row on the ledger — the card "
+                "history stays auditable."
+            ),
+            form_class=AdjustBalanceForm,
         ),
     )
     def adjust_balance(
@@ -244,7 +281,8 @@ class GiftCardTransactionAdmin(ExportActionMixin, BaseModelAdmin):
     )
     list_filter = (
         "kind",
-        ("gift_card", RelatedDropdownFilter),
+        # Autocomplete, not a dropdown of every card ever issued.
+        ("gift_card", AutocompleteSelectFilter),
         ("created_at", RangeDateTimeFilter),
     )
     search_fields = ("gift_card__code", "description")
@@ -273,6 +311,7 @@ class GiftCardPurchaseAdmin(BaseModelAdmin):
         "status",
         "created_at",
     )
+    date_hierarchy = "created_at"
     list_filter = (
         "status",
         ("created_at", RangeDateTimeFilter),

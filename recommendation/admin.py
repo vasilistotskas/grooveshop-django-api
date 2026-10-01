@@ -17,8 +17,6 @@ tenant-app models and the base withholds them on the public schema.
 
 from __future__ import annotations
 
-from typing import cast
-
 from django.contrib import admin, messages
 from django.http import HttpRequest, HttpResponse
 from django.urls import reverse
@@ -126,16 +124,13 @@ class RecommendationSlotAdmin(BaseModelAdmin):
     @action(
         description=_("Reset all slots to the store's preset"),
         icon="restart_alt",
-        dialog=cast(
-            "ActionDialog",
-            {
-                "title": _("Reset every slot to the preset?"),
-                "description": _(
-                    "Replaces the chain, weights, limits and price band "
-                    "of every surface with the defaults for this store's "
-                    "vertical. Your edits are lost."
-                ),
-            },
+        dialog=ActionDialog(
+            title=_("Reset every slot to the preset?"),
+            description=_(
+                "Replaces the chain, weights, limits and price band "
+                "of every surface with the defaults for this store's "
+                "vertical. Your edits are lost."
+            ),
         ),
     )
     def reset_all_to_preset(self, request: HttpRequest, form) -> HttpResponse:
@@ -160,16 +155,13 @@ class RecommendationSlotAdmin(BaseModelAdmin):
     @action(
         description=_("Reset to the store's preset"),
         icon="restart_alt",
-        dialog=cast(
-            "ActionDialog",
-            {
-                "title": _("Reset this slot to the preset?"),
-                "description": _(
-                    "Replaces this surface's chain, weights, limits and "
-                    "price band with the defaults for this store's "
-                    "vertical. Your edits are lost."
-                ),
-            },
+        dialog=ActionDialog(
+            title=_("Reset this slot to the preset?"),
+            description=_(
+                "Replaces this surface's chain, weights, limits and "
+                "price band with the defaults for this store's "
+                "vertical. Your edits are lost."
+            ),
         ),
     )
     def reset_to_preset(

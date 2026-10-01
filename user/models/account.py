@@ -86,6 +86,7 @@ class UserAccount(
         blank=True,
         default=None,
         on_delete=models.SET_NULL,
+        verbose_name=_("Country"),
     )
     region = models.ForeignKey(
         "region.Region",
@@ -94,6 +95,7 @@ class UserAccount(
         blank=True,
         default=None,
         on_delete=models.SET_NULL,
+        verbose_name=_("Region"),
     )
     image = ImageAndSvgField(
         _("Image"), upload_to="uploads/users/", blank=True, null=True
@@ -144,6 +146,7 @@ class UserAccount(
         # so this is an ORM-only relation. Tier resolution happens
         # inside the active tenant's schema_context.
         db_constraint=False,
+        verbose_name=_("Loyalty Tier"),
     )
     language_code = models.CharField(
         _("Language"),

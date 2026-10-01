@@ -1,0 +1,9 @@
+{% comment %}
+A doughnut chart on Unfold's chart contract - the same canvas as
+unfold/components/chart/bar.html with data-type="doughnut", which
+django-unfold does not ship. Unfold's renderCharts (app.js) draws every
+canvas.chart it finds.
+{% endcomment %}
+<div class="relative w-full{% if class %} {{ class }}{% endif %}">
+    <canvas class="chart" data-type="doughnut" data-value="{{ data }}" {% if options %}data-options="{{ options }}"{% endif %}></canvas>
+</div>

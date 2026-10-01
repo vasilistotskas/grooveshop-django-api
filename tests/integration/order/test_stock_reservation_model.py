@@ -13,6 +13,8 @@ from order.models import StockReservation
 from product.factories import ProductFactory
 from user.factories import UserAccountFactory
 
+pytestmark = pytest.mark.assert_english
+
 
 @pytest.mark.django_db
 class TestStockReservationModel:
@@ -74,7 +76,7 @@ class TestStockReservationModel:
         assert "Reservation" in str_repr
         assert str(reservation.id) in str_repr
         assert str(reservation.quantity) in str_repr
-        assert "active" in str_repr
+        assert "(Active)" in str_repr
 
     def test_str_representation_consumed(self):
         """Test string representation of consumed reservation."""
@@ -90,7 +92,7 @@ class TestStockReservationModel:
         )
 
         str_repr = str(reservation)
-        assert "consumed" in str_repr
+        assert "(Consumed)" in str_repr
 
     def test_is_expired_property_false(self):
         """Test is_expired property returns False for active reservation."""

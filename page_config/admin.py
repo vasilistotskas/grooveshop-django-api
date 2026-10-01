@@ -1,10 +1,15 @@
+from django import forms
 from django.conf import settings
 from django.contrib import admin, messages
+from django.core.serializers.json import DjangoJSONEncoder
+from django.db.models import Count
 from django.utils.html import escape, format_html_join
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
-from unfold.admin import TabularInline
+from unfold.admin import StackedInline
 from unfold.decorators import action
+from unfold.fields import UnfoldAdminJSONSchemaField
+from unfold.widgets import UnfoldAdminJSONSchemaWidget
 
 from admin.base import (
     BaseModelAdmin,
@@ -23,7 +28,6 @@ from page_config.legal_documents import (
 )
 from page_config.models import (
     ContentPage,
-    ContentPageTranslation,
     NavigationColumn,
     NavigationLink,
     NavigationMenu,
@@ -31,11 +35,49 @@ from page_config.models import (
     PageLayout,
     PageSection,
 )
+from page_config.section_schemas import (
+    SECTION_PROPS,
+    i18n_schema,
+    props_schema,
+)
 
 
-class PageSectionInline(TabularInline):
+class PageSectionForm(forms.ModelForm):
+    """A saved section edits ``props`` and ``i18n`` through its type's
+    schema (``page_config.section_schemas``). A new row is plain JSON
+    until its type is saved: the schema depends on the type, and Unfold
+    builds its editors once, when the page loads."""
+
+    class Meta:
+        model = PageSection
+        fields = ("component_type", "title", "is_visible", "props", "i18n")
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        component_type = self.instance.component_type
+        if self.instance.pk is None or component_type not in SECTION_PROPS:
+            return
+        for name, schema in (
+            ("props", props_schema(component_type)),
+            ("i18n", i18n_schema(component_type)),
+        ):
+            field = self.fields[name]
+            self.fields[name] = UnfoldAdminJSONSchemaField(
+                schema=schema,
+                widget=UnfoldAdminJSONSchemaWidget,
+                encoder=DjangoJSONEncoder,
+                required=False,
+                label=field.label,
+                help_text=field.help_text,
+            )
+
+
+class PageSectionInline(StackedInline):
     model = PageSection
+    form = PageSectionForm
     extra = 0
+    tab = True
+    collapsible = True
     fields = (
         "component_type",
         "title",
@@ -50,10 +92,6 @@ class PageSectionInline(TabularInline):
 
 @admin.register(PageLayout)
 class PageLayoutAdmin(BaseTranslatableAdmin):
-    compressed_fields = True
-    warn_unsaved_form = True
-    list_fullwidth = True
-
     list_display = (
         "page_type",
         "title",
@@ -79,7 +117,7 @@ class PageLayoutAdmin(BaseTranslatableAdmin):
             {
                 "fields": ("seo_title", "seo_description", "seo_keywords"),
                 "description": _(
-                    "The storefront's <title> and meta description for "
+                    "The storefront's page title and meta description for "
                     "this page. Left empty, the page keeps its built-in "
                     "title and the store description."
                 ),
@@ -117,8 +155,6 @@ class NavigationMenuAdmin(BaseModelAdmin):
     and links edited through the inlines below.
     """
 
-    compressed_fields = True
-    warn_unsaved_form = True
     list_display = ("slot", "entry_count", "updated_at")
     fields = ("slot",)
 
@@ -177,9 +213,19 @@ class NavigationColumnAdmin(BaseTranslatableAdmin):
     fields = ("menu", "label", "icon", "sort_order")
     inlines = [NavigationLinkInline]
 
-    @admin.display(description=_("Links"))
+    list_select_related = ("menu",)
+
+    def get_queryset(self, request):
+        return (
+            super()
+            .get_queryset(request)
+            .prefetch_related("translations")
+            .annotate(links_total=Count("links"))
+        )
+
+    @admin.display(description=_("Links"), ordering="links_total")
     def link_count(self, obj: NavigationColumn) -> int:
-        return obj.links.count()
+        return obj.links_total
 
 
 class NavigationColumnInline(BaseTranslatableTabularInline):
@@ -203,15 +249,6 @@ class NavigationMenuLinkInline(NavigationLinkInline):
     fk_name = "menu"
     verbose_name = _("Link")
     verbose_name_plural = _("Links")
-
-
-class ContentPageTranslationInline(TabularInline):
-    model = ContentPageTranslation
-    extra = 0
-    fields = ("language_code", "title")
-    show_change_link = True
-
-    tab = True
 
 
 @admin.register(ContentPage)
@@ -259,7 +296,8 @@ class ContentPageAdmin(BaseTranslatableAdmin):
         ),
     )
 
-    inlines = [ContentPageTranslationInline]
+    def get_queryset(self, request):
+        return super().get_queryset(request).prefetch_related("translations")
 
     @admin.display(description=_("Title"), ordering="translations__title")
     def title_display(self, obj):

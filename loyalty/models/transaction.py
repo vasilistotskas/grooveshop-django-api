@@ -1,6 +1,7 @@
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import ngettext
 from django_stubs_ext.db.models import TypedModelMeta
 
 from core.models import TimeStampMixinModel, UUIDModel
@@ -14,6 +15,7 @@ class PointsTransaction(TimeStampMixinModel, UUIDModel):
         "user.UserAccount",
         related_name="points_transactions",
         on_delete=models.CASCADE,
+        verbose_name=_("User"),
     )
     points = models.IntegerField(
         _("Points"),
@@ -32,6 +34,7 @@ class PointsTransaction(TimeStampMixinModel, UUIDModel):
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
+        verbose_name=_("Reference Order"),
     )
     description = models.TextField(_("Description"), blank=True, default="")
     created_by = models.ForeignKey(
@@ -41,6 +44,7 @@ class PointsTransaction(TimeStampMixinModel, UUIDModel):
         blank=True,
         on_delete=models.SET_NULL,
         help_text=_("Admin user who created this adjustment"),
+        verbose_name=_("Created By"),
     )
 
     objects: PointsTransactionManager = PointsTransactionManager()
@@ -62,4 +66,12 @@ class PointsTransaction(TimeStampMixinModel, UUIDModel):
         ]
 
     def __str__(self):
-        return f"{self.get_transaction_type_display()} {self.points} pts (user {self.user_id})"
+        return ngettext(
+            "%(type)s %(points)s point (user %(user)s)",
+            "%(type)s %(points)s points (user %(user)s)",
+            abs(self.points),
+        ) % {
+            "type": self.get_transaction_type_display(),
+            "points": self.points,
+            "user": self.user_id,
+        }

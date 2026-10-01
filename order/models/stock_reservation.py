@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
+from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 
@@ -30,6 +31,7 @@ class StockReservation(TimeStampMixinModel):
         related_name="stock_reservations",
         on_delete=models.CASCADE,
         help_text=_("Product being reserved"),
+        verbose_name=_("Product"),
     )
     quantity = models.PositiveIntegerField(
         _("Quantity"),
@@ -42,6 +44,7 @@ class StockReservation(TimeStampMixinModel):
         null=True,
         blank=True,
         help_text=_("User who made the reservation (null for guest users)"),
+        verbose_name=_("Reserved By"),
     )
     session_id = models.CharField(
         _("Session ID"),
@@ -68,6 +71,7 @@ class StockReservation(TimeStampMixinModel):
         null=True,
         blank=True,
         help_text=_("Order created from this reservation (set when consumed)"),
+        verbose_name=_("Order"),
     )
     abandonment_notified = models.BooleanField(
         _("Abandonment Notified"),
@@ -104,8 +108,15 @@ class StockReservation(TimeStampMixinModel):
         product_name = self.product.safe_translation_getter(
             "name", any_language=True
         )
-        status = "consumed" if self.consumed else "active"
-        return f"Reservation {self.id} - {product_name} x {self.quantity} ({status})"
+        status = gettext("Consumed") if self.consumed else gettext("Active")
+        return gettext(
+            "Reservation %(id)s - %(product)s × %(quantity)s (%(status)s)"
+        ) % {
+            "id": self.id,
+            "product": product_name,
+            "quantity": self.quantity,
+            "status": status,
+        }
 
     @property
     def is_expired(self) -> bool:

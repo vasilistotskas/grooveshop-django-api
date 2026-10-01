@@ -13,7 +13,10 @@ class Region(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         _("Region Code"), max_length=10, primary_key=True, unique=True
     )
     country = models.ForeignKey(
-        "country.Country", related_name="regions", on_delete=models.CASCADE
+        "country.Country",
+        related_name="regions",
+        on_delete=models.CASCADE,
+        verbose_name=_("Country"),
     )
     translations = TranslatedFields(
         name=models.CharField(_("Name"), max_length=100, blank=True, null=True)

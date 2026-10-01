@@ -8,9 +8,6 @@ the rollout could not touch is flagged to its merchant until they mark
 it reviewed.
 """
 
-from types import SimpleNamespace
-from unittest.mock import patch
-
 import pytest
 from django.conf import settings
 from django.contrib import admin as django_admin
@@ -19,7 +16,7 @@ from django.contrib.messages.storage.fallback import FallbackStorage
 from django.core.management import call_command
 from django.test import RequestFactory, TestCase
 
-from admin.dashboard import _check_legal_updates
+from admin.dashboard.store.widgets import StoreAlerts
 from core.utils.sanitize import sanitize_html
 from page_config.admin import ContentPageAdmin
 from page_config.defaults import pending_legal_reviews, seed_content_pages
@@ -243,34 +240,27 @@ class TestSeedAndReview(TestCase):
         assert faq.legal_text_revision is None
 
 
+def _legal_alerts(user) -> list:
+    """The dashboard's legal-update alerts, as ``user`` would see them."""
+    request = RequestFactory().get("/admin/")
+    request.user = user
+    return StoreAlerts(request=request)._legal_updates()
+
+
 class TestDashboardBanner(TestCase):
-    """The main suite runs on the public schema, where the banner is
-    always empty; pretend to be a tenant, as the dashboard tests do."""
-
-    def setUp(self):
-        patcher = patch("admin.dashboard._is_public_schema", return_value=False)
-        patcher.start()
-        self.addCleanup(patcher.stop)
-
-    def test_empty_on_the_public_schema(self):
-        _privacy("<p>Δική μας.</p>")
-        user = User.objects.create_superuser(
-            email="owner@example.com", password="x"
-        )
-
-        with patch("admin.dashboard._is_public_schema", return_value=True):
-            assert _check_legal_updates(SimpleNamespace(user=user)) == []
-
     def test_lists_pending_pages_for_someone_who_edits_them(self):
         page = _privacy("<p>Δική μας.</p>")
         user = User.objects.create_superuser(
             email="owner@example.com", password="x"
         )
 
-        banner = _check_legal_updates(SimpleNamespace(user=user))
+        alerts = _legal_alerts(user)
 
-        assert len(banner) == 1
-        assert str(page.pk) in banner[0]["url"]
+        assert len(alerts) == 1
+        assert (
+            f"/page_config/contentpage/{page.pk}/change/"
+            in alerts[0]["items"][0]
+        )
 
     def test_hidden_from_someone_who_cannot_edit_them(self):
         _privacy("<p>Δική μας.</p>")
@@ -278,7 +268,7 @@ class TestDashboardBanner(TestCase):
             email="viewer@example.com", password="x"
         )
 
-        assert _check_legal_updates(SimpleNamespace(user=user)) == []
+        assert _legal_alerts(user) == []
 
     def test_empty_when_nothing_is_pending(self):
         _privacy("<p>x</p>", revision=LEGAL_TEXT_REVISION)
@@ -286,7 +276,7 @@ class TestDashboardBanner(TestCase):
             email="owner@example.com", password="x"
         )
 
-        assert _check_legal_updates(SimpleNamespace(user=user)) == []
+        assert _legal_alerts(user) == []
 
 
 class TestLegalTextStatusCommand(TestCase):

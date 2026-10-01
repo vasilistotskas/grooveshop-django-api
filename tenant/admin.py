@@ -28,8 +28,6 @@ Lifecycle actions also write ``LogEntry``/``HistoricalRecords`` rows
 
 from __future__ import annotations
 
-from typing import Any
-
 from django import forms
 from django.contrib import admin, messages
 from django.contrib.admin.helpers import ACTION_CHECKBOX_NAME
@@ -38,13 +36,15 @@ from django.forms.models import ModelChoiceIterator
 from django.shortcuts import render
 from django.urls import reverse
 from django.utils import timezone
-from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
-from unfold.admin import ModelAdmin
+from unfold.admin import TabularInline
 from unfold.contrib.filters.admin import ChoicesRadioFilter
 from unfold.decorators import action, display
 from unfold.enums import ActionVariant
 
+from admin.base import BaseModelAdmin
+from admin.displays import format_dt, header_two_line
+from tenant.admin_labels import billing_badge, label, plan_badge, status_badge
 from tenant.lifecycle import (
     SUSPEND_COOLDOWN,
     activate_tenant,
@@ -62,9 +62,10 @@ from tenant.models import (
 )
 
 
-class TenantDomainInline(admin.TabularInline):
+class TenantDomainInline(TabularInline):
     model = TenantDomain
     extra = 1
+    tab = True
 
 
 def self_service_tenant(request):
@@ -90,46 +91,6 @@ def self_service_tenant(request):
     from tenant.membership import get_current_tenant
 
     return get_current_tenant()
-
-
-# Plan presentation: an icon and a colour per tier, so the estate reads
-# at a glance instead of as a column of lowercase words.
-#
-# Rendered through Unfold's own ``label.html`` rather than hand-written
-# markup: that template already accepts ``icon`` (``@display(label=...)``
-# does NOT — the decorator only carries a value->colour map, verified
-# against unfold 0.104.1), and reusing it means the badges inherit
-# Unfold's palette and dark-mode classes instead of duplicating them
-# here where they would silently drift on upgrade.
-_PLAN_BADGES: dict[str, tuple[str, str]] = {
-    "trial": ("schedule", "warning"),
-    "basic": ("storefront", "info"),
-    "pro": ("rocket_launch", "primary"),
-    "enterprise": ("workspace_premium", "success"),
-}
-
-# Billing state presentation: (label, unfold label tone, material icon),
-# keyed by ``tenant.billing.billing_state()``'s return value. Canonical
-# home for this map — the Plan & Billing page (admin/platform_billing.py)
-# imports it from here (mirroring how it already borrows ``_PLAN_BADGES``)
-# so the two surfaces cannot drift as states change.
-_STATE_BADGES: dict[str, tuple[Any, str, str]] = {
-    "suspended": (_("Suspended"), "danger", "pause_circle"),
-    "past_due": (_("Past due"), "danger", "event_busy"),
-    "expiring": (_("Expires soon"), "warning", "hourglass_top"),
-    "trial": (_("Trial"), "warning", "schedule"),
-    "unbilled": (_("No term recorded"), "info", "contract"),
-    "paid": (_("Paid"), "success", "check_circle"),
-}
-
-
-def _unfold_label(text, tone: str, icon: str | None = None) -> str:
-    from django.template.loader import render_to_string
-
-    return render_to_string(
-        "unfold/helpers/label.html",
-        {"text": text, "type": tone, "icon": icon},
-    )
 
 
 def _public_schema_context():
@@ -182,7 +143,7 @@ class PublicSchemaModelChoiceField(forms.ModelChoiceField):
 
 
 @admin.register(Tenant)
-class TenantAdmin(ModelAdmin):
+class TenantAdmin(BaseModelAdmin):
     list_display = [
         "display_store",
         "display_plan",
@@ -227,44 +188,27 @@ class TenantAdmin(ModelAdmin):
         ``header=True`` renders two lines plus a leading avatar — the
         store's logo when it has one, otherwise its initials. On a
         control plane listing every merchant, the logo is the fastest
-        way to identify a row.
+        way to identify a row. Domains are prefetched (``get_queryset``).
         """
-        primary = obj.domains.filter(is_primary=True).first()
-        name = obj.store_name or obj.name
-        avatar = (
-            {"path": obj.logo_light_url, "squared": True}
-            if obj.logo_light_url
-            else None
+        primary = next(
+            (domain for domain in obj.domains.all() if domain.is_primary),
+            None,
         )
-        return [
+        name = obj.store_name or obj.name
+        return header_two_line(
             name,
             primary.domain if primary else obj.schema_name,
-            "".join(word[:1] for word in name.split()[:2]).upper(),
-            avatar,
-        ]
+            image_path=obj.logo_light_url or None,
+            squared=True,
+        )
 
     @display(description=_("Plan"), ordering="plan")
     def display_plan(self, obj):
-        icon, tone = _PLAN_BADGES.get(obj.plan, ("help", "info"))
-        return mark_safe(_unfold_label(obj.get_plan_display(), tone, icon))
+        return plan_badge(obj)
 
     @display(description=_("Status"), ordering="is_active")
     def display_status(self, obj):
-        """Suspended is distinct from inactive — different operations.
-
-        A suspended store is mid-lifecycle (24h cooldown before it can
-        be destroyed); an inactive one was simply switched off. Showing
-        both as a bare boolean hid that difference.
-        """
-        if obj.suspended_at is not None:
-            return mark_safe(
-                _unfold_label(_("Suspended"), "danger", "pause_circle")
-            )
-        if not obj.is_active:
-            return mark_safe(
-                _unfold_label(_("Inactive"), "warning", "visibility_off")
-            )
-        return mark_safe(_unfold_label(_("Live"), "success", "check_circle"))
+        return status_badge(obj)
 
     @display(description=_("Billing"))
     def display_billing_state(self, obj):
@@ -273,53 +217,30 @@ class TenantAdmin(ModelAdmin):
         past-due store is visible without leaving the Tenants list."""
         from tenant.billing import billing_state
 
-        state = billing_state(obj, timezone.localdate())
-        label, tone, icon = _STATE_BADGES[state]
-        return mark_safe(_unfold_label(str(label), tone, icon))
+        return billing_badge(billing_state(obj, timezone.localdate()))
 
-    @display(description=_("Last activity"))
+    @display(description=_("Last order"))
     def display_last_activity(self, obj):
-        """Latest order in the tenant's OWN schema.
+        """The store's latest order, from its ``TenantStatsSnapshot``.
 
-        Same ``tenant_context`` + schema-existence guard as the
-        platform dashboard's estate table
-        (``admin/platform_dashboard.py::_tenant_rows``) — a
-        half-provisioned or not-yet-migrated schema must read as
-        "cannot tell" ("—"), not a misleading blank/zero. The
-        platform's own row is skipped outright: ``order`` is a
-        TENANT_APPS-only app, so the public schema has no orders table
-        to query at all.
+        Read inside the store's schema by ``refresh_stats_snapshot``
+        rather than here: this column used to switch schema per row. "—"
+        until the first refresh, and for the platform's own row, which
+        has no orders.
         """
-        from django_tenants.utils import get_public_schema_name
-
-        from admin.platform_dashboard import _schema_exists
-
-        if obj.schema_name == get_public_schema_name():
+        snapshot = getattr(obj, "stats_snapshot", None)
+        if snapshot is None or snapshot.last_order_at is None:
             return "—"
-        if not _schema_exists(obj.schema_name):
-            return "—"
-
-        from django.apps import apps
-        from django_tenants.utils import tenant_context
-
-        from admin.displays import format_dt
-
-        try:
-            with tenant_context(obj):
-                Order = apps.get_model("order", "Order")
-                latest = (
-                    Order.objects.order_by("-created_at")
-                    .values_list("created_at", flat=True)
-                    .first()
-                )
-        except Exception:
-            return "—"
-
-        return format_dt(latest) if latest is not None else "—"
+        return format_dt(snapshot.last_order_at)
 
     def get_queryset(self, request):
         """A store operator sees only their own row."""
-        qs = super().get_queryset(request)
+        qs = (
+            super()
+            .get_queryset(request)
+            .select_related("stats_snapshot")
+            .prefetch_related("domains")
+        )
         scope = self_service_tenant(request)
         if scope is None:
             return qs
@@ -493,18 +414,21 @@ class TenantAdmin(ModelAdmin):
                 level=messages.INFO,
             )
 
+    # Eight tabs, not seventeen collapsed sections: Unfold gives every
+    # tabbed fieldset its own tab, and the tab bar does not wrap.
     fieldsets = [
         (
-            None,
+            _("Store"),
             {
+                "classes": ["tab"],
                 "fields": [
                     "name",
                     "slug",
                     "schema_name",
                     "owner_email",
                     "is_active",
-                    # Sits here rather than under Features on purpose:
-                    # it gates no storefront behaviour, it declares what
+                    # Here rather than under Features on purpose: it
+                    # gates no storefront behaviour, it declares what
                     # KIND of tenant this row is.
                     "is_demo",
                     "is_protected",
@@ -515,24 +439,28 @@ class TenantAdmin(ModelAdmin):
                     "suspended_at",
                     "suspended_reason",
                     "uuid",
-                ]
+                    "created_at",
+                    "updated_at",
+                ],
             },
         ),
         (
             _("Plan & Billing"),
             {
+                "classes": ["tab"],
                 "fields": [
                     "plan",
                     "paid_until",
                     "billing_notice_stage",
                     "billing_notice_term",
                     "stripe_connect_account_id",
-                ]
+                ],
             },
         ),
         (
             _("Branding"),
             {
+                "classes": ["tab"],
                 "fields": [
                     "store_name",
                     "store_description",
@@ -541,16 +469,6 @@ class TenantAdmin(ModelAdmin):
                     "logo_light_url",
                     "logo_dark_url",
                     "favicon_url",
-                    "seo_author",
-                    "google_site_verification",
-                    "pinterest_domain_verify",
-                ]
-            },
-        ),
-        (
-            _("Theme"),
-            {
-                "fields": [
                     "primary_color",
                     "neutral_color",
                     "accent_hex",
@@ -560,30 +478,48 @@ class TenantAdmin(ModelAdmin):
                     "info_hex",
                     "theme_preset",
                     "theme_metadata",
-                ]
+                    "socials_discord",
+                    "socials_facebook",
+                    "socials_instagram",
+                    "socials_linkedin",
+                    "socials_pinterest",
+                    "socials_reddit",
+                    "socials_tiktok",
+                    "socials_twitter",
+                    "socials_youtube",
+                ],
             },
         ),
         (
             _("Features"),
             {
+                "classes": ["tab"],
                 "fields": [
                     "loyalty_enabled",
                     "blog_enabled",
                     "promotions_enabled",
                     "gift_cards_enabled",
-                    "agent_commerce_enabled",
                     # Was absent entirely, so the wholesale plan gate
                     # could only be flipped from a shell — every other
                     # plan gate is here.
                     "b2b_enabled",
                     "recommendations_enabled",
-                ]
+                    "agent_commerce_enabled",
+                    "agent_hosted_payment_enabled",
+                    "agent_stripe_delegated_enabled",
+                    "chat_api_key",
+                    "acp_bearer_token",
+                ],
             },
         ),
         (
-            _("Analytics"),
+            _("Marketing"),
             {
+                "classes": ["tab"],
                 "fields": [
+                    "seo_author",
+                    "google_site_verification",
+                    "pinterest_domain_verify",
                     "meta_pixel_id",
                     "tiktok_pixel_id",
                     "ga_tracking_id",
@@ -595,78 +531,32 @@ class TenantAdmin(ModelAdmin):
                     "meta_capi_access_token",
                     "meta_capi_dataset_id",
                 ],
-                "classes": ["collapse"],
             },
         ),
         (
-            _("Social Links"),
+            _("Email & Security"),
             {
-                "fields": [
-                    "socials_discord",
-                    "socials_facebook",
-                    "socials_instagram",
-                    "socials_linkedin",
-                    "socials_pinterest",
-                    "socials_reddit",
-                    "socials_tiktok",
-                    "socials_twitter",
-                    "socials_youtube",
-                ],
-                "classes": ["collapse"],
-            },
-        ),
-        (
-            _("Email"),
-            {
+                "classes": ["tab"],
                 "fields": [
                     "from_email",
                     "from_email_verified",
                     "contact_email",
+                    "totp_issuer",
+                    "allowed_csp_sources",
+                    "cloudflare_zone_id",
+                    "cloudflare_api_token",
                 ],
-                "classes": ["collapse"],
-            },
-        ),
-        (
-            _("Authentication"),
-            {
-                "fields": ["totp_issuer"],
-                "classes": ["collapse"],
-            },
-        ),
-        (
-            _("Agentic Commerce"),
-            {
-                "fields": [
-                    "chat_api_key",
-                    "acp_bearer_token",
-                    "agent_hosted_payment_enabled",
-                    "agent_stripe_delegated_enabled",
-                ],
-                "classes": ["collapse"],
-            },
-        ),
-        (
-            _("Security"),
-            {
-                "fields": ["allowed_csp_sources"],
-                "classes": ["collapse"],
-            },
-        ),
-        (
-            _("Edge cache — Cloudflare"),
-            {
-                "fields": ["cloudflare_zone_id", "cloudflare_api_token"],
-                "classes": ["collapse"],
                 "description": _(
-                    "Only for a store on its own domain in its own "
-                    "Cloudflare account. Leave empty on a platform "
-                    "hostname."
+                    "The Cloudflare fields are only for a store on its own "
+                    "domain in its own Cloudflare account. Leave them empty "
+                    "on a platform hostname."
                 ),
             },
         ),
         (
-            _("Payments — Viva Wallet"),
+            _("Payments"),
             {
+                "classes": ["tab"],
                 "fields": [
                     "viva_wallet_merchant_id",
                     "viva_wallet_api_key",
@@ -675,13 +565,15 @@ class TenantAdmin(ModelAdmin):
                     "viva_wallet_webhook_verification_key",
                     "viva_wallet_source_code",
                     "viva_wallet_live_mode",
+                    "stripe_publishable_key",
+                    "stripe_secret_key",
                 ],
-                "classes": ["collapse"],
             },
         ),
         (
-            _("Shipping — ACS"),
+            _("Shipping"),
             {
+                "classes": ["tab"],
                 "fields": [
                     "acs_api_key",
                     "acs_company_id",
@@ -690,14 +582,6 @@ class TenantAdmin(ModelAdmin):
                     "acs_user_password",
                     "acs_billing_code",
                     "acs_station_origin",
-                ],
-                "classes": ["collapse"],
-            },
-        ),
-        (
-            _("Shipping — BoxNow"),
-            {
-                "fields": [
                     "box_now_partner_id",
                     "box_now_client_id",
                     "box_now_client_secret",
@@ -705,24 +589,6 @@ class TenantAdmin(ModelAdmin):
                     "box_now_notify_phone",
                     "box_now_webhook_secret",
                 ],
-                "classes": ["collapse"],
-            },
-        ),
-        (
-            _("Payments — Stripe"),
-            {
-                "fields": [
-                    "stripe_publishable_key",
-                    "stripe_secret_key",
-                ],
-                "classes": ["collapse"],
-            },
-        ),
-        (
-            _("Timestamps"),
-            {
-                "fields": ["created_at", "updated_at"],
-                "classes": ["collapse"],
             },
         ),
     ]
@@ -768,7 +634,7 @@ class TenantAdmin(ModelAdmin):
     # ------------------------------------------------------------------
 
     @action(
-        description=str(_("Provision Stripe webhook")),
+        description=_("Provision Stripe webhook"),
         icon="webhook",
     )
     def provision_stripe_webhook(self, request, queryset):
@@ -827,7 +693,7 @@ class TenantAdmin(ModelAdmin):
     # ------------------------------------------------------------------
 
     @action(
-        description=str(_("Export store data (before destroying)")),
+        description=_("Export store data (before destroying)"),
         icon="download",
     )
     def export_tenant_data_action(self, request, queryset):
@@ -872,7 +738,7 @@ class TenantAdmin(ModelAdmin):
     # ------------------------------------------------------------------
 
     @action(
-        description=str(_("Suspend selected tenants")),
+        description=_("Suspend selected tenants"),
         variant=ActionVariant.WARNING,
         icon="pause_circle",
     )
@@ -918,7 +784,7 @@ class TenantAdmin(ModelAdmin):
     # ------------------------------------------------------------------
 
     @action(
-        description=str(_("Activate selected tenants")),
+        description=_("Activate selected tenants"),
         variant=ActionVariant.SUCCESS,
         icon="play_circle",
     )
@@ -960,7 +826,7 @@ class TenantAdmin(ModelAdmin):
     # ------------------------------------------------------------------
 
     @action(
-        description=str(_("Permanently destroy tenant + drop schema")),
+        description=_("Permanently destroy tenant + drop schema"),
         variant=ActionVariant.DANGER,
         icon="delete_forever",
     )
@@ -1006,7 +872,8 @@ class TenantAdmin(ModelAdmin):
                 remaining = SUSPEND_COOLDOWN - (now - tenant.suspended_at)
                 remaining_minutes = int(remaining.total_seconds() // 60)
                 skipped_cooldown.append(
-                    f"{tenant.name} ({remaining_minutes} min remaining)"
+                    _("%(name)s (%(minutes)s min remaining)")
+                    % {"name": tenant.name, "minutes": remaining_minutes}
                 )
                 continue
 
@@ -1097,7 +964,7 @@ class TenantAdmin(ModelAdmin):
         ``destroy_tenants`` still run in full on that second POST — this
         only adds a step before them, it does not replace them.
 
-        The changelist/index URLs are resolved against
+        The changelist URL is resolved against
         ``self.admin_site.name`` rather than hardcoded in the template:
         this action is platform-only (``get_actions`` strips it for
         merchants), reached exclusively through ``PlatformAdminSite``
@@ -1114,7 +981,6 @@ class TenantAdmin(ModelAdmin):
             "changelist_url": reverse(
                 f"{site_name}:{opts.app_label}_{opts.model_name}_changelist"
             ),
-            "index_url": reverse(f"{site_name}:index"),
         }
         return render(
             request, "admin/tenant/destroy_confirmation.html", context
@@ -1122,7 +988,7 @@ class TenantAdmin(ModelAdmin):
 
 
 @admin.register(TenantDomain)
-class TenantDomainAdmin(ModelAdmin):
+class TenantDomainAdmin(BaseModelAdmin):
     list_display = ["domain", "tenant", "is_primary"]
     list_filter = ["is_primary"]
     search_fields = ["domain"]
@@ -1132,7 +998,7 @@ class TenantDomainAdmin(ModelAdmin):
 
 
 @admin.register(UserTenantMembership)
-class UserTenantMembershipAdmin(ModelAdmin):
+class UserTenantMembershipAdmin(BaseModelAdmin):
     list_display = ["user", "tenant", "role", "is_active", "created_at"]
     list_filter = ["role", "is_active", "tenant"]
     search_fields = ["user__email", "user__username", "tenant__name"]
@@ -1272,7 +1138,7 @@ class UserTenantMembershipAdmin(ModelAdmin):
 
 
 @admin.register(TenantArchive)
-class TenantArchiveAdmin(ModelAdmin):
+class TenantArchiveAdmin(BaseModelAdmin):
     """Read-only erasure records for destroyed tenants.
 
     GDPR art. 5(2) requires the controller to be able to DEMONSTRATE
@@ -1290,6 +1156,7 @@ class TenantArchiveAdmin(ModelAdmin):
         "display_retention",
         "data_exported",
     ]
+    date_hierarchy = "created_at"
     list_filter = ["data_exported", "destroyed_at"]
     search_fields = ["schema_name", "tenant_name", "destroyed_by"]
     ordering = ["-destroyed_at"]
@@ -1306,11 +1173,11 @@ class TenantArchiveAdmin(ModelAdmin):
     @display(description=_("Retention"))
     def display_retention(self, obj):
         if obj.purged_at is not None:
-            return _unfold_label(_("Purged"), "success", "delete_sweep")
+            return label(_("Purged"), "success", "delete_sweep")
         if obj.retention_until is None:
-            return _unfold_label(_("Nothing retained"), "info", "block")
+            return label(_("Nothing retained"), "info", "block")
         tone = "danger" if obj.retention_expired else "warning"
-        return _unfold_label(
+        return label(
             _("Until %(date)s") % {"date": obj.retention_until},
             tone,
             "gavel",

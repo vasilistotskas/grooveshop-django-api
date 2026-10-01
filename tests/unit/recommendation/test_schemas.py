@@ -1,4 +1,4 @@
-"""Slot configuration validators — the reason a bad chain can never be
+"""Slot configuration validation — the reason a bad chain can never be
 stored and surface as a KeyError on every product page."""
 
 from __future__ import annotations
@@ -8,90 +8,75 @@ from django.core.exceptions import ValidationError
 
 from recommendation.enum import StrategyCode, Surface
 from recommendation.models import RecommendationSlot
-from recommendation.schemas import validate_strategy_chain, validate_weights
+
+
+def _slot(**kwargs) -> RecommendationSlot:
+    defaults = {
+        "surface": Surface.PDP,
+        "strategy_chain": [StrategyCode.CURATED],
+        "weights": {},
+        "limit": 4,
+        "min_fill": 2,
+    }
+    return RecommendationSlot(**{**defaults, **kwargs})
+
+
+def _errors(slot: RecommendationSlot) -> dict[str, list[str]]:
+    with pytest.raises(ValidationError) as excinfo:
+        slot.full_clean(exclude=["surface"])
+    return excinfo.value.message_dict
 
 
 class TestStrategyChain:
-    def test_valid_chain_is_returned_as_a_fresh_list(self):
-        chain = [StrategyCode.CURATED, StrategyCode.POPULAR]
-        out = validate_strategy_chain(chain)
-        assert out == chain
-        assert out is not chain
-
     @pytest.mark.parametrize(
-        ("value", "message"),
+        "value",
         [
-            ("curated", "must be a list"),
-            ([], "at least one"),
-            (["curated", "telepathy"], "not a known strategy"),
-            ([42], "not a known strategy"),
-            (["curated", "curated"], "more than once"),
+            "curated",
+            [],
+            ["curated", "telepathy"],
+            [42],
+            ["curated", "curated"],
         ],
     )
-    def test_rejects(self, value, message):
-        with pytest.raises(ValidationError, match=message):
-            validate_strategy_chain(value)
+    def test_rejects(self, value):
+        assert "strategy_chain" in _errors(_slot(strategy_chain=value))
 
 
 class TestWeights:
-    def test_valid_weights_are_coerced_to_floats(self):
-        out = validate_weights(
-            {"curated": 1, "popular": 0.25}, ["curated", "popular"]
+    def test_valid_weights_are_stored_as_floats(self):
+        slot = _slot(
+            strategy_chain=["curated", "popular"],
+            weights={"curated": 1, "popular": 0.25},
         )
-        assert out == {"curated": 1.0, "popular": 0.25}
-        assert all(isinstance(v, float) for v in out.values())
+        slot.full_clean(exclude=["surface"])
+        assert slot.weights == {"curated": 1.0, "popular": 0.25}
+        assert all(isinstance(v, float) for v in slot.weights.values())
 
     def test_empty_means_unweighted(self):
-        assert validate_weights({}, ["curated"]) == {}
+        slot = _slot(weights={})
+        slot.full_clean(exclude=["surface"])
+        assert slot.weights == {}
 
     @pytest.mark.parametrize(
-        ("value", "message"),
+        "value",
         [
-            ([0.5], "must be a mapping"),
-            ({"popular": 0.5}, "not in the chain"),
-            ({"curated": True}, "must be a number"),
-            ({"curated": "0.5"}, "must be a number"),
-            ({"curated": 1.5}, "between 0 and 1"),
-            ({"curated": -0.1}, "between 0 and 1"),
+            [0.5],
+            {"curated": True},
+            {"curated": "0.5"},
+            {"curated": 1.5},
+            {"curated": -0.1},
+            {"telepathy": 0.5},
         ],
     )
-    def test_rejects(self, value, message):
-        with pytest.raises(ValidationError, match=message):
-            validate_weights(value, ["curated"])
+    def test_rejects(self, value):
+        assert "weights" in _errors(_slot(weights=value))
+
+    def test_a_weight_outside_the_chain_is_refused(self):
+        errors = _errors(_slot(weights={"popular": 0.5}))
+        assert set(errors) == {"weights"}
+        assert "popular" in errors["weights"][0]
 
 
-class TestSlotClean:
-    def test_collects_every_field_error_at_once(self):
-        slot = RecommendationSlot(
-            surface=Surface.PDP,
-            strategy_chain=["telepathy"],
-            weights={},
-            limit=2,
-            min_fill=3,
-        )
-        with pytest.raises(ValidationError) as excinfo:
-            slot.clean()
-        assert set(excinfo.value.message_dict) == {"strategy_chain", "min_fill"}
-
-    def test_weights_are_checked_against_the_cleaned_chain(self):
-        slot = RecommendationSlot(
-            surface=Surface.PDP,
-            strategy_chain=[StrategyCode.CURATED],
-            weights={"popular": 0.5},
-            limit=4,
-            min_fill=2,
-        )
-        with pytest.raises(ValidationError) as excinfo:
-            slot.clean()
-        assert set(excinfo.value.message_dict) == {"weights"}
-
-    def test_a_valid_slot_is_normalised_in_place(self):
-        slot = RecommendationSlot(
-            surface=Surface.PDP,
-            strategy_chain=[StrategyCode.CURATED],
-            weights={"curated": 1},
-            limit=4,
-            min_fill=2,
-        )
-        slot.clean()
-        assert slot.weights == {"curated": 1.0}
+def test_every_field_error_is_reported_at_once():
+    errors = _errors(_slot(strategy_chain=["telepathy"], limit=2, min_fill=3))
+    assert {"strategy_chain", "min_fill"} <= set(errors)

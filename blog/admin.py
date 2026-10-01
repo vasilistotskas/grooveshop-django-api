@@ -9,6 +9,7 @@ from django.utils.text import Truncator
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import TabularInline
 from unfold.contrib.filters.admin import (
+    AutocompleteSelectFilter,
     DropdownFilter,
     RangeDateTimeFilter,
     RangeNumericListFilter,
@@ -19,12 +20,13 @@ from unfold.decorators import action, display
 from unfold.enums import ActionVariant
 
 from admin.base import BaseTranslatableAdmin
-from admin.displays import header_two_line
+from admin.displays import change_link, header_two_line
 from admin.export import ExportActionMixin
+from admin.filters import AnnotatedRangeFilter, LikesCountFilter
 from blog.models.author import BlogAuthor
 from blog.models.category import BlogCategory
 from blog.models.comment import BlogComment
-from blog.models.post import BlogPost, BlogPostTranslation
+from blog.models.post import BlogPost
 from blog.models.tag import BlogTag
 
 # ── Local (single-app) variant maps ────────────────────────────────────
@@ -45,120 +47,27 @@ SEO_SCORE_VARIANT: dict[str, str] = {
 }
 
 
-class LikesCountFilter(RangeNumericListFilter):
-    title = _("Likes")
-    parameter_name = "likes_count"
-
-    def queryset(self, request, queryset):
-        # Short-circuit when the filter is unused. Django admin
-        # invokes every ``list_filter``'s ``queryset()`` on every
-        # page load — without this guard ``with_likes_count()``
-        # added a ``LEFT JOIN blog_blogpost_likes`` + GROUP BY to
-        # the main fetch, exploding the BlogPost changelist from
-        # ~80 to >1000 queries.
-        value_from = self.used_parameters.get(f"{self.parameter_name}_from")
-        value_to = self.used_parameters.get(f"{self.parameter_name}_to")
-        if not value_from and not value_to:
-            return queryset
-
-        queryset = queryset.with_likes_count()
-        filters = {}
-        if value_from:
-            filters["likes_count__gte"] = value_from
-        if value_to:
-            filters["likes_count__lte"] = value_to
-        return queryset.filter(**filters)
-
-    def expected_parameters(self):
-        return [
-            f"{self.parameter_name}_from",
-            f"{self.parameter_name}_to",
-        ]
-
-
-class CommentsCountFilter(RangeNumericListFilter):
+class CommentsCountFilter(AnnotatedRangeFilter):
     title = _("Comments")
     parameter_name = "comments_count"
 
-    def queryset(self, request, queryset):
-        # Short-circuit — same rationale as ``LikesCountFilter`` above.
-        value_from = self.used_parameters.get(f"{self.parameter_name}_from")
-        value_to = self.used_parameters.get(f"{self.parameter_name}_to")
-        if not value_from and not value_to:
-            return queryset
-
-        queryset = queryset.with_comments_count(approved_only=True)
-        filters = {}
-        if value_from:
-            filters["comments_count__gte"] = value_from
-        if value_to:
-            filters["comments_count__lte"] = value_to
-        return queryset.filter(**filters)
-
-    def expected_parameters(self):
-        return [
-            f"{self.parameter_name}_from",
-            f"{self.parameter_name}_to",
-        ]
+    def annotate(self, queryset):
+        return queryset.with_comments_count(approved_only=True)
 
 
-class TagsCountFilter(RangeNumericListFilter):
+class TagsCountFilter(AnnotatedRangeFilter):
     title = _("Tags")
     parameter_name = "tags_count"
 
-    def queryset(self, request, queryset):
-        # Short-circuit — same rationale as ``LikesCountFilter`` above.
-        value_from = self.used_parameters.get(f"{self.parameter_name}_from")
-        value_to = self.used_parameters.get(f"{self.parameter_name}_to")
-        if not value_from and not value_to:
-            return queryset
-
-        queryset = queryset.with_tags_count(active_only=True)
-        filters = {}
-        if value_from:
-            filters["tags_count__gte"] = value_from
-        if value_to:
-            filters["tags_count__lte"] = value_to
-        return queryset.filter(**filters)
-
-    def expected_parameters(self):
-        return [
-            f"{self.parameter_name}_from",
-            f"{self.parameter_name}_to",
-        ]
+    def annotate(self, queryset):
+        return queryset.with_tags_count(active_only=True)
 
 
 class PostsCountFilter(RangeNumericListFilter):
+    """Over ``posts_count``, which ``BlogTagAdmin`` always annotates."""
+
     title = _("Posts")
     parameter_name = "posts_count"
-
-    def queryset(self, request, queryset):
-        # Short-circuit — same rationale as ``LikesCountFilter`` above.
-        value_from = self.used_parameters.get(f"{self.parameter_name}_from")
-        value_to = self.used_parameters.get(f"{self.parameter_name}_to")
-        if not value_from and not value_to:
-            return queryset
-
-        if hasattr(queryset.model, "blog_posts"):
-            queryset = queryset.annotate(
-                posts_count_annotation=Count("blog_posts", distinct=True)
-            )
-        else:
-            queryset = queryset.annotate(
-                posts_count_annotation=Count("posts", distinct=True)
-            )
-        filters = {}
-        if value_from:
-            filters["posts_count_annotation__gte"] = value_from
-        if value_to:
-            filters["posts_count_annotation__lte"] = value_to
-        return queryset.filter(**filters)
-
-    def expected_parameters(self):
-        return [
-            f"{self.parameter_name}_from",
-            f"{self.parameter_name}_to",
-        ]
 
 
 class PublishStatusFilter(DropdownFilter):
@@ -186,19 +95,11 @@ class PublishStatusFilter(DropdownFilter):
         return queryset
 
 
-class BlogPostTranslationInline(TabularInline):
-    model = BlogPostTranslation
-    extra = 0
-    fields = ("language_code", "title", "subtitle")
-    show_change_link = True
-
-    tab = True
-
-
 class BlogCommentInline(TabularInline):
     model = BlogComment
     extra = 0
     fields = ("user", "content_preview", "approved", "created_at")
+    autocomplete_fields = ("user",)
     readonly_fields = ("content_preview", "created_at")
     show_change_link = True
 
@@ -233,6 +134,7 @@ class BlogAuthorAdmin(BaseTranslatableAdmin):
         "translations__bio",
     )
     list_select_related = ["user"]
+    autocomplete_fields = ("user",)
     readonly_fields = ["id", "total_likes_received", "posts_count"]
 
     fieldsets = (
@@ -264,6 +166,7 @@ class BlogAuthorAdmin(BaseTranslatableAdmin):
             super()
             .get_queryset(request)
             .annotate(posts_count_ann=Count("blog_posts", distinct=True))
+            .with_engagement()
         )
 
     @display(description=_("User"), header=True, ordering="user__last_name")
@@ -279,9 +182,11 @@ class BlogAuthorAdmin(BaseTranslatableAdmin):
         bio = obj.safe_translation_getter("bio", any_language=True) or ""
         return Truncator(unescape(strip_tags(bio))).chars(50)
 
-    @admin.display(description=_("Posts"))
+    @admin.display(description=_("Posts"), ordering="posts_count_ann")
     def posts_count(self, obj):
-        return getattr(obj, "posts_count_ann", obj.blog_posts.count())
+        # Always annotated by ``get_queryset``; a ``getattr`` default
+        # would run its COUNT on every row even so.
+        return obj.posts_count_ann
 
     @admin.display(description=_("Website"))
     def website_link(self, obj):
@@ -301,7 +206,7 @@ class BlogTagAdmin(BaseTranslatableAdmin):
     list_display = (
         "name_display",
         "active",
-        "posts_count",
+        "posts_count_display",
         "sort_order",
     )
     list_filter = ("active", PostsCountFilter)
@@ -332,7 +237,7 @@ class BlogTagAdmin(BaseTranslatableAdmin):
         return (
             super()
             .get_queryset(request)
-            .annotate(posts_count_ann=Count("blog_posts", distinct=True))
+            .annotate(posts_count=Count("blog_posts", distinct=True))
         )
 
     @admin.display(description=_("Name"), ordering="translations__name")
@@ -341,9 +246,9 @@ class BlogTagAdmin(BaseTranslatableAdmin):
             "Unnamed Tag"
         )
 
-    @admin.display(description=_("Posts"))
-    def posts_count(self, obj):
-        return getattr(obj, "posts_count_ann", obj.blog_posts.count())
+    @admin.display(description=_("Posts"), ordering="posts_count")
+    def posts_count_display(self, obj):
+        return obj.posts_count
 
 
 @admin.register(BlogCategory)
@@ -499,7 +404,6 @@ class BlogPostAdmin(ExportActionMixin, BaseTranslatableAdmin):
         "unmark_as_featured",
         "publish_posts",
         "unpublish_posts",
-        "increment_view_count",
         "reset_view_count",
         "export_csv",
         "export_xml",
@@ -511,65 +415,58 @@ class BlogPostAdmin(ExportActionMixin, BaseTranslatableAdmin):
         (
             _("Content"),
             {
-                "fields": ("title", "subtitle", "body"),
-                "classes": ("wide",),
-            },
-        ),
-        (
-            _("Media"),
-            {
-                "fields": ("image",),
-                "classes": ("wide",),
-            },
-        ),
-        (
-            _("Organization"),
-            {
-                "fields": ("slug", "category", "tags"),
-                "classes": ("wide",),
+                "classes": ("tab",),
+                "fields": (
+                    "title",
+                    "subtitle",
+                    "body",
+                    "image",
+                ),
             },
         ),
         (
             _("Publishing"),
             {
+                "classes": ("tab",),
                 "fields": (
+                    "slug",
+                    "category",
+                    "tags",
                     "author",
                     "featured",
                     "is_published",
                     "published_at",
                 ),
-                "classes": ("wide",),
-            },
-        ),
-        (
-            _("Engagement"),
-            {
-                "fields": ("view_count", "engagement_display"),
-                "classes": ("collapse",),
             },
         ),
         (
             _("SEO"),
             {
+                "classes": ("tab",),
                 "fields": (
                     "seo_title",
                     "seo_description",
                     "seo_keywords",
                     "seo_score",
                 ),
-                "classes": ("collapse",),
             },
         ),
         (
-            _("System"),
+            _("Statistics"),
             {
-                "fields": ("id", "created_at", "updated_at"),
-                "classes": ("collapse",),
+                "classes": ("tab",),
+                "fields": (
+                    "view_count",
+                    "engagement_display",
+                    "id",
+                    "created_at",
+                    "updated_at",
+                ),
             },
         ),
     )
 
-    inlines = [BlogPostTranslationInline, BlogCommentInline]
+    inlines = [BlogCommentInline]
 
     def get_queryset(self, request):
         return (
@@ -647,7 +544,7 @@ class BlogPostAdmin(ExportActionMixin, BaseTranslatableAdmin):
         }
 
     @action(
-        description=str(_("Mark selected posts as featured")),
+        description=_("Mark selected posts as featured"),
         variant=ActionVariant.PRIMARY,
         icon="star",
     )
@@ -661,7 +558,7 @@ class BlogPostAdmin(ExportActionMixin, BaseTranslatableAdmin):
         )
 
     @action(
-        description=str(_("Remove featured mark from selected posts")),
+        description=_("Remove featured mark from selected posts"),
         variant=ActionVariant.WARNING,
         icon="star_border",
     )
@@ -675,7 +572,7 @@ class BlogPostAdmin(ExportActionMixin, BaseTranslatableAdmin):
         )
 
     @action(
-        description=str(_("Publish selected posts")),
+        description=_("Publish selected posts"),
         variant=ActionVariant.SUCCESS,
         icon="publish",
     )
@@ -691,7 +588,7 @@ class BlogPostAdmin(ExportActionMixin, BaseTranslatableAdmin):
         )
 
     @action(
-        description=str(_("Unpublish selected posts")),
+        description=_("Unpublish selected posts"),
         variant=ActionVariant.WARNING,
         icon="unpublished",
     )
@@ -705,23 +602,7 @@ class BlogPostAdmin(ExportActionMixin, BaseTranslatableAdmin):
         )
 
     @action(
-        description=str(_("Increment view count by 100")),
-        variant=ActionVariant.INFO,
-        icon="visibility",
-    )
-    def increment_view_count(self, request, queryset):
-        for post in queryset:
-            post.view_count += 100
-            post.save(update_fields=["view_count"])
-
-        self.message_user(
-            request,
-            _("View count increased by 100 for %(count)d posts.")
-            % {"count": queryset.count()},
-        )
-
-    @action(
-        description=str(_("Reset view count to zero")),
+        description=_("Reset view count to zero"),
         variant=ActionVariant.WARNING,
         icon="visibility_off",
     )
@@ -759,8 +640,8 @@ class BlogCommentAdmin(BaseTranslatableAdmin):
     list_filter = (
         "approved",
         ("created_at", RangeDateTimeFilter),
-        ("post", RelatedDropdownFilter),
-        ("user", RelatedDropdownFilter),
+        ("post", AutocompleteSelectFilter),
+        ("user", AutocompleteSelectFilter),
     )
     list_select_related = ["post", "user", "parent"]
     list_editable = ("approved",)
@@ -804,24 +685,18 @@ class BlogCommentAdmin(BaseTranslatableAdmin):
         ),
     )
 
+    autocomplete_fields = ("post", "user")
     readonly_fields = ["engagement_display"]
 
     def get_queryset(self, request):
-        # NOTE: I tried annotating ``likes_count`` and ``replies_count``
-        # to short-circuit the per-row property fallback (35 extra
-        # queries on a 30-comment page), but the resulting JOIN +
-        # GROUP BY on the main fetch was empirically more expensive
-        # than the 35 single-row COUNTs (~1ms each). Left here as a
-        # paper trail for the next person who's tempted. If we ever
-        # add a real ``BlogCommentQuerySet.with_likes_count()`` using
-        # ``Subquery`` (cheaper than JOIN explosion), wire it in here.
-        # The model properties already check ``__dict__`` first
-        # (see ``blog/models/comment.py``) so an annotation by name
-        # will short-circuit them.
+        """Engagement counts (``with_engagement``: one subquery each,
+        read by the model's ``likes_count``/``replies_count``)."""
         return (
             super()
             .get_queryset(request)
             .select_related("post", "user", "parent")
+            .prefetch_related("translations", "post__translations")
+            .with_engagement()
         )
 
     @admin.display(description=_("Content"))
@@ -845,15 +720,11 @@ class BlogCommentAdmin(BaseTranslatableAdmin):
     def post_link(self, obj):
         if not obj.post:
             return "—"
-        title = (
-            obj.post.safe_translation_getter("title", any_language=True)
-            or f"Post {obj.post.id}"
-        )
-        title_display = title[:30] + "..." if len(title) > 30 else title
-        return format_html(
-            '<a href="{url}">{title}</a>',
-            url=f"/admin/blog/blogpost/{obj.post.id}/change/",
-            title=title_display,
+        title = obj.post.safe_translation_getter(
+            "title", any_language=True
+        ) or _("Post %(id)s") % {"id": obj.post_id}
+        return change_link(
+            self.admin_site, BlogPost, obj.post_id, Truncator(title).chars(33)
         )
 
     @admin.display(description=_("Engagement"))
@@ -864,7 +735,7 @@ class BlogCommentAdmin(BaseTranslatableAdmin):
         }
 
     @action(
-        description=str(_("Approve selected comments")),
+        description=_("Approve selected comments"),
         variant=ActionVariant.SUCCESS,
         icon="check_circle",
     )
@@ -878,7 +749,7 @@ class BlogCommentAdmin(BaseTranslatableAdmin):
         )
 
     @action(
-        description=str(_("Unapprove selected comments")),
+        description=_("Unapprove selected comments"),
         variant=ActionVariant.WARNING,
         icon="cancel",
     )
@@ -892,7 +763,7 @@ class BlogCommentAdmin(BaseTranslatableAdmin):
         )
 
     @action(
-        description=str(_("Mark as spam and delete")),
+        description=_("Mark as spam and delete"),
         variant=ActionVariant.DANGER,
         icon="report",
     )

@@ -8,6 +8,8 @@ This module provides models for:
 
 from django.core.validators import MaxLengthValidator
 from django.db import models
+from django.utils.translation import gettext, ngettext
+from django.utils.translation import gettext_lazy as _
 
 from search.managers import SearchClickManager, SearchQueryManager
 
@@ -43,11 +45,13 @@ class SearchQuery(models.Model):
             "later click can be attributed to this query. Nullable because "
             "rows predating click tracking have none."
         ),
+        verbose_name=_("UUID"),
     )
     query = models.CharField(
         max_length=500,
         db_index=True,
         help_text="The search query text entered by the user",
+        verbose_name=_("Query"),
     )
     language_code = models.CharField(
         max_length=10,
@@ -56,23 +60,29 @@ class SearchQuery(models.Model):
         blank=True,
         default="",
         help_text="Language code for the search (e.g., 'en', 'el', 'de')",
+        verbose_name=_("Language Code"),
     )
     content_type = models.CharField(
         max_length=20,
         choices=CONTENT_TYPE_CHOICES,
         db_index=True,
         help_text="Type of content being searched",
+        verbose_name=_("Content Type"),
     )
     results_count = models.IntegerField(
-        db_index=True, help_text="Number of results returned"
+        db_index=True,
+        help_text="Number of results returned",
+        verbose_name=_("Results Count"),
     )
     estimated_total_hits = models.IntegerField(
-        help_text="Estimated total number of matching documents"
+        help_text="Estimated total number of matching documents",
+        verbose_name=_("Estimated Total Hits"),
     )
     processing_time_ms = models.IntegerField(
         null=True,
         blank=True,
         help_text="Time taken to process the search in milliseconds",
+        verbose_name=_("Processing Time (ms)"),
     )
 
     # User tracking (optional)
@@ -83,6 +93,7 @@ class SearchQuery(models.Model):
         blank=True,
         related_name="search_queries",
         help_text="User who performed the search (if authenticated)",
+        verbose_name=_("User"),
     )
     session_key = models.CharField(
         max_length=40,
@@ -90,9 +101,13 @@ class SearchQuery(models.Model):
         blank=True,
         default="",
         help_text="Session key for anonymous users",
+        verbose_name=_("Session Key"),
     )
     ip_address = models.GenericIPAddressField(
-        null=True, blank=True, help_text="IP address of the user"
+        null=True,
+        blank=True,
+        help_text="IP address of the user",
+        verbose_name=_("IP Address"),
     )
     user_agent = models.TextField(
         null=True,
@@ -100,12 +115,14 @@ class SearchQuery(models.Model):
         default="",
         help_text="User agent string from the request",
         validators=[MaxLengthValidator(512)],
+        verbose_name=_("User Agent"),
     )
 
     timestamp = models.DateTimeField(
         auto_now_add=True,
         db_index=True,
         help_text="When the search was performed",
+        verbose_name=_("Timestamp"),
     )
 
     class Meta:
@@ -124,9 +141,15 @@ class SearchQuery(models.Model):
         ]
 
     def __str__(self):
-        return (
-            f"{self.query} ({self.content_type}) - {self.results_count} results"
-        )
+        return ngettext(
+            "%(query)s (%(type)s) - %(count)s result",
+            "%(query)s (%(type)s) - %(count)s results",
+            self.results_count,
+        ) % {
+            "query": self.query,
+            "type": self.get_content_type_display(),
+            "count": self.results_count,
+        }
 
     def __repr__(self):
         return (
@@ -159,21 +182,28 @@ class SearchClick(models.Model):
         on_delete=models.CASCADE,
         related_name="clicks",
         help_text="The search query that led to this click",
+        verbose_name=_("Search Query"),
     )
     result_id = models.CharField(
         max_length=100,
         help_text="ID of the clicked result (Product or BlogPost ID)",
+        verbose_name=_("Result ID"),
     )
     result_type = models.CharField(
         max_length=20,
         choices=RESULT_TYPE_CHOICES,
         help_text="Type of result that was clicked",
+        verbose_name=_("Result Type"),
     )
     position = models.IntegerField(
-        help_text="Position of the result in search results (0-indexed)"
+        help_text="Position of the result in search results (0-indexed)",
+        verbose_name=_("Position"),
     )
     timestamp = models.DateTimeField(
-        auto_now_add=True, db_index=True, help_text="When the click occurred"
+        auto_now_add=True,
+        db_index=True,
+        help_text="When the click occurred",
+        verbose_name=_("Timestamp"),
     )
 
     class Meta:
@@ -189,9 +219,11 @@ class SearchClick(models.Model):
         ]
 
     def __str__(self):
-        return (
-            f"{self.result_type} {self.result_id} at position {self.position}"
-        )
+        return gettext("%(type)s %(id)s at position %(position)s") % {
+            "type": self.get_result_type_display(),
+            "id": self.result_id,
+            "position": self.position,
+        }
 
     def __repr__(self):
         return (

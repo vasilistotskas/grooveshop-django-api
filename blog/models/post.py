@@ -1,5 +1,6 @@
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
+from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from parler.fields import TranslationsForeignKey
@@ -35,22 +36,30 @@ class BlogPost(
         _("Image"), upload_to="uploads/blog/", blank=True, null=True
     )
     likes = models.ManyToManyField(
-        "user.UserAccount", related_name="liked_blog_posts", blank=True
+        "user.UserAccount",
+        related_name="liked_blog_posts",
+        blank=True,
+        verbose_name=_("Likes"),
     )
     category = models.ForeignKey(
         "blog.BlogCategory",
         related_name="blog_posts",
         on_delete=models.SET_NULL,
         null=True,
+        verbose_name=_("Category"),
     )
     tags = models.ManyToManyField(
-        "blog.BlogTag", related_name="blog_posts", blank=True
+        "blog.BlogTag",
+        related_name="blog_posts",
+        blank=True,
+        verbose_name=_("Tags"),
     )
     author = models.ForeignKey(
         "blog.BlogAuthor",
         related_name="blog_posts",
         on_delete=models.SET_NULL,
         null=True,
+        verbose_name=_("Author"),
     )
     featured = models.BooleanField(_("Featured"), default=False)
     view_count = models.PositiveBigIntegerField(_("View Count"), default=0)
@@ -85,12 +94,16 @@ class BlogPost(
         ]
 
     def __str__(self):
-        title = (
-            self.safe_translation_getter("title", any_language=True)
-            or "Untitled"
+        title = self.safe_translation_getter(
+            "title", any_language=True
+        ) or gettext("Untitled")
+        author_name = (
+            self.author.user.email if self.author else gettext("Unknown")
         )
-        author_name = self.author.user.email if self.author else "Unknown"
-        return f"{title} by {author_name}"
+        return gettext("%(title)s by %(author)s") % {
+            "title": title,
+            "author": author_name,
+        }
 
     def save(self, *args, **kwargs):
         if not self.slug:
@@ -348,5 +361,5 @@ class BlogPostTranslation(
             return False
 
     def __str__(self):
-        title = self.title or "Untitled"
+        title = self.title or gettext("Untitled")
         return f"{title} ({self.language_code})"

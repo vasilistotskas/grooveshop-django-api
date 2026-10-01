@@ -5,6 +5,7 @@ from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import ngettext
 from django_stubs_ext.db.models import TypedModelMeta
 from djmoney.money import Money
 
@@ -21,6 +22,7 @@ class Cart(TimeStampMixinModel, UUIDModel):
         blank=True,
         default=None,
         on_delete=models.CASCADE,
+        verbose_name=_("User"),
     )
     last_activity = models.DateTimeField(_("Last Activity"), auto_now=True)
 
@@ -40,10 +42,18 @@ class Cart(TimeStampMixinModel, UUIDModel):
         ]
 
     def __str__(self):
+        count = self.total_items
         if self.user:
-            return f"Cart for {self.user} - Items: {self.total_items} - Total: {self.total_price}"
-        else:
-            return f"Guest Cart {self.id} - Items: {self.total_items} - Total: {self.total_price}"
+            return ngettext(
+                "Cart for %(user)s - %(count)s item - Total: %(total)s",
+                "Cart for %(user)s - %(count)s items - Total: %(total)s",
+                count,
+            ) % {"user": self.user, "count": count, "total": self.total_price}
+        return ngettext(
+            "Guest cart %(id)s - %(count)s item - Total: %(total)s",
+            "Guest cart %(id)s - %(count)s items - Total: %(total)s",
+            count,
+        ) % {"id": self.id, "count": count, "total": self.total_price}
 
     def refresh_last_activity(self):
         # Use UPDATE to touch only last_activity — avoids triggering

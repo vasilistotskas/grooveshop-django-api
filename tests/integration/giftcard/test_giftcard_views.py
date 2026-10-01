@@ -194,7 +194,7 @@ class TestPurchaseRefusals:
             )
 
         assert response.status_code == 400
-        assert response.data == {
+        assert response.json() == {
             "detail": "Gift cards are not available.",
             "reason": "gift_card_invalid",
         }
@@ -207,7 +207,7 @@ class TestPurchaseRefusals:
             )
 
         assert response.status_code == 400
-        assert response.data == {
+        assert response.json() == {
             "detail": "Buyer email is required.",
             "reason": "gift_card_buyer_email_required",
         }
@@ -223,7 +223,7 @@ class TestPurchaseRefusals:
             )
 
         assert response.status_code == 400
-        assert response.data == {
+        assert response.json() == {
             "detail": "Gift card amount must be between 10 and 500 EUR.",
             "reason": "gift_card_invalid_amount",
         }
@@ -247,7 +247,7 @@ class TestPurchaseRefusals:
             )
 
         assert response.status_code == 400
-        assert response.data == {
+        assert response.json() == {
             "detail": "Gift card purchase is not available for this store.",
             "reason": "gift_card_purchase_unavailable",
         }
@@ -291,7 +291,7 @@ class TestPurchaseRefusals:
             )
 
         assert response.status_code == 400
-        assert response.data == {
+        assert response.json() == {
             "detail": "Failed to start the payment.",
             "reason": "gift_card_payment_failed",
         }
@@ -428,7 +428,7 @@ class TestPurchaseStatus:
             response = _client().get(STATUS_URL)
 
         assert response.status_code == 400
-        assert response.data == {"detail": "Missing uuid."}
+        assert response.json() == {"detail": "Missing uuid."}
 
     @pytest.mark.parametrize(
         "value", ["not-a-uuid", str(uuid.UUID(int=0))], ids=["bad", "unknown"]
@@ -440,7 +440,7 @@ class TestPurchaseStatus:
             response = _client().get(STATUS_URL, {"uuid": value})
 
         assert response.status_code == 404
-        assert response.data == {"detail": "Purchase not found."}
+        assert response.json() == {"detail": "Purchase not found."}
 
 
 class TestMine:

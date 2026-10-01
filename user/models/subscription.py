@@ -5,6 +5,7 @@ from django.db import models
 from django.db.models.functions import Lower
 from django.utils import timezone
 from django.utils.crypto import constant_time_compare, get_random_string
+from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from parler.models import TranslatableModel, TranslatedFields
@@ -138,10 +139,9 @@ class SubscriptionTopic(TranslatableModel, TimeStampMixinModel, UUIDModel):
         ]
 
     def __str__(self):
-        name = (
-            self.safe_translation_getter("name", any_language=True)
-            or "Unnamed Topic"
-        )
+        name = self.safe_translation_getter(
+            "name", any_language=True
+        ) or gettext("Unnamed topic")
         return f"{name} ({self.category})"
 
 

@@ -1,6 +1,12 @@
 from __future__ import annotations
 
+from django import forms
 from django.contrib.admin.forms import AdminAuthenticationForm
+from django.utils.translation import gettext_lazy as _
+from unfold.widgets import (
+    UnfoldAdminCheckboxSelectMultipleWidget,
+    UnfoldBooleanSwitchWidget,
+)
 
 from tenant.auth_backends import (
     PLATFORM_STAFF_BACKEND_PATH,
@@ -41,3 +47,25 @@ class PlatformAdminAuthenticationForm(AdminAuthenticationForm):
             self.confirm_login_allowed(self.user_cache)
 
         return self.cleaned_data
+
+
+class CachePurgeForm(forms.Form):
+    """The cache management page: which surfaces to purge, and whether
+    their related surfaces go too. Rendered through Unfold's widgets,
+    and validated, so an unknown surface code is refused here."""
+
+    surfaces = forms.MultipleChoiceField(
+        required=False, widget=UnfoldAdminCheckboxSelectMultipleWidget
+    )
+    include_related = forms.BooleanField(
+        label=_("Include related surfaces"),
+        required=False,
+        initial=True,
+        widget=UnfoldBooleanSwitchWidget,
+    )
+
+    def __init__(self, *args, surfaces, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.fields["surfaces"].choices = [
+            (surface.code, surface.label) for surface in surfaces
+        ]

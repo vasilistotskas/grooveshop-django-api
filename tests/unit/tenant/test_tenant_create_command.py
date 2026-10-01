@@ -29,7 +29,7 @@ from tenant.models import (
 )
 from tests.utils.staff import store_tenant
 
-pytestmark = pytest.mark.django_db
+pytestmark = [pytest.mark.django_db, pytest.mark.assert_english]
 
 
 @pytest.mark.parametrize("reserved", ["public", "global", "information_schema"])

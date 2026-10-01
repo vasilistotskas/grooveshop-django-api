@@ -28,6 +28,7 @@ from django_tenants.utils import get_public_schema_name
 
 from admin.mixins import STORE_SELF_SERVICE_APP_LABELS
 from tenant.app_labels import shared_only_app_labels, tenant_only_app_labels
+from tenant.role_scopes import REFERENCE_DATA_APP_LABELS
 
 
 class _Schema:
@@ -110,7 +111,8 @@ class TestEveryPlatformModelIsWithheld(TestCase):
         missed = [
             model._meta.label
             for model, admin in _withheld_models()
-            if admin.has_view_permission(request)
+            if model._meta.app_label not in REFERENCE_DATA_APP_LABELS
+            and admin.has_view_permission(request)
         ]
         assert not missed, (
             f"{missed} are hidden from the sidebar but still render when "
@@ -161,3 +163,47 @@ class TestMerchantSelfServiceSurvives(TestCase):
         from tenant.models import Tenant
 
         assert Tenant not in {model for model, _ in _withheld_models()}
+
+
+class TestReferenceDataIsReadOnlyOnAStore(TestCase):
+    """Countries and regions are platform data a store's forms pick
+    from: readable (the autocomplete endpoint checks the target admin's
+    view permission; it answered 403 on every store host), hidden from
+    the store sidebar, never editable there."""
+
+    def _admins(self):
+        return [
+            admin
+            for model, admin in django_admin.site._registry.items()
+            if model._meta.app_label in REFERENCE_DATA_APP_LABELS
+        ]
+
+    def test_readable_but_not_listed_or_editable(self):
+        from user.models import UserAccount
+
+        request = _request("webside")
+        request.user = UserAccount(
+            email="ref@example.com", is_staff=True, is_superuser=True
+        )
+        admins = self._admins()
+        assert admins
+        for admin in admins:
+            assert admin.has_view_permission(request)
+            assert not admin.has_module_permission(request)
+            assert not admin.has_add_permission(request)
+            assert not admin.has_change_permission(request)
+            assert not admin.has_delete_permission(request)
+
+    def test_every_store_role_may_view_it(self):
+        from tenant.auth_backends import _permissions_for_role
+        from tenant.models import TenantMembershipRole
+
+        for role in (
+            TenantMembershipRole.STAFF,
+            TenantMembershipRole.ADMIN,
+            TenantMembershipRole.OWNER,
+        ):
+            perms = _permissions_for_role(role)
+            assert "country.view_country" in perms
+            assert "region.view_region" in perms
+            assert "country.change_country" not in perms

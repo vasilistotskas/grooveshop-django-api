@@ -11,8 +11,6 @@ from unfold.contrib.filters.admin import (
     AutocompleteSelectFilter,
     DropdownFilter,
     RangeDateTimeFilter,
-    RangeNumericListFilter,
-    RelatedDropdownFilter,
     SliderNumericFilter,
 )
 from unfold.decorators import action, display
@@ -20,6 +18,7 @@ from unfold.enums import ActionVariant
 
 from admin.base import BaseModelAdmin
 from admin.displays import format_dt, header_two_line, money
+from admin.filters import AnnotatedRangeFilter
 from cart.models import Cart, CartItem
 
 CART_TYPE_VARIANT: dict[str, str] = {
@@ -57,36 +56,14 @@ class CartTypeFilter(DropdownFilter):
         return queryset
 
 
-class TotalItemsFilter(RangeNumericListFilter):
+class TotalItemsFilter(AnnotatedRangeFilter):
     title = _("Total Items")
-    parameter_name = "total_items"
+    parameter_name = "items_quantity_total"
 
-    def queryset(self, request, queryset):
-        filters = {}
-
-        value_from = self.used_parameters.get(f"{self.parameter_name}_from")
-        if value_from and value_from != "":
-            filters["items_quantity_total__gte"] = value_from
-
-        value_to = self.used_parameters.get(f"{self.parameter_name}_to")
-        if value_to and value_to != "":
-            filters["items_quantity_total__lte"] = value_to
-
-        if not filters:
-            return queryset
-        # `Sum` is an aggregate, not a lookup: the previous
-        # `items__quantity__sum__gte` raised `FieldError` and 500'd the
-        # changelist the moment anyone touched this filter. Annotate
-        # first, exactly as `CartFilter.filter_min_items` does.
+    def annotate(self, queryset):
         return queryset.annotate(
             items_quantity_total=Coalesce(Sum("items__quantity"), 0)
-        ).filter(**filters)
-
-    def expected_parameters(self):
-        return [
-            f"{self.parameter_name}_from",
-            f"{self.parameter_name}_to",
-        ]
+        )
 
 
 class ActivityStatusFilter(DropdownFilter):
@@ -183,7 +160,7 @@ class CartAdmin(BaseModelAdmin):
         ActivityStatusFilter,
         ("last_activity", RangeDateTimeFilter),
         ("created_at", RangeDateTimeFilter),
-        ("user", RelatedDropdownFilter),
+        ("user", AutocompleteSelectFilter),
         TotalItemsFilter,
     )
     search_fields = (
@@ -194,7 +171,7 @@ class CartAdmin(BaseModelAdmin):
         "user__last_name",
     )
     date_hierarchy = "last_activity"
-    raw_id_fields = ["user"]
+    autocomplete_fields = ("user",)
     list_select_related = ["user"]
     readonly_fields = [
         "id",
@@ -249,7 +226,9 @@ class CartAdmin(BaseModelAdmin):
             return header_two_line(
                 obj.user.full_name or obj.user.username, obj.user.email
             )
-        return header_two_line(str(_("Guest")), f"Cart #{obj.id}")
+        return header_two_line(
+            str(_("Guest")), _("Cart #%(id)s") % {"id": obj.id}
+        )
 
     @display(description=_("Type"), label=CART_TYPE_VARIANT)
     def cart_type(self, obj):
@@ -357,6 +336,7 @@ class CartItemAdmin(BaseModelAdmin):
         "product__translations__name",
     )
     list_select_related = ["cart", "cart__user", "product"]
+    autocomplete_fields = ("cart", "product")
     readonly_fields = [
         "id",
         "created_at",
@@ -419,7 +399,10 @@ class CartItemAdmin(BaseModelAdmin):
             if not obj.cart.user
             else obj.cart.user.full_name or obj.cart.user.username
         )
-        return f"Cart #{obj.cart.id} — {owner}"
+        return _("Cart #%(id)s — %(owner)s") % {
+            "id": obj.cart.id,
+            "owner": owner,
+        }
 
     @admin.display(description=_("Product"))
     def product_display(self, obj):
@@ -483,7 +466,7 @@ class CartItemAdmin(BaseModelAdmin):
         return _("No discounts applied")
 
     @action(
-        description=str(_("Increase quantity by 1")),
+        description=_("Increase quantity by 1"),
         variant=ActionVariant.PRIMARY,
         icon="add",
     )
@@ -497,7 +480,7 @@ class CartItemAdmin(BaseModelAdmin):
         )
 
     @action(
-        description=str(_("Decrease quantity by 1")),
+        description=_("Decrease quantity by 1"),
         variant=ActionVariant.WARNING,
         icon="remove",
     )
@@ -514,7 +497,7 @@ class CartItemAdmin(BaseModelAdmin):
         )
 
     @action(
-        description=str(_("Remove from cart")),
+        description=_("Remove from cart"),
         variant=ActionVariant.DANGER,
         icon="delete",
     )

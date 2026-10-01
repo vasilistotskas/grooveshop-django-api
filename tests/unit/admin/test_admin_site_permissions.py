@@ -180,8 +180,10 @@ class TestAdminSiteBranding:
         assert context["site_header"] == "Adminsite Store"
         assert "Adminsite Store" in str(context["site_title"])
 
-    def test_public_schema_keeps_platform_branding(self, db, monkeypatch):
+    def test_no_bound_store_keeps_the_deployment_identity(
+        self, db, monkeypatch, settings
+    ):
         monkeypatch.setattr(connection, "tenant", None, raising=False)
         superuser = UserAccountFactory(is_staff=True, is_superuser=True)
         context = admin_site.each_context(_request_for(superuser))
-        assert context["site_header"] == admin_site.site_header
+        assert context["site_header"] == settings.UNFOLD["SITE_HEADER"]

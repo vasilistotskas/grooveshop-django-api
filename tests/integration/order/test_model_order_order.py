@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+import pytest
 from django.conf import settings
 from django.test import TestCase
 from djmoney.money import Money
@@ -7,6 +8,8 @@ from djmoney.money import Money
 from order.enum.status import OrderStatus
 from order.factories.order import OrderFactory
 from product.factories.product import ProductFactory
+
+pytestmark = pytest.mark.assert_english
 
 
 class OrderModelTestCase(TestCase):

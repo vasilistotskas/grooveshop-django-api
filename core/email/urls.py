@@ -13,12 +13,7 @@ these views query ``Order``, which lives in TENANT_APPS.
 from django.contrib import admin
 from django.urls import path
 
-from .admin_views import (
-    EmailTemplateManagementView,
-    get_order_data,
-    get_template_info,
-    preview_template_ajax,
-)
+from .admin_views import EmailTemplateManagementView, preview_template
 
 app_name = "email_templates"
 
@@ -30,17 +25,7 @@ urlpatterns = [
     ),
     path(
         "preview/",
-        admin.site.admin_view(preview_template_ajax),
+        admin.site.admin_view(preview_template),
         name="preview",
-    ),
-    path(
-        "template/<str:template_name>/",
-        admin.site.admin_view(get_template_info),
-        name="template_info",
-    ),
-    path(
-        "order/<int:order_id>/",
-        admin.site.admin_view(get_order_data),
-        name="order_data",
     ),
 ]

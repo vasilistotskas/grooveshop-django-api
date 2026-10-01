@@ -134,25 +134,33 @@ class TestPanelScoping:
 
 
 class TestDisplayNeverResolvesTheForeignKey:
-    def test_the_template_renders_actor_email_not_the_actor(self):
-        from pathlib import Path
+    def test_the_page_shows_actor_email_not_the_actor(self):
+        """Rendering the FK resolves it against the READING schema, which
+        is how a customer came to be credited with an operator's purge."""
+        from types import SimpleNamespace
+        from unittest.mock import MagicMock
 
-        from django.conf import settings
+        from django.utils import timezone
 
-        template = (
-            Path(settings.BASE_DIR)
-            / "core"
-            / "templates"
-            / "admin"
-            / "clear_cache.html"
+        from admin.admin import _purge_log_table
+
+        actor = MagicMock()
+        actor.__str__.return_value = "resolved-from-the-fk"
+        log = SimpleNamespace(
+            created_at=timezone.now(),
+            actor=actor,
+            actor_email="operator@example.com",
+            surfaces=["pay_way"],
+            total_django=1,
+            total_nuxt=0,
+            total_blocked=0,
+            dry_run=False,
         )
-        body = template.read_text(encoding="utf-8")
 
-        assert "log.actor_email" in body
-        assert "{{ log.actor|" not in body, (
-            "rendering the FK resolves it against the READING schema, which is "
-            "how a customer came to be credited with an operator's purge"
-        )
+        row = _purge_log_table([log])["rows"][0]
+
+        assert "operator@example.com" in row
+        assert not any("resolved-from-the-fk" in str(cell) for cell in row)
 
     def test_the_changelist_lists_the_stored_address(self):
         from core.admin import CachePurgeLogAdmin

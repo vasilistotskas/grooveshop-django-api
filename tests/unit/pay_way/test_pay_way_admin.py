@@ -7,11 +7,9 @@ from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import RequestFactory, TestCase
 from django.utils.translation import gettext
+from unfold.contrib.filters.admin import RangeNumericFilter
 
 from pay_way.admin import (
-    ConfigurationStatusFilter,
-    CostRangeFilter,
-    FreeThresholdFilter,
     PaymentTypeFilter,
     PayWayAdmin,
 )
@@ -23,126 +21,48 @@ pytestmark = pytest.mark.assert_english
 User = get_user_model()
 
 
-class CostRangeFilterTestCase(TestCase):
+class MoneyRangeFiltersTestCase(TestCase):
+    """``cost`` and ``free_threshold`` filter through Unfold's field range
+    filter (``?cost_from=``/``?cost_to=``), not hand-written subclasses."""
+
     def setUp(self):
-        # Counts or orders every pay-way, so start without the rows
+        # Counts every pay-way, so start without the rows
         # ``pay_way/migrations/0019_seed_default_pay_ways`` seeds.
         PayWay.objects.all().delete()
-
-        self.factory = RequestFactory()
-        self.request = self.factory.get("/admin/pay_way/payway/")
-        self.model_admin = Mock()
-
-        self.free_payment = PayWay.objects.create(cost=Decimal("0.00"))
-        self.free_payment.set_current_language("en")
-        self.free_payment.name = "Free Payment"
-        self.free_payment.save()
-
-        self.low_cost_payment = PayWay.objects.create(cost=Decimal("2.50"))
-        self.low_cost_payment.set_current_language("en")
-        self.low_cost_payment.name = "Low Cost Payment"
-        self.low_cost_payment.save()
-
-        self.high_cost_payment = PayWay.objects.create(cost=Decimal("10.00"))
-        self.high_cost_payment.set_current_language("en")
-        self.high_cost_payment.name = "High Cost Payment"
-        self.high_cost_payment.save()
-
-    def test_filter_title(self):
-        filter_instance = CostRangeFilter(
-            self.request, {}, PayWay, self.model_admin
+        self.request = RequestFactory().get("/admin/pay_way/payway/")
+        self.free = PayWay.objects.create(
+            cost=Decimal("0.00"), free_threshold=Decimal("0.00")
         )
-        self.assertEqual(str(filter_instance.title), gettext("Cost Range"))
-
-    def test_filter_parameter_name(self):
-        filter_instance = CostRangeFilter(
-            self.request, {}, PayWay, self.model_admin
+        self.low = PayWay.objects.create(
+            cost=Decimal("2.50"), free_threshold=Decimal("50.00")
         )
-        self.assertEqual(filter_instance.parameter_name, "cost_range")
-
-    def test_queryset_with_from_value(self):
-        filter_instance = CostRangeFilter(
-            self.request, {"cost_range_from": "2.00"}, PayWay, self.model_admin
+        self.high = PayWay.objects.create(
+            cost=Decimal("10.00"), free_threshold=Decimal("100.00")
         )
-        queryset = filter_instance.queryset(self.request, PayWay.objects.all())
 
-        self.assertIn(self.low_cost_payment, queryset)
-        self.assertIn(self.high_cost_payment, queryset)
-        self.assertNotIn(self.free_payment, queryset)
-
-    def test_queryset_with_to_value(self):
-        filter_instance = CostRangeFilter(
-            self.request, {"cost_range_to": "5.00"}, PayWay, self.model_admin
-        )
-        queryset = filter_instance.queryset(self.request, PayWay.objects.all())
-
-        self.assertIn(self.free_payment, queryset)
-        self.assertIn(self.low_cost_payment, queryset)
-        self.assertNotIn(self.high_cost_payment, queryset)
-
-    def test_queryset_with_range(self):
-        filter_instance = CostRangeFilter(
+    def _filtered(self, field: str, params: dict) -> list:
+        range_filter = RangeNumericFilter(
+            PayWay._meta.get_field(field),
             self.request,
-            {"cost_range_from": "2.00", "cost_range_to": "5.00"},
+            dict(params),
             PayWay,
-            self.model_admin,
+            Mock(),
+            field,
         )
-        queryset = filter_instance.queryset(self.request, PayWay.objects.all())
+        return list(range_filter.queryset(self.request, PayWay.objects.all()))
 
-        self.assertNotIn(self.free_payment, queryset)
-        self.assertIn(self.low_cost_payment, queryset)
-        self.assertNotIn(self.high_cost_payment, queryset)
+    def test_cost_range(self):
+        rows = self._filtered("cost", {"cost_from": "2.00", "cost_to": "5.00"})
+        self.assertEqual(rows, [self.low])
 
-    def test_queryset_no_filter(self):
-        filter_instance = CostRangeFilter(
-            self.request, {}, PayWay, self.model_admin
-        )
-        queryset = filter_instance.queryset(self.request, PayWay.objects.all())
+    def test_free_threshold_from(self):
+        rows = self._filtered("free_threshold", {"free_threshold_from": "75"})
+        self.assertEqual(rows, [self.high])
 
-        self.assertEqual(queryset.count(), 3)
-
-
-class FreeThresholdFilterTestCase(TestCase):
-    def setUp(self):
-        self.factory = RequestFactory()
-        self.request = self.factory.get("/admin/pay_way/payway/")
-        self.model_admin = Mock()
-
-        self.no_threshold = PayWay.objects.create(
-            free_threshold=Decimal("0.00")
-        )
-        self.low_threshold = PayWay.objects.create(
-            free_threshold=Decimal("50.00")
-        )
-        self.high_threshold = PayWay.objects.create(
-            free_threshold=Decimal("100.00")
-        )
-
-    def test_filter_title(self):
-        filter_instance = FreeThresholdFilter(
-            self.request, {}, PayWay, self.model_admin
-        )
-        self.assertEqual(
-            str(filter_instance.title), gettext("Free Threshold Range")
-        )
-
-    def test_filter_parameter_name(self):
-        filter_instance = FreeThresholdFilter(
-            self.request, {}, PayWay, self.model_admin
-        )
-        self.assertEqual(filter_instance.parameter_name, "free_threshold_range")
-
-    def test_queryset_filtering(self):
-        filter_instance = FreeThresholdFilter(
-            self.request,
-            {"free_threshold_range_from": "75.00"},
-            PayWay,
-            self.model_admin,
-        )
-        queryset = filter_instance.queryset(self.request, PayWay.objects.all())
-
-        self.assertIn(self.high_threshold, queryset)
-        self.assertNotIn(self.low_threshold, queryset)
+    def test_the_admin_wires_both(self):
+        list_filter = PayWayAdmin(PayWay, AdminSite()).list_filter
+        self.assertIn(("cost", RangeNumericFilter), list_filter)
+        self.assertIn(("free_threshold", RangeNumericFilter), list_filter)
 
 
 class PaymentTypeFilterTestCase(TestCase):
@@ -227,91 +147,6 @@ class PaymentTypeFilterTestCase(TestCase):
         )
 
 
-class ConfigurationStatusFilterTestCase(TestCase):
-    def setUp(self):
-        # Counts or orders every pay-way, so start without the rows
-        # ``pay_way/migrations/0019_seed_default_pay_ways`` seeds.
-        PayWay.objects.all().delete()
-
-        self.factory = RequestFactory()
-        self.request = self.factory.get("/admin/pay_way/payway/")
-        self.model_admin = Mock()
-
-        self.configured_payment = PayWay.objects.create(
-            settlement=PaySettlement.ONLINE,
-            configuration={"api_key": "test_key", "merchant_id": "123"},
-        )
-        self.not_configured_payment = PayWay.objects.create(
-            settlement=PaySettlement.ONLINE, configuration={}
-        )
-        self.no_config_needed = PayWay.objects.create(
-            settlement=PaySettlement.COURIER_CASH, configuration=None
-        )
-        self.online_null_config = PayWay.objects.create(
-            settlement=PaySettlement.ONLINE, configuration=None
-        )
-        # Configuration on a method that collects without a PSP is
-        # irrelevant: it never counts as "configured".
-        self.offline_with_config = PayWay.objects.create(
-            settlement=PaySettlement.OFFLINE_TRANSFER,
-            configuration={"iban": "GR00"},
-        )
-
-    def _filtered_ids(self, value):
-        # Django hands a list filter the query string's value LIST and
-        # keeps its last item; a bare string would be read as its last
-        # character and silently match no lookup.
-        filter_instance = ConfigurationStatusFilter(
-            self.request,
-            {"configuration_status": [value]},
-            PayWay,
-            self.model_admin,
-        )
-        queryset = filter_instance.queryset(self.request, PayWay.objects.all())
-        return set(queryset.values_list("id", flat=True))
-
-    def test_filter_title(self):
-        filter_instance = ConfigurationStatusFilter(
-            self.request, {}, PayWay, self.model_admin
-        )
-        self.assertEqual(
-            str(filter_instance.title), gettext("Configuration Status")
-        )
-
-    def test_filter_parameter_name(self):
-        filter_instance = ConfigurationStatusFilter(
-            self.request, {}, PayWay, self.model_admin
-        )
-        self.assertEqual(filter_instance.parameter_name, "configuration_status")
-
-    def test_lookups(self):
-        filter_instance = ConfigurationStatusFilter(
-            self.request, {}, PayWay, self.model_admin
-        )
-        lookups = filter_instance.lookups(self.request, self.model_admin)
-
-        expected_keys = ["configured", "not_configured", "no_config_needed"]
-        actual_keys = [lookup[0] for lookup in lookups]
-        self.assertEqual(actual_keys, expected_keys)
-
-    def test_configured_is_online_with_a_non_empty_configuration(self):
-        self.assertEqual(
-            self._filtered_ids("configured"), {self.configured_payment.id}
-        )
-
-    def test_not_configured_is_online_with_null_or_empty_configuration(self):
-        self.assertEqual(
-            self._filtered_ids("not_configured"),
-            {self.not_configured_payment.id, self.online_null_config.id},
-        )
-
-    def test_no_config_needed_is_every_non_online_settlement(self):
-        self.assertEqual(
-            self._filtered_ids("no_config_needed"),
-            {self.no_config_needed.id, self.offline_with_config.id},
-        )
-
-
 class PayWayAdminTestCase(TestCase):
     def setUp(self):
         # Counts or orders every pay-way, so start without the rows
@@ -335,7 +170,6 @@ class PayWayAdminTestCase(TestCase):
             active=True,
             sort_order=1,
             provider_code="PAYPAL",
-            configuration={"api_key": "test_key"},
         )
         self.payway.set_current_language("en")
         self.payway.name = "PayPal Payment"
@@ -360,7 +194,6 @@ class PayWayAdminTestCase(TestCase):
             "payment_type_display",
             "cost_display",
             "free_threshold_display",
-            "icon_preview",
             "sort_order_display",
         )
         self.assertEqual(self.admin.list_display, expected_fields)
@@ -368,9 +201,7 @@ class PayWayAdminTestCase(TestCase):
     def test_list_filter(self):
         self.assertIn("active", self.admin.list_filter)
         self.assertIn(PaymentTypeFilter, self.admin.list_filter)
-        self.assertIn(ConfigurationStatusFilter, self.admin.list_filter)
-        self.assertIn(CostRangeFilter, self.admin.list_filter)
-        self.assertIn(FreeThresholdFilter, self.admin.list_filter)
+        self.assertIn(("cost", RangeNumericFilter), self.admin.list_filter)
 
     def test_search_fields(self):
         expected_fields = [
@@ -382,19 +213,13 @@ class PayWayAdminTestCase(TestCase):
         self.assertEqual(self.admin.search_fields, expected_fields)
 
     def test_readonly_fields(self):
-        # `configuration` is in the base readonly_fields because it holds
-        # payment-provider secrets; get_readonly_fields() removes it for
-        # superusers (see test_get_readonly_fields_*).
-        # `sort_order` is no longer in readonly_fields; it is editable via
+        # `sort_order` is not in readonly_fields; it is editable via
         # drag-and-drop (ordering_field = "sort_order").
         expected_fields = [
             "id",
             "created_at",
             "updated_at",
-            "configuration",
-            "configuration_preview",
             "effective_cost_display",
-            "is_configured_status",
         ]
         self.assertEqual(self.admin.readonly_fields, expected_fields)
 
@@ -405,16 +230,13 @@ class PayWayAdminTestCase(TestCase):
         expected_actions = [
             "activate_payment_methods",
             "deactivate_payment_methods",
-            "move_up_in_order",
-            "move_down_in_order",
-            "reset_sort_order",
         ]
         self.assertEqual(self.admin.actions, expected_actions)
 
     def test_name_display(self):
         result = self.admin.name_display(self.payway)
 
-        self.assertEqual(result, "PayPal Payment")
+        self.assertEqual(result[0], "PayPal Payment")
 
     def test_provider_code_display(self):
         result = self.admin.provider_code_display(self.payway)
@@ -471,47 +293,18 @@ class PayWayAdminTestCase(TestCase):
 
         self.assertIn("#0", result)
 
-    def test_icon_preview(self):
-        result = self.admin.icon_preview(self.payway)
-        self.assertEqual(result, "No icon")
+    def test_name_display_without_icon_has_no_image(self):
+        self.assertEqual(len(self.admin.name_display(self.payway)), 3)
 
-    def test_icon_preview_with_icon(self):
+    def test_name_display_shows_the_icon_uncropped(self):
         self.payway.icon = SimpleUploadedFile(
             "icon.png", b"fake_image_data", content_type="image/png"
         )
         self.payway.save()
 
-        result = self.admin.icon_preview(self.payway)
-        self.assertIn("<img", result)
-        self.assertIn("src=", result)
-
-    def test_configuration_preview(self):
-        result = self.admin.configuration_preview(self.payway)
-
-        self.assertIn("api_key", result)
-        self.assertIn("Configuration keys:", result)
-
-    def test_configuration_preview_empty(self):
-        self.payway.configuration = {}
-        result = self.admin.configuration_preview(self.payway)
-
-        self.assertEqual(result, "No configuration")
-
-    def test_configuration_preview_truncates_after_three_keys(self):
-        self.payway.configuration = {
-            "api_key": "k",
-            "merchant_id": "m",
-            "source_code": "s",
-            "webhook_key": "w",
-            "client_secret": "c",
-        }
-        result = self.admin.configuration_preview(self.payway)
-
-        self.assertEqual(
-            result,
-            "Configuration keys: api_key, merchant_id, source_code, "
-            "... and 2 more",
-        )
+        image = self.admin.name_display(self.payway)[3]
+        self.assertEqual(image["path"], self.payway.icon.url)
+        self.assertTrue(image["as_background"])
 
     def test_sort_order_display_without_a_position(self):
         self.payway.sort_order = None
@@ -522,17 +315,6 @@ class PayWayAdminTestCase(TestCase):
         result = self.admin.effective_cost_display(self.payway)
 
         self.assertIn("EUR", result)
-
-    def test_is_configured_status(self):
-        result = self.admin.is_configured_status(self.payway)
-
-        self.assertEqual(result, "Ready to use")
-
-    def test_is_configured_status_not_configured(self):
-        self.payway.configuration = {}
-        result = self.admin.is_configured_status(self.payway)
-
-        self.assertEqual(result, "Requires setup")
 
     def test_activate_payment_methods_action(self):
         inactive_payway = PayWay.objects.create(active=False)
@@ -596,44 +378,6 @@ class PayWayAdminTestCase(TestCase):
         message = mock_message.call_args[0][1]
         self.assertIn("0", str(message))
 
-    def test_move_up_in_order_action(self):
-        other_payway = PayWay.objects.create(sort_order=2)
-
-        request = self.factory.post("/admin/pay_way/payway/")
-        request.user = self.user
-        request._messages = Mock()
-
-        queryset = PayWay.objects.filter(id=other_payway.id)
-
-        with patch.object(self.admin, "message_user") as mock_message:
-            self.admin.move_up_in_order(request, queryset)
-
-            mock_message.assert_called_once()
-
-    def test_move_down_in_order_action(self):
-        request = self.factory.post("/admin/pay_way/payway/")
-        request.user = self.user
-        request._messages = Mock()
-
-        queryset = PayWay.objects.filter(id=self.payway.id)
-
-        with patch.object(self.admin, "message_user") as mock_message:
-            self.admin.move_down_in_order(request, queryset)
-
-            mock_message.assert_called_once()
-
-    def test_reset_sort_order_action(self):
-        request = self.factory.post("/admin/pay_way/payway/")
-        request.user = self.user
-        request._messages = Mock()
-
-        queryset = PayWay.objects.all()
-
-        with patch.object(self.admin, "message_user") as mock_message:
-            self.admin.reset_sort_order(request, queryset)
-
-            mock_message.assert_called_once()
-
 
 class PayWayAdminIntegrationTestCase(TestCase):
     def setUp(self):
@@ -654,7 +398,6 @@ class PayWayAdminIntegrationTestCase(TestCase):
             cost=Decimal("3.00"),
             settlement=PaySettlement.ONLINE,
             active=True,
-            configuration={"api_key": "test"},
         )
         self.online_payment.set_current_language("en")
         self.online_payment.name = "Credit Card"
@@ -674,9 +417,7 @@ class PayWayAdminIntegrationTestCase(TestCase):
         request.user = self.superuser
 
         self.assertIn(PaymentTypeFilter, self.admin.list_filter)
-        self.assertIn(ConfigurationStatusFilter, self.admin.list_filter)
-        self.assertIn(CostRangeFilter, self.admin.list_filter)
-        self.assertIn(FreeThresholdFilter, self.admin.list_filter)
+        self.assertIn(("cost", RangeNumericFilter), self.admin.list_filter)
 
     def test_admin_display_methods_integration(self):
         display_methods = [
@@ -686,10 +427,7 @@ class PayWayAdminIntegrationTestCase(TestCase):
             "cost_display",
             "free_threshold_display",
             "sort_order_display",
-            "icon_preview",
-            "configuration_preview",
             "effective_cost_display",
-            "is_configured_status",
         ]
 
         for method_name in display_methods:

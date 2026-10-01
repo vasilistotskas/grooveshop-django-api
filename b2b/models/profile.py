@@ -26,6 +26,7 @@ class BusinessProfile(TimeStampMixinModel, UUIDModel):
         "user.UserAccount",
         related_name="business_profile",
         on_delete=models.CASCADE,
+        verbose_name=_("User"),
     )
     status = models.CharField(
         _("Status"),
@@ -39,6 +40,7 @@ class BusinessProfile(TimeStampMixinModel, UUIDModel):
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
+        verbose_name=_("Customer group"),
     )
 
     # Company identity — the Greek invoice requisites.
@@ -91,6 +93,7 @@ class BusinessProfile(TimeStampMixinModel, UUIDModel):
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
+        verbose_name=_("Reviewed by"),
     )
     reviewed_at = models.DateTimeField(_("Reviewed at"), null=True, blank=True)
     rejection_reason = models.TextField(

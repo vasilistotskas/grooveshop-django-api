@@ -13004,7 +13004,7 @@ msgstr "Μέθοδος Πληρωμής"
 
 #: .\pay_way\models.py:110
 msgid "Pay Ways"
-msgstr "Τρόποι πληρωμής"
+msgstr "Μέθοδοι πληρωμής"
 
 #: .\pay_way\models.py:262
 msgid "Pay way"

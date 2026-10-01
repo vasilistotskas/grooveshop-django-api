@@ -3,6 +3,684 @@
 
 
 
+## v3.92.0 (2026-10-01)
+
+### Bug fixes
+
+* fix(deps): urllib3 2.8.0 and tornado 6.5.10 for new HIGH advisories
+
+urllib3 2.8.0 fixes CVE-2026-97687 and CVE-2026-97689; its one
+behaviour change concerns HTTPS-proxy TLS settings, which nothing here
+uses. tornado (Flower only) is raised past GHSA-chx6-46f5-w4vp and
+GHSA-c2m8-h5v5-343r, fixed in 6.5.9.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`d11b98c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d11b98c61c20123e3337c16ed9063e256f27e72b))
+
+* fix(admin): translate relative times and composed labels
+
+Django's Greek catalogue leaves the timesince units empty, so every
+"(5 days)" in the Greek admin read in English; relative_time now passes
+its own translated units. The order summary, cart, review and group
+labels and the suspend cooldown message were f-strings outside gettext,
+and a duplicated promotion is marked as a copy in each language's own
+words.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`acc93ae`](https://github.com/vasilistotskas/grooveshop-django-api/commit/acc93aeada8a752e41660c375f06f23c74bc24f3))
+
+* fix(admin): billing page links to Tenants; counters share the badges
+
+- The Tenants button reversed admin:tenant_tenant_changelist, a
+  namespace the platform host does not mount; {% url ... as %}
+  swallowed the NoReverseMatch and the button never rendered. The view
+  now reverses it on its own admin site.
+- The four counters are the shared KPI component, toned and iconed
+  from tenant.admin_labels.BILLING_BADGES, and the plans card renders
+  PLAN_BADGES instead of repeating their colours and icons by hand.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`5c54f6c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5c54f6ce8f19a5d4dab388dbef8a98d749ac6894))
+
+* fix(order): the invoice archive is read-only for everyone
+
+InvoiceAdmin's docstring called invoices immutable and said
+regenerating consumed a new counter slot, while superusers could
+delete invoices and Regenerate keeps the number. Greek tax law allows
+no gaps in the register, and a deleted row is one, so nobody deletes
+here now; the docstring states what Regenerate actually does
+(generate_invoice(force=True) keeps the number and issue date).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`2cd2d55`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2cd2d55472fd7fe6442343ba67ae4e82a1b8cd69))
+
+* fix(admin): stock history imports the moved cell helpers
+
+c0ad1c8c moved link_cell/label_cell to admin.displays; the stock
+history view imported them lazily from the old module. The purge-log
+actor test now asserts on the table the view builds, where the
+actor_email rule moved with it.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`8e6bc73`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8e6bc733ae6a81af81c52e77b5697e7306e5c3c1))
+
+* fix(admin): action labels follow the admin's language
+
+- 68 ``@action`` descriptions were ``str(_(...))``: the lazy string was
+  forced when the module was imported, so every label was frozen in
+  whichever language was active then, whatever the admin's own. The
+  wrapper dated from the ty migration, when Unfold typed
+  ``description`` as ``str``; 0.108 takes ``StrOrPromise``.
+- ACS's COD reconciliation and BoxNow's locker sync act on the whole
+  table, so they are list actions (a button above the list), not a row
+  action and a selection action that ignored its selection. The locker
+  sync now answers with a redirect, as a URL-backed action must.
+- The country, region, tag and pay-way "update / reset / move sort
+  order" actions renumbered only the selected rows (0..n, or x10), so
+  they collided with the rows left out. Every one of those lists
+  already has drag-and-drop ordering.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`2ae46a0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2ae46a007a274c75ac7105fbfebf298985ff11b1))
+
+### Chores
+
+* chore(admin): the built stylesheet ends with a newline
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`0a5201b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0a5201bf7ee46c71eab52e6b8ca64e6befbc41f5))
+
+* chore(api): regenerate the schema with the notification read labels
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`919899a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/919899aaa15aaf335104e6d9f228038797aa4ab5))
+
+* chore(api): regenerate the schema with the completed Greek catalogue
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`5f4dfaa`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5f4dfaafdc75a4a7c670dc23df0b2e771066d1b8))
+
+* chore(ci): refresh the shard durations and find the latest CI run again
+
+The durations file is rebuilt from CI run 36744878968 (the merge of
+#100): 9176 tests, measured on the runners, replacing timings from
+before the test-suite overhaul removed ~250 tests and added new ones.
+
+merge_test_durations.py picked a run from 2026-09-08: GitHub's
+per-workflow runs endpoint stopped listing new runs of this workflow,
+so `gh run list --workflow ci.yml` handed back a stale run whose
+artifacts had expired and the download failed. It now filters the
+repository-wide listing in Python (latest_successful_run, tested).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`0ad214e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0ad214e6779286d653b8a783cb6b11aa400d5db7))
+
+* chore(deps): sync uv.lock to 3.91.1 [skip ci] ([`52c5765`](https://github.com/vasilistotskas/grooveshop-django-api/commit/52c5765efa3bd831479ca724c44ae3046cee50f6))
+
+### Documentation
+
+* docs(order): point the order-source chart at the dashboard package
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`f01e4d7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f01e4d7134046f47ba3042a3edab600f2f3b5d12))
+
+### Features
+
+* feat(i18n): the admin names records in the active language
+
+Every model __str__ the admin shows went through an f-string, so page
+titles, breadcrumbs, related-object selects, delete confirmations and
+history read "Order 11 - ..." under the Greek admin. They are gettext
+now, counts through ngettext, and the repr-like shipment and payout
+names read as names. None feeds an email, myDATA, a carrier or the API.
+
+Notifications are "read" in Greek, not "visible", and the field-label
+guard skips models a test declares at runtime.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`99e880f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/99e880fb6a6449f4f02889fbc75f91343b61b191))
+
+* feat(i18n): label every model field the admin shows
+
+172 first-party fields had no verbose_name, so Django derived their
+labels from the field names and the Greek admin read "Pay way",
+"Country" or "Uuid". Each now has a translated label, abstract bases
+labelled once; the migrations only alter state. The order's gateway
+field is "Payment Gateway", since "Payment Method" is the method the
+shopper chose (pay_way), as the admin's Payment Methods section calls
+it. A guard test fails on a field whose label is still derived.
+
+The SEO migration test rolls product back once per class: the new
+product migration made each rollback cost about a minute.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`6bb7546`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6bb754698025c4cff0a37ad6c4b57de0a5ae4f61))
+
+* feat(i18n): translate django-unfold's own strings
+
+Unfold ships no translations and leaves them to each project
+(unfoldadmin/django-unfold#596), so "Filters", "Apply Filters", the
+sidebar search and the rest of its chrome read English under the Greek
+admin. makemessages_unfold extracts the installed Unfold's strings into
+locale_vendor/unfold, loaded after the project's own catalogue, leaving
+out whatever Django's Greek catalogues already translate. A test fails
+when an Unfold upgrade adds strings the catalogue lacks.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`59beecf`](https://github.com/vasilistotskas/grooveshop-django-api/commit/59beecf7ebde3a9fc07a20ea0178fd7656023f74))
+
+* feat(i18n): complete the Greek admin catalogue
+
+Every app names itself with a translatable verbose_name, so breadcrumbs
+and the app list stop reading "Order" and "Product" under the Greek UI.
+The el catalogue now has no untranslated or fuzzy entry, and a test keeps
+it that way. Two strings whose "%" is a literal percent are marked
+no-python-format, so msgfmt --check-format passes.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`0222a3a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0222a3a1f7bf2c5781cccac3ce0fbe4018710418))
+
+* feat(page_config): publish the section contract in the OpenAPI schema
+
+Every section type's props schema is a named component,
+PageSection<Type>Props, camelized as the API sends the data
+(core.json_schema.wire_schema; drf-spectacular's camelize hook only
+walks its own registry). The storefront can generate its render-time
+parser from Django's contract instead of hand-writing it in
+server/utils/pageSectionProps.ts.
+
+autoplay_ms uses enum: [0] instead of const: 0, since the document is
+OpenAPI 3.0.3, which has no const.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`c4f74e3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c4f74e37dab97e0f24c3aa425d4147b2cd6d4588))
+
+* feat(page_config): sections validate against one JSON Schema contract
+
+page_config/section_schemas.py is the section contract: every section
+type's props, and the per-locale i18n overrides, as Draft 2020-12
+schemas. It replaces ~1,100 lines of hand-written Python checkers;
+only the two rules that span props stay in Python (register rows name
+declared sectors; comparison rows are equally wide). Optional keys no
+longer accept null, matching the storefront's parser, which already
+dropped such a section at render time.
+
+- PageSection.clean() validates props and i18n. The admin saved them
+  unchecked; only the API serializer and the seed commands checked.
+- A saved section edits props and i18n through its type's schema in
+  Unfold's editor (a stacked, collapsible, tabbed inline).
+- Fix: the layout admin's SEO fieldset description said "<title>".
+  Django renders fieldset descriptions as HTML, so it opened a real
+  <title> element and swallowed the rest of the page: no page layout
+  ever showed its sections in the admin.
+- A required-key alternation (anyOf of required) now reads "needs one
+  of: image_url, icon" instead of jsonschema's generic message.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`c1a4c72`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c1a4c72d792cf63df863f7e7440dac192e08d5f5))
+
+* feat(tenant): a store's locales are the storefront's locales
+
+default_locale and every available_locales entry must be one of
+core.utils.tenant_urls.STOREFRONT_LOCALES (referenced, not copied),
+which is narrower than settings.LANGUAGES: Django carries de content
+but the storefront has no /de routes, so a store serving de linked
+visitors to 404s. default_locale is a choice from that list (named by
+settings.LANGUAGES), default_currency a choice from CURRENCY_CHOICES;
+both were free text. "available_locales contains default_locale" stays
+in Tenant.clean.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`0289f36`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0289f36f10eebac72e19b0002c8ecf2bda68f53a))
+
+* feat(admin): JSON Schemas for structured JSON fields
+
+A JSONField now names one JSON Schema (core.json_schema
+.JSONSchemaValidator, by import path so migrations record the path,
+not a drifting copy) and that schema validates writes (full_clean,
+the admin form, DRF) and drives Unfold's JSON editor, wired once in
+BaseModelAdmin.formfield_for_dbfield. Unfold's own JSONSchemaField is
+not used: it fixes its schema at import, cannot be deconstructed and
+skips validation silently without jsonschema.
+
+- Tenant.theme_metadata, available_locales and allowed_csp_sources
+  replace their hand-written checkers (tenant/json_schemas.py); errors
+  now name the offending entry (colors.primaryScale.500: ...). The
+  clean() mirrors that re-ran them are gone: they only duplicated the
+  messages under full_clean. The historical migrations' references to
+  the removed functions are dropped (validators are model state only).
+- RecommendationSlot.strategy_chain and weights are schemas too; the
+  model keeps only what a schema cannot say (weighted codes are in the
+  chain, min_fill fits the limit) and stores weights as floats.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`d2bf88f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d2bf88fd049432600539444ff9e698c259865900))
+
+* feat(admin): an order opens with its summary
+
+Status, payment, total, customer, shipment and invoice (with its
+myDATA state) sit in a row of cards above the order's tabs, built
+from the same display logic as the order list; the first tab used to
+hold only the uuid and timestamps.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`e29d1e2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e29d1e21b91e1c4ab9b8dc78cfa0330ae9ae64b2))
+
+* feat(admin): paged datasets for stock activity, orders and ledgers
+
+The product's stock-log inline claimed "recent 20" but max_num caps
+new rows, not the ones shown, so every movement a product ever had was
+rendered on each open. Stock activity, a customer's orders and a gift
+card's ledger are now Unfold datasets: paged, on their own tab, and
+empty for a reader without view permission on the rows
+(admin.datasets.RelatedDatasetAdmin).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`f48cb53`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f48cb535497321e1d915a5b5b2e0b7dc66a7a4f9))
+
+* feat(admin): cache purge needs its own permission; menu per role
+
+- Any store staff member could purge the store's caches: the page was
+  gated by the admin login alone. It now needs ``core.purge_cache``,
+  which store ADMIN and OWNER hold (purges are scoped to the store's
+  own keys, host and zone) and STAFF, who may not change store
+  settings, does not.
+- Unfold renders SITE_DROPDOWN items unchecked, so every store's staff
+  saw the cache purge, a Rosetta link refused outside the public
+  schema, and the platform's ops consoles. The menu is now built per
+  request (admin/navigation.py); the ops consoles are for platform
+  superusers only.
+- The cache page is rebuilt on Unfold components with a real form
+  (Unfold's checkbox and switch widgets; an unknown surface code is
+  refused) and Alpine for the selection count, replacing gray-palette
+  markup and an inline script. The unused live-count JSON endpoint is
+  gone. ``link_cell``/``label_cell`` move to ``admin.displays``.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`c0ad1c8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c0ad1c8cf8f1646711f6e61bc6359be16bf2807d))
+
+* feat(admin): rebuild both dashboards as cached, themed Unfold widgets
+
+The store dashboard was one 570-line template over one cached payload,
+and the control plane switched schema twice per store on every view.
+
+Store dashboard
+- admin/dashboard/ replaces admin/dashboard.py: each block is an Unfold
+  component class (store/widgets.py) over a cached query
+  (store/queries.py) declared with @dashboard_query(depends_on=...).
+  One key per query; a write to a listed model clears exactly those
+  keys, after commit. Cached data is plain values: labels, admin URLs
+  and chart JSON are built per request, in the viewer's language (the
+  old payload served the first viewer's language to everyone, and
+  cleared itself on every login via UserAccount.post_save).
+- Shared partials under core/templates/admin/dashboard/: KPI card, table
+  card, bar and doughnut chart cards, alerts, empty state. Charts use
+  theme CSS variables (no white doughnut rings in dark mode) and every
+  widget has an empty state instead of a blank canvas.
+- Fixes: average order value is over paid orders (unpaid rows carried
+  0); daily buckets use local dates; the funnel counts carts started as
+  orders plus open carts (placing an order deletes its cart); the
+  contact badge counts this week's messages instead of every message
+  ever; nine sidebar badges now read one cached query, memoised per
+  request.
+- Warm /admin/: 128 -> ~20 queries (with the lazy context processor);
+  a test pins the budget and that it does not grow with the data.
+
+Control plane
+- TenantStatsSnapshot (additive migration) holds each store's orders,
+  paid revenue and last order, refreshed every 30 minutes by
+  refresh_stats_snapshot inside each store's schema. The dashboard and
+  the Tenants list read it: no schema switch per row any more.
+- Four KPI cards (background-job health merged into one), store names
+  link to the tenant, plan/status badges from tenant/admin_labels.py,
+  shared with the Tenants list and Plan & Billing.
+
+Also: the stock-history page is rebuilt on the same helpers (theme
+colours, Unfold table, view-permission check); custom pages extend
+admin/base_site.html so Unfold's sidebar branding renders; admin
+display helpers format money and dates in the active locale and the
+current timezone (they hard-coded Greek separators and printed UTC);
+initials ignore punctuation ("Public (Platform)" gave "P(").
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`15fe644`](https://github.com/vasilistotskas/grooveshop-django-api/commit/15fe6449f2c9bac5a031ef8ee90c645d479db959))
+
+* feat(admin): upgrade django-unfold to 0.108.0 and remove drift
+
+- Pin django-unfold 0.108.0; make jsonschema a direct dependency (the
+  JSON-schema admin fields validate with it). The ty call-non-callable
+  override for admin modules goes: @action is typed -> Callable now.
+- Each store's admin wears its own marks. SITE_LOGO/SITE_ICON/
+  SITE_FAVICONS resolve through admin/branding.py with the rule outbound
+  email already follows: the tenant's asset, the bundled platform marks
+  only for the platform storefront, otherwise nothing (Unfold draws the
+  symbol and store name). Every store used to show tenant #1's wordmark.
+- The control plane's identity has one source, UNFOLD_PLATFORM
+  ("GrooveShop Platform"); the duplicate class attributes and the
+  store-admin branch that re-branded a platform request are gone - the
+  store admin is mounted on store hosts only.
+- Remove dead sidebar gates: is_store_section/tenant.console (the store
+  admin never serves the public schema), is_staff (the site already
+  requires it) and is_platform_section (unreferenced). Drop the
+  duplicate System > Configuration > Shipping Providers entry.
+- Re-base the nested-sidebar override on 0.108's app_list.html (brings
+  scrollbar-default-hover, link_attrs, icon_template; drops the dead
+  data-simplebar) and delete the app_list_badge.html override, which
+  upstream now covers. New render tests pin both.
+- Delete dead config: UNFOLD["LOGIN"]["redirect_after"] (still never
+  read in 0.108) and the Google Fonts Material Symbols stylesheet (every
+  one of the 128 icon names we use exists in Unfold's bundled font).
+- Re-stamp version-specific notes against 0.108.0; the command-palette
+  selectItem crash is still present upstream, so its guard stays.
+- Pin the framing policy the related-object modals rely on: admin
+  modal targets answer SAMEORIGIN, everything else DENY.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`0fb9e38`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0fb9e38cd977770b580295c5f66507cde1d7790c))
+
+### Performance improvements
+
+* perf(promotion): generating codes no longer loads every code
+
+"Generate codes" read every coupon code of every promotion into memory
+to find free ones. It now checks only the candidates it generated and
+lets the unique constraint skip a code a concurrent request inserted
+first, replacing it on the next round. The dialog redirects through
+the serving admin site's namespace.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`4c4439a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4c4439af0708f7e79f38f32e22d95a7f5a63d67d))
+
+* perf(tenant): one membership lookup per request
+
+A store staff member's admin page ran the same membership SELECT four
+times: the admin site's has_permission runs for the view gate,
+each_context and the app list, and the permission backend asks again.
+get_membership now remembers its answer (a miss included) on the
+request's user object, keyed by tenant like the backend's and
+is_store_staff's own caches.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`83bd27f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/83bd27f0c623d22c5cf96a8ab68f938e4c59f331))
+
+* perf(admin): no form lists a large table in a select
+
+A plain select renders one option per row: the order-item form loaded
+every order, the review form every customer and product, on each open.
+Foreign keys to users, products, orders, order items, carts, posts and
+gift cards are now autocompletes on every writable admin and inline,
+Cart's lone raw-id field included; Product.changed_by, stamped from the
+saving admin, is read-only.
+
+tests/unit/admin/test_large_foreign_keys.py walks both admin sites and
+fails for any writable form that renders such a select.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`953000d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/953000ddda82adaac2e65f10126429f03bcddac9))
+
+* perf(admin): no changelist pays a query per row
+
+A new guard renders every first-party changelist with 2 rows and with
+6 and requires the same query count (tests/unit/admin/
+test_changelist_query_growth.py); a new admin with no way to build rows
+fails a completeness check. It found:
+
+- BlogAuthor/BlogTag: `getattr(obj, "posts_count_ann", <COUNT>)`
+  evaluated its default on every row; BlogAuthor and BlogComment now
+  use their querysets' existing with_engagement() annotations.
+- BlogComment, Promotion, ContentPage, NavigationColumn: translations
+  (and the menu) prefetched; link counts annotated.
+- TaggedItem: GenericPrefetch of the tagged products with their
+  translations; a blanket `except Exception` around content_object gone.
+- GiftCard: `balance` reads a `ledger_total` annotation when present;
+  the ledger and redemptions sections are prefetched. GiftCard.__str__
+  is the code alone - it summed the ledger each time a card was named,
+  so the transactions list's gift-card filter ran a SUM per card. That
+  filter is now autocomplete.
+- CustomerGroup: business-profile count annotated, price-list section
+  prefetched.
+
+Also: one change_link() helper replaces eight hand-rolled link columns
+(hard-coded /admin/... paths broke under the platform namespace and a
+translated admin prefix); ActionDialog is constructed directly now
+that unfold 0.105 types it for lazy strings (the cast() workarounds
+go); promotion benefits and bulk actions use the shared formatters and
+unfold's @action.
+
+Tests pinned to the old strftime-on-UTC dates now expect the active
+locale's formats in local time, and the order changelist test re-warms
+after its writes: those writes now clear the sidebar's cached counts.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`effa8b4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/effa8b4d032308c8cb13ba3ea5110d8413505d12))
+
+* perf(core): resolve site metadata lazily in the context processor
+
+core.context_processors.metadata runs for every template rendered with
+a RequestContext, and Unfold renders each {% component %} that way. It
+resolved the tenant's contact email eagerly - two extra_settings
+queries whenever CONTACT_EMAIL is unset, because extra-settings never
+caches a default - so the admin dashboard spent 118 of its 128 warm
+queries on values no admin template reads.
+
+Every costly value is now a SimpleLazyObject, the pattern
+django.contrib.auth uses for `user`: the allauth account emails and
+the API landing page that do read them get the same values; the admin
+computes none. Measured on /admin/ for a superuser: 128 -> 9 queries
+warm, 138 -> 20 cold.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`fa27a6e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fa27a6e10612c0a0a2afb5065b0f728b4696d350))
+
+### Refactoring
+
+* refactor(pay_way): drop PayWay.configuration (expand)
+
+Nothing consumed it: payment credentials live on the tenant, the
+storefront and the agent gateway never read it, and the API only
+echoed it to staff. The field leaves the model state
+(SeparateDatabaseAndState); the column was already nullable, so this
+release and the one still serving can overlap. The next release drops
+the column with a RunSQL migration declaring contract_of
+pay_way.0027.
+
+Gone with it: the secret-key check in clean(), has_configuration and
+is_configured (whose only meaning was "the JSON is not empty"), the
+admin's configuration preview, status column and status filter, the
+API's hasConfiguration filter, and PayWayDetailSerializer, which
+differed from PayWaySerializer only by that field.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`68efcd4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/68efcd40b2e3b77409f3fbb8d55aff31b8af3f06))
+
+* refactor(admin): every inline is an Unfold inline, tabbed and paged
+
+- TenantDomainInline was Django's own TabularInline inside an Unfold
+  form; a guard now fails for any first-party inline that is not
+  Unfold's.
+- Page sections, shipping rates, pay-way exclusions and tenant domains
+  get their own tab like every other inline.
+- The product's attribute, image, reservation and tag inlines page at
+  20 rows; the sortable related-products inline stays whole, since a
+  page break would split its drag-and-drop order.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`c26f9de`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c26f9de28b88303172f58b456e4b292d7fda8745))
+
+* refactor(admin): long change forms are tabs
+
+Tenant's seventeen collapsed sections become eight tabs (Unfold gives
+every tabbed fieldset its own tab and the bar does not wrap); the
+customer, blog post, pay way, BoxNow and ACS shipment forms are
+tabbed too, and the ACS shipment form, which had no fieldsets at all,
+is grouped. Every field is kept.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`c90ac50`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c90ac50ccd958b43806544aa084e9855a2054fa3))
+
+* refactor(admin): email template page on Unfold, previews via htmx
+
+The page carried its own 430-line stylesheet and 260 lines of script.
+It is now Unfold cards, labels and widgets: a Django form (template,
+language, sample data or a recent order, HTML or text) posted by htmx
+to a view that renders the preview fragment server-side, and Alpine
+for the template search.
+
+- The HTML preview sits in a sandboxed iframe's srcdoc, force-escaped:
+  the rendered email is a SafeString, which autoescaping passes
+  through raw — it would end the attribute at its first quote and
+  spill the email's markup into the admin page.
+- Both views need order.view_order on top of the admin gate: previews
+  render real orders.
+- The template-info and order-data JSON endpoints had no caller; the
+  latter returned customer details.
+- Recent orders are read with values_list: Order.__init__ reads
+  deferred fields, so .only() recursed until the stack ran out.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`18c6cfe`](https://github.com/vasilistotskas/grooveshop-django-api/commit/18c6cfe3c662eb19440dd3e2a90c726d60bd717d))
+
+* refactor(admin): tenant destroy confirmation on Unfold components
+
+The second "are you sure" step stays a page (a bulk action over a
+selection gets no Unfold dialog) and is rebuilt from Unfold's card,
+text and button components instead of gray-palette markup.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`15055a7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/15055a7ba26fe5fbd8e683eefd7ec3536a0ba67f))
+
+* refactor(admin): loyalty adjustment as a dialog; discount page on Unfold
+
+- "Adjust loyalty points" read its amount from the query string and
+  silently defaulted to 100 points. It is now an Unfold dialog form
+  (bounded points, a required reason), and the superuser-only rule is
+  a permission, so store staff never see the button and Unfold refuses
+  the URL, instead of an error after the click.
+- "Apply custom discount" stays an intermediate page: Unfold 0.108
+  offers dialogs to list, row, detail and submit-line actions, not to
+  a bulk action over a selection. The page is rebuilt from Unfold's
+  card, field and button components (it hand-rolled gray-palette
+  markup and an inline SVG); the form uses Unfold's widgets. The action
+  works from the queryset Django builds from the re-posted selection,
+  so the vestigial session key and duplicate context are gone.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`de7c7f8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/de7c7f86441eb3166bc4e60ea6f1e83a373e2841))
+
+* refactor(admin): drop duplicate inlines and fake-metric actions
+
+- BlogPost and ContentPage listed their parler translation rows in a
+  raw inline beside parler's own language tabs, which edit the same
+  rows.
+- TagInLine was registered nowhere.
+- "Increment view count by 100" wrote fabricated views; "Analyze tag
+  usage" only flashed three counts the tag list already shows.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`6136adf`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6136adfdb33a8509a00f0a45def07652f537ce84))
+
+* refactor(admin): date drill-down on event logs; no redundant flags
+
+- ``date_hierarchy`` on the 15 event and transaction logs that lacked
+  it (order and item history, Viva webhooks, reviews, favourites,
+  subscriptions, data exports, gift-card purchases, ACS shipments,
+  pickup lists, COD payouts and tracking, BoxNow parcel events, cache
+  purges, tenant archives). Reference tables stay without one.
+- Six flags re-declared BaseModelAdmin's own value.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`d0607f2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d0607f2d77eaa21393de4d20717f745c5c3fdc54))
+
+* refactor(admin): images and labels through Unfold's own displays
+
+- Flags, tier icons, pay-way icons, carrier logos and category and
+  product images render in the row's header column
+  (``header_two_line``, now with ``contained=`` for logos and flags
+  Unfold would otherwise crop) instead of hand-written <img> columns.
+  ``@display(image=True)`` is not an option: 0.108 stores the flag
+  and nothing reads it.
+- django-admin-thumbnails is gone: Unfold's inline image widget
+  previews the current file, and the two image lists use the header.
+- Settings: category and type are Unfold labels; the 301-line
+  hex-coloured badge stylesheet is deleted.
+- Every list filter class now renders through Unfold (the guard checks
+  classes, not only field names): the settings category filter was a
+  Django link filter, and ACS's "label printed" empty-field filter is
+  an Unfold dropdown. ACS's hand-written shipment-state filter was the
+  field's own choice filter.
+- The variant-group members list links through ``change_link`` (the
+  serving site's namespace) instead of joining with mark_safe("<br>").
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`2e77f08`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2e77f08b1ce1a42e18895d9c67e989751052ad68))
+
+* refactor(admin): one kind of list filter; stores read reference data
+
+Every filter sheet now holds only Unfold filters, sent together by
+"Apply". BaseModelAdmin.get_list_filter maps a plain field name to its
+Unfold filter (choices, boolean, date range, related, all values):
+Django's link filters applied on click and dropped every selection not
+yet applied in the same sheet.
+
+- admin/filters.py: AnnotatedRangeFilter annotates only when a bound
+  is set, replacing nine copies of the same queryset/parameters code;
+  one shared LikesCountFilter. Ranges over values the admin always
+  annotates (posts, subscriptions, addresses) and PayWay's money
+  fields use Unfold's own range filters.
+- Order: the status-group, payment-status and document-type filters
+  duplicated the field filters beside them; status and payment status
+  are multi-select instead. Region's "group by continent" did nothing.
+- Users, orders, products and posts filter through autocomplete, not
+  a dropdown of every row.
+- Countries and regions are reference data every store role may VIEW
+  (tenant.role_scopes.REFERENCE_DATA_APP_LABELS): the store admin's
+  country/region autocompletes answered 403 on every tenant host.
+  They stay out of the store sidebar and are never editable there.
+- The dashboard growth test pinned the review status it seeds: the
+  factory cycles statuses process-wide, so on a busy worker the small
+  seed had no NEW review and one query fewer.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`d9f8a76`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d9f8a761283416f47db3d72fda33ac258e72fc49))
+
+* refactor(admin): one base for every first-party admin
+
+- Contact, Feedback, the four tenant admins, SettingAdmin, the
+  celery-beat wrappers and CachePurgeLog now extend BaseModelAdmin; a
+  new guard fails on any first-party admin that does not. ExportModelAdmin
+  (which re-derived unfold's ModelAdmin and skipped the base) and the
+  unused get_export_formats are gone.
+- Default action permissions no longer mutate shared function objects:
+  an inherited undeclared action gets its own stamped wrapper on the
+  inheriting class. This also closes celery-beat's run/enable/disable/
+  toggle task actions, which were offered fail-open.
+- The export actions declare permissions=["view"], so export works on
+  the read-only ledgers (gift-card transactions, points, redemptions),
+  where "change" had silently hidden it; Product lists them.
+- IsSuperuserOnlyModelAdmin cooperates with super(): the bases' guards
+  run first, then the superuser check, instead of being shadowed.
+- Delete the store admin's public-schema guards
+  (BaseModelAdmin._withheld_on_public and MyAdminSite.get_app_list's
+  hiding): the store admin is never mounted on the public host, which
+  test_platform_host_serves_only_the_platform_admin pins for every
+  locale, and the control plane registers platform apps only.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`e9e337b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e9e337b19cec74e32a410efc7d02cf296f933250))
+
+### Testing
+
+* test(tenant): the tenant CSRF middleware weakens nothing
+
+TenantCsrfMiddleware only adds the current store's own domains to the
+trusted origins. Pin that: the store's origin still needs a valid
+token, a foreign origin is refused even with one, and it is the only
+CSRF middleware in the stack. CodeQL's py/csrf-protection-disabled
+matches Django's class path by name and reports the subclass as CSRF
+being off; these tests are what that report is checked against.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`22f0db5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/22f0db511be3ed966301cce7cde93f100bb4e783))
+
+* test: fix two tests that depended on the machine they ran on
+
+The Unfold catalogue check now asserts one way only: every string the
+installed Unfold has is in the catalogue. What xgettext finds depends on
+its version (gettext before 0.23 skips calls inside f-strings, like
+Unfold's "Welcome"), so CI's Ubuntu gettext found fewer strings than
+the catalogue holds.
+
+The payment-start refusal test asked for no language and read lazy
+response.data, so it passed only where the URL happened to be reversed
+under English. It now requests English and asserts the rendered JSON.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`c4392c8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c4392c87ba92f80a034fa5385754a02906500d9b))
+
+* test: assert English text in English, not by catalogue gaps
+
+These tests passed only because the strings they assert had no Greek
+translation yet. Unit tests take the assert_english marker; API tests
+request English and assert the rendered JSON, since response.data holds
+lazy strings that are evaluated after the request has deactivated its
+language.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`d2d02be`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d2d02be85f3e2165b3ea0f5fbc273d7cc4defb6d))
+
+* test(devtools): pin the username in the password-change test
+
+A generated {Adjective}{Noun} username could resemble the replacement
+password, and the similarity validator then refused it: a flake.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`be72b6c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/be72b6c8983f95aa714ce6a92f137d1af05aaa15))
+
+* test(admin): the UI guard covers every admin template
+
+Every page under core/templates/admin and the Unfold overrides is now
+checked for inline styles and <style> blocks, raw gray tokens,
+hand-rolled pills and hex colours — the four custom pages that failed
+it have been rebuilt on Unfold's components.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`72993c0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/72993c00a11c5b944b546e86d0c0de7ba6a96d85))
+
 ## v3.91.1 (2026-09-30)
 
 ### Bug fixes

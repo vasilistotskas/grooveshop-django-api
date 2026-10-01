@@ -3,6 +3,23 @@
 
 
 
+## v3.92.4 (2026-10-01)
+
+### Bug fixes
+
+* fix(i18n): the billing explainer names screens as the Greek admin shows them
+
+The Greek text sent operators to "Plan & Billing", the "Suspend" and
+"Activate" actions and the "Tenants" list, which the Greek admin labels
+«Πλάνο & Χρεώσεις», «Αναστολή/Ενεργοποίηση επιλεγμένων καταστημάτων»
+and Καταστήματα.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`a84cda5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a84cda53c71cc31a200139fe3eafe8251d85f1be))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.92.3 [skip ci] ([`ed365b2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ed365b29c20699e256a0f9ac1443168ae1cec5d8))
+
 ## v3.92.3 (2026-10-01)
 
 ### Bug fixes

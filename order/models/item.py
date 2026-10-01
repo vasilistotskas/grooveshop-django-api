@@ -3,6 +3,7 @@ from decimal import Decimal
 from django.contrib.postgres.indexes import BTreeIndex
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from djmoney.models.fields import MoneyField
@@ -75,7 +76,11 @@ class OrderItem(TimeStampMixinModel, SortableModel, UUIDModel):
         product_name = self.product.safe_translation_getter(
             "name", any_language=True
         )
-        return f"Order {self.order.id} - {product_name} x {self.quantity}"
+        return gettext("Order %(order)s - %(product)s × %(quantity)s") % {
+            "order": self.order_id,
+            "product": product_name,
+            "quantity": self.quantity,
+        }
 
     def clean(self):
         if self.quantity <= 0:

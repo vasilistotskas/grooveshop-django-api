@@ -18,6 +18,7 @@ from django.conf import settings
 from django.db import models
 
 ROOT = Path(settings.BASE_DIR).resolve()
+TEST_PACKAGES = ("tests.", "tests_mt.")
 
 
 def _is_first_party(path: str | Path) -> bool:
@@ -68,6 +69,11 @@ def _unlabelled_fields() -> list[str]:
         if not _is_first_party(config.path):
             continue
         for model in config.get_models():
+            # A model a test declares registers under a real app label
+            # for the rest of that worker's session; it is no field of
+            # ours to label.
+            if model.__module__.startswith(TEST_PACKAGES):
+                continue
             for field in model._meta.get_fields():
                 if field.auto_created or not (
                     getattr(field, "concrete", False) or field.many_to_many

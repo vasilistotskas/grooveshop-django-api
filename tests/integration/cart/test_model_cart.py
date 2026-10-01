@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING
 
+import pytest
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.utils import timezone
@@ -15,6 +16,8 @@ if TYPE_CHECKING:
     from product.models.product import Product
 
 User = get_user_model()
+
+pytestmark = pytest.mark.assert_english
 
 
 class CartModelTestCase(TestCase):
@@ -45,7 +48,7 @@ class CartModelTestCase(TestCase):
         self.assertEqual(self.cart.last_activity.date(), timezone.now().date())
 
     def test_str_representation(self):
-        expected_str = f"Cart for {self.user} - Items: {self.cart.total_items} - Total: {self.cart.total_price}"
+        expected_str = f"Cart for {self.user} - {self.cart.total_items} items - Total: {self.cart.total_price}"
         self.assertEqual(str(self.cart), expected_str)
 
     def test_get_items(self):
@@ -221,7 +224,7 @@ class GuestCartModelTestCase(TestCase):
         self.assertEqual(self.cart.last_activity.date(), timezone.now().date())
 
     def test_str_representation(self):
-        expected_str = f"Guest Cart {self.cart.id} - Items: {self.cart.total_items} - Total: {self.cart.total_price}"
+        expected_str = f"Guest cart {self.cart.id} - {self.cart.total_items} items - Total: {self.cart.total_price}"
         self.assertEqual(str(self.cart), expected_str)
 
     def test_get_items(self):

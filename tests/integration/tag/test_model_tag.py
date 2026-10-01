@@ -1,3 +1,4 @@
+import pytest
 from django.conf import settings
 from django.test import TestCase
 
@@ -11,6 +12,8 @@ languages = [
 ]
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
+pytestmark = pytest.mark.assert_english
+
 
 class TagModelTestCase(TestCase):
     def setUp(self):
@@ -23,11 +26,11 @@ class TagModelTestCase(TestCase):
     def test_str_representation(self):
         tag_label = (
             self.tag.safe_translation_getter("label", any_language=True)
-            or "Unnamed Label"
+            or "Unnamed label"
         )
         self.assertEqual(
             str(self.tag),
-            f"{tag_label} ({'Active' if self.tag.active else 'Inactive'})",
+            f"{tag_label} ({'active' if self.tag.active else 'inactive'})",
         )
 
     def test_get_ordering_queryset(self):

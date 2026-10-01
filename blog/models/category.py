@@ -1,5 +1,6 @@
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
+from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from mptt.fields import TreeForeignKey
@@ -58,10 +59,8 @@ class BlogCategory(
         if not hasattr(self, "_full_path"):
             self._full_path = " / ".join(
                 [
-                    k.safe_translation_getter(
-                        "name", default="Unnamed", any_language=True
-                    )
-                    or "Unnamed"
+                    k.safe_translation_getter("name", any_language=True)
+                    or gettext("Unnamed")
                     for k in self.get_ancestors(include_self=True)
                 ]
             )

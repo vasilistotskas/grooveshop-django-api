@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
+from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from djmoney.models.fields import MoneyField
@@ -157,7 +158,7 @@ class AcsCodPayout(TimeStampMixinModel):
         ]
 
     def __str__(self) -> str:
-        return (
-            f"AcsCodPayout(voucher={self.voucher_no}, "
-            f"amount={self.cod_amount_total})"
-        )
+        return gettext("ACS COD payout %(voucher)s (%(amount)s)") % {
+            "voucher": self.voucher_no,
+            "amount": self.cod_amount_total,
+        }

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
+from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from parler.models import TranslatableModel, TranslatedFields
@@ -54,8 +55,13 @@ class ProductImage(
         product_name = self.product.safe_translation_getter(
             "name", any_language=True
         )
-        main_status = "Main" if self.is_main else "Secondary"
-        return f"{product_name} Image ({main_status})"
+        if self.is_main:
+            return gettext("%(product)s image (main)") % {
+                "product": product_name
+            }
+        return gettext("%(product)s image (secondary)") % {
+            "product": product_name
+        }
 
     def get_ordering_queryset(self):
         return self.product.images.all()

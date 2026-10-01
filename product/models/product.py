@@ -13,6 +13,7 @@ from django.db.models import (
     F,
 )
 from django.utils.safestring import SafeString, mark_safe
+from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from djmoney.models.fields import MoneyField
@@ -760,5 +761,5 @@ class ProductTranslation(
         }
 
     def __str__(self):
-        name = self.name or "Untitled"
+        name = self.name or gettext("Untitled")
         return f"{name} ({self.language_code})"

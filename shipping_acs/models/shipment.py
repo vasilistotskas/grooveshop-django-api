@@ -1,5 +1,6 @@
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
+from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from djmoney.models.fields import MoneyField
@@ -301,10 +302,14 @@ class AcsShipment(UUIDModel, TimeStampMixinModel):
         ]
 
     def __str__(self) -> str:
-        return (
-            f"AcsShipment(order={self.order_id}, "
-            f"voucher={self.voucher_no or 'pending'})"
-        )
+        if not self.voucher_no:
+            return gettext(
+                "ACS shipment, voucher pending (order %(order)s)"
+            ) % {"order": self.order_id}
+        return gettext("ACS shipment %(voucher)s (order %(order)s)") % {
+            "voucher": self.voucher_no,
+            "order": self.order_id,
+        }
 
     @property
     def is_active(self) -> bool:

@@ -1,6 +1,7 @@
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
 from django.utils import timezone
+from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 
@@ -35,8 +36,12 @@ class NotificationUser(TimeStampMixinModel, UUIDModel):
     )
 
     def __str__(self):
-        status = "seen" if self.seen else "unseen"
-        return f"Notification {self.notification.id} for {self.user.full_name}: {status}"
+        status = gettext("Seen") if self.seen else gettext("Unseen")
+        return gettext("Notification %(id)s for %(user)s: %(status)s") % {
+            "id": self.notification_id,
+            "user": self.user.full_name,
+            "status": status,
+        }
 
     class Meta(TypedModelMeta):
         verbose_name = _("Notification User")

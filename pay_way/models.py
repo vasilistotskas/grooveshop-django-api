@@ -2,6 +2,7 @@ import os
 
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
+from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from djmoney.models.fields import MoneyField
@@ -331,7 +332,8 @@ class PayWayShippingExclusion(TimeStampMixinModel):
         ]
 
     def __str__(self) -> str:
-        return (
-            f"{self.pay_way} blocked on "
-            f"{self.shipping_provider.code}/{self.shipping_kind}"
-        )
+        return gettext("%(pay_way)s blocked on %(provider)s/%(kind)s") % {
+            "pay_way": self.pay_way,
+            "provider": self.shipping_provider.code,
+            "kind": self.shipping_kind,
+        }

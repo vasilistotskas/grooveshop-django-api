@@ -13,6 +13,7 @@ from __future__ import annotations
 from django.contrib.postgres.indexes import BTreeIndex
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from djmoney.models.fields import MoneyField
@@ -93,9 +94,15 @@ class ProductAlert(TimeStampMixinModel, UUIDModel):
 
     def __str__(self) -> str:
         recipient = (
-            self.user.email if self.user_id else self.email or "<anonymous>"
+            self.user.email
+            if self.user_id
+            else self.email or gettext("Anonymous")
         )
-        return f"{self.get_kind_display()} — {recipient} — product {self.product_id}"
+        return gettext("%(kind)s — %(recipient)s — product %(product)s") % {
+            "kind": self.get_kind_display(),
+            "recipient": recipient,
+            "product": self.product_id,
+        }
 
     def clean(self) -> None:
         super().clean()

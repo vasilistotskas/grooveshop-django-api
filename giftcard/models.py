@@ -15,6 +15,7 @@ from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
 from django.db.models import Sum
 from django.utils import timezone
+from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from djmoney.models.fields import MoneyField
@@ -89,7 +90,10 @@ class GiftCardPurchase(TimeStampMixinModel, UUIDModel):
         ]
 
     def __str__(self):
-        return f"Gift card purchase {self.amount} → {self.recipient_email}"
+        return gettext("Gift card purchase %(amount)s → %(email)s") % {
+            "amount": self.amount,
+            "email": self.recipient_email,
+        }
 
 
 class GiftCard(TimeStampMixinModel, UUIDModel):
@@ -299,4 +303,8 @@ class GiftCardTransaction(TimeStampMixinModel):
         ]
 
     def __str__(self):
-        return f"{self.kind} {self.amount} on {self.gift_card_id}"
+        return gettext("%(kind)s %(amount)s on gift card %(card)s") % {
+            "kind": self.get_kind_display(),
+            "amount": self.amount,
+            "card": self.gift_card_id,
+        }

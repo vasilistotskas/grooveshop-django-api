@@ -1,5 +1,6 @@
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
+from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from mptt.fields import TreeForeignKey
@@ -72,17 +73,19 @@ class BlogComment(TranslatableModel, TimeStampMixinModel, UUIDModel, MPTTModel):
         order_insertion_by = ["-created_at"]
 
     def __str__(self):
-        translation_content = (
-            self.safe_translation_getter("content", any_language=True)
-            or "No content"
-        )
+        translation_content = self.safe_translation_getter(
+            "content", any_language=True
+        ) or gettext("No content")
         content = (
             f"{translation_content[:CONTENT_PREVIEW_LENGTH]}..."
             if len(translation_content) > CONTENT_PREVIEW_LENGTH
             else translation_content
         )
-        commenter = self.user.full_name if self.user else "Anonymous"
-        return f"Comment by {commenter}: {content}"
+        commenter = self.user.full_name if self.user else gettext("Anonymous")
+        return gettext("Comment by %(commenter)s: %(content)s") % {
+            "commenter": commenter,
+            "content": content,
+        }
 
     @property
     def likes_count(self) -> int:

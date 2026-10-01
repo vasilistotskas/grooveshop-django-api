@@ -8,6 +8,7 @@ from django.core.validators import validate_email
 from django.db import models
 from django.db.models import F, Sum
 from django.utils import timezone
+from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from djmoney.models.fields import MoneyField
@@ -483,7 +484,11 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         self._original_pay_way_id = self.pay_way_id
 
     def __str__(self) -> str:
-        return f"Order {self.id} - {self.first_name} {self.last_name}"
+        return gettext("Order %(id)s - %(first_name)s %(last_name)s") % {
+            "id": self.id,
+            "first_name": self.first_name,
+            "last_name": self.last_name,
+        }
 
     def save(self, *args: Any, **kwargs: Any) -> None:
         status_changed = bool(

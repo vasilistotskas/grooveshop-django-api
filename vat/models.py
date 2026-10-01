@@ -5,6 +5,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.db.models import CheckConstraint, Q
+from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 
@@ -78,7 +79,7 @@ class Vat(TimeStampMixinModel, UUIDModel):
         ]
 
     def __str__(self):
-        return f"{self.value}% VAT"
+        return gettext("%(value)s%% VAT") % {"value": self.value}
 
     @property
     def display_name(self) -> str:

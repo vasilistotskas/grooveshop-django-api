@@ -1,6 +1,7 @@
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import ngettext
 from django_stubs_ext.db.models import TypedModelMeta
 
 from core.models import TimeStampMixinModel, UUIDModel
@@ -65,4 +66,12 @@ class PointsTransaction(TimeStampMixinModel, UUIDModel):
         ]
 
     def __str__(self):
-        return f"{self.get_transaction_type_display()} {self.points} pts (user {self.user_id})"
+        return ngettext(
+            "%(type)s %(points)s point (user %(user)s)",
+            "%(type)s %(points)s points (user %(user)s)",
+            abs(self.points),
+        ) % {
+            "type": self.get_transaction_type_display(),
+            "points": self.points,
+            "user": self.user_id,
+        }

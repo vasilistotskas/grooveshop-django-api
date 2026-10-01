@@ -1,11 +1,14 @@
 from decimal import Decimal
 
+import pytest
 from django.test import TestCase
 
 from cart.factories.cart import CartFactory
 from cart.factories.item import CartItemFactory
 from product.factories.product import ProductFactory
 from vat.models import Vat
+
+pytestmark = pytest.mark.assert_english
 
 
 class CartItemModelTestCase(TestCase):
@@ -26,8 +29,8 @@ class CartItemModelTestCase(TestCase):
             "name", any_language=True
         )
         expected_str = (
-            f"CartItem {self.cart_item.id} in Cart {self.cart_item.cart.id}: "
-            f"{product_name} x {self.cart_item.quantity}"
+            f"Cart item {self.cart_item.id} in cart {self.cart_item.cart.id}: "
+            f"{product_name} × {self.cart_item.quantity}"
         )
         self.assertEqual(str(self.cart_item), expected_str)
 

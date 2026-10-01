@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
+from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 
@@ -107,8 +108,15 @@ class StockReservation(TimeStampMixinModel):
         product_name = self.product.safe_translation_getter(
             "name", any_language=True
         )
-        status = "consumed" if self.consumed else "active"
-        return f"Reservation {self.id} - {product_name} x {self.quantity} ({status})"
+        status = gettext("Consumed") if self.consumed else gettext("Active")
+        return gettext(
+            "Reservation %(id)s - %(product)s × %(quantity)s (%(status)s)"
+        ) % {
+            "id": self.id,
+            "product": product_name,
+            "quantity": self.quantity,
+            "status": status,
+        }
 
     @property
     def is_expired(self) -> bool:

@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
+from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from djmoney.models.fields import MoneyField
@@ -74,4 +75,8 @@ class PriceListItem(TimeStampMixinModel, UUIDModel):
         ]
 
     def __str__(self):
-        return f"{self.group} → product {self.product_id}: {self.net_price}"
+        return gettext("%(group)s → product %(product)s: %(price)s") % {
+            "group": self.group,
+            "product": self.product_id,
+            "price": self.net_price,
+        }

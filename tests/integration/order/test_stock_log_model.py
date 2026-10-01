@@ -69,8 +69,8 @@ class TestStockLogModel:
         )
 
         str_repr = str(stock_log)
-        assert "StockLog" in str_repr
-        assert "INCREMENT" in str_repr
+        assert "Stock log" in str_repr
+        assert "Increment" in str_repr
         assert "90 → 100" in str_repr
 
     def test_is_increase_property(self):

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from django.conf import settings
 from django.db import models
+from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 
 from core.models import TimeStampMixinModel, UUIDModel
@@ -77,7 +78,11 @@ class UserDataExport(UUIDModel, TimeStampMixinModel):
         ]
 
     def __str__(self) -> str:
-        return f"Export#{self.pk} user={self.user_id} status={self.status}"
+        return gettext("Data export #%(id)s for user %(user)s (%(status)s)") % {
+            "id": self.pk,
+            "user": self.user_id,
+            "status": self.get_status_display(),
+        }
 
     @property
     def is_ready(self) -> bool:

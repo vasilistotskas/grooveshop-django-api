@@ -3,6 +3,7 @@ from __future__ import annotations
 from django.conf import settings
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import ngettext
 
 
 class CachePurgeLogQuerySet(models.QuerySet):
@@ -80,4 +81,9 @@ class CachePurgeLog(models.Model):
         ]
 
     def __str__(self) -> str:
-        return f"CachePurgeLog #{self.pk} ({len(self.surfaces or [])} surfaces)"
+        count = len(self.surfaces or [])
+        return ngettext(
+            "Cache purge #%(id)s (%(count)s surface)",
+            "Cache purge #%(id)s (%(count)s surfaces)",
+            count,
+        ) % {"id": self.pk, "count": count}

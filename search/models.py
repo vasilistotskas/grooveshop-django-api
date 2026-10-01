@@ -8,6 +8,7 @@ This module provides models for:
 
 from django.core.validators import MaxLengthValidator
 from django.db import models
+from django.utils.translation import gettext, ngettext
 from django.utils.translation import gettext_lazy as _
 
 from search.managers import SearchClickManager, SearchQueryManager
@@ -140,9 +141,15 @@ class SearchQuery(models.Model):
         ]
 
     def __str__(self):
-        return (
-            f"{self.query} ({self.content_type}) - {self.results_count} results"
-        )
+        return ngettext(
+            "%(query)s (%(type)s) - %(count)s result",
+            "%(query)s (%(type)s) - %(count)s results",
+            self.results_count,
+        ) % {
+            "query": self.query,
+            "type": self.get_content_type_display(),
+            "count": self.results_count,
+        }
 
     def __repr__(self):
         return (
@@ -212,9 +219,11 @@ class SearchClick(models.Model):
         ]
 
     def __str__(self):
-        return (
-            f"{self.result_type} {self.result_id} at position {self.position}"
-        )
+        return gettext("%(type)s %(id)s at position %(position)s") % {
+            "type": self.get_result_type_display(),
+            "id": self.result_id,
+            "position": self.position,
+        }
 
     def __repr__(self):
         return (

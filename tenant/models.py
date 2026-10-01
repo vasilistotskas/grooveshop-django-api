@@ -7,6 +7,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.db import models
 from django.db.models.expressions import Combinable
+from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from django_tenants.models import DomainMixin, TenantMixin, _check_schema_name
 from knox.models import AbstractAuthToken
@@ -1684,7 +1685,10 @@ class PlatformStaffToken(AbstractAuthToken):
         verbose_name_plural = _("Platform Staff Tokens")
 
     def __str__(self):
-        return f"staff:{self.token_key} : {self.user}"
+        return gettext("Staff token %(key)s: %(user)s") % {
+            "key": self.token_key,
+            "user": self.user,
+        }
 
 
 class TenantArchive(TimeStampMixinModel):
@@ -1797,7 +1801,10 @@ class TenantArchive(TimeStampMixinModel):
         ]
 
     def __str__(self):
-        return f"{self.schema_name} (destroyed {self.destroyed_at:%Y-%m-%d})"
+        return gettext("%(schema)s (destroyed %(date)s)") % {
+            "schema": self.schema_name,
+            "date": f"{self.destroyed_at:%Y-%m-%d}",
+        }
 
     @property
     def retention_expired(self) -> bool:

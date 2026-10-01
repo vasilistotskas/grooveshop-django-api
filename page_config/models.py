@@ -7,6 +7,7 @@ from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django.db.models import Q
 from django.utils import timezone
+from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from parler.fields import TranslationsForeignKey
@@ -371,7 +372,9 @@ class NavigationMenu(TimeStampMixinModel, UUIDModel):
         ordering = ["slot"]
 
     def __str__(self) -> str:
-        return f"{self.get_slot_display()} navigation"
+        return gettext("%(slot)s navigation") % {
+            "slot": self.get_slot_display()
+        }
 
     def localized(self, locale: str) -> list:
         """The menu as ``locale`` should render it.
@@ -488,7 +491,7 @@ class NavigationColumn(
 
     def __str__(self) -> str:
         label = self.safe_translation_getter("label", any_language=True)
-        return label or f"Column #{self.pk}"
+        return label or gettext("Column #%(id)s") % {"id": self.pk}
 
 
 class NavigationColumnTranslation(TranslatedFieldsModel):
@@ -723,7 +726,11 @@ class NavigationLink(
 
     def __str__(self) -> str:
         label = self.safe_translation_getter("label", any_language=True)
-        return label or self.resolved_path or f"Link #{self.pk}"
+        return (
+            label
+            or self.resolved_path
+            or gettext("Link #%(id)s") % {"id": self.pk}
+        )
 
 
 class NavigationLinkTranslation(TranslatedFieldsModel):
@@ -849,5 +856,5 @@ class ContentPageTranslation(  # ty: ignore[invalid-method-override]
         verbose_name_plural = _("Content Page Translations")
 
     def __str__(self) -> str:
-        title = self.title or "Untitled"
+        title = self.title or gettext("Untitled")
         return f"{title} ({self.language_code})"

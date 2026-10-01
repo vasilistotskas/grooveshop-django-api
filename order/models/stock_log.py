@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
+from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 
@@ -138,10 +139,16 @@ class StockLog(TimeStampMixinModel):
         product_name = self.product.safe_translation_getter(
             "name", any_language=True
         )
-        return (
-            f"StockLog {self.id} - {product_name}: "
-            f"{self.operation_type} ({self.stock_before} → {self.stock_after})"
-        )
+        return gettext(
+            "Stock log %(id)s - %(product)s: %(operation)s "
+            "(%(before)s → %(after)s)"
+        ) % {
+            "id": self.id,
+            "product": product_name,
+            "operation": self.get_operation_type_display(),
+            "before": self.stock_before,
+            "after": self.stock_after,
+        }
 
     @property
     def is_increase(self) -> bool:

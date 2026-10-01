@@ -1,6 +1,7 @@
 from django.contrib.postgres.indexes import BTreeIndex
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from parler.models import TranslatableModel, TranslatedFields
@@ -72,11 +73,13 @@ class ProductReview(
                 + "..."
             )
             if self.comment
-            else "No Comment"
+            else gettext("No comment")
         )
-        return (
-            f"Review by {self.user.email} on {self.product}: {comment_snippet}"
-        )
+        return gettext("Review by %(user)s on %(product)s: %(comment)s") % {
+            "user": self.user.email,
+            "product": self.product,
+            "comment": comment_snippet,
+        }
 
     def clean(self):
         valid_rates = [choice[0] for choice in RateEnum.choices]

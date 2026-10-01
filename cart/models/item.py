@@ -3,6 +3,7 @@ from decimal import Decimal
 from django.conf import settings
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
+from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from djmoney.models.fields import MoneyField
 from djmoney.money import Money
@@ -66,11 +67,16 @@ class CartItem(TimeStampMixinModel, UUIDModel):
         ]
 
     def __str__(self):
-        return (
-            f"CartItem {self.id} in Cart"
-            f" {self.cart.id}: {self.product.safe_translation_getter('name', any_language=True)}"
-            f" x {self.quantity}"
-        )
+        return gettext(
+            "Cart item %(id)s in cart %(cart)s: %(product)s × %(quantity)s"
+        ) % {
+            "id": self.id,
+            "cart": self.cart_id,
+            "product": self.product.safe_translation_getter(
+                "name", any_language=True
+            ),
+            "quantity": self.quantity,
+        }
 
     def _b2b_resolved(self):
         """The bound wholesale price for this line, or None (retail).

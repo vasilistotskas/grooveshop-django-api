@@ -542,7 +542,10 @@ if DEEPL_AUTH_KEY == "changeme" and PRODUCTION_PROFILE:
         "(current value is the insecure default 'changeme')."
     )
 
-LOCALE_PATHS = [path.join(BASE_DIR, "locale/")]
+# Unfold ships no translations; ``manage.py makemessages_unfold`` keeps
+# the project's own catalogue of its strings here, after ours.
+UNFOLD_LOCALE_PATH = path.join(BASE_DIR, "locale_vendor", "unfold")
+LOCALE_PATHS = [path.join(BASE_DIR, "locale/"), UNFOLD_LOCALE_PATH]
 
 ENABLE_DEBUG_TOOLBAR = getenv("ENABLE_DEBUG_TOOLBAR", "False") == "True"
 

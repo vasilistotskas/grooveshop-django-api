@@ -3,6 +3,37 @@
 
 
 
+## v3.92.5 (2026-10-01)
+
+### Bug fixes
+
+* fix(country): a postal-code pattern may use only syntax the storefront reads the same way (#106)
+
+The storefront applies `Country.postal_code_pattern` as a JavaScript
+RegExp (no `u` flag, wrapped as `^(?:…)$`); Django checked only that it
+compiled in Python. Python accepts syntax JavaScript rejects — named
+`(?P<…>)` groups, inline flags, atomic and possessive forms — or reads
+differently: `\A`/`\Z` as the letters A and Z, `{,3}` and an unclosed `{`
+as text, `[]` as an empty class. Such a pattern made checkout and the
+server disagree on what a postcode is, or left the storefront with no
+format at all.
+
+`validate_postal_code_pattern` now admits an explicit portable subset
+(literals, the d/s/w/b classes, escaped punctuation, character classes,
+plain, non-capturing and look-around groups, one-digit backreferences,
+the standard quantifiers) and names the first construct outside it. It
+compiles with `re.ASCII`, as matching does. Every one of the 178 seeded
+patterns passes, and on 2,796 pattern/value pairs Python and Node agree.
+
+
+Claude-Session: https://claude.ai/code/session_01BtZU1jbJwAin2BbDRdGyfK
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`c1a2a4f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c1a2a4fed31ac08234cbd6c3a7e23e25bb90b036))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.92.4 [skip ci] ([`daf544a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/daf544adba478101ec39605fb3d78a9be004fb4f))
+
 ## v3.92.4 (2026-10-01)
 
 ### Bug fixes

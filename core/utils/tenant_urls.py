@@ -43,6 +43,30 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import connection
 from django.utils.translation import gettext_lazy as _
+from django_tenants.postgresql_backend.base import FakeTenant
+from django_tenants.utils import get_public_schema_name
+
+
+def _bound_tenant():
+    """The store every helper here builds for, or None for no store.
+
+    ``connection.tenant`` is not always that store's row. Under
+    ``schema_context`` — a public-schema ``TenantTask``, the order
+    signals' ``on_commit`` dispatch, a management command — django-tenants
+    binds a bare ``FakeTenant`` carrying only the schema name: on the
+    public schema it stands for no store at all, and on a store's schema
+    for that store's row, read here so its domains and locales decide the
+    link rather than the platform defaults. A store schema without a row
+    is no store either.
+    """
+    tenant = getattr(connection, "tenant", None)
+    if not isinstance(tenant, FakeTenant):
+        return tenant
+    if tenant.schema_name == get_public_schema_name():
+        return None
+    from tenant.models import Tenant
+
+    return Tenant.objects.filter(schema_name=tenant.schema_name).first()
 
 
 def get_tenant_base_url() -> str:
@@ -58,7 +82,7 @@ def get_tenant_base_url() -> str:
     transient states during tenant creation) — falls through to the
     settings value in that case rather than raising.
     """
-    tenant = getattr(connection, "tenant", None)
+    tenant = _bound_tenant()
     domains_manager = getattr(tenant, "domains", None) if tenant else None
     if domains_manager is not None:
         try:
@@ -107,8 +131,11 @@ def tenant_storefront_locales(tenant) -> tuple[str, ...]:
     rule for rule, because a link has to agree with the storefront's
     ``locale-available`` route middleware, which 404s any other prefix:
     ``Tenant.available_locales`` filtered to :data:`STOREFRONT_LOCALES`;
-    empty means ``[default_locale]``; no tenant at all, or a default the
-    storefront does not support, means every storefront locale.
+    empty means ``[default_locale]``; no tenant at all means every
+    storefront locale. A tenant whose list and default name nothing the
+    storefront can route is served :data:`STOREFRONT_DEFAULT_LOCALE`
+    only — the unprefixed locale every storefront renders — never every
+    locale: it declared none.
     """
     if tenant is None:
         return STOREFRONT_LOCALES
@@ -122,7 +149,7 @@ def tenant_storefront_locales(tenant) -> tuple[str, ...]:
     default = getattr(tenant, "default_locale", None)
     if default in STOREFRONT_LOCALES:
         return (default,)
-    return STOREFRONT_LOCALES
+    return (STOREFRONT_DEFAULT_LOCALE,)
 
 
 def storefront_locale_prefix(tenant, language: str) -> str:
@@ -153,9 +180,7 @@ def get_tenant_frontend_url(path: str, *, language: str) -> str:
     """
     if path and not path.startswith("/"):
         path = "/" + path
-    prefix = storefront_locale_prefix(
-        getattr(connection, "tenant", None), language
-    )
+    prefix = storefront_locale_prefix(_bound_tenant(), language)
     return f"{get_tenant_base_url()}{prefix}{path}"
 
 
@@ -169,9 +194,7 @@ def localize_storefront_url(url: str, *, language: str) -> str:
     (see ``UserAccountAdapter.send_mail``). Same rule, same tenant.
     """
     parts = urlsplit(url)
-    prefix = storefront_locale_prefix(
-        getattr(connection, "tenant", None), language
-    )
+    prefix = storefront_locale_prefix(_bound_tenant(), language)
     if not prefix:
         return url
     return urlunsplit(parts._replace(path=f"{prefix}{parts.path}"))
@@ -250,7 +273,7 @@ def get_tenant_api_base_url() -> str:
     tenants that don't expose ``.domains`` — falls through to the
     settings value rather than raising.
     """
-    api_domain = resolve_tenant_api_domain(getattr(connection, "tenant", None))
+    api_domain = resolve_tenant_api_domain(_bound_tenant())
     if api_domain:
         return f"https://{api_domain}"
 
@@ -412,9 +435,7 @@ def get_tenant_assets_base_url() -> str:
 
     Always returns a URL without trailing slash.
     """
-    assets_domain = resolve_tenant_assets_domain(
-        getattr(connection, "tenant", None)
-    )
+    assets_domain = resolve_tenant_assets_domain(_bound_tenant())
     if assets_domain:
         return f"https://{assets_domain}"
 
@@ -434,9 +455,7 @@ def get_tenant_static_base_url() -> str:
 
     Always returns a URL without trailing slash.
     """
-    static_domain = resolve_tenant_static_domain(
-        getattr(connection, "tenant", None)
-    )
+    static_domain = resolve_tenant_static_domain(_bound_tenant())
     if static_domain:
         return f"https://{static_domain}"
 

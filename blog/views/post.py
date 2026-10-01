@@ -34,6 +34,7 @@ from blog.strategies.weighted_related_posts_strategy import (
 )
 from core.api.permissions import StoreStaffModelPermissions
 from core.api.serializers import ErrorResponseSerializer
+from core.api.throttling import ViewCountThrottle
 from core.api.views import BaseModelViewSet
 from core.filters.camel_case_ordering import ActionOrdering
 from core.utils.serializers import (
@@ -290,7 +291,11 @@ class BlogPostViewSet(BaseModelViewSet):
         )
         return Response(response_serializer.data, status=status.HTTP_200_OK)
 
-    @action(detail=True, methods=["POST"])
+    @action(
+        detail=True,
+        methods=["POST"],
+        throttle_classes=[ViewCountThrottle],
+    )
     def update_view_count(self, request, pk=None):
         post = self.get_object()
         # Use F() expression for atomic increment to prevent lost updates

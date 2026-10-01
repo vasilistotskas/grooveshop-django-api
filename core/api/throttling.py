@@ -281,7 +281,8 @@ class SearchClickThrottle(UserOrIpRateThrottle):
 
 
 class ViewCountThrottle(UserOrIpRateThrottle):
-    """Tight per-caller throttle for the product view-count increment endpoint."""
+    """Tight per-caller throttle for the view-count increments — products
+    and blog posts share one ``view_count`` budget per visitor."""
 
     scope = "view_count"
 

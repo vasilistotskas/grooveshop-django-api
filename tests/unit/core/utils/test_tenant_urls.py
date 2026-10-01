@@ -31,6 +31,7 @@ from core.utils.tenant_urls import (
     storefront_path,
     tenant_storefront_locales,
 )
+from tenant.models import TenantDomain
 from tests.utils.staff import store_tenant
 
 
@@ -290,21 +291,24 @@ class TestStorefrontLocalePrefix:
         ("available_locales", "english_link"),
         [(["el"], "/cart"), (["el", "en"], "/en/cart")],
     )
-    def test_store_schema_context_reads_the_store_row(
+    def test_store_schema_context_builds_for_the_store_row(
         self, bind_tenant, available_locales, english_link
     ):
-        # A command under schema_context("<store>") binds a FakeTenant
-        # too; the link follows the store's own locales, read from its
-        # row — neither every locale nor none.
-        store_tenant(
+        # The order signals' on_commit dispatch and commands run under
+        # schema_context("<store>"), which binds a FakeTenant: the link is
+        # the store's — its host, its locales — not the platform's.
+        store = store_tenant(
             "locale_store",
             default_locale="el",
             available_locales=available_locales,
         )
+        TenantDomain.objects.create(
+            domain="locale-store.example", tenant=store, is_primary=True
+        )
         bind_tenant(FakeTenant(schema_name="locale_store"))
         assert (
             get_tenant_frontend_url("/cart", language="en")
-            == f"{get_tenant_base_url()}{english_link}"
+            == f"https://locale-store.example{english_link}"
         )
 
     def test_prefix_is_empty_or_the_code(self):

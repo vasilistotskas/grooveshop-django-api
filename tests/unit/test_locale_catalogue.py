@@ -50,9 +50,14 @@ def test_no_greek_message_is_fuzzy(catalogue):
     assert fuzzy == []
 
 
-def test_the_unfold_catalogue_matches_the_installed_unfold(tmp_path):
-    """An Unfold upgrade that adds or drops strings fails here until
-    ``makemessages_unfold -l el`` is run and the new strings translated."""
+def test_the_unfold_catalogue_covers_the_installed_unfold(tmp_path):
+    """An Unfold upgrade that adds strings fails here until
+    ``makemessages_unfold -l el`` is run and the new strings translated.
+
+    One way only: what xgettext finds depends on its version (before
+    gettext 0.23 it skips calls inside f-strings, such as Unfold's
+    ``f"{_('Welcome')} {username}"``), so the catalogue, regenerated
+    with a current gettext, may hold strings an older one misses."""
     copy = tmp_path / MESSAGES
     copy.parent.mkdir(parents=True)
     shutil.copy(CATALOGUES["unfold"], copy)
@@ -63,4 +68,4 @@ def test_the_unfold_catalogue_matches_the_installed_unfold(tmp_path):
     def messages(path: Path) -> set[tuple[str | None, str]]:
         return {(entry.msgctxt, entry.msgid) for entry in _live_entries(path)}
 
-    assert messages(copy) == messages(CATALOGUES["unfold"])
+    assert messages(copy) - messages(CATALOGUES["unfold"]) == set()

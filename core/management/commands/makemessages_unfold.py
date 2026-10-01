@@ -7,7 +7,9 @@ under the Greek admin. ``makemessages`` only walks the project tree; this
 walks the installed Unfold package instead and writes to
 ``settings.UNFOLD_LOCALE_PATH``, which ``LOCALE_PATHS`` loads after the
 project's own catalogue. Run it after every Unfold upgrade, then
-translate what it added.
+translate what it added. Use gettext 0.23 or later: older xgettext skips
+calls inside f-strings, and with ``no_obsolete`` would drop the strings
+they hold.
 
 Strings Django's own catalogues already translate are left out, so
 Django's wording stays the one the admin shows for them.

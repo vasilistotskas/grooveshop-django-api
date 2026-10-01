@@ -58,7 +58,7 @@ def canceled_order():
 )
 @override_settings(AGENT_STRIPE_DELEGATED_ENABLED=True)
 def test_a_canceled_order_cannot_start_a_payment(canceled_order, route):
-    client = APIClient()
+    client = APIClient(HTTP_ACCEPT_LANGUAGE="en")
     client.force_authenticate(user=canceled_order.user)
 
     # The store is fully configured, so the order is the only reason
@@ -77,7 +77,7 @@ def test_a_canceled_order_cannot_start_a_payment(canceled_order, route):
         )
 
     assert response.status_code == 400, response.data
-    assert response.data["detail"] == REFUSAL
+    assert response.json()["detail"] == REFUSAL
     provider.assert_not_called()
     canceled_order.refresh_from_db()
     assert canceled_order.payment_status == PaymentStatus.CANCELED
@@ -110,7 +110,7 @@ def test_a_cancel_during_the_provider_call_is_not_overwritten():
         }
 
     provider.process_payment.side_effect = cancel_then_open
-    client = APIClient()
+    client = APIClient(HTTP_ACCEPT_LANGUAGE="en")
     client.force_authenticate(user=user)
 
     with (

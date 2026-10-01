@@ -27,6 +27,10 @@ from unfold.forms import (
     BaseDialogForm,
     UserChangeForm,
 )
+from unfold.widgets import (
+    UnfoldAdminIntegerFieldWidget,
+    UnfoldAdminTextInputWidget,
+)
 
 from admin.base import BaseModelAdmin, BaseTranslatableAdmin
 from admin.datasets import RelatedDatasetAdmin
@@ -235,11 +239,13 @@ class AdjustLoyaltyPointsForm(BaseDialogForm):
         label=_("Points"),
         min_value=-10000,
         max_value=10000,
+        widget=UnfoldAdminIntegerFieldWidget,
         help_text=_("Positive awards points, negative removes them"),
     )
     reason = forms.CharField(
         label=_("Reason"),
         max_length=255,
+        widget=UnfoldAdminTextInputWidget,
         help_text=_("Recorded on the points ledger"),
     )
 

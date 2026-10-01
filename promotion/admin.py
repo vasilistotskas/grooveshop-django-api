@@ -16,6 +16,10 @@ from unfold.dataclasses import ActionDialog
 from unfold.decorators import action, display
 from unfold.forms import BaseDialogForm
 from unfold.sections import TableSection
+from unfold.widgets import (
+    UnfoldAdminIntegerFieldWidget,
+    UnfoldAdminTextInputWidget,
+)
 
 from admin.base import BaseModelAdmin, BaseTranslatableAdmin
 from admin.displays import money
@@ -79,12 +83,17 @@ def _create_codes(
 
 class GenerateCodesForm(BaseDialogForm):
     count = forms.IntegerField(
-        label=_("Number of codes"), min_value=1, max_value=10000, initial=100
+        label=_("Number of codes"),
+        min_value=1,
+        max_value=10000,
+        initial=100,
+        widget=UnfoldAdminIntegerFieldWidget,
     )
     prefix = forms.CharField(
         label=_("Prefix"),
         max_length=12,
         required=False,
+        widget=UnfoldAdminTextInputWidget,
         help_text=_("Optional prefix, e.g. VIP- (uppercased)"),
     )
     length = forms.IntegerField(
@@ -92,12 +101,14 @@ class GenerateCodesForm(BaseDialogForm):
         min_value=6,
         max_value=24,
         initial=10,
+        widget=UnfoldAdminIntegerFieldWidget,
     )
     usage_limit = forms.IntegerField(
         label=_("Usage limit per code"),
         min_value=1,
         required=False,
         initial=1,
+        widget=UnfoldAdminIntegerFieldWidget,
         help_text=_("Empty for unlimited; 1 for single-use codes"),
     )
 

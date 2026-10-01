@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-01 03:01+0300\n"
+"POT-Creation-Date: 2026-10-01 03:11+0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -13,7 +13,7 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: .\admin\admin.py:38 .\product\admin.py:1571
+#: .\admin\admin.py:38 .\product\admin.py:1572
 msgid "When"
 msgstr ""
 
@@ -161,7 +161,7 @@ msgstr ""
 #: .\giftcard\models.py:65 .\giftcard\models.py:106 .\meta_capi\models.py:57
 #: .\notification\admin.py:289 .\notification\admin.py:410 .\order\admin.py:677
 #: .\order\admin.py:702 .\order\models\order.py:150 .\product\admin.py:698
-#: .\product\admin.py:1845 .\product\models\review.py:29
+#: .\product\admin.py:1849 .\product\models\review.py:29
 #: .\promotion\admin.py:269 .\tenant\admin.py:209 .\user\admin.py:260
 #: .\user\admin.py:940 .\user\models\data_export.py:33
 #: .\user\models\subscription.py:198
@@ -311,10 +311,10 @@ msgstr "Order"
 #: .\core\templates\emails\shipping_acs\stale_shipments_alert.html:14
 #: .\core\templates\emails\shipping_acs\unprinted_vouchers_alert.html:14
 #: .\core\templates\invoices\invoice.html:187 .\notification\enum.py:14
-#: .\order\admin.py:816 .\order\admin.py:1483 .\order\admin.py:1580
-#: .\order\admin.py:1904 .\order\models\attribution.py:37
+#: .\order\admin.py:816 .\order\admin.py:1487 .\order\admin.py:1584
+#: .\order\admin.py:1908 .\order\models\attribution.py:37
 #: .\order\models\order.py:385 .\order\models\viva_webhook_event.py:57
-#: .\pay_way\admin.py:219 .\product\admin.py:1577
+#: .\pay_way\admin.py:219 .\product\admin.py:1578
 #: .\recommendation\models.py:261 .\shipping_acs\admin.py:431
 #: .\shipping_acs\models\shipment.py:44 .\shipping_boxnow\admin.py:317
 #: .\shipping_boxnow\models\shipment.py:45
@@ -328,7 +328,7 @@ msgid "Customer"
 msgstr ""
 
 #: .\admin\dashboard\store\widgets.py:282 .\cart\admin.py:134
-#: .\cart\admin.py:255
+#: .\cart\admin.py:257
 #: .\core\templates\emails\order\order_payment_confirmed.html:56
 #: .\core\templates\emails\order\order_received.html:61
 #: .\core\templates\emails\order\order_received.html:88
@@ -337,7 +337,7 @@ msgstr ""
 #: .\core\templates\emails\order\payment_failed.html:19
 #: .\core\templates\emails\order\payment_failed.txt:8
 #: .\core\templates\invoices\invoice.html:288 .\order\admin.py:224
-#: .\order\admin.py:326 .\order\admin.py:718 .\order\admin.py:1912
+#: .\order\admin.py:326 .\order\admin.py:718 .\order\admin.py:1916
 msgid "Total"
 msgstr "Total"
 
@@ -356,20 +356,20 @@ msgstr ""
 #: .\admin\dashboard\store\widgets.py:324
 #: .\admin\dashboard\store\widgets.py:437
 #: .\admin\dashboard\store\widgets.py:645 .\cart\admin.py:114
-#: .\cart\admin.py:402 .\core\templates\emails\cart\checkout_abandoned.html:15
+#: .\cart\admin.py:407 .\core\templates\emails\cart\checkout_abandoned.html:15
 #: .\core\templates\emails\order\order_payment_confirmed.html:53
 #: .\core\templates\emails\order\order_received.html:58
 #: .\core\templates\emails\order\order_status_generic.html:86
 #: .\core\templates\emails\product\low_stock_alert.html:13
-#: .\notification\enum.py:18 .\order\admin.py:211 .\order\admin.py:1500
-#: .\product\admin.py:1085 .\product\admin.py:1823 .\product\admin.py:1928
-#: .\product\admin.py:2090 .\product\models\product.py:225
+#: .\notification\enum.py:18 .\order\admin.py:211 .\order\admin.py:1504
+#: .\product\admin.py:1085 .\product\admin.py:1827 .\product\admin.py:1932
+#: .\product\admin.py:2094 .\product\models\product.py:225
 #: .\recommendation\models.py:142 .\recommendation\models.py:229
 msgid "Product"
 msgstr "Product"
 
 #: .\admin\dashboard\store\widgets.py:326 .\contact\admin.py:391
-#: .\contact\models.py:230 .\product\admin.py:1840
+#: .\contact\models.py:230 .\product\admin.py:1844
 msgid "Rating"
 msgstr ""
 
@@ -529,7 +529,7 @@ msgid "Active products with fewer than %(count)s left"
 msgstr ""
 
 #: .\admin\dashboard\store\widgets.py:646
-#: .\core\templates\admin\product\stock_history.html:31 .\product\admin.py:1551
+#: .\core\templates\admin\product\stock_history.html:31 .\product\admin.py:1552
 msgid "In stock"
 msgstr ""
 
@@ -599,6 +599,48 @@ msgstr ""
 #: .\admin\dashboard\store\widgets.py:809
 msgid "Set MYDATA_ENVIRONMENT to 'prod' when you are ready."
 msgstr ""
+
+#: .\admin\displays.py:180
+#, python-format
+msgid "%(num)d year"
+msgid_plural "%(num)d years"
+msgstr[0] ""
+msgstr[1] ""
+
+#: .\admin\displays.py:181
+#, python-format
+msgid "%(num)d month"
+msgid_plural "%(num)d months"
+msgstr[0] ""
+msgstr[1] ""
+
+#: .\admin\displays.py:182
+#, python-format
+msgid "%(num)d week"
+msgid_plural "%(num)d weeks"
+msgstr[0] ""
+msgstr[1] ""
+
+#: .\admin\displays.py:183
+#, python-format
+msgid "%(num)d day"
+msgid_plural "%(num)d days"
+msgstr[0] ""
+msgstr[1] ""
+
+#: .\admin\displays.py:184
+#, python-format
+msgid "%(num)d hour"
+msgid_plural "%(num)d hours"
+msgstr[0] ""
+msgstr[1] ""
+
+#: .\admin\displays.py:185
+#, python-format
+msgid "%(num)d minute"
+msgid_plural "%(num)d minutes"
+msgstr[0] ""
+msgstr[1] ""
 
 #: .\admin\environment.py:8
 #, fuzzy
@@ -783,7 +825,7 @@ msgstr ""
 #: .\core\templates\emails\b2b\business_profile_rejected.html:15
 #: .\core\templates\emails\b2b\business_profile_rejected.txt:3
 #: .\giftcard\admin.py:39 .\order\models\stock_log.py:85
-#: .\product\admin.py:1576 .\user\admin.py:241
+#: .\product\admin.py:1577 .\user\admin.py:241
 msgid "Reason"
 msgstr ""
 
@@ -818,7 +860,7 @@ msgstr "Price"
 msgid "Company"
 msgstr ""
 
-#: .\b2b\admin.py:121 .\notification\enum.py:23 .\product\admin.py:1813
+#: .\b2b\admin.py:121 .\notification\enum.py:23 .\product\admin.py:1814
 msgid "Review"
 msgstr ""
 
@@ -960,11 +1002,11 @@ msgid ""
 "for a product wins over this."
 msgstr ""
 
-#: .\b2b\models\group.py:36 .\blog\models\tag.py:13 .\cart\admin.py:241
+#: .\b2b\models\group.py:36 .\blog\models\tag.py:13 .\cart\admin.py:243
 #: .\core\templates\admin\email_template_management.html:30
 #: .\giftcard\enum.py:6 .\notification\admin.py:71 .\notification\admin.py:295
 #: .\notification\admin.py:357 .\notification\admin.py:476
-#: .\notification\admin.py:491 .\order\admin.py:1534 .\pay_way\models.py:21
+#: .\notification\admin.py:491 .\order\admin.py:1538 .\pay_way\models.py:21
 #: .\product\models\attribute.py:20 .\product\models\attribute_value.py:25
 #: .\product\models\category.py:30 .\product\models\category_image.py:31
 #: .\product\models\product.py:112 .\product\models\variant_group.py:26
@@ -1188,8 +1230,8 @@ msgstr ""
 msgid "Statistics"
 msgstr ""
 
-#: .\blog\admin.py:172 .\blog\admin.py:711 .\cart\admin.py:234
-#: .\notification\admin.py:440 .\product\admin.py:1832 .\product\admin.py:1924
+#: .\blog\admin.py:172 .\blog\admin.py:711 .\cart\admin.py:236
+#: .\notification\admin.py:440 .\product\admin.py:1836 .\product\admin.py:1928
 #: .\recommendation\models.py:251 .\tenant\models.py:1599
 #: .\tenant\models.py:1679 .\user\admin.py:498 .\user\admin.py:949
 #: .\user\models\data_export.py:30 .\user\models\subscription.py:177
@@ -1210,7 +1252,7 @@ msgid "Tag Information"
 msgstr ""
 
 #: .\blog\admin.py:228 .\blog\admin.py:299 .\country\admin.py:119
-#: .\page_config\admin.py:280 .\product\admin.py:1982 .\product\admin.py:2065
+#: .\page_config\admin.py:280 .\product\admin.py:1986 .\product\admin.py:2069
 #: .\region\admin.py:97 .\tag\admin.py:144
 msgid "Organization"
 msgstr ""
@@ -1219,7 +1261,7 @@ msgstr ""
 msgid "Unnamed Tag"
 msgstr ""
 
-#: .\blog\admin.py:278 .\product\admin.py:1630
+#: .\blog\admin.py:278 .\product\admin.py:1631
 msgid "Category Information"
 msgstr ""
 
@@ -1248,8 +1290,8 @@ msgid "Search by title, subtitle, slug, body, or author email/username."
 msgstr ""
 
 #: .\blog\admin.py:416 .\blog\admin.py:702 .\blog\models\comment.py:44
-#: .\page_config\admin.py:276 .\product\admin.py:1637 .\product\admin.py:1798
-#: .\product\admin.py:1975 .\product\admin.py:2058
+#: .\page_config\admin.py:276 .\product\admin.py:1638 .\product\admin.py:1799
+#: .\product\admin.py:1979 .\product\admin.py:2062
 msgid "Content"
 msgstr ""
 
@@ -1258,7 +1300,7 @@ msgid "Publishing"
 msgstr ""
 
 #: .\blog\admin.py:443 .\page_config\admin.py:116 .\page_config\admin.py:284
-#: .\product\admin.py:949 .\product\admin.py:1644
+#: .\product\admin.py:949 .\product\admin.py:1645
 msgid "SEO"
 msgstr ""
 
@@ -1280,7 +1322,7 @@ msgstr ""
 #: .\core\templates\emails\subscription\confirmation.html:27
 #: .\core\templates\emails\subscription\confirmation.txt:16
 #: .\notification\admin.py:280 .\notification\models\notification.py:46
-#: .\product\admin.py:1101 .\product\admin.py:1695 .\product\admin.py:2007
+#: .\product\admin.py:1103 .\product\admin.py:1696 .\product\admin.py:2011
 #: .\user\admin.py:793 .\user\models\subscription.py:61 .\vat\admin.py:132
 msgid "Category"
 msgstr ""
@@ -1809,7 +1851,7 @@ msgstr ""
 #: .\blog\models\category.py:33 .\core\admin.py:329
 #: .\core\templates\invoices\invoice.html:234 .\giftcard\models.py:261
 #: .\loyalty\models\tier.py:81 .\loyalty\models\transaction.py:36
-#: .\order\admin.py:268 .\order\admin.py:1589 .\order\admin.py:1678
+#: .\order\admin.py:268 .\order\admin.py:1593 .\order\admin.py:1682
 #: .\order\models\history.py:26 .\order\models\history.py:232
 #: .\pay_way\models.py:94 .\product\models\category.py:40
 #: .\product\models\product.py:457 .\promotion\models\promotion.py:290
@@ -2256,8 +2298,8 @@ msgstr ""
 msgid "Old (7+ days)"
 msgstr ""
 
-#: .\cart\admin.py:120 .\cart\admin.py:406 .\order\admin.py:217
-#: .\order\admin.py:1504 .\product\admin.py:1932 .\product\admin.py:2094
+#: .\cart\admin.py:120 .\cart\admin.py:411 .\order\admin.py:217
+#: .\order\admin.py:1508 .\product\admin.py:1936 .\product\admin.py:2098
 #, fuzzy
 #| msgid "Product"
 msgid "Unnamed Product"
@@ -2272,7 +2314,7 @@ msgstr ""
 msgid "%(price)s → %(final)s"
 msgstr ""
 
-#: .\cart\admin.py:140 .\cart\admin.py:432
+#: .\cart\admin.py:140 .\cart\admin.py:437
 #: .\core\templates\emails\order\order_payment_confirmed.html:75
 #: .\core\templates\emails\order\order_payment_confirmed.txt:28
 #: .\core\templates\emails\order\order_received.html:80
@@ -2287,7 +2329,7 @@ msgstr ""
 msgid "Cart Owner"
 msgstr ""
 
-#: .\cart\admin.py:194 .\cart\admin.py:237
+#: .\cart\admin.py:194 .\cart\admin.py:239
 #: .\core\templates\emails\b2b\admin_new_business_profile.html:15
 #: .\core\templates\emails\b2b\admin_new_business_profile.txt:6
 msgid "Activity"
@@ -2301,47 +2343,53 @@ msgstr ""
 msgid "Owner"
 msgstr ""
 
-#: .\cart\admin.py:229 .\cart\admin.py:235 .\cart\admin.py:396
+#: .\cart\admin.py:230 .\cart\admin.py:237 .\cart\admin.py:398
 #: .\user\admin.py:952
 msgid "Guest"
 msgstr ""
 
-#: .\cart\admin.py:231 .\core\admin.py:317 .\pay_way\admin.py:193
-#: .\product\admin.py:2020 .\shipping_boxnow\models\locker.py:30
+#: .\cart\admin.py:230
+#, fuzzy, python-format
+#| msgid "Order Details"
+msgid "Cart #%(id)s"
+msgstr "Order Details"
+
+#: .\cart\admin.py:233 .\core\admin.py:317 .\pay_way\admin.py:193
+#: .\product\admin.py:2024 .\shipping_boxnow\models\locker.py:30
 msgid "Type"
 msgstr ""
 
-#: .\cart\admin.py:243
+#: .\cart\admin.py:245
 msgid "Recent"
 msgstr ""
 
-#: .\cart\admin.py:245
+#: .\cart\admin.py:247
 msgid "Idle"
 msgstr ""
 
-#: .\cart\admin.py:246
+#: .\cart\admin.py:248
 msgid "Abandoned"
 msgstr ""
 
-#: .\cart\admin.py:248
+#: .\cart\admin.py:250
 msgid "Items"
 msgstr ""
 
-#: .\cart\admin.py:250
+#: .\cart\admin.py:252
 #, python-format
 msgid "%(total)d items, %(unique)d unique"
 msgstr ""
 
-#: .\cart\admin.py:259
+#: .\cart\admin.py:261
 #, python-format
 msgid "%(total)s (-%(discount)s saved)"
 msgstr ""
 
-#: .\cart\admin.py:265
+#: .\cart\admin.py:267
 msgid "Cart Summary"
 msgstr ""
 
-#: .\cart\admin.py:268
+#: .\cart\admin.py:270
 #, python-format
 msgid ""
 "Items: %(items)d total, %(unique)d unique. Total price: %(price)s. Total "
@@ -2349,102 +2397,107 @@ msgid ""
 "%(created)s."
 msgstr ""
 
-#: .\cart\admin.py:281
+#: .\cart\admin.py:283
 msgid "Financial Summary"
 msgstr ""
 
-#: .\cart\admin.py:292
+#: .\cart\admin.py:294
 #, python-format
 msgid ""
 "Final total: %(final)s. Discounts: -%(disc)s. VAT: %(vat)s. Savings: "
 "%(savings).1f%%."
 msgstr ""
 
-#: .\cart\admin.py:348 .\cart\models\item.py:47
+#: .\cart\admin.py:350 .\cart\models\item.py:47
 msgid "Cart Item"
 msgstr ""
 
-#: .\cart\admin.py:355
+#: .\cart\admin.py:357
 msgid "Pricing Information"
 msgstr ""
 
-#: .\cart\admin.py:362 .\core\apps.py:11 .\notification\enum.py:22
-#: .\order\admin.py:281 .\order\admin.py:1602 .\order\admin.py:1691
+#: .\cart\admin.py:364 .\core\apps.py:11 .\notification\enum.py:22
+#: .\order\admin.py:281 .\order\admin.py:1606 .\order\admin.py:1695
 #: .\page_config\admin.py:134 .\page_config\admin.py:291 .\pay_way\admin.py:164
-#: .\product\admin.py:743 .\product\admin.py:1541 .\settings.py:3645
+#: .\product\admin.py:743 .\product\admin.py:1542 .\settings.py:3645
 msgid "System"
 msgstr ""
 
-#: .\cart\admin.py:393 .\cart\models\cart.py:30 .\notification\enum.py:17
+#: .\cart\admin.py:395 .\cart\models\cart.py:30 .\notification\enum.py:17
 #: .\recommendation\enum.py:17 .\recommendation\models.py:239
 msgid "Cart"
 msgstr ""
 
-#: .\cart\admin.py:409 .\core\templates\invoices\invoice.html:235
+#: .\cart\admin.py:402
+#, python-format
+msgid "Cart #%(id)s — %(owner)s"
+msgstr ""
+
+#: .\cart\admin.py:414 .\core\templates\invoices\invoice.html:235
 msgid "Qty"
 msgstr ""
 
-#: .\cart\admin.py:413 .\order\admin.py:1517 .\product\admin.py:1133
+#: .\cart\admin.py:418 .\order\admin.py:1521 .\product\admin.py:1134
 msgid "Pricing"
-msgstr ""
-
-#: .\cart\admin.py:422
-#, python-format
-msgid "%(price)s → %(final)s each — total %(total)s"
 msgstr ""
 
 #: .\cart\admin.py:427
 #, python-format
+msgid "%(price)s → %(final)s each — total %(total)s"
+msgstr ""
+
+#: .\cart\admin.py:432
+#, python-format
 msgid "%(final)s each — total %(total)s"
 msgstr ""
 
-#: .\cart\admin.py:438
+#: .\cart\admin.py:443
 msgid "Pricing Breakdown"
 msgstr ""
 
-#: .\cart\admin.py:441
+#: .\cart\admin.py:446
 #, python-format
 msgid ""
 "Unit price: %(price)s. Final price: %(final)s. Quantity: %(qty)s. Total: "
 "%(total)s."
 msgstr ""
 
-#: .\cart\admin.py:450
+#: .\cart\admin.py:455
 msgid "Savings"
 msgstr ""
 
-#: .\cart\admin.py:454
+#: .\cart\admin.py:459
 #, python-format
 msgid "Discount: %(percent)s%%. You save %(value)s per item (%(total)s total)."
 msgstr ""
 
-#: .\cart\admin.py:461
+#: .\cart\admin.py:466
 msgid "No discounts applied"
 msgstr ""
 
-#: .\cart\admin.py:464
+#: .\cart\admin.py:469
 msgid "Increase quantity by 1"
 msgstr ""
 
-#: .\cart\admin.py:474
+#: .\cart\admin.py:479
 #, python-format
 msgid "Quantity increased for %(count)d items."
 msgstr ""
 
-#: .\cart\admin.py:478
+#: .\cart\admin.py:483
 msgid "Decrease quantity by 1"
 msgstr ""
 
-#: .\cart\admin.py:491
+#: .\cart\admin.py:496
 #, python-format
 msgid "Quantity decreased for %(count)d items."
 msgstr ""
 
-#: .\cart\admin.py:495
+#: .\cart\admin.py:500
 msgid "Remove from cart"
 msgstr ""
 
-#: .\cart\admin.py:504
+#: .\cart\admin.py:509
 #, python-format
 msgid "%(count)d items were removed from carts."
 msgstr ""
@@ -2657,7 +2710,7 @@ msgstr ""
 #: .\core\templates\emails\order\order_payment_confirmed.html:54
 #: .\core\templates\emails\order\order_received.html:59
 #: .\core\templates\emails\order\order_status_generic.html:87
-#: .\order\admin.py:1507 .\order\models\item.py:28
+#: .\order\admin.py:1511 .\order\models\item.py:28
 #: .\order\models\stock_reservation.py:35
 msgid "Quantity"
 msgstr "Quantity"
@@ -3157,10 +3210,10 @@ msgstr ""
 
 #: .\contact\admin.py:203 .\contact\admin.py:373 .\country\admin.py:126
 #: .\notification\admin.py:228 .\notification\admin.py:424
-#: .\order\admin.py:1465 .\product\admin.py:380 .\product\admin.py:520
-#: .\product\admin.py:968 .\product\admin.py:1661 .\product\admin.py:1805
-#: .\product\admin.py:1989 .\product\admin.py:2072 .\product\admin.py:2160
-#: .\product\admin.py:2250 .\region\admin.py:105 .\tag\admin.py:146
+#: .\order\admin.py:1469 .\product\admin.py:380 .\product\admin.py:520
+#: .\product\admin.py:968 .\product\admin.py:1662 .\product\admin.py:1806
+#: .\product\admin.py:1993 .\product\admin.py:2076 .\product\admin.py:2164
+#: .\product\admin.py:2254 .\region\admin.py:105 .\tag\admin.py:146
 #: .\tag\admin.py:245 .\user\admin.py:707 .\user\admin.py:777
 #: .\vat\admin.py:116
 msgid "System Information"
@@ -3339,7 +3392,7 @@ msgid "Website & UX"
 msgstr ""
 
 #: .\contact\models.py:217 .\core\cache\surfaces.py:238
-#: .\page_config\models.py:417 .\product\admin.py:2269 .\product\apps.py:7
+#: .\page_config\models.py:417 .\product\admin.py:2273 .\product\apps.py:7
 #: .\product\models\product.py:226 .\settings.py:3248
 msgid "Products"
 msgstr ""
@@ -3841,7 +3894,7 @@ msgstr ""
 #: .\core\email\sample_data.py:166
 #: .\core\templates\emails\order\order_pending_reminder.html:21
 #: .\core\templates\emails\order\order_pending_reminder.txt:7
-#: .\meta_capi\models.py:10 .\order\admin.py:1919 .\order\enum\status.py:6
+#: .\meta_capi\models.py:10 .\order\admin.py:1923 .\order\enum\status.py:6
 #: .\order\enum\status.py:34 .\user\models\data_export.py:20
 msgid "Pending"
 msgstr ""
@@ -4688,7 +4741,7 @@ msgid "Apply Discount"
 msgstr ""
 
 #: .\core\templates\admin\product\stock_history.html:8
-#: .\core\templates\admin\product\stock_history.html:15 .\product\admin.py:1555
+#: .\core\templates\admin\product\stock_history.html:15 .\product\admin.py:1556
 msgid "Stock history"
 msgstr ""
 
@@ -5560,7 +5613,7 @@ msgstr ""
 
 #: .\core\templates\emails\order\order_payment_confirmed.html:20
 #: .\core\templates\emails\order\order_payment_confirmed.txt:8
-#: .\order\admin.py:1493
+#: .\order\admin.py:1497
 #, fuzzy
 #| msgid "Order Details"
 msgid "Order Status"
@@ -5616,7 +5669,7 @@ msgstr "Subtotal"
 #: .\core\templates\emails\order\order_status_generic.html:106
 #: .\core\templates\emails\order\order_status_generic.txt:38
 #: .\core\templates\invoices\invoice.html:277 .\notification\enum.py:16
-#: .\order\admin.py:845 .\order\models\invoice.py:213 .\settings.py:3489
+#: .\order\admin.py:849 .\order\models\invoice.py:213 .\settings.py:3489
 #: .\shipping\apps.py:7 .\tenant\admin.py:574
 msgid "Shipping"
 msgstr "Shipping"
@@ -6799,9 +6852,9 @@ msgstr ""
 msgid "Incomplete"
 msgstr ""
 
-#: .\country\admin.py:180 .\order\admin.py:852 .\product\admin.py:419
-#: .\product\admin.py:563 .\product\admin.py:1156 .\product\admin.py:1715
-#: .\product\admin.py:1848 .\product\admin.py:1935 .\region\admin.py:176
+#: .\country\admin.py:180 .\order\admin.py:856 .\product\admin.py:419
+#: .\product\admin.py:563 .\product\admin.py:1157 .\product\admin.py:1716
+#: .\product\admin.py:1852 .\product\admin.py:1939 .\region\admin.py:176
 #: .\tag\admin.py:171
 msgid "Created"
 msgstr ""
@@ -7800,7 +7853,7 @@ msgstr ""
 
 #: .\notification\admin.py:214 .\notification\admin.py:321
 #: .\notification\admin.py:417 .\notification\admin.py:482
-#: .\product\admin.py:1651 .\region\admin.py:101
+#: .\product\admin.py:1652 .\region\admin.py:101
 msgid "Analytics"
 msgstr ""
 
@@ -8290,26 +8343,26 @@ msgstr ""
 msgid "Urgent (24h+ Pending)"
 msgstr ""
 
-#: .\order\admin.py:228 .\order\admin.py:1525
+#: .\order\admin.py:228 .\order\admin.py:1529
 msgid "Refund Status"
 msgstr ""
 
 # Email Template Translations
-#: .\order\admin.py:272 .\order\admin.py:1593 .\order\admin.py:1682
+#: .\order\admin.py:272 .\order\admin.py:1597 .\order\admin.py:1686
 #, fuzzy
 #| msgid "Questions?"
 msgid "No description"
 msgstr "Questions?"
 
-#: .\order\admin.py:277 .\order\admin.py:1598 .\order\admin.py:1687
+#: .\order\admin.py:277 .\order\admin.py:1602 .\order\admin.py:1691
 msgid "Changed By"
 msgstr ""
 
-#: .\order\admin.py:330 .\order\admin.py:1916
+#: .\order\admin.py:330 .\order\admin.py:1920
 msgid "Document"
 msgstr ""
 
-#: .\order\admin.py:335 .\order\admin.py:1743
+#: .\order\admin.py:335 .\order\admin.py:1747
 msgid "Pending render"
 msgstr ""
 
@@ -8376,7 +8429,7 @@ msgid ""
 "BoxNow shipment tab below."
 msgstr ""
 
-#: .\order\admin.py:558 .\order\admin.py:1458
+#: .\order\admin.py:558 .\order\admin.py:1462
 #: .\shipping_boxnow\models\parcel_event.py:87 .\user\admin.py:696
 msgid "Additional Information"
 msgstr ""
@@ -8392,7 +8445,7 @@ msgid_plural "%(count)d items"
 msgstr[0] ""
 msgstr[1] ""
 
-#: .\order\admin.py:739 .\order\admin.py:822 .\shipping_acs\admin.py:215
+#: .\order\admin.py:739 .\order\admin.py:826 .\shipping_acs\admin.py:215
 #: .\shipping_acs\models\cod_payout.py:44
 #: .\shipping_acs\models\tracking_event.py:27
 #: .\shipping_boxnow\models\parcel_event.py:32
@@ -8401,7 +8454,7 @@ msgstr[1] ""
 msgid "Shipment"
 msgstr "Shipping"
 
-#: .\order\admin.py:749 .\order\admin.py:1835 .\order\enum\document_type.py:7
+#: .\order\admin.py:749 .\order\admin.py:1839 .\order\enum\document_type.py:7
 #: .\order\enum\document_type.py:17 .\order\models\invoice.py:401
 msgid "Invoice"
 msgstr ""
@@ -8435,109 +8488,116 @@ msgstr ""
 msgid "items %(items)s + shipping %(shipping)s (currency mismatch)"
 msgstr ""
 
-#: .\order\admin.py:848
+#: .\order\admin.py:821
+#, python-format
+msgid "%(count)s item, qty %(qty)s — %(total)s"
+msgid_plural "%(count)s items, qty %(qty)s — %(total)s"
+msgstr[0] ""
+msgstr[1] ""
+
+#: .\order\admin.py:852
 msgid "Unknown carrier"
 msgstr ""
 
-#: .\order\admin.py:850
+#: .\order\admin.py:854
 msgid "No tracking"
 msgstr ""
 
-#: .\order\admin.py:857
+#: .\order\admin.py:861
 msgid "Mark selected orders as processing"
 msgstr ""
 
-#: .\order\admin.py:866
+#: .\order\admin.py:870
 #, python-format
 msgid "Order %(order_id)s marked as processing"
 msgstr ""
 
-#: .\order\admin.py:870
+#: .\order\admin.py:874
 msgid "Mark selected orders as shipped"
 msgstr ""
 
-#: .\order\admin.py:879
+#: .\order\admin.py:883
 #, python-format
 msgid "Order %(order_id)s marked as shipped"
 msgstr ""
 
-#: .\order\admin.py:883
+#: .\order\admin.py:887
 msgid "Mark selected orders as delivered"
 msgstr ""
 
-#: .\order\admin.py:892
+#: .\order\admin.py:896
 #, python-format
 msgid "Order %(order_id)s marked as delivered"
 msgstr ""
 
-#: .\order\admin.py:896
+#: .\order\admin.py:900
 msgid "Mark selected orders as completed"
 msgstr ""
 
-#: .\order\admin.py:905
+#: .\order\admin.py:909
 #, python-format
 msgid "Order %(order_id)s marked as completed"
 msgstr ""
 
-#: .\order\admin.py:909
+#: .\order\admin.py:913
 msgid "Mark selected orders as returned"
 msgstr ""
 
-#: .\order\admin.py:921
+#: .\order\admin.py:925
 #, fuzzy, python-format
 #| msgid "Your order has been canceled."
 msgid "Order %(order_id)s marked as returned"
 msgstr "Your order has been canceled."
 
-#: .\order\admin.py:925
+#: .\order\admin.py:929
 msgid "Mark selected orders as refunded"
 msgstr ""
 
-#: .\order\admin.py:937
+#: .\order\admin.py:941
 #, fuzzy, python-format
 #| msgid "Your order has been canceled."
 msgid "Order %(order_id)s marked as refunded"
 msgstr "Your order has been canceled."
 
-#: .\order\admin.py:962 .\order\admin.py:997
+#: .\order\admin.py:966 .\order\admin.py:1001
 #, python-format
 msgid "Order %(order_id)s skipped: %(reason)s"
 msgstr ""
 
-#: .\order\admin.py:968
+#: .\order\admin.py:972
 msgid "Cancel selected orders and restore stock"
 msgstr ""
 
-#: .\order\admin.py:988
+#: .\order\admin.py:992
 #, python-format
 msgid "Order %(order_id)s marked as canceled"
 msgstr ""
 
-#: .\order\admin.py:1009
+#: .\order\admin.py:1013
 #, python-format
 msgid "Order %(order_id)s: unexpected error (%(error)s) — check logs"
 msgstr ""
 
-#: .\order\admin.py:1042
+#: .\order\admin.py:1046
 msgid "Invoice not found."
 msgstr ""
 
-#: .\order\admin.py:1044
+#: .\order\admin.py:1048
 msgid "Invoice PDF has not been generated yet."
 msgstr ""
 
-#: .\order\admin.py:1056
+#: .\order\admin.py:1060
 msgid "Generate invoice"
 msgstr ""
 
-#: .\order\admin.py:1071 .\order\admin.py:1132 .\order\admin.py:1172
-#: .\order\admin.py:1227 .\order\admin.py:1279 .\order\admin.py:1381
+#: .\order\admin.py:1075 .\order\admin.py:1136 .\order\admin.py:1176
+#: .\order\admin.py:1231 .\order\admin.py:1283 .\order\admin.py:1385
 #, fuzzy
 #| msgid "Order Details"
 msgid "Order not found."
 msgstr "Order Details"
 
-#: .\order\admin.py:1078
+#: .\order\admin.py:1082
 #, python-format
 msgid ""
 "Order #%(order_id)s has document_type=%(doc)s, not INVOICE. Generating "
@@ -8545,201 +8605,201 @@ msgid ""
 "this is ongoing."
 msgstr ""
 
-#: .\order\admin.py:1094
+#: .\order\admin.py:1098
 #, python-format
 msgid "Invoice generation failed: %(err)s"
 msgstr ""
 
-#: .\order\admin.py:1101
+#: .\order\admin.py:1105
 #, python-format
 msgid "Invoice %(num)s ready for order #%(order_id)s."
 msgstr ""
 
-#: .\order\admin.py:1108
+#: .\order\admin.py:1112
 #, python-format
 msgid ""
 "Invoice row %(num)s exists but the PDF was not rendered — check server logs."
 msgstr ""
 
-#: .\order\admin.py:1116
+#: .\order\admin.py:1120
 msgid "Regenerate invoice (same number)"
 msgstr ""
 
-#: .\order\admin.py:1143
+#: .\order\admin.py:1147
 #, python-format
 msgid "Invoice regeneration failed: %(err)s"
 msgstr ""
 
-#: .\order\admin.py:1150
+#: .\order\admin.py:1154
 #, python-format
 msgid ""
 "Invoice %(num)s refreshed for order #%(order_id)s (number preserved; PDF + "
 "snapshots regenerated)."
 msgstr ""
 
-#: .\order\admin.py:1158
+#: .\order\admin.py:1162
 msgid "Send invoice to myDATA"
 msgstr ""
 
-#: .\order\admin.py:1180
+#: .\order\admin.py:1184
 #, python-format
 msgid ""
 "Order #%(order_id)s has no rendered invoice yet — generate the invoice "
 "first, then submit to myDATA."
 msgstr ""
 
-#: .\order\admin.py:1194
+#: .\order\admin.py:1198
 msgid ""
 "myDATA integration is not ready — check MYDATA_ENABLED and credentials in "
 "Settings before retrying."
 msgstr ""
 
-#: .\order\admin.py:1204
+#: .\order\admin.py:1208
 #, python-format
 msgid ""
 "Scheduled myDATA submission for invoice %(num)s (order #%(order_id)s). "
 "Refresh the Invoice admin to see the MARK once AADE responds."
 msgstr ""
 
-#: .\order\admin.py:1213
+#: .\order\admin.py:1217
 msgid "Cancel invoice in myDATA"
 msgstr ""
 
-#: .\order\admin.py:1235
+#: .\order\admin.py:1239
 #, python-format
 msgid "No myDATA MARK on file for order #%(order_id)s — nothing to cancel."
 msgstr ""
 
-#: .\order\admin.py:1248
+#: .\order\admin.py:1252
 #, python-format
 msgid "Scheduled myDATA cancellation for MARK %(mark)s (order #%(order_id)s)."
 msgstr ""
 
-#: .\order\admin.py:1256
+#: .\order\admin.py:1260
 msgid "Download shipping voucher (PDF)"
 msgstr ""
 
-#: .\order\admin.py:1287
+#: .\order\admin.py:1291
 #, python-format
 msgid ""
 "Order #%(order_id)s has no shipping carrier attached — nothing to download."
 msgstr ""
 
-#: .\order\admin.py:1299
+#: .\order\admin.py:1303
 #, python-format
 msgid ""
 "No shipment row for order #%(order_id)s — the create-shipment task has not "
 "run yet."
 msgstr ""
 
-#: .\order\admin.py:1326
+#: .\order\admin.py:1330
 #, python-format
 msgid ""
 "No voucher available for order #%(order_id)s — the %(carrier)s shipment is "
 "in state '%(state)s'. The carrier has not yet assigned a voucher number."
 msgstr ""
 
-#: .\order\admin.py:1349
+#: .\order\admin.py:1353
 #, python-format
 msgid ""
 "Failed to fetch %(carrier)s voucher for order #%(order_id)s. The carrier API "
 "responded with an error — see backend logs for the full traceback."
 msgstr ""
 
-#: .\order\admin.py:1365
+#: .\order\admin.py:1369
 msgid "Customer's orders"
 msgstr ""
 
-#: .\order\admin.py:1433
+#: .\order\admin.py:1437
 msgid "Order Item Information"
 msgstr ""
 
-#: .\order\admin.py:1440
+#: .\order\admin.py:1444
 msgid "Refund Information"
 msgstr ""
 
-#: .\order\admin.py:1451
+#: .\order\admin.py:1455
 msgid "Calculations"
 msgstr ""
 
-#: .\order\admin.py:1489 .\order\admin.py:1586 .\order\admin.py:1674
+#: .\order\admin.py:1493 .\order\admin.py:1590 .\order\admin.py:1678
 #: .\product\admin.py:701 .\product\admin.py:735
 #, fuzzy, python-format
 #| msgid "Order Details"
 msgid "Order #%(id)s"
 msgstr "Order Details"
 
-#: .\order\admin.py:1510
+#: .\order\admin.py:1514
 #, python-format
 msgid "total %(qty)s, refunded %(refunded)s, net %(net)s"
 msgstr ""
 
-#: .\order\admin.py:1519
+#: .\order\admin.py:1523
 #, python-format
 msgid "%(price)s each — total %(total)s (net %(net)s)"
 msgstr ""
 
-#: .\order\admin.py:1528
+#: .\order\admin.py:1532
 msgid "Fully Refunded"
 msgstr ""
 
-#: .\order\admin.py:1530
+#: .\order\admin.py:1534
 #, python-format
 msgid "Partial (%(refunded)s/%(qty)s)"
 msgstr ""
 
-#: .\order\admin.py:1577 .\order\admin.py:1649 .\order\models\history.py:47
+#: .\order\admin.py:1581 .\order\admin.py:1653 .\order\models\history.py:47
 #: .\order\models\history.py:253
 msgid "Change Type"
 msgstr ""
 
-#: .\order\admin.py:1660 .\order\models\item.py:46
+#: .\order\admin.py:1664 .\order\models\item.py:46
 msgid "Order Item"
 msgstr ""
 
-#: .\order\admin.py:1668
+#: .\order\admin.py:1672
 #, python-format
 msgid "Item #%(id)s"
 msgstr ""
 
-#: .\order\admin.py:1729
+#: .\order\admin.py:1733
 msgid "Stock Change"
 msgstr ""
 
-#: .\order\admin.py:1737
+#: .\order\admin.py:1741
 msgid "Has PDF"
 msgstr ""
 
-#: .\order\admin.py:1742
+#: .\order\admin.py:1746
 msgid "Rendered"
 msgstr ""
 
-#: .\order\admin.py:1848
+#: .\order\admin.py:1852
 #, fuzzy
 #| msgid "Total"
 msgid "Totals"
 msgstr "Total"
 
-#: .\order\admin.py:1860
+#: .\order\admin.py:1864
 msgid "Snapshots"
 msgstr ""
 
-#: .\order\admin.py:1867
+#: .\order\admin.py:1871
 msgid "myDATA (AADE)"
 msgstr ""
 
-#: .\order\admin.py:1886
+#: .\order\admin.py:1890
 msgid ""
 "Populated by the automated submission pipeline (``order.mydata``). Read-only "
 "— edit master data (seller / buyer / VAT rates) and use the Order admin's "
 "'Send to myDATA' action to regenerate."
 msgstr ""
 
-#: .\order\admin.py:1923
+#: .\order\admin.py:1927
 msgid "Download"
 msgstr ""
 
-#: .\order\admin.py:1927
+#: .\order\admin.py:1931
 msgid "myDATA"
 msgstr ""
 
@@ -12063,7 +12123,7 @@ msgid "High Reservations (>50% stock)"
 msgstr ""
 
 #: .\product\admin.py:304 .\product\admin.py:407 .\product\admin.py:547
-#: .\product\admin.py:557 .\product\admin.py:1108 .\product\admin.py:2186
+#: .\product\admin.py:557 .\product\admin.py:1110 .\product\admin.py:2190
 msgid "Unnamed"
 msgstr ""
 
@@ -12183,7 +12243,7 @@ msgstr ""
 msgid "Pending checkout"
 msgstr ""
 
-#: .\product\admin.py:720 .\product\admin.py:1573
+#: .\product\admin.py:720 .\product\admin.py:1574
 msgid "Change"
 msgstr ""
 
@@ -12195,7 +12255,7 @@ msgstr ""
 msgid "Related Order"
 msgstr ""
 
-#: .\product\admin.py:739 .\product\admin.py:1578
+#: .\product\admin.py:739 .\product\admin.py:1579
 msgid "By"
 msgstr ""
 
@@ -12274,225 +12334,241 @@ msgstr ""
 msgid "Untitled Product"
 msgstr "Product"
 
-#: .\product\admin.py:1110
+#: .\product\admin.py:1098
+#, python-format
+msgid "SKU %(sku)s"
+msgstr ""
+
+#: .\product\admin.py:1112
 msgid "Variants"
 msgstr ""
 
-#: .\product\admin.py:1130
+#: .\product\admin.py:1120
+#, fuzzy, python-format
+#| msgid "Order Details"
+msgid "Group #%(id)s"
+msgstr "Order Details"
+
+#: .\product\admin.py:1131
 msgid "variants"
 msgstr ""
 
-#: .\product\admin.py:1136
+#: .\product\admin.py:1137
 #, python-format
 msgid "%(price)s -> %(final)s (-%(discount)s%%)"
 msgstr ""
 
-#: .\product\admin.py:1144 .\product\models\product.py:113
+#: .\product\admin.py:1145 .\product\models\product.py:113
 msgid "Stock"
 msgstr ""
 
-#: .\product\admin.py:1149 .\product\admin.py:1547 .\recommendation\enum.py:18
+#: .\product\admin.py:1150 .\product\admin.py:1548 .\recommendation\enum.py:18
 msgid "Out of stock"
 msgstr ""
 
-#: .\product\admin.py:1151
+#: .\product\admin.py:1152
 #, python-format
 msgid "Critical (%(stock)s)"
 msgstr ""
 
-#: .\product\admin.py:1153
+#: .\product\admin.py:1154
 #, python-format
 msgid "Low (%(stock)s)"
 msgstr ""
 
-#: .\product\admin.py:1154
+#: .\product\admin.py:1155
 #, python-format
 msgid "In stock (%(stock)s)"
 msgstr ""
 
-#: .\product\admin.py:1163
+#: .\product\admin.py:1164
 msgid "Stock Reservation Summary"
 msgstr ""
 
-#: .\product\admin.py:1196
+#: .\product\admin.py:1197
 #, python-format
 msgid ""
 "Stock %(stock)s — reserved %(reserved)s, available %(available)s across "
 "%(count)s active reservation(s)."
 msgstr ""
 
-#: .\product\admin.py:1206
+#: .\product\admin.py:1207
 #, python-format
 msgid ""
 "Last 7 days: %(reserve)s reserved, %(release)s released, %(decrement)s "
 "decremented, %(increment)s incremented."
 msgstr ""
 
-#: .\product\admin.py:1216
+#: .\product\admin.py:1217
 msgid "Open full stock history chart"
 msgstr ""
 
-#: .\product\admin.py:1220
+#: .\product\admin.py:1221
 msgid "Activate selected products"
 msgstr ""
 
-#: .\product\admin.py:1236
+#: .\product\admin.py:1237
 #, python-format
 msgid "%(count)d product was successfully activated."
 msgid_plural "%(count)d products were successfully activated."
 msgstr[0] ""
 msgstr[1] ""
 
-#: .\product\admin.py:1245
+#: .\product\admin.py:1246
 msgid "Deactivate selected products"
 msgstr ""
 
-#: .\product\admin.py:1261
+#: .\product\admin.py:1262
 #, python-format
 msgid "%(count)d product was successfully deactivated."
 msgid_plural "%(count)d products were successfully deactivated."
 msgstr[0] ""
 msgstr[1] ""
 
-#: .\product\admin.py:1270
+#: .\product\admin.py:1271
 msgid "Apply custom discount to selected products"
 msgstr ""
 
-#: .\product\admin.py:1296
+#: .\product\admin.py:1297
 msgid "Apply Custom Discount"
 msgstr ""
 
-#: .\product\admin.py:1329
+#: .\product\admin.py:1330
 #, python-format
 msgid "Applied %(discount)s%% discount to %(count)d product."
 msgid_plural "Applied %(discount)s%% discount to %(count)d products."
 msgstr[0] ""
 msgstr[1] ""
 
-#: .\product\admin.py:1340
+#: .\product\admin.py:1341
 msgid "Clear discount from selected products"
 msgstr ""
 
-#: .\product\admin.py:1359
+#: .\product\admin.py:1360
 #, python-format
 msgid "%(count)d product's discount was cleared."
 msgid_plural "%(count)d products' discounts were cleared."
 msgstr[0] ""
 msgstr[1] ""
 
-#: .\product\admin.py:1368
+#: .\product\admin.py:1369
 msgid "Duplicate as draft"
 msgstr ""
 
-#: .\product\admin.py:1385 .\product\views\alert.py:104
+#: .\product\admin.py:1386 .\product\views\alert.py:104
 msgid "Product not found."
 msgstr ""
 
-#: .\product\admin.py:1427
+#: .\product\admin.py:1428
 msgid "Couldn't find a free slug — try renaming the source."
 msgstr ""
 
-#: .\product\admin.py:1437
+#: .\product\admin.py:1438
 #, python-format
 msgid ""
 "Cloned product #%(orig)s to draft #%(clone)s. Edit the copy and re-activate "
 "when ready."
 msgstr ""
 
-#: .\product\admin.py:1549
+#: .\product\admin.py:1550
 msgid "Low stock"
 msgstr ""
 
-#: .\product\admin.py:1572
+#: .\product\admin.py:1573
 msgid "Operation"
 msgstr ""
 
-#: .\product\admin.py:1574
+#: .\product\admin.py:1575
 msgid "Before"
 msgstr ""
 
-#: .\product\admin.py:1575
+#: .\product\admin.py:1576
 msgid "After"
 msgstr ""
 
-#: .\product\admin.py:1699 .\product\admin.py:2011
+#: .\product\admin.py:1700 .\product\admin.py:2015
 msgid "Unnamed Category"
 msgstr ""
 
-#: .\product\admin.py:1704
+#: .\product\admin.py:1705
 #, python-format
 msgid "Level %(level)s"
 msgstr ""
 
-#: .\product\admin.py:1711
+#: .\product\admin.py:1712
 msgid "Subcategories"
 msgstr ""
 
-#: .\product\admin.py:1719
+#: .\product\admin.py:1720
 msgid "Direct Products"
 msgstr ""
 
-#: .\product\admin.py:1724
+#: .\product\admin.py:1725
 msgid "Total Products"
 msgstr ""
 
-#: .\product\admin.py:1791
+#: .\product\admin.py:1792
 msgid "Review Information"
 msgstr ""
 
-#: .\product\admin.py:1817
+#: .\product\admin.py:1818
 msgid "No comment"
 msgstr ""
 
-#: .\product\admin.py:1853
+#: .\product\admin.py:1822
+#, python-format
+msgid "Review #%(id)s: %(comment)s"
+msgstr ""
+
+#: .\product\admin.py:1857
 msgid "Approve selected reviews"
 msgstr ""
 
-#: .\product\admin.py:1862
+#: .\product\admin.py:1866
 #, python-format
 msgid "%(count)d review was approved."
 msgid_plural "%(count)d reviews were approved."
 msgstr[0] ""
 msgstr[1] ""
 
-#: .\product\admin.py:1871
+#: .\product\admin.py:1875
 msgid "Reject selected reviews"
 msgstr ""
 
-#: .\product\admin.py:1880
+#: .\product\admin.py:1884
 #, python-format
 msgid "%(count)d review was rejected."
 msgid_plural "%(count)d reviews were rejected."
 msgstr[0] ""
 msgstr[1] ""
 
-#: .\product\admin.py:1968 .\product\admin.py:2051
+#: .\product\admin.py:1972 .\product\admin.py:2055
 msgid "Image Information"
 msgstr ""
 
-#: .\product\admin.py:2140
+#: .\product\admin.py:2144
 msgid "Variant Group"
 msgstr ""
 
-#: .\product\admin.py:2150 .\product\admin.py:2190 .\product\admin.py:2194
+#: .\product\admin.py:2154 .\product\admin.py:2194 .\product\admin.py:2198
 msgid "Members"
 msgstr ""
 
-#: .\product\admin.py:2154
+#: .\product\admin.py:2158
 msgid ""
 "Products assigned to this group. Add or remove members from each Product's "
 "page via the Variant Group field."
 msgstr ""
 
-#: .\product\admin.py:2183
+#: .\product\admin.py:2187
 msgid "Group"
 msgstr ""
 
-#: .\product\admin.py:2198
+#: .\product\admin.py:2202
 msgid "No products assigned yet."
 msgstr ""
 
-#: .\product\admin.py:2243 .\product\models\brand.py:20
+#: .\product\admin.py:2247 .\product\models\brand.py:20
 msgid "Brand"
 msgstr ""
 
@@ -13247,7 +13323,12 @@ msgstr ""
 msgid "Duplicate"
 msgstr ""
 
-#: .\promotion\admin.py:393
+#: .\promotion\admin.py:383
+#, python-format
+msgid "%(name)s (copy)"
+msgstr ""
+
+#: .\promotion\admin.py:396
 msgid "Promotion duplicated as an inactive draft."
 msgstr ""
 
@@ -16496,55 +16577,60 @@ msgstr ""
 msgid "Permanently destroy tenant + drop schema"
 msgstr ""
 
-#: .\tenant\admin.py:905
+#: .\tenant\admin.py:875
+#, python-format
+msgid "%(name)s (%(minutes)s min remaining)"
+msgstr ""
+
+#: .\tenant\admin.py:906
 #, python-format
 msgid ""
 "%(name)s: invoices retained until %(until)s under the statutory record-"
 "keeping obligation; everything else erased."
 msgstr ""
 
-#: .\tenant\admin.py:918
+#: .\tenant\admin.py:919
 #, python-format
 msgid "Error destroying %(name)s: %(error)s"
 msgstr ""
 
-#: .\tenant\admin.py:926
+#: .\tenant\admin.py:927
 #, python-format
 msgid "Skipped protected tenants (cannot destroy): %(names)s"
 msgstr ""
 
-#: .\tenant\admin.py:933
+#: .\tenant\admin.py:934
 #, python-format
 msgid "Skipped non-suspended tenants (suspend first): %(names)s"
 msgstr ""
 
-#: .\tenant\admin.py:940
+#: .\tenant\admin.py:941
 #, python-format
 msgid "Skipped tenants still within 24-hour cooldown: %(names)s"
 msgstr ""
 
-#: .\tenant\admin.py:947
+#: .\tenant\admin.py:948
 #, python-format
 msgid "Permanently destroyed %(count)d tenant(s): %(names)s"
 msgstr ""
 
-#: .\tenant\admin.py:976
+#: .\tenant\admin.py:977
 msgid "Are you sure?"
 msgstr ""
 
-#: .\tenant\admin.py:1172
+#: .\tenant\admin.py:1173
 msgid "Retention"
 msgstr ""
 
-#: .\tenant\admin.py:1175
+#: .\tenant\admin.py:1176
 msgid "Purged"
 msgstr ""
 
-#: .\tenant\admin.py:1177
+#: .\tenant\admin.py:1178
 msgid "Nothing retained"
 msgstr ""
 
-#: .\tenant\admin.py:1180
+#: .\tenant\admin.py:1181
 #, python-format
 msgid "Until %(date)s"
 msgstr ""

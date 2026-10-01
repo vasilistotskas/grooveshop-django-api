@@ -40,6 +40,7 @@ from django.utils.html import format_html
 from django.utils.safestring import SafeString
 from django.utils.timesince import timesince
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import ngettext_lazy
 from unfold.decorators import display
 
 from order.enum.attribution import OrderSourceType
@@ -173,11 +174,23 @@ def format_dt(
     return formats.date_format(timezone.localtime(dt), fmt)
 
 
+# Django's own catalogue leaves these empty in Greek, so ``timesince``
+# would answer in English under the Greek admin; ours are translated.
+TIME_STRINGS = {
+    "year": ngettext_lazy("%(num)d year", "%(num)d years", "num"),
+    "month": ngettext_lazy("%(num)d month", "%(num)d months", "num"),
+    "week": ngettext_lazy("%(num)d week", "%(num)d weeks", "num"),
+    "day": ngettext_lazy("%(num)d day", "%(num)d days", "num"),
+    "hour": ngettext_lazy("%(num)d hour", "%(num)d hours", "num"),
+    "minute": ngettext_lazy("%(num)d minute", "%(num)d minutes", "num"),
+}
+
+
 def relative_time(dt: datetime | None, now: datetime | None = None) -> str:
     """How long ago, in the active language ("3 hours")."""
     if dt is None:
         return "—"
-    return timesince(dt, now, depth=1)
+    return timesince(dt, now, time_strings=TIME_STRINGS, depth=1)
 
 
 # ── Links ─────────────────────────────────────────────────────────────

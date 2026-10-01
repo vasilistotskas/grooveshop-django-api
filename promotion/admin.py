@@ -6,7 +6,7 @@ from django.db.models import Count, Prefetch
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect
 from django.urls import reverse
-from django.utils import formats
+from django.utils import formats, translation
 from django.utils.translation import gettext_lazy as _
 from unfold.contrib.filters.admin import (
     RangeDateTimeFilter,
@@ -377,11 +377,14 @@ class PromotionAdmin(BaseTranslatableAdmin):
             usage_limit_total=source.usage_limit_total,
             usage_limit_per_customer=source.usage_limit_per_customer,
         )
-        for translation in source.translations.all():
+        for source_translation in source.translations.all():
+            # The marker is part of the name in that language.
+            with translation.override(source_translation.language_code):
+                name = _("%(name)s (copy)") % {"name": source_translation.name}
             clone.translations.create(
-                language_code=translation.language_code,
-                name=f"{translation.name} (copy)",
-                description=translation.description,
+                language_code=source_translation.language_code,
+                name=name,
+                description=source_translation.description,
             )
         clone.products.set(source.products.all())
         clone.categories.set(source.categories.all())

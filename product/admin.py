@@ -1094,7 +1094,9 @@ class ProductAdmin(
             main_image.image.url if main_image and main_image.image else None
         )
         return header_two_line(
-            name, f"SKU {obj.sku[:8]}", image_path=image_path
+            name,
+            _("SKU %(sku)s") % {"sku": obj.sku[:8]},
+            image_path=image_path,
         )
 
     @admin.display(
@@ -1114,10 +1116,9 @@ class ProductAdmin(
         group = obj.variant_group
         if group is None:
             return "—"
-        name = (
-            group.safe_translation_getter("name", any_language=True)
-            or f"Group #{group.pk}"
-        )
+        name = group.safe_translation_getter("name", any_language=True) or _(
+            "Group #%(id)s"
+        ) % {"id": group.pk}
         # len() over the prefetch cache — no per-row COUNT query.
         siblings = len(group.variants.all())
         return format_html(
@@ -1818,7 +1819,10 @@ class ProductReviewAdmin(BaseTranslatableAdmin):
         comment_preview = (
             comment[:100] + "..." if len(comment) > 100 else comment
         )
-        return f"Review #{obj.id}: {comment_preview}"
+        return _("Review #%(id)s: %(comment)s") % {
+            "id": obj.id,
+            "comment": comment_preview,
+        }
 
     @admin.display(description=_("Product"))
     def product_link(self, obj):

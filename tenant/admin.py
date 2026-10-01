@@ -872,7 +872,8 @@ class TenantAdmin(BaseModelAdmin):
                 remaining = SUSPEND_COOLDOWN - (now - tenant.suspended_at)
                 remaining_minutes = int(remaining.total_seconds() // 60)
                 skipped_cooldown.append(
-                    f"{tenant.name} ({remaining_minutes} min remaining)"
+                    _("%(name)s (%(minutes)s min remaining)")
+                    % {"name": tenant.name, "minutes": remaining_minutes}
                 )
                 continue
 

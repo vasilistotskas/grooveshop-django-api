@@ -817,7 +817,11 @@ class OrderAdmin(BaseModelAdmin):
     def order_summary(self, obj):
         item_count = getattr(obj, "item_count", 0)
         total_qty = getattr(obj, "total_items_quantity", 0) or 0
-        return f"{item_count} items, qty {total_qty} — {self._total(obj)}"
+        return ngettext(
+            "%(count)s item, qty %(qty)s — %(total)s",
+            "%(count)s items, qty %(qty)s — %(total)s",
+            item_count,
+        ) % {"count": item_count, "qty": total_qty, "total": self._total(obj)}
 
     @display(description=_("Shipment"), label=SHIPMENT_STATE_VARIANT)
     def shipment_state(self, obj):

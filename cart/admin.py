@@ -226,7 +226,9 @@ class CartAdmin(BaseModelAdmin):
             return header_two_line(
                 obj.user.full_name or obj.user.username, obj.user.email
             )
-        return header_two_line(str(_("Guest")), f"Cart #{obj.id}")
+        return header_two_line(
+            str(_("Guest")), _("Cart #%(id)s") % {"id": obj.id}
+        )
 
     @display(description=_("Type"), label=CART_TYPE_VARIANT)
     def cart_type(self, obj):
@@ -397,7 +399,10 @@ class CartItemAdmin(BaseModelAdmin):
             if not obj.cart.user
             else obj.cart.user.full_name or obj.cart.user.username
         )
-        return f"Cart #{obj.cart.id} — {owner}"
+        return _("Cart #%(id)s — %(owner)s") % {
+            "id": obj.cart.id,
+            "owner": owner,
+        }
 
     @admin.display(description=_("Product"))
     def product_display(self, obj):

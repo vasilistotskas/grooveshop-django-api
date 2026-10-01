@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from admin.displays import header_two_line
+from datetime import timedelta
+
+from django.utils import timezone, translation
+
+from admin.displays import header_two_line, relative_time
 
 
 def test_header_two_line_puts_image_dict_at_index_three():
@@ -28,3 +32,15 @@ def test_header_two_line_without_image_is_three_elements():
     row = header_two_line("Jane Doe", "jane@example.com")
 
     assert row == ["Jane Doe", "jane@example.com", "JD"]
+
+
+def test_relative_time_follows_the_active_language():
+    """Django's own Greek catalogue leaves the ``timesince`` units
+    empty, so without our strings the Greek admin read "5 days"."""
+    now = timezone.now()
+    then = now - timedelta(days=5)
+
+    with translation.override("el"):
+        assert relative_time(then, now) == "5\xa0ημέρες"
+    with translation.override("en"):
+        assert relative_time(then, now) == "5\xa0days"

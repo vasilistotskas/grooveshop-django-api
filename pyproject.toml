@@ -47,7 +47,7 @@ dependencies = [
   "psycopg[binary,pool]==3.3.5",
   "python-dotenv==1.2.3",
   "qrcode==8.2",
-  "urllib3==2.7.0",
+  "urllib3==2.8.0",
   "uvicorn==0.52.4",
   "celery[redis] >=5.6.3,<6.0.0",
   "disposable-email-domains==0.0.247",
@@ -262,7 +262,8 @@ override-dependencies = [
     # CVE-2026-35536, CVE-2026-31958 (HIGH) — fixed in 6.5.5
     # CVE-2026-49855, CVE-2026-49853 (HIGH) — fixed in 6.5.6
     # CVE-2026-82397 (HIGH) — fixed in 6.5.8
-    "tornado>=6.5.8",
+    # GHSA-chx6-46f5-w4vp, GHSA-c2m8-h5v5-343r (HIGH) — fixed in 6.5.9
+    "tornado>=6.5.9",
     # CVE-2026-42304 (HIGH) — DoS in twisted.names DNS compression
     # pointer chains; fixed in 26.4.0 (stable since 2026-08).
     # Extras kept inline so the resolver preserves pyopenssl/h2 etc.

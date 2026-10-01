@@ -246,6 +246,7 @@ class StockReservationStatusFilter(DropdownFilter):
         return [
             ("has_reservations", _("Has Active Reservations")),
             ("no_reservations", _("No Active Reservations")),
+            # xgettext:no-python-format — "% s" here is a literal percent.
             ("high_reservations", _("High Reservations (>50% stock)")),
         ]
 

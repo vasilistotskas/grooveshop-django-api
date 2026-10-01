@@ -2,6 +2,7 @@ import logging
 
 from django.apps import AppConfig
 from django.db import transaction
+from django.utils.translation import gettext_lazy as _
 
 from meili.exceptions import MeiliTaskFailed
 from tenant.celery import dispatch_on_commit
@@ -12,6 +13,7 @@ logger = logging.getLogger(__name__)
 class MeiliConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     name = "meili"
+    verbose_name = _("Search index")
 
     def ready(self):
         from django.apps import apps

@@ -23,6 +23,7 @@ class ApplyDiscountForm(forms.Form):
             "max_value": _("Discount cannot exceed 100%."),
         },
         help_text=_(
+            # xgettext:no-python-format — "% d" here is a literal percent.
             "Enter a value between 0 and 100. For example, 25 for 25% discount."
         ),
     )

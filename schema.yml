@@ -38537,12 +38537,12 @@ components:
           readOnly: true
         seen:
           type: boolean
-          title: Ορατό
+          title: Αναγνωσμένη
         seenAt:
           type: string
           format: date-time
           nullable: true
-          title: Ορατό στις
+          title: Αναγνώστηκε στις
         createdAt:
           type: string
           format: date-time
@@ -38590,12 +38590,12 @@ components:
           readOnly: true
         seen:
           type: boolean
-          title: Ορατό
+          title: Αναγνωσμένη
         seenAt:
           type: string
           format: date-time
           nullable: true
-          title: Ορατό στις
+          title: Αναγνώστηκε στις
         createdAt:
           type: string
           format: date-time
@@ -38622,7 +38622,7 @@ components:
       properties:
         seen:
           type: boolean
-          title: Ορατό
+          title: Αναγνωσμένη
     NullEnum:
       enum:
       - null
@@ -42305,7 +42305,7 @@ components:
       properties:
         seen:
           type: boolean
-          title: Ορατό
+          title: Αναγνωσμένη
     PatchedOrderItemWriteRequest:
       type: object
       properties:

@@ -47,7 +47,7 @@ def _upload(client, payload: bytes, name: str = "plan.pdf"):
 
 @pytest.fixture
 def client():
-    return APIClient()
+    return APIClient(HTTP_ACCEPT_LANGUAGE="en")
 
 
 class TestTheGate:
@@ -123,7 +123,7 @@ class TestTheGate:
     ):
         response = _upload(client, pdf_bytes(2 * 1024 * 1024))
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "1 MB" in str(response.data)
+        assert "1 MB" in str(response.json())
         assert ContactAttachment.objects.count() == 0
 
     def test_an_empty_file(self, client, private_tree, attachments_on):
@@ -212,7 +212,7 @@ class TestTheClaim:
         )
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "no longer available" in str(response.data)
+        assert "no longer available" in str(response.json())
 
     def test_more_files_than_the_store_allows(
         self, client, private_tree, attachments_on
@@ -227,7 +227,7 @@ class TestTheClaim:
         )
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "At most 2" in str(response.data)
+        assert "At most 2" in str(response.json())
 
     def test_the_same_id_twice(self, client, private_tree, attachments_on):
         ids = self._uploaded(client)
@@ -389,7 +389,7 @@ class TestTheCeilings:
         response = _upload(client, pdf_bytes(1024))
 
         assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
-        assert "try again" in str(response.data).lower()
+        assert "try again" in str(response.json()).lower()
         assert ContactAttachment.objects.count() == 1
         assert list(private_tree.rglob("*.pdf")) == []
 

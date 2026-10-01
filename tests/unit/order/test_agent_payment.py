@@ -143,10 +143,13 @@ class ConfirmAgentPaymentEndpointTestCase(APITestCase):
         # AGENT_STRIPE_DELEGATED_ENABLED defaults to False.
         order = self._guest_stripe_order()
         response = self.client.post(
-            self._url(order), {"sharedPaymentToken": SPT}, format="json"
+            self._url(order),
+            {"sharedPaymentToken": SPT},
+            format="json",
+            HTTP_ACCEPT_LANGUAGE="en",
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("not enabled", response.data["detail"])
+        self.assertIn("not enabled", response.json()["detail"])
 
     @override_settings(AGENT_STRIPE_DELEGATED_ENABLED=True)
     @mock.patch("order.views.order.get_payment_provider")

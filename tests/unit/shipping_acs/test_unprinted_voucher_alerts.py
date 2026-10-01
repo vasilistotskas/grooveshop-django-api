@@ -30,7 +30,7 @@ from shipping_acs.tasks import (
     warn_unprinted_acs_vouchers,
 )
 
-pytestmark = pytest.mark.django_db
+pytestmark = [pytest.mark.django_db, pytest.mark.assert_english]
 
 
 @pytest.fixture

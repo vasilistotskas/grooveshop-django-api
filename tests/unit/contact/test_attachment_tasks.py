@@ -36,7 +36,7 @@ from contact.tasks import (
 )
 from tests.unit.contact.conftest import pdf_bytes
 
-pytestmark = pytest.mark.django_db
+pytestmark = [pytest.mark.django_db, pytest.mark.assert_english]
 
 
 def make_attachment(

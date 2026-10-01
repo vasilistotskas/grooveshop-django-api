@@ -28,6 +28,8 @@ from tests.utils.staff import (
 )
 from user.factories.account import UserAccountFactory
 
+pytestmark = pytest.mark.assert_english
+
 
 def _mint(user):
     instance, token = PlatformStaffToken.objects.create(user)

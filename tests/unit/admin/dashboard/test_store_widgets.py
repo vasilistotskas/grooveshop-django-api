@@ -17,7 +17,7 @@ from order.factories.order import OrderFactory
 from product.factories.product import ProductFactory
 from user.factories.account import UserAccountFactory
 
-pytestmark = pytest.mark.django_db
+pytestmark = [pytest.mark.django_db, pytest.mark.assert_english]
 
 
 def _request(user=None):

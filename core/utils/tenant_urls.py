@@ -43,6 +43,8 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import connection
 from django.utils.translation import gettext_lazy as _
+from django_tenants.postgresql_backend.base import FakeTenant
+from django_tenants.utils import get_public_schema_name
 
 
 def get_tenant_base_url() -> str:
@@ -107,8 +109,11 @@ def tenant_storefront_locales(tenant) -> tuple[str, ...]:
     rule for rule, because a link has to agree with the storefront's
     ``locale-available`` route middleware, which 404s any other prefix:
     ``Tenant.available_locales`` filtered to :data:`STOREFRONT_LOCALES`;
-    empty means ``[default_locale]``; no tenant at all, or a default the
-    storefront does not support, means every storefront locale.
+    empty means ``[default_locale]``; no tenant at all means every
+    storefront locale. A tenant whose list and default name nothing the
+    storefront can route is served :data:`STOREFRONT_DEFAULT_LOCALE`
+    only — the unprefixed locale every storefront renders — never every
+    locale: it declared none.
     """
     if tenant is None:
         return STOREFRONT_LOCALES
@@ -122,7 +127,27 @@ def tenant_storefront_locales(tenant) -> tuple[str, ...]:
     default = getattr(tenant, "default_locale", None)
     if default in STOREFRONT_LOCALES:
         return (default,)
-    return STOREFRONT_LOCALES
+    return (STOREFRONT_DEFAULT_LOCALE,)
+
+
+def _bound_storefront_tenant():
+    """The store whose storefront a link built now opens, or None.
+
+    ``connection.tenant`` is not always that store's row. Under
+    ``schema_context`` — a public-schema ``TenantTask``, a management
+    command — django-tenants binds a bare ``FakeTenant`` that carries only
+    the schema name: on the public schema it stands for no store at all,
+    and on a store's schema it stands for that store's row, which is read
+    here so its locales decide the link rather than nothing.
+    """
+    tenant = getattr(connection, "tenant", None)
+    if not isinstance(tenant, FakeTenant):
+        return tenant
+    if tenant.schema_name == get_public_schema_name():
+        return None
+    from tenant.models import Tenant
+
+    return Tenant.objects.filter(schema_name=tenant.schema_name).first()
 
 
 def storefront_locale_prefix(tenant, language: str) -> str:
@@ -153,9 +178,7 @@ def get_tenant_frontend_url(path: str, *, language: str) -> str:
     """
     if path and not path.startswith("/"):
         path = "/" + path
-    prefix = storefront_locale_prefix(
-        getattr(connection, "tenant", None), language
-    )
+    prefix = storefront_locale_prefix(_bound_storefront_tenant(), language)
     return f"{get_tenant_base_url()}{prefix}{path}"
 
 
@@ -169,9 +192,7 @@ def localize_storefront_url(url: str, *, language: str) -> str:
     (see ``UserAccountAdapter.send_mail``). Same rule, same tenant.
     """
     parts = urlsplit(url)
-    prefix = storefront_locale_prefix(
-        getattr(connection, "tenant", None), language
-    )
+    prefix = storefront_locale_prefix(_bound_storefront_tenant(), language)
     if not prefix:
         return url
     return urlunsplit(parts._replace(path=f"{prefix}{parts.path}"))

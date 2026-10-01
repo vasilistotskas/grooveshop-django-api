@@ -15,6 +15,8 @@ from unittest.mock import MagicMock
 import pytest
 from django.core.exceptions import ValidationError
 from django.test import override_settings
+from django_tenants.postgresql_backend.base import FakeTenant
+from django_tenants.utils import get_public_schema_name
 
 from core.utils.tenant_urls import (
     STOREFRONT_DEFAULT_LOCALE,
@@ -29,6 +31,7 @@ from core.utils.tenant_urls import (
     storefront_path,
     tenant_storefront_locales,
 )
+from tests.utils.staff import store_tenant
 
 
 def _fake_tenant(primary_domain: str, schema_name: str = "tenant_a"):
@@ -264,11 +267,44 @@ class TestStorefrontLocalePrefix:
         assert tenant_storefront_locales(
             SimpleNamespace(default_locale="el", available_locales=[])
         ) == ("el",)
+        # A tenant that declares nothing the storefront can route is served
+        # the unprefixed default only, never every locale: "empty means
+        # single-language" holds whatever the stored default says.
+        assert tenant_storefront_locales(
+            SimpleNamespace(default_locale="de", available_locales=[])
+        ) == (STOREFRONT_DEFAULT_LOCALE,)
+        assert tenant_storefront_locales(
+            SimpleNamespace(default_locale="de", available_locales=["de"])
+        ) == (STOREFRONT_DEFAULT_LOCALE,)
+
+    def test_public_schema_context_serves_every_locale(self, bind_tenant):
+        # A public-schema TenantTask runs under schema_context("public"),
+        # which binds a bare FakeTenant: that is the platform, not a store.
+        bind_tenant(FakeTenant(schema_name=get_public_schema_name()))
+        assert get_tenant_frontend_url("/cart", language="en").endswith(
+            "/en/cart"
+        )
+
+    @pytest.mark.django_db
+    @pytest.mark.parametrize(
+        ("available_locales", "english_link"),
+        [(["el"], "/cart"), (["el", "en"], "/en/cart")],
+    )
+    def test_store_schema_context_reads_the_store_row(
+        self, bind_tenant, available_locales, english_link
+    ):
+        # A command under schema_context("<store>") binds a FakeTenant
+        # too; the link follows the store's own locales, read from its
+        # row — neither every locale nor none.
+        store_tenant(
+            "locale_store",
+            default_locale="el",
+            available_locales=available_locales,
+        )
+        bind_tenant(FakeTenant(schema_name="locale_store"))
         assert (
-            tenant_storefront_locales(
-                SimpleNamespace(default_locale="de", available_locales=[])
-            )
-            == STOREFRONT_LOCALES
+            get_tenant_frontend_url("/cart", language="en")
+            == f"{get_tenant_base_url()}{english_link}"
         )
 
     def test_prefix_is_empty_or_the_code(self):

@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-01 04:26+0300\n"
+"POT-Creation-Date: 2026-10-01 10:07+0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -47,7 +47,7 @@ msgid "Dry run"
 msgstr ""
 
 #: .\admin\admin.py:56 .\admin\dashboard\platform.py:73
-#: .\promotion\admin.py:287 .\tenant\admin_labels.py:68
+#: .\promotion\admin.py:298 .\tenant\admin_labels.py:68
 msgid "Live"
 msgstr ""
 
@@ -67,38 +67,38 @@ msgid ""
 "figures below are not reliable; see the application log for the error."
 msgstr ""
 
-#: .\admin\admin.py:232
+#: .\admin\admin.py:234
 msgid "Cache Management"
 msgstr ""
 
-#: .\admin\admin.py:239
+#: .\admin\admin.py:241
 msgid "Unknown cache surface."
 msgstr ""
 
-#: .\admin\admin.py:251
+#: .\admin\admin.py:253
 msgid "Select at least one cache surface to purge."
 msgstr ""
 
-#: .\admin\admin.py:274
+#: .\admin\admin.py:276
 #, python-format
 msgid ""
 "Dry run: %(d)s Django + %(n)s Nuxt keys would be removed across %(s)s "
 "surface(s)."
 msgstr ""
 
-#: .\admin\admin.py:283
+#: .\admin\admin.py:285
 #, python-format
 msgid "Purged %(d)s Django + %(n)s Nuxt keys across %(s)s surface(s)."
 msgstr ""
 
-#: .\admin\admin.py:296
+#: .\admin\admin.py:298
 #, python-format
 msgid ""
 "Django cache purge FAILED for %(n)s surface(s): %(codes)s. Those keys are "
 "still cached — see the application log for the backend error."
 msgstr ""
 
-#: .\admin\admin.py:310
+#: .\admin\admin.py:312
 #, python-format
 msgid ""
 "Nuxt purge unreachable for %(n)s surface(s). Check NUXT_INTERNAL_BASE_URL + "
@@ -149,7 +149,7 @@ msgid "Plan"
 msgstr ""
 
 #: .\admin\dashboard\platform.py:165 .\admin\dashboard\store\widgets.py:281
-#: .\b2b\admin.py:149 .\b2b\models\profile.py:32 .\blog\admin.py:502
+#: .\b2b\admin.py:151 .\b2b\models\profile.py:32 .\blog\admin.py:502
 #: .\core\templates\emails\order\order_canceled.html:15
 #: .\core\templates\emails\order\order_completed.html:22
 #: .\core\templates\emails\order\order_completed.txt:18
@@ -157,13 +157,13 @@ msgstr ""
 #: .\core\templates\emails\order\order_pending_reminder.html:19
 #: .\core\templates\emails\order\order_pending_reminder.txt:7
 #: .\core\templates\emails\order\order_shipped.html:13
-#: .\core\templates\invoices\invoice.html:226 .\giftcard\admin.py:186
+#: .\core\templates\invoices\invoice.html:226 .\giftcard\admin.py:192
 #: .\giftcard\models.py:67 .\giftcard\models.py:111 .\meta_capi\models.py:59
 #: .\notification\admin.py:289 .\notification\admin.py:410 .\order\admin.py:677
 #: .\order\admin.py:702 .\order\models\order.py:155 .\product\admin.py:698
 #: .\product\admin.py:1849 .\product\models\review.py:32
-#: .\promotion\admin.py:269 .\tenant\admin.py:209 .\user\admin.py:260
-#: .\user\admin.py:940 .\user\models\data_export.py:34
+#: .\promotion\admin.py:280 .\tenant\admin.py:209 .\user\admin.py:266
+#: .\user\admin.py:946 .\user\models\data_export.py:34
 #: .\user\models\subscription.py:198
 msgid "Status"
 msgstr "Status"
@@ -171,7 +171,7 @@ msgstr "Status"
 #: .\admin\dashboard\platform.py:166 .\admin\dashboard\store\widgets.py:178
 #: .\core\templates\admin\index.html:26 .\order\apps.py:7
 #: .\order\models\order.py:393 .\settings.py:3370 .\settings.py:3853
-#: .\tenant\models.py:1841 .\user\admin.py:274
+#: .\tenant\models.py:1841 .\user\admin.py:280
 msgid "Orders"
 msgstr ""
 
@@ -391,7 +391,7 @@ msgstr "Order Delivered"
 
 #: .\admin\dashboard\store\widgets.py:335 .\blog\admin.py:714
 #: .\blog\models\comment.py:84 .\contact\admin.py:386 .\contact\models.py:243
-#: .\product\models\alert.py:99 .\user\admin.py:502 .\user\admin.py:953
+#: .\product\models\alert.py:99 .\user\admin.py:508 .\user\admin.py:959
 msgid "Anonymous"
 msgstr ""
 
@@ -822,46 +822,46 @@ msgstr ""
 msgid "When the product was favourited"
 msgstr ""
 
-#: .\b2b\admin.py:25 .\b2b\models\price.py:26 .\b2b\models\profile.py:43
+#: .\b2b\admin.py:26 .\b2b\models\price.py:26 .\b2b\models\profile.py:43
 msgid "Customer group"
 msgstr ""
 
-#: .\b2b\admin.py:27
+#: .\b2b\admin.py:29
 msgid "The wholesale pricing tier this business gets"
 msgstr ""
 
-#: .\b2b\admin.py:33
+#: .\b2b\admin.py:35
 #: .\core\templates\emails\b2b\business_profile_rejected.html:15
 #: .\core\templates\emails\b2b\business_profile_rejected.txt:3
-#: .\giftcard\admin.py:39 .\order\models\stock_log.py:88
-#: .\product\admin.py:1577 .\user\admin.py:241
+#: .\giftcard\admin.py:44 .\order\models\stock_log.py:88
+#: .\product\admin.py:1577 .\user\admin.py:246
 msgid "Reason"
 msgstr ""
 
-#: .\b2b\admin.py:36
+#: .\b2b\admin.py:38
 msgid "Included in the notification email to the customer"
 msgstr ""
 
-#: .\b2b\admin.py:42
+#: .\b2b\admin.py:44
 #, fuzzy
 #| msgid "Price"
 msgid "Price lines"
 msgstr "Price"
 
-#: .\b2b\admin.py:47
+#: .\b2b\admin.py:49
 msgid ""
 "One product per line: sku;net price (VAT-exclusive). Comma also works as "
 "separator and as decimal mark. Existing rows for this group are updated in "
 "place."
 msgstr ""
 
-#: .\b2b\admin.py:55
+#: .\b2b\admin.py:57
 #, fuzzy
 #| msgid "Price"
 msgid "Price list"
 msgstr "Price"
 
-#: .\b2b\admin.py:104 .\contact\models.py:34
+#: .\b2b\admin.py:106 .\contact\models.py:34
 #: .\core\templates\emails\b2b\admin_new_business_profile.html:12
 #: .\core\templates\emails\b2b\admin_new_business_profile.txt:3
 #: .\core\templates\emails\b2b\business_profile_approved.html:14
@@ -869,88 +869,88 @@ msgstr "Price"
 msgid "Company"
 msgstr ""
 
-#: .\b2b\admin.py:121 .\notification\enum.py:23 .\product\admin.py:1814
+#: .\b2b\admin.py:123 .\notification\enum.py:23 .\product\admin.py:1814
 msgid "Review"
 msgstr ""
 
-#: .\b2b\admin.py:134 .\b2b\admin.py:161
+#: .\b2b\admin.py:136 .\b2b\admin.py:163
 #: .\core\templates\emails\b2b\admin_new_business_profile.html:17
 #: .\core\templates\emails\b2b\admin_new_business_profile.txt:8
 msgid "VIES"
 msgstr ""
 
-#: .\b2b\admin.py:173
+#: .\b2b\admin.py:175
 msgid "Approve"
 msgstr ""
 
-#: .\b2b\admin.py:176
+#: .\b2b\admin.py:178
 msgid "Approve business profile"
 msgstr ""
 
-#: .\b2b\admin.py:178
+#: .\b2b\admin.py:180
 msgid "Grants wholesale pricing for the chosen group and emails the customer."
 msgstr ""
 
-#: .\b2b\admin.py:194
+#: .\b2b\admin.py:196
 msgid "Business profile approved."
 msgstr ""
 
-#: .\b2b\admin.py:205
+#: .\b2b\admin.py:207
 msgid "Reject"
 msgstr ""
 
-#: .\b2b\admin.py:208
+#: .\b2b\admin.py:210
 msgid "Reject business profile"
 msgstr ""
 
-#: .\b2b\admin.py:210
+#: .\b2b\admin.py:212
 msgid "The reason is included in the email to the customer."
 msgstr ""
 
-#: .\b2b\admin.py:225
+#: .\b2b\admin.py:227
 msgid "Business profile rejected."
 msgstr ""
 
-#: .\b2b\admin.py:235
+#: .\b2b\admin.py:237
 msgid "Suspend"
 msgstr ""
 
-#: .\b2b\admin.py:242
+#: .\b2b\admin.py:244
 msgid "Business profile suspended."
 msgstr ""
 
-#: .\b2b\admin.py:248
+#: .\b2b\admin.py:250
 msgid "Re-check VIES"
 msgstr ""
 
-#: .\b2b\admin.py:256
+#: .\b2b\admin.py:258
 msgid "VIES re-checked."
 msgstr ""
 
-#: .\b2b\admin.py:295
+#: .\b2b\admin.py:297
 msgid "Businesses"
 msgstr ""
 
-#: .\b2b\admin.py:300
+#: .\b2b\admin.py:302
 msgid "Import prices"
 msgstr ""
 
-#: .\b2b\admin.py:303
+#: .\b2b\admin.py:305
 msgid "Import price list"
 msgstr ""
 
-#: .\b2b\admin.py:305
+#: .\b2b\admin.py:307
 msgid ""
 "Paste one product per line as sku;net price. Rows are created or updated for "
 "THIS group only."
 msgstr ""
 
-#: .\b2b\admin.py:320
+#: .\b2b\admin.py:322
 #, python-brace-format
 msgid "Imported: {created} created, {updated} updated."
 msgstr ""
 
-#: .\b2b\admin.py:330
+#: .\b2b\admin.py:332
 #, python-brace-format
 msgid "…and {count} more lines with errors."
 msgstr ""
@@ -994,7 +994,7 @@ msgstr ""
 #: .\pay_way\models.py:89 .\product\models\attribute.py:33
 #: .\product\models\brand.py:17 .\product\models\category.py:40
 #: .\product\models\product.py:462 .\product\models\variant_group.py:30
-#: .\promotion\admin.py:250 .\promotion\models\promotion.py:297
+#: .\promotion\admin.py:261 .\promotion\models\promotion.py:297
 #: .\region\models.py:22 .\shipping\models\provider.py:34
 #: .\shipping_acs\models\station.py:50 .\shipping_boxnow\models\locker.py:59
 #: .\tag\admin.py:161 .\tenant\models.py:120 .\user\models\subscription.py:95
@@ -1078,7 +1078,7 @@ msgstr ""
 #: .\product\models\favourite.py:17 .\product\models\review.py:28
 #: .\promotion\models\redemption.py:48 .\recommendation\models.py:251
 #: .\search\models.py:96 .\tenant\models.py:1600 .\tenant\models.py:1680
-#: .\user\admin.py:498 .\user\admin.py:949 .\user\models\address.py:20
+#: .\user\admin.py:504 .\user\admin.py:955 .\user\models\address.py:20
 #: .\user\models\data_export.py:31 .\user\models\subscription.py:177
 msgid "User"
 msgstr ""
@@ -1240,11 +1240,11 @@ msgstr ""
 msgid "Published"
 msgstr ""
 
-#: .\blog\admin.py:80 .\blog\admin.py:505 .\promotion\admin.py:281
+#: .\blog\admin.py:80 .\blog\admin.py:505 .\promotion\admin.py:292
 msgid "Draft"
 msgstr ""
 
-#: .\blog\admin.py:81 .\blog\admin.py:507 .\promotion\admin.py:284
+#: .\blog\admin.py:81 .\blog\admin.py:507 .\promotion\admin.py:295
 msgid "Scheduled"
 msgstr ""
 
@@ -1269,7 +1269,7 @@ msgstr ""
 msgid "Bio"
 msgstr ""
 
-#: .\blog\admin.py:191 .\blog\models\author.py:17 .\user\admin.py:524
+#: .\blog\admin.py:191 .\blog\models\author.py:17 .\user\admin.py:530
 #: .\user\models\account.py:118
 msgid "Website"
 msgstr ""
@@ -1318,8 +1318,9 @@ msgid "Search by title, subtitle, slug, body, or author email/username."
 msgstr ""
 
 #: .\blog\admin.py:416 .\blog\admin.py:702 .\blog\models\comment.py:51
-#: .\page_config\admin.py:276 .\product\admin.py:1638 .\product\admin.py:1799
-#: .\product\admin.py:1979 .\product\admin.py:2062
+#: .\core\cache\registry.py:21 .\page_config\admin.py:276
+#: .\product\admin.py:1638 .\product\admin.py:1799 .\product\admin.py:1979
+#: .\product\admin.py:2062
 msgid "Content"
 msgstr ""
 
@@ -1353,7 +1354,7 @@ msgstr ""
 #: .\notification\admin.py:280 .\notification\models\notification.py:46
 #: .\product\admin.py:1103 .\product\admin.py:1696 .\product\admin.py:2011
 #: .\product\models\category_image.py:23 .\product\models\product.py:87
-#: .\user\admin.py:793 .\user\models\subscription.py:62 .\vat\admin.py:132
+#: .\user\admin.py:799 .\user\models\subscription.py:62 .\vat\admin.py:132
 msgid "Category"
 msgstr ""
 
@@ -1366,7 +1367,7 @@ msgid "No author"
 msgstr ""
 
 #: .\blog\admin.py:510 .\blog\admin.py:680 .\blog\admin.py:730
-#: .\notification\admin.py:297 .\user\admin.py:533
+#: .\notification\admin.py:297 .\user\admin.py:539
 msgid "Engagement"
 msgstr ""
 
@@ -2418,7 +2419,7 @@ msgid "Owner"
 msgstr ""
 
 #: .\cart\admin.py:230 .\cart\admin.py:237 .\cart\admin.py:398
-#: .\user\admin.py:952
+#: .\user\admin.py:958
 msgid "Guest"
 msgstr ""
 
@@ -2776,7 +2777,7 @@ msgstr ""
 msgid "Filter by cart last activity before date"
 msgstr ""
 
-#: .\cart\models\cart.py:27 .\user\admin.py:541
+#: .\cart\models\cart.py:27 .\user\admin.py:547
 msgid "Last Activity"
 msgstr ""
 
@@ -3298,7 +3299,7 @@ msgstr ""
 msgid "Scan"
 msgstr ""
 
-#: .\contact\admin.py:189 .\user\admin.py:703
+#: .\contact\admin.py:189 .\user\admin.py:709
 msgid "Contact Information"
 msgstr ""
 
@@ -3308,7 +3309,7 @@ msgstr ""
 #: .\product\admin.py:968 .\product\admin.py:1662 .\product\admin.py:1806
 #: .\product\admin.py:1993 .\product\admin.py:2076 .\product\admin.py:2164
 #: .\product\admin.py:2254 .\region\admin.py:105 .\tag\admin.py:146
-#: .\tag\admin.py:245 .\user\admin.py:707 .\user\admin.py:777
+#: .\tag\admin.py:245 .\user\admin.py:713 .\user\admin.py:783
 #: .\vat\admin.py:116
 msgid "System Information"
 msgstr ""
@@ -3328,7 +3329,7 @@ msgstr ""
 
 #: .\contact\admin.py:284 .\contact\apps.py:7 .\contact\models.py:59
 #: .\contact\models.py:131 .\country\admin.py:152 .\page_config\models.py:422
-#: .\user\admin.py:507
+#: .\user\admin.py:513
 msgid "Contact"
 msgstr ""
 
@@ -3476,8 +3477,8 @@ msgstr ""
 msgid "Contact Attachments"
 msgstr "Contact us"
 
-#: .\contact\models.py:215 .\pay_way\admin.py:137 .\promotion\admin.py:149
-#: .\tenant\models.py:44
+#: .\contact\models.py:215 .\core\cache\registry.py:23 .\pay_way\admin.py:137
+#: .\promotion\admin.py:160 .\tenant\models.py:44
 msgid "General"
 msgstr ""
 
@@ -3492,7 +3493,7 @@ msgstr ""
 msgid "Products"
 msgstr ""
 
-#: .\contact\models.py:218 .\giftcard\admin.py:123
+#: .\contact\models.py:218 .\giftcard\admin.py:129
 #, fuzzy
 #| msgid "Order Delivered"
 msgid "Delivery"
@@ -3817,7 +3818,21 @@ msgid_plural "Cache purge #%(id)s (%(count)s surfaces)"
 msgstr[0] ""
 msgstr[1] ""
 
-#: .\core\cache\registry.py:82
+#: .\core\cache\registry.py:19 .\settings.py:3246
+msgid "Catalog"
+msgstr ""
+
+#: .\core\cache\registry.py:20
+msgid "Commerce"
+msgstr ""
+
+#: .\core\cache\registry.py:22
+#, fuzzy
+#| msgid "Order Confirmation"
+msgid "Configuration"
+msgstr "Order Confirmation"
+
+#: .\core\cache\registry.py:91
 #, python-format
 msgid "Unknown cache surface: %(code)s"
 msgstr ""
@@ -4971,7 +4986,7 @@ msgstr ""
 
 #: .\core\templates\emails\b2b\admin_new_business_profile.html:16
 #: .\core\templates\emails\b2b\admin_new_business_profile.txt:7
-#: .\notification\enum.py:19 .\user\admin.py:177 .\user\admin.py:372
+#: .\notification\enum.py:19 .\user\admin.py:181 .\user\admin.py:378
 #: .\user\models\subscription.py:170
 msgid "Account"
 msgstr ""
@@ -6414,13 +6429,13 @@ msgid "Confirm subscription"
 msgstr "Questions?"
 
 #: .\core\templates\emails\subscription\confirmation.html:25
-#: .\user\admin.py:888
+#: .\user\admin.py:894
 msgid "Subscription Details"
 msgstr ""
 
 #: .\core\templates\emails\subscription\confirmation.html:26
-#: .\core\templates\emails\subscription\confirmation.txt:15 .\user\admin.py:808
-#: .\user\admin.py:956 .\user\models\subscription.py:195
+#: .\core\templates\emails\subscription\confirmation.txt:15 .\user\admin.py:814
+#: .\user\admin.py:962 .\user\models\subscription.py:195
 msgid "Topic"
 msgstr ""
 
@@ -6705,7 +6720,7 @@ msgstr ""
 
 #: .\core\templates\invoices\invoice.html:224 .\notification\enum.py:15
 #: .\order\admin.py:682 .\order\admin.py:710 .\pay_way\admin.py:151
-#: .\user\admin.py:265
+#: .\user\admin.py:271
 msgid "Payment"
 msgstr ""
 
@@ -6853,15 +6868,15 @@ msgstr ""
 msgid "Delete a %(name)s. Requires authentication."
 msgstr ""
 
-#: .\core\utils\tenant_urls.py:191
+#: .\core\utils\tenant_urls.py:214
 msgid "Enter a storefront path starting with a single '/'."
 msgstr ""
 
-#: .\core\utils\tenant_urls.py:196
+#: .\core\utils\tenant_urls.py:219
 msgid "A storefront path cannot contain whitespace."
 msgstr ""
 
-#: .\core\utils\tenant_urls.py:202
+#: .\core\utils\tenant_urls.py:225
 msgid "A storefront path cannot start with a locale prefix."
 msgstr ""
 
@@ -7191,32 +7206,32 @@ msgstr ""
 msgid "Developer Tools"
 msgstr ""
 
-#: .\giftcard\admin.py:30
+#: .\giftcard\admin.py:34
 msgid "Adjustment amount"
 msgstr ""
 
-#: .\giftcard\admin.py:34
+#: .\giftcard\admin.py:39
 msgid ""
 "Positive adds balance, negative removes it (never below the current balance)"
 msgstr ""
 
-#: .\giftcard\admin.py:41
+#: .\giftcard\admin.py:47
 msgid "Recorded on the ledger row"
 msgstr ""
 
-#: .\giftcard\admin.py:46 .\giftcard\admin.py:66
+#: .\giftcard\admin.py:52 .\giftcard\admin.py:72
 msgid "Ledger"
 msgstr ""
 
-#: .\giftcard\admin.py:108 .\shipping_acs\enum\cod_payment_way.py:15
+#: .\giftcard\admin.py:114 .\shipping_acs\enum\cod_payment_way.py:15
 msgid "Card"
 msgstr ""
 
-#: .\giftcard\admin.py:180
+#: .\giftcard\admin.py:186
 msgid "Balance"
 msgstr ""
 
-#: .\giftcard\admin.py:194 .\notification\admin.py:72
+#: .\giftcard\admin.py:200 .\notification\admin.py:72
 #: .\notification\admin.py:294 .\notification\admin.py:357
 #: .\notification\admin.py:476 .\notification\admin.py:491
 #: .\shipping_boxnow\enum\parcel_state.py:12 .\user\models\data_export.py:25
@@ -7224,39 +7239,39 @@ msgstr ""
 msgid "Expired"
 msgstr ""
 
-#: .\giftcard\admin.py:198
+#: .\giftcard\admin.py:204
 msgid "Adjust balance"
 msgstr ""
 
-#: .\giftcard\admin.py:201
+#: .\giftcard\admin.py:207
 msgid "Adjust gift card balance"
 msgstr ""
 
-#: .\giftcard\admin.py:203
+#: .\giftcard\admin.py:209
 msgid "Writes an ADJUST row on the ledger — the card history stays auditable."
 msgstr ""
 
-#: .\giftcard\admin.py:217
+#: .\giftcard\admin.py:223
 msgid "Cannot remove more than the current balance."
 msgstr ""
 
-#: .\giftcard\admin.py:228
+#: .\giftcard\admin.py:234
 msgid "Balance adjusted."
 msgstr ""
 
-#: .\giftcard\admin.py:237
+#: .\giftcard\admin.py:243
 msgid "Disable card"
 msgstr ""
 
-#: .\giftcard\admin.py:244
+#: .\giftcard\admin.py:250
 msgid "Card disabled."
 msgstr ""
 
-#: .\giftcard\admin.py:251
+#: .\giftcard\admin.py:257
 msgid "Resend delivery email"
 msgstr ""
 
-#: .\giftcard\admin.py:261
+#: .\giftcard\admin.py:267
 msgid "Delivery email queued."
 msgstr ""
 
@@ -7656,7 +7671,7 @@ msgstr ""
 msgid "Tier (level %(level)s)"
 msgstr ""
 
-#: .\loyalty\models\transaction.py:21 .\user\admin.py:235
+#: .\loyalty\models\transaction.py:21 .\user\admin.py:239
 msgid "Points"
 msgstr ""
 
@@ -7993,7 +8008,7 @@ msgstr ""
 msgid "Security Related"
 msgstr ""
 
-#: .\notification\admin.py:119 .\user\admin.py:90
+#: .\notification\admin.py:119 .\user\admin.py:94
 msgid "User Status"
 msgstr ""
 
@@ -8619,7 +8634,7 @@ msgid ""
 msgstr ""
 
 #: .\order\admin.py:558 .\order\admin.py:1462
-#: .\shipping_boxnow\models\parcel_event.py:88 .\user\admin.py:696
+#: .\shipping_boxnow\models\parcel_event.py:88 .\user\admin.py:702
 msgid "Additional Information"
 msgstr ""
 
@@ -13499,108 +13514,108 @@ msgstr ""
 msgid "Review does not exist"
 msgstr ""
 
-#: .\promotion\admin.py:82
+#: .\promotion\admin.py:86
 msgid "Number of codes"
 msgstr ""
 
-#: .\promotion\admin.py:85
+#: .\promotion\admin.py:93
 msgid "Prefix"
 msgstr ""
 
-#: .\promotion\admin.py:88
+#: .\promotion\admin.py:97
 msgid "Optional prefix, e.g. VIP- (uppercased)"
 msgstr ""
 
-#: .\promotion\admin.py:91
+#: .\promotion\admin.py:100
 msgid "Random part length"
 msgstr ""
 
-#: .\promotion\admin.py:97
+#: .\promotion\admin.py:107
 msgid "Usage limit per code"
 msgstr ""
 
-#: .\promotion\admin.py:101
+#: .\promotion\admin.py:112
 msgid "Empty for unlimited; 1 for single-use codes"
 msgstr ""
 
-#: .\promotion\admin.py:109 .\promotion\admin.py:289
+#: .\promotion\admin.py:120 .\promotion\admin.py:300
 msgid "Redemptions"
 msgstr ""
 
-#: .\promotion\admin.py:165
+#: .\promotion\admin.py:176
 #, fuzzy
 #| msgid "Order Details"
 msgid "Benefit Details"
 msgstr "Order Details"
 
-#: .\promotion\admin.py:175
+#: .\promotion\admin.py:186
 msgid ""
 "BXGY: buy/get quantities + get-discount percent (100 = free); empty reward "
 "pool = same products as the buy side. FREE_GIFT: set exactly one gift "
 "product and the gift quantity."
 msgstr ""
 
-#: .\promotion\admin.py:183
+#: .\promotion\admin.py:194
 msgid "Targeting"
 msgstr ""
 
-#: .\promotion\admin.py:197
+#: .\promotion\admin.py:208
 msgid "Conditions & Limits"
 msgstr ""
 
-#: .\promotion\admin.py:257
+#: .\promotion\admin.py:268
 msgid "Benefit"
 msgstr ""
 
-#: .\promotion\admin.py:286
+#: .\promotion\admin.py:297
 msgid "Ended"
 msgstr ""
 
-#: .\promotion\admin.py:293
+#: .\promotion\admin.py:304
 msgid "Activate selected promotions"
 msgstr ""
 
-#: .\promotion\admin.py:298
+#: .\promotion\admin.py:309
 #, python-format
 msgid "%(count)d promotions activated."
 msgstr ""
 
-#: .\promotion\admin.py:302
+#: .\promotion\admin.py:313
 msgid "Deactivate selected promotions"
 msgstr ""
 
-#: .\promotion\admin.py:307
+#: .\promotion\admin.py:318
 #, python-format
 msgid "%(count)d promotions deactivated."
 msgstr ""
 
-#: .\promotion\admin.py:312
+#: .\promotion\admin.py:323
 msgid "Generate codes"
 msgstr ""
 
-#: .\promotion\admin.py:315
+#: .\promotion\admin.py:326
 msgid "Bulk-generate coupon codes"
 msgstr ""
 
-#: .\promotion\admin.py:317
+#: .\promotion\admin.py:328
 msgid "Creates unique random codes attached to this promotion."
 msgstr ""
 
-#: .\promotion\admin.py:339
+#: .\promotion\admin.py:350
 #, python-format
 msgid "%(count)d codes generated for %(name)s."
 msgstr ""
 
-#: .\promotion\admin.py:352
+#: .\promotion\admin.py:363
 msgid "Duplicate"
 msgstr ""
 
-#: .\promotion\admin.py:383
+#: .\promotion\admin.py:394
 #, python-format
 msgid "%(name)s (copy)"
 msgstr ""
 
-#: .\promotion\admin.py:396
+#: .\promotion\admin.py:407
 msgid "Promotion duplicated as an inactive draft."
 msgstr ""
 
@@ -14054,7 +14069,7 @@ msgid "Limits"
 msgstr ""
 
 #: .\recommendation\admin.py:107 .\shipping\admin.py:127
-#: .\shipping_boxnow\admin.py:276 .\user\admin.py:917
+#: .\shipping_boxnow\admin.py:276 .\user\admin.py:923
 msgid "Timestamps"
 msgstr ""
 
@@ -14830,10 +14845,6 @@ msgstr ""
 msgid "Navigation"
 msgstr ""
 
-#: .\settings.py:3246
-msgid "Catalog"
-msgstr ""
-
 #: .\settings.py:3269
 msgid "Reviews"
 msgstr ""
@@ -14914,7 +14925,7 @@ msgstr "Questions?"
 msgid "Subscription Topics"
 msgstr ""
 
-#: .\settings.py:3623 .\user\admin.py:770
+#: .\settings.py:3623 .\user\admin.py:776
 msgid "Settings"
 msgstr ""
 
@@ -16146,7 +16157,7 @@ msgid "Identification"
 msgstr "Order Confirmation"
 
 #: .\shipping_boxnow\admin.py:741 .\shipping_boxnow\admin.py:866
-#: .\user\admin.py:512 .\user\admin.py:723
+#: .\user\admin.py:518 .\user\admin.py:729
 msgid "Location"
 msgstr ""
 
@@ -18173,245 +18184,245 @@ msgstr ""
 msgid "'%(value)s' is a reserved schema name and cannot be used for a tenant."
 msgstr ""
 
-#: .\user\admin.py:78
+#: .\user\admin.py:82
 msgid "Subscription Count"
 msgstr ""
 
-#: .\user\admin.py:85
+#: .\user\admin.py:89
 msgid "Address Count"
 msgstr ""
 
-#: .\user\admin.py:95
+#: .\user\admin.py:99
 msgid "Active Staff"
 msgstr ""
 
-#: .\user\admin.py:96
+#: .\user\admin.py:100
 msgid "Active Regular Users"
 msgstr ""
 
-#: .\user\admin.py:97
+#: .\user\admin.py:101
 msgid "Inactive Users"
 msgstr ""
 
-#: .\user\admin.py:98
+#: .\user\admin.py:102
 msgid "Super Users"
 msgstr ""
 
-#: .\user\admin.py:99
+#: .\user\admin.py:103
 msgid "Users with Subscriptions"
 msgstr ""
 
-#: .\user\admin.py:100
+#: .\user\admin.py:104
 msgid "Users without Subscriptions"
 msgstr ""
 
-#: .\user\admin.py:123
+#: .\user\admin.py:127
 msgid "Social Media Presence"
 msgstr ""
 
-#: .\user\admin.py:128
+#: .\user\admin.py:132
 msgid "Has Website"
 msgstr ""
 
-#: .\user\admin.py:129
+#: .\user\admin.py:133
 msgid "Has Social Media"
 msgstr ""
 
-#: .\user\admin.py:130
+#: .\user\admin.py:134
 msgid "No Social Media"
 msgstr ""
 
-#: .\user\admin.py:160
+#: .\user\admin.py:164
 msgid "Topic Category"
 msgstr ""
 
 # Email Template Translations
-#: .\user\admin.py:172
+#: .\user\admin.py:176
 #, fuzzy
 #| msgid "Questions?"
 msgid "Subscriber"
 msgstr "Questions?"
 
-#: .\user\admin.py:178
+#: .\user\admin.py:182
 msgid "Guest (email only)"
 msgstr ""
 
-#: .\user\admin.py:238
+#: .\user\admin.py:243
 msgid "Positive awards points, negative removes them"
 msgstr ""
 
-#: .\user\admin.py:243
+#: .\user\admin.py:249
 msgid "Recorded on the points ledger"
 msgstr ""
 
-#: .\user\admin.py:328
+#: .\user\admin.py:334
 msgid "Search by email, username, name, phone, city, address, or bio."
 msgstr ""
 
-#: .\user\admin.py:383
+#: .\user\admin.py:389
 msgid "Profile"
 msgstr ""
 
-#: .\user\admin.py:397 .\user\admin.py:715 .\user\models\account.py:79
+#: .\user\admin.py:403 .\user\admin.py:721 .\user\models\account.py:79
 msgid "Address"
 msgstr ""
 
-#: .\user\admin.py:411 .\user\admin.py:519
+#: .\user\admin.py:417 .\user\admin.py:525
 msgid "Social"
 msgstr ""
 
-#: .\user\admin.py:427
+#: .\user\admin.py:433
 msgid "Permissions"
 msgstr ""
 
-#: .\user\admin.py:440
+#: .\user\admin.py:446
 msgid "Loyalty & Engagement"
 msgstr ""
 
-#: .\user\admin.py:510
+#: .\user\admin.py:516
 msgid "No contact info"
 msgstr ""
 
-#: .\user\admin.py:517
+#: .\user\admin.py:523
 msgid "No location"
 msgstr ""
 
-#: .\user\admin.py:535
+#: .\user\admin.py:541
 #, python-format
 msgid "%(active)d/%(subs)d subscriptions · %(addrs)d addresses"
 msgstr ""
 
-#: .\user\admin.py:545
+#: .\user\admin.py:551
 msgid "Social Links Summary"
 msgstr ""
 
-#: .\user\admin.py:562
+#: .\user\admin.py:568
 msgid "No social media links"
 msgstr ""
 
-#: .\user\admin.py:569
+#: .\user\admin.py:575
 msgid "Points Balance"
 msgstr ""
 
-#: .\user\admin.py:571
+#: .\user\admin.py:577
 #, python-format
 msgid "%(balance)d points"
 msgstr ""
 
-#: .\user\admin.py:575 .\user\models\account.py:126
+#: .\user\admin.py:581 .\user\models\account.py:126
 #, fuzzy
 #| msgid "Total"
 msgid "Total XP"
 msgstr "Total"
 
-#: .\user\admin.py:577
+#: .\user\admin.py:583
 #, python-format
 msgid "%(xp)d XP"
 msgstr ""
 
-#: .\user\admin.py:579
+#: .\user\admin.py:585
 msgid "Level"
 msgstr ""
 
-#: .\user\admin.py:581
+#: .\user\admin.py:587
 #, python-format
 msgid "Level %(level)d"
 msgstr ""
 
-#: .\user\admin.py:585
+#: .\user\admin.py:591
 msgid "Tier"
 msgstr ""
 
-#: .\user\admin.py:588
+#: .\user\admin.py:594
 msgid "No tier"
 msgstr ""
 
-#: .\user\admin.py:591 .\user\admin.py:595
+#: .\user\admin.py:597 .\user\admin.py:601
 msgid "Adjust loyalty points"
 msgstr ""
 
-#: .\user\admin.py:597
+#: .\user\admin.py:603
 msgid ""
 "Writes an adjustment row on the customer's points ledger; it cannot be "
 "undone, only offset by another adjustment."
 msgstr ""
 
-#: .\user\admin.py:617
+#: .\user\admin.py:623
 #, python-format
 msgid "%(user)s received a %(points)d loyalty points adjustment."
 msgstr ""
 
-#: .\user\admin.py:674
+#: .\user\admin.py:680
 msgid "Address Owner"
 msgstr ""
 
-#: .\user\admin.py:678 .\user\admin.py:719
+#: .\user\admin.py:684 .\user\admin.py:725
 msgid "Contact Person"
 msgstr ""
 
-#: .\user\admin.py:682
+#: .\user\admin.py:688
 msgid "Address Details"
 msgstr ""
 
-#: .\user\admin.py:763
+#: .\user\admin.py:769
 msgid "Topic Information"
 msgstr ""
 
-#: .\user\admin.py:811 .\user\admin.py:960
+#: .\user\admin.py:817 .\user\admin.py:966
 msgid "Unnamed Topic"
 msgstr ""
 
-#: .\user\admin.py:815
+#: .\user\admin.py:821
 msgid "Subscribers"
 msgstr ""
 
-#: .\user\admin.py:817
+#: .\user\admin.py:823
 #, python-format
 msgid "%(active)d/%(total)d active"
 msgstr ""
 
-#: .\user\admin.py:902
+#: .\user\admin.py:908
 msgid "Consent"
 msgstr ""
 
-#: .\user\admin.py:929
+#: .\user\admin.py:935
 msgid "Additional Data"
 msgstr ""
 
-#: .\user\admin.py:943
+#: .\user\admin.py:949
 msgid "Subscription"
 msgstr ""
 
-#: .\user\admin.py:963
+#: .\user\admin.py:969
 msgid "Dates"
 msgstr ""
 
-#: .\user\admin.py:966
+#: .\user\admin.py:972
 #, python-format
 msgid "Subscribed %(sub)s · Unsubscribed %(unsub)s"
 msgstr ""
 
-#: .\user\admin.py:970
+#: .\user\admin.py:976
 #, python-format
 msgid "Subscribed %(sub)s"
 msgstr ""
 
-#: .\user\admin.py:979
+#: .\user\admin.py:985
 #, fuzzy
 #| msgid "Order Confirmation"
 msgid "Resend confirmation"
 msgstr "Order Confirmation"
 
-#: .\user\admin.py:1010
+#: .\user\admin.py:1016
 #, python-format
 msgid "%(count)d confirmation emails were queued."
 msgstr ""
 
-#: .\user\admin.py:1014
+#: .\user\admin.py:1020
 msgid "Deactivate selected subscriptions"
 msgstr ""
 
-#: .\user\admin.py:1030
+#: .\user\admin.py:1036
 #, python-format
 msgid "%(count)d subscriptions were deactivated."
 msgstr ""

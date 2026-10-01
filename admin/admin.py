@@ -14,7 +14,7 @@ from admin.forms import CachePurgeForm, PlatformAdminAuthenticationForm
 from admin.mixins import AdminSiteLoginNextMixin
 from core.cache import CacheService
 from core.cache.nuxt import is_configured as nuxt_purge_configured
-from core.cache.registry import iter_surfaces
+from core.cache.registry import GROUP_LABELS, iter_surfaces
 
 logger = logging.getLogger(__name__)
 
@@ -226,7 +226,9 @@ class MyAdminSite(AdminSiteLoginNextMixin, UnfoldAdminSite):
         context = {
             **self.each_context(request),
             "form": form,
-            "groups": sorted(groups.items()),
+            "groups": [
+                (GROUP_LABELS[group], groups[group]) for group in sorted(groups)
+            ],
             "recent_logs": _purge_log_table(recent_logs),
             "nuxt_configured": nuxt_purge_configured(),
             "title": _("Cache Management"),

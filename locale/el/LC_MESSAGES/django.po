@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-01 04:26+0300\n"
+"POT-Creation-Date: 2026-10-01 10:07+0300\n"
 "PO-Revision-Date: 2026-04-17 12:58+0300\n"
 "Last-Translator: Webside Admin <webside@hotmail.gr>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -52,7 +52,7 @@ msgid "Dry run"
 msgstr "Δοκιμαστική εκτέλεση"
 
 #: .\admin\admin.py:56 .\admin\dashboard\platform.py:73
-#: .\promotion\admin.py:287 .\tenant\admin_labels.py:68
+#: .\promotion\admin.py:298 .\tenant\admin_labels.py:68
 msgid "Live"
 msgstr "Live"
 
@@ -75,19 +75,19 @@ msgstr ""
 "δεν απάντησε. Τα παρακάτω νούμερα δεν είναι αξιόπιστα· δείτε το αρχείο "
 "καταγραφής της εφαρμογής για το σφάλμα."
 
-#: .\admin\admin.py:232
+#: .\admin\admin.py:234
 msgid "Cache Management"
 msgstr "Διαχείριση Cache"
 
-#: .\admin\admin.py:239
+#: .\admin\admin.py:241
 msgid "Unknown cache surface."
 msgstr "Άγνωστη επιφάνεια cache."
 
-#: .\admin\admin.py:251
+#: .\admin\admin.py:253
 msgid "Select at least one cache surface to purge."
 msgstr "Επίλεξε τουλάχιστον μία περιοχή cache για εκκαθάριση."
 
-#: .\admin\admin.py:274
+#: .\admin\admin.py:276
 #, python-format
 msgid ""
 "Dry run: %(d)s Django + %(n)s Nuxt keys would be removed across %(s)s "
@@ -96,14 +96,14 @@ msgstr ""
 "Δοκιμαστική εκτέλεση: θα αφαιρούνταν %(d)s κλειδιά Django + %(n)s κλειδιά "
 "Nuxt σε %(s)s επιφάνεια/ες."
 
-#: .\admin\admin.py:283
+#: .\admin\admin.py:285
 #, python-format
 msgid "Purged %(d)s Django + %(n)s Nuxt keys across %(s)s surface(s)."
 msgstr ""
 "Καθαρίστηκαν %(d)s κλειδιά Django + %(n)s κλειδιά Nuxt σε %(s)s "
 "επιφάνεια/ες."
 
-#: .\admin\admin.py:296
+#: .\admin\admin.py:298
 #, python-format
 msgid ""
 "Django cache purge FAILED for %(n)s surface(s): %(codes)s. Those keys are "
@@ -113,7 +113,7 @@ msgstr ""
 " Αυτά τα κλειδιά παραμένουν στην cache — δείτε το αρχείο καταγραφής της "
 "εφαρμογής για το σφάλμα του backend."
 
-#: .\admin\admin.py:310
+#: .\admin\admin.py:312
 #, python-format
 msgid ""
 "Nuxt purge unreachable for %(n)s surface(s). Check NUXT_INTERNAL_BASE_URL + "
@@ -167,7 +167,7 @@ msgid "Plan"
 msgstr "Πλάνο"
 
 #: .\admin\dashboard\platform.py:165 .\admin\dashboard\store\widgets.py:281
-#: .\b2b\admin.py:149 .\b2b\models\profile.py:32 .\blog\admin.py:502
+#: .\b2b\admin.py:151 .\b2b\models\profile.py:32 .\blog\admin.py:502
 #: .\core\templates\emails\order\order_canceled.html:15
 #: .\core\templates\emails\order\order_completed.html:22
 #: .\core\templates\emails\order\order_completed.txt:18
@@ -175,13 +175,13 @@ msgstr "Πλάνο"
 #: .\core\templates\emails\order\order_pending_reminder.html:19
 #: .\core\templates\emails\order\order_pending_reminder.txt:7
 #: .\core\templates\emails\order\order_shipped.html:13
-#: .\core\templates\invoices\invoice.html:226 .\giftcard\admin.py:186
+#: .\core\templates\invoices\invoice.html:226 .\giftcard\admin.py:192
 #: .\giftcard\models.py:67 .\giftcard\models.py:111 .\meta_capi\models.py:59
 #: .\notification\admin.py:289 .\notification\admin.py:410
 #: .\order\admin.py:677 .\order\admin.py:702 .\order\models\order.py:155
 #: .\product\admin.py:698 .\product\admin.py:1849
-#: .\product\models\review.py:32 .\promotion\admin.py:269
-#: .\tenant\admin.py:209 .\user\admin.py:260 .\user\admin.py:940
+#: .\product\models\review.py:32 .\promotion\admin.py:280
+#: .\tenant\admin.py:209 .\user\admin.py:266 .\user\admin.py:946
 #: .\user\models\data_export.py:34 .\user\models\subscription.py:198
 msgid "Status"
 msgstr "Κατάσταση"
@@ -189,7 +189,7 @@ msgstr "Κατάσταση"
 #: .\admin\dashboard\platform.py:166 .\admin\dashboard\store\widgets.py:178
 #: .\core\templates\admin\index.html:26 .\order\apps.py:7
 #: .\order\models\order.py:393 .\settings.py:3370 .\settings.py:3853
-#: .\tenant\models.py:1841 .\user\admin.py:274
+#: .\tenant\models.py:1841 .\user\admin.py:280
 msgid "Orders"
 msgstr "Παραγγελίες"
 
@@ -400,7 +400,7 @@ msgstr "Λήψη"
 
 #: .\admin\dashboard\store\widgets.py:335 .\blog\admin.py:714
 #: .\blog\models\comment.py:84 .\contact\admin.py:386 .\contact\models.py:243
-#: .\product\models\alert.py:99 .\user\admin.py:502 .\user\admin.py:953
+#: .\product\models\alert.py:99 .\user\admin.py:508 .\user\admin.py:959
 msgid "Anonymous"
 msgstr "Ανώνυμος"
 
@@ -830,31 +830,31 @@ msgstr "Αν το προϊόν είναι αυτή τη στιγμή διαθέ�
 msgid "When the product was favourited"
 msgstr "Πότε προστέθηκε το προϊόν στα αγαπημένα"
 
-#: .\b2b\admin.py:25 .\b2b\models\price.py:26 .\b2b\models\profile.py:43
+#: .\b2b\admin.py:26 .\b2b\models\price.py:26 .\b2b\models\profile.py:43
 msgid "Customer group"
 msgstr "Ομάδα πελατών"
 
-#: .\b2b\admin.py:27
+#: .\b2b\admin.py:29
 msgid "The wholesale pricing tier this business gets"
 msgstr "Η βαθμίδα τιμών χονδρικής που λαμβάνει αυτή η επιχείρηση"
 
-#: .\b2b\admin.py:33
+#: .\b2b\admin.py:35
 #: .\core\templates\emails\b2b\business_profile_rejected.html:15
 #: .\core\templates\emails\b2b\business_profile_rejected.txt:3
-#: .\giftcard\admin.py:39 .\order\models\stock_log.py:88
-#: .\product\admin.py:1577 .\user\admin.py:241
+#: .\giftcard\admin.py:44 .\order\models\stock_log.py:88
+#: .\product\admin.py:1577 .\user\admin.py:246
 msgid "Reason"
 msgstr "Αιτία"
 
-#: .\b2b\admin.py:36
+#: .\b2b\admin.py:38
 msgid "Included in the notification email to the customer"
 msgstr "Συμπεριλαμβάνεται στο email ενημέρωσης προς τον πελάτη"
 
-#: .\b2b\admin.py:42
+#: .\b2b\admin.py:44
 msgid "Price lines"
 msgstr "Γραμμές τιμών"
 
-#: .\b2b\admin.py:47
+#: .\b2b\admin.py:49
 msgid ""
 "One product per line: sku;net price (VAT-exclusive). Comma also works as "
 "separator and as decimal mark. Existing rows for this group are updated in "
@@ -864,11 +864,11 @@ msgstr ""
 " ως διαχωριστικό και ως υποδιαστολή. Οι υπάρχουσες γραμμές αυτής της ομάδας "
 "ενημερώνονται."
 
-#: .\b2b\admin.py:55
+#: .\b2b\admin.py:57
 msgid "Price list"
 msgstr "Τιμοκατάλογος"
 
-#: .\b2b\admin.py:104 .\contact\models.py:34
+#: .\b2b\admin.py:106 .\contact\models.py:34
 #: .\core\templates\emails\b2b\admin_new_business_profile.html:12
 #: .\core\templates\emails\b2b\admin_new_business_profile.txt:3
 #: .\core\templates\emails\b2b\business_profile_approved.html:14
@@ -876,79 +876,79 @@ msgstr "Τιμοκατάλογος"
 msgid "Company"
 msgstr "Επωνυμία"
 
-#: .\b2b\admin.py:121 .\notification\enum.py:23 .\product\admin.py:1814
+#: .\b2b\admin.py:123 .\notification\enum.py:23 .\product\admin.py:1814
 msgid "Review"
 msgstr "Κριτική"
 
-#: .\b2b\admin.py:134 .\b2b\admin.py:161
+#: .\b2b\admin.py:136 .\b2b\admin.py:163
 #: .\core\templates\emails\b2b\admin_new_business_profile.html:17
 #: .\core\templates\emails\b2b\admin_new_business_profile.txt:8
 msgid "VIES"
 msgstr "VIES"
 
-#: .\b2b\admin.py:173
+#: .\b2b\admin.py:175
 msgid "Approve"
 msgstr "Έγκριση"
 
-#: .\b2b\admin.py:176
+#: .\b2b\admin.py:178
 msgid "Approve business profile"
 msgstr "Έγκριση εταιρικού προφίλ"
 
-#: .\b2b\admin.py:178
+#: .\b2b\admin.py:180
 msgid "Grants wholesale pricing for the chosen group and emails the customer."
 msgstr ""
 "Παρέχει τιμές χονδρικής για την επιλεγμένη ομάδα και ενημερώνει τον πελάτη "
 "με email."
 
-#: .\b2b\admin.py:194
+#: .\b2b\admin.py:196
 msgid "Business profile approved."
 msgstr "Το εταιρικό προφίλ εγκρίθηκε."
 
-#: .\b2b\admin.py:205
+#: .\b2b\admin.py:207
 msgid "Reject"
 msgstr "Απόρριψη"
 
-#: .\b2b\admin.py:208
+#: .\b2b\admin.py:210
 msgid "Reject business profile"
 msgstr "Απόρριψη εταιρικού προφίλ"
 
-#: .\b2b\admin.py:210
+#: .\b2b\admin.py:212
 msgid "The reason is included in the email to the customer."
 msgstr "Η αιτιολογία συμπεριλαμβάνεται στο email προς τον πελάτη."
 
-#: .\b2b\admin.py:225
+#: .\b2b\admin.py:227
 msgid "Business profile rejected."
 msgstr "Το εταιρικό προφίλ απορρίφθηκε."
 
-#: .\b2b\admin.py:235
+#: .\b2b\admin.py:237
 msgid "Suspend"
 msgstr "Αναστολή"
 
-#: .\b2b\admin.py:242
+#: .\b2b\admin.py:244
 msgid "Business profile suspended."
 msgstr "Το εταιρικό προφίλ τέθηκε σε αναστολή."
 
-#: .\b2b\admin.py:248
+#: .\b2b\admin.py:250
 msgid "Re-check VIES"
 msgstr "Επανέλεγχος VIES"
 
-#: .\b2b\admin.py:256
+#: .\b2b\admin.py:258
 msgid "VIES re-checked."
 msgstr "Ο έλεγχος VIES επαναλήφθηκε."
 
-#: .\b2b\admin.py:295
+#: .\b2b\admin.py:297
 msgid "Businesses"
 msgstr "Επιχειρήσεις"
 
-#: .\b2b\admin.py:300
+#: .\b2b\admin.py:302
 msgid "Import prices"
 msgstr "Εισαγωγή τιμών"
 
-#: .\b2b\admin.py:303
+#: .\b2b\admin.py:305
 msgid "Import price list"
 msgstr "Εισαγωγή τιμοκαταλόγου"
 
-#: .\b2b\admin.py:305
+#: .\b2b\admin.py:307
 msgid ""
 "Paste one product per line as sku;net price. Rows are created or updated for"
 " THIS group only."
@@ -956,12 +956,12 @@ msgstr ""
 "Επικόλλησε ένα προϊόν ανά γραμμή ως sku;καθαρή τιμή. Οι γραμμές "
 "δημιουργούνται ή ενημερώνονται μόνο για ΑΥΤΗ την ομάδα."
 
-#: .\b2b\admin.py:320
+#: .\b2b\admin.py:322
 #, python-brace-format
 msgid "Imported: {created} created, {updated} updated."
 msgstr "Εισαγωγή: {created} δημιουργήθηκαν, {updated} ενημερώθηκαν."
 
-#: .\b2b\admin.py:330
+#: .\b2b\admin.py:332
 #, python-brace-format
 msgid "…and {count} more lines with errors."
 msgstr "…και {count} ακόμη γραμμές με σφάλματα."
@@ -1005,7 +1005,7 @@ msgstr "Υπηρεσία μη διαθέσιμη"
 #: .\pay_way\models.py:89 .\product\models\attribute.py:33
 #: .\product\models\brand.py:17 .\product\models\category.py:40
 #: .\product\models\product.py:462 .\product\models\variant_group.py:30
-#: .\promotion\admin.py:250 .\promotion\models\promotion.py:297
+#: .\promotion\admin.py:261 .\promotion\models\promotion.py:297
 #: .\region\models.py:22 .\shipping\models\provider.py:34
 #: .\shipping_acs\models\station.py:50 .\shipping_boxnow\models\locker.py:59
 #: .\tag\admin.py:161 .\tenant\models.py:120 .\user\models\subscription.py:95
@@ -1095,8 +1095,8 @@ msgstr "%(group)s → προϊόν %(product)s: %(price)s"
 #: .\product\models\alert.py:50 .\product\models\favourite.py:17
 #: .\product\models\review.py:28 .\promotion\models\redemption.py:48
 #: .\recommendation\models.py:251 .\search\models.py:96
-#: .\tenant\models.py:1600 .\tenant\models.py:1680 .\user\admin.py:498
-#: .\user\admin.py:949 .\user\models\address.py:20
+#: .\tenant\models.py:1600 .\tenant\models.py:1680 .\user\admin.py:504
+#: .\user\admin.py:955 .\user\models\address.py:20
 #: .\user\models\data_export.py:31 .\user\models\subscription.py:177
 msgid "User"
 msgstr "Χρήστης"
@@ -1256,11 +1256,11 @@ msgstr "Κατάσταση δημοσίευσης"
 msgid "Published"
 msgstr "Δημοσιευμένο"
 
-#: .\blog\admin.py:80 .\blog\admin.py:505 .\promotion\admin.py:281
+#: .\blog\admin.py:80 .\blog\admin.py:505 .\promotion\admin.py:292
 msgid "Draft"
 msgstr "Πρόχειρο"
 
-#: .\blog\admin.py:81 .\blog\admin.py:507 .\promotion\admin.py:284
+#: .\blog\admin.py:81 .\blog\admin.py:507 .\promotion\admin.py:295
 msgid "Scheduled"
 msgstr "Προγραμματισμένο"
 
@@ -1285,7 +1285,7 @@ msgstr "Στατιστικά"
 msgid "Bio"
 msgstr "Βιογραφικό"
 
-#: .\blog\admin.py:191 .\blog\models\author.py:17 .\user\admin.py:524
+#: .\blog\admin.py:191 .\blog\models\author.py:17 .\user\admin.py:530
 #: .\user\models\account.py:118
 msgid "Website"
 msgstr "Ιστότοπος"
@@ -1334,8 +1334,9 @@ msgid "Search by title, subtitle, slug, body, or author email/username."
 msgstr "Αναζήτηση με τίτλο, υπότιτλο, slug, κείμενο ή email/όνομα συντάκτη."
 
 #: .\blog\admin.py:416 .\blog\admin.py:702 .\blog\models\comment.py:51
-#: .\page_config\admin.py:276 .\product\admin.py:1638 .\product\admin.py:1799
-#: .\product\admin.py:1979 .\product\admin.py:2062
+#: .\core\cache\registry.py:21 .\page_config\admin.py:276
+#: .\product\admin.py:1638 .\product\admin.py:1799 .\product\admin.py:1979
+#: .\product\admin.py:2062
 msgid "Content"
 msgstr "Περιεχόμενο"
 
@@ -1369,7 +1370,7 @@ msgstr "Χωρίς τίτλο"
 #: .\notification\admin.py:280 .\notification\models\notification.py:46
 #: .\product\admin.py:1103 .\product\admin.py:1696 .\product\admin.py:2011
 #: .\product\models\category_image.py:23 .\product\models\product.py:87
-#: .\user\admin.py:793 .\user\models\subscription.py:62 .\vat\admin.py:132
+#: .\user\admin.py:799 .\user\models\subscription.py:62 .\vat\admin.py:132
 msgid "Category"
 msgstr "Κατηγορία"
 
@@ -1382,7 +1383,7 @@ msgid "No author"
 msgstr "Χωρίς συντάκτη"
 
 #: .\blog\admin.py:510 .\blog\admin.py:680 .\blog\admin.py:730
-#: .\notification\admin.py:297 .\user\admin.py:533
+#: .\notification\admin.py:297 .\user\admin.py:539
 msgid "Engagement"
 msgstr "Συμμετοχή"
 
@@ -2460,7 +2461,7 @@ msgid "Owner"
 msgstr "Ιδιοκτήτης"
 
 #: .\cart\admin.py:230 .\cart\admin.py:237 .\cart\admin.py:398
-#: .\user\admin.py:952
+#: .\user\admin.py:958
 msgid "Guest"
 msgstr "Επισκέπτης"
 
@@ -2839,7 +2840,7 @@ msgstr "Φίλτρο ανά τελευταία δραστηριότητα καλ
 msgid "Filter by cart last activity before date"
 msgstr "Φίλτρο ανά τελευταία δραστηριότητα καλαθιού πριν από ημερομηνία"
 
-#: .\cart\models\cart.py:27 .\user\admin.py:541
+#: .\cart\models\cart.py:27 .\user\admin.py:547
 msgid "Last Activity"
 msgstr "Τελευταία δραστηριότητα"
 
@@ -3465,7 +3466,7 @@ msgstr "Μέγεθος"
 msgid "Scan"
 msgstr "Σάρωση"
 
-#: .\contact\admin.py:189 .\user\admin.py:703
+#: .\contact\admin.py:189 .\user\admin.py:709
 msgid "Contact Information"
 msgstr "Στοιχεία Επικοινωνίας"
 
@@ -3475,7 +3476,7 @@ msgstr "Στοιχεία Επικοινωνίας"
 #: .\product\admin.py:968 .\product\admin.py:1662 .\product\admin.py:1806
 #: .\product\admin.py:1993 .\product\admin.py:2076 .\product\admin.py:2164
 #: .\product\admin.py:2254 .\region\admin.py:105 .\tag\admin.py:146
-#: .\tag\admin.py:245 .\user\admin.py:707 .\user\admin.py:777
+#: .\tag\admin.py:245 .\user\admin.py:713 .\user\admin.py:783
 #: .\vat\admin.py:116
 msgid "System Information"
 msgstr "Πληροφορίες συστήματος"
@@ -3495,7 +3496,7 @@ msgstr "Θέμα"
 
 #: .\contact\admin.py:284 .\contact\apps.py:7 .\contact\models.py:59
 #: .\contact\models.py:131 .\country\admin.py:152 .\page_config\models.py:422
-#: .\user\admin.py:507
+#: .\user\admin.py:513
 msgid "Contact"
 msgstr "Επικοινωνία"
 
@@ -3644,8 +3645,8 @@ msgstr "Συνημμένο Επικοινωνίας"
 msgid "Contact Attachments"
 msgstr "Συνημμένα Επικοινωνίας"
 
-#: .\contact\models.py:215 .\pay_way\admin.py:137 .\promotion\admin.py:149
-#: .\tenant\models.py:44
+#: .\contact\models.py:215 .\core\cache\registry.py:23 .\pay_way\admin.py:137
+#: .\promotion\admin.py:160 .\tenant\models.py:44
 msgid "General"
 msgstr "Γενικά"
 
@@ -3660,7 +3661,7 @@ msgstr "Ιστότοπος & UX"
 msgid "Products"
 msgstr "Προϊόντα"
 
-#: .\contact\models.py:218 .\giftcard\admin.py:123
+#: .\contact\models.py:218 .\giftcard\admin.py:129
 msgid "Delivery"
 msgstr "Παράδοση"
 
@@ -3997,7 +3998,19 @@ msgid_plural "Cache purge #%(id)s (%(count)s surfaces)"
 msgstr[0] "Εκκαθάριση cache #%(id)s (%(count)s επιφάνεια)"
 msgstr[1] "Εκκαθάριση cache #%(id)s (%(count)s επιφάνειες)"
 
-#: .\core\cache\registry.py:82
+#: .\core\cache\registry.py:19 .\settings.py:3246
+msgid "Catalog"
+msgstr "Κατάλογος"
+
+#: .\core\cache\registry.py:20
+msgid "Commerce"
+msgstr "Εμπόριο"
+
+#: .\core\cache\registry.py:22
+msgid "Configuration"
+msgstr "Διαμόρφωση"
+
+#: .\core\cache\registry.py:91
 #, python-format
 msgid "Unknown cache surface: %(code)s"
 msgstr "Άγνωστη επιφάνεια cache: %(code)s"
@@ -5319,7 +5332,7 @@ msgstr "ΔΟΥ"
 
 #: .\core\templates\emails\b2b\admin_new_business_profile.html:16
 #: .\core\templates\emails\b2b\admin_new_business_profile.txt:7
-#: .\notification\enum.py:19 .\user\admin.py:177 .\user\admin.py:372
+#: .\notification\enum.py:19 .\user\admin.py:181 .\user\admin.py:378
 #: .\user\models\subscription.py:170
 msgid "Account"
 msgstr "Λογαριασμός Ανενεργός"
@@ -6835,13 +6848,13 @@ msgid "Confirm subscription"
 msgstr "Επιβεβαίωση εγγραφής"
 
 #: .\core\templates\emails\subscription\confirmation.html:25
-#: .\user\admin.py:888
+#: .\user\admin.py:894
 msgid "Subscription Details"
 msgstr "Λεπτομέρειες εγγραφής"
 
 #: .\core\templates\emails\subscription\confirmation.html:26
 #: .\core\templates\emails\subscription\confirmation.txt:15
-#: .\user\admin.py:808 .\user\admin.py:956 .\user\models\subscription.py:195
+#: .\user\admin.py:814 .\user\admin.py:962 .\user\models\subscription.py:195
 msgid "Topic"
 msgstr "Θέμα"
 
@@ -7152,7 +7165,7 @@ msgstr "Προς"
 
 #: .\core\templates\invoices\invoice.html:224 .\notification\enum.py:15
 #: .\order\admin.py:682 .\order\admin.py:710 .\pay_way\admin.py:151
-#: .\user\admin.py:265
+#: .\user\admin.py:271
 msgid "Payment"
 msgstr "Πληρωμή"
 
@@ -7303,15 +7316,15 @@ msgstr "Διαγραφή %(name)s"
 msgid "Delete a %(name)s. Requires authentication."
 msgstr "Διαγραφή %(name)s. Απαιτεί ταυτοποίηση."
 
-#: .\core\utils\tenant_urls.py:191
+#: .\core\utils\tenant_urls.py:214
 msgid "Enter a storefront path starting with a single '/'."
 msgstr "Εισαγάγετε μια διαδρομή του καταστήματος που ξεκινά με ένα μόνο '/'."
 
-#: .\core\utils\tenant_urls.py:196
+#: .\core\utils\tenant_urls.py:219
 msgid "A storefront path cannot contain whitespace."
 msgstr "Η διαδρομή του καταστήματος δεν μπορεί να περιέχει κενά."
 
-#: .\core\utils\tenant_urls.py:202
+#: .\core\utils\tenant_urls.py:225
 msgid "A storefront path cannot start with a locale prefix."
 msgstr "Η διαδρομή του καταστήματος δεν μπορεί να ξεκινά με πρόθεμα γλώσσας."
 
@@ -7668,34 +7681,34 @@ msgstr "Ο κωδικός χώρας ISO πρέπει να είναι μεταξ
 msgid "Developer Tools"
 msgstr "Εργαλεία προγραμματιστή"
 
-#: .\giftcard\admin.py:30
+#: .\giftcard\admin.py:34
 msgid "Adjustment amount"
 msgstr "Ποσό προσαρμογής"
 
-#: .\giftcard\admin.py:34
+#: .\giftcard\admin.py:39
 msgid ""
 "Positive adds balance, negative removes it (never below the current balance)"
 msgstr ""
 "Θετική τιμή προσθέτει υπόλοιπο, αρνητική αφαιρεί (ποτέ πέραν του τρέχοντος "
 "υπολοίπου)"
 
-#: .\giftcard\admin.py:41
+#: .\giftcard\admin.py:47
 msgid "Recorded on the ledger row"
 msgstr "Καταγράφεται στη γραμμή του καθολικού"
 
-#: .\giftcard\admin.py:46 .\giftcard\admin.py:66
+#: .\giftcard\admin.py:52 .\giftcard\admin.py:72
 msgid "Ledger"
 msgstr "Καθολικό"
 
-#: .\giftcard\admin.py:108 .\shipping_acs\enum\cod_payment_way.py:15
+#: .\giftcard\admin.py:114 .\shipping_acs\enum\cod_payment_way.py:15
 msgid "Card"
 msgstr "Κάρτα"
 
-#: .\giftcard\admin.py:180
+#: .\giftcard\admin.py:186
 msgid "Balance"
 msgstr "Υπόλοιπο"
 
-#: .\giftcard\admin.py:194 .\notification\admin.py:72
+#: .\giftcard\admin.py:200 .\notification\admin.py:72
 #: .\notification\admin.py:294 .\notification\admin.py:357
 #: .\notification\admin.py:476 .\notification\admin.py:491
 #: .\shipping_boxnow\enum\parcel_state.py:12 .\user\models\data_export.py:25
@@ -7703,41 +7716,41 @@ msgstr "Υπόλοιπο"
 msgid "Expired"
 msgstr "Έληξε"
 
-#: .\giftcard\admin.py:198
+#: .\giftcard\admin.py:204
 msgid "Adjust balance"
 msgstr "Προσαρμογή υπολοίπου"
 
-#: .\giftcard\admin.py:201
+#: .\giftcard\admin.py:207
 msgid "Adjust gift card balance"
 msgstr "Προσαρμογή υπολοίπου δωροκάρτας"
 
-#: .\giftcard\admin.py:203
+#: .\giftcard\admin.py:209
 msgid "Writes an ADJUST row on the ledger — the card history stays auditable."
 msgstr ""
 "Καταχωρεί μια γραμμή ADJUST στο καθολικό — το ιστορικό της κάρτας παραμένει "
 "ελέγξιμο."
 
-#: .\giftcard\admin.py:217
+#: .\giftcard\admin.py:223
 msgid "Cannot remove more than the current balance."
 msgstr "Δεν είναι δυνατή η αφαίρεση ποσού μεγαλύτερου από το τρέχον υπόλοιπο."
 
-#: .\giftcard\admin.py:228
+#: .\giftcard\admin.py:234
 msgid "Balance adjusted."
 msgstr "Το υπόλοιπο προσαρμόστηκε."
 
-#: .\giftcard\admin.py:237
+#: .\giftcard\admin.py:243
 msgid "Disable card"
 msgstr "Απενεργοποίηση κάρτας"
 
-#: .\giftcard\admin.py:244
+#: .\giftcard\admin.py:250
 msgid "Card disabled."
 msgstr "Η κάρτα απενεργοποιήθηκε."
 
-#: .\giftcard\admin.py:251
+#: .\giftcard\admin.py:257
 msgid "Resend delivery email"
 msgstr "Επαναποστολή email παράδοσης"
 
-#: .\giftcard\admin.py:261
+#: .\giftcard\admin.py:267
 msgid "Delivery email queued."
 msgstr "Το email παράδοσης μπήκε σε ουρά αποστολής."
 
@@ -8153,7 +8166,7 @@ msgstr "Επίπεδα Πιστότητας"
 msgid "Tier (level %(level)s)"
 msgstr "Βαθμίδα (επίπεδο %(level)s)"
 
-#: .\loyalty\models\transaction.py:21 .\user\admin.py:235
+#: .\loyalty\models\transaction.py:21 .\user\admin.py:239
 msgid "Points"
 msgstr "Πόντοι"
 
@@ -8506,7 +8519,7 @@ msgstr "Σχετικά με πληρωμές"
 msgid "Security Related"
 msgstr "Σχετικά με ασφάλεια"
 
-#: .\notification\admin.py:119 .\user\admin.py:90
+#: .\notification\admin.py:119 .\user\admin.py:94
 msgid "User Status"
 msgstr "Κατάσταση Χρήστη"
 
@@ -9140,7 +9153,7 @@ msgstr ""
 "ACS/BoxNow παρακάτω."
 
 #: .\order\admin.py:558 .\order\admin.py:1462
-#: .\shipping_boxnow\models\parcel_event.py:88 .\user\admin.py:696
+#: .\shipping_boxnow\models\parcel_event.py:88 .\user\admin.py:702
 msgid "Additional Information"
 msgstr "Πρόσθετες Πληροφορίες"
 
@@ -13004,7 +13017,7 @@ msgstr "Μέθοδος Πληρωμής"
 
 #: .\pay_way\models.py:110
 msgid "Pay Ways"
-msgstr "Τρόποι πληρωμής"
+msgstr "Μέθοδοι πληρωμής"
 
 #: .\pay_way\models.py:262
 msgid "Pay way"
@@ -14350,39 +14363,39 @@ msgstr "Πρέπει να έχετε αγοράσει το προϊόν για �
 msgid "Review does not exist"
 msgstr "Η αξιολόγηση δεν υπάρχει"
 
-#: .\promotion\admin.py:82
+#: .\promotion\admin.py:86
 msgid "Number of codes"
 msgstr "Αριθμός κωδικών"
 
-#: .\promotion\admin.py:85
+#: .\promotion\admin.py:93
 msgid "Prefix"
 msgstr "Πρόθεμα"
 
-#: .\promotion\admin.py:88
+#: .\promotion\admin.py:97
 msgid "Optional prefix, e.g. VIP- (uppercased)"
 msgstr "Προαιρετικό πρόθεμα, π.χ. VIP- (μετατρέπεται σε κεφαλαία)"
 
-#: .\promotion\admin.py:91
+#: .\promotion\admin.py:100
 msgid "Random part length"
 msgstr "Μήκος τυχαίου τμήματος"
 
-#: .\promotion\admin.py:97
+#: .\promotion\admin.py:107
 msgid "Usage limit per code"
 msgstr "Όριο χρήσης ανά κωδικό"
 
-#: .\promotion\admin.py:101
+#: .\promotion\admin.py:112
 msgid "Empty for unlimited; 1 for single-use codes"
 msgstr "Κενό για απεριόριστη χρήση· 1 για κωδικούς μίας χρήσης"
 
-#: .\promotion\admin.py:109 .\promotion\admin.py:289
+#: .\promotion\admin.py:120 .\promotion\admin.py:300
 msgid "Redemptions"
 msgstr "Εξαργυρώσεις"
 
-#: .\promotion\admin.py:165
+#: .\promotion\admin.py:176
 msgid "Benefit Details"
 msgstr "Λεπτομέρειες οφέλους"
 
-#: .\promotion\admin.py:175
+#: .\promotion\admin.py:186
 msgid ""
 "BXGY: buy/get quantities + get-discount percent (100 = free); empty reward "
 "pool = same products as the buy side. FREE_GIFT: set exactly one gift "
@@ -14392,68 +14405,68 @@ msgstr ""
 "προϊόντα ανταμοιβής = τα ίδια προϊόντα με την πλευρά της αγοράς. FREE_GIFT: "
 "ορίστε ακριβώς ένα προϊόν δώρου και την ποσότητα δώρου."
 
-#: .\promotion\admin.py:183
+#: .\promotion\admin.py:194
 msgid "Targeting"
 msgstr "Στόχευση"
 
-#: .\promotion\admin.py:197
+#: .\promotion\admin.py:208
 msgid "Conditions & Limits"
 msgstr "Προϋποθέσεις & Όρια"
 
-#: .\promotion\admin.py:257
+#: .\promotion\admin.py:268
 msgid "Benefit"
 msgstr "Όφελος"
 
-#: .\promotion\admin.py:286
+#: .\promotion\admin.py:297
 msgid "Ended"
 msgstr "Έληξε"
 
-#: .\promotion\admin.py:293
+#: .\promotion\admin.py:304
 msgid "Activate selected promotions"
 msgstr "Ενεργοποίηση επιλεγμένων προσφορών"
 
-#: .\promotion\admin.py:298
+#: .\promotion\admin.py:309
 #, python-format
 msgid "%(count)d promotions activated."
 msgstr "Ενεργοποιήθηκαν %(count)d προσφορές."
 
-#: .\promotion\admin.py:302
+#: .\promotion\admin.py:313
 msgid "Deactivate selected promotions"
 msgstr "Απενεργοποίηση επιλεγμένων προσφορών"
 
-#: .\promotion\admin.py:307
+#: .\promotion\admin.py:318
 #, python-format
 msgid "%(count)d promotions deactivated."
 msgstr "Απενεργοποιήθηκαν %(count)d προσφορές."
 
-#: .\promotion\admin.py:312
+#: .\promotion\admin.py:323
 msgid "Generate codes"
 msgstr "Δημιουργία κωδικών"
 
-#: .\promotion\admin.py:315
+#: .\promotion\admin.py:326
 msgid "Bulk-generate coupon codes"
 msgstr "Μαζική δημιουργία κωδικών κουπονιών"
 
-#: .\promotion\admin.py:317
+#: .\promotion\admin.py:328
 msgid "Creates unique random codes attached to this promotion."
 msgstr ""
 "Δημιουργεί μοναδικούς τυχαίους κωδικούς συνδεδεμένους με αυτή την προσφορά."
 
-#: .\promotion\admin.py:339
+#: .\promotion\admin.py:350
 #, python-format
 msgid "%(count)d codes generated for %(name)s."
 msgstr "Δημιουργήθηκαν %(count)d κωδικοί για %(name)s."
 
-#: .\promotion\admin.py:352
+#: .\promotion\admin.py:363
 msgid "Duplicate"
 msgstr "Αντιγραφή"
 
-#: .\promotion\admin.py:383
+#: .\promotion\admin.py:394
 #, python-format
 msgid "%(name)s (copy)"
 msgstr "%(name)s (αντίγραφο)"
 
-#: .\promotion\admin.py:396
+#: .\promotion\admin.py:407
 msgid "Promotion duplicated as an inactive draft."
 msgstr "Η προσφορά αντιγράφηκε ως ανενεργό πρόχειρο."
 
@@ -14955,7 +14968,7 @@ msgid "Limits"
 msgstr "Όρια"
 
 #: .\recommendation\admin.py:107 .\shipping\admin.py:127
-#: .\shipping_boxnow\admin.py:276 .\user\admin.py:917
+#: .\shipping_boxnow\admin.py:276 .\user\admin.py:923
 msgid "Timestamps"
 msgstr "Χρονοσημάνσεις"
 
@@ -15800,10 +15813,6 @@ msgstr "Αποτελέσματα ομάδας"
 msgid "Navigation"
 msgstr "Πλοήγηση"
 
-#: .\settings.py:3246
-msgid "Catalog"
-msgstr "Κατάλογος"
-
 #: .\settings.py:3269
 msgid "Reviews"
 msgstr "Κριτικές"
@@ -15878,7 +15887,7 @@ msgstr "Συνδρομές"
 msgid "Subscription Topics"
 msgstr "Θέματα Συνδρομών"
 
-#: .\settings.py:3623 .\user\admin.py:770
+#: .\settings.py:3623 .\user\admin.py:776
 msgid "Settings"
 msgstr "Ρυθμίσεις"
 
@@ -17269,7 +17278,7 @@ msgid "Identification"
 msgstr "Ταυτοποίηση"
 
 #: .\shipping_boxnow\admin.py:741 .\shipping_boxnow\admin.py:866
-#: .\user\admin.py:512 .\user\admin.py:723
+#: .\user\admin.py:518 .\user\admin.py:729
 msgid "Location"
 msgstr "Τοποθεσία"
 
@@ -19588,161 +19597,161 @@ msgstr ""
 "Το '%(value)s' είναι δεσμευμένο όνομα schema και δεν μπορεί να "
 "χρησιμοποιηθεί για κατάστημα."
 
-#: .\user\admin.py:78
+#: .\user\admin.py:82
 msgid "Subscription Count"
 msgstr "Πλήθος συνδρομητών"
 
-#: .\user\admin.py:85
+#: .\user\admin.py:89
 msgid "Address Count"
 msgstr "Πλήθος Διευθύνσεων"
 
-#: .\user\admin.py:95
+#: .\user\admin.py:99
 msgid "Active Staff"
 msgstr "Ενεργό προσωπικό"
 
-#: .\user\admin.py:96
+#: .\user\admin.py:100
 msgid "Active Regular Users"
 msgstr "Ενεργοί απλοί χρήστες"
 
-#: .\user\admin.py:97
+#: .\user\admin.py:101
 msgid "Inactive Users"
 msgstr "Ανενεργοί χρήστες"
 
-#: .\user\admin.py:98
+#: .\user\admin.py:102
 msgid "Super Users"
 msgstr "Διαχειριστές"
 
-#: .\user\admin.py:99
+#: .\user\admin.py:103
 msgid "Users with Subscriptions"
 msgstr "Χρήστες με συνδρομές"
 
-#: .\user\admin.py:100
+#: .\user\admin.py:104
 msgid "Users without Subscriptions"
 msgstr "Χρήστες χωρίς συνδρομές"
 
-#: .\user\admin.py:123
+#: .\user\admin.py:127
 msgid "Social Media Presence"
 msgstr "Παρουσία στα Μέσα Κοινωνικής Δικτύωσης"
 
-#: .\user\admin.py:128
+#: .\user\admin.py:132
 msgid "Has Website"
 msgstr "Έχει ιστότοπο"
 
-#: .\user\admin.py:129
+#: .\user\admin.py:133
 msgid "Has Social Media"
 msgstr "Έχει social media"
 
-#: .\user\admin.py:130
+#: .\user\admin.py:134
 msgid "No Social Media"
 msgstr "Χωρίς social media"
 
-#: .\user\admin.py:160
+#: .\user\admin.py:164
 msgid "Topic Category"
 msgstr "Κατηγορία θέματος"
 
-#: .\user\admin.py:172
+#: .\user\admin.py:176
 msgid "Subscriber"
 msgstr "Συνδρομητής"
 
-#: .\user\admin.py:178
+#: .\user\admin.py:182
 msgid "Guest (email only)"
 msgstr "Επισκέπτης (μόνο email)"
 
-#: .\user\admin.py:238
+#: .\user\admin.py:243
 msgid "Positive awards points, negative removes them"
 msgstr "Θετική τιμή απονέμει πόντους, αρνητική τους αφαιρεί"
 
-#: .\user\admin.py:243
+#: .\user\admin.py:249
 msgid "Recorded on the points ledger"
 msgstr "Καταγράφεται στο καθολικό πόντων"
 
-#: .\user\admin.py:328
+#: .\user\admin.py:334
 msgid "Search by email, username, name, phone, city, address, or bio."
 msgstr ""
 "Αναζήτηση με email, όνομα χρήστη, όνομα, τηλέφωνο, πόλη, διεύθυνση ή "
 "βιογραφικό."
 
-#: .\user\admin.py:383
+#: .\user\admin.py:389
 msgid "Profile"
 msgstr "Προφίλ"
 
-#: .\user\admin.py:397 .\user\admin.py:715 .\user\models\account.py:79
+#: .\user\admin.py:403 .\user\admin.py:721 .\user\models\account.py:79
 msgid "Address"
 msgstr "Διεύθυνση"
 
-#: .\user\admin.py:411 .\user\admin.py:519
+#: .\user\admin.py:417 .\user\admin.py:525
 msgid "Social"
 msgstr "Κοινωνικά"
 
-#: .\user\admin.py:427
+#: .\user\admin.py:433
 msgid "Permissions"
 msgstr "Δικαιώματα"
 
-#: .\user\admin.py:440
+#: .\user\admin.py:446
 msgid "Loyalty & Engagement"
 msgstr "Πιστότητα & Αλληλεπίδραση"
 
-#: .\user\admin.py:510
+#: .\user\admin.py:516
 msgid "No contact info"
 msgstr "Χωρίς στοιχεία επικοινωνίας"
 
-#: .\user\admin.py:517
+#: .\user\admin.py:523
 msgid "No location"
 msgstr "Χωρίς τοποθεσία"
 
-#: .\user\admin.py:535
+#: .\user\admin.py:541
 #, python-format
 msgid "%(active)d/%(subs)d subscriptions · %(addrs)d addresses"
 msgstr "%(active)d/%(subs)d εγγραφές · %(addrs)d διευθύνσεις"
 
-#: .\user\admin.py:545
+#: .\user\admin.py:551
 msgid "Social Links Summary"
 msgstr "Σύνοψη Συνδέσμων Κοινωνικών Δικτύων"
 
-#: .\user\admin.py:562
+#: .\user\admin.py:568
 msgid "No social media links"
 msgstr "Χωρίς συνδέσμους social media"
 
-#: .\user\admin.py:569
+#: .\user\admin.py:575
 msgid "Points Balance"
 msgstr "Υπόλοιπο πόντων"
 
-#: .\user\admin.py:571
+#: .\user\admin.py:577
 #, python-format
 msgid "%(balance)d points"
 msgstr "%(balance)d πόντοι"
 
-#: .\user\admin.py:575 .\user\models\account.py:126
+#: .\user\admin.py:581 .\user\models\account.py:126
 msgid "Total XP"
 msgstr "Συνολικά XP"
 
-#: .\user\admin.py:577
+#: .\user\admin.py:583
 #, python-format
 msgid "%(xp)d XP"
 msgstr "%(xp)d XP"
 
-#: .\user\admin.py:579
+#: .\user\admin.py:585
 msgid "Level"
 msgstr "Επίπεδο"
 
-#: .\user\admin.py:581
+#: .\user\admin.py:587
 #, python-format
 msgid "Level %(level)d"
 msgstr "Επίπεδο %(level)d"
 
-#: .\user\admin.py:585
+#: .\user\admin.py:591
 msgid "Tier"
 msgstr "Βαθμίδα"
 
-#: .\user\admin.py:588
+#: .\user\admin.py:594
 msgid "No tier"
 msgstr "Χωρίς επίπεδο"
 
-#: .\user\admin.py:591 .\user\admin.py:595
+#: .\user\admin.py:597 .\user\admin.py:601
 msgid "Adjust loyalty points"
 msgstr "Προσαρμογή πόντων πιστότητας"
 
-#: .\user\admin.py:597
+#: .\user\admin.py:603
 msgid ""
 "Writes an adjustment row on the customer's points ledger; it cannot be "
 "undone, only offset by another adjustment."
@@ -19750,80 +19759,80 @@ msgstr ""
 "Καταχωρεί μια εγγραφή προσαρμογής στο καθολικό πόντων του πελάτη· δεν μπορεί"
 " να αναιρεθεί, μόνο να αντισταθμιστεί με άλλη προσαρμογή."
 
-#: .\user\admin.py:617
+#: .\user\admin.py:623
 #, python-format
 msgid "%(user)s received a %(points)d loyalty points adjustment."
 msgstr "Ο/Η %(user)s έλαβε προσαρμογή %(points)d πόντων επιβράβευσης."
 
-#: .\user\admin.py:674
+#: .\user\admin.py:680
 msgid "Address Owner"
 msgstr "Κάτοχος Διεύθυνσης"
 
-#: .\user\admin.py:678 .\user\admin.py:719
+#: .\user\admin.py:684 .\user\admin.py:725
 msgid "Contact Person"
 msgstr "Άτομο Επικοινωνίας"
 
-#: .\user\admin.py:682
+#: .\user\admin.py:688
 msgid "Address Details"
 msgstr "Στοιχεία Διεύθυνσης"
 
-#: .\user\admin.py:763
+#: .\user\admin.py:769
 msgid "Topic Information"
 msgstr "Πληροφορίες θέματος"
 
-#: .\user\admin.py:811 .\user\admin.py:960
+#: .\user\admin.py:817 .\user\admin.py:966
 msgid "Unnamed Topic"
 msgstr "Θέμα χωρίς όνομα"
 
-#: .\user\admin.py:815
+#: .\user\admin.py:821
 msgid "Subscribers"
 msgstr "Συνδρομητές"
 
-#: .\user\admin.py:817
+#: .\user\admin.py:823
 #, python-format
 msgid "%(active)d/%(total)d active"
 msgstr "%(active)d/%(total)d ενεργά"
 
-#: .\user\admin.py:902
+#: .\user\admin.py:908
 msgid "Consent"
 msgstr "Συγκατάθεση"
 
-#: .\user\admin.py:929
+#: .\user\admin.py:935
 msgid "Additional Data"
 msgstr "Επιπλέον δεδομένα"
 
-#: .\user\admin.py:943
+#: .\user\admin.py:949
 msgid "Subscription"
 msgstr "Συνδρομή"
 
-#: .\user\admin.py:963
+#: .\user\admin.py:969
 msgid "Dates"
 msgstr "Ημερομηνίες"
 
-#: .\user\admin.py:966
+#: .\user\admin.py:972
 #, python-format
 msgid "Subscribed %(sub)s · Unsubscribed %(unsub)s"
 msgstr "Εγγραφή %(sub)s · Διαγραφή %(unsub)s"
 
-#: .\user\admin.py:970
+#: .\user\admin.py:976
 #, python-format
 msgid "Subscribed %(sub)s"
 msgstr "Εγγραφή %(sub)s"
 
-#: .\user\admin.py:979
+#: .\user\admin.py:985
 msgid "Resend confirmation"
 msgstr "Επαναποστολή επιβεβαίωσης"
 
-#: .\user\admin.py:1010
+#: .\user\admin.py:1016
 #, python-format
 msgid "%(count)d confirmation emails were queued."
 msgstr "Μπήκαν σε αναμονή %(count)d email επιβεβαίωσης."
 
-#: .\user\admin.py:1014
+#: .\user\admin.py:1020
 msgid "Deactivate selected subscriptions"
 msgstr "Απενεργοποίηση επιλεγμένων συνδρομών"
 
-#: .\user\admin.py:1030
+#: .\user\admin.py:1036
 #, python-format
 msgid "%(count)d subscriptions were deactivated."
 msgstr "%(count)d συνδρομές απενεργοποιήθηκαν."
@@ -21372,9 +21381,6 @@ msgstr "ΦΠΑ %(value)s%%"
 #~ msgid "Localization"
 #~ msgstr "Τοπικές ρυθμίσεις"
 
-#~ msgid "Configuration"
-#~ msgstr "Διαμόρφωση"
-
 #~ msgid "Pickup logo"
 #~ msgstr "Λογότυπο σημείου παραλαβής"
 
@@ -21424,9 +21430,6 @@ msgstr "ΦΠΑ %(value)s%%"
 
 #~ msgid "Authentication"
 #~ msgstr "Έλεγχος Ταυτότητας"
-
-#~ msgid "Agentic Commerce"
-#~ msgstr "Εμπόριο AI Πρακτόρων"
 
 #~ msgid "Payments — Viva Wallet"
 #~ msgstr "Πληρωμές — Viva Wallet"

@@ -12,6 +12,7 @@ from unfold.dataclasses import ActionDialog
 from unfold.decorators import action, display
 from unfold.forms import BaseDialogForm
 from unfold.sections import TableSection
+from unfold.widgets import UnfoldAdminSelectWidget, UnfoldAdminTextareaWidget
 
 from admin.base import BaseModelAdmin
 from admin.export import ExportActionMixin
@@ -24,6 +25,7 @@ class ApproveForm(BaseDialogForm):
     customer_group = forms.ModelChoiceField(
         label=_("Customer group"),
         queryset=CustomerGroup.objects.filter(is_active=True),
+        widget=UnfoldAdminSelectWidget,
         help_text=_("The wholesale pricing tier this business gets"),
     )
 
@@ -32,7 +34,7 @@ class RejectForm(BaseDialogForm):
     reason = forms.CharField(
         label=_("Reason"),
         max_length=1000,
-        widget=forms.Textarea(attrs={"rows": 3}),
+        widget=UnfoldAdminTextareaWidget(attrs={"rows": 3}),
         help_text=_("Included in the notification email to the customer"),
     )
 
@@ -40,7 +42,7 @@ class RejectForm(BaseDialogForm):
 class ImportPricesForm(BaseDialogForm):
     lines = forms.CharField(
         label=_("Price lines"),
-        widget=forms.Textarea(
+        widget=UnfoldAdminTextareaWidget(
             attrs={"rows": 12, "placeholder": "SKU-001;12.50"}
         ),
         help_text=_(

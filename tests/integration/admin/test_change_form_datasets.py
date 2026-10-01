@@ -10,6 +10,7 @@ from django.contrib import admin
 from django.test import Client, RequestFactory
 from django.urls import reverse
 
+from admin.datasets import RelatedDatasetAdmin
 from giftcard.enum import GiftCardTransactionKind
 from giftcard.factories import GiftCardFactory
 from giftcard.models import GiftCardTransaction
@@ -93,6 +94,25 @@ def test_a_gift_card_shows_its_own_ledger(client):
     assert response.status_code == 200
     (dataset,) = response.context["datasets"]
     assert {row.gift_card_id for row in dataset.cl.result_list} == {card.pk}
+
+
+def test_datasets_offer_no_bulk_actions(client):
+    """A superuser may delete stock logs on their own changelist; from a
+    product page they are read-only history, so no "delete selected"."""
+    product = ProductFactory(num_images=0, num_reviews=0)
+    _log(product, 0)
+
+    response = client.get(
+        reverse("admin:product_product_change", args=[product.pk])
+    )
+
+    dataset = next(
+        d for d in response.context["datasets"] if d.model is StockLog
+    )
+    assert dataset.cl.model_admin.get_actions(response.wsgi_request) == {}
+    assert not any(
+        subclass.actions for subclass in RelatedDatasetAdmin.__subclasses__()
+    )
 
 
 def test_no_view_permission_means_no_rows():

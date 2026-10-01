@@ -15,6 +15,10 @@ from unfold.datasets import BaseDataset
 from unfold.decorators import action, display
 from unfold.forms import BaseDialogForm
 from unfold.sections import TableSection
+from unfold.widgets import (
+    UnfoldAdminDecimalFieldWidget,
+    UnfoldAdminTextInputWidget,
+)
 
 from admin.base import BaseModelAdmin
 from admin.datasets import RelatedDatasetAdmin
@@ -30,6 +34,7 @@ class AdjustBalanceForm(BaseDialogForm):
         label=_("Adjustment amount"),
         max_digits=11,
         decimal_places=2,
+        widget=UnfoldAdminDecimalFieldWidget,
         help_text=_(
             "Positive adds balance, negative removes it (never below "
             "the current balance)"
@@ -38,6 +43,7 @@ class AdjustBalanceForm(BaseDialogForm):
     reason = forms.CharField(
         label=_("Reason"),
         max_length=255,
+        widget=UnfoldAdminTextInputWidget,
         help_text=_("Recorded on the ledger row"),
     )
 

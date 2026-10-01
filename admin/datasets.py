@@ -22,6 +22,10 @@ class RelatedDatasetAdmin(BaseModelAdmin):
     # Set on the instance by ``unfold.datasets.BaseDataset``.
     extra_context: dict
     list_per_page = 20
+    # A dataset reads another record's history (stock movements, a
+    # customer's orders, a gift card's ledger); Django's default
+    # "delete selected" would let a superuser bulk-delete it from there.
+    actions = None
 
     def get_queryset(self, request):
         queryset = super().get_queryset(request)

@@ -3,6 +3,28 @@
 
 
 
+## v3.94.1 (2026-10-02)
+
+### Bug fixes
+
+* fix(product): category detail lists only the children a caller may see (#111)
+
+The detail serializer took obj.get_children() unfiltered, so the
+storefront drew a pill for an inactive subcategory under its parent's
+title, linking to a page that 404s (the demo store's
+demo-chargers-cables, staging and production). Children now go
+through the same visible_to gate as the endpoints themselves: staff
+still see the whole tree.
+
+
+Claude-Session: https://claude.ai/code/session_01RE48ce8w633hGEh1GBiPW4
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`e78499d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e78499d685a0e1180b02f3efd02050f58d806745))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.94.0 [skip ci] ([`ae4c7fc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ae4c7fc719f299430ae48e92e7ed31777542524b))
+
 ## v3.94.0 (2026-10-02)
 
 ### Bug fixes

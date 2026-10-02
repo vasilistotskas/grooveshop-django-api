@@ -170,7 +170,9 @@ DEMO_SETTINGS: dict[str, Any] = {
     "INVOICE_SELLER_POSTAL_CODE": "54622",
     "INVOICE_SELLER_COUNTRY": "GR",
     "INVOICE_SELLER_EMAIL": _demo_contact_email,
-    "INVOICE_SELLER_PHONE": "+302310000000",
+    # As a shopper reads it: the footer and the legal pages print the
+    # value as stored.
+    "INVOICE_SELLER_PHONE": "+30 2310 000000",
 }
 
 # ── brands ───────────────────────────────────────────────────────────
@@ -2271,9 +2273,16 @@ def seed_newsletter() -> dict[str, int]:
 #: image, like every tenant's brand files, so no upload is involved.
 DEMO_FAVICON_PATH = "/platform-favicon/favicon.ico"
 
+#: The store line the footer prints under the logo. `store_description`
+#: is not translatable, so it is written in the store's default
+#: language.
+DEMO_STORE_DESCRIPTION = (
+    "Αξεσουάρ κινητού, δοκιμασμένα στο γραφείο μας και παραδομένα γρήγορα."
+)
+
 
 def seed_branding() -> dict[str, int]:
-    """Give the demo store its favicon.
+    """Give the demo store its favicon and its store line.
 
     Without one the storefront answers ``/favicon.ico`` with a 404 by
     design (an unbranded store shows the browser's default icon rather
@@ -2305,14 +2314,20 @@ def seed_branding() -> dict[str, int]:
         if not domain:
             return {"skipped_no_primary_domain": 1}
 
+        changed = []
         favicon_url = f"https://{domain}{DEMO_FAVICON_PATH}"
-        if tenant.favicon_url == favicon_url:
+        if tenant.favicon_url != favicon_url:
+            tenant.favicon_url = favicon_url
+            changed.append("favicon_url")
+        if tenant.store_description != DEMO_STORE_DESCRIPTION:
+            tenant.store_description = DEMO_STORE_DESCRIPTION
+            changed.append("store_description")
+        if not changed:
             return {"unchanged": 1}
-        tenant.favicon_url = favicon_url
         # The narrow update still goes through `Tenant.save`, which bumps
         # the generation the cached `tenant_resolve` payload is keyed by.
-        tenant.save(update_fields=["favicon_url"])
-    return {"updated": 1}
+        tenant.save(update_fields=changed)
+    return {"updated": len(changed)}
 
 
 def seed_demo_account() -> dict[str, int]:

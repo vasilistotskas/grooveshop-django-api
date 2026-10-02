@@ -1,11 +1,13 @@
-"""The demo store's homepage: one band of every kind the builder offers.
+"""The demo store's homepage: the Groove Volt design's eleven bands.
 
 The demo tenant inherited the platform's old blog-first default stack,
 four sections of which render nothing without blog rows — so the page
 opened on a category grid with no hero at all. This is the showcase
-page, so it exercises a carousel hero, product rails read three
-different ways, marketing grids, live promotions, the loyalty band only
-a member sees, blog, social proof, an FAQ and two conversion bands.
+page, and it follows the approved storefront design band for band: a
+carousel hero, the trust strip, category tiles, two product grids read
+two ways, the ink offers band, the rewards band (the programme for a
+guest, the points for a member), the proof row, blog, social proof and
+an FAQ.
 
 Every one of those renders nothing when its data or its flag is absent,
 which is what makes the same stack safe as a starting point for a store
@@ -119,7 +121,7 @@ HOME_SECTIONS: tuple[dict[str, Any], ...] = (
         "component_type": "trust_badges",
         "title": "",
         "props": {
-            "surface": "default",
+            "surface": "muted",
             "marquee": False,
             "items": [
                 {
@@ -193,21 +195,23 @@ HOME_SECTIONS: tuple[dict[str, Any], ...] = (
             "surface": "muted",
             "heading": "Αγόρασε ανά κατηγορία",
             "layout": "tiles",
-            "limit": 8,
+            "limit": 6,
         },
         "sort_order": 2,
         "i18n": {"en": {"props": {"heading": "Shop by category"}}},
     },
     {
-        "component_type": "products_slider",
+        "component_type": "products_grid",
         "title": "",
         "props": {
             "surface": "default",
             "heading": "Νέες αφίξεις",
             "subheading": "Ό,τι μπήκε τελευταίο στο κατάστημα.",
             "ordering": "newest",
-            "page_size": 12,
+            "page_size": 4,
             "show_add_to_cart": True,
+            "cta_text": "Δες όλα",
+            "cta_link": "/products",
         },
         "sort_order": 3,
         "i18n": {
@@ -215,94 +219,25 @@ HOME_SECTIONS: tuple[dict[str, Any], ...] = (
                 "props": {
                     "heading": "New arrivals",
                     "subheading": "The latest things to land in the shop.",
+                    "cta_text": "See all",
                 },
             },
         },
     },
     {
-        "component_type": "features_grid",
-        "title": "",
-        "props": {
-            "surface": "muted",
-            "heading": "Γιατί εδώ",
-            "columns": 4,
-            "decor": "framed",
-            "items": [
-                {
-                    "title": "Αποστολή αυθημερόν",
-                    "text": (
-                        "Παραγγελίες μέχρι τις 15:00 φεύγουν την ίδια μέρα."
-                    ),
-                    "icon": "i-heroicons-rocket-launch",
-                },
-                {
-                    "title": "Δοκιμασμένα",
-                    "text": "Κρατάμε μόνο ό,τι θα χρησιμοποιούσαμε κι εμείς.",
-                    "icon": "i-heroicons-beaker",
-                },
-                {
-                    "title": "Πραγματική υποστήριξη",
-                    "text": "Απαντάει άνθρωπος, στα ελληνικά, την ίδια μέρα.",
-                    "icon": "i-heroicons-chat-bubble-left-right",
-                },
-                {
-                    "title": "Εύκολες επιστροφές",
-                    "text": "Τριάντα ημέρες, χωρίς ερωτήσεις.",
-                    "icon": "i-heroicons-arrow-path",
-                },
-            ],
-        },
-        "sort_order": 4,
-        "i18n": {
-            "en": {
-                "props": {
-                    "heading": "Why here",
-                    "items": [
-                        {
-                            "title": "Same-day dispatch",
-                            "text": "Orders before 15:00 leave the same day.",
-                            "icon": "i-heroicons-rocket-launch",
-                        },
-                        {
-                            "title": "Actually tested",
-                            "text": (
-                                "We stock only what we would use ourselves."
-                            ),
-                            "icon": "i-heroicons-beaker",
-                        },
-                        {
-                            "title": "Real support",
-                            "text": "A person answers, the same day.",
-                            "icon": "i-heroicons-chat-bubble-left-right",
-                        },
-                        {
-                            "title": "Easy returns",
-                            "text": "Thirty days, no questions.",
-                            "icon": "i-heroicons-arrow-path",
-                        },
-                    ],
-                },
-            },
-        },
-    },
-    {
+        # The ink band. Its eyebrow and its "All N offers" link are the
+        # component's own — the count is the live promotions' — so the
+        # layout names neither.
         "component_type": "offers_preview",
         "title": "",
         "props": {
-            "surface": "default",
-            "heading": "Τρέχουσες προσφορές",
+            "heading": "Κωδικοί που όντως ισχύουν.",
             "limit": 3,
-            "cta_text": "Όλες οι προσφορές",
             "cta_link": "/offers",
         },
-        "sort_order": 5,
+        "sort_order": 4,
         "i18n": {
-            "en": {
-                "props": {
-                    "heading": "Running offers",
-                    "cta_text": "All offers",
-                },
-            },
+            "en": {"props": {"heading": "Codes that actually work."}},
         },
     },
     {
@@ -311,23 +246,44 @@ HOME_SECTIONS: tuple[dict[str, Any], ...] = (
         "props": {
             "surface": "muted",
             "heading": "Δημοφιλή προϊόντα",
+            "subheading": "Αυτά βάζουν όλοι στο καλάθι τους αυτόν τον μήνα.",
             "ordering": "popular",
-            "page_size": 8,
-            "columns": 4,
+            "page_size": 4,
             "show_add_to_cart": True,
+            "cta_text": "Δες όλα",
+            "cta_link": "/products",
         },
+        "sort_order": 5,
+        "i18n": {
+            "en": {
+                "props": {
+                    "heading": "Most popular",
+                    "subheading": (
+                        "What everyone is adding to their cart this month."
+                    ),
+                    "cta_text": "See all",
+                },
+            },
+        },
+    },
+    {
+        # A guest sees the programme's terms and tiers; a member sees
+        # their own points under this title.
+        "component_type": "loyalty_hero",
+        "title": "Οι πόντοι σου",
+        "props": {},
         "sort_order": 6,
-        "i18n": {"en": {"props": {"heading": "Most popular"}}},
+        "i18n": {"en": {"title": "Your rewards"}},
     },
     {
         "component_type": "stats_strip",
         "title": "",
         "props": {
-            "surface": "default",
+            "surface": "muted",
             "items": [
-                {"value": "12.400+", "label": "παραγγελίες"},
-                {"value": "4.8/5", "label": "μέση αξιολόγηση"},
-                {"value": "1-3", "label": "εργάσιμες για παράδοση"},
+                {"value": "12.400+", "label": "παραγγελίες στάλθηκαν"},
+                {"value": "4,8 / 5", "label": "μέση βαθμολογία"},
+                {"value": "1–3", "label": "εργάσιμες για παράδοση"},
                 {"value": "2 έτη", "label": "εγγύηση"},
             ],
         },
@@ -336,9 +292,9 @@ HOME_SECTIONS: tuple[dict[str, Any], ...] = (
             "en": {
                 "props": {
                     "items": [
-                        {"value": "12,400+", "label": "orders"},
-                        {"value": "4.8/5", "label": "average rating"},
-                        {"value": "1-3", "label": "working days to deliver"},
+                        {"value": "12,400+", "label": "orders shipped"},
+                        {"value": "4.8 / 5", "label": "average rating"},
+                        {"value": "1–3", "label": "working days"},
                         {"value": "2 years", "label": "warranty"},
                     ],
                 },
@@ -346,30 +302,23 @@ HOME_SECTIONS: tuple[dict[str, Any], ...] = (
         },
     },
     {
-        "component_type": "loyalty_hero",
-        "title": "Το πρόγραμμα επιβράβευσης",
-        "props": {},
-        "sort_order": 8,
-        "i18n": {"en": {"title": "Your rewards"}},
-    },
-    {
         "component_type": "blog_posts_grid",
         "title": "",
         "props": {
-            "surface": "muted",
+            "surface": "default",
             "heading": "Από το blog",
             "subheading": "Οδηγοί και συμβουλές, χωρίς μάρκετινγκ.",
             "count": 3,
             "cta_text": "Όλα τα άρθρα",
             "cta_link": "/blog",
         },
-        "sort_order": 9,
+        "sort_order": 8,
         "i18n": {
             "en": {
                 "props": {
                     "heading": "From the blog",
                     "subheading": "Guides and tips, without the marketing.",
-                    "cta_text": "All articles",
+                    "cta_text": "All posts",
                 },
             },
         },
@@ -378,30 +327,41 @@ HOME_SECTIONS: tuple[dict[str, Any], ...] = (
         "component_type": "testimonials",
         "title": "",
         "props": {
-            "surface": "default",
+            "surface": "muted",
             "heading": "Τι λένε οι πελάτες μας",
             "items": [
                 {
                     "name": "Γιώργος Π.",
                     "role": "Επαληθευμένη αγορά",
                     "rating": 5,
-                    "text": "Παρέλαβα την επόμενη μέρα, όλα σωστά.",
+                    "text": (
+                        "Ο φορτιστής των 65W αντικατέστησε τρία τροφοδοτικά "
+                        "στην τσάντα μου. Ήρθε το επόμενο πρωί στη "
+                        "Θεσσαλονίκη."
+                    ),
                 },
                 {
                     "name": "Μαρία Κ.",
                     "role": "Επαληθευμένη αγορά",
                     "rating": 5,
-                    "text": "Ρώτησα κάτι στο chat και απάντησαν αμέσως.",
+                    "text": (
+                        "Η διάφανη θήκη είναι ακόμα διάφανη μετά από τέσσερις "
+                        "μήνες. Την άλλαξα χωρίς κόπο όταν πήρα λάθος "
+                        "μέγεθος."
+                    ),
                 },
                 {
                     "name": "Νίκος Α.",
-                    "role": "Χονδρική",
-                    "rating": 4,
-                    "text": "Καλές τιμές και σοβαρή εξυπηρέτηση.",
+                    "role": "Πελάτης χονδρικής",
+                    "rating": 5,
+                    "text": (
+                        "Παίρνουμε καλώδια για όλο το γραφείο με τιμές "
+                        "χονδρικής. Τα τιμολόγια πάνε αυτόματα στο myDATA."
+                    ),
                 },
             ],
         },
-        "sort_order": 10,
+        "sort_order": 9,
         "i18n": {
             "en": {
                 "props": {
@@ -412,7 +372,9 @@ HOME_SECTIONS: tuple[dict[str, Any], ...] = (
                             "role": "Verified purchase",
                             "rating": 5,
                             "text": (
-                                "It arrived the next day, everything correct."
+                                "The 65W charger replaced three bricks in my "
+                                "bag. Delivered the next morning in "
+                                "Thessaloniki."
                             ),
                         },
                         {
@@ -420,15 +382,20 @@ HOME_SECTIONS: tuple[dict[str, Any], ...] = (
                             "role": "Verified purchase",
                             "rating": 5,
                             "text": (
-                                "I asked something in the chat and they "
-                                "answered straight away."
+                                "Clear case still clear after four months. "
+                                "Returns were painless when I picked the "
+                                "wrong size first."
                             ),
                         },
                         {
                             "name": "Nikos A.",
-                            "role": "Wholesale",
-                            "rating": 4,
-                            "text": "Good prices and serious service.",
+                            "role": "Wholesale customer",
+                            "rating": 5,
+                            "text": (
+                                "We order cables for the whole office on "
+                                "wholesale pricing. Invoices land in myDATA "
+                                "automatically."
+                            ),
                         },
                     ],
                 },
@@ -436,36 +403,29 @@ HOME_SECTIONS: tuple[dict[str, Any], ...] = (
         },
     },
     {
-        "component_type": "recently_viewed",
-        "title": "",
-        "props": {"heading": "Είδες πρόσφατα"},
-        "sort_order": 11,
-        "i18n": {"en": {"props": {"heading": "Recently viewed"}}},
-    },
-    {
         "component_type": "faq",
         "title": "",
         "props": {
-            "surface": "muted",
+            "surface": "default",
             "heading": "Συχνές ερωτήσεις",
             "multiple": False,
             "items": [
                 {
-                    "question": "Πόσο κάνει η αποστολή;",
+                    "question": "Πόσο κοστίζει η αποστολή;",
                     "answer": (
-                        "Δωρεάν για παραγγελίες από 50€. Κάτω από αυτό, "
-                        "3,50€ με ACS ή BOX NOW."
+                        "Δωρεάν από 50 €. Αλλιώς 3,50 € με courier ACS ή σε "
+                        "locker BOX NOW."
                     ),
                 },
                 {
-                    "question": "Πότε θα το παραλάβω;",
+                    "question": "Πότε θα φτάσει η παραγγελία μου;",
                     "answer": (
-                        "Σε 1-3 εργάσιμες σε όλη την Ελλάδα. Παραγγελίες "
+                        "Σε 1–3 εργάσιμες σε όλη την Ελλάδα. Παραγγελίες "
                         "μέχρι τις 15:00 φεύγουν αυθημερόν."
                     ),
                 },
                 {
-                    "question": "Μπορώ να το επιστρέψω;",
+                    "question": "Μπορώ να επιστρέψω κάτι;",
                     "answer": (
                         "Ναι, μέσα σε 30 ημέρες, στην αρχική του συσκευασία."
                     ),
@@ -479,28 +439,28 @@ HOME_SECTIONS: tuple[dict[str, Any], ...] = (
                 },
             ],
         },
-        "sort_order": 12,
+        "sort_order": 10,
         "i18n": {
             "en": {
                 "props": {
                     "heading": "Frequently asked",
                     "items": [
                         {
-                            "question": "What does delivery cost?",
+                            "question": "How much is delivery?",
                             "answer": (
-                                "Free over 50€. Below that, 3.50€ with ACS "
-                                "or BOX NOW."
+                                "Free over 50 €. Otherwise 3,50 € with ACS "
+                                "courier or a BOX NOW locker."
                             ),
                         },
                         {
-                            "question": "When will it arrive?",
+                            "question": "When will my order arrive?",
                             "answer": (
-                                "In 1-3 working days across Greece. Orders "
+                                "In 1–3 working days across Greece. Orders "
                                 "before 15:00 leave the same day."
                             ),
                         },
                         {
-                            "question": "Can I return it?",
+                            "question": "Can I return something?",
                             "answer": (
                                 "Yes, within 30 days, in its original "
                                 "packaging."
@@ -514,51 +474,6 @@ HOME_SECTIONS: tuple[dict[str, Any], ...] = (
                             ),
                         },
                     ],
-                },
-            },
-        },
-    },
-    {
-        "component_type": "cta_banner",
-        "title": "",
-        "props": {
-            "heading": "Δωρεάν αποστολή από 50€",
-            "description": "Παράδοση σε 1-3 εργάσιμες σε όλη την Ελλάδα.",
-            "button_text": "Δες τα προϊόντα",
-            "button_link": "/products",
-            "background_color": "#1F2937",
-        },
-        "sort_order": 13,
-        "i18n": {
-            "en": {
-                "props": {
-                    "heading": "Free delivery over 50€",
-                    "description": (
-                        "Delivered in 1-3 working days across Greece."
-                    ),
-                    "button_text": "Shop now",
-                },
-            },
-        },
-    },
-    {
-        "component_type": "newsletter_signup",
-        "title": "",
-        "props": {
-            "surface": "muted",
-            "heading": "Μία φορά τον μήνα, τίποτα άλλο",
-            "description": "Νέα προϊόντα και προσφορές. Διαγραφή με ένα κλικ.",
-            "button_text": "Εγγραφή",
-        },
-        "sort_order": 14,
-        "i18n": {
-            "en": {
-                "props": {
-                    "heading": "Once a month, nothing else",
-                    "description": (
-                        "New products and offers. One click to unsubscribe."
-                    ),
-                    "button_text": "Subscribe",
                 },
             },
         },

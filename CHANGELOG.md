@@ -3,6 +3,56 @@
 
 
 
+## v3.94.0 (2026-10-02)
+
+### Bug fixes
+
+* fix(search): a category filter matches its whole subtree (#110)
+
+The product index stores each product's own category, and the search
+view filtered `category IN [ids]` with the requested ids alone. A
+category whose products all sit in its subcategories therefore listed
+0 products under a header counting 77 (recursive_product_count) -
+the demo store's "Phone accessories" root, on staging and production.
+Each requested category now stands for itself and every descendant
+(MPTT get_queryset_descendants); an unknown id still filters to
+nothing instead of dropping the filter.
+
+
+Claude-Session: https://claude.ai/code/session_01RE48ce8w633hGEh1GBiPW4
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`206470a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/206470a75f259da6b6f14e5507081b5fa8c5516f))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.93.0
+
+The v3.93.0 release job stopped at its tag push, before the step that
+syncs uv.lock to the released version, so main's lock still names
+3.92.6 and `uv sync --locked` refuses it.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01RE48ce8w633hGEh1GBiPW4
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`007cffb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/007cffbbd69f9b31ac2200eb34003f7b92a36490))
+
+### Features
+
+* feat(devtools): demo seller phone and store line as the board draws them (#109) ([`007cffb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/007cffbbd69f9b31ac2200eb34003f7b92a36490))
+
+* feat(devtools): demo seller phone and store line as the board draws them
+
+The footer prints the seller phone and the store line as stored, so the
+demo shows "+30 2310 000000" rather than "+302310000000" (PLAN D-4),
+and seed_branding now writes the store line under the logo, which the
+seed never set (D-5). store_description is not translatable, so the
+line is in the store's default language.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01RE48ce8w633hGEh1GBiPW4 ([`007cffb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/007cffbbd69f9b31ac2200eb34003f7b92a36490))
+
 ## v3.93.0 (2026-10-02)
 
 ### Chores

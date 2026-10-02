@@ -15573,8 +15573,10 @@ msgid "Minimum views filter (view_count >= value)"
 msgstr "Φίλτρο ελάχιστων προβολών (view_count >= value)"
 
 #: .\search\views.py:386
-msgid "Comma-separated category IDs (category IN [ids])"
-msgstr "ID κατηγοριών διαχωρισμένα με κόμμα (category IN [ids])"
+msgid ""
+"Comma-separated category IDs; each matches its whole subtree (the "
+"category and every descendant)"
+msgstr "ID κατηγοριών χωρισμένα με κόμμα· το καθένα περιλαμβάνει και όλες τις υποκατηγορίες του"
 
 #: .\search\views.py:394
 msgid "Comma-separated attribute value IDs (attribute_values IN [ids])"

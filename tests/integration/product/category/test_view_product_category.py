@@ -387,6 +387,32 @@ class ProductCategoryVisibilityTestCase(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
+    def test_anonymous_detail_lists_only_the_visible_children(self):
+        parent = ProductCategoryFactory(active=True)
+        shown = ProductCategoryFactory(parent=parent, active=True)
+        switched_off = ProductCategoryFactory(parent=parent, active=False)
+
+        response = self.client.get(
+            reverse("product-category-detail", args=[parent.id])
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        child_ids = {child["id"] for child in response.data["children"]}
+        self.assertIn(shown.id, child_ids)
+        self.assertNotIn(switched_off.id, child_ids)
+
+    def test_staff_detail_still_lists_an_inactive_child(self):
+        parent = ProductCategoryFactory(active=True)
+        switched_off = ProductCategoryFactory(parent=parent, active=False)
+        self.client.force_authenticate(user=self.staff)
+
+        response = self.client.get(
+            reverse("product-category-detail", args=[parent.id])
+        )
+
+        child_ids = {child["id"] for child in response.data["children"]}
+        self.assertIn(switched_off.id, child_ids)
+
     def test_staff_still_see_the_whole_tree(self):
         self.client.force_authenticate(user=self.staff)
         response = self.client.get(reverse("product-category-all"))

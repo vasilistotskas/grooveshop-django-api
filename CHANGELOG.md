@@ -3,6 +3,30 @@
 
 
 
+## v3.93.0 (2026-10-02)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.92.6 [skip ci] ([`a1d679d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a1d679d7e07203f2aea2a00c189ec6d441f231be))
+
+### Features
+
+* feat(devtools): demo homepage follows the Groove Volt bands (#107)
+
+The demo store's home stack now matches the approved storefront design
+band for band: hero carousel, trust strip, category tiles (six), New
+arrivals and Most popular as 4-up grids (products_grid and
+featured_products), the ink offers band, the rewards band, the proof
+row, blog, testimonials and a two-column FAQ. The features grid,
+recently-viewed rail, CTA banner and newsletter band are gone (the
+footer carries the newsletter). Testimonials and FAQ copy follow the
+board, in Greek and English.
+
+
+Claude-Session: https://claude.ai/code/session_01RE48ce8w633hGEh1GBiPW4
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`db5e4cd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/db5e4cdc8e2b0f06347a9babd39d29052bd828e5))
+
 ## v3.92.6 (2026-10-02)
 
 ### Bug fixes

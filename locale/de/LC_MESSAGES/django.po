@@ -7965,7 +7965,9 @@ msgid "Minimum views filter (view_count >= value)"
 msgstr ""
 
 #: .\search\views.py:224
-msgid "Comma-separated category IDs (category IN [ids])"
+msgid ""
+"Comma-separated category IDs; each matches its whole subtree (the "
+"category and every descendant)"
 msgstr ""
 
 #: .\search\views.py:232

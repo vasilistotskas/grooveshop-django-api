@@ -454,6 +454,58 @@ class TestFederatedSearchSendsQueryVerbatim:
 
 
 @pytest.mark.django_db
+class TestProductSearchCategorySubtree:
+    """``categories`` names a category and everything under it.
+
+    The index stores each product's own category, so a category whose
+    products all sit in subcategories listed 0 of them under a header
+    counting them recursively. The filter now names the subtree.
+    """
+
+    def _category_filter(self, api_client, categories: str) -> str:
+        index = Mock()
+        index.search.return_value = {
+            "hits": [],
+            "estimatedTotalHits": 0,
+            "processingTimeMs": 1,
+        }
+        with patch("meili._client.client.get_search_index", return_value=index):
+            response = api_client.get(
+                "/api/v1/search/product",
+                {"query": "", "language_code": "el", "categories": categories},
+            )
+        assert response.status_code == status.HTTP_200_OK
+        filters = index.search.call_args.args[1]["filter"]
+        return next(f for f in filters if f.startswith("category IN"))
+
+    def test_a_parent_category_matches_its_whole_subtree(self, api_client):
+        from product.factories.category import ProductCategoryFactory
+
+        root = ProductCategoryFactory()
+        child = ProductCategoryFactory(parent=root)
+        grandchild = ProductCategoryFactory(parent=child)
+        ProductCategoryFactory()  # an unrelated root stays out
+
+        assert self._category_filter(api_client, str(root.id)) == (
+            f"category IN {sorted([root.id, child.id, grandchild.id])}"
+        )
+
+    def test_a_leaf_category_matches_itself(self, api_client):
+        from product.factories.category import ProductCategoryFactory
+
+        leaf = ProductCategoryFactory(parent=ProductCategoryFactory())
+
+        assert self._category_filter(api_client, str(leaf.id)) == (
+            f"category IN {[leaf.id]}"
+        )
+
+    def test_an_unknown_category_still_filters_to_nothing(self, api_client):
+        assert self._category_filter(api_client, "999999") == (
+            "category IN [999999]"
+        )
+
+
+@pytest.mark.django_db
 class TestProductSearchRelaxedRetry:
     """``/search/product`` retries a zero-hit multi-word query once with
     its leading word dropped — the one shape Meilisearch's ``last``

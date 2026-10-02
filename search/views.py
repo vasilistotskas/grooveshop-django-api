@@ -30,6 +30,7 @@ from core.api.serializers import ErrorResponseSerializer
 from core.api.throttling import SearchClickThrottle, SearchThrottle
 from meili._client import client as meili_client
 from meili.querysets import HIGHLIGHT_POST_TAG, HIGHLIGHT_PRE_TAG
+from product.models.category import ProductCategory
 from product.models.product import ProductTranslation
 from search.models import SearchClick, SearchQuery
 from search.serializers import (
@@ -128,6 +129,29 @@ def _parse_int_csv(value: str | None, name: str) -> list[int]:
         raise ValidationError(
             {name: _("Must be a comma-separated list of integers.")}
         )
+
+
+def _category_subtree_ids(category_ids: list[int]) -> list[int]:
+    """Every category under the requested ones, the requested included.
+
+    A category stands for its whole subtree: its page counts the products
+    of every descendant (``recursive_product_count``), and a shopper who
+    picks "Charging" means the cables and power banks filed under it too.
+    The index stores each product's OWN category, so the filter has to
+    name the descendants — filtering by the id alone listed 0 products on
+    any category whose products all sit in its subcategories, under a
+    header that said 77.
+
+    Ids that match no category are kept, so a request for an unknown
+    category still filters to nothing instead of dropping the filter.
+    """
+    requested = ProductCategory.objects.filter(id__in=category_ids)
+    subtree = set(
+        ProductCategory.objects.get_queryset_descendants(
+            requested, include_self=True
+        ).values_list("id", flat=True)
+    )
+    return sorted(subtree | set(category_ids))
 
 
 def _record_engine_time(request, milliseconds) -> None:
@@ -383,7 +407,10 @@ def blog_post_meili_search(request):
             name="categories",
             type=str,
             location=OpenApiParameter.QUERY,
-            description=_("Comma-separated category IDs (category IN [ids])"),
+            description=_(
+                "Comma-separated category IDs; each matches its whole "
+                "subtree (the category and every descendant)"
+            ),
             required=False,
         ),
         OpenApiParameter(
@@ -509,9 +536,12 @@ def product_meili_search(request):
     if views_min is not None:
         search_qs = search_qs.filter(view_count__gte=views_min)
 
-    # Apply category filter (multi-select with IN operator)
+    # Apply category filter (multi-select with IN operator), each
+    # requested category standing for its whole subtree.
     if category_ids:
-        search_qs = search_qs.filter(category__in=category_ids)
+        search_qs = search_qs.filter(
+            category__in=_category_subtree_ids(category_ids)
+        )
 
     # Apply attribute value filter (multi-select with IN operator)
     if attribute_value_ids:

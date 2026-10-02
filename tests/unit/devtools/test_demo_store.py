@@ -1035,12 +1035,21 @@ class TestBranding:
             return type(tenant).objects.get(pk=tenant.pk).favicon_url
 
     def test_points_the_favicon_at_the_primary_domain(self, demo_tenant):
-        assert demo_store.seed_branding() == {"updated": 1}
+        assert demo_store.seed_branding() == {"updated": 2}
 
         assert (
             self._favicon_url(demo_tenant)
             == "https://demo.example.test/platform-favicon/favicon.ico"
         )
+
+    def test_gives_the_store_its_line(self, demo_tenant):
+        from django_tenants.utils import get_public_schema_name, schema_context
+
+        demo_store.seed_branding()
+
+        with schema_context(get_public_schema_name()):
+            stored = type(demo_tenant).objects.get(pk=demo_tenant.pk)
+        assert stored.store_description == demo_store.DEMO_STORE_DESCRIPTION
 
     def test_a_second_run_changes_nothing(self, demo_tenant):
         demo_store.seed_branding()

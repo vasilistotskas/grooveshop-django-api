@@ -60,12 +60,24 @@ class ProductCategoryDetailSerializer(ProductCategorySerializer):
         )(many=True)
     )
     def get_children(self, obj: ProductCategory):
-        children = list(obj.get_children())
-        if children:
-            return ProductCategorySerializer(
-                children, many=True, context=self.context
-            ).data
-        return []
+        """The category's children a caller may see.
+
+        Through the same ``visible_to`` gate as the endpoints
+        themselves: ``obj.get_children()`` returned every child, so the
+        storefront drew a pill for an inactive subcategory under its
+        parent's title, linking to a page that 404s (the demo store's
+        ``demo-chargers-cables``, on staging and production).
+        """
+        request = self.context.get("request")
+        children = (
+            ProductCategory.objects.for_list()
+            .filter(parent=obj)
+            .visible_to(getattr(request, "user", None))
+            .order_by("lft")
+        )
+        return ProductCategorySerializer(
+            children, many=True, context=self.context
+        ).data
 
     class Meta(ProductCategorySerializer.Meta):
         fields = (

@@ -3,6 +3,38 @@
 
 
 
+## v3.92.6 (2026-10-02)
+
+### Bug fixes
+
+* fix(deps): virtualenv and pypdf security bumps (#108) ([`be5faaa`](https://github.com/vasilistotskas/grooveshop-django-api/commit/be5faaa7d142b11b8854fdaf51e37dd4163468bf))
+
+* fix(deps): virtualenv 21.14.4 (CVE-2026-102930)
+
+virtualenv <= 21.7.11 carries a HIGH advisory (CVE-2026-102930, fixed
+in 21.7.12) published 2026-10-01, which fails the Trivy filesystem
+scan on every pull request. Lock-only bump to the current release.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01RE48ce8w633hGEh1GBiPW4 ([`be5faaa`](https://github.com/vasilistotskas/grooveshop-django-api/commit/be5faaa7d142b11b8854fdaf51e37dd4163468bf))
+
+* fix(deps): pypdf 6.19.0 (CVE-2026-102998, -102999, -103000)
+
+pypdf 6.18.1 carries three HIGH advisories fixed in 6.19.0; with the
+virtualenv bump they are what fails the Trivy filesystem scan. The ACS
+bulk label merge (the one pypdf caller) passes its tests on 6.19.0.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01RE48ce8w633hGEh1GBiPW4
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`be5faaa`](https://github.com/vasilistotskas/grooveshop-django-api/commit/be5faaa7d142b11b8854fdaf51e37dd4163468bf))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.92.5 [skip ci] ([`447ec59`](https://github.com/vasilistotskas/grooveshop-django-api/commit/447ec590d73713be0a1a239707159181792ca859))
+
 ## v3.92.5 (2026-10-01)
 
 ### Bug fixes

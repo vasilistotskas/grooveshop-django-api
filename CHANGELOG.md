@@ -3,6 +3,25 @@
 
 
 
+## v3.94.2 (2026-10-03)
+
+### Bug fixes
+
+* fix(product): declare a favourite's username nullable (#112)
+
+username is optional on the account (an email sign-up has none), so ProductFavouriteSerializer.user_username is null for many shoppers, but it was declared a plain string. The storefront's generated schema then refused the shopper's whole favourites list with a 422, so the favourites page never loaded for any shopper without a username (the demo account included).
+
+allow_null=True makes the contract say what the endpoint sends. Additive for the release still serving: its generated schema keeps refusing a null, as it does today, and accepts every non-null value.
+
+
+Claude-Session: https://claude.ai/code/session_01RE48ce8w633hGEh1GBiPW4
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`ad99d70`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ad99d7068f026d55730ca9868a6de2a325e57017))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.94.1 [skip ci] ([`960490a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/960490aa50e73e82c4653b578806988f3693552a))
+
 ## v3.94.1 (2026-10-02)
 
 ### Bug fixes

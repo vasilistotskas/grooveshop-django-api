@@ -44819,6 +44819,7 @@ components:
         userUsername:
           type: string
           readOnly: true
+          nullable: true
         product:
           allOf:
           - $ref: '#/components/schemas/ProductDetail'
@@ -44879,6 +44880,7 @@ components:
         userUsername:
           type: string
           readOnly: true
+          nullable: true
         product:
           allOf:
           - $ref: '#/components/schemas/ProductDetail'

@@ -23,8 +23,11 @@ class TranslatedFieldsFieldExtend(TranslatedFieldExtended):
 
 class ProductFavouriteSerializer(serializers.ModelSerializer[ProductFavourite]):
     user_id = serializers.IntegerField(source="user.id", read_only=True)
+    # ``username`` is optional on the account (an email sign-up has none),
+    # so this is ``null`` for many shoppers — declared so, or the
+    # storefront's generated schema refuses the shopper's whole list.
     user_username = serializers.CharField(
-        source="user.username", read_only=True
+        source="user.username", read_only=True, allow_null=True
     )
     product = ProductDetailSerializer(read_only=True)
 

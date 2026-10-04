@@ -34,20 +34,12 @@ class CategoryRow:
     image: str
 
 
-# Ordered parents-first so MPTT never sees an unsaved parent.
+# The board's four roots, in its order, each followed by its children —
+# parents first so MPTT never sees an unsaved parent.
 CATEGORIES: tuple[CategoryRow, ...] = (
     CategoryRow(
-        "demo-accessories",
-        None,
-        "Αξεσουάρ Κινητών",
-        "Phone Accessories",
-        "Όλα όσα χρειάζεται το κινητό σου, σε ένα σημείο.",
-        "Everything your phone needs, in one place.",
-        "category-accessories",
-    ),
-    CategoryRow(
         "demo-charging",
-        "demo-accessories",
+        None,
         "Φόρτιση",
         "Charging",
         "Καλώδια, φορτιστές και powerbanks για κάθε συσκευή.",
@@ -91,8 +83,17 @@ CATEGORIES: tuple[CategoryRow, ...] = (
         "category-wireless-charging",
     ),
     CategoryRow(
+        "demo-audio",
+        None,
+        "Ήχος",
+        "Audio",
+        "Ακουστικά και ηχεία για δρόμο, γραφείο και σπίτι.",
+        "Earbuds and speakers for the street, the desk and home.",
+        "category-audio",
+    ),
+    CategoryRow(
         "demo-protection",
-        "demo-accessories",
+        None,
         "Προστασία",
         "Protection",
         "Θήκες και τζαμάκια που κρατούν το κινητό σαν καινούργιο.",
@@ -118,17 +119,8 @@ CATEGORIES: tuple[CategoryRow, ...] = (
         "category-screen-protection",
     ),
     CategoryRow(
-        "demo-audio",
-        "demo-accessories",
-        "Ήχος",
-        "Audio",
-        "Ακουστικά και ηχεία για δρόμο, γραφείο και σπίτι.",
-        "Earbuds and speakers for the street, the desk and home.",
-        "category-audio",
-    ),
-    CategoryRow(
         "demo-mounts-stands",
-        "demo-accessories",
+        None,
         "Βάσεις & Στηρίγματα",
         "Mounts & Stands",
         "Βάσεις γραφείου και αυτοκινήτου που δεν κουνιούνται.",

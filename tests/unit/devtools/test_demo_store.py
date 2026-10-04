@@ -147,7 +147,6 @@ class TestSectionProps(TestCase):
 class TestNavigation(TestCase):
     def test_navigation_payloads_pass_validation(self):
         for slot, items in (
-            (NavigationSlot.HEADER, demo_store.NAV_HEADER),
             (NavigationSlot.MOBILE, demo_store.NAV_MOBILE),
             (NavigationSlot.FOOTER, demo_store.NAV_FOOTER),
         ):
@@ -160,9 +159,7 @@ class TestNavigation(TestCase):
         unpublished_paths = {
             f"/{page_type}" for page_type in demo_store.UNPUBLISH_LAYOUTS
         }
-        targets: set[str] = set()
-        for items in (demo_store.NAV_HEADER, demo_store.NAV_MOBILE):
-            targets |= {item.get("to", "") for item in items}
+        targets = {item.get("to", "") for item in demo_store.NAV_MOBILE}
         for column in demo_store.NAV_FOOTER:
             targets |= {child.get("to", "") for child in column["children"]}
         assert not (targets & unpublished_paths)
@@ -223,16 +220,20 @@ class TestCatalogueIntegrity(TestCase):
                 assert row.parent in seen, f"{row.slug} precedes its parent"
             seen.add(row.slug)
 
-    def test_tree_is_at_least_three_levels_deep(self):
-        """A flat list never exercises breadcrumb depth or the
-        descendant-aware category filters.
+    def test_the_roots_are_the_boards_four(self):
+        """No umbrella: the storefront's mega menu draws one column per
+        root, so a single "Phone accessories" root drew one column.
         """
-        parent_of = {row.slug: row.parent for row in demo_store.CATEGORIES}
-        assert any(
-            parent_of[slug] is not None
-            and parent_of[parent_of[slug]] is not None
-            for slug in parent_of
-        )
+        roots = [
+            row.name_en for row in demo_store.CATEGORIES if row.parent is None
+        ]
+        assert roots == ["Charging", "Audio", "Protection", "Mounts & Stands"]
+
+    def test_the_tree_still_has_children_under_a_root(self):
+        """A flat list never exercises the descendant-aware category
+        filters or the mega menu's second level.
+        """
+        assert any(row.parent is not None for row in demo_store.CATEGORIES)
 
     def test_covers_the_stock_and_discount_edge_cases(self):
         """These are the whole point of the catalogue: before this
@@ -917,7 +918,6 @@ class TestEnglishNavigation(TestCase):
     """
 
     MENUS = (
-        (NavigationSlot.HEADER, demo_store.NAV_HEADER),
         (NavigationSlot.MOBILE, demo_store.NAV_MOBILE),
         (NavigationSlot.FOOTER, demo_store.NAV_FOOTER),
     )
@@ -989,6 +989,34 @@ class TestEnglishNavigation(TestCase):
                 )
 
 
+@pytest.fixture
+def demo_tenant(db):
+    from tenant.models import Tenant, TenantDomain
+    from tests.utils.staff import bind_store_tenant, unbind_store_tenant
+
+    tenant = Tenant(
+        schema_name="seed_demo",
+        name="Seed Demo",
+        slug="seed-demo",
+        owner_email="owner-seed-demo@example.com",
+        is_demo=True,
+    )
+    tenant.auto_create_schema = False
+    tenant.save()
+    TenantDomain.objects.create(
+        domain="demo.example.test", tenant=tenant, is_primary=True
+    )
+    TenantDomain.objects.create(
+        domain="api.demo.example.test", tenant=tenant, is_primary=False
+    )
+    # The seeder resolves its tenant from the schema it runs in, and
+    # enters `schema_context`, whose exit restores the connection via
+    # `set_tenant(previous)` — so bind through the django-tenants API.
+    previous = bind_store_tenant(tenant)
+    yield tenant
+    unbind_store_tenant(previous)
+
+
 class TestBranding:
     """`seed_branding` gives the demo store its favicon on its OWN host.
 
@@ -997,33 +1025,6 @@ class TestBranding:
     to follow the demo tenant's primary domain, so staging and
     production each point at themselves.
     """
-
-    @pytest.fixture
-    def demo_tenant(self, db):
-        from tenant.models import Tenant, TenantDomain
-        from tests.utils.staff import bind_store_tenant, unbind_store_tenant
-
-        tenant = Tenant(
-            schema_name="branding_demo",
-            name="Branding Demo",
-            slug="branding-demo",
-            owner_email="owner-branding-demo@example.com",
-            is_demo=True,
-        )
-        tenant.auto_create_schema = False
-        tenant.save()
-        TenantDomain.objects.create(
-            domain="demo.example.test", tenant=tenant, is_primary=True
-        )
-        TenantDomain.objects.create(
-            domain="api.demo.example.test", tenant=tenant, is_primary=False
-        )
-        # The seeder resolves its tenant from the schema it runs in, and
-        # enters `schema_context`, whose exit restores the connection via
-        # `set_tenant(previous)` — so bind through the django-tenants API.
-        previous = bind_store_tenant(tenant)
-        yield tenant
-        unbind_store_tenant(previous)
 
     @staticmethod
     def _favicon_url(tenant) -> str:
@@ -1067,3 +1068,181 @@ class TestBranding:
         demo_tenant.domains.update(is_primary=False)
 
         assert demo_store.seed_branding() == {"skipped_no_primary_domain": 1}
+
+
+class TestCategoryTree:
+    """The board's four roots replace the one umbrella, on a re-seed too."""
+
+    @staticmethod
+    def _roots():
+        from product.models import ProductCategory
+
+        return set(
+            ProductCategory.objects.filter(
+                slug__startswith="demo-", parent__isnull=True, active=True
+            ).values_list("slug", flat=True)
+        )
+
+    def _seed_the_old_umbrella_tree(self):
+        """What a demo tenant seeded before this change looks like."""
+        from product.models import ProductCategory
+
+        demo_store.seed_categories()
+        umbrella = ProductCategory(slug="demo-accessories", active=True)
+        umbrella.save()
+        for slug in ("demo-charging", "demo-protection", "demo-audio"):
+            child = ProductCategory.objects.get(slug=slug)
+            child.parent = umbrella
+            child.save()
+        return umbrella
+
+    def test_a_fresh_seed_makes_four_roots(self, demo_tenant):
+        demo_store.seed_categories()
+
+        assert self._roots() == {
+            "demo-charging",
+            "demo-audio",
+            "demo-protection",
+            "demo-mounts-stands",
+        }
+
+    def test_a_rerun_lifts_the_children_and_removes_the_umbrella(
+        self, demo_tenant
+    ):
+        from product.models import ProductCategory
+
+        self._seed_the_old_umbrella_tree()
+        assert "demo-accessories" in self._roots()
+
+        report = demo_store.seed_categories()
+
+        assert report["removed"] == 1
+        assert not ProductCategory.objects.filter(
+            slug="demo-accessories"
+        ).exists()
+        assert self._roots() == {
+            "demo-charging",
+            "demo-audio",
+            "demo-protection",
+            "demo-mounts-stands",
+        }
+        assert (
+            ProductCategory.objects.get(slug="demo-usb-c-cables")
+            .get_ancestors()
+            .count()
+            == 1
+        )
+
+    def test_an_umbrella_that_still_holds_a_product_is_retired_not_deleted(
+        self, demo_tenant
+    ):
+        from product.factories import ProductFactory
+        from product.models import ProductCategory
+
+        umbrella = self._seed_the_old_umbrella_tree()
+        ProductFactory(category=umbrella, num_images=0, num_reviews=0)
+
+        report = demo_store.seed_categories()
+
+        assert report["retired"] == 1
+        assert not ProductCategory.objects.get(slug="demo-accessories").active
+
+    def test_a_second_rerun_changes_nothing_structural(self, demo_tenant):
+        self._seed_the_old_umbrella_tree()
+        demo_store.seed_categories()
+
+        report = demo_store.seed_categories()
+
+        assert "removed" not in report
+        assert "retired" not in report
+
+
+class TestHeaderMenu:
+    """The demo gets the storefront's code navbar, not a seeded copy."""
+
+    @staticmethod
+    def _slots():
+        from page_config.models import NavigationMenu
+
+        return set(NavigationMenu.objects.values_list("slot", flat=True))
+
+    def test_a_demo_rerun_removes_the_header_row_an_earlier_run_made(
+        self, demo_tenant
+    ):
+        from page_config.models import NavigationMenu
+
+        NavigationMenu.objects.get_or_create(slot=NavigationSlot.HEADER)
+
+        report = demo_store.seed_navigation()
+
+        assert report["header_removed"] == 1
+        assert NavigationSlot.HEADER not in self._slots()
+        assert {NavigationSlot.MOBILE, NavigationSlot.FOOTER} <= self._slots()
+
+    def test_a_store_that_is_not_a_demo_keeps_its_header(self, demo_tenant):
+        from page_config.models import NavigationMenu
+
+        type(demo_tenant).objects.filter(pk=demo_tenant.pk).update(
+            is_demo=False
+        )
+        NavigationMenu.objects.get_or_create(slot=NavigationSlot.HEADER)
+
+        report = demo_store.seed_navigation()
+
+        assert "header_removed" not in report
+        assert NavigationSlot.HEADER in self._slots()
+
+    def test_a_second_run_has_nothing_to_remove(self, demo_tenant):
+        demo_store.seed_navigation()
+
+        assert "header_removed" not in demo_store.seed_navigation()
+
+
+class TestPayWays:
+    """The demo's cash-on-delivery fee is 2,00 EUR, and only that row."""
+
+    @pytest.fixture(autouse=True)
+    def _no_migration_seeded_pay_ways(self, db):
+        """Migrations seed a cash-on-delivery row of their own."""
+        from pay_way.models import PayWay
+
+        PayWay.objects.all().delete()
+
+    @staticmethod
+    def _pay_way(name, cost, provider_code):
+        from pay_way.models import PayWay
+
+        pay_way = PayWay(cost=cost, provider_code=provider_code)
+        pay_way.set_current_language("el")
+        pay_way.name = name
+        pay_way.save()
+        return pay_way
+
+    def test_prices_only_the_cash_on_delivery_row(self, demo_tenant):
+        cod = self._pay_way("PAY_ON_DELIVERY", 0, "cash_on_delivery")
+        potg = self._pay_way("BOX_NOW_PAY_ON_THE_GO", 0, "boxnow_pay_on_the_go")
+        card = self._pay_way("CREDIT_CARD", 0, "viva_wallet")
+
+        assert demo_store.seed_pay_ways() == {"updated": 1}
+
+        for pay_way in (cod, potg, card):
+            pay_way.refresh_from_db()
+        assert cod.cost.amount == demo_store.DEMO_COD_COST
+        assert potg.cost.amount == 0
+        assert card.cost.amount == 0
+
+    def test_a_second_run_changes_nothing(self, demo_tenant):
+        self._pay_way("PAY_ON_DELIVERY", 0, "cash_on_delivery")
+        demo_store.seed_pay_ways()
+
+        assert demo_store.seed_pay_ways() == {"unchanged": 1}
+
+    def test_skips_a_store_that_is_not_a_demo(self, demo_tenant):
+        cod = self._pay_way("PAY_ON_DELIVERY", 0, "cash_on_delivery")
+        type(demo_tenant).objects.filter(pk=demo_tenant.pk).update(
+            is_demo=False
+        )
+
+        assert demo_store.seed_pay_ways() == {"skipped_not_a_demo_tenant": 1}
+        cod.refresh_from_db()
+        assert cod.cost.amount == 0

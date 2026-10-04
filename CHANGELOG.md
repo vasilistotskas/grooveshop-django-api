@@ -3,6 +3,31 @@
 
 
 
+## v3.94.3 (2026-10-04)
+
+### Bug fixes
+
+* fix(user): publish a saved address's region as nullable (#113)
+
+UserAddressWriteSerializer accepts a null region (a region is required
+only when the country has any), but the read serializers declared it a
+plain string, so the OpenAPI document said `region: string`. The
+storefront generates its Zod schemas from that document: one region-less
+address made GET /user/address fail to parse, and the shopper's whole
+address list came back as an error in checkout and in the account.
+
+The read field now allows null, and schema.yml says so. The API's
+responses do not change; they already carried null.
+
+
+Claude-Session: https://claude.ai/code/session_01RE48ce8w633hGEh1GBiPW4
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`2b71e3b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2b71e3b38545b538204f30f65fc543ca060868fe))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.94.2 [skip ci] ([`feb8df5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/feb8df539607c27df0fc05ffc6b85cbe7abc5d82))
+
 ## v3.94.2 (2026-10-03)
 
 ### Bug fixes

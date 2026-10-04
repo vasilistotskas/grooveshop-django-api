@@ -15,7 +15,13 @@ User = get_user_model()
 class UserAddressSerializer(serializers.ModelSerializer[UserAddress]):
     user = PrimaryKeyRelatedField(read_only=True)
     country = PrimaryKeyRelatedField(queryset=Country.objects.all())
-    region = PrimaryKeyRelatedField(queryset=Region.objects.all())
+    # Null for an address in a country without regions — the write
+    # serializer accepts that — so the published schema must allow it:
+    # the storefront parses this response against that schema, and one
+    # region-less address made it reject the whole address list.
+    region = PrimaryKeyRelatedField(
+        queryset=Region.objects.all(), allow_null=True
+    )
     phone = PhoneNumberField()
 
     class Meta:

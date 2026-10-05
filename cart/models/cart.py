@@ -1,3 +1,4 @@
+from decimal import Decimal
 from typing import Literal, cast
 
 from django.conf import settings
@@ -11,6 +12,7 @@ from djmoney.money import Money
 
 from cart.managers.cart import CartManager
 from core.models import TimeStampMixinModel, UUIDModel
+from order.discounts import allocate_discount, vat_buckets
 
 
 class Cart(TimeStampMixinModel, UUIDModel):
@@ -97,13 +99,31 @@ class Cart(TimeStampMixinModel, UUIDModel):
 
     @property
     def total_vat_value(self) -> Money:
+        """VAT contained in ``total_price``, before any promotion."""
+        return self.vat_after_discount(Money(0, settings.DEFAULT_CURRENCY))
+
+    def vat_after_discount(self, discount: Money) -> Money:
+        """VAT owed once ``discount`` is taken off the line prices.
+
+        Line prices are what the shopper pays (markdown included), so VAT
+        is backed out of them; a price discount granted at the time of
+        sale reduces the taxable base, so it is spread across the lines
+        (and therefore across their VAT rates) exactly as the invoice
+        does it — see ``order.discounts``. Never pass a gift card here:
+        it is a means of payment and leaves VAT untouched.
+        """
         # Use prefetched items if available
-        items = (
+        items = list(
             self.items.all()
             if "items" in getattr(self, "_prefetched_objects_cache", {})
             else self.get_items()
         )
-        total = sum(item.total_vat_value.amount for item in items)
+        gross = {item.pk: item.total_price.amount for item in items}
+        discounted = allocate_discount(gross, Decimal(discount.amount))
+        buckets = vat_buckets(
+            (discounted[item.pk], Decimal(item.vat_percent)) for item in items
+        )
+        total = sum((row["vat"] for row in buckets.values()), Decimal(0))
         return Money(total, settings.DEFAULT_CURRENCY)
 
     @property

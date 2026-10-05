@@ -1,3 +1,4 @@
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
 import pytest
@@ -76,41 +77,28 @@ class CartModelTestCase(TestCase):
             self.cart.total_discount_value.amount, expected_total_discount
         )
 
-    def test_total_vat_value_multiplies_by_quantity(self):
-        """VAT must scale with quantity, like every other cart total.
+    def test_total_vat_value_is_backed_out_of_what_is_paid(self):
+        """VAT is the tax inside ``total_price`` — markdown included.
 
-        Summing the per-UNIT ``vat_value`` under-reported VAT on any
-        line with quantity > 1, so the cart summary's net/VAT split
-        never added up to the (correct) total price.
+        The invoice backs VAT out of the (marked-down) line gross; the
+        cart must report the same figure, and it must scale with
+        quantity like every other cart total.
         """
-        expected_total_vat = (
-            self.cart_item_1.vat_value.amount * self.cart_item_1.quantity
-            + self.cart_item_2.vat_value.amount * self.cart_item_2.quantity
+        gross = self.cart.total_price.amount
+        net = gross / Decimal("1.24")
+        self.assertEqual(
+            self.cart.total_vat_value.amount,
+            (gross - net).quantize(Decimal("0.01")),
         )
-        self.assertEqual(self.cart.total_vat_value.amount, expected_total_vat)
-
-        per_unit_sum = (
-            self.cart_item_1.vat_value.amount
-            + self.cart_item_2.vat_value.amount
-        )
-        self.assertNotEqual(self.cart.total_vat_value.amount, per_unit_sum)
 
     def test_cart_totals_reconcile(self):
-        """(price x qty) + VAT - discount == total price.
-
-        Mirrors ``Product.final_price``. All three cart totals must
-        scale with quantity for this to hold, which is what caught the
-        per-unit VAT sum.
-        """
-        net = (
-            self.cart_item_1.price.amount * self.cart_item_1.quantity
-            + self.cart_item_2.price.amount * self.cart_item_2.quantity
-        )
-        self.assertEqual(
-            net
-            + self.cart.total_vat_value.amount
-            - self.cart.total_discount_value.amount,
-            self.cart.total_price.amount,
+        """net + VAT == total price, with VAT backed out of the gross."""
+        total = self.cart.total_price.amount
+        vat = self.cart.total_vat_value.amount
+        net = total - vat
+        self.assertEqual(net + vat, total)
+        self.assertAlmostEqual(
+            net * Decimal("1.24"), total, delta=Decimal("0.01")
         )
 
     def test_total_items(self):

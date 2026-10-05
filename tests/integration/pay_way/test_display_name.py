@@ -1,6 +1,6 @@
 """A pay way must not print its own enum key at a human.
 
-``PayWayTranslation.name`` stores a ``PayWayEnum`` KEY on purpose — one
+``PayWay.key`` stores a ``PayWayEnum`` KEY on purpose — one
 shared vocabulary across the two repos, seedable by a migration without
 knowing a language. Nothing resolved it, so every Django-rendered
 surface printed the key: the invoice PDF's "Method" line on a Greek tax
@@ -15,7 +15,6 @@ one is passed through rather than swallowed (Django's documented
 
 from __future__ import annotations
 
-from django.core.cache import cache
 from django.test import TestCase
 from django.utils import translation
 
@@ -30,15 +29,10 @@ from pay_way.models import PayWay
 def _set_name(pay_way, name: str):
     """Write the name token and hand back an instance that can see it.
 
-    ``.update()`` writes straight to SQL, past BOTH of parler's caches:
-    the per-instance ``_translations_cache`` and the shared cache
-    backend that ``PARLER_ENABLE_CACHING`` populates on first read. A
-    plain re-fetch clears only the first, so without the explicit
-    ``cache.clear()`` every assertion here reads whichever name the
-    factory's ``Iterator`` happened to assign and the test lies.
+    The factory's ``Iterator`` assigns an arbitrary key, so every
+    assertion here must overwrite it first or the test lies.
     """
-    pay_way.translations.update(name=name)
-    cache.clear()
+    PayWay.objects.filter(pk=pay_way.pk).update(key=name)
     return PayWay.objects.get(pk=pay_way.pk)
 
 

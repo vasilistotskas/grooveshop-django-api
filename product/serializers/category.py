@@ -24,6 +24,9 @@ class ProductCategorySerializer(
     # Empty string when the category has no MAIN image, matching the
     # model property.
     main_image_path = serializers.CharField(read_only=True)
+    # Active products in the category and all its descendants, annotated
+    # by ``for_list()`` (no query per row).
+    recursive_product_count = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = ProductCategory
@@ -36,6 +39,7 @@ class ProductCategorySerializer(
             "level",
             "tree_id",
             "main_image_path",
+            "recursive_product_count",
             "created_at",
             "updated_at",
             "uuid",
@@ -45,6 +49,7 @@ class ProductCategorySerializer(
             "level",
             "tree_id",
             "main_image_path",
+            "recursive_product_count",
             "created_at",
             "updated_at",
             "uuid",
@@ -83,7 +88,6 @@ class ProductCategoryDetailSerializer(ProductCategorySerializer):
         fields = (
             *ProductCategorySerializer.Meta.fields,
             "children",
-            "recursive_product_count",
         )
 
 

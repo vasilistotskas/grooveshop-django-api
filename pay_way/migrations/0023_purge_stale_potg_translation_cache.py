@@ -29,7 +29,7 @@ from __future__ import annotations
 import logging
 
 from django.core.cache import cache
-from django.db import migrations
+from django.db import migrations, transaction
 from parler.cache import get_object_cache_keys
 
 logger = logging.getLogger(__name__)
@@ -56,10 +56,14 @@ def purge_potg_translation_cache(apps, schema_editor):
         from pay_way.models import PayWay
 
         keys: list[str] = []
-        for pay_way in PayWay.objects.using(db).filter(
-            provider_code=PROVIDER_CODE
-        ):
-            keys.extend(get_object_cache_keys(pay_way))
+        # A savepoint: the real model reads columns later migrations
+        # add or drop, and a failed query would otherwise abort the
+        # whole migration transaction instead of reaching ``except``.
+        with transaction.atomic(using=db):
+            for pay_way in PayWay.objects.using(db).filter(
+                provider_code=PROVIDER_CODE
+            ):
+                keys.extend(get_object_cache_keys(pay_way))
 
         if keys:
             cache.delete_many(keys)

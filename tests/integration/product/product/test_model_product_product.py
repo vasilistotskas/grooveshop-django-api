@@ -168,7 +168,8 @@ class ProductModelTestCase(TestCase):
         self.assertEqual(self.product.review_average, 5)
 
     def test_review_count(self):
-        self.assertEqual(self.product.review_count, 2)
+        # The fixture holds one approved and one rejected review.
+        self.assertEqual(self.product.review_count, 1)
 
     def test_vat_percent(self):
         self.assertEqual(self.product.vat_percent, self.vat.value)
@@ -338,7 +339,7 @@ class ProductQuerySetTestCase(TestCase):
         product2 = queryset.get(id=self.product2.id)
 
         actual_avg = ProductReview.objects.filter(
-            product=self.product1
+            product=self.product1, status=ReviewStatus.TRUE
         ).aggregate(avg=Avg("rate"))["avg"]
 
         self.assertEqual(product1.review_average, actual_avg)

@@ -15,7 +15,6 @@ from core.models import (
 )
 from core.utils.generators import SlugifyConfig, unique_slugify
 from product.managers.category import CategoryManager
-from product.models.product import Product
 
 
 class ProductCategory(
@@ -80,9 +79,21 @@ class ProductCategory(
 
     @property
     def recursive_product_count(self) -> int:
-        return Product.objects.filter(
-            category__in=self.get_descendants(include_self=True)
-        ).count()
+        """Active products of this category and all its descendants.
+
+        Reads the ``CategoryQuerySet.with_recursive_product_count``
+        annotation that ``for_list()`` supplies; a bare instance computes
+        the same value through that queryset, so there is one definition.
+        """
+        if "_recursive_product_count" in self.__dict__:
+            return self.__dict__["_recursive_product_count"]
+        return (
+            type(self)
+            .objects.filter(pk=self.pk)
+            .with_recursive_product_count()
+            .values_list("_recursive_product_count", flat=True)
+            .get()
+        )
 
     @property
     def main_image(self):

@@ -5,6 +5,46 @@ from rest_framework import serializers
 from tenant.models import Tenant, TenantDomain
 
 
+class ActiveShippingCarrierListSerializer(serializers.ListSerializer):
+    """The tenant's active carriers, read from the TENANT's schema.
+
+    ``TenantConfigSerializer`` runs in whatever schema the resolve
+    request hit (the public one), while ``ShippingProvider`` rows live
+    in each tenant's own schema. Overriding ``get_attribute`` keeps the
+    query and the schema switch in one place, and ``list()`` forces
+    evaluation inside the context — a lazy queryset would run after it
+    exits, against whatever schema the connection was left on.
+
+    The control plane (public schema) is not a store and has no
+    ``ShippingProvider`` table, so it advertises none rather than
+    answering 500.
+    """
+
+    def get_attribute(self, instance: Tenant):
+        from django_tenants.utils import get_public_schema_name, schema_context
+
+        from shipping.models import ShippingProvider
+
+        if instance.schema_name == get_public_schema_name():
+            return []
+        with schema_context(instance.schema_name):
+            return list(
+                ShippingProvider.objects.filter(is_active=True).only(
+                    "code", "name"
+                )
+            )
+
+
+class TenantShippingCarrierSerializer(serializers.Serializer):
+    """What a footer "Delivered by" badge needs, and nothing more."""
+
+    code = serializers.CharField(read_only=True)
+    name = serializers.CharField(read_only=True)
+
+    class Meta:
+        list_serializer_class = ActiveShippingCarrierListSerializer
+
+
 class TenantConfigSerializer(serializers.Serializer):
     """Public (AllowAny) serializer for the /api/v1/tenant/resolve endpoint.
 
@@ -77,6 +117,15 @@ class TenantConfigSerializer(serializers.Serializer):
         child=serializers.CharField(), required=False
     )
     default_currency = serializers.CharField(read_only=True)
+
+    # --- Delivery ---
+    # The store's ACTIVE carriers, for the footer's "Delivered by"
+    # badges. ``shipping/providers`` is staff-only and stays so; this
+    # exposes code + display name only. ``required=False`` for the same
+    # frontend-first-deploy reason as ``available_locales``.
+    shipping_carriers = TenantShippingCarrierSerializer(
+        many=True, required=False
+    )
 
     # --- Domain ---
     primary_domain = serializers.SerializerMethodField()

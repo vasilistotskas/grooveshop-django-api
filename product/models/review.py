@@ -8,7 +8,7 @@ from parler.models import TranslatableModel, TranslatedFields
 
 from core.models import PublishableModel, TimeStampMixinModel, UUIDModel
 from product.enum.review import RateEnum, ReviewStatus
-from product.managers.review import ProductReviewManager
+from product.managers.review import ProductReviewManager, purchase_items
 
 
 class ProductReview(
@@ -80,6 +80,19 @@ class ProductReview(
             "product": self.product,
             "comment": comment_snippet,
         }
+
+    @property
+    def is_verified_purchase(self) -> bool:
+        """Whether the author has a COMPLETED order containing the product.
+
+        Reads the ``verified_purchase`` annotation of ``for_list()`` when
+        present; a bare instance falls back to one query.
+        """
+        if "verified_purchase" in self.__dict__:
+            return self.__dict__["verified_purchase"]
+        return purchase_items(
+            user=self.user_id, product=self.product_id
+        ).exists()
 
     def clean(self):
         valid_rates = [choice[0] for choice in RateEnum.choices]

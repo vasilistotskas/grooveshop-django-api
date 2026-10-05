@@ -28,8 +28,13 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
     total_discount_value = MoneyField(
         max_digits=11, decimal_places=2, read_only=True
     )
-    total_vat_value = MoneyField(
-        max_digits=11, decimal_places=2, read_only=True
+    total_vat_value = serializers.SerializerMethodField(
+        help_text=_(
+            "VAT contained in total_price once promotion_discount is "
+            "taken off. A price discount reduces the taxable base, so "
+            "this is the figure the invoice will carry. Loyalty points "
+            "are redeemed against the order and are not reflected here."
+        ),
     )
     total_weight_grams = serializers.IntegerField(
         read_only=True,
@@ -139,6 +144,11 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
 
             cache[obj.pk] = PromotionEngine.evaluate(obj, user=obj.user)
         return cache[obj.pk]
+
+    @extend_schema_field(OpenApiTypes.DECIMAL)
+    def get_total_vat_value(self, obj: Cart):
+        discount = self._promotion_result(obj).discount_total
+        return obj.vat_after_discount(discount).amount
 
     @extend_schema_field(OpenApiTypes.DECIMAL)
     def get_promotion_discount(self, obj: Cart):

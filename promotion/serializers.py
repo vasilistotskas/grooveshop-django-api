@@ -133,10 +133,7 @@ def _publishable(code) -> bool:
     full reasoning.
     """
     return bool(
-        code.is_active
-        and code.assigned_to_id is None
-        and not code.assigned_to_email
-        and code.usage_limit != 1
+        code.is_active and not code.is_personal and code.usage_limit != 1
     )
 
 
@@ -345,6 +342,14 @@ class CartCouponSerializer(serializers.Serializer):
         source="code.code",
         read_only=True,
         help_text=_("The coupon code to apply."),
+    )
+    personal = serializers.BooleanField(
+        source="code.is_personal",
+        read_only=True,
+        help_text=_(
+            "Whether the code is reserved for this customer (assigned to "
+            "their account or email) rather than offered to everyone."
+        ),
     )
     eligible = serializers.BooleanField(
         read_only=True,

@@ -27,8 +27,10 @@ class OrderQuerySet(SoftDeleteQuerySetMixin, OptimizedQuerySet):
         return self.select_related("user")
 
     def with_payment_info(self) -> Self:
-        """Select related payment and location info."""
-        return self.select_related("pay_way", "country", "region")
+        """Select related payment, location and carrier info."""
+        return self.select_related(
+            "pay_way", "country", "region", "shipping_provider"
+        )
 
     def with_attribution(self) -> Self:
         """Select related acquisition source. A reverse one-to-one, so an

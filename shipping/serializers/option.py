@@ -47,14 +47,14 @@ class ShippingOptionsQuerySerializer(serializers.Serializer):
 class ShippingOptionPayWaySerializer(serializers.Serializer):
     """A payment method this shipping option can settle.
 
-    ``name`` is the ``PayWayEnum`` KEY, not a display string — the same
+    ``key`` is the ``PayWayEnum`` KEY, not a display string — the same
     contract the pay-way endpoint uses, so the storefront resolves it
     through the label map it already owns rather than rendering
     whatever language the API happened to answer in.
     """
 
     id = serializers.IntegerField()
-    name = serializers.CharField()
+    key = serializers.CharField()
 
 
 class ShippingOptionSerializer(serializers.Serializer):

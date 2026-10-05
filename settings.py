@@ -4083,6 +4083,10 @@ SPECTACULAR_SETTINGS = {
     ],
     "ENUM_NAME_OVERRIDES": {
         "OrderStatus": "order.enum.status.OrderStatus",
+        # ``PayWay.key`` and ``Order.pay_way_key`` share one vocabulary; the
+        # override keeps the established ``PayWayKeyEnum`` name for both
+        # instead of a second ``KeyEnum`` for the same choice set.
+        "PayWayKeyEnum": "pay_way.enum.pay_way.PayWayEnum",
         # Two choice sets now sit behind fields named ``type``: the BoxNow
         # locker type and ``OrderCreateErrorDetailSerializer.type``.
         # Without both overrides drf-spectacular renames the older one to

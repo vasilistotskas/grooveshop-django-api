@@ -70,6 +70,7 @@ class ProductTranslationSerializer(
     view_count = serializers.SerializerMethodField()
     review_average = serializers.SerializerMethodField()
     vat_percent = serializers.SerializerMethodField()
+    category_name = serializers.SerializerMethodField()
 
     class Meta:
         model = ProductTranslation
@@ -94,6 +95,7 @@ class ProductTranslationSerializer(
             "view_count",
             "review_average",
             "vat_percent",
+            "category_name",
         )
 
     def get_slug(self, obj):
@@ -113,6 +115,21 @@ class ProductTranslationSerializer(
 
     def get_content_type(self, obj):
         return "product"
+
+    def get_category_name(self, obj):
+        """The product's category in the hit's own language.
+
+        Read from the database (the category translations are prefetched
+        by ``get_search_result_queryset``), like every other field the
+        hit is enriched with, so a renamed category shows at once rather
+        than after a reindex.
+        """
+        category = obj.master.category if obj.master else None
+        if category is None:
+            return None
+        return category.safe_translation_getter(
+            "name", language_code=obj.language_code, any_language=True
+        )
 
     # ``is not None``, not truthiness: ``Money(0)`` is falsy, and a free
     # or fully discounted product costs 0, which is not "no price".
@@ -183,6 +200,7 @@ class ProductMeiliSearchResultSerializer(serializers.Serializer):
     view_count = serializers.IntegerField()
     review_average = serializers.FloatField(allow_null=True)
     vat_percent = serializers.FloatField(allow_null=True)
+    category_name = serializers.CharField(allow_null=True)
 
 
 class SearchDisclosureSerializer(serializers.Serializer):

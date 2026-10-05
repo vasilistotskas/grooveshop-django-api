@@ -84,14 +84,21 @@ class PayWay(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
             "Dropped in the release after settlement lands."
         ),
     )
-    translations = TranslatedFields(
-        name=models.CharField(
-            _("Name"),
-            max_length=50,
-            blank=True,
-            null=True,
-            choices=PayWayEnum,
+    key = models.CharField(
+        _("Key"),
+        max_length=50,
+        # ``default`` only backfills existing rows in the migration; a
+        # row without a key renders no label on the storefront, so
+        # forms and the write serializer require one.
+        default="",
+        choices=PayWayEnum,
+        help_text=_(
+            "Language-independent identifier of the payment method. The "
+            "storefront resolves its label from this key, so it never "
+            "depends on which languages the store has translated."
         ),
+    )
+    translations = TranslatedFields(
         description=models.TextField(_("Description"), blank=True, null=True),
         instructions=RichTextField(
             _("Payment Instructions"),
@@ -126,14 +133,13 @@ class PayWay(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
     def display_name(self) -> str:
         """Human-readable label for this payment method.
 
-        ``PayWayTranslation.name`` deliberately stores a ``PayWayEnum``
-        KEY rather than a display string — one shared vocabulary across
-        the two repos, seedable by a migration without knowing a
-        language. The consequence is that every Django-rendered surface
-        that printed the raw column showed ``PAY_ON_DELIVERY``: the
-        invoice PDF's "Method" line, the admin order email, the admin
-        list and every autocomplete label. This is the one place that
-        resolves the key.
+        ``key`` deliberately stores a ``PayWayEnum`` KEY rather than a
+        display string — one shared vocabulary across the two repos,
+        seedable by a migration without knowing a language. The
+        consequence is that every Django-rendered surface that printed
+        the raw column showed ``PAY_ON_DELIVERY``: the invoice PDF's
+        "Method" line, the admin order email, the admin list and every
+        autocomplete label. This is the one place that resolves the key.
 
         Resolution mirrors Django's ``get_FOO_display()``: a known
         member yields its ``gettext_lazy`` label, anything else yields
@@ -148,13 +154,12 @@ class PayWay(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         serializer exposes ``pay_way_key`` for that; see
         ``Order.pay_way_key``.
         """
-        raw = self.safe_translation_getter("name", any_language=True) or ""
-        if not raw:
+        if not self.key:
             return ""
         try:
-            return str(PayWayEnum(raw).label)
+            return str(PayWayEnum(self.key).label)
         except ValueError:
-            return raw
+            return self.key
 
     def __str__(self):
         return self.display_name

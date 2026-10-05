@@ -224,20 +224,14 @@ class TestRateFields:
 
 
 def _name_it(pay_way, enum_value: str):
-    """Write the enum key and hand back an instance that can see it.
+    """Write the enum key and hand back a fresh instance.
 
-    ``.update()`` goes straight to SQL, past BOTH of parler's caches —
-    the per-instance one and the shared backend ``PARLER_ENABLE_CACHING``
-    fills on first read. Without the clear, every assertion here reads
-    whatever name the factory's Iterator happened to assign and the test
-    lies. Same trap as ``tests/integration/pay_way/test_display_name.py``.
+    The factory's Iterator assigns an arbitrary key, so every assertion
+    here must overwrite it first or the test lies.
     """
-    from django.core.cache import cache
-
     from pay_way.models import PayWay
 
-    pay_way.translations.update(name=enum_value)
-    cache.clear()
+    PayWay.objects.filter(pk=pay_way.pk).update(key=enum_value)
     return PayWay.objects.get(pk=pay_way.pk)
 
 
@@ -282,7 +276,7 @@ class TestPayWaysPerOption:
             if opt["providerCode"] == "boxnow" and opt["kind"] == "pickup_point"
         )
         assert PayWayEnum.BOX_NOW_PAY_ON_THE_GO.value in [
-            p["name"] for p in locker["payWays"]
+            p["key"] for p in locker["payWays"]
         ]
 
     def test_a_courier_cash_pay_way_is_not_offered_on_a_locker(
@@ -315,7 +309,7 @@ class TestPayWaysPerOption:
             if opt["providerCode"] == "boxnow" and opt["kind"] == "pickup_point"
         )
         assert PayWayEnum.PAY_ON_DELIVERY.value not in [
-            p["name"] for p in locker["payWays"]
+            p["key"] for p in locker["payWays"]
         ]
 
     def test_an_inactive_pay_way_is_never_advertised(
@@ -340,7 +334,7 @@ class TestPayWaysPerOption:
 
         for opt in response.json():
             assert PayWayEnum.BOX_NOW_PAY_ON_THE_GO.value not in [
-                p["name"] for p in opt["payWays"]
+                p["key"] for p in opt["payWays"]
             ]
 
     def test_the_field_is_always_present(self, boxnow_configured_tenant):

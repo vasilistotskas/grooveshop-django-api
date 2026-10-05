@@ -28,6 +28,7 @@ class PayWaySerializer(
         fields = (
             "translations",
             "id",
+            "key",
             "active",
             "cost",
             "free_threshold",
@@ -96,6 +97,7 @@ class PayWayWriteSerializer(
         model = PayWay
         fields = (
             "translations",
+            "key",
             "active",
             "cost",
             "free_threshold",
@@ -105,3 +107,4 @@ class PayWayWriteSerializer(
             "settlement",
         )
         read_only_fields = ("sort_order",)
+        extra_kwargs = {"key": {"required": True}}

@@ -108,7 +108,7 @@ class PayWayAdmin(BaseTranslatableAdmin):
     ]
 
     search_fields = [
-        "translations__name",
+        "key",
         "provider_code",
         "translations__description",
         "translations__instructions",
@@ -140,7 +140,7 @@ class PayWayAdmin(BaseTranslatableAdmin):
                 "fields": (
                     "active",
                     "sort_order",
-                    "name",
+                    "key",
                     "icon",
                     "description",
                     "instructions",
@@ -175,11 +175,11 @@ class PayWayAdmin(BaseTranslatableAdmin):
 
     @display(description=_("Name"), header=True)
     def name_display(self, obj):
-        # ``display_name``, not the raw translation: the column stores a
-        # PayWayEnum key, so this list showed "PAY_ON_DELIVERY". Note
-        # ``search_fields`` still queries ``translations__name`` — it is
-        # a DB lookup and cannot see a Python property, so staff search
-        # by key, not by label.
+        # ``display_name``, not the raw column: it stores a PayWayEnum
+        # key, so this list showed "PAY_ON_DELIVERY". Note
+        # ``search_fields`` still queries ``key`` — it is a DB lookup
+        # and cannot see a Python property, so staff search by key, not
+        # by label.
         return header_two_line(
             obj.display_name or _("Unnamed Payment Method"),
             image_path=obj.icon.url if obj.icon else None,

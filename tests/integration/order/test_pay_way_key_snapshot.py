@@ -31,8 +31,7 @@ def _pay_way(name: str, **kwargs) -> PayWay:
     kwargs.setdefault("active", True)
     kwargs.setdefault("settlement", PaySettlement.COURIER_CASH.value)
     pay_way = PayWayFactory(**kwargs)
-    pay_way.translations.update(name=name)
-    cache.clear()
+    PayWay.objects.filter(pk=pay_way.pk).update(key=name)
     return PayWay.objects.get(pk=pay_way.pk)
 
 
@@ -67,10 +66,10 @@ class SnapshotOnWriteTests(TestCase):
         order = OrderFactory(num_order_items=0, pay_way=self.courier_cash)
         self.assertEqual(order.pay_way_key, PayWayEnum.PAY_ON_DELIVERY.value)
 
-        self.courier_cash.translations.update(
-            name=PayWayEnum.BOX_NOW_PAY_ON_THE_GO.value
+        PayWay.objects.filter(pk=self.courier_cash.pk).update(
+            key=PayWayEnum.BOX_NOW_PAY_ON_THE_GO.value
         )
-        cache.clear()
+        self.courier_cash.refresh_from_db()
         order.save()
         order.refresh_from_db()
 

@@ -365,7 +365,11 @@ class Product(
             cached_value = self.__dict__["review_average"]
             return float(cached_value) if cached_value is not None else 0.0
         # Otherwise query the database
-        avg = self.reviews.aggregate(avg=Avg("rate"))["avg"]
+        avg = (
+            self.reviews.get_queryset()
+            .approved()
+            .aggregate(avg=Avg("rate"))["avg"]
+        )
         return float(avg) if avg is not None else 0.0
 
     @review_average.setter
@@ -375,12 +379,12 @@ class Product(
 
     @property
     def review_count(self) -> int:
-        """Return the number of reviews for this product."""
+        """Return the number of approved reviews for this product."""
         # If annotation exists (stored as reviews_count), use it
         if "reviews_count" in self.__dict__:
             return self.__dict__["reviews_count"]
         # Otherwise query the database
-        return self.reviews.count()
+        return self.reviews.get_queryset().approved().count()
 
     @review_count.setter
     def review_count(self, value):
@@ -504,7 +508,10 @@ class ProductTranslation(
         from django.db.models import Prefetch
 
         master_qs = (
-            Product.objects.with_category().with_counts().with_main_image()
+            Product.objects.with_category()
+            .with_counts()
+            .with_main_image()
+            .prefetch_related("category__translations")
         )
         return cls.objects.prefetch_related(
             Prefetch("master", queryset=master_qs)
@@ -663,7 +670,7 @@ class ProductTranslation(
             "category": lambda obj: obj.master.category_id,
             "category_name": lambda obj: (
                 obj.master.category.safe_translation_getter(
-                    "name", any_language=True
+                    "name", language_code=obj.language_code, any_language=True
                 )
                 if obj.master.category
                 else None

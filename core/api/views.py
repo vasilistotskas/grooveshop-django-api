@@ -672,6 +672,9 @@ PUBLIC_SETTING_KEYS = frozenset(
         # Purchase-form bounds for the storefront gift-card page.
         "GIFT_CARD_MIN_AMOUNT",
         "GIFT_CARD_MAX_AMOUNT",
+        # Drives the storefront's "Valid for N years" line; the server
+        # reads it again when it stamps ``expires_at``.
+        "GIFT_CARD_VALIDITY_DAYS",
         "LOYALTY_REDEMPTION_RATIO_EUR",
         "LOYALTY_POINTS_FACTOR",
         "LOYALTY_TIER_MULTIPLIER_ENABLED",

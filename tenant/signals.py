@@ -109,6 +109,21 @@ def bump_generation_on_pay_way_change(sender, instance, **kwargs):
     _bump_generation_for_current_schema()
 
 
+@receiver(
+    [post_save, post_delete],
+    sender="shipping.ShippingProvider",
+    dispatch_uid="tenant.bump_generation_on_shipping_provider_change",
+)
+def bump_generation_on_shipping_provider_change(sender, instance, **kwargs):
+    """Move the tenant-resolve cache on when a carrier changes.
+
+    ``shippingCarriers`` is the tenant's active carriers, so switching
+    one on or off, or renaming it, must not sit behind the resolve cache
+    for the full TTL.
+    """
+    _bump_generation_for_current_schema()
+
+
 @receiver(post_save, sender=Tenant, dispatch_uid="tenant.reactivate_on_renewal")
 def reactivate_on_renewal(sender, instance, **kwargs):
     """Recording a payment lifts a BILLING suspension immediately.

@@ -62,6 +62,9 @@ STOREFRONT_FEATURE_TOGGLES = (
     "PRODUCT_ALERTS_ENABLED",
 )
 
+# Public, but not a bool toggle: asserted separately.
+STOREFRONT_PUBLIC_VALUES = ("GIFT_CARD_VALIDITY_DAYS",)
+
 
 def test_storefront_feature_toggles_ship_enabled():
     """Every storefront gate defaults ON — a merchant opts OUT.
@@ -116,6 +119,14 @@ class TestGetSettingByKeyPublicAccess:
             data = response.json()
             assert data["name"] == key
             assert "value" in data, key
+
+    def test_storefront_public_values_whitelisted_anonymous(self):
+        client = _anon_client()
+        url = reverse("api-settings-get")
+        for key in STOREFRONT_PUBLIC_VALUES:
+            response = client.get(url, {"key": key})
+            assert response.status_code == status.HTTP_200_OK, key
+            assert response.json()["name"] == key
 
     def test_non_whitelisted_key_returns_404_anonymous(self):
         """DEEPL_AUTH_KEY (or any unlisted key) must be blocked."""

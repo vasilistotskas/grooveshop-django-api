@@ -1,3 +1,4 @@
+from django.db.models import Count
 from django.utils.translation import gettext_lazy as _
 from djmoney.contrib.django_rest_framework import MoneyField
 from djmoney.money import Money
@@ -10,6 +11,7 @@ from rest_framework.relations import PrimaryKeyRelatedField
 from core.api.schema import generate_schema_multi_lang
 from core.api.serializers import MeasurementSerializerField
 from core.utils.serializers import TranslatedFieldExtended
+from product.enum.review import RateEnum
 from product.models.brand import Brand
 from product.models.category import ProductCategory
 from product.models.product import Product
@@ -105,6 +107,11 @@ class ProductSerializer(
         )
 
 
+class RatingDistributionSerializer(serializers.Serializer):
+    rate = serializers.IntegerField()
+    count = serializers.IntegerField()
+
+
 class ProductDetailSerializer(ProductSerializer):
     class Meta(ProductSerializer.Meta):
         fields = (*ProductSerializer.Meta.fields, "price_drop_alerts_enabled")
@@ -112,6 +119,45 @@ class ProductDetailSerializer(ProductSerializer):
             *ProductSerializer.Meta.read_only_fields,
             "price_drop_alerts_enabled",
         )
+
+
+class ProductRetrieveSerializer(ProductDetailSerializer):
+    """The product page's own payload.
+
+    ``ProductDetailSerializer`` is also nested in list payloads
+    (favourites), where the distribution query would run once per row,
+    so the extra field lives on this single-object subclass.
+    """
+
+    rating_distribution = serializers.SerializerMethodField()
+
+    class Meta(ProductDetailSerializer.Meta):
+        fields = (*ProductDetailSerializer.Meta.fields, "rating_distribution")
+        read_only_fields = (
+            *ProductDetailSerializer.Meta.read_only_fields,
+            "rating_distribution",
+        )
+
+    @extend_schema_field(RatingDistributionSerializer(many=True))
+    def get_rating_distribution(self, obj: Product) -> list[dict[str, int]]:
+        """Approved reviews per rate, one row for every ``RateEnum`` value.
+
+        The scale is ``RateEnum`` (1-10), not five stars; rates nobody
+        used come back as ``count: 0`` so the client never has to fill
+        gaps. Approved only, like the public review list: a pending or
+        rejected review must not move the bars.
+        """
+        counts = dict(
+            obj.reviews.get_queryset()
+            .approved()
+            .order_by()
+            .values_list("rate")
+            .annotate(count=Count("pk"))
+        )
+        return [
+            {"rate": rate, "count": counts.get(rate, 0)}
+            for rate in RateEnum.values
+        ]
 
 
 class ProductWriteSerializer(

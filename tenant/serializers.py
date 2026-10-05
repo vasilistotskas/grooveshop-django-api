@@ -45,6 +45,7 @@ class TenantShippingCarrierSerializer(serializers.Serializer):
     class Meta:
         list_serializer_class = ActiveShippingCarrierListSerializer
 
+
 class _ResendCooldownField(serializers.IntegerField):
     """``settings.ACCOUNT_RESEND_COOLDOWN_SECONDS``, read at render time.
 

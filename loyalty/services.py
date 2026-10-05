@@ -20,6 +20,9 @@ logger = logging.getLogger(__name__)
 def _reversal_due(order_id: int) -> bool:
     """Whether *order_id* was canceled or refunded.
 
+    Refunded means either the order status (``RETURNED`` → ``REFUNDED``
+    moves only that column) or the payment status.
+
     Both queue ``reverse_order_points`` once they commit, so points
     granted after that ran would never be taken back. Read fresh, under
     the caller's user-row lock, which the reversal takes too.
@@ -30,7 +33,7 @@ def _reversal_due(order_id: int) -> bool:
     return (
         Order.objects.filter(pk=order_id)
         .filter(
-            models.Q(status=OrderStatus.CANCELED)
+            models.Q(status__in=(OrderStatus.CANCELED, OrderStatus.REFUNDED))
             | models.Q(
                 payment_status__in=(
                     PaymentStatus.REFUNDED,

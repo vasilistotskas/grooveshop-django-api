@@ -108,3 +108,14 @@ def test_zero_for_wholesale_unless_the_merchant_opted_in():
         assert LoyaltyService.get_order_points(order) == 0
     with _settings({"B2B_LOYALTY_ENABLED": True}):
         assert LoyaltyService.get_order_points(order) > 0
+
+
+def test_zero_for_an_order_refunded_by_status_alone():
+    """RETURNED -> REFUNDED changes only ``status``; the payment status
+    can still read COMPLETED."""
+    order = _order(UserAccountFactory(), status=OrderStatus.REFUNDED)
+    assert order.payment_status == PaymentStatus.COMPLETED
+
+    with _settings():
+        assert LoyaltyService.get_order_points(order) == 0
+        assert LoyaltyService.award_order_points(order.id) == 0

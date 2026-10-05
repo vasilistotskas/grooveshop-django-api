@@ -873,6 +873,112 @@ def test_stats_strip_is_the_hero_proof_row_as_its_own_band():
 
 
 @pytest.mark.django_db
+class TestHeroSlideProduct:
+    """A slide can feature one product, drawn as a chip over the art."""
+
+    @staticmethod
+    def _slides(*product_ids):
+        return {
+            "slides": [
+                {"image_url": "/img/a.avif", "product_id": pid}
+                for pid in product_ids
+            ]
+        }
+
+    def test_a_product_of_this_store_is_accepted(self):
+        from product.factories.product import ProductFactory
+
+        product = ProductFactory(num_images=0, num_reviews=0)
+
+        validate_section_props("hero_carousel", self._slides(product.pk))
+
+    def test_a_slide_may_carry_no_product(self):
+        validate_section_props(
+            "hero_carousel",
+            {"slides": [{"image_url": "/img/a.avif"}]},
+        )
+
+    def test_an_unknown_product_is_refused_by_id(self):
+        with pytest.raises(ValidationError, match=r"not found.*\[987654\]"):
+            validate_section_props("hero_carousel", self._slides(987654))
+
+    def test_a_deleted_product_is_refused(self):
+        from product.factories.product import ProductFactory
+
+        product = ProductFactory(num_images=0, num_reviews=0)
+        product.delete()
+
+        with pytest.raises(ValidationError, match="not found"):
+            validate_section_props("hero_carousel", self._slides(product.pk))
+
+    def test_an_inactive_product_is_refused(self):
+        """The storefront detail 404s an inactive product for visitors,
+        so the chip would link to nothing."""
+        from product.factories.product import ProductFactory
+
+        product = ProductFactory(num_images=0, num_reviews=0, active=False)
+
+        with pytest.raises(ValidationError, match="active products"):
+            validate_section_props("hero_carousel", self._slides(product.pk))
+
+    def test_every_missing_id_is_named_in_one_message(self):
+        with pytest.raises(ValidationError) as exc_info:
+            validate_section_props(
+                "hero_carousel", self._slides(987654, 987655)
+            )
+        assert "[987654, 987655]" in str(exc_info.value)
+
+    def test_the_id_must_be_a_positive_integer(self):
+        for bad in (0, -1, "7", 1.5, True):
+            with pytest.raises(ValidationError, match="product_id"):
+                validate_section_props("hero_carousel", self._slides(bad))
+
+    def test_a_locale_copy_of_the_slides_is_checked_too(self):
+        """An override replaces ``slides`` wholesale, so its chip must
+        point at a real product as well."""
+        from page_config.schemas import validate_section_i18n
+
+        with pytest.raises(ValidationError, match=r"en\.props\..*not found"):
+            validate_section_i18n(
+                "hero_carousel", {"en": {"props": self._slides(987654)}}
+            )
+
+
+def test_offers_preview_has_an_eyebrow_and_an_ink_surface():
+    validate_section_props(
+        "offers_preview", {"eyebrow": "Running offers", "surface": "ink"}
+    )
+    with pytest.raises(ValidationError, match="eyebrow"):
+        validate_section_props("offers_preview", {"eyebrow": "x" * 101})
+    with pytest.raises(ValidationError, match="surface"):
+        validate_section_props("offers_preview", {"surface": "volt"})
+
+
+def test_ink_is_the_offers_band_surface_only():
+    """Only the band with a dark treatment takes ``ink``."""
+    with pytest.raises(ValidationError, match="surface"):
+        validate_section_props("stats_strip", {"surface": "ink"})
+
+
+def test_loyalty_hero_takes_its_own_wording_and_surface():
+    validate_section_props(
+        "loyalty_hero",
+        {
+            "surface": "muted",
+            "eyebrow": "Groove Rewards",
+            "cta_text": "Join free",
+            "cta_link": "/account/signup",
+            "secondary_cta_text": "How it works",
+            "secondary_cta_link": "/loyalty-program",
+        },
+    )
+    with pytest.raises(ValidationError, match="cta_link"):
+        validate_section_props("loyalty_hero", {"cta_link": "javascript:1"})
+    with pytest.raises(ValidationError, match="unexpected"):
+        validate_section_props("loyalty_hero", {"heading": "Not a prop"})
+
+
+@pytest.mark.django_db
 class TestTheAdminPath:
     """The admin saves through ``PageSection.clean()``; it used to save
     section JSON unchecked."""

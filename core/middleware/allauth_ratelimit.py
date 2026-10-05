@@ -26,6 +26,7 @@ _ALLAUTH_RATE_LIMITS: list[tuple[str, int | None, int | None]] = [
     ("/_allauth/app/v1/auth/password/request", 5, 10),
     ("/_allauth/app/v1/auth/password/reset", 5, 20),
     ("/_allauth/app/v1/auth/code/request", 5, 10),
+    ("/_allauth/app/v1/auth/code/resend", 3, 10),
     ("/_allauth/app/v1/auth/code/confirm", 10, 30),
     ("/_allauth/app/v1/auth/2fa/authenticate", 10, 30),
     ("/_allauth/app/v1/auth/2fa/reauthenticate", 10, 30),

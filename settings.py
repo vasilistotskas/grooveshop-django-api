@@ -670,6 +670,24 @@ ACCOUNT_EMAIL_VERIFICATION_BY_CODE_ENABLED = True
 ACCOUNT_EMAIL_VERIFICATION_BY_CODE_TIMEOUT = 300
 ACCOUNT_LOGIN_BY_CODE_MAX_ATTEMPTS = 3
 ACCOUNT_LOGIN_BY_CODE_TIMEOUT = 300
+# A pending code can be re-sent (``POST .../auth/code/resend`` and
+# ``.../auth/email/verify/resend``) at most this many times per pending flow,
+# and a pending email verification can be pointed at a corrected address
+# (``POST .../account/email``) at most ``..._SUPPORTS_CHANGE`` times — the
+# typo at signup would otherwise strand the visitor on a code that is going
+# to someone else's inbox. Both are allauth's own quotas, not custom views.
+ACCOUNT_LOGIN_BY_CODE_SUPPORTS_RESEND = 3
+ACCOUNT_EMAIL_VERIFICATION_SUPPORTS_RESEND = 3
+ACCOUNT_EMAIL_VERIFICATION_SUPPORTS_CHANGE = 2
+# Minimum gap between two verification mails to one address. Under
+# verification-by-code allauth answers a resend inside it with a 429 (its
+# default is 1/10s/key), so the storefront's "resend in 0:30" timer mirrors
+# this number. The login-code resend has no allauth limit of its own and is
+# bounded by the per-IP rules in ``core.middleware.allauth_ratelimit``.
+ACCOUNT_RESEND_COOLDOWN_SECONDS = 30
+ACCOUNT_RATE_LIMITS = {
+    "confirm_email": f"1/{ACCOUNT_RESEND_COOLDOWN_SECONDS}s/key",
+}
 ALLAUTH_USER_CODE_FORMAT = {"numeric": True, "dashed": False, "length": 6}
 ACCOUNT_SIGNUP_FORM_HONEYPOT_FIELD = "email_confirm"
 ACCOUNT_DEFAULT_HTTP_PROTOCOL = "http" if DEBUG else "https"
@@ -2060,6 +2078,19 @@ EXTRA_SETTINGS_DEFAULTS = [
         ),
     },
     {
+        "name": "DISPATCH_CUTOFF",
+        "type": "string",
+        "value": "15:00",
+        "validator": "tenant.validators.validate_dispatch_cutoff_setting",
+        "description": (
+            "Last time of day (HH:MM, store local time) an order still "
+            "ships the same business day. Orders at or after it, or on "
+            "a weekend / public holiday, dispatch the next business "
+            "day. Drives each order's estimated delivery date and the "
+            "storefront's 'order before ...' line. Empty = no cutoff."
+        ),
+    },
+    {
         "name": "GIFT_CARDS_ENABLED",
         "type": "bool",
         "value": False,
@@ -2361,13 +2392,32 @@ EXTRA_SETTINGS_DEFAULTS = [
         "description": (
             "Strip above the storefront header, as JSON: "
             '{"enabled": bool, "text": "<default-locale wording>", '
-            '"i18n": {"<locale>": {"text": "..."}}, "link"?, "icon"?, '
-            '"color"?, "dismissible"?, "id"?}. `text` is capped at 200 '
-            "characters because the bar is one line; `color` is one of "
+            '"shortText"?: "<phone wording>", "code"?: "<promo code>", '
+            '"i18n": {"<locale>": {"text"?: "...", "shortText"?: '
+            '"..."}}, "link"?, "icon"?, "color"?, "dismissible"?, '
+            '"id"?}. `text` is capped at 200 characters because the '
+            "bar is one line, `shortText` at 80; `code` is one "
+            "whitespace-free token of at most 40 characters, shown set "
+            "apart from the sentence and the same in every language "
+            "(so not an i18n key); `color` is one of "
             "primary/secondary/neutral/info/success/warning/error. "
             "`id` is what a dismissal is remembered against in the "
             "visitor's browser — change it to re-show the bar to "
             "everyone. Empty {} = no bar."
+        ),
+    },
+    {
+        "name": "AUTH_PANEL",
+        "type": "json",
+        "value": {},
+        "validator": "tenant.validators.validate_auth_panel_setting",
+        "description": (
+            "Photo and line on the ink panel beside the sign-in pages, "
+            'as JSON: {"imageUrl"?: "<stored media path>", "tagline"?: '
+            '"<default-locale wording>", "i18n": {"<locale>": '
+            '{"tagline": "..."}}}. `tagline` is capped at 200 '
+            "characters. Both keys are optional; without them the panel "
+            "is the store's logo on ink. Empty {} = nothing configured."
         ),
     },
     {

@@ -19483,3 +19483,59 @@ msgid ""
 "Whether the code is reserved for this customer (assigned to their account or"
 " email) rather than offered to everyone."
 msgstr ""
+
+#: .\order\models\order.py:343
+msgid "Estimated Delivery"
+msgstr ""
+
+#: .\order\models\order.py:346
+msgid ""
+"Latest expected delivery date, fixed when the order was placed from the "
+"chosen shipping rate, the dispatch cutoff and business days. Null when the "
+"rate advertises no estimate. A promise made at checkout: later rate edits do"
+" not move it."
+msgstr ""
+
+#: .\shipping\models\rate.py:104
+msgid ""
+"Slowest delivery, in business days after dispatch. The order's "
+"``estimated_delivery`` date is dispatch plus this many business days. Blank "
+"with the minimum also blank."
+msgstr ""
+
+#: .\shipping\models\rate.py:100
+msgid "Delivery Days (max)"
+msgstr ""
+
+#: .\shipping\models\rate.py:89
+msgid "Delivery Days (min)"
+msgstr ""
+
+#: .\shipping\models\rate.py:93
+msgid ""
+"Fastest delivery, in business days after dispatch. Blank means no estimate "
+"is advertised for this combination; set both bounds (equal for a fixed "
+"promise)."
+msgstr ""
+
+#: .\shipping\models\rate.py:177
+msgid "Maximum cannot be below the minimum."
+msgstr ""
+
+#: .\shipping\models\rate.py:169
+msgid "Set both delivery bounds or neither."
+msgstr ""
+
+#: .\shipping\serializers\option.py:107
+msgid ""
+"Fastest delivery in business days after dispatch, or null when the rate "
+"advertises no estimate. Pair with the public ``DISPATCH_CUTOFF`` setting for"
+" the 'order before HH:MM' line. Day counts only, never dates, so the "
+"response stays cacheable."
+msgstr ""
+
+#: .\shipping\serializers\option.py:117
+msgid ""
+"Slowest delivery in business days after dispatch; null exactly when "
+"``delivery_days_min`` is."
+msgstr ""

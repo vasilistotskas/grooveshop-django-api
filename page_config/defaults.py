@@ -24,61 +24,83 @@ from page_config.models import (
 logger = logging.getLogger(__name__)
 
 DEFAULT_PAGE_LAYOUTS: dict[str, dict] = {
-    # A SHOP's homepage: browse the catalogue, then the content around
-    # it. Until 2026-09-18 this mirrored the first tenant's blog-first
-    # page (blog categories rail → banner carousel → recently viewed →
-    # blog posts), which every new store inherited: a prop-less carousel
-    # renders nothing and an empty blog renders "no articles yet", so a
-    # freshly provisioned store opened on an empty state above the fold
-    # and showed no product at all. That page is still webside's own —
-    # ``BRAND_HOME_LAYOUT`` below — it is simply no longer the default.
+    # The Groove Volt home, band for band: hero, trust strip, category
+    # tiles, new arrivals, the ink offers band, the popular rail, the
+    # rewards band, the proof row, blog, social proof and an FAQ.
     #
-    # Every section here is DATA-DRIVEN and renders nothing when its
-    # data or its tenant flag is absent, so the stack degrades to
-    # whatever the store actually has rather than to empty cards. Keep
-    # that property when adding one.
+    # It used to stop at six product-first bands because the blog-first
+    # page a store inherited before 2026-09-18 opened on empty states.
+    # The rule that fixed that still holds and is what makes this stack
+    # safe: every section here is DATA-DRIVEN and renders NOTHING when
+    # its data or its tenant flag is absent (a carousel with no slides,
+    # a strip with no items, offers while none run, the rewards band
+    # while the programme is off), so a fresh store shows the bands it
+    # has content for and the merchant fills the rest from the admin.
+    # Keep that property when adding one. The catalogue bands carry no
+    # copy of their own: their headings are the components' translated
+    # defaults.
     #
-    # ``featured_products`` and ``products_slider`` are not duplicates:
+    # ``featured_products`` and ``products_grid`` are not duplicates:
     # the first is what the merchant curates, the second is what arrived
-    # last (``ordering``), which is why both are standard on a shop.
-    # ``surface`` alternates ground and raised down the stack. The
-    # storefront draws each section as a full-width BAND, and two
-    # neighbours on the same surface read as one; the page is what knows
-    # the order, so the alternation lives in the layout rather than in
-    # the components. Sections that can render nothing (recently viewed
-    # before a first visit, the blog before a first post) are skipped in
-    # the count on purpose — they vanish, and the bands that remain
-    # still alternate.
+    # last (``ordering``).
+    #
+    # ``surface`` alternates ground and raised down the stack, as the
+    # design draws it. The storefront draws each section as a full-width
+    # BAND, and two neighbours on the same surface read as one; the page
+    # is what knows the order, so the alternation lives in the layout
+    # rather than in the components. The offers band is ``ink``, and the
+    # rewards band paints its own card.
     "home": {
         "title": "Homepage",
         "sections": [
+            {"component_type": "hero_carousel", "title": "", "props": {}},
+            {
+                "component_type": "trust_badges",
+                "title": "",
+                "props": {"surface": "default"},
+            },
             {
                 "component_type": "product_categories",
                 "title": "",
-                "props": {"surface": "default"},
+                "props": {"surface": "default", "layout": "tiles"},
+            },
+            {
+                "component_type": "products_grid",
+                "title": "",
+                "props": {"ordering": "newest", "surface": "muted"},
+            },
+            {
+                "component_type": "offers_preview",
+                "title": "",
+                "props": {"surface": "ink"},
             },
             {
                 "component_type": "featured_products",
                 "title": "",
-                "props": {"surface": "muted"},
+                "props": {"ordering": "popular", "surface": "default"},
             },
             {
-                "component_type": "products_slider",
-                "title": "",
-                "props": {"ordering": "newest", "surface": "default"},
-            },
-            {
-                "component_type": "recently_viewed",
-                "title": "",
-                "props": {},
-            },
-            {
-                "component_type": "blog_posts_grid",
+                "component_type": "loyalty_hero",
                 "title": "",
                 "props": {"surface": "default"},
             },
             {
-                "component_type": "newsletter_signup",
+                "component_type": "stats_strip",
+                "title": "",
+                "props": {"surface": "default"},
+            },
+            {
+                "component_type": "blog_posts_grid",
+                "title": "",
+                "props": {"surface": "muted"},
+            },
+            {
+                "component_type": "testimonials",
+                "title": "",
+                "props": {"surface": "default"},
+            },
+            {
+                "component_type": "faq",
                 "title": "",
                 "props": {"surface": "muted"},
             },

@@ -95,6 +95,15 @@ class TestGetSettingByKeyPublicAccess:
         assert data["name"] == "LOYALTY_ENABLED"
         assert "value" in data
 
+    def test_dispatch_cutoff_is_public_with_its_default(self):
+        """The storefront's "order before HH:MM" line reads it."""
+        client = _anon_client()
+        response = client.get(
+            reverse("api-settings-get"), {"key": "DISPATCH_CUTOFF"}
+        )
+        assert response.status_code == status.HTTP_200_OK
+        assert response.json()["value"] == "15:00"
+
     def test_contact_email_whitelisted_returns_200_anonymous(self):
         """CONTACT_EMAIL was added to PUBLIC_SETTING_KEYS in this phase."""
         client = _anon_client()

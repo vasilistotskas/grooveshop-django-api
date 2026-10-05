@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from django.conf import settings
 from rest_framework import serializers
 
 from tenant.models import Tenant, TenantDomain
@@ -43,6 +44,21 @@ class TenantShippingCarrierSerializer(serializers.Serializer):
 
     class Meta:
         list_serializer_class = ActiveShippingCarrierListSerializer
+
+
+class _ResendCooldownField(serializers.IntegerField):
+    """``settings.ACCOUNT_RESEND_COOLDOWN_SECONDS``, read at render time.
+
+    Not a ``SerializerMethodField``: that is read-only, which the generated
+    schema marks required, so a frontend-first deploy would reject every
+    ``/tenant/resolve`` from a backend that predates it (see the
+    ``available_locales`` note). A writable declaration with
+    ``required=False`` emits an optional field; the value is a deploy-wide
+    constant, not tenant data, so there is no row to read it from.
+    """
+
+    def get_attribute(self, instance) -> int:
+        return settings.ACCOUNT_RESEND_COOLDOWN_SECONDS
 
 
 class TenantConfigSerializer(serializers.Serializer):
@@ -160,6 +176,11 @@ class TenantConfigSerializer(serializers.Serializer):
     # generated schema, and a frontend-first deploy would then reject
     # every resolve from a backend that predates the field.
     recommendations_enabled = serializers.BooleanField(required=False)
+    # --- Auth ---
+    # Minimum gap, in seconds, before a login or verification code can be
+    # re-sent; the storefront's resend timer reads it instead of
+    # hardcoding the number allauth enforces.
+    code_resend_cooldown_seconds = _ResendCooldownField(required=False)
     agent_stripe_delegated_enabled = serializers.BooleanField(read_only=True)
     # EFFECTIVE agent-commerce gates, consumed by the agent gateway:
     # plan flag AND the tenant-schema extra-setting, folded here so

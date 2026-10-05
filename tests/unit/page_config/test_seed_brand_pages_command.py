@@ -76,11 +76,9 @@ def test_creates_home_with_brand_hero_props_when_absent():
 def test_fills_prop_less_hero_on_existing_default_home():
     """Default-seeded home → brand seeding gives it a banner.
 
-    The default homepage is product-first and carries NO carousel (it
-    was blog-first, with one, until 2026-09-18), so brand seeding has to
-    add the section before it can fill it — otherwise the banner
-    silently never applies on a fresh schema. A merchant-customized hero
-    is still left untouched.
+    The default homepage opens on a prop-less ``hero_carousel``, which
+    brand seeding fills with the banner artwork instead of adding a
+    second carousel. A merchant-customized hero is still left untouched.
     """
     from page_config.defaults import (
         BRAND_HOME_HERO_PROPS,
@@ -91,9 +89,10 @@ def test_fills_prop_less_hero_on_existing_default_home():
     _make_tenant("brand-home-default")
     seed_page_layouts()
     home = PageLayout.objects.get(page_type="home")
-    assert not home.sections.filter(component_type="hero_carousel").exists()
+    assert not home.sections.get(component_type="hero_carousel").props
 
     call_command("seed_brand_pages", schema="public")
+    assert home.sections.filter(component_type="hero_carousel").count() == 1
     assert (
         home.sections.get(component_type="hero_carousel").props
         == BRAND_HOME_HERO_PROPS

@@ -32,6 +32,8 @@ class TestShippingRateInline:
             "price",
             "free_shipping_threshold",
             "max_weight_grams",
+            "delivery_days_min",
+            "delivery_days_max",
             "is_active",
         )
 

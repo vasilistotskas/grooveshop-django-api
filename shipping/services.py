@@ -351,6 +351,8 @@ class ShippingService:
                         "country_code": country_code,
                         "max_weight_grams": rate.max_weight_grams,
                         "exceeds_max_weight": exceeds_max_weight,
+                        "delivery_days_min": rate.delivery_days_min,
+                        "delivery_days_max": rate.delivery_days_max,
                     }
                 )
 

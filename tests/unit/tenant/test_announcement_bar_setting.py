@@ -17,9 +17,16 @@ from tenant.validators import validate_announcement_bar_setting
 _VALID = {
     "enabled": True,
     "text": "Δωρεάν αποστολή από 39€",
-    "i18n": {"en": {"text": "Free shipping over 39€"}},
+    "i18n": {
+        "en": {
+            "text": "Free shipping over 39€",
+            "shortText": "Free shipping 39€+",
+        }
+    },
     "link": "/offers",
     "icon": "i-heroicons-truck",
+    "shortText": "Δωρεάν αποστολή 39€+",
+    "code": "FREESHIP",
     "color": "secondary",
     "dismissible": True,
     "id": "free-shipping-2026",
@@ -114,3 +121,49 @@ def test_the_default_locale_is_not_an_override_key():
             },
         }
     )
+
+
+def test_code_is_one_bounded_token():
+    """It is shown set apart and copied, so it cannot be a sentence."""
+    for code in ("TWO WORDS", "", "x" * 41, 7, ["A"]):
+        assert not validate_announcement_bar_setting({**_VALID, "code": code})
+    assert validate_announcement_bar_setting({**_VALID, "code": "X" * 40})
+    assert validate_announcement_bar_setting({**_VALID, "code": "SAVE-5_NOW"})
+
+
+def test_short_text_is_bounded_and_a_string():
+    assert not validate_announcement_bar_setting(
+        {**_VALID, "shortText": "x" * 81}
+    )
+    assert not validate_announcement_bar_setting({**_VALID, "shortText": 5})
+    assert validate_announcement_bar_setting({**_VALID, "shortText": "x" * 80})
+
+
+def test_the_old_snake_case_spelling_is_not_a_key():
+    """The wire key is ``shortText``: the storefront reads the stored
+    JSON as written, so a second spelling would be silently ignored."""
+    assert not validate_announcement_bar_setting(
+        {**_VALID, "short_text": "Free shipping"}
+    )
+
+
+@pytest.mark.django_db
+def test_a_locale_may_override_short_text_alone():
+    assert validate_announcement_bar_setting(
+        {**_VALID, "i18n": {"en": {"shortText": "Free shipping 39€+"}}}
+    )
+
+
+@pytest.mark.django_db
+def test_a_locale_override_is_bounded_and_never_carries_the_code():
+    """A promo code is the same string in every language."""
+    for override in (
+        {"code": "FREESHIP"},
+        {"shortText": "x" * 81},
+        {"text": "x" * 201},
+        {"shortText": 3},
+        {},
+    ):
+        assert not validate_announcement_bar_setting(
+            {**_VALID, "i18n": {"en": override}}
+        ), override

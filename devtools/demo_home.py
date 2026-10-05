@@ -26,6 +26,12 @@ from __future__ import annotations
 
 from typing import Any
 
+#: Which product a hero slide features, by slide index → product slug.
+#: A slide's ``product_id`` is a row id, which no dataset can carry — it
+#: differs per schema — so ``demo_store.seed_layouts`` resolves the slug
+#: and writes the id into the slide and every locale's copy of it.
+HERO_SLIDE_PRODUCTS: dict[int, str] = {0: "demo-powerbank-20k"}
+
 HOME_SECTIONS: tuple[dict[str, Any], ...] = (
     {
         "component_type": "hero_carousel",
@@ -225,19 +231,26 @@ HOME_SECTIONS: tuple[dict[str, Any], ...] = (
         },
     },
     {
-        # The ink band. Its eyebrow and its "All N offers" link are the
-        # component's own — the count is the live promotions' — so the
-        # layout names neither.
+        # The ink band. Its "All N offers" link is the component's own —
+        # the count is the live promotions' — so the layout does not
+        # name it.
         "component_type": "offers_preview",
         "title": "",
         "props": {
+            "surface": "ink",
+            "eyebrow": "Τρέχουσες προσφορές",
             "heading": "Κωδικοί που όντως ισχύουν.",
             "limit": 3,
             "cta_link": "/offers",
         },
         "sort_order": 4,
         "i18n": {
-            "en": {"props": {"heading": "Codes that actually work."}},
+            "en": {
+                "props": {
+                    "eyebrow": "Running offers",
+                    "heading": "Codes that actually work.",
+                },
+            },
         },
     },
     {

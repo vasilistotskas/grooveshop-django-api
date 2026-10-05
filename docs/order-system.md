@@ -426,6 +426,21 @@ accepting Cyprus orders at the Greek flat rate.
   — an over-cap option (a heavy Cyprus BoxNow cart) is still listed,
   flagged, so the storefront can disable it with a reason instead of
   the step silently having one fewer card.
+- **Delivery estimate**: `delivery_days_min`/`delivery_days_max`
+  (business days after dispatch, both null = no estimate advertised,
+  nothing invented) are on the rate and on each `/shipping/options`
+  row as day counts only, never dates, so the response stays cacheable.
+  `Order.estimated_delivery` (a date, the max bound) is fixed at
+  creation by `OrderService._seed_estimated_delivery` and read from
+  `tracking_details.estimated_delivery`; later rate edits do not move
+  it. `shipping/delivery.py` owns the arithmetic: dispatch is the
+  placement day when the order lands before the public
+  `DISPATCH_CUTOFF` setting (`HH:MM`, store local time, an order at
+  exactly the cutoff misses it; empty = no cutoff), otherwise the next
+  business day; weekends and Greek public holidays (fixed dates plus
+  Orthodox-Easter-relative ones) are not business days. The Greek
+  calendar governs the dispatch day because every parcel leaves from
+  Greece, whatever the destination country.
 - **`/shipping/free-shipping-info`** defaults to the first
   `ShippingService.shippable_country_codes()` entry when no
   `country_code` is given, echoing whichever it used.

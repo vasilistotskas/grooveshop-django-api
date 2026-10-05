@@ -815,6 +815,7 @@ class OrderService:
                 order_data, weight_grams=cart_weight_grams
             )
             cls._seed_language_code(order_data)
+            cls._seed_estimated_delivery(order_data)
             order = Order.objects.create(**order_data)
             OrderAttributionService.record(
                 order, attribution or AttributionInput()
@@ -1311,6 +1312,7 @@ class OrderService:
                 order_data, weight_grams=cart_weight_grams
             )
             cls._seed_language_code(order_data)
+            cls._seed_estimated_delivery(order_data)
 
             order = Order.objects.create(**order_data)
             OrderAttributionService.record(
@@ -2692,6 +2694,39 @@ class OrderService:
                 order_data["shipping_provider"] = provider
 
         order_data["shipping_kind"] = kind
+
+    @staticmethod
+    def _seed_estimated_delivery(order_data: dict[str, Any]) -> None:
+        """Fix ``Order.estimated_delivery`` from the chosen rate at create.
+
+        Runs after :meth:`_resolve_shipping_provider`. Left unset when no
+        provider resolved, the rate advertises no estimate, or the
+        stored ``DISPATCH_CUTOFF`` is unreadable.
+        """
+        from shipping.delivery import configured_cutoff, estimated_delivery
+        from shipping.models import ShippingRate
+
+        provider = order_data.get("shipping_provider")
+        country_id = order_data.get("country_id")
+        if provider is None or not country_id:
+            return
+        rate = ShippingRate.objects.filter(
+            provider=provider,
+            country_id=country_id,
+            kind=order_data["shipping_kind"],
+            is_active=True,
+        ).first()
+        try:
+            cutoff = configured_cutoff()
+        except ValueError:
+            # Advisory estimate inside the create-order transaction: a
+            # bad stored setting must not lose the order. No date is
+            # better than one computed from an invented cutoff.
+            logger.exception("Estimated delivery skipped")
+            return
+        order_data["estimated_delivery"] = estimated_delivery(
+            rate, timezone.now(), cutoff
+        )
 
     @staticmethod
     def _seed_language_code(order_data: dict[str, Any]) -> None:

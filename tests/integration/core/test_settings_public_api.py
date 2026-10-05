@@ -111,3 +111,10 @@ def test_the_announcement_bar_is_public_and_empty_by_default():
     values = _public_settings()
 
     assert values["ANNOUNCEMENT_BAR"] == "{}"
+
+
+def test_the_auth_panel_is_public_and_empty_by_default():
+    """Shown on the sign-in pages before anyone has authenticated."""
+    values = _public_settings()
+
+    assert values["AUTH_PANEL"] == "{}"

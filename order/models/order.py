@@ -339,6 +339,18 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         db_index=True,
         help_text=_("Generic fulfilment kind, independent of provider."),
     )
+    estimated_delivery = models.DateField(
+        _("Estimated Delivery"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "Latest expected delivery date, fixed when the order was "
+            "placed from the chosen shipping rate, the dispatch cutoff "
+            "and business days. Null when the rate advertises no "
+            "estimate. A promise made at checkout: later rate edits do "
+            "not move it."
+        ),
+    )
     reminder_count = models.PositiveSmallIntegerField(
         _("Reminder Count"),
         default=0,

@@ -13,7 +13,6 @@ list already does.
 
 from __future__ import annotations
 
-from django.core.cache import cache
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -33,8 +32,9 @@ class PayWayKeyFieldTests(APITestCase):
             provider_code="cash_on_delivery",
             settlement=PaySettlement.COURIER_CASH.value,
         )
-        pay_way.translations.update(name=PayWayEnum.PAY_ON_DELIVERY.value)
-        cache.clear()
+        PayWay.objects.filter(pk=pay_way.pk).update(
+            key=PayWayEnum.PAY_ON_DELIVERY.value
+        )
         self.pay_way = PayWay.objects.get(pk=pay_way.pk)
         # A GUEST order: ``IsOwnerOrAdminOrGuest`` grants the
         # by-uuid route only when ``order.user`` is None and the

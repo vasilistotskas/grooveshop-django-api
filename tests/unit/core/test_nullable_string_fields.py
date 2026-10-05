@@ -60,7 +60,6 @@ _DEFERRED_TRANSLATED_FIELDS = frozenset(
         "page_config.ContentPageTranslation.body",
         "pay_way.PayWayTranslation.description",
         "pay_way.PayWayTranslation.instructions",
-        "pay_way.PayWayTranslation.name",
         "product.ProductCategoryImageTranslation.alt_text",
         "product.ProductCategoryImageTranslation.title",
         "product.ProductCategoryTranslation.description",

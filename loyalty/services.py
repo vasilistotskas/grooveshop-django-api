@@ -20,6 +20,9 @@ logger = logging.getLogger(__name__)
 def _reversal_due(order_id: int) -> bool:
     """Whether *order_id* was canceled or refunded.
 
+    Refunded means either the order status (``RETURNED`` → ``REFUNDED``
+    moves only that column) or the payment status.
+
     Both queue ``reverse_order_points`` once they commit, so points
     granted after that ran would never be taken back. Read fresh, under
     the caller's user-row lock, which the reversal takes too.
@@ -30,7 +33,7 @@ def _reversal_due(order_id: int) -> bool:
     return (
         Order.objects.filter(pk=order_id)
         .filter(
-            models.Q(status=OrderStatus.CANCELED)
+            models.Q(status__in=(OrderStatus.CANCELED, OrderStatus.REFUNDED))
             | models.Q(
                 payment_status__in=(
                     PaymentStatus.REFUNDED,
@@ -121,6 +124,62 @@ class LoyaltyService:
 
         return math.floor(calculated) + (product.points * quantity)
 
+    @staticmethod
+    def _wholesale_blocks_accrual(order) -> bool:
+        """Whether the order was wholesale-priced and the merchant has
+        not opted wholesale into loyalty (``B2B_LOYALTY_ENABLED``)."""
+        from b2b.services import B2BService
+
+        return bool(
+            (order.metadata or {}).get("b2b_pricing")
+            and not B2BService.loyalty_allowed()
+        )
+
+    @classmethod
+    def _item_points(cls, order) -> list[tuple]:
+        """``(item, points)`` per order line, at the buyer's current tier.
+
+        The one place an order's points are computed: ``award_order_
+        points`` stores these as EARN rows and ``get_order_points``
+        previews them, so the number a customer sees before the award
+        is the number the award then writes.
+        """
+        tier_multiplier = Decimal("1.0")
+        tier = order.user.loyalty_tier
+        if tier:
+            tier_multiplier = tier.points_multiplier
+        return [
+            (
+                item,
+                cls.calculate_item_points(
+                    item.product, item.quantity, tier_multiplier
+                ),
+            )
+            for item in order.items.select_related("product", "product__vat")
+        ]
+
+    @classmethod
+    def get_order_points(cls, order) -> int:
+        """Points the order earns for its customer; 0 when it earns none.
+
+        Once the award ran this is what was actually written (the tier
+        may have moved since, so recomputing would drift); before it,
+        the projection. Zero when the program is off, the order has no
+        account, it is wholesale-priced without the opt-in, or it was
+        canceled or refunded — the cases ``award_order_points`` refuses.
+        """
+        if not cls.is_enabled() or not order.user_id or _reversal_due(order.pk):
+            return 0
+
+        earned = PointsTransaction.objects.get_earn_transactions_for_order(
+            order
+        ).aggregate(total=models.Sum("points"))["total"]
+        if earned is not None:
+            return earned
+        if cls._wholesale_blocks_accrual(order):
+            return 0
+        return sum(points for _item, points in cls._item_points(order))
+
     @classmethod
     @transaction.atomic
     def award_order_points(cls, order_id: int) -> int:
@@ -152,11 +211,7 @@ class LoyaltyService:
         # group pricing applied. Redemption is gated on the same switch
         # (see ``B2BService.loyalty_allowed``) so a wholesale cart is
         # never half in the program.
-        from b2b.services import B2BService
-
-        if (order.metadata or {}).get(
-            "b2b_pricing"
-        ) and not B2BService.loyalty_allowed():
+        if cls._wholesale_blocks_accrual(order):
             logger.info(
                 "Order %s was wholesale-priced — skipping loyalty accrual "
                 "(B2B_LOYALTY_ENABLED is off)",
@@ -190,16 +245,9 @@ class LoyaltyService:
             return 0
 
         user = order.user
-        tier_multiplier = Decimal("1.0")
-        if user.loyalty_tier:
-            tier_multiplier = user.loyalty_tier.points_multiplier
-
         transactions_to_create = []
         total_points = 0
-        for item in order.items.select_related("product", "product__vat").all():
-            points = cls.calculate_item_points(
-                item.product, item.quantity, tier_multiplier
-            )
+        for item, points in cls._item_points(order):
             transactions_to_create.append(
                 PointsTransaction(
                     user=user,

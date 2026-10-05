@@ -79,6 +79,7 @@ class PayWayViewSetTestCase(APITestCase):
             "active": True,
             "cost": 10.00,
             "free_threshold": 100.00,
+            "key": PayWayEnum.CREDIT_CARD,
             "translations": {},
         }
 
@@ -86,13 +87,46 @@ class PayWayViewSetTestCase(APITestCase):
         # string yielded its first character, so this posted "e" and "d".
         for language_code in languages:
             payload["translations"][language_code] = {
-                "name": PayWayEnum.CREDIT_CARD,
+                "description": "Pay by card",
             }
 
         url = self.get_pay_way_list_url()
         response = self.client.post(url, data=payload, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["key"], PayWayEnum.CREDIT_CARD)
+        self.assertEqual(
+            PayWay.objects.get(pk=response.data["id"]).key,
+            PayWayEnum.CREDIT_CARD,
+        )
+
+    def test_create_requires_a_key(self):
+        """A row without a key renders no label on the storefront."""
+        self.client.force_authenticate(user=self.staff_user)
+        payload = {"active": True, "cost": 10.00, "translations": {}}
+
+        response = self.client.post(
+            self.get_pay_way_list_url(), data=payload, format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("key", response.data)
+
+    def test_create_rejects_an_unknown_key(self):
+        self.client.force_authenticate(user=self.staff_user)
+        payload = {
+            "active": True,
+            "cost": 10.00,
+            "key": "NOT_A_REAL_KEY",
+            "translations": {},
+        }
+
+        response = self.client.post(
+            self.get_pay_way_list_url(), data=payload, format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("key", response.data)
 
     def test_create_invalid(self):
         self.client.force_authenticate(user=self.staff_user)
@@ -161,18 +195,21 @@ class PayWayViewSetTestCase(APITestCase):
             "active": False,
             "cost": 20.00,
             "free_threshold": 200.00,
+            "key": PayWayEnum.PAY_ON_STORE,
             "translations": {},
         }
 
         for language_code in languages:
             payload["translations"][language_code] = {
-                "name": PayWayEnum.PAY_ON_STORE,
+                "description": "Pay in store",
             }
 
         url = self.get_pay_way_detail_url(self.pay_way.pk)
         response = self.client.put(url, data=payload, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.pay_way.refresh_from_db()
+        self.assertEqual(self.pay_way.key, PayWayEnum.PAY_ON_STORE)
 
     def test_update_invalid(self):
         self.client.force_authenticate(user=self.staff_user)
@@ -196,9 +233,10 @@ class PayWayViewSetTestCase(APITestCase):
         self.client.force_authenticate(user=self.staff_user)
         payload = {
             "active": False,
+            "key": PayWayEnum.PAY_ON_STORE,
             "translations": {
                 default_language: {
-                    "name": PayWayEnum.PAY_ON_STORE,
+                    "description": "Pay in store",
                 }
             },
         }

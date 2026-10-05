@@ -4,7 +4,7 @@ from datetime import timedelta
 from typing import TYPE_CHECKING
 
 from django.db import models
-from django.db.models import Count, Q
+from django.db.models import Count, Exists, OuterRef, Prefetch, Q
 from django.utils import timezone
 
 from core.managers import (
@@ -15,6 +15,25 @@ from product.enum.review import ReviewStatus
 
 if TYPE_CHECKING:
     from typing import Self
+
+
+def purchase_items(*, user, product):
+    """Order lines that entitle ``user`` to review ``product``.
+
+    The single definition of a verified purchase: a line of the user's
+    COMPLETED order. Only COMPLETED, because that is the state machine's
+    closed, successful end: PAID-but-undelivered, DELIVERED (still inside
+    the return window), CANCELED, RETURNED and REFUNDED orders prove
+    nothing about the customer having kept the goods. The review gate
+    (``ProductReviewViewSet.perform_create``) and the ``verified_purchase``
+    flag both read it, so they cannot drift apart.
+    """
+    from order.enum.status import OrderStatus
+    from order.models.item import OrderItem
+
+    return OrderItem.objects.filter(
+        order__user=user, order__status=OrderStatus.COMPLETED, product=product
+    )
 
 
 class ProductReviewQuerySet(TranslatableOptimizedQuerySet):
@@ -34,22 +53,48 @@ class ProductReviewQuerySet(TranslatableOptimizedQuerySet):
         return self.select_related("user")
 
     def with_product(self) -> Self:
-        """Select related product with translations."""
+        """Select related product with translations and its main image.
+
+        The main image lands in ``_prefetched_main_images``, which
+        ``Product.main_image_path`` reads instead of querying per row.
+        """
+        from product.models.image import ProductImage
+
         return self.select_related("product").prefetch_related(
-            "product__translations"
+            "product__translations",
+            Prefetch(
+                "product__images",
+                queryset=ProductImage.objects.filter(is_main=True),
+                to_attr="_prefetched_main_images",
+            ),
         )
 
     def with_product_images(self) -> Self:
         """Prefetch product images."""
         return self.prefetch_related("product__images__translations")
 
+    def with_verified_purchase(self) -> Self:
+        """Annotate ``verified_purchase`` (see ``purchase_items``)."""
+        return self.annotate(
+            verified_purchase=Exists(
+                purchase_items(
+                    user=OuterRef("user_id"), product=OuterRef("product_id")
+                )
+            )
+        )
+
     def for_list(self) -> Self:
         """
         Optimized queryset for list views.
 
-        Includes user, product, and translations.
+        Includes user, product, translations and the verified-purchase flag.
         """
-        return self.with_translations().with_user().with_product()
+        return (
+            self.with_translations()
+            .with_user()
+            .with_product()
+            .with_verified_purchase()
+        )
 
     def for_detail(self) -> Self:
         """

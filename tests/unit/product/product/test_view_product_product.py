@@ -6,6 +6,7 @@ from product.filters.product import ProductFilter
 from product.serializers.image import ProductImageSerializer
 from product.serializers.product import (
     ProductDetailSerializer,
+    ProductRetrieveSerializer,
     ProductSerializer,
     ProductWriteSerializer,
 )
@@ -35,12 +36,12 @@ class ProductViewSetTestCase(TestCase):
     def test_retrieve_action_serializer(self):
         self.viewset.action = "retrieve"
         serializer_class = self.viewset.get_serializer_class()
-        self.assertEqual(serializer_class, ProductDetailSerializer)
+        self.assertEqual(serializer_class, ProductRetrieveSerializer)
 
     def test_update_action_serializer(self):
         self.viewset.action = "update"
         serializer_class = self.viewset.get_serializer_class()
-        self.assertEqual(serializer_class, ProductDetailSerializer)
+        self.assertEqual(serializer_class, ProductRetrieveSerializer)
 
     def test_request_serializer_class(self):
         self.viewset.action = "create"
@@ -50,11 +51,11 @@ class ProductViewSetTestCase(TestCase):
     def test_response_serializer_class(self):
         self.viewset.action = "create"
         response_serializer = self.viewset.get_response_serializer()
-        self.assertEqual(response_serializer, ProductDetailSerializer)
+        self.assertEqual(response_serializer, ProductRetrieveSerializer)
 
         self.viewset.action = "update"
         response_serializer = self.viewset.get_response_serializer()
-        self.assertEqual(response_serializer, ProductDetailSerializer)
+        self.assertEqual(response_serializer, ProductRetrieveSerializer)
 
     def test_custom_action_serializers(self):
         self.viewset.action = "reviews"
@@ -72,7 +73,7 @@ class ProductViewSetTestCase(TestCase):
     def test_get_serializer_for_schema(self):
         schema_info = self.viewset.get_serializer_for_schema("create")
         self.assertEqual(schema_info["request"], ProductWriteSerializer)
-        self.assertEqual(schema_info["response"], ProductDetailSerializer)
+        self.assertEqual(schema_info["response"], ProductRetrieveSerializer)
 
         schema_info = self.viewset.get_serializer_for_schema("list")
         self.assertEqual(schema_info["request"], ProductSerializer)
@@ -120,11 +121,11 @@ class ProductViewSetTestCase(TestCase):
 
     def test_response_serializers_configuration(self):
         expected_responses = {
-            "create": ProductDetailSerializer,
+            "create": ProductRetrieveSerializer,
             "list": ProductSerializer,
-            "retrieve": ProductDetailSerializer,
-            "update": ProductDetailSerializer,
-            "partial_update": ProductDetailSerializer,
+            "retrieve": ProductRetrieveSerializer,
+            "update": ProductRetrieveSerializer,
+            "partial_update": ProductRetrieveSerializer,
             "update_view_count": ProductDetailSerializer,
             "reviews": ProductReviewSerializer,
             "images": ProductImageSerializer,

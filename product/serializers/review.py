@@ -42,6 +42,7 @@ class ProductReviewSerializer(
     # the account serializer carries email/phone/address/birth_date.
     user = UserPublicSerializer(read_only=True)
     product = ProductBriefSerializer(read_only=True)
+    is_verified_purchase = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = ProductReview
@@ -50,6 +51,7 @@ class ProductReviewSerializer(
             "product",
             "user",
             "rate",
+            "is_verified_purchase",
             "status",
             "is_published",
             "created_at",
@@ -75,6 +77,7 @@ class ProductReviewDetailSerializer(
     # the account serializer carries email/phone/address/birth_date.
     user = UserPublicSerializer(read_only=True)
     product = ProductSerializer(read_only=True)
+    is_verified_purchase = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = ProductReview
@@ -83,6 +86,7 @@ class ProductReviewDetailSerializer(
             "product",
             "user",
             "rate",
+            "is_verified_purchase",
             "status",
             "is_published",
             "created_at",

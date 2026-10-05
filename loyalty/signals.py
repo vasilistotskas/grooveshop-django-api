@@ -6,8 +6,14 @@ from django.db import transaction
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import Signal, receiver
 
+from order.enum.status import OrderStatus
 from order.models.order import Order
-from order.signals import order_canceled, order_completed, order_refunded
+from order.signals import (
+    order_canceled,
+    order_completed,
+    order_refunded,
+    order_status_changed,
+)
 from tenant.celery import dispatch_on_commit
 from user.models.account import UserAccount
 
@@ -114,6 +120,45 @@ def handle_order_refunded_loyalty(
 
             order_id = order.id
             dispatch_on_commit(reverse_order_points, [order_id])
+    except Exception:
+        logger.exception(
+            "Failed to queue loyalty reversal for order %s", order.id
+        )
+
+
+@receiver(
+    order_status_changed,
+    dispatch_uid="loyalty.handle_order_status_refunded_loyalty",
+)
+def handle_order_status_refunded_loyalty(
+    sender: type[Order],
+    order: Order,
+    new_status: str | None = None,
+    **kwargs: Any,
+) -> None:
+    """Reverse earned points when the order STATUS becomes REFUNDED.
+
+    The refund paths (``OrderService.refund_order``, the Stripe and Viva
+    webhooks) move ``payment_status`` and send ``order_refunded``; the
+    order status stays put, and ``RETURNED`` -> ``REFUNDED`` is a
+    separate, manual step that sends nothing. Without this receiver
+    that step left the points standing.
+
+    Calls the reversal directly rather than re-sending ``order_refunded``:
+    that signal also drives the refund email, the live toast, the gift
+    card credit and the Meta ``Refund`` event, which already fired when
+    the money moved. ``reverse_order_points`` is idempotent (it skips an
+    order that already has ADJUST rows, under the user-row lock), so a
+    refund that reversed first makes this a no-op. ``RETURNED`` alone
+    reverses nothing: the documented money event is the refund.
+    """
+    if (new_status or order.status) != OrderStatus.REFUNDED:
+        return
+    try:
+        if order.user_id:
+            from loyalty.tasks import reverse_order_points
+
+            dispatch_on_commit(reverse_order_points, [order.id])
     except Exception:
         logger.exception(
             "Failed to queue loyalty reversal for order %s", order.id

@@ -19450,3 +19450,36 @@ msgstr ""
 #~| msgid "Thank you for shopping with us!"
 #~ msgid "Thank you for staying connected with %(site_name)s!"
 #~ msgstr "Thank you for shopping with us!"
+
+#: .\cart\serializers\cart.py:32
+msgid ""
+"VAT contained in total_price once promotion_discount is taken off. A price "
+"discount reduces the taxable base, so this is the figure the invoice will "
+"carry. Loyalty points are redeemed against the order and are not reflected "
+"here."
+msgstr ""
+
+#: .\order\filters.py:143
+msgid "Filter by payment method key (case-insensitive)"
+msgstr ""
+
+#: .\pay_way\filters.py:76
+msgid "Filter by payment method key"
+msgstr ""
+
+#: .\pay_way\models.py:88
+msgid "Key"
+msgstr ""
+
+#: .\pay_way\models.py:95
+msgid ""
+"Language-independent identifier of the payment method. The storefront "
+"resolves its label from this key, so it never depends on which languages the"
+" store has translated."
+msgstr ""
+
+#: .\promotion\serializers.py:349
+msgid ""
+"Whether the code is reserved for this customer (assigned to their account or"
+" email) rather than offered to everyone."
+msgstr ""

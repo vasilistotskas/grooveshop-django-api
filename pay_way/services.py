@@ -256,10 +256,7 @@ class PayWayService:
                 PaySettlement(pay_way.settlement)
                 != PaySettlement.OFFLINE_TRANSFER
             ):
-                order.payment_method = (
-                    pay_way.safe_translation_getter("name", any_language=True)
-                    or ""
-                )
+                order.payment_method = pay_way.key
                 order.payment_status = PaymentStatus.PENDING
                 order.payment_id = payment_data["payment_id"]
                 order.save(
@@ -317,9 +314,7 @@ class PayWayService:
                 order.payment_id,
             ):
                 raise OrderChangedDuringPaymentError(order.id)
-            locked.payment_method = (
-                pay_way.safe_translation_getter("name", any_language=True) or ""
-            )
+            locked.payment_method = pay_way.key
             locked.payment_status = payment_data.get(
                 "status", PaymentStatus.PROCESSING
             )

@@ -64,6 +64,11 @@ class PromotionCode(TimeStampMixinModel):
     def __str__(self):
         return self.code
 
+    @property
+    def is_personal(self) -> bool:
+        """Whether the code is reserved for one customer (id or email)."""
+        return self.assigned_to_id is not None or bool(self.assigned_to_email)
+
     def save(self, *args, **kwargs):
         self.code = self.code.strip().upper()
         super().save(*args, **kwargs)

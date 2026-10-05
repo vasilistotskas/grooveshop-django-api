@@ -21909,3 +21909,45 @@ msgstr "ΦΠΑ %(value)s%%"
 
 #~ msgid "Edge cache — Cloudflare"
 #~ msgstr "Cache στο Cloudflare"
+
+#: .\cart\serializers\cart.py:32
+msgid ""
+"VAT contained in total_price once promotion_discount is taken off. A price "
+"discount reduces the taxable base, so this is the figure the invoice will "
+"carry. Loyalty points are redeemed against the order and are not reflected "
+"here."
+msgstr ""
+"ΦΠΑ που περιέχεται στο total_price αφού αφαιρεθεί το promotion_discount. Μια"
+" έκπτωση τιμής μειώνει τη φορολογητέα βάση, οπότε αυτό είναι το ποσό που θα "
+"φέρει το τιμολόγιο. Οι πόντοι επιβράβευσης εξαργυρώνονται στην παραγγελία "
+"και δεν αντικατοπτρίζονται εδώ."
+
+#: .\order\filters.py:143
+msgid "Filter by payment method key (case-insensitive)"
+msgstr "Φίλτρο ανά κλειδί τρόπου πληρωμής (χωρίς διάκριση πεζών-κεφαλαίων)"
+
+#: .\pay_way\filters.py:76
+msgid "Filter by payment method key"
+msgstr "Φίλτρο ανά κλειδί τρόπου πληρωμής"
+
+#: .\pay_way\models.py:88
+msgid "Key"
+msgstr "Κλειδί"
+
+#: .\pay_way\models.py:95
+msgid ""
+"Language-independent identifier of the payment method. The storefront "
+"resolves its label from this key, so it never depends on which languages the"
+" store has translated."
+msgstr ""
+"Αναγνωριστικό του τρόπου πληρωμής ανεξάρτητο από τη γλώσσα. Το storefront "
+"παίρνει την ετικέτα του από αυτό το κλειδί, ώστε να μην εξαρτάται ποτέ από "
+"το ποιες γλώσσες έχει μεταφράσει το κατάστημα."
+
+#: .\promotion\serializers.py:349
+msgid ""
+"Whether the code is reserved for this customer (assigned to their account or"
+" email) rather than offered to everyone."
+msgstr ""
+"Αν ο κωδικός είναι δεσμευμένος για αυτόν τον πελάτη (αντιστοιχισμένος στον "
+"λογαριασμό ή το email του) αντί να προσφέρεται σε όλους."

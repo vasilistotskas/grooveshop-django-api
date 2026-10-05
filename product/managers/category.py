@@ -67,6 +67,37 @@ class CategoryQuerySet(TreeTranslatableQuerySet):
 
         return self.annotate(_products_count=Count("products", distinct=True))
 
+    def with_recursive_product_count(self) -> Self:
+        """Annotate ``_recursive_product_count``.
+
+        Active, non-deleted products of the category and of every
+        descendant — what ``?category=`` on the product list returns
+        for that id, so a tile's number matches the page it links to.
+        One correlated COUNT using the MPTT containment test (same tree,
+        ``lft``/``rght`` inside the row's), not a query per row.
+        """
+        from django.db.models import Count, OuterRef, Subquery, Value
+        from django.db.models.functions import Coalesce
+
+        from product.models.product import Product
+
+        in_subtree = (
+            Product.objects.active()
+            .filter(
+                category__tree_id=OuterRef("tree_id"),
+                category__lft__gte=OuterRef("lft"),
+                category__rght__lte=OuterRef("rght"),
+            )
+            .order_by()
+            .annotate(_group=Value(1))
+            .values("_group")
+            .annotate(total=Count("pk"))
+            .values("total")
+        )
+        return self.annotate(
+            _recursive_product_count=Coalesce(Subquery(in_subtree), 0)
+        )
+
     def with_main_image(self) -> Self:
         """Prefetch only the MAIN image to avoid N+1 in main_image_path.
 
@@ -94,9 +125,15 @@ class CategoryQuerySet(TreeTranslatableQuerySet):
         """
         Optimized queryset for list views.
 
-        Includes translations, parent and the main image.
+        Includes translations, parent, the main image and the recursive
+        product count.
         """
-        return self.with_translations().with_parent().with_main_image()
+        return (
+            self.with_translations()
+            .with_parent()
+            .with_main_image()
+            .with_recursive_product_count()
+        )
 
     def for_detail(self) -> Self:
         """

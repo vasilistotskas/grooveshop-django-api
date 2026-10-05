@@ -19,7 +19,6 @@ available_languages = [
 
 class PayWayTranslationFactory(factory.django.DjangoModelFactory):
     language_code = factory.Iterator(available_languages)
-    name = factory.Iterator([choice.value for choice in PayWayEnum])
     description = factory.Faker(
         "random_element",
         elements=[
@@ -50,7 +49,7 @@ class PayWayTranslationFactory(factory.django.DjangoModelFactory):
 
     class Meta:
         model = apps.get_model("pay_way", "PayWayTranslation")
-        django_get_or_create = ("language_code", "master", "name")
+        django_get_or_create = ("language_code", "master")
 
 
 def generate_provider_data():
@@ -92,6 +91,7 @@ class PayWayFactory(factory.django.DjangoModelFactory):
     # calls into generate_provider_data(), which handed out incoherent
     # rows — an offline code marked is_online_payment=True (which then
     # failed at checkout with "Unknown payment provider").
+    key = factory.Iterator([choice.value for choice in PayWayEnum])
     provider_data = factory.LazyFunction(generate_provider_data)
     provider_code = factory.LazyAttribute(
         lambda o: o.provider_data["provider_code"]

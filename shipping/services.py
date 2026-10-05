@@ -396,10 +396,7 @@ class ShippingService:
                 {
                     "id": pay_way.pk,
                     # The KEY, not a label — see the serializer.
-                    "name": pay_way.safe_translation_getter(
-                        "name", any_language=True
-                    )
-                    or "",
+                    "key": pay_way.key,
                 }
                 for pay_way in queryset.order_by("sort_order", "id")
             ]

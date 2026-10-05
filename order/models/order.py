@@ -620,7 +620,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         # (``for_list``/``for_detail`` select_related it) and costs one
         # query on a write path that only set ``pay_way_id``.
         pay_way = self.pay_way
-        key = pay_way.safe_translation_getter("name", any_language=True) or ""
+        key = pay_way.key
         if key == self.pay_way_key:
             return False
 

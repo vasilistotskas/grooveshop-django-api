@@ -10,6 +10,7 @@ from django.db.models import (
     F,
     FloatField,
     Prefetch,
+    Q,
     Value,
     When,
 )
@@ -20,9 +21,13 @@ from core.managers import (
     TranslatableOptimizedQuerySet,
 )
 from core.mixins import SoftDeleteQuerySetMixin
+from product.enum.review import ReviewStatus
 
 if TYPE_CHECKING:
     from typing import Self
+
+
+_APPROVED_REVIEW = Q(reviews__status=ReviewStatus.TRUE)
 
 
 class ProductQuerySet(
@@ -41,14 +46,23 @@ class ProductQuerySet(
         return self.annotate(likes_count=Count("favourited_by", distinct=True))
 
     def with_reviews_count(self) -> Self:
-        """Annotate with reviews count."""
-        return self.annotate(reviews_count=Count("reviews", distinct=True))
+        """Annotate with the count of approved reviews.
+
+        Approved only, like every public review surface
+        (``ProductReviewQuerySet.visible_to``): a pending or rejected
+        review must not move the number a shopper sees.
+        """
+        return self.annotate(
+            reviews_count=Count(
+                "reviews", filter=_APPROVED_REVIEW, distinct=True
+            )
+        )
 
     def with_review_average(self) -> Self:
-        """Annotate with average review rating."""
+        """Annotate with the average rating of approved reviews."""
         return self.annotate(
             review_average=Coalesce(
-                Avg("reviews__rate"),
+                Avg("reviews__rate", filter=_APPROVED_REVIEW),
                 Value(0.0, output_field=FloatField()),
             )
         )

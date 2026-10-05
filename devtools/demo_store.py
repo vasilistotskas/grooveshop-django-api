@@ -2421,11 +2421,10 @@ def seed_pay_ways() -> dict[str, int]:
     if not _current_tenant_is_demo():
         return {"skipped_not_a_demo_tenant": 1}
 
-    # ``distinct``: the name join fans out once per translated language.
     ids = list(
-        PayWay.objects.filter(translations__name=PayWayEnum.PAY_ON_DELIVERY)
-        .values_list("id", flat=True)
-        .distinct()
+        PayWay.objects.filter(key=PayWayEnum.PAY_ON_DELIVERY).values_list(
+            "id", flat=True
+        )
     )
     # Amount AND currency, spelled out: ``PayWay.objects`` is not
     # djmoney-patched, so a ``Money`` here would reach the amount column

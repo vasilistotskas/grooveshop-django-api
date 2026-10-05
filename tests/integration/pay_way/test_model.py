@@ -2,6 +2,7 @@ from django.conf import settings
 from django.test import TestCase
 from djmoney.money import Money
 
+from pay_way.enum.pay_way import PayWayEnum
 from pay_way.enum.settlement import PaySettlement
 from pay_way.models import PayWay
 
@@ -16,11 +17,11 @@ class PayWayModelTestCase(TestCase):
             active=True,
             cost=Money(0, settings.DEFAULT_CURRENCY),
             free_threshold=Money(100, settings.DEFAULT_CURRENCY),
+            key=PayWayEnum.CREDIT_CARD,
             provider_code="stripe",
             settlement=PaySettlement.ONLINE,
         )
         self.credit_card.set_current_language("en")
-        self.credit_card.name = "Credit Card"
         self.credit_card.description = "Pay with credit card"
         self.credit_card.instructions = "Enter your card details"
         self.credit_card.save()
@@ -29,12 +30,12 @@ class PayWayModelTestCase(TestCase):
             active=True,
             cost=Money(0, settings.DEFAULT_CURRENCY),
             free_threshold=Money(0, settings.DEFAULT_CURRENCY),
+            key=PayWayEnum.BANK_TRANSFER,
             provider_code="",
             settlement=PaySettlement.OFFLINE_TRANSFER,
             sort_order=1,
         )
         self.bank_transfer.set_current_language("en")
-        self.bank_transfer.name = "Bank Transfer"
         self.bank_transfer.description = "Pay via bank transfer"
         self.bank_transfer.instructions = "Transfer to Account: 123456789"
         self.bank_transfer.save()
@@ -43,19 +44,25 @@ class PayWayModelTestCase(TestCase):
             active=True,
             cost=Money(5, settings.DEFAULT_CURRENCY),
             free_threshold=Money(50, settings.DEFAULT_CURRENCY),
+            key=PayWayEnum.PAY_ON_DELIVERY,
             provider_code="",
             settlement=PaySettlement.COURIER_CASH,
             sort_order=2,
         )
         self.pay_on_delivery.set_current_language("en")
-        self.pay_on_delivery.name = "Pay On Delivery"
         self.pay_on_delivery.description = "Pay when your order is delivered"
         self.pay_on_delivery.save()
 
     def test_pay_way_str(self):
-        self.assertEqual(str(self.credit_card), "Credit Card")
-        self.assertEqual(str(self.bank_transfer), "Bank Transfer")
-        self.assertEqual(str(self.pay_on_delivery), "Pay On Delivery")
+        self.assertEqual(
+            str(self.credit_card), str(PayWayEnum.CREDIT_CARD.label)
+        )
+        self.assertEqual(
+            str(self.bank_transfer), str(PayWayEnum.BANK_TRANSFER.label)
+        )
+        self.assertEqual(
+            str(self.pay_on_delivery), str(PayWayEnum.PAY_ON_DELIVERY.label)
+        )
 
     def test_pay_way_ordering(self):
         pay_ways = list(PayWay.objects.all())
@@ -65,18 +72,25 @@ class PayWayModelTestCase(TestCase):
 
     def test_pay_way_translations(self):
         self.credit_card.set_current_language("en")
-        self.assertEqual(self.credit_card.name, "Credit Card")
         self.assertEqual(self.credit_card.description, "Pay with credit card")
 
         self.bank_transfer.set_current_language("de")
-        self.bank_transfer.name = "Banküberweisung"
+        self.bank_transfer.description = "Per Überweisung zahlen"
         self.bank_transfer.save()
 
         self.bank_transfer.set_current_language("de")
-        self.assertEqual(str(self.bank_transfer), "Banküberweisung")
-
+        self.assertEqual(
+            self.bank_transfer.description, "Per Überweisung zahlen"
+        )
         self.bank_transfer.set_current_language("en")
-        self.assertEqual(str(self.bank_transfer), "Bank Transfer")
+        self.assertEqual(
+            self.bank_transfer.description, "Pay via bank transfer"
+        )
+
+    def test_key_does_not_depend_on_the_language(self):
+        for language in ("el", "en", "de"):
+            self.bank_transfer.set_current_language(language)
+            self.assertEqual(self.bank_transfer.key, PayWayEnum.BANK_TRANSFER)
 
     def test_settlement_is_the_stored_truth(self):
         self.assertEqual(self.credit_card.settlement, PaySettlement.ONLINE)

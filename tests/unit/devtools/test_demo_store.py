@@ -1209,12 +1209,10 @@ class TestPayWays:
         PayWay.objects.all().delete()
 
     @staticmethod
-    def _pay_way(name, cost, provider_code):
+    def _pay_way(key, cost, provider_code):
         from pay_way.models import PayWay
 
-        pay_way = PayWay(cost=cost, provider_code=provider_code)
-        pay_way.set_current_language("el")
-        pay_way.name = name
+        pay_way = PayWay(cost=cost, provider_code=provider_code, key=key)
         pay_way.save()
         return pay_way
 

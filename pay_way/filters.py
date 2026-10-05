@@ -8,6 +8,7 @@ from core.filters.core import (
     TimeStampFilterMixin,
     UUIDFilterMixin,
 )
+from pay_way.enum.pay_way import PayWayEnum
 from pay_way.enum.settlement import PaySettlement
 from pay_way.models import PayWay
 
@@ -69,10 +70,10 @@ class PayWayFilter(
         field_name="requires_confirmation",
         help_text=_("Filter by confirmation requirement"),
     )
-    name = filters.CharFilter(
-        field_name="translations__name",
-        lookup_expr="icontains",
-        help_text=_("Filter by name (partial match)"),
+    key = filters.ChoiceFilter(
+        field_name="key",
+        choices=PayWayEnum.choices,
+        help_text=_("Filter by payment method key"),
     )
     description = filters.CharFilter(
         field_name="translations__description",

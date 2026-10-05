@@ -30,7 +30,6 @@ are documented in ``INVOICE_SELLER_SETTING_KEYS`` below.
 from __future__ import annotations
 
 import logging
-from collections import defaultdict
 from decimal import Decimal
 from typing import Any
 
@@ -44,7 +43,11 @@ from extra_settings.models import Setting
 
 from core.utils.i18n import get_order_language
 from core.utils.tenant_urls import get_tenant_frontend_url
-from order.discounts import discounted_line_gross, order_discount_total
+from order.discounts import (
+    discounted_line_gross,
+    order_discount_total,
+    vat_buckets,
+)
 from order.models.invoice import Invoice, InvoiceCounter
 from order.models.order import Order
 from pay_way.enum.pay_way import PayWayEnum
@@ -134,44 +137,25 @@ def _compute_vat_breakdown(order: Order) -> list[dict[str, Any]]:
     the lines first — VAT is owed on what the customer actually paid.
     Gift-card amounts are payment, never allocated (order/discounts.py).
     """
-    buckets: dict[Decimal, dict[str, Decimal]] = defaultdict(
-        lambda: {
-            "subtotal": Decimal(0),
-            "vat": Decimal(0),
-            "gross": Decimal(0),
-        }
-    )
-
     items = list(order.items.select_related("product__vat").all())
     line_gross_by_pk = discounted_line_gross(order, items)
 
+    lines = []
     for item in items:
-        line_gross = line_gross_by_pk[item.pk]
-
         rate = Decimal(0)
         if item.product and item.product.vat_id:
             rate = Decimal(item.product.vat.value)
-
-        # Item prices are VAT-inclusive (final prices), so back out the
-        # VAT component: subtotal = gross / (1 + rate/100).
-        divisor = Decimal(1) + rate / Decimal(100)
-        line_subtotal = (line_gross / divisor) if divisor else line_gross
-        line_vat = line_gross - line_subtotal
-
-        bucket = buckets[rate]
-        bucket["subtotal"] += line_subtotal
-        bucket["vat"] += line_vat
-        bucket["gross"] += line_gross
+        lines.append((line_gross_by_pk[item.pk], rate))
 
     # Stable ordering — highest rate first is the Greek convention.
     return [
         {
             "rate": str(rate),
-            "subtotal": str(values["subtotal"].quantize(Decimal("0.01"))),
-            "vat": str(values["vat"].quantize(Decimal("0.01"))),
-            "gross": str(values["gross"].quantize(Decimal("0.01"))),
+            "subtotal": str(values["subtotal"]),
+            "vat": str(values["vat"]),
+            "gross": str(values["gross"]),
         }
-        for rate, values in sorted(buckets.items(), reverse=True)
+        for rate, values in sorted(vat_buckets(lines).items(), reverse=True)
     ]
 
 

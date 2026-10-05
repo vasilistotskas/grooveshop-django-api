@@ -137,10 +137,10 @@ class OrderFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
         help_text=_("Filter by region name (case-insensitive)"),
     )
 
-    pay_way__name = filters.CharFilter(
-        field_name="pay_way__translations__name",
+    pay_way__key = filters.CharFilter(
+        field_name="pay_way__key",
         lookup_expr="icontains",
-        help_text=_("Filter by payment method name (case-insensitive)"),
+        help_text=_("Filter by payment method key (case-insensitive)"),
     )
     pay_way__is_online_payment = filters.BooleanFilter(
         field_name="pay_way__is_online_payment",

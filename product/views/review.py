@@ -17,9 +17,8 @@ from core.utils.serializers import (
     create_schema_view_config,
     crud_config,
 )
-from order.enum.status import OrderStatus
-from order.models.item import OrderItem
 from product.filters.review import ProductReviewFilter
+from product.managers.review import purchase_items
 from product.models.review import ProductReview
 from product.serializers.product import ProductSerializer
 from product.serializers.review import (
@@ -123,12 +122,7 @@ class ProductReviewViewSet(BaseModelViewSet):
 
     def perform_create(self, serializer):
         product = serializer.validated_data["product"]
-        has_purchase = OrderItem.objects.filter(
-            order__user=self.request.user,
-            order__status=OrderStatus.COMPLETED,
-            product=product,
-        ).exists()
-        if not has_purchase:
+        if not purchase_items(user=self.request.user, product=product).exists():
             raise ValidationError({"product": _("must_have_purchased")})
         serializer.save(user=self.request.user)
 
@@ -137,7 +131,7 @@ class ProductReviewViewSet(BaseModelViewSet):
         user_id = request.user.id
 
         try:
-            review = ProductReview.objects.get(
+            review = ProductReview.objects.with_verified_purchase().get(
                 user_id=user_id, product_id=kwargs["pk"]
             )
             response_serializer_class = self.get_response_serializer()

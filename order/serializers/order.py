@@ -25,6 +25,7 @@ from pay_way.enum.pay_way import PayWayEnum
 from pay_way.enum.settlement import PaySettlement
 from pay_way.models import PayWay
 from region.models import Region
+from shipping.enum import ShippingKind
 from shipping_acs.serializers.shipment import AcsShipmentDetailSerializer
 from shipping_boxnow.serializers.shipment import (
     BoxNowShipmentDetailSerializer,
@@ -98,6 +99,12 @@ class OrderAttributionInputSerializer(serializers.Serializer):
             "over UCP or ACP."
         ),
     )
+
+
+class OrderDeliveryMethodSerializer(serializers.Serializer):
+    provider_code = serializers.CharField(allow_null=True)
+    provider_name = serializers.CharField(allow_null=True)
+    kind = serializers.ChoiceField(choices=ShippingKind.choices)
 
 
 class OrderSerializer(serializers.ModelSerializer[Order]):
@@ -189,6 +196,15 @@ class OrderSerializer(serializers.ModelSerializer[Order]):
             "is ~4 days)."
         ),
     )
+    delivery_method = serializers.SerializerMethodField(
+        help_text=(
+            "How the order is delivered: the carrier (code and display "
+            "name, null for a legacy order handled outside any provider) "
+            "and the generic fulfilment kind (home delivery or pickup "
+            "point). On the list too, so order history can label a row "
+            "without opening it."
+        )
+    )
     can_be_canceled = serializers.BooleanField(read_only=True)
     is_paid = serializers.BooleanField(read_only=True)
     attribution = OrderAttributionSerializer(
@@ -207,6 +223,15 @@ class OrderSerializer(serializers.ModelSerializer[Order]):
     @extend_schema_field({"type": "string"})
     def get_payment_status_display(self, order: Order) -> str:
         return order.get_payment_status_display()
+
+    @extend_schema_field(OrderDeliveryMethodSerializer)
+    def get_delivery_method(self, order: Order) -> dict[str, str | None]:
+        provider = order.shipping_provider
+        return {
+            "provider_code": provider.code if provider else None,
+            "provider_name": provider.name if provider else None,
+            "kind": order.shipping_kind,
+        }
 
     @extend_schema_field({"type": "boolean"})
     def get_is_online_payment(self, order: Order) -> bool:
@@ -279,6 +304,7 @@ class OrderSerializer(serializers.ModelSerializer[Order]):
             "pay_way_key",
             "is_online_payment",
             "is_collected_on_delivery",
+            "delivery_method",
             "can_be_canceled",
             "is_paid",
             "attribution",
@@ -310,6 +336,7 @@ class OrderSerializer(serializers.ModelSerializer[Order]):
             "is_paid",
             "is_online_payment",
             "is_collected_on_delivery",
+            "delivery_method",
             "attribution",
             # Derived: ``Order.save()`` owns this column. Writable
             # would let a client pin a key that contradicts ``pay_way``
@@ -357,6 +384,14 @@ class OrderDetailSerializer(OrderSerializer):
             "/ acs_shipment.  Returns the active provider's detail "
             "serializer dict (shape depends on the provider) or null "
             "when no shipment exists."
+        )
+    )
+    loyalty_points_to_earn = serializers.SerializerMethodField(
+        help_text=(
+            "Loyalty points this order earns its customer: the points "
+            "actually awarded once the order has been credited, the "
+            "projection before that. 0 when the program is off, the "
+            "order has no account, or it was canceled or refunded."
         )
     )
     shipment_provider_code = serializers.SerializerMethodField(
@@ -545,6 +580,12 @@ class OrderDetailSerializer(OrderSerializer):
         ``acs_shipment``) should consume this one.
         """
         return self._serialized_shipment(obj)
+
+    @extend_schema_field({"type": "integer"})
+    def get_loyalty_points_to_earn(self, obj: Order) -> int:
+        from loyalty.services import LoyaltyService
+
+        return LoyaltyService.get_order_points(obj)
 
     @extend_schema_field({"type": "string", "nullable": True})
     def get_shipment_provider_code(self, obj: Order) -> str | None:
@@ -865,6 +906,7 @@ class OrderDetailSerializer(OrderSerializer):
             "acs_shipment",
             "shipment",
             "shipment_provider_code",
+            "loyalty_points_to_earn",
             "cancellation",
             "applied_coupon_codes",
             "phone",
@@ -892,6 +934,7 @@ class OrderDetailSerializer(OrderSerializer):
             "acs_shipment",
             "shipment",
             "shipment_provider_code",
+            "loyalty_points_to_earn",
         )
 
 

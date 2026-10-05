@@ -409,6 +409,33 @@ class TestCandidateSet:
 
         assert codes == {"PUBLIC", "MINE"}
 
+    def test_serializer_flags_personal_codes_only(
+        self, make_cart, enable_promotions
+    ):
+        """The picker's ``personal`` field is what drives the "Yours"
+        badge: true for an assigned code, false for a public one."""
+        from promotion.serializers import CartCouponSerializer
+
+        user = UserAccountFactory()
+        cart, _products = make_cart([(50, 1)], user=user)
+        promotion, _code = _coded("PUBLIC")
+        PromotionCodeFactory(promotion=promotion, code="MINE", assigned_to=user)
+        PromotionCodeFactory(
+            promotion=promotion,
+            code="BYMAIL",
+            assigned_to_email=user.email,
+        )
+
+        data = CartCouponSerializer(
+            CouponPickerService.available(cart, user=user), many=True
+        ).data
+
+        assert {row["code"]: row["personal"] for row in data} == {
+            "PUBLIC": False,
+            "MINE": True,
+            "BYMAIL": True,
+        }
+
     def test_matches_a_personal_coupon_assigned_by_email(
         self, make_cart, enable_promotions
     ):

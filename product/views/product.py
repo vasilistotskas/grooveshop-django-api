@@ -28,6 +28,7 @@ from product.models.review import ProductReview
 from product.serializers.image import ProductImageSerializer
 from product.serializers.product import (
     ProductDetailSerializer,
+    ProductRetrieveSerializer,
     ProductSerializer,
     ProductWriteSerializer,
 )
@@ -40,7 +41,7 @@ from tenant.membership import is_store_staff
 serializers_config: SerializersConfig = {
     **crud_config(
         list=ProductSerializer,
-        detail=ProductDetailSerializer,
+        detail=ProductRetrieveSerializer,
         write=ProductWriteSerializer,
     ),
     "update_view_count": ActionConfig(
@@ -291,15 +292,13 @@ class ProductViewSet(BaseModelViewSet):
         # ``.all()`` and quietly published reviews an admin had rejected
         # as spam, plus reviews never approved, to anonymous callers.
         #
-        # select_related("user") avoids N+1 for UserPublicSerializer.
-        # prefetch_related("translations") avoids N+1 for the parler
-        # TranslatableModelSerializer (one extra query per review
-        # otherwise, as parler fetches the translation row lazily).
+        # ``for_list`` carries every relation the review serializer
+        # reads (user, translations, the product brief with its main
+        # image) so the page costs the same queries at any size.
         return (
-            ProductReview.objects.filter(product=product)
+            ProductReview.objects.for_list()
+            .filter(product=product)
             .visible_to(self.request.user)
-            .select_related("user")
-            .prefetch_related("translations")
         )
 
     @property

@@ -50,10 +50,35 @@ def seed():
         class connection:
             alias = "default"
 
+    class _KeyCarryingTranslations:
+        """Stand in for the translated ``name`` column 0029 dropped.
+
+        0019 still writes the key as an ``el`` translation name, and a
+        fresh tenant then runs 0029, which moves it onto the row. The
+        current ``PayWayTranslation`` has no ``name``, so the write is
+        replayed as 0029's outcome: the key on the row.
+        """
+
+        def using(self, _alias):
+            return self
+
+        def get_or_create(self, master, language_code, defaults):
+            PayWay.objects.filter(pk=master.pk).update(key=defaults["name"])
+            return None, True
+
+    class _ApplyingMigrationsApps:
+        def __init__(self, real_apps):
+            self._real = real_apps
+
+        def get_model(self, app_label, model_name):
+            if model_name == "PayWayTranslation":
+                return type("T", (), {"objects": _KeyCarryingTranslations()})
+            return self._real.get_model(app_label, model_name)
+
     def _run():
         from django.apps import apps
 
-        seeder.seed_pay_ways(apps, _SchemaEditor)
+        seeder.seed_pay_ways(_ApplyingMigrationsApps(apps), _SchemaEditor)
 
         # Re-assert what the HISTORICAL model would have written.
         #
@@ -143,7 +168,7 @@ class TestFreshTenantSeeding:
                     f"order.payment.get_payment_provider: {exc}"
                 )
 
-    def test_names_are_enum_keys_the_storefront_can_translate(self, seed):
+    def test_keys_are_enum_keys_the_storefront_can_translate(self, seed):
         """The storefront renders ``payment_methods.<KEY>`` from its locale.
 
         Storing a display string here would surface a raw label that
@@ -156,10 +181,9 @@ class TestFreshTenantSeeding:
 
         valid = set(PayWayEnum.values)
         for pay_way in PayWay.objects.all():
-            name = pay_way.safe_translation_getter(
-                "name", language_code="el", any_language=False
+            assert pay_way.key in valid, (
+                f"{pay_way.provider_code} -> {pay_way.key!r}"
             )
-            assert name in valid, f"{pay_way.provider_code} -> {name!r}"
 
 
 @pytest.mark.django_db
@@ -173,9 +197,7 @@ class TestExistingTenantIsUntouched:
             active=True,
             settlement=PaySettlement.ONLINE,
         )
-        live.set_current_language("el")
-        live.name = "CREDIT_CARD"
-        live.save()
+        PayWay.objects.filter(pk=live.pk).update(key="CREDIT_CARD")
 
         seed()
 

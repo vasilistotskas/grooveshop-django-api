@@ -13,6 +13,7 @@ from pay_way.admin import (
     PaymentTypeFilter,
     PayWayAdmin,
 )
+from pay_way.enum.pay_way import PayWayEnum
 from pay_way.enum.settlement import PaySettlement
 from pay_way.models import PayWay
 
@@ -170,9 +171,9 @@ class PayWayAdminTestCase(TestCase):
             active=True,
             sort_order=1,
             provider_code="PAYPAL",
+            key=PayWayEnum.PAY_PAL,
         )
         self.payway.set_current_language("en")
-        self.payway.name = "PayPal Payment"
         self.payway.description = "Pay with PayPal"
         self.payway.save()
 
@@ -205,7 +206,7 @@ class PayWayAdminTestCase(TestCase):
 
     def test_search_fields(self):
         expected_fields = [
-            "translations__name",
+            "key",
             "provider_code",
             "translations__description",
             "translations__instructions",
@@ -236,7 +237,7 @@ class PayWayAdminTestCase(TestCase):
     def test_name_display(self):
         result = self.admin.name_display(self.payway)
 
-        self.assertEqual(result[0], "PayPal Payment")
+        self.assertEqual(result[0], str(PayWayEnum.PAY_PAL.label))
 
     def test_provider_code_display(self):
         result = self.admin.provider_code_display(self.payway)

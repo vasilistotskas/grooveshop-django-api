@@ -58,7 +58,7 @@ class PayWayViewSet(BaseModelViewSet):
     ordering = ["sort_order", "-created_at"]
     search_fields = [
         "provider_code",
-        "translations__name",
+        "key",
         "translations__description",
         "translations__instructions",
     ]

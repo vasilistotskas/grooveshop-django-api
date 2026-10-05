@@ -3,6 +3,26 @@
 
 
 
+## v3.99.0 (2026-10-05)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.98.0 [skip ci] ([`b9c7f7e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b9c7f7e84794ee455b871edc2d8e329723d98073))
+
+### Features
+
+* feat(product): public brand list for the storefront's brand filter (#118)
+
+The PLP brand filter (search `brands=` + the `brand` facet, keyed by id)
+needs id -> name, and no brand endpoint existed. Mirrors the public
+category list: GET /product/brand (paginated, ordered by name, search
+and ordering on name/id), /product/brand/all (unpaginated, for mapping
+facet ids) and /product/brand/{id}. Only brands with an active product
+are listed, so switched-off feed brands stay private and every facet id
+resolves. Cached like categories, on the products cache surface.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`6111d6d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6111d6d917ea800a610b4f78d14894d6bbfd15fc))
+
 ## v3.98.0 (2026-10-05)
 
 ### Chores

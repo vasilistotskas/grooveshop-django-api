@@ -12,8 +12,11 @@ attribution, trending queries and per-store analytics.
 - **Response bodies are camelCase.** `CamelCaseJSONRenderer` is the global
   default renderer, so a serializer field `estimated_total_hits` goes out as
   `estimatedTotalHits`. A leading underscore is mangled by the renderer
-  (`_formatted` → `formatted`, `_rankingScore` → `rankingScore`), which is
-  why the federated view renames `_federation` to `federation` explicitly.
+  (`_federation` would go out as `Federation`), which is why the search
+  serializers expose Meilisearch's `_formatted` / `_rankingScore` /
+  `_matchesPosition` as plain `formatted` / `ranking_score` /
+  `matches_position` fields, and the federated view renames `_federation`
+  to `federation` explicitly.
 - **Query parameters accept either spelling.** `CamelCaseMiddleWare`
   underscoreizes `request.GET`, so `languageCode` and `language_code` both
   reach the view. The schema advertises the camelCase form.
@@ -52,8 +55,9 @@ tenant-schema row (see `is_platform_superuser`).
 Queries the product and blog indexes in one Meilisearch `multi_search` with
 federation weights **1.0 for products and 0.7 for blog posts**. Those are
 relevance multipliers applied when merging the two result sets — not a fixed
-share of the output. If the blog index is unavailable it is dropped from the
-federation rather than failing the whole search.
+share of the output. When the store's plan has blog off
+(`tenant_plan_allows("blog_enabled")`), the blog index is dropped from the
+federation rather than refusing the request, so product search keeps working.
 
 **Response** (`FederatedSearchResponse`):
 
@@ -81,7 +85,8 @@ federation rather than failing the whole search.
   `weightedRankingScore`).
 
 There is **no `processingTimeMs`** on any search response. Meilisearch
-reports one, but `meili/querysets.py` does not forward it.
+reports one, but the views hand it to the analytics middleware on the
+request (`_record_engine_time`) instead of returning it.
 
 ---
 
@@ -105,7 +110,9 @@ reports one, but `meili/querysets.py` does not forward it.
 | `sort` | string | No | — |
 | `facets` | comma-separated strings | No | — |
 
-`inStock=true` keeps products with stock above zero. `onOffer=true` keeps
+`categories` stands for each category's whole subtree: the view expands the
+ids to every descendant before filtering. `inStock=true` keeps products with
+stock above zero. `onOffer=true` keeps
 products with a markdown (`discountPercent > 0`); promotions are cart-level and
 windowed, so they are deliberately not part of it. `false` is the same as absent;
 anything but true/false/1/0 is a 400.
@@ -184,7 +191,8 @@ Most popular queries from the last 24 hours, cached 5 minutes per
 | `endDate` | `YYYY-MM-DD` | No | now |
 | `contentType` | string | No | — (`product`, `blog_post`, `federated`) |
 
-Both dates are whole days in the store's timezone, and both are included:
+Both dates are whole days in the server's `TIME_ZONE` (Europe/Athens by
+default; there is no per-store timezone), and both are included:
 `endDate=2026-03-12` counts every search made on the 12th. A date that is
 not `YYYY-MM-DD` (a datetime included) or a `startDate` after `endDate` is
 a 400.
@@ -242,9 +250,14 @@ envelope.
 
 ### Rate limiting
 
-The global DRF throttles apply; there are no search-specific scopes.
-Current rates live in `settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]`
-(`anon` and `user`, both daily budgets, disabled when `DEBUG`). DRF returns
+The search, product, blog, federated and trending endpoints carry
+`SearchThrottle` (scope `search`); `/search/click` carries
+`SearchClickThrottle` (scope `search_click`), a budget of its own so clicks
+cannot starve searches. Both are per user or IP
+(`core/api/throttling.py`), and the global `anon` / `user` daily throttles
+apply on top. `/search/analytics` has only the global DRF defaults. Rates
+live in `settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]`, all disabled
+when `DEBUG`. DRF returns
 `429` with a `Retry-After` header — no `X-RateLimit-*` headers are emitted.
 
 ## OpenAPI

@@ -17,7 +17,7 @@ uv run python manage.py meilisearch_enable_experimental --feature containsFilter
 ### Using Meilisearch API Directly
 
 ```bash
-curl -X POST 'http://localhost:7700/experimental-features' \
+curl -X PATCH 'http://localhost:7700/experimental-features' \
   -H 'Content-Type: application/json' \
   -H 'Authorization: Bearer YOUR_MASTER_KEY' \
   --data-binary '{
@@ -32,12 +32,16 @@ curl -X GET 'http://localhost:7700/experimental-features' \
   -H 'Authorization: Bearer YOUR_MASTER_KEY'
 ```
 
-Expected response:
+Expected response (it lists every experimental flag; only this one matters here):
 ```json
 {
-  "containsFilter": true
+  "containsFilter": true,
+  ...
 }
 ```
+
+The flag can also be set at launch with `MEILI_EXPERIMENTAL_CONTAINS_FILTER`
+(`--experimental-contains-filter`).
 
 ## Usage
 
@@ -51,8 +55,8 @@ from product.models import ProductTranslation
 # Find products with "laptop" anywhere in the name
 results = ProductTranslation.meilisearch.filter(name__contains="laptop")
 
-# Find products with "pro" in the description
-results = ProductTranslation.meilisearch.filter(description__contains="pro")
+# Find products whose category name contains "pro"
+results = ProductTranslation.meilisearch.filter(category_name__contains="pro")
 
 # Combine with other filters
 results = ProductTranslation.meilisearch.filter(
@@ -69,8 +73,10 @@ The `__contains` lookup generates Meilisearch filter expressions using the CONTA
 ProductTranslation.meilisearch.filter(name__contains="laptop")
 
 # Generated Meilisearch filter
-"name CONTAINS 'laptop'"
+'name CONTAINS "laptop"'
 ```
+
+The value is wrapped in double quotes, with `\` and `"` backslash-escaped.
 
 ### Case Sensitivity
 
@@ -90,12 +96,19 @@ you pass, not the field it's applied to — any string value is accepted
 regardless of which field it's filtered against. Only a non-string value
 (e.g. an `int`, `bool`, or `None`) raises `TypeError` client-side.
 
+Meilisearch itself only accepts a filter on an attribute listed in the
+index's `filterableAttributes`, i.e. the model's `MeiliMeta.filterable_fields`.
+For `ProductTranslation` the string ones are `name`, `language_code` and
+`category_name` (`category` and `brand` are integer ids; `description` is
+searchable but **not** filterable, and `sku` is not indexed at all). For
+`BlogPostTranslation` they are `title`, `language_code` and `category_name`
+(`body` is not filterable).
+
 ### ✅ Valid Usage
 
 ```python
 # String fields, string values
 ProductTranslation.meilisearch.filter(name__contains="laptop")
-ProductTranslation.meilisearch.filter(description__contains="high-performance")
 BlogPostTranslation.meilisearch.filter(title__contains="guide")
 
 # A string value against a numeric/boolean/date field does NOT raise —
@@ -131,9 +144,9 @@ laptops = ProductTranslation.meilisearch.filter(
     name__contains="laptop", language_code="en"
 )
 
-# Find products with "wireless" in description
+# Find products with "wireless" in the name
 wireless_products = ProductTranslation.meilisearch.filter(
-    description__contains="wireless", active=True
+    name__contains="wireless", active=True
 )
 
 # Find products with model numbers containing "X1"
@@ -150,9 +163,9 @@ tutorials = BlogPostTranslation.meilisearch.filter(
     title__contains="tutorial", is_published=True
 )
 
-# Find posts mentioning "Python" in body
+# Find posts with "Python" in the title (`body` is not filterable)
 python_posts = BlogPostTranslation.meilisearch.filter(
-    body__contains="Python", language_code="en"
+    title__contains="Python", language_code="en"
 )
 ```
 
@@ -170,7 +183,7 @@ results = ProductTranslation.meilisearch.filter(
 
 # Multiple CONTAINS filters
 results = ProductTranslation.meilisearch.filter(
-    name__contains="laptop", description__contains="gaming"
+    name__contains="laptop", category_name__contains="gaming"
 )
 ```
 
@@ -190,7 +203,7 @@ CONTAINS filtering may be slower than exact match or prefix matching, especially
    ```python
    # Better performance
    results = ProductTranslation.meilisearch.filter(
-       category="Computers",  # Narrow down first
+       category=3,  # category id - narrow down first
        name__contains="laptop",  # Then apply CONTAINS
    )
    ```
@@ -207,12 +220,12 @@ CONTAINS filtering may be slower than exact match or prefix matching, especially
 ### Query Optimization
 
 ```python
-# ❌ Slow: CONTAINS on large text field without other filters
-results = ProductTranslation.meilisearch.filter(description__contains="the")
+# ❌ Slow: CONTAINS with a very common substring and no other filters
+results = ProductTranslation.meilisearch.filter(name__contains="e")
 
 # ✅ Better: Combine with specific filters
 results = ProductTranslation.meilisearch.filter(
-    category="Electronics", active=True, description__contains="wireless"
+    category=3, active=True, name__contains="wireless"
 )
 
 # ✅ Best: Use full-text search for general queries
@@ -244,7 +257,8 @@ try:
     results = ProductTranslation.meilisearch.filter(name__contains="laptop")
 except Exception as e:
     print(f"Error: {e}")
-    # Error: The `CONTAINS` filter operator is experimental and must be enabled
+    # Meilisearch rejects the filter, saying CONTAINS needs the
+    # `containsFilter` experimental feature
 ```
 
 **Solution**: Enable the feature using the management command:
@@ -287,9 +301,6 @@ CONTAINS is ideal for finding specific substrings like model numbers or codes:
 ```python
 # Find products with model number containing "X1"
 ProductTranslation.meilisearch.filter(name__contains="X1")
-
-# Find products with SKU containing "ELEC"
-ProductTranslation.meilisearch.filter(sku__contains="ELEC")
 ```
 
 ### 2. Combine with Other Filters
@@ -298,7 +309,7 @@ Always combine CONTAINS with other filters to improve performance:
 
 ```python
 # Good: Narrow down by category first
-ProductTranslation.meilisearch.filter(category="Laptops", name__contains="pro")
+ProductTranslation.meilisearch.filter(category_name="Laptops", name__contains="pro")
 
 # Bad: CONTAINS on entire index
 ProductTranslation.meilisearch.filter(name__contains="pro")
@@ -338,8 +349,7 @@ date field won't raise in Python, but it's still the wrong tool for the job:
 ```python
 # ✅ String fields, string values
 name__contains = "laptop"
-description__contains = "wireless"
-sku__contains = "ELEC"
+category_name__contains = "wireless"
 
 # ⚠️ Doesn't raise, but semantically wrong — use range/exact lookups instead
 price__contains = "99"  # Use price__gte, price__lte instead
@@ -368,7 +378,7 @@ enforced.
 
 ### Feature Not Enabled
 
-**Error**: `The CONTAINS filter operator is experimental and must be enabled`
+**Error**: Meilisearch rejects the filter because CONTAINS requires the `containsFilter` experimental feature
 
 **Solution**:
 ```bash

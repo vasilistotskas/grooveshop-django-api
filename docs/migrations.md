@@ -9,12 +9,17 @@ there MUST be built concurrently, which PostgreSQL only allows outside a
 transaction:
 
 - Set `atomic = False` on the migration.
-- Prefer `django.contrib.postgres.operations.AddIndexConcurrently` (and
-  `RemoveIndexConcurrently` for the reverse); Django tracks the state and
-  writes the reverse for you.
-- If raw SQL is unavoidable, use `RunSQL("CREATE INDEX CONCURRENTLY ...",
-  reverse_sql="DROP INDEX CONCURRENTLY ...", state_operations=[AddIndex(...)])`
-  so the migration state still matches the model.
+- Use `core.db.migration_operations.AddIndexAdaptively(model_name, index)`.
+  Do not use Django's `AddIndexConcurrently`: it refuses to run inside the
+  caller's transaction, and `Tenant.save()` (`auto_create_schema`) replays
+  the whole migration history inside one (the platform admin's add form,
+  `tests_mt`). `AddIndexAdaptively` builds `CONCURRENTLY` when no
+  transaction is open (the PreSync `migrate_schemas` job) and a plain
+  `CREATE INDEX` inside one (a brand-new, empty tenant schema). It also
+  lifts `statement_timeout` for the build, drops an INVALID leftover first,
+  and uses `IF NOT EXISTS`, so a re-run is safe. It emits a plain column
+  list, with no `USING` method, so an index of another type (GIN, ...)
+  needs its own operation.
 
 Plain `AddIndex` stays fine on new or small tables.
 
@@ -121,6 +126,11 @@ length of the rollout; `product` 0046 also dropped
 `historicalproduct.seo_*`, which every old Product save writes. The
 translated columns were added without `db_default` as well. The
 preflight blocks all three.
+
+The migrations as shipped keep that unsafe shape (0035 still contains
+the `RenameField`). The safe shape they should have had is below; the
+`0038` contract step is illustrative, since `blog` 0038 is now
+`0038_rich_text_field`.
 
 Parler refuses a translated field with the shared model's field name,
 so the shared field has to leave the state name before the translated

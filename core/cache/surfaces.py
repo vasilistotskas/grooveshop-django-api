@@ -251,6 +251,7 @@ def register_default_surfaces() -> None:
                 "*ProductCategoryImageViewSet_*",
                 "*AttributeViewSet_*",
                 "*AttributeValueViewSet_*",
+                "*BrandViewSet_*",
             ),
             nuxt_patterns=_nuxt(
                 "ProductViewSet",

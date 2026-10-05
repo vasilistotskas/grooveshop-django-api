@@ -4,6 +4,7 @@ from rest_framework.urlpatterns import format_suffix_patterns
 from product.views.alert import ProductAlertViewSet
 from product.views.attribute import AttributeViewSet
 from product.views.attribute_value import AttributeValueViewSet
+from product.views.brand import BrandViewSet
 from product.views.category import ProductCategoryViewSet
 from product.views.category_image import ProductCategoryImageViewSet
 from product.views.favourite import ProductFavouriteViewSet
@@ -53,6 +54,21 @@ urlpatterns = [
         "product/<int:pk>/variants",
         ProductViewSet.as_view({"get": "variants"}),
         name="product-variants",
+    ),
+    path(
+        "product/brand",
+        BrandViewSet.as_view({"get": "list"}),
+        name="product-brand-list",
+    ),
+    path(
+        "product/brand/all",
+        BrandViewSet.as_view({"get": "all"}),
+        name="product-brand-all",
+    ),
+    path(
+        "product/brand/<int:pk>",
+        BrandViewSet.as_view({"get": "retrieve"}),
+        name="product-brand-detail",
     ),
     path(
         "product/category",

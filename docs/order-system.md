@@ -569,9 +569,16 @@ accepting Cyprus orders at the Greek flat rate.
 ### 5.3 Adding a new carrier
 
 1. Create `shipping_<provider>/` Django app.
-2. Implement `ShippingCarrierInterface`:
-   - `dispatch_create_shipment_task(order)` — enqueues the Celery task that mints the voucher.
-   - `apply_webhook_event(event)` (if webhook-based) or polling task.
+2. Implement `ShippingCarrierInterface` (`shipping/interfaces.py`):
+   - The abstract methods: `create_shipment`, `cancel_shipment`, `fetch_label_bytes`,
+     `fetch_tracking_events` (return `[]` when events arrive by webhook), `shipment_for_order`,
+     `serialize_shipment`, `validate_order_payload`.
+   - `dispatch_create_shipment_task(self, order, *, schema_name: str | None = None)` — enqueues the
+     Celery task that mints the voucher. `ShippingService` always passes `schema_name` (captured
+     before `on_commit`); accept it and stamp it on the task (`headers={"_schema_name": ...}`), or the
+     worker runs under the wrong tenant. The default is a no-op for carriers with no async step.
+   - Webhook-based carriers handle events in their own service (BoxNow:
+     `BoxNowService.apply_webhook_event`); it is not part of the interface.
 3. Decorate the adapter with `@register_provider` and import it in the app's `AppConfig.ready()`.
 4. Add `ShippingProvider` row in DB (admin or migration).
 5. Implement `_apply_order_status_transition` if your carrier emits state events.

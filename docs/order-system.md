@@ -44,8 +44,10 @@ instance) and falls back to `get_pay_way_key_display()` for a method no
 provider registers, such as cash on delivery. Both are in memory
 (`pay_way` is `list_select_related`), so the column costs no query.
 
-Each shipping provider (ACS, BoxNow) is a `ShippingCarrier` adapter
-in `shipping/interfaces.py` registered through
+Each shipping provider (ACS, BoxNow, plus the built-in `flat_rate`
+merchant delivery) is a `ShippingCarrierInterface` adapter
+(`shipping/interfaces.py`) registered with `@register_provider` and
+looked up via `get_provider(code)` by
 `shipping/services.py::ShippingService`. The adapter pattern lets
 new couriers plug in without touching the order code.
 
@@ -85,7 +87,7 @@ No explicit table — flips are direct assignments. Common paths:
 | `FAILED / PENDING / CANCELED → PENDING` | `POST /order/{id}/retry-payment` (`OrderViewSet.retry_payment`) mints a fresh Stripe PaymentIntent and reopens the payment — **only while `Order.status` is `PENDING`**. A CANCELED payment on a PENDING order (an intent canceled while the order waits) is retryable. Every endpoint that starts a payment (`create_payment_intent`, `create_checkout_session`, `retry-payment`, `confirm_agent_payment`) shares `OrderViewSet._payment_start_refusal`: a paid order gets 400 "This order has already been paid.", a CANCELED or otherwise advanced one 400 "This order is no longer open for payment." — before the provider is called, because `cancel_order` settles an unpaid payment to CANCELED too, and reopening it let a charge land on a dead order. The provider call itself runs unlocked; `PayWayService._record_opened_payment` then locks the row and, if its status, payment status or payment id changed meanwhile (a cancel, a webhook for the previous intent), raises `OrderChangedDuringPaymentError` — the view answers 409 and the new intent's client secret is never returned, so it can never be confirmed. |
 | `COMPLETED → REFUNDED` | `OrderService.refund_order()` (admin) OR `handle_stripe_charge_refunded` (full refund webhook) |
 | `COMPLETED → PARTIALLY_REFUNDED` | `handle_stripe_charge_refunded` (partial refund) |
-| `PENDING → CANCELED` | Viva refund webhook |
+| `COMPLETED → REFUNDED` | Viva reversal webhook (`_handle_reversal_created`, event 1797; full or partial both write REFUNDED) |
 | `PENDING / PROCESSING / FAILED → CANCELED` | `Order.save()` on the `status → CANCELED` **or `RETURNED`** transition (`PAYMENT_CLOSING_STATUSES`, `Order.settle_unpaid_payment`, `order/models/order.py`) — one save shared by the service, the admin form and any script, never a second save from the cascade (that re-fires the transition). An order that closes unpaid owes nothing, so its financial state is final too: a canceled order (`0057_settle_canceled_unpaid_orders` backfilled 78 rows) and a refused or uncollected COD parcel that came back RETURNED (`0058_settle_returned_unpaid_orders` backfilled 34). A PAID return keeps COMPLETED until the refund moves it to REFUNDED. |
 | `PENDING → COMPLETED` | `AcsService._mark_cod_order_paid_if_pending` (COD reconcile) |
 | `CANCELED → COMPLETED` on a CANCELED order | `OrderService.record_payment_after_cancel` — a confirmed Stripe (`handle_payment_succeeded`, `checkout.session.completed`) or Viva (`_handle_payment_created`) charge for an order that is already canceled. Checked **before** the settled-state guard (`OrderService.is_payment_after_cancel`), because a canceled order always carries a settled payment and behind the guard the charge was dropped with a WARNING. Books the money (`mark_as_paid`), records `metadata["payment_after_cancel"]`, logs ERROR, emails ops, notes the order; the order stays CANCELED and nothing ships. Idempotent per payment id. A REFUNDED / PARTIALLY_REFUNDED canceled order still ignores a stale success. |
@@ -242,7 +244,7 @@ accounts:
   `stripe_publishable_key` on the Tenant row before running
   `bootstrap_stripe`.
 - **Viva Wallet** — all credentials incl. `source_code` and `live_mode`
-  per-tenant (settings fallback). The webhook route on the tenant's own
+  per-tenant (no settings fallback). The webhook route on the tenant's own
   API host resolves the tenant BEFORE the GET verification challenge,
   so per-tenant verification keys work with no view changes; POST
   delivery still resolves the order by payload as source of truth.
@@ -257,7 +259,7 @@ accounts:
 Webhook handler: `order/signals/handlers.py::handle_stripe_payment_succeeded`.
 
 ```
-charge.succeeded → handle_stripe_payment_succeeded
+payment_intent.succeeded → handle_stripe_payment_succeeded
                  │
                  ├── webhook_processed_{event_id} idempotency guard
                  │
@@ -272,8 +274,8 @@ charge.succeeded → handle_stripe_payment_succeeded
                  │
                  │   only when outcome.applied:
                  ├── OrderHistory PAYMENT row (previous = the real prior status)
-                 ├── send_order_confirmation_email.delay(order.id)  ← order_received template
-                 └── notify_payment_confirmed_live.delay(order.id)
+                 ├── send_order_confirmation_email (on_commit)  ← order_payment_confirmed template
+                 └── notify_payment_confirmed_live (on_commit, logged-in users only)
 ```
 
 `applied` is False for a stale event against a settled payment, a
@@ -285,7 +287,7 @@ that their payment failed.
 
 The `_suppress_customer_status_notifications(PROCESSING)` call is
 load-bearing: without it the customer receives both an
-`order_received` email AND an `order_processing` email within ms
+`order_payment_confirmed` email AND an `order_processing` email within ms
 (PR #7).
 
 ### 4.2 Stripe refund (`charge.refunded`)
@@ -302,12 +304,14 @@ Webhook handler: `order/views/viva_webhook.py::_handle_payment_created`.
 
 Differences from the Stripe path that are easy to miss:
 
-- **Row lock** is acquired at the entry-point (`_handle_webhook_event`), not inside
+- **Row lock** is acquired in the view (`_process_event_in_tenant`), not inside
   a service method. The whole webhook body runs inside one
   ``select_for_update`` block.
-- **Idempotency** uses ``viva_webhook_{transaction_id}_{event_type_id}``
-  metadata flag (Viva's analogue of Stripe's
-  ``webhook_processed_{event_id}``).
+- **Idempotency** uses the ``VivaWebhookEvent`` table
+  (``order/models/viva_webhook_event.py``), unique on
+  ``(transaction_id, event_type_id)`` and written last in the same
+  transaction — not a metadata flag like Stripe's
+  ``webhook_processed_{event_id}``.
 - **Inline status mutation**: ``order.status = OrderStatus.PROCESSING``
   + ``order.save(update_fields=[...])``, NOT
   ``OrderService.update_order_status(...)``. The post-save signal
@@ -317,11 +321,11 @@ Differences from the Stripe path that are easy to miss:
 - **PR #7 PROCESSING suppression** is wired (mirrors Stripe): the
   handler calls ``OrderService._suppress_customer_status_notifications(
   order, "PROCESSING")`` immediately before the inline status flip
-  so the customer doesn't get back-to-back order_received +
+  so the customer doesn't get back-to-back payment-confirmed +
   order_processing emails when Viva confirms payment. Without
   this, the post-save handler would dispatch both.
 - **No ``notify_payment_confirmed_live`` toast** — that's a Stripe-
-  specific dispatch. Viva customers see the order_received email
+  specific dispatch. Viva customers see the payment-confirmed email
   + the WS toasts that fire on later state changes (SHIPPED,
   DELIVERED).
 
@@ -335,8 +339,8 @@ Nitro route ``/checkout/viva-return``, which calls the public
 ``GET /api/v1/order/viva_return`` and 302s to
 ``/checkout/success/{uuid}``. The endpoint resolves ``t`` →
 ``payment_id`` (post-webhook) with fallback ``s`` →
-``metadata.viva_order_code`` (written at session creation, so it
-wins the browser-vs-webhook race). Pitfalls encoded in history:
+``metadata.viva_order_codes`` (every code the order issued, appended at
+session creation, so it wins the browser-vs-webhook race). Pitfalls encoded in history:
 ``s`` is the 16-digit order code, NOT an ``F`` status flag, and
 ``eventId`` is an int32 Viva event code, NOT ``merchantTrns`` — two
 earlier frontend implementations assumed otherwise and broke the
@@ -364,8 +368,9 @@ success redirect (customer landed on the homepage via the
 ## 5. Shipping integrations
 
 Each carrier implements `ShippingCarrierInterface` in
-`shipping/interfaces.py` and registers with
-`ShippingProviderRegistry`. Two carriers today.
+`shipping/interfaces.py` and registers with `@register_provider`
+(imported in its `AppConfig.ready()`). Two courier carriers today, plus
+the API-less `flat_rate` adapter (`shipping/carriers/flat_rate.py`).
 
 Rules both carriers share:
 
@@ -459,7 +464,7 @@ accepting Cyprus orders at the Greek flat rate.
   rows (`metadata['supported_countries']` when set, else `["GR"]`), so
   no store starts offering a new country just because this shipped.
   The six Setting keys themselves are dropped in release N+1
-  (`0012_drop_legacy_shipping_settings.py`, additive-only rule —
+  (`0014_drop_legacy_shipping_settings.py`, additive-only rule —
   `docs/migrations.md`).
 - **Adding a country to an existing carrier** is an admin action, not a
   deploy: add a `ShippingRate` row (`ShippingProviderAdmin`'s Rates
@@ -565,9 +570,9 @@ accepting Cyprus orders at the Greek flat rate.
 
 1. Create `shipping_<provider>/` Django app.
 2. Implement `ShippingCarrierInterface`:
-   - `dispatch_create_shipment_task(order)` — Celery task that mints the voucher.
+   - `dispatch_create_shipment_task(order)` — enqueues the Celery task that mints the voucher.
    - `apply_webhook_event(event)` (if webhook-based) or polling task.
-3. Register the adapter in `shipping/interfaces.py`.
+3. Decorate the adapter with `@register_provider` and import it in the app's `AppConfig.ready()`.
 4. Add `ShippingProvider` row in DB (admin or migration).
 5. Implement `_apply_order_status_transition` if your carrier emits state events.
 6. Wire the COD path if applicable (see ACS for the pattern).
@@ -670,7 +675,7 @@ All WS notifications go through `notification.consumers.NotificationConsumer` an
 
 ### 7.1 Cancel paths
 
-- **Customer**: `POST /api/v1/orders/{id}/cancel/` → `OrderService.cancel_order(order, reason, refund_payment=True)`.
+- **Customer**: `POST /api/v1/order/{id}/cancel` → `OrderService.cancel_order(order, reason, refund_payment=True)`.
 - **Admin**: same `cancel_order` via the "Cancel selected orders and restore stock" action. The change form's `status` field is **read-only**: a form save wrote the column straight to the row, bypassing both `cancel_order` (no stock restore — prod orders 242 and 213, 2026-09-08) and the transition table in `update_order_status`. Every other transition is an action too (`mark_as_processing` … `mark_as_returned`, `mark_as_refunded`), routed through `update_order_status`. RETURNED and REFUNDED deliberately leave stock alone (§5.1).
 - **Auto**: `auto_cancel_stuck_pending_orders` Celery beat — cancels online orders stuck in PENDING for >24h.
 
@@ -678,14 +683,14 @@ All WS notifications go through `notification.consumers.NotificationConsumer` an
 1. Locks order row.
 2. Releases stock + reservations (`StockManager.increment_stock`, `release_reservation`).
 3. Sets `status=CANCELED` (the save settles an unpaid `payment_status` to `CANCELED` — `Order.settle_unpaid_payment`), records `metadata['cancellation']`.
-4. Cascades to courier voucher via `ShippingService.cancel_shipment` (PR #2 H). Records dispatch outcome on metadata. Carrier rejection (e.g., voucher already in pickup list) is swallowed and logged.
+4. Cascades to courier voucher via `cancel_attached_shipment` → `ShippingService.cancel_shipment` (PR #2 H). Records dispatch outcome on metadata. Carrier rejection (e.g., voucher already in pickup list) is swallowed and logged.
 5. Optional refund via `refund_order` (when `refund_payment=True` AND `is_paid`).
 
 **Don't bypass**: do not call `order.save(update_fields=['status'])` directly to cancel — you'll skip stock release + email + history. Always go through `OrderService.cancel_order`.
 
 ### 7.2 Refund paths
 
-- **Admin**: `POST /api/v1/orders/{id}/refund_order/` → `OrderService.refund_order(amount=None|Money, reason)`.
+- **In-app**: `OrderService.refund_order(order, amount=None|Money, reason)`, reached from `cancel_order(refund_payment=True)` on a paid order (there is no standalone refund endpoint; the admin "Mark selected orders as refunded" action only moves the status).
 - **Stripe dashboard**: webhook `charge.refunded` → `handle_stripe_charge_refunded`.
 
 Both fire `order_refunded.send` → `handle_order_refunded` → email + WS notification. Single boolean `refund_confirmation_email_sent` flag dedupes between paths (PR #8).
@@ -709,9 +714,9 @@ the linked memory note or the originating PR's commit message.
 | ACS voucher mint uses 3-phase claim → API → persist with 300s TTL | `project_acs_voucher_orphan_prevention.md` |
 | `Order.objects.filter(pk=...).values(...).first()` — NOT `refresh_from_db(fields=...)` | `project_order_state_machine_invariants.md` |
 | `_suppress_customer_status_notifications` on chained transitions | `project_order_state_machine_invariants.md` |
-| Webhook payment_status writes never regress a SETTLED state (`SETTLED_PAYMENT_STATUSES` = COMPLETED/REFUNDED/PARTIALLY_REFUNDED/CANCELED). Stripe/Viva events are unordered + may duplicate, so `handle_payment_failed`/`_handle_payment_failed` skip when already settled, and `handle_payment_succeeded`/`_handle_payment_created` skip when already REFUNDED/PARTIALLY_REFUNDED/CANCELED. Reversal (COMPLETED→REFUNDED) is left intact. | `order/services.py` `SETTLED_PAYMENT_STATUSES` |
+| Webhook payment_status writes never regress a SETTLED state (`SETTLED_PAYMENT_STATUSES` = COMPLETED/REFUNDED/PARTIALLY_REFUNDED/CANCELED). Stripe/Viva events are unordered + may duplicate, so `handle_payment_failed`/`_handle_payment_failed` skip when already settled, and `handle_payment_succeeded`/`_handle_payment_created` skip when already REFUNDED/PARTIALLY_REFUNDED/CANCELED. Reversal (COMPLETED→REFUNDED) is left intact. | `order/enum/status.py` `SETTLED_PAYMENT_STATUSES` |
 | The "shipped" email/toast fires only at genuine SHIPPED (status==SHIPPED **and** tracking present), never at voucher-mint; PROCESSING is internal-only (no customer email/toast). `send_shipping_notification_email` self-gates. | §6.1 above |
-| Admin-WYSIWYG fields in emails render `\|safe` (.html) / `unescape(strip_tags())`+`\|safe` (.txt — Django autoescapes .txt too) | §6.1 above |
+| Admin-WYSIWYG fields in emails render `\|safe` (.html) / `unescape(strip_tags())`+`\|safe` (.txt — Django autoescapes .txt too) | `CLAUDE.md` "Transactional email rendering" |
 | ACS COD numeric fields use Greek-locale (comma decimal) | `project_acs_cod_locale.md` |
 | Don't import from `'#shared/...'` in app/ or server/ | `feedback_no_shared_imports.md` |
 | Don't override generated Zod / OpenAPI types in Nuxt | `feedback_no_local_schema_overrides.md` |
@@ -734,7 +739,7 @@ the linked memory note or the originating PR's commit message.
 
 1. Add the value to `OrderStatus` in `order/enum/status.py`.
 2. Update the transition table in `OrderService.update_order_status`.
-3. Add a Greek translation in `locale/el/django.po`, run `compilemessages`.
+3. Add a Greek translation in `locale/el/LC_MESSAGES/django.po`, run `compilemessages`.
 4. Add the matching `_ORDER_STATUS_COPY` entry in `order/notifications.py` for the WS toast.
 5. Create email templates under `core/templates/emails/order/order_<status>.{html,txt}`.
 6. Add a state-machine test in `tests/integration/order/test_state_machine.py`.
@@ -743,7 +748,7 @@ the linked memory note or the originating PR's commit message.
 
 1. Add the field on `OrderSerializer` (list shape) or `OrderDetailSerializer` (detail-only) in `order/serializers/order.py`. Use `extend_schema_field` so spectacular emits it.
 2. `uv run python manage.py spectacular --color --file schema.yml`.
-3. In Nuxt: `pnpm generate:schema && pnpm openapi-ts`.
+3. In Nuxt: `pnpm generate:schema && pnpm openapi-ts && pnpm sync:schema`.
 4. Type-safe consumption in `app/pages/account/orders/[id].vue`.
 
 ### 9.4 Reconciling state after a manual prod fix

@@ -3,7 +3,8 @@
 Reference for the commands under `meili/management/commands/`. Every command below
 also accepts `--tenant <schema>` or `--all-tenants` (from `core.management.tenant_mixin`)
 unless stated otherwise; without either it runs against the schema bound to the current
-connection. Index names are tenant-prefixed (`{schema}__*`) by `meili.models.get_meili_index_name()`.
+connection. Index names are tenant-prefixed (`{schema}__*`) by the `IndexMixin.get_meili_index_name()`
+classmethod in `meili/models.py`.
 
 Run `uv run python manage.py <command> --help` for the authoritative option list.
 
@@ -49,8 +50,9 @@ Prints index settings, statistics and configuration.
 ## `meilisearch_apply_settings`
 
 Re-applies each model's `MeiliMeta` settings (filterable / searchable / sortable
-attributes, ranking rules, synonyms, typo tolerance) without reindexing. The deploy
-hook runs this after every release.
+attributes, ranking rules, synonyms, typo tolerance) without reindexing. The Argo CD
+PreSync hook runs it with `--all-tenants` on every deploy; it attempts every tenant and
+exits non-zero if any failed.
 
 | Option | Description |
 |---|---|
@@ -70,8 +72,10 @@ Meilisearch endpoints so the rest of the index configuration is untouched.
 
 ## `meilisearch_update_ranking`
 
-Replaces the ranking rules of one index. Custom `<field>:asc|desc` rules must name a
-field in the model's `sortable_fields`.
+Replaces the ranking rules of one index through the dedicated ranking-rules endpoint.
+The command only checks each rule's shape (a built-in rule or `<field>:asc|desc`). The
+change does not last: the next `meilisearch_apply_settings` (every deploy) restores the
+model's `MeiliMeta.ranking_rules`, so a permanent change belongs there.
 
 | Option | Description |
 |---|---|
@@ -92,6 +96,5 @@ Toggles an experimental Meilisearch feature on the server (not tenant-scoped).
 ```bash
 uv run python manage.py meilisearch_enable_experimental --feature containsFilter
 uv run python manage.py meilisearch_sync_all_indexes --all-tenants
-uv run python manage.py meilisearch_update_ranking --index ProductTranslation \
-    --rules "words,typo,proximity,attribute,sort,stock:desc,discount_percent:desc,exactness"
+uv run python manage.py meilisearch_apply_settings --all-tenants
 ```

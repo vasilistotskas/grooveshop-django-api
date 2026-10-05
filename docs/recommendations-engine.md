@@ -130,8 +130,8 @@ Standard and Pro tiers therefore have nothing behind them yet.
 |---|---|---|---|---|---|
 | `curated` | `ProductRelation` rows | ORM at any size | never — merchant intent always wins | Free | **shipped** |
 | `variant_group` | `Product.variant_group` | ORM | product has no group | Free | **shipped** |
-| `category` | same category (0.8), then sibling categories (0.6), then the parent's whole MPTT subtree (0.5); within a tier by `click_score`, `view_count` | ORM — exactly three queries whatever the seed count | product has no category | Free |
-| `popular` | `click_score`, `view_count`, `likes_count`, `discount_percent` | ORM / Meilisearch sort | never — last-resort filler, **capped at 1 slot** by the ranker | Free | **shipped** |
+| `category` | same category (0.8), then sibling categories (0.6), then the parent's whole MPTT subtree (0.5); within a tier by `click_score`, `view_count` | ORM — exactly three queries whatever the seed count | product has no category | Free | **shipped** |
+| `popular` | `click_score`, `view_count`, `likes_count`, `discount_percent` | ORM — one store-wide query | never — last-resort filler, **capped at 1 slot** by the ranker | Free | **shipped** |
 | `attributes` | shared `attribute_values` ∪ tags ∪ brand (Jaccard) | ORM < 2k · Meilisearch above | tenant populates none of the three | Standard | design only |
 | `semantic` | embedding similarity (§6) | Meilisearch `/similar` | no embedder on the index, or `OFFLINE` | Standard | design only |
 | `co_purchase` | `OrderItem` pairs, 180-day window | SQL aggregation → table | pair count < 5 or < 50 multi-item orders | Pro | design only |
@@ -156,8 +156,8 @@ For a seed set *S* (one product on a product page; every line on the
 cart), merge candidates from each enabled strategy, then:
 
 1. **Guard.** Drop anything not `active`, out of stock, soft-deleted,
-   in *S*, in the caller's `exclude` list (the cart passes its lines;
-   a tenant-level exclusion list for gift cards and fee SKUs is Step 2),
+   in *S*, in the caller's `exclude` list (the cart's lines are
+   already excluded as seeds; a tenant-level exclusion list for gift cards and fee SKUs is Step 2),
    or outside the price band — the slot's `price_band_ratio` against
    the seed's discounted price, so a €500 item never sits beside a €5
    one.
@@ -178,8 +178,9 @@ cart), merge candidates from each enabled strategy, then:
    the category.
 4. **Cut** to `limit`; return `[]` under `min_fill`.
 
-Weights start from the preset and are updated nightly from attach rate
-per strategy per tenant (exponentially weighted, floored at 0.05 so no
+Weights start from the preset. **Design, not built:** no task updates
+them yet — they stay the preset's (or the merchant's admin edit). The
+intended update is nightly, from attach rate per strategy per tenant (exponentially weighted, floored at 0.05 so no
 strategy is starved of impressions). Deliberately a bandit-shaped loop
 and not a model: explainable, runs in SQL, and its output is a row a
 merchant can read.
@@ -280,7 +281,7 @@ not by preference. Both paths use the same `documentTemplate`;
 switching is one settings PATCH per index (§9.4).
 
 `documentTemplate` (Liquid): `search_document: {{doc.name}}. {{doc.category_name}}. {{doc.attribute_values_text}}. {{doc.description | strip_html | truncatewords: 60}}`
-— the prefix only for nomic; `description` is an `HTMLField` passed
+— the prefix only for nomic; `description` is a `RichTextField` (an `HTMLField`) passed
 through verbatim by `meili_serialize`, hence the strip.
 
 Settings path (four files, in order): `meili/dataclasses.py`
@@ -298,7 +299,7 @@ every deploy. Enable `vectorStore` with the existing
 | Model | Fields | Notes |
 |---|---|---|
 | `product.ProductRelation` | `from_product · to_product · relation_type · sort_order` | unique (from, to, type); `from != to`; `SortableModel` scoped per `from_product` |
-| `recommendation.RecommendationSlot` | `surface · strategy_chain[] · weights{} · limit · min_fill · price_band_ratio · enabled` | one row per surface; `strategy_chain` is `JSONField(default=list)` validated in `schemas.py` (the `page_config` idiom) |
+| `recommendation.RecommendationSlot` | `surface · strategy_chain[] · weights{} · limit · min_fill · price_band_ratio · enabled` | one row per surface; `strategy_chain` is `JSONField(default=list)` validated in `json_schemas.py` (the `page_config` idiom) |
 | `recommendation.RecommendationCandidate` | `product · candidate · strategy · score · relation_type · computed_at` | unique (product, candidate, strategy); indexed (product, strategy, -score) |
 | `recommendation.RecommendationEvent` | `surface · strategy · seed · product · position · kind · impression_id · session_key · cart_uuid · user · order · matched_by · created_at` | `impression | click` from the storefront; `attach` derived from `order_created` (unique per order · product · impression); `cart_uuid` is the journey identity, the cart row is a per-customer singleton |
 | `cart.CartItem.recommendation_impression_id` → `order.OrderItem.recommendation_impression_id` | nullable UUID on the line | the impression carried from add-to-cart (`CartItemCreateSerializer` / `CartItemUpdateSerializer`, latest add wins) and copied at checkout by both `OrderService` cart→order paths; read by `record_attach_events` as the first identity |

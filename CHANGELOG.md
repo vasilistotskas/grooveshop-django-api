@@ -3,6 +3,77 @@
 
 
 
+## v3.97.0 (2026-10-05)
+
+### Bug fixes
+
+* fix(i18n): restore the msgstr the batch-2 rebase dropped
+
+Resolving the catalogue conflict kept both sides but lost the trailing
+msgstr they shared, so msgfmt refused the en catalogue.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`85e57d0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/85e57d0e87db1461fb07bdf14a1c385e790b1141))
+
+* fix(api): an unreadable dispatch cutoff never fails checkout; hero chips need an active product
+
+- DISPATCH_CUTOFF is parsed with the setting's own strict HH:MM
+  validator (time.fromisoformat read "24:00" as midnight and accepted
+  "1500"); an unreadable stored value raises a named error that order
+  creation logs and turns into a null estimate on both paths, instead
+  of aborting the transaction after payment. The default is read from
+  the settings registry entry, not repeated.
+- Hero slide product_id validates against Product.objects.active(), the
+  set the storefront's product page serves.
+- Tests: a 31 Dec order across the New Year holiday, both DST changes,
+  a provider with no matching rate.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`85e57d0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/85e57d0e87db1461fb07bdf14a1c385e790b1141))
+
+### Chores
+
+* chore(schema): regenerate for batch 2
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`85e57d0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/85e57d0e87db1461fb07bdf14a1c385e790b1141))
+
+* chore(deps): sync uv.lock to 3.96.0 [skip ci] ([`d347bd9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d347bd94900646c4f20049e33ed8b37afaaf7026))
+
+### Features
+
+* feat(api): Groove Volt API batch 2 — delivery estimates, code resend, announcement code, auth panel, page sections (#116) ([`85e57d0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/85e57d0e87db1461fb07bdf14a1c385e790b1141))
+
+* feat(api): Groove Volt API batch 2 — delivery estimates, code resend, announcement code, auth panel, page sections
+
+- F3: ShippingRate delivery_days_min/max and a DISPATCH_CUTOFF public
+  setting; Order.estimated_delivery is set at creation from the
+  placement time, the cutoff, Greek business days and the rate (both
+  creation paths); shipping options carry the day counts and order
+  tracking details the date.
+- F6: allauth's own resend for the login code and email verification,
+  and email correction mid-verification; a per-IP ceiling on the code
+  resend; the cooldown is published read-only on tenant resolve
+  (codeResendCooldownSeconds).
+- F9: ANNOUNCEMENT_BAR takes `code` and `shortText` (also per locale).
+- F10: AUTH_PANEL public setting (photo + translatable tagline); the
+  demo seeds the board's photo and copy.
+- F11: hero slide product_id (validated in this store), offers eyebrow
+  + ink surface, loyalty_hero props; the default home is the board's
+  eleven bands, and the demo seeder follows.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`85e57d0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/85e57d0e87db1461fb07bdf14a1c385e790b1141))
+
+### Testing
+
+* test(devtools): the hero's chip product is active, as the layout validator requires
+
+The factory picks `active` at random, so the seed test failed whenever
+it drew an inactive product.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`85e57d0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/85e57d0e87db1461fb07bdf14a1c385e790b1141))
+
 ## v3.96.0 (2026-10-05)
 
 ### Bug fixes

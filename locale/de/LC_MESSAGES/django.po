@@ -9814,3 +9814,45 @@ msgstr "Lieferland, für das dieser Ausschluss gilt. Leer lassen, um die Zahlung
 #: .\pay_way\filters.py
 msgid "ISO 3166-1 alpha-2 delivery country. Drops the pay ways an operator excluded for that country (e.g. BoxNow PAY ON THE GO in Cyprus). Has no effect without ``shippingKind``; when omitted only the every-country exclusions apply."
 msgstr "Lieferland (ISO 3166-1 alpha-2). Entfernt die Zahlungsarten, die der Betreiber für dieses Land ausgeschlossen hat (z. B. BoxNow PAY ON THE GO in Zypern). Ohne ``shippingKind`` wirkungslos; wenn weggelassen, gelten nur die Ausschlüsse für alle Länder."
+
+#: .\cart\serializers\cart.py:32
+msgid ""
+"VAT contained in total_price once promotion_discount is taken off. A price "
+"discount reduces the taxable base, so this is the figure the invoice will "
+"carry. Loyalty points are redeemed against the order and are not reflected "
+"here."
+msgstr ""
+"In total_price enthaltene MwSt., nachdem promotion_discount abgezogen wurde."
+" Ein Preisnachlass senkt die Bemessungsgrundlage, daher ist dies der Betrag,"
+" den die Rechnung ausweist. Treuepunkte werden auf die Bestellung eingelöst "
+"und sind hier nicht berücksichtigt."
+
+#: .\order\filters.py:143
+msgid "Filter by payment method key (case-insensitive)"
+msgstr "Nach Zahlungsartschlüssel filtern (Groß-/Kleinschreibung egal)"
+
+#: .\pay_way\filters.py:76
+msgid "Filter by payment method key"
+msgstr "Nach Zahlungsartschlüssel filtern"
+
+#: .\pay_way\models.py:88
+msgid "Key"
+msgstr "Schlüssel"
+
+#: .\pay_way\models.py:95
+msgid ""
+"Language-independent identifier of the payment method. The storefront "
+"resolves its label from this key, so it never depends on which languages the"
+" store has translated."
+msgstr ""
+"Sprachunabhängige Kennung der Zahlungsart. Das Storefront bezieht seine "
+"Bezeichnung aus diesem Schlüssel, sodass sie nie davon abhängt, welche "
+"Sprachen der Shop übersetzt hat."
+
+#: .\promotion\serializers.py:349
+msgid ""
+"Whether the code is reserved for this customer (assigned to their account or"
+" email) rather than offered to everyone."
+msgstr ""
+"Ob der Code für diesen Kunden reserviert ist (seinem Konto oder seiner "
+"E-Mail zugewiesen) und nicht allen angeboten wird."

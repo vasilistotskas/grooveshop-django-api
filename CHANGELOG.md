@@ -3,6 +3,31 @@
 
 
 
+## v3.98.0 (2026-10-05)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.97.0 [skip ci] ([`0c1c5a9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0c1c5a95bf5251551a512bfefe5a66b565f2c68c))
+
+### Features
+
+* feat(search): product card fields and brand / in-stock / on-offer filters (#117)
+
+- F1: product search hits (and federated hits) carry brandName,
+  reviewCount (approved only), createdAt and lowStockThreshold, hydrated
+  from the database with the brand loaded in the same query, so reviews
+  and brand renames never leave the index stale. Federated hits also get
+  the categoryName batch 1 added to product hits.
+- F2: `brands` (comma-separated ids), `inStock` and `onOffer` filters;
+  the product index makes brand, in_stock and discount_percent
+  filterable. "On offer" is the product's own markdown: promotions are
+  cart-level, windowed and scoped, so indexing them would go stale.
+
+After deploy, rebuild product documents once per environment (they lack
+`brand`): manage.py meilisearch_sync_all_indexes --all-tenants --app product
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`6c41be8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6c41be86e1050e7feb5670ef69fd8e1aca1df612))
+
 ## v3.97.0 (2026-10-05)
 
 ### Bug fixes

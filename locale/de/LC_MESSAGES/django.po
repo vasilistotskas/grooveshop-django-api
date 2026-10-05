@@ -9928,3 +9928,25 @@ msgid ""
 msgstr ""
 "Langsamste Lieferung in Werktagen nach dem Versand; genau dann null, wenn "
 "``delivery_days_min`` null ist."
+
+#: .\search\views.py:153
+msgid "Must be true or false."
+msgstr "Muss true oder false sein."
+
+#: .\search\views.py:451
+msgid "Comma-separated brand IDs (brand IN [ids])"
+msgstr "Kommagetrennte Marken-IDs (brand IN [ids])"
+
+#: .\search\views.py:458
+msgid "When true, only products with stock above zero"
+msgstr "Wenn true, nur Produkte mit einem Lagerbestand über null"
+
+#: .\search\views.py:465
+msgid ""
+"When true, only products carrying a markdown (discount_percent > 0). "
+"Promotions are cart-level (coupons, scoped and windowed) and are not part "
+"of this filter."
+msgstr ""
+"Wenn true, nur Produkte mit Preisnachlass (discount_percent > 0). Aktionen "
+"gelten auf Warenkorbebene (Gutscheine, eingegrenzt und zeitlich befristet) "
+"und sind nicht Teil dieses Filters."

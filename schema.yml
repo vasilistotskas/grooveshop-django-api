@@ -25988,6 +25988,11 @@ paths:
         description: ID τιμών χαρακτηριστικών διαχωρισμένα με κόμμα (attribute_values
           IN [ids])
       - in: query
+        name: brands
+        schema:
+          type: string
+        description: Comma-separated brand IDs (brand IN [ids])
+      - in: query
         name: categories
         schema:
           type: string
@@ -25998,6 +26003,18 @@ paths:
         schema:
           type: string
         description: Πεδία facet διαχωρισμένα με κόμμα για πλήθη και στατιστικά
+      - in: query
+        name: inStock
+        schema:
+          oneOf:
+          - type: string
+            enum:
+            - 'true'
+            - 'false'
+            - '1'
+            - '0'
+          - type: boolean
+        description: When true, only products with stock above zero
       - in: query
         name: languageCode
         schema:
@@ -26028,6 +26045,20 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         description: Αριθμός αποτελεσμάτων προς παράλειψη
+      - in: query
+        name: onOffer
+        schema:
+          oneOf:
+          - type: string
+            enum:
+            - 'true'
+            - 'false'
+            - '1'
+            - '0'
+          - type: boolean
+        description: When true, only products carrying a markdown (discount_percent
+          > 0). Promotions are cart-level (coupons, scoped and windowed) and are not
+          part of this filter.
       - in: query
         name: priceMax
         schema:
@@ -37460,6 +37491,21 @@ components:
           type: number
           format: double
           nullable: true
+        categoryName:
+          type: string
+          nullable: true
+        brandName:
+          type: string
+          nullable: true
+        reviewCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+          nullable: true
+        lowStockThreshold:
+          type: integer
+          nullable: true
         title:
           type: string
         subtitle:
@@ -45359,9 +45405,23 @@ components:
         categoryName:
           type: string
           nullable: true
+        brandName:
+          type: string
+          nullable: true
+        reviewCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+          nullable: true
+        lowStockThreshold:
+          type: integer
+          nullable: true
       required:
+      - brandName
       - categoryName
       - contentType
+      - createdAt
       - description
       - discountPercent
       - finalPrice
@@ -45369,6 +45429,7 @@ components:
       - id
       - languageCode
       - likesCount
+      - lowStockThreshold
       - mainImagePath
       - master
       - matchesPosition
@@ -45376,6 +45437,7 @@ components:
       - price
       - rankingScore
       - reviewAverage
+      - reviewCount
       - slug
       - stock
       - vatPercent

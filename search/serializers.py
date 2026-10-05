@@ -71,6 +71,10 @@ class ProductTranslationSerializer(
     review_average = serializers.SerializerMethodField()
     vat_percent = serializers.SerializerMethodField()
     category_name = serializers.SerializerMethodField()
+    brand_name = serializers.SerializerMethodField()
+    review_count = serializers.SerializerMethodField()
+    created_at = serializers.SerializerMethodField()
+    low_stock_threshold = serializers.SerializerMethodField()
 
     class Meta:
         model = ProductTranslation
@@ -96,6 +100,10 @@ class ProductTranslationSerializer(
             "review_average",
             "vat_percent",
             "category_name",
+            "brand_name",
+            "review_count",
+            "created_at",
+            "low_stock_threshold",
         )
 
     def get_slug(self, obj):
@@ -115,6 +123,23 @@ class ProductTranslationSerializer(
 
     def get_content_type(self, obj):
         return "product"
+
+    # The card fields below are read from the database, not the indexed
+    # document, like ``category_name``: a review is approved, a brand is
+    # renamed, stock crosses its threshold, all without a Product save
+    # that would reindex the hit.
+    def get_brand_name(self, obj):
+        brand = obj.master.brand if obj.master else None
+        return brand.name if brand else None
+
+    def get_review_count(self, obj):
+        return obj.master.review_count if obj.master else 0
+
+    def get_created_at(self, obj):
+        return obj.master.created_at if obj.master else None
+
+    def get_low_stock_threshold(self, obj):
+        return obj.master.low_stock_threshold if obj.master else None
 
     def get_category_name(self, obj):
         """The product's category in the hit's own language.
@@ -201,6 +226,10 @@ class ProductMeiliSearchResultSerializer(serializers.Serializer):
     review_average = serializers.FloatField(allow_null=True)
     vat_percent = serializers.FloatField(allow_null=True)
     category_name = serializers.CharField(allow_null=True)
+    brand_name = serializers.CharField(allow_null=True)
+    review_count = serializers.IntegerField()
+    created_at = serializers.DateTimeField(allow_null=True)
+    low_stock_threshold = serializers.IntegerField(allow_null=True)
 
 
 class SearchDisclosureSerializer(serializers.Serializer):
@@ -310,6 +339,13 @@ class FederatedSearchResultSerializer(serializers.Serializer):
     view_count = serializers.IntegerField(required=False)
     review_average = serializers.FloatField(allow_null=True, required=False)
     vat_percent = serializers.FloatField(allow_null=True, required=False)
+    category_name = serializers.CharField(allow_null=True, required=False)
+    brand_name = serializers.CharField(allow_null=True, required=False)
+    review_count = serializers.IntegerField(required=False)
+    created_at = serializers.DateTimeField(allow_null=True, required=False)
+    low_stock_threshold = serializers.IntegerField(
+        allow_null=True, required=False
+    )
 
     # Blog post-specific fields (optional)
     title = serializers.CharField(required=False)

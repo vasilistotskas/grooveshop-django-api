@@ -163,9 +163,7 @@ class TestSetAtCreation:
         assert order.estimated_delivery is None
 
 
-def test_payment_first_creation_stores_the_estimate():
-    """``create_order_from_cart`` (online) seeds it too, not only the
-    offline path."""
+def _create_online():
     from decimal import Decimal
 
     from djmoney.money import Money
@@ -219,4 +217,58 @@ def test_payment_first_creation_stores_the_estimate():
         )
 
     order.refresh_from_db()
-    assert order.estimated_delivery == date(2026, 10, 8)
+    return order
+
+
+def test_payment_first_creation_stores_the_estimate():
+    """``create_order_from_cart`` (online) seeds it too, not only the
+    offline path."""
+    assert _create_online().estimated_delivery == date(2026, 10, 8)
+
+
+def _store_unvalidated_cutoff(raw):
+    # ORM write: skips the admin/API validator, like a seeder would.
+    Setting.objects.update_or_create(
+        name="DISPATCH_CUTOFF",
+        defaults={"value_type": Setting.TYPE_STRING, "value_string": raw},
+    )
+
+
+class TestUnreadableCutoff:
+    """The estimate is advisory: a bad stored cutoff must not fail
+    checkout, least of all after the shopper has paid."""
+
+    @pytest.mark.parametrize("raw", ["25:99", "24:00", "3pm"])
+    def test_seed_leaves_it_unset_and_logs(self, raw, caplog):
+        country = _country_with_rate(delivery_days_min=1, delivery_days_max=3)
+        _store_unvalidated_cutoff(raw)
+        assert _seed(_order_data(country), MONDAY_10_ATHENS) is None
+        assert "DISPATCH_CUTOFF" in caplog.text
+        assert repr(raw) in caplog.text
+
+    def test_offline_order_is_still_created(self, caplog):
+        _store_unvalidated_cutoff("25:99")
+        order = TestSetAtCreation()._create(
+            days={"delivery_days_min": 1, "delivery_days_max": 3}
+        )
+        order.refresh_from_db()
+        assert order.pk
+        assert order.estimated_delivery is None
+        assert "DISPATCH_CUTOFF" in caplog.text
+
+    def test_payment_first_order_is_still_created(self, caplog):
+        _store_unvalidated_cutoff("25:99")
+        order = _create_online()
+        assert order.pk
+        assert order.estimated_delivery is None
+        assert "DISPATCH_CUTOFF" in caplog.text
+
+
+def test_provider_without_a_matching_rate_leaves_it_unset():
+    """Reaches the rate lookup (provider and country resolved) and finds
+    no rate for the requested kind."""
+    country = _country_with_rate(delivery_days_min=1, delivery_days_max=3)
+    data = _order_data(country)
+    assert data["shipping_provider"] is not None
+    data["shipping_kind"] = "pickup_point"
+    assert _seed(data, MONDAY_10_ATHENS) is None

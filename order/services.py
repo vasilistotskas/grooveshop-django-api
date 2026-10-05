@@ -2700,7 +2700,8 @@ class OrderService:
         """Fix ``Order.estimated_delivery`` from the chosen rate at create.
 
         Runs after :meth:`_resolve_shipping_provider`. Left unset when no
-        provider resolved or the rate advertises no estimate.
+        provider resolved, the rate advertises no estimate, or the
+        stored ``DISPATCH_CUTOFF`` is unreadable.
         """
         from shipping.delivery import configured_cutoff, estimated_delivery
         from shipping.models import ShippingRate
@@ -2715,8 +2716,16 @@ class OrderService:
             kind=order_data["shipping_kind"],
             is_active=True,
         ).first()
+        try:
+            cutoff = configured_cutoff()
+        except ValueError:
+            # Advisory estimate inside the create-order transaction: a
+            # bad stored setting must not lose the order. No date is
+            # better than one computed from an invented cutoff.
+            logger.exception("Estimated delivery skipped")
+            return
         order_data["estimated_delivery"] = estimated_delivery(
-            rate, timezone.now(), configured_cutoff()
+            rate, timezone.now(), cutoff
         )
 
     @staticmethod

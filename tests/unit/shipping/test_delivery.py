@@ -124,6 +124,35 @@ class TestDispatchDate:
             2026, 10, 29
         )
 
+    def test_year_boundary_after_cutoff_skips_new_year_holiday(self):
+        # Thu 31 Dec 2026 16:00 EET: next day is 1 Jan (holiday), then
+        # Sat/Sun, so dispatch is Mon 4 Jan.
+        assert dispatch_date(_utc(2026, 12, 31, 14, 0), CUTOFF) == date(
+            2027, 1, 4
+        )
+
+    def test_clocks_going_back_move_the_same_utc_time_before_cutoff(self):
+        # Fri 23 Oct 12:30 UTC is 15:30 EEST: after cutoff -> Monday.
+        # Mon 26 Oct 12:30 UTC is 14:30 EET (clocks went back Sun 25):
+        # before cutoff -> ships that day.
+        assert dispatch_date(_utc(2026, 10, 23, 12, 30), CUTOFF) == date(
+            2026, 10, 26
+        )
+        assert dispatch_date(_utc(2026, 10, 26, 12, 30), CUTOFF) == date(
+            2026, 10, 26
+        )
+
+    def test_clocks_going_forward_move_the_same_utc_time_past_cutoff(self):
+        # Fri 27 Mar 12:30 UTC is 14:30 EET: ships Friday.
+        # Mon 30 Mar 12:30 UTC is 15:30 EEST (clocks went forward Sun
+        # 29): after cutoff -> Tuesday.
+        assert dispatch_date(_utc(2026, 3, 27, 12, 30), CUTOFF) == date(
+            2026, 3, 27
+        )
+        assert dispatch_date(_utc(2026, 3, 30, 12, 30), CUTOFF) == date(
+            2026, 3, 31
+        )
+
     def test_no_cutoff_ships_same_day_even_late(self):
         assert dispatch_date(_utc(2026, 10, 5, 20, 0), None) == date(
             2026, 10, 5

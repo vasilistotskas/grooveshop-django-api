@@ -82,9 +82,12 @@ def _cross_check_comparison_rows(props: dict) -> list[str]:
 
 
 def _cross_check_hero_products(props: dict) -> list[str]:
-    """A slide's ``product_id`` must name a product that is live here.
+    """A slide's ``product_id`` must name an active product of this store.
 
-    The chip is drawn from that product, so a dangling id would leave a
+    "Active" is exactly what the storefront's product detail serves a
+    visitor (``Product.objects.active()``), so an inactive or deleted
+    product, which the chip would link to a 404, is refused. The chip is
+    drawn from that product, so a dangling id would leave a
     slide pointing at nothing — and an id is the one thing a merchant
     types blind. One query for the whole carousel, run in the current
     tenant's schema, which is what makes "exists in this tenant" true.
@@ -99,14 +102,16 @@ def _cross_check_hero_products(props: dict) -> list[str]:
     from product.models.product import Product
 
     found = set(
-        Product.objects.filter(pk__in=wanted, is_deleted=False).values_list(
-            "pk", flat=True
-        )
+        Product.objects.active()
+        .filter(pk__in=wanted)
+        .values_list("pk", flat=True)
     )
     missing = sorted(wanted - found)
     if not missing:
         return []
-    return [f"slides: product_id(s) not found in this store: {missing}"]
+    return [
+        f"slides: product_id(s) not found among this store's active products: {missing}"
+    ]
 
 
 # Run only once the props fit their schema: a cross-prop rule cannot

@@ -911,6 +911,16 @@ class TestHeroSlideProduct:
         with pytest.raises(ValidationError, match="not found"):
             validate_section_props("hero_carousel", self._slides(product.pk))
 
+    def test_an_inactive_product_is_refused(self):
+        """The storefront detail 404s an inactive product for visitors,
+        so the chip would link to nothing."""
+        from product.factories.product import ProductFactory
+
+        product = ProductFactory(num_images=0, num_reviews=0, active=False)
+
+        with pytest.raises(ValidationError, match="active products"):
+            validate_section_props("hero_carousel", self._slides(product.pk))
+
     def test_every_missing_id_is_named_in_one_message(self):
         with pytest.raises(ValidationError) as exc_info:
             validate_section_props(

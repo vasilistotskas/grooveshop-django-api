@@ -18,6 +18,7 @@ from datetime import date, datetime, time, timedelta
 from functools import lru_cache
 from typing import TYPE_CHECKING
 
+from django.conf import settings
 from django.utils import timezone
 
 if TYPE_CHECKING:
@@ -81,8 +82,14 @@ def add_business_days(day: date, days: int) -> date:
 
 def parse_cutoff(raw: object) -> time | None:
     """``DISPATCH_CUTOFF`` (``HH:MM``) as a time; empty means no cutoff."""
+    from tenant.validators import validate_dispatch_cutoff_setting
+
     if not raw:
         return None
+    # ``time.fromisoformat`` alone is too lenient ("24:00" reads as
+    # midnight, "1500" as 15:00); the admin validator is the one rule.
+    if not validate_dispatch_cutoff_setting(raw):
+        raise ValueError(f"not HH:MM: {raw!r}")
     return time.fromisoformat(str(raw))
 
 
@@ -109,6 +116,25 @@ def estimated_delivery(
 
 
 def configured_cutoff() -> time | None:
+    """The stored cutoff; ``None`` means the setting is empty.
+
+    Raises ``ValueError`` naming the setting and its raw value when it
+    is not ``HH:MM``. Admin and API saves are validated, but the ORM,
+    seeders and migrations write it unchecked; the caller decides what
+    an unreadable value means (``None`` here would wrongly read as "no
+    cutoff, ships today").
+    """
     from extra_settings.models import Setting
 
-    return parse_cutoff(Setting.get("DISPATCH_CUTOFF", default="15:00"))
+    default = next(
+        entry["value"]
+        for entry in settings.EXTRA_SETTINGS_DEFAULTS
+        if entry["name"] == "DISPATCH_CUTOFF"
+    )
+    raw = Setting.get("DISPATCH_CUTOFF", default=default)
+    try:
+        return parse_cutoff(raw)
+    except ValueError as exc:
+        raise ValueError(
+            f"DISPATCH_CUTOFF setting is not HH:MM: {raw!r}"
+        ) from exc

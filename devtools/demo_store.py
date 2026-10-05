@@ -34,6 +34,7 @@ import secrets
 from decimal import Decimal
 from typing import Any
 
+from djmoney.money import Money
 from measurement.measures import Weight
 
 from devtools.demo_blog import seed_blog as _seed_blog
@@ -952,30 +953,15 @@ UNPUBLISH_LAYOUTS: tuple[str, ...] = (
 # page_config.defaults: those columns link to /vision and the two
 # microlearning routes, which UNPUBLISH_LAYOUTS above takes down.
 #
+# There is no header menu on purpose: a configured header REPLACES the
+# storefront's code navbar, and the code navbar already draws Shop with
+# its category panel plus Offers, Blog, Gift cards and Rewards behind the
+# same gates as their pages. ``seed_navigation`` removes a header row an
+# earlier run created.
+#
 # Slot shapes (validated by ``validate_navigation_items``):
-#   header/mobile: [{label, to|href, icon?}] — EXACTLY one of to/href
+#   mobile: [{label, to|href, icon?}] — EXACTLY one of to/href
 #   footer:        [{label, icon?, children: [...]}]
-NAV_HEADER: list[dict[str, Any]] = [
-    {
-        "label": "Κατάστημα",
-        "to": "/products",
-        "icon": "i-heroicons-shopping-bag",
-    },
-    # /offers is the real page now (GET /api/v1/promotion + the
-    # storefront's offers route). An operator-configured header REPLACES
-    # the code-level navbar, so the link has to live here too — the
-    # two-tier-gated code link never renders for a tenant that has a
-    # NavigationMenu header row.
-    {"label": "Προσφορές", "to": "/offers", "icon": "i-heroicons-tag"},
-    {"label": "Blog", "to": "/blog", "icon": "i-heroicons-newspaper"},
-    {"label": "Δωροκάρτες", "to": "/gift-cards", "icon": "i-heroicons-gift"},
-    {
-        "label": "Επιβράβευση",
-        "to": "/loyalty-program",
-        "icon": "i-heroicons-star",
-    },
-]
-
 NAV_MOBILE: list[dict[str, Any]] = [
     {"label": "Αρχική", "to": "/", "icon": "i-heroicons-home"},
     {
@@ -999,7 +985,6 @@ NAV_FOOTER: list[dict[str, Any]] = [
         "children": [
             {"label": "Όλα τα προϊόντα", "to": "/products"},
             {"label": "Προσφορές", "to": "/offers"},
-            {"label": "Αξεσουάρ Κινητών", "to": "/products"},
             {"label": "Δωροκάρτες", "to": "/gift-cards"},
             {"label": "Πρόγραμμα Επιβράβευσης", "to": "/loyalty-program"},
         ],
@@ -1053,10 +1038,8 @@ NAV_LABELS_EN: dict[str, str] = {
     "Προσφορές": "Offers",
     "Blog": "Blog",
     "Δωροκάρτες": "Gift cards",
-    "Επιβράβευση": "Rewards",
     "Επικοινωνία": "Contact",
     "Όλα τα προϊόντα": "All products",
-    "Αξεσουάρ Κινητών": "Phone accessories",
     "Πρόγραμμα Επιβράβευσης": "Rewards programme",
     "Εξυπηρέτηση": "Support",
     "Συχνές Ερωτήσεις": "FAQ",
@@ -1522,9 +1505,10 @@ def seed_brands() -> dict[str, int]:
 def seed_categories() -> dict[str, int]:
     """Create the demo category tree, in both languages.
 
-    A NEW root, deliberately: the prod-cloned roots stay flat rather
-    than being reparented, because mutating cloned production rows to
-    manufacture tree depth is not worth the cosmetic gain.
+    NEW roots, deliberately — the board's four, side by side: the
+    prod-cloned roots stay flat rather than being reparented, because
+    mutating cloned production rows to manufacture tree depth is not
+    worth the cosmetic gain.
 
     An existing demo row is UPDATED rather than skipped. The names and
     the copy are what a re-run is for, and a seed that skipped what it
@@ -1560,17 +1544,36 @@ def seed_categories() -> dict[str, int]:
         by_slug[row.slug] = category
         _bump(report, "created" if created else "updated")
 
-    # A ``demo-`` category the tree no longer lists is DEACTIVATED, for
-    # the same reason its products are: rows point at it. Without this
-    # the previous tree's categories stayed live beside the new one, so
-    # the storefront's categories band offered "Chargers & Cables" next
-    # to the "Charging" that replaced it, each with its own image.
-    stale = ProductCategory.objects.filter(
-        slug__startswith=f"{DEMO_MARKER}-", active=True
-    ).exclude(slug__in=[row.slug for row in CATEGORIES])
-    retired = stale.update(active=False)
-    if retired:
-        _bump(report, "retired", retired)
+    # A ``demo-`` category the tree no longer lists goes, for the same
+    # reason its products are retired: without this the previous tree's
+    # categories stayed live beside the new one, so the storefront's
+    # categories band offered "Chargers & Cables" next to the "Charging"
+    # that replaced it, each with its own image, and the one-umbrella
+    # tree's "Phone Accessories" root stayed above the four roots that
+    # replaced it.
+    #
+    # DELETED when nothing points at it, DEACTIVATED when products do:
+    # a retired product keeps its category, and a demo store that loses
+    # its order history is a worse demo. Deepest first, so a parent is
+    # childless by the time it is looked at; each row is re-read because
+    # every delete shifts the MPTT bounds of the rest.
+    stale_ids = list(
+        ProductCategory.objects.filter(slug__startswith=f"{DEMO_MARKER}-")
+        .exclude(slug__in=[row.slug for row in CATEGORIES])
+        .order_by("-level", "-id")
+        .values_list("id", flat=True)
+    )
+    for category_id in stale_ids:
+        category = ProductCategory.objects.get(id=category_id)
+        if category.products.exists() or category.get_children().exists():
+            if category.active:
+                ProductCategory.objects.filter(id=category_id).update(
+                    active=False
+                )
+                _bump(report, "retired")
+        else:
+            category.delete()
+            _bump(report, "removed")
 
     return report
 
@@ -2398,6 +2401,44 @@ def activate_default_carrier() -> dict[str, int]:
     return report
 
 
+#: What the demo's cash-on-delivery option charges. The storefront
+#: always renders the real ``PayWay.cost``, so the board's "+2,00 €" is
+#: only true while this row says so.
+DEMO_COD_COST = Money(Decimal("2.00"), "EUR")
+
+
+def seed_pay_ways() -> dict[str, int]:
+    """Price the demo store's cash-on-delivery option.
+
+    Only the ``PAY_ON_DELIVERY`` row, only on a demo store: provisioning
+    seeds it free, and every other pay way (BoxNow's pay-on-the-go, the
+    online ones) keeps whatever it carries. The cost is the one field
+    written, so a merchant-style edit to the rest of the row survives.
+    """
+    from pay_way.enum.pay_way import PayWayEnum
+    from pay_way.models import PayWay
+
+    if not _current_tenant_is_demo():
+        return {"skipped_not_a_demo_tenant": 1}
+
+    # ``distinct``: the name join fans out once per translated language.
+    ids = list(
+        PayWay.objects.filter(translations__name=PayWayEnum.PAY_ON_DELIVERY)
+        .values_list("id", flat=True)
+        .distinct()
+    )
+    # Amount AND currency, spelled out: ``PayWay.objects`` is not
+    # djmoney-patched, so a ``Money`` here would reach the amount column
+    # alone and leave ``cost_currency`` as it was.
+    amount, currency = DEMO_COD_COST.amount, str(DEMO_COD_COST.currency)
+    changed = (
+        PayWay.objects.filter(id__in=ids)
+        .exclude(cost=amount, cost_currency=currency)
+        .update(cost=amount, cost_currency=currency)
+    )
+    return {"updated": changed} if changed else {"unchanged": 1}
+
+
 def seed_promotions() -> dict[str, int]:
     """The demo store's offers — see ``devtools/demo_promotions.py``.
 
@@ -2437,11 +2478,20 @@ def seed_navigation() -> dict[str, int]:
 
     report: dict[str, int] = {}
     payloads = {
-        NavigationSlot.HEADER: NAV_HEADER,
         NavigationSlot.MOBILE: NAV_MOBILE,
         NavigationSlot.FOOTER: NAV_FOOTER,
     }
     rebuild = _current_tenant_is_demo()
+
+    if rebuild:
+        # No header menu any more: an earlier run's row would keep
+        # REPLACING the storefront's code navbar, so on a demo store it
+        # goes. Anywhere else a header row is an operator's.
+        removed, _ = NavigationMenu.objects.filter(
+            slot=NavigationSlot.HEADER
+        ).delete()
+        if removed:
+            _bump(report, "header_removed")
 
     for slot, items in payloads.items():
         overrides = {"en": english_menu(items)}

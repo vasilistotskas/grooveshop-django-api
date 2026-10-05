@@ -73,6 +73,17 @@ def validate_business_hours_setting(value: object) -> bool:
     return True
 
 
+def validate_dispatch_cutoff_setting(value: object) -> bool:
+    """django-extra-settings validator for ``DISPATCH_CUTOFF``.
+
+    A zero-padded ``HH:MM`` local time, or empty for "no cutoff" (an
+    order placed on a business day always dispatches that day).
+    """
+    if value in (None, ""):
+        return True
+    return isinstance(value, str) and bool(_TIME_RE.match(value))
+
+
 # ---------------------------------------------------------------------------
 # STORE_OFFICES extra_setting
 # ---------------------------------------------------------------------------
@@ -181,6 +192,8 @@ def validate_social_login_providers_setting(value: object) -> bool:
 _ANNOUNCEMENT_KEYS = {
     "enabled",
     "text",
+    "shortText",
+    "code",
     "i18n",
     "link",
     "icon",
@@ -199,6 +212,10 @@ _ANNOUNCEMENT_COLORS = {
 }
 _ICON_NAME_RE = re.compile(r"^i-[a-z0-9:-]+$")
 _ANNOUNCEMENT_LINK_RE = re.compile(r"^(/|https://)")
+# The wording that differs per locale; ``code`` is not here on purpose.
+_ANNOUNCEMENT_TEXT_LIMITS = {"text": 200, "shortText": 80}
+# One token: a promo code is typed or copied, never read as a sentence.
+_PROMO_CODE_RE = re.compile(r"^\S{1,40}$")
 
 
 def validate_announcement_bar_setting(value: object) -> bool:
@@ -206,12 +223,19 @@ def validate_announcement_bar_setting(value: object) -> bool:
 
     Boolean contract, like ``validate_business_hours_setting``.
 
-    Shape: ``{"enabled": bool, "text": str, "i18n": {"<locale>":
-    {"text": str}}, "link"?, "icon"?, "color"?, "dismissible"?,
-    "id"?}``. ``text`` carries the DEFAULT locale's wording and
-    ``i18n`` overrides it per locale — the same partial-override
-    convention as ``PageSection.i18n`` and ``STORE_OFFICES``, so the
-    default locale is not a valid key there.
+    Shape: ``{"enabled": bool, "text": str, "shortText"?: str,
+    "code"?: str, "i18n": {"<locale>": {"text"?, "shortText"?}},
+    "link"?, "icon"?, "color"?, "dismissible"?, "id"?}``. ``text``
+    carries the DEFAULT locale's wording and ``i18n`` overrides it per
+    locale — the same partial-override convention as
+    ``PageSection.i18n`` and ``STORE_OFFICES``, so the default locale
+    is not a valid key there.
+
+    ``shortText`` is the phone's copy (the bar is one line, and a
+    phone has less of it); it falls back to ``text`` where absent.
+    ``code`` is a promo code the storefront sets apart from the
+    sentence. It is NOT translatable: a code is the same string in
+    every language, so a per-locale copy could only drift.
 
     ``id`` is what a dismissal is remembered against in the visitor's
     browser: changing it re-shows the bar to everyone, which is how a
@@ -231,7 +255,21 @@ def validate_announcement_bar_setting(value: object) -> bool:
         return False
 
     text = data.get("text", "")
-    if not isinstance(text, str) or len(text) > 200:
+    if (
+        not isinstance(text, str)
+        or len(text) > _ANNOUNCEMENT_TEXT_LIMITS["text"]
+    ):
+        return False
+    short_text = data.get("shortText")
+    if short_text is not None and (
+        not isinstance(short_text, str)
+        or len(short_text) > _ANNOUNCEMENT_TEXT_LIMITS["shortText"]
+    ):
+        return False
+    code = data.get("code")
+    if code is not None and (
+        not isinstance(code, str) or not _PROMO_CODE_RE.match(code)
+    ):
         return False
     # A bar with nothing to say is a blank strip above the header.
     if enabled and not text.strip():
@@ -274,10 +312,80 @@ def validate_announcement_bar_setting(value: object) -> bool:
     for code, override in i18n.items():
         if code not in codes or code == default:
             return False
-        if not isinstance(override, dict) or set(override) - {"text"}:
+        if (
+            not isinstance(override, dict)
+            or not override
+            or set(override) - set(_ANNOUNCEMENT_TEXT_LIMITS)
+        ):
             return False
-        entry = override.get("text")
-        if not isinstance(entry, str) or len(entry) > 200:
+        for key, entry in override.items():
+            if (
+                not isinstance(entry, str)
+                or len(entry) > _ANNOUNCEMENT_TEXT_LIMITS[key]
+            ):
+                return False
+
+    return True
+
+
+# ---------------------------------------------------------------------------
+# AUTH_PANEL extra_setting
+# ---------------------------------------------------------------------------
+
+_AUTH_PANEL_KEYS = {"imageUrl", "tagline", "i18n"}
+_AUTH_PANEL_TAGLINE_MAX = 200
+_AUTH_PANEL_IMAGE_MAX = 1000
+
+
+def validate_auth_panel_setting(value: object) -> bool:
+    """django-extra-settings validator for ``AUTH_PANEL``.
+
+    Boolean contract, like ``validate_business_hours_setting``.
+
+    Shape: ``{"imageUrl"?: str, "tagline"?: str, "i18n": {"<locale>":
+    {"tagline": str}}}`` — the photo and the line on the sign-in
+    pages' ink panel. ``imageUrl`` is a stored media path, the same
+    bare string every page-section image prop holds (an upload is
+    referenced, never inlined). ``tagline`` is the DEFAULT locale's
+    wording and ``i18n`` overrides it per locale, the same
+    partial-override convention as ``ANNOUNCEMENT_BAR`` — the image is
+    not translatable, so it is not an override key. Both are optional:
+    the panel falls back to the store's ink-and-logo layout. Empty
+    value = nothing configured.
+    """
+    if value in (None, "", {}):
+        return True
+    if not isinstance(value, dict):
+        return False
+    data = {str(k): v for k, v in value.items()}
+    if set(data) - _AUTH_PANEL_KEYS:
+        return False
+
+    image = data.get("imageUrl")
+    if image is not None and (
+        not isinstance(image, str) or len(image) > _AUTH_PANEL_IMAGE_MAX
+    ):
+        return False
+    tagline = data.get("tagline")
+    if tagline is not None and (
+        not isinstance(tagline, str) or len(tagline) > _AUTH_PANEL_TAGLINE_MAX
+    ):
+        return False
+
+    from core.utils.i18n import available_language_codes
+
+    codes = available_language_codes()
+    default = settings.PARLER_DEFAULT_LANGUAGE_CODE
+    i18n = data.get("i18n", {})
+    if not isinstance(i18n, dict):
+        return False
+    for code, override in i18n.items():
+        if code not in codes or code == default:
+            return False
+        if not isinstance(override, dict) or set(override) != {"tagline"}:
+            return False
+        entry = override["tagline"]
+        if not isinstance(entry, str) or len(entry) > _AUTH_PANEL_TAGLINE_MAX:
             return False
 
     return True

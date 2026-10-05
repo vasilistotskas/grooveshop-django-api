@@ -102,6 +102,23 @@ class ShippingOptionSerializer(serializers.Serializer):
             "one fewer option and no explanation."
         ),
     )
+    delivery_days_min = serializers.IntegerField(
+        allow_null=True,
+        help_text=_(
+            "Fastest delivery in business days after dispatch, or null "
+            "when the rate advertises no estimate. Pair with the public "
+            "``DISPATCH_CUTOFF`` setting for the 'order before HH:MM' "
+            "line. Day counts only, never dates, so the response stays "
+            "cacheable."
+        ),
+    )
+    delivery_days_max = serializers.IntegerField(
+        allow_null=True,
+        help_text=_(
+            "Slowest delivery in business days after dispatch; null "
+            "exactly when ``delivery_days_min`` is."
+        ),
+    )
     logo_url = serializers.URLField(
         allow_null=True,
         required=False,

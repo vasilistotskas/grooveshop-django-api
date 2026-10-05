@@ -206,21 +206,32 @@ class TestBrandHeroKeepsItsLink(TestCase):
         hero = home.sections.get(component_type="hero_carousel")
         assert hero.props.get("link")
 
-    def test_adds_a_hero_to_a_home_that_has_none(self):
-        """The default homepage is product-first and carries no carousel.
-
-        ``seed_brand_pages`` fills a PROP-LESS ``hero_carousel`` with the
-        banner artwork. On a schema that already went through
-        ``seed_page_layouts`` there is none to fill, so without this the
-        brand banner silently never applied — on a staging refresh, or
-        any test that seeds both.
-        """
-        from page_config.defaults import seed_brand_pages, seed_page_layouts
-        from page_config.models import PageLayout
-
+    def test_fills_the_default_homes_prop_less_hero(self):
+        """The default home opens on a prop-less ``hero_carousel``, which
+        ``seed_brand_pages`` fills with the banner artwork — in place,
+        not as a second carousel."""
         seed_page_layouts()
         home = PageLayout.objects.get(page_type="home")
-        assert not home.sections.filter(component_type="hero_carousel").exists()
+        hero = home.sections.get(component_type="hero_carousel")
+        assert not hero.props
+        sections_before = home.sections.count()
+
+        seed_brand_pages()
+
+        hero.refresh_from_db()
+        assert hero.props.get("link")
+        assert hero.sort_order == 0
+        assert home.sections.count() == sections_before
+
+    def test_adds_a_hero_to_a_home_that_has_none(self):
+        """A merchant-built home with no carousel is not left without the
+        banner: ``seed_brand_pages`` adds one, on top."""
+        home = PageLayout.objects.create(
+            page_type="home", title="Homepage", is_published=True
+        )
+        PageSection.objects.create(
+            layout=home, component_type="products_grid", title="", props={}
+        )
 
         seed_brand_pages()
 
@@ -260,31 +271,63 @@ class TestBrandHeroKeepsItsLink(TestCase):
 
 
 class TestDefaultHomeIsAShopHomepage(TestCase):
-    """The default homepage sells; it does not advertise an empty blog.
+    """The default homepage is the Groove Volt home.
 
     Until 2026-09-18 every new tenant inherited the first store's
-    blog-first page: a prop-less ``hero_carousel`` renders nothing and an
-    empty blog renders "no articles yet", so a freshly provisioned store
-    opened on an empty state and showed no product at all.
+    blog-first page, which opened on empty states and showed no product
+    at all. The bands it has now are all data-driven: each renders
+    nothing until it has content, so the stack never opens on an empty
+    state.
     """
 
-    def test_leads_with_the_catalogue(self):
-        sections = [
+    def test_is_the_boards_bands_in_the_boards_order(self):
+        assert [
             entry["component_type"]
             for entry in DEFAULT_PAGE_LAYOUTS["home"]["sections"]
+        ] == [
+            "hero_carousel",
+            "trust_badges",
+            "product_categories",
+            "products_grid",
+            "offers_preview",
+            "featured_products",
+            "loyalty_hero",
+            "stats_strip",
+            "blog_posts_grid",
+            "testimonials",
+            "faq",
         ]
-        assert sections[0] == "product_categories"
-        assert "featured_products" in sections
 
-    def test_carries_nothing_that_renders_an_empty_state_first(self):
-        sections = [
-            entry["component_type"]
-            for entry in DEFAULT_PAGE_LAYOUTS["home"]["sections"]
+    def test_the_offers_band_is_ink_and_the_rest_alternate(self):
+        sections = DEFAULT_PAGE_LAYOUTS["home"]["sections"]
+        surfaces = {
+            entry["component_type"]: entry["props"].get("surface")
+            for entry in sections
+        }
+        assert surfaces["offers_preview"] == "ink"
+        # Neighbouring bands on one surface read as a single band.
+        drawn = [
+            surfaces[t]
+            for t in (
+                "product_categories",
+                "products_grid",
+                "featured_products",
+                "blog_posts_grid",
+                "faq",
+            )
         ]
-        # The carousel needs artwork nobody has yet; the blog rail
-        # renders its own empty state.
-        assert "hero_carousel" not in sections
-        assert "blog_categories" not in sections
+        assert drawn == ["default", "muted", "default", "muted", "muted"]
+
+    def test_carries_no_copy_that_a_store_would_have_to_unlearn(self):
+        """Headings and items are the components' translated defaults or
+        the merchant's data: a default that ships Greek words ships them
+        to every language and every store."""
+        for entry in DEFAULT_PAGE_LAYOUTS["home"]["sections"]:
+            assert not (
+                {"heading", "subheading", "items", "slides"}
+                & set(entry["props"])
+            ), entry["component_type"]
+            assert not entry["title"], entry["component_type"]
 
     def test_every_default_section_satisfies_the_prop_contract(self):
         """Seeded props are operator-editable rows like any other.

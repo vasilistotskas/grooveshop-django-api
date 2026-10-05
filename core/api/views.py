@@ -663,6 +663,9 @@ PUBLIC_SETTING_KEYS = frozenset(
         # The rest (e.g. ACS_DYNAMIC_PRICING_ENABLED) are server-side
         # only and stay admin-gated.
         "ACS_SMARTPOINT_ENABLED",
+        # Storefront's "order before HH:MM" line next to a rate's
+        # delivery days.
+        "DISPATCH_CUTOFF",
         "LOYALTY_ENABLED",
         "PROMOTIONS_ENABLED",
         # Runtime half of the recommendations gate — the storefront's
@@ -732,6 +735,9 @@ PUBLIC_SETTING_KEYS = frozenset(
         # The strip above the header. Operator-authored text rendered on
         # every page, so it is public by construction.
         "ANNOUNCEMENT_BAR",
+        # The sign-in pages' photo and line. Operator-authored and shown
+        # to every visitor before they authenticate, so public.
+        "AUTH_PANEL",
         # Demo-store credentials, deliberately public: the login page
         # shows them so a prospect can see the logged-in storefront.
         # Default off + empty everywhere; the demo seeder writes them

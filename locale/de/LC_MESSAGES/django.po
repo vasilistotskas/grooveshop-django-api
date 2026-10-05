@@ -9856,3 +9856,75 @@ msgid ""
 msgstr ""
 "Ob der Code für diesen Kunden reserviert ist (seinem Konto oder seiner "
 "E-Mail zugewiesen) und nicht allen angeboten wird."
+
+#: .\order\models\order.py:343
+msgid "Estimated Delivery"
+msgstr "Voraussichtliche Lieferung"
+
+#: .\order\models\order.py:346
+msgid ""
+"Latest expected delivery date, fixed when the order was placed from the "
+"chosen shipping rate, the dispatch cutoff and business days. Null when the "
+"rate advertises no estimate. A promise made at checkout: later rate edits do"
+" not move it."
+msgstr ""
+"Spätestes erwartetes Lieferdatum, festgelegt bei Aufgabe der Bestellung aus "
+"dem gewählten Versandtarif, dem Annahmeschluss für den Versand und den "
+"Werktagen. Leer, wenn der Tarif keine Schätzung angibt. Ein beim Checkout "
+"gegebenes Versprechen: spätere Tarifänderungen verschieben es nicht."
+
+#: .\shipping\models\rate.py:104
+msgid ""
+"Slowest delivery, in business days after dispatch. The order's "
+"``estimated_delivery`` date is dispatch plus this many business days. Blank "
+"with the minimum also blank."
+msgstr ""
+"Langsamste Lieferung in Werktagen nach dem Versand. Das Datum "
+"``estimated_delivery`` der Bestellung ist der Versand plus so viele "
+"Werktage. Leer, wenn auch das Minimum leer ist."
+
+#: .\shipping\models\rate.py:100
+msgid "Delivery Days (max)"
+msgstr "Liefertage (max.)"
+
+#: .\shipping\models\rate.py:89
+msgid "Delivery Days (min)"
+msgstr "Liefertage (min.)"
+
+#: .\shipping\models\rate.py:93
+msgid ""
+"Fastest delivery, in business days after dispatch. Blank means no estimate "
+"is advertised for this combination; set both bounds (equal for a fixed "
+"promise)."
+msgstr ""
+"Schnellste Lieferung in Werktagen nach dem Versand. Leer bedeutet, dass für "
+"diese Kombination keine Schätzung angegeben wird; beide Grenzen setzen "
+"(gleich für ein festes Versprechen)."
+
+#: .\shipping\models\rate.py:177
+msgid "Maximum cannot be below the minimum."
+msgstr "Das Maximum darf nicht unter dem Minimum liegen."
+
+#: .\shipping\models\rate.py:169
+msgid "Set both delivery bounds or neither."
+msgstr "Beide Lieferzeitgrenzen setzen oder keine."
+
+#: .\shipping\serializers\option.py:107
+msgid ""
+"Fastest delivery in business days after dispatch, or null when the rate "
+"advertises no estimate. Pair with the public ``DISPATCH_CUTOFF`` setting for"
+" the 'order before HH:MM' line. Day counts only, never dates, so the "
+"response stays cacheable."
+msgstr ""
+"Schnellste Lieferung in Werktagen nach dem Versand oder null, wenn der Tarif"
+" keine Schätzung angibt. Zusammen mit der öffentlichen Einstellung "
+"``DISPATCH_CUTOFF`` für die Zeile „Bis HH:MM bestellen“ verwenden. Nur "
+"Tageszahlen, nie Daten, damit die Antwort cachefähig bleibt."
+
+#: .\shipping\serializers\option.py:117
+msgid ""
+"Slowest delivery in business days after dispatch; null exactly when "
+"``delivery_days_min`` is."
+msgstr ""
+"Langsamste Lieferung in Werktagen nach dem Versand; genau dann null, wenn "
+"``delivery_days_min`` null ist."

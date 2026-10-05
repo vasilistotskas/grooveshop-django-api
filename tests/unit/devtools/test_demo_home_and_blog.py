@@ -20,12 +20,13 @@ from pathlib import Path
 from django.test import TestCase
 
 from devtools import demo_blog, demo_store
-from devtools.demo_home import HOME_SECTIONS
+from devtools.demo_home import HERO_SLIDE_PRODUCTS, HOME_SECTIONS
 from page_config.models import ComponentType
 from page_config.schemas import (
     validate_section_i18n,
     validate_section_props,
 )
+from product.factories.product import ProductFactory
 
 LOCK = json.loads(
     (
@@ -237,6 +238,10 @@ class TestReplaceMode(TestCase):
         def fake_media_path(key: str) -> str:
             return f"media/demo/uploads/pages/{key}.avif"
 
+        # Products seed before layouts; the hero's chip names one.
+        for slug in HERO_SLIDE_PRODUCTS.values():
+            ProductFactory(slug=slug, num_images=0, num_reviews=0)
+
         with (
             _patched(demo_store, "ensure_asset", fake_ensure),
             _patched(demo_store, "media_path", fake_media_path),
@@ -300,6 +305,35 @@ class TestReplaceMode(TestCase):
         )
         assert hero.i18n.get("en"), hero.i18n
         assert hero.props["slides"][0]["image_url"].startswith("media/demo/")
+
+    def test_the_hero_features_its_product_in_every_language(self):
+        """An override replaces ``slides`` wholesale, so a chip written
+        only into the default copy would vanish on the English page."""
+        from page_config.models import PageSection
+        from product.models import Product
+
+        self._seed()
+        hero = PageSection.objects.get(
+            layout__page_type="home", component_type="hero_carousel"
+        )
+        (slug,) = HERO_SLIDE_PRODUCTS.values()
+        wanted = Product.objects.get(slug=slug).pk
+
+        assert hero.props["slides"][0]["product_id"] == wanted
+        assert hero.i18n["en"]["props"]["slides"][0]["product_id"] == wanted
+        # Only the slides the dataset names carry one.
+        assert "product_id" not in hero.props["slides"][1]
+
+    def test_the_offers_band_is_ink_with_an_eyebrow(self):
+        from page_config.models import PageSection
+
+        self._seed()
+        offers = PageSection.objects.get(
+            layout__page_type="home", component_type="offers_preview"
+        )
+        assert offers.props["surface"] == "ink"
+        assert offers.props["eyebrow"]
+        assert offers.i18n["en"]["props"]["eyebrow"]
 
     def test_a_second_run_changes_nothing(self):
         from page_config.models import PageSection

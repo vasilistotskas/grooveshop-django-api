@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 from io import StringIO
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -194,6 +195,61 @@ class TestSettings(TestCase):
             assert not any(marker in name for marker in credential_markers), (
                 name
             )
+
+
+class TestAuthPanelSeed(TestCase):
+    """The sign-in panel's photo and line on the demo store."""
+
+    @staticmethod
+    def _seed_settings():
+        def fake_ensure(key: str) -> str:
+            return f"uploads/pages/{key}.avif"
+
+        def fake_media_path(key: str) -> str:
+            return f"media/demo/uploads/pages/{key}.avif"
+
+        originals = (demo_store.ensure_asset, demo_store.media_path)
+        demo_store.ensure_asset, demo_store.media_path = (
+            fake_ensure,
+            fake_media_path,
+        )
+        try:
+            return demo_store.seed_settings()
+        finally:
+            demo_store.ensure_asset, demo_store.media_path = originals
+
+    def test_the_photo_is_a_committed_asset(self):
+        lock = json.loads(
+            (
+                Path(demo_store.__file__).resolve().parent
+                / "demo_assets"
+                / "manifest.lock.json"
+            ).read_text(encoding="utf-8")
+        )
+        assert demo_store.AUTH_PANEL_IMAGE in lock
+
+    def test_the_value_passes_the_settings_validator(self):
+        from tenant.validators import validate_auth_panel_setting
+
+        self._seed_settings()
+        from extra_settings.models import Setting
+
+        value = Setting.objects.get(name="AUTH_PANEL").value
+        assert validate_auth_panel_setting(value)
+        assert value["imageUrl"] == "media/demo/uploads/pages/hero-audio.avif"
+        assert value["tagline"] == demo_store.AUTH_PANEL_TAGLINE["el"]
+        assert value["i18n"] == {
+            "en": {"tagline": demo_store.AUTH_PANEL_TAGLINE["en"]}
+        }
+
+    def test_a_second_run_changes_nothing(self):
+        from extra_settings.models import Setting
+
+        self._seed_settings()
+        first = Setting.objects.get(name="AUTH_PANEL").value
+        report = self._seed_settings()
+        assert Setting.objects.get(name="AUTH_PANEL").value == first
+        assert not report.get("updated"), report
 
 
 class TestCatalogueIntegrity(TestCase):

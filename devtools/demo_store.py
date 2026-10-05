@@ -39,7 +39,7 @@ from measurement.measures import Weight
 
 from devtools.demo_blog import seed_blog as _seed_blog
 from devtools.demo_catalogue import CATEGORIES, PRODUCTS
-from devtools.demo_home import HOME_SECTIONS
+from devtools.demo_home import HERO_SLIDE_PRODUCTS, HOME_SECTIONS
 from devtools.demo_media import (
     ensure_asset,
     ensure_assets,
@@ -105,6 +105,38 @@ def _demo_contact_email() -> str:
     return f"{DEMO_MAILBOX}@{host}" if host else ""
 
 
+#: The sign-in pages' panel, from the design's login board: the audio
+#: hero photograph and its line. The photo is the same committed asset
+#: the audio hero slide uses, so no second file ships for it.
+AUTH_PANEL_IMAGE = "hero-audio"
+AUTH_PANEL_TAGLINE = {
+    "el": "Ακουστικά που κάθονται σωστά.",
+    "en": "Earbuds that actually fit.",
+}
+
+
+def _demo_auth_panel() -> dict[str, Any]:
+    """The ``AUTH_PANEL`` value, with the photo copied into THIS schema.
+
+    A callable like ``_demo_contact_email``: the stored path is
+    ``media/<schema>/uploads/...``, which only exists once the asset is
+    in this tenant's storage, so it cannot be a literal.
+    """
+    from django.conf import settings
+
+    ensure_asset(AUTH_PANEL_IMAGE)
+    default = settings.PARLER_DEFAULT_LANGUAGE_CODE
+    return {
+        "imageUrl": media_path(AUTH_PANEL_IMAGE),
+        "tagline": AUTH_PANEL_TAGLINE[default],
+        "i18n": {
+            code: {"tagline": text}
+            for code, text in AUTH_PANEL_TAGLINE.items()
+            if code != default
+        },
+    }
+
+
 # ── settings (extra_settings rows) ───────────────────────────────────
 # Only rows whose CURRENT staging value leaves a shipped feature
 # invisible or inert. Everything absent from this map is deliberately
@@ -129,6 +161,9 @@ DEMO_SETTINGS: dict[str, Any] = {
     # and on the contact page of a public showcase. Mail to it is
     # suppressed rather than delivered; see `_demo_contact_email`.
     "CONTACT_EMAIL": _demo_contact_email,
+    # The sign-in pages' photo and line (the Volt design's ink panel).
+    # Validated by tenant.validators.validate_auth_panel_setting.
+    "AUTH_PANEL": _demo_auth_panel,
     # Feeds the business_hours section, the footer open/closed badge and
     # the LocalBusiness schema.org block. Shape is validated by
     # tenant.validators.validate_business_hours_setting — exactly
@@ -2044,6 +2079,29 @@ def _resolve_assets(value):
     return value
 
 
+def _attach_slide_products(
+    props: dict[str, Any], product_ids: dict[str, int]
+) -> dict[str, Any]:
+    """Write ``product_id`` into the slides ``HERO_SLIDE_PRODUCTS`` names.
+
+    Run on the section's props and on every locale's override, because
+    an override replaces ``slides`` wholesale: a chip written only into
+    the default copy would vanish on the English page.
+    """
+    slides = props.get("slides")
+    if not slides:
+        return props
+    return {
+        **props,
+        "slides": [
+            {**slide, "product_id": product_ids[HERO_SLIDE_PRODUCTS[index]]}
+            if index in HERO_SLIDE_PRODUCTS
+            else slide
+            for index, slide in enumerate(slides)
+        ],
+    }
+
+
 def seed_layouts() -> dict[str, int]:
     """Apply ``LAYOUT_PLAN`` and unpublish the microlearning boilerplate.
 
@@ -2073,6 +2131,15 @@ def seed_layouts() -> dict[str, int]:
     from page_config.schemas import (
         validate_section_i18n,
         validate_section_props,
+    )
+    from product.models import Product
+
+    # The hero's featured products. A missing one is a seeding-order
+    # bug (products seed first), and the KeyError says which.
+    product_ids = dict(
+        Product.objects.filter(
+            slug__in=HERO_SLIDE_PRODUCTS.values()
+        ).values_list("slug", "pk")
     )
 
     report: dict[str, int] = {}
@@ -2114,6 +2181,17 @@ def seed_layouts() -> dict[str, int]:
             component_type = section["component_type"]
             props = _resolve_assets(section["props"])
             i18n = _resolve_assets(section.get("i18n") or {})
+            if component_type == "hero_carousel":
+                props = _attach_slide_products(props, product_ids)
+                i18n = {
+                    code: {
+                        **override,
+                        "props": _attach_slide_products(
+                            override["props"], product_ids
+                        ),
+                    }
+                    for code, override in i18n.items()
+                }
             validate_section_props(component_type, props)
             validate_section_i18n(component_type, i18n)
             if component_type in present:

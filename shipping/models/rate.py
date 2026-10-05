@@ -85,6 +85,28 @@ class ShippingRate(TimeStampMixinModel):
             "silently."
         ),
     )
+    delivery_days_min = models.PositiveSmallIntegerField(
+        _("Delivery Days (min)"),
+        null=True,
+        blank=True,
+        default=None,
+        help_text=_(
+            "Fastest delivery, in business days after dispatch. Blank "
+            "means no estimate is advertised for this combination; set "
+            "both bounds (equal for a fixed promise)."
+        ),
+    )
+    delivery_days_max = models.PositiveSmallIntegerField(
+        _("Delivery Days (max)"),
+        null=True,
+        blank=True,
+        default=None,
+        help_text=_(
+            "Slowest delivery, in business days after dispatch. The "
+            "order's ``estimated_delivery`` date is dispatch plus this "
+            "many business days. Blank with the minimum also blank."
+        ),
+    )
     is_active = models.BooleanField(
         _("Is Active"),
         default=True,
@@ -135,6 +157,24 @@ class ShippingRate(TimeStampMixinModel):
                         "kind": self.kind,
                     }
                 )
+            )
+
+        if (self.delivery_days_min is None) != (self.delivery_days_max is None):
+            field = (
+                "delivery_days_max"
+                if self.delivery_days_max is None
+                else "delivery_days_min"
+            )
+            errors.setdefault(field, []).append(
+                str(_("Set both delivery bounds or neither."))
+            )
+        elif (
+            self.delivery_days_min is not None
+            and self.delivery_days_max is not None
+            and self.delivery_days_min > self.delivery_days_max
+        ):
+            errors.setdefault("delivery_days_max", []).append(
+                str(_("Maximum cannot be below the minimum."))
             )
 
         if self.price is not None and self.price.amount < 0:

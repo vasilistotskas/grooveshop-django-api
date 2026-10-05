@@ -69,6 +69,9 @@ ID = integer(1, 2_147_483_647)
 # one layout and after a raised one on another. Every section that draws
 # a band carries it; a hero paints its own ground and does not.
 SURFACE = choice("default", "muted")
+# A band that is drawn dark: the ink surface a promotional band sits on.
+# Only the sections that have a dark treatment take it.
+INK_SURFACE = choice("default", "muted", "ink")
 
 
 def icon(max_length: int) -> Schema:
@@ -159,6 +162,10 @@ SLIDES = array(
             "cta_link": LINK,
             "secondary_cta_text": text(100),
             "secondary_cta_link": LINK,
+            # The product this slide features, drawn as a chip over the
+            # artwork. The id, not a slug (a slug is translatable); that
+            # it exists in this store is checked in Python.
+            "product_id": ID,
         },
         required=("image_url",),
     ),
@@ -381,7 +388,16 @@ SECTION_PROPS: dict[str, dict[str, Schema]] = {
     # ``thread`` renders the woven tri-strand divider from the tenant's
     # primary/secondary/accent tokens.
     "divider": {"variant": choice("line", "thread")},
-    "loyalty_hero": {},
+    # The guest card's own wording; the numbers and tiers on it come
+    # from the loyalty settings, never from here.
+    "loyalty_hero": {
+        "surface": SURFACE,
+        "eyebrow": text(100),
+        "cta_text": text(100),
+        "cta_link": LINK,
+        "secondary_cta_text": text(100),
+        "secondary_cta_link": LINK,
+    },
     "search_bar": {},
     "about_content": {},
     "vision_content": {},
@@ -572,7 +588,8 @@ SECTION_PROPS: dict[str, dict[str, Schema]] = {
     # Live promotions on a page that is not /offers; renders nothing
     # when promotions are off or none are running.
     "offers_preview": {
-        "surface": SURFACE,
+        "surface": INK_SURFACE,
+        "eyebrow": text(100),
         "heading": text(200),
         "subheading": text(500),
         "limit": integer(1, 6),

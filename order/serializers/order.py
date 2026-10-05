@@ -867,6 +867,7 @@ class OrderDetailSerializer(OrderSerializer):
                 "has_tracking": {"type": "boolean"},
                 "estimated_delivery": {
                     "type": "string",
+                    "format": "date",
                     "nullable": True,
                 },
                 "tracking_url": {
@@ -887,7 +888,11 @@ class OrderDetailSerializer(OrderSerializer):
             "tracking_number": obj.tracking_number,
             "shipping_carrier": obj.shipping_carrier,
             "has_tracking": bool(obj.tracking_number),
-            "estimated_delivery": None,
+            "estimated_delivery": (
+                obj.estimated_delivery.isoformat()
+                if obj.estimated_delivery
+                else None
+            ),
             "tracking_url": tracking_url,
         }
 

@@ -1,4 +1,4 @@
-"""Move the ``PayWayEnum`` key from the translated table to the row.
+"""Expand: the ``PayWayEnum`` key moves from the translated table to the row.
 
 ``PayWayTranslation.name`` held a language-independent key but was
 seeded for ``el`` only, so every other locale read an empty name. The
@@ -8,6 +8,12 @@ genuinely translatable copy (``description``, ``instructions``).
 Existing rows carry their ``el`` name over (falling back to whichever
 language has one); ``reverse`` writes the key back into the ``el``
 translation.
+
+The serving release still inserts pay ways without naming ``key`` (so
+the column carries a ``db_default``) and still reads the translated
+``name``. That column is nullable and only leaves Django's STATE here;
+the next release drops it with a ``RunSQL`` migration declaring
+``contract_of`` this one (see ``docs/migrations.md``).
 """
 
 from __future__ import annotations
@@ -73,6 +79,7 @@ class Migration(migrations.Migration):
             field=models.CharField(
                 choices=KEY_CHOICES,
                 default="",
+                db_default="",
                 help_text=(
                     "Language-independent identifier of the payment "
                     "method. The storefront resolves its label from this "
@@ -86,5 +93,12 @@ class Migration(migrations.Migration):
         migrations.RunPython(
             carry_name_to_key, carry_key_to_name, elidable=False
         ),
-        migrations.RemoveField(model_name="paywaytranslation", name="name"),
+        migrations.SeparateDatabaseAndState(
+            state_operations=[
+                migrations.RemoveField(
+                    model_name="paywaytranslation", name="name"
+                ),
+            ],
+            database_operations=[],
+        ),
     ]

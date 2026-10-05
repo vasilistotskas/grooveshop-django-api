@@ -87,10 +87,12 @@ class PayWay(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
     key = models.CharField(
         _("Key"),
         max_length=50,
-        # ``default`` only backfills existing rows in the migration; a
-        # row without a key renders no label on the storefront, so
+        # ``db_default`` keeps the release still serving during the
+        # PreSync rollout able to INSERT (it never names this column);
+        # a row without a key renders no label on the storefront, so
         # forms and the write serializer require one.
         default="",
+        db_default="",
         choices=PayWayEnum,
         help_text=_(
             "Language-independent identifier of the payment method. The "

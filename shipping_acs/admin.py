@@ -8,8 +8,9 @@ from __future__ import annotations
 
 import logging
 
+from django import forms
 from django.contrib import admin, messages
-from django.http import HttpResponse
+from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils import timezone
@@ -20,8 +21,11 @@ from unfold.contrib.filters.admin import (
     RangeDateFilter,
     RangeDateTimeFilter,
 )
+from unfold.dataclasses import ActionDialog
 from unfold.decorators import action
 from unfold.enums import ActionVariant
+from unfold.forms import BaseDialogForm
+from unfold.widgets import UnfoldAdminTextareaWidget
 
 from admin.base import BaseModelAdmin
 from admin.displays import SHIPMENT_STATE_VARIANT, change_link, choice_label
@@ -56,6 +60,17 @@ def _back_to_changelist(model_admin):
     opts = model_admin.model._meta
     return redirect(
         reverse(f"admin:{opts.app_label}_{opts.model_name}_changelist")
+    )
+
+
+class CodReceivedOutsideAcsForm(BaseDialogForm):
+    note = forms.CharField(
+        label=_("Note"),
+        widget=UnfoldAdminTextareaWidget(attrs={"rows": 3}),
+        help_text=_(
+            "How the money arrived (bank transfer reference, hand "
+            "delivery, ...). Recorded on the shipment's audit trail."
+        ),
     )
 
 
@@ -206,6 +221,9 @@ class AcsShipmentAdmin(BaseModelAdmin):
         "delivery_flag",
         "returned_flag",
         "raw_shipment_status",
+        "cod_received_outside_acs_at",
+        "cod_received_outside_acs_by",
+        "cod_received_outside_acs_note",
         "metadata",
         "created_at",
         "updated_at",
@@ -249,6 +267,9 @@ class AcsShipmentAdmin(BaseModelAdmin):
                     "cod_amount",
                     "cod_payment_way",
                     "delivery_products",
+                    "cod_received_outside_acs_at",
+                    "cod_received_outside_acs_by",
+                    "cod_received_outside_acs_note",
                 ),
             },
         ),
@@ -286,6 +307,7 @@ class AcsShipmentAdmin(BaseModelAdmin):
     # page they already work on, next to the "not printed" filter.
     actions_list = ["issue_pickup_list_now"]
     actions_row = ["repoll_tracking", "issue_voucher_now"]
+    actions_detail = ["record_cod_received_outside_acs"]
     actions = [
         "bulk_print_labels",
         "bulk_repoll_tracking",
@@ -496,6 +518,53 @@ class AcsShipmentAdmin(BaseModelAdmin):
         poll_acs_tracking_one.delay(int(object_id))
         messages.info(request, _("Tracking poll dispatched."))
         return _back_to_changelist(self)
+
+    @action(
+        description=_("Record COD received outside ACS"),
+        icon="payments",
+        dialog=ActionDialog(
+            title=_("Record COD received outside ACS"),
+            description=_(
+                "Use only when the merchant confirms the cash on delivery "
+                "reached them by a route ACS never reported. It stops the "
+                "unremitted-COD alert for this parcel and marks the order "
+                "paid if it is not already. ACS's own payout records are "
+                "not touched."
+            ),
+            form_class=CodReceivedOutsideAcsForm,
+        ),
+    )
+    def record_cod_received_outside_acs(
+        self, request: HttpRequest, form, object_id=None, **kwargs
+    ) -> HttpResponse:
+        from shipping_acs.exceptions import AcsCodSettlementError
+        from shipping_acs.services import AcsService
+
+        shipment = AcsShipment.objects.get(pk=object_id)
+        try:
+            AcsService.record_cod_received_outside_acs(
+                shipment,
+                user=request.user,
+                note=form.cleaned_data["note"],
+            )
+        except AcsCodSettlementError as exc:
+            # The service names the exact reason (not COD, not delivered,
+            # ACS already paid, already recorded): say it verbatim.
+            self.message_user(request, str(exc), messages.ERROR)
+        else:
+            self.message_user(
+                request,
+                _("COD recorded as received outside ACS."),
+                messages.SUCCESS,
+            )
+        return HttpResponse(
+            headers={
+                "HX-Redirect": reverse(
+                    "admin:shipping_acs_acsshipment_change",
+                    args=[object_id],
+                ),
+            }
+        )
 
     @action(
         description=_("Issue ACS voucher now"),

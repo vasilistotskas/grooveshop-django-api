@@ -411,6 +411,13 @@ def _unremitted_cod_rows(older_than_days: int) -> list[dict]:
     Keyed on the payout table rather than ``payment_status`` because the
     payout row IS the evidence: ``AcsCodPayout`` exists only once ACS
     reports having remitted, and writing it is what flips the order paid.
+
+    The one other way out is an operator's explicit settlement,
+    ``AcsService.record_cod_received_outside_acs``: the merchant confirms
+    the money arrived by a route ACS never reported (order 73 again, which
+    would otherwise have alerted nightly with no way to clear it). Such a
+    parcel carries ``cod_received_outside_acs_at`` and is excluded here;
+    no ``AcsCodPayout`` is ever invented for it.
     """
     from shipping_acs.enum.charge_type import AcsChargeType
     from shipping_acs.enum.shipment_state import AcsShipmentState
@@ -427,6 +434,7 @@ def _unremitted_cod_rows(older_than_days: int) -> list[dict]:
             charge_type=AcsChargeType.COD,
             cod_amount__gt=0,
             delivery_date__lt=cutoff,
+            cod_received_outside_acs_at__isnull=True,
         )
         .select_related("order")
         .order_by("delivery_date")
@@ -506,7 +514,10 @@ def alert_unremitted_cod_payouts(self) -> dict[str, Any]:
                 "remittance status. If a payout HAS been made on a date "
                 "the nightly reconcile never queried, replay it with "
                 "`manage.py reconcile_acs_cod --days N --silent "
-                "--tenant <schema>` — it is idempotent."
+                "--tenant <schema>` — it is idempotent.\n\n"
+                "If the merchant WAS paid for a parcel outside ACS, open "
+                "the shipment in the admin and use 'Record COD received "
+                "outside ACS' to clear it from this alert."
             ),
         )
     except Exception as exc:

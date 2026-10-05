@@ -19558,3 +19558,79 @@ msgid ""
 "Promotions are cart-level (coupons, scoped and windowed) and are not part "
 "of this filter."
 msgstr ""
+
+#: .\shipping_acs\admin.py:71
+msgid ""
+"How the money arrived (bank transfer reference, hand delivery, ...). "
+"Recorded on the shipment's audit trail."
+msgstr ""
+
+#: .\shipping_acs\admin.py:523 .\shipping_acs\admin.py:526
+msgid "Record COD received outside ACS"
+msgstr ""
+
+#: .\shipping_acs\admin.py:528
+msgid ""
+"Use only when the merchant confirms the cash on delivery reached them by a "
+"route ACS never reported. It stops the unremitted-COD alert for this parcel "
+"and marks the order paid if it is not already. ACS's own payout records are "
+"not touched."
+msgstr ""
+
+#: .\shipping_acs\admin.py:557
+msgid "COD recorded as received outside ACS."
+msgstr ""
+
+#: .\shipping_acs\models\shipment.py:256
+msgid "COD received outside ACS at"
+msgstr ""
+
+#: .\shipping_acs\models\shipment.py:260
+msgid ""
+"When an operator recorded that the merchant received this parcel's COD "
+"money by a route ACS never reported. Clears the unremitted-COD alert for "
+"the parcel; ACS's own payout rows are untouched."
+msgstr ""
+
+#: .\shipping_acs\models\shipment.py:272
+msgid "COD received outside ACS by"
+msgstr ""
+
+#: .\shipping_acs\models\shipment.py:279
+msgid ""
+"Operator who recorded the settlement. Stores a PLATFORM-schema user id; not "
+"FK-enforced."
+msgstr ""
+
+#: .\shipping_acs\models\shipment.py:284
+msgid "COD received outside ACS note"
+msgstr ""
+
+#: .\shipping_acs\models\shipment.py:289
+msgid ""
+"How and when the money arrived (bank transfer reference, hand delivery, "
+"...), as written by the operator."
+msgstr ""
+
+#: .\shipping_acs\services.py:2171
+msgid "A note is required."
+msgstr ""
+
+#: .\shipping_acs\services.py:2185
+msgid "Only a cash-on-delivery shipment with an amount due can be settled."
+msgstr ""
+
+#: .\shipping_acs\services.py:2192
+#, python-format
+msgid "Only a delivered shipment can be settled (this one is %(state)s)."
+msgstr ""
+
+#: .\shipping_acs\services.py:2200
+msgid "This shipment is already recorded as received outside ACS."
+msgstr ""
+
+#: .\shipping_acs\services.py:2212
+msgid ""
+"ACS already reported a payout for this voucher; there is nothing to settle."
+msgstr ""
+

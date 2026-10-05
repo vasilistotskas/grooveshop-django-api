@@ -22047,3 +22047,98 @@ msgstr ""
 "Όταν είναι true, μόνο προϊόντα με έκπτωση (discount_percent > 0). Οι "
 "προσφορές είναι σε επίπεδο καλαθιού (κουπόνια, με εύρος και χρονικά "
 "παράθυρα) και δεν περιλαμβάνονται σε αυτό το φίλτρο."
+
+#: .\shipping_acs\admin.py:71
+msgid ""
+"How the money arrived (bank transfer reference, hand delivery, ...). "
+"Recorded on the shipment's audit trail."
+msgstr ""
+"Πώς εισπράχθηκαν τα χρήματα (αριθμός τραπεζικής μεταφοράς, χειροκίνητη "
+"παράδοση, ...). Καταγράφεται στο ιστορικό της αποστολής."
+
+#: .\shipping_acs\admin.py:523 .\shipping_acs\admin.py:526
+msgid "Record COD received outside ACS"
+msgstr "Καταγραφή αντικαταβολής που εισπράχθηκε εκτός ACS"
+
+#: .\shipping_acs\admin.py:528
+msgid ""
+"Use only when the merchant confirms the cash on delivery reached them by a "
+"route ACS never reported. It stops the unremitted-COD alert for this parcel "
+"and marks the order paid if it is not already. ACS's own payout records are "
+"not touched."
+msgstr ""
+"Χρησιμοποιήστε το μόνο όταν ο έμπορος επιβεβαιώνει ότι η αντικαταβολή του "
+"έφτασε με τρόπο που η ACS δεν ανέφερε ποτέ. Σταματά την ειδοποίηση μη "
+"αποδοθείσας αντικαταβολής για αυτό το δέμα και σημειώνει την παραγγελία ως "
+"πληρωμένη, αν δεν είναι ήδη. Οι δικές της εγγραφές αποδόσεων της ACS δεν "
+"αλλάζουν."
+
+#: .\shipping_acs\admin.py:557
+msgid "COD recorded as received outside ACS."
+msgstr "Η αντικαταβολή καταγράφηκε ως εισπραγμένη εκτός ACS."
+
+#: .\shipping_acs\models\shipment.py:256
+msgid "COD received outside ACS at"
+msgstr "Αντικαταβολή εισπράχθηκε εκτός ACS στις"
+
+#: .\shipping_acs\models\shipment.py:260
+msgid ""
+"When an operator recorded that the merchant received this parcel's COD "
+"money by a route ACS never reported. Clears the unremitted-COD alert for "
+"the parcel; ACS's own payout rows are untouched."
+msgstr ""
+"Πότε ένας χειριστής κατέγραψε ότι ο έμπορος έλαβε τα χρήματα αντικαταβολής "
+"αυτού του δέματος με τρόπο που η ACS δεν ανέφερε ποτέ. Καθαρίζει την "
+"ειδοποίηση μη αποδοθείσας αντικαταβολής για το δέμα· οι εγγραφές αποδόσεων "
+"της ACS δεν αλλάζουν."
+
+#: .\shipping_acs\models\shipment.py:272
+msgid "COD received outside ACS by"
+msgstr "Αντικαταβολή εισπράχθηκε εκτός ACS από"
+
+#: .\shipping_acs\models\shipment.py:279
+msgid ""
+"Operator who recorded the settlement. Stores a PLATFORM-schema user id; not "
+"FK-enforced."
+msgstr ""
+"Ο χειριστής που κατέγραψε την εκκαθάριση. Αποθηκεύει id χρήστη του σχήματος "
+"PLATFORM· δεν επιβάλλεται ως FK."
+
+#: .\shipping_acs\models\shipment.py:284
+msgid "COD received outside ACS note"
+msgstr "Σημείωση αντικαταβολής που εισπράχθηκε εκτός ACS"
+
+#: .\shipping_acs\models\shipment.py:289
+msgid ""
+"How and when the money arrived (bank transfer reference, hand delivery, "
+"...), as written by the operator."
+msgstr ""
+"Πώς και πότε εισπράχθηκαν τα χρήματα (αριθμός τραπεζικής μεταφοράς, "
+"χειροκίνητη παράδοση, ...), όπως τα έγραψε ο χειριστής."
+
+#: .\shipping_acs\services.py:2171
+msgid "A note is required."
+msgstr "Η σημείωση είναι υποχρεωτική."
+
+#: .\shipping_acs\services.py:2185
+msgid "Only a cash-on-delivery shipment with an amount due can be settled."
+msgstr ""
+"Μόνο αποστολή με αντικαταβολή και οφειλόμενο ποσό μπορεί να εκκαθαριστεί."
+
+#: .\shipping_acs\services.py:2192
+#, python-format
+msgid "Only a delivered shipment can be settled (this one is %(state)s)."
+msgstr ""
+"Μόνο μια παραδομένη αποστολή μπορεί να εκκαθαριστεί (αυτή είναι: %(state)s)."
+
+#: .\shipping_acs\services.py:2200
+msgid "This shipment is already recorded as received outside ACS."
+msgstr "Αυτή η αποστολή έχει ήδη καταγραφεί ως εισπραγμένη εκτός ACS."
+
+#: .\shipping_acs\services.py:2212
+msgid ""
+"ACS already reported a payout for this voucher; there is nothing to settle."
+msgstr ""
+"Η ACS έχει ήδη αναφέρει απόδοση για αυτό το voucher· δεν υπάρχει κάτι να "
+"εκκαθαριστεί."
+

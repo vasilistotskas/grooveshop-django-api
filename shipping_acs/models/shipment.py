@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
 from django.utils.translation import gettext
@@ -243,6 +244,50 @@ class AcsShipment(UUIDModel, TimeStampMixinModel):
             "Set by check_stale_acs_shipments after admins were alerted "
             "that this shipment shows no tracking movement; cleared "
             "automatically when a new tracking event arrives."
+        ),
+    )
+
+    # ── COD settled outside ACS ─────────────────────────────────────
+    # Deliberately NOT an AcsCodPayout: that table is ACS's own
+    # statement and a hand-made row would forge it. This is the
+    # merchant's explicit, audited claim that the cash arrived by
+    # another route (history records the stamp like any other field).
+    cod_received_outside_acs_at = models.DateTimeField(
+        _("COD received outside ACS at"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "When an operator recorded that the merchant received this "
+            "parcel's COD money by a route ACS never reported. Clears the "
+            "unremitted-COD alert for the parcel; ACS's own payout rows "
+            "are untouched."
+        ),
+    )
+    cod_received_outside_acs_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="acs_cod_settlements_recorded",
+        verbose_name=_("COD received outside ACS by"),
+        # ORM-only for the same reason as AcsPickupList.issued_by: the
+        # operator is a PLATFORM-PUBLIC identity and this row lives in
+        # the tenant schema, where a real FK would either violate or
+        # silently match an unrelated shopper with the same pk.
+        db_constraint=False,
+        help_text=_(
+            "Operator who recorded the settlement. Stores a "
+            "PLATFORM-schema user id; not FK-enforced."
+        ),
+    )
+    cod_received_outside_acs_note = models.TextField(
+        _("COD received outside ACS note"),
+        blank=True,
+        default="",
+        db_default="",
+        help_text=_(
+            "How and when the money arrived (bank transfer reference, "
+            "hand delivery, ...), as written by the operator."
         ),
     )
 

@@ -49,6 +49,10 @@ class PayWaySerializer(
         )
         read_only_fields = (
             "id",
+            # Read-only here (writes go through PayWayWriteSerializer) so
+            # the schema states what every row carries: a key. Readers
+            # label the pay way from it and have nothing to fall back on.
+            "key",
             "sort_order",
             "main_image_path",
             "created_at",

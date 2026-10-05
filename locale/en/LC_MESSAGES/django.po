@@ -19539,3 +19539,22 @@ msgid ""
 "Slowest delivery in business days after dispatch; null exactly when "
 "``delivery_days_min`` is."
 msgstr ""
+
+#: .\search\views.py:153
+msgid "Must be true or false."
+msgstr ""
+
+#: .\search\views.py:451
+msgid "Comma-separated brand IDs (brand IN [ids])"
+msgstr ""
+
+#: .\search\views.py:458
+msgid "When true, only products with stock above zero"
+msgstr ""
+
+#: .\search\views.py:465
+msgid ""
+"When true, only products carrying a markdown (discount_percent > 0). "
+"Promotions are cart-level (coupons, scoped and windowed) and are not part "
+"of this filter."
+msgstr ""

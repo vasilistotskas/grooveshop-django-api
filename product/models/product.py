@@ -511,6 +511,7 @@ class ProductTranslation(
             Product.objects.with_category()
             .with_counts()
             .with_main_image()
+            .select_related("brand")
             .prefetch_related("category__translations")
         )
         return cls.objects.prefetch_related(
@@ -540,6 +541,9 @@ class ProductTranslation(
             "category",
             "category_name",
             "stock",
+            "in_stock",
+            "discount_percent",
+            "brand",
             "active",
             "is_deleted",
             "master_id",
@@ -668,6 +672,7 @@ class ProductTranslation(
                 else None
             ),
             "category": lambda obj: obj.master.category_id,
+            "brand": lambda obj: obj.master.brand_id,
             "category_name": lambda obj: (
                 obj.master.category.safe_translation_getter(
                     "name", language_code=obj.language_code, any_language=True

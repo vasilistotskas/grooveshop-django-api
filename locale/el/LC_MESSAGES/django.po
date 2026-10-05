@@ -22025,3 +22025,25 @@ msgid ""
 msgstr ""
 "Η πιο αργή παράδοση σε εργάσιμες ημέρες μετά την αποστολή· null ακριβώς όταν"
 " είναι και το ``delivery_days_min``."
+
+#: .\search\views.py:153
+msgid "Must be true or false."
+msgstr "Πρέπει να είναι true ή false."
+
+#: .\search\views.py:451
+msgid "Comma-separated brand IDs (brand IN [ids])"
+msgstr "Αναγνωριστικά μάρκας χωρισμένα με κόμμα (brand IN [ids])"
+
+#: .\search\views.py:458
+msgid "When true, only products with stock above zero"
+msgstr "Όταν είναι true, μόνο προϊόντα με απόθεμα μεγαλύτερο από μηδέν"
+
+#: .\search\views.py:465
+msgid ""
+"When true, only products carrying a markdown (discount_percent > 0). "
+"Promotions are cart-level (coupons, scoped and windowed) and are not part "
+"of this filter."
+msgstr ""
+"Όταν είναι true, μόνο προϊόντα με έκπτωση (discount_percent > 0). Οι "
+"προσφορές είναι σε επίπεδο καλαθιού (κουπόνια, με εύρος και χρονικά "
+"παράθυρα) και δεν περιλαμβάνονται σε αυτό το φίλτρο."

@@ -97,12 +97,24 @@ reports one, but `meili/querysets.py` does not forward it.
 | `offset` | integer | No | 0 |
 | `categories` | comma-separated ints | No | — |
 | `attributeValues` | comma-separated ints | No | — |
+| `brands` | comma-separated ints | No | — |
+| `inStock` | boolean | No | — |
+| `onOffer` | boolean | No | — |
 | `priceMin`, `priceMax` | number | No | — |
 | `likesMin`, `viewsMin` | integer | No | — |
 | `sort` | string | No | — |
 | `facets` | comma-separated strings | No | — |
 
-There is no `inStock` parameter.
+`inStock=true` keeps products with stock above zero. `onOffer=true` keeps
+products with a markdown (`discountPercent > 0`); promotions are cart-level and
+windowed, so they are deliberately not part of it. `false` is the same as absent;
+anything but true/false/1/0 is a 400.
+
+Product hits carry the card fields `brandName`, `reviewCount` (approved reviews
+only), `createdAt` and `lowStockThreshold`, read from the database like
+`categoryName`, so they are never stale. `brand`, `in_stock` and
+`discount_percent` are indexed; after a deploy that adds `brand`, run
+`meilisearch_sync_all_indexes --all-tenants --app product`.
 
 Response is `ProductMeiliSearchResponse`: the common envelope above plus
 `facetDistribution` and `facetStats` when `facets` was requested.

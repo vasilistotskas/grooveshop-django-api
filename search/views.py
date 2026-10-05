@@ -11,6 +11,7 @@ from django.db.models import Avg, Count, Max
 from django.utils import timezone
 from django.utils.functional import Promise
 from django.utils.translation import gettext_lazy as _
+from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from extra_settings.models import Setting
 from rest_framework import status
@@ -129,6 +130,27 @@ def _parse_int_csv(value: str | None, name: str) -> list[int]:
         raise ValidationError(
             {name: _("Must be a comma-separated list of integers.")}
         )
+
+
+_TRUE_VALUES = frozenset({"true", "1"})
+_FALSE_VALUES = frozenset({"false", "0"})
+
+
+def _parse_bool_flag(value: str | None, name: str) -> bool:
+    """Parse an optional on/off filter; absent or false both mean "no filter".
+
+    400 (not 500, not silently ignored) on anything but true/false/1/0, so
+    a typo'd ``inStock=ture`` cannot return unfiltered results as if it had
+    been applied.
+    """
+    if value is None or value == "":
+        return False
+    lowered = value.strip().lower()
+    if lowered in _TRUE_VALUES:
+        return True
+    if lowered in _FALSE_VALUES:
+        return False
+    raise ValidationError({name: _("Must be true or false.")})
 
 
 def _category_subtree_ids(category_ids: list[int]) -> list[int]:
@@ -423,6 +445,32 @@ def blog_post_meili_search(request):
             required=False,
         ),
         OpenApiParameter(
+            name="brands",
+            type=str,
+            location=OpenApiParameter.QUERY,
+            description=_("Comma-separated brand IDs (brand IN [ids])"),
+            required=False,
+        ),
+        OpenApiParameter(
+            name="inStock",
+            type=OpenApiTypes.BOOL,
+            location=OpenApiParameter.QUERY,
+            description=_("When true, only products with stock above zero"),
+            required=False,
+        ),
+        OpenApiParameter(
+            name="onOffer",
+            type=OpenApiTypes.BOOL,
+            location=OpenApiParameter.QUERY,
+            description=_(
+                "When true, only products carrying a markdown "
+                "(discount_percent > 0). Promotions are cart-level "
+                "(coupons, scoped and windowed) and are not part of this "
+                "filter."
+            ),
+            required=False,
+        ),
+        OpenApiParameter(
             name="sort",
             type=str,
             location=OpenApiParameter.QUERY,
@@ -499,6 +547,9 @@ def product_meili_search(request):
     attribute_value_ids = _parse_int_csv(
         request.query_params.get("attribute_values"), "attribute_values"
     )
+    brand_ids = _parse_int_csv(request.query_params.get("brands"), "brands")
+    in_stock = _parse_bool_flag(request.query_params.get("in_stock"), "inStock")
+    on_offer = _parse_bool_flag(request.query_params.get("on_offer"), "onOffer")
     sort_param = request.query_params.get("sort")
 
     # Parse facets parameter — restrict to known-safe facet fields.
@@ -546,6 +597,13 @@ def product_meili_search(request):
     # Apply attribute value filter (multi-select with IN operator)
     if attribute_value_ids:
         search_qs = search_qs.filter(attribute_values__in=attribute_value_ids)
+
+    if brand_ids:
+        search_qs = search_qs.filter(brand__in=brand_ids)
+    if in_stock:
+        search_qs = search_qs.filter(in_stock=True)
+    if on_offer:
+        search_qs = search_qs.filter(discount_percent__gt=0)
 
     # Apply sort — map the camelCase value to the snake_case field the index
     # exposes; unknown fields are dropped to prevent DSL injection.

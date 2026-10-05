@@ -3,6 +3,83 @@
 
 
 
+## v3.96.0 (2026-10-05)
+
+### Bug fixes
+
+* fix(loyalty): a refund by status alone reverses points once and earns nothing
+
+An order moved RETURNED -> REFUNDED by status (admin action,
+update_order_status) kept payment_status COMPLETED and fired no refund
+signal, so points-to-earn still showed and earned points were never
+reversed. _reversal_due counts status REFUNDED; a loyalty receiver on
+order_status_changed queues the idempotent reverse_order_points (the
+money-event refund paths already reverse through order_refunded, so a
+second call is a no-op). RETURNED alone keeps the points, per
+docs/order-system.md.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01RE48ce8w633hGEh1GBiPW4 ([`a93d763`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a93d763e515c73cc669abcb369f20241cb935b40))
+
+* fix(pay_way): ship the key as an expand-only migration
+
+PayWay.key gets a db_default so the serving release's INSERTs survive,
+and the translated name leaves Django's state only
+(SeparateDatabaseAndState); the column stays for the release still
+serving. The DROP COLUMN ships as a contract_of migration in the next
+release (docs/migrations.md).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01RE48ce8w633hGEh1GBiPW4 ([`a93d763`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a93d763e515c73cc669abcb369f20241cb935b40))
+
+* fix(pay_way): state in the schema that every pay way carries a key
+
+The read serializer's key had a model default, so the response schema
+marked it optional and clients had to guard a value that is always
+present. Read-only on PayWaySerializer (writes use the write
+serializer) makes it required in the response component.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`a93d763`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a93d763e515c73cc669abcb369f20241cb935b40))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.95.0 [skip ci] ([`c6551f0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c6551f04a37194e31bb3d2f2ae2932b13d419d3f))
+
+### Features
+
+* feat(api): Groove Volt API batch 1 — VAT after discounts, pay-way key, carriers, review and order fields (#115) ([`a93d763`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a93d763e515c73cc669abcb369f20241cb935b40))
+
+* feat(api): Groove Volt API batch 1 — VAT after discounts, pay-way key, carriers, review and order fields
+
+- F4: the cart's totalVatValue is VAT on what is paid (after markdown and
+  promotions), computed with the invoice's own allocation
+  (order/discounts.py allocate_discount + vat_buckets).
+- F15: PayWay.key (PayWayEnum) on the row; the translated `name` is
+  dropped (migration carries existing rows over). Filters, shipping
+  options and the demo seed read the key.
+- F14: tenant resolve carries the tenant's active shippingCarriers;
+  the resolve cache moves when a carrier changes.
+- F5: ratingDistribution on product retrieve, isVerifiedPurchase on
+  reviews (completed order, same rule as the review gate); reviewAverage
+  and reviewCount count approved reviews only; review-list N+1 removed.
+- F7: GIFT_CARD_VALIDITY_DAYS is public.
+- F8: recursiveProductCount on every category row (one query).
+- F12: coupon `personal`, order loyaltyPointsToEarn, order deliveryMethod.
+- F13: categoryName on search hits; the index document stores each
+  row's own language.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01RE48ce8w633hGEh1GBiPW4
+
+* i18n: catalogue entries for the batch-1 strings
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01RE48ce8w633hGEh1GBiPW4 ([`a93d763`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a93d763e515c73cc669abcb369f20241cb935b40))
+
 ## v3.95.0 (2026-10-05)
 
 ### Bug fixes

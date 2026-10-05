@@ -238,9 +238,11 @@ class TestReplaceMode(TestCase):
         def fake_media_path(key: str) -> str:
             return f"media/demo/uploads/pages/{key}.avif"
 
-        # Products seed before layouts; the hero's chip names one.
+        # Products seed before layouts; the hero's chip names one, and the
+        # layout validator only accepts an ACTIVE product (the factory
+        # picks `active` at random).
         for slug in HERO_SLIDE_PRODUCTS.values():
-            ProductFactory(slug=slug, num_images=0, num_reviews=0)
+            ProductFactory(slug=slug, active=True, num_images=0, num_reviews=0)
 
         with (
             _patched(demo_store, "ensure_asset", fake_ensure),

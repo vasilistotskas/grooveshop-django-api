@@ -3,6 +3,46 @@
 
 
 
+## v3.95.0 (2026-10-05)
+
+### Bug fixes
+
+* fix(devtools): write the demo COD fee's currency with its amount
+
+PayWay.objects is not djmoney's patched manager, so a Money value in
+exclude/update compared and wrote the amount only; a non-EUR row kept
+its currency. Pass cost and cost_currency explicitly.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01RE48ce8w633hGEh1GBiPW4
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`f137658`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f137658e9ce6a3dc7c5704f3c41e8dd7fc0e1be5))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.94.3 [skip ci] ([`b2a57f6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b2a57f6be604c795b6d2896a00001f8fd33ac5ec))
+
+### Features
+
+* feat(devtools): seed the demo store's four category roots, code navbar and COD fee (#114) ([`f137658`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f137658e9ce6a3dc7c5704f3c41e8dd7fc0e1be5))
+
+* feat(devtools): seed the demo store's four category roots, code navbar and COD fee
+
+- The demo category tree has the board's four roots (Charging, Audio,
+  Protection, Mounts & Stands) instead of one "Phone Accessories"
+  umbrella; a stale demo category is deleted when nothing points at it
+  and deactivated when products still do.
+- NAV_HEADER is dropped, so the demo renders the storefront's gated
+  code navbar; a rerun on a demo tenant deletes the header row an
+  earlier run created.
+- seed_pay_ways prices the demo's PAY_ON_DELIVERY option at 2.00 EUR
+  (demo tenants only, cost field only, idempotent).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01RE48ce8w633hGEh1GBiPW4 ([`f137658`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f137658e9ce6a3dc7c5704f3c41e8dd7fc0e1be5))
+
 ## v3.94.3 (2026-10-04)
 
 ### Bug fixes

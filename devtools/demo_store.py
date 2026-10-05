@@ -34,6 +34,7 @@ import secrets
 from decimal import Decimal
 from typing import Any
 
+from djmoney.money import Money
 from measurement.measures import Weight
 
 from devtools.demo_blog import seed_blog as _seed_blog
@@ -2403,7 +2404,7 @@ def activate_default_carrier() -> dict[str, int]:
 #: What the demo's cash-on-delivery option charges. The storefront
 #: always renders the real ``PayWay.cost``, so the board's "+2,00 €" is
 #: only true while this row says so.
-DEMO_COD_COST = Decimal("2.00")
+DEMO_COD_COST = Money(Decimal("2.00"), "EUR")
 
 
 def seed_pay_ways() -> dict[str, int]:
@@ -2426,10 +2427,14 @@ def seed_pay_ways() -> dict[str, int]:
         .values_list("id", flat=True)
         .distinct()
     )
+    # Amount AND currency, spelled out: ``PayWay.objects`` is not
+    # djmoney-patched, so a ``Money`` here would reach the amount column
+    # alone and leave ``cost_currency`` as it was.
+    amount, currency = DEMO_COD_COST.amount, str(DEMO_COD_COST.currency)
     changed = (
         PayWay.objects.filter(id__in=ids)
-        .exclude(cost=DEMO_COD_COST)
-        .update(cost=DEMO_COD_COST)
+        .exclude(cost=amount, cost_currency=currency)
+        .update(cost=amount, cost_currency=currency)
     )
     return {"updated": changed} if changed else {"unchanged": 1}
 

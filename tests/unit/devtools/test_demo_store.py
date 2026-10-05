@@ -1227,9 +1227,25 @@ class TestPayWays:
 
         for pay_way in (cod, potg, card):
             pay_way.refresh_from_db()
-        assert cod.cost.amount == demo_store.DEMO_COD_COST
+        assert cod.cost == demo_store.DEMO_COD_COST
         assert potg.cost.amount == 0
         assert card.cost.amount == 0
+
+    @pytest.mark.parametrize("amount", [0, "2.00"])
+    def test_corrects_a_foreign_currency_even_at_the_right_amount(
+        self, demo_tenant, amount
+    ):
+        from djmoney.money import Money
+
+        cod = self._pay_way(
+            "PAY_ON_DELIVERY", Money(amount, "USD"), "cash_on_delivery"
+        )
+
+        assert demo_store.seed_pay_ways() == {"updated": 1}
+
+        cod.refresh_from_db()
+        assert cod.cost == demo_store.DEMO_COD_COST
+        assert str(cod.cost.currency) == "EUR"
 
     def test_a_second_run_changes_nothing(self, demo_tenant):
         self._pay_way("PAY_ON_DELIVERY", 0, "cash_on_delivery")

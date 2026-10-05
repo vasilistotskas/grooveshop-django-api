@@ -19482,6 +19482,7 @@ msgstr ""
 msgid ""
 "Whether the code is reserved for this customer (assigned to their account or"
 " email) rather than offered to everyone."
+msgstr ""
 
 #: .\order\models\order.py:343
 msgid "Estimated Delivery"

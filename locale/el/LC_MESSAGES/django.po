@@ -22142,3 +22142,23 @@ msgstr ""
 "Η ACS έχει ήδη αναφέρει απόδοση για αυτό το voucher· δεν υπάρχει κάτι να "
 "εκκαθαριστεί."
 
+#: .\tenant\models.py:200
+msgid "Store Description (other languages)"
+msgstr "Περιγραφή Καταστήματος (άλλες γλώσσες)"
+
+#: .\tenant\models.py:206
+msgid ""
+"The store line in the storefront's other languages, keyed by locale, e.g. "
+"{\"en\": \"...\"}. The default locale line is Store Description; a locale "
+"left out falls back to it."
+msgstr ""
+"Η γραμμή του καταστήματος στις υπόλοιπες γλώσσες του storefront, ανά "
+"γλώσσα, π.χ. {\"en\": \"...\"}. Η γραμμή της προεπιλεγμένης γλώσσας είναι "
+"η Περιγραφή Καταστήματος· μια γλώσσα που λείπει χρησιμοποιεί αυτήν."
+
+#: .\tenant\models.py:1295
+#, python-format
+msgid "Remove %(locale)s: the default locale's line is Store Description."
+msgstr ""
+"Αφαιρέστε το %(locale)s: η γραμμή της προεπιλεγμένης γλώσσας είναι η "
+"Περιγραφή Καταστήματος."

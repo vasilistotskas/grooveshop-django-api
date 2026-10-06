@@ -74,6 +74,15 @@ class TenantConfigSerializer(serializers.Serializer):
     name = serializers.CharField(read_only=True)
     store_name = serializers.CharField(read_only=True)
     store_description = serializers.CharField(read_only=True)
+    # Other locales' store line, ``{"en": "..."}``; the default locale's
+    # is ``store_description``. ``required=False``, NOT ``read_only=True``
+    # (see ``available_locales``): a read-only field is REQUIRED in the
+    # generated schema and a frontend-first deploy would reject every
+    # resolve from a backend that predates it. DictField, not JSONField,
+    # so the generated type is ``Record<string, string>``, not ``unknown``.
+    store_description_i18n = serializers.DictField(
+        child=serializers.CharField(allow_blank=True), required=False
+    )
 
     # --- Assets ---
     logo_light_url = serializers.CharField(read_only=True, allow_blank=True)
@@ -417,6 +426,7 @@ class TenantAdminSerializer(serializers.ModelSerializer):
             # --- Branding ---
             "store_name",
             "store_description",
+            "store_description_i18n",
             "default_locale",
             "available_locales",
             "default_currency",

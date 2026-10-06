@@ -10045,3 +10045,23 @@ msgstr ""
 "ACS hat für diesen Voucher bereits eine Auszahlung gemeldet; es gibt nichts "
 "auszugleichen."
 
+#: .\tenant\models.py:200
+msgid "Store Description (other languages)"
+msgstr "Shopbeschreibung (weitere Sprachen)"
+
+#: .\tenant\models.py:206
+msgid ""
+"The store line in the storefront's other languages, keyed by locale, e.g. "
+"{\"en\": \"...\"}. The default locale line is Store Description; a locale "
+"left out falls back to it."
+msgstr ""
+"Die Shopzeile in den weiteren Sprachen des Storefronts, nach Sprache "
+"gegliedert, z. B. {\"en\": \"...\"}. Die Zeile der Standardsprache ist "
+"die Shopbeschreibung; eine fehlende Sprache greift darauf zurück."
+
+#: .\tenant\models.py:1295
+#, python-format
+msgid "Remove %(locale)s: the default locale's line is Store Description."
+msgstr ""
+"Entfernen Sie %(locale)s: Die Zeile der Standardsprache ist die "
+"Shopbeschreibung."

@@ -19634,3 +19634,18 @@ msgid ""
 "ACS already reported a payout for this voucher; there is nothing to settle."
 msgstr ""
 
+#: .\tenant\models.py:200
+msgid "Store Description (other languages)"
+msgstr ""
+
+#: .\tenant\models.py:206
+msgid ""
+"The store line in the storefront's other languages, keyed by locale, e.g. "
+"{\"en\": \"...\"}. The default locale line is Store Description; a locale "
+"left out falls back to it."
+msgstr ""
+
+#: .\tenant\models.py:1295
+#, python-format
+msgid "Remove %(locale)s: the default locale's line is Store Description."
+msgstr ""

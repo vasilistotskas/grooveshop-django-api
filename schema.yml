@@ -48310,6 +48310,10 @@ components:
         storeDescription:
           type: string
           readOnly: true
+        storeDescriptionI18n:
+          type: object
+          additionalProperties:
+            type: string
         logoLightUrl:
           type: string
           readOnly: true

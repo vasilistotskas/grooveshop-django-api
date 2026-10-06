@@ -3,6 +3,45 @@
 
 
 
+## v3.100.1 (2026-10-06)
+
+### Bug fixes
+
+* fix(deps): upgrade allauth and patch vulnerable transitive dependencies (#121)
+
+django-allauth 65.19.7 requires oauthlib 4, which fixes the PKCE
+code_verifier timing attack and the RevocationEndpoint JSONP injection
+(Dependabot #4, #5); its 65.19.3-65.19.7 releases are security fixes
+too (open-redirect wildcard, session-token hash check, rate-limit
+serialization, MFA races). None of the affected providers (Tumblr,
+Bitbucket, Pinterest) are enabled, and the storefront's social-login
+callback_url is relative, which the stricter is_safe_url still accepts.
+
+Also: multidict 6.9.1 (#30), GitPython 3.2.0 (#22) and source-map-js
+1.2.2 (#29).
+
+
+Claude-Session: https://claude.ai/code/session_01TFH41uvbvbU3iLBnPrz4og
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`c6746a9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c6746a9c9358e7ad65e81f4b59b1edc039afcd4d))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.100.0 [skip ci] ([`5121ae1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5121ae192fae0694df22447a36f2ea5acad5f5e5))
+
+### Testing
+
+* test(page_config): pin active products in the hero slide tests (#122)
+
+ProductFactory makes a product active 85% of the time, so the accepted
+case failed on an inactive roll and the deleted case could pass because
+the product was inactive rather than deleted.
+
+
+Claude-Session: https://claude.ai/code/session_01TFH41uvbvbU3iLBnPrz4og
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`abdfe8c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/abdfe8cf60e5a4f9c52ab0250b4afc4132202544))
+
 ## v3.100.0 (2026-10-06)
 
 ### Bug fixes

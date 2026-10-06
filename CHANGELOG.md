@@ -3,6 +3,32 @@
 
 
 
+## v3.101.0 (2026-10-06)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.100.2 [skip ci] ([`6ca5f32`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6ca5f323e737c872692f17bf4518f5261108e6fa))
+
+### Features
+
+* feat(tenant): store description per storefront locale (#124)
+
+The store line the storefront prints in the footer, the auth panel,
+the SEO site description and the web manifest was one language for
+every visitor, so an el + en store showed Greek on its English pages.
+store_description stays the default locale's wording; the new
+store_description_i18n maps the other storefront locales to theirs
+(the AUTH_PANEL i18n precedent), validated by a JSON schema and a
+rule that keeps the tenant's own default locale out of it. Exposed
+optionally on the public resolve payload as storeDescriptionI18n,
+editable by store owners and admins, and seeded in English for the
+demo store.
+
+
+Claude-Session: https://claude.ai/code/session_01TFH41uvbvbU3iLBnPrz4og
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`56ebaa1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/56ebaa13c63602cc0d664a154d32ad33ca056ea7))
+
 ## v3.100.2 (2026-10-06)
 
 ### Bug fixes

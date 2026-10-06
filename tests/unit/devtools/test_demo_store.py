@@ -1213,6 +1213,74 @@ class TestCategoryTree:
         assert "retired" not in report
 
 
+class TestProductVariantGroups:
+    """A re-seed keeps one group per key and nothing a product has left."""
+
+    @pytest.fixture
+    def seed(self, demo_tenant, monkeypatch):
+        monkeypatch.setattr(demo_store, "ensure_assets", lambda keys: {})
+        monkeypatch.setattr(
+            demo_store, "storage_name", lambda key: f"uploads/{key}.avif"
+        )
+        return demo_store.seed_products
+
+    @staticmethod
+    def _group(key):
+        from product.models import ProductVariantGroup
+
+        group = ProductVariantGroup(active=True)
+        group.set_current_language("el")
+        group.name = key
+        group.save()
+        return group
+
+    @staticmethod
+    def _catalogue_groups():
+        return {row.variant_group for row in demo_store.PRODUCTS} - {None}
+
+    def test_a_reseed_reuses_the_groups(self, seed):
+        from product.models import ProductVariantGroup
+
+        seed()
+        first = set(ProductVariantGroup.objects.values_list("pk", flat=True))
+        seed()
+
+        assert (
+            set(ProductVariantGroup.objects.values_list("pk", flat=True))
+            == first
+        )
+        assert len(first) == len(self._catalogue_groups())
+
+    def test_groups_earlier_runs_left_empty_are_removed(self, seed):
+        from product.models import ProductVariantGroup
+
+        orphan = self._group("usbc-black")
+
+        report = seed()
+
+        assert not ProductVariantGroup.objects.filter(pk=orphan.pk).exists()
+        assert report["variant_groups_removed"] == 1
+
+    def test_a_product_that_left_its_group_no_longer_offers_it(self, seed):
+        """The 20W white charger's only sibling left the catalogue."""
+        from product.models import Product, ProductVariantGroup
+
+        old = self._group("charger-20w")
+        for slug in ("demo-charger-20w-white", "demo-charger-20w-mint"):
+            Product.objects.create(
+                slug=slug, price=1, active=True, variant_group=old
+            )
+
+        seed()
+
+        white = Product.objects.get(slug="demo-charger-20w-white")
+        mint = Product.objects.get(slug="demo-charger-20w-mint")
+        assert white.variant_group is None
+        assert mint.active is False
+        assert mint.variant_group is None
+        assert not ProductVariantGroup.objects.filter(pk=old.pk).exists()
+
+
 class TestHeaderMenu:
     """The demo gets the storefront's code navbar, not a seeded copy."""
 

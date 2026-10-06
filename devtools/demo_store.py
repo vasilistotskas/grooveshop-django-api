@@ -1750,10 +1750,16 @@ def seed_products() -> dict[str, int]:
     groups: dict[str, ProductVariantGroup] = {}
 
     def group_for(key: str) -> ProductVariantGroup:
+        # Found by its key (the Greek name it was created with), so a
+        # re-seed reuses the group instead of minting a new one per run.
         if key not in groups:
-            group = ProductVariantGroup(active=True)
-            _translate(group, "el", name=key)
-            group.save()
+            group = ProductVariantGroup.objects.filter(
+                translations__language_code="el", translations__name=key
+            ).first()
+            if group is None:
+                group = ProductVariantGroup(active=True)
+                _translate(group, "el", name=key)
+                group.save()
             groups[key] = group
         return groups[key]
 
@@ -1785,8 +1791,11 @@ def seed_products() -> dict[str, int]:
         # Exercises the price-drop alert opt-in on a subset rather than
         # everywhere, so both branches have rows.
         product.price_drop_alerts_enabled = index % 4 == 0
-        if row.variant_group:
-            product.variant_group = group_for(row.variant_group)
+        # Cleared, not left alone, when a row has no group: a product taken
+        # out of one would otherwise keep offering a selector of itself.
+        product.variant_group = (
+            group_for(row.variant_group) if row.variant_group else None
+        )
 
         _translate(
             product,
@@ -1832,9 +1841,19 @@ def seed_products() -> dict[str, int]:
     stale = Product.objects.filter(
         slug__startswith=prefix, active=True
     ).exclude(slug__in=[row.slug for row in PRODUCTS])
-    retired = stale.update(active=False)
+    retired = stale.update(active=False, variant_group=None)
     if retired:
         _bump(report, "retired", retired)
+
+    # Groups nothing points at any more: the ones earlier runs minted per
+    # seed before `group_for` reused them, and any a catalogue change
+    # emptied.
+    _, deleted = ProductVariantGroup.objects.filter(
+        variants__isnull=True
+    ).delete()
+    emptied = deleted.get(ProductVariantGroup._meta.label, 0)
+    if emptied:
+        _bump(report, "variant_groups_removed", emptied)
 
     return report
 

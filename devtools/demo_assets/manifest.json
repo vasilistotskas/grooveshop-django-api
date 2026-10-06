@@ -42,11 +42,11 @@
   "source": "https://unsplash.com/photos/a-person-holding-a-cell-phone-in-their-hand-5SFiVF4lfnM"
  },
  "blog-usbc-cable": {
-  "author": "Masantocreative",
-  "download": "https://plus.unsplash.com/premium_photo-1760509400618-ebaee73e70ed?ixid=M3wxMjA3fDB8MXxzZWFyY2h8NXx8dXNiJTIwYyUyMGNhYmxlJTIwY29pbGVkJTIwYnJhaWRlZHxlbnwwfHx8fDE3ODk4MDU1NzJ8MA&ixlib=rb-4.1.0",
+  "author": "Marcus Urbenz",
+  "download": "https://images.unsplash.com/photo-1619459072761-496c0812331b?ixid=M3wxMjA3fDB8MXxzZWFyY2h8M3x8dXNiJTIwdHlwZS1jfGVufDB8fHx8MTc5MTI3NzU5MXww&ixlib=rb-4.1.0",
   "kind": "blog",
   "licence": "Unsplash",
-  "source": "https://unsplash.com/photos/yellow-usb-cable-coiled-on-a-blue-background-Cgu4VCmovzw"
+  "source": "https://unsplash.com/photos/white-usb-cable-on-white-surface-4xMAiJZPQXI"
  },
  "blog-wireless-charge": {
   "author": "Daniel Korpai",
@@ -62,19 +62,19 @@
   "licence": "Unsplash",
   "source": "https://unsplash.com/photos/black-usb-cable-on-white-table-RWxeE7wu1T8"
  },
- "cable-braided-white": {
-  "author": "Pham Nhat",
-  "download": "https://plus.unsplash.com/premium_photo-1759282946954-d1fdec6198eb?ixid=M3wxMjA3fDB8MXxzZWFyY2h8MTV8fHVzYiUyMGMlMjBjYWJsZSUyMHdoaXRlJTIwYmFja2dyb3VuZHxlbnwwfHx8fDE3ODk3NTQ5MTJ8MA&ixlib=rb-4.1.0",
-  "kind": "product",
-  "licence": "Unsplash",
-  "source": "https://unsplash.com/photos/three-white-charging-cables-on-a-light-blue-background-b5NYQOMOcYw"
- },
  "cable-coiled": {
-  "author": "Masantocreative",
-  "download": "https://plus.unsplash.com/premium_photo-1760507450686-5d01ef124541?ixid=M3wxMjA3fDB8MXxzZWFyY2h8MTl8fHVzYiUyMGMlMjBjYWJsZSUyMHdoaXRlJTIwYmFja2dyb3VuZHxlbnwwfHx8fDE3ODk3NTQ5MTJ8MA&ixlib=rb-4.1.0",
+  "author": "Fujiphilm",
+  "download": "https://images.unsplash.com/photo-1660945671777-6389d37d6ab4?ixid=M3wxMjA3fDB8MXxzZWFyY2h8MTl8fHR5cGUlMjBjJTIwY2FibGV8ZW58MHx8fHwxNzkxMjc3NTkzfDA&ixlib=rb-4.1.0",
   "kind": "product",
   "licence": "Unsplash",
-  "source": "https://unsplash.com/photos/four-usb-c-and-usb-a-cables-arranged-in-a-cross-g20jOLAalns"
+  "source": "https://unsplash.com/photos/a-close-up-of-a-cars-tire-0_S1K3u6Cmc"
+ },
+ "cable-gaming": {
+  "author": "Onur Binay",
+  "download": "https://images.unsplash.com/photo-1655958370938-a960fe73abb4?ixid=M3wxMjA3fDB8MXxzZWFyY2h8Nnx8Z2FtaW5nJTIwcGhvbmUlMjBjYWJsZXxlbnwwfHx8fDE3OTEyNzc0MzR8MA&ixlib=rb-4.1.0",
+  "kind": "product",
+  "licence": "Unsplash",
+  "source": "https://unsplash.com/photos/a-hand-holding-a-cell-phone-R-KqmkXMgJc"
  },
  "cable-lightning-white": {
   "author": "Adam Birkett",
@@ -84,11 +84,11 @@
   "source": "https://unsplash.com/photos/iphone-cable-1M0omkZlGM4"
  },
  "cable-usbc-black": {
-  "author": "Planet Volumes",
-  "download": "https://plus.unsplash.com/premium_photo-1669262667978-5d4aafe29dd5?ixid=M3wxMjA3fDB8MXxzZWFyY2h8MTF8fHVzYiUyMGMlMjBjYWJsZSUyMHdoaXRlJTIwYmFja2dyb3VuZHxlbnwwfHx8fDE3ODk3NTQ5MTJ8MA&ixlib=rb-4.1.0",
+  "author": "Markus Winkler",
+  "download": "https://images.unsplash.com/photo-1586253634201-819749fa2d1f?ixid=M3wxMjA3fDB8MXxzZWFyY2h8MjB8fHR5cGUlMjBjJTIwY2FibGV8ZW58MHx8fHwxNzkxMjc3NTkzfDA&ixlib=rb-4.1.0",
   "kind": "product",
   "licence": "Unsplash",
-  "source": "https://unsplash.com/photos/a-close-up-of-a-metal-object-on-a-beige-background-_s2X70XPu6M"
+  "source": "https://unsplash.com/photos/black-usb-cable-on-white-laptop-computer-lhBS2O221eM"
  },
  "cable-usbc-black-detail": {
   "author": "Mishaal Zahed (Meschael Zahède)",
@@ -103,13 +103,6 @@
   "kind": "product",
   "licence": "Unsplash",
   "source": "https://unsplash.com/photos/a-close-up-of-a-cable-mvFdCHhg2Nw"
- },
- "cable-usbc-white": {
-  "author": "Planet Volumes",
-  "download": "https://plus.unsplash.com/premium_photo-1669261149433-febd56c05327?ixid=M3wxMjA3fDB8MXxzZWFyY2h8N3x8dXNiJTIwYyUyMGNhYmxlJTIwd2hpdGUlMjBiYWNrZ3JvdW5kfGVufDB8fHx8MTc4OTc1NDkxMnww&ixlib=rb-4.1.0",
-  "kind": "product",
-  "licence": "Unsplash",
-  "source": "https://unsplash.com/photos/a-close-up-of-a-white-cable-with-a-blue-background-vf7xbXI2bW8"
  },
  "cable-usbc-white-detail": {
   "author": "Varad Murti",
@@ -126,11 +119,11 @@
   "source": "https://unsplash.com/photos/a-close-up-of-a-white-cable-on-a-white-surface-OJJhibC7cEM"
  },
  "case-clear": {
-  "author": "Planet Volumes",
-  "download": "https://plus.unsplash.com/premium_photo-1777139601633-109e279a6d34?ixid=M3wxMjA3fDB8MXxzZWFyY2h8MXx8Y2xlYXIlMjB0cmFuc3BhcmVudCUyMHBob25lJTIwY2FzZXxlbnwwfHx8fDE3ODk3NTUwMzZ8MA&ixlib=rb-4.1.0",
+  "author": "LARS KAIZER",
+  "download": "https://images.unsplash.com/photo-1583291023438-41cef6453b1f?ixid=M3wxMjA3fDB8MXxzZWFyY2h8Mnx8cGhvbmUlMjBjYXNlJTIwYW5kJTIwc2NyZWVuJTIwcHJvdGVjdG9yfGVufDB8fHx8MTc5MTI3NzU2MXww&ixlib=rb-4.1.0",
   "kind": "product",
   "licence": "Unsplash",
-  "source": "https://unsplash.com/photos/two-transparent-smartphones-displaying-music-interface-DQsyzGvT4jU"
+  "source": "https://unsplash.com/photos/black-android-smartphone-on-white-surface-JZrebB7aHyQ"
  },
  "case-clear-detail": {
   "author": "Lee Peterson",
@@ -146,12 +139,19 @@
   "licence": "Unsplash",
   "source": "https://unsplash.com/photos/clear-phone-case-with-magnetic-charging-circle-v38zp8oXaEg"
  },
+ "case-rugged": {
+  "author": "Franco Gancis",
+  "download": "https://images.unsplash.com/photo-1688528653595-9780d83d0470?ixid=M3wxMjA3fDB8MXxzZWFyY2h8MTJ8fHJ1Z2dlZCUyMHBob25lJTIwY2FzZXxlbnwwfHx8fDE3OTEyNzc0NDR8MA&ixlib=rb-4.1.0",
+  "kind": "product",
+  "licence": "Unsplash",
+  "source": "https://unsplash.com/photos/a-cell-phone-sitting-on-top-of-a-table-tDyz8YFY0H0"
+ },
  "category-accessories": {
-  "author": "Reesmada",
-  "download": "https://plus.unsplash.com/premium_photo-1759806457419-c5dfa3968eba?ixid=M3wxMjA3fDB8MXxzZWFyY2h8MTN8fHdhbGwlMjBjaGFyZ2VyJTIwcG93ZXIlMjBhZGFwdGVyJTIwcGx1Z3xlbnwwfHx8fDE3ODk3NTQ5NDB8MA&ixlib=rb-4.1.0",
+  "author": "Solen Feyissa",
+  "download": "https://images.unsplash.com/photo-1603539444875-76e7684265f6?ixid=M3wxMjA3fDB8MXxzZWFyY2h8MTR8fGNoYXJnaW5nJTIwYWNjZXNzb3JpZXN8ZW58MHx8fHwxNzkxMjc4MjIyfDA&ixlib=rb-4.1.0",
   "kind": "category",
   "licence": "Unsplash",
-  "source": "https://unsplash.com/photos/white-power-adapter-with-blue-cord-on-blue-background-KB637PC6ag8"
+  "source": "https://unsplash.com/photos/white-usb-cable-on-white-table-115YGe1M28I"
  },
  "category-audio": {
   "author": "Nidheesh Kavalan",
@@ -182,18 +182,18 @@
   "source": "https://unsplash.com/photos/black-metal-stand-with-white-background-Lg4weBBGbLU"
  },
  "category-power-banks": {
-  "author": "Karolina Grabowska",
-  "download": "https://plus.unsplash.com/premium_photo-1761494495055-6077392f40a4?ixid=M3wxMjA3fDB8MXxzZWFyY2h8NXx8cG93ZXIlMjBiYW5rJTIwcG9ydGFibGUlMjBiYXR0ZXJ5JTIwY2hhcmdlcnxlbnwwfHx8fDE3ODk3NTQ5NjN8MA&ixlib=rb-4.1.0",
+  "author": "gomi",
+  "download": "https://images.unsplash.com/photo-1706275399728-da031110dc43?ixid=M3wxMjA3fDB8MXxzZWFyY2h8OHx8d2hpdGUlMjBwb3dlciUyMGJhbmt8ZW58MHx8fHwxNzkxMjc3NDg2fDA&ixlib=rb-4.1.0",
   "kind": "category",
   "licence": "Unsplash",
-  "source": "https://unsplash.com/photos/a-power-bank-charging-with-several-batteries-around-it-i1lFFqIqyZg"
+  "source": "https://unsplash.com/photos/a-close-up-of-a-cell-phone-case-on-a-white-background-aQVLlMNQLTU"
  },
  "category-protection": {
-  "author": "Planet Volumes",
-  "download": "https://plus.unsplash.com/premium_photo-1777139601633-109e279a6d34?ixid=M3wxMjA3fDB8MXxzZWFyY2h8MXx8Y2xlYXIlMjB0cmFuc3BhcmVudCUyMHBob25lJTIwY2FzZXxlbnwwfHx8fDE3ODk3NTUwMzZ8MA&ixlib=rb-4.1.0",
+  "author": "Revendo",
+  "download": "https://images.unsplash.com/photo-1654588301119-7e23237ace60?ixid=M3wxMjA3fDB8MXxzZWFyY2h8MTF8fHBob25lJTIwY2FzZSUyMGJhY2t8ZW58MHx8fHwxNzkxMjc4MjI4fDA&ixlib=rb-4.1.0",
   "kind": "category",
   "licence": "Unsplash",
-  "source": "https://unsplash.com/photos/two-transparent-smartphones-displaying-music-interface-DQsyzGvT4jU"
+  "source": "https://unsplash.com/photos/a-yellow-cell-phone-laying-on-an-orange-surface-PSZ0pUx3FEE"
  },
  "category-screen-protection": {
   "author": "Kelly Sikkema",
@@ -223,6 +223,13 @@
   "licence": "Unsplash",
   "source": "https://unsplash.com/photos/white-round-device-on-brown-wooden-table-iE-MsY-8vEw"
  },
+ "charger-car": {
+  "author": "Noelle Rebekah",
+  "download": "https://images.unsplash.com/photo-1666739165788-ad4146aad813?ixid=M3wxMjA3fDB8MXxzZWFyY2h8Nnx8dXNiJTIwY2FyJTIwY2hhcmdlcnxlbnwwfHx8fDE3OTEyNzc3MjV8MA&ixlib=rb-4.1.0",
+  "kind": "product",
+  "licence": "Unsplash",
+  "source": "https://unsplash.com/photos/a-car-radio-with-a-red-button-l-B8W4usItM"
+ },
  "charger-gan-67w": {
   "author": "Andrey Matveev",
   "download": "https://images.unsplash.com/photo-1731616103600-3fe7ccdc5a59?ixid=M3wxMjA3fDB8MXxzZWFyY2h8Mnx8d2FsbCUyMGNoYXJnZXIlMjBwb3dlciUyMGFkYXB0ZXIlMjBwbHVnfGVufDB8fHx8MTc4OTc1NDk0MHww&ixlib=rb-4.1.0",
@@ -231,11 +238,18 @@
   "source": "https://unsplash.com/photos/a-couple-of-white-wires-sitting-next-to-each-other-f0EpYkZ-cp4"
  },
  "charger-gan-multi": {
-  "author": "Reesmada",
-  "download": "https://plus.unsplash.com/premium_photo-1759806457419-c5dfa3968eba?ixid=M3wxMjA3fDB8MXxzZWFyY2h8MTN8fHdhbGwlMjBjaGFyZ2VyJTIwcG93ZXIlMjBhZGFwdGVyJTIwcGx1Z3xlbnwwfHx8fDE3ODk3NTQ5NDB8MA&ixlib=rb-4.1.0",
+  "author": "I'M ZION",
+  "download": "https://images.unsplash.com/photo-1600490722773-35753aea6332?ixid=M3wxMjA3fDB8MXxzZWFyY2h8M3x8dXNiJTIwYyUyMGNoYXJnZXIlMjBtdWx0aXBsZSUyMHBvcnRzfGVufDB8fHx8MTc5MTI3NzQ1Mnww&ixlib=rb-4.1.0",
   "kind": "product",
   "licence": "Unsplash",
-  "source": "https://unsplash.com/photos/white-power-adapter-with-blue-cord-on-blue-background-KB637PC6ag8"
+  "source": "https://unsplash.com/photos/person-holding-white-ceramic-mug-2dCfoPlsrLY"
+ },
+ "charger-travel": {
+  "author": "Call Me Fred",
+  "download": "https://images.unsplash.com/photo-1564517945244-d371c925640b?ixid=M3wxMjA3fDB8MXxzZWFyY2h8Nnx8dHJhdmVsJTIwYWRhcHRlciUyMHBsdWd8ZW58MHx8fHwxNzkxMjc3NDYxfDA&ixlib=rb-4.1.0",
+  "kind": "product",
+  "licence": "Unsplash",
+  "source": "https://unsplash.com/photos/two-white-power-adapters-on-white-background-nBfTARHPxiU"
  },
  "charger-wall-cable": {
   "author": "Hayley Maxwell",
@@ -250,13 +264,6 @@
   "kind": "product",
   "licence": "Unsplash",
   "source": "https://unsplash.com/photos/a-couple-of-plugs-and-a-charger-on-a-table-rOFcFn6N-aY"
- },
- "charger-wall-mint": {
-  "author": "Natalia Blauth",
-  "download": "https://plus.unsplash.com/premium_photo-1761322104215-03aef058df2b?ixid=M3wxMjA3fDB8MXxzZWFyY2h8MTd8fHdhbGwlMjBjaGFyZ2VyJTIwcG93ZXIlMjBhZGFwdGVyJTIwcGx1Z3xlbnwwfHx8fDE3ODk3NTQ5NDB8MA&ixlib=rb-4.1.0",
-  "kind": "product",
-  "licence": "Unsplash",
-  "source": "https://unsplash.com/photos/white-phone-charger-and-cable-on-orange-background-KsF26iFO0H0"
  },
  "charger-wall-white": {
   "author": "Markus Winkler",
@@ -300,6 +307,13 @@
   "licence": "Unsplash",
   "source": "https://unsplash.com/photos/pink-and-white-plastic-tool-IpIqJwxdiog"
  },
+ "earbuds-sport": {
+  "author": "Hakii official",
+  "download": "https://images.unsplash.com/photo-1636100007422-4d77bdd15a6b?ixid=M3wxMjA3fDB8MXxzZWFyY2h8OHx8c3BvcnQlMjBlYXJidWRzfGVufDB8fHx8MTc5MTI3NzU0OHww&ixlib=rb-4.1.0",
+  "kind": "product",
+  "licence": "Unsplash",
+  "source": "https://unsplash.com/photos/a-pair-of-ear-buds-sitting-on-top-of-a-blue-surface-cYafiPay4q4"
+ },
  "earbuds-white": {
   "author": "Nidheesh Kavalan",
   "download": "https://images.unsplash.com/photo-1580477371194-4593e3c7c6cf?ixid=M3wxMjA3fDB8MXxzZWFyY2h8MTF8fHdpcmVsZXNzJTIwZWFyYnVkcyUyMGNoYXJnaW5nJTIwY2FzZXxlbnwwfHx8fDE3ODk3NTUwOTN8MA&ixlib=rb-4.1.0",
@@ -307,12 +321,19 @@
   "licence": "Unsplash",
   "source": "https://unsplash.com/photos/white-apple-watch-with-white-sports-band-wscuT4NtHXE"
  },
- "glass-cracked": {
-  "author": "Lala Azizli",
-  "download": "https://plus.unsplash.com/premium_photo-1726687330996-72c50adc6017?ixid=M3wxMjA3fDB8MXxzZWFyY2h8MXx8dGVtcGVyZWQlMjBnbGFzcyUyMHNjcmVlbiUyMHByb3RlY3RvcnxlbnwwfHx8fDE3ODk3NTUwODB8MA&ixlib=rb-4.1.0",
+ "glass-camera": {
+  "author": "TheRegisti",
+  "download": "https://images.unsplash.com/photo-1608547492989-e91bab9ce286?ixid=M3wxMjA3fDB8MXxzZWFyY2h8M3x8cGhvbmUlMjBjYW1lcmElMjBsZW5zJTIwY2xvc2UlMjB1cHxlbnwwfHx8fDE3OTEyNzc0NzV8MA&ixlib=rb-4.1.0",
   "kind": "product",
   "licence": "Unsplash",
-  "source": "https://unsplash.com/photos/a-broken-cell-phone-sitting-on-top-of-a-wooden-table-8QxPem_KGYw"
+  "source": "https://unsplash.com/photos/gray-and-black-control-panel-f-8MZ5BlEwk"
+ },
+ "glass-cracked": {
+  "author": "Fotografia Lui Vlad",
+  "download": "https://images.unsplash.com/photo-1746006084492-24a8fd02710a?ixid=M3wxMjA3fDB8MXxzZWFyY2h8M3x8Y3JhY2tlZCUyMHBob25lJTIwc2NyZWVufGVufDB8fHx8MTc5MTI3NzQ3MHww&ixlib=rb-4.1.0",
+  "kind": "product",
+  "licence": "Unsplash",
+  "source": "https://unsplash.com/photos/broken-smartphone-screen-on-a-blue-surface-pKw0NaV8Ubk"
  },
  "glass-outline": {
   "author": "Diego PH",
@@ -349,6 +370,34 @@
   "licence": "Unsplash",
   "source": "https://unsplash.com/photos/four-assorted-color-iphone-x-cases-FQXbLmlmvWY"
  },
+ "mount-car-magnetic": {
+  "author": "Graddes",
+  "download": "https://images.unsplash.com/photo-1708766896345-fe51d8845ae3?ixid=M3wxMjA3fDB8MXxzZWFyY2h8NHx8bWFnbmV0aWMlMjBjYXIlMjBtb3VudCUyMHBob25lfGVufDB8fHx8MTc5MTI3NzUyN3ww&ixlib=rb-4.1.0",
+  "kind": "product",
+  "licence": "Unsplash",
+  "source": "https://unsplash.com/photos/a-close-up-of-a-car-dashboard-with-a-cell-phone-f5spu2n1iE0"
+ },
+ "mount-car-vent": {
+  "author": "Priscilla Du Preez 🇨🇦",
+  "download": "https://images.unsplash.com/photo-1694813646391-4c505039c2ee?ixid=M3wxMjA3fDB8MXxzZWFyY2h8MTJ8fGNhciUyMHBob25lJTIwbW91bnQlMjB2ZW50fGVufDB8fHx8MTc5MTI3NzUyMnww&ixlib=rb-4.1.0",
+  "kind": "product",
+  "licence": "Unsplash",
+  "source": "https://unsplash.com/photos/a-person-using-a-cell-phone-while-driving-a-car-OG__S66O778"
+ },
+ "mount-tripod": {
+  "author": "Adesh Bankar",
+  "download": "https://images.unsplash.com/photo-1576299090369-9067e4adca28?ixid=M3wxMjA3fDB8MXxzZWFyY2h8Mnx8cGhvbmUlMjB0cmlwb2R8ZW58MHx8fHwxNzkxMjc3NTMyfDA&ixlib=rb-4.1.0",
+  "kind": "product",
+  "licence": "Unsplash",
+  "source": "https://unsplash.com/photos/black-smartphone-near-shore-H65vLv6Wc7c"
+ },
+ "organiser-cable": {
+  "author": "Bedirhan Gül",
+  "download": "https://images.unsplash.com/photo-1760348213270-7cd00b8c3405?ixid=M3wxMjA3fDB8MXxzZWFyY2h8Mnx8Y2FibGUlMjBvcmdhbml6ZXIlMjBkZXNrfGVufDB8fHx8MTc5MTI3NzU0MXww&ixlib=rb-4.1.0",
+  "kind": "product",
+  "licence": "Unsplash",
+  "source": "https://unsplash.com/photos/cable-organizer-holding-coiled-white-cord-under-desk-I_3D0pVrMhY"
+ },
  "powerbank-black": {
   "author": "gomi",
   "download": "https://images.unsplash.com/photo-1706275399524-813e89914e43?ixid=M3wxMjA3fDB8MXxzZWFyY2h8MTl8fHBvd2VyJTIwYmFuayUyMHBvcnRhYmxlJTIwYmF0dGVyeSUyMGNoYXJnZXJ8ZW58MHx8fHwxNzg5NzU0OTYzfDA&ixlib=rb-4.1.0",
@@ -357,11 +406,11 @@
   "source": "https://unsplash.com/photos/a-black-and-silver-electronic-device-on-a-white-surface-KI7M3RQezJI"
  },
  "powerbank-blue-slim": {
-  "author": "Behnam Norouzi",
-  "download": "https://plus.unsplash.com/premium_photo-1761033366849-c50f4a15d4c6?ixid=M3wxMjA3fDB8MXxzZWFyY2h8MXx8cG93ZXIlMjBiYW5rJTIwcG9ydGFibGUlMjBiYXR0ZXJ5JTIwY2hhcmdlcnxlbnwwfHx8fDE3ODk3NTQ5NjN8MA&ixlib=rb-4.1.0",
+  "author": "Kamil Switalski",
+  "download": "https://images.unsplash.com/photo-1644571669401-9ab344866592?ixid=M3wxMjA3fDB8MXxzZWFyY2h8Nnx8cG93ZXIlMjBiYW5rc3xlbnwwfHx8fDE3OTEyNzc1NTZ8MA&ixlib=rb-4.1.0",
   "kind": "product",
   "licence": "Unsplash",
-  "source": "https://unsplash.com/photos/a-blue-power-bank-charges-a-smartphone-on-white-background-XvSiM0xsFuE"
+  "source": "https://unsplash.com/photos/a-couple-of-cell-phones-sitting-on-top-of-a-table-1MSlwT_-X8c"
  },
  "powerbank-marble": {
   "author": "gomi",
@@ -378,32 +427,32 @@
   "source": "https://unsplash.com/photos/red-leather-case-on-black-surface-QsVafcI4ouo"
  },
  "powerbank-silver": {
-  "author": "gomi",
-  "download": "https://images.unsplash.com/photo-1706275399494-fb26bbc5da63?ixid=M3wxMjA3fDB8MXxzZWFyY2h8Nnx8cG93ZXIlMjBiYW5rJTIwcG9ydGFibGUlMjBiYXR0ZXJ5JTIwY2hhcmdlcnxlbnwwfHx8fDE3ODk3NTQ5NjN8MA&ixlib=rb-4.1.0",
+  "author": "Markus Winkler",
+  "download": "https://images.unsplash.com/photo-1585995603413-eb35b5f4a50b?ixid=M3wxMjA3fDB8MXxzZWFyY2h8M3x8cG93ZXIlMjBiYW5rc3xlbnwwfHx8fDE3OTEyNzc1NTZ8MA&ixlib=rb-4.1.0",
   "kind": "product",
   "licence": "Unsplash",
-  "source": "https://unsplash.com/photos/a-silver-electronic-device-sitting-on-top-of-a-white-table-CY4mVpRvPxc"
+  "source": "https://unsplash.com/photos/white-and-blue-coated-wires-UP_RojtnvTU"
  },
  "powerbank-white": {
-  "author": "Karolina Grabowska",
-  "download": "https://plus.unsplash.com/premium_photo-1761494495055-6077392f40a4?ixid=M3wxMjA3fDB8MXxzZWFyY2h8NXx8cG93ZXIlMjBiYW5rJTIwcG9ydGFibGUlMjBiYXR0ZXJ5JTIwY2hhcmdlcnxlbnwwfHx8fDE3ODk3NTQ5NjN8MA&ixlib=rb-4.1.0",
+  "author": "gomi",
+  "download": "https://images.unsplash.com/photo-1706275399494-44ec9ec29c7f?ixid=M3wxMjA3fDB8MXxzZWFyY2h8N3x8d2hpdGUlMjBwb3dlciUyMGJhbmt8ZW58MHx8fHwxNzkxMjc3NDg2fDA&ixlib=rb-4.1.0",
   "kind": "product",
   "licence": "Unsplash",
-  "source": "https://unsplash.com/photos/a-power-bank-charging-with-several-batteries-around-it-i1lFFqIqyZg"
+  "source": "https://unsplash.com/photos/a-white-cell-phone-sitting-on-top-of-a-white-table-JbNELCVSsR4"
  },
  "speaker-grey": {
-  "author": "Pham Nhat",
-  "download": "https://plus.unsplash.com/premium_photo-1779430703954-03c67e5c6510?ixid=M3wxMjA3fDB8MXxzZWFyY2h8MTN8fHBvcnRhYmxlJTIwYmx1ZXRvb3RoJTIwc3BlYWtlcnxlbnwwfHx8fDE3ODk3NTUxMTR8MA&ixlib=rb-4.1.0",
+  "author": "Jonas Jacobsson",
+  "download": "https://images.unsplash.com/photo-1507878566509-a0dbe19677a5?ixid=M3wxMjA3fDB8MXxzZWFyY2h8N3x8cG9ydGFibGUlMjBibHVldG9vdGglMjBzcGVha2VyfGVufDB8fHx8MTc5MTI3NzQ5NXww&ixlib=rb-4.1.0",
   "kind": "product",
   "licence": "Unsplash",
-  "source": "https://unsplash.com/photos/purple-and-green-portable-speaker-with-wavy-light-reflections-L8BdetCzOKQ"
+  "source": "https://unsplash.com/photos/selective-focus-photography-of-black-and-gray-portable-speaker-VSYq9nS-fY0"
  },
  "speaker-handle": {
-  "author": "Paris Bilal",
-  "download": "https://plus.unsplash.com/premium_photo-1779202458672-6abd0c2e3454?ixid=M3wxMjA3fDB8MXxzZWFyY2h8MTd8fHBvcnRhYmxlJTIwYmx1ZXRvb3RoJTIwc3BlYWtlcnxlbnwwfHx8fDE3ODk3NTUxMTR8MA&ixlib=rb-4.1.0",
+  "author": "Jason Yuen",
+  "download": "https://images.unsplash.com/photo-1718553404511-65453ab560c0?ixid=M3wxMjA3fDB8MXxzZWFyY2h8NHx8cG9ydGFibGUlMjBzcGVha2VyJTIwaGFuZGxlfGVufDB8fHx8MTc5MTI3NzUwMHww&ixlib=rb-4.1.0",
   "kind": "product",
   "licence": "Unsplash",
-  "source": "https://unsplash.com/photos/a-light-blue-portable-speaker-with-a-handle-0GwGvLnVcZ8"
+  "source": "https://unsplash.com/photos/a-radio-sitting-on-top-of-a-white-table-KDHT6gW14SU"
  },
  "speaker-mint": {
   "author": "Nicolas J Leclercq",
@@ -420,11 +469,11 @@
   "source": "https://unsplash.com/photos/oval-grey-portable-speaker-on-white-surface--WB52caEpmI"
  },
  "speaker-wood": {
-  "author": "TSD Studio",
-  "download": "https://plus.unsplash.com/premium_photo-1779736967900-8abeced4b89e?ixid=M3wxMjA3fDB8MXxzZWFyY2h8OXx8cG9ydGFibGUlMjBibHVldG9vdGglMjBzcGVha2VyfGVufDB8fHx8MTc4OTc1NTExNHww&ixlib=rb-4.1.0",
+  "author": "Behnam Norouzi",
+  "download": "https://images.unsplash.com/photo-1631972234521-24e9d4fbb841?ixid=M3wxMjA3fDB8MXxzZWFyY2h8Mnx8d29vZGVuJTIwc3BlYWtlcnxlbnwwfHx8fDE3OTEyNzc1MDZ8MA&ixlib=rb-4.1.0",
   "kind": "product",
   "licence": "Unsplash",
-  "source": "https://unsplash.com/photos/modern-wooden-speaker-with-a-light-grille-on-a-pedestal-22MnsFEXMdU"
+  "source": "https://unsplash.com/photos/a-speaker-on-a-wooden-table-y0K8EMigxV4"
  },
  "stand-aluminium": {
   "author": "Balázs Kétyi",
@@ -440,19 +489,26 @@
   "licence": "Unsplash",
   "source": "https://unsplash.com/photos/black-metal-stand-with-white-background-Lg4weBBGbLU"
  },
- "stand-green": {
-  "author": "Allison Saeng",
-  "download": "https://plus.unsplash.com/premium_photo-1681702277226-d3c63331730a?ixid=M3wxMjA3fDB8MXxzZWFyY2h8MXx8cGhvbmUlMjBzdGFuZCUyMGRlc2slMjBhbHVtaW5pdW18ZW58MHx8fHwxNzg5NzU1MTI2fDA&ixlib=rb-4.1.0",
+ "stand-headphone": {
+  "author": "Barry A",
+  "download": "https://images.unsplash.com/photo-1713707343787-94c85c3ec8b0?ixid=M3wxMjA3fDB8MXxzZWFyY2h8MTB8fGhlYWRwaG9uZSUyMHN0YW5kfGVufDB8fHx8MTc5MTI3NzUzN3ww&ixlib=rb-4.1.0",
   "kind": "product",
   "licence": "Unsplash",
-  "source": "https://unsplash.com/photos/a-cell-phone-sitting-on-top-of-a-table-next-to-a-mirror-BHhBg36oP3w"
+  "source": "https://unsplash.com/photos/a-pair-of-headphones-on-a-stand-4aELmD1P0Ec"
  },
  "stand-metal": {
-  "author": "Evelyn Verdín",
-  "download": "https://plus.unsplash.com/premium_photo-1755994149324-e96cef9c74de?ixid=M3wxMjA3fDB8MXxzZWFyY2h8NXx8cGhvbmUlMjBzdGFuZCUyMGRlc2slMjBhbHVtaW5pdW18ZW58MHx8fHwxNzg5NzU1MTI2fDA&ixlib=rb-4.1.0",
+  "author": "Vadim Bogulov",
+  "download": "https://images.unsplash.com/photo-1707651385176-8c7492596164?ixid=M3wxMjA3fDB8MXxzZWFyY2h8NHx8bWV0YWwlMjBwaG9uZSUyMHN0YW5kfGVufDB8fHx8MTc5MTI3NzUxNnww&ixlib=rb-4.1.0",
   "kind": "product",
   "licence": "Unsplash",
-  "source": "https://unsplash.com/photos/two-smartphones-on-a-white-surface-YTtvw4lE7Zo"
+  "source": "https://unsplash.com/photos/a-metal-frame-sitting-on-top-of-a-blueprint-RgMvkk2K6V0"
+ },
+ "stand-walnut": {
+  "author": "Dimitri Karastelev",
+  "download": "https://images.unsplash.com/photo-1569508177734-8d8f0c96c241?ixid=M3wxMjA3fDB8MXxzZWFyY2h8M3x8d29vZCUyMHBob25lJTIwaG9sZGVyfGVufDB8fHx8MTc5MTI3Nzc4N3ww&ixlib=rb-4.1.0",
+  "kind": "product",
+  "licence": "Unsplash",
+  "source": "https://unsplash.com/photos/black-smartphone-sH2mh_ZkUIc"
  },
  "stand-wire": {
   "author": "Shawn Rain",

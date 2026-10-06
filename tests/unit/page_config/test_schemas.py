@@ -888,7 +888,7 @@ class TestHeroSlideProduct:
     def test_a_product_of_this_store_is_accepted(self):
         from product.factories.product import ProductFactory
 
-        product = ProductFactory(num_images=0, num_reviews=0)
+        product = ProductFactory(num_images=0, num_reviews=0, active=True)
 
         validate_section_props("hero_carousel", self._slides(product.pk))
 
@@ -905,7 +905,7 @@ class TestHeroSlideProduct:
     def test_a_deleted_product_is_refused(self):
         from product.factories.product import ProductFactory
 
-        product = ProductFactory(num_images=0, num_reviews=0)
+        product = ProductFactory(num_images=0, num_reviews=0, active=True)
         product.delete()
 
         with pytest.raises(ValidationError, match="not found"):

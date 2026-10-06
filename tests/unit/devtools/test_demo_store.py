@@ -1092,7 +1092,7 @@ class TestBranding:
             return type(tenant).objects.get(pk=tenant.pk).favicon_url
 
     def test_points_the_favicon_at_the_primary_domain(self, demo_tenant):
-        assert demo_store.seed_branding() == {"updated": 2}
+        assert demo_store.seed_branding() == {"updated": 3}
 
         assert (
             self._favicon_url(demo_tenant)
@@ -1107,6 +1107,13 @@ class TestBranding:
         with schema_context(get_public_schema_name()):
             stored = type(demo_tenant).objects.get(pk=demo_tenant.pk)
         assert stored.store_description == demo_store.DEMO_STORE_DESCRIPTION
+        assert (
+            stored.store_description_i18n
+            == demo_store.DEMO_STORE_DESCRIPTION_I18N
+        )
+        assert stored.store_description_i18n["en"] == (
+            "Phone accessories, tested at our desk and delivered fast."
+        )
 
     def test_a_second_run_changes_nothing(self, demo_tenant):
         demo_store.seed_branding()

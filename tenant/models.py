@@ -196,6 +196,20 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
     store_description = models.TextField(
         _("Store Description"), blank=True, default=""
     )
+    store_description_i18n = models.JSONField(
+        _("Store Description (other languages)"),
+        default=dict,
+        db_default={},
+        blank=True,
+        validators=[
+            JSONSchemaValidator("tenant.json_schemas.store_description_i18n")
+        ],
+        help_text=_(
+            "The store line in the storefront's other languages, keyed "
+            'by locale, e.g. {"en": "..."}. The default locale line is '
+            "Store Description; a locale left out falls back to it."
+        ),
+    )
     default_locale = models.CharField(
         _("Default Locale"),
         max_length=10,
@@ -1224,6 +1238,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         self._validate_stripe_publishable_key()
         self._validate_stripe_secret_key()
         self._validate_available_locales()
+        self._validate_store_description_i18n()
         self._validate_legal_documents_for_new_locales()
         self._validate_meta_pixel_id()
         self._validate_tiktok_pixel_id()
@@ -1265,6 +1280,20 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
                         "Must contain default_locale (%(locale)s) — the "
                         "storefront would otherwise 404 the tenant's own "
                         "default language."
+                    )
+                    % {"locale": self.default_locale}
+                }
+            )
+
+    def _validate_store_description_i18n(self) -> None:
+        # The default locale's line lives in ``store_description``; a
+        # second copy here would be a value the storefront never reads.
+        if self.default_locale in (self.store_description_i18n or {}):
+            raise ValidationError(
+                {
+                    "store_description_i18n": _(
+                        "Remove %(locale)s: the default locale's line is "
+                        "Store Description."
                     )
                     % {"locale": self.default_locale}
                 }

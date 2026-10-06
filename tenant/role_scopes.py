@@ -130,6 +130,7 @@ TENANT_SELF_EDITABLE_FIELDS: frozenset[str] = frozenset(
         # Identity / presentation
         "store_name",
         "store_description",
+        "store_description_i18n",
         "contact_email",
         # A merchant may PROPOSE their own sender address; only the
         # platform can certify it. ``from_email`` takes effect solely

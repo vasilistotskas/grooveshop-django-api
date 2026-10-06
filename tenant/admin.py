@@ -464,6 +464,7 @@ class TenantAdmin(BaseModelAdmin):
                 "fields": [
                     "store_name",
                     "store_description",
+                    "store_description_i18n",
                     "default_locale",
                     "default_currency",
                     "logo_light_url",

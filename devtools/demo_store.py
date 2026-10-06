@@ -2374,11 +2374,14 @@ def seed_newsletter() -> dict[str, int]:
 DEMO_FAVICON_PATH = "/platform-favicon/favicon.ico"
 
 #: The store line the footer prints under the logo. `store_description`
-#: is not translatable, so it is written in the store's default
-#: language.
+#: holds the default locale's wording (Greek); the other locales live in
+#: `store_description_i18n`.
 DEMO_STORE_DESCRIPTION = (
     "Αξεσουάρ κινητού, δοκιμασμένα στο γραφείο μας και παραδομένα γρήγορα."
 )
+DEMO_STORE_DESCRIPTION_I18N = {
+    "en": "Phone accessories, tested at our desk and delivered fast.",
+}
 
 
 def seed_branding() -> dict[str, int]:
@@ -2422,6 +2425,9 @@ def seed_branding() -> dict[str, int]:
         if tenant.store_description != DEMO_STORE_DESCRIPTION:
             tenant.store_description = DEMO_STORE_DESCRIPTION
             changed.append("store_description")
+        if tenant.store_description_i18n != DEMO_STORE_DESCRIPTION_I18N:
+            tenant.store_description_i18n = DEMO_STORE_DESCRIPTION_I18N
+            changed.append("store_description_i18n")
         if not changed:
             return {"unchanged": 1}
         # The narrow update still goes through `Tenant.save`, which bumps

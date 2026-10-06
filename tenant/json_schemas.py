@@ -103,6 +103,24 @@ def available_locales() -> dict[str, Any]:
     }
 
 
+def store_description_i18n() -> dict[str, Any]:
+    """``Tenant.store_description_i18n``: the store line per locale.
+
+    ``store_description`` is the default locale's wording; this maps the
+    OTHER storefront locales to theirs. The schema admits every
+    ``STOREFRONT_LOCALES`` code (one editor row per locale); that the
+    tenant's own default locale is absent is a cross-field rule
+    (``Tenant.clean``), since the default is per tenant."""
+    return {
+        "type": "object",
+        "properties": {
+            code: {"type": "string", "title": code}
+            for code in STOREFRONT_LOCALES
+        },
+        "additionalProperties": False,
+    }
+
+
 def allowed_csp_sources() -> dict[str, Any]:
     return {
         "type": "array",

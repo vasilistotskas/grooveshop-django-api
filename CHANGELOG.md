@@ -3,6 +3,47 @@
 
 
 
+## v3.100.2 (2026-10-06)
+
+### Bug fixes
+
+* fix(devtools): replace paid demo photos and rebuild the set at 2x (#123)
+
+Nineteen demo assets came from paid Unsplash+ photographs with the
+watermark baked in (manifest labelled them "Unsplash"), and
+powerbank-silver showed a real trademark. All are replaced with free
+Unsplash-licence photographs, as are three new picks that showed brand
+names or app logos. Eleven products that borrowed another product's
+photograph (car and travel chargers, rugged case, camera-lens glass,
+car mounts, tripod, headphone stand, cable organiser, sport earbuds,
+gaming cable) get their own. Where no free photograph fits, the product
+changes instead: the green desk stand becomes walnut, the white braided
+cable grey, and the mint charger variant is removed (retired on seed).
+
+The set is rebuilt at twice its old size (product 2400, category
+3200x1800, blog 3000x2000, hero 4200x1800) with 4:4:4 AVIF at q80 under
+a 350 KB cap, fetched with imgix fit=min and never upscaled locally, so
+a smaller original keeps its own size.
+
+Stored names now carry the file's hash: the media service, Cloudflare
+and browsers cache a processed image for a year under its URL, so a
+rebuilt photograph under the old name would keep showing the old one.
+Earlier builds of a key are pruned from the volume.
+
+Also fixes the build cache, which was keyed by asset key and would hand
+back a replaced photograph's old frame, and the product seeder, which
+minted a new variant group per run and never cleared a group a product
+had left; empty groups are now removed.
+
+
+Claude-Session: https://claude.ai/code/session_01TFH41uvbvbU3iLBnPrz4og
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`f4bf837`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f4bf837d24e79434698b2e2a9e9875b95addd53b))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.100.1 [skip ci] ([`217545d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/217545d71143b4f56ab1334d65a087820f5d7270))
+
 ## v3.100.1 (2026-10-06)
 
 ### Bug fixes

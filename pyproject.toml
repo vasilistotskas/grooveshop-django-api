@@ -16,7 +16,7 @@ dependencies = [
   "channels[daphne]==4.3.2",
   "channels-redis==4.3.0",
   "django==6.0.8",
-  "django-allauth[idp-oidc]==65.19.2",
+  "django-allauth[idp-oidc]==65.19.7",
   "django-extra-settings==0.15.0",
   "django-celery-beat==2.9.0",
   "django-celery-results==2.6.0",

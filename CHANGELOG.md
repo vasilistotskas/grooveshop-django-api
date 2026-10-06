@@ -3,6 +3,101 @@
 
 
 
+## v3.100.0 (2026-10-06)
+
+### Bug fixes
+
+* fix(pay_way): drop the translated name column
+
+Contract step for 0029_payway_key: the column left in place for the
+previous release's replicas is no longer read now that v3.99.0 runs
+everywhere. migration_preflight refuses it until 0029 is applied.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`89ba1e3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/89ba1e33ff69515540b2792125852fe4f93e2728))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.99.0 [skip ci] ([`3915033`](https://github.com/vasilistotskas/grooveshop-django-api/commit/39150336a0e2b789e461139395dd40f3c435b35c))
+
+### Continuous integration
+
+* ci: re-run code scanning after runner-queue cancellation ([`7899f71`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7899f717b607dc869d2baf02c6fe2d418b286b35))
+
+* ci: re-run code scanning after the GitHub Actions incident ([`7899f71`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7899f717b607dc869d2baf02c6fe2d418b286b35))
+
+### Documentation
+
+* docs(search): format the contains-operator example
+
+ruff format checks Python blocks in Markdown, and the example line
+exceeded the line length.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`89ba1e3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/89ba1e33ff69515540b2792125852fe4f93e2728))
+
+* docs: correct the reference docs against the code (#120) ([`7899f71`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7899f717b607dc869d2baf02c6fe2d418b286b35))
+
+* docs: correct the reference docs against the code
+
+- migrations: AddIndexConcurrently cannot be used here; use
+  AddIndexAdaptively. Mark the SEO example as the safe shape, not what
+  shipped.
+- order-system: ShippingCarrierInterface with @register_provider, Viva
+  reversal COMPLETED -> REFUNDED with no settings fallback, Stripe fires on
+  payment_intent.succeeded; no refund_order endpoint exists.
+- api/search: SearchThrottle and SearchClickThrottle scopes exist; blog
+  index drops out when the plan disables blog; dates use TIME_ZONE.
+- search/contains-operator: PATCH, double-quoted filters, only filterable
+  fields in examples.
+- search/management-commands, recommendations-engine: match the code;
+  the nightly weight update is design, not built.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_014vsEbHneebYHCpqUex21cv ([`7899f71`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7899f717b607dc869d2baf02c6fe2d418b286b35))
+
+* docs(order-system): document the real carrier interface
+
+dispatch_create_shipment_task takes a keyword-only schema_name that
+ShippingService always passes, so an adapter written to the old line
+raised TypeError. List the abstract methods, and say apply_webhook_event
+belongs to BoxNowService, not to the interface.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_014vsEbHneebYHCpqUex21cv
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`7899f71`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7899f717b607dc869d2baf02c6fe2d418b286b35))
+
+### Features
+
+* feat(shipping_acs): record COD received outside ACS; drop pay_way name column (#119) ([`89ba1e3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/89ba1e33ff69515540b2792125852fe4f93e2728))
+
+* feat(shipping_acs): record COD received outside ACS
+
+The unremitted-COD watcher accepted only an ACS payout row as proof, so a
+parcel the merchant was paid for by another route alerted every night
+with no way to clear it (production order 73). An audited settlement on
+the shipment (who, when, note) now clears it: a detail action in the
+admin, backed by AcsService.record_cod_received_outside_acs, which
+refuses unless the parcel is a delivered COD with no ACS payout and marks
+the order paid silently when it is still pending. ACS payout rows stay
+ACS's statement only.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`89ba1e3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/89ba1e33ff69515540b2792125852fe4f93e2728))
+
+### Testing
+
+* test(shipping_acs): pin COD settlement refusal checks to English
+
+The refusal messages are translated, so matching their English text
+failed under the default Greek locale once the catalogue was compiled.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`89ba1e3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/89ba1e33ff69515540b2792125852fe4f93e2728))
+
 ## v3.99.0 (2026-10-05)
 
 ### Chores

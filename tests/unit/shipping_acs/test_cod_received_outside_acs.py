@@ -19,7 +19,7 @@ from django.contrib.admin.sites import AdminSite
 from django.contrib.messages.storage.fallback import FallbackStorage
 from django.test import RequestFactory
 from django.urls import reverse
-from django.utils import timezone
+from django.utils import timezone, translation
 from djmoney.money import Money
 
 from order.enum.status import OrderStatus, PaymentStatus
@@ -152,7 +152,10 @@ def test_refuses_when_acs_already_reported_a_payout(staff_user):
         cod_amount_total=Money(Decimal("24.48"), "EUR"),
     )
 
-    with pytest.raises(AcsCodSettlementError, match="payout"):
+    with (
+        translation.override("en"),
+        pytest.raises(AcsCodSettlementError, match="payout"),
+    ):
         AcsService.record_cod_received_outside_acs(
             shipment, user=staff_user, note="x"
         )
@@ -168,7 +171,10 @@ def test_refuses_a_second_recording_and_keeps_the_first(staff_user):
     )
 
     # A double submit hands in the stale, pre-stamp instance.
-    with pytest.raises(AcsCodSettlementError, match="already recorded"):
+    with (
+        translation.override("en"),
+        pytest.raises(AcsCodSettlementError, match="already recorded"),
+    ):
         AcsService.record_cod_received_outside_acs(
             shipment, user=staff_user, note="second"
         )
@@ -180,7 +186,10 @@ def test_refuses_a_second_recording_and_keeps_the_first(staff_user):
 def test_refuses_a_blank_note(staff_user):
     shipment = _shipment()
 
-    with pytest.raises(AcsCodSettlementError, match="note"):
+    with (
+        translation.override("en"),
+        pytest.raises(AcsCodSettlementError, match="note"),
+    ):
         AcsService.record_cod_received_outside_acs(
             shipment, user=staff_user, note="   "
         )
@@ -292,11 +301,13 @@ def test_admin_post_reports_a_refusal_instead_of_recording(
     shipment = _shipment(state=AcsShipmentState.IN_TRANSIT)
     request = _request(staff_user, data={"note": "x"})
 
-    response = shipment_admin.record_cod_received_outside_acs(
-        request, object_id=shipment.pk
-    )
+    with translation.override("en"):
+        response = shipment_admin.record_cod_received_outside_acs(
+            request, object_id=shipment.pk
+        )
+        expected_redirect = _redirect(shipment)
 
     shipment.refresh_from_db()
     assert shipment.cod_received_outside_acs_at is None
-    assert response.headers["HX-Redirect"] == _redirect(shipment)
+    assert response.headers["HX-Redirect"] == expected_redirect
     assert "delivered" in str(next(iter(request._messages)))

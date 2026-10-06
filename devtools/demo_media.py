@@ -11,15 +11,20 @@ by ``manage.py build_demo_assets``. Writing them goes through
 tenant's own prefix (``TenantFileSystemStorage`` →
 ``MEDIA_ROOT/<schema>/…``) in every environment, with no kubectl step.
 
-Idempotent by CONTENT, not by name: a file whose size already matches
-the lock is left alone, so re-seeding does not rewrite the volume, and
-a rebuilt asset does replace the old bytes.
+Content-addressed: the stored name carries the first characters of the
+file's hash (``uploads/products/cable-coiled-1a2b3c4d5e6f.avif``). The
+media service, Cloudflare and browsers all cache a processed image for
+a year under its URL, so a rebuilt photograph written under the old
+name would keep showing the old one; a new hash is a new URL. A name
+that already exists is therefore already right, and re-seeding does not
+rewrite the volume.
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import re
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -58,12 +63,36 @@ def _lock() -> dict[str, dict]:
     return _lock_cache
 
 
+#: Characters of the sha256 the stored name carries.
+HASH_LENGTH = 12
+
+
 def storage_name(key: str) -> str:
     """Where ``key`` lives inside the tenant's media, written or not."""
     entry = _lock().get(key)
     if entry is None:
         raise AssetMissing(f"Unknown demo asset {key!r}")
-    return f"{STORAGE_PREFIX[entry['kind']]}/{key}.avif"
+    digest = entry["sha256"][:HASH_LENGTH]
+    return f"{STORAGE_PREFIX[entry['kind']]}/{key}-{digest}.avif"
+
+
+def _prune_other_versions(key: str, name: str) -> None:
+    """Delete the earlier builds of ``key``, so the volume holds one each.
+
+    Matches the bare ``<key>.avif`` the store wrote before names carried
+    a hash, and any ``<key>-<hash>.avif`` that is not ``name``.
+    """
+    folder, _, current = name.rpartition("/")
+    pattern = re.compile(
+        rf"{re.escape(key)}(-[0-9a-f]{{{HASH_LENGTH}}})?\.avif"
+    )
+    try:
+        _, files = default_storage.listdir(folder)
+    except FileNotFoundError, NotImplementedError:
+        return
+    for filename in files:
+        if filename != current and pattern.fullmatch(filename):
+            default_storage.delete(f"{folder}/{filename}")
 
 
 def ensure_asset(key: str) -> str:
@@ -83,21 +112,12 @@ def ensure_asset(key: str) -> str:
 
     name = storage_name(key)
     if default_storage.exists(name):
-        try:
-            if default_storage.size(name) == entry["bytes"]:
-                return name
-        except OSError, NotImplementedError:
-            # A backend that cannot size a file is a reason to rewrite,
-            # not to guess it matches.
-            pass
-        # Delete first: FileSystemStorage renames around a collision, so
-        # saving over an existing name would leave `<key>_A1b2c3.avif`
-        # and the seeded path would point at the stale bytes.
-        default_storage.delete(name)
+        return name
 
     saved = default_storage.save(name, ContentFile(source.read_bytes()))
     if saved != name:
         logger.warning("Demo asset %s was stored as %s", name, saved)
+    _prune_other_versions(key, saved)
     return saved
 
 

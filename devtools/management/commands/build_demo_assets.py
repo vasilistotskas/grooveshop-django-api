@@ -34,21 +34,29 @@ CACHE = ASSETS_DIR / ".cache"
 # A product photograph is square because every grid, rail and thumbnail
 # on the storefront reserves a square-ish box for it; a category tile is
 # a landscape band across the top of its card.
+#
+# Sizes are twice the largest box each kind is drawn in, so a retina or
+# phone screen (2x, 3x) gets real pixels instead of a browser upscale;
+# the media service resizes down per request. A source smaller than its
+# shape is kept at its own size — upscaling only adds blur.
 SHAPES: dict[str, tuple[int, int]] = {
-    "product": (1200, 1200),
-    "category": (1600, 900),
-    "blog": (1500, 1000),
-    "hero": (2100, 900),
+    "product": (2400, 2400),
+    "category": (3200, 1800),
+    "blog": (3000, 2000),
+    "hero": (4200, 1800),
 }
 
 # Quality is stepped DOWN until the file fits, rather than fixed: these
 # photographs vary from a flat studio background (tiny at any quality)
 # to a textured fabric speaker (large), and one quality number for both
-# either bloats the repository or ruins the easy ones.
-QUALITY_START = 62
-QUALITY_FLOOR = 40
+# either bloats the repository or ruins the easy ones. Full-resolution
+# chroma (4:4:4): 4:2:0 smears the thin coloured edges product shots are
+# made of — cable sleeves, port outlines, printed text.
+QUALITY_START = 80
+QUALITY_FLOOR = 56
 QUALITY_STEP = 6
-MAX_BYTES = 110 * 1024
+MAX_BYTES = 350 * 1024
+SUBSAMPLING = "4:4:4"
 
 
 @dataclass(frozen=True)
@@ -89,9 +97,16 @@ def _download(asset: Asset, width: int, height: int) -> bytes:
     """
     url = asset.download
     joiner = "&" if "?" in url else "?"
-    url = f"{url}{joiner}w={width * 2}&h={height * 2}&fit=crop&q=85&fm=jpg"
+    # `fit=min`, not `fit=crop`: both crop to the shape's aspect ratio,
+    # but `crop` enlarges a smaller original to fill the box and `min`
+    # never exceeds the original's own pixels.
+    url = f"{url}{joiner}w={width}&h={height}&fit=min&q=90&fm=jpg"
 
-    cached = CACHE / f"{asset.key}.jpg"
+    # Keyed by the URL, not the asset key: replacing a key's photograph
+    # changes its download, and a key-named cache would hand back the
+    # old frame.
+    digest = hashlib.sha256(url.encode()).hexdigest()[:16]
+    cached = CACHE / f"{asset.key}-{digest}.jpg"
     if cached.exists():
         return cached.read_bytes()
 
@@ -111,7 +126,9 @@ def _encode(image: Image.Image) -> tuple[bytes, int]:
     quality = QUALITY_START
     while True:
         buffer = io.BytesIO()
-        image.save(buffer, format="AVIF", quality=quality)
+        image.save(
+            buffer, format="AVIF", quality=quality, subsampling=SUBSAMPLING
+        )
         data = buffer.getvalue()
         if len(data) <= MAX_BYTES or quality <= QUALITY_FLOOR:
             return data, quality
@@ -130,6 +147,8 @@ def _crop(raw: bytes, width: int, height: int) -> Image.Image:
         new_height = round(image.width / target)
         top = (image.height - new_height) // 2
         image = image.crop((0, top, image.width, top + new_height))
+    if image.width <= width:
+        return image
     return image.resize((width, height), Image.LANCZOS)
 
 
@@ -192,7 +211,9 @@ class Command(BaseCommand):
                 continue
 
             raw = _download(asset, width, height)
-            data, quality = _encode(_crop(raw, width, height))
+            image = _crop(raw, width, height)
+            width, height = image.size
+            data, quality = _encode(image)
 
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(data)

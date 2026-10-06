@@ -9950,3 +9950,98 @@ msgstr ""
 "Wenn true, nur Produkte mit Preisnachlass (discount_percent > 0). Aktionen "
 "gelten auf Warenkorbebene (Gutscheine, eingegrenzt und zeitlich befristet) "
 "und sind nicht Teil dieses Filters."
+
+#: .\shipping_acs\admin.py:71
+msgid ""
+"How the money arrived (bank transfer reference, hand delivery, ...). "
+"Recorded on the shipment's audit trail."
+msgstr ""
+"Wie das Geld eingegangen ist (Überweisungsreferenz, persönliche Übergabe, "
+"...). Wird im Verlauf der Sendung festgehalten."
+
+#: .\shipping_acs\admin.py:523 .\shipping_acs\admin.py:526
+msgid "Record COD received outside ACS"
+msgstr "Nachnahme als außerhalb von ACS erhalten erfassen"
+
+#: .\shipping_acs\admin.py:528
+msgid ""
+"Use only when the merchant confirms the cash on delivery reached them by a "
+"route ACS never reported. It stops the unremitted-COD alert for this parcel "
+"and marks the order paid if it is not already. ACS's own payout records are "
+"not touched."
+msgstr ""
+"Nur verwenden, wenn der Händler bestätigt, dass ihn die Nachnahme auf einem "
+"Weg erreicht hat, den ACS nie gemeldet hat. Die Warnung zu nicht "
+"ausgezahlter Nachnahme für dieses Paket entfällt, und die Bestellung wird "
+"als bezahlt markiert, falls sie es nicht schon ist. Die eigenen "
+"Auszahlungsdatensätze von ACS bleiben unverändert."
+
+#: .\shipping_acs\admin.py:557
+msgid "COD recorded as received outside ACS."
+msgstr "Nachnahme wurde als außerhalb von ACS erhalten erfasst."
+
+#: .\shipping_acs\models\shipment.py:256
+msgid "COD received outside ACS at"
+msgstr "Nachnahme außerhalb von ACS erhalten am"
+
+#: .\shipping_acs\models\shipment.py:260
+msgid ""
+"When an operator recorded that the merchant received this parcel's COD "
+"money by a route ACS never reported. Clears the unremitted-COD alert for "
+"the parcel; ACS's own payout rows are untouched."
+msgstr ""
+"Wann ein Bearbeiter erfasst hat, dass der Händler die Nachnahme dieses "
+"Pakets auf einem Weg erhalten hat, den ACS nie gemeldet hat. Hebt die "
+"Warnung zu nicht ausgezahlter Nachnahme für das Paket auf; die "
+"Auszahlungsdatensätze von ACS bleiben unverändert."
+
+#: .\shipping_acs\models\shipment.py:272
+msgid "COD received outside ACS by"
+msgstr "Nachnahme außerhalb von ACS erhalten von"
+
+#: .\shipping_acs\models\shipment.py:279
+msgid ""
+"Operator who recorded the settlement. Stores a PLATFORM-schema user id; not "
+"FK-enforced."
+msgstr ""
+"Bearbeiter, der den Ausgleich erfasst hat. Speichert eine Benutzer-ID aus "
+"dem PLATFORM-Schema; nicht per FK erzwungen."
+
+#: .\shipping_acs\models\shipment.py:284
+msgid "COD received outside ACS note"
+msgstr "Notiz zur außerhalb von ACS erhaltenen Nachnahme"
+
+#: .\shipping_acs\models\shipment.py:289
+msgid ""
+"How and when the money arrived (bank transfer reference, hand delivery, "
+"...), as written by the operator."
+msgstr ""
+"Wie und wann das Geld eingegangen ist (Überweisungsreferenz, persönliche "
+"Übergabe, ...), vom Bearbeiter notiert."
+
+#: .\shipping_acs\services.py:2171
+msgid "A note is required."
+msgstr "Eine Notiz ist erforderlich."
+
+#: .\shipping_acs\services.py:2185
+msgid "Only a cash-on-delivery shipment with an amount due can be settled."
+msgstr "Nur eine Nachnahmesendung mit offenem Betrag kann ausgeglichen werden."
+
+#: .\shipping_acs\services.py:2192
+#, python-format
+msgid "Only a delivered shipment can be settled (this one is %(state)s)."
+msgstr ""
+"Nur eine zugestellte Sendung kann ausgeglichen werden (diese ist: "
+"%(state)s)."
+
+#: .\shipping_acs\services.py:2200
+msgid "This shipment is already recorded as received outside ACS."
+msgstr "Diese Sendung ist bereits als außerhalb von ACS erhalten erfasst."
+
+#: .\shipping_acs\services.py:2212
+msgid ""
+"ACS already reported a payout for this voucher; there is nothing to settle."
+msgstr ""
+"ACS hat für diesen Voucher bereits eine Auszahlung gemeldet; es gibt nichts "
+"auszugleichen."
+

@@ -89,3 +89,11 @@ class AcsAuthError(AcsRetryableError):
     wrong, Celery's capped retries exhaust and the task fails loudly
     instead of silently returning.
     """
+
+
+class AcsCodSettlementError(AcsError):
+    """A COD parcel cannot be recorded as received outside ACS.
+
+    Raised by ``AcsService.record_cod_received_outside_acs`` with a
+    message an operator can act on (the admin action shows it verbatim).
+    """

@@ -22,6 +22,7 @@ from django.core.cache import cache
 from django.db import connection, transaction
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
+from django.utils.translation import gettext
 
 from pay_way.enum.settlement import PaySettlement
 from shipping.enum import ShippingKind
@@ -2139,6 +2140,104 @@ class AcsService:
                 "admin alert: %s",
                 exc,
             )
+
+    @classmethod
+    def record_cod_received_outside_acs(
+        cls, shipment: AcsShipment, *, user, note: str
+    ) -> AcsShipment:
+        """Record that the merchant was paid this parcel's COD by another route.
+
+        ACS's payout statement is the default evidence a COD parcel was
+        remitted, and ``AcsCodPayout`` is never forged to say otherwise.
+        When the money demonstrably arrived without ACS ever reporting it
+        (production order 73: delivered 2026-05-23, no payout on any date
+        ACS reports, merchant confirms receipt), this is the explicit,
+        audited way to settle the parcel. It stamps who/when/why on the
+        shipment, which the unremitted-COD watcher then skips, and marks
+        the order paid through the same path the reconcile uses (a no-op
+        when an operator already did).
+
+        Refuses unless the parcel is a delivered COD shipment with an
+        amount due, has no ACS payout row, and is not already recorded.
+        Atomic under the shipment row lock, so a double submit settles
+        once and the second call is refused.
+        """
+        from shipping_acs.enum.charge_type import AcsChargeType
+        from shipping_acs.exceptions import AcsCodSettlementError
+        from shipping_acs.models import AcsCodPayout
+
+        note = (note or "").strip()
+        if not note:
+            raise AcsCodSettlementError(gettext("A note is required."))
+
+        with transaction.atomic():
+            locked = (
+                AcsShipment.objects.select_for_update()
+                .select_related("order")
+                .get(pk=shipment.pk)
+            )
+            if (
+                locked.charge_type != AcsChargeType.COD
+                or locked.cod_amount.amount <= 0
+            ):
+                raise AcsCodSettlementError(
+                    gettext(
+                        "Only a cash-on-delivery shipment with an amount due "
+                        "can be settled."
+                    )
+                )
+            if locked.shipment_state != AcsShipmentState.DELIVERED:
+                raise AcsCodSettlementError(
+                    gettext(
+                        "Only a delivered shipment can be settled "
+                        "(this one is %(state)s)."
+                    )
+                    % {"state": locked.get_shipment_state_display()}
+                )
+            if locked.cod_received_outside_acs_at is not None:
+                raise AcsCodSettlementError(
+                    gettext(
+                        "This shipment is already recorded as received "
+                        "outside ACS."
+                    )
+                )
+            if (
+                locked.voucher_no
+                and AcsCodPayout.objects.filter(
+                    voucher_no=locked.voucher_no
+                ).exists()
+            ):
+                raise AcsCodSettlementError(
+                    gettext(
+                        "ACS already reported a payout for this voucher; "
+                        "there is nothing to settle."
+                    )
+                )
+
+            locked.cod_received_outside_acs_at = timezone.now()
+            locked.cod_received_outside_acs_by_id = user.pk
+            locked.cod_received_outside_acs_note = note
+            locked._change_reason = "COD received outside ACS"
+            locked.save(
+                update_fields=[
+                    "cod_received_outside_acs_at",
+                    "cod_received_outside_acs_by",
+                    "cod_received_outside_acs_note",
+                ]
+            )
+            cls._mark_cod_order_paid_if_pending(
+                locked, silent_for_customer=True
+            )
+
+        logger.info(
+            "ACS COD received outside ACS: order=%s voucher=%s amount=%s "
+            "recorded_by=%s",
+            locked.order_id,
+            locked.voucher_no,
+            locked.cod_amount,
+            user.pk,
+        )
+        return locked
 
     @classmethod
     def _mark_cod_order_paid_if_pending(

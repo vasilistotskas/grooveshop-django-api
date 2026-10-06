@@ -498,6 +498,19 @@ accepting Cyprus orders at the Greek flat rate.
   `manage.py reconcile_acs_cod --days N [--silent]` (`--silent`
   suppresses customer COMPLETED notifications — mandatory for
   backfills).
+- **COD received outside ACS**: the nightly `alert_unremitted_cod_payouts`
+  treats a delivered COD parcel as unremitted unless an `AcsCodPayout`
+  exists for its voucher (ACS's own statement). When the merchant was
+  paid by another route and ACS never reports it (prod order 73), an
+  operator uses the **Record COD received outside ACS** detail action on
+  the `AcsShipment` admin (a note is required). It calls
+  `AcsService.record_cod_received_outside_acs`, which refuses unless the
+  shipment is a DELIVERED COD with an amount due, has no `AcsCodPayout`
+  and is not already recorded; it stamps `cod_received_outside_acs_at/_by/
+  _note` (audited by simple-history) under the shipment row lock and marks
+  the order paid through `_mark_cod_order_paid_if_pending` (silent, a
+  no-op if already paid). `_unremitted_cod_rows` then skips the parcel. No
+  `AcsCodPayout` is ever created for it.
 - HTTP 403/406 (`AcsAuthError`) is **retryable**: prod ACS returns
   sporadic transient 406s (~2% of tracking polls, self-healing —
   verified 2026-07-11); only a persistent rejection means a bad

@@ -26,6 +26,14 @@ from django.test import TestCase
 
 from contact.models import FeedbackCategory
 from devtools import demo_store
+from devtools.demo_catalogue import (
+    CATEGORY_SPECS,
+    NEW_ARRIVAL_DAYS,
+    SPEC_OVERRIDES,
+    arrival_days_ago,
+    specs_for,
+    view_count,
+)
 from devtools.management.commands import seed_demo_store
 from page_config.models import ComponentType, NavigationSlot
 from page_config.schemas import (
@@ -374,8 +382,223 @@ class TestCatalogueIntegrity(TestCase):
     def test_every_attribute_axis_has_an_english_name(self):
         """``ATTRIBUTE_NAMES_EN`` is what the /en specs panel reads."""
         for row in demo_store.PRODUCTS:
-            for axis in row.attributes:
+            for axis in specs_for(row):
                 assert axis in demo_store.ATTRIBUTE_NAMES_EN, axis
+
+    def test_every_product_carries_five_or_six_specs(self):
+        """The specs panel is the same height down a category listing."""
+        for row in demo_store.PRODUCTS:
+            specs = specs_for(row)
+            assert 5 <= len(specs) <= 6, f"{row.slug}: {len(specs)}"
+            for axis, (value_el, value_en) in specs.items():
+                assert value_el.strip() and value_en.strip(), (row.slug, axis)
+
+    def test_a_spec_override_names_a_real_product_and_axis(self):
+        slugs = {row.slug: row for row in demo_store.PRODUCTS}
+        for slug, overrides in SPEC_OVERRIDES.items():
+            assert slug in slugs, slug
+            for axis in overrides:
+                assert axis in specs_for(slugs[slug]), (slug, axis)
+
+    def test_every_category_has_a_spec_bank(self):
+        """``specs_for`` indexes the bank by the category a product sits
+        in, so a product in a category with no entry would KeyError."""
+        for row in demo_store.PRODUCTS:
+            assert row.category in CATEGORY_SPECS, row.slug
+
+
+class TestRicherCatalogue(TestCase):
+    """The M3 additions: variants, subcategories, arrivals, views."""
+
+    def test_audio_and_mounts_have_subcategories_with_banners(self):
+        for root in ("demo-audio", "demo-mounts-stands"):
+            children = [
+                row for row in demo_store.CATEGORIES if row.parent == root
+            ]
+            assert len(children) >= 2, root
+            for child in children:
+                assert child.banner, f"{child.slug} has no banner"
+
+    def test_banners_are_committed_assets(self):
+        from devtools.demo_media import LOCK_PATH
+
+        known = set(json.loads(LOCK_PATH.read_text(encoding="utf-8")))
+        for row in demo_store.CATEGORIES:
+            if row.banner:
+                assert row.banner in known, row.slug
+
+    def test_a_root_with_children_holds_no_product_itself(self):
+        """The mega menu opens a root onto its children; a product left
+        on the root would be reachable from nowhere else."""
+        parents = {row.parent for row in demo_store.CATEGORIES if row.parent}
+        for row in demo_store.PRODUCTS:
+            if row.category in parents:
+                assert row.category not in {
+                    "demo-audio",
+                    "demo-mounts-stands",
+                }, row.slug
+
+    def test_the_power_bank_family_is_colour_by_capacity(self):
+        members = [
+            row
+            for row in demo_store.PRODUCTS
+            if row.variant_group == "powerbank-voltra"
+        ]
+        pairs = [
+            (row.attributes["Χωρητικότητα"][1], row.attributes["Χρώμα"][1])
+            for row in members
+        ]
+        assert len(pairs) == len(set(pairs)), "two variants are identical"
+        capacities = {capacity for capacity, _colour in pairs}
+        assert capacities == {
+            "10,000 mAh",
+            "20,000 mAh",
+            "26,800 mAh",
+        }
+        for capacity in capacities:
+            colours = {c for cap, c in pairs if cap == capacity}
+            assert {"White", "Black", "Silver"} <= colours, capacity
+
+    def test_the_family_shares_its_photographs(self):
+        """No new photograph: a colour variant shows the family's."""
+        for row in demo_store.PRODUCTS:
+            if row.variant_group == "powerbank-voltra":
+                assert row.images[0].startswith("powerbank-"), row.slug
+
+    def test_the_gan_group_spans_45_65_and_100_watts(self):
+        watts = {
+            row.attributes["Ισχύς"][1]
+            for row in demo_store.PRODUCTS
+            if row.variant_group == "charger-gan"
+        }
+        assert watts == {"45 W", "65 W", "100 W"}
+
+    def test_new_arrivals_are_staggered_and_reviewable(self):
+        days = sorted(NEW_ARRIVAL_DAYS.values())
+        assert len(set(days)) == len(days), "two arrivals share a day"
+        assert days[0] >= 12, "a buyer needs a week to complete an order"
+        assert days[-1] <= 45
+        slugs = {row.slug for row in demo_store.PRODUCTS}
+        assert set(NEW_ARRIVAL_DAYS) <= slugs
+
+    def test_every_other_product_is_older_than_the_newest(self):
+        for row in demo_store.PRODUCTS:
+            assert 12 <= arrival_days_ago(row.slug) <= 420, row.slug
+
+    def test_arrival_and_views_are_deterministic_and_age_driven(self):
+        for row in demo_store.PRODUCTS:
+            assert view_count(row.slug) == view_count(row.slug)
+            assert view_count(row.slug) > 0
+        newest = min(
+            demo_store.PRODUCTS, key=lambda r: arrival_days_ago(r.slug)
+        )
+        oldest = max(
+            demo_store.PRODUCTS, key=lambda r: arrival_days_ago(r.slug)
+        )
+        assert view_count(newest.slug) < view_count(oldest.slug)
+
+    def test_product_count_covers_the_new_members(self):
+        slugs = {row.slug for row in demo_store.PRODUCTS}
+        for slug in (
+            "demo-charger-gan-100w",
+            "demo-powerbank-26k-black",
+            "demo-powerbank-20k-white",
+        ):
+            assert slug in slugs
+
+
+class TestRicherCatalogueSeed:
+    """The seeder writes the new rows, and a second run changes nothing."""
+
+    @pytest.fixture
+    def seeded(self, demo_tenant, monkeypatch):
+        monkeypatch.setattr(demo_store, "ensure_assets", lambda keys: {})
+        monkeypatch.setattr(
+            demo_store, "ensure_asset", lambda key: f"uploads/{key}.avif"
+        )
+        monkeypatch.setattr(
+            demo_store, "storage_name", lambda key: f"uploads/{key}.avif"
+        )
+        demo_store.seed_categories()
+        return demo_store.seed_products()
+
+    def test_every_product_has_five_or_six_attributes(self, seeded):
+        from product.models import Product
+
+        assert Product.objects.filter(slug__startswith="demo-").count() == len(
+            demo_store.PRODUCTS
+        )
+        for product in Product.objects.filter(slug__startswith="demo-"):
+            count = product.product_attributes.count()
+            assert 5 <= count <= 6, f"{product.slug}: {count}"
+
+    def test_the_power_bank_family_is_one_variant_group(self, seeded):
+        from product.models import Product
+
+        slugs = [
+            row.slug
+            for row in demo_store.PRODUCTS
+            if row.variant_group == "powerbank-voltra"
+        ]
+        groups = set(
+            Product.objects.filter(slug__in=slugs).values_list(
+                "variant_group_id", flat=True
+            )
+        )
+        assert len(groups) == 1 and None not in groups
+        assert len(slugs) >= 9
+
+    def test_products_arrive_on_staggered_dates_with_views(self, seeded):
+        from django.utils import timezone
+
+        from product.models import Product
+
+        created = list(
+            Product.objects.filter(slug__startswith="demo-").values_list(
+                "created_at", flat=True
+            )
+        )
+        assert len({value.date() for value in created}) > 30
+        newest = Product.objects.get(slug="demo-powerbank-26k-black")
+        assert newest.view_count == view_count(newest.slug)
+        assert newest.created_at < timezone.now()
+
+    def test_a_second_run_writes_nothing(self, demo_tenant, seeded):
+        from product.models import ProductAttribute
+
+        before = ProductAttribute.objects.count()
+        report = demo_store.seed_products()
+
+        assert "arrivals_dated" not in report
+        assert "retired" not in report
+        assert ProductAttribute.objects.count() == before
+
+    def test_a_changed_spec_replaces_the_old_value(self, demo_tenant, seeded):
+        from product.models import Product
+
+        product = Product.objects.get(slug="demo-charger-gan-100w")
+        stale = demo_store._attribute_value("Θύρες", "Ports", "9", "9")
+        product.product_attributes.create(attribute_value=stale)
+        assert product.product_attributes.count() == 7
+
+        demo_store.seed_products()
+
+        assert product.product_attributes.count() == 6
+
+    def test_the_subcategories_get_a_main_image_and_a_banner(self, seeded):
+        from product.enum.category import CategoryImageTypeEnum
+        from product.models import ProductCategory
+
+        demo_store.seed_category_images()
+        for slug in ("demo-earbuds", "demo-speakers", "demo-car-mounts"):
+            category = ProductCategory.objects.get(slug=slug)
+            kinds = set(category.images.values_list("image_type", flat=True))
+            assert kinds == {
+                CategoryImageTypeEnum.MAIN,
+                CategoryImageTypeEnum.BANNER,
+            }, slug
+        again = demo_store.seed_category_images()
+        assert set(again) <= {"unchanged"}
 
 
 class TestReviews(TestCase):

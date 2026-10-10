@@ -31,14 +31,23 @@ from __future__ import annotations
 import logging
 import re
 import secrets
+from datetime import timedelta
 from decimal import Decimal
 from typing import Any
 
+from django.utils import timezone
 from djmoney.money import Money
 from measurement.measures import Weight
 
 from devtools.demo_blog import seed_blog as _seed_blog
-from devtools.demo_catalogue import CATEGORIES, PRODUCTS
+from devtools.demo_catalogue import (
+    CATEGORIES,
+    PRODUCTS,
+    arrival_days_ago,
+    arrival_hour,
+    specs_for,
+    view_count,
+)
 from devtools.demo_home import HERO_SLIDE_PRODUCTS, HOME_SECTIONS
 from devtools.demo_media import (
     ensure_asset,
@@ -230,6 +239,28 @@ ATTRIBUTE_NAMES_EN: dict[str, str] = {
     "Αυτονομία": "Battery life",
     "Τοποθέτηση": "Mounting",
     "Ύψος": "Height",
+    "Εγγύηση": "Warranty",
+    "Βύσμα": "Connector",
+    "Μέγιστη ισχύς": "Max power",
+    "Ταχύτητα δεδομένων": "Data speed",
+    "Θύρες": "Ports",
+    "Τεχνολογία": "Technology",
+    "Πρωτόκολλο": "Protocol",
+    "Ένδειξη μπαταρίας": "Charge indicator",
+    "Πρότυπο": "Standard",
+    "Είσοδος": "Input",
+    "Συμβατότητα": "Compatibility",
+    "Μαγνήτης": "Magnet",
+    "Προστασία πτώσης": "Drop protection",
+    "Πάχος": "Thickness",
+    "Επίστρωση": "Coating",
+    "Bluetooth": "Bluetooth",
+    "Ακύρωση θορύβου": "Noise cancelling",
+    "Αντοχή στο νερό": "Water resistance",
+    "Ισχύς ήχου": "Sound power",
+    "Περιστροφή": "Rotation",
+    "Ρύθμιση γωνίας": "Angle adjustment",
+    "Αντιολισθητική βάση": "Non-slip base",
 }
 
 
@@ -289,7 +320,13 @@ TAG_PRODUCT_RULES: dict[str, tuple[str, ...]] = {
         "demo-charger-gan-45w",
         "demo-case-clear-magnetic",
     ),
-    "Νέο": ("demo-earbuds-black", "demo-charger-gan-65w", "demo-glass-privacy"),
+    "Νέο": (
+        "demo-earbuds-black",
+        "demo-charger-gan-65w",
+        "demo-charger-gan-100w",
+        "demo-powerbank-26k",
+        "demo-glass-privacy",
+    ),
 }
 
 # ── reviews ──────────────────────────────────────────────────────────
@@ -1614,7 +1651,8 @@ def seed_categories() -> dict[str, int]:
 
 
 def seed_category_images() -> dict[str, int]:
-    """Give every demo category its own MAIN image.
+    """Give every demo category its own MAIN image, and a BANNER where
+    the dataset names one.
 
     The categories band and the category cards render
     ``mainImagePath`` through ``ImgWithFallback``, so a category with
@@ -1628,21 +1666,25 @@ def seed_category_images() -> dict[str, int]:
         category = ProductCategory.objects.filter(slug=row.slug).first()
         if category is None:
             continue
-        name = ensure_asset(row.image)
-        image, created = ProductCategoryImage.objects.get_or_create(
-            category=category,
-            image_type=CategoryImageTypeEnum.MAIN,
-            defaults={"image": name, "active": True},
-        )
-        if created:
-            _bump(report, "created")
-        elif image.image != name:
-            image.image = name
-            image.active = True
-            image.save(update_fields=["image", "active", "updated_at"])
-            _bump(report, "updated")
-        else:
-            _bump(report, "unchanged")
+        wanted = {CategoryImageTypeEnum.MAIN: row.image}
+        if row.banner:
+            wanted[CategoryImageTypeEnum.BANNER] = row.banner
+        for image_type, key in wanted.items():
+            name = ensure_asset(key)
+            image, created = ProductCategoryImage.objects.get_or_create(
+                category=category,
+                image_type=image_type,
+                defaults={"image": name, "active": True},
+            )
+            if created:
+                _bump(report, "created")
+            elif image.image != name:
+                image.image = name
+                image.active = True
+                image.save(update_fields=["image", "active", "updated_at"])
+                _bump(report, "updated")
+            else:
+                _bump(report, "unchanged")
     return report
 
 
@@ -1651,6 +1693,7 @@ def _attribute_value(
     attribute_name_en: str,
     value_el: str,
     value_en: str,
+    cache: dict[tuple[str, str], Any] | None = None,
 ):
     """The AttributeValue for one (attribute, value) pair, both languages.
 
@@ -1661,6 +1704,10 @@ def _attribute_value(
     English active.
     """
     from product.models import Attribute, AttributeValue
+
+    key = (attribute_name_el, value_el)
+    if cache is not None and key in cache:
+        return cache[key]
 
     attribute = None
     for candidate in Attribute.objects.all():
@@ -1684,12 +1731,16 @@ def _attribute_value(
         current = candidate.safe_translation_getter("value", language_code="el")
         if current == value_el:
             _ensure_english(candidate, value=value_en)
+            if cache is not None:
+                cache[key] = candidate
             return candidate
 
     value = AttributeValue(attribute=attribute, active=True)
     _translate(value, "el", value=value_el)
     value.save()
     _ensure_english(value, value=value_en)
+    if cache is not None:
+        cache[key] = value
     return value
 
 
@@ -1721,6 +1772,26 @@ def _ensure_english(instance, **fields) -> bool:
     return True
 
 
+def _stamp_arrival(product, slug: str, today) -> bool:
+    """Date the product's arrival and give it the views that age earns.
+
+    A queryset ``update()``: ``created_at`` is ``auto_now_add`` and the
+    model's history signal would otherwise record a save. The day is
+    anchored to local midnight, so a second run on the same day writes
+    the same values and reports nothing.
+    """
+    from product.models import Product
+
+    created_at = today - timedelta(days=arrival_days_ago(slug))
+    created_at += timedelta(hours=arrival_hour(slug))
+    changed = (
+        Product.objects.filter(pk=product.pk)
+        .exclude(created_at=created_at, view_count=view_count(slug))
+        .update(created_at=created_at, view_count=view_count(slug))
+    )
+    return bool(changed)
+
+
 def seed_products() -> dict[str, int]:
     """Create the demo catalogue: rows, copy, photographs, attributes.
 
@@ -1748,6 +1819,10 @@ def seed_products() -> dict[str, int]:
     prefix = f"{DEMO_MARKER}-"
 
     groups: dict[str, ProductVariantGroup] = {}
+    value_cache: dict[tuple[str, str], Any] = {}
+    today = timezone.localtime().replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
 
     def group_for(key: str) -> ProductVariantGroup:
         # Found by its key (the Greek name it was created with), so a
@@ -1821,16 +1896,25 @@ def seed_products() -> dict[str, int]:
                     product=product, image=name, is_main=position == 0
                 )
 
-        for attribute_el, (value_el, value_en) in row.attributes.items():
+        wanted_values = []
+        for attribute_el, (value_el, value_en) in specs_for(row).items():
             attribute_en = ATTRIBUTE_NAMES_EN.get(attribute_el, attribute_el)
             value = _attribute_value(
-                attribute_el, attribute_en, value_el, value_en
+                attribute_el, attribute_en, value_el, value_en, value_cache
             )
+            wanted_values.append(value)
             ProductAttribute.objects.get_or_create(
                 product=product, attribute_value=value
             )
+        # A spec this product no longer carries goes, or a corrected
+        # value (a 20 W charger fixed to 30 W) would show both.
+        product.product_attributes.exclude(
+            attribute_value__in=wanted_values
+        ).delete()
 
         _bump(report, "created" if created else "updated")
+        if _stamp_arrival(product, row.slug, today):
+            _bump(report, "arrivals_dated")
 
     # A ``demo-`` product the catalogue no longer lists is DEACTIVATED,
     # not deleted: order lines and reviews point at it, and a demo store

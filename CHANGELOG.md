@@ -3,6 +3,46 @@
 
 
 
+## v3.103.0 (2026-10-10)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.102.0 [skip ci] ([`f6e6d24`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f6e6d24df79971cc53055bfd65351d2ccbfab48d))
+
+### Features
+
+* feat(promotion): count live promotions as "on offer" (#126)
+
+"On offer" (the search filter and the product card badge) only saw a
+markdown, discount_percent > 0, so products the store was actively
+promoting could not be found that way.
+
+A product is now on offer when it carries a markdown or a live
+qualifying promotion targets it: AUTOMATIC (never a code), scoped to
+its products or categories (descendants included), live by the
+engine's own rules including its total usage limit, any benefit but
+free shipping, and minus its exclusions. offer_kind_expression is one
+SQL Case: MARKDOWN, else PROMOTION, else NULL.
+
+- Meilisearch indexes a filterable on_offer, which the onOffer filter
+  now uses; products and the search card expose an optional offerKind
+  ("MARKDOWN" | "PROMOTION" | null) from the same annotation, with no
+  extra query.
+- A promotion save, delete, M2M scope change or usage-limit edge marks
+  its products; marks are coalesced per tenant into one reindex 15 s
+  later.
+- A beat task every 5 minutes reindexes the products of promotions whose
+  window opened or closed since its cursor, so a sale starting at 09:00
+  shows by 09:05.
+
+Deploy: run meilisearch_sync_all_indexes --all-tenants --app product
+once so existing documents get on_offer.
+
+
+Claude-Session: https://claude.ai/code/session_01XySy2eta87v6cbzrZbfL6X
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`af00657`](https://github.com/vasilistotskas/grooveshop-django-api/commit/af00657d7211a0375b8fde6ef27ca0fd6aa85ce3))
+
 ## v3.102.0 (2026-10-10)
 
 ### Bug fixes

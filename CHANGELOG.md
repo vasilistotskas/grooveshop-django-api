@@ -3,6 +3,35 @@
 
 
 
+## v3.104.1 (2026-10-10)
+
+### Bug fixes
+
+* fix(shipping_acs): stop emailing the store about unprinted vouchers (#143)
+
+ACS refuses the whole pickup list while any voucher is unprinted, and
+on webside that is most days: labels are printed the next morning, so
+the 16:30 run finds the newest orders unprinted. ACS collects a printed
+parcel the same day with or without a manifest (2026-09-21 to 10-10:
+43 of 45 parcels collected with no pickup list, Saturdays included), so
+both mails, the 15:45 warning and the 16:30 refusal, told the owner
+about routine state he could not and need not act on.
+
+A refusal is now a blocked_unprinted status and a note on each order it
+holds back. The 15:45 warn_unprinted_acs_vouchers task, its fanout, its
+beat entry and the alert templates are removed. A data migration
+deletes the task's beat row, which DatabaseScheduler would otherwise
+keep firing, and bumps PeriodicTasks so a running beat reloads.
+
+
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`866fcd6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/866fcd6a4861b34837b39a9f9e5dd25608b125e1))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.104.0 [skip ci] ([`6fe9af8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6fe9af8a04c489ac5054bbee9e561c9ae48a8e41))
+
 ## v3.104.0 (2026-10-10)
 
 ### Bug fixes

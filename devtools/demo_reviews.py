@@ -33,6 +33,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
 from hashlib import sha1
+from typing import Any
 
 from djmoney.money import Money
 
@@ -614,6 +615,31 @@ def _stamp(anchor, days_ago: int, slug_or_key: str):
     return anchor - timedelta(days=days_ago) + timedelta(hours=hour)
 
 
+def ensure_reviewers() -> tuple[list[Any], int]:
+    """Get-or-create the whole pool, in pool order; also how many were new.
+
+    The blog's likes and comments draw on the same accounts, so the pool
+    is made here rather than in either seeder, and either can run alone.
+    """
+    from django.contrib.auth import get_user_model
+
+    user_model = get_user_model()
+    users = []
+    created_count = 0
+    for email, first_name, last_name in REVIEWER_POOL:
+        user, created = user_model.objects.get_or_create(
+            email=email,
+            defaults={
+                "first_name": first_name,
+                "last_name": last_name,
+                "is_active": True,
+            },
+        )
+        users.append(user)
+        created_count += int(created)
+    return users, created_count
+
+
 def seed_reviews() -> dict[str, int]:
     """Reviewers, their orders, and every approved review.
 
@@ -626,7 +652,6 @@ def seed_reviews() -> dict[str, int]:
     ``status=TRUE`` is what makes a review public: the viewset filters
     on it for anonymous callers.
     """
-    from django.contrib.auth import get_user_model
     from django.utils import timezone
 
     from country.models import Country
@@ -644,21 +669,9 @@ def seed_reviews() -> dict[str, int]:
         hour=0, minute=0, second=0, microsecond=0
     )
 
-    # -- reviewers ----------------------------------------------------
-    user_model = get_user_model()
-    users = []
-    for email, first_name, last_name in REVIEWER_POOL:
-        user, created = user_model.objects.get_or_create(
-            email=email,
-            defaults={
-                "first_name": first_name,
-                "last_name": last_name,
-                "is_active": True,
-            },
-        )
-        users.append(user)
-        if created:
-            _bump(report, "reviewers_created")
+    users, created = ensure_reviewers()
+    if created:
+        _bump(report, "reviewers_created", created)
 
     products = {
         product.slug: product

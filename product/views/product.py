@@ -256,6 +256,8 @@ class ProductViewSet(BaseModelViewSet):
             if not is_store_staff(self.request.user):
                 queryset = queryset.active()
 
+        queryset = queryset.with_offer_kind()
+
         # Add availability priority annotation for ordering
         queryset = queryset.annotate(
             availability_priority=Case(

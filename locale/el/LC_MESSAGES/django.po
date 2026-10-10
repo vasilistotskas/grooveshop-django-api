@@ -14550,6 +14550,14 @@ msgstr "Ο κωδικός δεν μπορεί να συνδυαστεί με τ�
 msgid "The customer is not eligible for this promotion"
 msgstr "Ο πελάτης δεν είναι επιλέξιμος για αυτή την προσφορά"
 
+#: .\promotion\enum.py:78
+msgid "Product markdown"
+msgstr "Έκπτωση προϊόντος"
+
+#: .\promotion\enum.py:79
+msgid "Live promotion"
+msgstr "Ενεργή προσφορά"
+
 #: .\promotion\enum.py:70
 msgid "Targets this product"
 msgstr "Στοχεύει αυτό το προϊόν"
@@ -22040,13 +22048,15 @@ msgstr "Όταν είναι true, μόνο προϊόντα με απόθεμα 
 
 #: .\search\views.py:465
 msgid ""
-"When true, only products carrying a markdown (discount_percent > 0). "
-"Promotions are cart-level (coupons, scoped and windowed) and are not part "
-"of this filter."
+"When true, only products on offer: carrying a markdown (discount_percent > "
+"0) or covered by a live automatic promotion on specific products or "
+"categories (free shipping, order-wide and coupon-code promotions do not "
+"count)."
 msgstr ""
-"Όταν είναι true, μόνο προϊόντα με έκπτωση (discount_percent > 0). Οι "
-"προσφορές είναι σε επίπεδο καλαθιού (κουπόνια, με εύρος και χρονικά "
-"παράθυρα) και δεν περιλαμβάνονται σε αυτό το φίλτρο."
+"Όταν είναι true, μόνο προϊόντα σε προσφορά: με έκπτωση (discount_percent > "
+"0) ή που καλύπτονται από ενεργή αυτόματη προσφορά σε συγκεκριμένα προϊόντα ή "
+"κατηγορίες (δεν μετρούν η δωρεάν αποστολή, οι προσφορές για όλη την "
+"παραγγελία και οι προσφορές με κωδικό κουπονιού)."
 
 #: .\shipping_acs\admin.py:71
 msgid ""

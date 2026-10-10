@@ -466,10 +466,11 @@ def blog_post_meili_search(request):
             type=OpenApiTypes.BOOL,
             location=OpenApiParameter.QUERY,
             description=_(
-                "When true, only products carrying a markdown "
-                "(discount_percent > 0). Promotions are cart-level "
-                "(coupons, scoped and windowed) and are not part of this "
-                "filter."
+                "When true, only products on offer: carrying a markdown "
+                "(discount_percent > 0) or covered by a live automatic "
+                "promotion on specific products or categories (free "
+                "shipping, order-wide and coupon-code promotions do not "
+                "count)."
             ),
             required=False,
         ),
@@ -606,7 +607,7 @@ def product_meili_search(request):
     if in_stock:
         search_qs = search_qs.filter(in_stock=True)
     if on_offer:
-        search_qs = search_qs.filter(discount_percent__gt=0)
+        search_qs = search_qs.filter(on_offer=True)
 
     # Apply sort — map the camelCase value to the snake_case field the index
     # exposes; unknown fields are dropped to prevent DSL injection.

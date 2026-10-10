@@ -1061,6 +1061,15 @@ def get_celery_beat_schedule():
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
         },
+        "reindex-offer-window-changes": {
+            # Fanout: Promotion/Product are per-tenant; beat fires in
+            # public. A promotion window opening or closing saves
+            # nothing, so no signal reindexes the products' ``on_offer``
+            # flag; this sweep does, per tenant, every 5 minutes.
+            "task": "tenant.tasks.fanout_reindex_offer_window_changes",
+            "schedule": SCHEDULE_PRESETS["every_5_minute"],
+            "options": {"queue": "celery", "expires": 240},
+        },
         "anonymize-old-search-queries": {
             # Fanout: SearchQuery is per-tenant; beat fires in public.
             # kwargs (days=90) live in the wrapper body, not here.

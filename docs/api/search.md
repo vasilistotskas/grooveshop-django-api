@@ -112,16 +112,65 @@ request (`_record_engine_time`) instead of returning it.
 
 `categories` stands for each category's whole subtree: the view expands the
 ids to every descendant before filtering. `inStock=true` keeps products with
-stock above zero. `onOffer=true` keeps
-products with a markdown (`discountPercent > 0`); promotions are cart-level and
-windowed, so they are deliberately not part of it. `false` is the same as absent;
-anything but true/false/1/0 is a 400.
+stock above zero. `onOffer=true` keeps the products that are
+[on offer](#on-offer), matched against the indexed `on_offer` flag. `false` is
+the same as absent; anything but true/false/1/0 is a 400.
 
 Product hits carry the card fields `brandName`, `reviewCount` (approved reviews
 only), `createdAt` and `lowStockThreshold`, read from the database like
-`categoryName`, so they are never stale. `brand`, `in_stock` and
-`discount_percent` are indexed; after a deploy that adds `brand`, run
-`meilisearch_sync_all_indexes --all-tenants --app product`.
+`categoryName`, so they are never stale. `brand`, `in_stock`,
+`discount_percent` and `on_offer` are indexed; after a deploy that adds an
+indexed field, run `meilisearch_sync_all_indexes --all-tenants --app product`
+(it applies the new filterable attribute and re-sends every document).
+
+Hits and the product list/detail carry `offerKind` too; see below.
+
+### On offer
+
+One definition, `promotion/offers.py`, answers "is this product on offer"
+for the search index, the product list/detail API and the search cards, so the
+`onOffer` filter and the badge cannot disagree. `offerKind` is
+`"MARKDOWN" | "PROMOTION" | null` (optional in the schema):
+
+- `MARKDOWN` when `discountPercent > 0`. A markdown wins over a promotion: the
+  storefront can show the concrete "-20%".
+- `PROMOTION` when a live promotion covers the product:
+  `trigger = AUTOMATIC` (never a coupon code), `targetScope` PRODUCTS or
+  CATEGORIES (a category includes its subtree), benefit PERCENTAGE,
+  FIXED_AMOUNT, BXGY or FREE_GIFT, active and inside its window, and below
+  `usageLimitTotal` (`publicly_listable`, the filter the `/offers` page uses).
+  `excludedProducts` / `excludedCategories` remove a product. Not counted:
+  FREE_SHIPPING, ORDER-scope promotions, the reward (gift) side of
+  BXGY/FREE_GIFT, and every promotion while `PROMOTIONS_ENABLED` is off.
+  `excludeDiscountedProducts` needs no clause of its own: it only drops
+  products with a markdown, which are already `MARKDOWN`.
+- `null` otherwise.
+
+The kind is a SQL expression (`offer_kind_expression`), annotated as
+`Product.with_offer_kind()` for the API and `ProductTranslation`'s bulk indexing
+queryset, so it costs no query per row. Products nested in cart, order or
+favourite lines carry `offerKind: null`: those payloads are not badge surfaces
+and their querysets do not annotate.
+
+**Keeping `on_offer` fresh.** A promotion can change a product's status without
+the product being saved, so `promotion/offer_sync.py` reindexes the affected
+products:
+
+- `promotion/signals.py` marks a promotion saved or deleted, its
+  `products` / `categories` / exclusion sets changed, or its total usage limit
+  reached (or freed). Marks are coalesced in the cache per tenant; one
+  `reindex_offer_products_task` runs 15 seconds after the first, whatever the
+  number of signals. Removed members are captured before the change, because
+  they are no longer in the scope afterwards.
+- `reindex_offer_window_changes_task` (beat, every 5 minutes, fanned out per
+  tenant by `fanout_reindex_offer_window_changes`) reindexes the products of
+  promotions whose `starts_at` / `ends_at` passed since the last run. The
+  cursor lives in the tenant's cache and only moves after the reindex was
+  dispatched; a missing cursor falls back to a one-day window.
+
+Not signalled: the reverse side of the M2M (`product.promotions.add(...)`) and
+flipping `PROMOTIONS_ENABLED`; the nightly `sync_meilisearch_indexes` repairs
+both.
 
 Response is `ProductMeiliSearchResponse`: the common envelope above plus
 `facetDistribution` and `facetStats` when `facets` was requested.

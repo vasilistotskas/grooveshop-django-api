@@ -13698,6 +13698,14 @@ msgstr ""
 msgid "The customer is not eligible for this promotion"
 msgstr ""
 
+#: .\promotion\enum.py:78
+msgid "Product markdown"
+msgstr ""
+
+#: .\promotion\enum.py:79
+msgid "Live promotion"
+msgstr ""
+
 #: .\promotion\enum.py:70
 msgid "Targets this product"
 msgstr ""
@@ -19554,9 +19562,10 @@ msgstr ""
 
 #: .\search\views.py:465
 msgid ""
-"When true, only products carrying a markdown (discount_percent > 0). "
-"Promotions are cart-level (coupons, scoped and windowed) and are not part "
-"of this filter."
+"When true, only products on offer: carrying a markdown (discount_percent > "
+"0) or covered by a live automatic promotion on specific products or "
+"categories (free shipping, order-wide and coupon-code promotions do not "
+"count)."
 msgstr ""
 
 #: .\shipping_acs\admin.py:71

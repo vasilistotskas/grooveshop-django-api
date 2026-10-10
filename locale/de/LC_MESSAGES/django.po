@@ -9943,13 +9943,15 @@ msgstr "Wenn true, nur Produkte mit einem Lagerbestand über null"
 
 #: .\search\views.py:465
 msgid ""
-"When true, only products carrying a markdown (discount_percent > 0). "
-"Promotions are cart-level (coupons, scoped and windowed) and are not part "
-"of this filter."
+"When true, only products on offer: carrying a markdown (discount_percent > "
+"0) or covered by a live automatic promotion on specific products or "
+"categories (free shipping, order-wide and coupon-code promotions do not "
+"count)."
 msgstr ""
-"Wenn true, nur Produkte mit Preisnachlass (discount_percent > 0). Aktionen "
-"gelten auf Warenkorbebene (Gutscheine, eingegrenzt und zeitlich befristet) "
-"und sind nicht Teil dieses Filters."
+"Wenn true, nur Produkte im Angebot: mit Preisnachlass (discount_percent > 0) "
+"oder von einer aktiven automatischen Aktion auf bestimmte Produkte oder "
+"Kategorien erfasst (kostenloser Versand, bestellweite Aktionen und Aktionen "
+"mit Gutscheincode zählen nicht)."
 
 #: .\shipping_acs\admin.py:71
 msgid ""

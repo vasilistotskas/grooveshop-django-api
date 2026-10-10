@@ -3,6 +3,144 @@
 
 
 
+## v3.104.0 (2026-10-10)
+
+### Bug fixes
+
+* fix(devtools): make the demo seed converge in one run
+
+Two things kept a first seed from ending where a second one does. The
+tags step labelled the newest blog posts before the blog step wrote
+them, so the new posts stayed untagged for one more run; it now follows
+the blog. And the wholesale orders asked for a bank-transfer pay way the
+demo store does not have, so two of its three orders were silently
+skipped; they now use the card and cash-on-delivery ways the store
+offers.
+
+Verified against a real tenant schema: a first and a second seed leave
+identical row counts.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01XySy2eta87v6cbzrZbfL6X ([`7c3d563`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7c3d563cf99121ea760c73fecb32176e38daa0a2))
+
+* fix(shipping): keep demo fixture shipments out of every carrier sweep
+
+The demo seed writes ACS and BoxNow rows with invented vouchers. Only
+the absence of carrier credentials stopped the pollers from calling the
+carriers for them, and the stale-shipment and unremitted-COD alerts
+would email a merchant about them regardless. Both shipment models now
+have a queryset with real(), which drops rows stamped demo_seed, and the
+two poll batches, the stale alert, the COD and unprinted-label alerts
+and the pickup-list candidates all start from it.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com> ([`7c3d563`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7c3d563cf99121ea760c73fecb32176e38daa0a2))
+
+* fix(devtools): tighten review dates, the strong tier and link checks
+
+Reviewer orders are now placed strictly after the arrival day of every
+product on them, since the same day could put an order before the
+product's hour of arrival. The strong quality tier no longer draws
+ratings below three stars, as its description says. The tests compare
+full timestamps for order versus arrival, pin the strong-tier floor, and
+reject protocol-relative links by parsing the URL.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`7c3d563`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7c3d563cf99121ea760c73fecb32176e38daa0a2))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.103.2 [skip ci] ([`4d3deca`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4d3decac0fa52b39144ee111732493aee134f493))
+
+### Features
+
+* feat(devtools): richer demo data (PLAN §6 M3) (#133) ([`7c3d563`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7c3d563cf99121ea760c73fecb32176e38daa0a2))
+
+* feat(devtools): richer demo catalogue
+
+Add the colour x capacity power-bank family (10,000 / 20,000 / 26,800
+mAh in white, black and silver) as one variant group, a 100 W member of
+the GaN charger group, and Earbuds / Speakers / Car Mounts / Desk Stands
+subcategories under Audio and Mounts, each with a main image and a
+banner reusing already-committed photographs.
+
+Every product now carries six spec attributes: its own two axes, the
+warranty and three that follow its category, with per-product overrides
+listed by slug. Products get staggered arrival dates (twelve recent
+ones, the rest spread over fourteen months) and view counts that grow
+with age, both derived from the slug so a re-seed reproduces them.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01XySy2eta87v6cbzrZbfL6X ([`7c3d563`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7c3d563cf99121ea760c73fecb32176e38daa0a2))
+
+* feat(devtools): verified demo reviews from fifty reviewer accounts
+
+Replace the 25 hand-written reviews (two per product at most, none
+verified) with a deterministic plan: every product gets 8 to 49 reviews
+from a pool of 50 dedicated reviewer accounts, with a positive-leaning
+spread that still carries one- and two-star reviews, and Greek and
+English text composed from a small bank of openers, product-specific
+sentences and closers.
+
+Each review follows a COMPLETED order of its author for that product,
+written silently through the new devtools.demo_orders helper (bulk
+writes, so no confirmation email, WebSocket toast, stock movement or
+state-machine transition), which is what makes it a verified purchase.
+Reviews and orders are matched on content and reconciled on every run,
+so a re-seed converges instead of appending; only the demo reviewers'
+own rows are ever touched.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01XySy2eta87v6cbzrZbfL6X ([`7c3d563`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7c3d563cf99121ea760c73fecb32176e38daa0a2))
+
+* feat(devtools): full order history for the demo shopper and wholesale accounts
+
+The shopper account now has fourteen orders across processing, shipped,
+completed, canceled, returned and refunded, with the ACS voucher or
+BoxNow parcel and tracking events an order in that state really has (one
+parcel to Cyprus), invoices, a redeemed SAVE5 coupon, a part-spent gift
+card, a loyalty ledger that makes the account Silver, five notifications
+and a Cyprus address. The wholesale login gets an approved business
+profile on the group's price list, with a VAT number that cannot belong
+to anyone, and three invoiced orders priced from that list. It signs in
+with the credential the store already publishes.
+
+Everything is built in the demo-account path, so the nightly reset
+rebuilds it, and nothing reaches the outside: orders and carrier rows are
+written directly, invoices go through generate_invoice and not the task
+that emails and submits to myDATA, notifications skip the socket push,
+and in-flight parcels are dated from now so the stale-shipment alert
+never fires.
+
+The reset now also deletes invoice PDFs with their rows, rewinds the
+invoice counter, removes private notifications and coupon redemptions,
+and keeps the seeded gift-card spend on one ledger row. The seed step
+runs the reset so the two paths end in the same state.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01XySy2eta87v6cbzrZbfL6X ([`7c3d563`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7c3d563cf99121ea760c73fecb32176e38daa0a2))
+
+* feat(devtools): richer demo blog with threads, likes and avatars
+
+Grow the blog from eight posts and three categories to fourteen and five
+(Travel and Home office are new), with bodies that use what the
+storefront's article typography styles: subheadings, numbered steps,
+comparison tables, pull quotes, links to the store and an FAQ accordion.
+Every body is checked against the rich-text policy and survives a save
+untouched, so a seed can never trip the lost-content refusal.
+
+Posts and comments collect likes from the reviewer accounts, comments
+form threads two replies deep with the post's own author answering, and
+both demo authors get an avatar that reuses a photograph the store
+already carries. Likes go in through the M2M's through model so no
+comment-liked notification is queued; re-runs reconcile only the demo
+accounts' own likes and comments.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01XySy2eta87v6cbzrZbfL6X ([`7c3d563`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7c3d563cf99121ea760c73fecb32176e38daa0a2))
+
 ## v3.103.2 (2026-10-10)
 
 ### Bug fixes

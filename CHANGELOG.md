@@ -3,6 +3,45 @@
 
 
 
+## v3.102.0 (2026-10-10)
+
+### Bug fixes
+
+* fix: type-check clean on ty 0.0.85 and keep main image replacement (#125)
+
+The dependency bump (ty 0.0.78 -> 0.0.85, django-stubs 6.1, DRF 3.18.3)
+turned main red.
+
+DRF 3.18.2 (#10021) now builds a validator from a conditional
+UniqueConstraint, so ProductImage's "one main image per product"
+constraint rejected a second is_main upload with 400. The model's save()
+demotes the previous main image; the constraint is the database's
+safety net, not a rule to refuse the request. The write serializer
+drops the generated validator.
+
+ty 0.0.85: choices=EnumClass is passed as choices=EnumClass.choices
+(identical at runtime and in migrations; astral-sh/ty#4551 rejects the
+class form). The rest are real annotation fixes: dynamic model attribute
+access typed through IndexMixin / TranslatableModel / UserAccount,
+attributes typed as type[...] or StrOrPromise, field names that shadow a
+base attribute annotated, TenantAdmin.get_actions passing its arguments
+through, a Sequence annotation for a truthiness test, st_mtime instead
+of the deprecated st_ctime for the latest backup, and two ty: ignore
+directives that no longer suppress anything removed.
+
+
+Claude-Session: https://claude.ai/code/session_01XySy2eta87v6cbzrZbfL6X
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`f843c1a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f843c1a6bf52361e8101928d2b0fbd237c3475be))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.101.0 [skip ci] ([`8aaf3e3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8aaf3e3de5692dd5cd1fd602221202629fc19379))
+
+### Features
+
+* feat: Bump Versions ([`4b165ed`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4b165edbf4ce4c69b4e4a58cadee0a0b02de5bb9))
+
 ## v3.101.0 (2026-10-06)
 
 ### Chores

@@ -54,7 +54,7 @@ dependencies = [
   "django-stubs-ext==6.1.2",
   "dj-stripe==2.11.0",
   "defusedxml>=0.7.1",
-  "django-tenants>=3.14.0,<4.0.0",
+  "django-tenants>=4.0.0,<5.0.0",
   "nh3>=0.3.6",
   "weasyprint>=70.0",
   "requests==2.34.2",

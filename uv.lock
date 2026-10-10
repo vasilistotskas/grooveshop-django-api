@@ -1174,14 +1174,14 @@ wheels = [
 
 [[package]]
 name = "django-tenants"
-version = "3.14.0"
+version = "4.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "django" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a3/44/f78ed75c27e019be3ba915d88484bf57355cc7dd92745ff27d23431fe61c/django_tenants-3.14.0.tar.gz", hash = "sha256:55dc64bcd4293a03fab7108f4c4e1724c2f53ef09a1c7f9e5f75a136fccc3146", size = 168058, upload-time = "2026-08-05T15:19:37.753Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/01/1c/a4c3f3eeec5e803f8b4ee9994e42b7ffddb2cea0db4d9b3db304336f095f/django_tenants-4.0.0.tar.gz", hash = "sha256:7fab6fb4dbed32cde1d6232075152b899b9574fa575ebc3da5e994a62071a034", size = 180299, upload-time = "2026-10-09T13:19:45.963Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/7c/a2/c4d45511b0c1c3868fafa9e745b6089c0e0b30959b8191ac4a5643bac9ae/django_tenants-3.14.0-py3-none-any.whl", hash = "sha256:f2c17b05d03c8b8d79c8e190ca2da14fdc36d52553d216b1dbb09c4adbda2eb6", size = 127095, upload-time = "2026-08-05T15:19:36.478Z" },
+    { url = "https://files.pythonhosted.org/packages/0f/e6/7901f88dfb26cb777fb523e6230c3be7778956029c8e89ce329ef148569f/django_tenants-4.0.0-py3-none-any.whl", hash = "sha256:f5422675dd814a7df362c1aab087dadb6f7481275743889295c8eccc2b24bbe3", size = 136327, upload-time = "2026-10-09T13:19:44.408Z" },
 ]
 
 [[package]]
@@ -1603,7 +1603,7 @@ requires-dist = [
     { name = "django-rosetta", specifier = "==0.10.3" },
     { name = "django-simple-history", specifier = "==3.13.0" },
     { name = "django-stubs-ext", specifier = "==6.1.2" },
-    { name = "django-tenants", specifier = ">=3.14.0,<4.0.0" },
+    { name = "django-tenants", specifier = ">=4.0.0,<5.0.0" },
     { name = "django-tinymce", specifier = "==5.0.0" },
     { name = "django-unfold", specifier = "==0.108.0" },
     { name = "djangorestframework", specifier = "==3.18.3" },

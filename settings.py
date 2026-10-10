@@ -1578,9 +1578,11 @@ TENANT_DOMAIN_MODEL = "tenant.TenantDomain"
 PUBLIC_SCHEMA_URLCONF = "tenant.urls_public"
 # django-tenants >= 3.14 issues ``SET search_path`` before EVERY cursor
 # unless this flag caches it per connection (one extra round-trip per
-# query otherwise). Safe since 3.14: the cache is invalidated on
-# set_tenant/set_schema AND on rollback(), so tenant switches and
-# aborted transactions always re-issue the SET.
+# query otherwise). Safe since 4.0: the cache is invalidated on
+# set_tenant/set_schema, on rollback() and close(), AND on a savepoint
+# rollback (django-tenants#1263). PostgreSQL reverts the search_path on a
+# savepoint rollback, so on 3.x a cached path could outlive it and the
+# connection read another schema's rows. Keep the pin at >=4.0.
 TENANT_LIMIT_SET_CALLS = True
 
 if SYSTEM_ENV == "ci":

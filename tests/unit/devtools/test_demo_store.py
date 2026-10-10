@@ -1424,6 +1424,12 @@ class TestStepTable(TestCase):
         labels = [label for label, _ in seed_demo_store.STEPS]
         self.assertEqual(sorted(labels), sorted(set(labels)))
 
+    def test_tags_follow_the_blog_they_tag(self):
+        """``seed_tags`` labels the newest posts, so a run needs them to
+        exist first — otherwise one run is not enough to converge."""
+        labels = [label for label, _ in seed_demo_store.STEPS]
+        self.assertGreater(labels.index("tags"), labels.index("blog"))
+
     def test_the_cache_purge_runs_last(self):
         """Its entire value is being after every writer.
 

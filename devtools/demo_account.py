@@ -521,13 +521,14 @@ WHOLESALE_TAX_OFFICE = "ΔΟΥ Θεσσαλονίκης"
 WHOLESALE_ACTIVITY = "Χονδρικό εμπόριο αξεσουάρ κινητής τηλεφωνίας"
 WHOLESALE_BILLING = ("Λεωφόρος Νίκης", "12", "Θεσσαλονίκη", "54621")
 
-#: A few orders on the group's price list. Bank transfer is how a
-#: business pays; the invoice is the document it needs.
+#: A few orders on the group's price list, paid the ways the store
+#: really offers (a card online, cash to the courier); the invoice is the
+#: document a business needs.
 WHOLESALE_ORDERS: tuple[OrderRow, ...] = (
     OrderRow(
         status="PROCESSING",
-        payment_status="PENDING",
-        settlement="offline_transfer",
+        payment_status="COMPLETED",
+        settlement="online",
         days_ago=2,
         items=(
             ("demo-powerbank-10k-black", 12),
@@ -539,7 +540,7 @@ WHOLESALE_ORDERS: tuple[OrderRow, ...] = (
     OrderRow(
         status="COMPLETED",
         payment_status="COMPLETED",
-        settlement="offline_transfer",
+        settlement="online",
         days_ago=9,
         items=(
             ("demo-cable-usbc-1m-black", 24),
@@ -556,7 +557,7 @@ WHOLESALE_ORDERS: tuple[OrderRow, ...] = (
     OrderRow(
         status="COMPLETED",
         payment_status="COMPLETED",
-        settlement="online",
+        settlement="courier_cash",
         days_ago=24,
         items=(
             ("demo-cable-usbc-braided-black", 20),

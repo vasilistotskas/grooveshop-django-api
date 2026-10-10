@@ -765,7 +765,7 @@ class TestRicherAccountDataset(TestCase):
         assert set(demo_account.WHOLESALE_VAT_ID[:-1]) == {"9"}
         assert demo_account.WHOLESALE_ORDERS
         for order in demo_account.WHOLESALE_ORDERS:
-            assert order.settlement in {"offline_transfer", "online"}
+            assert order.settlement in {"online", "courier_cash"}
             assert all(qty >= 6 for _slug, qty in order.items)
         days = [o.days_ago for o in demo_account.WHOLESALE_ORDERS]
         assert len(days) == len(set(days))
@@ -821,9 +821,6 @@ def _prepare_store():
         ),
         PaySettlement.COURIER_CASH.value: lambda: (
             PayWayFactory.create_offline_payment(requires_confirmation=False)
-        ),
-        PaySettlement.OFFLINE_TRANSFER.value: (
-            PayWayFactory.create_offline_payment
         ),
     }
     for settlement, make in wanted.items():

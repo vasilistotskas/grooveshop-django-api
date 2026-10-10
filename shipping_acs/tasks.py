@@ -254,7 +254,7 @@ def _unprinted_rows(voucher_numbers: list[str] | None = None) -> list[dict]:
     from shipping_acs.enum.shipment_state import AcsShipmentState
     from shipping_acs.models import AcsShipment
 
-    queryset = AcsShipment.objects.filter(
+    queryset = AcsShipment.objects.real().filter(
         voucher_no__isnull=False,
         pickup_list__isnull=True,
         shipment_state=AcsShipmentState.NEW,
@@ -428,7 +428,8 @@ def _unremitted_cod_rows(older_than_days: int) -> list[dict]:
 
     rows = []
     candidates = (
-        AcsShipment.objects.filter(
+        AcsShipment.objects.real()
+        .filter(
             voucher_no__isnull=False,
             shipment_state=AcsShipmentState.DELIVERED,
             charge_type=AcsChargeType.COD,
@@ -674,7 +675,8 @@ def poll_acs_tracking_batch(self, *, max_per_run: int = 200) -> dict[str, int]:
     try:
         cutoff = timezone.now() - timedelta(minutes=15)
         candidates = list(
-            AcsShipment.objects.filter(voucher_no__isnull=False)
+            AcsShipment.objects.real()
+            .filter(voucher_no__isnull=False)
             .exclude(
                 shipment_state__in=[
                     AcsShipmentState.PENDING_CREATION,
@@ -834,9 +836,8 @@ def check_stale_acs_shipments(self) -> dict[str, Any]:
             # ``of=("self",)``: lock only the shipment rows — the order /
             # pay-way join above sits on the nullable side of an outer
             # join, which PostgreSQL refuses to lock FOR UPDATE.
-            AcsShipment.objects.select_for_update(
-                skip_locked=True, of=("self",)
-            )
+            AcsShipment.objects.real()
+            .select_for_update(skip_locked=True, of=("self",))
             .filter(stale_alert_sent=False)
             .filter(stale_tracking | stranded_mint)
             .values_list("id", flat=True)

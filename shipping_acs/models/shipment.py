@@ -10,6 +10,7 @@ from simple_history.models import HistoricalRecords
 
 from core.models import TimeStampMixinModel, UUIDModel
 from shipping.enum import ShippingKind
+from shipping.querysets import ShipmentQuerySet
 from shipping_acs.enum.charge_type import AcsChargeType
 from shipping_acs.enum.cod_payment_way import AcsCodPaymentWay
 from shipping_acs.enum.shipment_state import AcsShipmentState
@@ -327,6 +328,8 @@ class AcsShipment(UUIDModel, TimeStampMixinModel):
         # FK anyway. Same reasoning as UserAccount.loyalty_tier.
         user_db_constraint=False,
     )
+
+    objects = ShipmentQuerySet.as_manager()
 
     class Meta(TypedModelMeta):
         verbose_name = _("ACS shipment")

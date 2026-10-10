@@ -480,7 +480,8 @@ def poll_boxnow_tracking_batch(
     try:
         cutoff = timezone.now() - timedelta(minutes=15)
         candidates = list(
-            BoxNowShipment.objects.filter(parcel_id__isnull=False)
+            BoxNowShipment.objects.real()
+            .filter(parcel_id__isnull=False)
             .exclude(
                 parcel_state__in=[
                     BoxNowParcelState.PENDING_CREATION,

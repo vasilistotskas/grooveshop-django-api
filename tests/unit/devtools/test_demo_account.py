@@ -1351,6 +1351,137 @@ class TestResetRebuildsTheAccounts:
 
 
 @pytest.mark.django_db
+class TestDemoShipmentsAreNeverSwept:
+    """Fixture vouchers are invented. If the demo tenant is ever given
+    carrier credentials, nothing that calls a carrier or alerts a
+    merchant about one may pick them up: every sweep starts from
+    ``Shipment.objects.real()``. Each test has a real shipment beside
+    the fixtures, so a sweep that selected nothing would not pass."""
+
+    @pytest.fixture(autouse=True)
+    def seeded(self, settings):
+        settings.EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+        with mock.patch(
+            "devtools.demo_store._current_tenant_is_demo", return_value=True
+        ):
+            _prepare_store()
+            demo_account.seed_demo_account()
+            yield
+
+    def test_the_manager_hides_fixtures_and_keeps_real_rows(self):
+        from shipping_acs.factories import AcsShipmentFactory
+        from shipping_acs.models import AcsShipment
+        from shipping_boxnow.factories import BoxNowShipmentFactory
+        from shipping_boxnow.models import BoxNowShipment
+
+        real_acs = AcsShipmentFactory(with_voucher=True)
+        real_box = BoxNowShipmentFactory(with_parcel=True)
+
+        assert AcsShipment.objects.count() > 1
+        assert list(AcsShipment.objects.real()) == [real_acs]
+        assert list(BoxNowShipment.objects.real()) == [real_box]
+
+    def test_the_acs_poll_batch_skips_them(self):
+        from shipping_acs import tasks
+        from shipping_acs.factories import AcsShipmentFactory
+        from shipping_acs.models import AcsShipment
+
+        real = AcsShipmentFactory(with_voucher=True)
+        AcsShipment.objects.update(last_polled_at=None)
+
+        with (
+            mock.patch("shipping_acs.config.is_configured", return_value=True),
+            mock.patch.object(
+                tasks.poll_acs_tracking_one, "apply_async"
+            ) as one,
+        ):
+            tasks.poll_acs_tracking_batch()
+
+        assert [c.kwargs["args"] for c in one.call_args_list] == [[real.pk]]
+
+    def test_the_boxnow_poll_batch_skips_them(self):
+        from shipping_boxnow import tasks
+        from shipping_boxnow.factories import BoxNowShipmentFactory
+        from shipping_boxnow.models import BoxNowShipment
+
+        real = BoxNowShipmentFactory(with_parcel=True)
+        BoxNowShipment.objects.update(last_polled_at=None)
+
+        with (
+            mock.patch(
+                "shipping_boxnow.services.is_configured", return_value=True
+            ),
+            mock.patch.object(
+                tasks.poll_boxnow_tracking_one, "apply_async"
+            ) as one,
+        ):
+            tasks.poll_boxnow_tracking_batch()
+
+        ids = [
+            (c.kwargs.get("args") or c.args[0])[0] for c in one.call_args_list
+        ]
+        assert ids == [real.pk]
+
+    def test_the_stale_alert_never_claims_them(self):
+        from shipping_acs import tasks
+        from shipping_acs.factories import AcsShipmentFactory
+        from shipping_acs.models import AcsShipment
+
+        real = AcsShipmentFactory(with_voucher=True)
+        long_ago = timezone.now() - timedelta(days=30)
+        AcsShipment.objects.update(last_event_at=long_ago)
+
+        tasks.check_stale_acs_shipments()
+
+        flagged = set(
+            AcsShipment.objects.filter(stale_alert_sent=True).values_list(
+                "pk", flat=True
+            )
+        )
+        assert flagged <= {real.pk}
+        assert not AcsShipment.objects.filter(
+            metadata__has_key="demo_seed", stale_alert_sent=True
+        ).exists()
+
+    def test_the_unremitted_cod_alert_skips_them(self):
+        from shipping_acs import tasks
+        from shipping_acs.enum.charge_type import AcsChargeType
+        from shipping_acs.factories import AcsShipmentFactory
+        from shipping_acs.models import AcsShipment
+
+        assert AcsShipment.objects.filter(
+            metadata__has_key="demo_seed",
+            shipment_state="delivered",
+            cod_amount__gt=0,
+        ).exists(), "the fixtures hold a delivered cash-on-delivery parcel"
+        long_ago = timezone.now() - timedelta(days=30)
+        AcsShipment.objects.update(delivery_date=long_ago)
+        real = AcsShipmentFactory(
+            with_voucher=True,
+            shipment_state="delivered",
+            charge_type=AcsChargeType.COD,
+            cod_amount=10,
+            delivery_date=long_ago,
+        )
+
+        rows = tasks._unremitted_cod_rows(older_than_days=1)
+
+        assert [row["voucher_no"] for row in rows] == [real.voucher_no]
+
+    def test_the_unprinted_label_alert_skips_them(self):
+        from shipping_acs import tasks
+        from shipping_acs.factories import AcsShipmentFactory
+        from shipping_acs.models import AcsShipment
+
+        AcsShipment.objects.update(label_printed_at=None)
+        real = AcsShipmentFactory(with_voucher=True)
+
+        rows = tasks._unprinted_rows()
+
+        assert [row["voucher_no"] for row in rows] == [real.voucher_no]
+
+
+@pytest.mark.django_db
 class TestResetIsSilent:
     """The nightly reset rebuilds fixtures; it must not act like a sale.
 

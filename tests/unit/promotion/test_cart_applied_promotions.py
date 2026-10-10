@@ -12,6 +12,7 @@ from __future__ import annotations
 from decimal import Decimal
 
 import pytest
+from djmoney.money import Money
 
 from cart.serializers.cart import CartSerializer
 from promotion.enum import BenefitType, PromotionTrigger
@@ -156,3 +157,31 @@ def test_no_promotions_means_an_empty_breakdown(enable_promotions, make_cart):
     cart, _ = make_cart([(100, 1)])
 
     assert _breakdown(cart) == []
+
+
+def test_near_miss_carries_whichever_distance_is_missing(
+    enable_promotions, make_cart
+):
+    """The teaser tells the storefront WHAT to add: money for a minimum
+    subtotal, units for a minimum quantity or a buy-X-get-Y group."""
+    cart, _ = make_cart([(10, 2)])
+    by_amount = PromotionFactory(
+        trigger=PromotionTrigger.AUTOMATIC,
+        benefit_value=Decimal(10),
+        min_subtotal=Money(Decimal(50), "EUR"),
+    )
+    by_units = PromotionFactory(
+        trigger=PromotionTrigger.AUTOMATIC,
+        benefit_value=Decimal(5),
+        min_quantity=3,
+    )
+
+    entries = {
+        entry["promotionId"]: entry
+        for entry in CartSerializer(cart).data["promotion_near_miss"]
+    }
+
+    assert entries[by_amount.id]["remainingAmount"] == Decimal("30.00")
+    assert entries[by_amount.id]["remainingQuantity"] is None
+    assert entries[by_units.id]["remainingQuantity"] == 1
+    assert entries[by_units.id]["remainingAmount"] is None

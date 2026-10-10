@@ -76,12 +76,18 @@ class GiftEntitlement:
 
 @dataclass
 class NearMissEntry:
-    """An automatic promotion the cart ALMOST qualifies for — blocked
-    only by its minimum subtotal. Powers the storefront's "add X more
-    to unlock" teaser (never emitted for an empty cart)."""
+    """An automatic promotion the cart ALMOST qualifies for.
+
+    Exactly one distance is set: ``remaining_amount`` when only the
+    minimum subtotal is missing, ``remaining_quantity`` when only units
+    are — a minimum quantity, or the rest of a buy-X-get-Y group.
+    Powers the storefront's "add X more to unlock" teaser, and is only
+    emitted for a cart that already holds something the promotion
+    counts (never for an empty cart)."""
 
     promotion: Promotion
-    remaining_amount: Decimal
+    remaining_amount: Decimal | None = None
+    remaining_quantity: int | None = None
 
 
 @dataclass
@@ -108,15 +114,24 @@ class CartDiscountResult:
     def blocking_rejections(self) -> list[tuple[str, str]]:
         """Rejections that must abort order creation.
 
-        A code losing the stacking comparison to a better automatic
-        promotion (combination_disallowed) is not blocking — the
-        shopper is charged LESS than the code alone would give, and
-        the cart preview showed the same outcome.
+        Two reasons are not blocking, because dropping the code changes
+        nothing the cart preview showed:
+
+        - combination_disallowed: the code lost the stacking comparison
+          to a better automatic promotion, so the shopper is charged LESS
+          than the code alone would give.
+        - not_applicable: nothing left in the cart is in the code's
+          scope (the item it covered was removed after applying), so it
+          discounted nothing.
         """
+        non_blocking = {
+            str(CouponRejectionReason.COMBINATION_DISALLOWED),
+            str(CouponRejectionReason.NOT_APPLICABLE),
+        }
         return [
             (code, reason)
             for code, reason in self.rejected
-            if reason != str(CouponRejectionReason.COMBINATION_DISALLOWED)
+            if reason not in non_blocking
         ]
 
 
@@ -259,23 +274,12 @@ class PromotionEngine:
             if reason is not None:
                 if code is not None:
                     result.rejected.append((code.code, str(reason)))
-                elif (
-                    reason == str(CouponRejectionReason.MINIMUM_NOT_MET)
-                    and promotion.min_subtotal
-                ):
-                    # Near-miss teaser: an automatic promotion blocked
-                    # ONLY by its minimum subtotal. The strictly-exceed
-                    # distance never reports 0 for a cart resting
-                    # exactly on the threshold (adveshop near-miss
-                    # design note).
-                    remaining = _quantize(
-                        Decimal(str(promotion.min_subtotal.amount))
-                        - items_total
+                elif reason == str(CouponRejectionReason.MINIMUM_NOT_MET):
+                    entry = cls._minimum_near_miss(
+                        promotion, cart_items, items_total
                     )
-                    if remaining > 0:
-                        result.near_miss.append(
-                            NearMissEntry(promotion, remaining)
-                        )
+                    if entry is not None:
+                        result.near_miss.append(entry)
                 continue
             eligible.append((promotion, code))
 
@@ -297,10 +301,86 @@ class PromotionEngine:
                 promotion, cart_items, items_total, currency
             )
             if amount.amount <= 0:
+                # A buy-X-get-Y short of its first full group earns
+                # nothing yet: an automatic one becomes an "add N more"
+                # teaser, and a code is refused rather than accepted
+                # for nothing.
+                short = (
+                    cls._bxgy_units_short(promotion, cart_items)
+                    if promotion.benefit_type == BenefitType.BXGY
+                    else 0
+                )
+                if short and code is None:
+                    result.near_miss.append(
+                        NearMissEntry(promotion, remaining_quantity=short)
+                    )
+                elif short:
+                    result.rejected.append(
+                        (
+                            code.code,
+                            str(CouponRejectionReason.MINIMUM_NOT_MET),
+                        )
+                    )
                 continue
             monetary.append(AppliedPromotion(promotion, code, amount))
 
         return monetary, applicable_free_shipping
+
+    @classmethod
+    def _minimum_near_miss(
+        cls, promotion: Promotion, cart_items, items_total: Decimal
+    ) -> NearMissEntry | None:
+        """The one missing minimum of an automatic promotion, if just one.
+
+        Subtotal and quantity are separate distances; when both are
+        unmet there is no single "add X more" to tell the shopper, so
+        nothing is emitted. The strictly-exceed subtotal distance never
+        reports 0 for a cart resting exactly on the threshold (adveshop
+        near-miss design note).
+        """
+        amount_short = Decimal(0)
+        if promotion.min_subtotal:
+            amount_short = _quantize(
+                Decimal(str(promotion.min_subtotal.amount)) - items_total
+            )
+        units_short = 0
+        if promotion.min_quantity:
+            units = sum(
+                item.quantity
+                for item in cls._matching_items(promotion, cart_items)
+            )
+            units_short = promotion.min_quantity - units
+
+        if amount_short > 0 and units_short <= 0:
+            return NearMissEntry(promotion, remaining_amount=amount_short)
+        if units_short > 0 and amount_short <= 0:
+            return NearMissEntry(promotion, remaining_quantity=units_short)
+        return None
+
+    @classmethod
+    def _bxgy_units_short(cls, promotion: Promotion, cart_items) -> int:
+        """Units the cart still needs before the buy side earns once.
+
+        Mirrors ``_bxgy_amount``'s two modes: a same-pool offer needs
+        ``buy + get`` eligible units ("buy 2 get 1 free" needs 3), a
+        reward-pool offer needs ``buy`` units on the buy side. Zero when
+        the cart holds none of the eligible units (nothing to build on)
+        or the group is already complete; a reward-pool offer whose buy
+        side is met but whose reward is missing is not a quantity
+        question, so it reports zero too.
+        """
+        buy_qty = promotion.buy_quantity or 0
+        get_qty = promotion.get_quantity or 0
+        if buy_qty < 1 or get_qty < 1:
+            return 0
+        units = sum(
+            item.quantity for item in cls._matching_items(promotion, cart_items)
+        )
+        if units == 0:
+            return 0
+        reward_pool = bool({p.id for p in promotion.get_products.all()})
+        needed = buy_qty if reward_pool else buy_qty + get_qty
+        return max(needed - units, 0)
 
     @classmethod
     def _amount_for(
@@ -535,16 +615,20 @@ class PromotionEngine:
         ):
             return str(CouponRejectionReason.USER_INELIGIBLE)
 
+        # Scope before minimums: a code for chargers on a cart of cables
+        # is "not applicable", not "minimum not met", and it must not be
+        # accepted just because it would discount nothing.
+        matching = cls._matching_items(promotion, cart_items)
+        if cart_items and not matching:
+            return str(CouponRejectionReason.NOT_APPLICABLE)
+
         if promotion.min_subtotal and items_total < Decimal(
             str(promotion.min_subtotal.amount)
         ):
             return str(CouponRejectionReason.MINIMUM_NOT_MET)
 
         if promotion.min_quantity:
-            eligible_units = sum(
-                item.quantity
-                for item in cls._matching_items(promotion, cart_items)
-            )
+            eligible_units = sum(item.quantity for item in matching)
             if eligible_units < promotion.min_quantity:
                 return str(CouponRejectionReason.MINIMUM_NOT_MET)
 
@@ -1483,16 +1567,21 @@ class CouponPickerService:
             promotion, cart_items, items_total, currency
         )
         if amount.amount <= 0:
-            # Worth nothing on this cart — its products are not in it,
-            # or the benefit computes to zero. ``_classify`` drops such
-            # a promotion before stacking, so no rejection is raised and
-            # ``apply`` accepts the code; it simply moves no money. The
-            # shopper is told that rather than left watching an
-            # unchanged total.
+            # Same verdict as ``_classify``, so the picker never offers
+            # a code ``apply`` refuses: a buy-X-get-Y short of its first
+            # group is MINIMUM_NOT_MET. (A code with nothing in scope
+            # already failed eligibility as NOT_APPLICABLE above.)
+            short = (
+                PromotionEngine._bxgy_units_short(promotion, cart_items)
+                if promotion.benefit_type == BenefitType.BXGY
+                else 0
+            )
             return CouponOption(
                 promotion=promotion,
                 code=code,
-                reason=None,
+                reason=str(CouponRejectionReason.MINIMUM_NOT_MET)
+                if short
+                else None,
                 amount=zero,
                 free_shipping=False,
                 applied=applied,

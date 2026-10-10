@@ -2944,11 +2944,11 @@ msgstr "Δικαιώματα δωρεάν δώρου που κέρδισε αυ�
 
 #: .\cart\serializers\cart.py:75
 msgid ""
-"Automatic promotions blocked only by their minimum subtotal — 'add X more to"
-" unlock'"
+"Automatic promotions short of exactly one minimum (subtotal or units) — 'add "
+"X more to unlock'"
 msgstr ""
-"Αυτόματες προσφορές που μπλοκάρονται μόνο από το ελάχιστο υποσύνολό τους — "
-"'προσθέστε X ακόμα για ξεκλείδωμα'"
+"Αυτόματες προσφορές στις οποίες λείπει ακριβώς μία ελάχιστη προϋπόθεση "
+"(ποσό ή τεμάχια) — 'πρόσθεσε X ακόμα για να την ξεκλειδώσεις'"
 
 #: .\cart\serializers\cart.py:81
 msgid ""
@@ -14549,6 +14549,10 @@ msgstr "Ο κωδικός δεν μπορεί να συνδυαστεί με τ�
 #: .\promotion\enum.py:55
 msgid "The customer is not eligible for this promotion"
 msgstr "Ο πελάτης δεν είναι επιλέξιμος για αυτή την προσφορά"
+
+#: .\promotion\enum.py:63
+msgid "No item in the cart qualifies for this promotion"
+msgstr "Κανένα προϊόν του καλαθιού δεν καλύπτεται από αυτή την προσφορά"
 
 #: .\promotion\enum.py:78
 msgid "Product markdown"

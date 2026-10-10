@@ -54,6 +54,13 @@ class CouponRejectionReason(models.TextChoices):
         "discount_code_user_ineligible",
         _("The customer is not eligible for this promotion"),
     )
+    # Outside the ACP enum: the agent gateway reports it as
+    # discount_code_invalid (``mapDiscountReason``), the storefront and
+    # admin keep the precise wording.
+    NOT_APPLICABLE = (
+        "discount_code_not_applicable",
+        _("No item in the cart qualifies for this promotion"),
+    )
 
 
 class ProductPromotionRelation(models.TextChoices):

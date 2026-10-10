@@ -7,8 +7,15 @@ from decimal import Decimal
 import pytest
 from djmoney.money import Money
 
-from promotion.enum import BenefitType, PromotionTrigger
-from promotion.factories import PromotionFactory
+from product.factories import ProductFactory
+from promotion.enum import (
+    BenefitType,
+    CouponRejectionReason,
+    PromotionTrigger,
+    TargetScope,
+)
+from promotion.factories import PromotionCodeFactory, PromotionFactory
+from promotion.models import CartPromotionCode
 from promotion.services import PromotionEngine
 
 pytestmark = pytest.mark.django_db
@@ -246,3 +253,120 @@ class TestNearMiss:
 
         assert result.near_miss == []
         assert result.discount_total.amount > 0
+
+    def test_bxgy_short_of_its_group_reports_remaining_units(
+        self, enable_promotions, make_cart
+    ):
+        """Demo store, 2026-10-10: two cables in the cart showed nothing
+        about "2+1"; the offer appeared only once the third was added."""
+        cart, products = make_cart([(10, 2)])
+        promotion = PromotionFactory(
+            trigger=PromotionTrigger.AUTOMATIC,
+            benefit_type=BenefitType.BXGY,
+            buy_quantity=2,
+            get_quantity=1,
+            get_discount_percent=Decimal(100),
+            target_scope=TargetScope.PRODUCTS,
+        )
+        promotion.products.set(products)
+
+        result = PromotionEngine.evaluate(cart)
+
+        [entry] = result.near_miss
+        assert entry.promotion == promotion
+        assert entry.remaining_quantity == 1
+        assert entry.remaining_amount is None
+        assert result.discount_total.amount == 0
+
+    def test_bxgy_with_a_full_group_applies_without_a_teaser(
+        self, enable_promotions, make_cart
+    ):
+        cart, products = make_cart([(10, 3)])
+        promotion = PromotionFactory(
+            trigger=PromotionTrigger.AUTOMATIC,
+            benefit_type=BenefitType.BXGY,
+            buy_quantity=2,
+            get_quantity=1,
+            get_discount_percent=Decimal(100),
+            target_scope=TargetScope.PRODUCTS,
+        )
+        promotion.products.set(products)
+
+        result = PromotionEngine.evaluate(cart)
+
+        assert result.near_miss == []
+        assert result.discount_total == Money(Decimal("10.00"), "EUR")
+
+    def test_bxgy_with_none_of_its_products_in_the_cart_is_silent(
+        self, enable_promotions, make_cart
+    ):
+        cart, _products = make_cart([(10, 2)])
+        elsewhere = [ProductFactory()]
+        promotion = PromotionFactory(
+            trigger=PromotionTrigger.AUTOMATIC,
+            benefit_type=BenefitType.BXGY,
+            buy_quantity=2,
+            get_quantity=1,
+            get_discount_percent=Decimal(100),
+            target_scope=TargetScope.PRODUCTS,
+        )
+        promotion.products.set(elsewhere)
+
+        assert PromotionEngine.evaluate(cart).near_miss == []
+
+    def test_min_quantity_short_reports_remaining_units(
+        self, enable_promotions, make_cart
+    ):
+        cart, _ = make_cart([(10, 2)])
+        promotion = PromotionFactory(
+            trigger=PromotionTrigger.AUTOMATIC,
+            benefit_value=Decimal(5),
+            min_quantity=3,
+        )
+
+        [entry] = PromotionEngine.evaluate(cart).near_miss
+
+        assert entry.promotion == promotion
+        assert entry.remaining_quantity == 1
+        assert entry.remaining_amount is None
+
+    def test_both_minimums_short_is_not_a_single_teaser(
+        self, enable_promotions, make_cart
+    ):
+        cart, _ = make_cart([(10, 2)])
+        PromotionFactory(
+            trigger=PromotionTrigger.AUTOMATIC,
+            benefit_value=Decimal(5),
+            min_quantity=3,
+            min_subtotal=Money(Decimal(50), "EUR"),
+        )
+
+        assert PromotionEngine.evaluate(cart).near_miss == []
+
+
+class TestNotApplicableCode:
+    def test_attached_code_left_without_its_products_does_not_block(
+        self, enable_promotions, make_cart
+    ):
+        """The shopper applied a code, then removed the item it covered.
+        It discounts nothing either way, so order creation must not
+        refuse the order over it (the preview already showed no saving).
+        """
+
+        cart, _products = make_cart([(10, 1)])
+        elsewhere = [ProductFactory()]
+        promotion = PromotionFactory(
+            trigger=PromotionTrigger.CODE,
+            benefit_value=Decimal(10),
+            target_scope=TargetScope.PRODUCTS,
+        )
+        promotion.products.set(elsewhere)
+        code = PromotionCodeFactory(promotion=promotion, code="GONE")
+        CartPromotionCode.objects.create(cart=cart, code=code)
+
+        result = PromotionEngine.evaluate(cart)
+
+        assert result.rejected == [
+            ("GONE", str(CouponRejectionReason.NOT_APPLICABLE))
+        ]
+        assert result.blocking_rejections == []

@@ -296,13 +296,13 @@ class TestVerdictMatchesApply:
         after = PromotionEngine.evaluate(cart).discount_total
         assert after - before == option.amount
 
-    def test_a_code_worth_nothing_on_this_cart_still_applies(
+    def test_a_code_for_products_not_in_the_cart_is_not_applicable(
         self, make_cart, enable_promotions
     ):
-        """A product-scoped coupon whose products are not in the cart
-        computes to zero, so ``_classify`` drops it before stacking and
-        no rejection is raised — apply() accepts it. Enabled, with the
-        amount telling the truth."""
+        """Demo store, 2026-10-10: a GaN-charger code on a cart of cables
+        was offered as usable and "applied" for nothing. A code whose
+        scope matches nothing in the cart is refused by both the picker
+        and apply(), with the same reason."""
         cart, _products = make_cart([(100, 1)])
         promotion, _code = _coded(
             "ELSEWHERE",
@@ -314,9 +314,37 @@ class TestVerdictMatchesApply:
 
         option = _by_code(CouponPickerService.available(cart))["ELSEWHERE"]
 
-        assert option.eligible is True
-        assert option.amount == Money(Decimal(0), "EUR")
-        CouponService.apply(cart, "ELSEWHERE")
+        assert option.eligible is False
+        assert option.reason == str(CouponRejectionReason.NOT_APPLICABLE)
+        with pytest.raises(CouponError) as refused:
+            CouponService.apply(cart, "ELSEWHERE")
+        assert refused.value.reason == str(CouponRejectionReason.NOT_APPLICABLE)
+        assert not cart.applied_codes.exists()
+
+    def test_a_bxgy_code_short_of_its_group_is_minimum_not_met(
+        self, make_cart, enable_promotions
+    ):
+        """ "Buy 2 get 1" with two units in the cart earns nothing yet:
+        refused as minimum-not-met everywhere, never accepted for 0."""
+        cart, products = make_cart([(10, 2)])
+        promotion, _code = _coded(
+            "TWOPLUSONE",
+            benefit_type=BenefitType.BXGY,
+            buy_quantity=2,
+            get_quantity=1,
+            get_discount_percent=Decimal(100),
+            target_scope=TargetScope.PRODUCTS,
+        )
+        promotion.products.set(products)
+
+        option = _by_code(CouponPickerService.available(cart))["TWOPLUSONE"]
+
+        assert option.reason == str(CouponRejectionReason.MINIMUM_NOT_MET)
+        with pytest.raises(CouponError) as refused:
+            CouponService.apply(cart, "TWOPLUSONE")
+        assert refused.value.reason == str(
+            CouponRejectionReason.MINIMUM_NOT_MET
+        )
 
     def test_amount_ignores_the_code_already_attached(
         self, make_cart, enable_promotions

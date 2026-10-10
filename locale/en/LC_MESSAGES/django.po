@@ -2865,8 +2865,8 @@ msgstr ""
 
 #: .\cart\serializers\cart.py:75
 msgid ""
-"Automatic promotions blocked only by their minimum subtotal — 'add X more to "
-"unlock'"
+"Automatic promotions short of exactly one minimum (subtotal or units) — 'add "
+"X more to unlock'"
 msgstr ""
 
 #: .\cart\serializers\cart.py:81
@@ -13696,6 +13696,10 @@ msgstr ""
 
 #: .\promotion\enum.py:55
 msgid "The customer is not eligible for this promotion"
+msgstr ""
+
+#: .\promotion\enum.py:63
+msgid "No item in the cart qualifies for this promotion"
 msgstr ""
 
 #: .\promotion\enum.py:78

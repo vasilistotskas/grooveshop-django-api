@@ -77,8 +77,8 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
     )
     promotion_near_miss = serializers.SerializerMethodField(
         help_text=_(
-            "Automatic promotions blocked only by their minimum "
-            "subtotal — 'add X more to unlock'"
+            "Automatic promotions short of exactly one minimum (subtotal "
+            "or units) — 'add X more to unlock'"
         ),
     )
     b2b_pricing = serializers.SerializerMethodField(
@@ -259,13 +259,36 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
                 "properties": {
                     "promotionId": {"type": "integer"},
                     "name": {"type": "string"},
-                    "remainingAmount": {"type": "number"},
+                    "remainingAmount": {
+                        "type": "number",
+                        "nullable": True,
+                        "description": (
+                            "Subtotal still missing; null when the "
+                            "missing part is units"
+                        ),
+                    },
+                    "remainingQuantity": {
+                        "type": "integer",
+                        "nullable": True,
+                        "description": (
+                            "Eligible units still missing (a minimum "
+                            "quantity, or the rest of a buy-X-get-Y "
+                            "group); null when the missing part is "
+                            "subtotal"
+                        ),
+                    },
                 },
+                "required": [
+                    "promotionId",
+                    "name",
+                    "remainingAmount",
+                    "remainingQuantity",
+                ],
             },
             "description": (
-                "Automatic promotions the cart ALMOST qualifies for — "
-                "blocked only by their minimum subtotal. Powers the "
-                "'add X more to unlock' teaser."
+                "Automatic promotions the cart ALMOST qualifies for: "
+                "exactly one of remainingAmount and remainingQuantity is "
+                "set. Powers the 'add X more to unlock' teaser."
             ),
         }
     )
@@ -278,6 +301,7 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
                 )
                 or "",
                 "remainingAmount": entry.remaining_amount,
+                "remainingQuantity": entry.remaining_quantity,
             }
             for entry in self._promotion_result(obj).near_miss
         ]

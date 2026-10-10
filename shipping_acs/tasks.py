@@ -4,8 +4,6 @@ Schedule (registered in ``settings.CELERY_BEAT_SCHEDULE``):
 
 * ``sync-acs-stations`` — daily 03:00 Europe/Athens (Phase 2 only).
 * ``issue-acs-pickup-list`` — Mon–Fri 16:30 Europe/Athens.
-* ``warn-unprinted-acs-vouchers`` — Mon–Fri 15:45 Europe/Athens, 45
-  minutes ahead of the manifest so there is time to act on it.
 * ``poll-acs-tracking`` — every 15 minutes.
 * ``reconcile-acs-cod-payouts`` — daily 02:30 Europe/Athens.
 * ``alert-unremitted-acs-cod`` — daily 03:00 Europe/Athens, after the
@@ -270,31 +268,13 @@ def _unprinted_rows(voucher_numbers: list[str] | None = None) -> list[dict]:
     ]
 
 
-def _unprinted_changelist_url() -> str:
-    """Absolute link to the ACS shipments admin, filtered to unprinted.
-
-    The tenant admin lives on the tenant's API host (``core/urls.py``
-    mounts ``admin.site.urls`` in the storefront URLconf), and the
-    changelist's ``("label_printed_at", EmptyFieldListFilter)`` reads
-    ``label_printed_at__isempty=1`` (``django/contrib/admin/filters.py``,
-    ``EmptyFieldListFilter.lookup_kwarg``). That page carries both the
-    "Print labels for selected shipments" action and the "Issue ACS
-    pickup list now" button.
-    """
-    from django.urls import reverse
-
-    from core.utils.tenant_urls import get_tenant_api_base_url
-
-    path = reverse("admin:shipping_acs_acsshipment_changelist")
-    return f"{get_tenant_api_base_url()}{path}?label_printed_at__isempty=1"
-
-
 def _note_unprinted_on_orders(rows: list[dict], *, acs_message: str) -> None:
     """Record the pickup-list block on each order it holds back.
 
-    The alert email reaches an inbox; the order page is where staff look
-    when a customer asks why their parcel has not moved, and until now it
-    showed nothing.
+    The order page is where staff look when a customer asks why their
+    parcel has not moved. Nobody is emailed: ACS collects a printed
+    parcel whether or not a manifest was issued, so a refused list is
+    bookkeeping, not an incident.
     """
     from order.models.history import OrderHistory
     from order.models.order import Order
@@ -314,87 +294,6 @@ def _note_unprinted_on_orders(rows: list[dict], *, acs_message: str) -> None:
                 "selected shipments), then press Issue ACS pickup list now."
             ),
         )
-
-
-def _alert_unprinted_vouchers(
-    rows: list[dict], *, blocked: bool, acs_message: str = ""
-) -> dict[str, Any]:
-    """Email the tenant's admins the vouchers that need a printed label.
-
-    ``blocked`` distinguishes the two moments this matters: the 15:45
-    heads-up, where there is still time to print, and the 16:30
-    rejection, where the manifest did not go out. Both name the exact
-    orders, because "print the labels" is only actionable with the list.
-    """
-    from django.core.mail import send_mail
-    from django.template.loader import render_to_string
-    from django.utils.translation import gettext as _
-
-    from core.utils.email_context import build_email_context
-    from tenant.credentials import (
-        tenant_admin_recipients,
-        tenant_from_email,
-        tenant_site_name,
-    )
-
-    if not rows:
-        return {"alerted": 0}
-
-    recipients = tenant_admin_recipients()
-    if not recipients:
-        logger.warning(
-            "ACS unprinted-voucher alert: no recipients configured — "
-            "%s voucher(s) still need printing",
-            len(rows),
-        )
-        return {"alerted": 0, "reason": "no_recipients"}
-
-    from django.utils.translation import get_language
-
-    # Merchant-facing, rendered under no override: the active language.
-    context = build_email_context(
-        language=get_language(),
-        vouchers=rows,
-        blocked=blocked,
-        acs_message=acs_message,
-        unprinted_admin_url=_unprinted_changelist_url(),
-    )
-    if blocked:
-        subject = _(
-            "ACS pickup list NOT issued — {n} voucher(s) need printing"
-        ).format(n=len(rows))
-    else:
-        subject = _(
-            "Print {n} ACS voucher(s) before today's pickup list"
-        ).format(n=len(rows))
-
-    try:
-        send_mail(
-            subject=f"[{tenant_site_name()}] {subject}",
-            message=render_to_string(
-                "emails/shipping_acs/unprinted_vouchers_alert.txt", context
-            ),
-            from_email=tenant_from_email() or None,
-            recipient_list=recipients,
-            html_message=render_to_string(
-                "emails/shipping_acs/unprinted_vouchers_alert.html", context
-            ),
-        )
-    except Exception as exc:
-        # Never let a mail failure mask the underlying problem: the
-        # caller still raises, and the ERROR log already carries the
-        # vouchers.
-        logger.exception(
-            "ACS unprinted-voucher alert: failed to send email",
-        )
-        return {"alerted": 0, "error": str(exc)}
-
-    logger.info(
-        "ACS unprinted-voucher alert sent (blocked=%s) for %s voucher(s)",
-        blocked,
-        len(rows),
-    )
-    return {"alerted": len(rows)}
 
 
 def _unremitted_cod_rows(older_than_days: int) -> list[dict]:
@@ -537,37 +436,6 @@ def alert_unremitted_cod_payouts(self) -> dict[str, Any]:
     }
 
 
-@shared_task(bind=True, base=TenantTask)
-def warn_unprinted_acs_vouchers(self) -> dict[str, Any]:
-    """Flag vouchers with no printed label, ahead of the manifest run.
-
-    ACS refuses the WHOLE pickup list when any voucher on it is
-    unprinted, and its API takes a pickup date with no voucher list —
-    so there is no partial manifest to fall back on. One order placed
-    shortly before 16:30 therefore blocks every other parcel that day
-    (observed 2026-09-03: one late voucher held up six ready ones).
-
-    Running 45 minutes early turns that into something a human can fix
-    while it still matters.
-    """
-    if _skip_if_acs_unconfigured("warn_unprinted_acs_vouchers"):
-        return {"status": "skipped_unconfigured"}
-
-    rows = _unprinted_rows()
-    if not rows:
-        logger.info("warn_unprinted_acs_vouchers: every candidate is printed")
-        return {"status": "ok", "unprinted": 0}
-
-    logger.warning(
-        "warn_unprinted_acs_vouchers: %s voucher(s) still unprinted before "
-        "today's pickup list: %s",
-        len(rows),
-        [r["voucher_no"] for r in rows],
-    )
-    result = _alert_unprinted_vouchers(rows, blocked=False)
-    return {"status": "ok", "unprinted": len(rows), **result}
-
-
 @shared_task(
     bind=True,
     base=TenantTask,
@@ -586,24 +454,21 @@ def issue_daily_acs_pickup_list(self) -> dict[str, Any]:
     try:
         pickup_list = AcsService.issue_daily_pickup_list()
     except AcsUnprintedVouchersError as exc:
-        # ACS refused the day over unprinted labels — the one refusal
-        # with a known fix (print, then "Issue ACS pickup list now"), and
-        # in production the courier collected those parcels the next
-        # morning regardless (orders 295-297, 2026-09-23). A status, not
-        # a failed task: the email and the order notes are what a human
-        # acts on. Every other refusal is an ``AcsAPIError`` and still
+        # ACS refused the day over unprinted labels. That is the normal
+        # state of the merchant's routine, not an incident: labels are
+        # printed the next morning and ACS collects a printed parcel the
+        # same day with or without a manifest (webside, 2026-09-21 to
+        # 10-10: 43 of 45 parcels collected with no pickup list). So a
+        # status and an order note, never an email or a failed task.
+        # Every other refusal is an ``AcsAPIError`` and still
         # propagates to Celery as a failure.
         rows = _unprinted_rows((exc.raw or {}).get("Unprinted_Vouchers"))
-        alert = _alert_unprinted_vouchers(
-            rows, blocked=True, acs_message=exc.error_message
-        )
         _note_unprinted_on_orders(rows, acs_message=exc.error_message)
         return {
             "status": "blocked_unprinted",
             "unprinted": [row["voucher_no"] for row in rows],
             "order_ids": [row["order_id"] for row in rows],
             "acs_message": exc.error_message,
-            **alert,
         }
 
     if pickup_list is None:

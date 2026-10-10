@@ -56,6 +56,7 @@ from devtools.demo_media import (
     storage_name,
 )
 from devtools.demo_promotions import seed_promotions as _seed_promotions
+from devtools.demo_reviews import seed_reviews as _seed_reviews
 
 logger = logging.getLogger(__name__)
 
@@ -328,141 +329,6 @@ TAG_PRODUCT_RULES: dict[str, tuple[str, ...]] = {
         "demo-glass-privacy",
     ),
 }
-
-# ── reviews ──────────────────────────────────────────────────────────
-# Authored by DEDICATED demo users, never by the prod-cloned accounts:
-# attaching invented opinions to a real customer's name is not
-# something a staging refresh should do.
-#
-# rate is 1..10 (RateEnum), NOT 1..5 — the storefront maps it with
-# ``rate * 0.099 * starCountMax``.
-DEMO_REVIEWERS: tuple[tuple[str, str, str], ...] = (
-    ("demo-shopper-1@staging.invalid", "Γιώργος", "Π."),
-    ("demo-shopper-2@staging.invalid", "Μαρία", "Κ."),
-    ("demo-shopper-3@staging.invalid", "Νίκος", "Α."),
-    ("demo-shopper-4@staging.invalid", "Ελένη", "Δ."),
-    ("demo-shopper-5@staging.invalid", "Δημήτρης", "Σ."),
-    ("demo-shopper-6@staging.invalid", "Σοφία", "Μ."),
-)
-
-# (product_slug, reviewer_index, rate, comment)
-REVIEWS: tuple[tuple[str, int, int, str], ...] = (
-    (
-        "demo-cable-usbc-1m-black",
-        0,
-        10,
-        "Δουλεύει άψογα, φορτίζει γρήγορα. Το πήρα και δεύτερο.",
-    ),
-    (
-        "demo-cable-usbc-1m-black",
-        1,
-        8,
-        "Καλό καλώδιο για την τιμή του. Λίγο κοντό για το κρεβάτι.",
-    ),
-    (
-        "demo-cable-usbc-2m-black",
-        2,
-        9,
-        "Το δίμετρο είναι ό,τι έψαχνα για τον καναπέ.",
-    ),
-    (
-        "demo-cable-usbc-braided-black",
-        0,
-        9,
-        "Η υφασμάτινη επένδυση κρατάει πολύ καλύτερα από τα απλά.",
-    ),
-    (
-        "demo-cable-usbc-braided-black",
-        3,
-        7,
-        "Καλό, αλλά είναι λίγο άκαμπτο στην αρχή.",
-    ),
-    (
-        "demo-cable-usbc-lightning",
-        4,
-        6,
-        "Πρακτικό στο ταξίδι, αλλά φορτίζει πιο αργά όταν το χρησιμοποιείς σε δύο συσκευές.",
-    ),
-    (
-        "demo-charger-20w-white",
-        1,
-        9,
-        "Μικρό, ζεσταίνεται ελάχιστα, κάνει τη δουλειά του.",
-    ),
-    (
-        "demo-charger-gan-45w",
-        2,
-        10,
-        "Εξαιρετικό. Φορτίζει laptop και κινητό ταυτόχρονα.",
-    ),
-    (
-        "demo-charger-gan-45w",
-        5,
-        9,
-        "Πολύ μικρότερο από ό,τι περίμενα, σε καλό.",
-    ),
-    (
-        "demo-charger-gan-65w",
-        0,
-        10,
-        "Αντικατέστησε τρεις φορτιστές στο γραφείο μου.",
-    ),
-    (
-        "demo-charger-car-30w",
-        3,
-        8,
-        "Σταθερή φόρτιση στο αυτοκίνητο, καλή εφαρμογή στην υποδοχή.",
-    ),
-    (
-        "demo-wireless-pad-white",
-        4,
-        7,
-        "Καλό, αλλά θέλει να κεντράρεις σωστά το κινητό.",
-    ),
-    (
-        "demo-case-clear",
-        1,
-        8,
-        "Διάφανη και λεπτή. Μετά από μήνες κιτρινίζει λίγο.",
-    ),
-    ("demo-case-rugged", 2, 10, "Μου έπεσε δύο φορές, μηδέν ζημιά."),
-    ("demo-case-rugged", 5, 9, "Ωραία αίσθηση, χωράει άνετα δύο κάρτες."),
-    (
-        "demo-case-clear-magnetic",
-        0,
-        9,
-        "Ο μαγνήτης κρατάει γερά στη βάση του αυτοκινήτου.",
-    ),
-    ("demo-glass-2pack", 3, 8, "Μπήκε εύκολα χωρίς φυσαλίδες. Καλή τιμή."),
-    (
-        "demo-glass-privacy",
-        4,
-        6,
-        "Κάνει τη δουλειά του αλλά σκουραίνει αισθητά την οθόνη.",
-    ),
-    (
-        "demo-earbuds-white",
-        1,
-        8,
-        "Καλός ήχος για την κατηγορία, κρατάει όλη μέρα.",
-    ),
-    (
-        "demo-earbuds-black",
-        2,
-        10,
-        "Η ακύρωση θορύβου είναι εντυπωσιακή για τα λεφτά της.",
-    ),
-    ("demo-earbuds-sport", 5, 9, "Δεν πέφτουν στο τρέξιμο, αυτό ήθελα."),
-    ("demo-speaker-wood", 0, 9, "Άνετα για πολλές ώρες, καλή μπαταρία."),
-    (
-        "demo-earbuds-sport",
-        3,
-        7,
-        "Απλά και λειτουργικά. Καλή λύση χωρίς μπαταρία.",
-    ),
-    ("demo-speaker-mini-grey", 4, 8, "Μικρό και δυνατό για το μέγεθός του."),
-    ("demo-speaker-party", 1, 9, "Το πήγα στην παραλία, άντεξε άνετα."),
-)
 
 # ── feedback ─────────────────────────────────────────────────────────
 # rating is 1..5 here (MinValueValidator(1)/MaxValueValidator(5)) —
@@ -1997,67 +1863,13 @@ def seed_tags() -> dict[str, int]:
     return report
 
 
-def _demo_users() -> dict[str, Any]:
-    """Get-or-create the dedicated demo shopper accounts.
-
-    Reviews and B2B profiles are attached to these, never to the
-    prod-cloned accounts — a staging refresh should not publish
-    invented opinions under a real customer's name.
-    """
-    from django.contrib.auth import get_user_model
-
-    user_model = get_user_model()
-    users: dict[str, Any] = {}
-    for email, first_name, last_name in DEMO_REVIEWERS:
-        user, _ = user_model.objects.get_or_create(
-            email=email,
-            defaults={
-                "first_name": first_name,
-                "last_name": last_name,
-                "is_active": True,
-            },
-        )
-        users[email] = user
-    return users
-
-
 def seed_reviews() -> dict[str, int]:
-    """Create approved product reviews.
+    """The demo store's reviews — see ``devtools/demo_reviews.py``.
 
-    ``status=TRUE`` is what makes a review PUBLIC — the viewset filters
-    on it for anonymous and non-owner requests, so ``NEW`` rows would
-    leave the product page as empty as zero rows do.
+    Dozens of dedicated reviewer accounts with COMPLETED orders for what
+    they review, so the reviews count as verified purchases.
     """
-    from product.enum.review import ReviewStatus
-    from product.models import Product, ProductReview
-
-    report: dict[str, int] = {}
-    users = _demo_users()
-    emails = [email for email, _, _ in DEMO_REVIEWERS]
-    products = {p.slug: p for p in Product.objects.all()}
-
-    for product_slug, reviewer_index, rate, comment in REVIEWS:
-        product = products.get(product_slug)
-        if product is None:
-            _bump(report, "product_missing")
-            continue
-        user = users[emails[reviewer_index]]
-        review, created = ProductReview.objects.get_or_create(
-            product=product,
-            user=user,
-            defaults={
-                "rate": rate,
-                "status": ReviewStatus.TRUE,
-                "is_published": True,
-            },
-        )
-        if not created:
-            _bump(report, "unchanged")
-            continue
-        _translate(review, comment=comment)
-        review.save()
-        _bump(report, "created")
-    return report
+    return _seed_reviews()
 
 
 def seed_feedback() -> dict[str, int]:

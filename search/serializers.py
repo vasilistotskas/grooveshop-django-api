@@ -4,6 +4,7 @@ from rest_framework import serializers
 
 from blog.models.post import BlogPostTranslation
 from product.models.product import ProductTranslation
+from promotion.enum import OfferKind
 
 
 class BlogPostTranslationSerializer(
@@ -65,6 +66,7 @@ class ProductTranslationSerializer(
     final_price = serializers.SerializerMethodField()
     price = serializers.SerializerMethodField()
     discount_percent = serializers.SerializerMethodField()
+    offer_kind = serializers.SerializerMethodField()
     stock = serializers.SerializerMethodField()
     likes_count = serializers.SerializerMethodField()
     view_count = serializers.SerializerMethodField()
@@ -94,6 +96,7 @@ class ProductTranslationSerializer(
             "final_price",
             "price",
             "discount_percent",
+            "offer_kind",
             "stock",
             "likes_count",
             "view_count",
@@ -171,6 +174,9 @@ class ProductTranslationSerializer(
     def get_discount_percent(self, obj):
         return obj.master.discount_percent if obj.master else None
 
+    def get_offer_kind(self, obj):
+        return obj.master.offer_kind if obj.master else None
+
     def get_stock(self, obj):
         return obj.master.stock if obj.master else 0
 
@@ -220,6 +226,9 @@ class ProductMeiliSearchResultSerializer(serializers.Serializer):
     final_price = serializers.FloatField(allow_null=True)
     price = serializers.FloatField(allow_null=True)
     discount_percent = serializers.IntegerField(allow_null=True)
+    offer_kind = serializers.ChoiceField(
+        choices=OfferKind.choices, allow_null=True, required=False
+    )
     stock = serializers.IntegerField()
     likes_count = serializers.IntegerField()
     view_count = serializers.IntegerField()
@@ -334,6 +343,9 @@ class FederatedSearchResultSerializer(serializers.Serializer):
     final_price = serializers.FloatField(allow_null=True, required=False)
     price = serializers.FloatField(allow_null=True, required=False)
     discount_percent = serializers.IntegerField(allow_null=True, required=False)
+    offer_kind = serializers.ChoiceField(
+        choices=OfferKind.choices, allow_null=True, required=False
+    )
     stock = serializers.IntegerField(required=False)
     likes_count = serializers.IntegerField(required=False)
     view_count = serializers.IntegerField(required=False)

@@ -185,6 +185,13 @@ def fanout_anonymize_old_search_queries():
 
 
 @celery_app.task(base=TenantTask)
+def fanout_reindex_offer_window_changes():
+    return run_for_all_tenants(
+        "promotion.tasks.reindex_offer_window_changes_task"
+    )
+
+
+@celery_app.task(base=TenantTask)
 def fanout_update_click_scores():
     return run_for_all_tenants("search.tasks.update_click_scores")
 

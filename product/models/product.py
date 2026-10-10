@@ -336,6 +336,23 @@ class Product(
         return Money(_quantize_cents(value), settings.DEFAULT_CURRENCY)
 
     @property
+    def offer_kind(self) -> str | None:
+        """Why the product is on offer (``OfferKind``), or ``None``.
+
+        Reads the ``with_offer_kind()`` annotation when the queryset
+        carried it; a bare instance resolves itself with one query.
+        """
+        if "offer_kind_annotation" in self.__dict__:
+            return self.offer_kind_annotation
+        return (
+            type(self)
+            .objects.filter(pk=self.pk)
+            .with_offer_kind()
+            .values_list("offer_kind_annotation", flat=True)
+            .first()
+        )
+
+    @property
     def price_save_percent(self) -> Decimal:
         if self.price.amount > 0:
             return Decimal(
@@ -478,6 +495,8 @@ class ProductTranslation(
         """Return optimized queryset for bulk indexing."""
         from django.db.models import Count
 
+        from promotion.offers import offer_kind_expression
+
         return (
             cls.objects.select_related(
                 "master", "master__category", "master__vat"
@@ -490,6 +509,7 @@ class ProductTranslation(
                 _likes_count=Count("master__favourited_by", distinct=True),
                 _review_average=Avg("master__reviews__rate"),
                 _reviews_count=Count("master__reviews", distinct=True),
+                _offer_kind=offer_kind_expression("master__"),
             )
         )
 
@@ -510,6 +530,7 @@ class ProductTranslation(
         master_qs = (
             Product.objects.with_category()
             .with_counts()
+            .with_offer_kind()
             .with_main_image()
             .select_related("brand")
             .prefetch_related("category__translations")
@@ -543,6 +564,7 @@ class ProductTranslation(
             "stock",
             "in_stock",
             "discount_percent",
+            "on_offer",
             "brand",
             "active",
             "is_deleted",
@@ -666,6 +688,7 @@ class ProductTranslation(
             "view_count": lambda obj: obj.master.view_count,
             "final_price": lambda obj: float(obj.master.final_price.amount),
             "discount_percent": lambda obj: float(obj.master.discount_percent),
+            "on_offer": lambda obj: obj.indexed_offer_kind() is not None,
             "created_at": lambda obj: (
                 obj.master.created_at.isoformat()
                 if obj.master.created_at
@@ -697,6 +720,17 @@ class ProductTranslation(
             ),
             **cls._attribute_meili_fields(),
         }
+
+    def indexed_offer_kind(self) -> str | None:
+        """``offer_kind`` from the bulk queryset's annotation, else resolved.
+
+        ``get_meilisearch_queryset`` annotates ``_offer_kind`` so a full
+        reindex costs no query per document; the single-document task
+        loads a bare row and resolves it with one.
+        """
+        if "_offer_kind" in self.__dict__:
+            return self.__dict__["_offer_kind"]
+        return self.master.offer_kind
 
     @staticmethod
     def _attribute_meili_fields():

@@ -16,6 +16,7 @@ from product.models.brand import Brand
 from product.models.category import ProductCategory
 from product.models.product import Product
 from product.serializers.product_attribute import ProductAttributeSerializer
+from promotion.enum import OfferKind
 from vat.models import Vat
 
 
@@ -50,6 +51,20 @@ class ProductSerializer(
     attributes = ProductAttributeSerializer(
         source="product_attributes", many=True, read_only=True
     )
+    # Reads the ``with_offer_kind()`` annotation and nothing else: a
+    # product nested in a cart, order or favourite line comes from a
+    # queryset without it, and resolving it per row would add a query to
+    # every line of surfaces that show no offer badge. Those payloads
+    # carry ``null``; the catalogue list and detail annotate.
+    # ``required=False``, NOT ``read_only=True``: drf-spectacular marks
+    # every read-only field as always present, and a storefront that
+    # deploys before the API would then reject the old payload.
+    offer_kind = serializers.ChoiceField(
+        source="offer_kind_annotation",
+        choices=OfferKind.choices,
+        allow_null=True,
+        required=False,
+    )
 
     class Meta:
         model = Product
@@ -82,6 +97,7 @@ class ProductSerializer(
             "updated_at",
             "uuid",
             "attributes",
+            "offer_kind",
         )
 
         read_only_fields = (

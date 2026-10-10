@@ -631,3 +631,35 @@ class TestManagementCommandsExecution:
                 ["words", "typo", "proximity", "attribute", "sort", "exactness"]
             )
             mock_index_obj.update_settings.assert_not_called()
+
+
+@pytest.mark.django_db
+class TestProductSearchOnOfferFilter:
+    """``onOffer`` matches the indexed ``on_offer`` flag, which covers
+    markdowns AND live promotions — not ``discount_percent`` alone."""
+
+    def _filters(self, api_client, **params) -> list[str]:
+        index = Mock()
+        index.search.return_value = {
+            "hits": [],
+            "estimatedTotalHits": 0,
+            "processingTimeMs": 1,
+        }
+        with patch("meili._client.client.get_search_index", return_value=index):
+            response = api_client.get(
+                "/api/v1/search/product",
+                {"query": "", "language_code": "el", **params},
+            )
+        assert response.status_code == status.HTTP_200_OK
+        return index.search.call_args.args[1]["filter"]
+
+    def test_on_offer_filters_the_indexed_flag(self, api_client):
+        filters = self._filters(api_client, on_offer="true")
+
+        assert "on_offer = True" in filters
+        assert not any("discount_percent" in f for f in filters)
+
+    def test_without_the_flag_nothing_is_filtered_on_offer(self, api_client):
+        filters = self._filters(api_client)
+
+        assert not any("on_offer" in f for f in filters)

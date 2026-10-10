@@ -71,3 +71,16 @@ class ProductPromotionRelation(models.TextChoices):
     REWARD = "REWARD", _("This product is the reward")
     CATEGORY = "CATEGORY", _("Targets this product's category")
     ORDER = "ORDER", _("Applies to the whole order")
+
+
+class OfferKind(models.TextChoices):
+    """Why a product counts as "on offer" in the catalogue.
+
+    A product-level markdown wins over a promotion: the storefront
+    shows the concrete "-20%" it can compute from ``discount_percent``
+    and falls back to a generic offer badge only when a promotion is the
+    sole reason. "Not on offer" is ``None``, never a member.
+    """
+
+    MARKDOWN = "MARKDOWN", _("Product markdown")
+    PROMOTION = "PROMOTION", _("Live promotion")

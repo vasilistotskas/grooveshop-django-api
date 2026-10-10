@@ -163,6 +163,16 @@ class ProductQuerySet(
             )
         )
 
+    def with_offer_kind(self) -> Self:
+        """Annotate ``offer_kind_annotation``: MARKDOWN, PROMOTION or NULL.
+
+        Opt-in rather than part of ``for_list()``: only the surfaces that
+        render the offer badge pay for the promotion subquery.
+        """
+        from promotion.offers import offer_kind_expression
+
+        return self.annotate(offer_kind_annotation=offer_kind_expression())
+
     def with_counts(self) -> Self:
         """Annotate with all count fields for efficient property access."""
         return (

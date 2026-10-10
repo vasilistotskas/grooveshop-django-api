@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from django.test import TestCase
 
@@ -239,7 +240,14 @@ class TestBlogDataset(TestCase):
         for row in demo_blog.POSTS:
             for body in (row.body_el, row.body_en):
                 for href in re.findall(r'href="([^"]*)"', body):
-                    assert href.startswith("/"), (row.slug, href)
+                    parts = urlsplit(href)
+                    # ``//host/path`` starts with a slash and leaves the
+                    # store: only an empty scheme AND netloc stays on it.
+                    assert not parts.scheme and not parts.netloc, (
+                        row.slug,
+                        href,
+                    )
+                    assert parts.path.startswith("/"), (row.slug, href)
 
     def test_both_locales_say_the_same_structure(self):
         """The English body has the same blocks as the Greek one."""

@@ -16,7 +16,7 @@ for everything except the two seed functions at the end.
 from __future__ import annotations
 
 import json
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from io import StringIO
 from pathlib import Path
 from types import SimpleNamespace
@@ -32,6 +32,7 @@ from devtools.demo_catalogue import (
     NEW_ARRIVAL_DAYS,
     SPEC_OVERRIDES,
     arrival_days_ago,
+    arrival_hour,
     specs_for,
     view_count,
 )
@@ -723,12 +724,30 @@ class TestReviewPlan(TestCase):
             held_by = orders.get((review.reviewer, review.product))
             assert held_by, review
             (order,) = held_by
-            assert order.days_ago <= arrival_days_ago(review.product)
+            anchor = datetime(2026, 1, 1, tzinfo=UTC)
+            arrived = (
+                anchor
+                - timedelta(days=arrival_days_ago(review.product))
+                + timedelta(hours=arrival_hour(review.product))
+            )
+            ordered = demo_reviews._stamp(anchor, order.days_ago, order.key)
+            assert ordered > arrived, (review.product, ordered, arrived)
             assert (
                 review.days_ago
                 <= order.days_ago - demo_reviews.ORDER_TO_REVIEW_DAYS
             )
             assert review.days_ago >= 1
+
+    def test_a_strong_product_has_no_review_below_three_stars(self):
+        """Three stars is a rate of 6; the tier is defined by that floor."""
+        strong = [
+            slug
+            for slug in self.by_product
+            if demo_reviews.quality_tier(slug) == "strong"
+        ]
+        assert strong, "no product lands in the strong tier"
+        for slug in strong:
+            assert min(r.rate for r in self.by_product[slug]) >= 6, slug
 
     def test_order_keys_are_unique_and_follow_the_content(self):
         keys = [order.key for order in self.plan.orders]

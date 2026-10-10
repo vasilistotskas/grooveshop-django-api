@@ -129,9 +129,11 @@ RATES = tuple(range(1, 11))
 
 #: Weights over ``RATES`` (a rate of 1 .. 10), per quality tier. Every
 #: tier leans positive; the "mixed" one is the product people argue
-#: about, and the "strong" one has no review below three stars.
+#: about, and the "strong" one has no review below three stars (a rate
+#: of 6), which ``test_a_strong_product_has_no_review_below_three_stars``
+#: pins.
 RATE_WEIGHTS: dict[str, tuple[int, ...]] = {
-    "strong": (0, 1, 1, 1, 2, 4, 7, 16, 22, 46),
+    "strong": (0, 0, 0, 0, 0, 3, 7, 16, 22, 52),
     "typical": (1, 3, 2, 3, 4, 6, 9, 20, 18, 34),
     "mixed": (2, 4, 3, 6, 7, 10, 14, 20, 14, 20),
 }
@@ -567,7 +569,10 @@ def build_plan(
         while position < len(wanted):
             chunk = wanted[position : position + rng.choice(ORDER_SIZES)]
             position += len(chunk)
-            ceiling = min(arrivals[chunk[0][0]], OLDEST_ORDER_DAYS)
+            # Strictly after the arrival DAY: the order's hour and the
+            # product's hour of arrival are both drawn from the clock of
+            # that day, so the same day could put the order first.
+            ceiling = min(arrivals[chunk[0][0]] - 1, OLDEST_ORDER_DAYS)
             order_days = rng.randint(ORDER_TO_REVIEW_DAYS + 1, ceiling)
             orders.append(
                 PlannedOrder(

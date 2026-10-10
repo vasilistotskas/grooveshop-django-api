@@ -49,7 +49,7 @@ class OrderHistory(TranslatableModel, TimeStampMixinModel, UUIDModel):
     change_type = models.CharField(
         _("Change Type"),
         max_length=20,
-        choices=OrderHistoryChangeType,
+        choices=OrderHistoryChangeType.choices,
     )
     previous_value = models.JSONField(
         _("Previous Value"),
@@ -261,7 +261,7 @@ class OrderItemHistory(TranslatableModel, TimeStampMixinModel, UUIDModel):
     change_type = models.CharField(
         _("Change Type"),
         max_length=20,
-        choices=OrderItemHistoryChangeType,
+        choices=OrderItemHistoryChangeType.choices,
     )
     previous_value = models.JSONField(
         _("Previous Value"),

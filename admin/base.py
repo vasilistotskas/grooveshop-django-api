@@ -236,11 +236,7 @@ class BaseTranslatableAdmin(TranslatableAdmin, BaseModelAdmin):
     """
 
 
-# Suppression is a stubs artefact, not a real override conflict: the two
-# bases declare the method with signatures that django-stubs types
-# differently, and ty reports the pair rather than a mismatch in the code
-# written here.
-class BaseTranslatableTabularInline(  # ty: ignore[invalid-method-override]
+class BaseTranslatableTabularInline(
     BaseInlineMixin, FormFieldModelAdminMixin, TranslatableTabularInline
 ):
     """Unfold-styled tabular inline for parler-translated child rows.

@@ -31,7 +31,7 @@ class BusinessProfile(TimeStampMixinModel, UUIDModel):
     status = models.CharField(
         _("Status"),
         max_length=10,
-        choices=BusinessProfileStatus,
+        choices=BusinessProfileStatus.choices,
         default=BusinessProfileStatus.PENDING,
     )
     customer_group = models.ForeignKey(
@@ -70,7 +70,7 @@ class BusinessProfile(TimeStampMixinModel, UUIDModel):
     vies_status = models.CharField(
         _("VIES status"),
         max_length=12,
-        choices=ViesStatus,
+        choices=ViesStatus.choices,
         default=ViesStatus.UNCHECKED,
     )
     vies_checked_at = models.DateTimeField(

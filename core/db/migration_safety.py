@@ -32,7 +32,7 @@ without blocking. See ``docs/migrations.md``.
 from __future__ import annotations
 
 import re
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 
 from django.db import models
@@ -256,7 +256,7 @@ def _run_sql(
         return []
     if not any(app == migration.app_label for app, _ in applied):
         return []  # a fresh schema: nothing serves it yet
-    contract_of: Iterable[MigrationKey] = getattr(migration, "contract_of", ())
+    contract_of: Sequence[MigrationKey] = getattr(migration, "contract_of", ())
     if not contract_of:
         return [
             (

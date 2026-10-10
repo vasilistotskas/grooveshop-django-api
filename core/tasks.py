@@ -858,7 +858,7 @@ def backup_database_task(
             ]
 
             if backup_files:
-                backup_file = max(backup_files, key=lambda f: f.stat().st_ctime)
+                backup_file = max(backup_files, key=lambda f: f.stat().st_mtime)
                 file_size = backup_file.stat().st_size
 
         success_message = (

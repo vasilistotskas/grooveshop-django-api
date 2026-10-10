@@ -183,6 +183,12 @@ class ProductImageWriteSerializer(
             "translations",
         )
         read_only_fields = ("sort_order",)
+        # DRF >= 3.18.2 turns the conditional ``unique_main_product_image``
+        # constraint into a validator that rejects a second ``is_main`` image.
+        # The contract here is promotion, not rejection: ``ProductImage.save``
+        # demotes the previous main image, and the constraint stays as the
+        # database-level safety net.
+        validators = []
 
     def validate_image(self, value: ImageFieldFile) -> ImageFieldFile:
         from PIL import Image as PILImage

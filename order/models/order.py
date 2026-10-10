@@ -128,14 +128,14 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
     floor = models.CharField(
         _("Floor"),
         max_length=50,
-        choices=FloorChoicesEnum,
+        choices=FloorChoicesEnum.choices,
         blank=True,
         default="",
     )
     location_type = models.CharField(
         _("Location Type"),
         max_length=100,
-        choices=LocationChoicesEnum,
+        choices=LocationChoicesEnum.choices,
         blank=True,
         default="",
     )
@@ -154,7 +154,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
     status = models.CharField(
         _("Status"),
         max_length=20,
-        choices=OrderStatus,
+        choices=OrderStatus.choices,
         default=OrderStatus.PENDING,
     )
     shipping_price = MoneyField(
@@ -172,7 +172,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
     document_type = models.CharField(
         _("Document Type"),
         max_length=100,
-        choices=OrderDocumentTypeEnum,
+        choices=OrderDocumentTypeEnum.choices,
         default=OrderDocumentTypeEnum.RECEIPT,
     )
     paid_amount = MoneyField(
@@ -225,7 +225,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         _("Payment Status"),
         max_length=50,
         blank=True,
-        choices=PaymentStatus,
+        choices=PaymentStatus.choices,
         default=PaymentStatus.PENDING,
     )
     # The gateway that took the charge; ``pay_way`` is the method the
@@ -238,7 +238,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         max_length=50,
         blank=True,
         default="",
-        choices=PayWayEnum,
+        choices=PayWayEnum.choices,
         help_text=_(
             "Snapshot of which payment method the shopper chose, as the "
             "``PayWayEnum`` key. Distinct from ``payment_method``, which "

@@ -21,7 +21,7 @@ class Promotion(TranslatableModel, TimeStampMixinModel, UUIDModel):
     trigger = models.CharField(
         _("Trigger"),
         max_length=10,
-        choices=PromotionTrigger,
+        choices=PromotionTrigger.choices,
         default=PromotionTrigger.CODE,
         help_text=_(
             "Automatic promotions apply to every eligible cart; "
@@ -31,7 +31,7 @@ class Promotion(TranslatableModel, TimeStampMixinModel, UUIDModel):
     benefit_type = models.CharField(
         _("Benefit Type"),
         max_length=20,
-        choices=BenefitType,
+        choices=BenefitType.choices,
         default=BenefitType.PERCENTAGE,
     )
     benefit_value = models.DecimalField(
@@ -47,7 +47,7 @@ class Promotion(TranslatableModel, TimeStampMixinModel, UUIDModel):
     target_scope = models.CharField(
         _("Target Scope"),
         max_length=10,
-        choices=TargetScope,
+        choices=TargetScope.choices,
         default=TargetScope.ORDER,
     )
     products = models.ManyToManyField(

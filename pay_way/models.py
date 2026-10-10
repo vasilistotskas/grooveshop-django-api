@@ -50,7 +50,7 @@ class PayWay(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
     settlement = models.CharField(
         _("Settlement"),
         max_length=32,
-        choices=PaySettlement,
+        choices=PaySettlement.choices,
         default=PaySettlement.ONLINE,
         help_text=_(
             "How the money changes hands. This is the authoritative "
@@ -93,7 +93,7 @@ class PayWay(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         # forms and the write serializer require one.
         default="",
         db_default="",
-        choices=PayWayEnum,
+        choices=PayWayEnum.choices,
         help_text=_(
             "Language-independent identifier of the payment method. The "
             "storefront resolves its label from this key, so it never "

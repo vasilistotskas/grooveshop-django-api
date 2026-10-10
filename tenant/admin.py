@@ -608,14 +608,14 @@ class TenantAdmin(BaseModelAdmin):
             return True
         return request.user.has_perm("tenant.change_tenant")
 
-    def get_actions(self, request):
+    def get_actions(self, request, *args, **kwargs):
         """Drop delete_selected, and platform lifecycle for merchants.
 
         Suspend/activate/destroy are the platform's levers; leaving them
         exposed would let a merchant suspend — or destroy — their own
         store from the store admin.
         """
-        actions = super().get_actions(request)
+        actions = super().get_actions(request, *args, **kwargs)
         actions.pop("delete_selected", None)
         if self_service_tenant(request) is not None:
             for name in (
@@ -1114,16 +1114,15 @@ class UserTenantMembershipAdmin(BaseModelAdmin):
         default field already resolves correctly.
         """
         if db_field.name == "user":
-            from django.contrib.auth import get_user_model
+            from user.models.account import UserAccount
 
-            user_model = get_user_model()
             with _public_schema_context():
                 public_user_ids = list(
-                    user_model.objects.order_by(
-                        user_model.USERNAME_FIELD
+                    UserAccount.objects.order_by(
+                        UserAccount.USERNAME_FIELD
                     ).values_list("pk", flat=True)
                 )
-            kwargs["queryset"] = user_model.objects.filter(
+            kwargs["queryset"] = UserAccount.objects.filter(
                 pk__in=public_user_ids
             )
             if self_service_tenant(request) is not None:

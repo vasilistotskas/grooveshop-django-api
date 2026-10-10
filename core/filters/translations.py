@@ -28,19 +28,19 @@ honest negation is "no translation matches", which is ``~`` on the
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from django.db.models import Exists, OuterRef, Q, Subquery
 from django.db.models.functions import Coalesce
 
 if TYPE_CHECKING:
-    from django.db.models import Model
+    from parler.models import TranslatableModel
 
 __all__ = ["any_translation", "translated_value"]
 
 
 def any_translation(
-    model: type[Model],
+    model: type[TranslatableModel],
     field: str,
     *conditions: Q,
     annotate: dict | None = None,
@@ -71,7 +71,7 @@ def any_translation(
 
 
 def translated_value(
-    model: type[Model],
+    model: type[TranslatableModel],
     path: str,
     language: str,
     fallback_language: str,
@@ -91,7 +91,9 @@ def translated_value(
     prefix, _, field = path.rpartition("translations__")
     owner = model
     for part in filter(None, prefix.split("__")):
-        owner = owner._meta.get_field(part).related_model
+        owner = cast(
+            "type[TranslatableModel]", owner._meta.get_field(part).related_model
+        )
     translations = owner._parler_meta.get_model_by_field(field)
 
     def in_language(code: str) -> Subquery:

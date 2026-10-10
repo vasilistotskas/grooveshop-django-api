@@ -19,9 +19,12 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import NamedTuple
+from typing import TYPE_CHECKING, NamedTuple
 
 from tenant.models import TenantPlan
+
+if TYPE_CHECKING:
+    from django_stubs_ext import StrOrPromise
 
 # Rank, not equality: ``min_plan`` means "this plan or any above it".
 _PLAN_RANK: dict[str, int] = {
@@ -90,7 +93,7 @@ class RecommendationStrategy(ABC):
     """
 
     code: str = ""
-    label: str = ""
+    label: StrOrPromise = ""
     min_plan: str = TenantPlan.TRIAL
     # Whether Celery precomputes this strategy's candidates into
     # ``RecommendationCandidate`` (True) or the engine calls

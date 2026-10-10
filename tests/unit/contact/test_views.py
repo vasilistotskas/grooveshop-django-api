@@ -108,6 +108,6 @@ class TestContactViewsIntegration(TestCase):
     def test_view_attributes(self):
         view = views.ContactCreateView()
 
-        assert view.queryset.model == Contact
+        assert view.get_queryset().model == Contact
 
         assert view.serializer_class == ContactWriteSerializer

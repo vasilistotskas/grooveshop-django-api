@@ -101,5 +101,5 @@ class TestFeedbackViewsIntegration(TestCase):
     def test_view_attributes(self):
         view = views.FeedbackCreateView()
 
-        assert view.queryset.model == Feedback
+        assert view.get_queryset().model == Feedback
         assert view.serializer_class == FeedbackWriteSerializer

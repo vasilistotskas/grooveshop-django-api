@@ -280,7 +280,7 @@ class Invoice(TimeStampMixinModel, UUIDModel):
     mydata_status = models.CharField(
         _("myDATA Status"),
         max_length=20,
-        choices=MyDataStatus,
+        choices=MyDataStatus.choices,
         default=MyDataStatus.NOT_SENT,
         help_text=_(
             "Lifecycle state of the invoice's AADE myDATA submission. "

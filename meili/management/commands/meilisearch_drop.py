@@ -117,7 +117,7 @@ class Command(TenantCommandMixin, BaseCommand):
 
         for app_config in apps.get_app_configs():
             for model in app_config.get_models():
-                if IndexMixin in model.__mro__:
+                if issubclass(model, IndexMixin):
                     try:
                         index_name = model.get_meili_index_name()
                         primary_key = model._meilisearch["primary_key"]

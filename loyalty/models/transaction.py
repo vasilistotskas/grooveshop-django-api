@@ -26,7 +26,7 @@ class PointsTransaction(TimeStampMixinModel, UUIDModel):
     transaction_type = models.CharField(
         _("Transaction Type"),
         max_length=10,
-        choices=TransactionType,
+        choices=TransactionType.choices,
     )
     reference_order = models.ForeignKey(
         "order.Order",

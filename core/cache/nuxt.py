@@ -75,7 +75,10 @@ def request_purge(
         logger.warning(msg)
         return NuxtPurgeResult(matched=0, deleted=0, blocked=0, error=msg)
 
-    payload: dict[str, object] = {"patterns": patterns, "dryRun": dry_run}
+    payload: dict[str, list[str] | bool | str] = {
+        "patterns": patterns,
+        "dryRun": dry_run,
+    }
     host = _current_tenant_host()
     if host:
         payload["host"] = host

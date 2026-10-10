@@ -27,11 +27,11 @@ class ProductReview(
         on_delete=models.CASCADE,
         verbose_name=_("User"),
     )
-    rate = models.PositiveSmallIntegerField(_("Rate"), choices=RateEnum)
+    rate = models.PositiveSmallIntegerField(_("Rate"), choices=RateEnum.choices)
     status = models.CharField(
         _("Status"),
         max_length=250,
-        choices=ReviewStatus,
+        choices=ReviewStatus.choices,
         default=ReviewStatus.NEW,
     )
     translations = TranslatedFields(

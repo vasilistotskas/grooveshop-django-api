@@ -15,7 +15,7 @@ from django.db.models import Case, When
 from meili._client import client
 
 if TYPE_CHECKING:
-    from django.db.models import Model
+    from meili.models import IndexMixin
 
 
 class Radius(NamedTuple):
@@ -74,7 +74,7 @@ class QueryState:
     locales: list[str] = field(default_factory=list)
 
 
-class IndexQuerySet[T: Model]:
+class IndexQuerySet[T: IndexMixin]:
     """
     QuerySet-like interface for Meilisearch queries.
 

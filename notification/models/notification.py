@@ -39,26 +39,26 @@ class Notification(TranslatableModel, TimeStampMixinModel, UUIDModel):
     kind = models.CharField(
         _("Kind"),
         max_length=250,
-        choices=NotificationKindEnum,
+        choices=NotificationKindEnum.choices,
         default=NotificationKindEnum.INFO,
     )
     category = models.CharField(
         _("Category"),
         max_length=50,
-        choices=NotificationCategoryEnum,
+        choices=NotificationCategoryEnum.choices,
         default=NotificationCategoryEnum.SYSTEM,
     )
     priority = models.CharField(
         _("Priority"),
         max_length=20,
-        choices=NotificationPriorityEnum,
+        choices=NotificationPriorityEnum.choices,
         default=NotificationPriorityEnum.NORMAL,
     )
     notification_type = models.CharField(
         _("Notification Type"),
         max_length=100,
         blank=True,
-        choices=NotificationTypeEnum,
+        choices=NotificationTypeEnum.choices,
         help_text=_(
             "Fine-grained event identifier. See "
             "``notification.enum.NotificationTypeEnum`` for the full "

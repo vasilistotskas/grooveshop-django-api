@@ -61,7 +61,7 @@ class SubscriptionTopic(TranslatableModel, TimeStampMixinModel, UUIDModel):
     category = models.CharField(
         _("Category"),
         max_length=20,
-        choices=TopicCategory,
+        choices=TopicCategory.choices,
         default=TopicCategory.OTHER,
         help_text=_("Category of the subscription topic"),
     )
@@ -197,13 +197,13 @@ class UserSubscription(TimeStampMixinModel, UUIDModel):
     status = models.CharField(
         _("Status"),
         max_length=20,
-        choices=SubscriptionStatus,
+        choices=SubscriptionStatus.choices,
         default=SubscriptionStatus.ACTIVE,
     )
     source = models.CharField(
         _("Source"),
         max_length=20,
-        choices=Source,
+        choices=Source.choices,
         default=Source.ACCOUNT,
         help_text=_("Where the subscription was made."),
     )

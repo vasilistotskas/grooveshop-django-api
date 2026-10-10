@@ -66,7 +66,7 @@ class GiftCardPurchase(TimeStampMixinModel, UUIDModel):
     status = models.CharField(
         _("Status"),
         max_length=10,
-        choices=GiftCardPurchaseStatus,
+        choices=GiftCardPurchaseStatus.choices,
         default=GiftCardPurchaseStatus.PENDING,
     )
     provider_code = models.CharField(
@@ -110,7 +110,7 @@ class GiftCard(TimeStampMixinModel, UUIDModel):
     status = models.CharField(
         _("Status"),
         max_length=10,
-        choices=GiftCardStatus,
+        choices=GiftCardStatus.choices,
         default=GiftCardStatus.ACTIVE,
     )
     expires_at = models.DateTimeField(
@@ -125,7 +125,7 @@ class GiftCard(TimeStampMixinModel, UUIDModel):
     source = models.CharField(
         _("Source"),
         max_length=10,
-        choices=GiftCardSource,
+        choices=GiftCardSource.choices,
         default=GiftCardSource.ADMIN,
     )
     issued_to = models.ForeignKey(
@@ -239,7 +239,7 @@ class GiftCardTransaction(TimeStampMixinModel):
     kind = models.CharField(
         _("Kind"),
         max_length=15,
-        choices=GiftCardTransactionKind,
+        choices=GiftCardTransactionKind.choices,
     )
     amount = models.DecimalField(
         _("Amount"),

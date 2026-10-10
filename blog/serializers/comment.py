@@ -8,7 +8,11 @@ from drf_spectacular.utils import extend_schema_field
 from mptt.fields import TreeForeignKey
 from parler_rest.serializers import TranslatableModelSerializer
 from rest_framework import serializers
-from rest_framework.relations import PrimaryKeyRelatedField
+from rest_framework.relations import (
+    ManyRelatedField,
+    PrimaryKeyRelatedField,
+    RelatedField,
+)
 
 from blog.models.comment import BlogComment
 from blog.models.post import BlogPost
@@ -255,7 +259,10 @@ class BlogCommentWriteSerializer(
 ):
     user = PrimaryKeyRelatedField(read_only=True)
     post = PrimaryKeyRelatedField(queryset=BlogPost.objects.all())
-    parent = PrimaryKeyRelatedField(
+    # ``parent`` is also DRF's ``Field.parent`` (the owning serializer), so
+    # the declared field needs its own annotation; the stubs type a related
+    # field's constructor as ``RelatedField | ManyRelatedField``.
+    parent: RelatedField | ManyRelatedField = PrimaryKeyRelatedField(
         queryset=BlogComment.objects.all(), required=False, allow_null=True
     )
     translations = TranslatedFieldsFieldExtend(shared_model=BlogComment)

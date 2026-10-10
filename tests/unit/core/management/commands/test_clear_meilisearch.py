@@ -5,6 +5,7 @@ from django.core.management import call_command
 from django.test import TestCase
 
 from meili.management.commands.meilisearch_drop import Command
+from product.models.product import ProductTranslation
 
 
 class TestClearMeiliSearchCommand(TestCase):
@@ -121,19 +122,11 @@ class TestClearMeiliSearchCommand(TestCase):
         mock_finished_task.status = "succeeded"
         mock_client.wait_for_task.return_value = mock_finished_task
 
-        from meili.models import IndexMixin
-
-        mock_model = MagicMock()
-        mock_model.__mro__ = (IndexMixin, object)
-        mock_model.__name__ = "TestModel"
-        mock_model._meilisearch = {
-            "base_index_name": "test_index",
-            "primary_key": "pk",
-        }
-        mock_model.get_meili_index_name.return_value = "test_index"
+        # A real indexed model: the command filters with ``issubclass``.
+        index_name = ProductTranslation.get_meili_index_name()
 
         mock_app_config = MagicMock()
-        mock_app_config.get_models.return_value = [mock_model]
+        mock_app_config.get_models.return_value = [ProductTranslation]
         mock_apps.get_app_configs.return_value = [mock_app_config]
 
         output = StringIO()
@@ -141,4 +134,4 @@ class TestClearMeiliSearchCommand(TestCase):
 
         output_content = output.getvalue()
         assert "Recreating indexes..." in output_content
-        assert "Recreated index: test_index" in output_content
+        assert f"Recreated index: {index_name}" in output_content

@@ -158,7 +158,7 @@ class ContactAttachment(
     scan_status = models.CharField(
         _("Scan status"),
         max_length=10,
-        choices=ScanStatus,
+        choices=ScanStatus.choices,
         db_default=ScanStatus.PENDING,
         default=ScanStatus.PENDING,
     )

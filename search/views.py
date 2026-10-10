@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from datetime import date, datetime, time, timedelta
+from typing import TYPE_CHECKING
 from urllib.parse import unquote
 from uuid import uuid4
 
@@ -9,7 +10,6 @@ from django.conf import settings as django_settings
 from django.core.cache import caches
 from django.db.models import Avg, Count, Max
 from django.utils import timezone
-from django.utils.functional import Promise
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
@@ -47,6 +47,9 @@ from search.serializers import (
 )
 from tenant.membership import tenant_plan_allows
 from tenant.permissions import IsBlogEnabled
+
+if TYPE_CHECKING:
+    from django_stubs_ext import StrOrPromise
 
 logger = logging.getLogger(__name__)
 
@@ -976,7 +979,7 @@ def search_click(request):
     return Response({"detail": _("Accepted.")}, status=status.HTTP_202_ACCEPTED)
 
 
-def _analytics_day(value: str | None, invalid: str | Promise) -> date | None:
+def _analytics_day(value: str | None, invalid: StrOrPromise) -> date | None:
     """Parse an analytics ``YYYY-MM-DD`` bound; ``None`` when absent."""
     if not value:
         return None

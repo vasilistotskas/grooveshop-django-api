@@ -9,6 +9,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Model
 from faker import Faker
+from parler.models import TranslatableModel
 
 logger = logging.getLogger(__name__)
 
@@ -104,7 +105,7 @@ class TranslationUtilities:
         instance: Model, model_class: type[Model]
     ) -> bool:
         """Validate that all required translations exist for an instance"""
-        if not hasattr(model_class, "_parler_meta"):
+        if not issubclass(model_class, TranslatableModel):
             return True
 
         available_languages = TranslationUtilities.get_available_languages()
@@ -136,7 +137,7 @@ class TranslationUtilities:
         """Ensure all required translations exist for an instance"""
         model_class = instance.__class__
 
-        if not hasattr(model_class, "_parler_meta"):
+        if not issubclass(model_class, TranslatableModel):
             return
 
         available_languages = cls.get_available_languages()

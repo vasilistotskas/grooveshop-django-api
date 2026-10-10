@@ -47,14 +47,14 @@ class UserAddress(TimeStampMixinModel, UUIDModel):
     floor = models.CharField(
         _("Floor"),
         max_length=50,
-        choices=FloorChoicesEnum,
+        choices=FloorChoicesEnum.choices,
         blank=True,
         default="",
     )
     location_type = models.CharField(
         _("Location Type"),
         max_length=100,
-        choices=LocationChoicesEnum,
+        choices=LocationChoicesEnum.choices,
         blank=True,
         default="",
     )

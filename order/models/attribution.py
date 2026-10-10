@@ -39,7 +39,7 @@ class OrderAttribution(TimeStampMixinModel):
     source_type = models.CharField(
         _("Source type"),
         max_length=16,
-        choices=OrderSourceType,
+        choices=OrderSourceType.choices,
         default=OrderSourceType.DIRECT,
     )
     source = models.CharField(

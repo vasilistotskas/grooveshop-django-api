@@ -89,7 +89,7 @@ class GenerateCodesForm(BaseDialogForm):
         initial=100,
         widget=UnfoldAdminIntegerFieldWidget,
     )
-    prefix = forms.CharField(
+    prefix: forms.CharField = forms.CharField(
         label=_("Prefix"),
         max_length=12,
         required=False,

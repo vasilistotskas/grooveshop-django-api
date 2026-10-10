@@ -112,7 +112,7 @@ class BoxNowWebhookEnvelopeSerializer(serializers.Serializer):
     type = serializers.CharField(
         help_text=_("Event type (expected: 'gr.boxnow.parcel_event_change')"),
     )
-    source = serializers.URLField(
+    source: serializers.URLField = serializers.URLField(
         help_text=_("Origin URL of the event source"),
     )
     subject = serializers.CharField(

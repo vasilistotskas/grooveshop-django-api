@@ -1047,11 +1047,13 @@ class AcsService:
 
         # --- Phase 1: collect candidates, no lock ---
         candidate_rows = list(
-            AcsShipment.objects.filter(
+            AcsShipment.objects.real()
+            .filter(
                 voucher_no__isnull=False,
                 pickup_list__isnull=True,
                 shipment_state=AcsShipmentState.NEW,
-            ).values_list(
+            )
+            .values_list(
                 "id",
                 "voucher_no",
                 "label_printed_at",

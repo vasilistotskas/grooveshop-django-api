@@ -18,6 +18,7 @@ Two rules run through it:
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass, field
 
 # ── categories ───────────────────────────────────────────────────────
@@ -32,6 +33,10 @@ class CategoryRow:
     description_el: str
     description_en: str
     image: str
+    #: A wide image for the category page's header. Only the
+    #: subcategories added with the richer demo data carry one; every
+    #: key is an asset that is already committed.
+    banner: str | None = None
 
 
 # The board's four roots, in its order, each followed by its children —
@@ -92,6 +97,26 @@ CATEGORIES: tuple[CategoryRow, ...] = (
         "category-audio",
     ),
     CategoryRow(
+        "demo-earbuds",
+        "demo-audio",
+        "Ακουστικά",
+        "Earbuds",
+        "Ασύρματα ακουστικά για μετακίνηση, προπόνηση και δουλειά.",
+        "Wireless earbuds for the commute, the gym and the desk.",
+        "earbuds-cases",
+        banner="hero-audio",
+    ),
+    CategoryRow(
+        "demo-speakers",
+        "demo-audio",
+        "Ηχεία",
+        "Speakers",
+        "Φορητά ηχεία και ηχεία γραφείου, από τη τσέπη ως το μπαλκόνι.",
+        "Portable and desk speakers, from a pocket to a balcony.",
+        "speaker-silver",
+        banner="category-audio",
+    ),
+    CategoryRow(
         "demo-protection",
         None,
         "Προστασία",
@@ -126,6 +151,26 @@ CATEGORIES: tuple[CategoryRow, ...] = (
         "Βάσεις γραφείου και αυτοκινήτου που δεν κουνιούνται.",
         "Desk and car mounts that stay put.",
         "category-mounts-stands",
+    ),
+    CategoryRow(
+        "demo-car-mounts",
+        "demo-mounts-stands",
+        "Βάσεις Αυτοκινήτου",
+        "Car Mounts",
+        "Βάσεις αεραγωγού και μαγνητικές, με ή χωρίς φόρτιση.",
+        "Vent and magnetic mounts, with or without charging.",
+        "mount-car-vent",
+        banner="category-mounts-stands",
+    ),
+    CategoryRow(
+        "demo-desk-stands",
+        "demo-mounts-stands",
+        "Βάσεις Γραφείου",
+        "Desk Stands",
+        "Βάσεις, τρίποδα και οργάνωση για ένα γραφείο που δεν μπλέκεται.",
+        "Stands, tripods and cable order for a desk that stays untangled.",
+        "stand-aluminium",
+        banner="category-mounts-stands",
     ),
 )
 
@@ -375,6 +420,22 @@ PRODUCTS: tuple[ProductRow, ...] = (
         attributes={"Χρώμα": ("Λευκό", "White"), "Ισχύς": ("65 W", "65 W")},
     ),
     _p(
+        "demo-charger-gan-100w",
+        "demo-wall-chargers",
+        "Voltra",
+        "Φορτιστής GaN 100W Τεσσάρων Θυρών",
+        "100W GaN Four-Port Charger",
+        "59.90",
+        "0",
+        45,
+        240,
+        ("charger-gan-67w", "charger-gan-multi", "charger-wall-grey"),
+        "Laptop στα 100W και τρεις συσκευές ακόμα, από μία πρίζα του γραφείου.",
+        "A laptop at 100W and three more devices, from one desk socket.",
+        variant_group="charger-gan",
+        attributes={"Χρώμα": ("Λευκό", "White"), "Ισχύς": ("100 W", "100 W")},
+    ),
+    _p(
         "demo-charger-travel",
         "demo-wall-chargers",
         "Voltra",
@@ -418,7 +479,7 @@ PRODUCTS: tuple[ProductRow, ...] = (
         ("powerbank-white", "powerbank-silver", "powerbank-blue-slim"),
         "Δύο πλήρεις φορτίσεις κινητού, σε βάρος που δεν το προσέχεις στην τσάντα.",
         "Two full phone charges, at a weight you stop noticing in a bag.",
-        variant_group="powerbank-10k",
+        variant_group="powerbank-voltra",
         attributes={
             "Χρώμα": ("Λευκό", "White"),
             "Χωρητικότητα": ("10.000 mAh", "10,000 mAh"),
@@ -437,7 +498,7 @@ PRODUCTS: tuple[ProductRow, ...] = (
         ("powerbank-black", "powerbank-silver"),
         "Ίδια χωρητικότητα, σε μαύρο ματ που δεν κρατάει δαχτυλιές.",
         "The same capacity in a matte black that does not hold fingerprints.",
-        variant_group="powerbank-10k",
+        variant_group="powerbank-voltra",
         attributes={
             "Χρώμα": ("Μαύρο", "Black"),
             "Χωρητικότητα": ("10.000 mAh", "10,000 mAh"),
@@ -447,8 +508,8 @@ PRODUCTS: tuple[ProductRow, ...] = (
         "demo-powerbank-20k",
         "demo-power-banks",
         "Voltra",
-        "Powerbank 20.000mAh 22.5W",
-        "20,000mAh Power Bank 22.5W",
+        "Powerbank 20.000mAh 22.5W Ασημί",
+        "20,000mAh Power Bank 22.5W Silver",
         "39.90",
         "20",
         70,
@@ -456,6 +517,7 @@ PRODUCTS: tuple[ProductRow, ...] = (
         ("powerbank-silver", "powerbank-black", "powerbank-white"),
         "Για σαββατοκύριακο εκτός πρίζας: τέσσερις φορτίσεις και γρήγορη έξοδος 22.5W.",
         "For a weekend away from a socket: four charges and a 22.5W fast output.",
+        variant_group="powerbank-voltra",
         attributes={
             "Χρώμα": ("Ασημί", "Silver"),
             "Χωρητικότητα": ("20.000 mAh", "20,000 mAh"),
@@ -510,10 +572,124 @@ PRODUCTS: tuple[ProductRow, ...] = (
         ("powerbank-red", "powerbank-black"),
         "Το ίδιο powerbank σε κόκκινο, με ένδειξη φόρτισης σε τέσσερις λυχνίες.",
         "The same power bank in red, with a four-light charge gauge.",
-        variant_group="powerbank-10k",
+        variant_group="powerbank-voltra",
         attributes={
             "Χρώμα": ("Κόκκινο", "Red"),
             "Χωρητικότητα": ("10.000 mAh", "10,000 mAh"),
+        },
+    ),
+    _p(
+        "demo-powerbank-10k-silver",
+        "demo-power-banks",
+        "Voltra",
+        "Powerbank 10.000mAh Ασημί",
+        "10,000mAh Power Bank Silver",
+        "24.90",
+        "0",
+        90,
+        210,
+        ("powerbank-silver", "powerbank-white"),
+        "Ίδια χωρητικότητα, σε ασημί αλουμινίου που ταιριάζει με το laptop.",
+        "The same capacity in brushed silver, to match the laptop.",
+        variant_group="powerbank-voltra",
+        attributes={
+            "Χρώμα": ("Ασημί", "Silver"),
+            "Χωρητικότητα": ("10.000 mAh", "10,000 mAh"),
+        },
+    ),
+    _p(
+        "demo-powerbank-20k-black",
+        "demo-power-banks",
+        "Voltra",
+        "Powerbank 20.000mAh 22.5W Μαύρο",
+        "20,000mAh Power Bank 22.5W Black",
+        "39.90",
+        "0",
+        80,
+        420,
+        ("powerbank-black", "powerbank-silver"),
+        "Τα ίδια τέσσερα γεμίσματα του κινητού, σε ματ μαύρο που δεν δείχνει τις γρατζουνιές.",
+        "The same four phone charges, in a matte black that hides scuffs.",
+        variant_group="powerbank-voltra",
+        attributes={
+            "Χρώμα": ("Μαύρο", "Black"),
+            "Χωρητικότητα": ("20.000 mAh", "20,000 mAh"),
+        },
+    ),
+    _p(
+        "demo-powerbank-20k-white",
+        "demo-power-banks",
+        "Voltra",
+        "Powerbank 20.000mAh 22.5W Λευκό",
+        "20,000mAh Power Bank 22.5W White",
+        "39.90",
+        "0",
+        60,
+        420,
+        ("powerbank-white", "powerbank-silver"),
+        "Τετραπλή φόρτιση και γρήγορη έξοδος 22.5W, σε λευκό.",
+        "Four charges and a 22.5W fast output, in white.",
+        variant_group="powerbank-voltra",
+        attributes={
+            "Χρώμα": ("Λευκό", "White"),
+            "Χωρητικότητα": ("20.000 mAh", "20,000 mAh"),
+        },
+    ),
+    _p(
+        "demo-powerbank-26k-black",
+        "demo-power-banks",
+        "Voltra",
+        "Powerbank 26.800mAh 65W Μαύρο",
+        "26,800mAh Power Bank 65W Black",
+        "54.90",
+        "0",
+        55,
+        560,
+        ("powerbank-black", "powerbank-silver"),
+        "Αρκετά για ένα laptop και δύο κινητά ανάμεσα σε δύο πρίζες, με έξοδο 65W.",
+        "Enough for a laptop and two phones between two sockets, with a 65W output.",
+        variant_group="powerbank-voltra",
+        attributes={
+            "Χρώμα": ("Μαύρο", "Black"),
+            "Χωρητικότητα": ("26.800 mAh", "26,800 mAh"),
+        },
+    ),
+    _p(
+        "demo-powerbank-26k-white",
+        "demo-power-banks",
+        "Voltra",
+        "Powerbank 26.800mAh 65W Λευκό",
+        "26,800mAh Power Bank 65W White",
+        "54.90",
+        "0",
+        40,
+        560,
+        ("powerbank-white", "powerbank-silver"),
+        "Η μεγάλη χωρητικότητα της σειράς, σε λευκό, με οθόνη που δείχνει τα υπόλοιπα watt.",
+        "The range's largest capacity, in white, with a display that shows the watts left.",
+        variant_group="powerbank-voltra",
+        attributes={
+            "Χρώμα": ("Λευκό", "White"),
+            "Χωρητικότητα": ("26.800 mAh", "26,800 mAh"),
+        },
+    ),
+    _p(
+        "demo-powerbank-26k-silver",
+        "demo-power-banks",
+        "Voltra",
+        "Powerbank 26.800mAh 65W Ασημί",
+        "26,800mAh Power Bank 65W Silver",
+        "54.90",
+        "10",
+        35,
+        560,
+        ("powerbank-silver", "powerbank-black"),
+        "Για ταξίδια με πτήσεις: κάτω από το όριο των 100Wh, με έξοδο 65W.",
+        "For trips that involve flights: under the 100Wh limit, with a 65W output.",
+        variant_group="powerbank-voltra",
+        attributes={
+            "Χρώμα": ("Ασημί", "Silver"),
+            "Χωρητικότητα": ("26.800 mAh", "26,800 mAh"),
         },
     ),
     # ── wireless charging ────────────────────────────────────────────
@@ -754,7 +930,7 @@ PRODUCTS: tuple[ProductRow, ...] = (
     # ── audio ────────────────────────────────────────────────────────
     _p(
         "demo-earbuds-white",
-        "demo-audio",
+        "demo-earbuds",
         "Groove",
         "Ασύρματα Ακουστικά Λευκά",
         "Wireless Earbuds White",
@@ -773,7 +949,7 @@ PRODUCTS: tuple[ProductRow, ...] = (
     ),
     _p(
         "demo-earbuds-black",
-        "demo-audio",
+        "demo-earbuds",
         "Groove",
         "Ασύρματα Ακουστικά Μαύρα",
         "Wireless Earbuds Black",
@@ -792,7 +968,7 @@ PRODUCTS: tuple[ProductRow, ...] = (
     ),
     _p(
         "demo-earbuds-pastel",
-        "demo-audio",
+        "demo-earbuds",
         "Groove",
         "Ασύρματα Ακουστικά Παστέλ",
         "Wireless Earbuds Pastel",
@@ -811,7 +987,7 @@ PRODUCTS: tuple[ProductRow, ...] = (
     ),
     _p(
         "demo-earbuds-sport",
-        "demo-audio",
+        "demo-earbuds",
         "Groove",
         "Αθλητικά Ακουστικά με Άγκιστρο",
         "Sport Earbuds with Ear Hook",
@@ -829,7 +1005,7 @@ PRODUCTS: tuple[ProductRow, ...] = (
     ),
     _p(
         "demo-speaker-mint",
-        "demo-audio",
+        "demo-speakers",
         "Groove",
         "Φορητό Ηχείο Bluetooth Μέντα",
         "Portable Bluetooth Speaker Mint",
@@ -848,7 +1024,7 @@ PRODUCTS: tuple[ProductRow, ...] = (
     ),
     _p(
         "demo-speaker-silver",
-        "demo-audio",
+        "demo-speakers",
         "Groove",
         "Φορητό Ηχείο Bluetooth Ασημί",
         "Portable Bluetooth Speaker Silver",
@@ -867,7 +1043,7 @@ PRODUCTS: tuple[ProductRow, ...] = (
     ),
     _p(
         "demo-speaker-wood",
-        "demo-audio",
+        "demo-speakers",
         "Nexis",
         "Ηχείο Γραφείου με Ξύλινη Πρόσοψη",
         "Desk Speaker with Wood Front",
@@ -882,7 +1058,7 @@ PRODUCTS: tuple[ProductRow, ...] = (
     ),
     _p(
         "demo-speaker-party",
-        "demo-audio",
+        "demo-speakers",
         "Groove",
         "Ηχείο Πάρτι με Χειρολαβή",
         "Party Speaker with Handle",
@@ -900,7 +1076,7 @@ PRODUCTS: tuple[ProductRow, ...] = (
     ),
     _p(
         "demo-speaker-mini-grey",
-        "demo-audio",
+        "demo-speakers",
         "Groove",
         "Μίνι Ηχείο Ταξιδιού",
         "Mini Travel Speaker",
@@ -919,7 +1095,7 @@ PRODUCTS: tuple[ProductRow, ...] = (
     # ── mounts and stands ────────────────────────────────────────────
     _p(
         "demo-stand-desk-black",
-        "demo-mounts-stands",
+        "demo-desk-stands",
         "Nexis",
         "Βάση Γραφείου Αλουμινίου Μαύρη",
         "Aluminium Desk Stand Black",
@@ -938,7 +1114,7 @@ PRODUCTS: tuple[ProductRow, ...] = (
     ),
     _p(
         "demo-stand-desk-silver",
-        "demo-mounts-stands",
+        "demo-desk-stands",
         "Nexis",
         "Βάση Γραφείου Αλουμινίου Ασημί",
         "Aluminium Desk Stand Silver",
@@ -957,7 +1133,7 @@ PRODUCTS: tuple[ProductRow, ...] = (
     ),
     _p(
         "demo-stand-foldable",
-        "demo-mounts-stands",
+        "demo-desk-stands",
         "Nexis",
         "Πτυσσόμενη Βάση Ταξιδιού",
         "Foldable Travel Stand",
@@ -975,7 +1151,7 @@ PRODUCTS: tuple[ProductRow, ...] = (
     ),
     _p(
         "demo-stand-green",
-        "demo-mounts-stands",
+        "demo-desk-stands",
         "Groove",
         "Βάση Γραφείου Καρυδιά",
         "Desk Stand Walnut",
@@ -994,7 +1170,7 @@ PRODUCTS: tuple[ProductRow, ...] = (
     ),
     _p(
         "demo-mount-car-vent",
-        "demo-mounts-stands",
+        "demo-car-mounts",
         "Voltra",
         "Βάση Αυτοκινήτου Αεραγωγού",
         "Car Vent Mount",
@@ -1012,7 +1188,7 @@ PRODUCTS: tuple[ProductRow, ...] = (
     ),
     _p(
         "demo-mount-car-magnetic",
-        "demo-mounts-stands",
+        "demo-car-mounts",
         "Voltra",
         "Μαγνητική Βάση Αυτοκινήτου με Φόρτιση",
         "Magnetic Car Mount with Charging",
@@ -1030,7 +1206,7 @@ PRODUCTS: tuple[ProductRow, ...] = (
     ),
     _p(
         "demo-mount-tripod",
-        "demo-mounts-stands",
+        "demo-desk-stands",
         "Groove",
         "Τρίποδο Κινητού με Τηλεχειριστήριο",
         "Phone Tripod with Remote",
@@ -1045,7 +1221,7 @@ PRODUCTS: tuple[ProductRow, ...] = (
     ),
     _p(
         "demo-stand-headphone",
-        "demo-mounts-stands",
+        "demo-desk-stands",
         "Nexis",
         "Βάση Ακουστικών Γραφείου",
         "Desk Headphone Stand",
@@ -1063,7 +1239,7 @@ PRODUCTS: tuple[ProductRow, ...] = (
     ),
     _p(
         "demo-organiser-cable",
-        "demo-mounts-stands",
+        "demo-desk-stands",
         "Groove",
         "Οργανωτής Καλωδίων Γραφείου",
         "Desk Cable Organiser",
@@ -1077,3 +1253,209 @@ PRODUCTS: tuple[ProductRow, ...] = (
         attributes={"Χρώμα": ("Γκρι", "Grey"), "Τεμάχια": ("5", "5")},
     ),
 )
+
+
+# ── specifications ───────────────────────────────────────────────────
+# Every product shows six rows in its specs panel: the two axes it is
+# sold along (``ProductRow.attributes``), the warranty, and three that
+# say what KIND of product it is. The last three come from the category
+# the product sits in, so a new product gets a full panel for free; the
+# exceptions are listed by slug in ``SPEC_OVERRIDES``.
+
+#: ``{axis: (value_el, value_en)}``, the shape ``ProductRow.attributes``
+#: already uses: a spec IS an attribute, there is no second mechanism.
+Specs = dict[str, tuple[str, str]]
+
+WARRANTY: Specs = {"Εγγύηση": ("24 μήνες", "24 months")}
+
+CATEGORY_SPECS: dict[str, Specs] = {
+    "demo-usb-c-cables": {
+        "Βύσμα": ("USB-C σε USB-C", "USB-C to USB-C"),
+        "Μέγιστη ισχύς": ("60 W", "60 W"),
+        "Ταχύτητα δεδομένων": ("480 Mbps", "480 Mbps"),
+    },
+    "demo-wall-chargers": {
+        "Θύρες": ("1", "1"),
+        "Τεχνολογία": ("Τυπική", "Standard"),
+        "Πρωτόκολλο": ("Power Delivery 3.0", "Power Delivery 3.0"),
+    },
+    "demo-power-banks": {
+        "Θύρες": ("2", "2"),
+        "Μέγιστη ισχύς": ("20 W", "20 W"),
+        "Ένδειξη μπαταρίας": ("4 λυχνίες LED", "4 LED lights"),
+    },
+    "demo-wireless-charging": {
+        "Πρότυπο": ("Qi", "Qi"),
+        "Είσοδος": ("USB-C", "USB-C"),
+        "Συμβατότητα": ("iPhone και Android", "iPhone and Android"),
+    },
+    "demo-cases": {
+        "Μαγνήτης": ("Όχι", "No"),
+        "Προστασία πτώσης": ("1.2 m", "1.2 m"),
+        "Πάχος": ("1.5 mm", "1.5 mm"),
+    },
+    "demo-screen-protection": {
+        "Συμβατότητα": ("Ανά μοντέλο κινητού", "Per phone model"),
+        "Πάχος": ("0.33 mm", "0.33 mm"),
+        "Επίστρωση": ("Ολεοφοβική", "Oleophobic"),
+    },
+    "demo-earbuds": {
+        "Bluetooth": ("5.3", "5.3"),
+        "Ακύρωση θορύβου": ("Όχι", "No"),
+        "Αντοχή στο νερό": ("IPX4", "IPX4"),
+    },
+    "demo-speakers": {
+        "Bluetooth": ("5.3", "5.3"),
+        "Αντοχή στο νερό": ("IPX5", "IPX5"),
+        "Ισχύς ήχου": ("10 W", "10 W"),
+    },
+    "demo-car-mounts": {
+        "Συμβατότητα": ("Κινητά 4.7–6.9 ιντσών", "Phones 4.7–6.9 inches"),
+        "Περιστροφή": ("360°", "360°"),
+        "Ρύθμιση γωνίας": ("Ναι", "Yes"),
+    },
+    "demo-desk-stands": {
+        "Συμβατότητα": ("Κινητά και tablet", "Phones and tablets"),
+        "Ρύθμιση γωνίας": ("Ναι", "Yes"),
+        "Αντιολισθητική βάση": ("Ναι", "Yes"),
+    },
+}
+
+#: Where a product differs from its category's default. Only the rows a
+#: shopper would notice are listed; everything else reads the default.
+SPEC_OVERRIDES: dict[str, Specs] = {
+    "demo-cable-usbc-braided-black": {
+        "Μέγιστη ισχύς": ("100 W", "100 W"),
+        "Ταχύτητα δεδομένων": ("5 Gbps", "5 Gbps"),
+    },
+    "demo-cable-usbc-braided-white": {
+        "Μέγιστη ισχύς": ("100 W", "100 W"),
+        "Ταχύτητα δεδομένων": ("5 Gbps", "5 Gbps"),
+    },
+    "demo-cable-usbc-lightning": {
+        "Βύσμα": ("USB-C σε Lightning", "USB-C to Lightning"),
+        "Μέγιστη ισχύς": ("27 W", "27 W"),
+    },
+    "demo-cable-usbc-90": {
+        "Βύσμα": ("USB-C γωνιακό", "Right-angle USB-C"),
+    },
+    "demo-charger-gan-45w": {
+        "Θύρες": ("2", "2"),
+        "Τεχνολογία": ("GaN", "GaN"),
+    },
+    "demo-charger-gan-65w": {
+        "Θύρες": ("3", "3"),
+        "Τεχνολογία": ("GaN", "GaN"),
+    },
+    "demo-charger-gan-100w": {
+        "Θύρες": ("4", "4"),
+        "Τεχνολογία": ("GaN", "GaN"),
+    },
+    "demo-charger-travel": {"Θύρες": ("2", "2")},
+    "demo-charger-car-30w": {"Θύρες": ("2", "2")},
+    "demo-powerbank-magnetic": {"Θύρες": ("1", "1")},
+    "demo-powerbank-pocket": {"Θύρες": ("1", "1")},
+    "demo-case-clear-magnetic": {"Μαγνήτης": ("Ναι", "Yes")},
+    "demo-case-rugged": {
+        "Προστασία πτώσης": ("2 m", "2 m"),
+        "Πάχος": ("3 mm", "3 mm"),
+    },
+    "demo-case-slim": {
+        "Προστασία πτώσης": ("0.5 m", "0.5 m"),
+        "Πάχος": ("0.35 mm", "0.35 mm"),
+    },
+    "demo-glass-privacy": {"Επίστρωση": ("Φίλτρο απορρήτου", "Privacy filter")},
+    "demo-glass-matte": {
+        "Επίστρωση": ("Αντιθαμβωτική ματ", "Matte anti-glare")
+    },
+    "demo-earbuds-black": {"Ακύρωση θορύβου": ("Ενεργή", "Active")},
+    "demo-earbuds-sport": {"Αντοχή στο νερό": ("IPX5", "IPX5")},
+    "demo-speaker-wood": {"Ισχύς ήχου": ("40 W", "40 W")},
+    "demo-speaker-party": {
+        "Αντοχή στο νερό": ("IPX6", "IPX6"),
+        "Ισχύς ήχου": ("60 W", "60 W"),
+    },
+}
+
+#: What a power bank can drive follows its capacity, so the whole
+#: family is keyed by the ``Χωρητικότητα`` value rather than by slug.
+POWERBANK_BY_CAPACITY: dict[str, Specs] = {
+    "10.000 mAh": {"Θύρες": ("2", "2"), "Μέγιστη ισχύς": ("20 W", "20 W")},
+    "20.000 mAh": {
+        "Θύρες": ("3", "3"),
+        "Μέγιστη ισχύς": ("22.5 W", "22.5 W"),
+    },
+    "26.800 mAh": {"Θύρες": ("3", "3"), "Μέγιστη ισχύς": ("65 W", "65 W")},
+}
+
+
+def specs_for(row: ProductRow) -> Specs:
+    """The six attributes a product carries, in display order.
+
+    Its own axes first (they are what the variant selector reads), then
+    the warranty, then the category's three. A later source wins on a
+    shared axis, so an override replaces a default rather than adding a
+    seventh row.
+    """
+    specs: Specs = dict(row.attributes)
+    specs.update(WARRANTY)
+    specs.update(CATEGORY_SPECS[row.category])
+    capacity = row.attributes.get("Χωρητικότητα")
+    if row.category == "demo-power-banks" and capacity is not None:
+        specs.update(POWERBANK_BY_CAPACITY.get(capacity[0], {}))
+    specs.update(SPEC_OVERRIDES.get(row.slug, {}))
+    return specs
+
+
+# ── arrival dates and view counts ────────────────────────────────────
+
+#: Days since the product arrived, for the ones that are new. Twelve is
+#: the floor on purpose: a verified review needs a COMPLETED order, and
+#: an order needs a week to complete, so nothing can honestly be both
+#: newer than that and reviewed by a buyer.
+NEW_ARRIVAL_DAYS: dict[str, int] = {
+    "demo-powerbank-26k-black": 12,
+    "demo-powerbank-26k-white": 14,
+    "demo-charger-gan-100w": 15,
+    "demo-powerbank-26k-silver": 17,
+    "demo-powerbank-20k-black": 19,
+    "demo-mount-car-magnetic": 22,
+    "demo-powerbank-20k-white": 24,
+    "demo-powerbank-10k-silver": 26,
+    "demo-earbuds-pastel": 29,
+    "demo-wireless-duo": 31,
+    "demo-glass-privacy": 34,
+    "demo-charger-gan-65w": 38,
+}
+
+#: Every other product arrived between these many days ago.
+OLDEST_ARRIVAL_DAYS = 420
+YOUNGEST_ARRIVAL_DAYS = 45
+
+
+def stable_number(*parts: object) -> int:
+    """A number that depends only on ``parts``, never on the process.
+
+    ``hash()`` is salted per run and ``random`` is shared state; this is
+    neither, so a re-seed reproduces every date, count and review.
+    """
+    digest = hashlib.sha256(":".join(map(str, parts)).encode()).hexdigest()
+    return int(digest, 16)
+
+
+def arrival_days_ago(slug: str) -> int:
+    if slug in NEW_ARRIVAL_DAYS:
+        return NEW_ARRIVAL_DAYS[slug]
+    span = OLDEST_ARRIVAL_DAYS - YOUNGEST_ARRIVAL_DAYS + 1
+    return YOUNGEST_ARRIVAL_DAYS + stable_number("arrival", slug) % span
+
+
+def arrival_hour(slug: str) -> int:
+    """The hour of day the product was added, within shop hours."""
+    return 9 + stable_number("hour", slug) % 10
+
+
+def view_count(slug: str) -> int:
+    """Views accrue with age: a steady daily rate times the days listed."""
+    per_day = 4 + stable_number("rate", slug) % 15
+    return arrival_days_ago(slug) * per_day + stable_number("jitter", slug) % 40

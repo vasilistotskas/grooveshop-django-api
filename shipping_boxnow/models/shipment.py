@@ -8,6 +8,7 @@ from djmoney.money import Money
 from simple_history.models import HistoricalRecords
 
 from core.models import TimeStampMixinModel, UUIDModel
+from shipping.querysets import ShipmentQuerySet
 from shipping_boxnow.enum.compartment_size import BoxNowCompartmentSize
 from shipping_boxnow.enum.parcel_state import BoxNowParcelState
 from shipping_boxnow.enum.payment_mode import BoxNowPaymentMode
@@ -197,6 +198,8 @@ class BoxNowShipment(UUIDModel, TimeStampMixinModel):
         # FK anyway. Same reasoning as UserAccount.loyalty_tier.
         user_db_constraint=False,
     )
+
+    objects = ShipmentQuerySet.as_manager()
 
     class Meta(TypedModelMeta):
         verbose_name = _("BoxNow Shipment")

@@ -16,6 +16,7 @@ for everything except the two seed functions at the end.
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime, timedelta
 from io import StringIO
 from pathlib import Path
 from types import SimpleNamespace
@@ -25,7 +26,16 @@ from django.core.management.base import CommandError
 from django.test import TestCase
 
 from contact.models import FeedbackCategory
-from devtools import demo_store
+from devtools import demo_reviews, demo_store
+from devtools.demo_catalogue import (
+    CATEGORY_SPECS,
+    NEW_ARRIVAL_DAYS,
+    SPEC_OVERRIDES,
+    arrival_days_ago,
+    arrival_hour,
+    specs_for,
+    view_count,
+)
 from devtools.management.commands import seed_demo_store
 from page_config.models import ComponentType, NavigationSlot
 from page_config.schemas import (
@@ -374,42 +384,585 @@ class TestCatalogueIntegrity(TestCase):
     def test_every_attribute_axis_has_an_english_name(self):
         """``ATTRIBUTE_NAMES_EN`` is what the /en specs panel reads."""
         for row in demo_store.PRODUCTS:
-            for axis in row.attributes:
+            for axis in specs_for(row):
                 assert axis in demo_store.ATTRIBUTE_NAMES_EN, axis
 
+    def test_every_product_carries_five_or_six_specs(self):
+        """The specs panel is the same height down a category listing."""
+        for row in demo_store.PRODUCTS:
+            specs = specs_for(row)
+            assert 5 <= len(specs) <= 6, f"{row.slug}: {len(specs)}"
+            for axis, (value_el, value_en) in specs.items():
+                assert value_el.strip() and value_en.strip(), (row.slug, axis)
 
-class TestReviews(TestCase):
+    def test_a_spec_override_names_a_real_product_and_axis(self):
+        slugs = {row.slug: row for row in demo_store.PRODUCTS}
+        for slug, overrides in SPEC_OVERRIDES.items():
+            assert slug in slugs, slug
+            for axis in overrides:
+                assert axis in specs_for(slugs[slug]), (slug, axis)
+
+    def test_every_category_has_a_spec_bank(self):
+        """``specs_for`` indexes the bank by the category a product sits
+        in, so a product in a category with no entry would KeyError."""
+        for row in demo_store.PRODUCTS:
+            assert row.category in CATEGORY_SPECS, row.slug
+
+
+class TestRicherCatalogue(TestCase):
+    """The M3 additions: variants, subcategories, arrivals, views."""
+
+    def test_audio_and_mounts_have_subcategories_with_banners(self):
+        for root in ("demo-audio", "demo-mounts-stands"):
+            children = [
+                row for row in demo_store.CATEGORIES if row.parent == root
+            ]
+            assert len(children) >= 2, root
+            for child in children:
+                assert child.banner, f"{child.slug} has no banner"
+
+    def test_banners_are_committed_assets(self):
+        from devtools.demo_media import LOCK_PATH
+
+        known = set(json.loads(LOCK_PATH.read_text(encoding="utf-8")))
+        for row in demo_store.CATEGORIES:
+            if row.banner:
+                assert row.banner in known, row.slug
+
+    def test_a_root_with_children_holds_no_product_itself(self):
+        """The mega menu opens a root onto its children; a product left
+        on the root would be reachable from nowhere else."""
+        parents = {row.parent for row in demo_store.CATEGORIES if row.parent}
+        for row in demo_store.PRODUCTS:
+            if row.category in parents:
+                assert row.category not in {
+                    "demo-audio",
+                    "demo-mounts-stands",
+                }, row.slug
+
+    def test_the_power_bank_family_is_colour_by_capacity(self):
+        members = [
+            row
+            for row in demo_store.PRODUCTS
+            if row.variant_group == "powerbank-voltra"
+        ]
+        pairs = [
+            (row.attributes["Χωρητικότητα"][1], row.attributes["Χρώμα"][1])
+            for row in members
+        ]
+        assert len(pairs) == len(set(pairs)), "two variants are identical"
+        capacities = {capacity for capacity, _colour in pairs}
+        assert capacities == {
+            "10,000 mAh",
+            "20,000 mAh",
+            "26,800 mAh",
+        }
+        for capacity in capacities:
+            colours = {c for cap, c in pairs if cap == capacity}
+            assert {"White", "Black", "Silver"} <= colours, capacity
+
+    def test_the_family_shares_its_photographs(self):
+        """No new photograph: a colour variant shows the family's."""
+        for row in demo_store.PRODUCTS:
+            if row.variant_group == "powerbank-voltra":
+                assert row.images[0].startswith("powerbank-"), row.slug
+
+    def test_the_gan_group_spans_45_65_and_100_watts(self):
+        watts = {
+            row.attributes["Ισχύς"][1]
+            for row in demo_store.PRODUCTS
+            if row.variant_group == "charger-gan"
+        }
+        assert watts == {"45 W", "65 W", "100 W"}
+
+    def test_new_arrivals_are_staggered_and_reviewable(self):
+        days = sorted(NEW_ARRIVAL_DAYS.values())
+        assert len(set(days)) == len(days), "two arrivals share a day"
+        assert days[0] >= 12, "a buyer needs a week to complete an order"
+        assert days[-1] <= 45
+        slugs = {row.slug for row in demo_store.PRODUCTS}
+        assert set(NEW_ARRIVAL_DAYS) <= slugs
+
+    def test_every_other_product_is_older_than_the_newest(self):
+        for row in demo_store.PRODUCTS:
+            assert 12 <= arrival_days_ago(row.slug) <= 420, row.slug
+
+    def test_arrival_and_views_are_deterministic_and_age_driven(self):
+        for row in demo_store.PRODUCTS:
+            assert view_count(row.slug) == view_count(row.slug)
+            assert view_count(row.slug) > 0
+        newest = min(
+            demo_store.PRODUCTS, key=lambda r: arrival_days_ago(r.slug)
+        )
+        oldest = max(
+            demo_store.PRODUCTS, key=lambda r: arrival_days_ago(r.slug)
+        )
+        assert view_count(newest.slug) < view_count(oldest.slug)
+
+    def test_product_count_covers_the_new_members(self):
+        slugs = {row.slug for row in demo_store.PRODUCTS}
+        for slug in (
+            "demo-charger-gan-100w",
+            "demo-powerbank-26k-black",
+            "demo-powerbank-20k-white",
+        ):
+            assert slug in slugs
+
+
+class TestRicherCatalogueSeed:
+    """The seeder writes the new rows, and a second run changes nothing."""
+
+    @pytest.fixture
+    def seeded(self, demo_tenant, monkeypatch):
+        monkeypatch.setattr(demo_store, "ensure_assets", lambda keys: {})
+        monkeypatch.setattr(
+            demo_store, "ensure_asset", lambda key: f"uploads/{key}.avif"
+        )
+        monkeypatch.setattr(
+            demo_store, "storage_name", lambda key: f"uploads/{key}.avif"
+        )
+        demo_store.seed_categories()
+        return demo_store.seed_products()
+
+    def test_every_product_has_five_or_six_attributes(self, seeded):
+        from product.models import Product
+
+        assert Product.objects.filter(slug__startswith="demo-").count() == len(
+            demo_store.PRODUCTS
+        )
+        for product in Product.objects.filter(slug__startswith="demo-"):
+            count = product.product_attributes.count()
+            assert 5 <= count <= 6, f"{product.slug}: {count}"
+
+    def test_the_power_bank_family_is_one_variant_group(self, seeded):
+        from product.models import Product
+
+        slugs = [
+            row.slug
+            for row in demo_store.PRODUCTS
+            if row.variant_group == "powerbank-voltra"
+        ]
+        groups = set(
+            Product.objects.filter(slug__in=slugs).values_list(
+                "variant_group_id", flat=True
+            )
+        )
+        assert len(groups) == 1 and None not in groups
+        assert len(slugs) >= 9
+
+    def test_products_arrive_on_staggered_dates_with_views(self, seeded):
+        from django.utils import timezone
+
+        from product.models import Product
+
+        created = list(
+            Product.objects.filter(slug__startswith="demo-").values_list(
+                "created_at", flat=True
+            )
+        )
+        assert len({value.date() for value in created}) > 30
+        newest = Product.objects.get(slug="demo-powerbank-26k-black")
+        assert newest.view_count == view_count(newest.slug)
+        assert newest.created_at < timezone.now()
+
+    def test_a_second_run_writes_nothing(self, demo_tenant, seeded):
+        from product.models import ProductAttribute
+
+        before = ProductAttribute.objects.count()
+        report = demo_store.seed_products()
+
+        assert "arrivals_dated" not in report
+        assert "retired" not in report
+        assert ProductAttribute.objects.count() == before
+
+    def test_a_changed_spec_replaces_the_old_value(self, demo_tenant, seeded):
+        from product.models import Product
+
+        product = Product.objects.get(slug="demo-charger-gan-100w")
+        stale = demo_store._attribute_value("Θύρες", "Ports", "9", "9")
+        product.product_attributes.create(attribute_value=stale)
+        assert product.product_attributes.count() == 7
+
+        demo_store.seed_products()
+
+        assert product.product_attributes.count() == 6
+
+    def test_the_subcategories_get_a_main_image_and_a_banner(self, seeded):
+        from product.enum.category import CategoryImageTypeEnum
+        from product.models import ProductCategory
+
+        demo_store.seed_category_images()
+        for slug in ("demo-earbuds", "demo-speakers", "demo-car-mounts"):
+            category = ProductCategory.objects.get(slug=slug)
+            kinds = set(category.images.values_list("image_type", flat=True))
+            assert kinds == {
+                CategoryImageTypeEnum.MAIN,
+                CategoryImageTypeEnum.BANNER,
+            }, slug
+        again = demo_store.seed_category_images()
+        assert set(again) <= {"unchanged"}
+
+
+class TestReviewPlan(TestCase):
+    """The shape of the review history, without a database."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.plan = demo_reviews.build_plan()
+        cls.by_product: dict[str, list] = {}
+        for review in cls.plan.reviews:
+            cls.by_product.setdefault(review.product, []).append(review)
+
     def test_every_review_targets_a_seeded_product(self):
         slugs = {row.slug for row in demo_store.PRODUCTS}
-        for row in demo_store.REVIEWS:
-            assert row[0] in slugs, row[0]
+        assert {review.product for review in self.plan.reviews} <= slugs
 
-    def test_reviewer_indexes_are_in_range(self):
-        for row in demo_store.REVIEWS:
-            assert 0 <= row[1] < len(demo_store.DEMO_REVIEWERS), row
+    def test_every_product_is_reviewed_between_eight_and_fifty_times(self):
+        slugs = {row.slug for row in demo_store.PRODUCTS}
+        assert set(self.by_product) == slugs
+        counts = [len(reviews) for reviews in self.by_product.values()]
+        assert min(counts) >= 8
+        assert max(counts) <= 50
+        assert max(counts) >= 40, "no product reads as a bestseller"
+        assert sum(counts) >= 800
 
     def test_rates_are_valid_choices(self):
         """``ProductReview.rate`` is 1..10, not 1..5 — the storefront
         maps it with ``rate * 0.099 * starCountMax``.
         """
         valid = {choice.value for choice in RateEnum}
-        for row in demo_store.REVIEWS:
-            assert row[2] in valid, row
+        for review in self.plan.reviews:
+            assert review.rate in valid, review
 
     def test_product_reviewer_pairs_are_unique(self):
-        """``ProductReview`` has a UniqueConstraint on
-        (product, user), so a duplicate pair would make the seed
-        non-idempotent in a way ``get_or_create`` hides.
-        """
-        pairs = [(row[0], row[1]) for row in demo_store.REVIEWS]
+        """``ProductReview`` has a UniqueConstraint on (product, user)."""
+        pairs = [(r.product, r.reviewer) for r in self.plan.reviews]
         assert len(pairs) == len(set(pairs))
 
-    def test_reviewers_are_dedicated_demo_accounts(self):
+    def test_reviewers_are_in_range(self):
+        pool = len(demo_reviews.REVIEWER_POOL)
+        for review in self.plan.reviews:
+            assert 0 <= review.reviewer < pool
+
+    def test_the_spread_is_positive_with_some_one_and_two_stars(self):
+        rates = [review.rate for review in self.plan.reviews]
+        stars = sum(rates) / len(rates) / 2
+        assert 3.8 <= stars <= 4.5, stars
+        low = [rate for rate in rates if rate <= 4]
+        assert 0.03 <= len(low) / len(rates) <= 0.15
+        assert {1, 2} & set(rates), "no one-star review at all"
+        assert {3, 4} & set(rates), "no two-star review at all"
+        assert rates.count(10) > rates.count(8) > rates.count(6)
+
+    def test_a_busy_product_always_has_a_critical_review(self):
+        """A "lowest rating first" sort needs something to show."""
+        for slug, reviews in self.by_product.items():
+            if len(reviews) >= demo_reviews.LOW_RATE_MINIMUM_REVIEWS and (
+                demo_reviews.quality_tier(slug) != "strong"
+            ):
+                assert any(r.rate <= demo_reviews.LOW_RATE_MAX for r in reviews)
+
+    def test_the_plan_is_deterministic(self):
+        assert demo_reviews.build_plan() == self.plan
+
+    def test_the_wording_is_varied_and_in_both_languages(self):
+        comments = [r.comment for r in self.plan.reviews if r.comment[0]]
+        assert len(comments) >= 0.8 * len(self.plan.reviews)
+        for el, en in comments:
+            assert el.strip() and en.strip()
+            assert any("Ͱ" <= char <= "Ͽ" for char in el), el
+            assert not any("Ͱ" <= char <= "Ͽ" for char in en), en
+        assert len(set(comments)) >= 0.8 * len(comments)
+        for reviews in self.by_product.values():
+            texts = [r.comment for r in reviews if r.comment[0]]
+            assert len(texts) == len(set(texts)), "a product repeats itself"
+        assert any(not r.comment[0] for r in self.plan.reviews), "no star-only"
+
+    def test_the_tone_follows_the_rate(self):
+        negative_openers = {el for el, _ in demo_reviews.OPENERS["negative"]}
+        positive_openers = {el for el, _ in demo_reviews.OPENERS["positive"]}
+        for review in self.plan.reviews:
+            text = review.comment[0]
+            if review.rate >= demo_reviews.POSITIVE_FROM:
+                assert not any(text.startswith(o) for o in negative_openers)
+            if review.rate <= demo_reviews.LOW_RATE_MAX:
+                assert not any(text.startswith(o) for o in positive_openers)
+
+    def test_every_category_has_words_for_every_tone(self):
+        for row in demo_store.PRODUCTS:
+            bank = demo_reviews.BODIES[row.category]
+            assert set(bank) == {"positive", "mixed", "negative"}
+            for phrases in bank.values():
+                assert len(phrases) >= 3
+
+    def test_the_pool_is_dedicated_demo_accounts(self):
         """Never a prod-cloned address: a staging refresh must not
         publish invented opinions under a real customer's name.
         """
-        for email, _first, _last in demo_store.DEMO_REVIEWERS:
+        emails = [email for email, _first, _last in demo_reviews.REVIEWER_POOL]
+        assert len(emails) == len(set(emails))
+        assert len(emails) >= 46
+        for email in emails:
             assert email.endswith("@staging.invalid"), email
+
+    def test_the_blogs_commenters_are_still_in_the_pool(self):
+        pool = {email for email, _first, _last in demo_reviews.REVIEWER_POOL}
+        for email, _first, _last in demo_reviews.DEMO_REVIEWERS:
+            assert email in pool
+            assert email.startswith("demo-shopper-")
+
+    def test_every_review_follows_an_order_that_could_have_held_it(self):
+        """A verified purchase is a COMPLETED order containing the
+        product, placed after it existed and a week before the review.
+        """
+        orders: dict[tuple[int, str], list] = {}
+        for order in self.plan.orders:
+            for slug, quantity in order.lines:
+                assert quantity >= 1
+                orders.setdefault((order.reviewer, slug), []).append(order)
+        for review in self.plan.reviews:
+            held_by = orders.get((review.reviewer, review.product))
+            assert held_by, review
+            (order,) = held_by
+            anchor = datetime(2026, 1, 1, tzinfo=UTC)
+            arrived = (
+                anchor
+                - timedelta(days=arrival_days_ago(review.product))
+                + timedelta(hours=arrival_hour(review.product))
+            )
+            ordered = demo_reviews._stamp(anchor, order.days_ago, order.key)
+            assert ordered > arrived, (review.product, ordered, arrived)
+            assert (
+                review.days_ago
+                <= order.days_ago - demo_reviews.ORDER_TO_REVIEW_DAYS
+            )
+            assert review.days_ago >= 1
+
+    def test_a_strong_product_has_no_review_below_three_stars(self):
+        """Three stars is a rate of 6; the tier is defined by that floor."""
+        strong = [
+            slug
+            for slug in self.by_product
+            if demo_reviews.quality_tier(slug) == "strong"
+        ]
+        assert strong, "no product lands in the strong tier"
+        for slug in strong:
+            assert min(r.rate for r in self.by_product[slug]) >= 6, slug
+
+    def test_order_keys_are_unique_and_follow_the_content(self):
+        keys = [order.key for order in self.plan.orders]
+        assert len(keys) == len(set(keys))
+        order = self.plan.orders[0]
+        moved = demo_reviews.PlannedOrder(
+            order.reviewer, order.lines, order.days_ago + 1
+        )
+        assert moved.key != order.key
+
+
+class TestReviewSeed:
+    """The seeder writes the plan, silently, and a second run is a no-op."""
+
+    @pytest.fixture
+    def seeded(self, demo_tenant, monkeypatch):
+        from pay_way.enum.settlement import PaySettlement
+        from pay_way.factories import PayWayFactory
+        from pay_way.models import PayWay
+
+        monkeypatch.setattr(demo_store, "ensure_assets", lambda keys: {})
+        monkeypatch.setattr(
+            demo_store, "storage_name", lambda key: f"uploads/{key}.avif"
+        )
+        demo_store.seed_categories()
+        demo_store.seed_products()
+        if not PayWay.objects.filter(settlement=PaySettlement.ONLINE).exists():
+            PayWayFactory.create_online_payment()
+        return demo_store.seed_reviews()
+
+    def test_every_planned_review_is_written_and_verified(self, seeded):
+        from product.models import ProductReview
+
+        plan = demo_reviews.build_plan()
+        assert seeded["reviews_created"] == len(plan.reviews)
+        reviews = ProductReview.objects.for_list().filter(
+            user__email__startswith="demo-"
+        )
+        assert reviews.count() == len(plan.reviews)
+        assert not reviews.filter(verified_purchase=False).exists()
+        assert not reviews.exclude(status="TRUE").exists()
+        assert not reviews.filter(is_published=False).exists()
+
+    def test_the_reviews_carry_both_languages(self, seeded):
+        from product.models import ProductReview
+
+        review = (
+            ProductReview.objects.filter(translations__comment__gt="")
+            .distinct()
+            .first()
+        )
+        assert review is not None
+        assert review.get_translation("el").comment
+        assert review.get_translation("en").comment
+
+    def test_reviews_and_orders_are_dated_in_the_past(self, seeded):
+        from django.utils import timezone
+
+        from order.models.order import Order
+        from product.models import ProductReview
+
+        now = timezone.now()
+        assert not ProductReview.objects.filter(created_at__gt=now).exists()
+        orders = Order.objects.filter(metadata__has_key="demo_review_seed")
+        assert orders.count() == seeded["orders_created"]
+        assert not orders.filter(created_at__gt=now).exists()
+        assert not orders.exclude(status="COMPLETED").exists()
+        assert not orders.exclude(payment_status="COMPLETED").exists()
+        assert orders.filter(created_at__lt=now - timedelta(days=100)).exists()
+
+    def test_the_orders_total_what_the_shopper_owed(self, seeded):
+        from order.models.order import Order
+
+        for order in Order.objects.filter(metadata__has_key="demo_review_seed")[
+            :25
+        ]:
+            assert order.paid_amount.amount > 0
+            assert order.paid_amount == order.calculate_order_total_amount()
+            assert order._payment_consistency_errors() == {}
+            assert order.pay_way_key
+
+    def test_a_second_run_changes_nothing(self, seeded):
+        from order.models.order import Order
+        from product.models import ProductReview
+
+        before = (
+            ProductReview.objects.count(),
+            Order.objects.count(),
+            set(ProductReview.objects.values_list("pk", flat=True)),
+        )
+        report = demo_store.seed_reviews()
+
+        assert "reviews_created" not in report
+        assert "reviews_updated" not in report
+        assert "reviews_removed" not in report
+        assert "orders_created" not in report
+        assert "orders_removed" not in report
+        assert report["reviews_unchanged"] == before[0]
+        assert (
+            ProductReview.objects.count(),
+            Order.objects.count(),
+            set(ProductReview.objects.values_list("pk", flat=True)),
+        ) == before
+
+    def test_an_edited_review_is_put_back_and_a_foreign_one_is_left(
+        self, seeded
+    ):
+        from django.contrib.auth import get_user_model
+
+        from product.models import Product, ProductReview
+
+        mine = ProductReview.objects.filter(
+            user__email__startswith="demo-reviewer-"
+        ).first()
+        original_rate = mine.rate
+        ProductReview.objects.filter(pk=mine.pk).update(
+            rate=1 if original_rate != 1 else 2
+        )
+        outsider = get_user_model().objects.create(
+            email="real-customer@example.com"
+        )
+        theirs = ProductReview.objects.create(
+            product=Product.objects.filter(slug__startswith="demo-").first(),
+            user=outsider,
+            rate=3,
+            status="TRUE",
+        )
+
+        report = demo_store.seed_reviews()
+
+        mine.refresh_from_db()
+        assert mine.rate == original_rate
+        assert report["reviews_updated"] == 1
+        assert ProductReview.objects.filter(pk=theirs.pk).exists()
+
+    def test_a_review_the_plan_no_longer_holds_is_removed(self, seeded):
+        from django.contrib.auth import get_user_model
+
+        from product.models import Product, ProductReview
+
+        product = Product.objects.get(slug="demo-cable-usbc-1m-black")
+        planned = {
+            (r.product, r.reviewer) for r in demo_reviews.build_plan().reviews
+        }
+        spare = next(
+            email
+            for index, (email, _f, _l) in enumerate(demo_reviews.REVIEWER_POOL)
+            if (product.slug, index) not in planned
+        )
+        stray = ProductReview.objects.create(
+            product=product,
+            user=get_user_model().objects.get(email=spare),
+            rate=10,
+            status="TRUE",
+        )
+
+        report = demo_store.seed_reviews()
+
+        assert report["reviews_removed"] == 1
+        assert not ProductReview.objects.filter(pk=stray.pk).exists()
+
+    def test_seeding_is_silent(
+        self,
+        demo_tenant,
+        monkeypatch,
+        settings,
+        django_capture_on_commit_callbacks,
+    ):
+        from unittest import mock
+
+        from django.core import mail
+
+        settings.EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+        monkeypatch.setattr(demo_store, "ensure_assets", lambda keys: {})
+        monkeypatch.setattr(
+            demo_store, "storage_name", lambda key: f"uploads/{key}.avif"
+        )
+        demo_store.seed_categories()
+        demo_store.seed_products()
+        from pay_way.enum.settlement import PaySettlement
+        from pay_way.factories import PayWayFactory
+        from pay_way.models import PayWay
+
+        if not PayWay.objects.filter(settlement=PaySettlement.ONLINE).exists():
+            PayWayFactory.create_online_payment()
+
+        mail.outbox = []
+        with (
+            mock.patch("celery.app.task.Task.apply_async") as dispatched,
+            django_capture_on_commit_callbacks(execute=True),
+        ):
+            demo_store.seed_reviews()
+
+        assert mail.outbox == []
+        dispatched.assert_not_called()
+
+    def test_reviews_are_still_written_without_an_online_pay_way(
+        self, demo_tenant, monkeypatch
+    ):
+        from pay_way.models import PayWay
+        from product.models import ProductReview
+
+        monkeypatch.setattr(demo_store, "ensure_assets", lambda keys: {})
+        monkeypatch.setattr(
+            demo_store, "storage_name", lambda key: f"uploads/{key}.avif"
+        )
+        demo_store.seed_categories()
+        demo_store.seed_products()
+        PayWay.objects.all().delete()
+
+        report = demo_store.seed_reviews()
+
+        assert report["orders_skipped_no_pay_way"] == 1
+        assert report["reviews_created"] > 0
+        assert ProductReview.objects.count() == report["reviews_created"]
 
 
 class TestFeedback(TestCase):
@@ -889,6 +1442,12 @@ class TestStepTable(TestCase):
     def test_labels_are_unique(self):
         labels = [label for label, _ in seed_demo_store.STEPS]
         self.assertEqual(sorted(labels), sorted(set(labels)))
+
+    def test_tags_follow_the_blog_they_tag(self):
+        """``seed_tags`` labels the newest posts, so a run needs them to
+        exist first — otherwise one run is not enough to converge."""
+        labels = [label for label, _ in seed_demo_store.STEPS]
+        self.assertGreater(labels.index("tags"), labels.index("blog"))
 
     def test_the_cache_purge_runs_last(self):
         """Its entire value is being after every writer.

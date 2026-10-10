@@ -31,14 +31,23 @@ from __future__ import annotations
 import logging
 import re
 import secrets
+from datetime import timedelta
 from decimal import Decimal
 from typing import Any
 
+from django.utils import timezone
 from djmoney.money import Money
 from measurement.measures import Weight
 
 from devtools.demo_blog import seed_blog as _seed_blog
-from devtools.demo_catalogue import CATEGORIES, PRODUCTS
+from devtools.demo_catalogue import (
+    CATEGORIES,
+    PRODUCTS,
+    arrival_days_ago,
+    arrival_hour,
+    specs_for,
+    view_count,
+)
 from devtools.demo_home import HERO_SLIDE_PRODUCTS, HOME_SECTIONS
 from devtools.demo_media import (
     ensure_asset,
@@ -47,6 +56,7 @@ from devtools.demo_media import (
     storage_name,
 )
 from devtools.demo_promotions import seed_promotions as _seed_promotions
+from devtools.demo_reviews import seed_reviews as _seed_reviews
 
 logger = logging.getLogger(__name__)
 
@@ -230,6 +240,28 @@ ATTRIBUTE_NAMES_EN: dict[str, str] = {
     "Αυτονομία": "Battery life",
     "Τοποθέτηση": "Mounting",
     "Ύψος": "Height",
+    "Εγγύηση": "Warranty",
+    "Βύσμα": "Connector",
+    "Μέγιστη ισχύς": "Max power",
+    "Ταχύτητα δεδομένων": "Data speed",
+    "Θύρες": "Ports",
+    "Τεχνολογία": "Technology",
+    "Πρωτόκολλο": "Protocol",
+    "Ένδειξη μπαταρίας": "Charge indicator",
+    "Πρότυπο": "Standard",
+    "Είσοδος": "Input",
+    "Συμβατότητα": "Compatibility",
+    "Μαγνήτης": "Magnet",
+    "Προστασία πτώσης": "Drop protection",
+    "Πάχος": "Thickness",
+    "Επίστρωση": "Coating",
+    "Bluetooth": "Bluetooth",
+    "Ακύρωση θορύβου": "Noise cancelling",
+    "Αντοχή στο νερό": "Water resistance",
+    "Ισχύς ήχου": "Sound power",
+    "Περιστροφή": "Rotation",
+    "Ρύθμιση γωνίας": "Angle adjustment",
+    "Αντιολισθητική βάση": "Non-slip base",
 }
 
 
@@ -289,143 +321,14 @@ TAG_PRODUCT_RULES: dict[str, tuple[str, ...]] = {
         "demo-charger-gan-45w",
         "demo-case-clear-magnetic",
     ),
-    "Νέο": ("demo-earbuds-black", "demo-charger-gan-65w", "demo-glass-privacy"),
-}
-
-# ── reviews ──────────────────────────────────────────────────────────
-# Authored by DEDICATED demo users, never by the prod-cloned accounts:
-# attaching invented opinions to a real customer's name is not
-# something a staging refresh should do.
-#
-# rate is 1..10 (RateEnum), NOT 1..5 — the storefront maps it with
-# ``rate * 0.099 * starCountMax``.
-DEMO_REVIEWERS: tuple[tuple[str, str, str], ...] = (
-    ("demo-shopper-1@staging.invalid", "Γιώργος", "Π."),
-    ("demo-shopper-2@staging.invalid", "Μαρία", "Κ."),
-    ("demo-shopper-3@staging.invalid", "Νίκος", "Α."),
-    ("demo-shopper-4@staging.invalid", "Ελένη", "Δ."),
-    ("demo-shopper-5@staging.invalid", "Δημήτρης", "Σ."),
-    ("demo-shopper-6@staging.invalid", "Σοφία", "Μ."),
-)
-
-# (product_slug, reviewer_index, rate, comment)
-REVIEWS: tuple[tuple[str, int, int, str], ...] = (
-    (
-        "demo-cable-usbc-1m-black",
-        0,
-        10,
-        "Δουλεύει άψογα, φορτίζει γρήγορα. Το πήρα και δεύτερο.",
-    ),
-    (
-        "demo-cable-usbc-1m-black",
-        1,
-        8,
-        "Καλό καλώδιο για την τιμή του. Λίγο κοντό για το κρεβάτι.",
-    ),
-    (
-        "demo-cable-usbc-2m-black",
-        2,
-        9,
-        "Το δίμετρο είναι ό,τι έψαχνα για τον καναπέ.",
-    ),
-    (
-        "demo-cable-usbc-braided-black",
-        0,
-        9,
-        "Η υφασμάτινη επένδυση κρατάει πολύ καλύτερα από τα απλά.",
-    ),
-    (
-        "demo-cable-usbc-braided-black",
-        3,
-        7,
-        "Καλό, αλλά είναι λίγο άκαμπτο στην αρχή.",
-    ),
-    (
-        "demo-cable-usbc-lightning",
-        4,
-        6,
-        "Πρακτικό στο ταξίδι, αλλά φορτίζει πιο αργά όταν το χρησιμοποιείς σε δύο συσκευές.",
-    ),
-    (
-        "demo-charger-20w-white",
-        1,
-        9,
-        "Μικρό, ζεσταίνεται ελάχιστα, κάνει τη δουλειά του.",
-    ),
-    (
-        "demo-charger-gan-45w",
-        2,
-        10,
-        "Εξαιρετικό. Φορτίζει laptop και κινητό ταυτόχρονα.",
-    ),
-    (
-        "demo-charger-gan-45w",
-        5,
-        9,
-        "Πολύ μικρότερο από ό,τι περίμενα, σε καλό.",
-    ),
-    (
-        "demo-charger-gan-65w",
-        0,
-        10,
-        "Αντικατέστησε τρεις φορτιστές στο γραφείο μου.",
-    ),
-    (
-        "demo-charger-car-30w",
-        3,
-        8,
-        "Σταθερή φόρτιση στο αυτοκίνητο, καλή εφαρμογή στην υποδοχή.",
-    ),
-    (
-        "demo-wireless-pad-white",
-        4,
-        7,
-        "Καλό, αλλά θέλει να κεντράρεις σωστά το κινητό.",
-    ),
-    (
-        "demo-case-clear",
-        1,
-        8,
-        "Διάφανη και λεπτή. Μετά από μήνες κιτρινίζει λίγο.",
-    ),
-    ("demo-case-rugged", 2, 10, "Μου έπεσε δύο φορές, μηδέν ζημιά."),
-    ("demo-case-rugged", 5, 9, "Ωραία αίσθηση, χωράει άνετα δύο κάρτες."),
-    (
-        "demo-case-clear-magnetic",
-        0,
-        9,
-        "Ο μαγνήτης κρατάει γερά στη βάση του αυτοκινήτου.",
-    ),
-    ("demo-glass-2pack", 3, 8, "Μπήκε εύκολα χωρίς φυσαλίδες. Καλή τιμή."),
-    (
-        "demo-glass-privacy",
-        4,
-        6,
-        "Κάνει τη δουλειά του αλλά σκουραίνει αισθητά την οθόνη.",
-    ),
-    (
-        "demo-earbuds-white",
-        1,
-        8,
-        "Καλός ήχος για την κατηγορία, κρατάει όλη μέρα.",
-    ),
-    (
+    "Νέο": (
         "demo-earbuds-black",
-        2,
-        10,
-        "Η ακύρωση θορύβου είναι εντυπωσιακή για τα λεφτά της.",
+        "demo-charger-gan-65w",
+        "demo-charger-gan-100w",
+        "demo-powerbank-26k",
+        "demo-glass-privacy",
     ),
-    ("demo-earbuds-sport", 5, 9, "Δεν πέφτουν στο τρέξιμο, αυτό ήθελα."),
-    ("demo-speaker-wood", 0, 9, "Άνετα για πολλές ώρες, καλή μπαταρία."),
-    (
-        "demo-earbuds-sport",
-        3,
-        7,
-        "Απλά και λειτουργικά. Καλή λύση χωρίς μπαταρία.",
-    ),
-    ("demo-speaker-mini-grey", 4, 8, "Μικρό και δυνατό για το μέγεθός του."),
-    ("demo-speaker-party", 1, 9, "Το πήγα στην παραλία, άντεξε άνετα."),
-)
+}
 
 # ── feedback ─────────────────────────────────────────────────────────
 # rating is 1..5 here (MinValueValidator(1)/MaxValueValidator(5)) —
@@ -1614,7 +1517,8 @@ def seed_categories() -> dict[str, int]:
 
 
 def seed_category_images() -> dict[str, int]:
-    """Give every demo category its own MAIN image.
+    """Give every demo category its own MAIN image, and a BANNER where
+    the dataset names one.
 
     The categories band and the category cards render
     ``mainImagePath`` through ``ImgWithFallback``, so a category with
@@ -1628,21 +1532,25 @@ def seed_category_images() -> dict[str, int]:
         category = ProductCategory.objects.filter(slug=row.slug).first()
         if category is None:
             continue
-        name = ensure_asset(row.image)
-        image, created = ProductCategoryImage.objects.get_or_create(
-            category=category,
-            image_type=CategoryImageTypeEnum.MAIN,
-            defaults={"image": name, "active": True},
-        )
-        if created:
-            _bump(report, "created")
-        elif image.image != name:
-            image.image = name
-            image.active = True
-            image.save(update_fields=["image", "active", "updated_at"])
-            _bump(report, "updated")
-        else:
-            _bump(report, "unchanged")
+        wanted = {CategoryImageTypeEnum.MAIN: row.image}
+        if row.banner:
+            wanted[CategoryImageTypeEnum.BANNER] = row.banner
+        for image_type, key in wanted.items():
+            name = ensure_asset(key)
+            image, created = ProductCategoryImage.objects.get_or_create(
+                category=category,
+                image_type=image_type,
+                defaults={"image": name, "active": True},
+            )
+            if created:
+                _bump(report, "created")
+            elif image.image != name:
+                image.image = name
+                image.active = True
+                image.save(update_fields=["image", "active", "updated_at"])
+                _bump(report, "updated")
+            else:
+                _bump(report, "unchanged")
     return report
 
 
@@ -1651,6 +1559,7 @@ def _attribute_value(
     attribute_name_en: str,
     value_el: str,
     value_en: str,
+    cache: dict[tuple[str, str], Any] | None = None,
 ):
     """The AttributeValue for one (attribute, value) pair, both languages.
 
@@ -1661,6 +1570,10 @@ def _attribute_value(
     English active.
     """
     from product.models import Attribute, AttributeValue
+
+    key = (attribute_name_el, value_el)
+    if cache is not None and key in cache:
+        return cache[key]
 
     attribute = None
     for candidate in Attribute.objects.all():
@@ -1684,12 +1597,16 @@ def _attribute_value(
         current = candidate.safe_translation_getter("value", language_code="el")
         if current == value_el:
             _ensure_english(candidate, value=value_en)
+            if cache is not None:
+                cache[key] = candidate
             return candidate
 
     value = AttributeValue(attribute=attribute, active=True)
     _translate(value, "el", value=value_el)
     value.save()
     _ensure_english(value, value=value_en)
+    if cache is not None:
+        cache[key] = value
     return value
 
 
@@ -1721,6 +1638,26 @@ def _ensure_english(instance, **fields) -> bool:
     return True
 
 
+def _stamp_arrival(product, slug: str, today) -> bool:
+    """Date the product's arrival and give it the views that age earns.
+
+    A queryset ``update()``: ``created_at`` is ``auto_now_add`` and the
+    model's history signal would otherwise record a save. The day is
+    anchored to local midnight, so a second run on the same day writes
+    the same values and reports nothing.
+    """
+    from product.models import Product
+
+    created_at = today - timedelta(days=arrival_days_ago(slug))
+    created_at += timedelta(hours=arrival_hour(slug))
+    changed = (
+        Product.objects.filter(pk=product.pk)
+        .exclude(created_at=created_at, view_count=view_count(slug))
+        .update(created_at=created_at, view_count=view_count(slug))
+    )
+    return bool(changed)
+
+
 def seed_products() -> dict[str, int]:
     """Create the demo catalogue: rows, copy, photographs, attributes.
 
@@ -1748,6 +1685,10 @@ def seed_products() -> dict[str, int]:
     prefix = f"{DEMO_MARKER}-"
 
     groups: dict[str, ProductVariantGroup] = {}
+    value_cache: dict[tuple[str, str], Any] = {}
+    today = timezone.localtime().replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
 
     def group_for(key: str) -> ProductVariantGroup:
         # Found by its key (the Greek name it was created with), so a
@@ -1821,16 +1762,25 @@ def seed_products() -> dict[str, int]:
                     product=product, image=name, is_main=position == 0
                 )
 
-        for attribute_el, (value_el, value_en) in row.attributes.items():
+        wanted_values = []
+        for attribute_el, (value_el, value_en) in specs_for(row).items():
             attribute_en = ATTRIBUTE_NAMES_EN.get(attribute_el, attribute_el)
             value = _attribute_value(
-                attribute_el, attribute_en, value_el, value_en
+                attribute_el, attribute_en, value_el, value_en, value_cache
             )
+            wanted_values.append(value)
             ProductAttribute.objects.get_or_create(
                 product=product, attribute_value=value
             )
+        # A spec this product no longer carries goes, or a corrected
+        # value (a 20 W charger fixed to 30 W) would show both.
+        product.product_attributes.exclude(
+            attribute_value__in=wanted_values
+        ).delete()
 
         _bump(report, "created" if created else "updated")
+        if _stamp_arrival(product, row.slug, today):
+            _bump(report, "arrivals_dated")
 
     # A ``demo-`` product the catalogue no longer lists is DEACTIVATED,
     # not deleted: order lines and reviews point at it, and a demo store
@@ -1913,67 +1863,13 @@ def seed_tags() -> dict[str, int]:
     return report
 
 
-def _demo_users() -> dict[str, Any]:
-    """Get-or-create the dedicated demo shopper accounts.
-
-    Reviews and B2B profiles are attached to these, never to the
-    prod-cloned accounts — a staging refresh should not publish
-    invented opinions under a real customer's name.
-    """
-    from django.contrib.auth import get_user_model
-
-    user_model = get_user_model()
-    users: dict[str, Any] = {}
-    for email, first_name, last_name in DEMO_REVIEWERS:
-        user, _ = user_model.objects.get_or_create(
-            email=email,
-            defaults={
-                "first_name": first_name,
-                "last_name": last_name,
-                "is_active": True,
-            },
-        )
-        users[email] = user
-    return users
-
-
 def seed_reviews() -> dict[str, int]:
-    """Create approved product reviews.
+    """The demo store's reviews — see ``devtools/demo_reviews.py``.
 
-    ``status=TRUE`` is what makes a review PUBLIC — the viewset filters
-    on it for anonymous and non-owner requests, so ``NEW`` rows would
-    leave the product page as empty as zero rows do.
+    Dozens of dedicated reviewer accounts with COMPLETED orders for what
+    they review, so the reviews count as verified purchases.
     """
-    from product.enum.review import ReviewStatus
-    from product.models import Product, ProductReview
-
-    report: dict[str, int] = {}
-    users = _demo_users()
-    emails = [email for email, _, _ in DEMO_REVIEWERS]
-    products = {p.slug: p for p in Product.objects.all()}
-
-    for product_slug, reviewer_index, rate, comment in REVIEWS:
-        product = products.get(product_slug)
-        if product is None:
-            _bump(report, "product_missing")
-            continue
-        user = users[emails[reviewer_index]]
-        review, created = ProductReview.objects.get_or_create(
-            product=product,
-            user=user,
-            defaults={
-                "rate": rate,
-                "status": ReviewStatus.TRUE,
-                "is_published": True,
-            },
-        )
-        if not created:
-            _bump(report, "unchanged")
-            continue
-        _translate(review, comment=comment)
-        review.save()
-        _bump(report, "created")
-    return report
+    return _seed_reviews()
 
 
 def seed_feedback() -> dict[str, int]:
@@ -2442,16 +2338,21 @@ def seed_demo_account() -> dict[str, int]:
     Gated on ``is_demo``, not merely on the command's guard: staging
     clones a real store, and a clone that passed the hostname check
     would otherwise start advertising a password on its login page.
+
+    Runs the nightly RESET rather than a bare seed. The accounts'
+    history is rebuilt from the dataset every night, so a seed that only
+    added what was missing would leave whatever an older dataset wrote
+    (four orders with no carrier rows, a gift card at full balance)
+    until the next reset — and the two paths must end in the same state.
     """
     from extra_settings.models import Setting
 
-    from devtools.demo_account import seed_demo_account as _seed
-    from devtools.demo_account import showcase_settings
+    from devtools.demo_account import reset_demo_account, showcase_settings
 
     if not _current_tenant_is_demo():
         return {"skipped_not_a_demo_tenant": 1}
 
-    report = _seed()
+    report = reset_demo_account()
     for name, value in showcase_settings().items():
         try:
             setting = Setting.objects.get(name=name)

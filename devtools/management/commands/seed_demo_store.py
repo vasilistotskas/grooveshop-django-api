@@ -71,11 +71,15 @@ STEPS: tuple[tuple[str, str], ...] = (
     ("categories", "seed_categories"),
     ("products", "seed_products"),
     ("category-images", "seed_category_images"),
-    ("tags", "seed_tags"),
     ("reviews", "seed_reviews"),
-    # After reviews: the comment authors are the same demo shopper
-    # accounts `seed_reviews` gets-or-creates.
+    # After reviews: the readers who like and comment are the same
+    # reviewer accounts (`demo_reviews.ensure_reviewers` makes them for
+    # either step, so this one can also run alone).
     ("blog", "seed_blog"),
+    # After the blog: it tags the newest posts, so run before the blog
+    # step it tagged the previous run's posts and a first run left the
+    # new ones untagged until a second.
+    ("tags", "seed_tags"),
     ("feedback", "seed_feedback"),
     ("b2b", "seed_b2b"),
     # Before anything a shopper touches: without an active carrier the

@@ -3,6 +3,27 @@
 
 
 
+## v3.103.1 (2026-10-10)
+
+### Bug fixes
+
+* fix(deps): upgrade Django to 6.0.9 (#127)
+
+Django 6.0.9 (2026-10-06) fixes three moderate and one low severity
+security issues, among them a quadratic-time denial of service in
+parse_header_parameters reachable without authentication through the
+Accept and Content-Type headers, plus an insufficient mitigation in
+6.0.8.
+
+
+Claude-Session: https://claude.ai/code/session_01XySy2eta87v6cbzrZbfL6X
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`8989acf`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8989acf1fef2f90d0eed7fef91a2bdd1dda2fa04))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.103.0 [skip ci] ([`f8e4497`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f8e449750d69ea061e5116d96a97126983a5ea06))
+
 ## v3.103.0 (2026-10-10)
 
 ### Chores

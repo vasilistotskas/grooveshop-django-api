@@ -3,6 +3,40 @@
 
 
 
+## v3.104.2 (2026-10-10)
+
+### Bug fixes
+
+* fix(promotion): refuse coupons that discount nothing and tease short BXGY groups
+
+Demo store, 2026-10-10. Three cables in the cart:
+- The coupon picker offered GAN20, a code for GaN chargers only.
+- Applying it reported success and changed nothing.
+- With two cables, nothing mentioned the "2+1" offer that a third
+  cable would unlock.
+
+A code whose scope matches nothing in the cart is now refused as
+discount_code_not_applicable by _check_eligibility. The picker and
+apply() both route through it, so the picker shows it unusable and
+apply() refuses it with that reason. If the matching item is removed
+after applying, the reason is non-blocking at order creation like
+combination_disallowed: the code discounted nothing in the preview
+either.
+
+A buy-X-get-Y offer short of its first full group now reports the
+units still missing. An automatic one becomes a near-miss teaser, a
+code is refused as minimum_not_met. A minimum-quantity promotion does
+the same. NearMissEntry carries remaining_quantity beside
+remaining_amount, and the cart's promotionNearMiss exposes
+remainingQuantity. Exactly one of the two is set.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1 ([`5522b58`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5522b58edbd996e4a72093617e68044cb2110910))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.104.1 [skip ci] ([`2880bec`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2880becb9c50c82af2524d41133793e06909a224))
+
 ## v3.104.1 (2026-10-10)
 
 ### Bug fixes

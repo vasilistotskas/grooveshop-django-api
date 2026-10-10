@@ -39,6 +39,8 @@ class FixtureLine:
     quantity: int
     #: The unit price as the order snapshotted it (VAT-inclusive).
     price: Money
+    #: The whole line went back (a REFUNDED order).
+    refunded: bool = False
 
 
 @dataclass
@@ -106,6 +108,8 @@ def create_orders(fixtures: Sequence[FixtureOrder]) -> list[Any]:
                     quantity=line.quantity,
                     original_quantity=line.quantity,
                     price=line.price,
+                    is_refunded=line.refunded,
+                    refunded_quantity=line.quantity if line.refunded else 0,
                 )
             )
         updated_at = fixture.updated_at or fixture.placed_at

@@ -2338,16 +2338,21 @@ def seed_demo_account() -> dict[str, int]:
     Gated on ``is_demo``, not merely on the command's guard: staging
     clones a real store, and a clone that passed the hostname check
     would otherwise start advertising a password on its login page.
+
+    Runs the nightly RESET rather than a bare seed. The accounts'
+    history is rebuilt from the dataset every night, so a seed that only
+    added what was missing would leave whatever an older dataset wrote
+    (four orders with no carrier rows, a gift card at full balance)
+    until the next reset — and the two paths must end in the same state.
     """
     from extra_settings.models import Setting
 
-    from devtools.demo_account import seed_demo_account as _seed
-    from devtools.demo_account import showcase_settings
+    from devtools.demo_account import reset_demo_account, showcase_settings
 
     if not _current_tenant_is_demo():
         return {"skipped_not_a_demo_tenant": 1}
 
-    report = _seed()
+    report = reset_demo_account()
     for name, value in showcase_settings().items():
         try:
             setting = Setting.objects.get(name=name)

@@ -75,9 +75,9 @@ class TestDataset(TestCase):
             assert order.settlement in settlements, order
 
     def test_points_ledger_reads_as_a_story(self):
-        kinds = [kind for kind, _points, _description in demo_account.POINTS]
-        assert "BONUS" in kinds and "EARN" in kinds and "REDEEM" in kinds
-        total = sum(points for _k, points, _d in demo_account.POINTS)
+        kinds = {row.transaction_type for row in demo_account.POINTS}
+        assert {"BONUS", "EARN", "REDEEM"} <= kinds
+        total = sum(row.points for row in demo_account.POINTS)
         assert total > 0, "a negative balance is not a showcase"
 
     def test_the_two_accounts_are_distinct(self):
@@ -630,6 +630,729 @@ class TestDemoStoreMailboxes(TestCase):
             self.assertFalse(module.is_demo_account(shopper))
 
 
+class TestRicherAccountDataset(TestCase):
+    """The shape of the shopper's history, without a database."""
+
+    def test_fourteen_orders_across_the_statuses_a_shop_has(self):
+        assert len(demo_account.ORDERS) == 14
+        statuses = {order.status for order in demo_account.ORDERS}
+        assert {
+            "PROCESSING",
+            "SHIPPED",
+            "COMPLETED",
+            "CANCELED",
+            "RETURNED",
+            "REFUNDED",
+        } <= statuses
+
+    def test_every_order_that_shipped_carries_a_carrier_row(self):
+        for order in demo_account.ORDERS + demo_account.WHOLESALE_ORDERS:
+            if order.status in {"SHIPPED", "RETURNED", "REFUNDED"}:
+                assert order.shipment is not None, order
+        carriers = {
+            order.shipment.carrier
+            for order in demo_account.ORDERS
+            if order.shipment
+        }
+        assert carriers == {"acs", "boxnow"}
+
+    def test_a_shipment_ends_in_a_state_its_order_can_hold(self):
+        delivered = {"delivered"}
+        for order in demo_account.ORDERS + demo_account.WHOLESALE_ORDERS:
+            shipment = order.shipment
+            if shipment is None:
+                continue
+            if order.status == "COMPLETED":
+                assert shipment.state in delivered, order
+            if order.status == "SHIPPED":
+                assert shipment.state not in delivered | {"returned"}, order
+            if order.status in {"RETURNED", "REFUNDED"}:
+                assert shipment.state == "returned", order
+
+    def test_vouchers_are_unique_and_unmistakably_fake(self):
+        vouchers = [
+            order.shipment.voucher
+            for order in demo_account.ORDERS + demo_account.WHOLESALE_ORDERS
+            if order.shipment
+        ]
+        assert len(vouchers) == len(set(vouchers))
+        for voucher in vouchers:
+            assert voucher.startswith("DEMO"), voucher
+            assert len(voucher) <= 20, "AcsShipment.voucher_no is 20 wide"
+
+    def test_in_flight_parcels_are_the_newest_so_tracking_stays_fresh(self):
+        from devtools.demo_shipments import FINAL_STATES
+
+        newest_final = min(
+            order.days_ago
+            for order in demo_account.ORDERS
+            if order.shipment and order.shipment.state in FINAL_STATES
+        )
+        for order in demo_account.ORDERS:
+            if order.shipment and order.shipment.state not in FINAL_STATES:
+                assert order.days_ago < newest_final, order
+
+    def test_a_cash_order_is_courier_cash_and_a_locker_order_is_boxnow(self):
+        for order in demo_account.ORDERS:
+            if order.shipment and order.shipment.carrier == "boxnow":
+                assert order.settlement in {"online", "carrier_terminal"}
+                assert order.shipment.locker_id
+            if order.settlement == "courier_cash":
+                assert order.shipment and order.shipment.carrier == "acs"
+
+    def test_there_is_a_cyprus_address_and_a_cyprus_order(self):
+        assert {a.country for a in demo_account.ADDRESSES} == {"GR", "CY"}
+        cyprus = [o for o in demo_account.ORDERS if o.country == "CY"]
+        assert cyprus
+        for order in cyprus:
+            assert order.shipment and order.shipment.destination_country == "CY"
+
+    def test_one_order_redeems_a_coupon_and_one_spends_the_gift_card(self):
+        assert sum(1 for o in demo_account.ORDERS if o.promotion_code) == 1
+        assert sum(1 for o in demo_account.ORDERS if o.gift_card) == 1
+        assert demo_account.GIFT_CARD_SPENT < demo_account.GIFT_CARD_AMOUNT
+        assert (
+            demo_account.GIFT_CARD_BALANCE
+            == demo_account.GIFT_CARD_AMOUNT - demo_account.GIFT_CARD_SPENT
+        )
+
+    def test_the_points_ledger_makes_the_account_silver(self):
+        kinds = {row.transaction_type for row in demo_account.POINTS}
+        assert {"BONUS", "EARN", "REDEEM"} <= kinds
+        xp = sum(r.points for r in demo_account.POINTS if r.points > 0)
+        balance = sum(r.points for r in demo_account.POINTS)
+        assert xp >= 4000, "level 5 is where Silver starts"
+        assert 0 < balance < xp
+        descriptions = [
+            (r.transaction_type, r.description) for r in demo_account.POINTS
+        ]
+        orders = {o.days_ago for o in demo_account.ORDERS}
+        for row in demo_account.POINTS:
+            if row.order is not None:
+                assert row.order in orders, row
+        assert len({d for d in descriptions if d[0] != "EARN"}) == len(
+            [d for d in descriptions if d[0] != "EARN"]
+        )
+
+    def test_five_notifications_some_read(self):
+        from notification.enum import (
+            NotificationCategoryEnum,
+            NotificationKindEnum,
+            NotificationTypeEnum,
+        )
+
+        rows = demo_account.NOTIFICATIONS
+        assert len(rows) == 5
+        assert {r.seen for r in rows} == {True, False}
+        orders = {o.days_ago for o in demo_account.ORDERS}
+        for row in rows:
+            assert row.notification_type in NotificationTypeEnum.values
+            assert row.kind in NotificationKindEnum.values
+            assert row.category in NotificationCategoryEnum.values
+            assert row.title_el.strip() and row.title_en.strip()
+            assert row.message_el.strip() and row.message_en.strip()
+            if row.order is not None:
+                assert row.order in orders, row
+            else:
+                assert row.link.startswith("/"), row
+
+    def test_the_wholesale_business_is_clearly_fake_but_passes_the_checksum(
+        self,
+    ):
+        from b2b.validators import is_valid_greek_vat
+
+        assert is_valid_greek_vat(demo_account.WHOLESALE_VAT_ID)
+        assert set(demo_account.WHOLESALE_VAT_ID[:-1]) == {"9"}
+        assert demo_account.WHOLESALE_ORDERS
+        for order in demo_account.WHOLESALE_ORDERS:
+            assert order.settlement in {"offline_transfer", "online"}
+            assert all(qty >= 6 for _slug, qty in order.items)
+        days = [o.days_ago for o in demo_account.WHOLESALE_ORDERS]
+        assert len(days) == len(set(days))
+        slugs = {row.slug for row in PRODUCTS}
+        for order in demo_account.WHOLESALE_ORDERS:
+            for slug, _qty in order.items:
+                assert slug in slugs, slug
+
+    def test_the_wholesale_login_is_the_one_the_store_already_publishes(self):
+        """No second credential: the profile hangs off the shared login
+        ``showcase_settings`` already advertises."""
+        values = demo_account.showcase_settings()
+        assert values["DEMO_ACCOUNT_B2B_EMAIL"] == demo_account.B2B_EMAIL
+        assert values["DEMO_ACCOUNT_B2B_PASSWORD"] == demo_account.B2B_PASSWORD
+
+
+@pytest.fixture(autouse=True)
+def _no_pdf_engine():
+    """The invoice renderer needs the system libraries WeasyPrint wraps,
+    which a developer machine may not have. Everything around the render
+    (numbering, snapshots, the context) still runs for real."""
+    with mock.patch(
+        "order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 demo"
+    ):
+        yield
+
+
+def _prepare_store():
+    """Products, pay ways and the coupon the fixtures need."""
+    from djmoney.money import Money
+
+    from pay_way.enum.settlement import PaySettlement
+    from pay_way.factories import PayWayFactory
+    from pay_way.models import PayWay
+    from product.factories.product import ProductFactory
+    from promotion.enum import BenefitType
+    from promotion.factories.promotion import (
+        PromotionCodeFactory,
+        PromotionFactory,
+    )
+
+    slugs = {
+        slug
+        for row in demo_account.ORDERS + demo_account.WHOLESALE_ORDERS
+        for slug, _qty in row.items
+    }
+    for slug in sorted(slugs):
+        ProductFactory(slug=slug, stock=100, num_images=0, num_reviews=0)
+    wanted = {
+        PaySettlement.ONLINE.value: PayWayFactory.create_online_payment,
+        PaySettlement.CARRIER_TERMINAL.value: lambda: PayWayFactory(
+            settlement=PaySettlement.CARRIER_TERMINAL.value
+        ),
+        PaySettlement.COURIER_CASH.value: lambda: (
+            PayWayFactory.create_offline_payment(requires_confirmation=False)
+        ),
+        PaySettlement.OFFLINE_TRANSFER.value: (
+            PayWayFactory.create_offline_payment
+        ),
+    }
+    for settlement, make in wanted.items():
+        if not PayWay.objects.filter(settlement=settlement).exists():
+            make()
+    PromotionCodeFactory(
+        code="SAVE5",
+        promotion=PromotionFactory(
+            benefit_type=BenefitType.FIXED_AMOUNT,
+            benefit_value=Decimal("5.00"),
+            min_subtotal=Money("25.00", "EUR"),
+        ),
+    )
+
+
+@pytest.mark.django_db
+class TestSeededAccount:
+    """What ``seed_demo_account`` writes for the shopper and the buyer."""
+
+    @pytest.fixture(autouse=True)
+    def _a_demo_store(self, settings):
+        settings.EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+        with mock.patch(
+            "devtools.demo_store._current_tenant_is_demo", return_value=True
+        ):
+            yield
+
+    @pytest.fixture
+    def seeded(self):
+        _prepare_store()
+        return demo_account.seed_demo_account()
+
+    @staticmethod
+    def _retail():
+        from django.contrib.auth import get_user_model
+
+        return get_user_model().objects.get(email=demo_account.RETAIL_EMAIL)
+
+    def test_the_shopper_has_fourteen_orders_in_their_states(self, seeded):
+        from order.models.order import Order
+
+        assert seeded["orders"] == 14
+        orders = Order.objects.filter(user=self._retail())
+        assert orders.count() == 14
+        assert {o.status for o in orders} == {
+            row.status for row in demo_account.ORDERS
+        }
+
+    def test_orders_total_what_the_shopper_owed(self, seeded):
+        from order.models.order import Order
+
+        for order in Order.objects.filter(user=self._retail()):
+            assert order.paid_amount.amount > 0, order.pk
+            assert order.paid_amount == order.calculate_order_total_amount()
+            assert order._payment_consistency_errors() == {}
+
+    def test_shipments_carry_the_state_events_and_tracking_number(self, seeded):
+        from shipping_acs.models import AcsShipment
+        from shipping_boxnow.models import BoxNowShipment
+
+        rows = {r.days_ago: r for r in demo_account.ORDERS if r.shipment}
+        acs = AcsShipment.objects.filter(order__user=self._retail())
+        boxnow = BoxNowShipment.objects.filter(order__user=self._retail())
+        assert acs.count() == sum(
+            1 for r in rows.values() if r.shipment.carrier == "acs"
+        )
+        assert boxnow.count() == sum(
+            1 for r in rows.values() if r.shipment.carrier == "boxnow"
+        )
+        for shipment in acs:
+            row = rows[shipment.order.metadata["demo_seed"]]
+            assert shipment.voucher_no == row.shipment.voucher
+            assert shipment.shipment_state == row.shipment.state
+            assert shipment.order.tracking_number == shipment.voucher_no
+            assert shipment.order.shipping_carrier == "acs"
+            assert shipment.events.count() >= 1
+            assert shipment.last_event_at == max(
+                e.event_time for e in shipment.events.all()
+            )
+        for shipment in boxnow:
+            row = rows[shipment.order.metadata["demo_seed"]]
+            assert shipment.parcel_id == row.shipment.voucher
+            assert shipment.parcel_state == row.shipment.state
+            assert shipment.locker_external_id == row.shipment.locker_id
+            assert shipment.events.count() >= 2
+
+    def test_an_acs_voucher_collects_cash_only_on_a_cash_order(self, seeded):
+        from shipping_acs.enum.charge_type import AcsChargeType
+        from shipping_acs.models import AcsShipment
+
+        for shipment in AcsShipment.objects.filter(order__user=self._retail()):
+            assert shipment.charge_type == AcsChargeType.COD
+            if shipment.order.pay_way.settlement == "courier_cash":
+                assert shipment.cod_amount == shipment.order.paid_amount
+                assert shipment.delivery_products == "COD"
+            else:
+                assert shipment.cod_amount.amount == 0
+                assert shipment.delivery_products == ""
+
+    def test_no_shipment_is_stale_or_pollable_into_the_past(self, seeded):
+        """``check_stale_acs_shipments`` emails the merchant about a
+        non-terminal voucher with no recent event, and the pollers pick
+        up anything not polled in 15 minutes — so what is still in
+        flight reports within the last day, and finished rows are
+        terminal."""
+        from shipping_acs.models import AcsShipment
+        from shipping_boxnow.models import BoxNowShipment
+
+        cutoff = timezone.now() - timedelta(
+            days=django_settings.ACS_STALE_SHIPMENT_DAYS
+        )
+        for model in (AcsShipment, BoxNowShipment):
+            for shipment in model.objects.filter(order__user=self._retail()):
+                if shipment.is_active:
+                    assert shipment.last_event_at > cutoff, shipment
+                else:
+                    assert shipment.last_event_at <= timezone.now()
+
+    def test_cyprus_address_and_order(self, seeded):
+        from order.models.order import Order
+        from user.models.address import UserAddress
+
+        address = UserAddress.objects.get(
+            user=self._retail(), country__alpha_2="CY"
+        )
+        assert address.city == "Λευκωσία"
+        order = Order.objects.get(user=self._retail(), country__alpha_2="CY")
+        assert order.city == address.city
+        assert order.shipping_kind == "pickup_point"
+
+    def test_one_coupon_is_redeemed_and_priced_into_the_order(self, seeded):
+        from promotion.models.redemption import PromotionRedemption
+
+        redemption = PromotionRedemption.objects.get(user=self._retail())
+        assert redemption.code.code == "SAVE5"
+        assert redemption.amount.amount == Decimal("5.00")
+        assert redemption.order.discount_amount == redemption.amount
+        assert redemption.order.metadata["promotions"][0]["code"] == "SAVE5"
+
+    def test_the_account_is_silver(self, seeded):
+        from loyalty.models.transaction import PointsTransaction
+        from loyalty.services import LoyaltyService
+
+        user = self._retail()
+        user.refresh_from_db()
+        assert user.loyalty_tier is not None
+        assert user.loyalty_tier.safe_translation_getter(
+            "name", language_code="en", any_language=True
+        ).lower() in {"silver", "ασημένιο"}
+        assert LoyaltyService.get_user_level(user) >= 5
+        balance = PointsTransaction.objects.get_balance(user)
+        assert balance == sum(r.points for r in demo_account.POINTS)
+        assert PointsTransaction.objects.filter(
+            user=user, reference_order__isnull=False
+        ).exists()
+
+    def test_five_notifications_three_unread(self, seeded):
+        from notification.models import NotificationUser
+
+        links = NotificationUser.objects.filter(user=self._retail())
+        assert links.count() == 5
+        assert links.filter(seen=False).count() == 3
+        for link in links.select_related("notification"):
+            assert link.notification.get_translation("el").title
+            assert link.notification.get_translation("en").title
+
+    def test_the_gift_card_is_part_spent_and_linked_to_its_order(self, seeded):
+        from giftcard.enum import GiftCardTransactionKind
+        from giftcard.models import GiftCard
+
+        card = GiftCard.objects.get(code=demo_account.GIFT_CARD_CODE)
+        assert card.balance.amount == demo_account.GIFT_CARD_BALANCE
+        spend = card.transactions.get(kind=GiftCardTransactionKind.REDEEM)
+        assert spend.amount == -demo_account.GIFT_CARD_SPENT
+        assert spend.order is not None
+        assert spend.order.gift_card_amount.amount == (
+            demo_account.GIFT_CARD_SPENT
+        )
+
+    def test_invoices_have_a_number_a_document_and_the_orders_date(
+        self, seeded
+    ):
+        from order.models.invoice import Invoice
+
+        wanted = sum(1 for r in demo_account.ORDERS if r.invoice)
+        invoices = Invoice.objects.filter(order__user=self._retail())
+        assert invoices.count() == wanted
+        for invoice in invoices.select_related("order"):
+            assert invoice.has_document()
+            assert invoice.invoice_number.startswith("INV-")
+            assert invoice.issue_date <= timezone.localdate()
+            assert (
+                invoice.issue_date
+                <= (invoice.order.created_at + timedelta(days=1)).date()
+            )
+            assert invoice.mydata_status == "NOT_SENT"
+            assert invoice.total.amount > 0
+
+    def test_the_wholesale_account_is_an_approved_business_on_group_prices(
+        self, seeded
+    ):
+        from django.contrib.auth import get_user_model
+
+        from b2b.enum import BusinessProfileStatus
+        from b2b.models import BusinessProfile
+        from b2b.services import B2BPricingService
+        from order.models.invoice import Invoice
+        from order.models.order import Order
+
+        buyer = get_user_model().objects.get(email=demo_account.B2B_EMAIL)
+        profile = BusinessProfile.objects.get(user=buyer)
+        assert profile.status == BusinessProfileStatus.APPROVED
+        assert profile.customer_group is not None
+        assert profile.vat_id == demo_account.WHOLESALE_VAT_ID
+        assert profile.reviewed_at is not None
+
+        orders = Order.objects.filter(user=buyer)
+        assert orders.count() == len(demo_account.WHOLESALE_ORDERS)
+        for order in orders:
+            assert order.document_type == "INVOICE"
+            assert order.billing_vat_id == demo_account.WHOLESALE_VAT_ID
+            assert order.billing_company_name == profile.company_name
+            assert order.metadata["b2b_pricing"]["group_id"] == (
+                profile.customer_group.pk
+            )
+            assert order.paid_amount == order.calculate_order_total_amount()
+            for item in order.items.select_related("product"):
+                priced = B2BPricingService.resolve_single(
+                    item.product, profile.customer_group
+                )
+                assert item.price == priced.final
+        assert Invoice.objects.filter(order__user=buyer).count() == sum(
+            1 for r in demo_account.WHOLESALE_ORDERS if r.invoice
+        )
+
+    def test_a_second_run_writes_nothing(self, seeded):
+        from loyalty.models.transaction import PointsTransaction
+        from notification.models import Notification
+        from order.models.invoice import Invoice
+        from order.models.order import Order
+        from shipping_acs.models import AcsShipment
+
+        before = (
+            Order.objects.count(),
+            Invoice.objects.count(),
+            AcsShipment.objects.count(),
+            PointsTransaction.objects.count(),
+            Notification.objects.count(),
+        )
+        report = demo_account.seed_demo_account()
+
+        for key in (
+            "orders",
+            "b2b_orders",
+            "shipments",
+            "invoices",
+            "points",
+            "notifications",
+            "redemptions",
+            "gift_card_spend",
+            "b2b_shipments",
+            "b2b_invoices",
+            "gift_card",
+        ):
+            assert not report.get(key), (key, report)
+        assert (
+            Order.objects.count(),
+            Invoice.objects.count(),
+            AcsShipment.objects.count(),
+            PointsTransaction.objects.count(),
+            Notification.objects.count(),
+        ) == before
+
+    def test_seeding_is_silent(
+        self, django_capture_on_commit_callbacks, settings
+    ):
+        """No mail, no dispatched task, no WebSocket push, no carrier,
+        payment or myDATA request: every row is built directly."""
+        from unittest import mock
+
+        from django.core import mail
+
+        _prepare_store()
+        mail.outbox = []
+        with (
+            mock.patch("celery.app.task.Task.apply_async") as dispatched,
+            mock.patch("requests.sessions.Session.send") as http,
+            mock.patch(
+                "urllib3.connectionpool.HTTPConnectionPool.urlopen"
+            ) as raw,
+            django_capture_on_commit_callbacks(execute=True) as callbacks,
+        ):
+            demo_account.seed_demo_account()
+
+        assert mail.outbox == []
+        dispatched.assert_not_called()
+        http.assert_not_called()
+        raw.assert_not_called()
+        # Nothing was left to run when a transaction committed either.
+        assert callbacks == []
+
+    def test_no_order_history_row_means_no_signal_fired(self, seeded):
+        from order.models.history import OrderHistory
+        from order.models.order import Order
+
+        assert not OrderHistory.objects.filter(
+            order__in=Order.objects.filter(user=self._retail())
+        ).exists()
+
+
+@pytest.mark.django_db
+class TestResetRebuildsTheAccounts:
+    """The nightly reset wipes what a visitor can change and rebuilds it."""
+
+    @pytest.fixture(autouse=True)
+    def _a_demo_store(self, settings):
+        settings.EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+        with mock.patch(
+            "devtools.demo_store._current_tenant_is_demo", return_value=True
+        ):
+            yield
+
+    @staticmethod
+    def _counts():
+        from loyalty.models.transaction import PointsTransaction
+        from notification.models import Notification, NotificationUser
+        from order.models.invoice import Invoice
+        from order.models.order import Order
+        from promotion.models.redemption import PromotionRedemption
+        from shipping_acs.models import AcsShipment
+        from shipping_boxnow.models import BoxNowShipment
+
+        return {
+            "orders": Order.objects.all_with_deleted().count(),
+            "invoices": Invoice.objects.count(),
+            "acs": AcsShipment.objects.count(),
+            "boxnow": BoxNowShipment.objects.count(),
+            "points": PointsTransaction.objects.count(),
+            "notifications": Notification.objects.count(),
+            "notification_users": NotificationUser.objects.count(),
+            "redemptions": PromotionRedemption.objects.count(),
+        }
+
+    def test_reset_converges_and_never_duplicates(
+        self, django_capture_on_commit_callbacks
+    ):
+        from django.core import mail
+
+        _prepare_store()
+        demo_account.seed_demo_account()
+        first = self._counts()
+
+        mail.outbox = []
+        with (
+            mock.patch("celery.app.task.Task.apply_async") as dispatched,
+            django_capture_on_commit_callbacks(execute=True),
+        ):
+            demo_account.reset_demo_account()
+            demo_account.reset_demo_account()
+
+        assert self._counts() == first
+        assert mail.outbox == []
+        dispatched.assert_not_called()
+
+    def test_a_visitors_changes_are_wiped_and_the_history_comes_back(self):
+        from django.contrib.auth import get_user_model
+
+        from notification.models import Notification, NotificationUser
+        from order.models.order import Order
+        from product.models import Product, ProductReview
+
+        _prepare_store()
+        demo_account.seed_demo_account()
+        user = get_user_model().objects.get(email=demo_account.RETAIL_EMAIL)
+        before = set(
+            Order.objects.filter(user=user).values_list("pk", flat=True)
+        )
+        ProductReview.objects.create(
+            product=Product.objects.first(), user=user, rate=2
+        )
+        visitor = Notification(kind="INFO")
+        visitor.set_current_language("el")
+        visitor.title, visitor.message = "x", "y"
+        visitor.save()
+        NotificationUser.objects.bulk_create(
+            [NotificationUser(user=user, notification=visitor)]
+        )
+
+        report = demo_account.reset_demo_account()
+
+        assert report["seeded_orders"] == len(demo_account.ORDERS)
+        after = set(
+            Order.objects.filter(user=user).values_list("pk", flat=True)
+        )
+        assert len(after) == len(demo_account.ORDERS)
+        assert not (before & after), "the orders are rebuilt, not kept"
+        assert not ProductReview.objects.filter(user=user).exists()
+        assert not Notification.objects.filter(pk=visitor.pk).exists()
+        assert NotificationUser.objects.filter(user=user).count() == 5
+
+    def test_the_invoice_numbers_do_not_climb_night_after_night(self):
+        """The wipe gives the numbers it frees back to the counter, so the
+        sequence is the same after a hundred nights as after one."""
+        from order.models.invoice import Invoice, InvoiceCounter
+
+        _prepare_store()
+        demo_account.seed_demo_account()
+        numbers = sorted(
+            Invoice.objects.values_list("invoice_number", flat=True)
+        )
+
+        for _night in range(2):
+            demo_account.reset_demo_account()
+
+        assert (
+            sorted(Invoice.objects.values_list("invoice_number", flat=True))
+            == numbers
+        )
+        counter = InvoiceCounter.objects.get()
+        assert counter.next_number == len(numbers) + 1
+
+    def test_wiping_an_invoice_removes_its_pdf_as_well_as_its_row(self):
+        from order.models.invoice import Invoice
+        from order.models.order import Order
+
+        _prepare_store()
+        demo_account.seed_demo_account()
+        invoices = list(Invoice.objects.all())
+        storage = invoices[0].document_file.storage
+        paths = [invoice.document_file.name for invoice in invoices]
+        assert paths and all(storage.exists(path) for path in paths)
+
+        removed = demo_account._delete_invoices(
+            list(Order.objects.values_list("pk", flat=True))
+        )
+
+        assert removed == len(invoices)
+        assert not Invoice.objects.exists()
+        assert not any(storage.exists(path) for path in paths)
+
+    def test_the_part_spent_card_stays_part_spent_without_ledger_growth(self):
+        from giftcard.models import GiftCard
+
+        _prepare_store()
+        demo_account.seed_demo_account()
+        card = GiftCard.objects.get(code=demo_account.GIFT_CARD_CODE)
+        rows = card.transactions.count()
+
+        for _night in range(3):
+            demo_account.reset_demo_account()
+
+        card.refresh_from_db()
+        assert card.balance.amount == demo_account.GIFT_CARD_BALANCE
+        assert card.transactions.count() == rows
+        assert card.transactions.filter(order__isnull=False).count() == 1
+
+    def test_the_wholesale_profile_survives_the_reset(self):
+        from b2b.models import BusinessProfile
+        from order.models.order import Order
+
+        _prepare_store()
+        demo_account.seed_demo_account()
+        pk = BusinessProfile.objects.get(user__email=demo_account.B2B_EMAIL).pk
+
+        demo_account.reset_demo_account()
+
+        profile = BusinessProfile.objects.get(
+            user__email=demo_account.B2B_EMAIL
+        )
+        assert profile.pk == pk
+        assert profile.status == "APPROVED"
+
+        assert Order.objects.filter(user=profile.user).count() == len(
+            demo_account.WHOLESALE_ORDERS
+        )
+
+    def test_the_seed_step_ends_where_the_reset_does(self):
+        """``seed_demo_store`` and the nightly task must converge: the
+        step runs the reset, so an order an older dataset wrote (no
+        carrier row, no invoice) is rebuilt rather than kept."""
+        from django.contrib.auth import get_user_model
+
+        from devtools import demo_store
+        from order.enum.status import OrderStatus, PaymentStatus
+        from order.factories.order import OrderFactory
+        from order.models.order import Order
+        from shipping_acs.models import AcsShipment
+
+        _prepare_store()
+        retail = get_user_model().objects.create(
+            email=demo_account.RETAIL_EMAIL, is_active=True
+        )
+        stale = OrderFactory(
+            user=retail,
+            status=OrderStatus.COMPLETED,
+            payment_status=PaymentStatus.COMPLETED,
+            num_order_items=1,
+            metadata={"demo_seed": 21},
+        )
+
+        report = demo_store.seed_demo_account()
+
+        assert report["seeded_orders"] == len(demo_account.ORDERS)
+        assert not Order.objects.filter(pk=stale.pk).exists()
+        assert Order.objects.filter(user=retail).count() == len(
+            demo_account.ORDERS
+        )
+        assert AcsShipment.objects.filter(order__user=retail).exists()
+        again = demo_store.seed_demo_account()
+        assert again["seeded_orders"] == len(demo_account.ORDERS)
+        assert Order.objects.filter(user=retail).count() == len(
+            demo_account.ORDERS
+        )
+
+    def test_a_demo_login_still_works_after_the_reset(self):
+        from django.contrib.auth import get_user_model
+
+        _prepare_store()
+        demo_account.seed_demo_account()
+        demo_account.reset_demo_account()
+
+        for email, password in (
+            (demo_account.RETAIL_EMAIL, demo_account.RETAIL_PASSWORD),
+            (demo_account.B2B_EMAIL, demo_account.B2B_PASSWORD),
+        ):
+            user = get_user_model().objects.get(email=email)
+            assert user.check_password(password)
+
+
 @pytest.mark.django_db
 class TestResetIsSilent:
     """The nightly reset rebuilds fixtures; it must not act like a sale.
@@ -652,16 +1375,7 @@ class TestResetIsSilent:
 
     @staticmethod
     def _catalogue():
-        from pay_way.enum.settlement import PaySettlement
-        from pay_way.factories import PayWayFactory
-        from product.factories.product import ProductFactory
-
-        for slug in {
-            slug for row in demo_account.ORDERS for slug, _q in row.items
-        }:
-            ProductFactory(slug=slug, stock=10, num_images=0, num_reviews=0)
-        PayWayFactory.create_online_payment()
-        PayWayFactory(settlement=PaySettlement.CARRIER_TERMINAL.value)
+        _prepare_store()
 
     def test_reset_sends_no_mail_dispatches_nothing_leaves_no_residue(
         self, settings, django_capture_on_commit_callbacks
@@ -713,7 +1427,7 @@ class TestResetIsSilent:
             assert order.pay_way_key
             assert order.paid_amount.amount > 0
             assert order.paid_amount == order.calculate_order_total_amount()
-            if row.payment_status == "COMPLETED":
+            if row.payment_status in {"COMPLETED", "REFUNDED"}:
                 assert order.payment_method == order.pay_way.provider_code
             else:
                 assert order.payment_method == ""
@@ -945,9 +1659,9 @@ class TestDemoGiftCardIsRestored:
         from giftcard.enum import GiftCardStatus, GiftCardTransactionKind
 
         card = self._seeded_card()
-        order = self._spend(card, "18.50")
-        assert card.balance.amount == demo_account.GIFT_CARD_AMOUNT - Decimal(
-            "18.50"
+        order = self._spend(card, "10.00")
+        assert card.balance.amount == demo_account.GIFT_CARD_BALANCE - Decimal(
+            "10.00"
         )
 
         mail.outbox = []
@@ -959,14 +1673,16 @@ class TestDemoGiftCardIsRestored:
 
         card.refresh_from_db()
         assert report["gift_card_restored"] == 1
-        assert card.balance.amount == demo_account.GIFT_CARD_AMOUNT
+        assert card.balance.amount == demo_account.GIFT_CARD_BALANCE
         # The ledger IS the balance: nothing was overwritten.
-        assert self._ledger_sum(card) == demo_account.GIFT_CARD_AMOUNT
+        assert self._ledger_sum(card) == demo_account.GIFT_CARD_BALANCE
         assert card.is_redeemable
         assert card.status == GiftCardStatus.ACTIVE
         # The spend stays on the card's history, its guest order gone.
-        redeem = card.transactions.get(kind=GiftCardTransactionKind.REDEEM)
-        assert redeem.order_id is None
+        redeem = card.transactions.get(
+            kind=GiftCardTransactionKind.REDEEM, order__isnull=True
+        )
+        assert redeem.amount == -Decimal("10.00")
         assert (
             not type(order)
             .objects.all_with_deleted()
@@ -974,7 +1690,7 @@ class TestDemoGiftCardIsRestored:
             .exists()
         )
         adjust = card.transactions.get(kind=GiftCardTransactionKind.ADJUST)
-        assert str(adjust.amount) == "18.50"
+        assert str(adjust.amount) == "10.00"
         assert mail.outbox == []
         dispatched.assert_not_called()
 
@@ -998,8 +1714,8 @@ class TestDemoGiftCardIsRestored:
         assert card.status == GiftCardStatus.ACTIVE
         assert not card.is_expired
         assert card.expiry_reminder_sent_at is None
-        assert card.balance.amount == demo_account.GIFT_CARD_AMOUNT
-        assert self._ledger_sum(card) == demo_account.GIFT_CARD_AMOUNT
+        assert card.balance.amount == demo_account.GIFT_CARD_BALANCE
+        assert self._ledger_sum(card) == demo_account.GIFT_CARD_BALANCE
         assert card.is_redeemable
 
     def test_an_untouched_card_gets_no_ledger_row(self):
@@ -1013,7 +1729,7 @@ class TestDemoGiftCardIsRestored:
         assert not card.transactions.filter(
             kind=GiftCardTransactionKind.ADJUST
         ).exists()
-        assert self._ledger_sum(card) == demo_account.GIFT_CARD_AMOUNT
+        assert self._ledger_sum(card) == demo_account.GIFT_CARD_BALANCE
 
     def test_a_card_the_seed_did_not_issue_is_left_alone(self):
         from djmoney.money import Money
@@ -1042,4 +1758,4 @@ class TestDemoGiftCardIsRestored:
         assert report == {"skipped_not_a_demo_tenant": 1}
         card.refresh_from_db()
         assert card.balance.amount == 0
-        assert card.transactions.count() == 2
+        assert card.transactions.count() == 3

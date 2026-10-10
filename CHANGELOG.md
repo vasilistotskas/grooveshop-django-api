@@ -3,6 +3,33 @@
 
 
 
+## v3.103.2 (2026-10-10)
+
+### Bug fixes
+
+* fix(deps): upgrade django-tenants to 4.0.0 (#132)
+
+With TENANT_LIMIT_SET_CALLS on, as here, django-tenants 3.x kept its
+cached search_path through a savepoint rollback while PostgreSQL
+reverted the path, so the connection could read another tenant's rows
+(django-tenants#1263). 4.0.0 clears the cache on savepoint rollback,
+rollback and close. The settings comment that called 3.14 safe now
+says why 4.0 is the floor.
+
+The 4.0 breaking changes do not touch this project: no subfolder
+tenants or their URL helpers, no schema_exists callers, and no tenant
+names that differ only in case. manage.py check and makemigrations
+--check are clean on 4.0.0.
+
+
+Claude-Session: https://claude.ai/code/session_01XySy2eta87v6cbzrZbfL6X
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`6bf07f0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6bf07f08fe7640934efbd53cd2f5c4b07c67b40d))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.103.1 [skip ci] ([`b400b24`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b400b240c5fa640d9ba8977e84ad223d29389726))
+
 ## v3.103.1 (2026-10-10)
 
 ### Bug fixes

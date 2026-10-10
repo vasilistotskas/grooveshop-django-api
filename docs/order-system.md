@@ -549,14 +549,18 @@ accepting Cyprus orders at the Greek flat rate.
 - An unprinted-labels refusal (`Unprinted_Found > 0`) is a status, not
   a failed task. The service raises `AcsUnprintedVouchersError`; the
   daily task returns `{"status": "blocked_unprinted", "unprinted": [...],
-  "order_ids": [...]}`, emails the orders with a link to the shipments
-  changelist filtered to `label_printed_at__isempty=1`, and notes each
-  blocked order. The fix is "Print labels for selected shipments", then
-  "Issue ACS pickup list now". Every other refusal is a plain
-  `AcsAPIError` and still fails the task. Evidence the courier does not
-  depend on the list: orders 295–297 were refused on 2026-09-23 and
-  scanned as picked up the next morning, and ~40 of ~45 September
-  vouchers were collected without appearing on any list.
+  "order_ids": [...]}` and notes each blocked order. Nobody is emailed,
+  and there is no 15:45 warning any more: on webside the labels are
+  printed the next morning, so the 16:30 run is refused most days, and
+  ACS scans a printed parcel as collected the same day with or without a
+  manifest (2026-09-21 to 10-10: 43 of 45 parcels collected with no
+  pickup list, Saturdays included, when no list runs at all). The mails
+  were daily noise the merchant asked to stop. To issue a list anyway:
+  "Print labels for selected shipments", then "Issue ACS pickup list
+  now". Every other refusal is a plain `AcsAPIError` and still fails the
+  task. The retired `warn-unprinted-acs-vouchers` beat row is deleted by
+  `tenant/migrations/0049`, because `DatabaseScheduler` never removes a
+  row whose entry left `CELERY_BEAT_SCHEDULE`.
 - The stale digest's "stranded mint" class (`pending_creation` > 24 h)
   excludes orders awaiting their online payment — the auto-cancel owns
   those, and listing them invited an "Issue ACS voucher now" for unpaid

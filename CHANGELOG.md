@@ -3,6 +3,52 @@
 
 
 
+## v3.104.6 (2026-10-11)
+
+### Bug fixes
+
+* fix(order): ask the courier before a customer cancel (#149)
+
+A customer cancel asks the courier to cancel the voucher first. The order
+is canceled and refunded only when the courier confirms, or when the order
+has no voucher. Once the parcel is with the courier (an ACS voucher on an
+issued pickup list, a BoxNow parcel past NEW), or the courier cannot be
+reached, the cancel is refused and nothing changes: no status, no refund,
+no shipment change.
+
+- OrderService.cancel_order takes customer_initiated (default True, so a
+  caller that forgets to choose gets the courier-first rule). The courier
+  is asked before the order row is locked and outside any transaction of
+  its own, then its outcome is recorded on metadata.cancellation so the
+  cascade and the order_canceled safety net do not ask a second time.
+- The cancel endpoint passes customer_initiated=not is_store_staff(user).
+  The admin action, auto_cancel_stuck_pending_orders and
+  AcsService._cancel_order_for_dead_shipment pass False and keep the
+  best-effort cascade. A courier refusal on that path is now also a
+  staff-only OrderHistory note and an error message on the admin action.
+- A refusal is 400 {"detail": <translated>, "error": {"type":
+  "parcel_with_courier"}} (OrderCancelErrorType, OrderCancelErrorSerializer,
+  ParcelWithCourierError); schema.yml regenerated.
+- canBeCanceled is Order.can_be_canceled_by_customer: the status rule and
+  ShippingService.can_cancel_shipment, read from local rows only. ACS reads
+  AcsShipment.pickup_list, BoxNow reads parcel_state; both are the guards
+  the carriers already apply before calling the courier, now shared through
+  ShippingCarrierInterface.can_cancel_shipment. OrderQuerySet.for_list
+  selects the shipment rows so the list stays flat in queries.
+- BoxNowService.cancel_shipment returns on an already CANCELED parcel
+  (as AcsService.cancel_voucher already did), so a retry after a cancel
+  that stopped part way is not refused.
+docs/order-system.md describes the rule; el and en catalogue entries added.
+
+
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`26d686e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/26d686e0d9974000d23c641c501ab04526f8ae41))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.104.5 [skip ci] ([`e744a07`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e744a073fe5e8ae1009c37597d33b6920c45adc9))
+
 ## v3.104.5 (2026-10-11)
 
 ### Bug fixes

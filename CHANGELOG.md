@@ -3,6 +3,61 @@
 
 
 
+## v3.104.3 (2026-10-11)
+
+### Bug fixes
+
+* fix(promotion): one reward unit unlocks a reward-pool offer
+
+The reward teaser asked for get_quantity units, but _bxgy_amount
+discounts whatever reward units are present, so the first one already
+earns the offer; the teaser now asks for one.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1 ([`5189671`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5189671262d0db7fced3e7598deefa20c2ff9c7c))
+
+* fix(promotion): a code must change the outcome, a teaser must hold
+
+Audit of every promise the store makes about offers against what the
+engine then grants, after GAN20 "applied" for nothing on the demo store.
+
+Teasers are now checked against the engine itself. Each near-miss is
+re-evaluated on the cart as it would be once the shopper adds what it
+asks for (full classification, stacking and clamp), and only one whose
+promotion is then granted is shown. "-5% from 3 items" was teased on two
+cables although the third cable unlocks a non-stackable "2+1" that wins.
+
+A reward-pool buy-X-get-Y whose buy side is met but whose reward is not
+in the cart now teases with rewardProducts (the sellable reward
+products), so a case in the cart says which screen protector to add.
+
+apply() and the picker refuse every code that would change nothing:
+
+- a monetary code the clamp leaves with 0 (combination_disallowed)
+- a free-shipping code when an automatic promotion already ships free
+  (combination_disallowed)
+- a gift code whose gift is inactive or sold out: new non-blocking
+  reason discount_code_gift_unavailable, since a freebie must not hold
+  the paid goods hostage at order creation
+- a code worth 0 for any other reason: minimum_not_met when a
+  buy-X-get-Y is short of its group or reward, otherwise not_applicable
+
+A sold-out gift is no entitlement any more, so the cart, the product
+page and the picker stop promising it; order creation still skips a
+gift another session's reservation took.
+
+The cart gains appliedCoupons, one entry per attached code with the
+money it takes off, freeShipping, gift, or the reason it is refused, so
+the storefront stops showing "a better offer applies" for SHIPFREE.
+minimum_not_met's label no longer claims the minimum is a subtotal.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1 ([`ee4258f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ee4258f1e544ca58ae33b37b77481de0e94cea19))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.104.2 [skip ci] ([`fc25b0a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc25b0af20fee3f00fefd5053c7944bfaac5fa0e))
+
 ## v3.104.2 (2026-10-10)
 
 ### Bug fixes

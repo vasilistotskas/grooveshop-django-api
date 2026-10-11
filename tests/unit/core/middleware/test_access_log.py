@@ -18,11 +18,12 @@ from unittest.mock import Mock, patch
 import pytest
 from django.conf import settings
 from django.http import HttpResponse
-from django.test import RequestFactory
+from django.test import RequestFactory, override_settings
 
 from core.logging import CorrelationIdFilter, JsonFormatter
 from core.middleware.access_log import UNMATCHED_ROUTE, AccessLogMiddleware
 from core.middleware.correlation_id import CORRELATION_ID_HEADER
+from tenant.internal import INTERNAL_DOMAINS_PATH
 
 ACCESS_LOGGER = "core.middleware.access_log"
 PRODUCT_DETAIL_ROUTE = "api/v1/product/<int:pk>"
@@ -104,6 +105,39 @@ class TestOneLinePerRequest:
         assert payload["route"] == UNMATCHED_ROUTE
         assert payload["status"] == 404
         assert "wp-login" not in json.dumps(payload)
+
+    @override_settings(AGENT_GATEWAY_INTERNAL_SECRET="internal-secret")
+    def test_a_request_a_middleware_answers_is_named_by_its_route(
+        self, client, access_lines
+    ):
+        """``InternalDomainsMiddleware`` serves the feed before any view
+        runs, so ``resolver_match`` is empty; the line still names the
+        route, never ``unmatched``."""
+        response = client.get(
+            INTERNAL_DOMAINS_PATH,
+            headers={"X-Internal-Token": "internal-secret"},
+        )
+
+        (record,) = access_lines()
+        payload = _as_json(record)
+        assert response.status_code == 200
+        assert payload["route"] == INTERNAL_DOMAINS_PATH.lstrip("/")
+
+    def test_a_cors_preflight_names_the_route_not_the_path(
+        self, client, access_lines
+    ):
+        client.options(
+            "/api/v1/product/999999",
+            headers={
+                "Origin": "https://example.test",
+                "Access-Control-Request-Method": "GET",
+            },
+        )
+
+        (record,) = access_lines()
+        payload = _as_json(record)
+        assert payload["route"] == PRODUCT_DETAIL_ROUTE
+        assert "999999" not in json.dumps(payload)
 
     def test_the_kubelet_readiness_probe_is_not_logged(
         self, client, access_lines

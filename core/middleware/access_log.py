@@ -31,12 +31,34 @@ from __future__ import annotations
 import logging
 import time
 
+from django.urls import Resolver404, resolve
+
 logger = logging.getLogger(__name__)
 
 #: ``route`` of a request no URL pattern matched. A fixed label rather
 #: than the raw path, so a scanner walking random URLs cannot mint a new
 #: value per request.
 UNMATCHED_ROUTE = "unmatched"
+
+
+def _route_of(request) -> str:
+    """The URL pattern the request belongs to, or ``UNMATCHED_ROUTE``.
+
+    ``resolver_match`` is set only when a view ran. A middleware that
+    answers on its own — the internal domains feed, a CORS preflight —
+    leaves it empty, so the path is resolved here against the urlconf
+    the request was routed with; only a path no pattern matches stays
+    unmatched.
+    """
+    match = request.resolver_match
+    if match is None:
+        try:
+            match = resolve(
+                request.path_info, getattr(request, "urlconf", None)
+            )
+        except Resolver404:
+            return UNMATCHED_ROUTE
+    return match.route or "/"
 
 
 class AccessLogMiddleware:
@@ -58,8 +80,7 @@ class AccessLogMiddleware:
         response = self.get_response(request)
         duration_ms = round((time.perf_counter() - started) * 1000, 1)
 
-        match = request.resolver_match
-        route = UNMATCHED_ROUTE if match is None else match.route or "/"
+        route = _route_of(request)
         logger.info(
             "%s %s %s %.1fms",
             request.method,

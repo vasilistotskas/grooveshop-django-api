@@ -3,6 +3,141 @@
 
 
 
+## v3.104.5 (2026-10-11)
+
+### Bug fixes
+
+* fix(logging): log task failure tracebacks at ERROR and add a request access line (#145) ([`0fa4981`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0fa4981838ac87f69136b5b35d815fe2fc10b7b4))
+
+* fix(logging): log task failure tracebacks at ERROR and add a request access line
+
+MonitoredTask.on_failure logged the failure at ERROR and the traceback
+as a second record at DEBUG, so production (INFO) never carried the
+stack of a failed task. Log it once, with the traceback attached to the
+ERROR record. The exception is passed as `exc`, not `einfo.exception`:
+Celery wraps the latter in billiard's ExceptionWithTraceback, whose
+__traceback__ is None, so it would log the wrapper type with no frames.
+
+The API had no per-request line with a duration (the django logger is at
+WARNING and Gunicorn's access line has none). AccessLogMiddleware logs
+one INFO line per request: method, route (the resolved URL pattern, never
+the raw path or query string), status, duration_ms and the
+correlation_id the storefront already sends as X-Correlation-ID.
+
+CorrelationIdMiddleware moves next to it, ahead of tenant resolution, so a
+request that fails there (unknown host, suspended store) still gets an id
+and a line; both sit behind HealthProbeMiddleware, so the readiness probe
+is not logged without a path list to maintain.
+
+JsonFormatter merges extra={"fields": {...}} at the top level so
+duration_ms is filterable in VictoriaLogs. Arbitrary extra= keys are
+still not copied.
+
+Refs #142
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1 ([`0fa4981`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0fa4981838ac87f69136b5b35d815fe2fc10b7b4))
+
+* fix(logging): name middleware-answered requests by their route
+
+A request answered before any view runs (the internal domains feed,
+a CORS preflight) has no resolver_match, so its access line read
+"unmatched". The path is now resolved against the request's urlconf;
+only a path no pattern matches stays unmatched.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`0fa4981`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0fa4981838ac87f69136b5b35d815fe2fc10b7b4))
+
+* fix(payments): only a Viva refund Viva accepted is recorded as refunded (#146) ([`a220258`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a220258b6822bb0c5563e9f2ba9372e80d22eba1))
+
+* fix(payments): only a Viva refund Viva accepted is recorded as refunded
+
+Cancelling a paid Viva Wallet order booked it REFUNDED and fired
+order_refunded (refund email, gift-card credit, loyalty reversal, Meta
+Refund) while Viva never refunded: all four REFUNDED orders in production
+still read statusId F at Viva.
+
+VivaWalletPaymentProvider.refund_payment omitted `amount` whenever it was
+called with None, which is what cancel_order always does, although Viva's
+Cancel Transaction requires it. It also treated any HTTP 2xx as success
+and never read the body's Success / ErrorCode.
+
+- The DELETE always carries `amount` in cents. A partial refund sends the
+  requested amount; a full refund (None) reads what Viva captured from
+  Retrieve Transaction, since Order.paid_amount is the amount owed at
+  creation and not the collected figure. If that read fails nothing is
+  sent.
+- Success needs `Success` true and `ErrorCode` 0; the returned
+  TransactionId is stored as the refund id. Anything else is logged with
+  ErrorCode/ErrorText/EventId and returned as a failure.
+- refund_order leaves a staff-only OrderHistory note for a refund the
+  provider did not make (NOTE rows are not customer-visible), so the
+  payment stays COMPLETED and no order_refunded side effect fires.
+- The admin cancel action reports a canceled order whose refund failed
+  instead of only "marked as canceled".
+
+Tests build the Viva bodies from docs/viva-payment-api.yaml and fake only
+the HTTP boundary.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1 ([`a220258`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a220258b6822bb0c5563e9f2ba9372e80d22eba1))
+
+* fix(auth): resolve Django permissions for platform identities only (#147) ([`e396e3f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e396e3fc584d79855abefe187f00a6319c348db3))
+
+* fix(auth): resolve Django permissions for platform identities only
+
+UserAccount.has_perm, has_module_perms and the get_*_permissions methods
+now answer only for a platform identity: a user object stamped by the
+platform staff backend or token authentication, or one read on the
+public schema. A tenant-schema row is a customer record, so its flags
+and any stored grants confer no Django permission. Platform identities
+keep resolving through the role backend as before, for DRF and the
+admin alike.
+
+The provenance check that is_platform_superuser already made is now
+tenant.membership.is_platform_identity, shared by both.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1 ([`e396e3f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e396e3fc584d79855abefe187f00a6319c348db3))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.104.4 [skip ci] ([`6e700d0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6e700d0e830a6b4ee1bd2a316a23689e0891ce84))
+
+### Documentation
+
+* docs(tests): cite Viva's public Payment API spec in the refund fixture
+
+The local copy of the spec is gitignored, so the fixture now names the
+public source its example bodies come from.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`a220258`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a220258b6822bb0c5563e9f2ba9372e80d22eba1))
+
+### Testing
+
+* test(page_config): authenticate the layout admin as a platform identity
+
+The admin viewset tests bind a tenant schema and authenticated an
+unstamped superuser, which no longer holds Django permissions there. A
+platform superuser reaches a store's API stamped by the staff token
+authentication; the tests now model that identity.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`e396e3f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e396e3fc584d79855abefe187f00a6319c348db3))
+
 ## v3.104.4 (2026-10-11)
 
 ### Bug fixes

@@ -15,6 +15,8 @@ from django.db.models import Case, When
 from meili._client import client
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     from meili.models import IndexMixin
 
 
@@ -46,6 +48,25 @@ HIGHLIGHT_PRE_TAG = "<mark>"
 HIGHLIGHT_POST_TAG = "</mark>"
 
 
+@dataclass(frozen=True, slots=True)
+class FacetGroup:
+    """One multi-select group inside a facet field.
+
+    A facet field can hold the keys of several groups side by side: the
+    product index's ``attribute_values`` lists the values of every
+    attribute. Standard faceted search counts a group's values without
+    that group's own selection, so picking one value does not hide its
+    alternatives, while every other group's selection still narrows them.
+
+    ``clause`` is the filter the group contributed; ``members`` are the
+    facet keys (as strings, the way the engine reports them) it governs.
+    """
+
+    facet: str
+    clause: str
+    members: frozenset[str]
+
+
 @dataclass(slots=True)
 class QueryState:
     """
@@ -59,6 +80,7 @@ class QueryState:
     limit: int = 20
     filters: list[str] = field(default_factory=list)
     facets: list[str] = field(default_factory=list)
+    facet_groups: list[FacetGroup] = field(default_factory=list)
     attributes_to_retrieve: list[str] = field(default_factory=lambda: ["*"])
     attributes_to_crop: list[str] = field(default_factory=list)
     crop_length: int = 10
@@ -193,6 +215,36 @@ class IndexQuerySet[T: IndexMixin]:
         """
         self._apply_geo_filters(*geo_filters)
         self._apply_field_filters(**filters)
+        return self
+
+    def filter_facet_group(
+        self,
+        facet: str,
+        selected: Iterable[int | str],
+        members: Iterable[int | str],
+    ) -> Self:
+        """
+        Keep documents whose ``facet`` holds ANY of ``selected``, as one
+        multi-select group of that facet.
+
+        Groups are ANDed with each other and with every other filter, so
+        two groups on the same facet are "any of these AND any of those".
+        When ``facet`` is also requested through ``set_facets``, ``search``
+        counts each group's ``members`` without that group's own clause
+        (see ``FacetGroup``).
+
+        Example:
+            .filter_facet_group("attribute_values", [10, 11], members=[10, 11, 12])
+            .filter_facet_group("attribute_values", [20], members=[20, 21])
+        """
+        self._add_in_filter(facet, list(selected))
+        self._state.facet_groups.append(
+            FacetGroup(
+                facet=facet,
+                clause=self._state.filters[-1],
+                members=frozenset(str(member) for member in members),
+            )
+        )
         return self
 
     def _apply_geo_filters(self, *geo_filters: Radius | BoundingBox) -> None:
@@ -373,7 +425,17 @@ class IndexQuerySet[T: IndexMixin]:
         - facetStats: Facet statistics (if facets requested)
         """
         search_params = self._build_search_params()
-        results = self.search_index.search(q, search_params)
+        counted_groups = [
+            group
+            for group in self._state.facet_groups
+            if group.facet in self._state.facets
+        ]
+        if counted_groups:
+            results = self._search_with_group_counts(
+                q, search_params, counted_groups
+            )
+        else:
+            results = self.search_index.search(q, search_params)
         enriched_results = self._enrich_results(results)
 
         response_data = {
@@ -396,6 +458,60 @@ class IndexQuerySet[T: IndexMixin]:
             response_data["facetStats"] = results["facetStats"]
 
         return response_data
+
+    def _search_with_group_counts(
+        self, q: str, params: dict, groups: list[FacetGroup]
+    ) -> dict:
+        """
+        Run the search plus one count-only query per facet group, in one
+        ``multi-search`` request (Meilisearch's documented recipe for
+        disjunctive facets).
+
+        Each group query repeats ``params`` (the same ``q``, matching
+        strategy and locales, so it matches the same documents) with the
+        group's own clause left out, ``limit`` 0 and only its facet. The
+        group's members are then counted from that query instead of the
+        main one, which has them narrowed by the group's own selection.
+        """
+        index_uid = self._model.get_meili_index_name()
+        queries = [{"indexUid": index_uid, "q": q, **params}]
+        queries.extend(
+            {
+                "indexUid": index_uid,
+                "q": q,
+                **params,
+                "filter": [
+                    clause
+                    for clause in params["filter"]
+                    if clause != group.clause
+                ],
+                "facets": [group.facet],
+                "offset": 0,
+                "limit": 0,
+            }
+            for group in groups
+        )
+        main, *counts = client.search_client.multi_search(queries)["results"]
+
+        distribution = main.setdefault("facetDistribution", {})
+        for group, counted in zip(groups, counts, strict=True):
+            own = counted.get("facetDistribution", {}).get(group.facet, {})
+            distribution[group.facet] = {
+                **{
+                    key: count
+                    for key, count in distribution.get(group.facet, {}).items()
+                    if key not in group.members
+                },
+                **{
+                    key: count
+                    for key, count in own.items()
+                    if key in group.members
+                },
+            }
+        main["processingTimeMs"] = sum(
+            result.get("processingTimeMs", 0) for result in (main, *counts)
+        )
+        return main
 
     def _build_search_params(self) -> dict:
         """Build the search parameters dictionary."""

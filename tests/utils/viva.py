@@ -4,7 +4,9 @@
 provider builds its real request (URL, query string, headers) and reads a
 real ``requests.Response``, so an assertion on ``FakeVivaApi.deletes``
 inspects what would have gone over the wire. The bodies below are copied
-from the Payment API spec (``docs/viva-payment-api.yaml``): the
+from Viva's Payment API spec
+(https://developer.viva.com/apis-for-payments/payment-api/; a local copy,
+gitignored, is kept at ``docs/viva-payment-api.yaml``): the
 ``delete_transaction`` example for Cancel Transaction and the
 ``get_transactions_v2`` example for Retrieve Transaction.
 """

@@ -83,3 +83,25 @@ class ShipmentAwaitingPaymentError(ShippingError):
             f"Order {order_id} is still awaiting its online payment — a "
             "courier shipment is only created once the payment is confirmed."
         )
+
+
+class CarrierError(Exception):
+    """A courier integration failed: the courier refused, or gave no answer.
+
+    The base of every carrier app's errors (``AcsError``, ``BoxNowError``),
+    so code that reaches the order's courier through ``ShippingService``
+    can tell a courier failure from a bug in our own code without
+    importing each carrier. Anything else that escapes a carrier call is
+    ours to fix, never the courier's answer.
+    """
+
+
+class CarrierUnavailableError(CarrierError):
+    """The courier gave no answer to act on.
+
+    Unreachable, timed out, failed on its side (HTTP 5xx), rejected the
+    call at its auth layer, has no credentials configured, or the same
+    request is already in flight. Unlike a plain :class:`CarrierError`
+    the courier did not judge the request, so nothing is known about the
+    parcel and asking again later may succeed.
+    """

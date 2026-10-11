@@ -22,6 +22,7 @@ from order.enum.status import (
 )
 from order.exceptions import (
     CartNotReadyError,
+    CourierUnreachableError,
     InsufficientStockError,
     InvalidCouponError,
     InvalidGiftCardError,
@@ -47,6 +48,7 @@ from order.signals import order_refunded
 from order.stock import StockManager
 from pay_way.enum.settlement import PaySettlement
 from promotion.services import CouponService, PromotionEngine
+from shipping.exceptions import CarrierError, CarrierUnavailableError
 from tenant.middleware import tenant_domain_set
 
 logger = logging.getLogger(__name__)
@@ -2213,11 +2215,13 @@ class OrderService:
         already knows (the cancel endpoint: the requester is not store
         staff). A customer cancel asks the courier to cancel the voucher
         FIRST and only goes on when the courier confirms or the order has
-        no voucher; if the courier refuses (voucher already on a pickup
-        list, parcel already at a locker) or cannot be reached, it raises
-        :class:`ParcelWithCourierError` and nothing changes — no status,
-        no refund, no shipment. That ask is a carrier HTTP call, so a
-        customer cancel must not run inside an open transaction.
+        no voucher. A courier that refuses (voucher already on a pickup
+        list, parcel already at a locker) raises
+        :class:`ParcelWithCourierError`, one that gives no answer raises
+        :class:`CourierUnreachableError`, and either way nothing changes —
+        no status, no refund, no shipment. That ask is a carrier HTTP
+        call, so a customer cancel must not run inside an open
+        transaction.
 
         Staff and system callers pass ``customer_initiated=False``: they
         cancel and refund regardless, the courier is asked afterwards on
@@ -2231,12 +2235,56 @@ class OrderService:
             if customer_initiated
             else None
         )
-        return cls._cancel_order_locked(
-            order,
-            reason,
-            refund_payment,
-            canceled_by,
-            shipment_cancel=shipment_cancel,
+        try:
+            return cls._cancel_order_locked(
+                order,
+                reason,
+                refund_payment,
+                canceled_by,
+                shipment_cancel=shipment_cancel,
+            )
+        except Exception:
+            if shipment_cancel is not None and shipment_cancel["dispatched"]:
+                cls._note_parcel_canceled_without_order(order)
+            raise
+
+    @classmethod
+    def _note_parcel_canceled_without_order(cls, order: Order) -> None:
+        """Tell staff the courier canceled a parcel whose order did not.
+
+        The courier is asked before the order row is locked, so the
+        order can move on while the courier answers (staff marking it
+        shipped is the realistic case: a courier that accepts the cancel
+        has not collected the parcel). The locked re-check then refuses
+        the cancel and the order stays live with no voucher behind it.
+        Nothing reverses a courier cancel, so staff must create a new
+        voucher; the ERROR line raises the logged-errors alert and the
+        note is where staff read about the order. An order another
+        request canceled in the meantime needs neither.
+        """
+        from order.models.history import OrderHistory
+
+        current_status = Order.objects.values_list("status", flat=True).get(
+            pk=order.pk
+        )
+        if current_status == OrderStatus.CANCELED:
+            return
+        logger.error(
+            "Order %s: the courier canceled its parcel for a customer "
+            "cancel, but the order (now %s) was not canceled; it needs "
+            "a new voucher",
+            order.id,
+            current_status,
+        )
+        OrderHistory.log_note(
+            order=order,
+            note=(
+                "The customer asked to cancel this order and the courier "
+                "canceled its parcel, but the order had moved on to "
+                f"{current_status} and was not canceled. The parcel's "
+                "voucher no longer exists: create a new one if the order "
+                "is still to ship."
+            ),
         )
 
     @classmethod
@@ -2251,14 +2299,19 @@ class OrderService:
         courier is not asked about an order that will not cancel, and
         the locked re-check in :meth:`_cancel_order_locked` raises the
         usual status error. Raises :class:`ParcelWithCourierError` when
-        the courier refuses or cannot be reached.
+        the courier refuses and :class:`CourierUnreachableError` when it
+        gives no answer (``CarrierUnavailableError``). Only courier
+        errors are the courier's answer: anything else is a fault of
+        ours and propagates as itself.
 
         Runs before the order row is locked, outside any transaction of
         its own: the carrier calls are three-phase so they never hold a
         transaction open across the courier's HTTP round trip
         (``idle_in_transaction_session_timeout`` would kill it), and the
         order row stays unlocked while the courier answers. The locked
-        re-check afterwards is what decides the order's fate.
+        re-check afterwards is what decides the order's fate
+        (:meth:`_note_parcel_canceled_without_order` covers a parcel the
+        courier canceled for an order that then did not cancel).
         """
         from shipping.services import ShippingService
 
@@ -2268,10 +2321,27 @@ class OrderService:
 
         try:
             dispatched = ShippingService.cancel_shipment(current, reason=reason)
-        except Exception as exc:
+        except CarrierUnavailableError as exc:
             logger.warning(
-                "Customer cancel of order %s refused: the courier did not "
-                "confirm the voucher cancel: %s",
+                "Customer cancel of order %s stopped: the courier gave no "
+                "answer to the voucher cancel: %s",
+                order.id,
+                exc,
+                exc_info=True,
+            )
+            raise CourierUnreachableError(
+                order_id=order.id,
+                reason=str(
+                    _(
+                        "We could not reach the courier to cancel your "
+                        "parcel. Please try again in a few minutes."
+                    )
+                ),
+            ) from exc
+        except CarrierError as exc:
+            logger.warning(
+                "Customer cancel of order %s refused: the courier refused "
+                "the voucher cancel: %s",
                 order.id,
                 exc,
                 exc_info=True,

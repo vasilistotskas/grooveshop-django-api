@@ -323,9 +323,19 @@ class ParcelWithCourierError(OrderCancellationError):
 
     A customer cancel asks the courier to cancel the voucher before the
     order is touched. A courier that refuses (the voucher is already on a
-    pickup list, the parcel is already at a locker) or cannot be reached
-    leaves the order exactly as it was: no status change, no refund, no
-    shipment change.
+    pickup list, the parcel is already at a locker) leaves the order
+    exactly as it was: no status change, no refund, no shipment change.
+    """
+
+
+class CourierUnreachableError(OrderCancellationError):
+    """
+    Raised when a customer cancel stops because the courier gave no answer.
+
+    The courier could not be reached, failed on its side or rejected the
+    call at its auth layer (``CarrierUnavailableError``), so nothing is
+    known about the parcel. Like a refusal it leaves the order exactly as
+    it was, but asking again later may succeed.
     """
 
 

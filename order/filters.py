@@ -208,10 +208,6 @@ class OrderFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
     is_canceled = filters.BooleanFilter(
         method="filter_is_canceled", help_text=_("Filter canceled orders")
     )
-    can_be_canceled = filters.BooleanFilter(
-        method="filter_can_be_canceled",
-        help_text=_("Filter orders that can be canceled"),
-    )
 
     active_orders = filters.BooleanFilter(
         method="filter_active_orders",
@@ -365,14 +361,6 @@ class OrderFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
             return queryset.filter(status=OrderStatus.CANCELED)
         elif value is False:
             return queryset.exclude(status=OrderStatus.CANCELED)
-        return queryset
-
-    def filter_can_be_canceled(self, queryset, name, value):
-        cancellable_statuses = [OrderStatus.PENDING, OrderStatus.PROCESSING]
-        if value is True:
-            return queryset.filter(status__in=cancellable_statuses)
-        elif value is False:
-            return queryset.exclude(status__in=cancellable_statuses)
         return queryset
 
     def filter_active_orders(self, queryset, name, value):

@@ -14,3 +14,7 @@ class OrderCancelErrorType(models.TextChoices):
         "parcel_with_courier",
         _("Parcel already with the courier"),
     )
+    COURIER_UNREACHABLE = (
+        "courier_unreachable",
+        _("Courier could not be reached"),
+    )

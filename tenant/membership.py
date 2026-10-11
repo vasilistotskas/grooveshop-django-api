@@ -153,37 +153,46 @@ def get_membership(user: Any, tenant: Any | None = None) -> Any | None:
     return membership
 
 
-def is_platform_superuser(user: Any) -> bool:
-    """True when *user*'s ``is_superuser`` flag can be believed.
+def is_platform_identity(user: Any) -> bool:
+    """True when *user* provably came from the public schema.
 
-    The flag alone cannot be. ``UserAccount`` is mirrored per schema and
-    the cutover copied users id-preserving, so ``is_superuser`` on a
-    TENANT-schema row is residue on a CUSTOMER record — the identical
-    argument this codebase already makes about ``is_staff``, on the
-    identical rows. Trusting one while rejecting the other was the gap.
+    ``UserAccount`` is mirrored per schema and the cutover copied users
+    id-preserving, so a TENANT-schema row is a customer record, and the
+    privilege flags or permission grants it may still carry are residue.
+    A user object is a platform identity in exactly two ways:
 
-    It is honoured only when the identity provably came from the public
-    schema, which is true in exactly two ways:
-
-    - the object carries ``PLATFORM_IDENTITY_ATTR``, stamped by
+    - it carries ``PLATFORM_IDENTITY_ATTR``, stamped by
       ``PlatformStaffBackend`` (login and session restore) and by
       ``PlatformStaffTokenAuthentication`` — the only three places a
       platform identity is ever loaded; or
     - the connection is on the public schema, where
-      ``user_useraccount`` IS the platform table, so the flag means what
-      it says. That is the platform control-plane host, and also the
-      single-schema lane the main test suite runs in.
+      ``user_useraccount`` IS the platform table. That is the platform
+      control-plane host, and also the single-schema lane the main test
+      suite runs in.
 
-    A tenant-schema customer holding residual ``is_superuser`` and a
-    plain Knox token satisfies neither, which is the whole point.
+    A tenant-schema customer with a plain Knox token or session is
+    neither.
     """
-    if user is None or not getattr(user, "is_superuser", False):
+    if user is None:
         return False
     from tenant.auth_backends import PLATFORM_IDENTITY_ATTR
 
     if getattr(user, PLATFORM_IDENTITY_ATTR, False):
         return True
     return connection.schema_name == get_public_schema_name()
+
+
+def is_platform_superuser(user: Any) -> bool:
+    """True when *user*'s ``is_superuser`` flag can be believed.
+
+    The flag alone cannot be: on a tenant-schema row it is residue on a
+    CUSTOMER record — the identical argument this codebase already makes
+    about ``is_staff``, on the identical rows. It is honoured only on a
+    platform identity (``is_platform_identity``).
+    """
+    if user is None or not getattr(user, "is_superuser", False):
+        return False
+    return is_platform_identity(user)
 
 
 def is_store_staff(user: Any) -> bool:

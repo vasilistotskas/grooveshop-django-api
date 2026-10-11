@@ -100,10 +100,10 @@ class StoreStaffModelPermissions(DjangoModelPermissions):
       role backend derives their set from ``connection.tenant`` +
       membership. STAFF gets view/add/change on operational apps,
       ADMIN/OWNER the full store scope.
-    - A **customer session: never.** Unstamped identities get nothing
-      from the role backend, customers hold no Django perms, and the
-      tenant-schema privilege flags were cleared — three independent
-      reasons.
+    - A **customer session: never.** ``UserAccount.has_perm`` answers
+      only for a platform identity (``tenant.membership
+      .is_platform_identity``), so a tenant-schema row holds no Django
+      permission whatever flags or grants it carries.
 
     The only extension over stock ``DjangoModelPermissions`` is
     requiring the ``view`` permission on reads: these are

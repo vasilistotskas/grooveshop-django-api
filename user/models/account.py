@@ -215,6 +215,46 @@ class UserAccount(
     def get_short_name(self):
         return self.username
 
+    # Django permissions belong to platform identities only
+    # (``tenant.membership.is_platform_identity``). A tenant-schema row
+    # is a customer record, so neither its flags nor any stored grant
+    # mean anything here; gating these methods keeps PermissionsMixin's
+    # superuser short-circuit and ModelBackend from reading them, for DRF
+    # and the admin alike. Platform identities resolve through the role
+    # backend (``tenant.auth_backends``) as before.
+    def has_perm(self, perm, obj=None):
+        from tenant.membership import is_platform_identity
+
+        return is_platform_identity(self) and super().has_perm(perm, obj)
+
+    def has_module_perms(self, app_label):
+        from tenant.membership import is_platform_identity
+
+        return is_platform_identity(self) and super().has_module_perms(
+            app_label
+        )
+
+    def get_all_permissions(self, obj=None):
+        from tenant.membership import is_platform_identity
+
+        if not is_platform_identity(self):
+            return set()
+        return super().get_all_permissions(obj)
+
+    def get_user_permissions(self, obj=None):
+        from tenant.membership import is_platform_identity
+
+        if not is_platform_identity(self):
+            return set()
+        return super().get_user_permissions(obj)
+
+    def get_group_permissions(self, obj=None):
+        from tenant.membership import is_platform_identity
+
+        if not is_platform_identity(self):
+            return set()
+        return super().get_group_permissions(obj)
+
     @property
     def active_subscriptions(self):
         return self.subscriptions.filter(

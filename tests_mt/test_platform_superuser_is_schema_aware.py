@@ -61,3 +61,70 @@ def test_a_plain_customer_is_neither(mt_tenant):
         assert is_store_staff(shopper) is False
     finally:
         connection.set_schema_to_public()
+
+
+# ``UserAccount.has_perm`` and friends answer only for a platform identity,
+# and every ``StoreStaffModelPermissions`` route asks ``has_perm``.
+
+
+def test_a_tenant_schema_superuser_holds_no_django_permission(mt_tenant):
+    connection.set_tenant(mt_tenant)
+    try:
+        residue = UserAccountFactory(is_superuser=True, is_staff=True)
+
+        assert residue.has_perm("product.add_productcategory") is False
+        assert residue.has_perms(["order.change_order"]) is False
+        assert residue.has_module_perms("order") is False
+        assert residue.get_all_permissions() == set()
+    finally:
+        connection.set_schema_to_public()
+
+
+def test_a_stamped_platform_superuser_keeps_every_permission(mt_tenant):
+    connection.set_tenant(mt_tenant)
+    try:
+        operator = UserAccountFactory(is_superuser=True)
+        setattr(operator, PLATFORM_IDENTITY_ATTR, True)
+
+        assert operator.has_perm("product.add_productcategory") is True
+        assert operator.has_module_perms("order") is True
+    finally:
+        connection.set_schema_to_public()
+
+
+def test_a_public_schema_superuser_keeps_every_permission():
+    connection.set_schema_to_public()
+
+    operator = UserAccountFactory(is_superuser=True)
+
+    assert operator.has_perm("product.add_productcategory") is True
+
+
+def test_a_residue_superuser_token_is_refused_on_a_store_staff_route(
+    mt_tenant,
+):
+    """End to end, through the real tenant middleware: a tenant-schema
+    account's flags grant nothing on a store-staff route."""
+    from django.urls import reverse
+    from django_tenants.test.client import TenantClient
+    from django_tenants.utils import schema_context
+    from knox.models import AuthToken
+
+    from product.models.category import ProductCategory
+
+    with schema_context(mt_tenant.schema_name):
+        residue = UserAccountFactory(is_superuser=True, is_staff=True)
+        _instance, token = AuthToken.objects.create(user=residue)
+        before = ProductCategory.objects.count()
+
+    client = TenantClient(mt_tenant)
+    response = client.post(
+        reverse("product-category-list"),
+        {"slug": "residue-probe", "translations": {"el": {"name": "x"}}},
+        content_type="application/json",
+        HTTP_AUTHORIZATION=f"Bearer {token}",
+    )
+
+    assert response.status_code == 403, getattr(response, "data", None)
+    with schema_context(mt_tenant.schema_name):
+        assert ProductCategory.objects.count() == before

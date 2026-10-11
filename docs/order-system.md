@@ -719,6 +719,10 @@ All WS notifications go through `notification.consumers.NotificationConsumer` an
 
 Both fire `order_refunded.send` → `handle_order_refunded` → email + WS notification. Single boolean `refund_confirmation_email_sent` flag dedupes between paths (PR #8).
 
+**A refund the provider did not make is not recorded.** `refund_order` returns `(False, response)` and changes nothing on the order: `payment_status` stays COMPLETED, `metadata["refunds"]` gets no entry, `order_refunded` does not fire. It leaves a staff-only `OrderHistory` NOTE (`Refund via <provider> was not processed: …`; `NOTE` is not a customer-visible history type). `cancel_order` still cancels and reports `refund_info = {"refunded": False, …}` with no provider text; the admin "Cancel selected orders" action raises an error message for it.
+
+**Viva (`VivaWalletPaymentProvider.refund_payment`).** Cancel Transaction requires `amount` (cents), so the request always carries it. A partial refund sends the amount asked for. `amount=None` (every `cancel_order`) means the whole capture: the provider reads what Viva captured from Retrieve Transaction (`_captured_amount`), because `Order.paid_amount` is the amount owed at creation, not what Viva collected. If that read fails nothing is sent. HTTP 2xx is not success: Viva reports refusals in a 200 body, so only `Success` true with `ErrorCode` 0 counts, and the body's `TransactionId` (the refund transaction) is stored as `refund_id`. Before #134 the amount was omitted and the body ignored, so every in-app Viva refund booked REFUNDED while Viva kept the payment at `F`.
+
 ## 8. Critical invariants
 
 These exist for a reason. Don't undo any without first re-reading

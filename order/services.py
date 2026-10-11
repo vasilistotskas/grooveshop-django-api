@@ -2488,6 +2488,23 @@ class OrderService:
         )
 
         if not success:
+            # Nothing was recorded as refunded, and the caller may only
+            # log the outcome (the admin cancel action once dropped it
+            # altogether), so leave the failure where staff look: the
+            # order's history. ``NOTE`` rows are not customer-visible
+            # (``CUSTOMER_VISIBLE_HISTORY_TYPES``), which matters because
+            # the provider's own wording goes in.
+            from order.models.history import OrderHistory
+
+            details = refund_response.get("details")
+            OrderHistory.log_note(
+                order=order,
+                note=(
+                    f"Refund via {order.pay_way.provider_code} was not "
+                    f"processed: {refund_response.get('error')}"
+                    + (f" ({details})" if details else "")
+                ),
+            )
             return False, refund_response
 
         order.payment_status = refund_response.get(

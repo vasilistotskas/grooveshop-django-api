@@ -11,12 +11,14 @@ routed through the service.
 
 from __future__ import annotations
 
+from decimal import Decimal
 from unittest.mock import patch
 
 import pytest
 from django.contrib.admin.sites import AdminSite
 from django.contrib.auth import get_user_model
 from django.test import RequestFactory
+from djmoney.money import Money
 
 from order.admin import OrderAdmin
 from order.enum.status import OrderStatus, PaymentStatus
@@ -25,6 +27,7 @@ from order.models.order import Order
 from order.stock import StockManager
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
+from tests.utils.viva import CANCEL_REFUSED, FakeVivaApi
 
 pytestmark = pytest.mark.django_db
 
@@ -117,3 +120,43 @@ def test_refunded_action_only_follows_a_return():
     completed.refresh_from_db()
     assert returned.status == OrderStatus.REFUNDED
     assert completed.status == OrderStatus.COMPLETED
+
+
+def _paid_viva_order():
+    return OrderFactory(
+        status=OrderStatus.PROCESSING,
+        payment_status=PaymentStatus.COMPLETED,
+        payment_id="b1a3067c-321b-4ec6-bc9d-1778aef2a19d",
+        paid_amount=Money(Decimal("21.10"), "EUR"),
+        pay_way=PayWayFactory.create_online_payment("viva_wallet"),
+        num_order_items=0,
+    )
+
+
+def test_cancel_action_says_so_when_the_refund_did_not_go_through():
+    """The order is canceled either way; "marked as canceled" alone would
+    read as a finished job while the money is still with the shop."""
+    order = _paid_viva_order()
+
+    with (
+        FakeVivaApi(cancel=(200, CANCEL_REFUSED)),
+        patch.object(OrderAdmin, "message_user") as message,
+    ):
+        _admin().mark_as_canceled(_request(), Order.objects.filter(pk=order.pk))
+
+    order.refresh_from_db()
+    assert order.status == OrderStatus.CANCELED
+    assert order.payment_status == PaymentStatus.COMPLETED
+    assert message.call_count == 2
+    assert message.call_args_list[-1].kwargs == {"level": "error"}
+
+
+def test_cancel_action_stays_quiet_when_the_refund_went_through():
+    order = _paid_viva_order()
+
+    with FakeVivaApi(), patch.object(OrderAdmin, "message_user") as message:
+        _admin().mark_as_canceled(_request(), Order.objects.filter(pk=order.pk))
+
+    order.refresh_from_db()
+    assert order.payment_status == PaymentStatus.REFUNDED
+    assert message.call_count == 1

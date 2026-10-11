@@ -986,12 +986,26 @@ class OrderAdmin(BaseModelAdmin):
 
         for order in queryset:
             try:
-                OrderService.cancel_order(order)
+                _canceled, refund_info = OrderService.cancel_order(order)
                 self.message_user(
                     request,
                     _("Order %(order_id)s marked as canceled")
                     % {"order_id": order.id},
                 )
+                if refund_info and not refund_info["refunded"]:
+                    # The order is canceled and the money is still with
+                    # the shop: say so, or "marked as canceled" reads as
+                    # a finished job. The cause is in the order history.
+                    self.message_user(
+                        request,
+                        _(
+                            "Order %(order_id)s was canceled but its "
+                            "payment was not refunded; see the order "
+                            "history."
+                        )
+                        % {"order_id": order.id},
+                        level="error",
+                    )
             except OrderCancellationError as e:
                 # Order not eligible (already shipped, delivered,
                 # cancelled, etc.). Skip and report — not a server

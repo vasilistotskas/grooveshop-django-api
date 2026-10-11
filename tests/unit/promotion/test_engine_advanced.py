@@ -370,3 +370,256 @@ class TestNotApplicableCode:
             ("GONE", str(CouponRejectionReason.NOT_APPLICABLE))
         ]
         assert result.blocking_rejections == []
+
+
+def _sellable_product(price, *, stock=1000, active=True):
+    return ProductFactory(
+        price=Money(Decimal(str(price)), "EUR"),
+        discount_percent=Decimal(0),
+        vat=None,
+        stock=stock,
+        active=active,
+    )
+
+
+def _reward_pool(buy_products, reward_products, *, trigger, **kwargs):
+    """A "buy a case, get its screen protector at -50%" offer."""
+    promotion = PromotionFactory(
+        trigger=trigger,
+        benefit_type=BenefitType.BXGY,
+        buy_quantity=1,
+        get_quantity=1,
+        get_discount_percent=Decimal(50),
+        target_scope=TargetScope.PRODUCTS,
+        **kwargs,
+    )
+    promotion.products.set(buy_products)
+    promotion.get_products.set(reward_products)
+    return promotion
+
+
+class TestTeaserIsAPromise:
+    """A teaser is shown only when doing what it says gets the offer."""
+
+    def test_withheld_when_a_better_non_stackable_offer_would_win(
+        self, enable_promotions, make_cart
+    ):
+        """Demo store, 2026-10-10: two cables teased "-5% from 3 items",
+        but the third cable unlocks a non-stackable "2+1" worth more, so
+        the -5% the teaser promised is never granted."""
+        cart, products = make_cart([(10, 2)])
+        five_percent = PromotionFactory(
+            trigger=PromotionTrigger.AUTOMATIC,
+            benefit_value=Decimal(5),
+            min_quantity=3,
+            stackable=True,
+        )
+        two_plus_one = PromotionFactory(
+            trigger=PromotionTrigger.AUTOMATIC,
+            benefit_type=BenefitType.BXGY,
+            buy_quantity=2,
+            get_quantity=1,
+            get_discount_percent=Decimal(100),
+            target_scope=TargetScope.PRODUCTS,
+            stackable=False,
+        )
+        two_plus_one.products.set(products)
+
+        result = PromotionEngine.evaluate(cart)
+
+        assert [entry.promotion for entry in result.near_miss] == [two_plus_one]
+        assert five_percent not in {e.promotion for e in result.near_miss}
+
+    def test_reward_pool_teaser_names_the_rewards_that_can_be_bought(
+        self, enable_promotions, make_cart
+    ):
+        cart, [case] = make_cart([(20, 1)])
+        sellable = _sellable_product(8)
+        inactive = _sellable_product(6, active=False)
+        sold_out = _sellable_product(5, stock=0)
+        promotion = _reward_pool(
+            [case],
+            [sellable, inactive, sold_out],
+            trigger=PromotionTrigger.AUTOMATIC,
+        )
+
+        [entry] = PromotionEngine.evaluate(cart).near_miss
+
+        assert entry.promotion == promotion
+        assert entry.reward_products == [sellable]
+        assert entry.remaining_quantity == 1
+        assert entry.remaining_amount is None
+
+    def test_reward_pool_short_of_its_buy_side_asks_for_units(
+        self, enable_promotions, make_cart
+    ):
+        cart, [case, protector] = make_cart([(20, 1), (8, 1)])
+        promotion = _reward_pool(
+            [case], [protector], trigger=PromotionTrigger.AUTOMATIC
+        )
+        promotion.buy_quantity = 2
+        promotion.save(update_fields=["buy_quantity"])
+
+        [entry] = PromotionEngine.evaluate(cart).near_miss
+
+        assert entry.remaining_quantity == 1
+        assert entry.reward_products == []
+
+    def test_reward_pool_short_of_both_sides_is_not_a_single_teaser(
+        self, enable_promotions, make_cart
+    ):
+        """One more case alone would still leave the reward missing, so
+        "add 1 more" would be a promise the cart then breaks."""
+        cart, [case] = make_cart([(20, 1)])
+        promotion = _reward_pool(
+            [case],
+            [_sellable_product(8)],
+            trigger=PromotionTrigger.AUTOMATIC,
+        )
+        promotion.buy_quantity = 2
+        promotion.save(update_fields=["buy_quantity"])
+
+        assert PromotionEngine.evaluate(cart).near_miss == []
+
+    def test_reward_pool_without_a_buyable_reward_is_silent(
+        self, enable_promotions, make_cart
+    ):
+        cart, [case] = make_cart([(20, 1)])
+        _reward_pool(
+            [case],
+            [_sellable_product(8, stock=0)],
+            trigger=PromotionTrigger.AUTOMATIC,
+        )
+
+        assert PromotionEngine.evaluate(cart).near_miss == []
+
+    def test_gift_teaser_withheld_while_the_gift_is_sold_out(
+        self, enable_promotions, make_cart
+    ):
+        cart, _ = make_cart([(30, 1)])
+        promotion = PromotionFactory(
+            trigger=PromotionTrigger.AUTOMATIC,
+            benefit_type=BenefitType.FREE_GIFT,
+            get_quantity=1,
+            min_subtotal=Money(Decimal(50), "EUR"),
+        )
+        promotion.get_products.add(_sellable_product(15, stock=0))
+
+        assert PromotionEngine.evaluate(cart).near_miss == []
+
+
+class TestACodeMustChangeTheOutcome:
+    """apply() accepts a code only when it takes something off."""
+
+    def test_gift_code_with_a_sold_out_gift_is_refused_without_blocking(
+        self, enable_promotions, make_cart
+    ):
+        cart, _ = make_cart([(100, 1)])
+        promotion = PromotionFactory(
+            trigger=PromotionTrigger.CODE,
+            benefit_type=BenefitType.FREE_GIFT,
+            get_quantity=1,
+        )
+        promotion.get_products.add(_sellable_product(15, stock=0))
+        code = PromotionCodeFactory(promotion=promotion, code="GIFT")
+        CartPromotionCode.objects.create(cart=cart, code=code)
+
+        result = PromotionEngine.evaluate(cart)
+
+        assert result.gift_items == []
+        assert result.rejected == [
+            ("GIFT", str(CouponRejectionReason.GIFT_UNAVAILABLE))
+        ]
+        # The paid goods are never held hostage by a sold-out freebie.
+        assert result.blocking_rejections == []
+
+    def test_free_shipping_code_redundant_with_an_automatic_is_refused(
+        self, enable_promotions, make_cart
+    ):
+        cart, _ = make_cart([(100, 1)])
+        automatic = PromotionFactory(
+            trigger=PromotionTrigger.AUTOMATIC,
+            benefit_type=BenefitType.FREE_SHIPPING,
+        )
+        code = PromotionCodeFactory(
+            promotion=PromotionFactory(
+                trigger=PromotionTrigger.CODE,
+                benefit_type=BenefitType.FREE_SHIPPING,
+            ),
+            code="SHIPFREE",
+        )
+        CartPromotionCode.objects.create(cart=cart, code=code)
+
+        result = PromotionEngine.evaluate(cart)
+
+        assert result.free_shipping is True
+        assert result.non_monetary == [(automatic, None)]
+        assert result.rejected == [
+            ("SHIPFREE", str(CouponRejectionReason.COMBINATION_DISALLOWED))
+        ]
+        assert result.blocking_rejections == []
+
+    def test_code_the_clamp_leaves_with_nothing_is_refused(
+        self, enable_promotions, make_cart
+    ):
+        cart, _ = make_cart([(50, 1)])
+        PromotionFactory(
+            trigger=PromotionTrigger.AUTOMATIC,
+            benefit_type=BenefitType.FIXED_AMOUNT,
+            benefit_value=Decimal(50),
+            stackable=True,
+            priority=0,
+        )
+        code = PromotionCodeFactory(
+            promotion=PromotionFactory(
+                trigger=PromotionTrigger.CODE,
+                benefit_type=BenefitType.FIXED_AMOUNT,
+                benefit_value=Decimal(10),
+                stackable=True,
+                priority=10,
+            ),
+            code="LATE",
+        )
+        CartPromotionCode.objects.create(cart=cart, code=code)
+
+        result = PromotionEngine.evaluate(cart)
+
+        assert result.discount_total == Money(Decimal("50.00"), "EUR")
+        assert "LATE" not in {e.code.code for e in result.applied if e.code}
+        assert result.rejected == [
+            ("LATE", str(CouponRejectionReason.COMBINATION_DISALLOWED))
+        ]
+
+    def test_reward_pool_code_without_the_reward_is_minimum_not_met(
+        self, enable_promotions, make_cart
+    ):
+        cart, [case] = make_cart([(20, 1)])
+        promotion = _reward_pool(
+            [case], [_sellable_product(8)], trigger=PromotionTrigger.CODE
+        )
+        code = PromotionCodeFactory(promotion=promotion, code="CASEGLASS")
+        CartPromotionCode.objects.create(cart=cart, code=code)
+
+        result = PromotionEngine.evaluate(cart)
+
+        assert result.rejected == [
+            ("CASEGLASS", str(CouponRejectionReason.MINIMUM_NOT_MET))
+        ]
+
+    def test_reward_pool_code_with_no_buyable_reward_is_not_applicable(
+        self, enable_promotions, make_cart
+    ):
+        cart, [case] = make_cart([(20, 1)])
+        promotion = _reward_pool(
+            [case],
+            [_sellable_product(8, active=False)],
+            trigger=PromotionTrigger.CODE,
+        )
+        code = PromotionCodeFactory(promotion=promotion, code="CASEGLASS")
+        CartPromotionCode.objects.create(cart=cart, code=code)
+
+        result = PromotionEngine.evaluate(cart)
+
+        assert result.rejected == [
+            ("CASEGLASS", str(CouponRejectionReason.NOT_APPLICABLE))
+        ]

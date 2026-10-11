@@ -15,7 +15,13 @@ import pytest
 from djmoney.money import Money
 
 from cart.serializers.cart import CartSerializer
-from promotion.enum import BenefitType, PromotionTrigger
+from product.factories import ProductFactory
+from promotion.enum import (
+    BenefitType,
+    CouponRejectionReason,
+    PromotionTrigger,
+    TargetScope,
+)
 from promotion.factories import PromotionCodeFactory, PromotionFactory
 from promotion.models import CartPromotionCode
 
@@ -185,3 +191,108 @@ def test_near_miss_carries_whichever_distance_is_missing(
     assert entries[by_amount.id]["remainingQuantity"] is None
     assert entries[by_units.id]["remainingQuantity"] == 1
     assert entries[by_units.id]["remainingAmount"] is None
+
+
+def _attach(cart, **promotion_kwargs):
+    code = PromotionCodeFactory(
+        promotion=PromotionFactory(
+            trigger=PromotionTrigger.CODE, **promotion_kwargs
+        )
+    )
+    CartPromotionCode.objects.create(cart=cart, code=code)
+    return code
+
+
+def test_applied_coupons_says_what_each_code_does(enable_promotions, make_cart):
+    """Demo store, 2026-10-11: SHIPFREE read "a better offer applies"
+    while it was waiving shipping, because the row only knew money."""
+    cart, _ = make_cart([(100, 1)])
+    code = _attach(cart, benefit_type=BenefitType.FREE_SHIPPING)
+
+    [entry] = CartSerializer(cart).data["applied_coupons"]
+
+    assert entry == {
+        "code": code.code,
+        "amount": Decimal(0),
+        "freeShipping": True,
+        "gift": False,
+        "rejection": None,
+    }
+
+
+def test_applied_coupons_carries_the_money_a_code_takes_off(
+    enable_promotions, make_cart
+):
+    cart, _ = make_cart([(100, 1)])
+    code = _attach(
+        cart,
+        benefit_type=BenefitType.FIXED_AMOUNT,
+        benefit_value=Decimal(5),
+    )
+
+    [entry] = CartSerializer(cart).data["applied_coupons"]
+
+    assert entry["code"] == code.code
+    assert entry["amount"] == Decimal("5.00")
+    assert entry["rejection"] is None
+
+
+def test_applied_coupons_explains_a_code_that_stopped_applying(
+    enable_promotions, make_cart
+):
+    cart, _ = make_cart([(100, 1)])
+    PromotionFactory(
+        trigger=PromotionTrigger.AUTOMATIC,
+        benefit_type=BenefitType.FIXED_AMOUNT,
+        benefit_value=Decimal(30),
+        stackable=False,
+    )
+    code = _attach(
+        cart,
+        benefit_type=BenefitType.FIXED_AMOUNT,
+        benefit_value=Decimal(5),
+        stackable=False,
+    )
+
+    [entry] = CartSerializer(cart).data["applied_coupons"]
+
+    assert entry["code"] == code.code
+    assert entry["amount"] == Decimal(0)
+    assert entry["freeShipping"] is False
+    assert entry["gift"] is False
+    assert entry["rejection"] == str(
+        CouponRejectionReason.COMBINATION_DISALLOWED
+    )
+
+
+def test_near_miss_names_the_reward_to_add(enable_promotions, make_cart):
+    """A case in the cart, its "-50% screen protector" not yet: the
+    teaser carries the protector so the storefront can link to it."""
+    cart, [case] = make_cart([(20, 1)])
+    protector = ProductFactory(
+        price=Money(Decimal(8), "EUR"), stock=10, active=True
+    )
+    promotion = PromotionFactory(
+        trigger=PromotionTrigger.AUTOMATIC,
+        benefit_type=BenefitType.BXGY,
+        buy_quantity=1,
+        get_quantity=1,
+        get_discount_percent=Decimal(50),
+        target_scope=TargetScope.PRODUCTS,
+    )
+    promotion.products.set([case])
+    promotion.get_products.set([protector])
+
+    [entry] = CartSerializer(cart).data["promotion_near_miss"]
+
+    assert entry["promotionId"] == promotion.id
+    assert entry["remainingQuantity"] == 1
+    assert [product["id"] for product in entry["rewardProducts"]] == [
+        protector.id
+    ]
+    assert set(entry["rewardProducts"][0]) == {
+        "id",
+        "name",
+        "slug",
+        "main_image_path",
+    }

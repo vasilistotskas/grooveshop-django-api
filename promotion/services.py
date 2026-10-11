@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import ROUND_CEILING, ROUND_HALF_UP, Decimal
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -80,14 +80,43 @@ class NearMissEntry:
 
     Exactly one distance is set: ``remaining_amount`` when only the
     minimum subtotal is missing, ``remaining_quantity`` when only units
-    are — a minimum quantity, or the rest of a buy-X-get-Y group.
-    Powers the storefront's "add X more to unlock" teaser, and is only
-    emitted for a cart that already holds something the promotion
-    counts (never for an empty cart)."""
+    are — a minimum quantity, the rest of a buy-X-get-Y group, or, with
+    ``reward_products`` set, units of one of those reward products (a
+    reward-pool offer whose buy side is already met). Powers the
+    storefront's "add X more to unlock" teaser. It is emitted only for a
+    cart that already holds something the promotion counts, and only
+    once ``PromotionEngine._teaser_holds`` has confirmed that doing what
+    it says would actually get the promotion granted."""
 
     promotion: Promotion
     remaining_amount: Decimal | None = None
     remaining_quantity: int | None = None
+    reward_products: list = field(default_factory=list)
+
+
+@dataclass
+class _SimulatedLine:
+    """A cart line as it would be after the shopper follows a teaser.
+
+    Carries exactly what the engine reads from a ``CartItem`` —
+    ``product``, ``product_id``, ``quantity``, ``final_price``,
+    ``total_price`` — so the real classification can run over a cart
+    that does not exist without writing anything."""
+
+    product: object
+    quantity: int
+    final_price: Money
+
+    @property
+    def product_id(self) -> int:
+        return self.product.pk
+
+    @property
+    def total_price(self) -> Money:
+        return Money(
+            self.quantity * self.final_price.amount,
+            self.final_price.currency,
+        )
 
 
 @dataclass
@@ -114,19 +143,24 @@ class CartDiscountResult:
     def blocking_rejections(self) -> list[tuple[str, str]]:
         """Rejections that must abort order creation.
 
-        Two reasons are not blocking, because dropping the code changes
-        nothing the cart preview showed:
+        Three reasons are not blocking, because dropping the code
+        changes nothing the cart preview showed:
 
         - combination_disallowed: the code lost the stacking comparison
-          to a better automatic promotion, so the shopper is charged LESS
+          to a better automatic promotion (or the automatic ones already
+          use up what it would give), so the shopper is charged no more
           than the code alone would give.
         - not_applicable: nothing left in the cart is in the code's
           scope (the item it covered was removed after applying), so it
           discounted nothing.
+        - gift_unavailable: the code's gift ran out after it was
+          applied. A freebie must not hold the paid goods hostage, the
+          same rule ``_inject_promotion_gifts`` follows.
         """
         non_blocking = {
             str(CouponRejectionReason.COMBINATION_DISALLOWED),
             str(CouponRejectionReason.NOT_APPLICABLE),
+            str(CouponRejectionReason.GIFT_UNAVAILABLE),
         }
         return [
             (code, reason)
@@ -230,10 +264,130 @@ class PromotionEngine:
 
         chosen = cls._resolve_stacking(monetary, result)
         chosen = cls._clamp(chosen, items_total, currency)
+        # A code the clamp left with nothing (earlier promotions already
+        # took the items total) moves no money: refuse it like a
+        # stacking loser instead of accepting it for nothing.
+        result.rejected.extend(
+            (entry.code.code, str(CouponRejectionReason.COMBINATION_DISALLOWED))
+            for entry in chosen
+            if entry.code is not None and entry.amount.amount <= 0
+        )
 
         result.applied = [e for e in chosen if e.amount.amount > 0]
         result.free_shipping = applicable_free_shipping
+        result.near_miss = [
+            entry
+            for entry in result.near_miss
+            if cls._teaser_holds(
+                entry,
+                candidates,
+                cart_items=cart_items,
+                currency=currency,
+                user=user,
+                email=email,
+            )
+        ]
         return result
+
+    @classmethod
+    def _teaser_holds(
+        cls,
+        entry: NearMissEntry,
+        candidates: list[tuple[Promotion, PromotionCode | None]],
+        *,
+        cart_items,
+        currency: str,
+        user,
+        email: str,
+    ) -> bool:
+        """Would doing what the teaser says get its promotion granted?
+
+        A teaser is a promise, so it is checked against the engine
+        itself: the cart is rebuilt as it would be once the shopper adds
+        what the teaser asks for, and the full classification, stacking
+        and clamp run over it. Only a teaser whose promotion survives is
+        shown. That rules out every way the promise could break — a
+        stackable promotion a better non-stackable one would beat (demo
+        store, 2026-10-10: "-5% from 3 items" teased on two cables, where
+        the third cable unlocks a "2+1" worth more), a free gift that is
+        out of stock, a reward the clamp would erase.
+        """
+        future_items = cls._items_after_teaser(entry, cart_items)
+        if future_items is None:
+            return False
+        future_total = sum(
+            (item.total_price.amount for item in future_items), Decimal(0)
+        )
+        scratch = CartDiscountResult()
+        monetary, _free_shipping = cls._classify(
+            candidates,
+            cart_items=future_items,
+            items_total=future_total,
+            currency=currency,
+            user=user,
+            email=email,
+            result=scratch,
+        )
+        chosen = cls._clamp(
+            cls._resolve_stacking(monetary, scratch), future_total, currency
+        )
+        granted = {e.promotion.pk for e in chosen if e.amount.amount > 0}
+        granted |= {promotion.pk for promotion, _code in scratch.non_monetary}
+        return entry.promotion.pk in granted
+
+    @classmethod
+    def _items_after_teaser(
+        cls, entry: NearMissEntry, cart_items
+    ) -> list | None:
+        """The cart lines once the teaser's advice is followed.
+
+        Units go onto the cheapest line the promotion counts — the
+        conservative reading, since a buy-X-get-Y discounts its cheapest
+        units — and a missing reward arrives as one new line of its
+        cheapest sellable product. ``None`` when there is nothing to
+        build on.
+        """
+        if entry.reward_products:
+            reward = min(
+                entry.reward_products,
+                key=lambda product: product.final_price.amount,
+            )
+            return [
+                *cart_items,
+                _SimulatedLine(
+                    product=reward,
+                    quantity=entry.remaining_quantity or 1,
+                    final_price=Money(
+                        reward.final_price.amount, settings.DEFAULT_CURRENCY
+                    ),
+                ),
+            ]
+
+        matching = cls._matching_items(entry.promotion, cart_items)
+        if not matching:
+            return None
+        target = min(matching, key=lambda item: item.final_price.amount)
+        if entry.remaining_quantity:
+            extra = entry.remaining_quantity
+        else:
+            unit = target.final_price.amount
+            if unit <= 0 or entry.remaining_amount is None:
+                return None
+            extra = int(
+                (entry.remaining_amount / unit).to_integral_value(
+                    rounding=ROUND_CEILING
+                )
+            )
+        return [
+            _SimulatedLine(
+                product=item.product,
+                quantity=item.quantity + extra,
+                final_price=item.final_price,
+            )
+            if item is target
+            else item
+            for item in cart_items
+        ]
 
     @classmethod
     def _classify(
@@ -259,7 +413,6 @@ class PromotionEngine:
         from the one the cart is actually charged with.
         """
         monetary: list[AppliedPromotion] = []
-        applicable_free_shipping = False
         eligible: list[tuple[Promotion, PromotionCode | None]] = []
         for promotion, code in candidates:
             reason = cls._check_eligibility(
@@ -283,48 +436,82 @@ class PromotionEngine:
                 continue
             eligible.append((promotion, code))
 
+        free_shipping: list[tuple[Promotion, PromotionCode | None]] = []
         for promotion, code in eligible:
             if promotion.benefit_type == BenefitType.FREE_SHIPPING:
                 # Free shipping has no amount to conflict over — it
                 # always combines (``stackable`` is ignored, see the
-                # model help_text).
-                applicable_free_shipping = True
-                result.non_monetary.append((promotion, code))
+                # model help_text). Settled after the loop, once it is
+                # known whether an automatic promotion already waives it.
+                free_shipping.append((promotion, code))
                 continue
             if promotion.benefit_type == BenefitType.FREE_GIFT:
                 entitlement = cls._gift_entitlement(promotion)
                 if entitlement is not None:
                     result.gift_items.append(entitlement)
                     result.non_monetary.append((promotion, code))
+                elif code is not None:
+                    # No gift it could hand over, so applying the code
+                    # would change nothing.
+                    result.rejected.append(
+                        (
+                            code.code,
+                            str(CouponRejectionReason.GIFT_UNAVAILABLE),
+                        )
+                    )
                 continue
             amount = cls._amount_for(
                 promotion, cart_items, items_total, currency
             )
             if amount.amount <= 0:
-                # A buy-X-get-Y short of its first full group earns
-                # nothing yet: an automatic one becomes an "add N more"
-                # teaser, and a code is refused rather than accepted
-                # for nothing.
-                short = (
-                    cls._bxgy_units_short(promotion, cart_items)
+                # Worth nothing on this cart yet. An automatic buy-X-
+                # get-Y short of its first group becomes an "add N more"
+                # teaser; a code is refused, never accepted for nothing.
+                shortfall = (
+                    cls._bxgy_shortfall(promotion, cart_items)
                     if promotion.benefit_type == BenefitType.BXGY
-                    else 0
+                    else None
                 )
-                if short and code is None:
-                    result.near_miss.append(
-                        NearMissEntry(promotion, remaining_quantity=short)
-                    )
-                elif short:
-                    result.rejected.append(
-                        (
-                            code.code,
-                            str(CouponRejectionReason.MINIMUM_NOT_MET),
-                        )
-                    )
+                if code is None:
+                    if shortfall is not None:
+                        result.near_miss.append(shortfall)
+                    continue
+                result.rejected.append(
+                    (code.code, cls._worthless_code_reason(shortfall))
+                )
                 continue
             monetary.append(AppliedPromotion(promotion, code, amount))
 
+        # A free-shipping code on a cart an automatic promotion already
+        # ships free would change nothing, so it is refused like a
+        # stacking loser rather than "applied" with no effect.
+        waived = any(code is None for _promotion, code in free_shipping)
+        for promotion, code in free_shipping:
+            if code is not None and waived:
+                result.rejected.append(
+                    (
+                        code.code,
+                        str(CouponRejectionReason.COMBINATION_DISALLOWED),
+                    )
+                )
+                continue
+            result.non_monetary.append((promotion, code))
+        applicable_free_shipping = bool(free_shipping)
+
         return monetary, applicable_free_shipping
+
+    @staticmethod
+    def _worthless_code_reason(shortfall: NearMissEntry | None) -> str:
+        """Why a code that would take nothing off this cart is refused.
+
+        Short of a buy-X-get-Y group (or its reward) is a minimum the
+        shopper can still meet; anything else — e.g. a reward-pool offer
+        whose rewards cannot be bought — leaves nothing in the cart for
+        the code to act on.
+        """
+        if shortfall is not None:
+            return str(CouponRejectionReason.MINIMUM_NOT_MET)
+        return str(CouponRejectionReason.NOT_APPLICABLE)
 
     @classmethod
     def _minimum_near_miss(
@@ -358,29 +545,50 @@ class PromotionEngine:
         return None
 
     @classmethod
-    def _bxgy_units_short(cls, promotion: Promotion, cart_items) -> int:
-        """Units the cart still needs before the buy side earns once.
+    def _bxgy_shortfall(
+        cls, promotion: Promotion, cart_items
+    ) -> NearMissEntry | None:
+        """What a buy-X-get-Y still needs before it earns once, if anything.
 
-        Mirrors ``_bxgy_amount``'s two modes: a same-pool offer needs
-        ``buy + get`` eligible units ("buy 2 get 1 free" needs 3), a
-        reward-pool offer needs ``buy`` units on the buy side. Zero when
-        the cart holds none of the eligible units (nothing to build on)
-        or the group is already complete; a reward-pool offer whose buy
-        side is met but whose reward is missing is not a quantity
-        question, so it reports zero too.
+        Mirrors ``_bxgy_amount``'s two modes. A same-pool offer needs
+        ``buy + get`` eligible units ("buy 2 get 1 free" needs 3). A
+        reward-pool offer needs ``buy`` units on the buy side, then one
+        of its reward products in the cart — reported with
+        ``reward_products`` so the shopper is told WHAT to add (demo
+        store: a case in the cart said nothing about its "-50% screen
+        protector"). ``None`` when the cart holds none of the eligible
+        units (nothing to build on), the group is already complete, or
+        no reward product can be bought.
         """
         buy_qty = promotion.buy_quantity or 0
         get_qty = promotion.get_quantity or 0
         if buy_qty < 1 or get_qty < 1:
-            return 0
+            return None
         units = sum(
             item.quantity for item in cls._matching_items(promotion, cart_items)
         )
         if units == 0:
-            return 0
-        reward_pool = bool({p.id for p in promotion.get_products.all()})
-        needed = buy_qty if reward_pool else buy_qty + get_qty
-        return max(needed - units, 0)
+            return None
+        rewards = list(promotion.get_products.all())
+        if not rewards:
+            short = buy_qty + get_qty - units
+            if short <= 0:
+                return None
+            return NearMissEntry(promotion, remaining_quantity=short)
+        if units < buy_qty:
+            return NearMissEntry(promotion, remaining_quantity=buy_qty - units)
+        reward_ids = {product.pk for product in rewards}
+        if any(item.product_id in reward_ids for item in cart_items):
+            return None
+        sellable = sorted(
+            (p for p in rewards if p.active and p.stock > 0),
+            key=lambda product: product.pk,
+        )
+        if not sellable:
+            return None
+        return NearMissEntry(
+            promotion, remaining_quantity=get_qty, reward_products=sellable
+        )
 
     @classmethod
     def _amount_for(
@@ -980,20 +1188,31 @@ class PromotionEngine:
         ``min`` over the cached rows reproduces
         ``.filter(active=True).order_by("pk").first()`` exactly: lowest
         pk among the active ones, or None.
+
+        A gift without the stock to hand over is no entitlement: order
+        creation would skip it (``_inject_promotion_gifts``), so the
+        cart, the product page and the coupon picker must not promise
+        it either.
         """
-        gift_product = min(
-            (p for p in promotion.get_products.all() if p.active),
-            key=lambda p: p.pk,
-            default=None,
-        )
-        if gift_product is None:
+        quantity = promotion.get_quantity or 1
+        active = [p for p in promotion.get_products.all() if p.active]
+        if not active:
             logger.warning(
                 "FREE_GIFT promotion %s has no active gift product "
                 "configured — skipping",
                 promotion.pk,
             )
             return None
-        quantity = promotion.get_quantity or 1
+        # Sold out is a normal state, not a misconfiguration: the offer
+        # simply pauses until the gift is restocked, so nothing is logged
+        # (this runs on every cart read).
+        gift_product = min(
+            (p for p in active if p.stock >= quantity),
+            key=lambda p: p.pk,
+            default=None,
+        )
+        if gift_product is None:
+            return None
         return GiftEntitlement(promotion, gift_product, quantity)
 
     @classmethod
@@ -1222,9 +1441,9 @@ class ProductPromotionService:
         """Whether the shopper RECEIVES this product from the offer.
 
         FREE_GIFT mirrors ``PromotionEngine._gift_entitlement`` exactly
-        — lowest-pk ACTIVE gift product — rather than "is in the
-        get_products list", so a mis-configured promotion with two
-        gifts never promises the one the engine would never hand out.
+        — lowest-pk active gift product with the stock to hand over —
+        rather than "is in the get_products list", so a promotion with
+        two gifts never promises the one the engine would not hand out.
         """
         if promotion.benefit_type == BenefitType.FREE_GIFT:
             entitlement = PromotionEngine._gift_entitlement(promotion)
@@ -1257,8 +1476,8 @@ class CouponOption:
     # What applying it RIGHT NOW would take off, measured against the
     # cart's automatic promotions alone — because applying a coupon
     # replaces whatever code is attached (v1 is one coupon per cart).
-    # Zero is a legitimate answer for an eligible coupon whose products
-    # are not in the cart, or one a better automatic offer outranks.
+    # Zero for an eligible coupon only when its benefit is not money (free
+    # shipping, a gift): a monetary code worth nothing is refused.
     amount: Money
     free_shipping: bool
     applied: bool
@@ -1486,6 +1705,12 @@ class CouponPickerService:
             for rejected_code, reason in scratch.rejected
             if reason == str(CouponRejectionReason.COMBINATION_DISALLOWED)
         }
+        # ``evaluate`` refuses a code the clamp left with nothing too.
+        losers |= {
+            entry.code.code
+            for entry in clamped
+            if entry.code is not None and entry.amount.amount <= 0
+        }
         return total, losers
 
     @classmethod
@@ -1537,13 +1762,15 @@ class CouponPickerService:
             )
 
         if promotion.benefit_type == BenefitType.FREE_SHIPPING:
+            # Same verdict as ``_classify``: with an automatic offer
+            # already waiving shipping the code would change nothing.
             return CouponOption(
                 promotion=promotion,
                 code=code,
-                reason=None,
+                reason=str(CouponRejectionReason.COMBINATION_DISALLOWED)
+                if baseline_shipping
+                else None,
                 amount=zero,
-                # Only claim shipping as this coupon's doing when an
-                # automatic offer is not already waiving it.
                 free_shipping=not baseline_shipping,
                 applied=applied,
             )
@@ -1552,12 +1779,9 @@ class CouponPickerService:
             return CouponOption(
                 promotion=promotion,
                 code=code,
-                # A gift promotion with no usable gift product is a
-                # misconfiguration, not an offer — refuse it the same
-                # way the engine silently drops it.
                 reason=None
                 if entitlement is not None
-                else str(CouponRejectionReason.INVALID),
+                else str(CouponRejectionReason.GIFT_UNAVAILABLE),
                 amount=zero,
                 free_shipping=False,
                 applied=applied,
@@ -1568,20 +1792,16 @@ class CouponPickerService:
         )
         if amount.amount <= 0:
             # Same verdict as ``_classify``, so the picker never offers
-            # a code ``apply`` refuses: a buy-X-get-Y short of its first
-            # group is MINIMUM_NOT_MET. (A code with nothing in scope
-            # already failed eligibility as NOT_APPLICABLE above.)
-            short = (
-                PromotionEngine._bxgy_units_short(promotion, cart_items)
+            # a code ``apply`` refuses.
+            shortfall = (
+                PromotionEngine._bxgy_shortfall(promotion, cart_items)
                 if promotion.benefit_type == BenefitType.BXGY
-                else 0
+                else None
             )
             return CouponOption(
                 promotion=promotion,
                 code=code,
-                reason=str(CouponRejectionReason.MINIMUM_NOT_MET)
-                if short
-                else None,
+                reason=PromotionEngine._worthless_code_reason(shortfall),
                 amount=zero,
                 free_shipping=False,
                 applied=applied,

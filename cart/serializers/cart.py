@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.conf import settings
 from django.utils.text import format_lazy
 from django.utils.translation import gettext_lazy as _
@@ -9,6 +11,11 @@ from rest_framework import serializers
 
 from cart.models import Cart
 from cart.serializers.item import CartItemSerializer
+from promotion.enum import BenefitType, CouponRejectionReason
+from promotion.serializers import (
+    REWARD_PREVIEW_LIMIT,
+    PromotionProductRefSerializer,
+)
 
 
 class CartWriteSerializer(serializers.ModelSerializer[Cart]):
@@ -72,13 +79,21 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
     applied_coupon_codes = serializers.SerializerMethodField(
         help_text=_("Coupon codes currently attached to this cart"),
     )
+    applied_coupons = serializers.SerializerMethodField(
+        help_text=_(
+            "What each attached coupon does for this cart right now: the "
+            "money it takes off, the free shipping or gift it earns, or "
+            "why the engine refuses it. A code that would change nothing "
+            "is refused, so exactly one of the four holds per entry."
+        ),
+    )
     promotion_gift_items = serializers.SerializerMethodField(
         help_text=_("Free-gift entitlements earned by this cart"),
     )
     promotion_near_miss = serializers.SerializerMethodField(
         help_text=_(
-            "Automatic promotions short of exactly one minimum (subtotal "
-            "or units) — 'add X more to unlock'"
+            "Automatic promotions short of exactly one minimum (subtotal, "
+            "units, or a reward product) — 'add X more to unlock'"
         ),
     )
     b2b_pricing = serializers.SerializerMethodField(
@@ -165,6 +180,89 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
         # past the `applied_codes__code` prefetch and costs a query per
         # cart on the staff list. Iterating the prefetched rows uses it.
         return [row.code.code for row in obj.applied_codes.all()]
+
+    @extend_schema_field(
+        {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "code": {"type": "string"},
+                    "amount": {
+                        "type": "number",
+                        "description": (
+                            "Money this code takes off; 0 when its "
+                            "benefit is not money, or it is refused"
+                        ),
+                    },
+                    "freeShipping": {
+                        "type": "boolean",
+                        "description": "This code waives shipping",
+                    },
+                    "gift": {
+                        "type": "boolean",
+                        "description": (
+                            "This code earns the gift listed in "
+                            "promotionGiftItems"
+                        ),
+                    },
+                    "rejection": {
+                        "type": "string",
+                        "nullable": True,
+                        "enum": [*CouponRejectionReason.values, None],
+                        "description": (
+                            "Why the engine refuses the attached code "
+                            "now; null while it applies"
+                        ),
+                    },
+                },
+                "required": [
+                    "code",
+                    "amount",
+                    "freeShipping",
+                    "gift",
+                    "rejection",
+                ],
+            },
+        }
+    )
+    def get_applied_coupons(self, obj: Cart) -> list[dict]:
+        # A coupon row that only knows its own money cannot tell "free
+        # shipping" from "a better offer applies" (demo store: SHIPFREE
+        # read "a better offer applies" while it was waiving shipping),
+        # nor say why a code that stopped applying is idle. The engine
+        # already decided all of it; this hands its verdict over.
+        result = self._promotion_result(obj)
+        rejections: dict[str, str] = {}
+        for code, reason in result.rejected:
+            rejections.setdefault(code, reason)
+        benefits = {
+            code.code: promotion.benefit_type
+            for promotion, code in result.non_monetary
+            if code is not None
+        }
+        entries = []
+        for row in obj.applied_codes.all():
+            code = row.code.code
+            entries.append(
+                {
+                    "code": code,
+                    "amount": sum(
+                        (
+                            entry.amount.amount
+                            for entry in result.applied
+                            if entry.code is not None
+                            and entry.code.code == code
+                        ),
+                        Decimal(0),
+                    ),
+                    "freeShipping": benefits.get(code)
+                    == BenefitType.FREE_SHIPPING,
+                    "gift": benefits.get(code) == BenefitType.FREE_GIFT,
+                    "rejection": rejections.get(code),
+                }
+            )
+        return entries
 
     @extend_schema_field(
         {
@@ -273,8 +371,19 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
                         "description": (
                             "Eligible units still missing (a minimum "
                             "quantity, or the rest of a buy-X-get-Y "
-                            "group); null when the missing part is "
-                            "subtotal"
+                            "group, or of a reward product); null when "
+                            "the missing part is subtotal"
+                        ),
+                    },
+                    "rewardProducts": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/PromotionProductRef"
+                        },
+                        "description": (
+                            "The products to add when what is missing is "
+                            "an offer's reward (a case bought, its screen "
+                            "protector at -50% not yet); empty otherwise"
                         ),
                     },
                 },
@@ -283,16 +392,21 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
                     "name",
                     "remainingAmount",
                     "remainingQuantity",
+                    "rewardProducts",
                 ],
             },
             "description": (
                 "Automatic promotions the cart ALMOST qualifies for: "
                 "exactly one of remainingAmount and remainingQuantity is "
-                "set. Powers the 'add X more to unlock' teaser."
+                "set. Powers the 'add X more to unlock' teaser; each one "
+                "is checked against the engine, so following it really "
+                "does unlock the offer."
             ),
         }
     )
     def get_promotion_near_miss(self, obj: Cart) -> list[dict]:
+        near_miss = self._promotion_result(obj).near_miss
+        rewards = self._reward_products(near_miss)
         return [
             {
                 "promotionId": entry.promotion.id,
@@ -302,9 +416,42 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
                 or "",
                 "remainingAmount": entry.remaining_amount,
                 "remainingQuantity": entry.remaining_quantity,
+                "rewardProducts": PromotionProductRefSerializer(
+                    [
+                        rewards[product.pk]
+                        for product in entry.reward_products
+                        if product.pk in rewards
+                    ][:REWARD_PREVIEW_LIMIT],
+                    many=True,
+                    context=self.context,
+                ).data,
             }
-            for entry in self._promotion_result(obj).near_miss
+            for entry in near_miss
         ]
+
+    @staticmethod
+    def _reward_products(near_miss) -> dict:
+        """The teasers' reward products, card-ready, in one query.
+
+        The engine's rows come from the promotion's ``get_products``
+        prefetch, which carries neither translations nor the main
+        image; reading those per product would cost two queries each.
+        """
+        ids = {
+            product.pk
+            for entry in near_miss
+            for product in entry.reward_products
+        }
+        if not ids:
+            return {}
+        from product.models.product import Product
+
+        return {
+            product.pk: product
+            for product in Product.objects.filter(pk__in=ids)
+            .with_translations()
+            .with_main_image()
+        }
 
     class Meta:
         model = Cart
@@ -324,6 +471,7 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
             "applied_promotions",
             "promotion_free_shipping",
             "applied_coupon_codes",
+            "applied_coupons",
             "promotion_gift_items",
             "promotion_near_miss",
             "b2b_pricing",
@@ -344,6 +492,7 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
             "applied_promotions",
             "promotion_free_shipping",
             "applied_coupon_codes",
+            "applied_coupons",
             "promotion_gift_items",
             "promotion_near_miss",
             "b2b_pricing",

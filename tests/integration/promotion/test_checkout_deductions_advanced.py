@@ -156,17 +156,27 @@ class TestGiftInjection:
             gift_product.id
         )
 
-    def test_out_of_stock_gift_is_skipped_not_blocking(
+    def test_gift_held_by_another_session_is_skipped_not_blocking(
         self, enable_promotions, checkout
     ):
+        """The last unit is in stock when the cart is priced, but another
+        shopper's reservation holds it by the time the order is written:
+        the gift is skipped and recorded, the paid goods still ship."""
+        from order.stock import StockManager
+
         gift_product = ProductFactory(
             price=Money(Decimal(15), "EUR"),
             discount_percent=Decimal(0),
             vat=None,
-            stock=0,
+            stock=1,
             active=True,
         )
         self._gift_promotion(gift_product)
+        StockManager.reserve_stock(
+            product_id=gift_product.id,
+            quantity=1,
+            session_id="another-shopper",
+        )
 
         order = OrderService.create_order_from_cart_offline(
             cart=checkout["cart"],
@@ -179,6 +189,30 @@ class TestGiftInjection:
         assert order.metadata.get("promotion_gifts_skipped") == [
             gift_product.id
         ]
+
+    def test_sold_out_gift_is_never_promised(self, enable_promotions, checkout):
+        """No stock, no entitlement: the cart never showed the gift, so
+        the order neither carries it nor records it as skipped."""
+        gift_product = ProductFactory(
+            price=Money(Decimal(15), "EUR"),
+            discount_percent=Decimal(0),
+            vat=None,
+            stock=0,
+            active=True,
+        )
+        promotion = self._gift_promotion(gift_product)
+
+        order = OrderService.create_order_from_cart_offline(
+            cart=checkout["cart"],
+            shipping_address=checkout["shipping_address"],
+            pay_way=checkout["pay_way"],
+            user=checkout["user"],
+        )
+
+        assert not order.items.filter(product=gift_product).exists()
+        assert "promotion_gifts" not in order.metadata
+        assert "promotion_gifts_skipped" not in order.metadata
+        assert not promotion.redemptions.exists()
 
 
 class TestLoyaltyPaymentIntentParity:

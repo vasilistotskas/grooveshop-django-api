@@ -2938,17 +2938,30 @@ msgid "Coupon codes currently attached to this cart"
 msgstr ""
 "Κωδικοί κουπονιών που είναι αυτή τη στιγμή συνδεδεμένοι με αυτό το καλάθι"
 
+#: .\cart\serializers\cart.py
+msgid ""
+"What each attached coupon does for this cart right now: the money it takes "
+"off, the free shipping or gift it earns, or why the engine refuses it. A "
+"code that would change nothing is refused, so exactly one of the four holds "
+"per entry."
+msgstr ""
+"Τι κάνει αυτή τη στιγμή κάθε συνδεδεμένο κουπόνι για το καλάθι: το ποσό "
+"που αφαιρεί, τα δωρεάν μεταφορικά ή το δώρο που κερδίζει, ή γιατί το "
+"απορρίπτει ο μηχανισμός. Ένας κωδικός που δεν θα άλλαζε τίποτα "
+"απορρίπτεται, οπότε σε κάθε εγγραφή ισχύει ακριβώς ένα από τα τέσσερα."
+
 #: .\cart\serializers\cart.py:71
 msgid "Free-gift entitlements earned by this cart"
 msgstr "Δικαιώματα δωρεάν δώρου που κέρδισε αυτό το καλάθι"
 
 #: .\cart\serializers\cart.py:75
 msgid ""
-"Automatic promotions short of exactly one minimum (subtotal or units) — 'add "
-"X more to unlock'"
+"Automatic promotions short of exactly one minimum (subtotal, units, or a "
+"reward product) — 'add X more to unlock'"
 msgstr ""
 "Αυτόματες προσφορές στις οποίες λείπει ακριβώς μία ελάχιστη προϋπόθεση "
-"(ποσό ή τεμάχια) — 'πρόσθεσε X ακόμα για να την ξεκλειδώσεις'"
+"(ποσό, τεμάχια ή προϊόν-ανταμοιβή) — 'πρόσθεσε X ακόμα για να την "
+"ξεκλειδώσεις'"
 
 #: .\cart\serializers\cart.py:81
 msgid ""
@@ -14535,8 +14548,8 @@ msgid "The promotion has not started yet"
 msgstr "Η προσφορά δεν έχει ξεκινήσει ακόμα"
 
 #: .\promotion\enum.py:43
-msgid "The cart does not meet the minimum subtotal"
-msgstr "Το καλάθι δεν καλύπτει το ελάχιστο υποσύνολο"
+msgid "The cart does not meet the promotion's minimum yet"
+msgstr "Το καλάθι δεν καλύπτει ακόμη την ελάχιστη προϋπόθεση της προσφοράς"
 
 #: .\promotion\enum.py:47
 msgid "The code has reached its usage limit"
@@ -14553,6 +14566,10 @@ msgstr "Ο πελάτης δεν είναι επιλέξιμος για αυτή
 #: .\promotion\enum.py:63
 msgid "No item in the cart qualifies for this promotion"
 msgstr "Κανένα προϊόν του καλαθιού δεν καλύπτεται από αυτή την προσφορά"
+
+#: .\promotion\enum.py
+msgid "The gift for this code is not available right now"
+msgstr "Το δώρο αυτού του κωδικού δεν είναι διαθέσιμο αυτή τη στιγμή"
 
 #: .\promotion\enum.py:78
 msgid "Product markdown"

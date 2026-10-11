@@ -388,17 +388,123 @@ class TestNonMonetaryBenefits:
         assert option.free_shipping is True
         assert option.amount == Money(Decimal(0), "EUR")
 
-    def test_free_shipping_claims_nothing_when_an_automatic_already_waives(
+    def test_free_shipping_is_refused_when_an_automatic_already_waives(
         self, make_cart, enable_promotions
     ):
+        """The code would change nothing, so both the picker and apply()
+        refuse it rather than "apply" it for nothing."""
         cart, _products = make_cart([(50, 1)])
         _automatic(benefit_type=BenefitType.FREE_SHIPPING, stackable=True)
         _coded("SHIPFREE", benefit_type=BenefitType.FREE_SHIPPING)
 
         option = _by_code(CouponPickerService.available(cart))["SHIPFREE"]
 
-        assert option.eligible is True
+        assert option.reason == str(
+            CouponRejectionReason.COMBINATION_DISALLOWED
+        )
         assert option.free_shipping is False
+        with pytest.raises(CouponError) as refused:
+            CouponService.apply(cart, "SHIPFREE")
+        assert refused.value.reason == option.reason
+
+    def test_a_gift_code_whose_gift_sold_out_is_refused(
+        self, make_cart, enable_promotions
+    ):
+        cart, _products = make_cart([(50, 1)])
+        promotion, _code = _coded(
+            "GIFT", benefit_type=BenefitType.FREE_GIFT, get_quantity=1
+        )
+        promotion.get_products.add(ProductFactory(stock=0, active=True))
+
+        option = _by_code(CouponPickerService.available(cart))["GIFT"]
+
+        assert option.reason == str(CouponRejectionReason.GIFT_UNAVAILABLE)
+        with pytest.raises(CouponError) as refused:
+            CouponService.apply(cart, "GIFT")
+        assert refused.value.reason == option.reason
+
+    def test_a_gift_code_with_a_gift_in_stock_is_offered(
+        self, make_cart, enable_promotions
+    ):
+        cart, _products = make_cart([(50, 1)])
+        promotion, _code = _coded(
+            "GIFT", benefit_type=BenefitType.FREE_GIFT, get_quantity=1
+        )
+        promotion.get_products.add(ProductFactory(stock=5, active=True))
+
+        option = _by_code(CouponPickerService.available(cart))["GIFT"]
+
+        assert option.eligible is True
+        assert CouponService.apply(cart, "GIFT").gift_items
+
+
+@pytest.mark.django_db
+class TestCodesWorthNothing:
+    """A code that would take nothing off is refused by both sides."""
+
+    def test_a_code_the_clamp_leaves_with_nothing(
+        self, make_cart, enable_promotions
+    ):
+        cart, _products = make_cart([(50, 1)])
+        _automatic(
+            benefit_type=BenefitType.FIXED_AMOUNT,
+            benefit_value=Decimal(50),
+            stackable=True,
+            priority=0,
+        )
+        _coded(
+            "LATE",
+            benefit_type=BenefitType.FIXED_AMOUNT,
+            benefit_value=Decimal(10),
+            stackable=True,
+            priority=10,
+        )
+
+        option = _by_code(CouponPickerService.available(cart))["LATE"]
+
+        assert option.reason == str(
+            CouponRejectionReason.COMBINATION_DISALLOWED
+        )
+        with pytest.raises(CouponError) as refused:
+            CouponService.apply(cart, "LATE")
+        assert refused.value.reason == option.reason
+
+    @pytest.mark.parametrize(
+        ("reward_kwargs", "reason"),
+        [
+            pytest.param(
+                {"stock": 5, "active": True},
+                CouponRejectionReason.MINIMUM_NOT_MET,
+                id="reward-buyable-but-missing",
+            ),
+            pytest.param(
+                {"stock": 5, "active": False},
+                CouponRejectionReason.NOT_APPLICABLE,
+                id="no-buyable-reward",
+            ),
+        ],
+    )
+    def test_a_reward_pool_code_without_its_reward(
+        self, make_cart, enable_promotions, reward_kwargs, reason
+    ):
+        cart, [case] = make_cart([(20, 1)])
+        promotion, _code = _coded(
+            "CASEGLASS",
+            benefit_type=BenefitType.BXGY,
+            buy_quantity=1,
+            get_quantity=1,
+            get_discount_percent=Decimal(50),
+            target_scope=TargetScope.PRODUCTS,
+        )
+        promotion.products.set([case])
+        promotion.get_products.set([ProductFactory(**reward_kwargs)])
+
+        option = _by_code(CouponPickerService.available(cart))["CASEGLASS"]
+
+        assert option.reason == str(reason)
+        with pytest.raises(CouponError) as refused:
+            CouponService.apply(cart, "CASEGLASS")
+        assert refused.value.reason == str(reason)
 
 
 @pytest.mark.django_db

@@ -40,7 +40,7 @@ class CouponRejectionReason(models.TextChoices):
     )
     MINIMUM_NOT_MET = (
         "discount_code_minimum_not_met",
-        _("The cart does not meet the minimum subtotal"),
+        _("The cart does not meet the promotion's minimum yet"),
     )
     USAGE_LIMIT_REACHED = (
         "discount_code_usage_limit_reached",
@@ -60,6 +60,13 @@ class CouponRejectionReason(models.TextChoices):
     NOT_APPLICABLE = (
         "discount_code_not_applicable",
         _("No item in the cart qualifies for this promotion"),
+    )
+    # Outside the ACP enum too: a gift code whose gift is inactive or out
+    # of stock. Never blocks order creation — a freebie that ran out must
+    # not hold the paid goods hostage (``_inject_promotion_gifts``).
+    GIFT_UNAVAILABLE = (
+        "discount_code_gift_unavailable",
+        _("The gift for this code is not available right now"),
     )
 
 

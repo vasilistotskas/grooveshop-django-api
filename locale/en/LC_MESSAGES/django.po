@@ -2859,14 +2859,22 @@ msgstr ""
 msgid "Coupon codes currently attached to this cart"
 msgstr ""
 
+#: .\cart\serializers\cart.py
+msgid ""
+"What each attached coupon does for this cart right now: the money it takes "
+"off, the free shipping or gift it earns, or why the engine refuses it. A "
+"code that would change nothing is refused, so exactly one of the four holds "
+"per entry."
+msgstr ""
+
 #: .\cart\serializers\cart.py:71
 msgid "Free-gift entitlements earned by this cart"
 msgstr ""
 
 #: .\cart\serializers\cart.py:75
 msgid ""
-"Automatic promotions short of exactly one minimum (subtotal or units) — 'add "
-"X more to unlock'"
+"Automatic promotions short of exactly one minimum (subtotal, units, or a "
+"reward product) — 'add X more to unlock'"
 msgstr ""
 
 #: .\cart\serializers\cart.py:81
@@ -13683,7 +13691,7 @@ msgid "The promotion has not started yet"
 msgstr ""
 
 #: .\promotion\enum.py:43
-msgid "The cart does not meet the minimum subtotal"
+msgid "The cart does not meet the promotion's minimum yet"
 msgstr ""
 
 #: .\promotion\enum.py:47
@@ -13700,6 +13708,10 @@ msgstr ""
 
 #: .\promotion\enum.py:63
 msgid "No item in the cart qualifies for this promotion"
+msgstr ""
+
+#: .\promotion\enum.py
+msgid "The gift for this code is not available right now"
 msgstr ""
 
 #: .\promotion\enum.py:78

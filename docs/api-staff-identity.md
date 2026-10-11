@@ -154,6 +154,13 @@ method → `add`/`change`/`delete` codename → `has_perm`). Subclass it
 only to add the `view` permission on reads. Object scoping stays in the
 querysets, as in the admin.
 
+`UserAccount.has_perm`, `has_module_perms` and the `get_*_permissions`
+methods answer only for a platform identity
+(`tenant.membership.is_platform_identity`: stamped, or on the public
+schema). A tenant-schema row is a customer record, so its
+`is_superuser`/`is_staff` flags and any stored grants confer no Django
+permission (`tests_mt/test_platform_superuser_is_schema_aware.py`).
+
 ### Issuance and revocation
 
 A login endpoint on the PLATFORM host only (`tenant.urls_public`),

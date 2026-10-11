@@ -2245,22 +2245,26 @@ class OrderService:
             )
         except Exception:
             if shipment_cancel is not None and shipment_cancel["dispatched"]:
-                cls._note_parcel_canceled_without_order(order)
+                cls._note_shipment_canceled_without_order(order)
             raise
 
     @classmethod
-    def _note_parcel_canceled_without_order(cls, order: Order) -> None:
-        """Tell staff the courier canceled a parcel whose order did not.
+    def _note_shipment_canceled_without_order(cls, order: Order) -> None:
+        """Tell staff the order's shipment was canceled but the order was not.
 
-        The courier is asked before the order row is locked, so the
-        order can move on while the courier answers (staff marking it
-        shipped is the realistic case: a courier that accepts the cancel
-        has not collected the parcel). The locked re-check then refuses
-        the cancel and the order stays live with no voucher behind it.
-        Nothing reverses a courier cancel, so staff must create a new
-        voucher; the ERROR line raises the logged-errors alert and the
-        note is where staff read about the order. An order another
-        request canceled in the meantime needs neither.
+        The shipment is canceled (at the courier, or only locally when no
+        voucher had been issued) before the order row is locked, so the
+        order cancel can still fail afterwards: most likely the order
+        moved on while the courier answered (staff marking it shipped; a
+        courier that accepts the cancel has not collected the parcel),
+        and any other failure of the locked cancel ends the same way.
+        The order then stays live with no voucher behind it. Nothing
+        reverses a shipment cancel, so staff must create a new voucher;
+        the ERROR line raises the logged-errors alert and the note is
+        where staff read about the order. The note states only what is
+        known (the shipment is canceled, the order is not, and its
+        current status), never why. An order another request canceled
+        in the meantime needs neither.
         """
         from order.models.history import OrderHistory
 
@@ -2270,19 +2274,18 @@ class OrderService:
         if current_status == OrderStatus.CANCELED:
             return
         logger.error(
-            "Order %s: the courier canceled its parcel for a customer "
-            "cancel, but the order (now %s) was not canceled; it needs "
-            "a new voucher",
+            "Order %s: a customer cancel canceled its shipment, but the "
+            "order (status %s) was not canceled; it needs a new voucher",
             order.id,
             current_status,
         )
         OrderHistory.log_note(
             order=order,
             note=(
-                "The customer asked to cancel this order and the courier "
-                "canceled its parcel, but the order had moved on to "
-                f"{current_status} and was not canceled. The parcel's "
-                "voucher no longer exists: create a new one if the order "
+                "The customer asked to cancel this order and its "
+                "shipment was canceled, but the order itself was not "
+                f"canceled (its status is {current_status}). The shipment "
+                "no longer has a voucher: create a new one if the order "
                 "is still to ship."
             ),
         )
@@ -2310,8 +2313,8 @@ class OrderService:
         (``idle_in_transaction_session_timeout`` would kill it), and the
         order row stays unlocked while the courier answers. The locked
         re-check afterwards is what decides the order's fate
-        (:meth:`_note_parcel_canceled_without_order` covers a parcel the
-        courier canceled for an order that then did not cancel).
+        (:meth:`_note_shipment_canceled_without_order` covers a
+        shipment canceled for an order that then did not cancel).
         """
         from shipping.services import ShippingService
 

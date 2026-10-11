@@ -512,7 +512,7 @@ class TestTheOrderMovesOnWhileTheCourierAnswers:
         assert _row(order)["status"] == OrderStatus.SHIPPED
         assert viva.sent == []
         [note] = self._parcel_notes(order)
-        assert "had moved on to SHIPPED" in note
+        assert "its status is SHIPPED" in note
         assert "create a new one" in note
         assert any(
             record.levelno == logging.ERROR

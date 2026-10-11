@@ -187,5 +187,33 @@ class TestARefundVivaAcceptsIsRecorded:
         assert [r["refund_id"] for r in order.metadata["refunds"]] == [
             refund_id
         ]
-        assert len(refunded_signals) == 1
+        # ``order_refunded`` always says how much came back; a full refund
+        # sends what the order paid.
+        assert [r["amount"] for r in refunded_signals] == [
+            Money(Decimal("21.10"), "EUR")
+        ]
         assert _refund_failure_notes(order) == []
+
+    def test_a_part_refund_is_partially_refunded_not_refunded(
+        self, refunded_signals
+    ):
+        """Viva answers success for a part refund exactly as for a full
+        one, and REFUNDED is what releases the gift-card redemption and
+        the loyalty points — so it has to mean "nothing left to refund"."""
+        order = _paid_viva_order()
+        fake = FakeVivaApi(captured=21.10)
+
+        with fake:
+            success, _response = OrderService.refund_order(
+                order, amount=Money(Decimal("5.00"), "EUR")
+            )
+
+        assert success is True
+        [delete] = fake.deletes
+        assert fake.query(delete) == {"amount": ["500"]}
+        order.refresh_from_db()
+        assert order.payment_status == PaymentStatus.PARTIALLY_REFUNDED
+        assert [r["amount"] for r in order.metadata["refunds"]] == ["5.00"]
+        assert [r["amount"] for r in refunded_signals] == [
+            Money(Decimal("5.00"), "EUR")
+        ]

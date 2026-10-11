@@ -139,7 +139,7 @@ class OrderServiceTestCase(TestCase):
         self.assertEqual(response["refund_id"], "refund_123")
         self.assertEqual(order.payment_status, PaymentStatus.REFUNDED)
         self.assertEqual(len(order.metadata["refunds"]), 1)
-        self.assertEqual(order.metadata["refunds"][0]["amount"], "full")
+        self.assertEqual(order.metadata["refunds"][0]["amount"], "100.00")
 
     @patch("order.payment.get_payment_provider")
     def test_refund_order_partial(self, mock_get_provider):

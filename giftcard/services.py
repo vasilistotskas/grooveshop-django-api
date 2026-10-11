@@ -13,7 +13,7 @@ import logging
 import secrets
 from dataclasses import dataclass
 from datetime import timedelta
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import Decimal
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -404,27 +404,18 @@ class GiftCardService:
     # ── refunds ────────────────────────────────────────────────────
 
     @classmethod
-    def credit_refund(cls, order, amount: Decimal | None = None) -> Decimal:
-        """Return the refunded gift-card value to the source card(s).
+    def credit_refund(cls, order) -> Decimal:
+        """Return the order's whole gift-card redemption to the source card(s).
 
-        *amount* is how much was actually refunded. ``None`` means a FULL
-        refund and credits the whole redeemed value — which is what this
-        method used to do unconditionally, for partial refunds too. A
-        €100 order settled with a €60 gift card and then refunded €5 put
-        the entire €60 back on the card, immediately spendable, while the
-        shopper kept the goods. Money out of nothing, once per order.
-
-        A partial refund is shared across the order's cards in proportion
-        to what each contributed, so no card is credited more than it
-        gave and the total never exceeds *amount*. Rounding is absorbed
-        by the last card, so the parts always sum to the whole.
+        Called once the order is fully refunded or canceled, never for a
+        slice: a partial refund is paid back by the provider first, and a
+        slice of the redemption on top of it put money on the card that
+        the refund never returned (EUR 60 back for a EUR 5 refund).
 
         Idempotent per order: the partial unique constraint on
         (gift_card, order) for REFUND_CREDIT rows makes a racing
         duplicate insert impossible — the loser skips the card instead of
-        double-crediting it. That also means a LATER, larger refund on
-        the same order cannot top up a card already credited; an operator
-        adjusts the balance directly for that.
+        double-crediting it.
         """
         from django.db import IntegrityError, transaction
 
@@ -436,22 +427,13 @@ class GiftCardService:
                 order=order, kind=GiftCardTransactionKind.REFUND_CREDIT
             ).values_list("gift_card_id", flat=True)
         )
-        # `redeem.amount` is negative (a debit), so this is what each
-        # card actually contributed.
-        contributions = [(r, -r.amount) for r in redeems]
-        redeemed_total = sum((c for _, c in contributions), Decimal(0))
-
-        if amount is None or amount >= redeemed_total:
-            shares = dict(contributions)
-        else:
-            shares = cls._split_refund(contributions, max(amount, Decimal(0)))
-
         credited = Decimal(0)
-        remaining_cards = [r for r, _ in contributions]
-        for redeem in remaining_cards:
+        for redeem in redeems:
             if redeem.gift_card_id in already:
                 continue
-            share = shares.get(redeem, Decimal(0))
+            # `redeem.amount` is negative (a debit): this is what the card
+            # actually contributed.
+            share = -redeem.amount
             if share <= 0:
                 continue
             try:
@@ -502,30 +484,6 @@ class GiftCardService:
             previous,
             fresh,
         )
-
-    @staticmethod
-    def _split_refund(contributions, amount: Decimal) -> dict:
-        """Share *amount* across cards in proportion to what each gave.
-
-        The last card absorbs the rounding remainder, so the shares
-        always sum to *amount* exactly rather than to a cent less.
-        """
-        total = sum((c for _, c in contributions), Decimal(0))
-        if total <= 0:
-            return {}
-
-        cent = Decimal("0.01")
-        shares: dict = {}
-        allocated = Decimal(0)
-        for redeem, contributed in contributions[:-1]:
-            share = (amount * contributed / total).quantize(
-                cent, rounding=ROUND_HALF_UP
-            )
-            shares[redeem] = share
-            allocated += share
-        last_redeem, _ = contributions[-1]
-        shares[last_redeem] = amount - allocated
-        return shares
 
     # ── expiry ─────────────────────────────────────────────────────
 

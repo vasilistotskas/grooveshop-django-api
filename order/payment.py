@@ -698,6 +698,25 @@ def _alpha_currency(reported: str | None) -> str | None:
     return code.upper() or None
 
 
+#: Viva ``StatusId`` of a transaction that completed successfully. A
+#: refund is a transaction of its own and carries this status too; ``R``
+#: ("fully or partially refunded") belongs to the ORIGINAL payment.
+VIVA_STATUS_FINISHED = "F"
+
+#: ``TransactionTypeId`` values that hand money back to the payer: every
+#: row of Viva's table named Refund or Void
+#: (developer.viva.com/integration-reference/response-codes/,
+#: "TransactionTypeId parameter"). The "Refund Claimed" rows (13, 46, 83,
+#: 90) are chargebacks, a dispute outcome and not a refund the merchant
+#: made, so they are deliberately absent, as is the unreferenced "Card
+#: Original Credit" (8).
+VIVA_REFUND_TRANSACTION_TYPE_IDS: frozenset[int] = frozenset(
+    {4, 7, 11, 17, 18, 21, 24, 26, 28, 30, 35, 37, 39, 41, 45, 49, 51, 53}
+    | {55, 57, 59, 61, 63, 65, 67, 71, 73, 75, 77, 79, 82, 84, 85, 86, 87}
+    | {89, 91}
+)
+
+
 class VivaWalletPaymentProvider(PaymentProvider):
     DEMO_AUTH_URL = "https://demo-accounts.vivapayments.com/connect/token"
     LIVE_AUTH_URL = "https://accounts.vivapayments.com/connect/token"
@@ -956,7 +975,7 @@ class VivaWalletPaymentProvider(PaymentProvider):
     ) -> tuple[bool, dict[str, Any]]:
         return self.create_checkout_session(amount, order_id, **kwargs)
 
-    def _captured_amount(self, payment_id: str) -> Decimal | None:
+    def captured_amount(self, payment_id: str) -> Decimal | None:
         """What Viva says it captured on ``payment_id``, in euros.
 
         Cancel Transaction REQUIRES ``amount`` and rejects one above the
@@ -996,7 +1015,7 @@ class VivaWalletPaymentProvider(PaymentProvider):
             )
 
             if amount is None:
-                refund_amount = self._captured_amount(payment_id)
+                refund_amount = self.captured_amount(payment_id)
                 if refund_amount is None:
                     logger.error(
                         "Viva Wallet refund not sent: Retrieve Transaction "
@@ -1115,6 +1134,7 @@ class VivaWalletPaymentProvider(PaymentProvider):
                 "amount": data.get("amount"),
                 "currency": _alpha_currency(data.get("currencyCode")),
                 "order_code": data.get("orderCode"),
+                "transaction_type_id": data.get("transactionTypeId"),
                 "created": data.get("insDate"),
             }
 

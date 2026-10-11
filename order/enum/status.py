@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
@@ -38,6 +40,20 @@ class PaymentStatus(models.TextChoices):
     REFUNDED = "REFUNDED", _("Refunded")
     PARTIALLY_REFUNDED = "PARTIALLY_REFUNDED", _("Partially Refunded")
     CANCELED = "CANCELED", _("Canceled")
+
+    @classmethod
+    def after_refund(
+        cls, *, refunded: Decimal, captured: Decimal
+    ) -> PaymentStatus:
+        """The payment status once ``refunded`` has been paid back out of
+        ``captured``, both cumulative and in the same currency.
+
+        REFUNDED means nothing is left to refund. It is also the only
+        state that releases what hangs off the order's total — the
+        gift-card redemption and the loyalty points — because those are
+        returned once, with the last refund, not in slices.
+        """
+        return cls.REFUNDED if refunded >= captured else cls.PARTIALLY_REFUNDED
 
 
 PAYMENT_CLOSING_STATUSES: frozenset[str] = frozenset(

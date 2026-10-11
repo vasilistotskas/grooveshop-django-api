@@ -6,7 +6,7 @@ from django.db import transaction
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import Signal, receiver
 
-from order.enum.status import OrderStatus
+from order.enum.status import OrderStatus, PaymentStatus
 from order.models.order import Order
 from order.signals import (
     order_canceled,
@@ -108,12 +108,21 @@ def handle_order_canceled_loyalty(
 def handle_order_refunded_loyalty(
     sender: type[Order], order: Order, **kwargs: Any
 ) -> None:
-    """Trigger async points reversal when order is refunded.
+    """Trigger async points reversal when order is fully refunded.
 
     Queues a Celery task to reverse any loyalty points that were
     previously earned for this order. Only processes orders with
     an authenticated user.
+
+    A partial refund reverses nothing. The reversal is all-or-nothing
+    and runs once per order (any ADJUST row blocks a second run), so
+    taking it on the first slice would never take the rest, and taking
+    all of it for a EUR 5 goodwill refund would wipe the points of an
+    order the shopper still keeps. The last refund moves the order to
+    REFUNDED and reverses everything.
     """
+    if order.payment_status != PaymentStatus.REFUNDED:
+        return
     try:
         if order.user_id:
             from loyalty.tasks import reverse_order_points

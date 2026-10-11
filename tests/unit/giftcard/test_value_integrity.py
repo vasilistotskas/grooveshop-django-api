@@ -88,7 +88,7 @@ class TestARefundIsNotConfiscatedByTheExpirySweep:
         order, _unused = giftcard_order_settled_with_one_card
         card = self._expired_card_with_a_redemption(order)
 
-        GiftCardService.credit_refund(order, None)
+        GiftCardService.credit_refund(order)
         card.refresh_from_db()
         assert card.balance.amount == Decimal("30.00")
 
@@ -105,7 +105,7 @@ class TestARefundIsNotConfiscatedByTheExpirySweep:
         order, _unused = giftcard_order_settled_with_one_card
         card = self._expired_card_with_a_redemption(order)
 
-        GiftCardService.credit_refund(order, None)
+        GiftCardService.credit_refund(order)
 
         card.refresh_from_db()
         assert card.expires_at > timezone.now()
@@ -121,7 +121,7 @@ class TestARefundIsNotConfiscatedByTheExpirySweep:
         card.expires_at = original
         card.save(update_fields=["expires_at"])
 
-        GiftCardService.credit_refund(order, None)
+        GiftCardService.credit_refund(order)
 
         card.refresh_from_db()
         assert card.expires_at == original

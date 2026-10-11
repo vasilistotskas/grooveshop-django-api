@@ -4,7 +4,6 @@ from typing import Any
 from django.db import transaction
 from django.db.models import Q, QuerySet
 from django.utils.translation import gettext_lazy as _
-from djmoney.money import Money
 
 from order.enum.status import (
     SETTLED_PAYMENT_STATUSES,
@@ -13,7 +12,6 @@ from order.enum.status import (
 from order.exceptions import OrderChangedDuringPaymentError
 from order.models import Order
 from order.payment import get_payment_provider
-from order.signals import order_refunded
 from pay_way.enum.settlement import PaySettlement
 from pay_way.models import PayWay
 
@@ -378,66 +376,3 @@ class PayWayService:
                 )
 
         return status, status_data
-
-    @staticmethod
-    def refund_payment(
-        pay_way: PayWay, order: Order, amount: Money | None = None
-    ) -> tuple[bool, dict[str, Any]]:
-        if order.payment_status not in (
-            PaymentStatus.COMPLETED,
-            PaymentStatus.PROCESSING,
-        ):
-            return False, {
-                "error": _(
-                    "Cannot refund an order that has not been paid. "
-                    "Current status: %(status)s"
-                )
-                % {"status": order.payment_status}
-            }
-
-        if not order.payment_id:
-            return False, {"error": _("No payment ID found for order")}
-
-        if PaySettlement(pay_way.settlement) != PaySettlement.ONLINE:
-            if amount and amount.amount > 0:
-                refund_info = {
-                    "refund_id": f"MANUAL_REFUND_{order.id}",
-                    "status": PaymentStatus.PENDING,
-                    "amount": str(amount.amount),
-                    "currency": amount.currency,
-                    "provider": "manual",
-                    "note": _("Manual refund process required"),
-                }
-            else:
-                refund_info = {
-                    "refund_id": f"MANUAL_REFUND_{order.id}",
-                    "status": PaymentStatus.PENDING,
-                    "amount": "full refund",
-                    "provider": "manual",
-                    "note": _("Manual refund process required"),
-                }
-
-            # Flip ``payment_status`` only; ``order.status`` is a
-            # business decision (the canonical transition table only
-            # allows RETURNED → REFUNDED). Mirrors the policy in
-            # ``handle_stripe_charge_refunded``; admin drives the
-            # RETURNED→REFUNDED transition manually from the order
-            # page when the goods are actually returned.
-            order.payment_status = PaymentStatus.REFUNDED
-            order.save(update_fields=["payment_status"])
-            order_refunded.send(sender=Order, order=order)
-
-            return True, refund_info
-
-        provider = PayWayService.get_provider_for_pay_way(pay_way)
-        if not provider:
-            return False, {"error": _("Payment provider not available")}
-
-        success, refund_data = provider.refund_payment(order.payment_id, amount)
-
-        if success:
-            order.payment_status = PaymentStatus.REFUNDED
-            order.save(update_fields=["payment_status"])
-            order_refunded.send(sender=Order, order=order)
-
-        return success, refund_data

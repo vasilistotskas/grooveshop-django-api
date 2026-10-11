@@ -1,4 +1,5 @@
 import logging
+from decimal import Decimal
 from typing import Any
 
 from django.conf import settings
@@ -7,6 +8,7 @@ from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from django.utils import timezone
 from django_tenants.utils import schema_context
+from djmoney.money import Money
 from djstripe.event_handlers import djstripe_receiver
 from djstripe.models import Event
 
@@ -673,19 +675,16 @@ def handle_order_completed(
 
 @receiver(order_refunded, dispatch_uid="order.handle_order_refunded")
 def handle_order_refunded(
-    sender: type[Order], order: Order, **kwargs: Any
+    sender: type[Order], order: Order, amount: Money, **kwargs: Any
 ) -> None:
     """Handle order refunded signal."""
     try:
-        refund_amount = kwargs.get("amount")
         refund_reason = kwargs.get("reason", "")
 
         OrderHistory.log_refund(
             order=order,
             refund_data={
-                "amount": str(refund_amount)
-                if refund_amount
-                else "Full order amount",
+                "amount": str(amount),
                 "reason": refund_reason or "Not specified",
             },
         )
@@ -1137,7 +1136,13 @@ def handle_stripe_charge_refunded(sender, **kwargs):
         )
 
         if is_full_refund:
-            order_refunded.send(sender=Order, order=order)
+            order_refunded.send(
+                sender=Order,
+                order=order,
+                amount=Money(
+                    Decimal(amount_refunded) / 100, charge["currency"].upper()
+                ),
+            )
 
     except KeyError, TypeError:
         # Malformed payload only. Everything else must PROPAGATE (G0231):

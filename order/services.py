@@ -2609,9 +2609,18 @@ class OrderService:
             )
             return False, refund_response
 
-        order.payment_status = refund_response.get(
-            "status", PaymentStatus.REFUNDED
-        )
+        # ``None`` refunds everything the order paid.
+        refunded = amount if amount is not None else order.paid_amount
+
+        # A provider answers REFUNDED for any refund it accepted, partial
+        # ones too; REFUNDED is what releases the gift-card redemption and
+        # the loyalty points, so it must mean "nothing left to refund".
+        payment_status = refund_response.get("status", PaymentStatus.REFUNDED)
+        if payment_status == PaymentStatus.REFUNDED:
+            payment_status = PaymentStatus.after_refund(
+                refunded=refunded.amount, captured=order.paid_amount.amount
+            )
+        order.payment_status = payment_status
 
         if not order.metadata:
             order.metadata = {}
@@ -2622,10 +2631,8 @@ class OrderService:
         order.metadata["refunds"].append(
             {
                 "refund_id": refund_response.get("refund_id"),
-                "amount": str(amount.amount) if amount else "full",
-                "currency": str(amount.currency)
-                if amount
-                else str(order.total_price.currency),
+                "amount": str(refunded.amount),
+                "currency": str(refunded.currency),
                 "reason": reason,
                 "refunded_at": timezone.now().isoformat(),
                 "refunded_by": refunded_by,
@@ -2635,7 +2642,7 @@ class OrderService:
         order.save(update_fields=["payment_status", "metadata"])
 
         order_refunded.send(
-            sender=cls, order=order, amount=amount, reason=reason
+            sender=cls, order=order, amount=refunded, reason=reason
         )
 
         logger.info("Order %s refunded successfully", order.id)

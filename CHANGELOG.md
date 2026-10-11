@@ -3,6 +3,36 @@
 
 
 
+## v3.104.4 (2026-10-11)
+
+### Bug fixes
+
+* fix(order): restrict order-item writes to store staff (#144)
+
+POST /order-items and PUT/PATCH/DELETE /order-items/<pk> were available
+to the owner of the order. An order line carries the price and the
+quantity, and a quantity change moves stock, so changing one is a
+merchant operation rather than customer self-service.
+
+create, update, partial_update and destroy now go through
+StoreStaffModelPermissions, the gate the other store-scoped write routes
+use: the method maps to add/change/delete_orderitem and the role
+backend answers for the tenant on the connection. Customers keep
+read-only access to the items of their own orders, and the refund action
+is unchanged.
+
+Neither the storefront nor the agent gateway calls these write routes,
+and the OpenAPI document is identical before and after.
+
+
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`a5b2104`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a5b210437de80f34fa1bddf968de43b80cda3d5e))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.104.3 [skip ci] ([`6a098b6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6a098b614a25a881ec4674b5776e63e1877bc198))
+
 ## v3.104.3 (2026-10-11)
 
 ### Bug fixes

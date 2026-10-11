@@ -450,6 +450,22 @@ class TestTeaserIsAPromise:
         assert entry.remaining_quantity == 1
         assert entry.remaining_amount is None
 
+    def test_one_reward_unit_unlocks_a_multi_unit_reward(
+        self, enable_promotions, make_cart
+    ):
+        """ "Buy 1, get 2 at -50%": the first reward unit already earns
+        the offer, so the teaser asks for one."""
+        cart, [case] = make_cart([(20, 1)])
+        promotion = _reward_pool(
+            [case], [_sellable_product(8)], trigger=PromotionTrigger.AUTOMATIC
+        )
+        promotion.get_quantity = 2
+        promotion.save(update_fields=["get_quantity"])
+
+        [entry] = PromotionEngine.evaluate(cart).near_miss
+
+        assert entry.remaining_quantity == 1
+
     def test_reward_pool_short_of_its_buy_side_asks_for_units(
         self, enable_promotions, make_cart
     ):

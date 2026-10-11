@@ -586,8 +586,10 @@ class PromotionEngine:
         )
         if not sellable:
             return None
+        # One reward unit already earns the offer (``_bxgy_amount``
+        # discounts whatever reward units are present, up to the cap).
         return NearMissEntry(
-            promotion, remaining_quantity=get_qty, reward_products=sellable
+            promotion, remaining_quantity=1, reward_products=sellable
         )
 
     @classmethod

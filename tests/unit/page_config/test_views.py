@@ -9,6 +9,7 @@ from page_config.models import (
     PageLayout,
     PageSection,
 )
+from tenant.auth_backends import PLATFORM_IDENTITY_ATTR
 from tenant.models import (
     Tenant,
     TenantMembershipRole,
@@ -122,6 +123,11 @@ class TestPageLayoutAdminViewSet(TestCase):
     def setUp(self):
         self.client = APIClient()
         self.admin = UserAccountFactory(is_staff=True, is_superuser=True)
+        # A platform superuser reaches a store's API through
+        # ``PlatformStaffTokenAuthentication``, which stamps the identity;
+        # an unstamped row on a tenant-bound connection is a customer
+        # record and holds no permission (``UserAccount.has_perm``).
+        setattr(self.admin, PLATFORM_IDENTITY_ATTR, True)
         self.client.force_authenticate(user=self.admin)
 
         # Page-layout admin is ``IsPlatformSuperuser``. It previously

@@ -86,6 +86,12 @@ class MonitoredTask(TenantTask):
             k: ("***" if k in sensitive else _safe_repr(v, key=k))
             for k, v in (kwargs or {}).items()
         }
+        # ``exc_info=exc`` and not ``einfo.exception``: Celery wraps the
+        # latter in billiard's ``ExceptionWithTraceback`` (its ``str()``
+        # is the traceback text and its ``__traceback__`` is ``None``),
+        # so passing it would log a bogus exception type with no frames.
+        # ``exc`` is the exception the task raised, with its traceback
+        # attached by Celery before this handler runs.
         logger.error(
             "Task %s failed. Task ID: %s, Error: %s, args=%s, kwargs=%s",
             self.name,
@@ -93,13 +99,8 @@ class MonitoredTask(TenantTask):
             exc,
             safe_args,
             safe_kwargs,
+            exc_info=exc,
         )
-        if einfo is not None:
-            logger.debug(
-                "Task %s traceback:\n%s",
-                self.name,
-                einfo.traceback,
-            )
 
 
 class _DeletedLogFile(TypedDict):

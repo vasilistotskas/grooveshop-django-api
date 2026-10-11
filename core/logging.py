@@ -92,6 +92,14 @@ class JsonFormatter(logging.Formatter):
     existing VictoriaLogs queries keep working: ``line`` stays a number,
     ``process``/``thread`` stay strings. ``exception`` and ``stack`` are
     additive and appear only when the record carries them.
+
+    A call site that wants QUERYABLE fields rather than values baked
+    into the message passes them as ``extra={"fields": {...}}``. They
+    are merged into the object at the top level (``duration_ms`` can
+    then be filtered and aggregated on) and never override one of the
+    fixed fields above. Arbitrary ``extra=`` keys are NOT copied:
+    existing call sites pass whole result dicts that were never meant
+    to become log fields.
     """
 
     default_time_format = "%Y-%m-%dT%H:%M:%S"
@@ -127,6 +135,9 @@ class JsonFormatter(logging.Formatter):
 
         if record.stack_info:
             payload["stack"] = self.formatStack(record.stack_info)
+
+        for key, value in getattr(record, "fields", {}).items():
+            payload.setdefault(key, value)
 
         # ``ensure_ascii=False``: Greek copy is logged routinely and
         # \u escapes make it unreadable in log search. ``default=str``

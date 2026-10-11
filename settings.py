@@ -274,6 +274,14 @@ MIDDLEWARE = [
     # Probe bypass MUST precede TenantMainMiddleware — kubelet probes
     # carry the pod IP as Host, which no TenantDomain row can match.
     "core.middleware.health_probe.HealthProbeMiddleware",
+    # Correlation id, then the access line that reports it. Both sit
+    # OUTSIDE tenant resolution so a request that fails there (unknown
+    # host, suspended store) still gets an id and a log line, and below
+    # the probe bypass so kubelet's readiness probe is never logged.
+    # The access log must stay inside the correlation id: that layer's
+    # ContextVar is reset on the way out.
+    "core.middleware.correlation_id.CorrelationIdMiddleware",
+    "core.middleware.access_log.AccessLogMiddleware",
     # Internal-token-gated domains feed for cluster-internal services
     # dialing backend-service directly (no resolvable tenant Host) —
     # must answer BEFORE tenant resolution.
@@ -289,7 +297,6 @@ MIDDLEWARE = [
     "tenant.middleware.TenantCookieDomainMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "corsheaders.middleware.CorsMiddleware",
-    "core.middleware.correlation_id.CorrelationIdMiddleware",
     "django.middleware.gzip.GZipMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "core.middleware.locale.RequestLanguageMiddleware",

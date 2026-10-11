@@ -66,6 +66,7 @@ class TestMonitoredTask:
             exception,
             [],
             {},
+            exc_info=exception,
         )
 
 

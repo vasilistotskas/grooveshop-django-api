@@ -160,6 +160,42 @@ class TestFieldContract:
         assert payload["message"] == "got <opaque>"
 
 
+class TestQueryableFields:
+    """``extra={"fields": {...}}`` is how a call site gets fields it can
+    filter on in VictoriaLogs (the access line's ``duration_ms``)."""
+
+    def test_fields_are_merged_at_the_top_level(self):
+        record = _record("GET api/v1/x 200 4.2ms")
+        record.fields = {"route": "api/v1/x", "status": 200, "duration_ms": 4.2}
+
+        payload = json.loads(_emit(record))
+
+        assert payload["route"] == "api/v1/x"
+        assert payload["status"] == 200
+        assert payload["duration_ms"] == 4.2
+
+    def test_fields_cannot_override_a_fixed_field(self):
+        record = _record("hello")
+        record.fields = {"level": "DEBUG", "correlation_id": "forged"}
+
+        payload = json.loads(_emit(record))
+
+        assert payload["level"] == "ERROR"
+        assert payload["correlation_id"] == "cid-1"
+
+    def test_other_extra_keys_are_not_copied(self):
+        """``logger.info(..., extra=result)`` is passed whole result
+        dicts today; surfacing those would change unrelated lines."""
+        record = _record("System health check completed")
+        record.checks = {"database": True}
+        record.status = "healthy"
+
+        payload = json.loads(_emit(record))
+
+        assert "checks" not in payload
+        assert "status" not in payload
+
+
 class TestProductionWiring:
     """The production ``json`` formatter is only *configured* on the
     ``IS_KUBERNETES`` branch, so asserting against ``settings.LOGGING``

@@ -222,6 +222,57 @@ click-id parameter, one `CLICK_ID_PARAMS` entry, which changes the
 generated `ClickIdsEnum` the storefront's capture is typed against —
 regenerate the schema on both sides).
 
+### 3.5 VAT on an order (`OrderItem.vat_rate`, `order/taxation.py`)
+
+Prices on an order are VAT-inclusive. The VAT inside them is backed out
+at **the rate the line was sold at**, which the order records and the
+catalogue can no longer change.
+
+- **The snapshot.** `OrderItem.vat_rate` is written when the line is
+  created. Both checkout paths pass `cart_item.vat_percent` (the rate the
+  cart backed the line's price out of, wholesale prices included), a
+  promotion gift line passes its product's, and `OrderItem.save()`
+  snapshots the product's current rate for every other writer (the order
+  item admin and API, scripts); `bulk_create` skips `save()`, so
+  `devtools/demo_orders.py` passes it itself. The column has
+  `db_default=0` only so the release still serving during a rollout can
+  keep inserting; a product with no `Vat` row is sold at 0. The item
+  admin shows the rate read-only on add and editable afterwards, so
+  staff can correct a wrong snapshot.
+- **Nothing reads `product.vat` for an order again.** `order/invoicing.py`
+  and `order/mydata/builder.py` get their lines from
+  `order.taxation.order_vat_lines`, which reads `item.vat_rate`. Editing
+  a `Vat` row, moving the product to another, or deleting the row (the
+  FK is `SET_NULL`) changes neither the PDF nor the myDATA payload of an
+  existing order. Regenerating a not-yet-registered invoice therefore
+  keeps the original rates too. Lines that predate the column were
+  backfilled (`0065`) from their product's VAT at deploy time, which is
+  what the documents used before the snapshot existed.
+- **Shipping and the payment-method fee.** Incidental costs the seller
+  charges the customer belong to the taxable amount of the goods they
+  accompany (VAT Directive 2006/112/EC art. 78(b); Greek VAT Code, Law
+  5144/2024, art. 24(4)(a) — art. 19 of the repealed Law 2859/2000), so
+  they take the goods' rate. A basket that mixes rates has no single
+  rate for them: each charge is split over the rates in proportion to
+  the goods' value at each (`_rate_weights`: undiscounted line gross,
+  units when the goods are free; largest remainder, so the shares add
+  up to the cent) and every share is taxed at its own rate. A
+  single-rate basket puts 100% on that rate. There is no order-level
+  "shipping VAT rate" to store: the split is a function of the
+  snapshotted lines and the two amounts, and a stored copy could only
+  disagree with the lines when staff edit them. A charge on an order
+  with no goods raises, since no rate can follow nothing.
+- **One computation, two documents.** Every line is split into a net and
+  a VAT amount rounded half-up to the cent, then summed
+  (`order.taxation.split_gross`). `Invoice.subtotal`, `.total_vat`,
+  `.total` and the PDF's VAT breakdown are sums of those lines, and the
+  myDATA `invoiceDetails` / `invoiceSummary` are the same lines, so they
+  agree to the cent for any order
+  (`tests/unit/order/test_invoice_mydata_agreement.py`). The cart's
+  `vat_after_discount` rounds the same way. `Invoice.shipping` and
+  `.payment_fee` are the gross amounts, printed as reference rows;
+  net + VAT is the whole document.
+
 ## 4. Payment paths
 
 **Per-tenant payment identity.** Every tenant runs its OWN payment
@@ -753,6 +804,7 @@ the linked memory note or the originating PR's commit message.
 | A payment-success handler checks `is_payment_after_cancel` BEFORE its settled-state guard | §2.2 above |
 | Order `status` changes only through admin actions / `OrderService`, never the change form | §7.1 above |
 | Every checkout-created order since `0059_orderattribution` has exactly one `OrderAttribution` row (`direct` when there was no signal); for a checkout order a missing row means "older than attribution", never "direct"; `source_type=agent` only with the gateway's `X-Internal-Gateway` secret | §3.4 above |
+| An issued tax document never re-reads the catalogue's VAT: invoices and myDATA split each line at `OrderItem.vat_rate`, snapshotted at creation, and tax shipping and the payment fee at the rate(s) of the goods (`order/taxation.py`); `Invoice` totals and the myDATA `invoiceSummary` come from the same lines | §3.5 above |
 | The default cache fails open on a Redis outage (reads miss, writes no-op — `core/caches.py`), but never for keys under `STRICT_KEY_PREFIXES`: the `strict:` throttle namespace, allauth's rate limits, TOTP replay protection, the IdP's single-use codes and WebSocket tickets. The checkout, payment, coupon and gift-card throttles (`core/api/throttling.py`, `fail_closed = True`) therefore DENY with 429 during an outage, while browsing/search/cart throttles and DRF's default `anon`/`user` budgets allow | `core/api/throttling.py` module docstring |
 | The tenant resolve payload and domain set are invalidated by `Tenant.cache_generation`, never by a Redis delete: it is part of their keys, and `Tenant.save`, every `TenantDomain` write and the folded pay-way / agent-setting writes bump it in the database inside the write's transaction. A delete during an outage is a fail-open no-op, so purge-by-delete left the pre-write payload served for up to its TTL; strict keys would have made the READS raise, and resolve is on every storefront request | `tenant/cache.py` module docstring |
 | The nightly demo reset returns the published demo gift card (`GIFT_CARD_CODE`) to its issued value with one `ADJUST` ledger row, so the ledger sum stays the balance and every guest spend stays on the card's history; only on `is_demo` tenants, and silently (no mail, no dispatch) | `devtools/demo_account.py: _restore_gift_card` |

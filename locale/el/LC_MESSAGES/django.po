@@ -7220,9 +7220,13 @@ msgstr "Έκπτωση (με ΦΠΑ)"
 msgid "Subtotal (excl. VAT)"
 msgstr "Υποσύνολο (χωρίς ΦΠΑ)"
 
-#: .\core\templates\invoices\invoice.html:283
-msgid "Payment fee"
-msgstr "Χρέωση πληρωμής"
+#: .\core\templates\invoices\invoice.html:263
+msgid "Shipping (incl. VAT)"
+msgstr "Μεταφορικά (με ΦΠΑ)"
+
+#: .\core\templates\invoices\invoice.html:273
+msgid "Payment fee (incl. VAT)"
+msgstr "Χρέωση πληρωμής (με ΦΠΑ)"
 
 #: .\core\templates\invoices\invoice.html:295
 msgid "VAT breakdown"
@@ -9580,13 +9584,16 @@ msgstr "myDATA (ΑΑΔΕ)"
 #: .\order\admin.py:1890
 msgid ""
 "Populated by the automated submission pipeline (``order.mydata``). Read-only"
-" — edit master data (seller / buyer / VAT rates) and use the Order admin's "
-"'Send to myDATA' action to regenerate."
+" — edit master data (seller / buyer) and use the Order admin's 'Send to "
+"myDATA' action to regenerate. VAT rates are fixed on each order line at "
+"checkout and do not follow later catalogue edits."
 msgstr ""
 "Συμπληρώνεται από τον αυτοματοποιημένο μηχανισμό υποβολής "
 "(``order.mydata``). Μόνο για ανάγνωση — επεξεργαστείτε τα κύρια δεδομένα "
-"(πωλητής / αγοραστής / συντελεστές ΦΠΑ) και χρησιμοποιήστε την ενέργεια "
-"«Αποστολή στο myDATA» στη διαχείριση Παραγγελιών για αναδημιουργία."
+"(πωλητής / αγοραστής) και χρησιμοποιήστε την ενέργεια «Αποστολή στο myDATA» "
+"στη διαχείριση Παραγγελιών για αναδημιουργία. Οι συντελεστές ΦΠΑ "
+"καθορίζονται στη γραμμή της παραγγελίας κατά την ολοκλήρωση της αγοράς και "
+"δεν ακολουθούν μεταγενέστερες αλλαγές του καταλόγου."
 
 #: .\order\admin.py:1927
 msgid "Download"
@@ -22246,3 +22253,12 @@ msgid "Remove %(locale)s: the default locale's line is Store Description."
 msgstr ""
 "Αφαιρέστε το %(locale)s: η γραμμή της προεπιλεγμένης γλώσσας είναι η "
 "Περιγραφή Καταστήματος."
+
+#: .\order\models\item.py:41
+msgid ""
+"VAT percentage this line was sold at, fixed when the line was created. "
+"Invoices and myDATA use it, never the product's current VAT."
+msgstr ""
+"Ποσοστό ΦΠΑ με το οποίο πουλήθηκε η γραμμή, καθορισμένο κατά τη δημιουργία "
+"της. Τιμολόγια και myDATA χρησιμοποιούν αυτό, ποτέ το τρέχον ΦΠΑ του "
+"προϊόντος."

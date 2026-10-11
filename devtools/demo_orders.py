@@ -108,6 +108,9 @@ def create_orders(fixtures: Sequence[FixtureOrder]) -> list[Any]:
                     quantity=line.quantity,
                     original_quantity=line.quantity,
                     price=line.price,
+                    # ``bulk_create`` skips ``OrderItem.save``, which is
+                    # what snapshots the rate for every other writer.
+                    vat_rate=line.product.vat_percent,
                     is_refunded=line.refunded,
                     refunded_quantity=line.quantity if line.refunded else 0,
                 )

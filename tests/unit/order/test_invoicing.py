@@ -115,6 +115,17 @@ class InvoiceCounterConcurrencyTestCase(TransactionTestCase):
         )
 
 
+def _goods_only_order():
+    """An order with no shipping, no fee and no lines yet.
+
+    ``OrderFactory`` charges a random shipping price, which the breakdown
+    now taxes alongside the goods; these tests pin the goods arithmetic.
+    """
+    return OrderFactory(
+        num_order_items=0, shipping_price=Money(Decimal(0), "EUR")
+    )
+
+
 class VatBreakdownTestCase(TestCase):
     def _make_item(self, order, product, *, amount: str, quantity: int):
         """Create an OrderItem with an exact price/quantity.
@@ -137,7 +148,7 @@ class VatBreakdownTestCase(TestCase):
     def test_single_rate_aggregates(self) -> None:
         vat_24 = VatFactory(value=24)
         product = ProductFactory(vat=vat_24)
-        order = OrderFactory(num_order_items=0)
+        order = _goods_only_order()
         self._make_item(order, product, amount="12.40", quantity=2)
 
         breakdown = _compute_vat_breakdown(order)
@@ -154,7 +165,7 @@ class VatBreakdownTestCase(TestCase):
         vat_6 = VatFactory(value=6)
         p_standard = ProductFactory(vat=vat_24)
         p_reduced = ProductFactory(vat=vat_6)
-        order = OrderFactory(num_order_items=0)
+        order = _goods_only_order()
         self._make_item(order, p_standard, amount="12.40", quantity=1)
         self._make_item(order, p_reduced, amount="10.60", quantity=1)
 
@@ -167,7 +178,7 @@ class VatBreakdownTestCase(TestCase):
 
     def test_no_vat_bucketed_under_zero_rate(self) -> None:
         product = ProductFactory(vat=None)
-        order = OrderFactory(num_order_items=0)
+        order = _goods_only_order()
         self._make_item(order, product, amount="5.00", quantity=1)
 
         breakdown = _compute_vat_breakdown(order)
@@ -178,26 +189,40 @@ class VatBreakdownTestCase(TestCase):
 
 
 class OrderTotalsTestCase(TestCase):
-    def test_adds_shipping_and_payment_fee_on_top(self) -> None:
-        order = OrderFactory(num_order_items=0)
-        order.shipping_price = Money(Decimal("3.50"), "EUR")
-        order.payment_method_fee = Money(Decimal("1.25"), "EUR")
-        breakdown = [
-            {
-                "rate": "24",
-                "subtotal": "10.00",
-                "vat": "2.40",
-                "gross": "12.40",
-            },
-        ]
+    def test_shipping_and_payment_fee_are_taxed_inside_the_totals(self) -> None:
+        """Shipping and the fee are part of the taxable supply (VAT
+        Directive art. 78(b)), so their net and VAT sit inside
+        ``subtotal`` / ``total_vat`` — the figures myDATA reports — and
+        the gross amounts are kept only as reference rows."""
+        order = OrderFactory(
+            num_order_items=0,
+            shipping_price=Money(Decimal("3.50"), "EUR"),
+            payment_method_fee=Money(Decimal("1.25"), "EUR"),
+        )
+        order.items.create(
+            product=ProductFactory(vat=VatFactory(value=24)),
+            price=Money(Decimal("12.40"), "EUR"),
+            quantity=1,
+        )
 
+        breakdown = _compute_vat_breakdown(order)
         totals = _order_totals(order, breakdown)
-        self.assertEqual(totals["subtotal"], Decimal("10.00"))
-        self.assertEqual(totals["total_vat"], Decimal("2.40"))
+
+        # Goods 12.40 -> 10.00 + 2.40; shipping 3.50 -> 2.82 + 0.68;
+        # fee 1.25 -> 1.01 + 0.24. All three follow the goods' 24%.
+        self.assertEqual(len(breakdown), 1)
+        self.assertEqual(breakdown[0]["subtotal"], "13.83")
+        self.assertEqual(breakdown[0]["vat"], "3.32")
+        self.assertEqual(breakdown[0]["gross"], "17.15")
+        self.assertEqual(totals["subtotal"], Decimal("13.83"))
+        self.assertEqual(totals["total_vat"], Decimal("3.32"))
         self.assertEqual(totals["shipping"], Decimal("3.50"))
         self.assertEqual(totals["payment_fee"], Decimal("1.25"))
-        # 10 + 2.40 + 3.50 + 1.25 = 17.15
+        # 12.40 + 3.50 + 1.25 = 17.15, and net + VAT is all of it.
         self.assertEqual(totals["total"], Decimal("17.15"))
+        self.assertEqual(
+            totals["subtotal"] + totals["total_vat"], totals["total"]
+        )
 
 
 class GenerateInvoiceIdempotencyTestCase(TestCase):
@@ -238,11 +263,11 @@ class GenerateInvoiceIdempotencyTestCase(TestCase):
         """The AADE-registered regen must still render shipping and the
         payment fee.
 
-        The template puts those rows behind ``{% if totals.shipping %}``
-        and then prints ``totals.total`` unconditionally, and the frozen
-        total contains both. Dropping the keys produced a legally filed
-        document, emailed to the customer, whose lines do not add up to
-        its own total.
+        The template puts those reference rows behind
+        ``{% if totals.shipping %}`` and prints ``totals.total``
+        unconditionally. Dropping the keys produced a legally filed
+        document, emailed to the customer, that no longer shows what the
+        total contains.
         """
         order = self._make_order()
         order.shipping_price = Money(Decimal("3.50"), "EUR")
@@ -271,12 +296,10 @@ class GenerateInvoiceIdempotencyTestCase(TestCase):
 
         self.assertEqual(totals["shipping"].amount, Decimal("3.50"))
         self.assertEqual(totals["payment_fee"].amount, Decimal("1.25"))
-        # The printed rows must reconcile with the printed total.
+        # Net + VAT is the whole document: shipping and the fee are taxed
+        # inside it, the rows above are reference amounts.
         self.assertEqual(
-            totals["subtotal"].amount
-            + totals["total_vat"].amount
-            + totals["shipping"].amount
-            + totals["payment_fee"].amount,
+            totals["subtotal"].amount + totals["total_vat"].amount,
             totals["total"].amount,
         )
 
@@ -436,9 +459,10 @@ class RenderItemsTestCase(TestCase):
         # 12.40 × 2 = 24.80
         self.assertEqual(row["line_total"], Decimal("24.80"))
 
-    def test_product_without_vat_reports_none_rate(self) -> None:
-        """None vs 0 matters — the template uses ``is not None`` to
-        decide whether to render "X%" at all."""
+    def test_product_without_vat_is_sold_at_zero_percent(self) -> None:
+        """A product with no VAT row is sold at 0%, and the line says so:
+        the rate is the snapshot on the item, never an absent product
+        VAT the template has to guess at."""
         product = ProductFactory(vat=None)
         order = OrderFactory(num_order_items=0)
         OrderItemFactory(
@@ -449,7 +473,7 @@ class RenderItemsTestCase(TestCase):
         )
 
         rows = _render_items(order)
-        self.assertIsNone(rows[0]["vat_rate"])
+        self.assertEqual(rows[0]["vat_rate"], Decimal(0))
 
 
 class QrSvgTestCase(TestCase):

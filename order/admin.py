@@ -1472,7 +1472,7 @@ class OrderItemAdmin(BaseModelAdmin):
         (
             _("Order Item Information"),
             {
-                "fields": ("order", "product", "quantity", "price"),
+                "fields": ("order", "product", "quantity", "price", "vat_rate"),
                 "classes": ("wide",),
             },
         ),
@@ -1509,6 +1509,15 @@ class OrderItemAdmin(BaseModelAdmin):
             },
         ),
     )
+
+    def get_readonly_fields(self, request, obj=None):
+        readonly_fields = super().get_readonly_fields(request, obj)
+        if obj is None:
+            # A new line takes its product's current VAT rate (see
+            # ``OrderItem.save``); an existing one shows the rate it was
+            # sold at, which staff may correct.
+            return (*readonly_fields, "vat_rate")
+        return readonly_fields
 
     def get_queryset(self, request):
         # ``product_display`` calls ``safe_translation_getter``, which
@@ -1925,8 +1934,10 @@ class InvoiceAdmin(BaseModelAdmin):
                 "description": _(
                     "Populated by the automated submission pipeline "
                     "(``order.mydata``). Read-only — edit master data "
-                    "(seller / buyer / VAT rates) and use the Order "
-                    "admin's 'Send to myDATA' action to regenerate."
+                    "(seller / buyer) and use the Order admin's 'Send to "
+                    "myDATA' action to regenerate. VAT rates are fixed on "
+                    "each order line at checkout and do not follow later "
+                    "catalogue edits."
                 ),
             },
         ),

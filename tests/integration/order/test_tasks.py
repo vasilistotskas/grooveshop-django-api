@@ -10,6 +10,7 @@ from django.utils import timezone
 from factory.django import mute_signals
 
 from order.enum.status import OrderStatus, PaymentStatus
+from order.factories.item import OrderItemFactory
 from order.factories.order import OrderFactory
 from order.models.order import Order
 from order.tasks import (
@@ -25,6 +26,16 @@ from order.tasks import (
     send_shipping_notification_email,
 )
 from pay_way.factories import PayWayFactory
+
+
+def _sell_something(order):
+    """Give the order a goods line.
+
+    An invoice taxes the order's shipping at the rate of the goods it
+    travels with, so an order that charges shipping needs goods to be
+    invoiced at all.
+    """
+    return OrderItemFactory(order=order)
 
 
 def _quiet_order(num_order_items=0, **fields):
@@ -637,6 +648,8 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
     def test_generate_order_invoice_success(
         self, mock_render_pdf, mock_send_email
     ):
+        _sell_something(self.order)
+
         result = generate_order_invoice(self.order.id)
 
         self.assertTrue(result)
@@ -669,6 +682,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
 
         from order.invoicing import generate_invoice
 
+        _sell_something(self.order)
         generate_invoice(self.order)
 
         # Clear any emails the order_created signal already sent so we
@@ -974,6 +988,7 @@ class OrderTasksIntegrationTestCase(DjangoTestCase):
         self.assertTrue(Order.objects.filter(id=self.order.id).exists())
 
         original_status = self.order.status
+        _sell_something(self.order)
 
         result = generate_order_invoice(self.order.id)
         self.assertTrue(result)

@@ -12,7 +12,8 @@ from djmoney.money import Money
 
 from cart.managers.cart import CartManager
 from core.models import TimeStampMixinModel, UUIDModel
-from order.discounts import allocate_discount, vat_buckets
+from order.discounts import allocate_discount
+from order.taxation import split_gross
 
 
 class Cart(TimeStampMixinModel, UUIDModel):
@@ -109,7 +110,8 @@ class Cart(TimeStampMixinModel, UUIDModel):
         is backed out of them; a price discount granted at the time of
         sale reduces the taxable base, so it is spread across the lines
         (and therefore across their VAT rates) exactly as the invoice
-        does it — see ``order.discounts``. Never pass a gift card here:
+        does it — see ``order.discounts`` and ``order.taxation``, whose
+        per-line rounding this shares. Never pass a gift card here:
         it is a means of payment and leaves VAT untouched.
         """
         # Use prefetched items if available
@@ -120,10 +122,13 @@ class Cart(TimeStampMixinModel, UUIDModel):
         )
         gross = {item.pk: item.total_price.amount for item in items}
         discounted = allocate_discount(gross, Decimal(discount.amount))
-        buckets = vat_buckets(
-            (discounted[item.pk], Decimal(item.vat_percent)) for item in items
+        total = sum(
+            (
+                split_gross(discounted[item.pk], Decimal(item.vat_percent))[1]
+                for item in items
+            ),
+            Decimal(0),
         )
-        total = sum((row["vat"] for row in buckets.values()), Decimal(0))
         return Money(total, settings.DEFAULT_CURRENCY)
 
     @property

@@ -60,3 +60,30 @@ def test_several_payment_statuses_are_ored(client):
     assert _listed(
         client, "payment_status__exact=FAILED&payment_status__exact=PENDING"
     ) == {failed.pk, pending.pk}
+
+
+def test_refund_owed_lists_cancelled_orders_still_paid(client):
+    """A refund the provider refused leaves the order cancelled with its
+    payment COMPLETED; staff refund those from this list."""
+    owed = OrderFactory(
+        status=OrderStatus.CANCELED,
+        payment_status=PaymentStatus.COMPLETED,
+        num_order_items=0,
+    )
+    OrderFactory(
+        status=OrderStatus.CANCELED,
+        payment_status=PaymentStatus.REFUNDED,
+        num_order_items=0,
+    )
+    OrderFactory(
+        status=OrderStatus.CANCELED,
+        payment_status=PaymentStatus.PENDING,
+        num_order_items=0,
+    )
+    OrderFactory(
+        status=OrderStatus.PROCESSING,
+        payment_status=PaymentStatus.COMPLETED,
+        num_order_items=0,
+    )
+
+    assert _listed(client, "refund_owed=yes") == {owed.pk}

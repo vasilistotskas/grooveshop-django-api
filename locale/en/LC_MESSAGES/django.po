@@ -5573,6 +5573,10 @@ msgstr "Order Canceled"
 msgid "Refund"
 msgstr ""
 
+#: .\order\admin.py
+msgid "Cancelled but still paid"
+msgstr ""
+
 #: .\core\templates\emails\order\order_canceled.html:38
 #: .\core\templates\emails\order\order_canceled.txt:11
 #, python-format

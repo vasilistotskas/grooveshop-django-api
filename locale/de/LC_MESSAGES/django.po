@@ -5197,6 +5197,13 @@ msgstr ""
 msgid "Order %(order_id)s marked as canceled"
 msgstr ""
 
+#: .\order\admin.py:1001
+#, python-format
+msgid ""
+"Order %(order_id)s was canceled but its payment was not refunded; see the "
+"order history."
+msgstr ""
+
 #: .\order\admin.py:1131
 msgid "Order Item Information"
 msgstr ""

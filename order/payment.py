@@ -1,5 +1,6 @@
 import logging
 from abc import ABC, abstractmethod
+from decimal import Decimal
 from typing import Any, ClassVar
 
 import moneyed
@@ -955,9 +956,32 @@ class VivaWalletPaymentProvider(PaymentProvider):
     ) -> tuple[bool, dict[str, Any]]:
         return self.create_checkout_session(amount, order_id, **kwargs)
 
+    def _captured_amount(self, payment_id: str) -> Decimal | None:
+        """What Viva says it captured on ``payment_id``, in euros.
+
+        Cancel Transaction REQUIRES ``amount`` and rejects one above the
+        original payment, so a full refund has to name the captured
+        figure. The order cannot supply it: ``Order.paid_amount`` is the
+        amount owed when the order was created, not what Viva collected.
+        Retrieve Transaction is the authority, and ``get_payment_status``
+        already reads it. ``None`` when Viva cannot say (it has logged why).
+        """
+        _status, data = self.get_payment_status(payment_id)
+        captured = data.get("amount")
+        return None if captured is None else Decimal(str(captured))
+
     def refund_payment(
         self, payment_id: str, amount: Money | None = None
     ) -> tuple[bool, dict[str, Any]]:
+        """Cancel or refund ``payment_id``; ``None`` refunds all of it.
+
+        The request ALWAYS carries ``amount`` in cents (the field is
+        ``required: true`` in Viva's Cancel Transaction spec). An HTTP 2xx
+        is not success: Viva reports a refusal in the body as
+        ``Success: false`` and a non-zero ``ErrorCode``, so only a body
+        with ``Success`` true and ``ErrorCode`` 0 counts, and its
+        ``TransactionId`` (the refund transaction) is the refund id.
+        """
         import requests
 
         try:
@@ -965,29 +989,62 @@ class VivaWalletPaymentProvider(PaymentProvider):
                 "Processing Viva Wallet refund",
                 extra={
                     "payment_id": payment_id,
-                    "amount": str(amount.amount) if amount else "full",
+                    "amount": (
+                        str(amount.amount) if amount is not None else "full"
+                    ),
                 },
             )
 
-            params = {}
-            if amount:
-                params["amount"] = round(amount.amount * 100)
+            if amount is None:
+                refund_amount = self._captured_amount(payment_id)
+                if refund_amount is None:
+                    logger.error(
+                        "Viva Wallet refund not sent: Retrieve Transaction "
+                        "reported no captured amount",
+                        extra={"payment_id": payment_id},
+                    )
+                    return False, {
+                        "error": (
+                            "Could not read the amount Viva captured for "
+                            "this payment."
+                        ),
+                        "viva_error": True,
+                    }
+            else:
+                refund_amount = amount.amount
 
             response = requests.delete(
                 f"{self.transactions_url}/api/transactions/{payment_id}",
                 headers={
                     "Authorization": self._get_basic_auth_header(),
                 },
-                params=params,
+                params={"amount": round(refund_amount * 100)},
                 timeout=30,
             )
             response.raise_for_status()
             data = response.json()
 
+            if data.get("Success") is not True or data.get("ErrorCode") != 0:
+                logger.error(
+                    "Viva Wallet refused the refund: ErrorCode=%s "
+                    "ErrorText=%s EventId=%s",
+                    data.get("ErrorCode"),
+                    data.get("ErrorText"),
+                    data.get("EventId"),
+                    extra={"payment_id": payment_id},
+                )
+                return False, {
+                    "error": data.get("ErrorText")
+                    or "Viva Wallet refused the refund.",
+                    "viva_error": True,
+                    "error_code": data.get("ErrorCode"),
+                    "event_id": data.get("EventId"),
+                }
+
             refund_data = {
-                "refund_id": data.get("TransactionId", ""),
+                "refund_id": data.get("TransactionId"),
                 "status": PaymentStatus.REFUNDED,
-                "amount": str(amount.amount) if amount else "full refund",
+                "amount": str(refund_amount),
                 "payment_id": payment_id,
                 "viva_status": "refunded",
             }

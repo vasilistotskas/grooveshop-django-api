@@ -9317,6 +9317,15 @@ msgstr "Ακύρωση επιλεγμένων παραγγελιών και επ
 msgid "Order %(order_id)s marked as canceled"
 msgstr "Η παραγγελία %(order_id)s σημάνθηκε ως ακυρωμένη"
 
+#: .\order\admin.py:1001
+#, python-format
+msgid ""
+"Order %(order_id)s was canceled but its payment was not refunded; see the "
+"order history."
+msgstr ""
+"Η παραγγελία %(order_id)s ακυρώθηκε, αλλά η πληρωμή της δεν επιστράφηκε· "
+"δείτε το ιστορικό της παραγγελίας."
+
 #: .\order\admin.py:1013
 #, python-format
 msgid "Order %(order_id)s: unexpected error (%(error)s) — check logs"

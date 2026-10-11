@@ -12,6 +12,7 @@ from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from core.api.permissions import StoreStaffModelPermissions
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
@@ -62,9 +63,10 @@ serializers_config: SerializersConfig = {
 class OrderItemViewSet(BaseModelViewSet):
     queryset = OrderItem.objects.none()
     serializers_config = serializers_config
-    # The queryset is user-scoped and schema-isolated, so an
+    # Reads: the queryset is user-scoped and schema-isolated, so an
     # authenticated caller is by construction a customer of THIS store.
     # Tenancy is not an extra permission here (see tenant/membership.py).
+    # Writes are not customer self-service: see ``get_permissions``.
     permission_classes = [IsAuthenticated]
     filterset_class = OrderItemFilter
     ordering_fields = [
@@ -83,6 +85,18 @@ class OrderItemViewSet(BaseModelViewSet):
         "order__last_name",
         "order__email",
     ]
+
+    def get_permissions(self):
+        # An order line carries the price, the quantity and, through the
+        # order total, the amount owed, and a quantity change moves stock.
+        # Once an order exists that is a merchant operation, not
+        # something the order's owner edits: customers read their lines
+        # here and change an order only through the order endpoints.
+        # DELETE maps to ``delete_orderitem``, which ADMIN/OWNER hold and
+        # STAFF deliberately does not (tenant.role_scopes).
+        if self.action in {"create", "update", "partial_update", "destroy"}:
+            return [StoreStaffModelPermissions()]
+        return super().get_permissions()
 
     def get_queryset(self):
         user = self.request.user

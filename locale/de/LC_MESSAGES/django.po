@@ -5204,6 +5204,13 @@ msgid ""
 "order history."
 msgstr ""
 
+#: .\order\admin.py:1010
+#, python-format
+msgid ""
+"Order %(order_id)s was canceled but the courier did not cancel its "
+"parcel (%(error)s); arrange its return with the courier."
+msgstr ""
+
 #: .\order\admin.py:1131
 msgid "Order Item Information"
 msgstr ""

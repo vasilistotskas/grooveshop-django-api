@@ -9326,6 +9326,15 @@ msgstr ""
 "Η παραγγελία %(order_id)s ακυρώθηκε, αλλά η πληρωμή της δεν επιστράφηκε· "
 "δείτε το ιστορικό της παραγγελίας."
 
+#: .\order\admin.py:1010
+#, python-format
+msgid ""
+"Order %(order_id)s was canceled but the courier did not cancel its "
+"parcel (%(error)s); arrange its return with the courier."
+msgstr ""
+"Η παραγγελία %(order_id)s ακυρώθηκε, αλλά ο courier δεν ακύρωσε το "
+"δέμα της (%(error)s)· κανονίστε την επιστροφή του με τον courier."
+
 #: .\order\admin.py:1013
 #, python-format
 msgid "Order %(order_id)s: unexpected error (%(error)s) — check logs"
@@ -9626,6 +9635,10 @@ msgstr "Παραπομπή"
 msgctxt "order source type"
 msgid "AI agent"
 msgstr "Πράκτορας AI"
+
+#: .\order\enum\cancel_error.py:15
+msgid "Parcel already with the courier"
+msgstr "Το δέμα βρίσκεται ήδη στον courier"
 
 #: .\order\enum\create_error.py:13
 msgid "Insufficient stock"
@@ -11166,6 +11179,19 @@ msgstr ""
 "Ορίζεται από το agent gateway για παραγγελία που έκανε πράκτορας AI μέσω UCP"
 " ή ACP."
 
+#: .\order\serializers\order.py:213
+msgid ""
+"Whether the customer can cancel the order now: its status allows it and "
+"the courier has not yet taken the parcel. Read from local data, so the "
+"cancel request itself still asks the courier and can be refused with "
+"``error.type`` ``parcel_with_courier``."
+msgstr ""
+"Αν ο πελάτης μπορεί να ακυρώσει την παραγγελία τώρα: η κατάστασή της "
+"το επιτρέπει και ο courier δεν έχει ακόμη παραλάβει το δέμα. "
+"Προκύπτει από τοπικά δεδομένα, οπότε το ίδιο το αίτημα ακύρωσης "
+"ρωτά πάντα τον courier και μπορεί να απορριφθεί με ``error.type`` "
+"``parcel_with_courier``."
+
 #: .\order\serializers\order.py:912
 msgid "Payment method ID"
 msgstr "ID μεθόδου πληρωμής"
@@ -11520,6 +11546,15 @@ msgstr "Το νόμισμα είναι υποχρεωτικό όταν δίνε�
 msgid "Refund amount must be greater than 0"
 msgstr "Το ποσό επιστροφής πρέπει να είναι μεγαλύτερο από 0"
 
+#: .\order\serializers\order.py:1871
+msgid ""
+"Stable code for why the cancel was refused. Branch on this, never on "
+"``detail``, which is in the request's language."
+msgstr ""
+"Σταθερός κωδικός για τον λόγο απόρριψης της ακύρωσης. Διακλαδώστε με "
+"βάση αυτόν, ποτέ με βάση το ``detail``, που είναι στη γλώσσα του "
+"αιτήματος."
+
 #: .\order\serializers\order.py:1812
 msgid ""
 "Stable code for why the order was refused. Branch on this, never on "
@@ -11656,6 +11691,15 @@ msgid ""
 msgstr ""
 "Παραγγελία σε κατάσταση {status} δεν μπορεί να ακυρωθεί. Μόνο παραγγελίες σε"
 " κατάσταση PENDING ή PROCESSING μπορούν να ακυρωθούν."
+
+#: .\order\services.py:2282
+msgid ""
+"Your parcel is already with the courier, so the order can no longer be "
+"canceled. Contact the store to arrange a return."
+msgstr ""
+"Το δέμα σας βρίσκεται ήδη στον courier, επομένως η παραγγελία δεν "
+"μπορεί πλέον να ακυρωθεί. Επικοινωνήστε με το κατάστημα για να "
+"κανονίσετε επιστροφή."
 
 #: .\order\services.py:2403 .\order\services.py:2414
 msgid "The refund could not be processed."

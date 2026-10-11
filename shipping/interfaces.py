@@ -70,6 +70,20 @@ class ShippingCarrierInterface(ABC):
     def cancel_shipment(self, shipment: Any, *, reason: str = "") -> None:
         """Cancel the shipment via the provider's API."""
 
+    def can_cancel_shipment(self, shipment: Any) -> bool:
+        """Whether the carrier would still accept a cancel of ``shipment``.
+
+        Judged from local data only — never a carrier call — so it is
+        safe on every order read. It is the same rule the carrier's own
+        :meth:`cancel_shipment` applies before it contacts the courier,
+        so a ``False`` here means the cancel would be refused. ``True``
+        is not a promise: only the carrier's answer is final.
+
+        Default ``True``: a carrier with no cancel rule of its own (the
+        merchant's own delivery) never refuses.
+        """
+        return True
+
     @abstractmethod
     def fetch_label_bytes(self, shipment: Any) -> bytes:
         """Return the raw label PDF bytes (provider-format may vary)."""

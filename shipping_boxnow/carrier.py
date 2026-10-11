@@ -53,6 +53,11 @@ class BoxNowCarrier(ShippingCarrierInterface):
 
         BoxNowService.cancel_shipment(shipment, reason=reason)
 
+    def can_cancel_shipment(self, shipment: Any) -> bool:
+        from shipping_boxnow.services import BoxNowService
+
+        return BoxNowService.can_cancel_shipment(shipment)
+
     def fetch_label_bytes(self, shipment: Any) -> bytes:
         from shipping_boxnow.services import BoxNowService
 

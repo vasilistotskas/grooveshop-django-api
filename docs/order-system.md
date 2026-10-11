@@ -699,18 +699,35 @@ All WS notifications go through `notification.consumers.NotificationConsumer` an
 
 ### 7.1 Cancel paths
 
-- **Customer**: `POST /api/v1/order/{id}/cancel` → `OrderService.cancel_order(order, reason, refund_payment=True)`.
-- **Admin**: same `cancel_order` via the "Cancel selected orders and restore stock" action. The change form's `status` field is **read-only**: a form save wrote the column straight to the row, bypassing both `cancel_order` (no stock restore — prod orders 242 and 213, 2026-09-08) and the transition table in `update_order_status`. Every other transition is an action too (`mark_as_processing` … `mark_as_returned`, `mark_as_refunded`), routed through `update_order_status`. RETURNED and REFUNDED deliberately leave stock alone (§5.1).
-- **Auto**: `auto_cancel_stuck_pending_orders` Celery beat — cancels online orders stuck in PENDING for >24h.
+- **Customer** (the owner, or a guest holding the order's uuid): `POST /api/v1/order/{id}/cancel` → `OrderService.cancel_order(order, reason, refund_payment=True, customer_initiated=True)`. The courier is asked first, see §7.1.1.
+- **Store staff**: the same endpoint, with `customer_initiated=False` — the view takes it from `is_store_staff(request.user)`, never from `is_staff`.
+- **Admin**: same `cancel_order` (`customer_initiated=False`) via the "Cancel selected orders and restore stock" action. The change form's `status` field is **read-only**: a form save wrote the column straight to the row, bypassing both `cancel_order` (no stock restore — prod orders 242 and 213, 2026-09-08) and the transition table in `update_order_status`. Every other transition is an action too (`mark_as_processing` … `mark_as_returned`, `mark_as_refunded`), routed through `update_order_status`. RETURNED and REFUNDED deliberately leave stock alone (§5.1).
+- **Auto**: `auto_cancel_stuck_pending_orders` Celery beat — cancels online orders stuck in PENDING for >24h (`customer_initiated=False`).
+- **Carrier-driven**: `AcsService._cancel_order_for_dead_shipment` (`customer_initiated=False`; the voucher is already canceled).
+
+`customer_initiated` is a required decision for every caller that is not a customer: it defaults to `True`, so a caller that forgets to choose is held to the courier's answer (§7.1.1) rather than silently skipping it.
 
 `cancel_order`:
+0. Customer only: asks the courier to cancel the voucher before anything else (§7.1.1). No lock is held and no transaction is open for that call.
 1. Locks order row.
 2. Releases stock + reservations (`StockManager.increment_stock`, `release_reservation`).
 3. Sets `status=CANCELED` (the save settles an unpaid `payment_status` to `CANCELED` — `Order.settle_unpaid_payment`), records `metadata['cancellation']`.
-4. Cascades to courier voucher via `cancel_attached_shipment` → `ShippingService.cancel_shipment` (PR #2 H). Records dispatch outcome on metadata. Carrier rejection (e.g., voucher already in pickup list) is swallowed and logged.
+4. Staff / system only: cascades to the courier voucher via `cancel_attached_shipment` → `ShippingService.cancel_shipment` (PR #2 H). Records the dispatch outcome on metadata. A carrier rejection (e.g., voucher already in pickup list) does not stop the cancel: it is logged, kept in `metadata['cancellation']['shipment_cancel']['error']`, left as a staff-only `OrderHistory` NOTE (`Order canceled, but the courier did not cancel the parcel: …`), and the admin "Cancel selected orders" action raises an error message for it. For a customer cancel the courier already confirmed in step 0, so the outcome is recorded up front and the cascade (and the `order_canceled` signal's safety net) skips.
 5. Optional refund via `refund_order` (when `refund_payment=True` AND `is_paid`).
 
 **Don't bypass**: do not call `order.save(update_fields=['status'])` directly to cancel — you'll skip stock release + email + history. Always go through `OrderService.cancel_order`.
+
+### 7.1.1 A customer cancel asks the courier first
+
+An order stays PENDING / PROCESSING from the moment its voucher exists until a tracking poll sees the parcel move (voucher creation stores the tracking number but does not advance the status). In that window the courier may already hold the parcel, so a customer cancel is only accepted once the courier agrees:
+
+1. `OrderService._ask_courier_to_cancel` re-reads the order's status (an order that no longer allows a cancel gets the usual status error and the courier is not asked), then calls `ShippingService.cancel_shipment` — the same carrier path a staff cancel uses (`AcsService.cancel_voucher`, `BoxNowService.cancel_shipment`). An order with no voucher has nothing to ask, and goes on.
+2. If the courier confirms, the order cancels and refunds as usual, and `metadata['cancellation']['shipment_cancel']` is `{"attempted": true, "dispatched": <bool>}`.
+3. If the courier refuses (an ACS voucher already on an issued pickup list, a BoxNow parcel past `NEW`) or cannot be reached, `cancel_order` raises `ParcelWithCourierError` and changes **nothing**: no status, no refund, no shipment change, no history row. `POST /order/{id}/cancel` answers 400 `{"detail": <translated message>, "error": {"type": "parcel_with_courier"}}` (`OrderCancelErrorType`, `OrderCancelErrorSerializer`). Branch on `error.type`, never on `detail`. The same code covers a refusal and an unreachable courier.
+
+Both carriers' cancel is idempotent on an already canceled shipment, so a customer who retries after a cancel that stopped half way is not refused (`BoxNowService.cancel_shipment` returns on a CANCELED parcel, as `AcsService.cancel_voucher` already did).
+
+**`canBeCanceled`** (order list and detail) is `Order.can_be_canceled_by_customer`: the status rule (`Order.can_be_canceled`) AND `ShippingService.can_cancel_shipment(order)`. The second half reads local rows only, never the carrier: `AcsService.can_cancel_voucher` (false once the voucher is on a pickup list, `AcsShipment.pickup_list`) and `BoxNowService.can_cancel_shipment` (false once a parcel with a `parcel_id` is past `NEW`). These are the exact guards the carriers apply before they call the courier, so the flag and the cancel cannot drift; `ShippingCarrierInterface.can_cancel_shipment` defaults to `True` for a carrier with no cancel rule. A `True` is not a promise — the cancel request still asks the courier. `Order.can_be_canceled` (status only) stays the rule for staff and system cancels and for the `canBeCanceled` list filter. `OrderQuerySet.for_list()` selects `acs_shipment` / `boxnow_shipment` so the list reads the flag without a query per order.
 
 ### 7.2 Refund paths
 

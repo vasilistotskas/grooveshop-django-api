@@ -848,6 +848,24 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         return self.status in cancellable_statuses
 
     @property
+    def can_be_canceled_by_customer(self) -> bool:
+        """Whether the customer's cancel button should be on offer.
+
+        A customer cancel asks the courier to take the parcel back
+        before the order changes (``OrderService.cancel_order``), so on
+        top of the status rule the offer ends once local data shows the
+        courier would refuse: an ACS voucher already on an issued pickup
+        list, a BoxNow parcel past ``NEW``. Read from local rows only —
+        never a carrier call. Staff and system cancels are not bound by
+        the courier, so they stay on :attr:`can_be_canceled`.
+        """
+        from shipping.services import ShippingService
+
+        return self.can_be_canceled and ShippingService.can_cancel_shipment(
+            self
+        )
+
+    @property
     def is_completed(self) -> bool:
         return self.status == OrderStatus.COMPLETED
 

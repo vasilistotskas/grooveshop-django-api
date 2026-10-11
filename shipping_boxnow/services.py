@@ -633,6 +633,21 @@ class BoxNowService:
     # cancel_shipment
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def can_cancel_shipment(shipment: BoxNowShipment) -> bool:
+        """Whether BoxNow would still accept a cancel of this parcel.
+
+        Local data only. BoxNow only cancels a parcel in the ``NEW``
+        state; a shipment with no ``parcel_id`` never reached BoxNow and
+        an already CANCELED parcel has nothing left to refuse. This is
+        the one rule :meth:`cancel_shipment` enforces before it calls
+        BoxNow and the order's ``canBeCanceled`` flag reads.
+        """
+        return not shipment.parcel_id or shipment.parcel_state in (
+            BoxNowParcelState.NEW,
+            BoxNowParcelState.CANCELED,
+        )
+
     @classmethod
     def cancel_shipment(
         cls, shipment: BoxNowShipment, *, reason: str = ""
@@ -642,8 +657,10 @@ class BoxNowService:
 
         BoxNow only permits cancellation while the parcel is in the
         ``NEW`` state (error P420 otherwise). We mirror that guard
-        locally so we never make an API call that BoxNow would reject,
-        and so the caller gets a clear error message.
+        locally (:meth:`can_cancel_shipment`) so we never make an API
+        call that BoxNow would reject, and so the caller gets a clear
+        error message. Cancelling a parcel that is already CANCELED is a
+        no-op, so a retry after a partly failed cancel goes through.
 
         Three-phase design — same shape as ``create_shipment_for_order``
         — so the BoxNow API call doesn't happen with a row lock held.
@@ -729,10 +746,17 @@ class BoxNowService:
                 )
                 return
 
+            # Already canceled (a webhook, an earlier cancel that the
+            # caller then failed to finish): nothing left to do. Without
+            # this the state guard below read CANCELED as "past NEW" and
+            # refused a parcel that is exactly as canceled as asked.
+            if locked.parcel_state == BoxNowParcelState.CANCELED:
+                return
+
             # State guard: parcel_id is set, so a real BoxNow-side
             # parcel exists. BoxNow only allows cancellation from
             # the NEW state — refuse remote cancel for anything else.
-            if locked.parcel_state != BoxNowParcelState.NEW:
+            if not cls.can_cancel_shipment(locked):
                 raise BoxNowAPIError(
                     409,
                     code="P420",

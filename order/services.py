@@ -28,6 +28,7 @@ from order.exceptions import (
     InvalidOrderDataError,
     InvalidStatusTransitionError,
     OrderCancellationError,
+    ParcelWithCourierError,
     PaymentAmountMismatchError,
     PaymentCurrencyMismatchError,
     PaymentError,
@@ -2197,13 +2198,106 @@ class OrderService:
         }
 
     @classmethod
-    @transaction.atomic
     def cancel_order(
         cls,
         order: Order,
         reason: str = "",
         refund_payment: bool = True,
         canceled_by: int | None = None,
+        *,
+        customer_initiated: bool = True,
+    ) -> tuple[Order, dict[str, Any] | None]:
+        """Cancel an order: stock back, status CANCELED, voucher, refund.
+
+        ``customer_initiated`` is the caller's call, taken from what it
+        already knows (the cancel endpoint: the requester is not store
+        staff). A customer cancel asks the courier to cancel the voucher
+        FIRST and only goes on when the courier confirms or the order has
+        no voucher; if the courier refuses (voucher already on a pickup
+        list, parcel already at a locker) or cannot be reached, it raises
+        :class:`ParcelWithCourierError` and nothing changes — no status,
+        no refund, no shipment. That ask is a carrier HTTP call, so a
+        customer cancel must not run inside an open transaction.
+
+        Staff and system callers pass ``customer_initiated=False``: they
+        cancel and refund regardless, the courier is asked afterwards on
+        a best-effort basis, and a refusal is recorded in
+        ``metadata['cancellation']['shipment_cancel']`` and in a staff
+        history note. The default is the strict one, so a caller that
+        forgets to choose is held to the courier's answer.
+        """
+        shipment_cancel = (
+            cls._ask_courier_to_cancel(order, reason)
+            if customer_initiated
+            else None
+        )
+        return cls._cancel_order_locked(
+            order,
+            reason,
+            refund_payment,
+            canceled_by,
+            shipment_cancel=shipment_cancel,
+        )
+
+    @classmethod
+    def _ask_courier_to_cancel(
+        cls, order: Order, reason: str
+    ) -> dict[str, Any] | None:
+        """Cancel the order's voucher at the courier before the order moves.
+
+        Returns the ``shipment_cancel`` outcome to record on the order
+        (the same shape :meth:`cancel_attached_shipment` writes), or
+        ``None`` when the order's status no longer allows a cancel — the
+        courier is not asked about an order that will not cancel, and
+        the locked re-check in :meth:`_cancel_order_locked` raises the
+        usual status error. Raises :class:`ParcelWithCourierError` when
+        the courier refuses or cannot be reached.
+
+        Runs before the order row is locked, outside any transaction of
+        its own: the carrier calls are three-phase so they never hold a
+        transaction open across the courier's HTTP round trip
+        (``idle_in_transaction_session_timeout`` would kill it), and the
+        order row stays unlocked while the courier answers. The locked
+        re-check afterwards is what decides the order's fate.
+        """
+        from shipping.services import ShippingService
+
+        current = Order.objects.get(pk=order.pk)
+        if not current.can_be_canceled:
+            return None
+
+        try:
+            dispatched = ShippingService.cancel_shipment(current, reason=reason)
+        except Exception as exc:
+            logger.warning(
+                "Customer cancel of order %s refused: the courier did not "
+                "confirm the voucher cancel: %s",
+                order.id,
+                exc,
+                exc_info=True,
+            )
+            raise ParcelWithCourierError(
+                order_id=order.id,
+                reason=str(
+                    _(
+                        "Your parcel is already with the courier, so the "
+                        "order can no longer be canceled. Contact the store "
+                        "to arrange a return."
+                    )
+                ),
+            ) from exc
+        return {"attempted": True, "dispatched": dispatched}
+
+    @classmethod
+    @transaction.atomic
+    def _cancel_order_locked(
+        cls,
+        order: Order,
+        reason: str,
+        refund_payment: bool,
+        canceled_by: int | None,
+        *,
+        shipment_cancel: dict[str, Any] | None,
     ) -> tuple[Order, dict[str, Any] | None]:
         # Lock the order row to prevent concurrent cancellation requests
         # from both restoring stock
@@ -2342,6 +2436,14 @@ class OrderService:
                 "canceled_by": canceled_by,
                 "previous_status": old_status,
             }
+            if shipment_cancel is not None:
+                # The courier already confirmed (a customer cancel asks it
+                # first). Recording the outcome here is also what stops
+                # the cascade below, and the ``order_canceled`` signal's
+                # safety net, from asking the carrier a second time.
+                order.metadata["cancellation"]["shipment_cancel"] = (
+                    shipment_cancel
+                )
 
             order.save(
                 update_fields=["status", "status_updated_at", "metadata"]
@@ -2851,7 +2953,12 @@ class OrderService:
         parcel already accepted at a locker) are recorded on
         ``order.metadata['cancellation']['shipment_cancel']`` so the
         admin can see why the cascade didn't reach the courier and
-        coordinate the in-transit return out of band.
+        coordinate the in-transit return out of band. A refusal is also
+        left as a staff-only ``OrderHistory`` note.
+
+        This is the staff / system path: a customer cancel asks the
+        courier first (:meth:`_ask_courier_to_cancel`) and is refused
+        when the courier refuses.
 
         Never raises — order cancellation must be allowed to complete
         even when the courier-side cancel fails.
@@ -2911,6 +3018,21 @@ class OrderService:
         # recursion or duplicate-signal failures (verified in CI on
         # 2026-05-16).
         Order.objects.filter(pk=order.pk).update(metadata=order.metadata)
+
+        if "error" in info:
+            # The carrier outcome belongs where staff read about the
+            # order, not only in a metadata blob: the order is canceled
+            # (and refunded) while the parcel may still be delivered.
+            from order.models.history import OrderHistory
+
+            OrderHistory.log_note(
+                order=order,
+                note=(
+                    "Order canceled, but the courier did not cancel the "
+                    f"parcel: {info['error']}. The parcel may still be "
+                    "delivered; arrange its return with the courier."
+                ),
+            )
 
     @classmethod
     def _dispatch_shipment_creation_task(cls, order: Order) -> None:

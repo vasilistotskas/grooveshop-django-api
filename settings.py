@@ -4148,13 +4148,15 @@ SPECTACULAR_SETTINGS = {
         # override keeps the established ``PayWayKeyEnum`` name for both
         # instead of a second ``KeyEnum`` for the same choice set.
         "PayWayKeyEnum": "pay_way.enum.pay_way.PayWayEnum",
-        # Two choice sets now sit behind fields named ``type``: the BoxNow
-        # locker type and ``OrderCreateErrorDetailSerializer.type``.
-        # Without both overrides drf-spectacular renames the older one to
-        # a hashed ``Type8dcEnum``, which bleeds into the generated
-        # frontend types. ``TypeEnum`` keeps the name it already had.
+        # Three choice sets now sit behind fields named ``type``: the
+        # BoxNow locker type, ``OrderCreateErrorDetailSerializer.type``
+        # and ``OrderCancelErrorDetailSerializer.type``. Without every
+        # override drf-spectacular renames the older one to a hashed
+        # ``Type8dcEnum``, which bleeds into the generated frontend
+        # types. ``TypeEnum`` keeps the name it already had.
         "TypeEnum": "shipping_boxnow.enum.locker_type.BoxNowLockerType",
         "OrderCreateErrorType": "order.enum.create_error.OrderCreateErrorType",
+        "OrderCancelErrorType": "order.enum.cancel_error.OrderCancelErrorType",
         "ReviewStatus": "product.enum.review.ReviewStatus",
         "SubscriptionStatus": "user.models.subscription.UserSubscription.SubscriptionStatus",
         # Both ``SubscriptionTopic.category`` and ``Notification.category``

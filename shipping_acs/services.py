@@ -764,6 +764,21 @@ class AcsService:
     # Voucher cancellation
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def can_cancel_voucher(shipment: AcsShipment) -> bool:
+        """Whether ACS would still accept a cancel of this voucher.
+
+        Local data only. Once the voucher is on an issued pickup list it
+        is immutable at ACS (``ACS_Delete_Voucher`` refuses it); an
+        already CANCELED voucher has nothing left to refuse. This is the
+        one rule :meth:`cancel_voucher` enforces before it calls ACS and
+        the order's ``canBeCanceled`` flag reads.
+        """
+        return (
+            shipment.shipment_state == AcsShipmentState.CANCELED
+            or shipment.pickup_list_id is None
+        )
+
     @classmethod
     def cancel_voucher(
         cls,
@@ -794,7 +809,7 @@ class AcsService:
             if shipment.shipment_state == AcsShipmentState.CANCELED:
                 return  # idempotent
 
-            if shipment.pickup_list_id is not None:
+            if not cls.can_cancel_voucher(shipment):
                 raise AcsAPIError(
                     alias="ACS_Delete_Voucher",
                     error_message=(
@@ -2488,6 +2503,7 @@ class AcsService:
             order,
             reason="ACS shipment canceled before dispatch",
             refund_payment=False,
+            customer_initiated=False,
         )
 
     @classmethod

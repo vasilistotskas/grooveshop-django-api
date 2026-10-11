@@ -581,6 +581,23 @@ class TestCancelShipment:
         assert exc_info.value.code == "P420"
         mock_client.return_value.cancel_parcel.assert_not_called()
 
+    def test_cancel_when_already_canceled_is_a_no_op(self):
+        """A retry after a cancel that stopped half way (the parcel is
+        canceled, the caller never finished) must not read CANCELED as
+        "past NEW" and refuse."""
+        shipment = BoxNowShipmentFactory(
+            with_parcel=True,
+            parcel_state=BoxNowParcelState.CANCELED,
+        )
+
+        mock_client = MagicMock()
+        with patch("shipping_boxnow.services.BoxNowClient", mock_client):
+            BoxNowService.cancel_shipment(shipment, reason="retry")
+
+        mock_client.return_value.cancel_parcel.assert_not_called()
+        shipment.refresh_from_db()
+        assert shipment.parcel_state == BoxNowParcelState.CANCELED
+
     def test_cancel_pending_creation_marks_local_without_api_call(self):
         """The canonical case revealed by prod order 76 (2026-05-21):
         an unpaid online BoxNow order sits at ``parcel_state =
@@ -632,6 +649,48 @@ class TestCancelShipment:
         mock_client.return_value.cancel_parcel.assert_not_called()
         shipment.refresh_from_db()
         assert shipment.parcel_state == BoxNowParcelState.CANCELED
+
+
+@pytest.mark.django_db
+class TestCanCancelShipment:
+    """The one local rule ``cancel_shipment`` applies before it calls
+    BoxNow and the order's ``canBeCanceled`` reads."""
+
+    @pytest.mark.parametrize(
+        ("parcel_state", "expected"),
+        [
+            (BoxNowParcelState.NEW, True),
+            (BoxNowParcelState.CANCELED, True),
+            (BoxNowParcelState.IN_DEPOT, False),
+            (BoxNowParcelState.FINAL_DESTINATION, False),
+            (BoxNowParcelState.ACCEPTED_TO_LOCKER, False),
+            (BoxNowParcelState.DELIVERED, False),
+        ],
+    )
+    def test_follows_the_parcel_state(self, parcel_state, expected):
+        shipment = BoxNowShipmentFactory(
+            with_parcel=True, parcel_state=parcel_state
+        )
+
+        assert BoxNowService.can_cancel_shipment(shipment) is expected
+
+    def test_a_shipment_that_never_reached_boxnow_can_always_cancel(self):
+        shipment = BoxNowShipmentFactory(
+            parcel_id=None,
+            delivery_request_id=None,
+            parcel_state=BoxNowParcelState.PENDING_CREATION,
+        )
+
+        assert BoxNowService.can_cancel_shipment(shipment) is True
+
+    def test_the_carrier_adapter_answers_with_the_same_rule(self):
+        from shipping.interfaces import get_provider
+
+        shipment = BoxNowShipmentFactory(
+            with_parcel=True, parcel_state=BoxNowParcelState.IN_DEPOT
+        )
+
+        assert get_provider("boxnow").can_cancel_shipment(shipment) is False
 
 
 # ---------------------------------------------------------------------------

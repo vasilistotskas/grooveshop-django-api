@@ -216,6 +216,9 @@ class TestCancelOrderCascadesToShipment:
         assert shipment_cancel.get("dispatched") is True
 
     def test_cascade_swallows_carrier_error_so_order_still_cancels(self):
+        """A staff or system cancel (``customer_initiated=False``) is not
+        bound by the courier: it cancels and records the refusal. A
+        customer cancel is held to it (test_customer_cancel_asks_courier)."""
         order = OrderFactory(
             num_order_items=0,
             status=OrderStatus.PROCESSING,
@@ -227,7 +230,12 @@ class TestCancelOrderCascadesToShipment:
                 "carrier rejected — already in pickup list"
             ),
         ):
-            OrderService.cancel_order(order, reason="m", refund_payment=False)
+            OrderService.cancel_order(
+                order,
+                reason="m",
+                refund_payment=False,
+                customer_initiated=False,
+            )
         order.refresh_from_db()
         assert order.status == OrderStatus.CANCELED
         cancellation = order.metadata.get("cancellation", {})

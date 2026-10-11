@@ -986,12 +986,34 @@ class OrderAdmin(BaseModelAdmin):
 
         for order in queryset:
             try:
-                _canceled, refund_info = OrderService.cancel_order(order)
+                canceled, refund_info = OrderService.cancel_order(
+                    order, customer_initiated=False
+                )
                 self.message_user(
                     request,
                     _("Order %(order_id)s marked as canceled")
                     % {"order_id": order.id},
                 )
+                courier_error = (
+                    (canceled.metadata or {})
+                    .get("cancellation", {})
+                    .get("shipment_cancel", {})
+                    .get("error")
+                )
+                if courier_error:
+                    # Staff cancels go through whatever the courier says,
+                    # so the parcel may still be delivered: say so here,
+                    # not only in the order's metadata and history.
+                    self.message_user(
+                        request,
+                        _(
+                            "Order %(order_id)s was canceled but the courier "
+                            "did not cancel its parcel (%(error)s); arrange "
+                            "its return with the courier."
+                        )
+                        % {"order_id": order.id, "error": courier_error},
+                        level="error",
+                    )
                 if refund_info and not refund_info["refunded"]:
                     # The order is canceled and the money is still with
                     # the shop: say so, or "marked as canceled" reads as

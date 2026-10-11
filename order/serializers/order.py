@@ -12,6 +12,7 @@ from core.utils.email import is_disposable_domain
 from core.validators import address as address_rules
 from country.models import Country
 from order.attribution import AGENT_PROTOCOLS, CLICK_ID_PARAMS
+from order.enum.cancel_error import OrderCancelErrorType
 from order.enum.create_error import OrderCreateErrorType
 from order.enum.document_type import OrderCreateDocumentTypeEnum
 from order.enum.status import OrderStatus, PaymentStatus
@@ -205,7 +206,17 @@ class OrderSerializer(serializers.ModelSerializer[Order]):
             "without opening it."
         )
     )
-    can_be_canceled = serializers.BooleanField(read_only=True)
+    can_be_canceled = serializers.BooleanField(
+        source="can_be_canceled_by_customer",
+        read_only=True,
+        help_text=_(
+            "Whether the customer can cancel the order now: its status "
+            "allows it and the courier has not yet taken the parcel. "
+            "Read from local data, so the cancel request itself still "
+            "asks the courier and can be refused with "
+            "``error.type`` ``parcel_with_courier``."
+        ),
+    )
     is_paid = serializers.BooleanField(read_only=True)
     attribution = OrderAttributionSerializer(
         read_only=True,
@@ -1851,6 +1862,28 @@ class ReorderResponseSerializer(serializers.Serializer):
     cart_id = serializers.IntegerField(allow_null=True)
     added_items = ReorderItemSerializer(many=True)
     skipped_items = ReorderItemSerializer(many=True)
+
+
+class OrderCancelErrorDetailSerializer(serializers.Serializer):
+    type = serializers.ChoiceField(
+        choices=OrderCancelErrorType.choices,
+        help_text=_(
+            "Stable code for why the cancel was refused. Branch on this, "
+            "never on ``detail``, which is in the request's language."
+        ),
+    )
+
+
+class OrderCancelErrorSerializer(serializers.Serializer):
+    """The 400 body of ``POST /order/{id}/cancel``.
+
+    A refusal the order service types carries ``error.type``; any other
+    refusal (the order's status no longer allows a cancel) is ``detail``
+    alone, which is why ``error`` is optional.
+    """
+
+    detail = serializers.CharField(required=False)
+    error = OrderCancelErrorDetailSerializer(required=False)
 
 
 class OrderCreateErrorDetailSerializer(serializers.Serializer):

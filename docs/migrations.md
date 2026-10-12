@@ -23,6 +23,40 @@ transaction:
 
 Plain `AddIndex` stays fine on new or small tables.
 
+## Unique constraints on live tables
+
+`AddConstraint` builds a unique constraint with the same plain
+`CREATE UNIQUE INDEX`, and so blocks writes the same way. Postgres has no
+`NOT VALID` for uniqueness (`AddConstraintNotValid` is for CHECK
+constraints), and a *partial* unique index cannot be attached afterwards
+with `ADD CONSTRAINT ... USING INDEX`, so the concurrent index build IS the
+constraint. Django already builds a conditional `UniqueConstraint` as exactly
+that index. For a live table:
+
+- Set `atomic = False` on the migration.
+- Use `core.db.migration_operations.AddUniqueConstraintAdaptively(model_name,
+  constraint)`. The constraint needs a `condition` (Django builds one without
+  as an `ALTER TABLE`, which this operation refuses). Same adaptive build as
+  `AddIndexAdaptively`: `CONCURRENTLY` outside a transaction, plain inside one
+  (a tenant being provisioned), `statement_timeout` lifted, an INVALID
+  leftover dropped first, `IF NOT EXISTS`.
+- **Existing duplicates abort it, loudly, before anything is built.** A
+  concurrent unique build that meets a duplicate fails half way and leaves
+  an INVALID index; the operation counts them first and raises an
+  `IntegrityError` naming the duplicated values and the schema, having
+  changed nothing. The PreSync hook stops before the new image rolls, so the
+  old pods keep serving. It never deletes or merges rows: which of two rows is
+  the real one is a person's call. Fix the data, then re-run.
+- **A duplicate that arrives after the count still fails the build** (the old
+  pods keep inserting while it runs), and `CREATE INDEX CONCURRENTLY` leaves an
+  INVALID index when it fails. A failed build outside a transaction drops its
+  own leftover (`DROP INDEX CONCURRENTLY IF EXISTS`) before re-raising the
+  build's error, so nothing keeps costing writes until someone retries; the
+  next run also drops any leftover first.
+- Check production for duplicates before the release that ships it, with the
+  `GROUP BY ... HAVING count(*) > 1` query in the migration's docstring
+  (`order` `0069_order_payment_id_unique` is the worked example).
+
 ## The release still serving reads the new schema
 
 The Argo CD PreSync hook (`prepare-helm/templates/job.yaml` in the

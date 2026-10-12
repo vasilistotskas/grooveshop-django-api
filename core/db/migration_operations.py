@@ -19,8 +19,10 @@ from __future__ import annotations
 
 import logging
 
+from django.db import IntegrityError
 from django.db.migrations.operations.base import Operation
-from django.db.migrations.operations.models import AddIndex
+from django.db.migrations.operations.models import AddConstraint, AddIndex
+from django.db.models import Count, UniqueConstraint
 
 logger = logging.getLogger(__name__)
 
@@ -355,3 +357,179 @@ class BackfillNullStringsToEmpty(Operation):
     @property
     def migration_name_fragment(self):
         return f"backfill_{self.model_name.lower()}_empty_strings"
+
+
+class AddUniqueConstraintAdaptively(Operation):
+    """Add a unique constraint to a live table: refuse duplicates up front,
+    build without blocking writes.
+
+    ``AddConstraint`` emits a plain ``CREATE UNIQUE INDEX``, which holds a
+    ``SHARE`` lock for the whole build, and so blocks every INSERT and
+    UPDATE on the table. Postgres has no ``NOT VALID`` for uniqueness
+    (``AddConstraintNotValid`` is for CHECK and foreign keys), and a
+    *partial* unique index cannot be attached afterwards with ``ADD
+    CONSTRAINT ... USING INDEX`` either, so the concurrent index build IS
+    the constraint. Django itself builds a conditional ``UniqueConstraint``
+    as exactly that index (``CREATE UNIQUE INDEX ... WHERE``), which is why
+    this operation uses Django's own statement and only adds ``CONCURRENTLY
+    IF NOT EXISTS`` to it. For the same reason as ``AddIndexAdaptively``,
+    ``CONCURRENTLY`` is used only when no transaction is open (the PreSync
+    ``migrate_schemas`` job); a tenant being provisioned replays history
+    inside one, against an empty table, where the plain build is instant.
+
+    **Existing duplicates fail the migration, loudly, before anything is
+    built.** A concurrent unique build that meets a duplicate fails
+    half-way and leaves an INVALID index behind; the up-front count turns
+    that into an ``IntegrityError`` that names the duplicated values and
+    leaves the database untouched. Nothing here deletes or merges rows:
+    which of two orders is the real one is a decision for a person.
+    The PreSync job then stops before the new image rolls and the old pods
+    keep serving. After the data is fixed, re-running resumes: any INVALID
+    leftover of an interrupted build is dropped first (``IF NOT EXISTS``
+    would skip it).
+
+    **A duplicate that arrives AFTER the count still fails the build**,
+    and it can: the old pods keep inserting while the index is built. The
+    build then fails the same half-way way, so a failed build drops its own
+    INVALID index before re-raising instead of leaving it to cost every
+    write until someone retries. The error that propagates is the build's.
+    Only outside a transaction: inside one a failed statement leaves
+    nothing behind, and the transaction is already aborted.
+
+    ``statement_timeout`` is lifted for the build, as in
+    ``AddIndexAdaptively``. The migration using this MUST set
+    ``atomic = False``, or the non-transactional branch can never be taken.
+    """
+
+    reduces_to_sql = False
+    reversible = True
+
+    #: How many duplicated values the failure message lists.
+    reported_duplicates = 10
+
+    def __init__(self, model_name: str, constraint: UniqueConstraint):
+        self.model_name = model_name
+        self.constraint = constraint
+
+    # -- state -------------------------------------------------------
+    def state_forwards(self, app_label, state):
+        AddConstraint(self.model_name, self.constraint).state_forwards(
+            app_label, state
+        )
+
+    # -- database ----------------------------------------------------
+    def database_forwards(self, app_label, schema_editor, from_state, to_state):
+        connection = schema_editor.connection
+        model = to_state.apps.get_model(app_label, self.model_name)
+        # Raw SQL bypasses the router (see ``AddIndexAdaptively``).
+        if not self.allow_migrate_model(connection.alias, model):
+            return
+
+        name = self.constraint.name
+        statement = self.constraint.create_sql(model, schema_editor)
+        sql = str(statement)
+        create = "CREATE UNIQUE INDEX "
+        if not sql.startswith(create):
+            # A constraint Django builds as ALTER TABLE ... ADD CONSTRAINT
+            # (no condition, no INCLUDE) takes the unique index it would
+            # create out of our hands; this operation exists for the
+            # partial case.
+            raise ValueError(
+                f"{name}: expected Django to build a CREATE UNIQUE INDEX "
+                f"statement (give the constraint a condition); got {sql!r}"
+            )
+        concurrently = "" if connection.in_atomic_block else "CONCURRENTLY"
+        sql = (
+            f"CREATE UNIQUE INDEX {concurrently} IF NOT EXISTS "
+            f"{sql.removeprefix(create)}"
+        )
+
+        with connection.cursor() as cursor:
+            previous = _lift_statement_timeout(cursor)
+            try:
+                _drop_if_invalid(cursor, name)
+                self._refuse_duplicates(model, connection)
+                try:
+                    cursor.execute(sql)
+                except Exception:
+                    if not connection.in_atomic_block:
+                        self._drop_failed_build(cursor)
+                    raise
+            finally:
+                _restore_statement_timeout(cursor, previous)
+
+    def _drop_failed_build(self, cursor) -> None:
+        """Remove the INVALID index a failed ``CREATE INDEX CONCURRENTLY``
+        leaves behind. Never raises: the build's own error is the one the
+        operator needs, and a cleanup that fails is logged for them."""
+        name = self.constraint.name
+        try:
+            cursor.execute(f'DROP INDEX CONCURRENTLY IF EXISTS "{name}"')
+        except Exception:
+            logger.exception(
+                "The build of %s failed and its INVALID index could not be "
+                "dropped; drop it by hand before retrying",
+                name,
+            )
+
+    def _refuse_duplicates(self, model, connection) -> None:
+        rows = model._base_manager.using(connection.alias)
+        if self.constraint.condition is not None:
+            rows = rows.filter(self.constraint.condition)
+        duplicated = (
+            rows.order_by()
+            .values(*self.constraint.fields)
+            .annotate(rows=Count("pk"))
+            .filter(rows__gt=1)
+        )
+        total = duplicated.count()
+        if not total:
+            return
+        listed = ", ".join(
+            "{} on {} rows".format(
+                [group[field] for field in self.constraint.fields],
+                group["rows"],
+            )
+            for group in duplicated.order_by("-rows", *self.constraint.fields)[
+                : self.reported_duplicates
+            ]
+        )
+        schema = getattr(connection, "schema_name", "public")
+        raise IntegrityError(
+            f"Cannot add unique constraint {self.constraint.name} on "
+            f"{schema}.{model._meta.db_table}: {total} value(s) of "
+            f"({', '.join(self.constraint.fields)}) appear on more than one "
+            f"row (first {self.reported_duplicates}: {listed}). Nothing was "
+            "changed. Resolve the duplicates, then re-run the migration."
+        )
+
+    def database_backwards(
+        self, app_label, schema_editor, from_state, to_state
+    ):
+        connection = schema_editor.connection
+        model = from_state.apps.get_model(app_label, self.model_name)
+        if not self.allow_migrate_model(connection.alias, model):
+            return
+
+        concurrently = "" if connection.in_atomic_block else "CONCURRENTLY"
+        with connection.cursor() as cursor:
+            previous = _lift_statement_timeout(cursor)
+            try:
+                cursor.execute(
+                    f"DROP INDEX {concurrently} IF EXISTS "
+                    f'"{self.constraint.name}"'
+                )
+            finally:
+                _restore_statement_timeout(cursor, previous)
+
+    # -- reporting ---------------------------------------------------
+    def describe(self):
+        return (
+            f"Create unique constraint {self.constraint.name} on "
+            f"{self.model_name} (concurrently when not already in a "
+            f"transaction; refuses existing duplicates)"
+        )
+
+    @property
+    def migration_name_fragment(self):
+        return f"{self.model_name.lower()}_{self.constraint.name.lower()}"

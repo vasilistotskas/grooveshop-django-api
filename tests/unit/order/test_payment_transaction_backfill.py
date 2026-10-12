@@ -178,6 +178,13 @@ class TestCharges:
         assert len(_rows(order)) == 2
 
     def test_two_orders_naming_one_payment_do_not_collide(self):
+        # Orders from before ``order_payment_id_unique`` can still name one
+        # payment (the duplicates that index now prevents), and 0067 has to
+        # cope with them: it runs before the index exists on a real
+        # database. The test database has it, so drop it, inside this
+        # test's own transaction.
+        with connection.cursor() as cursor:
+            cursor.execute("DROP INDEX order_payment_id_unique")
         first = _paid(payment_id="pi_shared")
         second = _paid(payment_id="pi_shared")
 

@@ -145,7 +145,15 @@ class TestCreateOrderFromCart:
 
         assert not Order.objects.filter(user=self.user).exists()
 
-    def test_incomplete_shipping_address_is_refused(self):
+    @patch("order.payment.get_payment_provider")
+    def test_incomplete_shipping_address_is_refused(self, mock_get_provider):
+        # The provider is asked about the intent BEFORE the order
+        # transaction opens (no PSP call under the cart lock), so it must
+        # answer for the address check to be reached.
+        mock_get_provider.return_value = _provider_reporting(
+            PaymentStatus.PENDING
+        )
+
         with pytest.raises(InvalidOrderDataError, match="last_name"):
             self._create(shipping_address={"first_name": "John"})
 
@@ -164,9 +172,14 @@ class TestCreateOrderFromCart:
         assert "FAILED" in str(exc_info.value)
 
     @patch("order.payment.get_payment_provider")
-    def test_insufficient_stock_is_refused_before_payment_lookup(
+    def test_insufficient_stock_is_refused_and_moves_no_stock(
         self, mock_get_provider
     ):
+        # The intent is read first, outside the transaction: a cart that
+        # cannot be checked out costs one provider read and no lock.
+        mock_get_provider.return_value = _provider_reporting(
+            PaymentStatus.PENDING
+        )
         scarce = ProductFactory.create(
             price=_eur("10.00"), stock=1, active=True
         )
@@ -176,9 +189,14 @@ class TestCreateOrderFromCart:
             self._create()
 
         assert exc_info.value.insufficient_stock is True
-        mock_get_provider.assert_not_called()
-        scarce.refresh_from_db()
-        assert scarce.stock == 1
+        assert not Order.objects.filter(user=self.user).exists()
+        for product, stock in (
+            (scarce, 1),
+            (self.product1, 20),
+            (self.product2, 15),
+        ):
+            product.refresh_from_db()
+            assert product.stock == stock
 
     @patch("order.payment.get_payment_provider")
     def test_converts_the_carts_reservations_into_the_sale(

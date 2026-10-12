@@ -662,10 +662,16 @@ class OrderViewSet(BaseModelViewSet):
             ]
         return super().get_throttles()
 
-    @transaction.atomic
     def create(self, request, *args, **kwargs):
         """
         Create an order with dual-flow support.
+
+        Deliberately NOT wrapped in ``transaction.atomic``: the service
+        owns the one transaction that creates the order, and the
+        payment-first flow asks the provider about the intent before it
+        opens. A view-level block would put that HTTP call inside a
+        transaction again, idle on a pooled connection that
+        ``idle_in_transaction_session_timeout`` kills.
 
         This endpoint supports two payment flows based on payment method type:
 
@@ -673,6 +679,9 @@ class OrderViewSet(BaseModelViewSet):
         - Requires payment_intent_id
         - Flow: Payment confirmed → Order created
         - Examples: Stripe
+        - Idempotent per payment intent: a repeat submit of the same cart
+          answers 201 with the order the first submit created, not a
+          second order
 
         **Order-first (offline + redirect-based online):**
         - No payment_intent_id required

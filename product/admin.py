@@ -1319,7 +1319,14 @@ class ProductAdmin(
         # selection, which the confirmation page shows.
         updated = 0
         with transaction.atomic():
-            for product in queryset.select_for_update():
+            # Locked in pk order, on the product table alone: a selection
+            # of many products and a checkout over some of them share
+            # rows, and two transactions that take shared rows in
+            # different orders deadlock (see
+            # ``StockManager.lock_products``).
+            for product in queryset.order_by("pk").select_for_update(
+                of=("self",)
+            ):
                 product.discount_percent = discount_percent
                 product.save(update_fields=["discount_percent"])
                 updated += 1
@@ -1350,7 +1357,9 @@ class ProductAdmin(
         # otherwise keep advertising the discounted one.
         updated = 0
         with transaction.atomic():
-            for product in queryset.select_for_update():
+            for product in queryset.order_by("pk").select_for_update(
+                of=("self",)
+            ):
                 product.discount_percent = Decimal("0.0")
                 product.save(update_fields=["discount_percent"])
                 updated += 1

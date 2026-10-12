@@ -5,7 +5,7 @@ from typing import Any, ClassVar
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.db import connection, transaction
+from django.db import IntegrityError, connection, transaction
 from django.db.models import QuerySet, Sum
 from django.utils import timezone
 from django.utils.translation import get_language
@@ -40,7 +40,7 @@ from order.exceptions import (
 )
 from order.models.attribution import OrderAttribution
 from order.models.item import OrderItem
-from order.models.order import Order
+from order.models.order import PAYMENT_ID_UNIQUE_CONSTRAINT, Order
 from order.models.stock_log import StockLog
 from order.models.stock_reservation import StockReservation
 from order.payment import (
@@ -132,6 +132,14 @@ class RefundResult:
 __all__ = ["OrderService", "PaymentEventOutcome", "RefundResult"]
 
 
+def _violated_constraint(error: IntegrityError) -> str | None:
+    """The constraint a database integrity error names, when the driver
+    says (psycopg reports it as ``diag.constraint_name``, which for a
+    unique index is the index name)."""
+    diagnostics = getattr(error.__cause__, "diag", None)
+    return getattr(diagnostics, "constraint_name", None)
+
+
 def _log_price_drift_if_needed(cart_item, current_price) -> None:
     """Emit a warning when the live product price differs from the price the
     customer saw at add-to-cart time.
@@ -218,10 +226,13 @@ class OrderService:
         quantity, and oversell — none of which the previous
         convert-every-reservation loop caught.
 
-        Must run inside the order-creation ``transaction.atomic`` block;
-        ``convert_reservation_to_sale``/``decrement_stock`` lock each product
-        row, so an insufficient-stock product raises ``InsufficientStockError``
-        and rolls the order back.
+        Must run inside the order-creation ``transaction.atomic`` block,
+        after ``_lock_order_products`` has locked every product the order
+        touches; ``convert_reservation_to_sale``/``decrement_stock`` then
+        re-lock a row this transaction already holds, so an
+        insufficient-stock product raises ``InsufficientStockError`` and
+        rolls the order back. Products are walked in ascending pk order,
+        the order the locks were taken in.
 
         Returns the list of converted reservation ids (stored on the order for
         parity with the cancel path).
@@ -251,7 +262,7 @@ class OrderService:
                     exc,
                 )
 
-        for product_id, quantity in needed.items():
+        for product_id, quantity in sorted(needed.items()):
             covered = 0
             for reservation in reservations_by_product.pop(product_id, []):
                 if covered >= quantity:
@@ -288,11 +299,28 @@ class OrderService:
                 )
 
         # Release reservations for products no longer in the cart.
-        for leftovers in reservations_by_product.values():
+        for _product_id, leftovers in sorted(reservations_by_product.items()):
             for reservation in leftovers:
                 _release(reservation)
 
         return converted_ids
+
+    @classmethod
+    def _lock_order_products(cls, *, cart_items, reservations, promo_result):
+        """Lock every product the order is about to touch, in pk order.
+
+        Called once, right after the cart lines are read and BEFORE the
+        first ``OrderItem`` insert (see ``StockManager.lock_products`` for
+        why that position matters). The set is everything the stock
+        steps below will lock: the cart's lines, the cart session's
+        reservations (a hold on a product no longer in the cart is
+        released at checkout) and the free-gift products.
+        """
+        StockManager.lock_products(
+            {item.product_id for item in cart_items}
+            | {reservation.product_id for reservation in reservations}
+            | {gift.product.id for gift in promo_result.gift_items}
+        )
 
     @classmethod
     def _evaluate_promotions(cls, cart, *, user, email: str):
@@ -442,7 +470,97 @@ class OrderService:
             ) from exc
 
     @classmethod
-    @transaction.atomic
+    def _retrieve_payment_intent(
+        cls, payment_intent_id: str, pay_way
+    ) -> tuple[PaymentStatus, dict[str, Any]]:
+        """Ask the provider about the intent and refuse one that cannot pay.
+
+        An HTTP round trip (and, for Stripe, the dj-stripe sync), so it
+        runs BEFORE the order-creation transaction opens: inside it the
+        call held the cart row and every live automatic ``Promotion`` row
+        for as long as the provider took to answer, which serialised every
+        concurrent checkout (Viva and COD included, they evaluate the same
+        promotions) behind a slow provider. The transaction re-compares
+        only what depends on server state: the amount and currency the
+        intent was created for, against the total it computes under lock.
+
+        PENDING and PROCESSING are accepted: the provider's webhook
+        settles the order once the charge completes.
+        """
+        from order.payment import get_payment_provider
+
+        if not payment_intent_id:
+            raise InvalidOrderDataError(
+                str(_("Payment intent ID is required for order creation"))
+            )
+
+        provider = get_payment_provider(pay_way.provider_code)
+        payment_status, payment_data = provider.get_payment_status(
+            payment_intent_id
+        )
+        if payment_status not in [
+            PaymentStatus.PENDING,
+            PaymentStatus.PROCESSING,
+            PaymentStatus.COMPLETED,
+        ]:
+            raise PaymentVerificationError(
+                payment_intent_id,
+                _("payment intent is in an invalid state: {status}").format(
+                    status=payment_status
+                ),
+            )
+        return payment_status, payment_data
+
+    @classmethod
+    def _order_created_for_payment(cls, payment_intent_id: str, cart):
+        """The order this payment intent already produced for ``cart``.
+
+        Returns ``None`` when no order carries the intent. Called twice:
+        first without a lock, before the provider is asked, so a repeat
+        is answered from what is stored; then under the cart row lock,
+        where two submits of one checkout (a double click, a retry after
+        a timeout, Back and resubmit while the hosted payment is still
+        open) serialise and the second one finds the first one's
+        committed order instead of creating its own and taking the stock
+        a second time. ``Order.payment_id`` is unique
+        (``order_payment_id_unique``), which backs this up for submits of
+        two DIFFERENT carts: the cart lock does not serialise those, the
+        index rejects the second insert and ``create_order_from_cart``
+        answers it as it answers the sequential case.
+
+        An intent that belongs to a different cart or user, or to an
+        order that was canceled or deleted, is not a repeat of this
+        checkout: answering with that order would hand one shopper
+        another's order, and a new order would take a payment already
+        committed elsewhere. It is refused.
+        """
+        existing = (
+            Order.objects.all_with_deleted()
+            .filter(payment_id=payment_intent_id)
+            .first()
+        )
+        if existing is None:
+            return None
+        snapshot = (existing.metadata or {}).get("cart_snapshot") or {}
+        if (
+            existing.status != OrderStatus.CANCELED
+            and not existing.is_deleted
+            and snapshot.get("cart_uuid") == str(cart.uuid)
+        ):
+            logger.info(
+                "Payment intent %s already created order %s; "
+                "returning it instead of creating another",
+                payment_intent_id,
+                existing.id,
+            )
+            return existing
+        raise PaymentVerificationError(
+            payment_intent_id,
+            f"payment intent already belongs to order {existing.id}, which "
+            "is not an open order of this cart",
+        )
+
+    @classmethod
     def create_order_from_cart(
         cls,
         *,
@@ -461,15 +579,23 @@ class OrderService:
 
         This method implements the payment-first approach where payment is confirmed
         before order creation. It performs the following steps:
-        1. Validates cart items still exist and prices match
-        2. Validates shipping address completeness
-        3. Validates payment intent exists and is confirmed
-        4. Gets stock reservations for cart session
-        5. Creates Order with payment_id field populated
-        6. Creates OrderItems from CartItems
-        7. Converts stock reservations to decrements via StockManager
-        8. Clears cart
-        9. Returns order in PENDING status (webhook will move to PROCESSING)
+        0. Returns the order this payment intent already created for the
+           cart, if any, before the provider is asked anything; otherwise
+           retrieves the intent from the provider and checks its state,
+           OUTSIDE any transaction (``_retrieve_payment_intent``)
+        then, in ONE transaction (``_create_order_for_verified_intent``):
+        1. Locks the cart; returns the order this payment intent already
+           created for it, if any (idempotent)
+        2. Validates cart items still exist and prices match
+        3. Validates shipping address completeness
+        4. Re-compares the intent's amount and currency with the total
+           computed under lock
+        5. Gets stock reservations for cart session
+        6. Creates Order with payment_id field populated
+        7. Creates OrderItems from CartItems
+        8. Converts stock reservations to decrements via StockManager
+        9. Clears cart
+        10. Returns order in PENDING status (webhook will move to PROCESSING)
 
         Args:
             cart: Cart object containing items to order
@@ -479,12 +605,15 @@ class OrderService:
             user: Optional UserAccount (None for guest orders)
 
         Returns:
-            Order: Created order in PENDING status
+            Order: Created order in PENDING status, or the order this
+            payment intent already created for the cart
 
         Raises:
             InvalidOrderDataError: If validation fails
             InsufficientStockError: If stock unavailable
             PaymentNotFoundError: If payment_intent_id invalid
+            PaymentVerificationError: If the intent is in an invalid state
+                or already belongs to another order
 
         Example:
             >>> order = OrderService.create_order_from_cart(
@@ -506,12 +635,87 @@ class OrderService:
             ... )
         """
         try:
+            # A repeat of a submit that already created its order is
+            # answered from what is stored, before the provider is asked
+            # anything: the order exists, so its answer must not depend
+            # on the provider being reachable (a retry after a timeout is
+            # exactly when it may not be). No lock here; the locked lookup
+            # below is what serialises two first submits racing.
+            if payment_intent_id:
+                existing_order = cls._order_created_for_payment(
+                    payment_intent_id, cart
+                )
+                if existing_order is not None:
+                    return existing_order
+            payment_status, payment_data = cls._retrieve_payment_intent(
+                payment_intent_id, pay_way
+            )
+        except InvalidOrderDataError, PaymentVerificationError:
+            raise
+        except Exception as e:
+            logger.exception(
+                "Unexpected error retrieving the payment intent",
+            )
+            raise InvalidOrderDataError(
+                _("Failed to create order: {error}").format(error=str(e))
+            ) from e
+
+        return cls._create_order_for_verified_intent(
+            cart=cart,
+            shipping_address=shipping_address,
+            payment_intent_id=payment_intent_id,
+            payment_status=payment_status,
+            payment_data=payment_data,
+            pay_way=pay_way,
+            user=user,
+            loyalty_points_to_redeem=loyalty_points_to_redeem,
+            gift_card_codes=gift_card_codes,
+            meta_context=meta_context,
+            attribution=attribution,
+        )
+
+    @classmethod
+    @transaction.atomic
+    def _create_order_for_verified_intent(
+        cls,
+        *,
+        cart,
+        shipping_address: dict[str, Any],
+        payment_intent_id: str,
+        payment_status: PaymentStatus,
+        payment_data: dict[str, Any],
+        pay_way,
+        user,
+        loyalty_points_to_redeem: int | None,
+        gift_card_codes: list[str] | None,
+        meta_context: dict[str, Any] | None,
+        attribution: AttributionInput | None,
+    ) -> Order:
+        """The locked half of ``create_order_from_cart``.
+
+        Makes no provider call: ``payment_status`` and ``payment_data``
+        were read before this transaction opened. Everything here either
+        hits the database or recomputes the server-side total.
+        """
+        try:
             from cart.models import Cart
 
             # Lock the Cart row immediately so concurrent checkouts on the
             # same cart are serialised.  Must happen before any reads so
             # validate_cart_for_checkout sees the locked snapshot.
             cart = Cart.objects.select_for_update().get(pk=cart.pk)
+
+            # Step 0: a repeat of a submit that already created its order
+            # answers with that order. BEFORE the cart checks: the first
+            # order has already taken the stock and, once it is paid,
+            # emptied the cart, so a repeat can fail both and would
+            # otherwise be refused for the very thing the first submit
+            # did.
+            existing_order = cls._order_created_for_payment(
+                payment_intent_id, cart
+            )
+            if existing_order is not None:
+                return existing_order
 
             # Step 1: Validate cart for checkout
             validation_result = cls.validate_cart_for_checkout(cart)
@@ -568,36 +772,10 @@ class OrderService:
             )
             promo_discount = promo_result.discount_total
 
-            # Step 3: Validate payment intent exists
-            from order.payment import get_payment_provider
-
-            if not payment_intent_id:
-                raise InvalidOrderDataError(
-                    str(_("Payment intent ID is required for order creation"))
-                )
-
-            # Get payment provider and verify payment intent exists
-            provider = get_payment_provider(pay_way.provider_code)
-            payment_status, payment_data = provider.get_payment_status(
-                payment_intent_id
-            )
-
-            # Verify payment intent exists and is in a valid state
-            # We accept PENDING status - Stripe webhooks will update order after confirmation
-            # This is the standard Stripe payment flow
-            if payment_status not in [
-                PaymentStatus.PENDING,
-                PaymentStatus.PROCESSING,
-                PaymentStatus.COMPLETED,
-            ]:
-                raise PaymentVerificationError(
-                    payment_intent_id,
-                    _("payment intent is in an invalid state: {status}").format(
-                        status=payment_status
-                    ),
-                )
-
-            # Verify the provider amount matches the server-calculated total.
+            # Step 3: Verify the provider amount matches the server-
+            # calculated total. The intent itself (existence, state) was
+            # read before this transaction opened, so this is the only
+            # part of the verification that needs server state.
             # The Stripe PaymentIntent's amount (in cents) must equal the
             # cart total + shipping + payment fee to prevent a tampered client
             # submitting a PI created for a lower amount.
@@ -753,8 +931,19 @@ class OrderService:
             # executes, the lazy queryset would resolve to zero rows.
             # Also lock the CartItem rows within the same transaction to
             # prevent concurrent mutations while we process them.
+            # ``of=("self",)``: without it the join also locked every
+            # product row, in this cart's line order, and two carts that
+            # share products in different line orders deadlocked. The
+            # products are locked next, in pk order.
             cart_items = list(
-                cart.items.select_for_update().select_related("product")
+                cart.items.select_for_update(of=("self",)).select_related(
+                    "product"
+                )
+            )
+            cls._lock_order_products(
+                cart_items=cart_items,
+                reservations=reservations,
+                promo_result=promo_result,
             )
 
             # Reservations (active, expired, or duplicated) are reconciled
@@ -1121,6 +1310,24 @@ class OrderService:
         ):
             raise
         except Exception as e:
+            if (
+                isinstance(e, IntegrityError)
+                and _violated_constraint(e) == PAYMENT_ID_UNIQUE_CONSTRAINT
+            ):
+                # Another cart's checkout committed an order on this
+                # intent between the lookup above and this insert (the
+                # cart lock only serialises submits of ONE cart). It is
+                # the sequential case's answer: the intent is taken.
+                logger.warning(
+                    "Payment intent %s was taken by another order while "
+                    "this one was being created",
+                    payment_intent_id,
+                )
+                raise PaymentVerificationError(
+                    payment_intent_id,
+                    "payment intent was attached to another order "
+                    "while this one was being created",
+                ) from e
             logger.exception(
                 "Unexpected error creating order from cart",
             )
@@ -1258,9 +1465,18 @@ class OrderService:
             # if anything causes that callback to fire before this loop
             # executes, the lazy queryset would resolve to zero rows.
             # Also lock the CartItem rows within the same transaction to
-            # prevent concurrent mutations while we process them.
+            # prevent concurrent mutations while we process them. Only the
+            # cart lines are locked here; the products follow in pk order
+            # (see the payment-first path for why).
             cart_items = list(
-                cart.items.select_for_update().select_related("product")
+                cart.items.select_for_update(of=("self",)).select_related(
+                    "product"
+                )
+            )
+            cls._lock_order_products(
+                cart_items=cart_items,
+                reservations=reservations,
+                promo_result=promo_result,
             )
 
             # Reservations (active, expired, or duplicated) are reconciled
@@ -2443,12 +2659,40 @@ class OrderService:
             )
 
         try:
-            # Release stock reservations if they exist
             reservation_ids = (
                 order.metadata.get("stock_reservation_ids", [])
                 if order.metadata
                 else []
             )
+            # What the order is actually HOLDING — see the restore loop
+            # below for why that is not the quantities it lists.
+            outstanding = list(
+                StockLog.objects.filter(
+                    order_id=order.id,
+                    operation_type__in=(
+                        StockLog.OPERATION_DECREMENT,
+                        StockLog.OPERATION_INCREMENT,
+                    ),
+                )
+                .values("product_id")
+                .annotate(net=Sum("quantity_delta"))
+                .order_by("product_id")
+            )
+            # Every product this cancel touches (each reservation release
+            # and each restore takes a product lock, and they run in the
+            # order the order's own rows happen to come back) is locked
+            # up front in pk order, so a cancel cannot deadlock with a
+            # checkout or another cancel that shares a product.
+            StockManager.lock_products(
+                {row["product_id"] for row in outstanding}
+                | set(
+                    StockReservation.objects.filter(
+                        id__in=reservation_ids
+                    ).values_list("product_id", flat=True)
+                )
+            )
+
+            # Release stock reservations if they exist
             for reservation_id in reservation_ids:
                 try:
                     StockManager.release_reservation(reservation_id)
@@ -2500,17 +2744,6 @@ class OrderService:
             # RESERVE/RELEASE rows are excluded — a reservation is a logical
             # hold and leaves physical stock untouched (stock_before ==
             # stock_after).
-            outstanding = (
-                StockLog.objects.filter(
-                    order_id=order.id,
-                    operation_type__in=(
-                        StockLog.OPERATION_DECREMENT,
-                        StockLog.OPERATION_INCREMENT,
-                    ),
-                )
-                .values("product_id")
-                .annotate(net=Sum("quantity_delta"))
-            )
             for row in outstanding:
                 # ``net`` is a Sum over a non-null column, and every row
                 # here IS a group, so it is always an int.

@@ -1,5 +1,6 @@
 from unittest.mock import MagicMock, patch
 
+from django.db import connection
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -149,6 +150,83 @@ class TestPaymentFirstOrderCreation(APITestCase):
             list(order.items.values_list("product_id", "quantity")),
             [(self.product1.id, 1)],
         )
+
+    @patch("order.payment.get_payment_provider")
+    def test_a_repeat_submit_answers_with_the_first_order(
+        self, mock_get_provider
+    ):
+        """A double click, a retry after a timeout, Back and resubmit
+        while the payment is still open: one order, one stock decrement,
+        and the same answer both times, not a 500 or a second order.
+
+        PENDING keeps the cart (the shopper still owes the money), which
+        is what lets the repeat pass cart validation at all."""
+        provider = MagicMock()
+        provider.get_payment_status.return_value = (PaymentStatus.PENDING, {})
+        mock_get_provider.return_value = provider
+        self.client.force_authenticate(user=self.user)
+
+        first = self._post(self._order_data())
+        again = self._post(self._order_data())
+
+        self.assertEqual(first.status_code, status.HTTP_201_CREATED, first.data)
+        self.assertEqual(again.status_code, status.HTTP_201_CREATED, again.data)
+        self.assertEqual(again.data["id"], first.data["id"])
+        self.assertEqual(again.data["uuid"], first.data["uuid"])
+        self.assertEqual(
+            Order.objects.filter(payment_id=PAYMENT_INTENT_ID).count(), 1
+        )
+        self.product1.refresh_from_db()
+        self.product2.refresh_from_db()
+        self.assertEqual((self.product1.stock, self.product2.stock), (8, 4))
+
+    @patch("order.payment.get_payment_provider")
+    def test_an_intent_that_belongs_to_another_cart_is_refused(
+        self, mock_get_provider
+    ):
+        provider = MagicMock()
+        provider.get_payment_status.return_value = (PaymentStatus.PENDING, {})
+        mock_get_provider.return_value = provider
+        self.client.force_authenticate(user=self.user)
+        first = self._post(self._order_data())
+        self.assertEqual(first.status_code, status.HTTP_201_CREATED, first.data)
+        self.client.force_authenticate(user=None)
+
+        response = self._post(self._order_data(), cart=self.guest_cart)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["error"]["type"], "payment_verification")
+        self.assertNotIn(str(first.data["uuid"]), str(response.data))
+        self.assertEqual(
+            Order.objects.filter(payment_id=PAYMENT_INTENT_ID).count(), 1
+        )
+
+    @patch("order.payment.get_payment_provider")
+    def test_the_view_does_not_wrap_the_provider_call_in_a_transaction(
+        self, mock_get_provider
+    ):
+        """The service owns the one transaction. A view-level
+        ``transaction.atomic`` would put the provider's HTTP call back
+        inside one, idle on a connection that
+        ``idle_in_transaction_session_timeout`` kills."""
+        baseline_depth = len(connection.savepoint_ids)
+        depths = []
+
+        def read(payment_id):
+            depths.append(len(connection.savepoint_ids))
+            return PaymentStatus.COMPLETED, {}
+
+        provider = MagicMock()
+        provider.get_payment_status.side_effect = read
+        mock_get_provider.return_value = provider
+        self.client.force_authenticate(user=self.user)
+
+        response = self._post(self._order_data())
+
+        self.assertEqual(
+            response.status_code, status.HTTP_201_CREATED, response.data
+        )
+        self.assertEqual(depths, [baseline_depth])
 
     def test_intentless_online_order_is_refused(self):
         """Intent-less online orders are refused unless deductions

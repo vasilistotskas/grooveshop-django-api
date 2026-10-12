@@ -174,8 +174,12 @@ class CartService:
         lines_combined = 0
         lines_capped = 0
 
+        # ``of=("self",)``: the merge reads each product (stock cap) but
+        # never writes one. Without it the join locked every product row
+        # of the guest cart in its line order, which a checkout locking
+        # the same products in pk order deadlocks with.
         for item in (
-            source_cart.items.select_for_update()
+            source_cart.items.select_for_update(of=("self",))
             .select_related("product")
             .all()
         ):

@@ -18,6 +18,7 @@ Viva HTTP boundary are faked.
 from __future__ import annotations
 
 import logging
+import uuid
 from dataclasses import dataclass
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
@@ -74,7 +75,6 @@ from user.factories.account import UserAccountFactory
 
 pytestmark = pytest.mark.django_db
 
-PAYMENT_ID = "b1a3067c-321b-4ec6-bc9d-1778aef2a19d"
 REFUSAL_DETAIL = (
     "Your parcel is already with the courier, so the order can no longer "
     "be canceled. Contact the store to arrange a return."
@@ -153,7 +153,8 @@ def _paid_order(provider_code: str | None = None, **kwargs):
     )
     kwargs.setdefault("status", OrderStatus.PROCESSING)
     kwargs.setdefault("payment_status", PaymentStatus.COMPLETED)
-    kwargs.setdefault("payment_id", PAYMENT_ID)
+    # ``Order.payment_id`` is unique: one per order.
+    kwargs.setdefault("payment_id", str(uuid.uuid4()))
     kwargs.setdefault("paid_amount", Money(Decimal("21.10"), "EUR"))
     return OrderFactory(num_order_items=0, **kwargs)
 

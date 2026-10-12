@@ -111,7 +111,9 @@ def generate_payment_data(status=None):
     elif payment_method == "PAYPAL":
         payment_id = f"PP-{fake.numerify('##########')}"
     elif payment_method == "BANK_TRANSFER":
-        payment_id = f"BT-{fake.numerify('######')}"
+        # ``Order.payment_id`` is unique, so the id space has to be wide
+        # enough for a batch of orders (six digits was a million).
+        payment_id = f"BT-{fake.numerify('############')}"
     elif payment_method == "STRIPE":
         payment_id = f"pi_{fake.lexify('?' * 24)}"
 

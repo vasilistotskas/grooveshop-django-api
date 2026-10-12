@@ -446,7 +446,9 @@ class TestRetryPaymentPermissions:
 
     def test_guest_order_with_wrong_uuid_is_forbidden(self):
         order = _stripe_order(user=None, email="guest@example.com")
-        other = _stripe_order(user=None, email="other@example.com")
+        other = _stripe_order(
+            user=None, email="other@example.com", payment_id="pi_other_guest"
+        )
         provider = _provider()
 
         with _patch_provider(provider):

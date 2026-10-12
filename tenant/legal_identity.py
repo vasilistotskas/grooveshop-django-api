@@ -85,6 +85,39 @@ REQUIRED_DISCLOSURE_FIELDS: tuple[str, ...] = (
 )
 
 
+#: What a tax document needs about the seller. Greek law puts the ΑΦΜ and
+#: ΔΟΥ on every document the seller issues, and myDATA refuses to take a
+#: submission without the ΑΦΜ (``order.mydata.service``). Unlike
+#: ``REQUIRED_DISCLOSURE_FIELDS`` this only matters to a store that
+#: actually issues tax documents (``MYDATA_ENABLED``).
+REQUIRED_TAX_DOCUMENT_FIELDS: tuple[str, ...] = (
+    "name",
+    "vat_id",
+    "tax_office",
+)
+
+
+def _read_settings(keys: tuple[str, ...]) -> dict[str, object]:
+    """``keys`` as ``Setting.get`` would return them, in one query at most.
+
+    ``Setting.get`` caches per key in the Django cache and only warms the
+    others after a hit on a row, so a store with unset keys, or a cold
+    cache, pays a query per key. This reads the extra_settings cache for
+    every key first, then fetches the keys it lacks together and caches
+    them the way the library does. A key with no row reads as ``None``.
+    """
+    from extra_settings.cache import get_cached_setting, set_cached_setting
+    from extra_settings.models import Setting
+
+    values = {key: get_cached_setting(key) for key in keys}
+    absent = [key for key, value in values.items() if value is None]
+    if absent:
+        for row in Setting.objects.filter(name__in=absent):
+            values[row.name] = row.value
+            set_cached_setting(row.name, row.value)
+    return values
+
+
 def merchant_legal_identity() -> dict[str, object]:
     """The current tenant's published legal identity.
 
@@ -95,30 +128,40 @@ def merchant_legal_identity() -> dict[str, object]:
     fall back to the site name for its own rendering; that is an invoice
     concern and does not belong in the published identity.
     """
-    from extra_settings.models import Setting
-
+    values = _read_settings((*SELLER_SETTING_KEYS.values(), IN_LIQUIDATION_KEY))
     identity: dict[str, object] = {
-        field: str(Setting.get(key, default="") or "").strip()
+        field: str(values.get(key) or "").strip()
         for field, key in SELLER_SETTING_KEYS.items()
     }
-    identity["in_liquidation"] = bool(
-        Setting.get(IN_LIQUIDATION_KEY, default=False)
-    )
+    identity["in_liquidation"] = bool(values.get(IN_LIQUIDATION_KEY))
     return identity
 
 
-def missing_disclosure_fields() -> list[str]:
+def _blank(
+    fields: tuple[str, ...], identity: Mapping[str, object] | None
+) -> list[str]:
+    identity = merchant_legal_identity() if identity is None else identity
+    return [f for f in fields if not str(identity.get(f, "")).strip()]
+
+
+def missing_disclosure_fields(
+    identity: Mapping[str, object] | None = None,
+) -> list[str]:
     """Which legally required fields the merchant has left blank.
 
     Lets the admin and the onboarding flow surface the gap before it
-    becomes a fine, instead of discovering it from a complaint.
+    becomes a fine, instead of discovering it from a complaint. A caller
+    that checks several field sets passes the ``identity`` it already
+    read, so the settings are fetched once.
     """
-    identity = merchant_legal_identity()
-    return [
-        field
-        for field in REQUIRED_DISCLOSURE_FIELDS
-        if not str(identity.get(field, "")).strip()
-    ]
+    return _blank(REQUIRED_DISCLOSURE_FIELDS, identity)
+
+
+def missing_tax_document_fields(
+    identity: Mapping[str, object] | None = None,
+) -> list[str]:
+    """Which fields a tax document needs that are still blank."""
+    return _blank(REQUIRED_TAX_DOCUMENT_FIELDS, identity)
 
 
 def is_disclosure_complete() -> bool:

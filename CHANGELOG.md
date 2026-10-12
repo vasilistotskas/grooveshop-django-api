@@ -3,6 +3,30 @@
 
 
 
+## v3.106.4 (2026-10-12)
+
+### Bug fixes
+
+* fix(auth): resolve Django permissions for platform identities only
+
+UserAccount.has_perm, has_module_perms and the get_*_permissions methods
+now answer only for a platform identity: a user object stamped by the
+platform staff backend or token authentication, or one read on the
+public schema. A tenant-schema row is a customer record, so its flags
+and any stored grants confer no Django permission. Platform identities
+keep resolving through the role backend as before, for DRF and the
+admin alike.
+
+The provenance check that is_platform_superuser already made is now
+tenant.membership.is_platform_identity, shared by both.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1 ([`d489ad6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d489ad6b4c95fb8ed2fd1be47d9e537f5fd169f1))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.106.3 [skip ci] ([`7f2f657`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7f2f657cd8d012075fafccda02baceb645a1b218))
+
 ## v3.106.3 (2026-10-12)
 
 ### Bug fixes

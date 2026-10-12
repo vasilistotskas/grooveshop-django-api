@@ -3,6 +3,34 @@
 
 
 
+## v3.111.0 (2026-10-12)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.110.0 [skip ci] ([`a11dfe4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a11dfe4cfd8f6c5b70e1dac23d88f3fd72eb4db7))
+
+### Features
+
+* feat(tenant): drop the plaintext tenant secret columns (#168)
+
+Contract step of the secret-encryption migration (contract_of 0050 and
+0051). Ships only after the expand release has run in production.
+
+The migration first encrypts whatever the previous release wrote to the
+old plaintext columns during the rollout, only into columns that are
+still empty so nothing set through the new code is overwritten, and
+copies late MYDATA_* settings onto the Tenant row. It then drops the
+thirteen plaintext columns and deletes the retired MYDATA_USER_ID and
+MYDATA_SUBSCRIPTION_KEY extra_settings rows in every store schema.
+
+The expand-step tests put the plaintext columns back inside their own
+transaction, since the test database no longer has them.
+
+
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`ca63118`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ca63118806c8e88d87a5530bef0545e995d120af))
+
 ## v3.110.0 (2026-10-12)
 
 ### Bug fixes

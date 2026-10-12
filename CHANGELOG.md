@@ -3,6 +3,57 @@
 
 
 
+## v3.105.0 (2026-10-12)
+
+### Bug fixes
+
+* fix(devtools): point the demo store's favicon at its own mark (#156)
+
+seed_branding pointed the demo tenant's favicon_url at the storefront's
+/platform-favicon set on the reasoning that the platform mark is the demo's
+own. That set is the platform storefront's icon, which is webside's, so the
+demo wore another store's brand in its tabs, bookmarks and PWA icon. It now
+points at the demo's own mark, shipped by the storefront under
+img/tenants/demo/.
+
+
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`6912021`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6912021b9e50b543498c3be00bd94c7451efb18c))
+
+* fix(order): list partly refunded cancellations in the refund worklist
+
+A cancelled order refunded only in part still owes the rest, so the
+Refund filter's "Cancelled but still paid" lists PARTIALLY_REFUNDED
+cancellations beside the COMPLETED ones.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`e87a590`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e87a5908fc14fecd03d789ecf89c882a422feb19))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.104.9 [skip ci] ([`61d3c72`](https://github.com/vasilistotskas/grooveshop-django-api/commit/61d3c720c259a6b04e0676c2333bb765aba50b6c))
+
+### Features
+
+* feat(order): admin filter for cancelled orders still awaiting a refund (#148) ([`e87a590`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e87a5908fc14fecd03d789ecf89c882a422feb19))
+
+* feat(order): admin filter for cancelled orders still awaiting a refund
+
+A cancel refunds a paid order through its provider, and since the Viva
+refund now reports a refusal instead of marking the order refunded, a
+refused refund leaves the order cancelled with its payment COMPLETED.
+The order changelist gains a "Refund: Cancelled but still paid" filter,
+the worklist staff refund those from. The refusal reason is already in
+the order's history and logged at ERROR, which the log alert picks up.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1 ([`e87a590`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e87a5908fc14fecd03d789ecf89c882a422feb19))
+
 ## v3.104.9 (2026-10-12)
 
 ### Bug fixes

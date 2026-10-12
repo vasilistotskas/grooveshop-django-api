@@ -41,7 +41,7 @@ from admin.displays import (
 from admin.mixins import IsSuperuserOnlyModelAdmin
 from order.attribution import source_label
 from order.enum.document_type import OrderDocumentTypeEnum
-from order.enum.status import OrderStatus
+from order.enum.status import OrderStatus, PaymentStatus
 from order.invoicing import generate_invoice
 from order.models.attribution import OrderAttribution
 from order.models.history import OrderHistory, OrderItemHistory
@@ -156,6 +156,34 @@ class WholesaleOrderFilter(DropdownFilter):
                 return queryset.exclude(metadata__has_key="b2b_pricing")
             case _:
                 return queryset
+
+
+class RefundOwedFilter(DropdownFilter):
+    """Cancelled orders whose payment was not (fully) returned.
+
+    A cancel refunds a paid order through its provider, and a refund the
+    provider refuses leaves the order cancelled with its payment still
+    COMPLETED (``OrderService.refund_order`` records why in the order's
+    history); a cancelled order refunded only in part still owes the
+    rest. This is the worklist for refunding those by hand.
+    """
+
+    title = _("Refund")
+    parameter_name = "refund_owed"
+
+    def lookups(self, request, model_admin):
+        return [("yes", _("Cancelled but still paid"))]
+
+    def queryset(self, request, queryset):
+        if self.value() == "yes":
+            return queryset.filter(
+                status=OrderStatus.CANCELED,
+                payment_status__in=(
+                    PaymentStatus.COMPLETED,
+                    PaymentStatus.PARTIALLY_REFUNDED,
+                ),
+            )
+        return queryset
 
 
 class RecentOrdersFilter(DropdownFilter):
@@ -360,6 +388,7 @@ class OrderAdmin(BaseModelAdmin):
         ("payment_status", MultipleChoicesDropdownFilter),
         "document_type",
         WholesaleOrderFilter,
+        RefundOwedFilter,
         RecentOrdersFilter,
         ("attribution__source_type", ChoicesDropdownFilter),
         OrderSourceFilter,

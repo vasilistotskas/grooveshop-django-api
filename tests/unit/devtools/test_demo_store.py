@@ -1655,7 +1655,7 @@ class TestBranding:
 
         assert (
             self._favicon_url(demo_tenant)
-            == "https://demo.example.test/platform-favicon/favicon.ico"
+            == "https://demo.example.test/img/tenants/demo/favicon-512x512.png"
         )
 
     def test_gives_the_store_its_line(self, demo_tenant):

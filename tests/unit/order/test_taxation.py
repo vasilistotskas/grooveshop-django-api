@@ -25,6 +25,7 @@ from order.taxation import (
     split_gross,
 )
 from product.factories import ProductFactory
+from vat.constants import MYDATA_SUPPORTED_VAT_RATES
 from vat.factories import VatFactory
 
 pytestmark = pytest.mark.django_db
@@ -68,6 +69,23 @@ class TestSplitGross:
 
     def test_a_zero_rate_leaves_the_amount_whole(self):
         assert split_gross(D("5.00"), D("0")) == (D("5.00"), D("0.00"))
+
+    def test_a_half_cent_tie_still_adds_up_to_the_gross(self):
+        # 0.13 at 4%: the net is exactly 0.125 and the VAT 0.005. Rounding
+        # both up billed 0.14 for 0.13 of goods.
+        net, vat = split_gross(D("0.13"), D("4"))
+
+        assert (net, vat) == (D("0.13"), D("0.00"))
+        assert net + vat == D("0.13")
+
+    def test_net_plus_vat_is_the_gross_for_every_cent_at_every_rate(self):
+        for cents in range(1, 501):
+            gross = D(cents) / 100
+            for rate in MYDATA_SUPPORTED_VAT_RATES:
+                net, vat = split_gross(gross, rate)
+                assert net + vat == gross, (gross, rate)
+                assert net >= 0
+                assert vat >= 0
 
 
 class TestProportionalShares:
@@ -118,6 +136,17 @@ class TestGoodsLines:
             "0.57",
             "3.00",
         )
+
+    def test_every_line_adds_up_to_what_was_charged(self):
+        """Two 0.13 lines at 4% plus 0.13 of shipping at the same rate:
+        each line's net and VAT are its gross, so the order bills 0.39
+        for 0.39, not 0.42."""
+        order = _order([("0.13", "4", 1), ("0.13", "4", 1)], shipping="0.13")
+
+        lines = order_vat_lines(order)
+
+        assert [line.gross for line in lines] == [D("0.13")] * 3
+        assert sum(line.gross for line in lines) == D("0.39")
 
     def test_a_line_with_nothing_to_pay_is_left_out(self):
         """myDATA rejects zero-amount lines, and a row of zeros in the

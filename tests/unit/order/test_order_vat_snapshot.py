@@ -11,6 +11,7 @@ writes the rate on the line and the documents read only that.
 from __future__ import annotations
 
 import importlib
+from datetime import date
 from decimal import Decimal
 from unittest.mock import patch
 from xml.etree.ElementTree import fromstring
@@ -31,6 +32,7 @@ from order.invoicing import (
     _render_items,
     generate_invoice,
 )
+from order.models.invoice import Invoice
 from order.models.item import OrderItem
 from order.mydata.builder import build_invoice_xml
 from order.services import OrderService
@@ -378,17 +380,85 @@ class TestBackfill:
 
 
 class TestAdmin:
-    def test_a_new_line_cannot_state_a_rate_but_an_existing_one_can_be_fixed(
-        self,
-    ):
+    """Who may state a line's rate: nobody on a new line (it snapshots its
+    product's), staff on an existing one until its order's invoice is
+    registered with AADE, nobody after."""
+
+    @staticmethod
+    def _request():
         request = RequestFactory().get("/")
         request.user = UserAccountFactory(admin=True)
-        item_admin = admin.site._registry[OrderItem]
-        existing = OrderFactory(num_order_items=0).items.create(
+        return request
+
+    @staticmethod
+    def _line():
+        return OrderFactory(num_order_items=0).items.create(
             product=_product("24"), price=Money(D("5.00"), "EUR"), quantity=1
         )
 
-        assert "vat_rate" in item_admin.get_readonly_fields(request, None)
+    @staticmethod
+    def _invoice(item, **fields):
+        return Invoice.objects.create(
+            order=item.order,
+            invoice_number=f"INV-2026-{item.pk:06d}",
+            issue_date=date(2026, 1, 1),
+            currency="EUR",
+            **fields,
+        )
+
+    def test_a_new_line_cannot_state_a_rate(self):
+        item_admin = admin.site._registry[OrderItem]
+
+        assert "vat_rate" in item_admin.get_readonly_fields(
+            self._request(), None
+        )
+        assert (
+            "vat_rate" not in item_admin.get_form(self._request()).base_fields
+        )
+
+    def test_a_wrong_rate_can_be_corrected_before_any_invoice(self):
+        item_admin = admin.site._registry[OrderItem]
+        line = self._line()
+
         assert "vat_rate" not in item_admin.get_readonly_fields(
-            request, existing
+            self._request(), line
+        )
+        assert (
+            "vat_rate" in item_admin.get_form(self._request(), line).base_fields
+        )
+
+    def test_a_wrong_rate_can_be_corrected_while_the_invoice_has_no_mark(self):
+        item_admin = admin.site._registry[OrderItem]
+        line = self._line()
+        self._invoice(line)
+
+        assert "vat_rate" not in item_admin.get_readonly_fields(
+            self._request(), line
+        )
+
+    def test_the_rate_is_frozen_once_the_invoice_has_a_mark(self):
+        """A forced regeneration keeps a registered invoice's totals but
+        prints the lines' rates, so an edit here would split them."""
+        item_admin = admin.site._registry[OrderItem]
+        line = self._line()
+        self._invoice(line, mydata_mark=400001234567890)
+
+        assert "vat_rate" in item_admin.get_readonly_fields(
+            self._request(), line
+        )
+        assert (
+            "vat_rate"
+            not in item_admin.get_form(self._request(), line).base_fields
+        )
+
+    def test_only_the_marked_orders_lines_are_frozen(self):
+        item_admin = admin.site._registry[OrderItem]
+        registered, other = self._line(), self._line()
+        self._invoice(registered, mydata_mark=400001234567891)
+
+        assert "vat_rate" in item_admin.get_readonly_fields(
+            self._request(), registered
+        )
+        assert "vat_rate" not in item_admin.get_readonly_fields(
+            self._request(), other
         )

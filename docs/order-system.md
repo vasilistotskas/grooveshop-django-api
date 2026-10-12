@@ -262,8 +262,9 @@ catalogue can no longer change.
   snapshotted lines and the two amounts, and a stored copy could only
   disagree with the lines when staff edit them. A charge on an order
   with no goods raises, since no rate can follow nothing.
-- **One computation, two documents.** Every line is split into a net and
-  a VAT amount rounded half-up to the cent, then summed
+- **One computation, two documents.** Every line is split into a net
+  rounded half-up to the cent and the VAT left of its gross, so each line
+  adds up to what was charged, then summed
   (`order.taxation.split_gross`). `Invoice.subtotal`, `.total_vat`,
   `.total` and the PDF's VAT breakdown are sums of those lines, and the
   myDATA `invoiceDetails` / `invoiceSummary` are the same lines, so they

@@ -24,12 +24,13 @@ Shipping and the payment-method fee
     is what a single-rate order degenerates to (100% at that rate).
 
 Rounding
-    Every line is split into a net and a VAT amount rounded to the cent
-    (``ROUND_HALF_UP``, AADE's rule) **before** anything is summed. myDATA
-    validates ``invoiceSummary`` against the sum of the rounded lines, so
-    the PDF totals must be that sum too — summing the lines first and
-    rounding the bucket gives a different cent on, for example, three
-    €1.00 lines at 24%.
+    Every line is split into a net, rounded to the cent (``ROUND_HALF_UP``,
+    AADE's rule), and the VAT that is left of its gross, so each line adds
+    up to what was charged. This happens **before** anything is summed:
+    myDATA validates ``invoiceSummary`` against the sum of the rounded
+    lines, so the PDF totals must be that sum too — summing the lines
+    first and rounding the bucket gives a different cent on, for example,
+    three €1.00 lines at 24%.
 """
 
 from __future__ import annotations
@@ -65,17 +66,20 @@ class VatLine:
 
 
 def split_gross(gross: Decimal, rate: Decimal) -> tuple[Decimal, Decimal]:
-    """Back out net + VAT from a VAT-inclusive amount, each to the cent.
+    """Back out net + VAT from a cent-exact, VAT-inclusive amount.
 
-    Returning the ROUNDED values is essential: the per-line and summary
-    columns must agree after AADE's server-side re-rounding (errors 203 /
-    207-210 otherwise).
+    The net is rounded to the cent (half up) and the VAT is what is left,
+    so net + VAT is ``gross`` on every line. Rounding both independently
+    breaks that on a half-cent tie: 0.13 at 4% has a net of 0.125, which
+    rounds up to 0.13, and a VAT of 0.005, which also rounds up to 0.01,
+    so the line would bill 0.14 for 0.13 of goods. The per-line and
+    summary columns must agree after AADE's server-side re-rounding
+    (errors 203 / 207-210 otherwise).
     """
-    net = gross / (Decimal(1) + rate / Decimal(100))
-    return (
-        net.quantize(CENT, rounding=ROUND_HALF_UP),
-        (gross - net).quantize(CENT, rounding=ROUND_HALF_UP),
+    net = (gross / (Decimal(1) + rate / Decimal(100))).quantize(
+        CENT, rounding=ROUND_HALF_UP
     )
+    return net, gross - net
 
 
 def _line(kind: ChargeKind, gross: Decimal, rate: Decimal) -> VatLine:

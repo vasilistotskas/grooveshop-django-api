@@ -23,6 +23,7 @@ from order.invoicing import generate_invoice
 from order.mydata.builder import build_invoice_xml
 from order.mydata.types import (
     VAT_CATEGORY_0,
+    VAT_CATEGORY_4,
     VAT_CATEGORY_6,
     VAT_CATEGORY_13,
     VAT_CATEGORY_24,
@@ -38,6 +39,7 @@ CATEGORY_BY_RATE = {
     D("24"): VAT_CATEGORY_24,
     D("13"): VAT_CATEGORY_13,
     D("6"): VAT_CATEGORY_6,
+    D("4"): VAT_CATEGORY_4,
     D("0"): VAT_CATEGORY_0,
 }
 
@@ -111,6 +113,13 @@ SCENARIOS = {
         "shipping": "0",
         "fee": "0",
     },
+    # 0.13 at 4% has a net of exactly 0.125: rounding net and VAT
+    # independently billed 0.28 for 0.26 of goods.
+    "two 0.13 lines at 4%, a half-cent tie": {
+        "lines": [("0.13", "4", 1)] * 2,
+        "shipping": "0",
+        "fee": "0",
+    },
     "zero-rated goods": {
         "lines": [("10.00", "0", 1)],
         "shipping": "3.50",
@@ -124,6 +133,20 @@ SCENARIOS = {
 }
 
 
+def _charged(scenario):
+    """What the customer is charged: goods and extras, less discounts."""
+    goods = sum(
+        (D(gross) * qty for gross, _rate, qty in scenario["lines"]), D(0)
+    )
+    return (
+        goods
+        + D(scenario["shipping"])
+        + D(scenario["fee"])
+        - D(scenario.get("discount", 0))
+        - D(scenario.get("loyalty", 0))
+    )
+
+
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=list(SCENARIOS))
 def test_invoice_row_equals_the_mydata_summary_to_the_cent(scenario):
     invoice, root = _documents(_order(**SCENARIOS[scenario]))
@@ -134,6 +157,14 @@ def test_invoice_row_equals_the_mydata_summary_to_the_cent(scenario):
     assert invoice.subtotal.amount + invoice.total_vat.amount == (
         invoice.total.amount
     )
+
+
+@pytest.mark.parametrize("scenario", SCENARIOS, ids=list(SCENARIOS))
+def test_both_documents_bill_exactly_what_the_customer_is_charged(scenario):
+    invoice, root = _documents(_order(**SCENARIOS[scenario]))
+
+    assert invoice.total.amount == _charged(SCENARIOS[scenario])
+    assert _summary(root, "totalGrossValue") == _charged(SCENARIOS[scenario])
 
 
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=list(SCENARIOS))

@@ -1512,10 +1512,18 @@ class OrderItemAdmin(BaseModelAdmin):
 
     def get_readonly_fields(self, request, obj=None):
         readonly_fields = super().get_readonly_fields(request, obj)
-        if obj is None:
-            # A new line takes its product's current VAT rate (see
-            # ``OrderItem.save``); an existing one shows the rate it was
-            # sold at, which staff may correct.
+        # A new line takes its product's current VAT rate (see
+        # ``OrderItem.save``). An existing one shows the rate it was sold
+        # at, which staff may correct, until the order's invoice is
+        # registered with AADE: from then on its figures are frozen (see
+        # ``invoicing._persist_invoice_row``), and an edited rate would
+        # print on a regenerated PDF beside totals that no longer match.
+        if (
+            obj is None
+            or Invoice.objects.filter(
+                order_id=obj.order_id, mydata_mark__isnull=False
+            ).exists()
+        ):
             return (*readonly_fields, "vat_rate")
         return readonly_fields
 

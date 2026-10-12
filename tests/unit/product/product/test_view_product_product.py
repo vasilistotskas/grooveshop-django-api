@@ -98,6 +98,7 @@ class ProductViewSetTestCase(TestCase):
             "likes_count",
             "review_average",
             "discount_percent",
+            "announced_discount_percent",
         ]
         self.assertEqual(
             set(self.viewset.ordering_fields), set(expected_fields)

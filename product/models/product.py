@@ -437,11 +437,19 @@ class Product(
         undiscounted list price, and read from the stored columns so a
         list page costs nothing per row.
         """
+        if "announced_discount_percent" in self.__dict__:
+            return self.__dict__["announced_discount_percent"]
+
         from product.pricing.evaluation import announced_discount_percent
 
         return announced_discount_percent(
             self.prior_price, self.effective_price
         )
+
+    @announced_discount_percent.setter
+    def announced_discount_percent(self, value):
+        """Allow Django to set the annotation value."""
+        self.__dict__["announced_discount_percent"] = value
 
     @property
     def likes_count(self) -> int:

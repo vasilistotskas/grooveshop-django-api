@@ -118,6 +118,33 @@ class TestProductApi:
         assert body["priorPrice"] is None
         assert body["announcedDiscountPercent"] is None
 
+    def test_list_filters_and_orders_by_the_announced_percent(
+        self, category, vat
+    ):
+        announced = reduced_product(category, vat)
+        plain_product(category, vat)
+        # A markdown on a young product is not an announcement.
+        ProductFactory(
+            category=category,
+            vat=vat,
+            price=Decimal("100.00"),
+            discount_percent=Decimal(50),
+            active=True,
+        )
+
+        response = APIClient().get(
+            reverse("product-list"),
+            {
+                "min_announced_discount_percent": 1,
+                "ordering": "-announcedDiscountPercent",
+            },
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        rows = response.json()["results"]
+        assert [row["id"] for row in rows] == [announced.pk]
+        assert rows[0]["announcedDiscountPercent"] == 20
+
     def test_list_query_count_does_not_grow_with_the_page(self, category, vat):
         def queries_for(count):
             for _ in range(count):

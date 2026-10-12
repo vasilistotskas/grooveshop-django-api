@@ -213,6 +213,7 @@ class ProductViewSet(BaseModelViewSet):
         "likes_count",
         "review_average",
         "discount_percent",
+        "announced_discount_percent",
     ]
     ordering = ["-availability_priority", "id"]
     # ``reviews`` lists ProductReview rows, so it sorts by the review

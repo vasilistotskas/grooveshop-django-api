@@ -65,6 +65,13 @@ class ProductFilter(
         lookup_expr="gte",
         help_text="Minimum discount percentage",
     )
+    min_announced_discount_percent = filters.NumberFilter(
+        method="filter_min_announced_discount_percent",
+        help_text=(
+            "Minimum announced discount percentage: only products with an "
+            "Omnibus prior price, computed from it"
+        ),
+    )
     max_discount_percent = filters.NumberFilter(
         field_name="discount_percent",
         lookup_expr="lte",
@@ -206,6 +213,14 @@ class ProductFilter(
         if value:
             return queryset.filter(discount_percent__gt=0)
         return queryset.filter(discount_percent=0)
+
+    def filter_min_announced_discount_percent(self, queryset, name, value):
+        """Filter products announcing a reduction of at least ``value`` %"""
+        if value is not None:
+            return queryset.with_announced_discount_percent().filter(
+                announced_discount_percent__gte=value
+            )
+        return queryset
 
     def filter_min_final_price(self, queryset, name, value):
         """Filter products with minimum final price"""

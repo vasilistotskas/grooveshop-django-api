@@ -24,8 +24,18 @@ pytestmark = pytest.mark.django_db
 
 expand = import_module("tenant.migrations.0050_encrypt_tenant_secrets")
 copy_mydata = import_module("tenant.migrations.0051_copy_mydata_credentials")
+contract = import_module("tenant.migrations.0052_drop_plaintext_tenant_secrets")
 
 SCHEMA_EDITOR = SimpleNamespace(connection=connection)
+
+
+@pytest.fixture(autouse=True)
+def _plaintext_columns():
+    """The contract migration (0052) dropped the plaintext columns from the
+    test database; the expand step runs while they still exist. The DDL is
+    rolled back with the test's transaction."""
+    with connection.cursor() as cursor:
+        cursor.execute(contract.RESTORE_SQL)
 
 
 def _write(tenant: Tenant, column: str, value: str) -> None:

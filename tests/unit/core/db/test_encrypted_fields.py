@@ -52,11 +52,6 @@ def test_the_column_holds_ciphertext_not_the_plaintext():
     assert decrypt_value(stored) == SECRET
 
 
-def test_the_secret_lives_in_the_renamed_column_only():
-    tenant = store_tenant("enc_old_column", stripe_secret_key=SECRET)
-    assert _raw(tenant, "stripe_secret_key") == ""
-
-
 def test_the_empty_string_stays_empty():
     tenant = store_tenant("enc_empty")
     assert _raw(tenant, "stripe_secret_key_encrypted") == ""

@@ -1472,7 +1472,7 @@ class OrderItemAdmin(BaseModelAdmin):
         (
             _("Order Item Information"),
             {
-                "fields": ("order", "product", "quantity", "price"),
+                "fields": ("order", "product", "quantity", "price", "vat_rate"),
                 "classes": ("wide",),
             },
         ),
@@ -1509,6 +1509,43 @@ class OrderItemAdmin(BaseModelAdmin):
             },
         ),
     )
+
+    def get_fieldsets(self, request, obj=None):
+        fieldsets = super().get_fieldsets(request, obj)
+        if obj is not None:
+            return fieldsets
+        # A new line is not asked for a rate: ``OrderItem.save`` snapshots
+        # its product's current one. It cannot be shown read-only either,
+        # since an unsaved instance holds a ``DatabaseDefault`` that the
+        # admin has no way to format.
+        return [
+            (
+                title,
+                {
+                    **options,
+                    "fields": tuple(
+                        name for name in options["fields"] if name != "vat_rate"
+                    ),
+                },
+            )
+            for title, options in fieldsets
+        ]
+
+    def get_readonly_fields(self, request, obj=None):
+        readonly_fields = super().get_readonly_fields(request, obj)
+        # An existing line shows the rate it was sold at, which staff may
+        # correct until the order's invoice is registered with AADE: from
+        # then on its figures are frozen (see
+        # ``invoicing._persist_invoice_row``), and an edited rate would
+        # print on a regenerated PDF beside totals that no longer match.
+        if (
+            obj is not None
+            and Invoice.objects.filter(
+                order_id=obj.order_id, mydata_mark__isnull=False
+            ).exists()
+        ):
+            return (*readonly_fields, "vat_rate")
+        return readonly_fields
 
     def get_queryset(self, request):
         # ``product_display`` calls ``safe_translation_getter``, which
@@ -1925,8 +1962,10 @@ class InvoiceAdmin(BaseModelAdmin):
                 "description": _(
                     "Populated by the automated submission pipeline "
                     "(``order.mydata``). Read-only — edit master data "
-                    "(seller / buyer / VAT rates) and use the Order "
-                    "admin's 'Send to myDATA' action to regenerate."
+                    "(seller / buyer) and use the Order admin's 'Send to "
+                    "myDATA' action to regenerate. VAT rates are fixed on "
+                    "each order line at checkout and do not follow later "
+                    "catalogue edits."
                 ),
             },
         ),

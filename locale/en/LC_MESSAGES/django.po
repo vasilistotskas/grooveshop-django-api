@@ -6767,8 +6767,12 @@ msgstr ""
 msgid "Subtotal (excl. VAT)"
 msgstr ""
 
-#: .\core\templates\invoices\invoice.html:283
-msgid "Payment fee"
+#: .\core\templates\invoices\invoice.html:263
+msgid "Shipping (incl. VAT)"
+msgstr ""
+
+#: .\core\templates\invoices\invoice.html:273
+msgid "Payment fee (incl. VAT)"
 msgstr ""
 
 #: .\core\templates\invoices\invoice.html:295
@@ -9029,8 +9033,9 @@ msgstr ""
 #: .\order\admin.py:1890
 msgid ""
 "Populated by the automated submission pipeline (``order.mydata``). Read-only "
-"— edit master data (seller / buyer / VAT rates) and use the Order admin's "
-"'Send to myDATA' action to regenerate."
+"— edit master data (seller / buyer) and use the Order admin's 'Send to "
+"myDATA' action to regenerate. VAT rates are fixed on each order line at "
+"checkout and do not follow later catalogue edits."
 msgstr ""
 
 #: .\order\admin.py:1927
@@ -19725,4 +19730,10 @@ msgstr ""
 #: .\tenant\models.py:1295
 #, python-format
 msgid "Remove %(locale)s: the default locale's line is Store Description."
+msgstr ""
+
+#: .\order\models\item.py:41
+msgid ""
+"VAT percentage this line was sold at, fixed when the line was created. "
+"Invoices and myDATA use it, never the product's current VAT."
 msgstr ""

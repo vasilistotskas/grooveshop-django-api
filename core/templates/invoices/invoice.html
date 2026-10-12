@@ -247,7 +247,7 @@
           </td>
           <td class="num">{{ item.quantity }}</td>
           <td class="num">{{ item.unit_gross|floatformat:2 }}</td>
-          <td class="num">{% if item.vat_rate is not None %}{{ item.vat_rate|floatformat:"-1" }}%{% else %}0%{% endif %}</td>
+          <td class="num">{{ item.vat_rate|floatformat:"-1" }}%</td>
           <td class="num">{{ item.line_total|floatformat:2 }}</td>
         </tr>
       {% endfor %}
@@ -262,6 +262,18 @@
         <td class="num">-{{ totals.discount|floatformat:2 }} {{ currency }}</td>
       </tr>
       {% endif %}
+      {% if totals.shipping %}
+      <tr>
+        <td>{% trans "Shipping (incl. VAT)" %}</td>
+        <td class="num">{{ totals.shipping|floatformat:2 }} {{ currency }}</td>
+      </tr>
+      {% endif %}
+      {% if totals.payment_fee %}
+      <tr>
+        <td>{% trans "Payment fee (incl. VAT)" %}</td>
+        <td class="num">{{ totals.payment_fee|floatformat:2 }} {{ currency }}</td>
+      </tr>
+      {% endif %}
       <tr>
         <td>{% trans "Subtotal (excl. VAT)" %}</td>
         <td class="num">{{ totals.subtotal|floatformat:2 }} {{ currency }}</td>
@@ -272,18 +284,6 @@
           <td class="num">{{ row.vat|floatformat:2 }} {{ currency }}</td>
         </tr>
       {% endfor %}
-      {% if totals.shipping %}
-        <tr>
-          <td>{% trans "Shipping" %}</td>
-          <td class="num">{{ totals.shipping|floatformat:2 }} {{ currency }}</td>
-        </tr>
-      {% endif %}
-      {% if totals.payment_fee %}
-        <tr>
-          <td>{% trans "Payment fee" %}</td>
-          <td class="num">{{ totals.payment_fee|floatformat:2 }} {{ currency }}</td>
-        </tr>
-      {% endif %}
       <tr class="total">
         <td>{% trans "Total" %}</td>
         <td class="num">{{ totals.total|floatformat:2 }} {{ currency }}</td>

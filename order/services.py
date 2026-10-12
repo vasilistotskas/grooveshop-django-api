@@ -330,6 +330,7 @@ class OrderService:
                 product=gift.product,
                 quantity=gift.quantity,
                 price=Money(0, target_currency),
+                vat_rate=gift.product.vat_percent,
             )
         if skipped:
             order.metadata["promotion_gifts_skipped"] = skipped
@@ -911,6 +912,10 @@ class OrderService:
                     product=product,
                     quantity=quantity,
                     price=item_price,
+                    # The rate the cart backed this price's VAT out of —
+                    # frozen on the line so the invoice and myDATA split
+                    # ``price`` at it, whatever the catalogue says later.
+                    vat_rate=cart_item.vat_percent,
                     recommendation_impression_id=(
                         cart_item.recommendation_impression_id
                     ),
@@ -1423,6 +1428,10 @@ class OrderService:
                     product=product,
                     quantity=quantity,
                     price=item_price,
+                    # The rate the cart backed this price's VAT out of —
+                    # frozen on the line so the invoice and myDATA split
+                    # ``price`` at it, whatever the catalogue says later.
+                    vat_rate=cart_item.vat_percent,
                     recommendation_impression_id=(
                         cart_item.recommendation_impression_id
                     ),

@@ -34,6 +34,7 @@ from giftcard.factories import GiftCardFactory
 from giftcard.tasks import deliver_gift_card_email
 from loyalty.tasks import notify_loyalty_tier_up_live
 from notification.models.notification import Notification
+from order.factories.item import OrderItemFactory
 from order.factories.order import OrderFactory
 from order.invoicing import generate_invoice
 from order.models.stock_reservation import StockReservation
@@ -369,6 +370,9 @@ class TestMoreOrderEmails:
     @LANGUAGES
     def test_invoice_site_link(self, language, prefix):
         order = OrderFactory(num_order_items=0, language_code=language)
+        # An invoice taxes the order's shipping at the rate of the goods it
+        # travels with, so the order needs a goods line to be invoiced.
+        OrderItemFactory(order=order)
         with patch(
             "order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4"
         ):

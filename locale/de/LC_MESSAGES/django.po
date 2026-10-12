@@ -9410,8 +9410,12 @@ msgid "VAT"
 msgstr "MwSt."
 
 #: .\core\templates\invoices\invoice.html
-msgid "Payment fee"
-msgstr "Zahlungsgebühr"
+msgid "Shipping (incl. VAT)"
+msgstr "Versand (inkl. MwSt.)"
+
+#: .\core\templates\invoices\invoice.html
+msgid "Payment fee (incl. VAT)"
+msgstr "Zahlungsgebühr (inkl. MwSt.)"
 
 #: .\core\templates\invoices\invoice.html
 msgid "VAT breakdown"
@@ -10081,3 +10085,12 @@ msgid "Remove %(locale)s: the default locale's line is Store Description."
 msgstr ""
 "Entfernen Sie %(locale)s: Die Zeile der Standardsprache ist die "
 "Shopbeschreibung."
+
+#: .\order\models\item.py:41
+msgid ""
+"VAT percentage this line was sold at, fixed when the line was created. "
+"Invoices and myDATA use it, never the product's current VAT."
+msgstr ""
+"MwSt.-Satz, zu dem diese Position verkauft wurde, festgelegt bei ihrer "
+"Erstellung. Rechnungen und myDATA verwenden ihn, nie die aktuelle MwSt. des "
+"Produkts."

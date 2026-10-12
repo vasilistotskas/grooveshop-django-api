@@ -37,7 +37,6 @@ from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 from xml.etree.ElementTree import Element, SubElement, tostring
 
-from order.discounts import discounted_line_gross
 from order.mydata.types import (
     CLASSIFICATION_CATEGORY_B2B_MERCHANDISE,
     CLASSIFICATION_CATEGORY_GOODS_SALES,
@@ -59,6 +58,7 @@ from order.mydata.types import (
     VAT_EXEMPTION_NO_VAT_ARTICLES,
 )
 from order.mydata.uid import build_uid
+from order.taxation import order_vat_lines
 from pay_way.enum.settlement import PaySettlement
 from vat.constants import MYDATA_SUPPORTED_VAT_RATES
 
@@ -111,21 +111,6 @@ def _vat_category(rate: Decimal) -> int:
 def _money(value: Decimal) -> str:
     """Serialise a ``Decimal`` using AADE's 2dp ``ROUND_HALF_UP``."""
     return str(value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
-
-
-def _split_gross(line_gross: Decimal, rate: Decimal) -> tuple[Decimal, Decimal]:
-    """Back out net + VAT from a gross amount, each quantised to 2dp.
-
-    Returning the ROUNDED values is essential — the per-line and
-    summary columns must agree after AADE's server-side re-rounding
-    (errors 203 / 207–210 otherwise)."""
-    divisor = Decimal(1) + rate / Decimal(100)
-    line_net = line_gross / divisor if divisor else line_gross
-    line_vat = line_gross - line_net
-    return (
-        Decimal(_money(line_net)),
-        Decimal(_money(line_vat)),
-    )
 
 
 def _emit_detail(
@@ -190,18 +175,6 @@ def _emit_income_classification(
         cls, f"{{{_INCLS_NS}}}classificationCategory"
     ).text = classification_category
     SubElement(cls, f"{{{_INCLS_NS}}}amount").text = _money(amount)
-
-
-def _ancillary_charges(order: Any):
-    """Yield the customer-paid amounts that sit outside ``OrderItem``
-    rows (shipping, payment-method fee). Empty / zero values are
-    skipped — AADE rejects zero-amount lines."""
-    shipping = getattr(order, "shipping_price", None)
-    if shipping is not None and shipping.amount > 0:
-        yield Decimal(shipping.amount)
-    fee = getattr(order, "payment_method_fee", None)
-    if fee is not None and fee.amount > 0:
-        yield Decimal(fee.amount)
 
 
 @dataclass(frozen=True)
@@ -495,61 +468,26 @@ def build_invoice_xml(
     )
     cls_type, cls_category = _classification_pair_for(invoice_type)
 
-    line_number = 0
-    order_items = list(invoice.order.items.select_related("product__vat").all())
-    # Order-level discounts (promotions + loyalty) are allocated across
-    # the lines with the same largest-remainder split the PDF invoice
-    # uses, so both documents and the summary agree to the cent.
-    # Gift-card amounts are payment (multi-purpose voucher) — they
-    # never reduce the taxable line values.
-    line_gross_by_pk = discounted_line_gross(invoice.order, order_items)
-    for item in order_items:
-        rate = (
-            Decimal(item.product.vat.value)
-            if item.product and item.product.vat_id
-            else Decimal(0)
-        )
-        line_gross = line_gross_by_pk[item.pk]
-        if line_gross <= 0:
-            # A fully-discounted line would be a zero-amount detail,
-            # which AADE rejects — skip it like the ancillary charges.
-            continue
-        line_net, line_vat = _split_gross(line_gross, rate)
-        line_number += 1
+    # The lines are the PDF invoice's lines — one rule for both documents
+    # (``order.taxation``): goods at the rate snapshotted on each item,
+    # then shipping and the payment-method fee at the rate(s) of the
+    # goods they travel with. Order-level discounts are already allocated
+    # across the goods; gift-card amounts are payment and never reduce a
+    # taxable value.
+    for line_number, line in enumerate(order_vat_lines(invoice.order), start=1):
         _emit_detail(
             invoice_el,
             line_number=line_number,
-            line_net=line_net,
-            line_vat=line_vat,
-            rate=rate,
+            line_net=line.net,
+            line_vat=line.vat,
+            rate=line.rate,
             classification_type=cls_type,
             classification_category=cls_category,
         )
-        summed_net += line_net
-        summed_vat += line_vat
-        summed_gross += line_net + line_vat
-        classification_totals[(cls_type, cls_category)] += line_net
-
-    # Shipping + payment-method fee — customer-paid amounts that sit
-    # outside ``OrderItem`` rows. Treated as VAT 24% (standard GR
-    # domestic rate). Tier C will thread through per-order overrides
-    # for exports / island rates.
-    for gross_decimal in _ancillary_charges(invoice.order):
-        line_net, line_vat = _split_gross(gross_decimal, Decimal(24))
-        line_number += 1
-        _emit_detail(
-            invoice_el,
-            line_number=line_number,
-            line_net=line_net,
-            line_vat=line_vat,
-            rate=Decimal(24),
-            classification_type=cls_type,
-            classification_category=cls_category,
-        )
-        summed_net += line_net
-        summed_vat += line_vat
-        summed_gross += line_net + line_vat
-        classification_totals[(cls_type, cls_category)] += line_net
+        summed_net += line.net
+        summed_vat += line.vat
+        summed_gross += line.gross
+        classification_totals[(cls_type, cls_category)] += line.net
 
     # (taxesTotals is omitted for 11.1 — only non-VAT document-level
     # taxes populate it. Leaving it out means AADE derives document-

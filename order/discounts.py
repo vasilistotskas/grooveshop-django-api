@@ -14,8 +14,7 @@ without reducing its taxable value.
 
 from __future__ import annotations
 
-from collections import defaultdict
-from collections.abc import Hashable, Iterable
+from collections.abc import Hashable
 from decimal import ROUND_FLOOR, Decimal
 
 CENT = Decimal("0.01")
@@ -27,6 +26,36 @@ def order_discount_total(order) -> Decimal:
         if money and money.amount > 0:
             total += Decimal(money.amount)
     return total.quantize(CENT)
+
+
+def proportional_shares[K: Hashable](
+    amount: Decimal, weights: dict[K, Decimal]
+) -> dict[K, Decimal]:
+    """Split ``amount`` over ``weights`` so the shares sum EXACTLY to it.
+
+    Each share is floored to the cent and the leftover cents go to the
+    largest remainders (ties broken by key), the same largest-remainder
+    rule for every split the invoice, the myDATA payload and the cart
+    share. ``weights`` must total more than zero.
+    """
+    total = sum(weights.values(), Decimal(0))
+
+    shares: dict[K, Decimal] = {}
+    remainders: dict[K, Decimal] = {}
+    allocated = Decimal(0)
+    for key, weight in weights.items():
+        raw = amount * weight / total
+        floored = raw.quantize(CENT, rounding=ROUND_FLOOR)
+        shares[key] = floored
+        remainders[key] = raw - floored
+        allocated += floored
+
+    leftover_cents = int(((amount - allocated) / CENT).to_integral_value())
+    for key, _remainder in sorted(
+        remainders.items(), key=lambda kv: (-kv[1], kv[0])
+    )[:leftover_cents]:
+        shares[key] += CENT
+    return shares
 
 
 def allocate_discount[K: Hashable](
@@ -44,22 +73,7 @@ def allocate_discount[K: Hashable](
         return gross
 
     discount = min(discount, items_total)
-
-    shares: dict[K, Decimal] = {}
-    remainders: dict[K, Decimal] = {}
-    allocated = Decimal(0)
-    for key, line in gross.items():
-        raw = discount * line / items_total
-        floored = raw.quantize(CENT, rounding=ROUND_FLOOR)
-        shares[key] = floored
-        remainders[key] = raw - floored
-        allocated += floored
-
-    leftover_cents = int(((discount - allocated) / CENT).to_integral_value())
-    for key, _remainder in sorted(
-        remainders.items(), key=lambda kv: (-kv[1], kv[0])
-    )[:leftover_cents]:
-        shares[key] += CENT
+    shares = proportional_shares(discount, gross)
 
     # A remainder cent can, in the razor's-edge case where the discount
     # nearly equals the items total, push one line past its own gross.
@@ -100,33 +114,3 @@ def discounted_line_gross(order, items=None) -> dict[int, Decimal]:
         for item in items
     }
     return allocate_discount(gross, order_discount_total(order))
-
-
-def vat_buckets(
-    lines: Iterable[tuple[Decimal, Decimal]],
-) -> dict[Decimal, dict[str, Decimal]]:
-    """Group ``(gross, rate)`` lines by VAT rate, backing VAT out of gross.
-
-    Line prices are VAT-inclusive, so ``subtotal = gross / (1 + rate/100)``.
-    Each bucket is quantized to the cent AFTER summing its lines — the one
-    rounding rule the invoice, the myDATA payload and the cart share, so
-    their VAT figures agree.
-    """
-    raw: dict[Decimal, dict[str, Decimal]] = defaultdict(
-        lambda: {
-            "subtotal": Decimal(0),
-            "vat": Decimal(0),
-            "gross": Decimal(0),
-        }
-    )
-    for gross, rate in lines:
-        divisor = Decimal(1) + rate / Decimal(100)
-        subtotal = gross / divisor if divisor else gross
-        bucket = raw[rate]
-        bucket["subtotal"] += subtotal
-        bucket["vat"] += gross - subtotal
-        bucket["gross"] += gross
-    return {
-        rate: {name: value.quantize(CENT) for name, value in bucket.items()}
-        for rate, bucket in raw.items()
-    }

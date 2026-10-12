@@ -11102,6 +11102,12 @@ msgstr ""
 msgid "Only staff can process refunds."
 msgstr ""
 
+#: .\order\views\item.py:163
+msgid ""
+"The wholesale group that priced this order no longer exists, so a new "
+"line cannot be priced for it."
+msgstr ""
+
 #: .\order\views\item.py:159
 msgid "This order is not in a refundable state."
 msgstr ""

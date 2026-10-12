@@ -9,7 +9,7 @@ from django.http import FileResponse, Http404, HttpRequest, HttpResponse
 from django.shortcuts import redirect
 from django.urls import path, reverse
 from django.utils import timezone
-from django.utils.html import format_html
+from django.utils.html import format_html, format_html_join
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import ngettext
 from djmoney.money import Money
@@ -56,18 +56,20 @@ from order.enum.status import (
     PaymentStatus,
 )
 from order.exceptions import PaymentError
-from order.invoicing import generate_invoice
+from order.invoicing import generate_invoice, receipt_issuable
 from order.models.attribution import OrderAttribution
 from order.models.history import OrderHistory, OrderItemHistory
 from order.models.invoice import Invoice, InvoiceCounter, MyDataStatus
 from order.models.item import OrderItem
 from order.models.order import Order
 from order.models.payment_transaction import PaymentTransaction
+from order.models.retail_credit import CreditCounter, RetailCredit
 from order.models.stock_log import StockLog
 from order.models.viva_webhook_event import VivaWebhookEvent
 from order.payment import payment_provider_label
 from order.payment_ledger import PaymentLedger
 from order.services import OrderService
+from order.taxation import breakdown_by_rate, order_vat_lines
 from user.models import UserAccount
 
 logger = logging.getLogger(__name__)
@@ -404,12 +406,19 @@ def _invoice_download_url(invoice: Invoice) -> str | None:
     return reverse("admin:order_invoice_download", args=[invoice.pk])
 
 
-class InvoiceInline(TabularInline):
-    """Single-row inline surfacing the order's invoice (if any).
+def _credit_download_url(credit: RetailCredit) -> str | None:
+    """Admin-only URL to stream a credit document's PDF."""
+    if not credit.pk:
+        return None
+    return reverse("admin:order_credit_download", args=[credit.pk])
 
-    Archival-only — the invoice itself is immutable once rendered
-    (Greek tax law: no gaps, no edits). Admins regenerate or issue
-    new invoices via the order-level detail actions on OrderAdmin.
+
+class InvoiceInline(TabularInline):
+    """Single-row inline surfacing the order's retail receipt (if any).
+
+    Archival-only — the receipt itself is immutable once rendered
+    (Greek tax law: no gaps, no edits). Admins regenerate or issue it
+    via the order-level detail actions on OrderAdmin.
     """
 
     model = Invoice
@@ -452,6 +461,47 @@ class InvoiceInline(TabularInline):
         return format_html(
             '<a href="{url}" target="_blank" rel="noopener">{label}</a>',
             url=_invoice_download_url(obj) or "",
+            label=_("Download PDF"),
+        )
+
+
+class RetailCreditInline(TabularInline):
+    """The retail credit documents issued for the order's refunds."""
+
+    model = RetailCredit
+    extra = 0
+    max_num = 0
+    can_delete = False
+    show_change_link = True
+    tab = True
+    per_page = 15
+    collapsible = True
+
+    fields = (
+        "credit_number",
+        "reason",
+        "issue_date",
+        "total_display",
+        "mydata_status",
+        "mydata_mark",
+        "document_status",
+    )
+    readonly_fields = fields
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    @admin.display(description=_("Total"))
+    def total_display(self, obj):
+        return money(obj.total.amount)
+
+    @admin.display(description=_("Document"))
+    def document_status(self, obj):
+        if not obj or not obj.pk or not obj.has_document():
+            return "—"
+        return format_html(
+            '<a href="{url}" target="_blank" rel="noopener">{label}</a>',
+            url=_credit_download_url(obj) or "",
             label=_("Download PDF"),
         )
 
@@ -535,6 +585,7 @@ class OrderAdmin(BaseModelAdmin):
         "loyalty_discount",
         "gift_card_amount",
         "wholesale_pricing",
+        "timologio_summary",
         # Shopper-supplied analytics, recorded once at checkout.
         "attribution_source_type",
         "attribution_source",
@@ -591,11 +642,19 @@ class OrderAdmin(BaseModelAdmin):
                     "billing_city",
                     "billing_zipcode",
                     "wholesale_pricing",
+                    "timologio_summary",
+                    "timologio_invoice_number",
+                    "timologio_invoice_mark",
+                    "timologio_credit_number",
+                    "timologio_credit_mark",
                 ),
                 "classes": ("tab",),
                 "description": _(
-                    "Buyer identity snapshotted for the Τιμολόγιο. "
-                    "Populated only on INVOICE orders."
+                    "Buyer identity snapshotted for the invoice. Populated "
+                    "only on INVOICE orders. The platform does not issue "
+                    "invoices: issue it in AADE's timologio app from the "
+                    "figures below, then record its number and MARK here "
+                    "(and those of a credit invoice, if one follows)."
                 ),
             },
         ),
@@ -708,9 +767,10 @@ class OrderAdmin(BaseModelAdmin):
             "title": _("Invoicing & myDATA"),
             "icon": "receipt_long",
             "items": [
-                "generate_invoice_now",
+                "issue_receipt_now",
                 "regenerate_invoice",
                 "send_invoice_to_mydata_now",
+                "issue_credit_documents_now",
                 "cancel_mydata_invoice_now",
             ],
         },
@@ -726,6 +786,7 @@ class OrderAdmin(BaseModelAdmin):
         OrderItemInline,
         PaymentTransactionInline,
         InvoiceInline,
+        RetailCreditInline,
         OrderHistoryInline,
     ]
     date_hierarchy = "created_at"
@@ -868,17 +929,94 @@ class OrderAdmin(BaseModelAdmin):
                 else "—",
                 "footer": self.shipping_info(order),
             },
-            {
-                "title": _("Invoice"),
-                "value": invoice.invoice_number if invoice else "—",
-                "footer": label_cell(
-                    invoice.get_mydata_status_display(),
-                    MYDATA_STATUS_VARIANT.get(invoice.mydata_status, "default"),
-                )
-                if invoice
-                else "",
-            },
+            self._document_card(order, invoice),
         ]
+
+    @staticmethod
+    def _document_card(order, invoice) -> dict:
+        """The order's tax document: the receipt the platform issues, or,
+        for an invoice order, the invoice staff issue in timologio."""
+        if order.document_type == OrderDocumentTypeEnum.INVOICE.value:
+            number = (
+                order.timologio_invoice_number or order.timologio_invoice_mark
+            )
+            return {
+                "title": _("Invoice"),
+                "value": number or "—",
+                "footer": _("Issued in timologio")
+                if number
+                else _("To be issued in timologio"),
+            }
+        return {
+            "title": _("Receipt"),
+            "value": invoice.invoice_number if invoice else "—",
+            "footer": label_cell(
+                invoice.get_mydata_status_display(),
+                MYDATA_STATUS_VARIANT.get(invoice.mydata_status, "default"),
+            )
+            if invoice
+            else "",
+        }
+
+    @admin.display(description=_("To issue in timologio"))
+    def timologio_summary(self, obj):
+        """What staff need to issue the invoice in timologio: the buyer's
+        identity and the VAT rows of the order, the figures the platform
+        itself would have used (``order.taxation``)."""
+        if (
+            not obj
+            or not obj.pk
+            or obj.document_type != OrderDocumentTypeEnum.INVOICE.value
+        ):
+            return "—"
+        address = ", ".join(
+            part
+            for part in (
+                f"{obj.billing_street} {obj.billing_street_number}".strip(),
+                f"{obj.billing_zipcode} {obj.billing_city}".strip(),
+                obj.billing_country,
+            )
+            if part
+        )
+        identity = [
+            (_("Company"), obj.billing_company_name),
+            (_("VAT ID"), obj.billing_vat_id),
+            (_("Tax office"), obj.billing_tax_office),
+            (_("Business activity"), obj.billing_activity),
+            (_("Address"), address),
+            (_("Email"), obj.email),
+        ]
+        try:
+            rows = breakdown_by_rate(order_vat_lines(obj))
+        except ValueError:
+            rows = []
+        total = sum((Decimal(r["gross"]) for r in rows), Decimal(0))
+        return format_html(
+            "{}{}<div><strong>{}:</strong> {}</div>",
+            format_html_join(
+                "",
+                "<div><strong>{}:</strong> {}</div>",
+                ((label, value or "—") for label, value in identity),
+            ),
+            format_html_join(
+                "",
+                "<div>{}%: {} {} + {} {} = {} {}</div>",
+                (
+                    (
+                        Decimal(r["rate"]).normalize(),
+                        _("net"),
+                        r["subtotal"],
+                        _("VAT"),
+                        r["vat"],
+                        r["gross"],
+                        obj.amount_due.currency.code,
+                    )
+                    for r in rows
+                ),
+            ),
+            _("Total"),
+            f"{total} {obj.amount_due.currency.code}",
+        )
 
     attribution_source_type = _attribution_field(
         "source_type", _("Source type")
@@ -1281,6 +1419,11 @@ class OrderAdmin(BaseModelAdmin):
                 self.admin_site.admin_view(self.invoice_download_view),
                 name="order_invoice_download",
             ),
+            path(
+                "credit/<int:credit_id>/download/",
+                self.admin_site.admin_view(self.credit_download_view),
+                name="order_credit_download",
+            ),
         ]
         return custom + urls
 
@@ -1295,9 +1438,9 @@ class OrderAdmin(BaseModelAdmin):
         try:
             invoice = Invoice.objects.select_related("order").get(pk=invoice_id)
         except Invoice.DoesNotExist as exc:
-            raise Http404(_("Invoice not found.")) from exc
+            raise Http404(_("Receipt not found.")) from exc
         if not invoice.has_document():
-            raise Http404(_("Invoice PDF has not been generated yet."))
+            raise Http404(_("Receipt PDF has not been generated yet."))
         return FileResponse(
             invoice.document_file.open("rb"),
             content_type="application/pdf",
@@ -1305,71 +1448,128 @@ class OrderAdmin(BaseModelAdmin):
             filename=f"{invoice.invoice_number}.pdf",
         )
 
+    def credit_download_view(self, request, credit_id: int):
+        """Stream a credit document's PDF back through admin auth."""
+        try:
+            credit = RetailCredit.objects.get(pk=credit_id)
+        except RetailCredit.DoesNotExist as exc:
+            raise Http404(_("Credit document not found.")) from exc
+        if not credit.has_document():
+            raise Http404(_("Credit document PDF has not been rendered yet."))
+        return FileResponse(
+            credit.document_file.open("rb"),
+            content_type="application/pdf",
+            as_attachment=True,
+            filename=f"{credit.credit_number}.pdf",
+        )
+
     def _redirect_to_order_change(self, object_id):
         return redirect(reverse("admin:order_order_change", args=[object_id]))
 
     @action(
-        description=_("Generate invoice"),
+        description=_("Issue receipt (myDATA)"),
         variant=ActionVariant.PRIMARY,
         icon="receipt_long",
     )
-    def generate_invoice_now(self, request, object_id):
-        """Synchronously render an invoice for this order.
+    def issue_receipt_now(self, request, object_id):
+        """Issue the order's retail receipt now (generate, register with
+        AADE, email).
 
-        Idempotent — if an invoice already exists it's returned as-is
-        (no counter slot consumed, no file re-render). Runs inline
-        rather than via Celery so the admin gets immediate success /
-        failure feedback.
+        The platform issues it by itself when the order ships while
+        ``MYDATA_AUTO_SUBMIT`` is on; this is for a store that issues by
+        hand, and for an order whose receipt never got a row (a failure
+        before it was created). Exactly once per order: an order that
+        already has its receipt is not issued a second one.
         """
+        from order.mydata.config import load_config
+        from order.tasks import generate_order_invoice
+
         try:
             order = Order.objects.get(pk=object_id)
         except Order.DoesNotExist:
             messages.error(request, _("Order not found."))
             return self._redirect_to_order_change(object_id)
 
-        if order.document_type != OrderDocumentTypeEnum.INVOICE.value:
+        if not receipt_issuable(order):
             messages.warning(
                 request,
                 _(
-                    "Order #%(order_id)s has document_type=%(doc)s, not "
-                    "INVOICE. Generating anyway as an explicit admin "
-                    "override — update the order's document type if this "
-                    "is ongoing."
+                    "A retail receipt is issued for a receipt order once it "
+                    "has shipped. Order #%(order_id)s is %(doc)s, status "
+                    "%(status)s."
                 )
-                % {"order_id": order.id, "doc": order.document_type},
-            )
-
-        try:
-            invoice = generate_invoice(order)
-        except Exception as exc:
-            logger.exception(
-                "Admin invoice generation failed for order %s", order.id
-            )
-            messages.error(
-                request,
-                _("Invoice generation failed: %(err)s") % {"err": str(exc)},
+                % {
+                    "order_id": order.id,
+                    "doc": order.get_document_type_display(),
+                    "status": order.get_status_display(),
+                },
             )
             return self._redirect_to_order_change(object_id)
 
-        if invoice.has_document():
-            messages.success(
-                request,
-                _("Invoice %(num)s ready for order #%(order_id)s.")
-                % {"num": invoice.invoice_number, "order_id": order.id},
-            )
-        else:
+        if not load_config().is_ready():
             messages.warning(
                 request,
                 _(
-                    "Invoice row %(num)s exists but the PDF was not "
-                    "rendered — check server logs."
-                )
-                % {"num": invoice.invoice_number},
+                    "myDATA integration is not ready — check MYDATA_ENABLED "
+                    "and credentials in Settings before retrying."
+                ),
             )
+            return self._redirect_to_order_change(object_id)
+
+        generate_order_invoice.delay(order.id)
+        messages.success(
+            request,
+            _("Scheduled the receipt for order #%(order_id)s.")
+            % {"order_id": order.id},
+        )
         return self._redirect_to_order_change(object_id)
 
     @action(
-        description=_("Regenerate invoice (same number)"),
+        description=_("Issue credit documents (myDATA)"),
+        variant=ActionVariant.PRIMARY,
+        icon="receipt",
+    )
+    def issue_credit_documents_now(self, request, object_id):
+        """Issue the retail credit documents the order owes, and resubmit
+        any that AADE has not registered.
+
+        Automatic while ``MYDATA_AUTO_SUBMIT`` is on (one per refund, once
+        the receipt is registered); this is for a store that issues by
+        hand and for a credit that was refused or never answered.
+        """
+        from order.mydata.config import load_config
+        from order.tasks import issue_pending_credits
+
+        try:
+            order = Order.objects.get(pk=object_id)
+        except Order.DoesNotExist:
+            messages.error(request, _("Order not found."))
+            return self._redirect_to_order_change(object_id)
+
+        if not load_config().is_ready():
+            messages.warning(
+                request,
+                _(
+                    "myDATA integration is not ready — check MYDATA_ENABLED "
+                    "and credentials in Settings before retrying."
+                ),
+            )
+            return self._redirect_to_order_change(object_id)
+
+        issue_pending_credits.delay(order.id)
+        messages.success(
+            request,
+            _(
+                "Scheduled the credit documents for order #%(order_id)s. "
+                "Nothing is issued before the receipt is registered with "
+                "AADE."
+            )
+            % {"order_id": order.id},
+        )
+        return self._redirect_to_order_change(object_id)
+
+    @action(
+        description=_("Regenerate receipt (same number)"),
         variant=ActionVariant.WARNING,
         icon="refresh",
     )
@@ -1411,7 +1611,7 @@ class OrderAdmin(BaseModelAdmin):
         return self._redirect_to_order_change(object_id)
 
     @action(
-        description=_("Send invoice to myDATA"),
+        description=_("Send receipt to myDATA"),
         variant=ActionVariant.PRIMARY,
         icon="cloud_upload",
     )
@@ -1466,16 +1666,16 @@ class OrderAdmin(BaseModelAdmin):
         return self._redirect_to_order_change(object_id)
 
     @action(
-        description=_("Cancel invoice in myDATA"),
+        description=_("Cancel receipt in myDATA (issued in error)"),
         variant=ActionVariant.DANGER,
         icon="cancel",
     )
     def cancel_mydata_invoice_now(self, request, object_id):
         """Schedule a ``CancelInvoice`` call for this order's MARK.
 
-        Only valid when the invoice has already been registered. The
-        Greek tax-law cancellation window is tight (same accounting
-        period) — beyond it, issue a credit note (5.1 / 11.4) instead.
+        Only for a receipt issued in error, and only once it has been
+        registered. A sale that did not happen is undone by a credit
+        document, never by cancelling the receipt.
         """
         try:
             order = Order.objects.select_related("invoice").get(pk=object_id)
@@ -2238,6 +2438,177 @@ class InvoiceAdmin(BaseModelAdmin):
         return obj.mydata_status, label
 
 
+@admin.register(RetailCredit)
+class RetailCreditAdmin(BaseModelAdmin):
+    """Read-only register of retail credit documents (myDATA 11.4).
+
+    Like the receipts, a credit document is a tax record: browse, search
+    and download only. ``OrderAdmin``'s "Issue credit documents" resubmits
+    one AADE has not registered; the "Cancel in myDATA" action here is for
+    a document issued in error.
+    """
+
+    list_display = (
+        "credit_number",
+        "order_link",
+        "reason",
+        "issue_date",
+        "total_display",
+        "document_badge",
+        "mydata_status_label",
+    )
+    list_filter = (
+        ("issue_date", RangeDateFilter),
+        "reason",
+        "mydata_status",
+    )
+    search_fields = (
+        "credit_number",
+        "order__id",
+        "order__email",
+        "mydata_mark",
+        "mydata_uid",
+    )
+    ordering = ("-issue_date", "-credit_number")
+    date_hierarchy = "issue_date"
+    list_select_related = ("order",)
+    actions = ["cancel_in_mydata"]
+
+    readonly_fields = (
+        "credit_number",
+        "issue_date",
+        "order_link",
+        "invoice",
+        "reason",
+        "refund",
+        "document_badge",
+        "subtotal",
+        "total_vat",
+        "total",
+        "currency",
+        "vat_breakdown",
+        "created_at",
+        "updated_at",
+        "mydata_status",
+        "mydata_invoice_type",
+        "mydata_series",
+        "mydata_aa",
+        "mydata_uid",
+        "mydata_mark",
+        "mydata_qr_url",
+        "mydata_authentication_code",
+        "mydata_cancellation_mark",
+        "mydata_error_code",
+        "mydata_error_message",
+        "mydata_submitted_at",
+        "mydata_confirmed_at",
+    )
+    fieldsets = (
+        (
+            _("Credit document"),
+            {
+                "fields": (
+                    "credit_number",
+                    "issue_date",
+                    "order_link",
+                    "invoice",
+                    "reason",
+                    "refund",
+                    "document_badge",
+                    "created_at",
+                    "updated_at",
+                )
+            },
+        ),
+        (
+            _("Totals"),
+            {
+                "fields": (
+                    "subtotal",
+                    "total_vat",
+                    "total",
+                    "currency",
+                    "vat_breakdown",
+                )
+            },
+        ),
+        (
+            _("myDATA (AADE)"),
+            {
+                "fields": (
+                    "mydata_status",
+                    "mydata_invoice_type",
+                    "mydata_series",
+                    "mydata_aa",
+                    "mydata_uid",
+                    "mydata_mark",
+                    "mydata_qr_url",
+                    "mydata_authentication_code",
+                    "mydata_cancellation_mark",
+                    "mydata_error_code",
+                    "mydata_error_message",
+                    "mydata_submitted_at",
+                    "mydata_confirmed_at",
+                ),
+                "classes": ("collapse",),
+            },
+        ),
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    @admin.display(description=_("Order"))
+    def order_link(self, obj):
+        return change_link(
+            self.admin_site, Order, obj.order_id, f"#{obj.order_id}"
+        )
+
+    @admin.display(description=_("Total"))
+    def total_display(self, obj):
+        return money(obj.total.amount)
+
+    @admin.display(description=_("Document"))
+    def document_badge(self, obj):
+        if not obj.has_document():
+            return _("Pending")
+        return format_html(
+            '<a href="{url}" target="_blank" rel="noopener">{label}</a>',
+            url=_credit_download_url(obj) or "",
+            label=_("Download"),
+        )
+
+    @display(
+        description=_("myDATA"),
+        label=MYDATA_STATUS_VARIANT,
+        ordering="mydata_status",
+    )
+    def mydata_status_label(self, obj):
+        label = obj.get_mydata_status_display()
+        if obj.mydata_mark:
+            label = f"{label} (#{obj.mydata_mark})"
+        return obj.mydata_status, label
+
+    @admin.action(description=_("Cancel in myDATA (issued in error)"))
+    def cancel_in_mydata(self, request, queryset):
+        from order.tasks import cancel_mydata_credit
+
+        registered = queryset.filter(mydata_mark__isnull=False)
+        for credit in registered:
+            cancel_mydata_credit.delay(credit.pk)
+        self.message_user(
+            request,
+            _("Scheduled myDATA cancellation for %(count)d credit document(s).")
+            % {"count": registered.count()},
+        )
+
+
 @admin.register(InvoiceCounter)
 class InvoiceCounterAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
     """Per-year sequential invoice counter.
@@ -2246,6 +2617,19 @@ class InvoiceCounterAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
     action (e.g. reserving ``INV-2026-000001..100`` for legacy imports).
     Regular staff should never touch it; a wrong value corrupts the
     sequence across all future invoices that year.
+    """
+
+    list_display = ("year", "next_number")
+    ordering = ("-year",)
+    readonly_fields = ()
+
+
+@admin.register(CreditCounter)
+class CreditCounterAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
+    """Per-year sequential counter of the retail credit documents.
+
+    Superusers only, like the receipts' counter: a wrong ``next_number``
+    leaves a gap in the series AADE requires to be gapless.
     """
 
     list_display = ("year", "next_number")

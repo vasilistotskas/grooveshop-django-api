@@ -1,0 +1,29 @@
+{% extends "emails/base/email_base.html" %}
+{% load i18n %}
+
+{% block email_title %}{% if is_credit %}{% trans "Your Credit Receipt" %}{% else %}{% trans "Your Receipt" %}{% endif %} - {{ SITE_NAME }}{% endblock %}
+
+{% block email_content %}
+<div style="background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%); padding: 32px 24px; text-align: center; border-radius: 8px; margin-bottom: 24px;">
+    <h2 style="color: white; font-size: 28px; margin: 0 0 12px 0;">{% if is_credit %}{% trans "Your Credit Receipt" %}{% else %}{% trans "Your Receipt" %}{% endif %}</h2>
+    <p style="color: white; font-size: 16px; margin: 0;">
+        {% if is_credit %}{% blocktrans with document_number=document_number order_id=order.id %}Credit receipt {{ document_number }} for order #{{ order_id }} is attached.{% endblocktrans %}{% else %}{% blocktrans with document_number=document_number order_id=order.id %}Receipt {{ document_number }} for order #{{ order_id }} is attached.{% endblocktrans %}{% endif %}
+    </p>
+</div>
+
+<p>{% blocktrans with first_name=order.first_name last_name=order.last_name %}Dear {{ first_name }} {{ last_name }},{% endblocktrans %}</p>
+
+<p>{% if is_credit %}{% trans "Please find the credit receipt for the refund of your order attached to this email as a PDF." %}{% else %}{% trans "Please find the receipt for your order attached to this email as a PDF." %}{% endif %}</p>
+
+<div class="email-card">
+    <h2>{% trans "Document details" %}</h2>
+    <p><strong>{% trans "Document number" %}:</strong> {{ document_number }}</p>
+    {% if mydata_mark %}<p><strong>{% trans "MARK" %}:</strong> {{ mydata_mark }}</p>{% endif %}
+    <p><strong>{% trans "Issue date" %}:</strong> {{ issue_date|date:"SHORT_DATE_FORMAT" }}</p>
+    <p><strong>{% trans "Order" %}:</strong> #{{ order.id }}</p>
+</div>
+
+<p>{% if is_credit %}{% trans "This credit receipt is your proof of the refund — please keep it for your records." %}{% else %}{% trans "This receipt is your proof of purchase — please keep it for your records." %}{% endif %}</p>
+
+<p>{% trans "If you have any questions, please contact our customer service team." %}</p>
+{% endblock %}

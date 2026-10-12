@@ -1228,16 +1228,19 @@ def send_shipping_notification_email(self, order_id: int) -> bool:
     base=MonitoredTask, bind=True, max_retries=3, default_retry_delay=300
 )
 def generate_order_invoice(self, order_id: int) -> bool:
-    """Generate a PDF invoice for an order and persist it.
+    """Issue the order's retail receipt (myDATA 11.1): the row and its PDF,
+    then the submission to AADE (``send_invoice_to_mydata``).
 
-    Idempotent via ``order.invoicing.generate_invoice`` — calling this
-    task twice for the same order is a no-op on the second call
-    (returns the existing Invoice row). Safe to invoke from
-    ``handle_order_completed`` without an explicit dedupe flag. Once
-    the PDF is ready this task also schedules ``send_invoice_email``
-    so the buyer gets a copy via email.
+    Dispatched when the order ships (``handle_order_shipped``, while
+    ``MyDataConfig.issues_automatically``) or by staff from the order.
+    Exactly once per order: ``order.invoicing.generate_invoice`` returns
+    the existing row, and an order whose receipt already carries a MARK
+    has nothing left to issue. An order that is not a receipt order (an
+    invoice order is issued by hand in timologio) or has not shipped is
+    refused here, whoever asked.
     """
-    from order.invoicing import generate_invoice
+    from order.invoicing import generate_invoice, receipt_issuable
+    from order.mydata.config import load_config
 
     try:
         order = Order.objects.select_related(
@@ -1245,9 +1248,20 @@ def generate_order_invoice(self, order_id: int) -> bool:
         ).get(id=order_id)
     except Order.DoesNotExist:
         logger.error(
-            "Could not generate invoice - Order #%s not found",
+            "Could not issue receipt - Order #%s not found",
             order_id,
             extra={"order_id": order_id},
+        )
+        return False
+
+    if not receipt_issuable(order) or not load_config().is_ready():
+        logger.info(
+            "No receipt issued for order #%s (type=%s, status=%s, "
+            "myDATA ready=%s)",
+            order_id,
+            order.document_type,
+            order.status,
+            load_config().is_ready(),
         )
         return False
 
@@ -1255,7 +1269,7 @@ def generate_order_invoice(self, order_id: int) -> bool:
         invoice = generate_invoice(order)
     except Exception as e:
         logger.exception(
-            "Error generating invoice for order #%s",
+            "Error generating receipt for order #%s",
             order_id,
             extra={"order_id": order_id, "error": str(e)},
         )
@@ -1264,33 +1278,28 @@ def generate_order_invoice(self, order_id: int) -> bool:
         return False
 
     logger.info(
-        "Invoice %s ready for order #%s", invoice.invoice_number, order_id
+        "Receipt %s ready for order #%s", invoice.invoice_number, order_id
     )
     if not invoice.has_document():
-        # An Invoice row without a file would just produce an empty
-        # attachment / unusable myDATA submission. Bail out — the
-        # next retry or an admin regeneration will re-trigger the chain.
+        # A row without a file is resumed by the next retry or an admin
+        # regeneration; there is nothing to register yet.
+        return True
+    if invoice.mydata_mark:
         return True
 
-    # Chain to myDATA submission when enabled; that task chains the
-    # email itself once the MARK is persisted (so the attached PDF
-    # carries the AADE MARK + QR). When myDATA is off or auto-submit
-    # is disabled, email fires directly as before.
-    from order.mydata.config import load_config as _load_mydata_config
-
-    mydata_config = _load_mydata_config()
-    if mydata_config.is_ready() and mydata_config.auto_submit:
-        send_invoice_to_mydata.delay(order_id)
-    else:
-        send_invoice_email.delay(order_id)
+    send_invoice_to_mydata.delay(order_id)
     return True
 
 
 INVOICE_EMAIL_SENT_FLAG = "invoice_email_sent"
 
 
-def _reserve_invoice_email(order_id: int) -> bool:
-    """Reserve-before-send for the invoice email.
+def _credit_email_flag(credit_id: int) -> str:
+    return f"credit_email_sent_{credit_id}"
+
+
+def _reserve_document_email(order_id: int, flag: str) -> bool:
+    """Reserve-before-send for a retail document's email.
 
     Returns ``True`` when this caller won the race. The flag lives
     under ``Order.metadata`` so it survives task retries and
@@ -1298,43 +1307,91 @@ def _reserve_invoice_email(order_id: int) -> bool:
     """
     with transaction.atomic():
         order = Order.objects.select_for_update().get(id=order_id)
-        if order.metadata and order.metadata.get(INVOICE_EMAIL_SENT_FLAG):
+        if order.metadata and order.metadata.get(flag):
             return False
         if not order.metadata:
             order.metadata = {}
-        order.metadata[INVOICE_EMAIL_SENT_FLAG] = True
+        order.metadata[flag] = True
         order.save(update_fields=["metadata"])
     return True
 
 
-def _release_invoice_email(order_id: int) -> None:
-    """Clear the invoice-email reservation on permanent failure."""
+def _release_document_email(order_id: int, flag: str) -> None:
+    """Clear a document email's reservation on permanent failure."""
     with transaction.atomic():
         order = Order.objects.select_for_update().filter(id=order_id).first()
         if order is None or not order.metadata:
             return
-        if order.metadata.pop(INVOICE_EMAIL_SENT_FLAG, None) is not None:
+        if order.metadata.pop(flag, None) is not None:
             order.save(update_fields=["metadata"])
+
+
+def _send_document_email(order: Order, document, *, is_credit: bool) -> None:
+    """Email the document's PDF to the buyer."""
+    language = get_order_language(order)
+    with translation.override(language):
+        if is_credit:
+            subject = _(
+                "Credit receipt {document_number} for your order #{order_id}"
+            )
+        else:
+            subject = _("Receipt {document_number} for your order #{order_id}")
+        subject = subject.format(
+            document_number=document.document_number, order_id=order.id
+        )
+        context = build_email_context(
+            language=language,
+            order=order,
+            document_number=document.document_number,
+            issue_date=document.issue_date,
+            mydata_mark=document.mydata_mark,
+            is_credit=is_credit,
+        )
+        text_content = render_to_string(
+            "emails/order/retail_document_issued.txt", context
+        )
+        html_content = render_to_string(
+            "emails/order/retail_document_issued.html", context
+        )
+
+    msg = EmailMultiAlternatives(
+        subject,
+        text_content,
+        tenant_from_email(),
+        [order.email],
+        reply_to=tenant_reply_to(),
+        headers=build_transactional_list_headers(
+            list_id="order_credit" if is_credit else "order_invoice"
+        ),
+    )
+    msg.attach_alternative(html_content, "text/html")
+    # ``storage.open`` works for both S3 and FileSystem — streams
+    # from S3 in prod, opens the file in dev. ``.read()`` is fine
+    # at these sizes (≤ ~50kB typical).
+    with document.document_file.open("rb") as fh:
+        pdf_bytes = fh.read()
+    msg.attach(f"{document.document_number}.pdf", pdf_bytes, "application/pdf")
+    msg.send()
 
 
 @celery_app.task(
     base=MonitoredTask, bind=True, max_retries=3, default_retry_delay=300
 )
 def send_invoice_email(self, order_id: int) -> bool:
-    """Email the rendered invoice PDF to the buyer.
+    """Email the registered retail receipt's PDF to the buyer.
 
-    Chained from ``generate_order_invoice`` once the PDF is ready.
-    Idempotent via ``INVOICE_EMAIL_SENT_FLAG`` in ``Order.metadata`` so
-    a retry or a re-fired ``order_completed`` signal doesn't re-send.
-    Released on permanent failure so an admin can resend manually.
+    Chained from ``send_invoice_to_mydata`` once the MARK is persisted and
+    the PDF carries it. Idempotent via ``INVOICE_EMAIL_SENT_FLAG`` in
+    ``Order.metadata`` so a retry doesn't re-send. Released on permanent
+    failure so an admin can resend manually.
     """
     email_sent = False
     try:
         if (self.request.retries == 0) and (
-            not _reserve_invoice_email(order_id)
+            not _reserve_document_email(order_id, INVOICE_EMAIL_SENT_FLAG)
         ):
             logger.info(
-                "Invoice email already sent for order #%s, skipping",
+                "Receipt email already sent for order #%s, skipping",
                 order_id,
             )
             return True
@@ -1344,102 +1401,60 @@ def send_invoice_email(self, order_id: int) -> bool:
         ).get(id=order_id)
         invoice = getattr(order, "invoice", None)
         if invoice is None or not invoice.has_document():
-            # An invoice row with no PDF is recoverable, so retry rather
-            # than give up on the first look. The myDATA path re-renders
-            # after the MARK lands, and that re-render DELETES the stored
-            # PDF before rendering the replacement — if the render then
-            # fails, the only copy is gone and this task used to release
-            # the flag and return, leaving the customer with no invoice
-            # and nothing recording that one was owed.
+            # A row with no PDF is recoverable, so retry rather than give
+            # up on the first look: the re-render after the MARK lands
+            # DELETES the stored PDF before rendering the replacement, and
+            # if that render fails the only copy is gone until the retry.
             if invoice is not None and self.request.retries < self.max_retries:
                 logger.warning(
-                    "Invoice PDF for order #%s is not ready — retrying",
+                    "Receipt PDF for order #%s is not ready — retrying",
                     order_id,
                 )
                 raise self.retry(countdown=self.default_retry_delay)
 
-            _release_invoice_email(order_id)
+            _release_document_email(order_id, INVOICE_EMAIL_SENT_FLAG)
             logger.error(
-                "Invoice email abandoned for order #%s — no PDF after %s "
-                "attempt(s); the invoice needs regenerating by hand",
+                "Receipt email abandoned for order #%s — no PDF after %s "
+                "attempt(s); the receipt needs regenerating by hand",
                 order_id,
                 self.request.retries + 1,
             )
             return False
 
-        language = get_order_language(order)
-        with translation.override(language):
-            subject = _(
-                "Invoice {invoice_number} for your order #{order_id}"
-            ).format(invoice_number=invoice.invoice_number, order_id=order.id)
-            context = build_email_context(
-                language=language,
-                order=order,
-                invoice=invoice,
-            )
-            text_content = render_to_string(
-                "emails/order/invoice_issued.txt", context
-            )
-            html_content = render_to_string(
-                "emails/order/invoice_issued.html", context
-            )
-
-        msg = EmailMultiAlternatives(
-            subject,
-            text_content,
-            tenant_from_email(),
-            [order.email],
-            reply_to=tenant_reply_to(),
-            headers=build_transactional_list_headers(list_id="order_invoice"),
-        )
-        msg.attach_alternative(html_content, "text/html")
-
-        # ``storage.open`` works for both S3 and FileSystem — streams
-        # from S3 in prod, opens the file in dev. ``.read()`` is fine
-        # at invoice sizes (≤ ~50kB typical).
-        with invoice.document_file.open("rb") as fh:
-            pdf_bytes = fh.read()
-        msg.attach(
-            f"{invoice.invoice_number}.pdf",
-            pdf_bytes,
-            "application/pdf",
-        )
-
-        msg.send()
+        _send_document_email(order, invoice, is_credit=False)
         email_sent = True
 
         logger.info(
-            "Invoice email sent for order #%s (%s)",
+            "Receipt email sent for order #%s (%s)",
             order.id,
             invoice.invoice_number,
         )
         OrderHistory.log_note(
             order=order,
-            note=f"Invoice {invoice.invoice_number} emailed to {order.email}",
+            note=f"Receipt {invoice.invoice_number} emailed to {order.email}",
         )
         return True
 
     except Order.DoesNotExist:
         logger.error(
-            "Could not send invoice email - Order #%s not found",
-            order_id,
+            "Could not send receipt email - Order #%s not found", order_id
         )
         return False
 
     except Exception as e:
         logger.exception(
-            "Error sending invoice email for order #%s",
+            "Error sending receipt email for order #%s",
             order_id,
             extra={"order_id": order_id, "error": str(e)},
         )
         if email_sent:
             # The message is already with the relay. Whatever failed
             # after it (the history note, the logging call) must not put
-            # the customer through a second invoice email — the
-            # reservation is only consulted on the first attempt, so a
-            # retry here would send again, up to max_retries times.
+            # the customer through a second email — the reservation is
+            # only consulted on the first attempt, so a retry here would
+            # send again, up to max_retries times.
             logger.error(
-                "invoice email for order #%s was sent but the bookkeeping "
+                "receipt email for order #%s was sent but the bookkeeping "
                 "after it failed: %s",
                 order_id,
                 e,
@@ -1451,42 +1466,102 @@ def send_invoice_email(self, order_id: int) -> bool:
             raise self.retry(exc=e) from e
         # Unconditionally, NOT "if this attempt reserved": the slot is
         # claimed on attempt 0, which always retries while attempts
-        # remain, so by the time control reaches here the claim was made
-        # by an earlier attempt of this same run and a per-attempt flag
-        # is always False. Guarding on one made the release dead code and
-        # left the flag standing for a send that never happened.
-        _release_invoice_email(order_id)
+        # remain, so a per-attempt flag is always False by now.
+        _release_document_email(order_id, INVOICE_EMAIL_SENT_FLAG)
         return False
 
 
-@celery_app.task(
-    base=MonitoredTask, bind=True, max_retries=5, default_retry_delay=120
-)
-def send_invoice_to_mydata(self, order_id: int) -> bool:
-    """Submit the order's invoice to AADE myDATA.
+def _submit_document_to_mydata(task, order: Order, document):
+    """Send ``document`` (a receipt or a credit) to AADE and say what became
+    of it: the parsed row once it is registered, ``None`` otherwise.
 
-    Chained from :func:`generate_order_invoice` once the PDF is
-    rendered AND the myDATA integration is enabled + auto-submit.
-    On success: persists MARK + ``qr_url`` on the invoice, regenerates
-    the PDF (so the final customer artifact carries the MARK + AADE-
-    returned QR code), then chains :func:`send_invoice_email`.
-
-    Retries transport-level failures with the SAME ``uid`` — AADE
-    dedupes via error 228 so retries are idempotent. Terminal
-    validation errors short-circuit to the email step with the
-    pre-transmission PDF so the buyer still gets an invoice even
-    when AADE rejected ours (ops reconciles via the REJECTED state
-    in admin).
+    A transport failure retries with the SAME uid (AADE dedupes through
+    error 228, whose MARK recovery ``submit_document`` already attempted),
+    so repeats are safe; out of retries the status stays SUBMITTED for
+    staff to resubmit. Terminal refusals are recorded on the document and
+    as a staff note. Nothing here ever reaches the customer: a document
+    AADE has not registered is not issued.
     """
-    from order.invoicing import generate_invoice
     from order.mydata import (
         MyDataAuthError,
         MyDataDuplicateError,
         MyDataError,
         MyDataTransportError,
         MyDataValidationError,
-        submit_invoice,
+        submit_document,
     )
+
+    number = document.document_number
+    try:
+        return submit_document(document)
+    except MyDataTransportError as exc:
+        logger.warning(
+            "myDATA submission transport failure for order #%s (%s): %s",
+            order.id,
+            number,
+            exc,
+        )
+        if task.request.retries < task.max_retries:
+            raise task.retry(exc=exc) from exc
+        return None
+    except MyDataDuplicateError as exc:
+        logger.error(
+            "myDATA submission duplicate uid for order #%s (%s, uid=%s); "
+            "MARK recovery via RequestTransmittedDocs failed. Manual "
+            "reconciliation required: %s",
+            order.id,
+            number,
+            document.mydata_uid,
+            exc,
+        )
+        OrderHistory.log_note(
+            order=order,
+            note=(
+                f"myDATA duplicate uid for {number}; automatic MARK "
+                "recovery failed — manual reconciliation required "
+                f"(uid={document.mydata_uid})"
+            ),
+        )
+        return None
+    except (MyDataValidationError, MyDataAuthError) as exc:
+        logger.error(
+            "myDATA submission terminal failure for order #%s (%s, "
+            "code=%s): %s",
+            order.id,
+            number,
+            exc.code,
+            exc.message,
+        )
+        OrderHistory.log_note(
+            order=order,
+            note=f"myDATA rejected {number}: {exc.code} {exc.message}",
+        )
+        return None
+    except MyDataError as exc:
+        # Catch-all for future subclasses we haven't branched on yet.
+        logger.error(
+            "myDATA submission unexpected error for order #%s (%s): %s",
+            order.id,
+            number,
+            exc,
+        )
+        return None
+
+
+@celery_app.task(
+    base=MonitoredTask, bind=True, max_retries=5, default_retry_delay=120
+)
+def send_invoice_to_mydata(self, order_id: int) -> bool:
+    """Submit the order's retail receipt to AADE myDATA.
+
+    Chained from :func:`generate_order_invoice` once the PDF is rendered,
+    and run by staff to resubmit a receipt that was refused or never
+    answered. On success: persists MARK + ``qr_url`` on the receipt,
+    regenerates the PDF (so the customer's copy carries the MARK + AADE's
+    QR code), emails it, and releases the credit documents that were
+    waiting for this MARK (:func:`issue_pending_credits`).
+    """
+    from order.invoicing import generate_invoice
 
     try:
         order = Order.objects.select_related(
@@ -1494,7 +1569,7 @@ def send_invoice_to_mydata(self, order_id: int) -> bool:
         ).get(id=order_id)
     except Order.DoesNotExist:
         logger.error(
-            "Could not submit invoice to myDATA - Order #%s not found",
+            "Could not submit receipt to myDATA - Order #%s not found",
             order_id,
         )
         return False
@@ -1502,84 +1577,14 @@ def send_invoice_to_mydata(self, order_id: int) -> bool:
     invoice = getattr(order, "invoice", None)
     if invoice is None or not invoice.has_document():
         logger.warning(
-            "myDATA submission skipped for order #%s — invoice PDF not ready",
+            "myDATA submission skipped for order #%s — receipt PDF not ready",
             order_id,
         )
-        send_invoice_email.delay(order_id)
         return False
 
-    try:
-        response = submit_invoice(invoice)
-    except MyDataTransportError as exc:
-        # Transient: network, 5xx, 429. Retry with the SAME uid —
-        # AADE dedupes via error 228 so repeats are safe.
-        logger.warning(
-            "myDATA submission transport failure for order #%s: %s",
-            order_id,
-            exc,
-        )
-        if self.request.retries < self.max_retries:
-            raise self.retry(exc=exc) from exc
-        # Out of retries — fall through to email so the buyer still
-        # gets the pre-transmission PDF; status stays SUBMITTED so
-        # ops can retry manually once AADE is back.
-        send_invoice_email.delay(order_id)
-        return False
-    except MyDataDuplicateError as exc:
-        # AADE error 228: ``submit_invoice`` already attempted Tier A.5
-        # recovery via ``recover_mark_for_invoice`` / RequestTransmittedDocs.
-        # This branch is reached only when that recovery failed (zero
-        # matches, multiple matches, transport error during recovery query,
-        # or matched doc had no MARK). Leave REJECTED state in place and
-        # deliver the pre-transmission PDF so the customer isn't blocked.
-        logger.error(
-            "myDATA submission duplicate uid for order #%s "
-            "(uid=%s); MARK recovery via RequestTransmittedDocs failed. "
-            "Manual reconciliation required: %s",
-            order_id,
-            invoice.mydata_uid,
-            exc,
-        )
-        OrderHistory.log_note(
-            order=order,
-            note=(
-                f"myDATA duplicate uid for invoice "
-                f"{invoice.invoice_number}; automatic MARK recovery "
-                f"failed — manual reconciliation required "
-                f"(uid={invoice.mydata_uid})"
-            ),
-        )
-        send_invoice_email.delay(order_id)
-        return False
-    except (MyDataValidationError, MyDataAuthError) as exc:
-        logger.error(
-            "myDATA submission terminal failure for order #%s (code=%s): %s",
-            order_id,
-            exc.code,
-            exc.message,
-        )
-        OrderHistory.log_note(
-            order=order,
-            note=f"myDATA rejected invoice {invoice.invoice_number}: "
-            f"{exc.code} {exc.message}",
-        )
-        send_invoice_email.delay(order_id)
-        return False
-    except MyDataError as exc:
-        # Catch-all for future subclasses we haven't branched on yet.
-        logger.error(
-            "myDATA submission unexpected error for order #%s: %s",
-            order_id,
-            exc,
-        )
-        send_invoice_email.delay(order_id)
-        return False
-
+    response = _submit_document_to_mydata(self, order, invoice)
     if response is None:
-        # Integration disabled mid-flight — deliver the pre-transmission
-        # PDF rather than leaving the order stuck.
-        send_invoice_email.delay(order_id)
-        return True
+        return False
 
     # Success: MARK + qr_url persisted. Re-render the PDF so the
     # version the customer downloads carries the authoritative AADE
@@ -1589,69 +1594,188 @@ def send_invoice_to_mydata(self, order_id: int) -> bool:
         generate_invoice(order, force=True)
     except Exception:
         logger.exception(
-            "Failed to re-render PDF with MARK for order #%s",
-            order_id,
+            "Failed to re-render PDF with MARK for order #%s", order_id
         )
 
     OrderHistory.log_note(
         order=order,
-        note=f"Invoice {invoice.invoice_number} registered with myDATA "
+        note=f"Receipt {invoice.invoice_number} registered with myDATA "
         f"(MARK={response.invoice_mark})",
     )
     send_invoice_email.delay(order_id)
+    issue_pending_credits.delay(order_id)
     return True
 
 
 @celery_app.task(
     base=MonitoredTask, bind=True, max_retries=3, default_retry_delay=300
 )
-def cancel_mydata_invoice(self, order_id: int) -> bool:
-    """Send a ``CancelInvoice`` for the order's registered invoice.
+def issue_pending_credits(self, order_id: int) -> list[int]:
+    """Issue every retail credit document the order owes.
 
-    Fails fast when there is no MARK — cancelling a document that
-    was never transmitted is a no-op, not an error. Only used from
-    the admin action today; automatic cancellation (e.g. on order
-    refund) is not wired until Tier B.
+    Creates the missing ones (``order.credit_documents``: one per ledger
+    refund, one settlement for an order closed without a sale) and submits
+    each credit that is not yet registered (one a run died before
+    submitting, or AADE refused, is simply sent again). Dispatched by every
+    trigger (a refund, an order closing, the receipt being registered,
+    staff) and idempotent: with nothing owed and everything registered it
+    does nothing.
     """
+    from order.credit_documents import create_pending_credits
+    from order.models import RetailCredit
+    from order.models.invoice import MyDataStatus
+
+    create_pending_credits(order_id)
+    pending = list(
+        RetailCredit.objects.filter(order_id=order_id, mydata_mark__isnull=True)
+        .exclude(mydata_status=MyDataStatus.CANCELED)
+        .order_by("id")
+        .values_list("pk", flat=True)
+    )
+    for credit_id in pending:
+        send_credit_to_mydata.delay(credit_id)
+    return pending
+
+
+@celery_app.task(
+    base=MonitoredTask, bind=True, max_retries=5, default_retry_delay=120
+)
+def send_credit_to_mydata(self, credit_id: int) -> bool:
+    """Submit one retail credit document (11.4) to AADE myDATA.
+
+    Linked to the MARK of the receipt it credits. On success the PDF is
+    rendered and emailed. Staff resubmit a refused one with this task.
+    """
+    from order.models import RetailCredit
+
+    credit = (
+        RetailCredit.objects.select_related(
+            "order", "order__user", "order__country", "invoice"
+        )
+        .filter(pk=credit_id)
+        .first()
+    )
+    if credit is None:
+        logger.error(
+            "Could not submit credit to myDATA - credit #%s not found",
+            credit_id,
+        )
+        return False
+    if credit.mydata_mark:
+        return True
+    if not credit.invoice.mydata_mark:
+        logger.warning(
+            "Credit %s waits for the MARK of receipt %s",
+            credit.credit_number,
+            credit.invoice.invoice_number,
+        )
+        return False
+
+    order = credit.order
+    response = _submit_document_to_mydata(self, order, credit)
+    if response is None:
+        return False
+
+    OrderHistory.log_note(
+        order=order,
+        note=f"Credit receipt {credit.credit_number} registered with "
+        f"myDATA (MARK={response.invoice_mark}, credits receipt "
+        f"{credit.invoice.invoice_number})",
+    )
+    send_credit_email.delay(credit_id)
+    return True
+
+
+@celery_app.task(
+    base=MonitoredTask, bind=True, max_retries=3, default_retry_delay=300
+)
+def send_credit_email(self, credit_id: int) -> bool:
+    """Render a registered credit document's PDF and email it to the buyer.
+
+    Idempotent per credit through a flag in ``Order.metadata``, released on
+    permanent failure so staff can resend.
+    """
+    from order.invoicing import render_credit_pdf
+    from order.models import RetailCredit
+
+    credit = (
+        RetailCredit.objects.select_related(
+            "order", "order__user", "order__country", "invoice"
+        )
+        .filter(pk=credit_id)
+        .first()
+    )
+    if credit is None:
+        logger.error(
+            "Could not send credit email - credit #%s not found", credit_id
+        )
+        return False
+    order = credit.order
+    flag = _credit_email_flag(credit_id)
+    email_sent = False
+    try:
+        if (self.request.retries == 0) and (
+            not _reserve_document_email(order.id, flag)
+        ):
+            return True
+        # Rendered here, after the MARK landed, so the PDF carries it and
+        # AADE's QR; a retry re-renders from the same frozen figures.
+        render_credit_pdf(credit)
+        _send_document_email(order, credit, is_credit=True)
+        email_sent = True
+        OrderHistory.log_note(
+            order=order,
+            note=f"Credit receipt {credit.credit_number} emailed to "
+            f"{order.email}",
+        )
+        return True
+    except Exception as e:
+        logger.exception(
+            "Error sending credit email for credit #%s",
+            credit_id,
+            extra={"credit_id": credit_id, "error": str(e)},
+        )
+        if email_sent:
+            return True
+        if self.request.retries < self.max_retries:
+            raise self.retry(exc=e) from e
+        _release_document_email(order.id, flag)
+        return False
+
+
+def _cancel_registered_document(task, order: Order, document) -> bool:
+    """Send ``CancelInvoice`` for a registered document issued in error."""
     from order.mydata import (
         MyDataError,
         MyDataTransportError,
     )
     from order.mydata import (
-        cancel_invoice as _cancel,
+        cancel_document as _cancel,
     )
 
-    try:
-        order = Order.objects.select_related("user").get(id=order_id)
-    except Order.DoesNotExist:
-        logger.error(
-            "Could not cancel myDATA invoice - Order #%s not found", order_id
-        )
-        return False
-
-    invoice = getattr(order, "invoice", None)
-    if invoice is None or not invoice.mydata_mark:
+    if not document.mydata_mark:
         logger.warning(
-            "myDATA cancellation skipped for order #%s — no MARK on file",
-            order_id,
+            "myDATA cancellation skipped for order #%s — %s has no MARK",
+            order.id,
+            document.document_number,
         )
         return False
 
     try:
-        response = _cancel(invoice)
+        response = _cancel(document)
     except MyDataTransportError as exc:
-        if self.request.retries < self.max_retries:
-            raise self.retry(exc=exc) from exc
+        if task.request.retries < task.max_retries:
+            raise task.retry(exc=exc) from exc
         logger.error(
             "myDATA cancellation exhausted retries for order #%s: %s",
-            order_id,
+            order.id,
             exc,
         )
         return False
     except MyDataError as exc:
         logger.error(
             "myDATA cancellation terminal failure for order #%s: %s",
-            order_id,
+            order.id,
             exc,
         )
         return False
@@ -1663,10 +1787,51 @@ def cancel_mydata_invoice(self, order_id: int) -> bool:
 
     OrderHistory.log_note(
         order=order,
-        note=f"Invoice {invoice.invoice_number} cancelled in myDATA "
+        note=f"{document.document_number} cancelled in myDATA "
         f"(cancellation MARK={response.cancellation_mark})",
     )
     return True
+
+
+@celery_app.task(
+    base=MonitoredTask, bind=True, max_retries=3, default_retry_delay=300
+)
+def cancel_mydata_invoice(self, order_id: int) -> bool:
+    """Send a ``CancelInvoice`` for the order's registered receipt.
+
+    Only for a receipt issued in error, and only from the admin action:
+    a sale that did not happen is undone by a credit document, never by
+    cancelling the receipt. Fails fast when there is no MARK.
+    """
+    try:
+        order = Order.objects.select_related("user").get(id=order_id)
+    except Order.DoesNotExist:
+        logger.error(
+            "Could not cancel myDATA receipt - Order #%s not found", order_id
+        )
+        return False
+    invoice = getattr(order, "invoice", None)
+    if invoice is None:
+        return False
+    return _cancel_registered_document(self, order, invoice)
+
+
+@celery_app.task(
+    base=MonitoredTask, bind=True, max_retries=3, default_retry_delay=300
+)
+def cancel_mydata_credit(self, credit_id: int) -> bool:
+    """Send a ``CancelInvoice`` for a credit document issued in error
+    (admin only)."""
+    from order.models import RetailCredit
+
+    credit = (
+        RetailCredit.objects.select_related("order")
+        .filter(pk=credit_id)
+        .first()
+    )
+    if credit is None:
+        return False
+    return _cancel_registered_document(self, credit.order, credit)
 
 
 @celery_app.task(

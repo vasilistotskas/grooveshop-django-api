@@ -43,6 +43,7 @@ class MyDataConfig:
     user_id: str
     subscription_key: str
     invoice_series_prefix: str
+    credit_series_prefix: str
     issuer_branch: int
     request_timeout_seconds: int
 
@@ -56,6 +57,13 @@ class MyDataConfig:
         are populated. The call sites should no-op rather than raise
         when False — the integration is opt-in, not mandatory."""
         return bool(self.enabled and self.user_id and self.subscription_key)
+
+    def issues_automatically(self) -> bool:
+        """True when the platform issues its retail documents by itself:
+        the receipt when an order ships, a credit document when money goes
+        back. ``MYDATA_AUTO_SUBMIT`` off leaves issuing to the staff
+        actions on the order, which work whenever :meth:`is_ready`."""
+        return self.is_ready() and self.auto_submit
 
     def headers(self) -> dict[str, str]:
         """Return the authentication headers AADE expects on every
@@ -92,6 +100,9 @@ def load_config() -> MyDataConfig:
         invoice_series_prefix=str(
             Setting.get("MYDATA_INVOICE_SERIES_PREFIX", default="GRVP")
             or "GRVP"
+        ),
+        credit_series_prefix=str(
+            Setting.get("MYDATA_CREDIT_SERIES_PREFIX", default="GRVC") or "GRVC"
         ),
         issuer_branch=int(Setting.get("MYDATA_ISSUER_BRANCH", default=0) or 0),
         request_timeout_seconds=int(

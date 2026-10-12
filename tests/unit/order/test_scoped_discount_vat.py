@@ -26,7 +26,7 @@ from country.factories import CountryFactory
 from loyalty.models.transaction import PointsTransaction
 from order.invoicing import generate_invoice
 from order.models.item import OrderItem
-from order.mydata.builder import build_invoice_xml
+from order.mydata.builder import build_receipt_xml
 from order.services import OrderService
 from order.taxation import ChargeKind, order_vat_lines
 from pay_way.enum.settlement import PaySettlement
@@ -163,7 +163,7 @@ def _documents(order):
         "order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test"
     ):
         invoice = generate_invoice(order)
-    built = build_invoice_xml(
+    built = build_receipt_xml(
         invoice,
         issuer_vat="123456789",
         issuer_country="GR",

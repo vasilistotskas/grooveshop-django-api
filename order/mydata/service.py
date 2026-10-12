@@ -18,7 +18,7 @@ Error handling:
 - Row-level ``ValidationError`` / ``XMLSyntaxError`` from AADE become
   ``MyDataValidationError`` — terminal; invoice stays ``REJECTED``.
 - Error 228 (duplicate uid) triggers the Tier A.5 recovery path:
-  ``recover_mark_for_invoice`` queries ``RequestTransmittedDocs`` and
+  ``recover_mark_for_document`` queries ``RequestTransmittedDocs`` and
   writes the existing MARK back if exactly one matching doc is found.
   If recovery fails for any reason the invoice stays ``REJECTED`` and
   the caller falls back to the existing manual-reconciliation path.
@@ -34,12 +34,12 @@ from django.db import transaction
 from django.utils import timezone
 from extra_settings.models import Setting
 
-from order.mydata.builder import build_invoice_xml
+from order.models.retail_credit import RetailCredit
+from order.mydata.builder import build_credit_xml, build_receipt_xml
 from order.mydata.client import MyDataClient
 from order.mydata.config import load_config
 from order.mydata.exceptions import (
     MyDataDuplicateError,
-    MyDataInactiveCounterpartError,
     MyDataTransportError,
     MyDataValidationError,
 )
@@ -48,13 +48,13 @@ from order.mydata.parser import (
     parse_requested_doc,
     parse_response_doc,
 )
-from order.mydata.types import ERROR_DUPLICATE_UID, ERROR_INACTIVE_VAT
+from order.mydata.types import ERROR_DUPLICATE_UID
 from order.mydata.validator import validate_invoice_doc
 
 logger = logging.getLogger(__name__)
 
 
-def submit_invoice(invoice: Any) -> ResponseRow | None:
+def submit_document(invoice: Any) -> ResponseRow | None:
     """Submit ``invoice`` to AADE ``SendInvoices``.
 
     Returns the parsed :class:`ResponseRow` on success (MARK + qrUrl
@@ -87,7 +87,7 @@ def submit_invoice(invoice: Any) -> ResponseRow | None:
             "Skipping submit for invoice %s.",
             config.enabled,
             bool(config.user_id and config.subscription_key),
-            invoice.invoice_number,
+            invoice.document_number,
         )
         return None
 
@@ -99,15 +99,11 @@ def submit_invoice(invoice: Any) -> ResponseRow | None:
             code="MISSING_SELLER_VAT",
         )
 
-    _guard_b2b_invoice_integrity(invoice)
-
     try:
-        built = build_invoice_xml(
+        built = _build_document(
             invoice,
+            config=config,
             issuer_vat=issuer_vat,
-            issuer_country="GR",
-            branch=config.issuer_branch,
-            series_prefix=config.invoice_series_prefix,
         )
     except ValueError as exc:
         # Unsupported VAT rate or malformed invoice_number — bad
@@ -167,7 +163,7 @@ def submit_invoice(invoice: Any) -> ResponseRow | None:
         # so recover_mark_for_invoice can use the uid), then attempt to
         # recover the MARK via RequestTransmittedDocs.
         _persist_failure(invoice, code=code, message=message)
-        recovered = recover_mark_for_invoice(invoice)
+        recovered = recover_mark_for_document(invoice)
         if recovered:
             # Return a synthetic success row so the caller treats this
             # as CONFIRMED and chains the post-submission steps (PDF
@@ -184,14 +180,6 @@ def submit_invoice(invoice: Any) -> ResponseRow | None:
             )
         raise MyDataDuplicateError(message, code=code)
 
-    if code == ERROR_INACTIVE_VAT:
-        # Buyer ΑΦΜ is not in AADE's active registry. Customer-fixable
-        # (re-enter the number), so surface a distinct exception so
-        # the task can queue a tailored "your VAT ID is invalid"
-        # email instead of the generic rejection notice.
-        _persist_failure(invoice, code=code, message=message)
-        raise MyDataInactiveCounterpartError(message, code=code)
-
     if row.status_code == "TechnicalError":
         # AADE gateway fault — includes the empty-200 body the parser
         # synthesises into a TechnicalError row (auth/routing hiccups).
@@ -206,7 +194,7 @@ def submit_invoice(invoice: Any) -> ResponseRow | None:
     raise MyDataValidationError(message, code=code)
 
 
-def cancel_invoice(invoice: Any) -> ResponseRow | None:
+def cancel_document(invoice: Any) -> ResponseRow | None:
     """Cancel a previously-submitted invoice via ``CancelInvoice``.
 
     Only valid when the invoice has an ``mydata_mark`` — we don't
@@ -248,7 +236,7 @@ def cancel_invoice(invoice: Any) -> ResponseRow | None:
     raise MyDataValidationError(message, code=code)
 
 
-def recover_mark_for_invoice(invoice: Any) -> bool:
+def recover_mark_for_document(invoice: Any) -> bool:
     """Attempt to recover a MARK for an invoice that received error 228.
 
     Error 228 means AADE already has our ``uid`` registered under a MARK
@@ -411,41 +399,24 @@ def recover_mark_for_invoice(invoice: Any) -> bool:
     return True
 
 
-def _guard_b2b_invoice_integrity(invoice: Any) -> None:
-    """Reject the submission early if the order-level document-type
-    and the per-Order billing-VAT fields disagree.
-
-    ``Order.document_type == INVOICE`` is the merchant-facing signal
-    that the buyer asked for a proper Τιμολόγιο Πώλησης. Without a
-    ``billing_vat_id`` we'd silently fall back to 11.1 (retail
-    receipt), which is tax-fraud-adjacent. Fail loud here so the
-    admin sees a REJECTED row with a clear message instead of an
-    11.1 submission that "quietly worked" under the wrong type.
-
-    The API serializer enforces the same rule so this branch only
-    fires when a bad row slips past (e.g. legacy order rows, or an
-    admin bulk edit that flipped ``document_type``)."""
-    from order.enum.document_type import OrderDocumentTypeEnum
-
-    order = invoice.order
-    doc_type = getattr(order, "document_type", None)
-    if doc_type != OrderDocumentTypeEnum.INVOICE.value:
-        return
-    buyer_vat = (getattr(order, "billing_vat_id", "") or "").strip()
-    if not buyer_vat:
-        _persist_failure(
+def _build_document(invoice: Any, *, config: Any, issuer_vat: str):
+    """Build the payload for the document: a credit (11.4) for a
+    :class:`RetailCredit`, otherwise the order's receipt (11.1)."""
+    if isinstance(invoice, RetailCredit):
+        return build_credit_xml(
             invoice,
-            code="MISSING_BUYER_VAT",
-            message=(
-                "Order is marked as INVOICE but no billing_vat_id is set. "
-                "Either populate the buyer VAT (for B2B) or change the "
-                "document_type to RECEIPT."
-            ),
+            issuer_vat=issuer_vat,
+            issuer_country="GR",
+            branch=config.issuer_branch,
+            series_prefix=config.credit_series_prefix,
         )
-        raise MyDataValidationError(
-            "Order requests an invoice but has no buyer VAT.",
-            code="MISSING_BUYER_VAT",
-        )
+    return build_receipt_xml(
+        invoice,
+        issuer_vat=issuer_vat,
+        issuer_country="GR",
+        branch=config.issuer_branch,
+        series_prefix=config.invoice_series_prefix,
+    )
 
 
 def _resolve_issuer_vat() -> str:
@@ -463,10 +434,14 @@ def _persist_submission_intent(
     aa: int,
 ) -> None:
     """Lock + save the identity fields before the HTTP round-trip."""
-    from order.models.invoice import Invoice, MyDataStatus
+    from order.models.invoice import MyDataStatus
 
     with transaction.atomic():
-        locked = Invoice.objects.select_for_update().get(pk=invoice.pk)
+        locked = (
+            type(invoice)
+            ._default_manager.select_for_update()
+            .get(pk=invoice.pk)
+        )
         locked.mydata_uid = uid
         locked.mydata_invoice_type = invoice_type
         locked.mydata_series = series
@@ -499,10 +474,14 @@ def _persist_submission_intent(
 
 
 def _persist_success(invoice: Any, row: ResponseRow) -> None:
-    from order.models.invoice import Invoice, MyDataStatus
+    from order.models.invoice import MyDataStatus
 
     with transaction.atomic():
-        locked = Invoice.objects.select_for_update().get(pk=invoice.pk)
+        locked = (
+            type(invoice)
+            ._default_manager.select_for_update()
+            .get(pk=invoice.pk)
+        )
         locked.mydata_status = MyDataStatus.CONFIRMED
         locked.mydata_mark = row.invoice_mark
         locked.mydata_authentication_code = row.authentication_code or ""
@@ -528,10 +507,14 @@ def _persist_success(invoice: Any, row: ResponseRow) -> None:
 
 
 def _persist_failure(invoice: Any, *, code: str, message: str) -> None:
-    from order.models.invoice import Invoice, MyDataStatus
+    from order.models.invoice import MyDataStatus
 
     with transaction.atomic():
-        locked = Invoice.objects.select_for_update().get(pk=invoice.pk)
+        locked = (
+            type(invoice)
+            ._default_manager.select_for_update()
+            .get(pk=invoice.pk)
+        )
         locked.mydata_status = MyDataStatus.REJECTED
         locked.mydata_error_code = code[:10]
         locked.mydata_error_message = message or ""
@@ -555,10 +538,12 @@ def _persist_error_only(invoice: Any, *, code: str, message: str) -> None:
     validly transmitted at AADE, so it must not be flipped to REJECTED
     (G0262).
     """
-    from order.models.invoice import Invoice
-
     with transaction.atomic():
-        locked = Invoice.objects.select_for_update().get(pk=invoice.pk)
+        locked = (
+            type(invoice)
+            ._default_manager.select_for_update()
+            .get(pk=invoice.pk)
+        )
         locked.mydata_error_code = code[:10]
         locked.mydata_error_message = message or ""
         locked.save(
@@ -573,10 +558,14 @@ def _persist_error_only(invoice: Any, *, code: str, message: str) -> None:
 
 
 def _persist_cancellation(invoice: Any, *, cancellation_mark: int) -> None:
-    from order.models.invoice import Invoice, MyDataStatus
+    from order.models.invoice import MyDataStatus
 
     with transaction.atomic():
-        locked = Invoice.objects.select_for_update().get(pk=invoice.pk)
+        locked = (
+            type(invoice)
+            ._default_manager.select_for_update()
+            .get(pk=invoice.pk)
+        )
         locked.mydata_status = MyDataStatus.CANCELED
         locked.mydata_cancellation_mark = cancellation_mark
         locked.save(
@@ -595,10 +584,14 @@ def _persist_recovered_mark(invoice: Any, *, mark: int) -> None:
     ``RequestTransmittedDocs``. Uses the same locked pattern as
     ``_persist_success`` — no qr_url or authentication_code because
     those aren't returned by the query endpoint."""
-    from order.models.invoice import Invoice, MyDataStatus
+    from order.models.invoice import MyDataStatus
 
     with transaction.atomic():
-        locked = Invoice.objects.select_for_update().get(pk=invoice.pk)
+        locked = (
+            type(invoice)
+            ._default_manager.select_for_update()
+            .get(pk=invoice.pk)
+        )
         locked.mydata_status = MyDataStatus.CONFIRMED
         locked.mydata_mark = mark
         locked.mydata_confirmed_at = timezone.now()

@@ -13,7 +13,7 @@
 {{ order.city }}, {{ order.zipcode }}
 {{ order.country }}
 
-{% if order.document_type == "INVOICE" %}{% trans "INVOICE DETAILS (ΤΙΜΟΛΟΓΙΟ)" %}
+{% if order.document_type == "INVOICE" %}{% trans "INVOICE REQUEST" %}
 {% if order.billing_company_name %}{{ order.billing_company_name }}
 {% endif %}{% trans "VAT number (ΑΦΜ)" %}: {{ order.billing_vat_id }}
 {% if order.billing_tax_office %}{% trans "Tax office" %}: {{ order.billing_tax_office }}

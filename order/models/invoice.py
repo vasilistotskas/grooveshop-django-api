@@ -124,8 +124,8 @@ class InvoiceCounter(models.Model):
     next_number = models.PositiveIntegerField(_("Next Number"), default=1)
 
     class Meta(TypedModelMeta):
-        verbose_name = _("Invoice Counter")
-        verbose_name_plural = _("Invoice Counters")
+        verbose_name = _("Receipt Counter")
+        verbose_name_plural = _("Receipt Counters")
 
     def __str__(self) -> str:
         return gettext("%(year)s: next number %(number)s") % {
@@ -152,8 +152,154 @@ class InvoiceCounter(models.Model):
         return INVOICE_NUMBER_FORMAT.format(year=year, number=number)
 
 
-class Invoice(TimeStampMixinModel, UUIDModel):
-    """Immutable-by-convention invoice archive linked to an Order.
+class MyDataRegistration(models.Model):
+    """The AADE registration of a document the platform issues over the ERP
+    channel: the fields every myDATA document carries, shared by the retail
+    receipt (:class:`Invoice`, 11.1) and the retail credit document
+    (:class:`RetailCredit`, 11.4).
+
+    Populated after transmission to AADE. All fields are read-only; the
+    write paths live exclusively in ``order.mydata`` (submit / cancel).
+    """
+
+    mydata_status = models.CharField(
+        _("myDATA Status"),
+        max_length=20,
+        choices=MyDataStatus.choices,
+        default=MyDataStatus.NOT_SENT,
+        help_text=_(
+            "Lifecycle state of the document's AADE myDATA submission. "
+            "NOT_SENT is the resting state before it is submitted."
+        ),
+    )
+    mydata_invoice_type = models.CharField(
+        _("myDATA Invoice Type"),
+        max_length=10,
+        blank=True,
+        default="",
+        help_text=_(
+            "AADE invoiceType code: 11.1 (retail receipt) or 11.4 (retail "
+            "credit document)."
+        ),
+    )
+    mydata_series = models.CharField(
+        _("myDATA Series"),
+        max_length=50,
+        blank=True,
+        default="",
+        help_text=_(
+            "AADE ``series`` field — the alphanumeric part of the "
+            "document's unique identifier within the issuer's register."
+        ),
+    )
+    mydata_aa = models.PositiveIntegerField(
+        _("myDATA Serial Number (aa)"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "AADE ``aa`` field — strictly-increasing integer within "
+            "``(series, year)``. Must be gapless per Greek tax law."
+        ),
+    )
+    mydata_uid = models.CharField(
+        _("myDATA UID"),
+        max_length=64,
+        blank=True,
+        default="",
+        help_text=_(
+            "Deterministic SHA-1 fingerprint of (issuer VAT | year | "
+            "branch | invoiceType | series | aa). Sent as the request's "
+            "``uid`` so retries dedupe against AADE error 228."
+        ),
+    )
+    mydata_mark = models.BigIntegerField(
+        _("myDATA MARK"),
+        null=True,
+        blank=True,
+        unique=True,
+        help_text=_(
+            "15-digit registration number assigned by AADE. This is "
+            "the legally-authoritative identifier — printed on the PDF."
+        ),
+    )
+    mydata_authentication_code = models.CharField(
+        _("myDATA Authentication Code"),
+        max_length=128,
+        blank=True,
+        default="",
+        help_text=_(
+            "Short hash AADE generates alongside the MARK; part of the "
+            "``qr_url`` query string. Populated only via licensed "
+            "provider channels (kept for forward compatibility)."
+        ),
+    )
+    mydata_qr_url = models.URLField(
+        _("myDATA QR URL"),
+        max_length=500,
+        blank=True,
+        default="",
+        help_text=_(
+            "AADE-returned URL for the PDF QR code. NEVER synthesise — "
+            "AADE changes the query-string parameters between schema "
+            "versions; always store the string they return verbatim."
+        ),
+    )
+    mydata_cancellation_mark = models.BigIntegerField(
+        _("myDATA Cancellation MARK"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "9-series MARK returned by a successful ``CancelInvoice`` "
+            "call — proves the cancellation registered."
+        ),
+    )
+    mydata_error_code = models.CharField(
+        _("myDATA Error Code"),
+        max_length=10,
+        blank=True,
+        default="",
+        help_text=_(
+            "Numeric AADE ``errorCode`` from the most recent failed "
+            "submission (e.g. 101 XML syntax, 216/217 VAT "
+            "category). Empty when last attempt succeeded."
+        ),
+    )
+    mydata_error_message = models.TextField(
+        _("myDATA Error Message"),
+        blank=True,
+        default="",
+        help_text=_("Human-readable message that accompanied the error code."),
+    )
+    mydata_submitted_at = models.DateTimeField(
+        _("myDATA Submitted At"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "Timestamp of the first transmission attempt — preserved "
+            "across retries so reporting reflects the original send time."
+        ),
+    )
+    mydata_confirmed_at = models.DateTimeField(
+        _("myDATA Confirmed At"),
+        null=True,
+        blank=True,
+        help_text=_("Timestamp AADE assigned the MARK."),
+    )
+
+    class Meta(TypedModelMeta):
+        abstract = True
+
+    def has_mydata_mark(self) -> bool:
+        """True when AADE has assigned a MARK — i.e. the invoice is
+        legally registered and the PDF should embed MARK + QR."""
+        return bool(self.mydata_mark) and bool(self.mydata_qr_url)
+
+
+class Invoice(TimeStampMixinModel, UUIDModel, MyDataRegistration):
+    """The order's retail receipt (myDATA 11.1), linked 1:1 to an Order.
+
+    The class keeps its name from when it also carried B2B invoices; the
+    platform no longer issues those (``order.mydata.types``).
 
     Once ``document_file`` is populated we treat this row as final —
     regenerating requires deleting the Invoice and its counter entry,
@@ -272,139 +418,9 @@ class Invoice(TimeStampMixinModel, UUIDModel):
         default=settings.DEFAULT_CURRENCY,
     )
 
-    # ── myDATA (IAPR / ΑΑΔΕ) fields ──────────────────────────────────
-    # Populated after successful transmission to AADE. Nullable/blank
-    # defaults so pre-myDATA invoices migrate without touching the
-    # sequential register. All fields are read-only — write paths live
-    # exclusively in ``order.mydata`` (submit / cancel).
-    mydata_status = models.CharField(
-        _("myDATA Status"),
-        max_length=20,
-        choices=MyDataStatus.choices,
-        default=MyDataStatus.NOT_SENT,
-        help_text=_(
-            "Lifecycle state of the invoice's AADE myDATA submission. "
-            "NOT_SENT is the resting state when the myDATA integration "
-            "is disabled or the invoice predates it."
-        ),
-    )
-    mydata_invoice_type = models.CharField(
-        _("myDATA Invoice Type"),
-        max_length=10,
-        blank=True,
-        default="",
-        help_text=_(
-            "AADE invoiceType code — e.g. 11.1 (B2C retail), 1.1 (B2B "
-            "sales invoice), 5.1 (linked credit note)."
-        ),
-    )
-    mydata_series = models.CharField(
-        _("myDATA Series"),
-        max_length=50,
-        blank=True,
-        default="",
-        help_text=_(
-            "AADE ``series`` field — the alphanumeric part of the "
-            "document's unique identifier within the issuer's register."
-        ),
-    )
-    mydata_aa = models.PositiveIntegerField(
-        _("myDATA Serial Number (aa)"),
-        null=True,
-        blank=True,
-        help_text=_(
-            "AADE ``aa`` field — strictly-increasing integer within "
-            "``(series, year)``. Must be gapless per Greek tax law."
-        ),
-    )
-    mydata_uid = models.CharField(
-        _("myDATA UID"),
-        max_length=64,
-        blank=True,
-        default="",
-        help_text=_(
-            "Deterministic SHA-1 fingerprint of (issuer VAT | year | "
-            "branch | invoiceType | series | aa). Sent as the request's "
-            "``uid`` so retries dedupe against AADE error 228."
-        ),
-    )
-    mydata_mark = models.BigIntegerField(
-        _("myDATA MARK"),
-        null=True,
-        blank=True,
-        unique=True,
-        help_text=_(
-            "15-digit registration number assigned by AADE. This is "
-            "the legally-authoritative identifier — printed on the PDF."
-        ),
-    )
-    mydata_authentication_code = models.CharField(
-        _("myDATA Authentication Code"),
-        max_length=128,
-        blank=True,
-        default="",
-        help_text=_(
-            "Short hash AADE generates alongside the MARK; part of the "
-            "``qr_url`` query string. Populated only via licensed "
-            "provider channels (kept for forward compatibility)."
-        ),
-    )
-    mydata_qr_url = models.URLField(
-        _("myDATA QR URL"),
-        max_length=500,
-        blank=True,
-        default="",
-        help_text=_(
-            "AADE-returned URL for the PDF QR code. NEVER synthesise — "
-            "AADE changes the query-string parameters between schema "
-            "versions; always store the string they return verbatim."
-        ),
-    )
-    mydata_cancellation_mark = models.BigIntegerField(
-        _("myDATA Cancellation MARK"),
-        null=True,
-        blank=True,
-        help_text=_(
-            "9-series MARK returned by a successful ``CancelInvoice`` "
-            "call — proves the cancellation registered."
-        ),
-    )
-    mydata_error_code = models.CharField(
-        _("myDATA Error Code"),
-        max_length=10,
-        blank=True,
-        default="",
-        help_text=_(
-            "Numeric AADE ``errorCode`` from the most recent failed "
-            "submission (e.g. 101 XML syntax, 102 inactive VAT, "
-            "216/217 VAT category). Empty when last attempt succeeded."
-        ),
-    )
-    mydata_error_message = models.TextField(
-        _("myDATA Error Message"),
-        blank=True,
-        default="",
-        help_text=_("Human-readable message that accompanied the error code."),
-    )
-    mydata_submitted_at = models.DateTimeField(
-        _("myDATA Submitted At"),
-        null=True,
-        blank=True,
-        help_text=_(
-            "Timestamp of the first transmission attempt — preserved "
-            "across retries so reporting reflects the original send time."
-        ),
-    )
-    mydata_confirmed_at = models.DateTimeField(
-        _("myDATA Confirmed At"),
-        null=True,
-        blank=True,
-        help_text=_("Timestamp AADE assigned the MARK."),
-    )
-
     class Meta(TypedModelMeta):
-        verbose_name = _("Invoice")
-        verbose_name_plural = _("Invoices")
+        verbose_name = _("Receipt")
+        verbose_name_plural = _("Receipts")
         ordering = ["-issue_date", "-invoice_number"]
         indexes = [
             *TimeStampMixinModel.Meta.indexes,
@@ -421,14 +437,13 @@ class Invoice(TimeStampMixinModel, UUIDModel):
         return self.invoice_number
 
     @property
+    def document_number(self) -> str:
+        return self.invoice_number
+
+    @property
     def order_id_display(self) -> int | None:
         return self.order_id
 
     def has_document(self) -> bool:
         """True when the PDF has been generated and stored."""
         return bool(self.document_file and self.document_file.name)
-
-    def has_mydata_mark(self) -> bool:
-        """True when AADE has assigned a MARK — i.e. the invoice is
-        legally registered and the PDF should embed MARK + QR."""
-        return bool(self.mydata_mark) and bool(self.mydata_qr_url)

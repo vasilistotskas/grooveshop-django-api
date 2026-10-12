@@ -20005,3 +20005,331 @@ msgstr ""
 #: .\product\models\price_spell.py:53
 msgid "Empty while this is the current price."
 msgstr ""
+
+
+#: .\core\templates\emails\order\order_payment_confirmed.html:37
+#: .\core\templates\emails\order\order_received.html:42
+msgid "Invoice request"
+msgstr ""
+
+#: .\core\templates\emails\order\order_payment_confirmed.html:45
+#: .\core\templates\emails\order\order_received.html:50
+#: .\core\templates\emails\order\order_received.txt:26
+msgid ""
+"Check these details carefully — the store issues your invoice with exactly "
+"what is shown here."
+msgstr ""
+
+#: .\core\templates\emails\order\order_payment_confirmed.txt:16
+#: .\core\templates\emails\order\order_received.txt:20
+msgid "INVOICE REQUEST"
+msgstr ""
+
+#: .\core\templates\emails\order\retail_document_issued.html:4
+#: .\core\templates\emails\order\retail_document_issued.html:8
+msgid "Your Credit Receipt"
+msgstr ""
+
+#: .\core\templates\emails\order\retail_document_issued.html:4
+#: .\core\templates\emails\order\retail_document_issued.html:8
+msgid "Your Receipt"
+msgstr ""
+
+#: .\core\templates\emails\order\retail_document_issued.html:10
+#, python-format
+msgid ""
+"Credit receipt %(document_number)s for order #%(order_id)s is attached."
+msgstr ""
+
+#: .\core\templates\emails\order\retail_document_issued.html:10
+#, python-format
+msgid "Receipt %(document_number)s for order #%(order_id)s is attached."
+msgstr ""
+
+#: .\core\templates\emails\order\retail_document_issued.html:16
+msgid ""
+"Please find the credit receipt for the refund of your order attached to this"
+" email as a PDF."
+msgstr ""
+
+#: .\core\templates\emails\order\retail_document_issued.html:16
+msgid ""
+"Please find the receipt for your order attached to this email as a PDF."
+msgstr ""
+
+#: .\core\templates\emails\order\retail_document_issued.html:19
+#: .\core\templates\emails\order\retail_document_issued.txt:10
+msgid "Document details"
+msgstr ""
+
+#: .\core\templates\emails\order\retail_document_issued.html:20
+#: .\core\templates\emails\order\retail_document_issued.txt:12
+msgid "Document number"
+msgstr ""
+
+#: .\core\templates\emails\order\retail_document_issued.html:26
+#: .\core\templates\emails\order\retail_document_issued.txt:17
+msgid ""
+"This credit receipt is your proof of the refund — please keep it for your "
+"records."
+msgstr ""
+
+#: .\core\templates\emails\order\retail_document_issued.html:26
+#: .\core\templates\emails\order\retail_document_issued.txt:17
+msgid ""
+"This receipt is your proof of purchase — please keep it for your records."
+msgstr ""
+
+#: .\core\templates\emails\order\retail_document_issued.txt:3
+msgid "YOUR CREDIT RECEIPT"
+msgstr ""
+
+#: .\core\templates\emails\order\retail_document_issued.txt:3
+msgid "YOUR RECEIPT"
+msgstr ""
+
+#: .\core\templates\emails\order\retail_document_issued.txt:8
+#, python-format
+msgid ""
+"Please find attached the credit receipt (%(document_number)s) for the refund"
+" of your order #%(order_id)s."
+msgstr ""
+
+#: .\core\templates\emails\order\retail_document_issued.txt:8
+#, python-format
+msgid ""
+"Please find attached the receipt (%(document_number)s) for your order "
+"#%(order_id)s."
+msgstr ""
+
+#: .\core\templates\invoices\invoice.html:178
+msgid "RETAIL CREDIT RECEIPT"
+msgstr ""
+
+#: .\core\templates\invoices\invoice.html:178
+msgid "RETAIL RECEIPT"
+msgstr ""
+
+#: .\core\templates\invoices\invoice.html:181
+#, python-format
+msgid "Credits receipt %(number)s"
+msgstr ""
+
+#: .\order\admin.py:653
+msgid ""
+"Buyer identity snapshotted for the invoice. Populated only on INVOICE "
+"orders. The platform does not issue invoices: issue it in AADE's timologio "
+"app from the figures below, then record its number and MARK here (and those "
+"of a credit invoice, if one follows)."
+msgstr ""
+
+#: .\order\admin.py:946
+msgid "Issued in timologio"
+msgstr ""
+
+#: .\order\admin.py:948
+msgid "To be issued in timologio"
+msgstr ""
+
+#: .\order\admin.py:961
+msgid "To issue in timologio"
+msgstr ""
+
+#: .\order\admin.py:1007
+msgid "net"
+msgstr ""
+
+#: .\order\admin.py:1441
+msgid "Receipt not found."
+msgstr ""
+
+#: .\order\admin.py:1443
+msgid "Receipt PDF has not been generated yet."
+msgstr ""
+
+#: .\order\admin.py:1456
+msgid "Credit document not found."
+msgstr ""
+
+#: .\order\admin.py:1458
+msgid "Credit document PDF has not been rendered yet."
+msgstr ""
+
+#: .\order\admin.py:1470
+msgid "Issue receipt (myDATA)"
+msgstr ""
+
+#: .\order\admin.py:1497
+#, python-format
+msgid ""
+"A retail receipt is issued for a receipt order once it has shipped. Order "
+"#%(order_id)s is %(doc)s, status %(status)s."
+msgstr ""
+
+#: .\order\admin.py:1522
+#, python-format
+msgid "Scheduled the receipt for order #%(order_id)s."
+msgstr ""
+
+#: .\order\admin.py:1528
+msgid "Issue credit documents (myDATA)"
+msgstr ""
+
+#: .\order\admin.py:1563
+#, python-format
+msgid ""
+"Scheduled the credit documents for order #%(order_id)s. Nothing is issued "
+"before the receipt is registered with AADE."
+msgstr ""
+
+#: .\order\admin.py:1572
+msgid "Regenerate receipt (same number)"
+msgstr ""
+
+#: .\order\admin.py:1614
+msgid "Send receipt to myDATA"
+msgstr ""
+
+#: .\order\admin.py:1669
+msgid "Cancel receipt in myDATA (issued in error)"
+msgstr ""
+
+#: .\order\admin.py:2508
+msgid "Credit document"
+msgstr ""
+
+#: .\order\admin.py:2598
+msgid "Cancel in myDATA (issued in error)"
+msgstr ""
+
+#: .\order\admin.py:2607
+#, python-format
+msgid "Scheduled myDATA cancellation for %(count)d credit document(s)."
+msgstr ""
+
+#: .\order\models\order.py:338
+msgid "Invoice MARK (timologio)"
+msgstr ""
+
+#: .\order\models\order.py:341
+msgid "MARK of the invoice issued in the timologio app."
+msgstr ""
+
+#: .\order\models\order.py:344
+msgid "Invoice number (timologio)"
+msgstr ""
+
+#: .\order\models\order.py:349
+msgid "Series and number of the invoice issued in timologio."
+msgstr ""
+
+#: .\order\models\order.py:352
+msgid "Credit invoice MARK (timologio)"
+msgstr ""
+
+#: .\order\models\order.py:356
+msgid "MARK of a credit invoice issued in timologio for this order."
+msgstr ""
+
+#: .\order\models\order.py:360
+msgid "Credit invoice number (timologio)"
+msgstr ""
+
+#: .\order\models\order.py:365
+msgid "Series and number of that credit invoice."
+msgstr ""
+
+#: .\order\models\retail_credit.py:33
+msgid "Order closed without a sale"
+msgstr ""
+
+#: .\order\models\retail_credit.py:62
+msgid "Credit Counter"
+msgstr ""
+
+#: .\order\models\retail_credit.py:63
+msgid "Credit Counters"
+msgstr ""
+
+#: .\order\models\retail_credit.py:97
+msgid "Credited receipt"
+msgstr ""
+
+#: .\order\models\retail_credit.py:99
+msgid ""
+"The retail receipt (11.1) this document credits; its MARK is sent as the "
+"correlated invoice."
+msgstr ""
+
+#: .\order\models\retail_credit.py:117
+msgid ""
+"The ledger refund this document credits. One document per refund; empty for "
+"the settlement of a closed order."
+msgstr ""
+
+#: .\order\models\retail_credit.py:122
+msgid "Credit Number"
+msgstr ""
+
+#: .\order\models\retail_credit.py:126
+#, python-brace-format
+msgid "Sequential identifier in the form ``CRD-{YEAR}-{NNNNNN}``."
+msgstr ""
+
+#: .\order\models\retail_credit.py:150
+msgid ""
+"``{rate, subtotal, vat, gross}`` rows of what this document credits, frozen "
+"when it was issued."
+msgstr ""
+
+#: .\order\models\retail_credit.py:157
+msgid "Retail Credit Document"
+msgstr ""
+
+#: .\order\models\retail_credit.py:158
+msgid "Retail Credit Documents"
+msgstr ""
+
+#: .\order\tasks.py:1335
+#, python-brace-format
+msgid "Credit receipt {document_number} for your order #{order_id}"
+msgstr ""
+
+#: .\order\tasks.py:1338
+#, python-brace-format
+msgid "Receipt {document_number} for your order #{order_id}"
+msgstr ""
+
+#: .\order\models\invoice.py:127 .\settings.py:3913
+msgid "Receipt Counter"
+msgstr ""
+
+#: .\order\models\invoice.py:128
+msgid "Receipt Counters"
+msgstr ""
+
+#: .\order\models\invoice.py:171
+msgid ""
+"Lifecycle state of the document's AADE myDATA submission. NOT_SENT is the "
+"resting state before it is submitted."
+msgstr ""
+
+#: .\order\models\invoice.py:181
+msgid ""
+"AADE invoiceType code: 11.1 (retail receipt) or 11.4 (retail credit "
+"document)."
+msgstr ""
+
+#: .\order\models\invoice.py:262
+msgid ""
+"Numeric AADE ``errorCode`` from the most recent failed submission (e.g. 101 "
+"XML syntax, 216/217 VAT category). Empty when last attempt succeeded."
+msgstr ""
+
+#: .\order\models\invoice.py:423 .\settings.py:3475 .\settings.py:3964
+msgid "Receipts"
+msgstr ""
+
+#: .\settings.py:3483 .\settings.py:3970
+msgid "Credit Documents"
+msgstr ""

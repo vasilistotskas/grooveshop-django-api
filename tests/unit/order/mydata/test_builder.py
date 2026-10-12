@@ -1,4 +1,4 @@
-"""Unit tests for :func:`order.mydata.builder.build_invoice_xml`.
+"""Unit tests for :func:`order.mydata.builder.build_receipt_xml`.
 
 Focuses on the mapping from ``Invoice`` → ``InvoicesDoc`` XML. Uses
 the real ``OrderFactory`` / ``InvoiceCounter`` path to produce a
@@ -24,7 +24,7 @@ from djmoney.money import Money
 from order.factories.item import OrderItemFactory
 from order.factories.order import OrderFactory
 from order.invoicing import generate_invoice
-from order.mydata.builder import build_invoice_xml
+from order.mydata.builder import build_receipt_xml
 from pay_way.enum.settlement import PaySettlement
 from product.factories.product import ProductFactory
 from vat.factories import VatFactory
@@ -56,7 +56,7 @@ class BuildInvoiceXmlTestCase(TestCase):
             return generate_invoice(order)
 
     def _build(self, invoice):
-        return build_invoice_xml(
+        return build_receipt_xml(
             invoice,
             issuer_vat="123456789",
             issuer_country="GR",
@@ -80,7 +80,7 @@ class BuildInvoiceXmlTestCase(TestCase):
         self.assertEqual(issuer.find(f"{AADE_NS}country").text, "GR")
         self.assertEqual(issuer.find(f"{AADE_NS}branch").text, "0")
 
-    def test_invoice_header_uses_tier_a_defaults(self):
+    def test_invoice_header_carries_the_receipt_identity(self):
         built = self._build(self._issued_invoice())
         root = fromstring(built.xml_bytes)
         header = root.find(_localise("invoice/invoiceHeader"))
@@ -176,9 +176,9 @@ class BuildInvoiceXmlTestCase(TestCase):
         for row in root.findall(_localise("invoice/invoiceDetails")):
             cls = row.find(f"{AADE_NS}incomeClassification")
             self.assertIsNotNone(cls, "invoiceDetails missing classification")
-            # AADE dev verified these are the correct values for
-            # invoiceType 11.1 (retail receipt / Ιδιωτική Πελατεία).
-            # 001/category1_1 is wholesale → error 313 on 11.1.
+            # Goods are category1_1 ("Έσοδα από Πώληση Εμπορευμάτων");
+            # category1_3 is services. AADE's combinations sheet for 11.1
+            # allows category1_1 with E3_561_003 (Ιδιωτική Πελατεία).
             cls_ns = "{https://www.aade.gr/myDATA/incomeClassificaton/v1.0}"
             self.assertEqual(
                 cls.find(f"{cls_ns}classificationType").text,
@@ -186,7 +186,7 @@ class BuildInvoiceXmlTestCase(TestCase):
             )
             self.assertEqual(
                 cls.find(f"{cls_ns}classificationCategory").text,
-                "category1_3",
+                "category1_1",
             )
             self.assertIsNotNone(cls.find(f"{cls_ns}amount").text)
 
@@ -342,15 +342,26 @@ class BuildInvoiceXmlTestCase(TestCase):
                 row.find(f"{AADE_NS}vatExemptionCategory").text, "30"
             )
 
-    # ── Tier B (invoiceType 1.1 — domestic B2B) ──────────────────
+    # ── Retail only: no invoice type 1.1, no counterpart ─────────
 
-    def _b2b_invoice(self, billing_vat: str = "123456789"):
-        """Build a B2B-flagged invoice for routing tests."""
+    def test_receipt_is_always_invoice_type_111(self):
+        built = self._build(self._issued_invoice())
+        self.assertEqual(built.invoice_type, "11.1")
+        root = fromstring(built.xml_bytes)
+        self.assertEqual(
+            root.find(_localise("invoice/invoiceHeader/invoiceType")).text,
+            "11.1",
+        )
+
+    def test_a_billing_vat_number_does_not_turn_a_receipt_into_an_invoice(self):
+        """An invoice order is issued by hand in timologio: whatever the
+        order says about the buyer, the platform's document stays an
+        11.1 with no counterpart."""
         vat = VatFactory(value=24)
         product = ProductFactory(vat=vat)
         order = OrderFactory(
             num_order_items=0,
-            billing_vat_id=billing_vat,
+            billing_vat_id="123456789",
             billing_country="GR",
         )
         OrderItemFactory(
@@ -363,73 +374,17 @@ class BuildInvoiceXmlTestCase(TestCase):
             "order.invoicing._render_pdf_bytes",
             return_value=b"%PDF-1.4 test",
         ):
-            return generate_invoice(order)
-
-    def test_b2b_order_picks_invoice_type_11(self):
-        """Regression: builder routes to 1.1 when buyer has a GR VAT.
-        Previous (Tier A) behaviour hard-coded 11.1 regardless of
-        buyer identity — flipping to 1.1 is the whole point of Tier B."""
-        built = self._build(self._b2b_invoice())
-        self.assertEqual(built.invoice_type, "1.1")
-        root = fromstring(built.xml_bytes)
-        self.assertEqual(
-            root.find(_localise("invoice/invoiceHeader/invoiceType")).text,
-            "1.1",
-        )
-
-    def test_retail_order_stays_invoice_type_111(self):
-        """Orders without billing_vat_id keep the Tier A 11.1 flow."""
-        built = self._build(self._issued_invoice())
+            invoice = generate_invoice(order)
+        built = self._build(invoice)
         self.assertEqual(built.invoice_type, "11.1")
-
-    def test_b2b_emits_counterpart_block(self):
-        """Regression: <counterpart> is REQUIRED for 1.1 (vatNumber +
-        country + branch). 11.1 must NOT emit it (error 220 for GR
-        counterpart name)."""
-        built = self._build(self._b2b_invoice(billing_vat="123456789"))
-        root = fromstring(built.xml_bytes)
-        counterpart = root.find(_localise("invoice/counterpart"))
-        self.assertIsNotNone(counterpart)
-        self.assertEqual(
-            counterpart.find(f"{AADE_NS}vatNumber").text, "123456789"
-        )
-        self.assertEqual(counterpart.find(f"{AADE_NS}country").text, "GR")
-        self.assertEqual(counterpart.find(f"{AADE_NS}branch").text, "0")
-        # AADE error 220 — GR counterpart must NOT carry a name.
-        self.assertIsNone(counterpart.find(f"{AADE_NS}name"))
-
-    def test_retail_omits_counterpart_block(self):
-        built = self._build(self._issued_invoice())
         root = fromstring(built.xml_bytes)
         self.assertIsNone(root.find(_localise("invoice/counterpart")))
 
-    def test_b2b_uses_wholesale_classification_combo(self):
-        """Regression: 1.1 must carry ``E3_561_001`` + ``category1_1``
-        (wholesale). The retail pair ``E3_561_003`` + ``category1_3``
-        triggers AADE error 313 on 1.1."""
-        built = self._build(self._b2b_invoice())
+    def test_receipt_has_no_correlated_invoices(self):
+        built = self._build(self._issued_invoice())
         root = fromstring(built.xml_bytes)
-        cls_ns = "{https://www.aade.gr/myDATA/incomeClassificaton/v1.0}"
-        for row in root.findall(_localise("invoice/invoiceDetails")):
-            cls = row.find(f"{AADE_NS}incomeClassification")
-            self.assertEqual(
-                cls.find(f"{cls_ns}classificationType").text, "E3_561_001"
-            )
-            self.assertEqual(
-                cls.find(f"{cls_ns}classificationCategory").text,
-                "category1_1",
-            )
-
-    def test_normalises_vat_prefix_on_counterpart(self):
-        """Users routinely paste the VIES form (EL137096089) into the
-        VAT field. The builder must strip the prefix before emitting
-        so AADE doesn't reject with error 104 ("Invalid Greek VAT")."""
-        invoice = self._b2b_invoice(billing_vat="EL123456789")
-        built = self._build(invoice)
-        root = fromstring(built.xml_bytes)
-        self.assertEqual(
-            root.find(_localise("invoice/counterpart/vatNumber")).text,
-            "123456789",
+        self.assertIsNone(
+            root.find(_localise("invoice/invoiceHeader/correlatedInvoices"))
         )
 
     def test_shipping_and_payment_fee_emitted_as_detail_lines(self):

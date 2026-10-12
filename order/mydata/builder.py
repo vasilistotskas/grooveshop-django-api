@@ -1,22 +1,24 @@
-"""Build the ``InvoicesDoc`` XML payload from an :class:`Invoice` row.
+"""Build the ``InvoicesDoc`` XML payload for a retail document.
 
-Scope for Tier A: ``invoiceType=11.1`` (Α.Λ.Π. — retail receipt, B2C).
-Structure is driven off the AADE ``myDATA v1.0.10`` XSDs and validated
-against the official error catalogue (PDF bundled under ``docs/``).
+Two documents are issued, both over the ERP ``SendInvoices`` channel:
 
-Element ordering inside ``<invoice>`` is fixed by AADE's schema
-(PDF line 667): ``issuer, counterpart, paymentMethods,
-invoiceHeader, invoiceDetails, taxesTotals, invoiceSummary``. Wrong
-order triggers error 101 (XML syntax / schema).
+* ``invoiceType=11.1`` (Α.Λ.Π. — retail receipt), from an
+  :class:`~order.models.invoice.Invoice`, one line per order item plus
+  shipping and fees (``order.taxation``);
+* ``invoiceType=11.4`` (retail credit document), from a
+  :class:`~order.models.retail_credit.RetailCredit`, one line per VAT rate
+  of what is credited, linked to the receipt's MARK through
+  ``correlatedInvoices``.
 
-Extensibility (Tier B — B2B / credit notes / refunds):
-- Switch ``invoiceType`` based on ``order.document_type`` +
-  buyer-VAT presence.
-- Populate ``counterpart`` with buyer VAT / tax office when issuing
-  1.1 (B2B sales invoice).
-- Pass ``correlatedInvoices`` (inside InvoiceHeader) for 5.1 linked
-  credit notes.
-- Populate ``vatExemptionCategory`` per export / reverse-charge kind.
+Invoices (1.1) and credit invoices (5.1) are not built here: AADE decision
+Α.1128/2025 art. 1(2) takes them off the ERP channel (see
+``order.mydata.types``).
+
+Element ordering inside ``<invoice>`` is fixed by AADE's schema:
+``issuer, counterpart, paymentMethods, invoiceHeader, invoiceDetails,
+taxesTotals, invoiceSummary`` — see the notes at each element for what the
+live API enforces. Wrong order triggers error 101 (XML syntax / schema).
+A retail document carries no ``counterpart``.
 
 Decimal handling follows AADE rules: **2 decimal places, ROUND_HALF_UP,
 and summary totals MUST equal the sum of the rounded line values**
@@ -33,17 +35,16 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
+from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 from xml.etree.ElementTree import Element, SubElement, tostring
 
 from order.mydata.types import (
-    CLASSIFICATION_CATEGORY_B2B_MERCHANDISE,
     CLASSIFICATION_CATEGORY_GOODS_SALES,
-    CLASSIFICATION_TYPE_B2B_DOMESTIC,
     CLASSIFICATION_TYPE_RETAIL_GOODS,
-    INVOICE_TYPE_B2B_SALES,
-    INVOICE_TYPE_B2C_RETAIL,
+    INVOICE_TYPE_RETAIL_CREDIT,
+    INVOICE_TYPE_RETAIL_RECEIPT,
     PAYMENT_METHOD_CASH,
     PAYMENT_METHOD_POS_CARD,
     PAYMENT_METHOD_WEB_BANKING,
@@ -126,7 +127,7 @@ def _emit_detail(
     """Append one fully-populated ``<invoiceDetails>`` row.
 
     Includes the mandatory ``<incomeClassification>`` per AADE error
-    314 (every 11.1/1.1 line needs a classification) and the
+    314 (every line needs a classification) and the
     ``<vatExemptionCategory>`` disambiguator required when
     ``vatCategory=7`` (error 217)."""
     row = SubElement(parent, "invoiceDetails")
@@ -188,81 +189,6 @@ class BuiltInvoice:
     invoice_type: str
     series: str
     aa: int
-
-
-def _normalise_buyer_vat(raw: str) -> str:
-    """Strip optional ``EL`` / ``GR`` prefix from a Greek ΑΦΜ.
-
-    AADE rejects prefixed VATs with error 104 ("Invalid Greek VAT
-    number"), but users routinely enter the VIES form. Normalising
-    once here keeps the rest of the pipeline assumption-free."""
-    cleaned = (raw or "").strip().upper()
-    if cleaned.startswith(("EL", "GR")):
-        cleaned = cleaned[2:]
-    return cleaned.strip()
-
-
-def _pick_invoice_type(order: Any, issuer_country: str) -> str:
-    """Determine the AADE ``invoiceType`` from Order state.
-
-    Tier B supports only 11.1 (B2C retail) and 1.1 (domestic B2B).
-    Intra-EU (1.2) and third-country (1.3) are deferred to Tier C
-    because they additionally need reverse-charge VAT exemption
-    handling and classification swaps (``E3_561_005`` / ``006``).
-    """
-    buyer_vat = _normalise_buyer_vat(getattr(order, "billing_vat_id", "") or "")
-    if not buyer_vat:
-        return INVOICE_TYPE_B2C_RETAIL
-    buyer_country = (
-        (getattr(order, "billing_country", "") or "").strip().upper()
-    )
-    # An empty buyer_country defaults to the issuer's country — most
-    # GR e-commerce B2B orders leave it blank and are domestic by
-    # default.
-    effective_buyer_country = buyer_country or issuer_country.upper()
-    if effective_buyer_country == issuer_country.upper():
-        return INVOICE_TYPE_B2B_SALES
-    # Non-domestic B2B: out of scope for Tier B. Fall back to 11.1
-    # (receipt) rather than guessing 1.2/1.3 wrong. The service layer
-    # blocks ``document_type=INVOICE + foreign VAT`` upstream so this
-    # branch is defence in depth only.
-    return INVOICE_TYPE_B2C_RETAIL
-
-
-def _classification_pair_for(invoice_type: str) -> tuple[str, str]:
-    """Return the ``(classificationType, classificationCategory)``
-    that AADE requires for the given ``invoiceType``."""
-    if invoice_type == INVOICE_TYPE_B2B_SALES:
-        return (
-            CLASSIFICATION_TYPE_B2B_DOMESTIC,
-            CLASSIFICATION_CATEGORY_B2B_MERCHANDISE,
-        )
-    # Default: 11.1 retail.
-    return (
-        CLASSIFICATION_TYPE_RETAIL_GOODS,
-        CLASSIFICATION_CATEGORY_GOODS_SALES,
-    )
-
-
-def _emit_counterpart(
-    parent: Element,
-    *,
-    vat_number: str,
-    country: str,
-    issuer_country: str,
-    branch: int = 0,
-) -> None:
-    """Append a ``<counterpart>`` block for B2B invoices.
-
-    Per AADE v1.0.10 §5.1 + error 220: ``<name>`` is FORBIDDEN when
-    the counterpart country equals the issuer's (Greek party
-    emitting to a Greek party). Only vatNumber/country/branch are
-    sent for domestic B2B. Tier C will extend this for non-GR
-    counterparts that need ``<name>`` and ``<address>``."""
-    counterpart = SubElement(parent, "counterpart")
-    SubElement(counterpart, "vatNumber").text = vat_number
-    SubElement(counterpart, "country").text = country.upper()
-    SubElement(counterpart, "branch").text = str(branch)
 
 
 def _pick_payment_type(invoice: Any) -> int:
@@ -347,7 +273,52 @@ def _payment_rows(invoice: Any) -> list[tuple[int, Decimal]]:
     return rows
 
 
-def build_invoice_xml(
+@dataclass(frozen=True)
+class _Line:
+    """One ``invoiceDetails`` row: a rate and its net and VAT, to the cent."""
+
+    rate: Decimal
+    net: Decimal
+    vat: Decimal
+
+    @property
+    def gross(self) -> Decimal:
+        return self.net + self.vat
+
+
+def _receipt_lines(invoice: Any) -> list[_Line]:
+    """The receipt's lines — the PDF's lines, one rule for both documents
+    (``order.taxation``): goods at the rate snapshotted on each item, then
+    shipping and the payment-method fee at the rate(s) of the goods they
+    travel with. Order-level discounts are already allocated across the
+    goods; gift-card amounts are payment and never reduce a taxable
+    value."""
+    return [
+        _Line(rate=line.rate, net=line.net, vat=line.vat)
+        for line in order_vat_lines(invoice.order)
+    ]
+
+
+def _credit_lines(credit: Any) -> list[_Line]:
+    """The credit document's lines: the VAT breakdown frozen on the row when
+    it was issued (``order.credit_documents``), so a retry sends exactly
+    what the first attempt did."""
+    return [
+        _Line(
+            rate=Decimal(row["rate"]),
+            net=Decimal(row["subtotal"]),
+            vat=Decimal(row["vat"]),
+        )
+        for row in credit.vat_breakdown
+    ]
+
+
+def _credit_payment_rows(credit: Any) -> list[tuple[int, Decimal]]:
+    """One row for the whole credited amount, by how the order was paid."""
+    return [(_pick_payment_type(credit), Decimal(credit.total.amount))]
+
+
+def build_receipt_xml(
     invoice: Any,
     *,
     issuer_vat: str,
@@ -355,40 +326,94 @@ def build_invoice_xml(
     branch: int,
     series_prefix: str,
 ) -> BuiltInvoice:
-    """Return the ``InvoicesDoc`` XML for a single :class:`Invoice`.
+    """The ``InvoicesDoc`` for an order's retail receipt (11.1).
 
     Caller is responsible for passing the resolved seller identity —
     we don't read ``invoice.seller_snapshot`` here so this function
     stays testable without spinning up the full settings stack.
 
-    :param invoice: Persisted ``Invoice`` row with ``vat_breakdown`` /
-        ``totals`` already populated.
+    :param invoice: Persisted ``Invoice`` row.
     :param issuer_vat: Seller ΑΦΜ (no country prefix).
     :param issuer_country: ISO 3166-1 alpha-2 country code (``GR``).
     :param branch: AADE branch number — 0 for main branch.
     :param series_prefix: Configured series prefix; combined with the
-        invoice year to form ``series``.
+        document year to form ``series``.
     """
-    order = invoice.order
-    invoice_type = _pick_invoice_type(order, issuer_country=issuer_country)
-    year = invoice.issue_date.year
+    return _build(
+        invoice,
+        invoice_type=INVOICE_TYPE_RETAIL_RECEIPT,
+        lines=_receipt_lines(invoice),
+        payment_rows=_payment_rows(invoice),
+        correlated_mark=None,
+        issuer_vat=issuer_vat,
+        issuer_country=issuer_country,
+        branch=branch,
+        series_prefix=series_prefix,
+    )
+
+
+def build_credit_xml(
+    credit: Any,
+    *,
+    issuer_vat: str,
+    issuer_country: str,
+    branch: int,
+    series_prefix: str,
+) -> BuiltInvoice:
+    """The ``InvoicesDoc`` for a retail credit document (11.4), correlated
+    to the MARK of the receipt it credits (``correlatedInvoices``).
+
+    A credit without that MARK is refused here: AADE cannot link it, and
+    the caller waits for the receipt to be registered first.
+    """
+    mark = credit.invoice.mydata_mark
+    if not mark:
+        raise ValueError(
+            f"Receipt {credit.invoice.invoice_number} has no MARK to "
+            "correlate the credit document to."
+        )
+    return _build(
+        credit,
+        invoice_type=INVOICE_TYPE_RETAIL_CREDIT,
+        lines=_credit_lines(credit),
+        payment_rows=_credit_payment_rows(credit),
+        correlated_mark=mark,
+        issuer_vat=issuer_vat,
+        issuer_country=issuer_country,
+        branch=branch,
+        series_prefix=series_prefix,
+    )
+
+
+def _build(
+    document: Any,
+    *,
+    invoice_type: str,
+    lines: list[_Line],
+    payment_rows: list[tuple[int, Decimal]],
+    correlated_mark: int | None,
+    issuer_vat: str,
+    issuer_country: str,
+    branch: int,
+    series_prefix: str,
+) -> BuiltInvoice:
+    issue_date: date = document.issue_date
+    year = issue_date.year
     # Reuse the persisted ``mydata_series`` on a resubmission (mirrors the
     # ``mydata_aa`` reuse below). Recomputing it from the live
     # ``series_prefix`` would change the ``uid`` if the prefix config was
     # edited between the first submission and a retry, defeating AADE's 228
-    # duplicate-uid dedup (G0265). NOTE: ``branch`` also feeds the uid and is
-    # not persisted, so it must not change between submit and resubmit.
-    series = invoice.mydata_series or f"{series_prefix}-{year}"
-    # ``aa`` is the per-year sequential integer; ``InvoiceCounter``
-    # already owns it, so reuse ``mydata_aa`` if pre-allocated (on
-    # resubmission) else derive from the counter number baked into
-    # ``invoice_number``.
-    aa = invoice.mydata_aa or _derive_aa_from_invoice_number(
-        invoice.invoice_number
+    # duplicate-uid dedup. NOTE: ``branch`` also feeds the uid and is not
+    # persisted, so it must not change between submit and resubmit.
+    series = document.mydata_series or f"{series_prefix}-{year}"
+    # ``aa`` is the per-year sequential integer its counter owns, baked into
+    # the document number; reuse ``mydata_aa`` once pre-allocated.
+    aa = document.mydata_aa or _derive_aa_from_document_number(
+        document.document_number
     )
     uid = build_uid(
         issuer_vat=issuer_vat,
-        issue_date=invoice.issue_date,
+        issue_date=issue_date,
         branch=branch,
         invoice_type=invoice_type,
         series=series,
@@ -397,84 +422,52 @@ def build_invoice_xml(
 
     # The official AADE namespace is MANDATORY — without it the
     # server can't match any element against the XSD and returns
-    # error 101 for every tag ("Could not find schema information
-    # for the element 'X'"). Kept as a literal string rather than
-    # a module-level constant so the schema version bump (v1.0.10 →
-    # v1.0.12) is a single textual change.
+    # error 101 for every tag.
     root = Element(
         "InvoicesDoc",
         {"xmlns": "http://www.aade.gr/myDATA/invoice/v1.0"},
     )
     invoice_el = SubElement(root, "invoice")
 
-    # ── issuer ──────────────────────────────────────────────────
     issuer = SubElement(invoice_el, "issuer")
     SubElement(issuer, "vatNumber").text = issuer_vat
     SubElement(issuer, "country").text = issuer_country
     SubElement(issuer, "branch").text = str(branch)
 
-    # ── counterpart (B2B only) ──────────────────────────────────
-    # 11.1 retail must NOT emit counterpart (AADE error 220 for
-    # Greek counterpart name, plus "forbidden for invoice type"
-    # errors on other counterpart fields). 1.1 B2B REQUIRES it
-    # — without vatNumber + country the invoice is malformed.
-    if invoice_type == INVOICE_TYPE_B2B_SALES:
-        buyer_vat = _normalise_buyer_vat(
-            getattr(order, "billing_vat_id", "") or ""
-        )
-        buyer_country = (
-            getattr(order, "billing_country", "") or ""
-        ).strip().upper() or issuer_country.upper()
-        _emit_counterpart(
-            invoice_el,
-            vat_number=buyer_vat,
-            country=buyer_country,
-            issuer_country=issuer_country,
-        )
-
-    # ── invoiceHeader ───────────────────────────────────────────
     # Actual XSD sequence (verified via live AADE dev response): the
     # PDF field-list table orders things differently to the XSD, so
     # don't be fooled by docs — ``invoiceHeader`` must come BEFORE
-    # ``paymentMethods`` (error 101 otherwise, with a helpful
-    # "expected invoiceHeader" message).
+    # ``paymentMethods`` (error 101 otherwise). Inside the header,
+    # ``correlatedInvoices`` follows ``currency``.
     header = SubElement(invoice_el, "invoiceHeader")
     SubElement(header, "series").text = series
     SubElement(header, "aa").text = str(aa)
-    SubElement(header, "issueDate").text = invoice.issue_date.isoformat()
+    SubElement(header, "issueDate").text = issue_date.isoformat()
     SubElement(header, "invoiceType").text = invoice_type
-    SubElement(header, "currency").text = invoice.currency or "EUR"
+    SubElement(header, "currency").text = document.currency or "EUR"
+    if correlated_mark is not None:
+        SubElement(header, "correlatedInvoices").text = str(correlated_mark)
 
-    # ── paymentMethods ──────────────────────────────────────────
-    # One row per settlement source; amounts MUST sum to
-    # totalGrossValue (AADE multi-payment rule).
+    # One row per settlement source; amounts MUST sum to totalGrossValue.
     pm_container = SubElement(invoice_el, "paymentMethods")
-    for payment_type, payment_amount in _payment_rows(invoice):
+    for payment_type, payment_amount in payment_rows:
         pm_row = SubElement(pm_container, "paymentMethodDetails")
         SubElement(pm_row, "type").text = str(payment_type)
         SubElement(pm_row, "amount").text = _money(payment_amount)
 
-    # ── invoiceDetails ──────────────────────────────────────────
-    # Accumulate rounded per-line totals + per-classification sums so
-    # the summary numbers we emit exactly match the sum of the lines
-    # the server sees (avoids errors 203 / 207–210). Shipping and
-    # payment-method fees are emitted as extra lines so
-    # ``paymentMethods.amount`` still equals the invoice gross.
+    # Accumulate the rounded per-line totals so the summary numbers we emit
+    # exactly match the sum of the lines the server sees (errors 203 /
+    # 207-210).
     summed_net = Decimal(0)
     summed_vat = Decimal(0)
     summed_gross = Decimal(0)
     classification_totals: dict[tuple[str, str], Decimal] = defaultdict(
         lambda: Decimal(0)
     )
-    cls_type, cls_category = _classification_pair_for(invoice_type)
+    cls_type = CLASSIFICATION_TYPE_RETAIL_GOODS
+    cls_category = CLASSIFICATION_CATEGORY_GOODS_SALES
 
-    # The lines are the PDF invoice's lines — one rule for both documents
-    # (``order.taxation``): goods at the rate snapshotted on each item,
-    # then shipping and the payment-method fee at the rate(s) of the
-    # goods they travel with. Order-level discounts are already allocated
-    # across the goods; gift-card amounts are payment and never reduce a
-    # taxable value.
-    for line_number, line in enumerate(order_vat_lines(invoice.order), start=1):
+    for line_number, line in enumerate(lines, start=1):
         _emit_detail(
             invoice_el,
             line_number=line_number,
@@ -489,11 +482,9 @@ def build_invoice_xml(
         summed_gross += line.gross
         classification_totals[(cls_type, cls_category)] += line.net
 
-    # (taxesTotals is omitted for 11.1 — only non-VAT document-level
-    # taxes populate it. Leaving it out means AADE derives document-
-    # level tax totals from the per-line columns.)
-
-    # ── invoiceSummary ──────────────────────────────────────────
+    # (taxesTotals is omitted: only non-VAT document-level taxes populate
+    # it. Leaving it out means AADE derives document-level tax totals from
+    # the per-line columns.)
     summary = SubElement(invoice_el, "invoiceSummary")
     SubElement(summary, "totalNetValue").text = _money(summed_net)
     SubElement(summary, "totalVatAmount").text = _money(summed_vat)
@@ -503,12 +494,8 @@ def build_invoice_xml(
     SubElement(summary, "totalOtherTaxesAmount").text = "0.00"
     SubElement(summary, "totalDeductionsAmount").text = "0.00"
     SubElement(summary, "totalGrossValue").text = _money(summed_gross)
-    # Aggregate classification block MUST mirror the sums of the
-    # per-line entries by (classificationType, classificationCategory).
-    # Tier B still emits a single combo per invoice (retail OR B2B),
-    # so this loop runs once; the data structure is ready for Tier C
-    # where mixed baskets (e.g. goods + services) will produce
-    # multiple rows.
+    # The aggregate classification block mirrors the sums of the per-line
+    # entries by (classificationType, classificationCategory).
     for (type_code, category_code), amount in classification_totals.items():
         _emit_income_classification(
             summary,
@@ -527,12 +514,13 @@ def build_invoice_xml(
     )
 
 
-def _derive_aa_from_invoice_number(invoice_number: str) -> int:
-    """Extract the integer ``aa`` from ``INV-YYYY-NNNNNN``.
+def _derive_aa_from_document_number(number: str) -> int:
+    """Extract the integer ``aa`` from ``INV-YYYY-NNNNNN`` (or the credit
+    ``CRD-YYYY-NNNNNN``).
 
-    The counter stores it as a plain int; our ``invoice_number`` is
-    the display form. Raises ``ValueError`` on malformed input — a
-    bug, not a recoverable situation.
+    The counter stores it as a plain int; the document number is the
+    display form. Raises ``ValueError`` on malformed input: a bug, not a
+    recoverable situation.
     """
-    tail = invoice_number.rsplit("-", 1)[-1]
+    tail = number.rsplit("-", 1)[-1]
     return int(tail)

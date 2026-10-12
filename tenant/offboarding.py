@@ -219,13 +219,16 @@ def latest_invoice_year(schema_name: str) -> int | None:
     try:
         with schema_context(schema_name):
             from order.models.invoice import Invoice
+            from order.models.retail_credit import RetailCredit
 
-            latest = (
-                Invoice.objects.exclude(document_file="")
+            dates = [
+                model.objects.exclude(document_file="")
                 .order_by("-issue_date")
                 .values_list("issue_date", flat=True)
                 .first()
-            )
+                for model in (Invoice, RetailCredit)
+            ]
+            latest = max((d for d in dates if d is not None), default=None)
     except Exception:
         logger.exception(
             "Offboarding: could not read invoices for tenant %s; assuming "

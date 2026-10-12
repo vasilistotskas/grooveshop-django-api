@@ -1,11 +1,18 @@
-"""Invoice generation service.
+"""Retail receipt generation service.
 
-Given an :class:`Order`, this module renders a Greek-tax-law compliant
-PDF invoice, allocates an atomic sequential number via
-:class:`InvoiceCounter`, and stores the result in private media. The
-customer-facing download goes through ``OrderViewSet.invoice_download``
-which streams the bytes via Django auth — no raw storage URLs are
-ever exposed to clients.
+Given an :class:`Order`, this module renders the PDF of its retail receipt
+(the platform's myDATA 11.1 document, issued when the order ships),
+allocates an atomic sequential number via :class:`InvoiceCounter`, and
+stores the result in private media. The customer-facing download goes
+through ``OrderViewSet.invoice_download`` which streams the bytes via
+Django auth — no raw storage URLs are ever exposed to clients. The PDF of
+a retail credit document (11.4) is rendered here too
+(:func:`render_credit_pdf`).
+
+The platform issues no invoice (Τιμολόγιο): from 2.11.2026 AADE decision
+Α.1128/2025 requires invoices to come from a licensed provider or AADE's
+timologio app, so ``document_type=INVOICE`` orders never reach this
+module (see ``order.mydata.types``).
 
 The heavy lifting is split into small helpers so the unit tests can
 pin ``_compute_vat_breakdown`` and ``_build_context`` without spinning
@@ -44,8 +51,11 @@ from extra_settings.models import Setting
 from core.utils.i18n import get_order_language
 from core.utils.tenant_urls import get_tenant_frontend_url
 from order.discounts import order_discount_total
+from order.enum.document_type import OrderDocumentTypeEnum
+from order.enum.status import OrderStatus
 from order.models.invoice import Invoice, InvoiceCounter
 from order.models.order import Order
+from order.models.retail_credit import RetailCredit
 from order.taxation import breakdown_by_rate, order_vat_lines
 from pay_way.enum.pay_way import PayWayEnum
 from tenant.credentials import tenant_contact_email, tenant_site_name
@@ -60,6 +70,30 @@ logger = logging.getLogger(__name__)
 from tenant.legal_identity import SELLER_SETTING_KEYS  # noqa: E402
 
 INVOICE_SELLER_SETTING_KEYS = SELLER_SETTING_KEYS
+
+
+#: Statuses from which a retail receipt may be issued: the goods are on
+#: their way or were. ΕΛΠ art. 13(a) dates the receipt to "the delivery or
+#: the start of the shipment", so SHIPPED is where it is issued; the later
+#: ones are for an order whose receipt was missed.
+RECEIPT_ISSUING_STATUSES = frozenset(
+    {
+        OrderStatus.SHIPPED,
+        OrderStatus.DELIVERED,
+        OrderStatus.COMPLETED,
+        OrderStatus.RETURNED,
+    }
+)
+
+
+def receipt_issuable(order: Order) -> bool:
+    """True when the platform issues this order's retail receipt now: a
+    receipt order (an invoice order never gets one) whose goods have
+    shipped."""
+    return (
+        order.document_type == OrderDocumentTypeEnum.RECEIPT.value
+        and order.status in RECEIPT_ISSUING_STATUSES
+    )
 
 
 def _seller_snapshot() -> dict[str, str]:
@@ -84,13 +118,11 @@ def _seller_snapshot() -> dict[str, str]:
 
 def _buyer_snapshot(order: Order) -> dict[str, str]:
     """Capture the buyer fields at issue time (order state is mutable
-    until the invoice is frozen).
+    until the document is frozen).
 
-    Company requisites (Επωνυμία / ΑΦΜ / ΔΟΥ / activity + the
-    registered address) render the B2B block on the PDF; blank on
-    legacy rows and retail receipts, so the template guards on
-    presence. Billing address falls back to the shipping address for
-    orders created before the billing columns existed.
+    ΕΛΠ art. 12(4) has the seller keep the customer's name and address for
+    every credit document above EUR 50: the credit documents render this
+    snapshot, taken with the receipt they credit.
     """
     return {
         "name": f"{order.first_name} {order.last_name}".strip(),
@@ -106,19 +138,6 @@ def _buyer_snapshot(order: Order) -> dict[str, str]:
         "region": (order.region.name if order.region_id else "")
         if hasattr(order, "region")
         else "",
-        "company_name": order.billing_company_name,
-        "vat_id": order.billing_vat_id,
-        "tax_office": order.billing_tax_office,
-        "activity": order.billing_activity,
-        # ISO code of the buyer's TAX country (may differ from the
-        # shipping country the ``country`` key above renders).
-        "billing_country": order.billing_country,
-        "billing_address_line_1": (
-            f"{order.billing_street} {order.billing_street_number}".strip()
-            or f"{order.street} {order.street_number}".strip()
-        ),
-        "billing_city": order.billing_city or order.city,
-        "billing_postal_code": order.billing_zipcode or order.zipcode,
     }
 
 
@@ -305,6 +324,8 @@ def _build_context(
     )
     return {
         "invoice": invoice,
+        "document_number": invoice.invoice_number,
+        "is_credit": False,
         "order": order,
         "items": _render_items(order),
         "seller": invoice.seller_snapshot,
@@ -466,3 +487,56 @@ def generate_invoice(order: Order, *, force: bool = False) -> Invoice:
         len(pdf_bytes),
     )
     return invoice
+
+
+def render_credit_pdf(credit: RetailCredit) -> RetailCredit:
+    """Render (or re-render) the PDF of a credit document and store it.
+
+    The totals and the VAT table are the ones frozen on the row, the
+    parties are the receipt's snapshots, and the QR carries AADE's own URL
+    once the document is registered. Like :func:`generate_invoice` the
+    render runs with no transaction open, and the stale file is removed
+    first so the replacement lands at the same storage key.
+    """
+    order = credit.order
+    invoice = credit.invoice
+    language = get_order_language(order)
+    qr_target_url = credit.mydata_qr_url or _verification_url(
+        order, language=language
+    )
+    context = {
+        "invoice": credit,
+        "document_number": credit.credit_number,
+        "is_credit": True,
+        "credited_invoice": invoice,
+        "order": order,
+        "items": [],
+        "seller": invoice.seller_snapshot,
+        "buyer": invoice.buyer_snapshot,
+        "vat_breakdown": _vat_breakdown_for_render(credit.vat_breakdown),
+        "totals": {
+            "subtotal": credit.subtotal.amount,
+            "total_vat": credit.total_vat.amount,
+            "total": credit.total.amount,
+        },
+        "currency": credit.currency,
+        "pay_way_name": _pay_way_display(order),
+        "verification_url": qr_target_url,
+        "qr_svg": _build_qr_svg(qr_target_url),
+        "mydata_mark": credit.mydata_mark,
+    }
+    with translation_override(language):
+        pdf_bytes = _render_pdf_bytes(context)
+    if credit.document_file:
+        credit.document_file.delete(save=False)
+    credit.document_file.save(
+        f"{credit.credit_number}.pdf", ContentFile(pdf_bytes), save=False
+    )
+    credit.save(update_fields=["document_file"])
+    logger.info(
+        "Rendered credit document %s for order %s (%s bytes)",
+        credit.credit_number,
+        order.id,
+        len(pdf_bytes),
+    )
+    return credit

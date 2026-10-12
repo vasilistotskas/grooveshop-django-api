@@ -26,12 +26,12 @@ What each account gets:
 
   - the shopper: fourteen orders across every status, with the ACS and
     BoxNow rows (and tracking events) an order in that state really has,
-    invoices, a redeemed coupon, a part-spent gift card, a loyalty ledger
+    receipts, a redeemed coupon, a part-spent gift card, a loyalty ledger
     that makes the account Silver, five notifications and a Cyprus
     address;
   - the buyer: an approved business profile on the wholesale group's
     price list (a VAT number that cannot belong to anyone) and a few
-    invoiced orders. It signs in with the login the store already
+    invoice-type orders. It signs in with the login the store already
     publishes — there is no third credential.
 
 Orders are written with `bulk_create` and backdated, never through
@@ -39,7 +39,7 @@ Orders are written with `bulk_create` and backdated, never through
 must not send a confirmation email, must not move stock, and must not
 enter the state machine — it is a fixture, not a sale. The same goes for
 everything that hangs off one: the carrier rows are written directly and
-never reach a carrier, the invoice is issued by `generate_invoice` and
+never reach a carrier, a retail receipt is issued by `generate_invoice` and
 not by the task that emails and submits it to myDATA, and the
 notifications skip the `post_save` that would push them to a socket.
 """
@@ -522,8 +522,8 @@ WHOLESALE_ACTIVITY = "Χονδρικό εμπόριο αξεσουάρ κινη�
 WHOLESALE_BILLING = ("Λεωφόρος Νίκης", "12", "Θεσσαλονίκη", "54621")
 
 #: A few orders on the group's price list, paid the ways the store
-#: really offers (a card online, cash to the courier); the invoice is the
-#: document a business needs.
+#: really offers (a card online, cash to the courier). A business's invoice is
+#: issued by hand in timologio, so the platform seeds no document for them.
 WHOLESALE_ORDERS: tuple[OrderRow, ...] = (
     OrderRow(
         status="PROCESSING",
@@ -552,7 +552,6 @@ WHOLESALE_ORDERS: tuple[OrderRow, ...] = (
             "acs", "delivered", "DEMO0000001009", _ACS_STATION
         ),
         shipping_price="0.00",
-        invoice=True,
     ),
     OrderRow(
         status="COMPLETED",
@@ -568,7 +567,6 @@ WHOLESALE_ORDERS: tuple[OrderRow, ...] = (
             "acs", "delivered", "DEMO0000001024", _ACS_STATION_ATHENS
         ),
         shipping_price="0.00",
-        invoice=True,
     ),
 )
 

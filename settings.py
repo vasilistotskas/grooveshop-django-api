@@ -2392,13 +2392,13 @@ EXTRA_SETTINGS_DEFAULTS = [
         "name": "MYDATA_ENABLED",
         "type": "bool",
         "value": False,
-        "description": "Master toggle. When off the integration is a pure no-op.",
+        "description": "Master toggle for the retail documents the platform issues over the myDATA ERP channel (receipt 11.1 when an order ships, credit document 11.4 for a refund). When off the integration is a pure no-op. Invoices are never issued here: staff issue them in AADE's timologio app.",
     },
     {
         "name": "MYDATA_AUTO_SUBMIT",
         "type": "bool",
         "value": False,
-        "description": "If true, submit the invoice automatically once the PDF is rendered. Otherwise submission happens only via the admin action.",
+        "description": "If true, the platform issues its retail documents by itself: the receipt when an order ships, a credit document when money goes back. Otherwise they are issued only through the order's admin actions.",
     },
     {
         "name": "MYDATA_ENVIRONMENT",
@@ -2411,6 +2411,12 @@ EXTRA_SETTINGS_DEFAULTS = [
         "type": "string",
         "value": "GRVP",
         "description": "Prefix for the AADE series code. Combined with the issuer VAT + year to form e.g. 'GRVP-2026'.",
+    },
+    {
+        "name": "MYDATA_CREDIT_SERIES_PREFIX",
+        "type": "string",
+        "value": "GRVC",
+        "description": "Prefix for the AADE series code of the retail credit documents (11.4), which are a gapless series of their own. Combined with the year to form e.g. 'GRVC-2026'.",
     },
     {
         "name": "MYDATA_ISSUER_BRANCH",
@@ -3475,10 +3481,18 @@ UNFOLD = {
                         "badge_variant": "warning",
                     },
                     {
-                        "title": _("Invoices"),
+                        "title": _("Receipts"),
                         "icon": "receipt",
                         "link": reverse_lazy(
                             "admin:order_invoice_changelist",
+                            urlconf=ROOT_URLCONF,
+                        ),
+                    },
+                    {
+                        "title": _("Credit Documents"),
+                        "icon": "assignment_return",
+                        "link": reverse_lazy(
+                            "admin:order_retailcredit_changelist",
                             urlconf=ROOT_URLCONF,
                         ),
                     },
@@ -3905,10 +3919,19 @@ UNFOLD = {
                                 "permission": "admin.permissions.is_superuser",
                             },
                             {
-                                "title": _("Invoice Counter"),
+                                "title": _("Receipt Counter"),
                                 "icon": "tag",
                                 "link": reverse_lazy(
                                     "admin:order_invoicecounter_changelist",
+                                    urlconf=ROOT_URLCONF,
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                            {
+                                "title": _("Credit Counter"),
+                                "icon": "tag",
+                                "link": reverse_lazy(
+                                    "admin:order_creditcounter_changelist",
                                     urlconf=ROOT_URLCONF,
                                 ),
                                 "permission": "admin.permissions.is_superuser",
@@ -3934,6 +3957,7 @@ UNFOLD = {
             "models": [
                 "order.order",
                 "order.invoice",
+                "order.retailcredit",
                 "order.stocklog",
                 "order.orderhistory",
                 "order.orderitemhistory",
@@ -3946,9 +3970,16 @@ UNFOLD = {
                     ),
                 },
                 {
-                    "title": _("Invoices"),
+                    "title": _("Receipts"),
                     "link": reverse_lazy(
                         "admin:order_invoice_changelist", urlconf=ROOT_URLCONF
+                    ),
+                },
+                {
+                    "title": _("Credit Documents"),
+                    "link": reverse_lazy(
+                        "admin:order_retailcredit_changelist",
+                        urlconf=ROOT_URLCONF,
                     ),
                 },
                 {

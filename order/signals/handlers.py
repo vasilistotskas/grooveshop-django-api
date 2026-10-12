@@ -11,16 +11,17 @@ from djmoney.money import Money
 from djstripe.event_handlers import djstripe_receiver
 from djstripe.models import Event
 
-from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.status import (
     SETTLED_PAYMENT_STATUSES,
     OrderStatus,
     PaymentStatus,
 )
+from order.invoicing import receipt_issuable
 from order.models.history import OrderHistory, OrderItemHistory
 from order.models.item import OrderItem
 from order.models.order import Order
 from order.models.payment_transaction import PaymentTransaction
+from order.mydata.config import load_config as load_mydata_config
 from order.notifications import (
     notify_order_created_live,
     notify_order_refunded_live,
@@ -46,6 +47,7 @@ from order.signals import (
 from order.signals._tenant import with_tenant_schema_from_event
 from order.tasks import (
     generate_order_invoice,
+    issue_pending_credits,
     push_order_event_to_gateway,
     send_admin_new_order_email,
     send_dispute_notification_email,
@@ -177,10 +179,28 @@ def handle_order_post_save(
         hasattr(instance, "_original_payment_status")
         and instance._original_payment_status != instance.payment_status
     )
+    # An order whose payment closed without a sale (a collect-on-delivery
+    # parcel that came back, ``Order.settle_unpaid_payment``) owes its
+    # receipt a credit document if the receipt was already issued.
+    if (
+        payment_status_changed
+        and instance.payment_status == PaymentStatus.CANCELED
+    ):
+        _dispatch_credit_documents(instance)
+
     if settings.AGENT_GATEWAY_INTERNAL_URL and (
         status_changed or payment_status_changed or tracking_dispatched
     ):
         dispatch_on_commit(push_order_event_to_gateway, [instance.id])
+
+
+def _dispatch_credit_documents(order: Order) -> None:
+    """Issue the order's retail credit documents, when the platform issues
+    its retail documents by itself (``MYDATA_AUTO_SUBMIT``). Idempotent on
+    the receiving side: nothing is owed until the order's receipt is
+    registered, and each refund is credited once."""
+    if load_mydata_config().issues_automatically():
+        dispatch_on_commit(issue_pending_credits, [order.id])
 
 
 def _cart_for_order(order: Order):
@@ -569,6 +589,11 @@ def handle_order_shipped(
     # Email is sent by handle_order_status_changed via
     # send_order_status_update_email (uses the shipped template)
 
+    # The retail receipt is issued when the shipment starts (ΕΛΠ art.
+    # 13(a)). Idempotent: ``generate_order_invoice`` issues it once.
+    if receipt_issuable(order) and load_mydata_config().issues_automatically():
+        dispatch_on_commit(generate_order_invoice, [order.id])
+
 
 @receiver(order_delivered, dispatch_uid="order.handle_order_delivered")
 def handle_order_delivered(
@@ -664,9 +689,6 @@ def handle_order_completed(
 ) -> None:
     """Handle order completed signal."""
     try:
-        if order.document_type == OrderDocumentTypeEnum.INVOICE.value:
-            dispatch_on_commit(generate_order_invoice, [order.id])
-
         OrderHistory.log_note(order=order, note="Order completed")
 
         logger.info("Order %s marked as completed", order.id)
@@ -712,6 +734,11 @@ def handle_order_refunded(
         # notification which is account-bound, the email uses
         # ``order.email`` as the recipient.
         dispatch_on_commit(send_refund_confirmation_email, [refund.pk])
+
+        # The refund's retail credit document (ΕΛΠ art. 12(4)), linked to
+        # the receipt's MARK. Every refund path signals here once per
+        # ledger row, which is what makes it one document per refund.
+        _dispatch_credit_documents(order)
 
         logger.info("Order %s refunded", order.id)
 

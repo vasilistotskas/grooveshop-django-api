@@ -3,6 +3,49 @@
 
 
 
+## v3.107.0 (2026-10-12)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.106.4 [skip ci] ([`767c589`](https://github.com/vasilistotskas/grooveshop-django-api/commit/767c5896ffad58689e110b56c739ae2c1f44ff0c))
+
+### Features
+
+* feat(tenant): encrypt merchant secrets at rest (#161)
+
+Add EncryptedCharField (core/db/encrypted_fields.py), a model field built
+on cryptography's MultiFernet. FIELD_ENCRYPTION_KEYS is an ordered list
+read from the environment: the first key encrypts, every key decrypts,
+and production/staging refuse to start without a valid one. The empty
+string is stored as the empty string, so "is it configured" checks and
+exclude(field="") keep working.
+
+The thirteen Tenant secret columns now map onto new <name>_encrypted text
+columns through that field; attribute names are unchanged, so callers
+read and write plain strings. Expand migration 0050 adds the columns with
+a DB default, gives the old plaintext columns a DB default, encrypts the
+existing values into the new columns (idempotent) and switches the model
+state, leaving the old columns for the contract release because the
+previous release still reads them.
+
+Also:
+- move the myDATA credentials from per-schema extra_settings rows onto
+  Tenant (mydata_user_id plaintext, mydata_subscription_key encrypted),
+  read through tenant.credentials.mydata_credentials, editable in the
+  tenant admin, the tenant self-service scopes and TenantAdminSerializer;
+  migration 0051 copies each store's Setting values over
+- decide the edge-purge token check in Python instead of filtering on the
+  encrypted column
+- add the rotate_tenant_secrets command (MultiFernet.rotate, idempotent,
+  prints counts only) and docs/secret-encryption.md with the runbook
+- stop logging the first characters of the Viva verification key
+- declare cryptography as a direct dependency
+
+
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`b85eb0c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b85eb0c8eba8cf36077b51ed1ad5af299a0d4aab))
+
 ## v3.106.4 (2026-10-12)
 
 ### Bug fixes

@@ -3,6 +3,59 @@
 
 
 
+## v3.105.1 (2026-10-12)
+
+### Bug fixes
+
+* fix(order): store the VAT-inclusive price on a staff-added order line (#154) ([`e8343af`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e8343af2e4bf6b5638bef2a3f3b7a40e150a84e1))
+
+* fix(order): store the VAT-inclusive price on a staff-added order line
+
+OrderItemViewSet.perform_create saved product.price, the net price, while
+every checkout line stores the cart line's final_price (VAT included, after
+the product discount), which is what OrderItem.price means and what the
+invoice and myDATA split by the line's vat_rate. A staff-added line was
+therefore under-priced by its VAT. It now stores product.final_price.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1 ([`e8343af`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e8343af2e4bf6b5638bef2a3f3b7a40e150a84e1))
+
+* fix(order): price a staff-added line on a wholesale order at its group price
+
+A wholesale-priced order stamps the customer group that priced it in
+metadata["b2b_pricing"]. A line staff add to such an order is now priced
+by that group (B2BPricingService.resolve_single), not at retail, and is
+refused when the group no longer exists, since nothing then says what it
+should cost.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1 ([`e8343af`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e8343af2e4bf6b5638bef2a3f3b7a40e150a84e1))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.105.0 [skip ci] ([`50b4e42`](https://github.com/vasilistotskas/grooveshop-django-api/commit/50b4e4232bf300da72191381845bfbcfad94742b))
+
+### Documentation
+
+* docs(order): describe the item admin's VAT rate and staff line pricing
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1 ([`e8343af`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e8343af2e4bf6b5638bef2a3f3b7a40e150a84e1))
+
+### Testing
+
+* test(order): price the wholesale line test on a product with no retail discount
+
+The group price is capped at the retail final price, so a factory product
+with a random retail discount could price both the same.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`e8343af`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e8343af2e4bf6b5638bef2a3f3b7a40e150a84e1))
+
 ## v3.105.0 (2026-10-12)
 
 ### Bug fixes

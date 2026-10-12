@@ -141,9 +141,9 @@ urlpatterns = [
         name="order-item-detail",
     ),
     path(
-        "order-items/<int:pk>/refund",
-        OrderItemViewSet.as_view({"post": "refund"}),
-        name="order-item-refund",
+        "order-items/<int:pk>/restock",
+        OrderItemViewSet.as_view({"post": "restock"}),
+        name="order-item-restock",
     ),
 ]
 

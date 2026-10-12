@@ -1,5 +1,3 @@
-from decimal import Decimal
-
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
@@ -41,20 +39,6 @@ class PaymentStatus(models.TextChoices):
     PARTIALLY_REFUNDED = "PARTIALLY_REFUNDED", _("Partially Refunded")
     CANCELED = "CANCELED", _("Canceled")
 
-    @classmethod
-    def after_refund(
-        cls, *, refunded: Decimal, captured: Decimal
-    ) -> PaymentStatus:
-        """The payment status once ``refunded`` has been paid back out of
-        ``captured``, both cumulative and in the same currency.
-
-        REFUNDED means nothing is left to refund. It is also the only
-        state that releases what hangs off the order's total — the
-        gift-card redemption and the loyalty points — because those are
-        returned once, with the last refund, not in slices.
-        """
-        return cls.REFUNDED if refunded >= captured else cls.PARTIALLY_REFUNDED
-
 
 PAYMENT_CLOSING_STATUSES: frozenset[str] = frozenset(
     {OrderStatus.CANCELED, OrderStatus.RETURNED}
@@ -65,6 +49,18 @@ An order that reaches one of these while still unpaid owes nothing, so
 ``Order.save()`` settles its ``payment_status`` to CANCELED on the
 transition (``Order.settle_unpaid_payment``). A paid order is left to
 the refund: REFUNDED is the exit for money that actually moved.
+"""
+
+RETURN_HANDLING_STATUSES: frozenset[str] = frozenset(
+    {OrderStatus.DELIVERED, OrderStatus.COMPLETED, OrderStatus.RETURNED}
+)
+"""The order statuses in which staff handle what a customer sent back.
+
+A delivered order is where a return (the EU 14-day right of withdrawal)
+starts; staff refund its payment (``OrderService.refund_order``, the admin
+"Refund" action) and restock the returned units
+(``OrderItemViewSet.restock``) from DELIVERED, COMPLETED or RETURNED.
+Before delivery a customer cancels instead.
 """
 
 SETTLED_PAYMENT_STATUSES: frozenset[str] = frozenset(

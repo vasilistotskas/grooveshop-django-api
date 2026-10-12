@@ -160,6 +160,12 @@ class OrderItem(TimeStampMixinModel, SortableModel, UUIDModel):
         super().save(*args, **kwargs)
 
     def refund(self, quantity=None):
+        """Put ``quantity`` returned units back in stock and record them as
+        refunded on this line. Moves NO money: what the customer is paid
+        back is the order's refund (``OrderService.refund_order``), because
+        a line's snapshot price is not what was paid for it. Returns the
+        value of the units, for the caller's display.
+        """
         from django.db import transaction
 
         from order.stock import StockManager

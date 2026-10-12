@@ -52,6 +52,7 @@ class TestExternalServiceErrorsAreLogged:
                 {
                     "payment_id": "pi_test_123",
                     "amount": Money("25.00", "USD"),
+                    "idempotency_key": "order-1-refund-1",
                 },
             ),
             # Stripe payment status
@@ -175,7 +176,11 @@ class TestExternalServiceErrorsAreLogged:
             ),
             (
                 "refund_payment",
-                {"payment_id": "pi_test_123", "amount": Money("25.00", "USD")},
+                {
+                    "payment_id": "pi_test_123",
+                    "amount": Money("25.00", "USD"),
+                    "idempotency_key": "order-1-refund-1",
+                },
             ),
         ],
     )
@@ -274,7 +279,11 @@ class TestExternalServiceErrorsAreLogged:
         with patch.object(
             stripe.Refund, "create", side_effect=APIError("Stripe refund error")
         ):
-            stripe_provider.refund_payment("pi_test", Money("50.00", "USD"))
+            stripe_provider.refund_payment(
+                "pi_test",
+                Money("50.00", "USD"),
+                idempotency_key="order-1-refund-1",
+            )
 
         # Verify: Multiple errors logged
         error_logs = [r for r in caplog.records if r.levelname == "ERROR"]

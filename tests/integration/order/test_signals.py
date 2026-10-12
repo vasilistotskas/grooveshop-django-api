@@ -6,6 +6,7 @@ from django.test import TestCase
 from djmoney.money import Money
 
 from order.enum.status import OrderStatus, PaymentStatus
+from order.factories import RefundTransactionFactory
 from order.factories.order import OrderFactory
 from order.models.history import OrderHistory, OrderItemHistory
 from order.models.order import Order
@@ -480,6 +481,7 @@ class OrderSignalsTestCase(TestCase):
             order=self.order,
             amount=refunded,
             reason="Defective product",
+            refund=RefundTransactionFactory(order=self.order),
         )
 
         self.assertTrue(
@@ -498,7 +500,19 @@ class OrderSignalsTestCase(TestCase):
         leaves it out fails loudly instead of being read as a refund of
         "everything"."""
         with self.assertRaises(TypeError):
-            order_refunded.send(sender=Order, order=self.order)
+            order_refunded.send(
+                sender=Order,
+                order=self.order,
+                refund=RefundTransactionFactory(order=self.order),
+            )
+
+    def test_order_refunded_without_the_refund_row_is_an_error(self):
+        """``refund`` (the ledger row) is part of the contract too: the
+        confirmation email is queued for it, one per refund."""
+        with self.assertRaises(TypeError):
+            order_refunded.send(
+                sender=Order, order=self.order, amount=Money("5.00", "EUR")
+            )
 
     def test_handle_order_returned(self):
         order_returned.send(

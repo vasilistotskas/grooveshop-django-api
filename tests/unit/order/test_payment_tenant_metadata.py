@@ -129,13 +129,17 @@ class TestRefundMetadata:
     @mock.patch("order.payment.Refund.sync_from_stripe_data")
     @mock.patch("order.payment.stripe.Refund.create")
     def test_includes_tenant_schema(
-        self, mock_refund, _mock_sync, bind_tenant_and_schema
+        self, mock_refund, _mock_sync, amount, bind_tenant_and_schema
     ):
         bind_tenant_and_schema(_fake_tenant(schema_name="tenant-c"))
-        mock_refund.return_value = mock.Mock(id="re_1", status="succeeded")
+        mock_refund.return_value = mock.Mock(
+            id="re_1", status="succeeded", amount=10000, currency="eur"
+        )
 
         provider = StripePaymentProvider()
-        provider.refund_payment("pi_some")
+        provider.refund_payment(
+            "pi_some", amount, idempotency_key="order-1-refund-1"
+        )
 
         refund_kwargs = mock_refund.call_args.kwargs
         assert refund_kwargs["metadata"]["tenant_schema"] == "tenant-c"

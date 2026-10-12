@@ -132,17 +132,20 @@ class OrderItemCreateSerializer(serializers.ModelSerializer[OrderItem]):
         return attrs
 
 
-class OrderItemRefundSerializer(serializers.Serializer):
+class OrderItemRestockSerializer(serializers.Serializer):
     quantity = serializers.IntegerField(
         min_value=1,
         required=False,
-        help_text=_("Quantity to refund. If not provided, refunds all."),
+        help_text=_(
+            "Quantity returned and restocked. If not provided, every unit "
+            "not yet restocked."
+        ),
     )
     reason = serializers.CharField(
         required=False,
         allow_blank=True,
         max_length=255,
-        help_text=_("Optional reason for the refund"),
+        help_text=_("Optional reason for the return"),
     )
 
     def validate(self, attrs):
@@ -151,13 +154,13 @@ class OrderItemRefundSerializer(serializers.Serializer):
 
         if not item:
             raise serializers.ValidationError(
-                _("Order item is required for refund operation")
+                _("Order item is required for restock operation")
             )
 
         if quantity and quantity > item.quantity - item.refunded_quantity:
             raise serializers.ValidationError(
                 _(
-                    "Cannot refund more than the available quantity. Available: {available_quantity}"
+                    "Cannot restock more than the available quantity. Available: {available_quantity}"
                 ).format(
                     available_quantity=item.quantity - item.refunded_quantity
                 )
@@ -166,7 +169,6 @@ class OrderItemRefundSerializer(serializers.Serializer):
         return attrs
 
 
-class OrderItemRefundResponseSerializer(serializers.Serializer):
+class OrderItemRestockResponseSerializer(serializers.Serializer):
     detail = serializers.CharField()
-    refunded_amount = MoneyField(max_digits=11, decimal_places=2)
     item = OrderItemSerializer()

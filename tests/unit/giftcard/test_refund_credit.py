@@ -22,6 +22,7 @@ from djmoney.money import Money
 
 from giftcard.models import GiftCardTransaction, GiftCardTransactionKind
 from order.enum.status import OrderStatus, PaymentStatus
+from order.factories import RefundTransactionFactory
 from order.models.order import Order
 from order.signals import order_refunded
 from order.views.viva_webhook import _process_event_in_tenant
@@ -49,7 +50,12 @@ def _refund(order, status, amount):
     order.payment_status = status
     order.save(update_fields=["payment_status"])
     order_refunded.send(
-        sender=Order, order=order, amount=Money(Decimal(amount), "EUR")
+        sender=Order,
+        order=order,
+        amount=Money(Decimal(amount), "EUR"),
+        refund=RefundTransactionFactory(
+            order=order, amount=Money(Decimal(amount), "EUR")
+        ),
     )
 
 

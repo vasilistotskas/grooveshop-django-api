@@ -14,6 +14,7 @@ from order.services import OrderService
 from order.stock import StockManager
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
+from tests.utils.payments import CAPTURED
 from tests.utils.shipping import enable_rate
 from user.factories.account import UserAccountFactory
 
@@ -447,7 +448,9 @@ class TestTransactionFailuresRollbackCompletely:
                 with pytest.raises(
                     Exception, match="Order status update failed"
                 ):
-                    OrderService.handle_payment_succeeded(payment_intent_id)
+                    OrderService.handle_payment_succeeded(
+                        payment_intent_id, captured=CAPTURED
+                    )
 
         # Verify complete rollback - no partial changes persisted
 

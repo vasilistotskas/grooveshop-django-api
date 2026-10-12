@@ -3,6 +3,137 @@
 
 
 
+## v3.108.0 (2026-10-12)
+
+### Bug fixes
+
+* fix(product): take no row lock when recording a price in Product.save
+
+A per-save SELECT FOR UPDATE on the product, taken after a caller such as the
+bulk discount action had already locked its batch in pk order, is a second,
+unordered lock acquisition and breaks the pk-order invariant for multi-product
+transactions. Two concurrent saves opening a spell are already refused by the
+one-current-spell-per-product constraint, so the loser rolls back.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1 ([`a65888f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a65888f8ebd3b1ed22b77e6913dc1185f50e1c6b))
+
+* fix(product): plan price records from what a save persists and keep soft-deleted products current
+
+Product.save planned from the whole instance, so a partial save of
+discount_percent recorded a spell for an unsaved price; with update_fields the
+plan is now built from the stored row plus only the persisted fields.
+update_fields is materialised once, since an iterator was spent by the first
+read. The backfill, the Vat fan-out, the offer scope and the nightly sweep now
+include soft-deleted products, so a restored product is already current and
+needs no re-plan. A docstring named a task that does not exist.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1 ([`a65888f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a65888f8ebd3b1ed22b77e6913dc1185f50e1c6b))
+
+* fix(product): price one unit with the cart's per-line discount allocation
+
+Rebase onto the per-line discount allocation: single_unit_discount now runs the
+one-line cart through _clamp and allocate_capped, the rule the cart is charged
+with, instead of the removed total-based clamp. Restores the msgstr the merge of
+the English catalogue dropped.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`a65888f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a65888f8ebd3b1ed22b77e6913dc1185f50e1c6b))
+
+* fix(order): allocate discounts to the lines they cover for VAT (#162) ([`9d24991`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9d24991017ecea856da92522b2a1e53040e8f20f))
+
+* fix(order): allocate discounts to the lines they cover for VAT
+
+The tax documents spread an order's whole discount proportionally over
+ALL lines. A promotion can be scoped (products, categories, the reward
+units of a buy-X-get-Y), so in a basket that mixes VAT rates a coupon for
+the 13% food was partly booked against the 24% line and the VAT per rate,
+and in total, on the invoice and the myDATA payload was wrong. Shipping and
+the payment fee were apportioned over the pre-discount goods value, which is
+not the value of the goods charged (AADE circular 10/1987).
+
+The promotion engine now reports, for every applied monetary promotion, the
+part of its amount each covered cart line carries
+(AppliedPromotion.line_amounts, CartDiscountResult.line_discounts), cent
+exact through order.discounts.allocate_capped, the one allocation rule the
+cart preview, the payment intent and order creation all share. Checkout
+freezes each line's share on OrderItem.discount_allocation, as vat_rate is
+frozen, and spreads the order-wide loyalty redemption over the value left
+on every line; the standalone loyalty redeem endpoint does the same.
+order.taxation reads the snapshots, weights shipping and the payment fee
+by the discounted goods value per rate, and refuses an order whose
+snapshots do not add up to its discount instead of billing a wrong total.
+
+Migrations: 0072 adds the column (db_default, currency column through the
+documented money recipe); 0073 gives existing discounted orders the
+proportional allocation their documents were issued under, through
+order.discount_snapshot.heal_discount_allocation, which the new
+heal_discount_allocation command re-runs for orders the previous release
+creates while it still serves the rollout. Invoice rows are never touched.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1 ([`9d24991`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9d24991017ecea856da92522b2a1e53040e8f20f))
+
+* fix(i18n): restore the msgstr of the myDATA subscription key help text
+
+The rebase onto the tenant-secret encryption merge kept both sides of the
+English catalogue's conflict but dropped the empty msgstr of the
+subscription key's help text, so compilemessages refused the file.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`9d24991`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9d24991017ecea856da92522b2a1e53040e8f20f))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.107.0 [skip ci] ([`cc420a1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cc420a1a480e31f6509881efc19694d4079c6885))
+
+### Features
+
+* feat(product): record price spells and freeze the Omnibus prior price per reduction (#163) ([`a65888f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a65888f8ebd3b1ed22b77e6913dc1185f50e1c6b))
+
+* feat(product): record price spells and freeze the Omnibus prior price per reduction
+
+A reduction a customer is shown must state the lowest price of the 30 days
+before it started, and the announced percentage must be computed from it.
+Nothing in the API could answer that: simple-history is purged after 365
+days, keeps no VAT rate and knows nothing of automatic promotions.
+
+ProductPriceSpell is an append-only record of the consumer gross unit price
+per period. Product gains effective_price, prior_price and
+reduction_started_at, derived columns that history excludes. A pure
+evaluate_reduction decides the episode: reference = minimum of the 30 days
+before the start, fixed at the start; none for a product on sale under 30
+days; a further drop keeps the reference only within 60 days of the start;
+an increase or a stop ends the episode. The strictest common denominator of
+Greece and Cyprus, so no per-country switch.
+
+Every path that moves a price records it: Product.save (price, markdown,
+VAT, derived columns ride the same UPDATE), a Vat edit or deletion, an
+unconditional automatic promotion starting, ending or being edited (the
+offer queue and window sweep now refresh price records before the index,
+and no longer depend on Meilisearch being online), and a nightly
+reconciliation. Migration 0050 replays the existing history into spells and
+episodes per schema.
+
+The API exposes priorPrice, effectivePrice and announcedDiscountPercent on
+products and search hits, and prior_price / announced_discount_percent in
+the Meilisearch document, all from stored columns. discountPercent,
+discountValue and priceSavePercent are marked deprecated for one release.
+
+Refs #139, #140
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1 ([`a65888f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a65888f8ebd3b1ed22b77e6913dc1185f50e1c6b))
+
 ## v3.107.0 (2026-10-12)
 
 ### Chores

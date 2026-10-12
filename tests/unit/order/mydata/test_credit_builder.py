@@ -2,9 +2,9 @@
 :func:`order.mydata.builder.build_credit_xml`.
 
 AADE's classification combinations sheet for 11.4 allows ``category1_1``
-with ``E3_561_003``, like the receipt; the receipt's MARK travels in
-``correlatedInvoices``, which the myDATA schema places after ``currency``
-inside ``invoiceHeader``.
+with ``E3_561_003``, like the receipt. AADE forbids ``correlatedInvoices`` on
+an 11.4 (error 205, confirmed against the dev API), so the payload names no
+receipt, and ``specialInvoiceCategory`` is not sent.
 """
 
 from __future__ import annotations
@@ -14,7 +14,6 @@ from decimal import Decimal
 from types import SimpleNamespace
 from xml.etree.ElementTree import fromstring
 
-import pytest
 from djmoney.money import Money
 
 from order.mydata.builder import build_credit_xml
@@ -85,32 +84,26 @@ def _text(root, path):
     return None if el is None else el.text
 
 
-def test_it_is_a_retail_credit_correlated_to_the_receipts_mark():
+def test_it_is_a_retail_credit_that_names_no_receipt():
     built, root = _build(_credit(_receipt(), ROWS))
 
     assert built.invoice_type == "11.4"
     assert _text(root, "invoice/invoiceHeader/invoiceType") == "11.4"
-    assert _text(root, "invoice/invoiceHeader/correlatedInvoices") == str(
-        RECEIPT_MARK
-    )
+    # AADE answers 205 to correlatedInvoices on this type.
+    assert _text(root, "invoice/invoiceHeader/correlatedInvoices") is None
+    assert b"correlatedInvoices" not in built.xml_bytes
+    assert b"specialInvoiceCategory" not in built.xml_bytes
     # A retail document: no counterpart.
     assert root.find(f"{AADE_NS}invoice/{AADE_NS}counterpart") is None
 
 
-def test_correlated_invoices_follows_currency_in_the_header():
+def test_the_header_is_series_aa_date_type_currency_only():
     _built, root = _build(_credit(_receipt(), ROWS))
     header = root.find(f"{AADE_NS}invoice/{AADE_NS}invoiceHeader")
 
     tags = [child.tag.removeprefix(AADE_NS) for child in header]
 
-    assert tags == [
-        "series",
-        "aa",
-        "issueDate",
-        "invoiceType",
-        "currency",
-        "correlatedInvoices",
-    ]
+    assert tags == ["series", "aa", "issueDate", "invoiceType", "currency"]
 
 
 def test_it_has_its_own_series_and_the_aa_of_its_number():
@@ -161,13 +154,6 @@ def test_the_payment_row_is_the_credited_amount():
         _text(root, "invoice/paymentMethods/paymentMethodDetails/amount")
         == "50.00"
     )
-
-
-def test_a_credit_for_an_unregistered_receipt_is_refused():
-    receipt = _receipt(mydata_mark=None)
-
-    with pytest.raises(ValueError, match="no MARK"):
-        _build(_credit(receipt, ROWS))
 
 
 def test_a_retry_resends_the_same_identity():

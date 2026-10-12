@@ -22841,12 +22841,8 @@ msgid "Credited receipt"
 msgstr "Πιστωμένη απόδειξη"
 
 #: .\order\models\retail_credit.py:99
-msgid ""
-"The retail receipt (11.1) this document credits; its MARK is sent as the "
-"correlated invoice."
-msgstr ""
-"Η απόδειξη λιανικής (11.1) που πιστώνει αυτό το παραστατικό· το MARK της "
-"αποστέλλεται ως συσχετιζόμενο παραστατικό."
+msgid "The retail receipt (11.1) this document credits. AADE does not link an 11.4 to its receipt, so the link is kept here only."
+msgstr "Η απόδειξη λιανικής (11.1) που πιστώνει αυτό το παραστατικό. Η ΑΑΔΕ δεν συνδέει ένα 11.4 με την απόδειξή του, οπότε η σύνδεση τηρείται μόνο εδώ."
 
 #: .\order\models\retail_credit.py:117
 msgid ""

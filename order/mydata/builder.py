@@ -7,8 +7,10 @@ Two documents are issued, both over the ERP ``SendInvoices`` channel:
   shipping and fees (``order.taxation``);
 * ``invoiceType=11.4`` (retail credit document), from a
   :class:`~order.models.retail_credit.RetailCredit`, one line per VAT rate
-  of what is credited, linked to the receipt's MARK through
-  ``correlatedInvoices``.
+  of what is credited. AADE forbids ``correlatedInvoices`` on this type
+  (error 205, live-confirmed), so the payload carries no link to the
+  receipt; ``specialInvoiceCategory`` 13 ("Δυσχέρεια Συσχέτισης", valid
+  for 11.4) is optional in the schema and is not sent.
 
 Invoices (1.1) and credit invoices (5.1) are not built here: AADE decision
 Α.1128/2025 art. 1(2) takes them off the ERP channel (see
@@ -344,7 +346,6 @@ def build_receipt_xml(
         invoice_type=INVOICE_TYPE_RETAIL_RECEIPT,
         lines=_receipt_lines(invoice),
         payment_rows=_payment_rows(invoice),
-        correlated_mark=None,
         issuer_vat=issuer_vat,
         issuer_country=issuer_country,
         branch=branch,
@@ -360,24 +361,16 @@ def build_credit_xml(
     branch: int,
     series_prefix: str,
 ) -> BuiltInvoice:
-    """The ``InvoicesDoc`` for a retail credit document (11.4), correlated
-    to the MARK of the receipt it credits (``correlatedInvoices``).
+    """The ``InvoicesDoc`` for a retail credit document (11.4).
 
-    A credit without that MARK is refused here: AADE cannot link it, and
-    the caller waits for the receipt to be registered first.
+    No ``correlatedInvoices``: AADE answers 205 to one on this type. The
+    receipt it credits is known to us only (``RetailCredit.invoice``).
     """
-    mark = credit.invoice.mydata_mark
-    if not mark:
-        raise ValueError(
-            f"Receipt {credit.invoice.invoice_number} has no MARK to "
-            "correlate the credit document to."
-        )
     return _build(
         credit,
         invoice_type=INVOICE_TYPE_RETAIL_CREDIT,
         lines=_credit_lines(credit),
         payment_rows=_credit_payment_rows(credit),
-        correlated_mark=mark,
         issuer_vat=issuer_vat,
         issuer_country=issuer_country,
         branch=branch,
@@ -391,7 +384,6 @@ def _build(
     invoice_type: str,
     lines: list[_Line],
     payment_rows: list[tuple[int, Decimal]],
-    correlated_mark: int | None,
     issuer_vat: str,
     issuer_country: str,
     branch: int,
@@ -437,16 +429,13 @@ def _build(
     # Actual XSD sequence (verified via live AADE dev response): the
     # PDF field-list table orders things differently to the XSD, so
     # don't be fooled by docs — ``invoiceHeader`` must come BEFORE
-    # ``paymentMethods`` (error 101 otherwise). Inside the header,
-    # ``correlatedInvoices`` follows ``currency``.
+    # ``paymentMethods`` (error 101 otherwise).
     header = SubElement(invoice_el, "invoiceHeader")
     SubElement(header, "series").text = series
     SubElement(header, "aa").text = str(aa)
     SubElement(header, "issueDate").text = issue_date.isoformat()
     SubElement(header, "invoiceType").text = invoice_type
     SubElement(header, "currency").text = document.currency or "EUR"
-    if correlated_mark is not None:
-        SubElement(header, "correlatedInvoices").text = str(correlated_mark)
 
     # One row per settlement source; amounts MUST sum to totalGrossValue.
     pm_container = SubElement(invoice_el, "paymentMethods")

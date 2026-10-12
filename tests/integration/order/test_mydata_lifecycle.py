@@ -300,10 +300,10 @@ class TestCreditForEveryRefundSource:
         [credit] = _credits(order)
         [sent] = aade.credits
         assert sent.invoice_type == "11.4"
-        # Linked to the receipt's MARK, crediting exactly what was refunded.
-        assert sent.correlated == str(
-            Invoice.objects.get(order=order).mydata_mark
-        )
+        # AADE forbids correlatedInvoices on an 11.4 (error 205): the link to
+        # the receipt is ours only.
+        assert sent.correlated is None
+        assert credit.invoice == Invoice.objects.get(order=order)
         assert sent.gross == Decimal(amount)
         assert sent.net + sent.vat == sent.gross
         assert credit.total == _eur(amount)
@@ -434,7 +434,8 @@ class TestPartialCredits:
             assert credit.net + credit.vat == credit.gross
             # A mixed order credits both rates, never one of them.
             assert {line.category for line in credit.lines} == {"1", "2"}
-        # Never more than the receipt's net at any point (AADE error 319)
+        # Never more than the receipt's net at any point (our cap is the only
+        # guard: AADE cannot link an 11.4 to its receipt)
         # and exactly the receipt's net and VAT once everything is back.
         running = Decimal(0)
         for credit in aade.credits:
@@ -471,7 +472,7 @@ class TestPartialCredits:
     def test_cumulative_net_never_passes_the_receipt_with_awkward_cents(self):
         """Credits of 3.33, 3.33, 3.33 and 0.01 against 10.00 at 24%
         (receipt net 8.06): rounding each credit's net on its own would
-        credit 8.08, which AADE refuses (319). The net is derived from the
+        credit 8.08, past the receipt, and nothing at AADE would catch it. The net is derived from the
         cumulative gross, so it ends exactly on 8.06."""
         receipt = [
             {
@@ -534,7 +535,7 @@ class TestNoCreditWithoutAReceipt:
 
         [receipt] = aade.receipts
         [credit] = aade.credits
-        assert credit.correlated == str(aade.marks[0])
+        assert credit.correlated is None
         assert credit.gross == Decimal("40.00")
         assert receipt.gross == Decimal("100.00")
 
@@ -568,7 +569,8 @@ class TestOrderClosedWithoutASale:
         [sent] = aade.credits
         assert sent.gross == invoice.total.amount == Decimal("85.00")
         assert sent.net == invoice.subtotal.amount
-        assert sent.correlated == str(invoice.mydata_mark)
+        assert sent.correlated is None
+        assert _credits(order).get().invoice == invoice
         [credit] = _credits(order)
         assert credit.reason == CreditReason.SETTLEMENT
         assert credit.refund is None
@@ -616,9 +618,8 @@ class TestOrderClosedWithoutASale:
             OrderService.refund_order(order, reason="returned")
 
         assert sum(c.gross for c in aade.credits) == invoice.total.amount
-        assert all(
-            c.correlated == str(invoice.mydata_mark) for c in aade.credits
-        )
+        assert all(c.correlated is None for c in aade.credits)
+        assert {c.invoice for c in _credits(order)} == {invoice}
 
 
 class TestDocuments:

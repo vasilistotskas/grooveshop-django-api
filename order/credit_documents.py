@@ -4,7 +4,7 @@
 document is issued". The platform's retail receipt is the order's
 :class:`~order.models.invoice.Invoice` (11.1, issued when the order
 ships). Once that receipt carries a MARK, money going back owes a credit
-document linked to it (``correlatedInvoices``):
+document:
 
 * every REFUND row on the payment ledger gets one, for exactly the amount
   refunded (``PaymentLedger.record_refund`` is where every refund path
@@ -27,9 +27,15 @@ registered) calls the same idempotent function.
 rate (``Invoice.vat_breakdown``: goods, shipping and fees all in it). A
 credit spreads its amount over the rates in proportion to what each still
 holds, to the cent (``order.discounts.allocate_capped``), so a partial
-refund of a mixed 24%/13% order credits both rates. AADE rejects (error
-319) credits whose total passes the receipt's net, so the NET of a credit
-is derived cumulatively: what the rate's total credited gross splits to
+refund of a mixed 24%/13% order credits both rates.
+
+**Nothing but this module stops an over-credit.** AADE forbids
+``correlatedInvoices`` on an 11.4 (error 205, confirmed against the dev API
+on 2026-10-12), so the credit is not linked to its receipt at AADE and AADE
+cannot check it against the receipt's total (error 319 belongs to linked
+credits). The link lives in our ``RetailCredit.invoice`` row only, and the
+cap below is the sole guard: a credit the receipt cannot hold is never
+submitted. The NET of a credit is derived cumulatively: what the rate's total credited gross splits to
 (``order.taxation.split_gross``), capped at the receipt's net for the
 rate, less the net already credited. Rounding can therefore never push
 several partial credits past the receipt, and the last one lands exactly on
@@ -249,9 +255,9 @@ def create_pending_credits(order_id: int) -> list[int]:
 def _guarded(order: Order, invoice: Invoice, **kwargs: Any) -> list[int]:
     """Create one credit, or record why it cannot exist.
 
-    A credit larger than what its receipt holds is not sent: AADE would
-    refuse it (error 319) and a document that disagrees with the receipt
-    is wrong whatever AADE says. Staff are told on the order.
+    A credit larger than what its receipt holds is never sent: AADE does
+    not link an 11.4 to its receipt, so it would accept it and register a
+    document that disagrees with the receipt. Staff are told on the order.
     """
     try:
         with transaction.atomic():

@@ -82,7 +82,7 @@ class CreditCounter(models.Model):
 
 
 class RetailCredit(TimeStampMixinModel, UUIDModel, MyDataRegistration):
-    """A retail credit document (11.4) correlated to the order's receipt."""
+    """A retail credit document (11.4) for the order's receipt."""
 
     order = models.ForeignKey(
         "order.Order",
@@ -96,8 +96,8 @@ class RetailCredit(TimeStampMixinModel, UUIDModel, MyDataRegistration):
         on_delete=models.PROTECT,
         verbose_name=_("Credited receipt"),
         help_text=_(
-            "The retail receipt (11.1) this document credits; its MARK is "
-            "sent as the correlated invoice."
+            "The retail receipt (11.1) this document credits. AADE does "
+            "not link an 11.4 to its receipt, so the link is kept here only."
         ),
     )
     reason = models.CharField(

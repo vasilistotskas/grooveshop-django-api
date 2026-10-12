@@ -78,9 +78,9 @@ def _doc(xml_bytes: bytes) -> SimpleNamespace:
     summary = invoice.find(f"{AADE_NS}invoiceSummary")
     return SimpleNamespace(
         invoice_type=text(header, "invoiceType"),
+        correlated=text(header, "correlatedInvoices"),
         series=text(header, "series"),
         aa=text(header, "aa"),
-        correlated=text(header, "correlatedInvoices"),
         lines=[
             SimpleNamespace(
                 net=Decimal(text(row, "netValue")),

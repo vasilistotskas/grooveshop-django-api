@@ -105,7 +105,7 @@ class Migration(migrations.Migration):
                 ('total', djmoney.models.fields.MoneyField(decimal_places=2, default=djmoney.money.Money(0, 'EUR'), max_digits=11, verbose_name='Total (incl. VAT)')),
                 ('vat_breakdown', models.JSONField(default=list, help_text='``{rate, subtotal, vat, gross}`` rows of what this document credits, frozen when it was issued.', verbose_name='VAT Breakdown')),
                 ('currency', models.CharField(default='EUR', max_length=10, verbose_name='Currency')),
-                ('invoice', models.ForeignKey(help_text='The retail receipt (11.1) this document credits; its MARK is sent as the correlated invoice.', on_delete=django.db.models.deletion.PROTECT, related_name='credits', to='order.invoice', verbose_name='Credited receipt')),
+                ('invoice', models.ForeignKey(help_text='The retail receipt (11.1) this document credits. AADE does not link an 11.4 to its receipt, so the link is kept here only.', on_delete=django.db.models.deletion.PROTECT, related_name='credits', to='order.invoice', verbose_name='Credited receipt')),
                 ('order', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='credit_documents', to='order.order', verbose_name='Order')),
                 ('refund', models.OneToOneField(blank=True, help_text='The ledger refund this document credits. One document per refund; empty for the settlement of a closed order.', null=True, on_delete=django.db.models.deletion.PROTECT, related_name='credit_document', to='order.paymenttransaction', verbose_name='Refund')),
             ],

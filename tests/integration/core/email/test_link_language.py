@@ -34,6 +34,7 @@ from giftcard.factories import GiftCardFactory
 from giftcard.tasks import deliver_gift_card_email
 from loyalty.tasks import notify_loyalty_tier_up_live
 from notification.models.notification import Notification
+from order.factories import RefundTransactionFactory
 from order.factories.item import OrderItemFactory
 from order.factories.order import OrderFactory
 from order.invoicing import generate_invoice
@@ -362,8 +363,9 @@ class TestMoreOrderEmails:
     @LANGUAGES
     def test_refund_site_link(self, language, prefix):
         order = OrderFactory(num_order_items=0, language_code=language)
+        refund = RefundTransactionFactory(order=order)
 
-        assert send_refund_confirmation_email(order.id) is True
+        assert send_refund_confirmation_email(refund.pk) is True
 
         _assert_links(_body(mail.outbox[-1]), f"{BASE}{prefix}", language)
 

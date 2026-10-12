@@ -24,13 +24,13 @@ from core.utils.serializers import (
     create_schema_view_config,
     crud_config,
 )
-from order.enum.status import OrderStatus
+from order.enum.status import RETURN_HANDLING_STATUSES
 from order.filters import OrderItemFilter
 from order.models.item import OrderItem
 from order.serializers.item import (
     OrderItemDetailSerializer,
-    OrderItemRefundResponseSerializer,
-    OrderItemRefundSerializer,
+    OrderItemRestockResponseSerializer,
+    OrderItemRestockSerializer,
     OrderItemSerializer,
     OrderItemWriteSerializer,
 )
@@ -42,12 +42,16 @@ serializers_config: SerializersConfig = {
         detail=OrderItemDetailSerializer,
         write=OrderItemWriteSerializer,
     ),
-    "refund": ActionConfig(
-        request=OrderItemRefundSerializer,
-        response=OrderItemRefundResponseSerializer,
-        operation_id="refundOrderItem",
-        summary=_("Process a refund for an order item"),
-        description=_("Process a refund for an order item."),
+    "restock": ActionConfig(
+        request=OrderItemRestockSerializer,
+        response=OrderItemRestockResponseSerializer,
+        operation_id="restockOrderItem",
+        summary=_("Restock returned units of an order item"),
+        description=_(
+            "Puts returned units of an order line back into stock and "
+            "records them on the line. It moves no money: refund the "
+            "payment with the order's refund action."
+        ),
         tags=["Order Items"],
     ),
 }
@@ -185,28 +189,33 @@ class OrderItemViewSet(BaseModelViewSet):
         serializer.save()
 
     @action(detail=True, methods=["POST"])
-    def refund(self, request, pk=None):
-        # Refunding restocks merchant inventory and flips refund state; it is a
-        # staff/merchant operation, never customer self-service (which would
-        # otherwise let an order owner restock stock and mark items refunded
-        # with no payment refund).
+    def restock(self, request, pk=None):
+        # Restocking puts returned units back on the shelf and records them
+        # on the line; it moves NO money. What the customer is paid back is
+        # the order's refund (``OrderService.refund_order``, the staff
+        # "Refund" admin action), decided at order level because a line's
+        # snapshot price is not what the customer paid for it (tax, shared
+        # discounts, shipping). It is a staff/merchant operation, never
+        # customer self-service (which would let an order owner restock
+        # stock and mark items returned).
         if not is_store_staff(request.user):
-            raise PermissionDenied(_("Only staff can process refunds."))
+            raise PermissionDenied(_("Only staff can restock order items."))
 
         order_item = self.get_object()
 
-        if order_item.order.status not in [
-            OrderStatus.DELIVERED,
-            OrderStatus.COMPLETED,
-            OrderStatus.RETURNED,
-        ]:
+        if order_item.order.status not in RETURN_HANDLING_STATUSES:
             raise DRFValidationError(
-                {"detail": _("This order is not in a refundable state.")}
+                {
+                    "detail": _(
+                        "Units can only be restocked on a delivered, "
+                        "completed or returned order."
+                    )
+                }
             )
 
         if order_item.is_refunded:
             raise DRFValidationError(
-                {"detail": _("This item has already been fully refunded.")}
+                {"detail": _("All units of this item were already restocked.")}
             )
 
         request_serializer_class = self.get_request_serializer()
@@ -220,20 +229,19 @@ class OrderItemViewSet(BaseModelViewSet):
         reason = serializer.validated_data.get("reason", "")
 
         try:
-            # Refund FIRST, then record why. Writing the reason up front
-            # left "Refund reason: ..." on an item whose refund then
-            # failed validation, so the notes claimed a refund that never
+            # Restock FIRST, then record why. Writing the reason up front
+            # left "Restock reason: ..." on an item whose restock then
+            # failed validation, so the notes claimed a restock that never
             # happened.
-            refunded_amount = order_item.refund(quantity)
+            order_item.refund(quantity)
 
             if reason:
                 notes = order_item.notes or ""
-                order_item.notes = f"{notes}\nRefund reason: {reason}".strip()
+                order_item.notes = f"{notes}\nRestock reason: {reason}".strip()
                 order_item.save(update_fields=["notes"])
 
             response_data = {
-                "detail": _("Refund processed successfully."),
-                "refunded_amount": refunded_amount,
+                "detail": _("The returned units were restocked."),
                 "item": order_item,
             }
 
@@ -245,7 +253,7 @@ class OrderItemViewSet(BaseModelViewSet):
             logger = logging.getLogger(__name__)
 
             logger.error(
-                f"Validation error during refund: {e!s}",
+                f"Validation error during restock: {e!s}",
                 extra={
                     "order_item_id": order_item.id,
                     "user_id": request.user.id,
@@ -254,14 +262,14 @@ class OrderItemViewSet(BaseModelViewSet):
             raise DRFValidationError(
                 {
                     "detail": _(
-                        "A validation error occurred while processing the refund. Please check your input and try again."
+                        "A validation error occurred while restocking the item. Please check your input and try again."
                     )
                 }
             ) from e
         except Exception as e:
             logger = logging.getLogger(__name__)
             logger.error(
-                f"Error processing refund: {e!s}",
+                f"Error restocking order item: {e!s}",
                 extra={
                     "order_item_id": order_item.id,
                     "user_id": request.user.id,
@@ -270,7 +278,7 @@ class OrderItemViewSet(BaseModelViewSet):
             raise DRFValidationError(
                 {
                     "detail": _(
-                        "An error occurred while processing the refund. Please try again later."
+                        "An error occurred while restocking the item. Please try again later."
                     )
                 }
             ) from e

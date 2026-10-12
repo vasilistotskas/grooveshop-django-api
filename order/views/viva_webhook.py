@@ -1319,8 +1319,6 @@ def _handle_payment_created(order, event_data, transaction_id):
 
     if verified_amount_raw is not None:
         try:
-            from decimal import Decimal
-
             verified_amount = Decimal(str(verified_amount_raw))
             expected_amount = order_total.amount
             # Allow a 1-cent tolerance for any provider-side rounding.
@@ -1367,7 +1365,31 @@ def _handle_payment_created(order, event_data, transaction_id):
         order.id,
     )
 
+    from djmoney.money import Money
+
+    from order.payment import VivaWalletPaymentProvider
+    from order.payment_ledger import PaymentLedger
     from order.services import OrderService
+
+    # The money is in, whatever state the order is in: a canceled order or
+    # a second payment under another of its checkout codes is still a
+    # charge, and the one a refund has to name.
+    try:
+        captured = Decimal(str(verified_amount_raw))
+    except InvalidOperation:
+        logger.error(
+            "Viva transaction %s carries no readable amount: not recorded "
+            "in the payment ledger of order %s",
+            transaction_id,
+            order.id,
+        )
+    else:
+        PaymentLedger.record_charge(
+            order,
+            amount=Money(captured, order_total.currency),
+            provider=VivaWalletPaymentProvider.code,
+            reference=transaction_id,
+        )
 
     # Before the settled guard: a canceled order's payment is already
     # settled (``Order.save`` settles an unpaid one to CANCELED), so
@@ -1529,34 +1551,37 @@ def _handle_payment_failed(order, event_data, transaction_id):
 
 
 def _handle_reversal_created(order, event_data, transaction_id):
-    """Book a refund Viva made against this order's payment.
+    """Book a refund Viva made against one of this order's payments.
 
-    Mirrors ``handle_stripe_charge_refunded``: only ``payment_status``
-    transitions, an audit row lands in ``metadata['refunds']``, and
-    ``order_refunded`` fires so the refund email, live WS toast, and Meta
-    CAPI Refund event all run. ``Order.status`` is left untouched —
-    deciding whether a reversal also means the goods are returned is a
-    business call the admin owns.
+    Mirrors ``handle_stripe_charge_refunded``: the refund becomes a
+    ``PaymentTransaction`` row, ``PaymentLedger.record_refund`` derives
+    ``payment_status`` from the ledger's sums, and ``order_refunded`` fires
+    so the refund email, live WS toast, and Meta CAPI Refund event all run.
+    ``Order.status`` is left untouched — deciding whether a reversal also
+    means the goods are returned is a business call the admin owns.
 
     The event's ``TransactionId`` is the refund and ``ParentId`` the
-    payment it reverses (:func:`_verify_viva_refund`). ``payment_status``
-    follows the CUMULATIVE refunded amount against what Viva captured:
-    PARTIALLY_REFUNDED while part of it remains, REFUNDED once it is all
-    back. Only REFUNDED releases the gift-card redemption and the loyalty
+    payment it reverses (:func:`_verify_viva_refund`). The ledger holds
+    every payment of the order (it can be paid twice, under two of its
+    checkout codes), so the refund is attached to the payment ``ParentId``
+    names. REFUNDED releases the gift-card redemption and the loyalty
     points, which come back once, with the last refund.
 
     A refund the in-app path already booked reaches us again as a 1797 of
-    its own (Viva notifies every refund, whoever made it), so a refund id
-    already in ``metadata['refunds']`` is not applied twice.
+    its own (Viva notifies every refund, whoever made it), and Viva
+    redelivers: both hit the ledger's unique constraint on the refund
+    transaction id and change nothing.
 
     Returns ``OUTCOME_SKIPPED`` when the event changed nothing, so the
     audit row says so; ``None`` when a refund was booked.
     """
-    from django.utils import timezone
     from djmoney.money import Money
 
+    from order.enum.payment_transaction import PaymentTransactionKind
+    from order.models.payment_transaction import PaymentTransaction
     from order.models.viva_webhook_event import VivaWebhookEvent
     from order.payment import VivaWalletPaymentProvider
+    from order.payment_ledger import PaymentLedger
     from order.signals import order_refunded
 
     logger.info(
@@ -1573,28 +1598,58 @@ def _handle_reversal_created(order, event_data, transaction_id):
     if refunded is None:
         return VivaWebhookEvent.OUTCOME_SKIPPED
 
-    # The refund must reverse THIS order's payment, not another payment
-    # that happens to share its order code. Retrieve Transaction does not
-    # document a parent id, so this is the event's own ``ParentId``; it can
-    # only refuse, never grant — the refund itself was verified above.
-    parent_id = event_data.get("ParentId")
-    if not (
-        parent_id
+    # The refund must reverse one of THIS order's payments, not another
+    # payment that happens to share its order code. Retrieve Transaction
+    # does not document a parent id, so this is the event's own
+    # ``ParentId``; it can only refuse, never grant — the refund itself was
+    # verified above, and the payment it is attached to comes from our own
+    # ledger rows (or, for an order whose capture was never recorded, from
+    # the order's own ``payment_id``), never from the event.
+    parent_id = str(event_data.get("ParentId") or "")
+    charge = (
+        PaymentTransaction.objects.filter(
+            order=order,
+            kind=PaymentTransactionKind.CHARGE,
+            provider=VivaWalletPaymentProvider.code,
+            provider_reference__iexact=parent_id,
+        ).first()
+        if parent_id
+        else None
+    )
+    if (
+        charge is None
+        and parent_id
         and order.payment_id
-        and str(parent_id).lower() == str(order.payment_id).lower()
+        and parent_id.lower() == order.payment_id.lower()
     ):
+        charge = PaymentLedger.ensure_charge(
+            order,
+            provider_code=VivaWalletPaymentProvider.code,
+            payment_id=order.payment_id,
+        )
+        if charge is None:
+            # Without it the refund cannot be attached to a payment. Retry
+            # rather than guess.
+            raise RuntimeError(
+                f"Viva captured amount unavailable for payment "
+                f"{order.payment_id}"
+            )
+    if charge is None:
         logger.error(
-            "Viva reversal %s names parent %r, which is not order %s's "
-            "payment %r — skipping",
+            "Viva reversal %s names parent %r, which is none of order %s's "
+            "payments — skipping",
             transaction_id,
             parent_id,
             order.id,
-            order.payment_id,
         )
         return VivaWebhookEvent.OUTCOME_SKIPPED
 
-    refunds = list((order.metadata or {}).get("refunds") or [])
-    if any(refund.get("refund_id") == transaction_id for refund in refunds):
+    previous_payment_status = order.payment_status
+    refund = Money(refunded, charge.amount.currency)
+    refund_row, created = PaymentLedger.record_refund(
+        order, charge=charge, amount=refund, reference=transaction_id
+    )
+    if not created:
         logger.info(
             "Viva reversal %s is already recorded on order %s — skipping",
             transaction_id,
@@ -1602,59 +1657,13 @@ def _handle_reversal_created(order, event_data, transaction_id):
         )
         return VivaWebhookEvent.OUTCOME_SKIPPED
 
-    if order.payment_status not in (
-        PaymentStatus.COMPLETED,
-        PaymentStatus.PARTIALLY_REFUNDED,
-    ):
-        logger.warning(
-            "Viva reversal %s for order %s whose payment_status is %s, not "
-            "a paid one — skipping; reconcile it by hand",
-            transaction_id,
-            order.id,
-            order.payment_status,
-        )
-        return VivaWebhookEvent.OUTCOME_SKIPPED
-
-    captured = VivaWalletPaymentProvider().captured_amount(order.payment_id)
-    if captured is None:
-        # Without it a refund cannot be called full or partial. Retry
-        # rather than guess.
-        raise RuntimeError(
-            f"Viva captured amount unavailable for payment {order.payment_id}"
-        )
-
-    already_refunded = sum(
-        (Decimal(str(refund["amount"])) for refund in refunds), Decimal(0)
-    )
-    new_payment_status = PaymentStatus.after_refund(
-        refunded=already_refunded + refunded, captured=captured
-    )
-    currency = order.calculate_order_total_amount().currency
-
-    previous_payment_status = order.payment_status
-    refunds.append(
-        {
-            "refund_id": transaction_id,
-            "amount": str(refunded),
-            "currency": currency.code,
-            "provider": "viva_wallet",
-            "refunded_at": timezone.now().isoformat(),
-        }
-    )
-    if not order.metadata:
-        order.metadata = {}
-    order.metadata["refunds"] = refunds
-    order.payment_status = new_payment_status
-
-    order.save(update_fields=["payment_status", "metadata"])
-
     OrderHistory.log_payment_update(
         order=order,
         previous_value={
             "payment_status": previous_payment_status,
         },
         new_value={
-            "payment_status": new_payment_status,
+            "payment_status": order.payment_status,
             "refund_id": transaction_id,
             "amount": str(refunded),
             "provider": "viva_wallet",
@@ -1662,5 +1671,5 @@ def _handle_reversal_created(order, event_data, transaction_id):
     )
 
     order_refunded.send(
-        sender=Order, order=order, amount=Money(refunded, currency)
+        sender=Order, order=order, amount=refund, refund=refund_row
     )

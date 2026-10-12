@@ -7,8 +7,9 @@ order_canceled = Signal()
 order_shipped = Signal()
 order_delivered = Signal()
 order_completed = Signal()
-# Dispatched once per refund the payment provider made, after
-# ``order.payment_status`` was written. Keyword arguments:
+# Dispatched once per REFUND row recorded on the payment ledger
+# (``PaymentLedger.record_refund``), after ``order.payment_status`` was
+# derived from it. Keyword arguments:
 #
 # * ``amount`` (``Money``, always present): what THIS refund paid back.
 #   Receivers that use it declare it as a required argument, so a sender
@@ -17,7 +18,7 @@ order_completed = Signal()
 #
 # ``order.payment_status`` says how much of the order is back:
 # PARTIALLY_REFUNDED while part of the payment remains refundable,
-# REFUNDED once nothing does (``PaymentStatus.after_refund``). Whatever
+# REFUNDED once nothing does (``PaymentLedger.refund_status``). Whatever
 # hangs off the order's total — the gift-card redemption, the loyalty
 # points — is released only on REFUNDED, once, with the last refund; a
 # slice per partial refund cannot be made whole again by the next one.

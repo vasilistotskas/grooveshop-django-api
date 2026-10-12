@@ -18,6 +18,7 @@ from loyalty.enum import TransactionType
 from loyalty.models.transaction import PointsTransaction
 from loyalty.services import LoyaltyService
 from order.enum.status import OrderStatus, PaymentStatus
+from order.factories import RefundTransactionFactory
 from order.factories.item import OrderItemFactory
 from order.factories.order import OrderFactory
 from order.services import OrderService
@@ -129,6 +130,9 @@ def test_a_partial_refund_keeps_the_points(
             sender=OrderService,
             order=order,
             amount=Money(Decimal("5.00"), "EUR"),
+            refund=RefundTransactionFactory(
+                order=order, amount=Money(Decimal("5.00"), "EUR")
+            ),
         )
 
     assert not _reversals(order).exists()
@@ -150,6 +154,9 @@ def test_the_refund_that_completes_the_order_reverses_the_points(
             sender=OrderService,
             order=order,
             amount=Money(Decimal("95.00"), "EUR"),
+            refund=RefundTransactionFactory(
+                order=order, amount=Money(Decimal("95.00"), "EUR")
+            ),
         )
 
     assert _reversals(order).count() == 1
@@ -173,6 +180,9 @@ def test_refund_then_status_move_reverses_exactly_once(
             sender=OrderService,
             order=order,
             amount=Money(Decimal("100.00"), "EUR"),
+            refund=RefundTransactionFactory(
+                order=order, amount=Money(Decimal("100.00"), "EUR")
+            ),
         )
     assert _reversals(order).count() == 1
 

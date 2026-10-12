@@ -28,7 +28,13 @@ pytestmark = pytest.mark.django_db
 def _event(event_id: str, payment_intent_id: str) -> Mock:
     event = Mock(spec=Event)
     event.id = event_id
-    event.data = {"object": {"id": payment_intent_id}}
+    event.data = {
+        "object": {
+            "id": payment_intent_id,
+            "amount_received": 5000,
+            "currency": "eur",
+        }
+    }
     return event
 
 

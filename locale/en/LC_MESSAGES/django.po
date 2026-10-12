@@ -19747,3 +19747,167 @@ msgid ""
 "VAT percentage this line was sold at, fixed when the line was created. "
 "Invoices and myDATA use it, never the product's current VAT."
 msgstr ""
+
+#: .\order\admin.py:221
+msgid "Recorded with the refund on the order's payment ledger."
+msgstr ""
+
+#: .\order\admin.py:234
+#, python-format
+msgid "Up to %(refundable)s can still be refunded."
+msgstr ""
+
+#: .\order\admin.py:1036
+msgid "Refund (amount, reason)"
+msgstr ""
+
+#: .\order\admin.py:1040
+msgid "Refund order"
+msgstr ""
+
+#: .\order\admin.py:1041
+msgid "Pays the amount back through the payment provider and records it on the order's payment ledger. A part refund can be followed by more until nothing is left. The order status and its stock are not changed."
+msgstr ""
+
+#: .\order\admin.py:1073
+#, python-format
+msgid "Order %(order_id)s refunded %(amount)s."
+msgstr ""
+
+#: .\order\admin.py:1080
+#, python-format
+msgid "Order %(order_id)s was not refunded; see the order history."
+msgstr ""
+
+#: .\order\services.py:2643
+msgid "This order was not paid through a payment provider, so there is nothing to refund here."
+msgstr ""
+
+#: .\order\services.py:2681
+msgid "The refund amount must be greater than zero."
+msgstr ""
+
+#: .\order\services.py:2712
+#, python-brace-format
+msgid "Refund amount ({refund}) cannot exceed the refundable amount ({refundable})."
+msgstr ""
+
+#: .\order\models\payment_transaction.py:60
+msgid "Provider reference"
+msgstr ""
+
+#: .\order\models\payment_transaction.py:88
+msgid "Payment Transaction"
+msgstr ""
+
+#: .\order\models\payment_transaction.py:89
+msgid "Payment Transactions"
+msgstr ""
+
+#: .\order\models\payment_transaction.py:49
+msgid "Always positive; the kind says which way it moved."
+msgstr ""
+
+#: .\order\models\payment_transaction.py:54
+msgid "Who moved the money: the payment provider's code, or the courier's cash-on-delivery code."
+msgstr ""
+
+#: .\order\models\payment_transaction.py:62
+msgid "The provider's own id for this movement (a Stripe PaymentIntent or refund id, a Viva transaction id, a courier voucher)."
+msgstr ""
+
+#: .\order\models\payment_transaction.py:75
+msgid "Refunded charge"
+msgstr ""
+
+#: .\order\models\payment_transaction.py:76
+msgid "Set on a refund: the charge it paid back."
+msgstr ""
+
+#: .\order\models\payment_transaction.py:83
+msgid "The reason given for a refund."
+msgstr ""
+
+#: .\order\models\payment_transaction.py:120
+#, python-format
+msgid "%(kind)s %(amount)s on order %(order)s"
+msgstr ""
+
+#: .\order\enum\payment_transaction.py:13
+msgid "Charge"
+msgstr ""
+
+#: .\order\enum\payment_transaction.py:15
+msgid "Cash on delivery collection"
+msgstr ""
+
+#: .\order\views\item.py:46
+msgid "Restock returned units of an order item"
+msgstr ""
+
+#: .\order\views\item.py:47
+msgid "Puts returned units of an order line back into stock and records them on the line. It moves no money: refund the payment with the order's refund action."
+msgstr ""
+
+#: .\order\views\item.py:171
+msgid "Only staff can restock order items."
+msgstr ""
+
+#: .\order\views\item.py:213
+msgid "The returned units were restocked."
+msgstr ""
+
+#: .\order\views\item.py:178
+msgid "Units can only be restocked on a delivered, completed or returned order."
+msgstr ""
+
+#: .\order\views\item.py:187
+msgid "All units of this item were already restocked."
+msgstr ""
+
+#: .\order\views\item.py:233
+msgid "A validation error occurred while restocking the item. Please check your input and try again."
+msgstr ""
+
+#: .\order\views\item.py:249
+msgid "An error occurred while restocking the item. Please try again later."
+msgstr ""
+
+#: .\order\serializers\item.py:139
+msgid "Quantity returned and restocked. If not provided, every unit not yet restocked."
+msgstr ""
+
+#: .\order\serializers\item.py:148
+msgid "Optional reason for the return"
+msgstr ""
+
+#: .\order\serializers\item.py:157
+msgid "Order item is required for restock operation"
+msgstr ""
+
+#: .\order\serializers\item.py:162
+#, python-brace-format
+msgid "Cannot restock more than the available quantity. Available: {available_quantity}"
+msgstr ""
+
+#: .\order\admin.py:1089
+#, python-format
+msgid "Order %(order_id)s: %(refunded)s of %(requested)s refunded; the rest was declined: %(reason)s"
+msgstr ""
+
+#: .\order\models\refund_notification.py:31
+msgid "The refund whose confirmation email this claims."
+msgstr ""
+
+#: .\order\models\refund_notification.py:37
+msgid "Refund Notification"
+msgstr ""
+
+#: .\order\models\refund_notification.py:38
+msgid "Refund Notifications"
+msgstr ""
+
+#: .\order\models\refund_notification.py:41
+#, python-format
+msgid "Notification of refund %(refund)s"
+msgstr ""

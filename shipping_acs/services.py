@@ -48,6 +48,10 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+#: ``Order.payment_method`` of an order ACS collected cash for, and the
+#: provider of its payment-ledger row.
+_COD_PAYMENT_METHOD = "acs_cod"
+
 
 # State-transition tables (string literals to avoid importing
 # order.enum.status at module import time and risking a circular
@@ -2275,16 +2279,22 @@ class AcsService:
         flip, attempts the DELIVERED → COMPLETED auto-advance so
         accounting matches the lifecycle.
         """
-        from order.enum.status import PaymentStatus
         from order.services import OrderService
         from order.signals import order_paid
 
         order = getattr(shipment, "order", None)
         if order is None:
             return
-        if order.payment_status != PaymentStatus.PENDING:
+        # The status flip and the ledger row are one atomic step under the
+        # order lock (``settle_cod_payment``); what follows is only run by
+        # the call that settled it.
+        if not OrderService.settle_cod_payment(
+            order,
+            amount=shipment.cod_amount,
+            provider=_COD_PAYMENT_METHOD,
+            reference=shipment.voucher_no,
+        ):
             return
-        order.mark_as_paid(payment_method="acs_cod")
         logger.info(
             "ACS COD reconcile: order=%s payment_status PENDING -> "
             "COMPLETED (voucher=%s)",

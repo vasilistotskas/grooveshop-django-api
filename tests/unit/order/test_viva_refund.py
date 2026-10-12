@@ -15,7 +15,6 @@ from decimal import Decimal
 import pytest
 from djmoney.money import Money
 
-from order.enum.status import PaymentStatus
 from order.payment import VivaWalletPaymentProvider
 from tests.utils.viva import (
     CANCEL_ALREADY_CANCELLED,
@@ -25,78 +24,68 @@ from tests.utils.viva import (
 )
 
 PAYMENT_ID = "b1a3067c-321b-4ec6-bc9d-1778aef2a19d"
+IDEMPOTENCY_KEY = "order-1-refund-1"
 
 
 def _refund(fake: FakeVivaApi, amount: Money | None = None):
     with fake:
-        return VivaWalletPaymentProvider().refund_payment(PAYMENT_ID, amount)
+        return VivaWalletPaymentProvider().refund_payment(
+            PAYMENT_ID,
+            amount or Money(Decimal("21.10"), "EUR"),
+            idempotency_key=IDEMPOTENCY_KEY,
+        )
 
 
 class TestTheRequestAlwaysCarriesAnAmount:
-    def test_a_full_refund_names_the_amount_viva_captured(self):
-        fake = FakeVivaApi(captured=21.1)
+    @pytest.mark.parametrize(
+        ("amount", "cents"),
+        [
+            (Money(Decimal("21.10"), "EUR"), "2110"),
+            (Money(Decimal("5.25"), "EUR"), "525"),
+            (Money(Decimal("0.01"), "EUR"), "1"),
+        ],
+    )
+    def test_the_refund_sends_exactly_the_amount_asked_for(self, amount, cents):
+        fake = FakeVivaApi()
 
-        success, _data = _refund(fake)
+        success, _data = _refund(fake, amount)
 
         assert success is True
         [delete] = fake.deletes
-        assert fake.query(delete) == {"amount": ["2110"]}
+        assert fake.query(delete) == {"amount": [cents]}
         assert delete.url.startswith(
             f"https://demo.vivapayments.com/api/transactions/{PAYMENT_ID}?"
         )
 
-    def test_a_partial_refund_sends_what_was_asked_without_a_lookup(self):
+    def test_the_amount_is_never_read_back_from_viva_first(self):
+        """The ledger holds what was captured, so a refund is one call."""
         fake = FakeVivaApi()
 
-        success, _data = _refund(fake, Money(Decimal("5.25"), "EUR"))
+        _refund(fake, Money(Decimal("5.25"), "EUR"))
 
-        assert success is True
-        [delete] = fake.deletes
-        assert fake.query(delete) == {"amount": ["525"]}
         assert all(r.method != "GET" for r in fake.sent)
 
-    @pytest.mark.parametrize(
-        "amount",
-        [None, Money(Decimal("10.00"), "EUR"), Money(Decimal(0), "EUR")],
-        ids=["full", "partial", "zero"],
-    )
-    def test_no_delete_goes_out_without_amount(self, amount):
+    def test_the_idempotency_key_is_not_sent(self):
+        """``DELETE /api/transactions/{id}`` has no such parameter (Viva's
+        ``idempotencyKey`` belongs to ``/acquiring/v1/transactions/{id}``),
+        so a key that went out would only be an unknown query parameter."""
         fake = FakeVivaApi()
 
-        _refund(fake, amount)
+        _refund(fake)
 
-        assert fake.deletes
-        assert all("amount" in fake.query(r) for r in fake.deletes)
-
-    @pytest.mark.parametrize(
-        "retrieve",
-        [
-            (404, ["Transaction Id does not exist."]),
-            (200, {"statusId": "F"}),
-        ],
-        ids=["retrieve-fails", "retrieve-has-no-amount"],
-    )
-    def test_a_full_refund_that_cannot_learn_the_amount_sends_nothing(
-        self, retrieve
-    ):
-        fake = FakeVivaApi(retrieve=retrieve)
-
-        success, data = _refund(fake)
-
-        assert success is False
-        assert data["viva_error"] is True
-        assert fake.deletes == []
+        [delete] = fake.deletes
+        assert "idempotencyKey" not in fake.query(delete)
+        assert IDEMPOTENCY_KEY not in (delete.url or "")
 
 
 class TestOnlyADocumentedSuccessCounts:
     def test_the_refund_id_is_the_returned_transaction_id(self):
-        success, data = _refund(FakeVivaApi(captured=21.1))
+        success, data = _refund(FakeVivaApi())
 
         assert success is True
         assert data == {
             "refund_id": CANCEL_SUCCESS["TransactionId"],
-            "status": PaymentStatus.REFUNDED,
-            "amount": "21.1",
+            "amount": "21.10",
             "payment_id": PAYMENT_ID,
             "viva_status": "refunded",
         }

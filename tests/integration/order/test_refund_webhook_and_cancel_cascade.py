@@ -1,210 +1,24 @@
-"""Integration tests for PR #2 H + I.
+"""Integration tests for PR #2 H + the refund concurrency guard.
 
 H: Cancelling an order cascades to the courier voucher.
-I: Stripe ``charge.refunded`` webhook flips Order.payment_status.
+The ``charge.refunded`` webhook (PR #2 I) is covered in
+``test_stripe_charge_refunded.py`` since the payment ledger.
 """
 
 from __future__ import annotations
 
-from decimal import Decimal
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pytest
 from djmoney.money import Money
-from djstripe.models import Event
 
+from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import OrderStatus, PaymentStatus
 from order.exceptions import PaymentError
-from order.factories import OrderFactory
+from order.factories import OrderFactory, PaymentTransactionFactory
 from order.models.order import Order
 from order.services import OrderService
-from order.signals import order_refunded
-from order.signals.handlers import handle_stripe_charge_refunded
-
-# ---------------------------------------------------------------------------
-# I — charge.refunded webhook
-# ---------------------------------------------------------------------------
-
-
-def _build_charge_event(
-    *,
-    event_id: str,
-    payment_intent_id: str,
-    amount: int,
-    amount_refunded: int,
-    currency: str = "eur",
-) -> Mock:
-    event = Mock(spec=Event)
-    event.id = event_id
-    event.type = "charge.refunded"
-    event.data = {
-        "object": {
-            "id": "ch_test_xxx",
-            "payment_intent": payment_intent_id,
-            "amount": amount,
-            "amount_refunded": amount_refunded,
-            "currency": currency,
-            "refunded": amount_refunded >= amount > 0,
-        }
-    }
-    return event
-
-
-@pytest.mark.django_db
-class TestChargeRefundedWebhook:
-    def test_full_refund_flips_payment_status_to_refunded(self):
-        order = OrderFactory(
-            num_order_items=0,
-            payment_id="pi_full_refund_1",
-            status=OrderStatus.DELIVERED,
-            payment_status=PaymentStatus.COMPLETED,
-        )
-        event = _build_charge_event(
-            event_id="evt_full_refund_1",
-            payment_intent_id="pi_full_refund_1",
-            amount=5000,
-            amount_refunded=5000,
-        )
-        handle_stripe_charge_refunded(sender=None, event=event)
-        order.refresh_from_db()
-        assert order.payment_status == PaymentStatus.REFUNDED
-        assert order.metadata["refunds"][-1]["is_full_refund"] is True
-        assert order.metadata["refunds"][-1]["amount_refunded"] == 5000
-
-    @pytest.mark.parametrize(
-        ("currency", "expected"),
-        [
-            # A charge reports minor units in the currency's OWN exponent:
-            # 5000 of a two-decimal currency is 50, of a zero-decimal one
-            # it is 5000.
-            ("eur", Money(Decimal(50), "EUR")),
-            ("jpy", Money(Decimal(5000), "JPY")),
-        ],
-    )
-    def test_full_refund_says_how_much_was_refunded(self, currency, expected):
-        """``order_refunded`` always carries its amount: a receiver must
-        never have to read its absence as "everything"."""
-        OrderFactory(
-            num_order_items=0,
-            payment_id=f"pi_full_refund_amount_{currency}",
-            status=OrderStatus.DELIVERED,
-            payment_status=PaymentStatus.COMPLETED,
-        )
-        event = _build_charge_event(
-            event_id=f"evt_full_refund_amount_{currency}",
-            payment_intent_id=f"pi_full_refund_amount_{currency}",
-            amount=5000,
-            amount_refunded=5000,
-            currency=currency,
-        )
-        received: list[dict] = []
-
-        def receiver(sender, **kwargs):
-            received.append(kwargs)
-
-        order_refunded.connect(receiver, weak=False)
-        try:
-            handle_stripe_charge_refunded(sender=None, event=event)
-        finally:
-            order_refunded.disconnect(receiver)
-
-        assert [r["amount"] for r in received] == [expected]
-
-    def test_partial_refund_flips_payment_status_to_partially_refunded(self):
-        order = OrderFactory(
-            num_order_items=0,
-            payment_id="pi_partial_refund_1",
-            status=OrderStatus.DELIVERED,
-            payment_status=PaymentStatus.COMPLETED,
-        )
-        event = _build_charge_event(
-            event_id="evt_partial_refund_1",
-            payment_intent_id="pi_partial_refund_1",
-            amount=5000,
-            amount_refunded=1500,
-        )
-        handle_stripe_charge_refunded(sender=None, event=event)
-        order.refresh_from_db()
-        assert order.payment_status == PaymentStatus.PARTIALLY_REFUNDED
-        assert order.metadata["refunds"][-1]["is_full_refund"] is False
-        assert order.metadata["refunds"][-1]["amount_refunded"] == 1500
-
-    def test_redelivery_is_idempotent(self):
-        order = OrderFactory(
-            num_order_items=0,
-            payment_id="pi_idempotent_1",
-            status=OrderStatus.DELIVERED,
-            payment_status=PaymentStatus.COMPLETED,
-        )
-        event = _build_charge_event(
-            event_id="evt_idempotent_1",
-            payment_intent_id="pi_idempotent_1",
-            amount=5000,
-            amount_refunded=5000,
-        )
-        handle_stripe_charge_refunded(sender=None, event=event)
-        # Replay the same event — should not duplicate metadata entries
-        handle_stripe_charge_refunded(sender=None, event=event)
-        order.refresh_from_db()
-        assert len(order.metadata["refunds"]) == 1
-
-    def test_unknown_payment_intent_silently_warns(self):
-        event = _build_charge_event(
-            event_id="evt_unknown_1",
-            payment_intent_id="pi_does_not_exist",
-            amount=5000,
-            amount_refunded=5000,
-        )
-        # Must not raise.
-        handle_stripe_charge_refunded(sender=None, event=event)
-
-    def test_event_without_payment_intent_id_no_ops(self):
-        event = Mock(spec=Event)
-        event.id = "evt_no_pi"
-        event.type = "charge.refunded"
-        event.data = {
-            "object": {
-                "id": "ch_no_pi",
-                "payment_intent": "",
-                "amount": 5000,
-                "amount_refunded": 5000,
-            }
-        }
-        handle_stripe_charge_refunded(sender=None, event=event)
-
-    def test_full_refund_dispatches_confirmation_email_once(self):
-        """PR #8 U1: a charge.refunded event for a full refund queues
-        the customer's refund-confirmation email exactly once. The
-        idempotency flag prevents a redelivery from emailing twice."""
-        order = OrderFactory(
-            num_order_items=0,
-            payment_id="pi_email_once_1",
-            status=OrderStatus.DELIVERED,
-            payment_status=PaymentStatus.COMPLETED,
-        )
-        event = _build_charge_event(
-            event_id="evt_email_once_1",
-            payment_intent_id="pi_email_once_1",
-            amount=5000,
-            amount_refunded=5000,
-        )
-        # The handler dispatches via apply_async (not .delay) so it can
-        # pin the tenant schema in the task header — see the on_commit
-        # schema-capture pattern in handle_order_refunded.
-        with patch(
-            "order.signals.handlers.send_refund_confirmation_email.apply_async"
-        ) as mock_email:
-            handle_stripe_charge_refunded(sender=None, event=event)
-            # Stripe redelivers the same event ~10s later.
-            handle_stripe_charge_refunded(sender=None, event=event)
-
-        # First call queued the email; second call short-circuited at
-        # the webhook-event dedup before reaching the signal.
-        assert mock_email.call_count == 1
-        mock_email.assert_called_with(
-            args=[order.id], headers={"_schema_name": "public"}
-        )
-
+from pay_way.factories import PayWayFactory
 
 # ---------------------------------------------------------------------------
 # H — order cancel cascades to courier voucher
@@ -305,14 +119,11 @@ class TestCancelOrderCascadesToShipment:
 
 @pytest.mark.django_db
 class TestRefundOrderConcurrencyGuard:
-    """refund_order must re-check the LOCKED row so a concurrent refund
-    that already committed can't be double-issued (G0280)."""
+    """refund_order must read what is left from the LOCKED ledger, so a
+    concurrent refund that already committed can't be double-issued
+    (G0280)."""
 
-    def test_refund_rechecks_locked_row_and_skips_provider(self):
-        from djmoney.money import Money
-
-        from pay_way.factories import PayWayFactory
-
+    def _stale_order(self):
         order = OrderFactory(
             status=OrderStatus.COMPLETED,
             payment_status=PaymentStatus.COMPLETED,
@@ -321,9 +132,25 @@ class TestRefundOrderConcurrencyGuard:
             paid_amount=Money("50.00", "EUR"),
             num_order_items=0,
         )
+        charge = PaymentTransactionFactory(
+            order=order,
+            amount=Money("50.00", "EUR"),
+            provider_reference="pi_refund_race",
+        )
+        return order, charge
 
-        # Simulate a concurrent refund that already committed REFUNDED,
-        # WITHOUT touching the caller's stale in-memory ``order``.
+    def test_a_refund_that_took_everything_leaves_nothing_to_refund(self):
+        order, charge = self._stale_order()
+
+        # A concurrent refund that already committed, WITHOUT touching the
+        # caller's stale in-memory ``order`` (still COMPLETED).
+        PaymentTransactionFactory(
+            order=order,
+            charge=charge,
+            kind=PaymentTransactionKind.REFUND,
+            amount=Money("50.00", "EUR"),
+            provider_reference="re_race_1",
+        )
         Order.objects.filter(pk=order.pk).update(
             payment_status=PaymentStatus.REFUNDED
         )
@@ -332,5 +159,23 @@ class TestRefundOrderConcurrencyGuard:
             with pytest.raises(PaymentError):
                 OrderService.refund_order(order, reason="dup")
 
-            # The re-fetched guard blocked it — no second provider refund.
+            # The locked ledger blocked it: no second provider refund.
+            mock_provider.assert_not_called()
+
+    def test_a_refund_that_took_part_shrinks_what_may_be_refunded(self):
+        order, charge = self._stale_order()
+        PaymentTransactionFactory(
+            order=order,
+            charge=charge,
+            kind=PaymentTransactionKind.REFUND,
+            amount=Money("30.00", "EUR"),
+            provider_reference="re_race_1",
+        )
+
+        with patch("order.payment.get_payment_provider") as mock_provider:
+            with pytest.raises(PaymentError, match=r"\(20\.00\)"):
+                OrderService.refund_order(
+                    order, amount=Money("30.00", "EUR"), reason="dup"
+                )
+
             mock_provider.assert_not_called()

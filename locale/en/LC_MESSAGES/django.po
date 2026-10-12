@@ -9086,6 +9086,10 @@ msgstr ""
 msgid "Parcel already with the courier"
 msgstr ""
 
+#: .\order\enum\cancel_error.py:19
+msgid "Courier could not be reached"
+msgstr ""
+
 #: .\order\enum\create_error.py:13
 msgid "Insufficient stock"
 msgstr ""
@@ -9298,10 +9302,6 @@ msgstr ""
 
 #: .\order\filters.py:209
 msgid "Filter canceled orders"
-msgstr ""
-
-#: .\order\filters.py:213
-msgid "Filter orders that can be canceled"
 msgstr ""
 
 #: .\order\filters.py:219
@@ -10984,6 +10984,12 @@ msgstr ""
 msgid ""
 "Your parcel is already with the courier, so the order can no longer be "
 "canceled. Contact the store to arrange a return."
+msgstr ""
+
+#: .\order\services.py:2321
+msgid ""
+"We could not reach the courier to cancel your parcel. Please try "
+"again in a few minutes."
 msgstr ""
 
 #: .\order\services.py:2403 .\order\services.py:2414

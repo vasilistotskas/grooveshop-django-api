@@ -53,6 +53,7 @@ from order.enum.create_error import OrderCreateErrorType
 from order.enum.status import OrderStatus, PaymentStatus
 from order.exceptions import (
     CartNotReadyError,
+    CourierUnreachableError,
     InsufficientStockError,
     InvalidCouponError,
     InvalidGiftCardError,
@@ -131,7 +132,10 @@ serializers_config: SerializersConfig = {
     "cancel": ActionConfig(
         request=CancelOrderRequestSerializer,
         response=OrderDetailSerializer,
-        responses={400: OrderCancelErrorSerializer},
+        responses={
+            400: OrderCancelErrorSerializer,
+            503: OrderCancelErrorSerializer,
+        },
         operation_id="cancelOrder",
         summary=_("Cancel an order"),
         description=_("Cancel an existing order and restore product stock"),
@@ -1814,6 +1818,23 @@ class OrderViewSet(BaseModelViewSet):
 
             return Response(response_data)
 
+        except CourierUnreachableError as e:
+            # Before OrderCancellationError, which it subclasses. A 503:
+            # the courier, not the request, is at fault, and the same
+            # request may succeed later.
+            logger.warning(
+                "Order %s cancel stopped: the courier gave no answer",
+                order.id,
+            )
+            return Response(
+                {
+                    "detail": e.reason,
+                    "error": {
+                        "type": OrderCancelErrorType.COURIER_UNREACHABLE,
+                    },
+                },
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
         except ParcelWithCourierError as e:
             # Before OrderCancellationError, which it subclasses. The
             # client branches on ``error.type``, never on ``detail``,

@@ -3,6 +3,63 @@
 
 
 
+## v3.104.7 (2026-10-12)
+
+### Bug fixes
+
+* fix(order): tell a courier outage apart from a refusal on customer cancel (#150) ([`086f2bc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/086f2bc999cc5ec4d0e66400dfab59b66b487f06))
+
+* fix(order): tell a courier outage apart from a refusal on customer cancel
+
+A customer cancel turned every exception from the courier call into a
+400 parcel_with_courier, so a database error or a bug of ours told the
+customer their parcel was already with the courier, and so did a courier
+that was merely unreachable (ACS answers ~2% of calls with a transient
+406).
+
+- shipping.exceptions gains CarrierError and CarrierUnavailableError.
+  AcsError and BoxNowError derive from CarrierError; the no-answer
+  errors (AcsRetryableError and so AcsAuthError, AcsConfigError,
+  BoxNowRetryableError, BoxNowAuthError, BoxNowConfigError) also derive
+  from CarrierUnavailableError.
+- _ask_courier_to_cancel catches courier errors only: a refusal stays
+  400 parcel_with_courier, no answer is CourierUnreachableError and a
+  503 courier_unreachable ("try again in a few minutes"), anything else
+  propagates as itself to the endpoint's 500.
+- The courier is asked before the order row is locked. If the order
+  moved on meanwhile and the locked re-check refuses the cancel after
+  the courier canceled the parcel, an ERROR line and a staff note say
+  the order needs a new voucher. An order canceled by another request
+  meanwhile needs neither.
+- The order list's canBeCanceled filter is removed. It was status-only
+  while the canBeCanceled field now follows the courier, so it listed
+  orders whose own flag said no, and no client used it.
+- schema.yml regenerated; el/en catalogue entries; docs/order-system.md
+  section 7.1.1 describes the three answers.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1 ([`086f2bc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/086f2bc999cc5ec4d0e66400dfab59b66b487f06))
+
+* fix(order): word the staff note by what is known, not by a guessed cause
+
+The note written when a customer cancel canceled the shipment but not the
+order said the order had moved on and that the courier canceled its
+parcel. Neither holds every time: any failure of the locked cancel ends
+the same way, and a shipment with no voucher yet is canceled only
+locally. It now states that the shipment was canceled, that the order was
+not, and the order's current status.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`086f2bc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/086f2bc999cc5ec4d0e66400dfab59b66b487f06))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.104.6 [skip ci] ([`519371d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/519371df66216fd8019263d76d3a7e3e040d2114))
+
 ## v3.104.6 (2026-10-11)
 
 ### Bug fixes

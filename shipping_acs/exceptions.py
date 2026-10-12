@@ -18,12 +18,14 @@ ACS error semantics (per PDF):
 
 from __future__ import annotations
 
+from shipping.exceptions import CarrierError, CarrierUnavailableError
 
-class AcsError(Exception):
+
+class AcsError(CarrierError):
     """Base class for ACS-related errors."""
 
 
-class AcsConfigError(AcsError):
+class AcsConfigError(AcsError, CarrierUnavailableError):
     """Raised when required ACS credentials or settings are missing."""
 
 
@@ -60,7 +62,7 @@ class AcsAPIError(AcsError):
         return f"ACS [{self.alias}]: {self.error_message}"
 
 
-class AcsRetryableError(AcsAPIError):
+class AcsRetryableError(AcsAPIError, CarrierUnavailableError):
     """Raised on HTTP 5xx and connection errors — Celery autoretries."""
 
 

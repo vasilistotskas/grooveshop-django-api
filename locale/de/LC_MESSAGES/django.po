@@ -5380,10 +5380,6 @@ msgstr ""
 msgid "Filter canceled orders"
 msgstr ""
 
-#: .\order\filters.py:199
-msgid "Filter orders that can be canceled"
-msgstr ""
-
 #: .\order\filters.py:205
 msgid "Filter active orders (pending, processing, shipped, delivered)"
 msgstr ""

@@ -150,10 +150,15 @@ Every price field above reads a stored column, so a list costs no query per row.
 `discountPercent`) are the merchant's markdown, not an announcement. They are
 **deprecated** in the schema and stay for one release; a client that struck
 them through must move to the fields above, after which they are removed with
-the expand/contract rule of `docs/migrations.md`. The Meilisearch index needs
-`manage.py meilisearch_apply_settings` once for the new displayed, filterable
-and sortable fields (`prior_price`, `announced_discount_percent`,
-`effective_price`).
+the expand/contract rule of `docs/migrations.md`. The deploy's PreSync hook
+applies the new displayed, filterable and sortable fields
+(`prior_price`, `announced_discount_percent`, `effective_price`) with
+`meilisearch_apply_settings --all-tenants`. Documents indexed before such a
+field existed only gain it when they are rebuilt, so a release that adds one
+is followed by
+`manage.py meilisearch_sync_index product.ProductTranslation --all-tenants`;
+without `--all-tenants` the command runs in the public schema, which holds no
+products.
 
 ## The markdown formula
 

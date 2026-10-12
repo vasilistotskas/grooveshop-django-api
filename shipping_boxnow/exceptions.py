@@ -1,15 +1,17 @@
 from __future__ import annotations
 
+from shipping.exceptions import CarrierError, CarrierUnavailableError
+
 # ---------------------------------------------------------------------------
 # Exception hierarchy
 # ---------------------------------------------------------------------------
 
 
-class BoxNowError(Exception):
+class BoxNowError(CarrierError):
     """Base class for all BoxNow-related errors."""
 
 
-class BoxNowConfigError(BoxNowError):
+class BoxNowConfigError(BoxNowError, CarrierUnavailableError):
     """Raised when required BoxNow credentials or settings are missing."""
 
 
@@ -78,7 +80,7 @@ class BoxNowAPIError(BoxNowError):
         return f"BoxNow API {self.status_code} [{self.code}]: {self.message}"
 
 
-class BoxNowAuthError(BoxNowAPIError):
+class BoxNowAuthError(BoxNowAPIError, CarrierUnavailableError):
     """
     Raised for HTTP 401 / 403 responses from BoxNow.
 
@@ -87,7 +89,7 @@ class BoxNowAuthError(BoxNowAPIError):
     """
 
 
-class BoxNowRetryableError(BoxNowAPIError):
+class BoxNowRetryableError(BoxNowAPIError, CarrierUnavailableError):
     """
     Raised for transient failures that Celery tasks should auto-retry on.
 

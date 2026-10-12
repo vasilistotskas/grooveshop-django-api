@@ -6,8 +6,10 @@ accepted and refunded while the courier had already taken the parcel. The
 customer cancel now asks the courier to cancel the voucher before anything
 else changes and only goes on when the courier confirms (or no voucher
 exists). A refusal, or a courier that cannot be reached, leaves the order
-exactly as it was. Staff and system cancels are not bound by the courier:
-they cancel and refund, and the refusal is shown to staff.
+exactly as it was; the answer says which of the two it was, because a
+courier that gives no answer may give one later. Staff and system cancels
+are not bound by the courier: they cancel and refund, and the refusal is
+shown to staff.
 
 Only the carrier HTTP boundary (``AcsClient`` / ``BoxNowClient``) and the
 Viva HTTP boundary are faked.
@@ -15,6 +17,8 @@ Viva HTTP boundary are faked.
 
 from __future__ import annotations
 
+import logging
+from dataclasses import dataclass
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
@@ -34,7 +38,11 @@ from rest_framework.test import APIClient
 from order.admin import OrderAdmin
 from order.enum.cancel_error import OrderCancelErrorType
 from order.enum.status import OrderStatus, PaymentStatus
-from order.exceptions import ParcelWithCourierError
+from order.exceptions import (
+    CourierUnreachableError,
+    OrderCancellationError,
+    ParcelWithCourierError,
+)
 from order.factories.order import OrderFactory
 from order.models.history import OrderHistory
 from order.models.order import Order
@@ -42,10 +50,18 @@ from order.services import OrderService
 from pay_way.factories import PayWayFactory
 from shipping.models import ShippingProvider
 from shipping_acs.enum.shipment_state import AcsShipmentState
-from shipping_acs.exceptions import AcsAPIError, AcsRetryableError
+from shipping_acs.exceptions import (
+    AcsAPIError,
+    AcsAuthError,
+    AcsRetryableError,
+)
 from shipping_acs.factories import AcsPickupListFactory, AcsShipmentFactory
 from shipping_boxnow.enum.parcel_state import BoxNowParcelState
-from shipping_boxnow.exceptions import BoxNowAPIError, BoxNowRetryableError
+from shipping_boxnow.exceptions import (
+    BoxNowAPIError,
+    BoxNowAuthError,
+    BoxNowRetryableError,
+)
 from shipping_boxnow.factories import BoxNowShipmentFactory
 from tests.utils.staff import (
     bind_store_tenant,
@@ -62,6 +78,34 @@ PAYMENT_ID = "b1a3067c-321b-4ec6-bc9d-1778aef2a19d"
 REFUSAL_DETAIL = (
     "Your parcel is already with the courier, so the order can no longer "
     "be canceled. Contact the store to arrange a return."
+)
+UNREACHABLE_DETAIL = (
+    "We could not reach the courier to cancel your parcel. Please try "
+    "again in a few minutes."
+)
+
+
+@dataclass(frozen=True)
+class Outcome:
+    """What the customer is told when the courier does not confirm."""
+
+    status: int
+    type: OrderCancelErrorType
+    detail: str
+    error: type[OrderCancellationError]
+
+
+REFUSED = Outcome(
+    status.HTTP_400_BAD_REQUEST,
+    OrderCancelErrorType.PARCEL_WITH_COURIER,
+    REFUSAL_DETAIL,
+    ParcelWithCourierError,
+)
+UNREACHABLE = Outcome(
+    status.HTTP_503_SERVICE_UNAVAILABLE,
+    OrderCancelErrorType.COURIER_UNREACHABLE,
+    UNREACHABLE_DETAIL,
+    CourierUnreachableError,
 )
 
 
@@ -257,21 +301,27 @@ class TestACustomerCancelTheCourierConfirms:
 
 
 @pytest.mark.assert_english
-class TestACustomerCancelTheCourierRefuses:
-    """Whatever stops the courier cancelling, the order stays untouched."""
+class TestACustomerCancelTheCourierDoesNotConfirm:
+    """Whatever stops the courier cancelling, the order stays untouched.
 
-    @pytest.fixture(
-        params=[
-            "acs_on_pickup_list",
-            "acs_business_error",
-            "acs_unreachable",
-            "boxnow_in_depot",
-            "boxnow_business_error",
-            "boxnow_unreachable",
-        ]
-    )
-    def held_order(self, request, monkeypatch):
-        """An owned order the courier will not cancel, and its shipment."""
+    A refusal (the courier judged the parcel and said no) is a 400 to
+    take up with the store; no answer at all (unreachable, a 5xx, an
+    auth-layer rejection) is a 503 the customer can retry."""
+
+    CASES = {
+        "acs_on_pickup_list": REFUSED,
+        "acs_business_error": REFUSED,
+        "acs_unreachable": UNREACHABLE,
+        "acs_auth_layer": UNREACHABLE,
+        "boxnow_in_depot": REFUSED,
+        "boxnow_business_error": REFUSED,
+        "boxnow_unreachable": UNREACHABLE,
+        "boxnow_auth_layer": UNREACHABLE,
+    }
+
+    @pytest.fixture(params=list(CASES))
+    def held(self, request, monkeypatch) -> tuple[Order, Outcome]:
+        """An owned order the courier will not cancel, and the outcome."""
         user = UserAccountFactory()
         case = request.param
         if case.startswith("acs"):
@@ -283,56 +333,63 @@ class TestACustomerCancelTheCourierRefuses:
                 "acs_unreachable": AcsRetryableError(
                     alias="ACS_Delete_Voucher", error_message="HTTP 503"
                 ),
+                "acs_auth_layer": AcsAuthError(
+                    alias="ACS_Delete_Voucher", http_status=406
+                ),
             }.get(case)
             monkeypatch.setattr(
                 "shipping_acs.services.AcsClient", FakeAcs(delete_error=error)
             )
-            return _acs_order(
+            order = _acs_order(
                 user=user, on_pickup_list=case == "acs_on_pickup_list"
             )
+            return order, self.CASES[case]
 
         client = MagicMock()
-        if case == "boxnow_business_error":
-            client.return_value.cancel_parcel.side_effect = BoxNowAPIError(
+        client.return_value.cancel_parcel.side_effect = {
+            "boxnow_business_error": BoxNowAPIError(
                 409, code="P420", message="Parcel not cancellable."
-            )
-        if case == "boxnow_unreachable":
-            client.return_value.cancel_parcel.side_effect = (
-                BoxNowRetryableError(503, message="Service unavailable")
-            )
+            ),
+            "boxnow_unreachable": BoxNowRetryableError(
+                503, message="Service unavailable"
+            ),
+            "boxnow_auth_layer": BoxNowAuthError(401, message="Unauthorized"),
+        }.get(case)
         monkeypatch.setattr("shipping_boxnow.services.BoxNowClient", client)
-        return _boxnow_order(
+        order = _boxnow_order(
             BoxNowParcelState.IN_DEPOT
             if case == "boxnow_in_depot"
             else BoxNowParcelState.NEW,
             user=user,
         )
+        return order, self.CASES[case]
 
-    def test_is_refused_with_a_code_and_a_message(self, held_order):
+    def test_is_answered_with_a_code_and_a_message(self, held):
+        order, outcome = held
+
         with FakeVivaApi():
-            response = _cancel(_owner_client(held_order), held_order)
+            response = _cancel(_owner_client(order), order)
 
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert response.data["error"] == {
-            "type": OrderCancelErrorType.PARCEL_WITH_COURIER
-        }
-        assert response.data["detail"] == REFUSAL_DETAIL
+        assert response.status_code == outcome.status
+        assert response.data["error"] == {"type": outcome.type}
+        assert response.data["detail"] == outcome.detail
 
-    def test_changes_nothing(self, held_order):
+    def test_changes_nothing(self, held):
+        order, _outcome = held
         shipment = (
-            held_order.acs_shipment
-            if held_order.shipping_provider.code == "acs"
-            else held_order.boxnow_shipment
+            order.acs_shipment
+            if order.shipping_provider.code == "acs"
+            else order.boxnow_shipment
         )
         state_before = (
             getattr(shipment, "shipment_state", None) or shipment.parcel_state
         )
-        order_before = _row(held_order)
+        order_before = _row(order)
 
         with FakeVivaApi() as viva:
-            _cancel(_owner_client(held_order), held_order)
+            _cancel(_owner_client(order), order)
 
-        assert _row(held_order) == order_before
+        assert _row(order) == order_before
         assert order_before["status"] == OrderStatus.PROCESSING
         assert order_before["payment_status"] == PaymentStatus.COMPLETED
         assert "cancellation" not in order_before["metadata"]
@@ -343,15 +400,17 @@ class TestACustomerCancelTheCourierRefuses:
             getattr(shipment, "shipment_state", None) or shipment.parcel_state
         ) == state_before
         assert not OrderHistory.objects.filter(
-            order=held_order, change_type="STATUS"
+            order=order, change_type="STATUS"
         ).exists()
 
-    def test_the_service_raises_the_typed_error(self, held_order):
-        with FakeVivaApi() as viva, pytest.raises(ParcelWithCourierError):
-            OrderService.cancel_order(held_order, reason="changed mind")
+    def test_the_service_raises_the_typed_error(self, held):
+        order, outcome = held
+
+        with FakeVivaApi() as viva, pytest.raises(outcome.error):
+            OrderService.cancel_order(order, reason="changed mind")
 
         assert viva.sent == []
-        assert _row(held_order)["status"] == OrderStatus.PROCESSING
+        assert _row(order)["status"] == OrderStatus.PROCESSING
 
     def test_a_guest_holding_the_uuid_is_held_to_the_courier_too(self, acs):
         order = _acs_order(user=None, on_pickup_list=True)
@@ -370,6 +429,106 @@ class TestACustomerCancelTheCourierRefuses:
         )
         assert viva.sent == []
         assert _row(order)["status"] == OrderStatus.PROCESSING
+
+
+@pytest.mark.assert_english
+class TestAFaultOfOursIsNotTheCouriersAnswer:
+    """Only a courier error is the courier's answer. Anything else that
+    escapes the courier call is a bug of ours: a 500 that reaches the
+    error log, never a refusal the customer is told to take up with the
+    store."""
+
+    @pytest.fixture
+    def order(self, monkeypatch) -> Order:
+        monkeypatch.setattr(
+            "shipping_acs.services.AcsClient",
+            FakeAcs(delete_error=KeyError("cod_amount")),
+        )
+        return _acs_order(user=UserAccountFactory())
+
+    def test_is_a_server_error_and_changes_nothing(self, order):
+        order_before = _row(order)
+
+        with FakeVivaApi() as viva:
+            response = _cancel(_owner_client(order), order)
+
+        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+        assert "error" not in response.data
+        assert _row(order) == order_before
+        assert viva.sent == []
+
+    def test_the_service_raises_it_as_itself(self, order):
+        with FakeVivaApi(), pytest.raises(KeyError):
+            OrderService.cancel_order(order, reason="changed mind")
+
+
+@pytest.mark.assert_english
+class TestTheOrderMovesOnWhileTheCourierAnswers:
+    """The courier is asked before the order row is locked, so the order
+    can move on while it answers. A parcel the courier canceled for an
+    order that then does not cancel has no voucher behind it any more:
+    staff are told to create a new one."""
+
+    @staticmethod
+    def _courier_moving_the_order(monkeypatch, order: Order, to: str):
+        courier = FakeAcs()
+        confirm = courier.delete_voucher
+
+        def delete_voucher(voucher_no: str) -> None:
+            Order.objects.filter(pk=order.pk).update(status=to)
+            confirm(voucher_no)
+
+        courier.delete_voucher = delete_voucher
+        monkeypatch.setattr("shipping_acs.services.AcsClient", courier)
+        return courier
+
+    @staticmethod
+    def _parcel_notes(order: Order) -> list[str]:
+        return [
+            row.new_value["note"]
+            for row in OrderHistory.objects.filter(
+                order=order, change_type="NOTE"
+            )
+            if row.new_value["note"].startswith("The customer asked")
+        ]
+
+    def test_staff_are_told_the_order_needs_a_new_voucher(
+        self, monkeypatch, caplog
+    ):
+        order = _acs_order(user=UserAccountFactory())
+        courier = self._courier_moving_the_order(
+            monkeypatch, order, OrderStatus.SHIPPED
+        )
+
+        with (
+            FakeVivaApi() as viva,
+            caplog.at_level(logging.ERROR, logger="order.services"),
+        ):
+            response = _cancel(_owner_client(order), order)
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "cannot be canceled" in response.data["detail"]
+        assert courier.deleted == [order.acs_shipment.voucher_no]
+        assert _row(order)["status"] == OrderStatus.SHIPPED
+        assert viva.sent == []
+        [note] = self._parcel_notes(order)
+        assert "its status is SHIPPED" in note
+        assert "create a new one" in note
+        assert any(
+            record.levelno == logging.ERROR
+            and "needs a new voucher" in record.getMessage()
+            for record in caplog.records
+        )
+
+    def test_an_order_canceled_meanwhile_needs_no_note(self, monkeypatch):
+        order = _acs_order(user=UserAccountFactory())
+        self._courier_moving_the_order(monkeypatch, order, OrderStatus.CANCELED)
+
+        with FakeVivaApi():
+            response = _cancel(_owner_client(order), order)
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert self._parcel_notes(order) == []
 
 
 class TestTheRefusalIsInTheRequestLanguage:

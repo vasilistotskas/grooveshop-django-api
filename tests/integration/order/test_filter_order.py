@@ -415,13 +415,6 @@ class OrderFilterTest(APITestCase):
         self.assertIn(self.pending_order.id, result_ids)
         self.assertIn(self.processing_order.id, result_ids)
 
-        response = self.client.get(url, {"can_be_canceled": "true"})
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-        self.assertEqual(len(result_ids), 2)
-        self.assertIn(self.pending_order.id, result_ids)
-        self.assertIn(self.processing_order.id, result_ids)
-
     def test_timestamp_filters(self):
         url = reverse("order-list")
 

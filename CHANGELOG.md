@@ -3,6 +3,32 @@
 
 
 
+## v3.109.0 (2026-10-12)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.108.1 [skip ci] ([`211aa00`](https://github.com/vasilistotskas/grooveshop-django-api/commit/211aa0066ce2f676a3fd694542e885c474be87c8))
+
+### Features
+
+* feat(product): filter and order the catalogue by the announced discount (#167)
+
+A rail of the biggest discounts sorted on the merchant markdown
+(discount_percent), which announces nothing under the Omnibus rule, and
+filtered on it too. The announced percent was only a property, so the list
+could not sort or filter by it.
+
+with_announced_discount_percent() annotates the same floored percent from the
+stored prior_price and effective_price columns, for_list() carries it, and
+the property reads the annotation. ProductFilter gains
+min_announced_discount_percent and the viewset orders on
+announced_discount_percent.
+
+
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`cfaa2db`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cfaa2dba36aecbe4ebf7d2179b6193ecbbc33160))
+
 ## v3.108.1 (2026-10-12)
 
 ### Bug fixes

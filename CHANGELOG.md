@@ -3,6 +3,49 @@
 
 
 
+## v3.108.1 (2026-10-12)
+
+### Bug fixes
+
+* fix(product): take the markdown off the gross price the shopper pays (#164)
+
+Product.final_price charged VAT on the undiscounted net price and subtracted
+the net markdown, so a 10% markdown took only about 8% off what the shopper
+pays (30.00 net at 24% VAT with 10% off cost 34.20 instead of 33.48). The
+markdown now reduces the net price and VAT is charged on the reduced net:
+final_price = price * (1 - p) * (1 + vat). vat_value is the VAT of the price
+actually charged, discount_value stays the markdown on the net price, and
+final_price == price - discount_value + vat_value. The SQL annotation twins,
+the search index price, the price filters, cart lines, the B2B retail cap, the
+cart VAT and invoice split follow from the single definition; the loyalty
+price-incl-VAT basis and the cart admin savings percent no longer lean on the
+old vat_value.
+
+Migration 0051 records the new price of every marked-down product as an
+ordinary price drop in the price spells and re-evaluates its reduction episode;
+products carrying a promotion are left to the nightly sweep.
+
+
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`28f04f7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/28f04f77cc8c52e9c3b078409ee127462f2b43bd))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.108.0 [skip ci] ([`42bdf9b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/42bdf9ba61ac16fac755e5db945a80de8d551996))
+
+### Testing
+
+* test(core): tamper with the token's bytes, not its last base64 character (#166)
+
+The tamper test replaced the character before the token's padding. That
+character carries bits base64 decoders ignore, so the replacement could
+decode to the very same bytes and the token still verified: CI failed
+with "DID NOT RAISE DecryptionError" on an unrelated PR. Flipping a bit
+in the decoded bytes always breaks the HMAC (2000 of 2000 rejected).
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`d1d83dd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d1d83dd5350753010e9e25fba9a01f87aaa7e6e1))
+
 ## v3.108.0 (2026-10-12)
 
 ### Bug fixes

@@ -175,6 +175,66 @@ both.
 Response is `ProductMeiliSearchResponse`: the common envelope above plus
 `facetDistribution` and `facetStats` when `facets` was requested.
 
+### Attribute filters and facet counts
+
+`attributeValues` is one flat list of attribute value ids, as the storefront's
+filter sidebar sends it. `AttributeSelection` (`product/attribute_selection.py`)
+groups the ids by the attribute each value belongs to, and that grouping is the
+rule: the values of **one attribute are alternatives (OR)**, and **every
+attribute with a selection narrows the result (AND)**. With Colour values 10
+and 11 and a Length value 20, `attributeValues=10,11,20` means
+`(Colour 10 OR 11) AND Length 20`, never "any of the three".
+
+The same class reads the ids for every surface that filters by attribute
+value, so they cannot drift: this search (one `attribute_values IN [...]`
+clause per attribute; a Meilisearch filter list ANDs its elements) and the
+product list's `attributeValue_In` filter (`product/filters/product.py`, one
+subquery per attribute). The federated search has no attribute filter, and the
+agent gateway's catalogue calls reach this endpoint without one.
+
+An id that belongs to no attribute (a deleted value in a stale link) is kept as
+a group of its own that matches no product: the request lists nothing instead
+of silently losing the filter, as an unknown category does.
+
+**Facet counts** (`facets=attribute_values`) follow the standard faceted-search
+rule: an attribute's own selection must not shrink its own counts, or the
+shopper could never see the alternatives to the value they picked, while the
+other attributes' selections still do. With Black and 2 m selected, the Colour
+values are counted among the products that are 2 m long (Black and White both
+appear), the Length values among the Black ones, and an attribute with no
+selection among the products matching every selection.
+
+`IndexQuerySet.filter_facet_group` registers each attribute as a facet group.
+When the facet is requested, `IndexQuerySet.search` sends one `multi-search`
+request with the main query (hits, the other facets, the unselected attributes'
+values) and one count-only query (`limit: 0`) per selected attribute with that
+attribute's own clause left out, the recipe of Meilisearch's disjunctive-facets
+guide. The count queries repeat the main query's text, matching strategy and
+locales, so they match the same documents. That is `1 + N` queries in one round
+trip, `N` being the attributes with a selection; without a selection, or
+without `attribute_values` in `facets`, it stays a single query.
+
+Only an attribute's **unselected** values are read from its count query. A
+selected value keeps the main query's count, which already is its count without
+its own clause (a product holding it matches that clause either way), and a
+sibling that a product holds together with a selected value is replaced by the
+count query's wider number.
+
+**The facet value cap.** Every facet returns at most `maxValuesPerFacet` values
+(100, `MeiliMeta.faceting` in `product/models/product.py`), taken in ascending
+alphanumeric order of the key unless `sortFacetValuesBy` says otherwise.
+`attribute_values` lists the values of every attribute side by side, so a
+catalogue with more than 100 distinct attribute values loses the rest from
+`facetDistribution`: a value past the cap is simply not listed, with or without
+a selection. The count queries match more documents than the main query, so
+they can hit the cap where the main query does not; that is why a selected
+value is counted by the main query and stays listed, and only a sibling can
+fall past the cap.
+
+The other facets (`category`, ...) follow every filter, their own included: a
+caller that wants a facet's counts without its own selection leaves that
+parameter off the facet request, as the storefront does for `categories`.
+
 ---
 
 ### Blog post search

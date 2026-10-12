@@ -14699,8 +14699,12 @@ msgid ""
 "category and every descendant)"
 msgstr ""
 
-#: .\search\views.py:394
-msgid "Comma-separated attribute value IDs (attribute_values IN [ids])"
+#: .\search\views.py:449
+msgid ""
+"Comma-separated attribute value IDs. Values of the same attribute are "
+"alternatives (any of them); values of different attributes must all match. "
+"With the attribute_values facet, an attribute's own values are counted "
+"without its own selection."
 msgstr ""
 
 #: .\search\views.py:403

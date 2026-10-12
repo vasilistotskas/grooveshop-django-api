@@ -18639,7 +18639,9 @@ paths:
             items:
               type: integer
               title: Τιμή Χαρακτηριστικού
-        description: Filter by multiple attribute value IDs (comma-separated)
+        description: Filter by multiple attribute value IDs (comma-separated). Values
+          of the same attribute are alternatives (any of them); values of different
+          attributes must all match.
         explode: false
         style: form
       - in: query
@@ -26193,8 +26195,10 @@ paths:
         name: attributeValues
         schema:
           type: string
-        description: ID τιμών χαρακτηριστικών διαχωρισμένα με κόμμα (attribute_values
-          IN [ids])
+        description: ID τιμών χαρακτηριστικών διαχωρισμένα με κόμμα. Οι τιμές του
+          ίδιου χαρακτηριστικού είναι εναλλακτικές (αρκεί μία από αυτές)· οι τιμές
+          διαφορετικών χαρακτηριστικών πρέπει να ταιριάζουν όλες. Με το facet attribute_values,
+          οι τιμές ενός χαρακτηριστικού μετριούνται χωρίς τη δική τους επιλογή.
       - in: query
         name: brands
         schema:

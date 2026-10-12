@@ -19952,6 +19952,7 @@ msgstr ""
 
 #: .\order\services.py:1
 msgid "A promotion discounts a cart line that is not part of the order."
+msgstr ""
 
 #: .\product\models\product.py:156
 msgid "Effective Price"

@@ -330,12 +330,13 @@ class PromotionEngine:
     ) -> Decimal:
         """What ``promotions`` take off one unit of ``product`` bought alone.
 
-        Runs the cart's own benefit, stacking and clamping rules over a
-        one-line cart, so a listing price and the cart cannot disagree.
+        Runs the cart's own benefit, stacking and allocation rules
+        (``_clamp`` / ``allocate_capped``, the same ones the cart is
+        charged with) over a one-line cart, so a listing price and the cart cannot disagree.
         The caller passes only promotions that need nothing from the
         basket (``promotion.offers.price_reducing_promotions``).
         """
-        items = [_SimulatedLine(product, 1, unit_price)]
+        items = [_SimulatedLine(NEW_LINE_PK, product, 1, unit_price)]
         currency = settings.DEFAULT_CURRENCY
         entries = []
         for promotion in promotions:
@@ -346,7 +347,7 @@ class PromotionEngine:
                 entries.append(AppliedPromotion(promotion, None, amount))
         chosen = cls._clamp(
             cls._resolve_stacking(entries, CartDiscountResult()),
-            unit_price.amount,
+            items,
             currency,
         )
         return sum((entry.amount.amount for entry in chosen), Decimal(0))

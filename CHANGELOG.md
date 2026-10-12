@@ -3,6 +3,87 @@
 
 
 
+## v3.104.9 (2026-10-12)
+
+### Bug fixes
+
+* fix(order): snapshot the VAT rate on order lines and tax shipping and fees with the goods (#153) ([`e04a91d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e04a91d07d9a7e51efc63cb3bcdd6a4783d8f42c))
+
+* fix(order): snapshot the VAT rate on order lines and tax shipping and fees with the goods
+
+The invoice and the myDATA payload backed VAT out of each line at the
+product's CURRENT Vat row, days after the sale, so editing or deleting a
+Vat row rewrote a tax document for money already earned. They also
+disagreed about shipping and the payment-method fee: myDATA taxed them at
+a flat 24% while the PDF and the Invoice row added them on top with no
+VAT, and the two rounded differently (summed bucket vs rounded lines).
+
+- OrderItem.vat_rate (db_default 0, backfilled from the product's current
+  VAT in 0065) is written when a line is created: both checkout paths pass
+  the rate the cart used, promotion gift lines pass their product's, and
+  OrderItem.save() snapshots the product's rate for every other writer.
+  Nothing reads product.vat for an order again.
+- order/taxation.py is the one rule both documents derive their lines
+  from. Shipping and the fee are part of the taxable amount of the goods
+  (Directive 2006/112/EC art. 78(b); Greek VAT Code, Law 5144/2024, art.
+  24(4)(a)), so they take the goods' rate, apportioned by goods value
+  when the basket mixes rates. Every line is rounded to the cent before
+  it is summed, so Invoice.subtotal / total_vat / total, the PDF VAT
+  table and the myDATA invoiceSummary agree to the cent for any order.
+  The cart's VAT figure rounds the same way.
+- No Order-level rate field: the split is a function of the snapshotted
+  lines and the two amounts.
+- The PDF lists shipping and the fee as reference rows (incl. VAT) above
+  the net subtotal; the invoice admin help no longer tells staff that
+  editing a VAT row fixes an order.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1 ([`e04a91d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e04a91d07d9a7e51efc63cb3bcdd6a4783d8f42c))
+
+* fix(order): make every VAT line add up to its gross and freeze a registered line's rate
+
+- split_gross rounded the net and the VAT independently, so on a half-cent
+  tie both rounded up and a line billed more than it was charged (two 0.13
+  lines at 4% came to 0.28 for 0.26 of goods). The net is now rounded and
+  the VAT is what is left of the gross, so net + VAT is the gross on every
+  line and the invoice and myDATA totals, built from the same lines, still
+  agree to the cent and equal what the customer was charged.
+- The order item admin left vat_rate editable on every existing line. Once
+  the order's invoice carries a myDATA MARK its totals are frozen, so an
+  edited rate would print on a regenerated PDF beside totals that no longer
+  match; the field is read-only from then on and stays editable before it,
+  so staff can still correct a wrong checkout rate.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1 ([`e04a91d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e04a91d07d9a7e51efc63cb3bcdd6a4783d8f42c))
+
+* fix(order): keep the item admin's add page rendering and cover the item-less invoice case
+
+- OrderItemAdmin listed vat_rate as read-only on the add page, where the
+  unsaved line holds a DatabaseDefault that the admin cannot format, so
+  GET /admin/order/orderitem/add/ answered 500. A new line is no longer
+  shown a rate (OrderItem.save snapshots its product's); an existing line
+  still offers it until its invoice carries a MARK.
+- An order that charges shipping but has no goods (staff deleting every
+  line) has no rate for the shipping to follow, so its invoice is refused
+  rather than filed with a guessed rate. Every caller already reports it
+  (the task logs and retries, the admin actions show the message, myDATA
+  records a BUILD failure); tests pin that the sequential invoice number
+  is not consumed and that the task gives up cleanly. Fixtures that
+  invoiced item-less orders with shipping now carry a goods line.
+- The docs name the refusal and its callers.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`e04a91d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e04a91d07d9a7e51efc63cb3bcdd6a4783d8f42c))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.104.8 [skip ci] ([`501a2e9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/501a2e9f92b1a0ce64f3b8456cbb4ad9b8b1bf9e))
+
 ## v3.104.8 (2026-10-12)
 
 ### Bug fixes

@@ -64,10 +64,16 @@ def test_several_payment_statuses_are_ored(client):
 
 def test_refund_owed_lists_cancelled_orders_still_paid(client):
     """A refund the provider refused leaves the order cancelled with its
-    payment COMPLETED; staff refund those from this list."""
+    payment COMPLETED, and a partial refund leaves the rest owed; staff
+    refund those from this list."""
     owed = OrderFactory(
         status=OrderStatus.CANCELED,
         payment_status=PaymentStatus.COMPLETED,
+        num_order_items=0,
+    )
+    partly_returned = OrderFactory(
+        status=OrderStatus.CANCELED,
+        payment_status=PaymentStatus.PARTIALLY_REFUNDED,
         num_order_items=0,
     )
     OrderFactory(
@@ -86,4 +92,4 @@ def test_refund_owed_lists_cancelled_orders_still_paid(client):
         num_order_items=0,
     )
 
-    assert _listed(client, "refund_owed=yes") == {owed.pk}
+    assert _listed(client, "refund_owed=yes") == {owed.pk, partly_returned.pk}

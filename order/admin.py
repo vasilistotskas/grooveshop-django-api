@@ -159,12 +159,13 @@ class WholesaleOrderFilter(DropdownFilter):
 
 
 class RefundOwedFilter(DropdownFilter):
-    """Cancelled orders whose payment was never returned.
+    """Cancelled orders whose payment was not (fully) returned.
 
     A cancel refunds a paid order through its provider, and a refund the
     provider refuses leaves the order cancelled with its payment still
     COMPLETED (``OrderService.refund_order`` records why in the order's
-    history). This is the worklist for refunding those by hand.
+    history); a cancelled order refunded only in part still owes the
+    rest. This is the worklist for refunding those by hand.
     """
 
     title = _("Refund")
@@ -177,7 +178,10 @@ class RefundOwedFilter(DropdownFilter):
         if self.value() == "yes":
             return queryset.filter(
                 status=OrderStatus.CANCELED,
-                payment_status=PaymentStatus.COMPLETED,
+                payment_status__in=(
+                    PaymentStatus.COMPLETED,
+                    PaymentStatus.PARTIALLY_REFUNDED,
+                ),
             )
         return queryset
 

@@ -3,6 +3,102 @@
 
 
 
+## v3.106.2 (2026-10-12)
+
+### Bug fixes
+
+* fix(order): rename paid_amount to amount_due and make remaining_amount mean what is left to pay (#158) ([`01782a9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/01782a97eab91ec74eef1cdd6e8499c57308cf2f))
+
+* fix(order): name what the customer owes amount_due and make remaining_amount mean what is left to pay
+
+Order.paid_amount was never what was paid: checkout writes it at creation
+from calculate_order_total_amount(), before any money moves, so it is
+what the customer OWES. Two readers took it for money collected:
+
+- pricing_breakdown.remaining_amount computed
+  max(grand_total - gift_card - paid, 0) with paid already equal to
+  grand_total - gift_card, so it was 0 on every order, paid or not, and
+  the storefront "pay X" state could never show;
+- the is_paid filter matched COMPLETED OR paid_amount > 0, which is every
+  unpaid online order, and is_paid=false was effectively empty.
+
+The field is renamed amount_due (API: amountDue, amountDueMin/Max,
+ordering amountDue; no alias). Migration 0070 is the expand step of
+docs/migrations.md: amount_due is added NOT NULL with a db_default and
+copied from paid_amount, and paid_amount leaves Django's state only, so
+the release still serving keeps working. The currency column django-money
+builds cannot take a db_default, so it is added with its own ALTER TABLE
+and declared in state separately. The physical drop is a later migration
+with contract_of.
+
+Order.remaining_amount is amount_due while the payment is not settled and
+0 once payment_status is in SETTLED_PAYMENT_STATUSES; the pricing
+breakdown reports it, and reports amount_due where it reported
+paid_amount. It is read from the status and not from the payment ledger:
+a settled order can hold no ledger row (paid by hand, cash collected under
+a payment method the ledger backfill does not key on, the demo seed). A
+refund does not create an amount owed, and a canceled order owes nothing.
+
+is_paid=true is payment_status COMPLETED and is_paid=false is every other
+status, the same rule as Order.is_paid.
+
+Tests: the one that restated the broken formula now asserts the rule;
+new ones cover remaining_amount for an unpaid online, a paid, a settled
+by hand with no ledger row, a partially and fully refunded, a canceled and
+a COD order, the filter both ways, the API contract and schema, and the
+migration (backfill, defaults, old columns kept, an insert from the
+previous release, reverse).
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1 ([`01782a9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/01782a97eab91ec74eef1cdd6e8499c57308cf2f))
+
+* fix(order): keep paidAmount as a deprecated alias of amountDue for one release
+
+Removing paidAmount from the API in the release that adds amountDue fails
+every order response the storefront and the agent gateway parse between
+the Django rollout and theirs: their generated schemas require it, at the
+top level of the order and inside pricingBreakdown. The API needs the same
+expand / contract the migration already has.
+
+Release N (this one) emits paidAmount again, top level (OrderSerializer
+.paid_amount, so on the list and the detail) and in pricingBreakdown, both
+read from amount_due beside amountDue, and marks both deprecated in the
+OpenAPI schema (extend_schema_serializer(deprecate_fields=...) and a
+deprecated flag in the hand-written breakdown schema). Each carries a
+comment naming the contract release that removes it. The paidAmount*
+filters and ordering stay gone: nothing outside Django uses them.
+
+The 0070 docstring and docs/order-system.md now spell out release N+1:
+ship it only after the storefront and the gateway read amountDue, drop the
+two deprecated fields, then a migration with contract_of that re-copies
+paid_amount into amount_due and drops the two columns.
+
+Tests: the API contract asserts amountDue is present and that the
+deprecated paidAmount equals it, top level, in the list and in the
+breakdown; the schema carries amountDue plus paidAmount with deprecated
+true (still required, as before) and no paidAmount filter or ordering.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`01782a9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/01782a97eab91ec74eef1cdd6e8499c57308cf2f))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.106.1 [skip ci] ([`87405ee`](https://github.com/vasilistotskas/grooveshop-django-api/commit/87405eef7a3c1ed44284e037dc4ed32c2a28382f))
+
+### Documentation
+
+* docs(order): quote the partial-refund message as code
+
+The bare <reason> placeholder is read as an unclosed HTML element when the
+page is synced into the docs site, which fails its build.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1 ([`9bfd032`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9bfd0324b84a23a70552c5535563fb8b54f230d9))
+
 ## v3.106.1 (2026-10-12)
 
 ### Bug fixes

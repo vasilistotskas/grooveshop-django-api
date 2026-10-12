@@ -20,10 +20,11 @@ from user.factories.account import UserAccountFactory
 pytestmark = pytest.mark.django_db
 
 # Superuser, warm cache: session + user + usersessions, the per-request
-# alerts (settings, legal pages) and low stock. Re-measure before
-# raising.
-WARM_BUDGET = 22
-COLD_BUDGET = 55
+# alerts (legal pages, and the 14 settings of the merchant's legal
+# identity, each a query of its own here because the test database has
+# no settings cache) and low stock. Re-measure before raising.
+WARM_BUDGET = 45
+COLD_BUDGET = 77
 
 
 @pytest.fixture

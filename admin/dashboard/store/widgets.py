@@ -668,11 +668,20 @@ def _alert(
     }
 
 
-_REQUIRED_SELLER_SETTINGS = (
-    ("INVOICE_SELLER_NAME", _("Company name")),
-    ("INVOICE_SELLER_VAT_ID", _("VAT ID (ΑΦΜ)")),
-    ("INVOICE_SELLER_TAX_OFFICE", _("Tax office (ΔΟΥ)")),
-)
+# Owner-facing name of each field of the merchant's legal identity
+# (``tenant.legal_identity``), which decides what is required and when.
+_IDENTITY_FIELD_LABELS = {
+    "name": _("Company name"),
+    "legal_form": _("Legal form (e.g. IKE, EPE)"),
+    "registration_number": _("GEMI number"),
+    "vat_id": _("VAT ID (ΑΦΜ)"),
+    "tax_office": _("Tax office (ΔΟΥ)"),
+    "address_line_1": _("Street name and number"),
+    "city": _("City"),
+    "postal_code": _("Postal code"),
+    "country": _("Country"),
+    "email": _("Contact email"),
+}
 
 
 @register_component
@@ -680,13 +689,18 @@ class StoreAlerts(DashboardWidget):
     """What needs someone's attention, checked on every load.
 
     Legal-page updates go to whoever may edit content pages (the
-    merchant). Invoicing and myDATA configuration go to superusers.
+    merchant). The legal-identity alerts go to whoever may change store
+    settings (superusers, and the merchant's owner and admins - not
+    staff), since that is where the fix is made. myDATA configuration
+    goes to superusers.
     """
 
     def shape(self, data: None) -> dict[str, Any]:
         alerts = self._legal_updates()
+        if self.request.user.has_perm("extra_settings.change_setting"):
+            alerts += self._legal_identity()
         if self.is_superuser:
-            alerts += self._seller_config() + self._mydata()
+            alerts += self._mydata()
         return {"alerts": alerts}
 
     def _legal_updates(self) -> list[dict[str, Any]]:
@@ -716,34 +730,59 @@ class StoreAlerts(DashboardWidget):
             )
         ]
 
-    def _seller_config(self) -> list[dict[str, Any]]:
+    def _settings_link(self, text: Any) -> tuple[str, Any]:
+        return (
+            self.changelist_url("extra_settings.Setting", "q=INVOICE_SELLER_"),
+            text,
+        )
+
+    def _legal_identity(self) -> list[dict[str, Any]]:
         from extra_settings.models import Setting
 
-        missing = [
-            label
-            for key, label in _REQUIRED_SELLER_SETTINGS
-            if not Setting.get(key, default="")
-        ]
-        if not missing:
-            return []
-        return [
-            _alert(
-                "danger",
-                "warning",
-                _("Invoice seller details are incomplete"),
-                _(
-                    "Invoices issued now will render without a legal identity "
-                    "and will not pass a tax audit."
-                ),
-                items=missing,
-                link=(
-                    self.changelist_url(
-                        "extra_settings.Setting", "q=INVOICE_SELLER_"
+        from tenant.legal_identity import (
+            merchant_legal_identity,
+            missing_disclosure_fields,
+            missing_tax_document_fields,
+        )
+
+        identity = merchant_legal_identity()
+        alerts = []
+        # A compliance gap, not an outage: calm, and always shown.
+        if missing := missing_disclosure_fields(identity):
+            alerts.append(
+                _alert(
+                    "warning",
+                    "policy",
+                    _("Your store's legal details are incomplete"),
+                    _(
+                        "Greek and EU law require your website to show who "
+                        "is selling. Please add the details that are still "
+                        "missing:"
                     ),
-                    _("Fix in settings"),
-                ),
+                    items=[_IDENTITY_FIELD_LABELS[f] for f in missing],
+                    link=self._settings_link(_("Add the missing details")),
+                )
             )
-        ]
+        # Only a store that issues tax documents needs these, and for it
+        # a gap is an outage: every submission to AADE fails.
+        if Setting.get("MYDATA_ENABLED", default=False) and (
+            missing := missing_tax_document_fields(identity)
+        ):
+            alerts.append(
+                _alert(
+                    "danger",
+                    "receipt_long",
+                    _("Your receipts are missing company details"),
+                    _(
+                        "myDATA is enabled, so your store issues tax "
+                        "documents. They cannot be submitted to AADE "
+                        "without:"
+                    ),
+                    items=[_IDENTITY_FIELD_LABELS[f] for f in missing],
+                    link=self._settings_link(_("Fix in settings")),
+                )
+            )
+        return alerts
 
     def _mydata(self) -> list[dict[str, Any]]:
         from extra_settings.models import Setting

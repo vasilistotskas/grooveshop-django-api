@@ -85,6 +85,18 @@ REQUIRED_DISCLOSURE_FIELDS: tuple[str, ...] = (
 )
 
 
+#: What a tax document needs about the seller. Greek law puts the ΑΦΜ and
+#: ΔΟΥ on every document the seller issues, and myDATA refuses to take a
+#: submission without the ΑΦΜ (``order.mydata.service``). Unlike
+#: ``REQUIRED_DISCLOSURE_FIELDS`` this only matters to a store that
+#: actually issues tax documents (``MYDATA_ENABLED``).
+REQUIRED_TAX_DOCUMENT_FIELDS: tuple[str, ...] = (
+    "name",
+    "vat_id",
+    "tax_office",
+)
+
+
 def merchant_legal_identity() -> dict[str, object]:
     """The current tenant's published legal identity.
 
@@ -107,18 +119,31 @@ def merchant_legal_identity() -> dict[str, object]:
     return identity
 
 
-def missing_disclosure_fields() -> list[str]:
+def _blank(
+    fields: tuple[str, ...], identity: Mapping[str, object] | None
+) -> list[str]:
+    identity = merchant_legal_identity() if identity is None else identity
+    return [f for f in fields if not str(identity.get(f, "")).strip()]
+
+
+def missing_disclosure_fields(
+    identity: Mapping[str, object] | None = None,
+) -> list[str]:
     """Which legally required fields the merchant has left blank.
 
     Lets the admin and the onboarding flow surface the gap before it
-    becomes a fine, instead of discovering it from a complaint.
+    becomes a fine, instead of discovering it from a complaint. A caller
+    that checks several field sets passes the ``identity`` it already
+    read, so the settings are fetched once.
     """
-    identity = merchant_legal_identity()
-    return [
-        field
-        for field in REQUIRED_DISCLOSURE_FIELDS
-        if not str(identity.get(field, "")).strip()
-    ]
+    return _blank(REQUIRED_DISCLOSURE_FIELDS, identity)
+
+
+def missing_tax_document_fields(
+    identity: Mapping[str, object] | None = None,
+) -> list[str]:
+    """Which fields a tax document needs that are still blank."""
+    return _blank(REQUIRED_TAX_DOCUMENT_FIELDS, identity)
 
 
 def is_disclosure_complete() -> bool:

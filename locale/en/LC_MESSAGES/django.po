@@ -554,6 +554,18 @@ msgstr ""
 msgid "Tax office (ΔΟΥ)"
 msgstr ""
 
+#: .\admin\dashboard\store\widgets.py
+msgid "Legal form (e.g. IKE, EPE)"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py
+msgid "GEMI number"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py
+msgid "Contact email"
+msgstr ""
+
 #: .\admin\dashboard\store\widgets.py:704
 #, fuzzy
 #| msgid "Your order has been canceled."
@@ -567,14 +579,24 @@ msgid ""
 "text to add."
 msgstr ""
 
-#: .\admin\dashboard\store\widgets.py:733
-msgid "Invoice seller details are incomplete"
+#: .\admin\dashboard\store\widgets.py
+msgid "Your store's legal details are incomplete"
 msgstr ""
 
-#: .\admin\dashboard\store\widgets.py:735
-msgid ""
-"Invoices issued now will render without a legal identity and will not pass a "
-"tax audit."
+#: .\admin\dashboard\store\widgets.py
+msgid "Greek and EU law require your website to show who is selling. Please add the details that are still missing:"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py
+msgid "Add the missing details"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py
+msgid "Your receipts are missing company details"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py
+msgid "myDATA is enabled, so your store issues tax documents. They cannot be submitted to AADE without:"
 msgstr ""
 
 #: .\admin\dashboard\store\widgets.py:743

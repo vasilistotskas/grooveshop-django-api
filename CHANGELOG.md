@@ -3,6 +3,89 @@
 
 
 
+## v3.106.1 (2026-10-12)
+
+### Bug fixes
+
+* fix(order): one order per payment intent, product locks in pk order, provider read outside the transaction (#157) ([`5ce6de3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5ce6de3e497e0ea99228442e8ef0ee3f63e4c840))
+
+* fix(order): one order per payment intent, product locks in pk order, provider read outside the transaction
+
+Three defects in OrderService.create_order_from_cart, fixed together
+because they are the same function and the same lock sequence.
+
+#130 duplicate orders. Order.payment_id gets a partial unique index
+(order_payment_id_unique, non-empty ids only) and create_order_from_cart
+becomes idempotent: under the cart row lock, before cart validation, it
+returns the order the same payment intent already produced for that cart.
+A repeat therefore takes the stock once and answers 201 with the first
+order. An intent that belongs to another cart, or to a canceled or deleted
+order, is refused with PaymentVerificationError instead of being answered
+or re-used. The migration adds the index with the new
+AddUniqueConstraintAdaptively operation (CONCURRENTLY outside a
+transaction) and counts existing duplicates first: it fails with an
+IntegrityError naming them, before anything is built, rather than leaving
+an INVALID index behind. The order-first (Viva) path is left as it was: a
+reuse guard there needs a key over the whole request and has to run before
+both stock validations.
+
+#131 deadlock. The cart-item lock no longer joins the products
+(of=("self",)); StockManager.lock_products locks every product the order
+touches (cart lines, the cart session's reservations, free-gift products)
+in one statement, ORDER BY pk, before the first OrderItem insert, whose
+FOR KEY SHARE on the product would otherwise conflict with the later FOR
+UPDATE. The stock step walks products in pk order. cancel_order, the cart
+merge and the bulk discount admin actions follow the same rule, and the
+expired-reservation sweep now uses the same helper.
+
+#141 PSP call under locks. The provider is asked about the intent, and its
+state checked, before the transaction opens; the transaction re-compares
+only the intent's amount and currency with the total it computes under
+lock. OrderViewSet.create no longer wraps the request in
+transaction.atomic, which had kept the call inside a transaction.
+
+Closes #130, closes #131, closes #141.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1 ([`5ce6de3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5ce6de3e497e0ea99228442e8ef0ee3f63e4c840))
+
+* fix(order): answer a repeat before the provider, translate the cross-cart index race, clean up a failed index build
+
+Follow-up to the order-creation hardening, after the payment ledger (#155)
+took order migrations 0066 to 0068.
+
+- The unique-index migration is now 0069_order_payment_id_unique, depending
+  on 0068_refund_notification.
+- A repeat submit is answered from the stored order BEFORE the provider is
+  asked (a lock-free lookup), so a retry for an order that already exists no
+  longer depends on the provider being reachable. The lookup under the cart
+  lock stays, for two first submits of one cart racing.
+- Two different carts can both miss the lookup; the unique index then
+  rejects the second insert. That violation, matched by the constraint's
+  name off the driver's diagnostics, is now answered as the sequential case
+  is (PaymentVerificationError, payment_verification) instead of
+  invalid_order_data. Any other integrity error keeps its generic answer.
+- A duplicate that arrives after the migration's up-front count (the old
+  pods keep inserting while the index builds) fails the concurrent build and
+  leaves an INVALID index. A failed build outside a transaction now drops
+  its own leftover (DROP INDEX CONCURRENTLY IF EXISTS) before re-raising the
+build's error.
+- The ledger backfill test that names one payment from two orders drops the
+  new index inside its own transaction: those duplicates are exactly the
+  legacy data 0067 must cope with, and the index can no longer be built
+  over them.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`5ce6de3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5ce6de3e497e0ea99228442e8ef0ee3f63e4c840))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.106.0 [skip ci] ([`534d2b9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/534d2b9b229687cb897b786aac3691e298ca1a37))
+
 ## v3.106.0 (2026-10-12)
 
 ### Bug fixes

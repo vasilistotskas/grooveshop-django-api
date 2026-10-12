@@ -168,25 +168,28 @@ class OrderItemViewSetTestCase(TestURLFixerMixin, APITestCase):
     def test_create_on_a_wholesale_order_uses_the_group_that_priced_it(self):
         group = CustomerGroupFactory(discount_percent=Decimal("10.00"))
         order = self._wholesale_order(group.pk)
+        # No retail discount: the group price is capped at the retail
+        # final price, so a discounted product could price both the same.
+        product = ProductFactory(
+            active=True,
+            num_images=0,
+            num_reviews=0,
+            stock=5,
+            discount_percent=Decimal(0),
+        )
         self.client.force_authenticate(user=self.staff)
 
         response = self.client.post(
             self.get_order_item_list_url(),
-            {
-                "order": order.id,
-                "product": self.other_product.id,
-                "quantity": 1,
-            },
+            {"order": order.id, "product": product.id, "quantity": 1},
             format="json",
         )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         item = OrderItem.objects.get(pk=response.data["id"])
-        expected = B2BPricingService.resolve_single(
-            self.other_product, group
-        ).final
+        expected = B2BPricingService.resolve_single(product, group).final
         self.assertEqual(item.price, expected)
-        self.assertLess(item.price, self.other_product.final_price)
+        self.assertLess(item.price, product.final_price)
 
     def test_create_on_a_wholesale_order_whose_group_is_gone_is_refused(self):
         group = CustomerGroupFactory()

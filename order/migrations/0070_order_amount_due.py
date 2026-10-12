@@ -33,53 +33,16 @@ would fail every order response they parse between the two rollouts. The
 ``paidAmount*`` filters and ordering are gone outright (nothing outside
 Django uses them).
 
-Until the re-copy below runs, an order the previous release created has
+Until the re-copy runs, an order the previous release created has
 ``amount_due`` 0 (its INSERTs do not name the column): ``mark_as_paid`` and
 the Viva webhook set it from the order total when the payment lands, as
-they always did for a zero. Run the re-copy statement on every schema right
-after the rollout if you do not want to wait for release N+1.
+they always did for a zero.
 
-Release N+1 (contract) -- the exact steps
-=========================================
-
-1. **Ship it only after the storefront and the agent gateway read
-   ``amountDue``** (regenerated clients, every storefront variant, the
-   gateway's ``PricingBreakdown`` DTO) and those releases are what
-   production runs. It removes what they still require.
-2. **Drop the two deprecated API fields**: ``OrderSerializer.paid_amount``
-   (the field, its entry in ``Meta.fields``, the ``deprecate_fields``
-   argument of ``extend_schema_serializer``) and the ``"paid_amount"`` key
-   of ``OrderDetailSerializer.get_pricing_breakdown`` (and of its
-   ``extend_schema_field`` properties). Regenerate ``schema.yml``.
-3. **A migration with ``contract_of``**, the only way ``migration_preflight``
-   accepts a ``DROP`` (``RemoveField`` cannot: the fields left the state
-   here). It re-copies what the previous release wrote while it still
-   served, then drops both columns::
-
-       class Migration(migrations.Migration):
-           dependencies = [("order", "<latest>")]
-           contract_of = [("order", "0070_order_amount_due")]
-           operations = [
-               migrations.RunSQL(
-                   "UPDATE order_order "
-                   "SET amount_due = paid_amount, "
-                   "amount_due_currency = COALESCE(paid_amount_currency, 'EUR') "
-                   "WHERE amount_due = 0 AND paid_amount > 0; "
-                   "ALTER TABLE order_order "
-                   "DROP COLUMN IF EXISTS paid_amount, "
-                   "DROP COLUMN IF EXISTS paid_amount_currency",
-                   reverse_sql=(
-                       "ALTER TABLE order_order "
-                       "ADD COLUMN IF NOT EXISTS paid_amount numeric(11, 2) NULL, "
-                       "ADD COLUMN IF NOT EXISTS paid_amount_currency varchar(3) NULL"
-                   ),
-               ),
-           ]
-
-   A deploy that skips this release (0070 still pending next to its
-   contract) is refused by the preflight.
-4. Update ``docs/order-system.md`` (§7.3 and the invariants row) to drop
-   the "deprecated alias" wording.
+Release N+1 (contract) is ``0071_order_drop_paid_amount_columns``: it
+re-copies what the previous release wrote while it still served, drops both
+columns, and ships with the removal of the two deprecated API fields
+(``OrderSerializer.paid_amount`` and the ``paid_amount`` key of
+``OrderDetailSerializer.get_pricing_breakdown``).
 """
 
 from decimal import Decimal

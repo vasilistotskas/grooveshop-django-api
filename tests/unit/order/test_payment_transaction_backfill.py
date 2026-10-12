@@ -3,7 +3,7 @@
 It writes what the order rows and ``metadata["refunds"]`` PROVE, and
 nothing it would have to guess: the amount is ``paid_amount`` (what the
 order owed, which checkout verified against the provider; the column the
-field was called before 0070 renamed it), a refund with
+field was called before 0070 renamed it and 0071 dropped it), a refund with
 no provider refund id is not invented, and ``payment_status`` is left
 alone. It runs against the historical model registry, which is what a
 migration actually receives.
@@ -46,6 +46,24 @@ def _historical_apps():
         ("order", "0067_backfill_payment_transactions")
     )
     return state.apps
+
+
+@pytest.fixture(autouse=True)
+def _legacy_paid_amount_columns(db):
+    """Give ``order_order`` the columns 0067 reads.
+
+    ``0071_order_drop_paid_amount_columns`` dropped them from the database
+    the tests run on, but the backfill runs against the registry as of
+    0067, whose ``Order`` still has ``paid_amount`` and its currency. The
+    shape is the one 0070 left them in, nullable (the contract migration's
+    ``reverse_sql``); the test transaction rolls the DDL back.
+    """
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "ALTER TABLE order_order "
+            "ADD COLUMN IF NOT EXISTS paid_amount numeric(11, 2) NULL, "
+            "ADD COLUMN IF NOT EXISTS paid_amount_currency varchar(3) NULL"
+        )
 
 
 def _run():

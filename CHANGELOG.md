@@ -3,6 +3,82 @@
 
 
 
+## v3.110.0 (2026-10-12)
+
+### Bug fixes
+
+* fix(order): send no correlatedInvoices on the 11.4 retail credit
+
+AADE answers error 205 to correlatedInvoices on an 11.4 (confirmed against the
+dev API), so the credit payload names no receipt; the link lives in
+RetailCredit.invoice, the admin and the PDF. AADE therefore cannot check an
+over-credit (error 319 belongs to linked credits) and the cumulative cap in
+order/credit_documents.py is the only guard; docs and tests say so.
+specialInvoiceCategory 13 is optional and is not sent.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com> ([`c8799c7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c8799c7596b19c39c02a99e1a231e64b3591d649))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.109.0 [skip ci] ([`c524b1c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c524b1cf654b20b87e6d4997f3b1df399b9f9ee2))
+
+### Features
+
+* feat(order): myDATA retail receipt at shipment, credit document per refund, no platform invoices (#165) ([`c8799c7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c8799c7596b19c39c02a99e1a231e64b3591d649))
+
+* feat(order): issue retail myDATA receipts at shipment and a credit document per refund
+
+The platform issued an 11.1 receipt only for invoice orders, on COMPLETED, and
+had no credit document at all. From 2.11.2026 AADE decision Α.1128/2025 art.
+1(2) takes invoices (1.1, 5.1) off the ERP channel, so the lifecycle is now
+retail only.
+
+- 11.1 is issued for every RECEIPT order when it ships (ΕΛΠ art. 13(a): at the
+  start of the shipment), exactly once, cash-on-delivery included. Gated by
+  MYDATA_ENABLED and MYDATA_AUTO_SUBMIT (auto off: the order's admin actions).
+  A receipt AADE did not register is never emailed.
+- 11.4 retail credit documents (RetailCredit, CreditCounter, own series
+  MYDATA_CREDIT_SERIES_PREFIX) for every ledger REFUND row of an order whose
+  receipt has a MARK, linked through correlatedInvoices: the in-app refund, the
+  staff action, cancel, Stripe charge.refunded and Viva reversal all end in
+  PaymentLedger.record_refund. Partial refunds credit exactly what was
+  refunded, spread over the receipt's VAT rates; the net is derived
+  cumulatively so partial credits never pass the receipt's net (AADE 319). One
+  settlement credit covers an order that closes without a sale (a returned COD
+  parcel, the gift-card share of a refunded order). A refund before the
+  receipt, or a cancellation before shipment, needs no document.
+- Goods are classified category1_1 instead of category1_3 (services); the
+  comment blaming error 313 on category1_1 was wrong.
+- Invoice orders submit nothing and get no PDF or email: the 1.1 builder, the
+  counterpart, the guard and the inactive-VAT path are deleted. Staff see what
+  timologio needs on the order (timologio_summary) and record its number and
+  MARK (Order.timologio_invoice_*, timologio_credit_*).
+- CancelInvoice stays for documents issued in error only. The "generate
+  anyway" override is replaced by Issue receipt / Issue credit documents.
+- Admin: Receipts and Credit Documents screens and order tabs; PDFs titled
+  retail receipt / retail credit receipt; the receipt email says receipt.
+
+Migration order/0074 only adds: two tables and four nullable or db_default
+columns on order, plus state-only option and help-text changes.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1 ([`c8799c7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c8799c7596b19c39c02a99e1a231e64b3591d649))
+
+### Refactoring
+
+* refactor(order): log retail credit documents by id
+
+CodeQL's clear-text-logging query reads `credit_number` as card data.
+It is the document number (series + sequence), not a secret, but the
+row id identifies the document just as well in a log line, so the two
+log calls name the credit by its primary key.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`c8799c7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c8799c7596b19c39c02a99e1a231e64b3591d649))
+
 ## v3.109.0 (2026-10-12)
 
 ### Chores

@@ -219,7 +219,7 @@ def scope_product_ids(promotion_ids: Iterable[int]) -> set[int]:
         )
     )
     return set(
-        Product.objects.filter(Q(promotions__in=ids) | in_scope_category)
+        Product._base_manager.filter(Q(promotions__in=ids) | in_scope_category)
         .order_by()
         .values_list("pk", flat=True)
         .distinct()

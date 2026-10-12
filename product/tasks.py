@@ -607,7 +607,9 @@ def reevaluate_price_episodes() -> dict[str, int]:
     from product.pricing.service import sync_product_prices
     from product.signals import reindex_products_by_pk
 
-    changed = sync_product_prices(Product.objects.values_list("pk", flat=True))
+    changed = sync_product_prices(
+        Product._base_manager.values_list("pk", flat=True)
+    )
     reindex_products_by_pk(changed)
     logger.info("Price episode sweep: %s products changed", len(changed))
     return {"products": len(changed)}

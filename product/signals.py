@@ -447,7 +447,7 @@ def sync_prices_on_vat_change(sender, instance, created, raw=False, **kwargs):
     if raw or created:
         return
     product_ids = list(
-        Product.objects.filter(vat=instance).values_list("pk", flat=True)
+        Product._base_manager.filter(vat=instance).values_list("pk", flat=True)
     )
     if product_ids:
         dispatch_on_commit(
@@ -468,7 +468,7 @@ def remember_vat_products_on_delete(sender, instance, **kwargs):
     afterwards.
     """
     instance._repriced_product_ids = list(
-        Product.objects.filter(vat=instance).values_list("pk", flat=True)
+        Product._base_manager.filter(vat=instance).values_list("pk", flat=True)
     )
 
 

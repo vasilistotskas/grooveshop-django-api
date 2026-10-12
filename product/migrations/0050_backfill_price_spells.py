@@ -24,6 +24,9 @@ What it CANNOT reconstruct, and deliberately does not guess:
 * Anything saved by pods of the previous release while this ran: the
   nightly run reconciles it.
 
+Soft-deleted products are seeded too, so a restored one is already
+current.
+
 Idempotent: a product that already has a spell is skipped, so a replay
 adds nothing. Runs once per schema through ``migrate_schemas``. The
 reverse is a no-op by design: spells are a legal record.
@@ -66,9 +69,7 @@ def backfill_price_spells(apps, schema_editor):
 
     product_ids = [
         pk
-        for pk in Product.objects.filter(is_deleted=False)
-        .order_by("pk")
-        .values_list("pk", flat=True)
+        for pk in Product.objects.order_by("pk").values_list("pk", flat=True)
         if pk not in already
     ]
     for start in range(0, len(product_ids), BATCH):

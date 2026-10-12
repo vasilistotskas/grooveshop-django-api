@@ -328,11 +328,14 @@ class Product(
         from product.pricing import service
 
         update_fields = kwargs.get("update_fields")
+        if update_fields is not None:
+            # Read twice below: an iterator would be spent after the first.
+            update_fields = kwargs["update_fields"] = list(update_fields)
         if not service.touches_price(update_fields):
             super().save(*args, **kwargs)
             return
         with transaction.atomic():
-            plan = service.plan_for_save(self)
+            plan = service.plan_for_save(self, update_fields)
             if update_fields is not None:
                 kwargs["update_fields"] = [
                     *update_fields,

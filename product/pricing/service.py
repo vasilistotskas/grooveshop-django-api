@@ -6,7 +6,7 @@ Every path that can move a product's public price goes through here:
 
 * ``Product.save`` (price, markdown, VAT) — ``plan_for_save`` /
   ``record_spells``, so the derived columns ride the same UPDATE;
-* a ``Vat`` rate change or deletion — ``product.tasks.sync_vat_prices``;
+* a ``Vat`` rate change or deletion — ``product.tasks.sync_price_records``;
 * an unconditional automatic promotion starting, ending or being edited —
   ``promotion.offer_sync.refresh_products``;
 * the nightly ``product.tasks.reevaluate_price_episodes`` sweep, which
@@ -61,6 +61,8 @@ PRICE_FIELDS = frozenset(
 _HISTORY_LOOKBACK = max(REFERENCE_WINDOW, PROGRESSIVE_REDUCTION_WINDOW)
 
 #: Products locked and rewritten per transaction by the bulk paths.
+#: Soft-deleted products are included: their records stay current, so
+#: restoring one needs no re-plan.
 BATCH_SIZE = 500
 
 
@@ -201,7 +203,9 @@ def _plan(
     )
 
 
-def plan_for_save(product: Product) -> PricePlan:
+def plan_for_save(
+    product: Product, update_fields: Collection[str] | None = None
+) -> PricePlan:
     """Plan a product's records before it is saved, and set its columns.
 
     Takes no lock of its own: a multi-product transaction must acquire
@@ -212,12 +216,30 @@ def plan_for_save(product: Product) -> PricePlan:
     save rolls back instead of recording a wrong price. The derived columns
     are assigned to the instance, so the save that follows writes them in
     the same statement; ``record_spells`` writes the spells once it has a pk.
+
+    With ``update_fields`` only those fields are persisted, so the plan is
+    built from the stored row with just those fields taken from the
+    instance: an unsaved price on the instance is not a price anyone pays.
     """
     now = timezone.now()
     history = None
+    subject = product
     if product.pk is not None:
         history = _load_histories([product.pk], now).get(product.pk)
-    plan = _plan(product, history, load_price_reducing_promotions(), now)
+        if update_fields is not None:
+            subject = (
+                Product._base_manager.select_related("vat")
+                .filter(pk=product.pk)
+                .first()
+                or product
+            )
+            for name in PRICE_FIELDS.intersection(update_fields):
+                if name != "vat":
+                    setattr(subject, name, getattr(product, name))
+            if "vat" in update_fields:
+                subject.vat = product.vat
+    plan = _plan(subject, history, load_price_reducing_promotions(), now)
+    plan.product = product
     plan.apply_to_product()
     return plan
 
@@ -259,7 +281,7 @@ def sync_product_prices(
         chunk = ids[start : start + BATCH_SIZE]
         with transaction.atomic():
             products = list(
-                Product.objects.select_for_update(of=("self",))
+                Product._base_manager.select_for_update(of=("self",))
                 .select_related("vat")
                 .filter(pk__in=chunk)
                 .order_by("pk")
@@ -278,7 +300,7 @@ def sync_product_prices(
             stale = [plan for plan in touched if plan.derived_changed]
             for plan in stale:
                 plan.apply_to_product()
-            Product.objects.bulk_update(
+            Product._base_manager.bulk_update(
                 [plan.product for plan in stale], list(PRICING_DERIVED_FIELDS)
             )
             changed.update(plan.product.pk for plan in touched)

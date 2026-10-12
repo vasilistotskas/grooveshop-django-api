@@ -167,6 +167,47 @@ class TestProductSave:
         assert fresh.effective_price == Decimal("114.00")
         assert fresh.reduction_started_at == clock.now
 
+    def test_a_partial_save_plans_from_what_it_persists(
+        self, clock, vat, category
+    ):
+        product = make_product(vat, category)
+        clock.advance(days=3)
+
+        product.price = Decimal("90.00")  # never saved
+        product.discount_percent = Decimal(10)
+        product.save(update_fields=["discount_percent"])
+
+        assert reload(product).price.amount == Decimal("100.00")
+        assert reload(product).effective_price == Decimal("114.00")
+        assert [s.price.amount for s in spells_of(product)] == [
+            Decimal("124.00"),
+            Decimal("114.00"),
+        ]
+
+    def test_update_fields_may_be_an_iterator(self, clock, vat, category):
+        product = make_product(vat, category)
+        clock.advance(days=3)
+        product.discount_percent = Decimal(10)
+
+        product.save(update_fields=(name for name in ["discount_percent"]))
+
+        assert reload(product).effective_price == Decimal("114.00")
+
+    def test_a_soft_deleted_product_stays_current_and_restores_clean(
+        self, clock, vat, category
+    ):
+        product = make_product(vat, category)
+        product.delete()
+        clock.advance(days=3)
+
+        vat.value = Decimal("6.0")
+        vat.save()
+        product.restore()
+
+        fresh = Product.objects.get(pk=product.pk)
+        assert fresh.effective_price == Decimal("106.00")
+        assert len(spells_of(product)) == 2
+
     def test_there_is_one_current_spell_per_product(self, clock, vat, category):
         product = make_product(vat, category)
 
@@ -664,6 +705,15 @@ class TestBackfill:
         assert fresh.effective_price == Decimal("104.00")
         assert fresh.prior_price == Decimal("124.00")
         assert fresh.reduction_started_at == started
+
+    def test_soft_deleted_products_are_seeded_too(self, clock, vat, category):
+        product = make_product(vat, category)
+        product.delete()
+        self._forget(product)
+
+        self._run()
+
+        assert len(spells_of(product)) == 1
 
     def test_a_product_without_history_gets_one_spell_from_its_creation(
         self, clock, vat, category

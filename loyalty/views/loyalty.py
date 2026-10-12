@@ -231,18 +231,32 @@ class LoyaltyViewSet(BaseModelViewSet):
         # stored on the row. The checkout path always did this; this
         # standalone endpoint used to burn the points while leaving
         # the order total (and therefore the charge) untouched.
+        from django.db import transaction
         from djmoney.money import Money
 
-        order.loyalty_discount = Money(discount, currency)
-        order.amount_due = order.calculate_order_total_amount()
-        order.save(
-            update_fields=[
-                "loyalty_discount",
-                "loyalty_discount_currency",
-                "amount_due",
-                "amount_due_currency",
-            ]
+        from order.discounts import (
+            add_line_discounts,
+            spread_by_remaining_value,
         )
+
+        with transaction.atomic():
+            order.loyalty_discount = Money(discount, currency)
+            order.amount_due = order.calculate_order_total_amount()
+            order.save(
+                update_fields=[
+                    "loyalty_discount",
+                    "loyalty_discount_currency",
+                    "amount_due",
+                    "amount_due_currency",
+                ]
+            )
+            # The tax documents read where the discount landed per line
+            # (order.discounts): the redemption is order-wide, so it is
+            # spread over the value the lines still carry.
+            items = list(order.items.all())
+            add_line_discounts(
+                items, spread_by_remaining_value(items, discount)
+            )
 
         remaining_balance = LoyaltyService.get_user_balance(request.user)
 

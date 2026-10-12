@@ -19937,4 +19937,18 @@ msgstr ""
 msgid ""
 "The Ocp-Apim-Subscription-Key from the myDATA developer portal. Secret. No"
 " platform fallback — empty disables myDATA."
+
+#: .\order\models\item.py:53
+msgid "Discount Allocation"
+msgstr ""
+
+#: .\order\models\item.py:57
+msgid ""
+"Part of the order's discount this line carries, fixed when the order was "
+"created. Invoices and myDATA use it to split the VAT of what was actually "
+"charged."
+msgstr ""
+
+#: .\order\services.py:1
+msgid "A promotion discounts a cart line that is not part of the order."
 msgstr ""

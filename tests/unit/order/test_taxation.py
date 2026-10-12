@@ -25,6 +25,7 @@ from order.taxation import (
     split_gross,
 )
 from product.factories import ProductFactory
+from tests.utils.discounts import snapshot_discounts
 from vat.constants import MYDATA_SUPPORTED_VAT_RATES
 from vat.factories import VatFactory
 
@@ -33,8 +34,13 @@ pytestmark = pytest.mark.django_db
 D = Decimal
 
 
-def _order(lines, *, shipping="0", fee="0", discount=None):
+def _order(
+    lines, *, shipping="0", fee="0", discount=None, promotion_lines=None
+):
     """``lines``: ``(unit gross, VAT rate, quantity)`` per goods line.
+
+    ``promotion_lines`` maps a line's index to the promotion money it
+    carries (a scoped promotion); without it the discount is order-wide.
 
     The rate is stated on each item, as checkout does, so these tests do
     not lean on the product's current VAT.
@@ -45,16 +51,27 @@ def _order(lines, *, shipping="0", fee="0", discount=None):
         payment_method_fee=Money(D(fee), "EUR"),
     )
     order.items.all().delete()
-    for gross, rate, quantity in lines:
+    created = [
         order.items.create(
             product=ProductFactory(vat=VatFactory(value=D(str(rate)))),
             price=Money(D(str(gross)), "EUR"),
             quantity=quantity,
             vat_rate=D(str(rate)),
         )
+        for gross, rate, quantity in lines
+    ]
     if discount is not None:
         order.discount_amount = Money(D(str(discount)), "EUR")
         order.save()
+        snapshot_discounts(
+            order,
+            None
+            if promotion_lines is None
+            else {
+                created[index].pk: D(amount)
+                for index, amount in promotion_lines.items()
+            },
+        )
     return order
 
 
@@ -252,6 +269,49 @@ class TestAncillaryCharges:
         ] == [(D("24"), D("5.00")), (D("6"), D("5.00"))]
         # The discount still reduces the goods themselves.
         assert _gross(lines, ChargeKind.GOODS) == D("150.00")
+
+    def test_a_discount_on_one_rate_moves_the_apportionment_to_the_other(self):
+        """Shipping follows the value of the goods CHARGED (Εγκ. 10/1987),
+        so a promotion that only took the 24% line down leaves it the
+        smaller weight: 50.00 at 24% against 100.00 at 6% is 5.00 / 10.00,
+        where the undiscounted 100.00 / 100.00 gave 7.50 each."""
+        order = _order(
+            [("100.00", "24", 1), ("100.00", "6", 1)],
+            shipping="15.00",
+            discount="50.00",
+            promotion_lines={0: "50.00"},
+        )
+
+        lines = order_vat_lines(order)
+
+        assert [
+            (line.rate, line.gross)
+            for line in lines
+            if line.kind is ChargeKind.SHIPPING
+        ] == [(D("24"), D("5.00")), (D("6"), D("10.00"))]
+        assert [
+            (line.rate, line.gross)
+            for line in lines
+            if line.kind is ChargeKind.GOODS
+        ] == [(D("24"), D("50.00")), (D("6"), D("100.00"))]
+
+    def test_a_fully_discounted_rate_takes_no_share_of_the_charge(self):
+        order = _order(
+            [("10.00", "24", 1), ("30.00", "6", 1)],
+            shipping="4.00",
+            discount="10.00",
+            promotion_lines={0: "10.00"},
+        )
+
+        shipping = [
+            line
+            for line in order_vat_lines(order)
+            if line.kind is ChargeKind.SHIPPING
+        ]
+
+        assert [(line.rate, line.gross) for line in shipping] == [
+            (D("6"), D("4.00"))
+        ]
 
     def test_goods_with_no_value_fall_back_to_units(self):
         """A free sample with paid delivery: nothing to weigh by value,

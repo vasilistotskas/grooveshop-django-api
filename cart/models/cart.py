@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from decimal import Decimal
 from typing import Literal, cast
 
@@ -12,7 +13,6 @@ from djmoney.money import Money
 
 from cart.managers.cart import CartManager
 from core.models import TimeStampMixinModel, UUIDModel
-from order.discounts import allocate_discount
 from order.taxation import split_gross
 
 
@@ -101,18 +101,22 @@ class Cart(TimeStampMixinModel, UUIDModel):
     @property
     def total_vat_value(self) -> Money:
         """VAT contained in ``total_price``, before any promotion."""
-        return self.vat_after_discount(Money(0, settings.DEFAULT_CURRENCY))
+        return self.vat_after_discount({})
 
-    def vat_after_discount(self, discount: Money) -> Money:
-        """VAT owed once ``discount`` is taken off the line prices.
+    def vat_after_discount(
+        self, line_discounts: Mapping[int, Decimal]
+    ) -> Money:
+        """VAT owed once ``line_discounts`` are taken off the line prices.
 
         Line prices are what the shopper pays (markdown included), so VAT
         is backed out of them; a price discount granted at the time of
-        sale reduces the taxable base, so it is spread across the lines
-        (and therefore across their VAT rates) exactly as the invoice
-        does it — see ``order.discounts`` and ``order.taxation``, whose
-        per-line rounding this shares. Never pass a gift card here:
-        it is a means of payment and leaves VAT untouched.
+        sale reduces the taxable base of the lines it was granted on, so
+        each line's gross is reduced by its own share
+        (``CartDiscountResult.line_discounts``, cart item pk -> amount)
+        exactly as the invoice reads it from the order's snapshots — see
+        ``order.discounts`` and ``order.taxation``, whose per-line rounding
+        this shares. Never pass a gift card here: it is a means of payment
+        and leaves VAT untouched.
         """
         # Use prefetched items if available
         items = list(
@@ -120,11 +124,13 @@ class Cart(TimeStampMixinModel, UUIDModel):
             if "items" in getattr(self, "_prefetched_objects_cache", {})
             else self.get_items()
         )
-        gross = {item.pk: item.total_price.amount for item in items}
-        discounted = allocate_discount(gross, Decimal(discount.amount))
         total = sum(
             (
-                split_gross(discounted[item.pk], Decimal(item.vat_percent))[1]
+                split_gross(
+                    item.total_price.amount
+                    - line_discounts.get(item.pk, Decimal(0)),
+                    Decimal(item.vat_percent),
+                )[1]
                 for item in items
             ),
             Decimal(0),

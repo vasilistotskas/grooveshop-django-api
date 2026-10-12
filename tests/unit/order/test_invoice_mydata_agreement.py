@@ -29,6 +29,7 @@ from order.mydata.types import (
     VAT_CATEGORY_24,
 )
 from product.factories import ProductFactory
+from tests.utils.discounts import snapshot_discounts
 from vat.factories import VatFactory
 
 pytestmark = pytest.mark.django_db
@@ -64,6 +65,7 @@ def _order(lines, *, shipping, fee, discount=None, loyalty=None):
     if loyalty is not None:
         order.loyalty_discount = Money(D(loyalty), "EUR")
     order.save()
+    snapshot_discounts(order)
     return order
 
 

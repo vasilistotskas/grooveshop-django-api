@@ -50,6 +50,26 @@ class OrderItem(TimeStampMixinModel, SortableModel, UUIDModel):
             "current VAT."
         ),
     )
+    # The part of the order's monetary discount (promotions + loyalty)
+    # this line carries, for the whole line, fixed when the order is
+    # created. A promotion lands on the lines it covers, so a coupon for
+    # one category never reduces a line of another (which may carry a
+    # different VAT rate); the invoice and myDATA read this and never
+    # re-derive it (``order.discounts``). ``db_default`` is for the
+    # rolling deploy: the previous release still INSERTs without the
+    # column, and ``heal_discount_allocation`` fills those orders in.
+    discount_allocation = MoneyField(
+        _("Discount Allocation"),
+        max_digits=11,
+        decimal_places=2,
+        default=0,
+        db_default=Decimal(0),
+        help_text=_(
+            "Part of the order's discount this line carries, fixed when "
+            "the order was created. Invoices and myDATA use it to split "
+            "the VAT of what was actually charged."
+        ),
+    )
     quantity = models.IntegerField(_("Quantity"), default=1)
     original_quantity = models.IntegerField(
         _("Original Quantity"), null=True, blank=True

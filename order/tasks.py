@@ -1665,8 +1665,8 @@ def send_credit_to_mydata(self, credit_id: int) -> bool:
         return True
     if not credit.invoice.mydata_mark:
         logger.warning(
-            "Credit %s waits for the MARK of receipt %s",
-            credit.credit_number,
+            "Credit #%s waits for the MARK of receipt %s",
+            credit.pk,
             credit.invoice.invoice_number,
         )
         return False

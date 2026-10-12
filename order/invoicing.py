@@ -534,8 +534,8 @@ def render_credit_pdf(credit: RetailCredit) -> RetailCredit:
     )
     credit.save(update_fields=["document_file"])
     logger.info(
-        "Rendered credit document %s for order %s (%s bytes)",
-        credit.credit_number,
+        "Rendered credit document #%s for order %s (%s bytes)",
+        credit.pk,
         order.id,
         len(pdf_bytes),
     )

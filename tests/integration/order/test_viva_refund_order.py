@@ -67,7 +67,7 @@ def _paid_viva_order(*, captured="21.10", ledger=True, **kwargs):
     kwargs.setdefault("status", OrderStatus.PROCESSING)
     kwargs.setdefault("payment_status", PaymentStatus.COMPLETED)
     kwargs.setdefault("payment_id", PAYMENT_ID)
-    kwargs.setdefault("paid_amount", Money(Decimal("21.10"), "EUR"))
+    kwargs.setdefault("amount_due", Money(Decimal("21.10"), "EUR"))
     order = OrderFactory(num_order_items=0, **kwargs)
     if ledger:
         PaymentTransactionFactory(
@@ -214,11 +214,11 @@ class TestARefundVivaAcceptsIsRecorded:
     def test_a_full_refund_is_what_the_ledger_captured_not_what_was_billed(
         self, refunded_signals
     ):
-        """``Order.paid_amount`` is the amount owed when the order was
+        """``Order.amount_due`` is the amount owed when the order was
         created. The refund, and what ``order_refunded`` reports, is the
         amount the ledger holds for the payment."""
         order = _paid_viva_order(captured="10.00")
-        assert order.paid_amount == Money(Decimal("21.10"), "EUR")
+        assert order.amount_due == Money(Decimal("21.10"), "EUR")
         fake = FakeVivaApi()
 
         with fake:

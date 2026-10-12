@@ -110,7 +110,7 @@ class TestZeroTotalSettlement:
         )
 
         order.refresh_from_db()
-        assert order.paid_amount.amount == Decimal(0)
+        assert order.amount_due.amount == Decimal(0)
         assert order.payment_status == PaymentStatus.COMPLETED
         assert order.payment_id == f"DISCOUNT_{order.uuid}"
         assert order.payment_method == "discount"
@@ -274,7 +274,7 @@ class TestLoyaltyPaymentIntentParity:
 
         order.refresh_from_db()
         assert order.loyalty_discount.amount == Decimal("5.00")
-        assert order.paid_amount.amount == expected_total
+        assert order.amount_due.amount == expected_total
 
     def test_verification_rejects_stale_undiscounted_intent(
         self, enable_promotions, checkout

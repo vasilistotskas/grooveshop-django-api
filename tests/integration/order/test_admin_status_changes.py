@@ -127,7 +127,7 @@ def _paid_viva_order():
         status=OrderStatus.PROCESSING,
         payment_status=PaymentStatus.COMPLETED,
         payment_id="b1a3067c-321b-4ec6-bc9d-1778aef2a19d",
-        paid_amount=Money(Decimal("21.10"), "EUR"),
+        amount_due=Money(Decimal("21.10"), "EUR"),
         pay_way=PayWayFactory.create_online_payment("viva_wallet"),
         num_order_items=0,
     )

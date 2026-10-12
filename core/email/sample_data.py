@@ -87,7 +87,7 @@ class SampleOrderDataGenerator:
         order_data["total_price_items"] = f"€{items_total:.2f}"
         order_data["shipping_price"] = f"€{shipping_price:.2f}"
         order_data["total_price"] = f"€{total_price:.2f}"
-        order_data["paid_amount"] = f"€{total_price:.2f}"
+        order_data["amount_due"] = f"€{total_price:.2f}"
 
         # Add status and status_display at root level for templates
         current_status = order_data.get("status", "PENDING")

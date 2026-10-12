@@ -1,5 +1,4 @@
 from django.db import models
-from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
 
@@ -162,15 +161,15 @@ class OrderFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
         help_text=_("Filter orders that have status update timestamp"),
     )
 
-    paid_amount_min = filters.NumberFilter(
-        field_name="paid_amount",
+    amount_due_min = filters.NumberFilter(
+        field_name="amount_due",
         lookup_expr="gte",
-        help_text=_("Filter by minimum paid amount"),
+        help_text=_("Filter by minimum amount due"),
     )
-    paid_amount_max = filters.NumberFilter(
-        field_name="paid_amount",
+    amount_due_max = filters.NumberFilter(
+        field_name="amount_due",
         lookup_expr="lte",
-        help_text=_("Filter by maximum paid amount"),
+        help_text=_("Filter by maximum amount due"),
     )
     shipping_price_min = filters.NumberFilter(
         field_name="shipping_price",
@@ -288,7 +287,7 @@ class OrderFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
             "payment_id": ["exact", "icontains"],
             "payment_method": ["exact", "icontains"],
             "shipping_carrier": ["exact", "icontains"],
-            "paid_amount": ["gte", "lte"],
+            "amount_due": ["gte", "lte"],
             "shipping_price": ["gte", "lte"],
             "status_updated_at": ["gte", "lte", "date"],
             "user": ["exact"],
@@ -333,20 +332,13 @@ class OrderFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
         return queryset
 
     def filter_is_paid(self, queryset, name, value):
+        # ``Order.is_paid``: the payment status is the settlement
+        # authority. The amount due says what the customer owes, never
+        # whether it was paid.
         if value is True:
-            return queryset.filter(
-                Q(payment_status=PaymentStatus.COMPLETED) | Q(paid_amount__gt=0)
-            )
+            return queryset.filter(payment_status=PaymentStatus.COMPLETED)
         elif value is False:
-            return queryset.filter(
-                Q(
-                    payment_status__in=[
-                        PaymentStatus.PENDING,
-                        PaymentStatus.FAILED,
-                    ]
-                )
-                & Q(paid_amount__lte=0)
-            )
+            return queryset.exclude(payment_status=PaymentStatus.COMPLETED)
         return queryset
 
     def filter_is_completed(self, queryset, name, value):

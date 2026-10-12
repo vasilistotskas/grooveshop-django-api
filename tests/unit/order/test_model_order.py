@@ -26,7 +26,7 @@ class OrderModelTestCase(TestCase):
         self.order.created_at = timezone.now()
         self.order.document_type = OrderDocumentTypeEnum.RECEIPT
         self.order.shipping_price = Money("10.00", settings.DEFAULT_CURRENCY)
-        self.order.paid_amount = Money("0.00", settings.DEFAULT_CURRENCY)
+        self.order.amount_due = Money("0.00", settings.DEFAULT_CURRENCY)
         self.order.payment_method_fee = None  # No payment method fee
         self.order._original_status = OrderStatus.PENDING
 
@@ -96,7 +96,7 @@ class OrderModelTestCase(TestCase):
 
     def test_is_paid_property_true(self):
         self.order.payment_status = PaymentStatus.COMPLETED
-        self.order.paid_amount = Money("100.00", settings.DEFAULT_CURRENCY)
+        self.order.amount_due = Money("100.00", settings.DEFAULT_CURRENCY)
 
         result = Order.is_paid.__get__(self.order)
 
@@ -113,9 +113,9 @@ class OrderModelTestCase(TestCase):
         """A gift card (or a 100% promotion, or a full loyalty
         redemption) settles the order without a provider, so the
         REMAINDER the customer owed is 0.00. Requiring a positive
-        paid_amount made such an order report itself unpaid forever."""
+        amount_due made such an order report itself unpaid forever."""
         self.order.payment_status = PaymentStatus.COMPLETED
-        self.order.paid_amount = Money("0.00", settings.DEFAULT_CURRENCY)
+        self.order.amount_due = Money("0.00", settings.DEFAULT_CURRENCY)
         self.order.payment_id = "GIFTCARD_abc"
 
         self.assertTrue(Order.is_paid.__get__(self.order))
@@ -125,7 +125,7 @@ class OrderModelTestCase(TestCase):
         way, so the same gap kept a settled order in the "pay now" state
         and let the checkout endpoints open a zero-amount session."""
         self.order.payment_status = PaymentStatus.COMPLETED
-        self.order.paid_amount = Money("0.00", settings.DEFAULT_CURRENCY)
+        self.order.amount_due = Money("0.00", settings.DEFAULT_CURRENCY)
         # ``settlement``, not the deprecated mirror: a bare Mock
         # attribute is not a valid PaySettlement and the property
         # now raises on one.
@@ -139,7 +139,7 @@ class OrderModelTestCase(TestCase):
 
     def test_is_paid_false_while_payment_is_pending(self):
         self.order.payment_status = PaymentStatus.PENDING
-        self.order.paid_amount = Money("100.00", settings.DEFAULT_CURRENCY)
+        self.order.amount_due = Money("100.00", settings.DEFAULT_CURRENCY)
 
         self.assertFalse(Order.is_paid.__get__(self.order))
 

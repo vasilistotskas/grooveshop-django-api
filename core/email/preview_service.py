@@ -230,7 +230,7 @@ class EmailTemplatePreviewService:
                 "total_price": f"€{float(order.total_price.amount) if hasattr(order.total_price, 'amount') else float(order.total_price):.2f}",
                 "total_price_items": f"€{float(order.total_price_items.amount) if hasattr(order.total_price_items, 'amount') else float(order.total_price_items):.2f}",
                 "shipping_price": f"€{float(order.shipping_price.amount) if hasattr(order.shipping_price, 'amount') else float(order.shipping_price):.2f}",
-                "paid_amount": f"€{float(order.total_price.amount) if hasattr(order.total_price, 'amount') else float(order.total_price):.2f}",
+                "amount_due": f"€{float(order.total_price.amount) if hasattr(order.total_price, 'amount') else float(order.total_price):.2f}",
                 "created_at": order.created_at,
                 "status_updated_at": order.status_updated_at
                 or order.created_at,

@@ -5341,11 +5341,11 @@ msgid "Filter orders that have status update timestamp"
 msgstr ""
 
 #: .\order\filters.py:154
-msgid "Filter by minimum paid amount"
+msgid "Filter by minimum amount due"
 msgstr ""
 
 #: .\order\filters.py:159
-msgid "Filter by maximum paid amount"
+msgid "Filter by maximum amount due"
 msgstr ""
 
 #: .\order\filters.py:164
@@ -5741,7 +5741,14 @@ msgid "Fee charged by the payment method (e.g., Cash on Delivery fee)"
 msgstr ""
 
 #: .\order\models\order.py:159
-msgid "Paid Amount"
+msgid "Amount Due"
+msgstr ""
+
+#: .\order\models\order.py:179
+msgid ""
+"What the customer owes for the order, fixed at creation: lines and "
+"extras, less every deduction. Not what was collected; that is on the "
+"payment ledger."
 msgstr ""
 
 #: .\order\models\order.py:166

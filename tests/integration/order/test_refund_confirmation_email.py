@@ -278,7 +278,7 @@ class TestEachRefundQueuesItsOwnTask:
             status=OrderStatus.DELIVERED,
             payment_status=PaymentStatus.COMPLETED,
             payment_id="pi_ledger",
-            paid_amount=Money(Decimal("100.00"), "EUR"),
+            amount_due=Money(Decimal("100.00"), "EUR"),
         )
         PaymentTransactionFactory(
             order=order,

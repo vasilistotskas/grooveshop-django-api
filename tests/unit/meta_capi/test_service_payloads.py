@@ -153,7 +153,7 @@ class TestCustomData:
         order.payment_method_fee = Money(Decimal("1.50"), "EUR")
         order.discount_amount = Money(Decimal("2.00"), "EUR")
         order.loyalty_discount = Money(Decimal("0.50"), "EUR")
-        order.paid_amount = Money(Decimal("0.00"), "EUR")
+        order.amount_due = Money(Decimal("0.00"), "EUR")
         items_total = order.total_price_items.amount
 
         event, event_id = build_initiate_checkout_event(order)
@@ -182,9 +182,9 @@ class TestCustomData:
 
         assert event.custom_data.value == 0.0
 
-    def test_refund_explicit_amount_wins_over_paid_amount(self):
+    def test_refund_explicit_amount_wins_over_amount_due(self):
         order = OrderFactory(num_order_items=0)
-        order.paid_amount = Money(Decimal("40.00"), "EUR")
+        order.amount_due = Money(Decimal("40.00"), "EUR")
 
         explicit, id_a = build_refund_event(order, Decimal("15.25"))
         fallback, id_b = build_refund_event(order, None)
@@ -195,9 +195,9 @@ class TestCustomData:
         # Refunds carry a fresh id each time (no browser leg to dedup).
         assert id_a != id_b
 
-    def test_purchase_reports_paid_amount_and_order_id(self):
+    def test_purchase_reports_amount_due_and_order_id(self):
         order = OrderFactory(num_order_items=1)
-        order.paid_amount = Money(Decimal("27.40"), "EUR")
+        order.amount_due = Money(Decimal("27.40"), "EUR")
 
         event, _ = build_purchase_event(order)
 

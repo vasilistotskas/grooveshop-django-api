@@ -74,7 +74,7 @@ def _paid_order(*, ledger=True, **kwargs):
     kwargs.setdefault("status", OrderStatus.PROCESSING)
     kwargs.setdefault("payment_status", PaymentStatus.COMPLETED)
     kwargs.setdefault("payment_id", PAYMENT_ID)
-    kwargs.setdefault("paid_amount", Money(Decimal(str(CAPTURED)), "EUR"))
+    kwargs.setdefault("amount_due", Money(Decimal(str(CAPTURED)), "EUR"))
     # The codes this order actually issued: Viva's guidance is to confirm
     # a result with the COMBINATION of OrderCode and TransactionId.
     kwargs.setdefault("metadata", {"viva_order_codes": [str(ORDER_CODE)]})

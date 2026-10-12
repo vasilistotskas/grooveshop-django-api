@@ -35,7 +35,7 @@ def _order(status, amount):
     return OrderFactory(
         num_order_items=0,
         payment_status=status,
-        paid_amount=Money(amount, settings.DEFAULT_CURRENCY),
+        amount_due=Money(amount, settings.DEFAULT_CURRENCY),
     )
 
 

@@ -170,7 +170,7 @@ class OrderSignalsTestCase(TestCase):
 
         Order.objects.filter(id=self.order.id).update(
             payment_status=PaymentStatus.COMPLETED,
-            paid_amount=Money("100.00", settings.DEFAULT_CURRENCY),
+            amount_due=Money("100.00", settings.DEFAULT_CURRENCY),
         )
         self.order.refresh_from_db()
         receiver = Mock()

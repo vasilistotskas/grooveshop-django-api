@@ -102,7 +102,7 @@ class TestSplitPayment:
 
         order.refresh_from_db()
         assert order.gift_card_amount.amount == Decimal("30.00")
-        assert order.paid_amount.amount == order.total_price.amount - Decimal(
+        assert order.amount_due.amount == order.total_price.amount - Decimal(
             "30.00"
         )
         assert order.payment_status != "COMPLETED"
@@ -121,7 +121,7 @@ class TestSplitPayment:
         order.refresh_from_db()
         total = order.total_price.amount
         assert order.gift_card_amount.amount == total
-        assert order.paid_amount.amount == Decimal(0)
+        assert order.amount_due.amount == Decimal(0)
         assert order.payment_status == "COMPLETED"
         assert order.payment_id == f"GIFTCARD_{order.uuid}"
         assert order.payment_method == "gift_card"

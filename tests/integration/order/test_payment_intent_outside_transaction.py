@@ -136,7 +136,7 @@ class TestIntentIsReadOutsideTheTransaction:
             lambda _id: (PaymentStatus.PENDING, {})
         )
         reference = self._create("pi_reference")
-        total = float(reference.paid_amount.amount)
+        total = float(reference.amount_due.amount)
 
         mock_get_provider.return_value = self._provider(
             lambda _id: (
@@ -147,7 +147,7 @@ class TestIntentIsReadOutsideTheTransaction:
         order = self._create("pi_matching", cart=self._cart())
 
         assert order.payment_id == "pi_matching"
-        assert order.paid_amount == reference.paid_amount
+        assert order.amount_due == reference.amount_due
 
     @patch("order.payment.get_payment_provider")
     def test_the_server_total_is_recomputed_inside_the_transaction(
@@ -160,7 +160,7 @@ class TestIntentIsReadOutsideTheTransaction:
         mock_get_provider.return_value = self._provider(
             lambda _id: (PaymentStatus.PENDING, {})
         )
-        total = float(self._create("pi_reference").paid_amount.amount)
+        total = float(self._create("pi_reference").amount_due.amount)
 
         def read(payment_id):
             Product.objects.filter(pk=self.product.pk).update(

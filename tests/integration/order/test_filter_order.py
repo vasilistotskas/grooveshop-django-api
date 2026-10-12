@@ -76,7 +76,7 @@ class OrderFilterTest(APITestCase):
             street_number="123",
             phone="+1234567890",
             customer_notes="Please deliver after 5 PM",
-            paid_amount=Money(0, "EUR"),
+            amount_due=Money(40, "EUR"),
             shipping_price=Money(10, "EUR"),
             tracking_number="",
             payment_id="",
@@ -103,7 +103,7 @@ class OrderFilterTest(APITestCase):
             street_number="456",
             phone="+1234567890",
             customer_notes="",
-            paid_amount=Money(50, "EUR"),
+            amount_due=Money(50, "EUR"),
             shipping_price=Money(15, "EUR"),
             tracking_number="",
             payment_id="pay_123456",
@@ -130,7 +130,7 @@ class OrderFilterTest(APITestCase):
             street_number="1",
             phone="+49123456789",
             customer_notes="Ring the bell twice",
-            paid_amount=Money(75, "EUR"),
+            amount_due=Money(75, "EUR"),
             shipping_price=Money(20, "EUR"),
             tracking_number="TRACK123456",
             payment_id="pay_789012",
@@ -158,7 +158,7 @@ class OrderFilterTest(APITestCase):
             street_number="8",
             phone="+49123456789",
             customer_notes="",
-            paid_amount=Money(100, "EUR"),
+            amount_due=Money(100, "EUR"),
             shipping_price=Money(5, "EUR"),
             tracking_number="TRACK789012",
             payment_id="pay_345678",
@@ -186,7 +186,7 @@ class OrderFilterTest(APITestCase):
             street_number="999",
             phone="+1987654321",
             customer_notes="",
-            paid_amount=Money(0, "EUR"),
+            amount_due=Money(30, "EUR"),
             shipping_price=Money(12, "EUR"),
             tracking_number="",
             payment_id="",
@@ -307,7 +307,7 @@ class OrderFilterTest(APITestCase):
     def test_amount_filters(self):
         url = reverse("order-list")
 
-        response = self.client.get(url, {"paid_amount_min": "50"})
+        response = self.client.get(url, {"amount_due_min": "50"})
         self.assertEqual(response.status_code, 200)
         result_ids = [r["id"] for r in response.data["results"]]
         self.assertEqual(len(result_ids), 3)
@@ -315,7 +315,7 @@ class OrderFilterTest(APITestCase):
         self.assertIn(self.shipped_order.id, result_ids)
         self.assertIn(self.completed_order.id, result_ids)
 
-        response = self.client.get(url, {"paid_amount_max": "75"})
+        response = self.client.get(url, {"amount_due_max": "75"})
         self.assertEqual(response.status_code, 200)
         result_ids = [r["id"] for r in response.data["results"]]
         self.assertEqual(len(result_ids), 4)
@@ -380,6 +380,28 @@ class OrderFilterTest(APITestCase):
         self.assertIn(self.processing_order.id, result_ids)
         self.assertIn(self.shipped_order.id, result_ids)
         self.assertIn(self.completed_order.id, result_ids)
+
+    def test_is_paid_keys_on_the_payment_status_only(self):
+        """Every order here owes money. The unpaid ones owe it too, so a
+        filter reading the amount due would call them paid."""
+        url = reverse("order-list")
+        paid = {
+            self.processing_order.id,
+            self.shipped_order.id,
+            self.completed_order.id,
+        }
+        unpaid = {self.pending_order.id, self.canceled_order.id}
+        self.assertTrue(
+            all(order.amount_due.amount > 0 for order in Order.objects.all())
+        )
+
+        response = self.client.get(url, {"is_paid": "true"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual({r["id"] for r in response.data["results"]}, paid)
+
+        response = self.client.get(url, {"is_paid": "false"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual({r["id"] for r in response.data["results"]}, unpaid)
 
     def test_special_filters(self):
         url = reverse("order-list")
@@ -526,7 +548,7 @@ class OrderFilterTest(APITestCase):
                 "created_after": created_after_date.isoformat(),
                 "has_tracking": "true",
                 "payment_status": PaymentStatus.COMPLETED.value,
-                "ordering": "-paid_amount",
+                "ordering": "-amount_due",
             },
         )
         self.assertEqual(response.status_code, 200)
@@ -538,7 +560,7 @@ class OrderFilterTest(APITestCase):
         url = reverse("order-list")
 
         response = self.client.get(
-            url, {"is_paid": "true", "ordering": "-paid_amount"}
+            url, {"is_paid": "true", "ordering": "-amount_due"}
         )
         self.assertEqual(response.status_code, 200)
         results = response.data["results"]

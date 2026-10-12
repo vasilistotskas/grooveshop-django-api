@@ -9269,11 +9269,11 @@ msgid "Filter orders that have status update timestamp"
 msgstr ""
 
 #: .\order\filters.py:168
-msgid "Filter by minimum paid amount"
+msgid "Filter by minimum amount due"
 msgstr ""
 
 #: .\order\filters.py:173
-msgid "Filter by maximum paid amount"
+msgid "Filter by maximum amount due"
 msgstr ""
 
 #: .\order\filters.py:178
@@ -9982,7 +9982,14 @@ msgid "Document Type"
 msgstr ""
 
 #: .\order\models\order.py:179
-msgid "Paid Amount"
+msgid "Amount Due"
+msgstr ""
+
+#: .\order\models\order.py:179
+msgid ""
+"What the customer owes for the order, fixed at creation: lines and "
+"extras, less every deduction. Not what was collected; that is on the "
+"payment ledger."
 msgstr ""
 
 #: .\order\models\order.py:186
@@ -10156,7 +10163,7 @@ msgstr ""
 
 #: .\order\models\order.py:688
 msgid ""
-"A completed payment needs the amount paid, unless discounts, loyalty points "
+"A completed payment needs an amount due, unless discounts, loyalty points "
 "or gift cards cover the whole order total."
 msgstr ""
 

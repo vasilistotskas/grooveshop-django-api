@@ -185,11 +185,11 @@ class OrderFactory(factory.django.DjangoModelFactory):
     document_type = factory.LazyFunction(
         lambda: random.choice([s[0] for s in OrderDocumentTypeEnum.choices])
     )
-    # A COMPLETED payment always has money on it: ``Order.clean()`` refuses
-    # one with nothing paid unless deductions cover the whole total, so a
-    # zero here made about 1 in 25 default orders invalid and failed any
-    # test that validated them. Every other status keeps the old mix.
-    paid_amount = factory.LazyAttribute(
+    # A COMPLETED payment always has an amount due: ``Order.clean()``
+    # refuses one with nothing due unless deductions cover the whole total,
+    # so a zero here made about 1 in 25 default orders invalid and failed
+    # any test that validated them. Every other status keeps the old mix.
+    amount_due = factory.LazyAttribute(
         lambda o: (
             Money(
                 fake.pydecimal(
@@ -273,7 +273,7 @@ class OrderFactory(factory.django.DjangoModelFactory):
         ]:
             payment_data = generate_payment_data(PaymentStatus.COMPLETED)
             data.update(payment_data)
-            data["paid_amount"] = Money(
+            data["amount_due"] = Money(
                 fake.pydecimal(
                     left_digits=3,
                     right_digits=2,
@@ -297,7 +297,7 @@ class OrderFactory(factory.django.DjangoModelFactory):
         elif status == OrderStatus.REFUNDED:
             payment_data = generate_payment_data(PaymentStatus.REFUNDED)
             data.update(payment_data)
-            data["paid_amount"] = Money(
+            data["amount_due"] = Money(
                 fake.pydecimal(
                     left_digits=3,
                     right_digits=2,

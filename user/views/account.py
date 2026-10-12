@@ -212,7 +212,7 @@ class UserAccountViewSet(BaseModelViewSet):
                 "status",
                 "status_updated_at",
                 "payment_status",
-                "paid_amount",
+                "amount_due",
             ),
             default=("-created_at",),
         ),

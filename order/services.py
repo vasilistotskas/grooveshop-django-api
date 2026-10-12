@@ -420,7 +420,7 @@ class OrderService:
         redemption that cannot be honoured aborts order creation with
         a typed error — the intent was created for the discounted
         amount, so silently dropping the discount would make the
-        capture disagree with ``paid_amount``.
+        capture disagree with ``amount_due``.
         """
         if (
             not loyalty_points_to_redeem
@@ -742,7 +742,7 @@ class OrderService:
             # merchant opts in. Dropped HERE, before any pricing math,
             # so the verified PaymentIntent amount, the order total and
             # ``redeem_points`` all agree — dropping it later would let
-            # the capture disagree with ``paid_amount``.
+            # the capture disagree with ``amount_due``.
             if B2BService.suppresses_loyalty(cart):
                 loyalty_points_to_redeem = 0
 
@@ -819,7 +819,7 @@ class OrderService:
             # Loyalty is a discount, so it reduces what the provider
             # charges — priced here under the user-row lock with the
             # SAME math ``redeem_points`` runs after the order exists,
-            # so the verified intent amount and ``paid_amount`` cannot
+            # so the verified intent amount and ``amount_due`` cannot
             # drift. (Historically the intent ignored loyalty and
             # Stripe captured the undiscounted total while the points
             # were still burnt.)
@@ -1221,7 +1221,7 @@ class OrderService:
                     # The PaymentIntent was verified WITH the loyalty
                     # discount (Step 2.6) — silently dropping it here
                     # would make the captured amount disagree with
-                    # ``paid_amount``. The user-row lock taken during
+                    # ``amount_due``. The user-row lock taken during
                     # verification makes this branch unreachable in
                     # practice; if it ever fires, fail loud so the
                     # transaction (and its idempotency mark) rolls
@@ -1252,7 +1252,7 @@ class OrderService:
             # the order's own total undiscounted is what let every
             # charge site bill the full amount while the points were
             # burnt.
-            order.paid_amount = order.calculate_order_total_amount()
+            order.amount_due = order.calculate_order_total_amount()
             order.save(
                 update_fields=[
                     "discount_amount",
@@ -1261,8 +1261,8 @@ class OrderService:
                     "loyalty_discount_currency",
                     "gift_card_amount",
                     "gift_card_amount_currency",
-                    "paid_amount",
-                    "paid_amount_currency",
+                    "amount_due",
+                    "amount_due_currency",
                     "metadata",
                 ]
             )
@@ -1792,7 +1792,7 @@ class OrderService:
             # the order's own total undiscounted is what let every
             # charge site bill the full amount while the points were
             # burnt.
-            order.paid_amount = order.calculate_order_total_amount()
+            order.amount_due = order.calculate_order_total_amount()
             order.save(
                 update_fields=[
                     "discount_amount",
@@ -1801,8 +1801,8 @@ class OrderService:
                     "loyalty_discount_currency",
                     "gift_card_amount",
                     "gift_card_amount_currency",
-                    "paid_amount",
-                    "paid_amount_currency",
+                    "amount_due",
+                    "amount_due_currency",
                     "metadata",
                 ]
             )
@@ -1826,7 +1826,7 @@ class OrderService:
                 or order.discount_amount.amount > 0
                 or order.loyalty_discount.amount > 0
             )
-            fully_covered = deductions_present and order.paid_amount.amount == 0
+            fully_covered = deductions_present and order.amount_due.amount == 0
             if fully_covered:
                 if order.gift_card_amount.amount > 0:
                     settle_id = f"GIFTCARD_{order.uuid}"
@@ -3001,7 +3001,7 @@ class OrderService:
                 }
                 cls._note_refund_declined(order, provider_code, declined)
                 return RefundResult(
-                    refunded=Money(0, order.paid_amount.currency),
+                    refunded=Money(0, order.amount_due.currency),
                     declined=declined,
                 )
 

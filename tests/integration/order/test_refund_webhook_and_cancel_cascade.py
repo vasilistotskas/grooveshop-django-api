@@ -129,7 +129,7 @@ class TestRefundOrderConcurrencyGuard:
             payment_status=PaymentStatus.COMPLETED,
             payment_id="pi_refund_race",
             pay_way=PayWayFactory(),
-            paid_amount=Money("50.00", "EUR"),
+            amount_due=Money("50.00", "EUR"),
             num_order_items=0,
         )
         charge = PaymentTransactionFactory(

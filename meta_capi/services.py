@@ -208,21 +208,21 @@ def _build_purchase_custom_data(order: Order) -> Any:
     items = list(order.items.all())
     contents = [_content_for_order_item(item) for item in items]
     content_ids = [str(item.product_id) for item in items if item.product_id]
-    paid = order.paid_amount
-    paid_amount = (
-        _decimal_to_float(paid.amount)
-        if paid is not None and getattr(paid, "amount", None) is not None
+    due = order.amount_due
+    value = (
+        _decimal_to_float(due.amount)
+        if due is not None and getattr(due, "amount", None) is not None
         else 0.0
     )
     currency = (
-        paid.currency.code.upper()
-        if paid is not None and getattr(paid, "currency", None)
+        due.currency.code.upper()
+        if due is not None and getattr(due, "currency", None)
         else settings.DEFAULT_CURRENCY
     )
 
     return CustomData(
         currency=currency,
-        value=paid_amount,
+        value=value,
         content_type=str(ContentType.PRODUCT),
         content_ids=content_ids,
         contents=contents,
@@ -240,14 +240,14 @@ def _build_initiate_checkout_custom_data(order: Order) -> Any:
 
     # Compute the *expected* checkout total (items + shipping + payment
     # method fee, minus promotion/loyalty discounts). Using
-    # ``paid_amount`` here would report 0 for COD orders (which only
+    # ``amount_due`` here would report 0 for COD orders (which only
     # flip to paid on reconciliation), tanking InitiateCheckout value
     # reporting and breaking funnel ROAS for COD-heavy markets like
     # Greece. Discounts must be subtracted or InitiateCheckout
     # over-reports against the Purchase event (which reads the
-    # post-discount ``paid_amount``) and Meta flags the funnel as a
+    # post-discount ``amount_due``) and Meta flags the funnel as a
     # conversion-value discrepancy. Gift cards are intentionally NOT
-    # subtracted — they are payment, and Purchase's ``paid_amount``
+    # subtracted — they are payment, and Purchase's ``amount_due``
     # excludes them the same way only for the provider-charged part,
     # so the expected value stays the customer's economic commitment.
     total_items = order.total_price_items
@@ -269,10 +269,10 @@ def _build_initiate_checkout_custom_data(order: Order) -> Any:
     )
     value = _decimal_to_float(max(expected_total, 0)) or 0.0
 
-    # Currency lookup walks total_items → paid_amount → settings default
+    # Currency lookup walks total_items → amount_due → settings default
     # so we always emit a real ISO code even if the order has no items.
     currency = settings.DEFAULT_CURRENCY
-    for source in (total_items, order.paid_amount):
+    for source in (total_items, order.amount_due):
         cur = getattr(source, "currency", None) if source is not None else None
         if cur is not None:
             currency = cur.code.upper()
@@ -291,16 +291,16 @@ def _build_initiate_checkout_custom_data(order: Order) -> Any:
 def _build_refund_custom_data(order: Order, amount: Decimal | None) -> Any:
     from facebook_business.adobjects.serverside.custom_data import CustomData
 
-    paid = order.paid_amount
+    due = order.amount_due
     fallback = (
-        _decimal_to_float(paid.amount)
-        if paid is not None and getattr(paid, "amount", None) is not None
+        _decimal_to_float(due.amount)
+        if due is not None and getattr(due, "amount", None) is not None
         else 0.0
     )
     value = _decimal_to_float(amount) if amount is not None else fallback
     currency = (
-        paid.currency.code.upper()
-        if paid is not None and getattr(paid, "currency", None)
+        due.currency.code.upper()
+        if due is not None and getattr(due, "currency", None)
         else settings.DEFAULT_CURRENCY
     )
     return CustomData(

@@ -70,7 +70,7 @@ def _pending_order(payment_id) -> Order:
         zipcode="12345",
         phone="+306900000000",
         shipping_price=_eur("5.00"),
-        paid_amount=_eur("0.00"),
+        amount_due=_eur("0.00"),
     )
 
 

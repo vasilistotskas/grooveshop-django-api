@@ -155,7 +155,7 @@ def _paid_order(provider_code: str | None = None, **kwargs):
     kwargs.setdefault("payment_status", PaymentStatus.COMPLETED)
     # ``Order.payment_id`` is unique: one per order.
     kwargs.setdefault("payment_id", str(uuid.uuid4()))
-    kwargs.setdefault("paid_amount", Money(Decimal("21.10"), "EUR"))
+    kwargs.setdefault("amount_due", Money(Decimal("21.10"), "EUR"))
     return OrderFactory(num_order_items=0, **kwargs)
 
 

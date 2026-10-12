@@ -76,16 +76,16 @@ def kpis() -> dict[str, Any]:
 
     aggregates: dict[str, Any] = {
         "pending": Count("id", filter=Q(status=OrderStatus.PENDING)),
-        "aov": Avg("paid_amount", filter=paid & Q(created_at__gte=month_ago)),
+        "aov": Avg("amount_due", filter=paid & Q(created_at__gte=month_ago)),
     }
     for key, days in REVENUE_PERIODS:
         start = now - timedelta(days=days)
         prior_start = now - timedelta(days=days * 2)
         aggregates[f"current_{key}"] = Sum(
-            "paid_amount", filter=paid & Q(created_at__gte=start)
+            "amount_due", filter=paid & Q(created_at__gte=start)
         )
         aggregates[f"prior_{key}"] = Sum(
-            "paid_amount",
+            "amount_due",
             filter=paid & Q(created_at__gte=prior_start, created_at__lt=start),
         )
     orders = Order.objects.aggregate(**aggregates)
@@ -134,7 +134,7 @@ def performance() -> list[dict[str, Any]]:
         .annotate(
             orders=Count("id"),
             revenue=Sum(
-                "paid_amount",
+                "amount_due",
                 filter=Q(payment_status=PaymentStatus.COMPLETED),
             ),
         )
@@ -212,9 +212,7 @@ def recent_orders() -> list[dict[str, Any]]:
             "email": order.email,
             "status": order.status,
             # djmoney: ``.amount`` is the Decimal.
-            "amount": float(
-                order.paid_amount.amount if order.paid_amount else 0
-            ),
+            "amount": float(order.amount_due.amount),
             "created_at": order.created_at,
         }
         for order in Order.objects.order_by("-created_at")[:6]

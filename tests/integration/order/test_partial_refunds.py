@@ -47,7 +47,7 @@ def _order(captured="100.00", **kwargs):
     kwargs.setdefault("status", OrderStatus.DELIVERED)
     kwargs.setdefault("payment_status", PaymentStatus.COMPLETED)
     kwargs.setdefault("payment_id", "pi_ledger")
-    kwargs.setdefault("paid_amount", _eur(captured))
+    kwargs.setdefault("amount_due", _eur(captured))
     order = OrderFactory(num_order_items=0, **kwargs)
     PaymentTransactionFactory(
         order=order, amount=_eur(captured), provider_reference="pi_ledger"
@@ -434,7 +434,7 @@ class TestACaptureTheLedgerNeverRecorded:
             status=OrderStatus.DELIVERED,
             payment_status=PaymentStatus.COMPLETED,
             payment_id="pi_unrecorded",
-            paid_amount=_eur("50.00"),
+            amount_due=_eur("50.00"),
         )
 
     def test_it_is_read_from_stripe_once_and_recorded(self):

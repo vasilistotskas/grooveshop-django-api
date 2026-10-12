@@ -127,7 +127,7 @@ class ConfirmAgentPaymentEndpointTestCase(APITestCase):
             pay_way=pay_way,
             status=OrderStatus.PENDING,
             payment_status=PaymentStatus.PENDING,
-            paid_amount=Money(
+            amount_due=Money(
                 amount=Decimal("0.00"), currency=settings.DEFAULT_CURRENCY
             ),
         )
@@ -215,12 +215,12 @@ class ConfirmAgentPaymentEndpointTestCase(APITestCase):
         self.assertEqual(response.data["payment_id"], "pi_agent_pending")
         row = (
             Order.objects.filter(pk=order.pk)
-            .values("payment_status", "payment_id", "paid_amount")
+            .values("payment_status", "payment_id", "amount_due")
             .first()
         )
         self.assertEqual(row["payment_status"], PaymentStatus.PENDING)
         self.assertEqual(row["payment_id"], "pi_agent_pending")
-        self.assertEqual(row["paid_amount"], Decimal("0.00"))
+        self.assertEqual(row["amount_due"], Decimal("0.00"))
 
     @override_settings(AGENT_STRIPE_DELEGATED_ENABLED=True)
     def test_non_stripe_pay_way_rejected(self) -> None:

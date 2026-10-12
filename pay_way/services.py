@@ -239,7 +239,7 @@ class PayWayService:
             # Amount owed, not the raw total: a loyalty redemption is
             # deducted by calculate_order_total_amount(). Cash on
             # delivery already collected the discounted figure via
-            # paid_amount, so reporting total_price here contradicted
+            # amount_due, so reporting total_price here contradicted
             # the amount actually due.
             amount_due = order.calculate_order_total_amount()
             payment_data = {

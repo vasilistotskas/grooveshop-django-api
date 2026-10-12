@@ -180,12 +180,23 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         choices=OrderDocumentTypeEnum.choices,
         default=OrderDocumentTypeEnum.RECEIPT,
     )
-    paid_amount = MoneyField(
-        _("Paid Amount"),
+    # What the customer owes for the order, fixed at creation from
+    # ``calculate_order_total_amount()``: lines and extras, less every
+    # deduction. It says nothing about what was collected, which is the
+    # payment ledger's business (``PaymentLedger``). ``db_default`` as well
+    # as ``default``: migrations run BEFORE the new image rolls, so the
+    # release still serving INSERTs orders without this column.
+    amount_due = MoneyField(
+        _("Amount Due"),
         max_digits=11,
         decimal_places=2,
-        null=True,
         default=0,
+        db_default=Decimal(0),
+        help_text=_(
+            "What the customer owes for the order, fixed at creation: "
+            "lines and extras, less every deduction. Not what was "
+            "collected; that is on the payment ledger."
+        ),
     )
     loyalty_discount = MoneyField(
         _("Loyalty Discount"),
@@ -695,15 +706,16 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
             raise ValidationError(errors)
 
     def _payment_consistency_errors(self) -> dict[str, list]:
-        """A COMPLETED payment with nothing paid must be fully covered.
+        """A COMPLETED payment with nothing due must be fully covered.
 
-        ``paid_amount`` is legitimately 0.00 on a COMPLETED order only
+        ``amount_due`` is legitimately 0.00 on a COMPLETED order only
         when deductions — promotion, loyalty redemption, gift card —
         cover the whole total (see ``is_paid``); ``calculate_order_total_
         amount`` is exactly that remainder. Anything else is a payment
-        booked without the money: the admin form, which edits both
-        fields, is the path this guards (the demo fixtures that produced
-        eight such rows no longer go through ``save`` at all).
+        booked on an order whose amount due was never set: the admin
+        form, which edits both fields, is the path this guards (the demo
+        fixtures that produced eight such rows no longer go through
+        ``save`` at all).
 
         Not a ``CheckConstraint``: the total is a sum over the order's
         lines, which a row constraint cannot see. An unsaved order has
@@ -711,14 +723,14 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         """
         if self.payment_status != PaymentStatus.COMPLETED or self.pk is None:
             return {}
-        if self.paid_amount is not None and self.paid_amount.amount > 0:
+        if self.amount_due.amount > 0:
             return {}
         if self.calculate_order_total_amount().amount == 0:
             return {}
         return {
-            "paid_amount": [
+            "amount_due": [
                 _(
-                    "A completed payment needs the amount paid, unless "
+                    "A completed payment needs an amount due, unless "
                     "discounts, loyalty points or gift cards cover the "
                     "whole order total."
                 )
@@ -817,23 +829,44 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         """True when the order owes nothing.
 
         ``payment_status`` is the settlement authority — only
-        ``mark_as_paid`` and the provider webhooks set it COMPLETED.
-        Requiring ``paid_amount > 0`` on top of it broke the one case
-        where a settled order legitimately charges zero: deductions
-        (gift card, 100% promotion, full loyalty redemption) covering
-        the whole total. ``OrderService`` settles those without ever
-        involving a provider, and ``paid_amount`` is the REMAINDER the
-        customer owed, which is exactly 0.00 there — so the order
-        reported itself unpaid forever, ``awaits_online_payment`` stayed
-        True, and the checkout endpoints happily opened a zero-amount
-        provider session for it.
+        ``mark_as_paid`` and the provider webhooks set it COMPLETED —
+        and the whole test: a settled order can legitimately owe zero
+        when deductions (gift card, 100% promotion, full loyalty
+        redemption) cover the whole total. ``OrderService`` settles
+        those without ever involving a provider, and ``amount_due`` is
+        exactly 0.00 there, so a test on the amount would report the
+        order unpaid forever, ``awaits_online_payment`` would stay True,
+        and the checkout endpoints would open a zero-amount provider
+        session for it.
 
-        A COMPLETED order can only carry a zero ``paid_amount`` in that
+        A COMPLETED order can only carry a zero ``amount_due`` in that
         case: ``mark_as_paid`` backfills the field from the order total
-        whenever it is unset or zero, so any order that owed money ends
-        up positive.
+        whenever it is zero, so any order that owed money ends up
+        positive.
         """
         return self.payment_status == PaymentStatus.COMPLETED
+
+    @property
+    def remaining_amount(self) -> Money:
+        """What the customer still has to pay: ``amount_due`` until the
+        payment is settled, nothing after.
+
+        Read from ``payment_status``, never from the payment ledger: the
+        ledger holds no row for an order settled without a provider (a
+        payment staff recorded by hand, cash collected under a
+        ``payment_method`` the ledger backfill does not key on, the demo
+        seed), and such an order would read as unpaid.
+
+        A settled status owes nothing, whichever it is
+        (``SETTLED_PAYMENT_STATUSES``). A refund does not create an amount
+        owed: PARTIALLY_REFUNDED and REFUNDED stay at zero. CANCELED owes
+        nothing either: ``Order.save`` settles an order that closes unpaid
+        to CANCELED (``PAYMENT_CLOSING_STATUSES``), because no payment
+        will ever be collected for it.
+        """
+        if self.payment_status in SETTLED_PAYMENT_STATUSES:
+            return Money(0, self.amount_due.currency)
+        return self.amount_due
 
     @property
     def awaits_online_payment(self) -> bool:
@@ -914,7 +947,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
 
         This is the ONE amount the shopper is charged, the order-create
         verification compares against, and the payment webhooks check.
-        The discount used to live only in ``paid_amount`` while every
+        The discount used to live only in ``amount_due`` while every
         charge site read the undiscounted ``total_price``: a shopper who
         spent 500 points for EUR 5 off a EUR 50 cart saw EUR 45 in the
         sidebar, had the points burnt, and was charged EUR 50 by both
@@ -955,16 +988,16 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         if payment_method:
             self.payment_method = payment_method
 
-        if not self.paid_amount or self.paid_amount.amount == 0:
-            self.paid_amount = self.calculate_order_total_amount()
+        if not self.amount_due:
+            self.amount_due = self.calculate_order_total_amount()
 
         self.save(
             update_fields=[
                 "payment_status",
                 "payment_id",
                 "payment_method",
-                "paid_amount",
-                "paid_amount_currency",
+                "amount_due",
+                "amount_due_currency",
             ]
         )
 

@@ -34,7 +34,6 @@ import logging
 from decimal import Decimal
 from typing import Any
 
-from django.conf import settings
 from django.core.files.base import ContentFile
 from django.db import transaction
 from django.template.loader import render_to_string
@@ -394,11 +393,7 @@ def _persist_invoice_row(
     else:
         vat_breakdown = _compute_vat_breakdown(order)
         totals = _order_totals(order, vat_breakdown)
-    currency = (
-        order.paid_amount.currency.code
-        if order.paid_amount
-        else settings.DEFAULT_CURRENCY
-    )
+    currency = order.amount_due.currency.code
 
     invoice.invoice_number = invoice_number
     invoice.issue_date = issue_date

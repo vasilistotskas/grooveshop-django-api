@@ -64,6 +64,9 @@ class TestRefundOrderRefusals:
 
         with patch("order.payment.get_payment_provider") as get_provider:
             provider = get_provider.return_value
+            # What the provider captured decides that this is the whole
+            # of it, whatever the order says it owed.
+            provider.captured_amount.return_value = Decimal("50.00")
             provider.refund_payment.return_value = (
                 True,
                 {"refund_id": "re_1", "status": PaymentStatus.REFUNDED},

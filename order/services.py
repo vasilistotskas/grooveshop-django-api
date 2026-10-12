@@ -2658,9 +2658,29 @@ class OrderService:
         from order.payment import get_payment_provider
 
         provider = get_payment_provider(order.pay_way.provider_code)
-        success, refund_response = provider.refund_payment(
-            payment_id=order.payment_id, amount=amount
-        )
+
+        # A part refund is judged against what the provider captured, not
+        # against what the order was billed (``paid_amount`` is the amount
+        # owed when the order was created). It is read BEFORE refunding:
+        # once the money has moved, an unreadable figure cannot be undone.
+        captured = None
+        if amount is not None:
+            captured = provider.captured_amount(order.payment_id)
+
+        if amount is not None and captured is None:
+            success, refund_response = (
+                False,
+                {
+                    "error": (
+                        "Could not read the amount the provider captured "
+                        "for this payment."
+                    )
+                },
+            )
+        else:
+            success, refund_response = provider.refund_payment(
+                payment_id=order.payment_id, amount=amount
+            )
 
         if not success:
             # Nothing was recorded as refunded, and the caller may only
@@ -2682,16 +2702,26 @@ class OrderService:
             )
             return False, refund_response
 
-        # ``None`` refunds everything the order paid.
-        refunded = amount if amount is not None else order.paid_amount
+        # ``None`` refunds everything the provider captured, a figure only
+        # the provider knows: take what it reports it paid back.
+        refunded = (
+            amount
+            if amount is not None
+            else Money(
+                Decimal(str(refund_response["amount"])),
+                order.paid_amount.currency,
+            )
+        )
 
         # A provider answers REFUNDED for any refund it accepted, partial
         # ones too; REFUNDED is what releases the gift-card redemption and
-        # the loyalty points, so it must mean "nothing left to refund".
+        # the loyalty points, so it must mean "nothing left to refund". A
+        # full refund is that by definition, a part refund is compared
+        # with the captured amount read above.
         payment_status = refund_response.get("status", PaymentStatus.REFUNDED)
-        if payment_status == PaymentStatus.REFUNDED:
+        if captured is not None and payment_status == PaymentStatus.REFUNDED:
             payment_status = PaymentStatus.after_refund(
-                refunded=refunded.amount, captured=order.paid_amount.amount
+                refunded=refunded.amount, captured=captured
             )
         order.payment_status = payment_status
 

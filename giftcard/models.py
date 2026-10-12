@@ -75,6 +75,17 @@ class GiftCardPurchase(TimeStampMixinModel, UUIDModel):
     payment_id = models.CharField(
         _("Payment ID"), max_length=255, blank=True, default=""
     )
+    # What the provider has refunded of this purchase's payment so far, in
+    # the purchase's currency. The card is the whole purchase, so it is
+    # voided only once the refunds add up to ``amount``; a part refund
+    # leaves the value the buyer still owns alone.
+    refunded_amount = models.DecimalField(
+        _("Refunded Amount"),
+        max_digits=11,
+        decimal_places=2,
+        default=0,
+        db_default=0,
+    )
 
     class Meta(TypedModelMeta):
         verbose_name = _("Gift Card Purchase")

@@ -71,21 +71,31 @@ class TestChargeRefundedWebhook:
         assert order.metadata["refunds"][-1]["is_full_refund"] is True
         assert order.metadata["refunds"][-1]["amount_refunded"] == 5000
 
-    def test_full_refund_says_how_much_was_refunded(self):
-        """``order_refunded`` always carries its amount (a charge reports
-        minor units): a receiver must never have to read its absence as
-        "everything"."""
+    @pytest.mark.parametrize(
+        ("currency", "expected"),
+        [
+            # A charge reports minor units in the currency's OWN exponent:
+            # 5000 of a two-decimal currency is 50, of a zero-decimal one
+            # it is 5000.
+            ("eur", Money(Decimal(50), "EUR")),
+            ("jpy", Money(Decimal(5000), "JPY")),
+        ],
+    )
+    def test_full_refund_says_how_much_was_refunded(self, currency, expected):
+        """``order_refunded`` always carries its amount: a receiver must
+        never have to read its absence as "everything"."""
         OrderFactory(
             num_order_items=0,
-            payment_id="pi_full_refund_amount",
+            payment_id=f"pi_full_refund_amount_{currency}",
             status=OrderStatus.DELIVERED,
             payment_status=PaymentStatus.COMPLETED,
         )
         event = _build_charge_event(
-            event_id="evt_full_refund_amount",
-            payment_intent_id="pi_full_refund_amount",
+            event_id=f"evt_full_refund_amount_{currency}",
+            payment_intent_id=f"pi_full_refund_amount_{currency}",
             amount=5000,
             amount_refunded=5000,
+            currency=currency,
         )
         received: list[dict] = []
 
@@ -98,9 +108,7 @@ class TestChargeRefundedWebhook:
         finally:
             order_refunded.disconnect(receiver)
 
-        assert [r["amount"] for r in received] == [
-            Money(Decimal("50.00"), "EUR")
-        ]
+        assert [r["amount"] for r in received] == [expected]
 
     def test_partial_refund_flips_payment_status_to_partially_refunded(self):
         order = OrderFactory(

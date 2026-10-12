@@ -211,13 +211,13 @@ class TestVivaPurchaseWebhookBranch:
         card = GiftCardService.complete_purchase(purchase)
         return purchase, card
 
-    def _reversal(self, purchase):
+    def _reversal(self, purchase, refund_id=None):
         """Viva's documented 1797 for a refund of this purchase's payment."""
         from order.views.viva_webhook import (
             _process_gift_card_purchase_event,
         )
 
-        refund_id = f"refund-{purchase.pk}"
+        refund_id = refund_id or f"refund-{purchase.pk}"
         body = reversal_created_event(
             refund_id=refund_id,
             parent_id=REVERSAL_CREATED_EVENT["EventData"]["ParentId"],
@@ -298,7 +298,8 @@ class TestVivaPurchaseWebhookBranch:
         self, enable_gift_cards
     ):
         """The card is the whole purchase; a goodwill refund of EUR 5 of
-        EUR 40 must not destroy the other EUR 35."""
+        EUR 40 must not destroy the other EUR 35. It is booked, though:
+        the next refunds add to it."""
         from order.models.viva_webhook_event import VivaWebhookEvent
 
         purchase, card = self._paid_purchase("9034567890123456")
@@ -313,14 +314,70 @@ class TestVivaPurchaseWebhookBranch:
         card.refresh_from_db()
         assert response.status_code == 200
         assert purchase.status == GiftCardPurchaseStatus.PAID
+        assert purchase.refunded_amount == Decimal(5)
         assert card.status == GiftCardStatus.ACTIVE
         assert card.balance.amount == Decimal(40)
         assert (
             VivaWebhookEvent.objects.get(
                 transaction_id=f"refund-{purchase.pk}"
             ).outcome
-            == VivaWebhookEvent.OUTCOME_SKIPPED
+            == VivaWebhookEvent.OUTCOME_PROCESSED
         )
+
+    def _viva_refunding(self, purchase, **refunds):
+        """A Viva that answers Retrieve for each named refund id."""
+        return FakeVivaApi(
+            transactions={
+                refund_id: (
+                    200,
+                    retrieve_refund(
+                        amount=paid_back, order_code=int(purchase.payment_id)
+                    ),
+                )
+                for refund_id, paid_back in refunds.items()
+            }
+        )
+
+    def test_refunds_that_add_up_to_the_purchase_void_the_card(
+        self, enable_gift_cards
+    ):
+        """EUR 5 and then EUR 35 of a EUR 40 purchase: the first leaves the
+        card spendable, the second completes the refund and voids it."""
+        purchase, card = self._paid_purchase("9234567890123457")
+
+        with self._viva_refunding(purchase, first=5.0, second=35.0):
+            self._reversal(purchase, refund_id="first")
+            card.refresh_from_db()
+            assert card.status == GiftCardStatus.ACTIVE
+            assert card.balance.amount == Decimal(40)
+            self._reversal(purchase, refund_id="second")
+
+        purchase.refresh_from_db()
+        card.refresh_from_db()
+        assert purchase.refunded_amount == Decimal(40)
+        assert purchase.status == GiftCardPurchaseStatus.CANCELED
+        assert card.status == GiftCardStatus.DISABLED
+        assert card.balance.amount == Decimal(0)
+
+    def test_a_replayed_refund_is_counted_once(self, enable_gift_cards):
+        """Viva redelivers: EUR 5 delivered twice is EUR 5, not EUR 10, and
+        must not bring the card closer to being voided."""
+        purchase, card = self._paid_purchase("9334567890123458")
+
+        with self._viva_refunding(purchase, first=5.0, second=35.0):
+            self._reversal(purchase, refund_id="first")
+            replay = self._reversal(purchase, refund_id="first")
+            # Acknowledged and left alone, not refused with a 500 that
+            # Viva would keep redelivering.
+            assert replay.status_code == 200
+            purchase.refresh_from_db()
+            assert purchase.refunded_amount == Decimal(5)
+            self._reversal(purchase, refund_id="second")
+
+        purchase.refresh_from_db()
+        card.refresh_from_db()
+        assert purchase.refunded_amount == Decimal(40)
+        assert card.status == GiftCardStatus.DISABLED
 
     def test_a_refund_of_another_payment_voids_nothing(self, enable_gift_cards):
         """Anyone may post their OWN real refund against this purchase's

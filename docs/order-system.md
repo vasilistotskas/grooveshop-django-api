@@ -348,16 +348,20 @@ unauthenticated body except `ParentId`:
    requires one of the order's issued order codes on it, `F`, a refund or
    void type and a negative amount; the refunded amount is `-amount`. The
    gift-card purchase path (`_process_gift_card_purchase_event`) goes
-   through the same verifier with the purchase's own order code, and voids
-   the card only for a refund of the whole purchase.
+   through the same verifier with the purchase's own order code. The card
+   is the whole purchase, so each verified refund is added to
+   `GiftCardPurchase.refunded_amount` and the card is voided once the
+   refunds reach the purchase amount (a refund id counts once: the
+   `VivaWebhookEvent` row is its idempotency key); a part refund leaves the
+   value the buyer still owns alone.
 2. `ParentId` must be the order's `payment_id`. Retrieve Transaction
    documents no parent id, so this check can only refuse, never grant.
 3. A refund id already in `metadata["refunds"]` is skipped: Viva notifies
    every refund, including the one `refund_order` has just made.
 4. Only a paid order (COMPLETED / PARTIALLY_REFUNDED) takes a refund. The
    captured amount is read from Retrieve Transaction on `payment_id`
-   (`VivaWalletPaymentProvider.captured_amount`, the helper `refund_payment`
-   uses; unreadable → 500). The refund is appended to `metadata["refunds"]`
+   (`PaymentProvider.captured_amount`, the helper `refund_payment` and
+   `refund_order` use; unreadable → 500). The refund is appended to `metadata["refunds"]`
    (`refund_id`, `amount`, `currency`, `provider`, `refunded_at`) and
    `PaymentStatus.after_refund(refunded=<cumulative>, captured=<captured>)`
    picks PARTIALLY_REFUNDED or REFUNDED.
@@ -785,6 +789,8 @@ Both carriers' cancel is idempotent on an already canceled shipment, so a custom
 - **Viva dashboard**: webhook 1797 → `_handle_reversal_created` (§4.3). The same webhook also reports the refunds the in-app path makes; a refund id already in `metadata["refunds"]` is not applied twice.
 
 All fire `order_refunded.send` → `handle_order_refunded` → email + WS notification. Single boolean `refund_confirmation_email_sent` flag dedupes between paths (PR #8).
+
+**What `refund_order` books comes from the provider, not from the order.** `Order.paid_amount` is the amount owed when the order was created. A full refund (`amount=None`) records and signals the `amount` the provider reports it paid back (`refund_payment`'s response carries it for both providers); a part refund is compared with `PaymentProvider.captured_amount`, read BEFORE refunding so that an unreadable figure refuses the refund (staff NOTE, nothing sent) instead of leaving money returned and the order unbooked. Stripe amounts are integers in the currency's own smallest unit, converted with `money_from_minor_units` (the exponent comes from `moneyed`, not an assumed two decimals).
 
 **The `order_refunded` contract** (`order/signals/__init__.py`). It carries `amount`, a `Money`: what THIS refund paid back, never absent (receivers that use it declare it as a required argument, so a sender that leaves it out raises). `order.payment_status` is already written and says how much of the order is back: PARTIALLY_REFUNDED while part of the payment remains refundable, REFUNDED once nothing does (`PaymentStatus.after_refund`; `refund_order` applies it too, because a provider answers REFUNDED for a partial refund as well). **Whatever hangs off the order's total is released only on REFUNDED, once, with the last refund**: the gift-card redemption (`giftcard.signals.handle_order_refunded_giftcard` → `GiftCardService.credit_refund`, the whole redemption) and the loyalty points (`loyalty.signals.handle_order_refunded_loyalty`, which is all-or-nothing and once per order). A partial refund is paid back by the provider first, so a slice of the redemption on top would hand back more than that refund was worth (a EUR 5 refund once put EUR 60 back on a gift card), and the one-credit-per-card ledger could not top the card up when the rest is refunded. The email, the toast, the history row and the Meta `Refund` event fire on every refund.
 

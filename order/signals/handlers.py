@@ -1,5 +1,4 @@
 import logging
-from decimal import Decimal
 from typing import Any
 
 from django.conf import settings
@@ -1136,11 +1135,13 @@ def handle_stripe_charge_refunded(sender, **kwargs):
         )
 
         if is_full_refund:
+            from order.payment import money_from_minor_units
+
             order_refunded.send(
                 sender=Order,
                 order=order,
-                amount=Money(
-                    Decimal(amount_refunded) / 100, charge["currency"].upper()
+                amount=money_from_minor_units(
+                    amount_refunded, charge["currency"]
                 ),
             )
 

@@ -128,7 +128,11 @@ class OrderServiceTestCase(TestCase):
         )
         mock_get_provider.return_value.refund_payment.return_value = (
             True,
-            {"refund_id": "refund_123", "status": PaymentStatus.REFUNDED},
+            {
+                "refund_id": "refund_123",
+                "status": PaymentStatus.REFUNDED,
+                "amount": "100.00",
+            },
         )
 
         success, response = OrderService.refund_order(

@@ -1044,21 +1044,30 @@ def _process_gift_card_purchase_event(
                 )
                 if refunded is None:
                     outcome = VivaWebhookEvent.OUTCOME_SKIPPED
-                elif refunded < purchase.amount.amount:
-                    # The card is the whole purchase: a goodwill refund of
-                    # part of it must not void value the buyer still owns.
-                    logger.error(
-                        "Viva refunded %s of %s for %s: only a refund of "
-                        "the whole purchase voids its card, so nothing "
-                        "was changed. Void the card by hand if the rest "
-                        "is meant to be returned too.",
-                        refunded,
-                        purchase.amount,
-                        subject,
-                    )
-                    outcome = VivaWebhookEvent.OUTCOME_SKIPPED
                 else:
-                    outcome = GiftCardService.handle_purchase_reversal(purchase)
+                    # The card is the whole purchase: a goodwill refund of
+                    # part of it must not void value the buyer still owns,
+                    # so refunds add up and the card is voided once they
+                    # reach the purchase amount. Each refund is counted
+                    # once: its id is the idempotency key checked above,
+                    # and the unique ``VivaWebhookEvent`` row written below
+                    # in the same transaction rolls this increment back for
+                    # a parallel duplicate that got past that check.
+                    purchase.refunded_amount += refunded
+                    purchase.save(update_fields=["refunded_amount"])
+                    if purchase.refunded_amount < purchase.amount.amount:
+                        logger.warning(
+                            "Viva has refunded %s of %s for %s: the card "
+                            "is voided once the refunds reach the whole "
+                            "purchase",
+                            purchase.refunded_amount,
+                            purchase.amount,
+                            subject,
+                        )
+                    else:
+                        outcome = GiftCardService.handle_purchase_reversal(
+                            purchase
+                        )
             else:
                 logger.info(
                     "Unhandled Viva event type %s for gift-card purchase %s",

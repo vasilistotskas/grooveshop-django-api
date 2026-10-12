@@ -15,6 +15,7 @@ markdown; it discounts the already-marked-down cart line totals.
 from __future__ import annotations
 
 import logging
+from collections import defaultdict
 from dataclasses import dataclass, field
 from decimal import ROUND_CEILING, ROUND_HALF_UP, Decimal
 
@@ -26,6 +27,7 @@ from django.utils import timezone
 from djmoney.money import Money
 from extra_settings.models import Setting
 
+from order.discounts import allocate_capped
 from promotion.enum import (
     BenefitType,
     CouponRejectionReason,
@@ -45,6 +47,9 @@ logger = logging.getLogger(__name__)
 
 TWO_PLACES = Decimal("0.01")
 
+# Key of a simulated cart line (``_SimulatedLine``) that is not a row yet.
+NEW_LINE_PK = -1
+
 
 class CouponError(ValidationError):
     """A coupon code was refused; ``reason`` is machine-readable."""
@@ -59,9 +64,18 @@ class CouponError(ValidationError):
 
 @dataclass
 class AppliedPromotion:
+    """A monetary promotion that applies, and where its money lands.
+
+    ``line_amounts`` (cart item pk -> amount) is filled by
+    ``PromotionEngine._clamp``: the part of ``amount`` each cart line the
+    promotion covers carries, to the cent, summing exactly to ``amount``.
+    Entries not yet clamped (the pre-stacking ones) leave it empty.
+    """
+
     promotion: Promotion
     code: PromotionCode | None
     amount: Money
+    line_amounts: dict[int, Decimal] = field(default_factory=dict)
 
 
 @dataclass
@@ -99,10 +113,12 @@ class _SimulatedLine:
     """A cart line as it would be after the shopper follows a teaser.
 
     Carries exactly what the engine reads from a ``CartItem`` —
-    ``product``, ``product_id``, ``quantity``, ``final_price``,
+    ``pk``, ``product``, ``product_id``, ``quantity``, ``final_price``,
     ``total_price`` — so the real classification can run over a cart
-    that does not exist without writing anything."""
+    that does not exist without writing anything. A line that is not in
+    the cart yet takes ``NEW_LINE_PK``, which no row can have."""
 
+    pk: int
     product: object
     quantity: int
     final_price: Money
@@ -138,6 +154,22 @@ class CartDiscountResult:
         currency = settings.DEFAULT_CURRENCY
         total = sum((entry.amount.amount for entry in self.applied), Decimal(0))
         return Money(total, currency)
+
+    @property
+    def line_discounts(self) -> dict[int, Decimal]:
+        """Cart item pk -> the promotion money its line carries.
+
+        Sums the applied promotions' ``line_amounts``, so the lines add up
+        to ``discount_total`` exactly. This, not a proportional spread
+        over the whole cart, is what the VAT of a discounted cart is
+        derived from (``Cart.vat_after_discount``) and what checkout
+        freezes on the order lines (``OrderItem.discount_allocation``).
+        """
+        lines: dict[int, Decimal] = defaultdict(Decimal)
+        for entry in self.applied:
+            for pk, amount in entry.line_amounts.items():
+                lines[pk] += amount
+        return dict(lines)
 
     @property
     def blocking_rejections(self) -> list[tuple[str, str]]:
@@ -263,7 +295,7 @@ class PromotionEngine:
         )
 
         chosen = cls._resolve_stacking(monetary, result)
-        chosen = cls._clamp(chosen, items_total, currency)
+        chosen = cls._clamp(chosen, cart_items, currency)
         # A code the clamp left with nothing (earlier promotions already
         # took the items total) moves no money: refuse it like a
         # stacking loser instead of accepting it for nothing.
@@ -329,7 +361,7 @@ class PromotionEngine:
             result=scratch,
         )
         chosen = cls._clamp(
-            cls._resolve_stacking(monetary, scratch), future_total, currency
+            cls._resolve_stacking(monetary, scratch), future_items, currency
         )
         granted = {e.promotion.pk for e in chosen if e.amount.amount > 0}
         granted |= {promotion.pk for promotion, _code in scratch.non_monetary}
@@ -355,6 +387,7 @@ class PromotionEngine:
             return [
                 *cart_items,
                 _SimulatedLine(
+                    pk=NEW_LINE_PK,
                     product=reward,
                     quantity=entry.remaining_quantity or 1,
                     final_price=Money(
@@ -380,6 +413,7 @@ class PromotionEngine:
             )
         return [
             _SimulatedLine(
+                pk=item.pk,
                 product=item.product,
                 quantity=item.quantity + extra,
                 final_price=item.final_price,
@@ -605,35 +639,74 @@ class PromotionEngine:
             return cls._bxgy_amount(promotion, cart_items, currency)
         return cls._benefit_amount(promotion, cart_items, items_total, currency)
 
-    @staticmethod
+    @classmethod
     def _clamp(
+        cls,
         chosen: list[AppliedPromotion],
-        items_total: Decimal,
+        cart_items,
         currency: str,
     ) -> list[AppliedPromotion]:
-        """Never discount below zero items value.
+        """Allocate each promotion to the lines it covers, never below zero.
+
+        A promotion's money is split over the cart lines it covers
+        (``_covered_weights``) by ``allocate_capped``, the one allocation
+        rule: largest remainder to the cent, and no line gets more than
+        is left of its value after the promotions before it. A promotion
+        worth more than its covered lines still hold is cut down to what
+        they hold; one the earlier promotions left nothing to act on ends
+        at 0 (``evaluate`` refuses its code).
 
         Returns NEW entries rather than mutating the ones handed in:
         the coupon picker clamps the same baseline entries once per
         candidate coupon, and an in-place rewrite would carry each
         pass's clamping into the next one.
         """
+        remaining = {
+            item.pk: Decimal(str(item.total_price.amount))
+            for item in cart_items
+        }
         clamped: list[AppliedPromotion] = []
-        running = Decimal(0)
         for entry in chosen:
-            available = items_total - running
-            amount = (
-                Decimal(0)
-                if available <= 0
-                else _quantize(min(entry.amount.amount, available))
+            shares = allocate_capped(
+                _quantize(entry.amount.amount),
+                cls._covered_weights(entry.promotion, cart_items),
+                remaining,
             )
-            running += amount
+            for pk, share in shares.items():
+                remaining[pk] -= share
             clamped.append(
                 AppliedPromotion(
-                    entry.promotion, entry.code, Money(amount, currency)
+                    entry.promotion,
+                    entry.code,
+                    Money(sum(shares.values(), Decimal(0)), currency),
+                    {pk: share for pk, share in shares.items() if share > 0},
                 )
             )
         return clamped
+
+    @classmethod
+    def _covered_weights(
+        cls, promotion: Promotion, cart_items
+    ) -> dict[int, Decimal]:
+        """The cart lines a monetary promotion discounts, by what they weigh.
+
+        Cart item pk -> the value the promotion's discount is spread by:
+        the lines ``_matching_items`` counts, by their value, for a
+        percentage or a fixed amount; the units a buy-X-get-Y actually
+        discounts, by their price. A line outside the promotion's scope or
+        past its exclusions is not in the result, so it never carries the
+        discount, and neither does the VAT rate it may sit at.
+        """
+        weights: dict[int, Decimal] = defaultdict(Decimal)
+        if promotion.benefit_type == BenefitType.BXGY:
+            for unit_price, pk in cls._bxgy_discounted_units(
+                promotion, cart_items
+            ):
+                weights[pk] += unit_price
+        else:
+            for item in cls._matching_items(promotion, cart_items):
+                weights[item.pk] += Decimal(str(item.total_price.amount))
+        return {pk: weight for pk, weight in weights.items() if weight > 0}
 
     @classmethod
     def gift_weight_grams(cls, result: CartDiscountResult) -> int:
@@ -1111,24 +1184,24 @@ class PromotionEngine:
         return items
 
     @classmethod
-    def _unit_prices(cls, items) -> list[Decimal]:
-        """Expand cart lines to one entry per unit (final unit price).
+    def _unit_prices(cls, items) -> list[tuple[Decimal, int]]:
+        """Expand cart lines to one ``(unit price, cart item pk)`` per unit.
 
         Reads the CartItem property, not ``product.final_price``, so a
         wholesale-bound cart credits BxGY discounts against the price
         the buyer actually pays — retail carts resolve identically.
         """
-        units: list[Decimal] = []
+        units: list[tuple[Decimal, int]] = []
         for item in items:
             unit = Decimal(str(item.final_price.amount))
-            units.extend([unit] * item.quantity)
+            units.extend([(unit, item.pk)] * item.quantity)
         return units
 
     @classmethod
-    def _bxgy_amount(
-        cls, promotion: Promotion, cart_items, currency: str
-    ) -> Money:
-        """Buy-X-get-Y-discounted, on units already in the cart.
+    def _bxgy_discounted_units(
+        cls, promotion: Promotion, cart_items
+    ) -> list[tuple[Decimal, int]]:
+        """The ``(unit price, cart item pk)`` units a buy-X-get-Y discounts.
 
         Two deterministic modes (documented on the admin form):
 
@@ -1143,34 +1216,39 @@ class PromotionEngine:
           get_quantity``) are discounted. Reward units that also match
           the buy scope still count on the buy side — the rule stays
           monotonic as the shopper adds items.
+
+        "Cheapest" ties break by cart item pk, so every evaluation of the
+        same cart (preview, payment intent, order creation) discounts the
+        same lines. Empty while the promotion earns nothing.
         """
         buy_qty = promotion.buy_quantity or 0
         get_qty = promotion.get_quantity or 0
         if buy_qty < 1 or get_qty < 1:
-            return Money(Decimal(0), currency)
+            return []
 
         buy_units = cls._unit_prices(cls._matching_items(promotion, cart_items))
         reward_ids = {p.id for p in promotion.get_products.all()}
 
         if not reward_ids:
-            group_size = buy_qty + get_qty
-            applications = len(buy_units) // group_size
-            if applications < 1:
-                return Money(Decimal(0), currency)
-            discounted_units = sorted(buy_units)[: applications * get_qty]
+            applications = len(buy_units) // (buy_qty + get_qty)
+            candidates = buy_units
         else:
             applications = len(buy_units) // buy_qty
-            if applications < 1:
-                return Money(Decimal(0), currency)
-            reward_units = cls._unit_prices(
+            candidates = cls._unit_prices(
                 [item for item in cart_items if item.product_id in reward_ids]
             )
-            if not reward_units:
-                return Money(Decimal(0), currency)
-            discounted_units = sorted(reward_units)[: applications * get_qty]
+        if applications < 1:
+            return []
+        return sorted(candidates)[: applications * get_qty]
 
-        pct = promotion.get_discount_percent / Decimal(100)
-        amount = sum(discounted_units, Decimal(0)) * pct
+    @classmethod
+    def _bxgy_amount(
+        cls, promotion: Promotion, cart_items, currency: str
+    ) -> Money:
+        """Buy-X-get-Y-discounted, on units already in the cart."""
+        discounted_units = cls._bxgy_discounted_units(promotion, cart_items)
+        amount = sum((price for price, _pk in discounted_units), Decimal(0))
+        amount *= promotion.get_discount_percent / Decimal(100)
         if promotion.max_discount_amount:
             amount = min(
                 amount, Decimal(str(promotion.max_discount_amount.amount))
@@ -1557,7 +1635,7 @@ class CouponPickerService:
         # has no coupon codes in it, so the losers it throws out are
         # never rows this picker offers.
         baseline_total, _baseline_losers = cls._stacked_total(
-            baseline_monetary, items_total, currency
+            baseline_monetary, cart_items, currency
         )
 
         PromotionEngine.attach_category_scopes(
@@ -1685,7 +1763,7 @@ class CouponPickerService:
     @staticmethod
     def _stacked_total(
         monetary: list[AppliedPromotion],
-        items_total: Decimal,
+        cart_items,
         currency: str,
     ) -> tuple[Decimal, set[str]]:
         """What the engine would charge for this entry set, and which
@@ -1700,7 +1778,7 @@ class CouponPickerService:
         """
         scratch = CartDiscountResult()
         chosen = PromotionEngine._resolve_stacking(monetary, scratch)
-        clamped = PromotionEngine._clamp(chosen, items_total, currency)
+        clamped = PromotionEngine._clamp(chosen, cart_items, currency)
         total = sum((entry.amount.amount for entry in clamped), Decimal(0))
         losers = {
             rejected_code
@@ -1811,7 +1889,7 @@ class CouponPickerService:
 
         entry = AppliedPromotion(promotion, code, amount)
         total_with, losers = cls._stacked_total(
-            [*baseline_monetary, entry], items_total, currency
+            [*baseline_monetary, entry], cart_items, currency
         )
         if code.code in losers:
             # A non-stackable coupon the automatic offers already beat.

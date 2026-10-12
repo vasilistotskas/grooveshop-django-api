@@ -162,8 +162,8 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
 
     @extend_schema_field(OpenApiTypes.DECIMAL)
     def get_total_vat_value(self, obj: Cart):
-        discount = self._promotion_result(obj).discount_total
-        return obj.vat_after_discount(discount).amount
+        line_discounts = self._promotion_result(obj).line_discounts
+        return obj.vat_after_discount(line_discounts).amount
 
     @extend_schema_field(OpenApiTypes.DECIMAL)
     def get_promotion_discount(self, obj: Cart):

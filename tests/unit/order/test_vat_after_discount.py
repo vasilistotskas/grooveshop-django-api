@@ -16,13 +16,14 @@ from djmoney.money import Money
 
 from cart.factories import CartFactory, CartItemFactory
 from cart.serializers.cart import CartSerializer
-from order.discounts import allocate_discount
+from order.discounts import allocate_capped
 from order.factories.order import OrderFactory
 from order.invoicing import _compute_vat_breakdown
 from order.taxation import split_gross
 from product.factories import ProductFactory
 from promotion.enum import BenefitType, PromotionTrigger
 from promotion.factories import PromotionFactory
+from tests.utils.discounts import snapshot_discounts
 from vat.factories import VatFactory
 
 pytestmark = pytest.mark.django_db
@@ -91,6 +92,7 @@ def _order(lines, discount=None, loyalty=None, gift_card=None):
     if gift_card is not None:
         order.gift_card_amount = Money(D(str(gift_card)), "EUR")
     order.save()
+    snapshot_discounts(order)
     return order
 
 
@@ -102,9 +104,10 @@ class TestSharedFunctions:
     def test_allocation_sums_exactly_across_mixed_lines(self):
         gross = {1: D("124.00"), 2: D("113.00"), 3: D("10.01")}
 
-        discounted = allocate_discount(gross, D("33.33"))
+        shares = allocate_capped(D("33.33"), gross, gross)
 
-        assert sum(discounted.values()) == sum(gross.values()) - D("33.33")
+        assert sum(shares.values()) == D("33.33")
+        assert all(shares[key] <= gross[key] for key in gross)
 
     def test_split_reconciles_to_the_cent(self):
         for gross, rate, net, vat in (

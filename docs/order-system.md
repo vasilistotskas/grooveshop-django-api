@@ -327,13 +327,55 @@ catalogue can no longer change.
   keeps the original rates too. Lines that predate the column were
   backfilled (`0065`) from their product's VAT at deploy time, which is
   what the documents used before the snapshot existed.
+- **Where a discount lands.** A monetary discount (promotions + the
+  loyalty redemption) reduces the taxable value of the lines it was
+  granted on, not of every line: a coupon for the 13% food category must
+  not be booked against a 24% line. `PromotionEngine` reports it:
+  `PromotionEngine._clamp` splits each applied promotion over the cart
+  lines it covers (`_covered_weights`: the lines `_matching_items` counts,
+  by value, or the units a buy-X-get-Y actually discounts, by price) with
+  `order.discounts.allocate_capped`, the one largest-remainder rule (cent
+  exact, no line pushed below what is left of it), and exposes the result
+  as `AppliedPromotion.line_amounts` / `CartDiscountResult.line_discounts`
+  (cart item pk -> amount). The cart preview (`Cart.vat_after_discount`),
+  the payment-intent amount and order creation all read the same
+  evaluation. Checkout (`OrderService._snapshot_line_discounts`, both
+  paths) freezes each line's share on `OrderItem.discount_allocation`
+  (the whole line, not per unit) exactly as it freezes `vat_rate`; the
+  loyalty redemption is order-wide and is spread over the value left on
+  every line (`spread_by_remaining_value`; the standalone
+  `/loyalty/redeem` endpoint does the same on an existing pending
+  order). Gift-card amounts are payment and never allocated; a staff-added
+  line carries none; a free gift has no value to carry any.
+  `order.discounts.discounted_line_gross` reads the snapshots and raises
+  when they do not add up to the order's discount (capped at its goods): a
+  document on such lines would bill a total the customer never owed. That
+  is the state of an order created by the previous release during the
+  rollout of the column, or one whose discounted line staff deleted.
+- **Orders without a snapshot.** `order` 0072 adds the column
+  (`db_default` 0, currency column added with the `docs/migrations.md`
+  money recipe) and 0073 gives every existing discounted order the
+  proportional allocation (`heal_discount_allocation` in
+  `order/discount_snapshot.py`): a `PromotionRedemption` row records the
+  promotion and its amount but not the lines, and the promotion may have
+  been edited since,
+  so proportional, the rule every existing document was issued under, is
+  the only honest reconstruction. `Invoice` rows are never touched, and
+  one with a MARK is frozen anyway. Orders the previous release creates
+  while it still serves the rollout are not covered by 0073 (it already
+  ran): run `manage.py heal_discount_allocation --all-tenants` once after
+  the last old pod has exited (idempotent: an order whose lines carry any
+  allocation is skipped). The invoice task fails loudly on such an order
+  until then and retries.
 - **Shipping and the payment-method fee.** Incidental costs the seller
   charges the customer belong to the taxable amount of the goods they
   accompany (VAT Directive 2006/112/EC art. 78(b); Greek VAT Code, Law
   5144/2024, art. 24(4)(a) — art. 19 of the repealed Law 2859/2000), so
   they take the goods' rate. A basket that mixes rates has no single
   rate for them: each charge is split over the rates in proportion to
-  the goods' value at each (`_rate_weights`: undiscounted line gross,
+  the value of the goods charged at each, i.e. after their discounts
+  (`_rate_weights` over `discounted_line_gross`; AADE circular Εγκ.
+  10/1987 Π.4336/3162: incidental costs follow "την αξία των αγαθών";
   units when the goods are free; largest remainder, so the shares add
   up to the cent) and every share is taxed at its own rate. A
   single-rate basket puts 100% on that rate. There is no order-level

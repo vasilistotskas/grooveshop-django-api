@@ -6,11 +6,13 @@ so their net, VAT and gross totals are the same numbers by construction —
 not two computations that happen to agree.
 
 Goods
-    One line per ``OrderItem``: its VAT-inclusive gross, after the
-    order-level discount allocation (``order.discounts``), split at the
-    rate **snapshotted on the line at checkout** (``OrderItem.vat_rate``).
-    The catalogue is never consulted: editing or deleting a ``Vat`` row
-    later must not rewrite a tax document that was already earned.
+    One line per ``OrderItem``: its VAT-inclusive gross, less the part of
+    the order's discount **snapshotted on the line at checkout**
+    (``OrderItem.discount_allocation``, see ``order.discounts``: a promotion
+    lands on the lines it covers), split at the rate **snapshotted on the
+    line at checkout** (``OrderItem.vat_rate``). The catalogue is never
+    consulted: editing or deleting a ``Vat`` row later must not rewrite a
+    tax document that was already earned.
 
 Shipping and the payment-method fee
     Incidental costs the seller charges the customer are part of the
@@ -18,10 +20,14 @@ Shipping and the payment-method fee
     art. 78(b); Greek VAT Code, Law 5144/2024, art. 24(4)(a)), so they are
     taxed at the rate of the goods they travel with. An order that mixes
     rates has no single rate to give them: each charge is apportioned over
-    the rates in proportion to the value the goods carry at each, to the
-    cent (largest remainder), and every share is taxed at its own rate.
-    Neither law fixes the apportionment key; value is the neutral one and
-    is what a single-rate order degenerates to (100% at that rate).
+    the rates in proportion to the value of the goods charged at each, to
+    the cent (largest remainder), and every share is taxed at its own rate.
+    The key is the one AADE circular Εγκ. 10/1987 (Π.4336/3162) gives for
+    incidental costs, "με βάση την αξία των αγαθών": the value of the goods
+    actually charged, so AFTER the discounts they received. A discount no
+    longer lands proportionally on every line, so the pre-discount value
+    would weigh a rate by goods the customer did not pay for. A
+    single-rate order degenerates to 100% at that rate.
 
 Rounding
     Every line is split into a net, rounded to the cent (``ROUND_HALF_UP``,
@@ -87,19 +93,21 @@ def _line(kind: ChargeKind, gross: Decimal, rate: Decimal) -> VatLine:
     return VatLine(kind=kind, rate=rate, net=net, vat=vat)
 
 
-def _rate_weights(items: Sequence[Any]) -> dict[Decimal, Decimal]:
+def _rate_weights(
+    items: Sequence[Any], gross_by_pk: dict[int, Decimal]
+) -> dict[Decimal, Decimal]:
     """What each VAT rate weighs in the order's goods.
 
-    Value comes first: the gross the goods were sold for, before the
-    order-level discount (which is spread proportionally over the lines,
-    so it never changes the proportions). An order whose goods carry no
-    value at all (a free sample with paid delivery) falls back to units,
-    so the charge still follows the goods it travels with.
+    Value comes first: the gross the goods were charged for, after their
+    discounts (``gross_by_pk``; Εγκ. 10/1987, "the value of the goods").
+    An order whose goods carry no value at all (a free sample with paid
+    delivery, a fully discounted basket) falls back to units, so the
+    charge still follows the goods it travels with.
     """
     value: dict[Decimal, Decimal] = defaultdict(Decimal)
     units: dict[Decimal, Decimal] = defaultdict(Decimal)
     for item in items:
-        value[item.vat_rate] += Decimal(item.price.amount) * item.quantity
+        value[item.vat_rate] += gross_by_pk[item.pk]
         units[item.vat_rate] += item.quantity
     return {rate: weight for rate, weight in value.items() if weight > 0} or {
         rate: weight for rate, weight in units.items() if weight > 0
@@ -127,7 +135,7 @@ def order_vat_lines(
         (ChargeKind.SHIPPING, order.shipping_price),
         (ChargeKind.PAYMENT_FEE, order.payment_method_fee),
     )
-    weights = _rate_weights(rows)
+    weights = _rate_weights(rows, gross_by_pk)
     for kind, money in charges:
         if money.amount <= 0:
             continue

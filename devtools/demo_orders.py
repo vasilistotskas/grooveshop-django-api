@@ -85,6 +85,11 @@ def create_orders(fixtures: Sequence[FixtureOrder]) -> list[Any]:
 
     Returns the orders in the order given, each with its primary key.
     """
+    from order.discounts import (
+        add_line_discounts,
+        order_discount_total,
+        spread_by_remaining_value,
+    )
     from order.models.item import OrderItem
     from order.models.order import Order
 
@@ -121,6 +126,13 @@ def create_orders(fixtures: Sequence[FixtureOrder]) -> list[Any]:
         order.updated_at = updated_at
         order.status_updated_at = updated_at
     written = OrderItem.objects.bulk_create(items)
+    # The discount a fixture order carries lands on its lines, as checkout
+    # snapshots it: the tax documents refuse a discounted order without it.
+    for order in created:
+        lines = [item for item in written if item.order_id == order.pk]
+        add_line_discounts(
+            lines, spread_by_remaining_value(lines, order_discount_total(order))
+        )
     Order.objects.bulk_update(
         created,
         ["amount_due", "created_at", "updated_at", "status_updated_at"],

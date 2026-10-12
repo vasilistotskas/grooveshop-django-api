@@ -1679,6 +1679,9 @@ class OrderItemAdmin(BaseModelAdmin):
         "created_at",
         "updated_at",
         "total_price",
+        # Stamped at checkout, like the order's own discounts: the tax
+        # documents read it (order.discounts).
+        "discount_allocation",
         "refunded_amount",
         "net_price",
     ]
@@ -1706,7 +1709,12 @@ class OrderItemAdmin(BaseModelAdmin):
         (
             _("Calculations"),
             {
-                "fields": ("total_price", "refunded_amount", "net_price"),
+                "fields": (
+                    "total_price",
+                    "discount_allocation",
+                    "refunded_amount",
+                    "net_price",
+                ),
                 "classes": ("collapse",),
             },
         ),

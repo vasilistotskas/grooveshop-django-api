@@ -10105,3 +10105,23 @@ msgstr ""
 "MwSt.-Satz, zu dem diese Position verkauft wurde, festgelegt bei ihrer "
 "Erstellung. Rechnungen und myDATA verwenden ihn, nie die aktuelle MwSt. des "
 "Produkts."
+
+#: .\order\models\item.py:53
+msgid "Discount Allocation"
+msgstr "Rabattzuordnung"
+
+#: .\order\models\item.py:57
+msgid ""
+"Part of the order's discount this line carries, fixed when the order was "
+"created. Invoices and myDATA use it to split the VAT of what was actually "
+"charged."
+msgstr ""
+"Anteil des Rabatts der Bestellung, den diese Position trägt, festgelegt bei "
+"der Erstellung der Bestellung. Rechnungen und myDATA verwenden ihn, um die "
+"MwSt. des tatsächlich berechneten Betrags aufzuteilen."
+
+#: .\order\services.py:1
+msgid "A promotion discounts a cart line that is not part of the order."
+msgstr ""
+"Eine Aktion gewährt Rabatt auf eine Warenkorbposition, die nicht Teil der "
+"Bestellung ist."

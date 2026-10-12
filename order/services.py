@@ -14,6 +14,7 @@ from django_stubs_ext import StrOrPromise
 from djmoney.money import Money
 
 from order.attribution import AttributionInput, classify
+from order.discounts import add_line_discounts, spread_by_remaining_value
 from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.status import (
     SETTLED_PAYMENT_STATUSES,
@@ -407,6 +408,44 @@ class OrderService:
             )
         if skipped:
             order.metadata["promotion_gifts_skipped"] = skipped
+
+    @classmethod
+    def _snapshot_line_discounts(
+        cls, order_items: dict[int, OrderItem], promo_result, loyalty_discount
+    ) -> None:
+        """Freeze where the order's discounts landed on its lines.
+
+        Each promotion's money goes to the lines the engine says it
+        covers (``CartDiscountResult.line_discounts``, keyed by cart item
+        pk); the loyalty redemption is order-wide and is spread over the
+        value that is left on every line. The invoice and the myDATA
+        payload read these snapshots (``order.discounts``), so a coupon
+        for one category can never lower the taxable value of a line of
+        another. The gift-card amount is payment and is not allocated.
+        """
+        line_discounts = promo_result.line_discounts
+        if line_discounts.keys() - order_items.keys():
+            raise InvalidOrderDataError(
+                str(
+                    _(
+                        "A promotion discounts a cart line that is not "
+                        "part of the order."
+                    )
+                )
+            )
+        lines = list(order_items.values())
+        add_line_discounts(
+            lines,
+            {
+                order_items[cart_pk].pk: amount
+                for cart_pk, amount in line_discounts.items()
+            },
+        )
+        if loyalty_discount.amount > 0:
+            add_line_discounts(
+                lines,
+                spread_by_remaining_value(lines, loyalty_discount.amount),
+            )
 
     @classmethod
     def _plan_loyalty_locked(
@@ -1102,6 +1141,10 @@ class OrderService:
                 order.metadata["meta"] = sanitised_meta
 
             # Step 6: Create OrderItems from CartItems
+            # Cart item pk -> the line written for it: the promotion
+            # engine reports each promotion's money per cart item, and
+            # the order lines snapshot it below.
+            order_items: dict[int, OrderItem] = {}
             for cart_item in cart_items:
                 product = cart_item.product
                 quantity = cart_item.quantity
@@ -1141,7 +1184,7 @@ class OrderService:
                 # canonical creation hook. bulk_create skips all signals.
                 # The loop is already inside @transaction.atomic so all
                 # inserts land in one DB round-trip on commit.
-                OrderItem.objects.create(
+                order_items[cart_item.pk] = OrderItem.objects.create(
                     order=order,
                     product=product,
                     quantity=quantity,
@@ -1242,6 +1285,9 @@ class OrderService:
 
             order.discount_amount = PromotionEngine.record(order, promo_result)
             order.loyalty_discount = loyalty_discount
+            cls._snapshot_line_discounts(
+                order_items, promo_result, loyalty_discount
+            )
             order.gift_card_amount = GiftCardService.record_plan(
                 gift_plan, order
             )
@@ -1645,6 +1691,10 @@ class OrderService:
                 order.metadata["meta"] = sanitised_meta
 
             # Step 5: Create OrderItems from CartItems
+            # Cart item pk -> the line written for it: the promotion
+            # engine reports each promotion's money per cart item, and
+            # the order lines snapshot it below.
+            order_items: dict[int, OrderItem] = {}
             for cart_item in cart_items:
                 product = cart_item.product
                 quantity = cart_item.quantity
@@ -1684,7 +1734,7 @@ class OrderService:
                 # canonical creation hook. bulk_create skips all signals.
                 # The loop is already inside @transaction.atomic so all
                 # inserts land in one DB round-trip on commit.
-                OrderItem.objects.create(
+                order_items[cart_item.pk] = OrderItem.objects.create(
                     order=order,
                     product=product,
                     quantity=quantity,
@@ -1778,6 +1828,9 @@ class OrderService:
             # for the evaluation done under lock at Step 2.5.
             order.discount_amount = PromotionEngine.record(order, promo_result)
             order.loyalty_discount = loyalty_discount
+            cls._snapshot_line_discounts(
+                order_items, promo_result, loyalty_discount
+            )
 
             # Step 6.7: Redeem gift cards LAST — they are payment, not
             # discount, so they settle whatever is still due after the

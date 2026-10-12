@@ -6,6 +6,8 @@ the assertions about what the DATABASE holds read the real column.
 
 from __future__ import annotations
 
+import base64
+
 import pytest
 from cryptography.fernet import Fernet
 from django.db import connection
@@ -137,10 +139,13 @@ def test_a_wrong_key_fails_loudly_on_load(settings, two_keys):
 
 
 def test_a_tampered_token_fails_loudly():
-    token = encrypt_value(SECRET)
-    flipped = token[:-2] + ("A" if token[-2] != "A" else "B") + token[-1]
+    # Flip a bit in the decoded bytes, not a base64 character: the last
+    # character before the padding carries bits decoders ignore, so
+    # replacing it can leave the token byte-for-byte intact.
+    raw = bytearray(base64.urlsafe_b64decode(encrypt_value(SECRET)))
+    raw[len(raw) // 2] ^= 0x01
     with pytest.raises(DecryptionError):
-        decrypt_value(flipped)
+        decrypt_value(base64.urlsafe_b64encode(bytes(raw)).decode())
 
 
 def test_plaintext_in_the_encrypted_column_is_refused():

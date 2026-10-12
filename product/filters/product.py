@@ -1,3 +1,4 @@
+from django import forms
 from django_filters import rest_framework as filters
 
 from core.filters.camel_case_filters import CamelCaseTimeStampFilterSet
@@ -5,8 +6,15 @@ from core.filters.core import (
     MetaDataFilterMixin,
     UUIDFilterMixin,
 )
+from product.attribute_selection import AttributeSelection
 from product.models.category import ProductCategory
 from product.models.product import Product
+
+
+class IntegerInFilter(filters.BaseInFilter, filters.Filter):
+    """Comma-separated whole numbers; anything else is a 400."""
+
+    field_class = forms.IntegerField
 
 
 class ProductFilter(
@@ -129,9 +137,14 @@ class ProductFilter(
         field_name="product_attributes__attribute_value_id",
         help_text="Filter by attribute value ID",
     )
-    attribute_value__in = filters.BaseInFilter(
+    attribute_value__in = IntegerInFilter(
         field_name="product_attributes__attribute_value_id",
-        help_text="Filter by multiple attribute value IDs (comma-separated)",
+        method="filter_attribute_value__in",
+        help_text=(
+            "Filter by multiple attribute value IDs (comma-separated). "
+            "Values of the same attribute are alternatives (any of them); "
+            "values of different attributes must all match."
+        ),
     )
     attribute = filters.NumberFilter(
         field_name="product_attributes__attribute_value__attribute_id",
@@ -160,6 +173,12 @@ class ProductFilter(
             "is_deleted": ["exact"],
             "uuid": ["exact"],
         }
+
+    def filter_attribute_value__in(self, queryset, name, value):
+        """Alternatives within one attribute, every attribute narrowing."""
+        return AttributeSelection.from_value_ids(value).filter_products(
+            queryset
+        )
 
     def filter_category(self, queryset, name, value):
         """Filter by category including descendant categories."""

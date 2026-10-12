@@ -7859,6 +7859,10 @@ msgstr "Κωδικός παρόχου"
 msgid "Payment ID"
 msgstr "ID πληρωμής"
 
+#: .\giftcard\models.py:85
+msgid "Refunded Amount"
+msgstr "Επιστραφέν ποσό"
+
 #: .\giftcard\models.py:80
 msgid "Gift Card Purchase"
 msgstr "Αγορά δωροκάρτας"
@@ -15675,10 +15679,18 @@ msgid ""
 "category and every descendant)"
 msgstr "ID κατηγοριών χωρισμένα με κόμμα· το καθένα περιλαμβάνει και όλες τις υποκατηγορίες του"
 
-#: .\search\views.py:394
-msgid "Comma-separated attribute value IDs (attribute_values IN [ids])"
+#: .\search\views.py:449
+msgid ""
+"Comma-separated attribute value IDs. Values of the same attribute are "
+"alternatives (any of them); values of different attributes must all match. "
+"With the attribute_values facet, an attribute's own values are counted "
+"without its own selection."
 msgstr ""
-"ID τιμών χαρακτηριστικών διαχωρισμένα με κόμμα (attribute_values IN [ids])"
+"ID τιμών χαρακτηριστικών διαχωρισμένα με κόμμα. Οι τιμές του ίδιου "
+"χαρακτηριστικού είναι εναλλακτικές (αρκεί μία από αυτές)· οι τιμές "
+"διαφορετικών χαρακτηριστικών πρέπει να ταιριάζουν όλες. Με το facet "
+"attribute_values, οι τιμές ενός χαρακτηριστικού μετριούνται χωρίς τη δική "
+"τους επιλογή."
 
 #: .\search\views.py:403
 msgid ""

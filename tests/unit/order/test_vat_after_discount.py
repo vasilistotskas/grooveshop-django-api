@@ -198,8 +198,9 @@ class TestMarkdownVat:
             product=product, price=product.final_price, quantity=2
         )
 
-        # paid 2 x 104.00 = 208.00 -> VAT 40.26, not 2 x 24.00 on list net
-        assert _cart_vat(cart) == _invoice_vat(order) == D("40.26")
+        # paid 2 x 99.20 = 198.40 (the markdown is taken off the net price
+        # and VAT is charged on what is left) -> VAT 38.40
+        assert _cart_vat(cart) == _invoice_vat(order) == D("38.40")
 
 
 class TestInvoiceVat:

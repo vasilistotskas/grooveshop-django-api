@@ -166,3 +166,103 @@ class TestBackfillMigration(TestCase):
         self.assertEqual(
             Product.objects.get(pk=pk).price.amount, Decimal("100.00")
         )
+
+
+REPRICE_BEFORE = ("product", "0050_backfill_price_spells")
+REPRICE_AFTER = ("product", "0051_reprice_discounted_products")
+
+
+class TestRepriceMigration(TestCase):
+    """``0051``: the markdown moved onto the gross price, so every
+    marked-down product's current price dropped and is recorded as such."""
+
+    def _setup(self, *, price, discount, spell_price, started_days=90):
+        before = _migrate_to(REPRICE_BEFORE)
+        Vat = before.get_model("vat", "Vat")
+        Product = before.get_model("product", "Product")
+        Spell = before.get_model("product", "ProductPriceSpell")
+        vat = Vat.objects.get_or_create(value=Decimal("24.0"))[0]
+        product = Product.objects.create(
+            sku=str(uuid.uuid4()),
+            slug=str(uuid.uuid4()),
+            price=price,
+            price_currency="EUR",
+            discount_percent=discount,
+            vat_id=vat.pk,
+            effective_price=spell_price,
+        )
+        Spell.objects.create(
+            product_id=product.pk,
+            price=spell_price,
+            price_currency="EUR",
+            valid_from=NOW - timedelta(days=started_days),
+        )
+        _settle_deferred_constraints()
+        return product.pk
+
+    def _after(self, pk):
+        after = _migrate_to(REPRICE_AFTER)
+        Spell = after.get_model("product", "ProductPriceSpell")
+        Product = after.get_model("product", "Product")
+        return (
+            list(Spell.objects.filter(product_id=pk).order_by("valid_from")),
+            Product.objects.get(pk=pk),
+        )
+
+    def test_the_current_spell_moves_to_the_new_price(self):
+        # 30.00 net, 24% VAT, 10% off: 34.20 before, 33.48 now.
+        pk = self._setup(
+            price=Decimal("30.00"),
+            discount=Decimal(10),
+            spell_price=Decimal("34.20"),
+        )
+
+        spells, product = self._after(pk)
+
+        self.assertEqual(
+            [spell.price.amount for spell in spells],
+            [Decimal("34.20"), Decimal("33.48")],
+        )
+        self.assertEqual(spells[0].valid_to, spells[1].valid_from)
+        self.assertIsNone(spells[1].valid_to)
+        self.assertEqual(product.effective_price, Decimal("33.48"))
+
+    def test_a_product_carrying_a_promotion_is_left_to_the_sweep(self):
+        pk = self._setup(
+            price=Decimal("30.00"),
+            discount=Decimal(10),
+            spell_price=Decimal("30.00"),  # not the old formula's price
+        )
+
+        spells, product = self._after(pk)
+
+        self.assertEqual(len(spells), 1)
+        self.assertEqual(product.effective_price, Decimal("30.00"))
+
+    def test_an_unmarked_product_is_untouched(self):
+        pk = self._setup(
+            price=Decimal("30.00"),
+            discount=Decimal(0),
+            spell_price=Decimal("37.20"),
+        )
+
+        spells, _product = self._after(pk)
+
+        self.assertEqual(len(spells), 1)
+
+    def test_it_is_idempotent(self):
+        pk = self._setup(
+            price=Decimal("30.00"),
+            discount=Decimal(10),
+            spell_price=Decimal("34.20"),
+        )
+        after = _migrate_to(REPRICE_AFTER)
+        from importlib import import_module
+
+        import_module(
+            "product.migrations.0051_reprice_discounted_products"
+        ).reprice(after, None)
+
+        spells, _product = self._after(pk)
+
+        self.assertEqual(len(spells), 2)

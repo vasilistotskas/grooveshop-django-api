@@ -659,6 +659,23 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         # The email task is chained once the PDF is ready.
         mock_send_email.assert_called_once_with(self.order.id)
 
+    @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
+    def test_generate_order_invoice_gives_up_on_an_order_with_no_goods(
+        self, mock_render_pdf
+    ):
+        """The fixture order charges shipping and has no lines, which is
+        what staff leave behind by deleting every line: no VAT rate can
+        follow nothing, so the task reports a failure after its retries
+        instead of filing a guessed tax document."""
+        result = generate_order_invoice.apply(
+            args=[self.order.id], retries=generate_order_invoice.max_retries
+        ).get()
+
+        self.assertFalse(result)
+        mock_render_pdf.assert_not_called()
+        self.order.refresh_from_db()
+        self.assertFalse(hasattr(self.order, "invoice"))
+
     @patch("order.tasks.logger.error")
     def test_generate_order_invoice_order_not_found(self, mock_logger):
         result = generate_order_invoice(999999)

@@ -261,7 +261,11 @@ catalogue can no longer change.
   "shipping VAT rate" to store: the split is a function of the
   snapshotted lines and the two amounts, and a stored copy could only
   disagree with the lines when staff edit them. A charge on an order
-  with no goods raises, since no rate can follow nothing.
+  with no goods (only reachable by staff deleting every line) raises,
+  since no rate can follow nothing and a guessed one would be a wrong tax
+  document. Every caller already surfaces it: `generate_order_invoice`
+  logs and retries, the admin generate/regenerate actions show the
+  message, and `submit_invoice` records a `BUILD` failure.
 - **One computation, two documents.** Every line is split into a net
   rounded half-up to the cent and the VAT left of its gross, so each line
   adds up to what was charged, then summed

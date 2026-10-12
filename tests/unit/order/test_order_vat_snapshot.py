@@ -20,7 +20,8 @@ import pytest
 from django.contrib import admin
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
-from django.test import RequestFactory
+from django.test import Client, RequestFactory
+from django.urls import reverse
 from djmoney.money import Money
 
 from cart.factories import CartFactory, CartItemFactory
@@ -406,15 +407,67 @@ class TestAdmin:
             **fields,
         )
 
-    def test_a_new_line_cannot_state_a_rate(self):
-        item_admin = admin.site._registry[OrderItem]
+    @staticmethod
+    def _client():
+        client = Client()
+        client.force_login(
+            UserAccountFactory(admin=True),
+            backend="tenant.auth_backends.PlatformStaffBackend",
+        )
+        return client
 
-        assert "vat_rate" in item_admin.get_readonly_fields(
-            self._request(), None
-        )
+    def test_a_new_line_is_not_asked_for_a_rate(self):
+        item_admin = admin.site._registry[OrderItem]
+        request = self._request()
+        shown = [
+            name
+            for _title, options in item_admin.get_fieldsets(request, None)
+            for name in options["fields"]
+        ]
+
+        assert "vat_rate" not in shown
+        assert "vat_rate" not in item_admin.get_form(request).base_fields
+
+    def test_the_add_page_renders_and_a_new_line_takes_its_products_rate(
+        self,
+    ):
+        """Showing the rate read-only on the add page 500ed: an unsaved
+        line holds a ``DatabaseDefault``, which the admin cannot format."""
+        client = self._client()
+        order = OrderFactory(num_order_items=0)
+        product = _product("13")
+
         assert (
-            "vat_rate" not in item_admin.get_form(self._request()).base_fields
+            client.get(reverse("admin:order_orderitem_add")).status_code == 200
         )
+        response = client.post(
+            reverse("admin:order_orderitem_add"),
+            {
+                "order": order.pk,
+                "product": product.pk,
+                "quantity": 2,
+                "price_0": "11.30",
+                "price_1": "EUR",
+                "refunded_quantity": 0,
+                "notes": "",
+            },
+        )
+
+        assert response.status_code == 302, response.context["errors"]
+        assert order.items.get().vat_rate == D("13")
+
+    def test_an_existing_lines_change_page_offers_the_rate_until_a_mark(self):
+        line = self._line()
+        url = reverse("admin:order_orderitem_change", args=[line.pk])
+
+        before = self._client().get(url)
+        self._invoice(line, mydata_mark=400001234567892)
+        after = self._client().get(url)
+
+        assert before.status_code == after.status_code == 200
+        assert "vat_rate" in before.context["adminform"].form.fields
+        assert "vat_rate" not in after.context["adminform"].form.fields
+        assert "vat_rate" in after.context["adminform"].readonly_fields
 
     def test_a_wrong_rate_can_be_corrected_before_any_invoice(self):
         item_admin = admin.site._registry[OrderItem]

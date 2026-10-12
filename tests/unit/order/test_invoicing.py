@@ -385,6 +385,30 @@ class GenerateInvoiceIdempotencyTestCase(TestCase):
             "after the invoice row is committed",
         )
 
+    def test_shipping_with_no_goods_is_refused_without_burning_a_number(
+        self,
+    ) -> None:
+        """Staff can delete every line of an order that still carries
+        shipping. No VAT rate follows nothing, so the invoice is refused
+        (the admin actions and the task already report the failure) — and
+        the sequential register must not lose a number to it."""
+        order = OrderFactory(
+            num_order_items=0, shipping_price=Money(Decimal("3.50"), "EUR")
+        )
+
+        def counters():
+            return sorted(
+                InvoiceCounter.objects.values_list("year", "next_number")
+            )
+
+        before = counters()
+
+        with self.assertRaisesMessage(ValueError, "no goods"):
+            generate_invoice(order)
+
+        self.assertFalse(Invoice.objects.filter(order=order).exists())
+        self.assertEqual(counters(), before)
+
     def test_resumes_row_whose_render_failed(self) -> None:
         """A row committed by a run whose render then died must be
         FINISHED on the next call, not returned as a PDF-less invoice

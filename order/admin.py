@@ -1510,17 +1510,37 @@ class OrderItemAdmin(BaseModelAdmin):
         ),
     )
 
+    def get_fieldsets(self, request, obj=None):
+        fieldsets = super().get_fieldsets(request, obj)
+        if obj is not None:
+            return fieldsets
+        # A new line is not asked for a rate: ``OrderItem.save`` snapshots
+        # its product's current one. It cannot be shown read-only either,
+        # since an unsaved instance holds a ``DatabaseDefault`` that the
+        # admin has no way to format.
+        return [
+            (
+                title,
+                {
+                    **options,
+                    "fields": tuple(
+                        name for name in options["fields"] if name != "vat_rate"
+                    ),
+                },
+            )
+            for title, options in fieldsets
+        ]
+
     def get_readonly_fields(self, request, obj=None):
         readonly_fields = super().get_readonly_fields(request, obj)
-        # A new line takes its product's current VAT rate (see
-        # ``OrderItem.save``). An existing one shows the rate it was sold
-        # at, which staff may correct, until the order's invoice is
-        # registered with AADE: from then on its figures are frozen (see
+        # An existing line shows the rate it was sold at, which staff may
+        # correct until the order's invoice is registered with AADE: from
+        # then on its figures are frozen (see
         # ``invoicing._persist_invoice_row``), and an edited rate would
         # print on a regenerated PDF beside totals that no longer match.
         if (
-            obj is None
-            or Invoice.objects.filter(
+            obj is not None
+            and Invoice.objects.filter(
                 order_id=obj.order_id, mydata_mark__isnull=False
             ).exists()
         ):

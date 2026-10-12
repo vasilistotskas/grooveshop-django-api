@@ -17,7 +17,9 @@ from django.urls import reverse
 from djmoney.money import Money
 from rest_framework.test import APIClient
 
+from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import OrderStatus, PaymentStatus
+from order.factories import PaymentTransactionFactory
 from order.factories.order import OrderFactory
 from order.models.history import OrderHistory
 from order.models.order import Order
@@ -55,7 +57,10 @@ def refunded_signals():
     order_refunded.disconnect(receiver)
 
 
-def _paid_viva_order(**kwargs):
+def _paid_viva_order(*, captured="21.10", ledger=True, **kwargs):
+    """A paid Viva order. ``captured`` is what the ledger says Viva took;
+    ``ledger=False`` leaves the capture unrecorded (the order was settled
+    while the previous release served, say)."""
     kwargs.setdefault(
         "pay_way", PayWayFactory.create_online_payment("viva_wallet")
     )
@@ -63,7 +68,19 @@ def _paid_viva_order(**kwargs):
     kwargs.setdefault("payment_status", PaymentStatus.COMPLETED)
     kwargs.setdefault("payment_id", PAYMENT_ID)
     kwargs.setdefault("paid_amount", Money(Decimal("21.10"), "EUR"))
-    return OrderFactory(num_order_items=0, **kwargs)
+    order = OrderFactory(num_order_items=0, **kwargs)
+    if ledger:
+        PaymentTransactionFactory(
+            order=order,
+            provider="viva_wallet",
+            provider_reference=PAYMENT_ID,
+            amount=Money(Decimal(captured), "EUR"),
+        )
+    return order
+
+
+def _refund_rows(order: Order):
+    return order.payment_transactions.filter(kind=PaymentTransactionKind.REFUND)
 
 
 def _refund_failure_notes(order: Order) -> list[str]:
@@ -96,7 +113,7 @@ class TestARefundVivaRefusesLeavesTheOrderUnrefunded:
         assert response["error"] == "The transaction cannot be reversed."
         order.refresh_from_db()
         assert order.payment_status == PaymentStatus.COMPLETED
-        assert "refunds" not in (order.metadata or {})
+        assert not _refund_rows(order).exists()
         assert refunded_signals == []
 
     def test_cancel_reports_the_refund_as_not_done_and_fires_nothing(
@@ -115,7 +132,7 @@ class TestARefundVivaRefusesLeavesTheOrderUnrefunded:
         assert order.status == OrderStatus.CANCELED
         # Money taken, none returned: the payment must still read COMPLETED.
         assert order.payment_status == PaymentStatus.COMPLETED
-        assert "refunds" not in order.metadata
+        assert not _refund_rows(order).exists()
         assert refunded_signals == []
 
     def test_staff_find_the_reason_in_the_order_history(self):
@@ -166,7 +183,7 @@ class TestARefundVivaAcceptsIsRecorded:
         self, refunded_signals
     ):
         order = _paid_viva_order()
-        fake = FakeVivaApi(captured=21.10)
+        fake = FakeVivaApi()
 
         with fake:
             canceled, refund_info = OrderService.cancel_order(
@@ -184,9 +201,10 @@ class TestARefundVivaAcceptsIsRecorded:
         order.refresh_from_db()
         assert canceled.status == OrderStatus.CANCELED
         assert order.payment_status == PaymentStatus.REFUNDED
-        assert [r["refund_id"] for r in order.metadata["refunds"]] == [
-            refund_id
-        ]
+        [refund] = _refund_rows(order)
+        assert refund.provider_reference == refund_id
+        assert refund.provider == "viva_wallet"
+        assert refund.description == "Order canceled: changed mind"
         # ``order_refunded`` always says how much came back; a full refund
         # sends what the order paid.
         assert [r["amount"] for r in refunded_signals] == [
@@ -194,55 +212,90 @@ class TestARefundVivaAcceptsIsRecorded:
         ]
         assert _refund_failure_notes(order) == []
 
-    def test_a_full_refund_is_what_viva_paid_back_not_what_was_billed(
+    def test_a_full_refund_is_what_the_ledger_captured_not_what_was_billed(
         self, refunded_signals
     ):
         """``Order.paid_amount`` is the amount owed when the order was
         created. The refund, and what ``order_refunded`` reports, is the
-        amount Viva says it captured and returned."""
-        order = _paid_viva_order()
+        amount the ledger holds for the payment."""
+        order = _paid_viva_order(captured="10.00")
         assert order.paid_amount == Money(Decimal("21.10"), "EUR")
-        fake = FakeVivaApi(captured=10.0)
+        fake = FakeVivaApi()
 
         with fake:
             OrderService.cancel_order(order, reason="changed mind")
 
+        [delete] = fake.deletes
+        assert fake.query(delete) == {"amount": ["1000"]}
         order.refresh_from_db()
         assert order.payment_status == PaymentStatus.REFUNDED
-        assert [Decimal(r["amount"]) for r in order.metadata["refunds"]] == [
+        assert [Decimal(r.amount.amount) for r in _refund_rows(order)] == [
             Decimal(10)
         ]
         assert [r["amount"] for r in refunded_signals] == [
             Money(Decimal(10), "EUR")
         ]
 
-    def test_a_part_refund_is_judged_against_what_viva_captured(
+    def test_a_part_refund_is_partially_refunded_not_refunded(
         self, refunded_signals
     ):
-        """Viva captured EUR 10 of a EUR 21.10 bill: refunding those 10 is
-        the whole of what there is to refund, whatever the order says it
-        owed."""
+        """Viva answers success for a part refund exactly as for a full
+        one, and REFUNDED is what releases the gift-card redemption and
+        the loyalty points — so it has to mean "nothing left to refund"."""
         order = _paid_viva_order()
-        fake = FakeVivaApi(captured=10.0)
+        fake = FakeVivaApi()
 
         with fake:
             success, _response = OrderService.refund_order(
-                order, amount=Money(Decimal("10.00"), "EUR")
+                order, amount=Money(Decimal("5.00"), "EUR")
             )
 
         assert success is True
+        [delete] = fake.deletes
+        assert fake.query(delete) == {"amount": ["500"]}
         order.refresh_from_db()
-        assert order.payment_status == PaymentStatus.REFUNDED
-        assert [r["amount"] for r in refunded_signals] == [
-            Money(Decimal("10.00"), "EUR")
+        assert order.payment_status == PaymentStatus.PARTIALLY_REFUNDED
+        assert [r.amount.amount for r in _refund_rows(order)] == [
+            Decimal("5.00")
         ]
+        assert [r["amount"] for r in refunded_signals] == [
+            Money(Decimal("5.00"), "EUR")
+        ]
+        # The ledger already held the capture: Viva is not asked for it.
+        assert fake.retrieved == []
 
-    def test_a_part_refund_is_refused_when_the_captured_amount_is_unreadable(
+
+class TestACaptureTheLedgerNeverRecorded:
+    """An order settled without a CHARGE row (the payment landed while the
+    previous release was serving, or the success event never reached the
+    order) is read from Viva once, recorded, and refunded from the ledger."""
+
+    def test_the_capture_is_read_from_viva_and_recorded(self, refunded_signals):
+        order = _paid_viva_order(ledger=False)
+        fake = FakeVivaApi(captured=21.10)
+
+        with fake:
+            success, _response = OrderService.refund_order(
+                order, amount=Money(Decimal("5.00"), "EUR")
+            )
+
+        assert success is True
+        assert fake.retrieved == [PAYMENT_ID]
+        [charge] = order.payment_transactions.filter(
+            kind=PaymentTransactionKind.CHARGE
+        )
+        assert charge.provider == "viva_wallet"
+        assert charge.provider_reference == PAYMENT_ID
+        assert charge.amount == Money(Decimal("21.10"), "EUR")
+        order.refresh_from_db()
+        assert order.payment_status == PaymentStatus.PARTIALLY_REFUNDED
+
+    def test_an_unreadable_capture_refuses_the_refund_and_sends_nothing(
         self, refunded_signals
     ):
         """Nothing is sent: once the money has moved, a figure that could
         not be read could no longer be undone."""
-        order = _paid_viva_order()
+        order = _paid_viva_order(ledger=False)
         fake = FakeVivaApi(retrieve=(404, ["Transaction Id does not exist."]))
 
         with fake:
@@ -255,30 +308,6 @@ class TestARefundVivaAcceptsIsRecorded:
         assert fake.deletes == []
         order.refresh_from_db()
         assert order.payment_status == PaymentStatus.COMPLETED
-        assert "refunds" not in (order.metadata or {})
+        assert not order.payment_transactions.exists()
         assert refunded_signals == []
         assert len(_refund_failure_notes(order)) == 1
-
-    def test_a_part_refund_is_partially_refunded_not_refunded(
-        self, refunded_signals
-    ):
-        """Viva answers success for a part refund exactly as for a full
-        one, and REFUNDED is what releases the gift-card redemption and
-        the loyalty points — so it has to mean "nothing left to refund"."""
-        order = _paid_viva_order()
-        fake = FakeVivaApi(captured=21.10)
-
-        with fake:
-            success, _response = OrderService.refund_order(
-                order, amount=Money(Decimal("5.00"), "EUR")
-            )
-
-        assert success is True
-        [delete] = fake.deletes
-        assert fake.query(delete) == {"amount": ["500"]}
-        order.refresh_from_db()
-        assert order.payment_status == PaymentStatus.PARTIALLY_REFUNDED
-        assert [r["amount"] for r in order.metadata["refunds"]] == ["5.00"]
-        assert [r["amount"] for r in refunded_signals] == [
-            Money(Decimal("5.00"), "EUR")
-        ]

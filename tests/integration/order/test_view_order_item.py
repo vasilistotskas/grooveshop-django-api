@@ -1,10 +1,17 @@
+from unittest.mock import patch
+
+import pytest
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from djmoney.money import Money
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from order.enum.status import OrderStatus
+from order.enum.status import (
+    RETURN_HANDLING_STATUSES,
+    OrderStatus,
+    PaymentStatus,
+)
 from order.factories.order import OrderFactory
 from order.models.item import OrderItem
 from order.models.order import Order
@@ -574,18 +581,24 @@ class OrderItemViewSetTestCase(TestURLFixerMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
 
-class RefundActionTests(TestURLFixerMixin, APITestCase):
+@pytest.mark.assert_english
+class RestockActionTests(TestURLFixerMixin, APITestCase):
     """
-    Tests for the refund action on OrderItemViewSet.
+    Tests for the restock action on OrderItemViewSet.
+
+    It put returned units back in stock and records them on the line; it
+    moves NO money (it was ``refund`` until the payment ledger, and its
+    "Refund processed successfully" claimed money that never moved). What
+    the customer is paid back is the order's refund.
 
     Uses per-test setUp (not setUpTestData) because each test must set
-    a specific order status before calling the refund endpoint — mutating
+    a specific order status before calling the restock endpoint — mutating
     shared class-level state in setUpTestData causes test-order coupling.
     """
 
     def setUp(self):
         self.user = UserAccountFactory()
-        # Refunds are a STORE STAFF operation: a stamped platform identity
+        # Restocking is a STORE STAFF operation: a stamped platform identity
         # with a staff role in the tenant bound to this connection.
         self.tenant = store_tenant("refund_tenant")
         self.staff = store_staff(self.tenant)
@@ -595,7 +608,10 @@ class RefundActionTests(TestURLFixerMixin, APITestCase):
             active=True, num_images=0, num_reviews=0, stock=20
         )
         self.order = OrderFactory(
-            num_order_items=0, user=self.user, pay_way=self.pay_way
+            num_order_items=0,
+            user=self.user,
+            pay_way=self.pay_way,
+            payment_status=PaymentStatus.COMPLETED,
         )
         self.order_item = self.order.items.create(
             product=self.product,
@@ -603,28 +619,29 @@ class RefundActionTests(TestURLFixerMixin, APITestCase):
             quantity=2,
         )
 
-    def get_refund_url(self, pk):
-        return reverse("order-item-refund", kwargs={"pk": pk})
+    def get_restock_url(self, pk):
+        return reverse("order-item-restock", kwargs={"pk": pk})
 
-    def test_refund_action_forbidden_for_non_staff(self):
-        # Refund restocks inventory and flips refund state — a staff-only
-        # operation. The order owner must not be able to self-serve it.
+    def test_restock_action_forbidden_for_non_staff(self):
+        # Restocking changes inventory and the line's returned quantity — a
+        # staff-only operation. The order owner must not be able to
+        # self-serve it.
         self.client.force_authenticate(user=self.user)
 
         self.order.status = OrderStatus.DELIVERED.value
         self.order.save()
 
         response = self.client.post(
-            self.get_refund_url(self.order_item.id),
-            {"quantity": 1, "reason": "self refund"},
+            self.get_restock_url(self.order_item.id),
+            {"quantity": 1, "reason": "self restock"},
             format="json",
         )
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         self.order_item.refresh_from_db()
-        self.assertFalse(self.order_item.is_refunded)
+        self.assertEqual(self.order_item.refunded_quantity, 0)
 
-    def test_refund_action_refused_for_is_staff_residue(self):
+    def test_restock_action_refused_for_is_staff_residue(self):
         """``is_staff`` on a tenant-schema customer row is not a grant."""
         residue = UserAccountFactory(is_staff=True)
         self.client.force_authenticate(user=residue)
@@ -633,16 +650,16 @@ class RefundActionTests(TestURLFixerMixin, APITestCase):
         self.order.save()
 
         response = self.client.post(
-            self.get_refund_url(self.order_item.id),
+            self.get_restock_url(self.order_item.id),
             {"quantity": 1, "reason": "Product defective"},
             format="json",
         )
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         self.order_item.refresh_from_db()
-        self.assertFalse(self.order_item.is_refunded)
+        self.assertEqual(self.order_item.refunded_quantity, 0)
 
-    def test_refund_action_valid(self):
+    def test_restock_action_valid(self):
         self.client.force_authenticate(user=self.staff)
 
         self.order.status = OrderStatus.DELIVERED.value
@@ -650,39 +667,87 @@ class RefundActionTests(TestURLFixerMixin, APITestCase):
 
         payload = {"quantity": 1, "reason": "Product defective"}
         response = self.client.post(
-            self.get_refund_url(self.order_item.id),
+            self.get_restock_url(self.order_item.id),
             payload,
             format="json",
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertIn("detail", response.data)
-        self.assertIn("refunded_amount", response.data)
+        self.assertEqual(
+            response.data["detail"], "The returned units were restocked."
+        )
+        self.assertEqual(response.data["item"]["refunded_quantity"], 1)
+        self.order_item.refresh_from_db()
+        self.assertIn(
+            "Restock reason: Product defective", self.order_item.notes
+        )
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock, 21)
 
-    def test_refund_action_invalid_order_status(self):
+    def test_restock_action_moves_no_money(self):
+        """The answer says nothing about a refunded amount and nothing is
+        written to the ledger or the order's payment."""
+        self.client.force_authenticate(user=self.staff)
+        self.order.status = OrderStatus.DELIVERED.value
+        self.order.save()
+
+        with patch("order.services.order_refunded.send") as refunded_signal:
+            response = self.client.post(
+                self.get_restock_url(self.order_item.id),
+                {"quantity": 2},
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertNotIn("refunded_amount", response.data)
+        self.assertFalse(self.order.payment_transactions.exists())
+        refunded_signal.assert_not_called()
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.payment_status, PaymentStatus.COMPLETED)
+
+    def test_restock_action_allowed_while_staff_handle_a_return(self):
+        self.client.force_authenticate(user=self.staff)
+
+        for order_status in RETURN_HANDLING_STATUSES:
+            with self.subTest(status=order_status):
+                self.order.status = order_status
+                self.order.save()
+                self.order_item.refunded_quantity = 0
+                self.order_item.is_refunded = False
+                self.order_item.save()
+
+                response = self.client.post(
+                    self.get_restock_url(self.order_item.id),
+                    {"quantity": 1},
+                    format="json",
+                )
+
+                self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_restock_action_invalid_order_status(self):
         self.client.force_authenticate(user=self.staff)
 
         self.order.status = OrderStatus.PENDING.value
         self.order.save()
 
-        payload = {"quantity": 1, "reason": "Test refund"}
+        payload = {"quantity": 1, "reason": "Test restock"}
         response = self.client.post(
-            self.get_refund_url(self.order_item.id),
+            self.get_restock_url(self.order_item.id),
             payload,
             format="json",
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_refund_action_excessive_quantity(self):
+    def test_restock_action_excessive_quantity(self):
         self.client.force_authenticate(user=self.staff)
 
         self.order.status = OrderStatus.DELIVERED.value
         self.order.save()
 
-        payload = {"quantity": 10, "reason": "Test excessive refund"}
+        payload = {"quantity": 10, "reason": "Test excessive restock"}
         response = self.client.post(
-            self.get_refund_url(self.order_item.id),
+            self.get_restock_url(self.order_item.id),
             payload,
             format="json",
         )

@@ -1,9 +1,10 @@
 """Refusal and failure branches of ``OrderService.refund_order`` and the
 refund leg of ``OrderService.cancel_order`` (``order/services.py``).
 
-The happy paths are covered in ``test_service_order.py``; this module
-pins what happens when a refund cannot or does not go through. Only the
-PSP (``order.payment.get_payment_provider``) is mocked.
+The happy paths are covered in ``test_service_order.py`` and
+``test_partial_refunds.py``; this module pins what happens when a refund
+cannot or does not go through. Only the PSP
+(``order.payment.get_payment_provider``) is mocked.
 """
 
 from __future__ import annotations
@@ -16,8 +17,10 @@ from django.urls import reverse
 from djmoney.money import Money
 from rest_framework.test import APIClient
 
+from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import OrderStatus, PaymentStatus
 from order.exceptions import PaymentError
+from order.factories import PaymentTransactionFactory
 from order.factories.order import OrderFactory
 from order.models.order import Order
 from order.services import OrderService
@@ -28,12 +31,20 @@ pytestmark = [pytest.mark.django_db, pytest.mark.assert_english]
 
 
 def _paid_order(**kwargs):
+    """An order Stripe captured 50.00 for, as its ledger says."""
     kwargs.setdefault("pay_way", PayWayFactory.create_online_payment())
     kwargs.setdefault("status", OrderStatus.COMPLETED)
     kwargs.setdefault("payment_status", PaymentStatus.COMPLETED)
     kwargs.setdefault("payment_id", "pi_paid_123")
     kwargs.setdefault("paid_amount", Money(Decimal("50.00"), "EUR"))
-    return OrderFactory(num_order_items=0, **kwargs)
+    order = OrderFactory(num_order_items=0, **kwargs)
+    if order.payment_id:
+        PaymentTransactionFactory(
+            order=order,
+            amount=Money(Decimal("50.00"), "EUR"),
+            provider_reference=order.payment_id,
+        )
+    return order
 
 
 def _status_in_db(order) -> str:
@@ -42,8 +53,12 @@ def _status_in_db(order) -> str:
     )
 
 
+def _refund_rows(order):
+    return order.payment_transactions.filter(kind=PaymentTransactionKind.REFUND)
+
+
 class TestRefundOrderRefusals:
-    def test_amount_above_paid_amount_is_refused_before_the_provider(self):
+    def test_amount_above_the_refundable_is_refused_before_the_provider(self):
         order = _paid_order()
 
         with patch("order.payment.get_payment_provider") as get_provider:
@@ -53,57 +68,104 @@ class TestRefundOrderRefusals:
                 )
 
         assert str(excinfo.value) == (
-            "Refund amount (50.01) cannot exceed paid amount (50.00)."
+            "Refund amount (50.01) cannot exceed the refundable amount (50.00)."
         )
         get_provider.assert_not_called()
         assert _status_in_db(order) == PaymentStatus.COMPLETED
 
-    def test_amount_equal_to_paid_amount_reaches_the_provider(self):
+    def test_amount_equal_to_the_refundable_reaches_the_provider(self):
         order = _paid_order()
         amount = Money(Decimal("50.00"), "EUR")
 
         with patch("order.payment.get_payment_provider") as get_provider:
             provider = get_provider.return_value
-            # What the provider captured decides that this is the whole
-            # of it, whatever the order says it owed.
-            provider.captured_amount.return_value = Decimal("50.00")
             provider.refund_payment.return_value = (
                 True,
-                {"refund_id": "re_1", "status": PaymentStatus.REFUNDED},
+                {"refund_id": "re_1", "amount": "50.00"},
             )
             success, _response = OrderService.refund_order(order, amount=amount)
 
         assert success is True
         get_provider.assert_called_once_with("stripe")
         provider.refund_payment.assert_called_once_with(
-            payment_id="pi_paid_123", amount=amount
+            payment_id="pi_paid_123",
+            amount=amount,
+            idempotency_key=f"order-{order.pk}-refund-1",
         )
+        # The ledger says nothing is left, so the order reads REFUNDED.
         assert _status_in_db(order) == PaymentStatus.REFUNDED
 
-    def test_order_without_pay_way_is_refused(self):
+    @pytest.mark.parametrize("amount", ["0.00", "-5.00"])
+    def test_an_amount_that_is_not_positive_is_refused(self, amount):
         order = _paid_order()
-        Order.objects.filter(pk=order.pk).update(pay_way=None)
-        order.refresh_from_db()
 
         with patch("order.payment.get_payment_provider") as get_provider:
             with pytest.raises(PaymentError) as excinfo:
-                OrderService.refund_order(order)
+                OrderService.refund_order(
+                    order, amount=Money(Decimal(amount), "EUR")
+                )
 
         assert str(excinfo.value) == (
-            "This order has no payment method configured."
+            "The refund amount must be greater than zero."
         )
         get_provider.assert_not_called()
-        assert _status_in_db(order) == PaymentStatus.COMPLETED
 
-    def test_order_without_payment_id_is_refused(self):
+    def test_an_order_the_ledger_holds_no_payment_for_is_refused(self):
+        """COMPLETED by a courier, a gift card or a hand edit: no provider
+        captured anything, so there is nothing to refund through one."""
         order = _paid_order(payment_id="")
 
         with patch("order.payment.get_payment_provider") as get_provider:
             with pytest.raises(PaymentError) as excinfo:
                 OrderService.refund_order(order)
 
-        assert str(excinfo.value) == ("This order has no payment ID to refund.")
+        assert str(excinfo.value) == (
+            "This order was not paid through a payment provider, so there "
+            "is nothing to refund here."
+        )
         get_provider.assert_not_called()
+        assert _status_in_db(order) == PaymentStatus.COMPLETED
+
+    def test_an_unpaid_order_is_refused_without_asking_the_provider(self):
+        """It names a payment intent (opened at checkout) and an online pay
+        way, yet nothing was captured: there is nothing to look for."""
+        order = _paid_order(payment_status=PaymentStatus.PENDING)
+        order.payment_transactions.all().delete()
+
+        with patch("order.payment.get_payment_provider") as get_provider:
+            with pytest.raises(PaymentError) as excinfo:
+                OrderService.refund_order(order)
+
+        assert str(excinfo.value) == "This order has not been paid yet."
+        get_provider.assert_not_called()
+
+    def test_the_status_is_read_under_the_lock_not_from_the_callers_copy(self):
+        order = _paid_order(payment_id="")
+        stale = Order.objects.get(pk=order.pk)
+        stale.payment_status = PaymentStatus.PENDING  # never saved
+
+        with pytest.raises(PaymentError) as excinfo:
+            OrderService.refund_order(stale)
+
+        assert str(excinfo.value) == (
+            "This order was not paid through a payment provider, so there "
+            "is nothing to refund here."
+        )
+
+    def test_a_fully_refunded_order_is_refused(self):
+        order = _paid_order()
+        with patch("order.payment.get_payment_provider") as get_provider:
+            get_provider.return_value.refund_payment.return_value = (
+                True,
+                {"refund_id": "re_1", "amount": "50.00"},
+            )
+            OrderService.refund_order(order)
+
+            with pytest.raises(PaymentError) as excinfo:
+                OrderService.refund_order(order)
+
+        assert str(excinfo.value) == "This order has already been refunded."
+        assert get_provider.return_value.refund_payment.call_count == 1
 
     def test_provider_decline_is_returned_and_nothing_is_recorded(self):
         order = _paid_order()
@@ -122,7 +184,7 @@ class TestRefundOrderRefusals:
         refunded_signal.assert_not_called()
         order.refresh_from_db()
         assert order.payment_status == PaymentStatus.COMPLETED
-        assert "refunds" not in (order.metadata or {})
+        assert not _refund_rows(order).exists()
 
 
 def _cancellable_paid_order(**kwargs):
@@ -155,7 +217,7 @@ class TestCancelOrderWhenTheRefundFails:
         # COMPLETED so the order still shows as owing a refund.
         assert order.payment_status == PaymentStatus.COMPLETED
         assert order.metadata["cancellation"]["reason"] == "changed mind"
-        assert "refunds" not in order.metadata
+        assert not _refund_rows(order).exists()
 
     def test_provider_exception_still_cancels_and_reports_the_failure(self):
         order = _cancellable_paid_order()
@@ -176,6 +238,7 @@ class TestCancelOrderWhenTheRefundFails:
         order.refresh_from_db()
         assert order.status == OrderStatus.CANCELED
         assert order.payment_status == PaymentStatus.COMPLETED
+        assert not _refund_rows(order).exists()
 
     def test_refund_payment_false_never_calls_the_provider(self):
         order = _cancellable_paid_order()

@@ -34,6 +34,8 @@ from giftcard.factories import GiftCardFactory
 from giftcard.tasks import deliver_gift_card_email
 from loyalty.tasks import notify_loyalty_tier_up_live
 from notification.models.notification import Notification
+from order.enum.payment_transaction import PaymentTransactionKind
+from order.factories import PaymentTransactionFactory
 from order.factories.item import OrderItemFactory
 from order.factories.order import OrderFactory
 from order.invoicing import generate_invoice
@@ -362,6 +364,13 @@ class TestMoreOrderEmails:
     @LANGUAGES
     def test_refund_site_link(self, language, prefix):
         order = OrderFactory(num_order_items=0, language_code=language)
+        charge = PaymentTransactionFactory(order=order)
+        PaymentTransactionFactory(
+            order=order,
+            charge=charge,
+            kind=PaymentTransactionKind.REFUND,
+            provider_reference="re_link",
+        )
 
         assert send_refund_confirmation_email(order.id) is True
 

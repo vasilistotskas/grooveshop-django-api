@@ -1,6 +1,8 @@
+from decimal import Decimal
 from unittest.mock import Mock, patch
 
 import pytest
+from djmoney.money import Money
 from djstripe.models import Event
 
 from order.enum.status import OrderStatus, PaymentStatus
@@ -13,6 +15,9 @@ from order.signals.handlers import (
     handle_stripe_payment_failed,
     handle_stripe_payment_succeeded,
 )
+
+# What the ``mock_djstripe_event`` fixture says Stripe collected.
+STRIPE_CAPTURED = Money(Decimal(50), "USD")
 
 
 def _applied(order, previous=PaymentStatus.PENDING):
@@ -29,6 +34,7 @@ def mock_djstripe_event():
         "object": {
             "id": "pi_test_123456",
             "amount": 5000,
+            "amount_received": 5000,
             "currency": "usd",
             "status": "succeeded",
         }
@@ -83,7 +89,9 @@ class TestHandleStripePaymentSucceeded:
             )
 
         # Verify
-        mock_service.assert_called_once_with(payment_intent_id)
+        mock_service.assert_called_once_with(
+            payment_intent_id, captured=STRIPE_CAPTURED
+        )
 
     def test_successful_payment_enqueues_confirmation_email(
         self, mock_djstripe_event
@@ -261,7 +269,9 @@ class TestHandleStripePaymentSucceeded:
             )
 
         # Verify service was called but no error raised
-        mock_service.assert_called_once_with(payment_intent_id)
+        mock_service.assert_called_once_with(
+            payment_intent_id, captured=STRIPE_CAPTURED
+        )
 
     def test_service_exception_propagates(self, mock_djstripe_event):
         """A processing error must PROPAGATE out of the receiver (G0231).
@@ -292,7 +302,9 @@ class TestHandleStripePaymentSucceeded:
                     sender=None, event=mock_djstripe_event
                 )
 
-        mock_service.assert_called_once_with(payment_intent_id)
+        mock_service.assert_called_once_with(
+            payment_intent_id, captured=STRIPE_CAPTURED
+        )
 
     def test_extracts_payment_intent_id_correctly(self, mock_djstripe_event):
         """
@@ -318,7 +330,9 @@ class TestHandleStripePaymentSucceeded:
             )
 
         # Verify correct payment_intent_id was used
-        mock_service.assert_called_once_with(payment_intent_id)
+        mock_service.assert_called_once_with(
+            payment_intent_id, captured=STRIPE_CAPTURED
+        )
 
     @pytest.mark.parametrize(
         "previous", [PaymentStatus.COMPLETED, PaymentStatus.CANCELED]
@@ -556,7 +570,7 @@ class TestWebhookHandlerErrorHandling:
             )
 
             # Verify service was called with None
-            mock_service.assert_called_once_with(None)
+            mock_service.assert_called_once_with(None, captured=STRIPE_CAPTURED)
 
 
 @pytest.mark.django_db
@@ -632,12 +646,17 @@ class TestWebhookHandlerIntegration:
         # First event
         event1 = Mock(spec=Event)
         event1.id = "evt_first"
-        event1.data = {"object": {"id": payment_intent_id}}
+        payment_intent = {
+            "id": payment_intent_id,
+            "amount_received": 5000,
+            "currency": "eur",
+        }
+        event1.data = {"object": payment_intent}
 
         # Second event (different event_id)
         event2 = Mock(spec=Event)
         event2.id = "evt_second"
-        event2.data = {"object": {"id": payment_intent_id}}
+        event2.data = {"object": payment_intent}
 
         # Execute both events
         handle_stripe_payment_succeeded(sender=None, event=event1)
@@ -736,6 +755,8 @@ class TestHandleStripeCheckoutCompleted:
                 "id": "cs_test_1",
                 "payment_intent": "pi_cs_test_1",
                 "payment_status": payment_status,
+                "amount_total": 5000,
+                "currency": "eur",
                 "metadata": {"order_id": str(order_id)},
             }
         }

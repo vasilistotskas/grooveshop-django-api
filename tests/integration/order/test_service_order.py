@@ -6,8 +6,10 @@ from django.conf import settings
 from django.test import TestCase
 from djmoney.money import Money
 
+from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import OrderStatus, PaymentStatus
 from order.exceptions import OrderCancellationError, PaymentError
+from order.factories import PaymentTransactionFactory
 from order.factories.order import OrderFactory
 from order.services import OrderService
 from order.stock import StockManager
@@ -126,13 +128,14 @@ class OrderServiceTestCase(TestCase):
             paid_amount=_eur("100.00"),
             num_order_items=0,
         )
+        PaymentTransactionFactory(
+            order=order,
+            amount=_eur("100.00"),
+            provider_reference="test_payment_123",
+        )
         mock_get_provider.return_value.refund_payment.return_value = (
             True,
-            {
-                "refund_id": "refund_123",
-                "status": PaymentStatus.REFUNDED,
-                "amount": "100.00",
-            },
+            {"refund_id": "refund_123", "amount": "100.00"},
         )
 
         success, response = OrderService.refund_order(
@@ -142,8 +145,12 @@ class OrderServiceTestCase(TestCase):
         self.assertTrue(success)
         self.assertEqual(response["refund_id"], "refund_123")
         self.assertEqual(order.payment_status, PaymentStatus.REFUNDED)
-        self.assertEqual(len(order.metadata["refunds"]), 1)
-        self.assertEqual(order.metadata["refunds"][0]["amount"], "100.00")
+        [refund] = order.payment_transactions.filter(
+            kind=PaymentTransactionKind.REFUND
+        )
+        self.assertEqual(refund.provider_reference, "refund_123")
+        self.assertEqual(refund.amount, _eur("100.00"))
+        self.assertEqual(refund.description, "Test refund")
 
     @patch("order.payment.get_payment_provider")
     def test_refund_order_partial(self, mock_get_provider):
@@ -153,12 +160,14 @@ class OrderServiceTestCase(TestCase):
             paid_amount=_eur("100.00"),
             num_order_items=0,
         )
+        PaymentTransactionFactory(
+            order=order,
+            amount=_eur("100.00"),
+            provider_reference="test_payment_123",
+        )
         mock_get_provider.return_value.refund_payment.return_value = (
             True,
-            {
-                "refund_id": "refund_456",
-                "status": PaymentStatus.PARTIALLY_REFUNDED,
-            },
+            {"refund_id": "refund_456", "amount": "25.00"},
         )
 
         success, _response = OrderService.refund_order(
@@ -167,7 +176,10 @@ class OrderServiceTestCase(TestCase):
 
         self.assertTrue(success)
         self.assertEqual(order.payment_status, PaymentStatus.PARTIALLY_REFUNDED)
-        self.assertEqual(order.metadata["refunds"][0]["amount"], "25.00")
+        [refund] = order.payment_transactions.filter(
+            kind=PaymentTransactionKind.REFUND
+        )
+        self.assertEqual(refund.amount, _eur("25.00"))
 
     def test_refund_order_refuses_an_unpaid_order(self):
         order = OrderFactory(

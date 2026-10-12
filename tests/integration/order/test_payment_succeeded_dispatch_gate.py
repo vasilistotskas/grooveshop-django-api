@@ -24,6 +24,7 @@ from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
 from order.models.order import Order
 from order.services import OrderService
+from tests.utils.payments import CAPTURED
 
 pytestmark = pytest.mark.django_db
 
@@ -41,7 +42,9 @@ def _order(status, payment_status=PaymentStatus.COMPLETED):
 
 
 def _run():
-    return OrderService.handle_payment_succeeded("pi_dispatch_gate")
+    return OrderService.handle_payment_succeeded(
+        "pi_dispatch_gate", captured=CAPTURED
+    )
 
 
 @pytest.mark.parametrize(

@@ -26,6 +26,10 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+#: ``Order.payment_method`` of an order BoxNow collected cash for, and the
+#: provider of its payment-ledger row.
+_COD_PAYMENT_METHOD = "boxnow_cod"
+
 # ---------------------------------------------------------------------------
 # State-transition tables
 # ---------------------------------------------------------------------------
@@ -1766,12 +1770,19 @@ class BoxNowService:
         PENDING → PROCESSING transition that normally emits it).
         """
         from order.enum.status import PaymentStatus
+        from order.payment_ledger import PaymentLedger
         from order.signals import order_paid
 
         order = shipment.order
         if order.payment_status != PaymentStatus.PENDING:
             return
-        order.mark_as_paid(payment_method="boxnow_cod")
+        order.mark_as_paid(payment_method=_COD_PAYMENT_METHOD)
+        PaymentLedger.record_cod_collection(
+            order,
+            amount=shipment.amount_to_be_collected,
+            provider=_COD_PAYMENT_METHOD,
+            reference=shipment.parcel_id,
+        )
         logger.info(
             "BoxNow COD delivered: order=%s payment_status PENDING -> "
             "COMPLETED (parcel=%s)",

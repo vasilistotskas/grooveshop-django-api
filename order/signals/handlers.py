@@ -27,6 +27,8 @@ from order.notifications import (
     notify_payment_confirmed_live,
     notify_payment_failed_live,
 )
+from order.payment import StripePaymentProvider, money_from_minor_units
+from order.payment_ledger import PaymentLedger
 from order.services import OrderService
 from order.signals import (
     order_canceled,
@@ -694,14 +696,14 @@ def handle_order_refunded(
         if order.user_id:
             dispatch_on_commit(notify_order_refunded_live, [order.id])
 
-        # Email confirmation. Idempotent via the
-        # ``refund_confirmation_email_sent`` reservation flag, so the
-        # in-app refund path (OrderService.refund_order) and the
-        # Stripe ``charge.refunded`` webhook both firing
-        # ``order_refunded.send`` for the same order can't double-
-        # email the customer. Guest orders DO get the email — unlike
-        # the live notification which is account-bound, the email
-        # uses ``order.email`` as the recipient.
+        # Email confirmation, one per refund: the task sends while the
+        # payment ledger holds more refunds than the emails already sent
+        # cover, so a repeat of the same signal sends nothing. A refund the
+        # ledger already holds never signals again (the provider's webhook
+        # for a refund this app made adds no row), so the in-app and
+        # webhook paths cannot double-email the customer. Guest orders DO
+        # get the email — unlike the live notification which is
+        # account-bound, the email uses ``order.email`` as the recipient.
         dispatch_on_commit(send_refund_confirmation_email, [order.id])
 
         logger.info("Order %s refunded", order.id)
@@ -760,7 +762,12 @@ def handle_stripe_payment_succeeded(sender, **kwargs):
 
     try:
         event: Event = kwargs["event"]
-        payment_intent_id = event.data["object"]["id"]
+        payment_intent = event.data["object"]
+        payment_intent_id = payment_intent["id"]
+        # What Stripe actually collected, for the payment ledger.
+        captured = money_from_minor_units(
+            payment_intent["amount_received"], payment_intent["currency"]
+        )
         event_id = event.id
     except KeyError, TypeError:
         # Malformed event payload — a redelivery carries the same bad body,
@@ -823,7 +830,9 @@ def handle_stripe_payment_succeeded(sender, **kwargs):
     # NO try/except around the processing section: any error must
     # propagate so dj-stripe's outer atomic rolls back the mark + Event
     # row and Stripe redelivers (G0231).
-    outcome = OrderService.handle_payment_succeeded(payment_intent_id)
+    outcome = OrderService.handle_payment_succeeded(
+        payment_intent_id, captured=captured
+    )
 
     # A stale event, a repeat, or a charge on a canceled order changes
     # nothing to confirm: no history row, no "order confirmed" email.
@@ -1037,17 +1046,25 @@ def handle_stripe_charge_refunded(sender, **kwargs):
     a handler, refunds initiated outside our admin would never hit the
     DB and the order would silently look paid.
 
-    Mapping:
-    * ``amount_refunded == amount`` → ``PaymentStatus.REFUNDED``
-    * ``amount_refunded < amount``  → ``PaymentStatus.PARTIALLY_REFUNDED``
+    The event carries the charge's CUMULATIVE ``amount_refunded`` and no
+    refund id (Stripe's own docs call fetching it an extra API call), so
+    the ledger is brought up to that figure: what it does not hold yet is
+    recorded as one REFUND row, keyed on the event id, and
+    ``PaymentLedger.record_refund`` derives ``payment_status`` from the
+    sums like every other refund path. A refund this app made is already in
+    the ledger under its own refund id, so its event adds nothing, and so
+    does a redelivered or out-of-order one (an older event reports less
+    than the ledger holds). Whatever the ledger records fires
+    ``order_refunded``, partial refunds included.
 
     ``Order.status`` is intentionally NOT changed — the canonical
     transition table only reaches ``REFUNDED`` from ``RETURNED``, and
     deciding whether a refund means the goods were also returned is a
     business call. Admin can drive that from the order page.
 
-    Idempotency: ``webhook_processed_{event_id}`` flag mirrors the
-    succeeded / failed handlers; redeliveries are no-ops.
+    The event also proves the charge it refunds, so a charge the ledger
+    does not hold yet (the payment event was lost or came later) is
+    recorded from it first.
     """
     logger.debug("Processing charge.refunded webhook")
 
@@ -1056,8 +1073,11 @@ def handle_stripe_charge_refunded(sender, **kwargs):
         charge = event.data["object"]
         event_id = event.id
         payment_intent_id = charge.get("payment_intent") or ""
-        amount = int(charge.get("amount") or 0)
-        amount_refunded = int(charge.get("amount_refunded") or 0)
+        currency = charge["currency"]
+        captured = money_from_minor_units(int(charge["amount"]), currency)
+        refunded_to_date = money_from_minor_units(
+            int(charge["amount_refunded"]), currency
+        )
 
         if not payment_intent_id:
             logger.warning(
@@ -1067,17 +1087,10 @@ def handle_stripe_charge_refunded(sender, **kwargs):
             return
 
         logger.info(
-            "Stripe charge refunded: payment_intent=%s amount_refunded=%s/%s",
+            "Stripe charge refunded: payment_intent=%s refunded=%s of %s",
             payment_intent_id,
-            amount_refunded,
-            amount,
-        )
-
-        is_full_refund = amount_refunded >= amount > 0
-        new_payment_status = (
-            PaymentStatus.REFUNDED
-            if is_full_refund
-            else PaymentStatus.PARTIALLY_REFUNDED
+            refunded_to_date,
+            captured,
         )
 
         with transaction.atomic():
@@ -1095,55 +1108,42 @@ def handle_stripe_charge_refunded(sender, **kwargs):
                 )
                 return
 
-            if order.metadata and order.metadata.get(
-                f"webhook_processed_{event_id}"
-            ):
+            previous_payment_status = order.payment_status
+            paid, _created = PaymentLedger.record_charge(
+                order,
+                amount=captured,
+                provider=StripePaymentProvider.code,
+                reference=payment_intent_id,
+            )
+            new_refund = refunded_to_date.amount - PaymentLedger.refunded_on(
+                paid
+            )
+            if new_refund <= 0:
                 logger.info(
-                    "Webhook %s already processed for order %s, skipping",
+                    "charge.refunded %s adds nothing to order %s: the ledger "
+                    "already holds %s refunded",
                     event_id,
                     order.id,
+                    refunded_to_date,
                 )
                 return
-
-            previous_payment_status = order.payment_status
-            order.payment_status = new_payment_status
-            if not order.metadata:
-                order.metadata = {}
-            order.metadata[f"webhook_processed_{event_id}"] = True
-            refunds = list(order.metadata.get("refunds") or [])
-            refunds.append(
-                {
-                    "stripe_event_id": event_id,
-                    "amount_refunded": amount_refunded,
-                    "amount": amount,
-                    "currency": (charge.get("currency") or "").lower(),
-                    "is_full_refund": is_full_refund,
-                    "payment_intent": payment_intent_id,
-                }
+            refund = Money(new_refund, refunded_to_date.currency)
+            PaymentLedger.record_refund(
+                order, charge=paid, amount=refund, reference=event_id
             )
-            order.metadata["refunds"] = refunds
-            order.save(update_fields=["payment_status", "metadata"])
 
         OrderHistory.log_payment_update(
             order=order,
             previous_value={"payment_status": str(previous_payment_status)},
             new_value={
-                "payment_status": str(new_payment_status),
-                "amount_refunded": amount_refunded,
-                "is_full_refund": is_full_refund,
+                "payment_status": str(order.payment_status),
+                "amount_refunded": str(refunded_to_date.amount),
+                "is_full_refund": order.payment_status
+                == PaymentStatus.REFUNDED,
             },
         )
 
-        if is_full_refund:
-            from order.payment import money_from_minor_units
-
-            order_refunded.send(
-                sender=Order,
-                order=order,
-                amount=money_from_minor_units(
-                    amount_refunded, charge["currency"]
-                ),
-            )
+        order_refunded.send(sender=Order, order=order, amount=refund)
 
     except KeyError, TypeError:
         # Malformed payload only. Everything else must PROPAGATE (G0231):
@@ -1296,6 +1296,14 @@ def handle_stripe_checkout_completed(sender, **kwargs):
         session_id = session_data["id"]
         payment_intent_id = session_data.get("payment_intent")
         payment_status = session_data.get("payment_status")
+        # What Stripe actually collected, for the payment ledger.
+        captured = (
+            money_from_minor_units(
+                session_data["amount_total"], session_data["currency"]
+            )
+            if payment_status == "paid"
+            else None
+        )
         event_id = event.id
     except KeyError, TypeError:
         # Malformed payload — a redelivery carries the same bad body, so
@@ -1345,6 +1353,17 @@ def handle_stripe_checkout_completed(sender, **kwargs):
 
             order.metadata["stripe_checkout_session_id"] = session_id
             order.metadata["stripe_payment_intent_id"] = payment_intent_id
+
+            # The money is in whatever state the order is. The
+            # ``payment_intent.succeeded`` event that follows records the
+            # same charge under the same key and changes nothing.
+            if captured is not None:
+                PaymentLedger.record_charge(
+                    order,
+                    amount=captured,
+                    provider=StripePaymentProvider.code,
+                    reference=payment_intent_id,
+                )
 
             # Before the settled guard: a canceled order's payment is
             # already settled, and behind the guard a real charge on it

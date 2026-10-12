@@ -106,13 +106,17 @@ class PaymentProvider(ABC):
 
     @abstractmethod
     def refund_payment(
-        self, payment_id: str, amount: Money | None = None
+        self, payment_id: str, amount: Money, *, idempotency_key: str
     ) -> tuple[bool, dict[str, Any]]:
-        """Refund ``amount`` of ``payment_id``; ``None`` refunds all of it.
+        """Refund ``amount`` of ``payment_id``.
 
-        On success the data carries ``refund_id`` and ``amount``, the
-        decimal string the provider actually paid back: for a full refund
-        that is the figure only the provider knows.
+        ``idempotency_key`` names this one refund attempt: asking again
+        with the same key must not refund twice. A provider whose refund
+        call cannot honour one does not send it.
+
+        True only for a refund the provider accepted. The data then carries
+        ``refund_id`` and ``amount``, the decimal string it paid back; a
+        refusal carries ``error``.
         """
 
     @abstractmethod
@@ -120,19 +124,6 @@ class PaymentProvider(ABC):
         self, payment_id: str
     ) -> tuple[PaymentStatus, dict[str, Any]]:
         pass
-
-    def captured_amount(self, payment_id: str) -> Decimal | None:
-        """What the provider says it captured on ``payment_id``.
-
-        The order cannot supply it: ``Order.paid_amount`` is the amount
-        owed when the order was created, not what the provider collected,
-        and Viva's Cancel Transaction rejects an amount above the original
-        payment. ``get_payment_status`` already reads it from the provider.
-        ``None`` when the provider cannot say (it has logged why).
-        """
-        _status, data = self.get_payment_status(payment_id)
-        captured = data.get("amount")
-        return None if captured is None else Decimal(str(captured))
 
     @abstractmethod
     def create_checkout_session(
@@ -583,32 +574,47 @@ class StripePaymentProvider(PaymentProvider):
             )
             return False, {"error": str(e)}
 
+    #: Refund statuses (docs.stripe.com/api/refunds/object) that mean Stripe
+    #: took the refund on: ``succeeded`` (a partial refund reports it too)
+    #: and ``pending`` (asynchronous methods; the amount is committed
+    #: against the charge from this point). ``requires_action`` waits on the
+    #: customer, and ``failed`` / ``canceled`` returned nothing, so none of
+    #: those is a refund that was made.
+    _ACCEPTED_REFUND_STATUSES: ClassVar[frozenset[str]] = frozenset(
+        {"succeeded", "pending"}
+    )
+
     def refund_payment(
-        self, payment_id: str, amount: Money | None = None
+        self, payment_id: str, amount: Money, *, idempotency_key: str
     ) -> tuple[bool, dict[str, Any]]:
+        """Refund ``amount`` of the PaymentIntent ``payment_id``.
+
+        ``idempotency_key`` goes to Stripe as the ``Idempotency-Key`` of the
+        request: Stripe keeps the first answer for a key for at least 24
+        hours and, asked again with the same parameters, returns it instead
+        of refunding twice. That is what makes a retry after a timeout safe.
+        Reusing a key with different parameters is an error on Stripe's side.
+        """
         try:
             logger.info(
                 "Processing Stripe refund",
                 extra={
                     "payment_id": payment_id,
-                    "amount": str(amount.amount) if amount else "full",
+                    "amount": str(amount.amount),
+                    "idempotency_key": idempotency_key,
                 },
             )
 
             from django.db import connection as _connection
 
             tenant_schema = getattr(_connection, "schema_name", "public")
-            refund_params: dict[str, Any] = {
-                "payment_intent": payment_id,
-                # Echo the tenant back on the refund for finance reconciliation.
-                "metadata": {"tenant_schema": tenant_schema},
-            }
-            if amount:
-                refund_params["amount"] = round(
-                    amount.amount * amount.currency.sub_unit
-                )
             stripe_refund = stripe.Refund.create(
-                **refund_params, api_key=self.api_key
+                payment_intent=payment_id,
+                amount=round(amount.amount * amount.currency.sub_unit),
+                # Echo the tenant back on the refund for finance reconciliation.
+                metadata={"tenant_schema": tenant_schema},
+                idempotency_key=idempotency_key,
+                api_key=self.api_key,
             )
 
             try:
@@ -621,13 +627,26 @@ class StripePaymentProvider(PaymentProvider):
                     f"Failed to sync Refund to dj-stripe: {sync_error}"
                 )
 
-            refund_data = {
+            if stripe_refund.status not in self._ACCEPTED_REFUND_STATUSES:
+                logger.error(
+                    "Stripe did not take the refund on: refund=%s status=%s "
+                    "payment=%s",
+                    stripe_refund.id,
+                    stripe_refund.status,
+                    payment_id,
+                )
+                return False, {
+                    "error": (
+                        f"Stripe refund {stripe_refund.id} is "
+                        f"{stripe_refund.status}, not completed."
+                    ),
+                    "refund_id": stripe_refund.id,
+                    "stripe_status": stripe_refund.status,
+                    "stripe_error": True,
+                }
+
+            return True, {
                 "refund_id": stripe_refund.id,
-                "status": PaymentStatus.REFUNDED
-                if stripe_refund.status == "succeeded"
-                else PaymentStatus.PROCESSING,
-                # What Stripe actually paid back: a full refund (``amount``
-                # None) is the one figure only Stripe knows.
                 "amount": str(
                     money_from_minor_units(
                         stripe_refund.amount, stripe_refund.currency
@@ -636,8 +655,6 @@ class StripePaymentProvider(PaymentProvider):
                 "payment_id": payment_id,
                 "stripe_status": stripe_refund.status,
             }
-
-            return True, refund_data
 
         except stripe.StripeError as e:
             logger.exception(
@@ -1019,16 +1036,23 @@ class VivaWalletPaymentProvider(PaymentProvider):
         return self.create_checkout_session(amount, order_id, **kwargs)
 
     def refund_payment(
-        self, payment_id: str, amount: Money | None = None
+        self, payment_id: str, amount: Money, *, idempotency_key: str
     ) -> tuple[bool, dict[str, Any]]:
-        """Cancel or refund ``payment_id``; ``None`` refunds all of it.
+        """Cancel or refund ``amount`` of ``payment_id``.
 
-        The request ALWAYS carries ``amount`` in cents (the field is
+        The request carries ``amount`` in cents (the field is
         ``required: true`` in Viva's Cancel Transaction spec). An HTTP 2xx
         is not success: Viva reports a refusal in the body as
         ``Success: false`` and a non-zero ``ErrorCode``, so only a body
         with ``Success`` true and ``ErrorCode`` 0 counts, and its
         ``TransactionId`` (the refund transaction) is the refund id.
+
+        ``idempotency_key`` is not sent: ``DELETE /api/transactions/{id}``
+        has no such parameter (Viva's ``idempotencyKey`` belongs to the
+        ``/acquiring/v1/transactions/{id}`` route). Viva refuses a refund
+        above what is left on the payment, which is what stops a repeated
+        call from refunding twice, and the ledger's unique constraint on
+        the refund transaction id stops it being recorded twice.
         """
         import requests
 
@@ -1037,29 +1061,11 @@ class VivaWalletPaymentProvider(PaymentProvider):
                 "Processing Viva Wallet refund",
                 extra={
                     "payment_id": payment_id,
-                    "amount": (
-                        str(amount.amount) if amount is not None else "full"
-                    ),
+                    "amount": str(amount.amount),
                 },
             )
 
-            if amount is None:
-                refund_amount = self.captured_amount(payment_id)
-                if refund_amount is None:
-                    logger.error(
-                        "Viva Wallet refund not sent: Retrieve Transaction "
-                        "reported no captured amount",
-                        extra={"payment_id": payment_id},
-                    )
-                    return False, {
-                        "error": (
-                            "Could not read the amount Viva captured for "
-                            "this payment."
-                        ),
-                        "viva_error": True,
-                    }
-            else:
-                refund_amount = amount.amount
+            refund_amount = amount.amount
 
             response = requests.delete(
                 f"{self.transactions_url}/api/transactions/{payment_id}",
@@ -1091,7 +1097,6 @@ class VivaWalletPaymentProvider(PaymentProvider):
 
             refund_data = {
                 "refund_id": data.get("TransactionId"),
-                "status": PaymentStatus.REFUNDED,
                 "amount": str(refund_amount),
                 "payment_id": payment_id,
                 "viva_status": "refunded",

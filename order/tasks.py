@@ -20,6 +20,7 @@ from core.tasks import MonitoredTask
 from core.utils.email_context import build_email_context
 from core.utils.i18n import get_order_language, get_user_language
 from core.utils.tenant_urls import get_tenant_frontend_url
+from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import OrderStatus, PaymentStatus
 from order.models import Order, OrderHistory
 from order.models.order import AMOUNT_MISMATCH_FLAG
@@ -675,46 +676,33 @@ def send_payment_failed_email(self, order_id: int) -> bool:
         return False
 
 
-REFUND_CONFIRMATION_EMAIL_SENT_FLAG = "refund_confirmation_email_sent"
+REFUNDS_EMAILED_KEY = "refunds_emailed"
 
 
-def _reserve_refund_confirmation_email(order_id: int) -> bool:
-    """Atomically claim the refund-confirmation-email slot for an order.
+def _count_refunds(order: Order) -> int:
+    """How many refunds the payment ledger holds for *order*."""
+    return order.payment_transactions.filter(
+        kind=PaymentTransactionKind.REFUND
+    ).count()
 
-    Both ``OrderService.refund_order`` (the in-app admin-initiated
-    path) and ``handle_stripe_charge_refunded`` (the webhook path)
-    fire ``order_refunded.send`` for the same order. Without this
-    reservation, the customer would get two refund emails — one when
-    we hit the Stripe API, another when Stripe redelivers the event
-    back to us.
 
-    Returns True if this caller won the race. Raises
-    ``Order.DoesNotExist`` so the caller can surface a missing order
-    consistently with the rest of the file.
+def _mark_refunds_emailed(order_id: int, refunds: int) -> None:
+    """Record that the customer was told about *refunds* refunds.
+
+    An order can be refunded many times, so "has the customer been
+    emailed" is a question about how many of its refunds the emails
+    already cover: ``metadata["refunds_emailed"]`` is the number of ledger
+    REFUND rows the last email accounted for, and the next email is due
+    while the ledger holds more than that. It only ever grows, so an
+    email that was slow cannot move it back.
     """
     with transaction.atomic():
         order = Order.objects.select_for_update().get(id=order_id)
-        if order.metadata and order.metadata.get(
-            REFUND_CONFIRMATION_EMAIL_SENT_FLAG
-        ):
-            return False
-        if not order.metadata:
-            order.metadata = {}
-        order.metadata[REFUND_CONFIRMATION_EMAIL_SENT_FLAG] = True
-        order.save(update_fields=["metadata"])
-    return True
-
-
-def _release_refund_confirmation_email(order_id: int) -> None:
-    """Clear the refund-confirmation-email reservation on permanent failure."""
-    with transaction.atomic():
-        order = Order.objects.select_for_update().filter(id=order_id).first()
-        if order is None or not order.metadata:
-            return
-        if (
-            order.metadata.pop(REFUND_CONFIRMATION_EMAIL_SENT_FLAG, None)
-            is not None
-        ):
+        if refunds > int((order.metadata or {}).get(REFUNDS_EMAILED_KEY, 0)):
+            order.metadata = {
+                **(order.metadata or {}),
+                REFUNDS_EMAILED_KEY: refunds,
+            }
             order.save(update_fields=["metadata"])
 
 
@@ -724,10 +712,16 @@ def _release_refund_confirmation_email(order_id: int) -> None:
 def send_refund_confirmation_email(self, order_id: int) -> bool:
     """Send the customer the refund-confirmation email.
 
-    Triggered from ``handle_order_refunded`` so both refund paths
-    converge here — admin-initiated refunds via
-    ``OrderService.refund_order`` and Stripe-dashboard refunds
-    arriving as ``charge.refunded`` webhooks.
+    Triggered from ``handle_order_refunded`` so every refund path
+    converges here — admin-initiated refunds via
+    ``OrderService.refund_order``, the staff Refund action, and
+    dashboard refunds arriving as ``charge.refunded`` / Viva reversal
+    webhooks. An order can be refunded more than once and each refund
+    tells the customer: the email is due while the payment ledger holds
+    more refunds than the emails already sent cover
+    (``_mark_refunds_emailed``). A refund the ledger already holds never
+    signals again, so there is no second email for the webhook that
+    reports a refund this app made.
 
     Renders ``emails/order/order_refunded.html`` (which inherits from
     ``order_status_generic.html``'s REFUNDED branch). Reuses the
@@ -735,27 +729,17 @@ def send_refund_confirmation_email(self, order_id: int) -> bool:
     """
     email_sent = False
     try:
-        if self.request.retries == 0:
-            try:
-                if not _reserve_refund_confirmation_email(order_id):
-                    logger.info(
-                        "Refund confirmation email already sent (or reserved) "
-                        "for order #%s, skipping",
-                        order_id,
-                    )
-                    return True
-            except Order.DoesNotExist:
-                logger.error(
-                    "Could not reserve refund confirmation email — Order #%s "
-                    "not found",
-                    order_id,
-                    extra={"order_id": order_id},
-                )
-                return False
-
         order = Order.objects.select_related(
             "user", "country", "region", "pay_way"
         ).get(id=order_id)
+        refunds = _count_refunds(order)
+        if refunds <= int((order.metadata or {}).get(REFUNDS_EMAILED_KEY, 0)):
+            logger.info(
+                "Refund confirmation email already sent for order #%s, "
+                "skipping",
+                order_id,
+            )
+            return True
 
         # The label must resolve INSIDE the override below.
         # get_FOO_display() calls force_str(..., strings_only=True) on the
@@ -804,6 +788,7 @@ def send_refund_confirmation_email(self, order_id: int) -> bool:
         msg.attach_alternative(html_content, "text/html")
         msg.send()
         email_sent = True
+        _mark_refunds_emailed(order_id, refunds)
 
         OrderHistory.log_note(
             order=order,
@@ -834,10 +819,10 @@ def send_refund_confirmation_email(self, order_id: int) -> bool:
         )
         if email_sent:
             # The message is already with the relay. Whatever failed
-            # after it (the history note, the logging call) must not put
-            # the customer through a second refund confirmation email — the
-            # reservation is only consulted on the first attempt, so a
-            # retry here would send again, up to max_retries times.
+            # after it (the bookkeeping, the history note, the logging
+            # call) must not put the customer through a second refund
+            # confirmation email: a retry here would send again, up to
+            # max_retries times.
             logger.error(
                 "refund confirmation email for order #%s was sent but the bookkeeping "
                 "after it failed: %s",
@@ -849,13 +834,8 @@ def send_refund_confirmation_email(self, order_id: int) -> bool:
 
         if self.request.retries < self.max_retries:
             raise self.retry(exc=e) from e
-        # Unconditionally, NOT "if this attempt reserved": the slot is
-        # claimed on attempt 0, which always retries while attempts
-        # remain, so by the time control reaches here the claim was made
-        # by an earlier attempt of this same run and a per-attempt flag
-        # is always False. Guarding on one made the release dead code and
-        # left the flag standing for a send that never happened.
-        _release_refund_confirmation_email(order_id)
+        # Nothing was marked, so the next refund's email covers this one
+        # too: the customer is told late rather than never.
         return False
 
 

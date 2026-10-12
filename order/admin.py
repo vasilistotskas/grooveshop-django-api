@@ -1,15 +1,18 @@
 import logging
 from datetime import timedelta
+from decimal import Decimal
 
+from django import forms
 from django.contrib import admin, messages
 from django.db.models import Count, Sum
-from django.http import FileResponse, Http404
+from django.http import FileResponse, Http404, HttpRequest, HttpResponse
 from django.shortcuts import redirect
 from django.urls import path, reverse
 from django.utils import timezone
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import ngettext
+from djmoney.money import Money
 from unfold.admin import TabularInline
 from unfold.contrib.filters.admin import (
     AutocompleteSelectFilter,
@@ -21,8 +24,14 @@ from unfold.contrib.filters.admin import (
     RelatedDropdownFilter,
     SliderNumericFilter,
 )
+from unfold.dataclasses import ActionDialog
 from unfold.decorators import action, display
 from unfold.enums import ActionVariant
+from unfold.forms import BaseDialogForm
+from unfold.widgets import (
+    UnfoldAdminDecimalFieldWidget,
+    UnfoldAdminTextInputWidget,
+)
 
 from admin.base import BaseModelAdmin
 from admin.displays import (
@@ -41,16 +50,19 @@ from admin.displays import (
 from admin.mixins import IsSuperuserOnlyModelAdmin
 from order.attribution import source_label
 from order.enum.document_type import OrderDocumentTypeEnum
-from order.enum.status import OrderStatus
+from order.enum.status import RETURN_HANDLING_STATUSES, OrderStatus
+from order.exceptions import PaymentError
 from order.invoicing import generate_invoice
 from order.models.attribution import OrderAttribution
 from order.models.history import OrderHistory, OrderItemHistory
 from order.models.invoice import Invoice, InvoiceCounter, MyDataStatus
 from order.models.item import OrderItem
 from order.models.order import Order
+from order.models.payment_transaction import PaymentTransaction
 from order.models.stock_log import StockLog
 from order.models.viva_webhook_event import VivaWebhookEvent
 from order.payment import payment_provider_label
+from order.payment_ledger import PaymentLedger
 from order.services import OrderService
 from user.models import UserAccount
 
@@ -186,6 +198,44 @@ class RecentOrdersFilter(DropdownFilter):
         return queryset
 
 
+class RefundOrderForm(BaseDialogForm):
+    """The "Refund (amount, reason)" dialog of an order.
+
+    The amount is checked against what the payment ledger says can still
+    be refunded by ``OrderService.refund_order`` itself (under the order
+    lock, so a stale dialog cannot overshoot); the dialog only offers the
+    figure.
+    """
+
+    amount = forms.DecimalField(
+        label=_("Amount"),
+        max_digits=11,
+        decimal_places=2,
+        min_value=Decimal("0.01"),
+        widget=UnfoldAdminDecimalFieldWidget,
+    )
+    reason = forms.CharField(
+        label=_("Reason"),
+        max_length=255,
+        widget=UnfoldAdminTextInputWidget,
+        help_text=_("Recorded with the refund on the order's payment ledger."),
+    )
+
+    def __init__(self, request, object_id=None, *args, **kwargs):
+        super().__init__(request, object_id, *args, **kwargs)
+        refundable = (
+            PaymentLedger.refundable(Order.objects.get(pk=object_id))
+            if object_id
+            else Decimal(0)
+        )
+        if refundable > 0:
+            amount = self.fields["amount"]
+            amount.initial = refundable
+            amount.help_text = _(
+                "Up to %(refundable)s can still be refunded."
+            ) % {"refundable": money(refundable)}
+
+
 class OrderItemInline(TabularInline):
     model = OrderItem
     extra = 0
@@ -279,6 +329,40 @@ class OrderHistoryInline(TabularInline):
         if obj.user:
             return obj.user.full_name or obj.user.username
         return _("System")
+
+
+class PaymentTransactionInline(TabularInline):
+    """The order's payment ledger, read-only.
+
+    Every charge, cash collection and refund a provider reported, which is
+    where ``Order.payment_status`` and the amount still refundable come
+    from. Append-only by design, so nothing here is editable.
+    """
+
+    model = PaymentTransaction
+    extra = 0
+    max_num = 0
+    can_delete = False
+    per_page = 15
+    collapsible = True
+    tab = True
+    fields = (
+        "created_at",
+        "kind",
+        "amount_display",
+        "provider",
+        "provider_reference",
+        "description",
+    )
+    readonly_fields = fields
+    ordering = ("created_at", "id")
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    @admin.display(description=_("Amount"))
+    def amount_display(self, obj):
+        return money(obj.amount.amount)
 
 
 def _invoice_download_url(invoice: Invoice) -> str | None:
@@ -585,6 +669,7 @@ class OrderAdmin(BaseModelAdmin):
     # the shipping-voucher button top-level (it's the most-used
     # one-click op and reads cleaner with a short label).
     actions_detail = [
+        "refund_payment",
         "download_shipping_voucher",
         {
             "title": _("Invoicing & myDATA"),
@@ -604,7 +689,12 @@ class OrderAdmin(BaseModelAdmin):
         "download_shipping_voucher",
         "view_customer_orders_row",
     ]
-    inlines = [OrderItemInline, InvoiceInline, OrderHistoryInline]
+    inlines = [
+        OrderItemInline,
+        PaymentTransactionInline,
+        InvoiceInline,
+        OrderHistoryInline,
+    ]
     date_hierarchy = "created_at"
     list_select_related = [
         "user",
@@ -931,14 +1021,86 @@ class OrderAdmin(BaseModelAdmin):
         icon="currency_exchange",
     )
     def mark_as_refunded(self, request, queryset):
-        # The order status only; the money moves through
-        # ``OrderService.refund_order`` or the provider's refund webhook,
-        # neither of which changes ``status`` (docs/order-system.md §4.2).
+        # The order status only; the money moves through the "Refund"
+        # action below (``OrderService.refund_order``) or the provider's
+        # refund webhook, neither of which changes ``status``
+        # (docs/order-system.md §4.2).
         self._bulk_update_status(
             request,
             queryset,
             OrderStatus.REFUNDED,
             _("Order %(order_id)s marked as refunded"),
+        )
+
+    @action(
+        description=_("Refund (amount, reason)"),
+        icon="currency_exchange",
+        permissions=["change", "refund"],
+        dialog=ActionDialog(
+            title=_("Refund order"),
+            description=_(
+                "Pays the amount back through the payment provider and "
+                "records it on the order's payment ledger. A part refund "
+                "can be followed by more until nothing is left. The order "
+                "status and its stock are not changed."
+            ),
+            form_class=RefundOrderForm,
+        ),
+    )
+    def refund_payment(
+        self, request: HttpRequest, form, object_id=None, **kwargs
+    ) -> HttpResponse:
+        order = Order.objects.get(pk=object_id)
+        amount = Money(form.cleaned_data["amount"], order.paid_amount.currency)
+        reason = form.cleaned_data["reason"]
+        try:
+            refunded, _response = OrderService.refund_order(
+                order, amount=amount, reason=reason
+            )
+        except PaymentError as exc:
+            # The service names the exact reason (nothing left to refund,
+            # more than the remainder, not paid through a provider).
+            self.message_user(request, str(exc), messages.ERROR)
+        else:
+            if refunded:
+                self.log_change(
+                    request,
+                    order,
+                    f"Refunded {amount}: {reason}",
+                )
+                self.message_user(
+                    request,
+                    _("Order %(order_id)s refunded %(amount)s.")
+                    % {"order_id": order.id, "amount": money(amount.amount)},
+                    messages.SUCCESS,
+                )
+            else:
+                self.message_user(
+                    request,
+                    _(
+                        "Order %(order_id)s was not refunded; see the order "
+                        "history."
+                    )
+                    % {"order_id": order.id},
+                    messages.ERROR,
+                )
+        return HttpResponse(
+            headers={
+                "HX-Redirect": reverse(
+                    "admin:order_order_change", args=[object_id]
+                ),
+            }
+        )
+
+    def has_refund_permission(self, request, object_id=None):
+        """Money moves from here, so only where a refund applies: an order
+        staff are handling a return for (delivered, completed or
+        returned). Before delivery a cancel refunds the order instead."""
+        return (
+            object_id is not None
+            and Order.objects.filter(
+                pk=object_id, status__in=RETURN_HANDLING_STATUSES
+            ).exists()
         )
 
     def _bulk_update_status(

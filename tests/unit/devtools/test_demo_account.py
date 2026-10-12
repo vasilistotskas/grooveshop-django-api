@@ -1185,6 +1185,25 @@ class TestResetRebuildsTheAccounts:
         assert mail.outbox == []
         dispatched.assert_not_called()
 
+    def test_an_order_of_the_shared_account_with_a_ledger_is_wiped_too(self):
+        """``PaymentTransaction.order`` is ``PROTECT``; the reset removes a
+        ledger with the order it belongs to instead of aborting."""
+        from django.contrib.auth import get_user_model
+
+        from order.factories import PaymentTransactionFactory
+        from order.models.order import Order
+        from order.models.payment_transaction import PaymentTransaction
+
+        _prepare_store()
+        demo_account.seed_demo_account()
+        user = get_user_model().objects.get(email=demo_account.RETAIL_EMAIL)
+        visitor_order = Order.objects.filter(user=user).first()
+        PaymentTransactionFactory(order=visitor_order)
+
+        demo_account.reset_demo_account()
+
+        assert not PaymentTransaction.objects.exists()
+
     def test_a_visitors_changes_are_wiped_and_the_history_comes_back(self):
         from django.contrib.auth import get_user_model
 
@@ -1693,6 +1712,30 @@ class TestGuestCheckoutsAreCleared:
             operation_type=StockLog.OPERATION_INCREMENT,
             quantity_delta=2,
         ).exists()
+
+    def test_a_guest_order_with_a_payment_ledger_is_cleared_too(self):
+        """``PaymentTransaction.order`` is ``PROTECT``: a ledger the reset
+        did not remove first would abort the nightly job."""
+        from order.enum.payment_transaction import PaymentTransactionKind
+        from order.factories import PaymentTransactionFactory
+        from order.models.order import Order
+        from order.models.payment_transaction import PaymentTransaction
+
+        order, _product, _reservation = self._guest_order_holding_stock()
+        charge = PaymentTransactionFactory(order=order)
+        PaymentTransactionFactory(
+            order=order,
+            charge=charge,
+            kind=PaymentTransactionKind.REFUND,
+            provider_reference="re_demo",
+        )
+
+        demo_account._wipe_guest_checkouts(
+            before=order.created_at + timedelta(seconds=1)
+        )
+
+        assert not Order.objects.all_with_deleted().filter(pk=order.pk).exists()
+        assert not PaymentTransaction.objects.filter(order_id=order.pk).exists()
 
     def test_an_order_placed_after_the_run_began_is_kept(self):
         from order.models.order import Order

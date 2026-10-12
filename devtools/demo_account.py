@@ -1531,8 +1531,23 @@ def _wipe_guest_checkouts(*, before) -> dict[str, int]:
 
     PromotionRedemption.objects.filter(order_id__in=order_ids).delete()
     _delete_invoices(order_ids)
+    _delete_payment_ledgers(order_ids)
     guests.hard_delete()
     return {"guest_orders": len(order_ids), "guest_stock_restored": restored}
+
+
+def _delete_payment_ledgers(order_ids) -> int:
+    """Remove the payment ledgers of these orders.
+
+    ``PaymentTransaction.order`` is ``PROTECT``: a financial record
+    outlives its order unless somebody removes it on purpose, and a reset
+    that hard-deletes orders is that somebody. Demo checkouts are cash on
+    delivery today, so this is normally empty, but a demo order that ever
+    took a provider payment must not abort the nightly reset.
+    """
+    from order.models.payment_transaction import PaymentTransaction
+
+    return PaymentTransaction.objects.filter(order_id__in=order_ids).delete()[0]
 
 
 def _delete_invoices(order_ids) -> int:
@@ -1610,7 +1625,9 @@ def _wipe_visitor_data(user) -> int:
     # redemptions would only be orphaned (``SET_NULL``) and keep counting
     # against a coupon's usage limit for ever.
     removed += PromotionRedemption.objects.filter(user=user).delete()[0]
-    removed += _delete_invoices(list(orders.values_list("pk", flat=True)))
+    order_ids = list(orders.values_list("pk", flat=True))
+    removed += _delete_invoices(order_ids)
+    removed += _delete_payment_ledgers(order_ids)
     # Orders next: points transactions reference them. ``hard_delete``
     # over ``all_with_deleted``: ``Order``'s queryset ``delete()`` only
     # soft-deletes, so every reset left the previous night's four

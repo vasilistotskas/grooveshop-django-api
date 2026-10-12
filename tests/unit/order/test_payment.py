@@ -114,7 +114,9 @@ class PaymentModuleTestCase(TestCase):
                 amount=Decimal("50.00"), currency=settings.DEFAULT_CURRENCY
             )
 
-            success, refund_data = provider.refund_payment(payment_id, amount)
+            success, refund_data = provider.refund_payment(
+                payment_id, amount, idempotency_key="order-1-refund-1"
+            )
 
             self.assertTrue(success)
             self.assertEqual(
@@ -122,6 +124,12 @@ class PaymentModuleTestCase(TestCase):
             )
             # What Stripe paid back, in major units: 5000 minor units of EUR.
             self.assertEqual(Decimal(refund_data["amount"]), Decimal(50))
+            # The key goes out as Stripe's Idempotency-Key: a retry under it
+            # is answered with this refund instead of making another.
+            self.assertEqual(
+                mock_stripe_refund.call_args.kwargs["idempotency_key"],
+                "order-1-refund-1",
+            )
 
     @mock.patch("order.payment.stripe.PaymentIntent.retrieve")
     @mock.patch("order.payment.PaymentIntent.sync_from_stripe_data")
@@ -605,14 +613,16 @@ class MinorUnitsTestCase(TestCase):
                 id="re_1", status="succeeded", amount=500, currency="jpy"
             )
             success, data = StripePaymentProvider().refund_payment(
-                "pi_1", Money(Decimal(500), "JPY")
+                "pi_1",
+                Money(Decimal(500), "JPY"),
+                idempotency_key="order-1-refund-1",
             )
 
         self.assertTrue(success)
         self.assertEqual(create.call_args.kwargs["amount"], 500)
         self.assertEqual(Decimal(data["amount"]), Decimal(500))
 
-    def test_stripe_captured_amount_is_in_major_units(self):
+    def test_stripe_payment_status_amount_is_in_major_units(self):
         with (
             mock.patch("tenant.credentials.stripe_credentials") as creds,
             mock.patch("order.payment.stripe.PaymentIntent.retrieve") as get,
@@ -622,6 +632,62 @@ class MinorUnitsTestCase(TestCase):
             get.return_value = mock.Mock(
                 status="succeeded", amount=500, currency="jpy", created=1
             )
-            captured = StripePaymentProvider().captured_amount("pi_1")
+            _status, data = StripePaymentProvider().get_payment_status("pi_1")
 
-        self.assertEqual(captured, Decimal(500))
+        self.assertEqual(Decimal(str(data["amount"])), Decimal(500))
+
+
+class StripeRefundStatusTestCase(TestCase):
+    """What a Stripe refund's ``status`` means for the order's money.
+
+    Stripe answers ``succeeded`` for a partial refund exactly as for a full
+    one (docs.stripe.com/api/refunds/object), so the status never says
+    whether the order is fully refunded; the ledger's sums do. What it does
+    say is whether Stripe took the refund on: ``succeeded``, and ``pending``
+    (asynchronous methods; committed against the charge from then on).
+    ``requires_action`` waits on the customer and ``failed``/``canceled``
+    returned nothing, so none of those is a refund that was made.
+    """
+
+    def _refund(self, status):
+        with (
+            mock.patch("tenant.credentials.stripe_credentials") as creds,
+            mock.patch("order.payment.stripe.Refund.create") as create,
+            mock.patch("order.payment.Refund.sync_from_stripe_data"),
+        ):
+            creds.return_value = {"secret_key": "sk_test_dummy"}
+            create.return_value = mock.Mock(
+                id="re_1", status=status, amount=1500, currency="eur"
+            )
+            return StripePaymentProvider().refund_payment(
+                "pi_1",
+                Money(Decimal("15.00"), "EUR"),
+                idempotency_key="order-1-refund-1",
+            )
+
+    def test_succeeded_and_pending_refunds_are_accepted(self):
+        for status in ("succeeded", "pending"):
+            with self.subTest(status=status):
+                success, data = self._refund(status)
+
+                self.assertTrue(success)
+                self.assertEqual(data["refund_id"], "re_1")
+                self.assertEqual(data["stripe_status"], status)
+                self.assertEqual(Decimal(data["amount"]), Decimal("15.00"))
+
+    def test_a_refund_stripe_did_not_take_on_is_not_a_refund(self):
+        for status in ("requires_action", "failed", "canceled"):
+            with self.subTest(status=status):
+                success, data = self._refund(status)
+
+                self.assertFalse(success)
+                self.assertEqual(data["refund_id"], "re_1")
+                self.assertEqual(data["stripe_status"], status)
+                self.assertIn(status, data["error"])
+
+    def test_the_provider_never_says_which_payment_status_follows(self):
+        """Stripe says ``succeeded`` for a part refund too, so the answer
+        carries no payment status: the ledger derives it."""
+        _success, data = self._refund("succeeded")
+
+        self.assertNotIn("status", data)

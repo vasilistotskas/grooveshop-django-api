@@ -27,6 +27,7 @@ from order.models.history import OrderHistory
 from order.services import OrderService
 from order.signals.handlers import handle_stripe_checkout_completed
 from order.views.viva_webhook import _handle_payment_created
+from tests.utils.payments import CAPTURED
 
 pytestmark = pytest.mark.django_db
 
@@ -128,7 +129,9 @@ class TestStripeChargeOnACanceledOrder:
                 "order.services.OrderService._dispatch_shipment_creation_task"
             ) as dispatch,
         ):
-            OrderService.handle_payment_succeeded("pi_after_cancel")
+            OrderService.handle_payment_succeeded(
+                "pi_after_cancel", captured=CAPTURED
+            )
 
         order.refresh_from_db()
         assert order.status == OrderStatus.CANCELED
@@ -149,6 +152,8 @@ class TestStripeChargeOnACanceledOrder:
                 "id": "cs_after_cancel",
                 "payment_intent": "pi_cs_after_cancel",
                 "payment_status": "paid",
+                "amount_total": 5000,
+                "currency": "eur",
                 "metadata": {"order_id": str(order.id)},
             }
         }

@@ -26,6 +26,12 @@ Syncs one model's index, e.g. `product.ProductTranslation` or `blog.BlogPostTran
 | Option | Description |
 |---|---|
 | `--batch_size N` | Documents per import batch |
+| `--tenant SCHEMA` | Sync that store's index only |
+| `--all-tenants` | Sync every store's index |
+
+Without either option it runs in the public schema, which holds no store's
+products. A release that adds a field to the index document needs this with
+`--all-tenants` after the deploy, so documents indexed before it gain the field.
 
 ## `meilisearch_drop`
 

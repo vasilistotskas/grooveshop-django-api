@@ -3,6 +3,43 @@
 
 
 
+## v3.106.3 (2026-10-12)
+
+### Bug fixes
+
+* fix(order): drop Order.paid_amount and the paidAmount API alias (#159)
+
+Release N+1 of the paid_amount -> amount_due rename. The expand step
+(0070, v3.106.2) is in production and the storefront and the agent
+gateway read amountDue, so what they no longer need goes:
+
+- OrderSerializer.paid_amount, its Meta.fields entry and the
+  deprecate_fields argument, and the paid_amount key of
+  OrderDetailSerializer.get_pricing_breakdown with its schema entry.
+  schema.yml loses paidAmount from Order, OrderDetail and the pricing
+  breakdown.
+- 0071_order_drop_paid_amount_columns (contract_of 0070): re-copies
+  paid_amount into amount_due where amount_due = 0 AND paid_amount > 0
+  (the orders the previous release wrote while it still served), then
+  drops paid_amount and paid_amount_currency in one RunSQL. The reverse
+  re-adds both nullable.
+
+Tests: the API contract test asserts paidAmount is absent from every
+response and from the whole schema; a new migration test covers the
+re-copy, the drop and the reverse; the 0067 backfill test, which writes
+the legacy column through the historical registry, adds the columns back
+for its own transaction. docs/order-system.md and docs/migrations.md drop
+the deprecated-alias wording.
+
+
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`a70c0bd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a70c0bd97d3784325672155f505c60890a812dd0))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.106.2 [skip ci] ([`f371d67`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f371d67af79585c13aa04cb0ff881cf29a50ffe3))
+
 ## v3.106.2 (2026-10-12)
 
 ### Bug fixes

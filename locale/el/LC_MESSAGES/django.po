@@ -5967,6 +5967,10 @@ msgstr "Ημερομηνία Ακύρωσης"
 msgid "Refund"
 msgstr "Επιστροφή Χρημάτων"
 
+#: .\order\admin.py
+msgid "Cancelled but still paid"
+msgstr "Ακυρωμένες αλλά πληρωμένες"
+
 #: .\core\templates\emails\order\order_canceled.html:38
 #: .\core\templates\emails\order\order_canceled.txt:11
 #, python-format

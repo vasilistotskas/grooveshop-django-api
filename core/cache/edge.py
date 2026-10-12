@@ -140,13 +140,16 @@ def purge_all_storefronts() -> int:
     platform = platform_zone()
     if platform:
         zones[platform.zone_id] = platform
-    own = (
-        Tenant.objects.exclude(cloudflare_zone_id="")
-        .exclude(cloudflare_api_token="")
-        .values_list("cloudflare_zone_id", "cloudflare_api_token")
+    # The token is encrypted at rest, so SQL can only narrow on the zone
+    # id; "has a token" is decided on the decrypted value.
+    own = Tenant.objects.exclude(cloudflare_zone_id="").values_list(
+        "cloudflare_zone_id", "cloudflare_api_token"
     )
     for zone_id, api_token in own:
-        zones.setdefault(zone_id, Zone(zone_id=zone_id, api_token=api_token))
+        if api_token:
+            zones.setdefault(
+                zone_id, Zone(zone_id=zone_id, api_token=api_token)
+            )
     for zone in zones.values():
         purge_tags(zone, [EDGE_CACHE_TAG])
     return len(zones)

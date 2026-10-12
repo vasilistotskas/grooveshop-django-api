@@ -168,6 +168,41 @@ class TestIsActiveCannotBeWrittenThroughTheSerializer:
         assert tenant.is_active is True
 
 
+class TestSecretsAreEncryptedAtRest:
+    def test_a_patched_secret_is_stored_as_ciphertext(self, operator_client):
+        from django.db import connection
+
+        tenant = store_tenant("api_patch_secret")
+
+        response = operator_client.patch(
+            reverse("tenant-admin-detail", args=[tenant.pk]),
+            {
+                "stripeSecretKey": "sk_live_via_api",
+                "mydataSubscriptionKey": "mydata-via-api",
+                "mydataUserId": "mydata-user",
+            },
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["stripe_secret_key"] == "sk_live_via_api"
+        assert response.data["mydata_subscription_key"] == "mydata-via-api"
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT stripe_secret_key_encrypted, "
+                "mydata_subscription_key, mydata_user_id "
+                "FROM tenant_tenant WHERE id = %s",
+                [tenant.pk],
+            )
+            stripe, mydata_key, mydata_user = cursor.fetchone()
+        assert "sk_live_via_api" not in stripe
+        assert "mydata-via-api" not in mydata_key
+        assert mydata_user == "mydata-user"
+        tenant.refresh_from_db()
+        assert tenant.stripe_secret_key == "sk_live_via_api"
+        assert tenant.mydata_subscription_key == "mydata-via-api"
+
+
 class TestTheLifecycleRoutes:
     def test_suspend_records_the_anchor_and_flushes_media(
         self, operator_client

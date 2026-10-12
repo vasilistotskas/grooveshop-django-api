@@ -157,6 +157,31 @@ class TestPurges:
             c.args[1] == ["storefront-html"] for c in purge.call_args_list
         )
 
+    def test_the_deploy_purge_skips_a_zone_without_a_token(self):
+        _tenant(
+            "edge_no_token",
+            ["no-token.example"],
+            cloudflare_zone_id=OWN_ZONE,
+            cloudflare_api_token="",
+        )
+        with mock.patch.object(edge, "purge_tags") as purge:
+            assert edge.purge_all_storefronts() == 1
+        assert {c.args[0].zone_id for c in purge.call_args_list} == {
+            PLATFORM_ZONE
+        }
+
+    def test_the_deploy_purge_uses_the_decrypted_token(self):
+        _tenant(
+            "edge_decrypts",
+            ["decrypts.example"],
+            cloudflare_zone_id=OWN_ZONE,
+            cloudflare_api_token="own-token",
+        )
+        with mock.patch.object(edge, "purge_tags") as purge:
+            edge.purge_all_storefronts()
+        tokens = {c.args[0].api_token for c in purge.call_args_list}
+        assert "own-token" in tokens
+
 
 class TestScheduling:
     def test_repeated_edits_queue_one_purge(self):

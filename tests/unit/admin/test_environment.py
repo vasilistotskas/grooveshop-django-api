@@ -63,6 +63,9 @@ def test_no_hardening_check_keys_on_the_deployment_name():
     assert not re.search(r'SYSTEM_ENV\s*==\s*"production"', source)
 
 
+# A well-formed Fernet key (32 url-safe base64 bytes); not used anywhere.
+_VALID_FERNET_KEY = "ZGV2LW9ubHktaW5zZWN1cmUta2V5LW5vdC1zZWNyZXQ="
+
 # What settings.py refuses to start without under the production profile.
 _PRODUCTION_SECRETS = {
     "SECRET_KEY": "not-the-default",
@@ -71,6 +74,7 @@ _PRODUCTION_SECRETS = {
     "CELERY_BROKER_URL": "amqp://user:pass@broker:5672//",
     "MEILI_MASTER_KEY": "not-the-default",
     "MEILI_SEARCH_KEY": "not-the-default",
+    "FIELD_ENCRYPTION_KEYS": _VALID_FERNET_KEY,
     "EMAIL_HOST_PASSWORD": "not-the-default",
     "USE_X_FORWARDED_HOST": "True",
 }
@@ -111,5 +115,36 @@ def test_the_production_profile_refuses_a_cleartext_database(sslmode):
 
 def test_the_production_profile_accepts_a_tls_database():
     result = _import_settings(SYSTEM_ENV="staging", DB_SSLMODE="verify-full")
+
+    assert result.returncode == 0, result.stderr
+
+
+def test_the_production_profile_refuses_a_missing_encryption_key():
+    result = _import_settings(SYSTEM_ENV="staging", FIELD_ENCRYPTION_KEYS="")
+
+    assert result.returncode != 0
+    assert "FIELD_ENCRYPTION_KEYS environment variable is required" in (
+        result.stderr
+    )
+
+
+@pytest.mark.parametrize(
+    "keys",
+    ["not-a-fernet-key", f"{_VALID_FERNET_KEY},not-a-fernet-key"],
+)
+def test_an_invalid_encryption_key_is_refused_at_startup(keys):
+    result = _import_settings(SYSTEM_ENV="staging", FIELD_ENCRYPTION_KEYS=keys)
+
+    assert result.returncode != 0
+    assert "invalid Fernet key" in result.stderr
+    assert "not-a-fernet-key" not in result.stderr
+
+
+def test_every_listed_encryption_key_is_accepted():
+    second = "VkyGsNMhjr7YocC7DKYmx9PeHvgKAXcLZXaOQDJQTqA="
+    result = _import_settings(
+        SYSTEM_ENV="staging",
+        FIELD_ENCRYPTION_KEYS=f"{second}, {_VALID_FERNET_KEY}",
+    )
 
     assert result.returncode == 0, result.stderr

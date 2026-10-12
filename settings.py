@@ -9,6 +9,8 @@ from celery.schedules import crontab
 from corsheaders.defaults import (
     default_headers,
 )
+from cryptography.fernet import Fernet
+from django.core.exceptions import ImproperlyConfigured
 from django.templatetags.static import static
 from django.urls import reverse_lazy
 from django.utils.translation import gettext_lazy as _
@@ -45,6 +47,36 @@ if not SECRET_KEY:
             "SECRET_KEY environment variable is required in production."
         )
     SECRET_KEY = "insecure-dev-key-do-not-use-in-production"
+
+# Fernet keys that encrypt merchant secrets at rest
+# (``core.db.encrypted_fields``), comma separated. The FIRST key encrypts
+# and every key decrypts, so a rotation is: put the new key first, deploy,
+# run ``rotate_tenant_secrets``, drop the old key. Never derived from
+# SECRET_KEY. Generate one with ``Fernet.generate_key()``; the runbook is
+# ``docs/secret-encryption.md``.
+FIELD_ENCRYPTION_KEYS = [
+    key.strip()
+    for key in getenv("FIELD_ENCRYPTION_KEYS", "").split(",")
+    if key.strip()
+]
+if not FIELD_ENCRYPTION_KEYS:
+    if PRODUCTION_PROFILE:
+        raise ImproperlyConfigured(
+            "FIELD_ENCRYPTION_KEYS environment variable is required in "
+            "production."
+        )
+    # Dev and CI only: lets a checkout boot and migrate without setup.
+    # Data encrypted under it is not protected.
+    FIELD_ENCRYPTION_KEYS = ["ZGV2LW9ubHktaW5zZWN1cmUta2V5LW5vdC1zZWNyZXQ="]
+for _key in FIELD_ENCRYPTION_KEYS:
+    try:
+        Fernet(_key)
+    except ValueError:
+        raise ImproperlyConfigured(
+            "FIELD_ENCRYPTION_KEYS holds an invalid Fernet key: each "
+            "comma separated entry must be 32 url-safe base64-encoded "
+            "bytes (Fernet.generate_key())."
+        ) from None
 
 _fallback = getenv("SECRET_KEY_FALLBACK", "")
 SECRET_KEY_FALLBACKS = [_fallback] if _fallback else []
@@ -2364,18 +2396,6 @@ EXTRA_SETTINGS_DEFAULTS = [
         "type": "string",
         "value": "dev",
         "description": "Target environment: 'dev' (mydataapidev.aade.gr) or 'prod' (mydatapi.aade.gr/myDATA). Dev and prod are separate portals with separate credentials.",
-    },
-    {
-        "name": "MYDATA_USER_ID",
-        "type": "string",
-        "value": "",
-        "description": "aade-user-id header — TAXISnet developer account username issued via the myDATA portal.",
-    },
-    {
-        "name": "MYDATA_SUBSCRIPTION_KEY",
-        "type": "string",
-        "value": "",
-        "description": "Ocp-Apim-Subscription-Key header — Azure APIM key from the myDATA developer portal.",
     },
     {
         "name": "MYDATA_INVOICE_SERIES_PREFIX",

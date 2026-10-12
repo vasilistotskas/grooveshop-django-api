@@ -276,10 +276,7 @@ def _handle_verification(request):
         )
         return JsonResponse({"error": "Not configured"}, status=500)
 
-    logger.info(
-        "Returning Viva verification key (first 8 chars: %s...)",
-        verification_key[:8],
-    )
+    logger.info("Returning Viva verification key")
     return JsonResponse(
         {"Key": verification_key},
         json_dumps_params={"separators": (",", ":")},

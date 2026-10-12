@@ -19918,3 +19918,23 @@ msgstr ""
 #, python-format
 msgid "Notification of refund %(refund)s"
 msgstr ""
+
+#: .\tenant\models.py:1078
+msgid "myDATA user ID"
+msgstr ""
+
+#: .\tenant\models.py:1084
+msgid ""
+"The aade-user-id of the store's TAXISnet myDATA developer account. No "
+"platform fallback — empty disables myDATA."
+msgstr ""
+
+#: .\tenant\models.py:1089
+msgid "myDATA subscription key"
+msgstr ""
+
+#: .\tenant\models.py:1095
+msgid ""
+"The Ocp-Apim-Subscription-Key from the myDATA developer portal. Secret. No"
+" platform fallback — empty disables myDATA."
+msgstr ""

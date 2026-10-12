@@ -13,6 +13,7 @@ from django_tenants.models import DomainMixin, TenantMixin, _check_schema_name
 from knox.models import AbstractAuthToken
 from simple_history.models import HistoricalRecords
 
+from core.db.encrypted_fields import EncryptedCharField
 from core.json_schema import JSONSchemaValidator
 from core.models import TimeStampMixinModel, UUIDModel
 from core.utils.tenant_urls import (
@@ -492,9 +493,10 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         default="",
     )
 
-    stripe_secret_key = models.CharField(
+    stripe_secret_key = EncryptedCharField(
         _("Stripe secret key"),
         max_length=255,
+        db_column="stripe_secret_key_encrypted",
         blank=True,
         default="",
         help_text=_(
@@ -560,9 +562,10 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
             "platform hostname."
         ),
     )
-    cloudflare_api_token = models.CharField(
+    cloudflare_api_token = EncryptedCharField(
         _("Cloudflare API token"),
         max_length=255,
+        db_column="cloudflare_api_token_encrypted",
         blank=True,
         default="",
         db_default="",
@@ -836,9 +839,10 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
 
     # === Analytics (server-side) ===
 
-    meta_capi_access_token = models.CharField(
+    meta_capi_access_token = EncryptedCharField(
         _("Meta CAPI Access Token"),
         max_length=255,
+        db_column="meta_capi_access_token_encrypted",
         blank=True,
         default="",
         help_text=_(
@@ -871,9 +875,10 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
             "No platform fallback — empty disables Viva Wallet."
         ),
     )
-    viva_wallet_api_key = models.CharField(
+    viva_wallet_api_key = EncryptedCharField(
         _("Viva Wallet API Key"),
         max_length=255,
+        db_column="viva_wallet_api_key_encrypted",
         blank=True,
         default="",
         help_text=_(
@@ -891,9 +896,10 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
             "No platform fallback — empty disables Viva Wallet."
         ),
     )
-    viva_wallet_client_secret = models.CharField(
+    viva_wallet_client_secret = EncryptedCharField(
         _("Viva Wallet Client Secret"),
         max_length=255,
+        db_column="viva_wallet_client_secret_encrypted",
         blank=True,
         default="",
         help_text=_(
@@ -901,9 +907,10 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
             "No platform fallback — empty disables Viva Wallet."
         ),
     )
-    viva_wallet_webhook_verification_key = models.CharField(
+    viva_wallet_webhook_verification_key = EncryptedCharField(
         _("Viva Wallet Webhook Verification Key"),
         max_length=255,
+        db_column="viva_wallet_webhook_verification_key_encrypted",
         blank=True,
         default="",
         help_text=_(
@@ -937,9 +944,10 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
 
     # === Shipping — ACS ===
 
-    acs_api_key = models.CharField(
+    acs_api_key = EncryptedCharField(
         _("ACS API Key"),
         max_length=255,
+        db_column="acs_api_key_encrypted",
         blank=True,
         default="",
         help_text=_(
@@ -955,9 +963,10 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
             "ACS company identifier. No platform fallback — empty disables ACS."
         ),
     )
-    acs_company_password = models.CharField(
+    acs_company_password = EncryptedCharField(
         _("ACS Company Password"),
         max_length=128,
+        db_column="acs_company_password_encrypted",
         blank=True,
         default="",
         help_text=_(
@@ -973,9 +982,10 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
             "ACS API user identifier. No platform fallback — empty disables ACS."
         ),
     )
-    acs_user_password = models.CharField(
+    acs_user_password = EncryptedCharField(
         _("ACS User Password"),
         max_length=128,
+        db_column="acs_user_password_encrypted",
         blank=True,
         default="",
         help_text=_(
@@ -1015,9 +1025,10 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
             "No platform fallback — empty disables BoxNow."
         ),
     )
-    box_now_client_secret = models.CharField(
+    box_now_client_secret = EncryptedCharField(
         _("BoxNow Client Secret"),
         max_length=255,
+        db_column="box_now_client_secret_encrypted",
         blank=True,
         default="",
         help_text=_(
@@ -1045,9 +1056,10 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
             "No platform fallback — empty disables BoxNow."
         ),
     )
-    box_now_webhook_secret = models.CharField(
+    box_now_webhook_secret = EncryptedCharField(
         _("BoxNow Webhook Secret"),
         max_length=255,
+        db_column="box_now_webhook_secret_encrypted",
         blank=True,
         default="",
         help_text=_(
@@ -1057,11 +1069,41 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         ),
     )
 
+    # === Invoicing — myDATA (AADE) ===
+    # Per-tenant like every other merchant credential: each store invoices
+    # under its own TAXISnet account. ``MYDATA_ENABLED`` and the rest of
+    # the myDATA knobs stay ``extra_settings`` rows.
+
+    mydata_user_id = models.CharField(
+        _("myDATA user ID"),
+        max_length=64,
+        blank=True,
+        default="",
+        db_default="",
+        help_text=_(
+            "The aade-user-id of the store's TAXISnet myDATA developer "
+            "account. No platform fallback — empty disables myDATA."
+        ),
+    )
+    mydata_subscription_key = EncryptedCharField(
+        _("myDATA subscription key"),
+        max_length=255,
+        blank=True,
+        default="",
+        db_default="",
+        help_text=_(
+            "The Ocp-Apim-Subscription-Key from the myDATA developer "
+            "portal. Secret. No platform fallback — empty disables "
+            "myDATA."
+        ),
+    )
+
     # === Agentic Commerce (secret) ===
 
-    acp_bearer_token = models.CharField(
+    acp_bearer_token = EncryptedCharField(
         _("ACP Bearer Token"),
         max_length=255,
+        db_column="acp_bearer_token_encrypted",
         blank=True,
         default="",
         help_text=_(
@@ -1105,9 +1147,10 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
             "Stripe Agentic Commerce."
         ),
     )
-    chat_api_key = models.CharField(
+    chat_api_key = EncryptedCharField(
         _("Chat API Key"),
         max_length=255,
+        db_column="chat_api_key_encrypted",
         blank=True,
         default="",
         help_text=_(
@@ -1147,6 +1190,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
             "box_now_webhook_secret",
             "acp_bearer_token",
             "chat_api_key",
+            "mydata_subscription_key",
             # A cache key component, not a fact about the store.
             "cache_generation",
         ],

@@ -1,9 +1,11 @@
-"""Runtime config for myDATA, resolved from ``extra_settings``.
+"""Runtime config for myDATA: ``extra_settings`` knobs plus the tenant's
+own credentials (``tenant.credentials.mydata_credentials``).
 
 Keeps config access in one place so the rest of the package can ask
 "is myDATA ready?" without sprinkling ``Setting.get(...)`` calls
-everywhere. Mutable at runtime — operators flip ``MYDATA_ENABLED`` and
-credentials via the Django admin; no code deploy needed.
+everywhere. Mutable at runtime — operators flip ``MYDATA_ENABLED`` via
+the Django admin and a store edits its credentials on its tenant row; no
+code deploy needed.
 
 The dev/prod base URLs are **hard-coded constants** because they are
 published AADE endpoints, not customer-supplied. Accidentally pointing
@@ -16,6 +18,8 @@ from dataclasses import dataclass
 from typing import Literal
 
 from extra_settings.models import Setting
+
+from tenant.credentials import mydata_credentials
 
 _BASE_URLS: dict[str, str] = {
     # Published by AADE: https://www.aade.gr/en/mydata
@@ -69,22 +73,22 @@ class MyDataConfig:
 
 
 def load_config() -> MyDataConfig:
-    """Build a :class:`MyDataConfig` from current ``extra_settings``
-    values. Call per task invocation — not cached."""
+    """Build a :class:`MyDataConfig` from the current ``extra_settings``
+    values and the active tenant's credentials. Call per task
+    invocation — not cached."""
     env = Setting.get("MYDATA_ENVIRONMENT", default="dev")
     # Defend against typos in the admin — anything we don't recognise
     # falls back to ``dev`` so a misconfigured prod flag can't hit the
     # wrong base URL.
     if env not in _BASE_URLS:
         env = "dev"
+    credentials = mydata_credentials()
     return MyDataConfig(
         enabled=bool(Setting.get("MYDATA_ENABLED", default=False)),
         auto_submit=bool(Setting.get("MYDATA_AUTO_SUBMIT", default=False)),
         environment=env,  # type: ignore[arg-type]
-        user_id=str(Setting.get("MYDATA_USER_ID", default="") or ""),
-        subscription_key=str(
-            Setting.get("MYDATA_SUBSCRIPTION_KEY", default="") or ""
-        ),
+        user_id=credentials["user_id"],
+        subscription_key=credentials["subscription_key"],
         invoice_series_prefix=str(
             Setting.get("MYDATA_INVOICE_SERIES_PREFIX", default="GRVP")
             or "GRVP"

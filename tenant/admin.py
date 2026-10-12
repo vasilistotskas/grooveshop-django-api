@@ -592,6 +592,16 @@ class TenantAdmin(BaseModelAdmin):
                 ],
             },
         ),
+        (
+            _("Invoicing & myDATA"),
+            {
+                "classes": ["tab"],
+                "fields": [
+                    "mydata_user_id",
+                    "mydata_subscription_key",
+                ],
+            },
+        ),
     ]
 
     def has_module_permission(self, request):

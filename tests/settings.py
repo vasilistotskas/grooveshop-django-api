@@ -106,3 +106,8 @@ MEDIA_ROOT = str(
 )
 for _root in (MEDIA_ROOT, MEDIA_ROOT + "_private"):
     rmtree(_root, ignore_errors=True)
+
+# A fixed key, so the suite never depends on the developer's .env and a
+# ciphertext written by one test run is readable by the next. Tests that
+# need a second key (rotation) override this setting themselves.
+FIELD_ENCRYPTION_KEYS = ["VkyGsNMhjr7YocC7DKYmx9PeHvgKAXcLZXaOQDJQTqA="]

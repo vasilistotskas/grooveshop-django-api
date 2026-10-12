@@ -7,7 +7,7 @@ from django.conf import settings
 from django.contrib.postgres.indexes import BTreeIndex
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
-from django.db import models
+from django.db import models, transaction
 from django.db.models import (
     Avg,
     F,
@@ -50,6 +50,14 @@ DISCOUNT_PERCENT_MIN = Decimal("0.0")
 DISCOUNT_PERCENT_MAX = Decimal("100.0")
 
 TWO_PLACES = Decimal("0.01")
+
+#: Columns ``product.pricing.service`` owns: they follow from the price,
+#: the markdown, the VAT rate and the live promotions, never from input.
+PRICING_DERIVED_FIELDS = (
+    "effective_price",
+    "prior_price",
+    "reduction_started_at",
+)
 
 
 def _quantize_cents(value: Decimal) -> Decimal:
@@ -144,6 +152,42 @@ class Product(
         decimal_places=2,
         default=Decimal("0.0"),
     )
+    effective_price = models.DecimalField(
+        _("Effective Price"),
+        max_digits=11,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        editable=False,
+        help_text=_(
+            "Gross unit price a consumer pays now: price plus VAT, minus "
+            "the markdown and any unconditional automatic promotion. "
+            "Maintained automatically, never edited."
+        ),
+    )
+    prior_price = models.DecimalField(
+        _("Prior Price"),
+        max_digits=11,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        editable=False,
+        help_text=_(
+            "EU Omnibus reference: the lowest gross price of the 30 days "
+            "before the current reduction started, frozen at its start. "
+            "Empty when no reduction may be announced."
+        ),
+    )
+    reduction_started_at = models.DateTimeField(
+        _("Reduction Started At"),
+        null=True,
+        blank=True,
+        editable=False,
+        help_text=_(
+            "When the reduction in force began; empty when the product "
+            "is not reduced."
+        ),
+    )
     vat = models.ForeignKey(
         "vat.Vat",
         related_name="products",
@@ -207,6 +251,10 @@ class Product(
         # ACS/BoxNow shipment histories already declare this; Product
         # was the one historied model that had been missed.
         user_db_constraint=False,
+        # Derived from price, markdown, VAT and promotions by
+        # ``product.pricing.service``; the legal record of prices is
+        # ``ProductPriceSpell``, not this table.
+        excluded_fields=PRICING_DERIVED_FIELDS,
     )
 
     points_coefficient = models.DecimalField(
@@ -274,7 +322,24 @@ class Product(
                 title_field="name",
             )
             self.slug = unique_slugify(config)
-        super().save(*args, **kwargs)
+
+        # Imported here: the service loads the promotion engine, which
+        # needs every model registered.
+        from product.pricing import service
+
+        update_fields = kwargs.get("update_fields")
+        if not service.touches_price(update_fields):
+            super().save(*args, **kwargs)
+            return
+        with transaction.atomic():
+            plan = service.plan_for_save(self)
+            if update_fields is not None:
+                kwargs["update_fields"] = [
+                    *update_fields,
+                    *PRICING_DERIVED_FIELDS,
+                ]
+            super().save(*args, **kwargs)
+            service.record_spells([plan])
 
     def clean(self):
         super().clean()
@@ -359,6 +424,20 @@ class Product(
                 (self.discount_value.amount / self.price.amount) * 100
             )
         return Decimal(0)
+
+    @property
+    def announced_discount_percent(self) -> int | None:
+        """The whole percent a reduction may be announced as, or ``None``.
+
+        Computed from ``prior_price`` (CJEU C-330/23), never from the
+        undiscounted list price, and read from the stored columns so a
+        list page costs nothing per row.
+        """
+        from product.pricing.evaluation import announced_discount_percent
+
+        return announced_discount_percent(
+            self.prior_price, self.effective_price
+        )
 
     @property
     def likes_count(self) -> int:
@@ -607,6 +686,8 @@ class ProductTranslation(
             "category_name",
             "stock",
             "discount_percent",
+            "prior_price",
+            "announced_discount_percent",
             "active",
             "is_deleted",
             "attributes",
@@ -688,6 +769,14 @@ class ProductTranslation(
             "view_count": lambda obj: obj.master.view_count,
             "final_price": lambda obj: float(obj.master.final_price.amount),
             "discount_percent": lambda obj: float(obj.master.discount_percent),
+            "prior_price": lambda obj: (
+                None
+                if obj.master.prior_price is None
+                else float(obj.master.prior_price)
+            ),
+            "announced_discount_percent": lambda obj: (
+                obj.master.announced_discount_percent
+            ),
             "on_offer": lambda obj: obj.indexed_offer_kind() is not None,
             "created_at": lambda obj: (
                 obj.master.created_at.isoformat()

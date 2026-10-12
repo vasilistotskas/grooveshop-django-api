@@ -1,0 +1,190 @@
+"""What the API and the search document say about a reduction.
+
+Three stored columns carry it (``prior_price``, ``effective_price``,
+``reduction_started_at``), so no surface may cost a query per row.
+"""
+
+from __future__ import annotations
+
+from datetime import UTC, datetime, timedelta
+from decimal import Decimal
+from unittest.mock import patch
+
+import pytest
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
+from django.urls import reverse
+from rest_framework import status
+from rest_framework.test import APIClient
+
+from product.factories import ProductFactory
+from product.factories.category import ProductCategoryFactory
+from product.models.product import ProductTranslation
+from search.serializers import ProductTranslationSerializer
+from vat.models import Vat
+
+CREATED = datetime(2026, 3, 1, 10, 0, tzinfo=UTC)
+MARKED_DOWN = CREATED + timedelta(days=40)
+
+
+@pytest.fixture
+def category(db):
+    return ProductCategoryFactory()
+
+
+@pytest.fixture
+def vat(db):
+    return Vat.objects.get_or_create(value=Decimal("24.0"))[0]
+
+
+def reduced_product(category, vat):
+    """An established product whose markdown started after 40 days."""
+    with patch("django.utils.timezone.now", return_value=CREATED):
+        product = ProductFactory(
+            category=category,
+            vat=vat,
+            price=Decimal("100.00"),
+            discount_percent=Decimal(0),
+            active=True,
+            num_reviews=0,
+        )
+    with patch("django.utils.timezone.now", return_value=MARKED_DOWN):
+        product.discount_percent = Decimal(20)
+        product.save()
+    return product
+
+
+def plain_product(category, vat):
+    return ProductFactory(
+        category=category,
+        vat=vat,
+        price=Decimal("100.00"),
+        discount_percent=Decimal(0),
+        active=True,
+        num_reviews=0,
+    )
+
+
+@pytest.mark.django_db
+class TestProductApi:
+    def test_detail_carries_the_prior_price_and_the_announced_percent(
+        self, category, vat
+    ):
+        product = reduced_product(category, vat)
+
+        response = APIClient().get(
+            reverse("product-detail", kwargs={"pk": product.pk})
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        body = response.json()
+        assert body["priorPrice"] == 124.0
+        assert body["effectivePrice"] == 104.0
+        # 20% of the net price, 16% of the gross prior price.
+        assert body["announcedDiscountPercent"] == 16
+        assert body["discountPercent"] == 20.0
+
+    def test_a_product_that_is_not_reduced_announces_nothing(
+        self, category, vat
+    ):
+        product = plain_product(category, vat)
+
+        response = APIClient().get(
+            reverse("product-detail", kwargs={"pk": product.pk})
+        )
+
+        body = response.json()
+        assert body["priorPrice"] is None
+        assert body["announcedDiscountPercent"] is None
+        assert body["effectivePrice"] == 124.0
+
+    def test_a_young_product_with_a_markdown_announces_nothing(
+        self, category, vat
+    ):
+        product = ProductFactory(
+            category=category,
+            vat=vat,
+            price=Decimal("100.00"),
+            discount_percent=Decimal(20),
+            active=True,
+        )
+
+        body = (
+            APIClient()
+            .get(reverse("product-detail", kwargs={"pk": product.pk}))
+            .json()
+        )
+
+        assert body["priorPrice"] is None
+        assert body["announcedDiscountPercent"] is None
+
+    def test_list_query_count_does_not_grow_with_the_page(self, category, vat):
+        def queries_for(count):
+            for _ in range(count):
+                reduced_product(category, vat)
+            with CaptureQueriesContext(connection) as queries:
+                response = APIClient().get(reverse("product-list"))
+            assert response.status_code == status.HTTP_200_OK
+            rows = response.json()["results"]
+            assert all(row["priorPrice"] == 124.0 for row in rows)
+            return len(queries)
+
+        assert queries_for(8) == queries_for(2)
+
+    def test_the_schema_deprecates_the_markdown_fields(self, openapi_schema):
+        properties = openapi_schema["components"]["schemas"]["Product"][
+            "properties"
+        ]
+
+        for name in ("discountPercent", "discountValue", "priceSavePercent"):
+            assert properties[name]["deprecated"] is True
+        for name in (
+            "priorPrice",
+            "effectivePrice",
+            "announcedDiscountPercent",
+        ):
+            assert "deprecated" not in properties[name]
+
+
+@pytest.mark.django_db
+class TestSearch:
+    def test_the_document_carries_the_two_announcement_fields(
+        self, category, vat
+    ):
+        product = reduced_product(category, vat)
+        translation = ProductTranslation.get_meilisearch_queryset().get(
+            master=product, language_code="en"
+        )
+
+        document = translation.meili_serialize()
+
+        assert document["prior_price"] == 124.0
+        assert document["announced_discount_percent"] == 16
+
+    def test_the_document_of_an_unreduced_product_has_none(self, category, vat):
+        product = plain_product(category, vat)
+        translation = ProductTranslation.get_meilisearch_queryset().get(
+            master=product, language_code="en"
+        )
+
+        document = translation.meili_serialize()
+
+        assert document["prior_price"] is None
+        assert document["announced_discount_percent"] is None
+
+    def test_the_card_costs_no_extra_query(self, category, vat):
+        product = reduced_product(category, vat)
+        hit = (
+            ProductTranslation.get_search_result_queryset()
+            .filter(master=product, language_code="en")
+            .get()
+        )
+        _ = hit.master
+
+        with CaptureQueriesContext(connection) as queries:
+            data = ProductTranslationSerializer(hit, context={}).data
+
+        assert data["prior_price"] == 124.0
+        assert data["effective_price"] == 104.0
+        assert data["announced_discount_percent"] == 16
+        assert not any("pricespell" in q["sql"].lower() for q in queries)

@@ -1,9 +1,11 @@
-"""Keep the search index's ``on_offer`` flag in step with promotions.
+"""Keep what derives from promotions in step with them.
 
-``on_offer`` is derived from promotions (``promotion.offers``), so it can
-go stale without any Product being saved: an admin edits a promotion, a
-window opens or closes, a usage limit is reached. Three producers feed
-one coalescing queue:
+``on_offer`` (the search index) and the consumer price a product is
+offered at (``product.pricing.service``: price spells and the Omnibus
+reduction episode) both derive from promotions, so they can go stale
+without any Product being saved: an admin edits a promotion, a window
+opens or closes, a usage limit is reached. Three producers feed one
+coalescing queue:
 
 * ``promotion.signals`` — a promotion, its scope, or its usage changed;
 * ``reindex_offer_window_changes_task`` (beat, every 5 minutes) — a
@@ -12,9 +14,13 @@ one coalescing queue:
 Producers only record *what may have changed*: promotion ids, or product
 ids when the old scope must be captured before it disappears. One task
 runs ``REINDEX_DELAY_SECONDS`` after the first mark and drains
-everything, so an admin save that fires a dozen signals reindexes once.
+everything, so an admin save that fires a dozen signals refreshes once:
+the price records first, then the index documents built from them.
 The sets live in the cache, scoped per schema by its key function, like
 ``core.cache.invalidation``.
+
+The two celery tasks keep their ``reindex_*`` names: renaming a task
+strands the messages an older worker still has queued.
 """
 
 from __future__ import annotations
@@ -23,7 +29,6 @@ import logging
 from collections.abc import Iterable
 from datetime import datetime, timedelta
 
-from django.conf import settings
 from django.core.cache import cache
 from django.db import connection, transaction
 from django.db.models import Q
@@ -54,20 +59,15 @@ _PENDING_TIMEOUT = REINDEX_DELAY_SECONDS * 30
 _SCHEDULED_TIMEOUT = REINDEX_DELAY_SECONDS * 6
 
 
-def indexing_enabled() -> bool:
-    """False when Meilisearch is switched off: there is no index to keep."""
-    return not settings.MEILISEARCH.get("OFFLINE", False)
-
-
-def queue_reindex(
+def queue_refresh(
     *,
     promotion_ids: Iterable[int] = (),
     product_ids: Iterable[int] = (),
 ) -> None:
-    """Mark promotions / products for reindexing once this transaction commits."""
+    """Mark promotions / products for a refresh once this transaction commits."""
     promotions = [str(pk) for pk in promotion_ids]
     products = [str(pk) for pk in product_ids]
-    if not indexing_enabled() or (not promotions and not products):
+    if not promotions and not products:
         return
     schema_name = getattr(connection, "schema_name", "public")
     transaction.on_commit(lambda: _enqueue(schema_name, promotions, products))
@@ -90,11 +90,11 @@ def _enqueue(
                 )
     except Exception:
         # Runs in an on_commit hook: an exception has no caller, and the
-        # write that triggered it already succeeded. The nightly full
-        # sync repairs whatever this drops.
+        # write that triggered it already succeeded. The nightly syncs
+        # (Meilisearch, price episodes) repair whatever this drops.
         logger.exception(
-            "Offer reindex could not be queued for schema=%s; on_offer "
-            "stays stale until the next full sync",
+            "Offer refresh could not be queued for schema=%s; on_offer "
+            "and promotion prices stay stale until the next nightly sync",
             schema_name,
         )
 
@@ -125,17 +125,30 @@ def drain_pending() -> set[int]:
         raise
 
 
-def reindex_window_changes(now: datetime | None = None) -> set[int]:
-    """Reindex the products whose promotion window opened or closed.
+def refresh_products(product_ids: Iterable[int]) -> int:
+    """Re-record the consumer price of ``product_ids``, then reindex them.
+
+    The price records come first: the index documents carry
+    ``prior_price`` and ``announced_discount_percent``, which the records
+    decide. Returns the number of index documents dispatched.
+    """
+    from product.pricing.service import sync_product_prices
+    from product.signals import reindex_products_by_pk
+
+    ids = set(product_ids)
+    sync_product_prices(ids)
+    return reindex_products_by_pk(ids)
+
+
+def refresh_window_changes(now: datetime | None = None) -> set[int]:
+    """Refresh the products whose promotion window opened or closed.
 
     A promotion goes live at ``starts_at`` and dies at ``ends_at``
     (``PromotionQuerySet.live``: ``starts_at <= now < ends_at``), so an
     edge in ``(cursor, now]`` is a status change. The cursor only moves
-    after the reindex was dispatched; a crash in between repeats the
-    window next run instead of skipping it.
+    after the refresh ran; a crash in between repeats the window next run
+    instead of skipping it.
     """
-    from product.signals import reindex_products_by_pk
-
     now = now or timezone.now()
     cursor_raw = cache.get(_WINDOW_CURSOR_KEY)
     cursor = (
@@ -148,7 +161,7 @@ def reindex_window_changes(now: datetime | None = None) -> set[int]:
         | Q(ends_at__gt=cursor, ends_at__lte=now)
     )
     product_ids = scope_product_ids(crossed.values_list("pk", flat=True))
-    reindex_products_by_pk(product_ids)
+    refresh_products(product_ids)
     # No expiry: losing the cursor only widens the next window.
     cache.set(_WINDOW_CURSOR_KEY, now.isoformat(), timeout=None)
     return product_ids

@@ -6,6 +6,7 @@ from .category import ProductCategory
 from .category_image import ProductCategoryImage
 from .favourite import ProductFavourite
 from .image import ProductImage
+from .price_spell import ProductPriceSpell
 from .product import Product
 from .product_attribute import ProductAttribute
 from .relation import ProductRelation
@@ -24,6 +25,7 @@ __all__ = [
     "ProductCategoryImage",
     "ProductFavourite",
     "ProductImage",
+    "ProductPriceSpell",
     "ProductRelation",
     "ProductReview",
     "ProductVariantGroup",

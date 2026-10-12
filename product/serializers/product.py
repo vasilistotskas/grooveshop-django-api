@@ -2,7 +2,10 @@ from django.db.models import Count
 from django.utils.translation import gettext_lazy as _
 from djmoney.contrib.django_rest_framework import MoneyField
 from djmoney.money import Money
-from drf_spectacular.utils import extend_schema_field
+from drf_spectacular.utils import (
+    extend_schema_field,
+    extend_schema_serializer,
+)
 from measurement.measures import Weight
 from parler_rest.serializers import TranslatableModelSerializer
 from rest_framework import serializers
@@ -25,6 +28,20 @@ class TranslatedFieldsFieldExtend(TranslatedFieldExtended):
     pass
 
 
+# ``discount_percent``, ``discount_value`` and ``price_save_percent`` are
+# the merchant's markdown, not an announcement: a "was" price struck
+# through and a "-N%" badge built from them carry no prior price, which
+# the EU Omnibus rule requires. ``prior_price`` and
+# ``announced_discount_percent`` are what a customer may be shown; the
+# fields below stay for one release so the storefront can move off them
+# (docs/migrations.md: expand, then contract).
+@extend_schema_serializer(
+    deprecate_fields=[
+        "discount_percent",
+        "discount_value",
+        "price_save_percent",
+    ]
+)
 class ProductSerializer(
     TranslatableModelSerializer, serializers.ModelSerializer[Product]
 ):
@@ -45,6 +62,19 @@ class ProductSerializer(
     final_price = MoneyField(max_digits=11, decimal_places=2, read_only=True)
     discount_value = MoneyField(max_digits=11, decimal_places=2, read_only=True)
     vat_value = MoneyField(max_digits=11, decimal_places=2, read_only=True)
+    # What a consumer pays now, promotions that need nothing from the
+    # basket included; ``final_price`` stops at VAT and the markdown.
+    effective_price = MoneyField(
+        max_digits=11, decimal_places=2, read_only=True, allow_null=True
+    )
+    # The EU Omnibus reference: the lowest price of the 30 days before the
+    # current reduction began. ``null`` means nothing may be announced.
+    prior_price = MoneyField(
+        max_digits=11, decimal_places=2, read_only=True, allow_null=True
+    )
+    announced_discount_percent = serializers.IntegerField(
+        read_only=True, allow_null=True
+    )
     weight = MeasurementSerializerField(
         measurement=Weight, required=False, allow_null=True
     )
@@ -89,6 +119,9 @@ class ProductSerializer(
             "vat_percent",
             "vat_value",
             "final_price",
+            "effective_price",
+            "prior_price",
+            "announced_discount_percent",
             "main_image_path",
             "review_average",
             "review_count",
@@ -110,6 +143,9 @@ class ProductSerializer(
             "vat_percent",
             "vat_value",
             "final_price",
+            "effective_price",
+            "prior_price",
+            "announced_discount_percent",
             "main_image_path",
             "review_average",
             "review_count",

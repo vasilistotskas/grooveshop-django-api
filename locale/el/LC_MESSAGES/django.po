@@ -22512,3 +22512,55 @@ msgstr ""
 msgid "A promotion discounts a cart line that is not part of the order."
 msgstr ""
 "Μια προσφορά εκπτώνει γραμμή του καλαθιού που δεν ανήκει στην παραγγελία."
+
+#: .\product\models\product.py:156
+msgid "Effective Price"
+msgstr "Πραγματική τιμή"
+
+#: .\product\models\product.py:162
+msgid "Gross unit price a consumer pays now: price plus VAT, minus the markdown and any unconditional automatic promotion. Maintained automatically, never edited."
+msgstr "Η τελική τιμή μονάδας (με ΦΠΑ) που πληρώνει τώρα ο καταναλωτής: τιμή συν ΦΠΑ, μείον την έκπτωση προϊόντος και κάθε άνευ όρων αυτόματη προσφορά. Ενημερώνεται αυτόματα, δεν επεξεργάζεται."
+
+#: .\product\models\product.py:169
+msgid "Prior Price"
+msgstr "Προηγούμενη τιμή"
+
+#: .\product\models\product.py:175
+msgid "EU Omnibus reference: the lowest gross price of the 30 days before the current reduction started, frozen at its start. Empty when no reduction may be announced."
+msgstr "Τιμή αναφοράς Omnibus της ΕΕ: η χαμηλότερη τιμή με ΦΠΑ των 30 ημερών πριν από την έναρξη της τρέχουσας μείωσης, σταθερή από την έναρξή της. Κενή όταν δεν επιτρέπεται να ανακοινωθεί μείωση."
+
+#: .\product\models\product.py:182
+msgid "Reduction Started At"
+msgstr "Έναρξη μείωσης"
+
+#: .\product\models\product.py:188
+msgid "When the reduction in force began; empty when the product is not reduced."
+msgstr "Πότε ξεκίνησε η ισχύουσα μείωση· κενό όταν το προϊόν δεν έχει μειωμένη τιμή."
+
+#: .\product\models\price_spell.py:57
+msgid "Product price spell"
+msgstr "Περίοδος τιμής προϊόντος"
+
+#: .\product\models\price_spell.py:58
+msgid "Product price spells"
+msgstr "Περίοδοι τιμής προϊόντων"
+
+#: .\product\models\price_spell.py:36
+msgid "Consumer price"
+msgstr "Τιμή καταναλωτή"
+
+#: .\product\models\price_spell.py:41
+msgid "The gross unit price a consumer paid: price plus VAT, minus the product markdown and any unconditional automatic promotion."
+msgstr "Η τελική τιμή μονάδας (με ΦΠΑ) που πλήρωσε ο καταναλωτής: τιμή συν ΦΠΑ, μείον την έκπτωση προϊόντος και κάθε άνευ όρων αυτόματη προσφορά."
+
+#: .\product\models\price_spell.py:48
+msgid "Valid from"
+msgstr "Ισχύει από"
+
+#: .\product\models\price_spell.py:50
+msgid "Valid to"
+msgstr "Ισχύει έως"
+
+#: .\product\models\price_spell.py:53
+msgid "Empty while this is the current price."
+msgstr "Κενό όσο αυτή είναι η τρέχουσα τιμή."

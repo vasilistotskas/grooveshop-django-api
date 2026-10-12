@@ -1100,6 +1100,15 @@ def get_celery_beat_schedule():
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
         },
+        "reevaluate-price-episodes": {
+            # Fanout: Product and its price spells are per-tenant; beat
+            # fires in public. The net under the EU Omnibus price
+            # records: reconciles every product with its live price.
+            "task": "tenant.tasks.fanout_reevaluate_price_episodes",
+            "schedule": SCHEDULE_PRESETS["daily_3am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_hour"],
+        },
         "reindex-offer-window-changes": {
             # Fanout: Promotion/Product are per-tenant; beat fires in
             # public. A promotion window opening or closing saves

@@ -1,8 +1,8 @@
-"""Reindex ``on_offer`` when a promotion change can move it.
+"""Refresh ``on_offer`` and promotion prices when a promotion changes.
 
-Everything routes through ``promotion.offer_sync.queue_reindex``, which
+Everything routes through ``promotion.offer_sync.queue_refresh``, which
 coalesces: an admin save that touches the row and four M2M sets fires
-five signals and runs one reindex.
+five signals and runs one refresh (price records, then the index).
 
 Two kinds of mark, because a removed scope cannot be recomputed after
 the fact. A change that leaves the new scope readable records the
@@ -27,7 +27,7 @@ from django.db.models.signals import (
 from django.dispatch import receiver
 
 from promotion.models import Promotion, PromotionRedemption
-from promotion.offer_sync import indexing_enabled, queue_reindex
+from promotion.offer_sync import queue_refresh
 from promotion.offers import scope_product_ids
 
 _SCOPE_THROUGHS = (
@@ -46,7 +46,7 @@ _SCOPE_THROUGHS = (
 def reindex_offer_on_promotion_save(sender, instance, raw=False, **kwargs):
     if raw:
         return
-    queue_reindex(promotion_ids=[instance.pk])
+    queue_refresh(promotion_ids=[instance.pk])
 
 
 @receiver(
@@ -55,18 +55,16 @@ def reindex_offer_on_promotion_save(sender, instance, raw=False, **kwargs):
     dispatch_uid="promotion.reindex_offer_on_delete",
 )
 def reindex_offer_on_promotion_delete(sender, instance, **kwargs):
-    if not indexing_enabled():
-        return
-    queue_reindex(product_ids=scope_product_ids([instance.pk]))
+    queue_refresh(product_ids=scope_product_ids([instance.pk]))
 
 
 def reindex_offer_on_scope_change(sender, instance, action, reverse, **kwargs):
-    if reverse or not indexing_enabled():
+    if reverse:
         return
     if action in {"pre_remove", "pre_clear"}:
-        queue_reindex(product_ids=scope_product_ids([instance.pk]))
+        queue_refresh(product_ids=scope_product_ids([instance.pk]))
     elif action in {"post_add", "post_remove", "post_clear"}:
-        queue_reindex(promotion_ids=[instance.pk])
+        queue_refresh(promotion_ids=[instance.pk])
 
 
 for _through in _SCOPE_THROUGHS:
@@ -104,10 +102,10 @@ def _crossed_usage_limit(promotion_id: int, *, created: bool) -> bool:
     dispatch_uid="promotion.reindex_offer_on_redemption",
 )
 def reindex_offer_on_redemption(sender, instance, created, raw=False, **kwargs):
-    if raw or not created or not indexing_enabled():
+    if raw or not created:
         return
     if _crossed_usage_limit(instance.promotion_id, created=True):
-        queue_reindex(promotion_ids=[instance.promotion_id])
+        queue_refresh(promotion_ids=[instance.promotion_id])
 
 
 @receiver(
@@ -116,7 +114,5 @@ def reindex_offer_on_redemption(sender, instance, created, raw=False, **kwargs):
     dispatch_uid="promotion.reindex_offer_on_redemption_delete",
 )
 def reindex_offer_on_redemption_delete(sender, instance, **kwargs):
-    if indexing_enabled() and _crossed_usage_limit(
-        instance.promotion_id, created=False
-    ):
-        queue_reindex(promotion_ids=[instance.promotion_id])
+    if _crossed_usage_limit(instance.promotion_id, created=False):
+        queue_refresh(promotion_ids=[instance.promotion_id])

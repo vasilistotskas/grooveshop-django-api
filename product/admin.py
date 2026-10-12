@@ -55,6 +55,7 @@ from product.models.category import ProductCategory
 from product.models.category_image import ProductCategoryImage
 from product.models.favourite import ProductFavourite
 from product.models.image import ProductImage
+from product.models.price_spell import ProductPriceSpell
 from product.models.product import Product
 from product.models.product_attribute import ProductAttribute
 from product.models.relation import ProductRelation
@@ -639,6 +640,29 @@ class ProductImageInline(TabularInline):
     show_change_link = True
 
 
+class ProductPriceSpellInline(TabularInline):
+    """The product's price record, newest first. Read-only: it is the
+    evidence behind every announced reduction, so nothing here is edited
+    or deleted by hand."""
+
+    model = ProductPriceSpell
+    extra = 0
+    fields = ("price", "valid_from", "valid_to")
+    readonly_fields = fields
+    ordering = ("-valid_from",)
+    tab = True
+    per_page = 20
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
 class StockReservationInline(TabularInline):
     """Display active stock reservations for this product."""
 
@@ -838,6 +862,7 @@ class ProductAdmin(
         ProductAttributeInline,
         ProductImageInline,
         StockReservationInline,
+        ProductPriceSpellInline,
         TaggedItemInline,
         ProductRelationInline,
     ]
@@ -851,6 +876,10 @@ class ProductAdmin(
         "view_count",
         "likes_count",
         "stock_reservation_summary",
+        # Derived by ``product.pricing.service``; shown, never edited.
+        "effective_price",
+        "prior_price",
+        "reduction_started_at",
         # Stamped from the saving admin (``Product._history_user``).
         "changed_by",
     )
@@ -901,6 +930,9 @@ class ProductAdmin(
                     "price",
                     "discount_percent",
                     "vat",
+                    "effective_price",
+                    "prior_price",
+                    "reduction_started_at",
                     "stock",
                     "weight",
                     "low_stock_threshold",

@@ -11,12 +11,14 @@ from __future__ import annotations
 
 # ── invoiceType: the document-kind enum ──────────────────────────
 #
-# Tier A wired 11.1; Tier B adds 1.1 (domestic B2B). Other invoice
-# types live in the AADE catalogue but wait for their own tier:
-# 1.2 (intra-EU), 1.3 (third-country), 2.x (services), 5.x (credit
-# notes), 13.x (expense documents), 17.x (depreciation).
-INVOICE_TYPE_B2C_RETAIL = "11.1"  # Α.Λ.Π. — retail sales receipt
-INVOICE_TYPE_B2B_SALES = "1.1"  # Τιμολόγιο Πώλησης — domestic B2B
+# The platform issues retail documents only, over the ERP ``SendInvoices``
+# channel: the retail receipt (11.1, ΕΛΠ art. 12(1)) and the retail credit
+# document (11.4, art. 12(4)). Invoices (1.1) and credit invoices (5.1)
+# are NOT issued here: from 2.11.2026 AADE decision Α.1128/2025 art. 1(2)
+# requires them to come from a licensed provider or AADE's timologio app,
+# and an ERP-issued one counts as not issued.
+INVOICE_TYPE_RETAIL_RECEIPT = "11.1"  # Α.Λ.Π. — retail sales receipt
+INVOICE_TYPE_RETAIL_CREDIT = "11.4"  # Πιστωτικό Στοιχείο Λιανικής
 
 # ── paymentMethodDetails.type ────────────────────────────────────
 #
@@ -51,23 +53,14 @@ VAT_EXEMPTION_NO_VAT_ARTICLES = 30  # Λοιπές εξαιρέσεις ΦΠΑ
 
 
 # ── Classification types for invoiceDetails + invoiceSummary ─────
-# Every invoice MUST carry either an income or expenses classification
-# (AADE error 314 otherwise). The valid ``type``/``category`` pair is
-# specific to the invoiceType; live-verified on AADE dev:
-#   * 11.1 (Α.Λ.Π. / retail receipt):
-#     ``E3_561_003`` (Πωλήσεις Λιανικές — Ιδιωτική Πελατεία) paired
-#     with ``category1_3``. The ``E3_561_001`` / ``category1_1`` pair
-#     fails with error 313 because ``category1_1`` is Χονδρικές.
-#   * 1.1 (B2B sales invoice — domestic):
-#     ``E3_561_001`` (Πωλήσεις Χονδρικές — Επιτηδευματιών) paired
-#     with ``category1_1`` (sale of merchandise).
-#   * 1.2 (intra-EU supply) / 1.3 (third-country): out of Tier B scope;
-#     use ``E3_561_005`` / ``E3_561_006`` respectively when wired.
+# Every document MUST carry an income classification (AADE error 314
+# otherwise). Goods are ``category1_1`` ("Έσοδα από Πώληση Εμπορευμάτων");
+# ``category1_3`` is "Έσοδα από Παροχή Υπηρεσιών" and is wrong for a
+# webshop's goods. AADE's classification combinations (v2.0.2, sheets
+# 11.1 and 11.4) allow ``category1_1`` with ``E3_561_003`` ("Πωλήσεις
+# Λιανικές — Ιδιωτική Πελατεία"), for the receipt and its credit alike.
 CLASSIFICATION_TYPE_RETAIL_GOODS = "E3_561_003"
-CLASSIFICATION_CATEGORY_GOODS_SALES = "category1_3"
-
-CLASSIFICATION_TYPE_B2B_DOMESTIC = "E3_561_001"
-CLASSIFICATION_CATEGORY_B2B_MERCHANDISE = "category1_1"
+CLASSIFICATION_CATEGORY_GOODS_SALES = "category1_1"
 
 
 # ── AADE error codes we branch on explicitly ─────────────────────
@@ -75,4 +68,3 @@ CLASSIFICATION_CATEGORY_B2B_MERCHANDISE = "category1_1"
 # ones with custom handling. Everything else is treated as a
 # terminal ``ValidationError``.
 ERROR_DUPLICATE_UID = "228"  # uid already registered under another MARK
-ERROR_INACTIVE_VAT = "102"  # counterpart VAT is not on AADE's registry

@@ -112,7 +112,13 @@ class TestInvoiceFieldsFlow:
         assert data["billing_company_name"] == "Example IKE"
         assert data["billing_tax_office"] == "Α' Αθηνών"
 
-    def test_buyer_snapshot_carries_company_block(self, checkout):
+    def test_buyer_snapshot_is_the_retail_customer_not_a_company(
+        self, checkout
+    ):
+        """The platform issues no invoice (AADE decision Α.1128/2025): the
+        snapshot its receipts and credit documents render carries the
+        customer's name and address, never the company requisites that
+        staff read from the order when they issue the invoice in timologio."""
         order = OrderService.create_order_from_cart_offline(
             cart=checkout["cart"],
             shipping_address=checkout["shipping_address"],
@@ -121,34 +127,11 @@ class TestInvoiceFieldsFlow:
         )
 
         snapshot = _buyer_snapshot(order)
-        assert snapshot["company_name"] == "Example IKE"
-        assert snapshot["vat_id"] == "123456783"
-        assert snapshot["tax_office"] == "Α' Αθηνών"
-        assert snapshot["billing_address_line_1"] == "Stadiou 5"
-        assert snapshot["billing_city"] == "Piraeus"
 
-    def test_legacy_row_snapshot_falls_back_to_shipping(self, checkout):
-        # Orders created before the billing columns existed have blanks
-        # — the snapshot must fall back to the shipping address.
-        address = {
-            **checkout["shipping_address"],
-            "billing_street": "",
-            "billing_street_number": "",
-            "billing_city": "",
-            "billing_zipcode": "",
-        }
-        order = OrderService.create_order_from_cart_offline(
-            cart=checkout["cart"],
-            shipping_address=address,
-            pay_way=checkout["pay_way"],
-            user=checkout["user"],
-        )
-        # Simulate the pre-migration row.
-        order.billing_street = ""
-        order.billing_street_number = ""
-        order.billing_city = ""
-        order.billing_zipcode = ""
-
-        snapshot = _buyer_snapshot(order)
-        assert snapshot["billing_address_line_1"] == "Ermou 1"
-        assert snapshot["billing_city"] == "Athens"
+        assert snapshot["name"]
+        assert snapshot["address_line_1"]
+        for key in ("company_name", "vat_id", "tax_office", "activity"):
+            assert key not in snapshot
+        # The company requisites stay on the order for staff.
+        assert order.billing_company_name == "Example IKE"
+        assert order.billing_vat_id == "123456783"

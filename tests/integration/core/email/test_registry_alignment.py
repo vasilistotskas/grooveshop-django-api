@@ -98,13 +98,17 @@ class TestEveryPreviewRenders:
     def test_order_templates_preview_with_an_order_in_context(self):
         """Path-only fixes left these rendering USER sample data.
 
-        invoice_issued and admin_new_order would have previewed with no
+        retail_document_issued and admin_new_order would have previewed with no
         order in context at all.
         """
         from core.email.preview_service import EmailTemplatePreviewService
 
         service = EmailTemplatePreviewService()
-        for name in ("invoice_issued", "admin_new_order", "payment_failed"):
+        for name in (
+            "retail_document_issued",
+            "admin_new_order",
+            "payment_failed",
+        ):
             preview = service.generate_preview(
                 template_name=name, order_id=None, language="el"
             )

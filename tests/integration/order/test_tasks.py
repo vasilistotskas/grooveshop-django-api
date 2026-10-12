@@ -26,6 +26,7 @@ from order.tasks import (
     send_shipping_notification_email,
 )
 from pay_way.factories import PayWayFactory
+from tests.utils.mydata import mydata_enabled
 
 
 def _sell_something(order):
@@ -36,6 +37,15 @@ def _sell_something(order):
     invoiced at all.
     """
     return OrderItemFactory(order=order)
+
+
+def _ship_a_receipt_order(order):
+    """Make it a receipt order that has shipped, which is what the platform
+    issues a retail receipt for, without running the shipping handlers."""
+    Order.objects.filter(pk=order.pk).update(
+        status=OrderStatus.SHIPPED, document_type="RECEIPT"
+    )
+    order.refresh_from_db()
 
 
 def _quiet_order(num_order_items=0, **fields):
@@ -643,21 +653,22 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         self.assertFalse(result)
         mock_logger.assert_called_once()
 
-    @patch("order.tasks.send_invoice_email.delay")
+    @patch("order.tasks.send_invoice_to_mydata.delay")
     @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
-    def test_generate_order_invoice_success(
-        self, mock_render_pdf, mock_send_email
-    ):
+    def test_generate_order_invoice_success(self, mock_render_pdf, mock_submit):
+        _ship_a_receipt_order(self.order)
         _sell_something(self.order)
 
-        result = generate_order_invoice(self.order.id)
+        with mydata_enabled():
+            result = generate_order_invoice(self.order.id)
 
         self.assertTrue(result)
         mock_render_pdf.assert_called_once()
         self.order.refresh_from_db()
         self.assertTrue(hasattr(self.order, "invoice"))
-        # The email task is chained once the PDF is ready.
-        mock_send_email.assert_called_once_with(self.order.id)
+        # The submission to AADE is chained once the PDF is ready; the
+        # customer's email follows the MARK, not the PDF.
+        mock_submit.assert_called_once_with(self.order.id)
 
     @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
     def test_generate_order_invoice_gives_up_on_an_order_with_no_goods(
@@ -667,9 +678,12 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         what staff leave behind by deleting every line: no VAT rate can
         follow nothing, so the task reports a failure after its retries
         instead of filing a guessed tax document."""
-        result = generate_order_invoice.apply(
-            args=[self.order.id], retries=generate_order_invoice.max_retries
-        ).get()
+        _ship_a_receipt_order(self.order)
+        with mydata_enabled():
+            result = generate_order_invoice.apply(
+                args=[self.order.id],
+                retries=generate_order_invoice.max_retries,
+            ).get()
 
         self.assertFalse(result)
         mock_render_pdf.assert_not_called()
@@ -1004,10 +1018,13 @@ class OrderTasksIntegrationTestCase(DjangoTestCase):
     def test_database_operations_integrity(self, mock_render_pdf):
         self.assertTrue(Order.objects.filter(id=self.order.id).exists())
 
+        _ship_a_receipt_order(self.order)
         original_status = self.order.status
         _sell_something(self.order)
 
-        result = generate_order_invoice(self.order.id)
+        with patch("order.tasks.send_invoice_to_mydata.delay"):
+            with mydata_enabled():
+                result = generate_order_invoice(self.order.id)
         self.assertTrue(result)
 
         # Invoice generation must not mutate the order's status.

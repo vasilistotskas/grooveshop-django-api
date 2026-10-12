@@ -1,16 +1,19 @@
 """Greek IAPR / AADE myDATA integration.
 
-Public surface used by ``order.tasks`` and the admin layer:
+Public surface used by ``order.tasks`` and the admin layer. A
+"document" is an :class:`order.models.Invoice` (the order's retail
+receipt, 11.1) or an :class:`order.models.RetailCredit` (a retail credit
+document, 11.4):
 
-- :func:`submit_invoice` — serialise an :class:`Invoice`, POST it to
+- :func:`submit_document` — serialise the document, POST it to
   ``SendInvoices``, persist the MARK / UID / QR on the row. When AADE
-  returns error 228 (duplicate uid), :func:`recover_mark_for_invoice`
+  returns error 228 (duplicate uid), :func:`recover_mark_for_document`
   is called inline to recover the existing MARK via
   ``RequestTransmittedDocs``.
-- :func:`cancel_invoice` — POST ``CancelInvoice``, persist the
-  cancellation MARK.
-- :func:`recover_mark_for_invoice` — Tier A.5 MARK recovery: query
-  ``RequestTransmittedDocs`` and flip the invoice to CONFIRMED when
+- :func:`cancel_document` — POST ``CancelInvoice``, persist the
+  cancellation MARK (for a document issued in error).
+- :func:`recover_mark_for_document` — MARK recovery: query
+  ``RequestTransmittedDocs`` and flip the document to CONFIRMED when
   exactly one matching uid is found with a valid MARK.
 - :class:`MyDataError` and subclasses — typed exceptions distinguishing
   retryable transport errors from terminal validation errors.
@@ -35,24 +38,22 @@ from order.mydata.exceptions import (
     MyDataAuthError,
     MyDataDuplicateError,
     MyDataError,
-    MyDataInactiveCounterpartError,
     MyDataTransportError,
     MyDataValidationError,
 )
 from order.mydata.service import (
-    cancel_invoice,
-    recover_mark_for_invoice,
-    submit_invoice,
+    cancel_document,
+    recover_mark_for_document,
+    submit_document,
 )
 
 __all__ = [
     "MyDataAuthError",
     "MyDataDuplicateError",
     "MyDataError",
-    "MyDataInactiveCounterpartError",
     "MyDataTransportError",
     "MyDataValidationError",
-    "cancel_invoice",
-    "recover_mark_for_invoice",
-    "submit_invoice",
+    "cancel_document",
+    "recover_mark_for_document",
+    "submit_document",
 ]

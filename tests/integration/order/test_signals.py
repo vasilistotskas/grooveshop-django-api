@@ -361,21 +361,17 @@ class OrderSignalsTestCase(TestCase):
         self.assertEqual(self.order.status, OrderStatus.DELIVERED.value)
 
     def test_handle_order_completed(self):
+        # An invoice order is issued by hand in timologio: completing it
+        # queues no document.
         self.order.document_type = "INVOICE"
         self.order.save()
 
-        # The invoice PDF needs WeasyPrint's native libraries; here it is
-        # enough that the handler queues it.
         with patch(
             "order.signals.handlers.generate_order_invoice"
         ) as generate_invoice:
             order_completed.send(sender=Order, order=self.order)
 
-        generate_invoice.apply_async.assert_called_once()
-        self.assertEqual(
-            generate_invoice.apply_async.call_args.kwargs["args"],
-            [self.order.id],
-        )
+        generate_invoice.apply_async.assert_not_called()
 
         self.assertTrue(
             OrderHistory.objects.filter(

@@ -22564,3 +22564,367 @@ msgstr "Ισχύει έως"
 #: .\product\models\price_spell.py:53
 msgid "Empty while this is the current price."
 msgstr "Κενό όσο αυτή είναι η τρέχουσα τιμή."
+
+
+#: .\core\templates\emails\order\order_payment_confirmed.html:37
+#: .\core\templates\emails\order\order_received.html:42
+msgid "Invoice request"
+msgstr "Αίτημα τιμολογίου"
+
+#: .\core\templates\emails\order\order_payment_confirmed.html:45
+#: .\core\templates\emails\order\order_received.html:50
+#: .\core\templates\emails\order\order_received.txt:26
+msgid ""
+"Check these details carefully — the store issues your invoice with exactly "
+"what is shown here."
+msgstr ""
+"Έλεγξε προσεκτικά αυτά τα στοιχεία — το κατάστημα εκδίδει το τιμολόγιό σου "
+"με ακριβώς ό,τι εμφανίζεται εδώ."
+
+#: .\core\templates\emails\order\order_payment_confirmed.txt:16
+#: .\core\templates\emails\order\order_received.txt:20
+msgid "INVOICE REQUEST"
+msgstr "ΑΙΤΗΜΑ ΤΙΜΟΛΟΓΙΟΥ"
+
+#: .\core\templates\emails\order\retail_document_issued.html:4
+#: .\core\templates\emails\order\retail_document_issued.html:8
+msgid "Your Credit Receipt"
+msgstr "Η Πιστωτική Απόδειξή σου"
+
+#: .\core\templates\emails\order\retail_document_issued.html:4
+#: .\core\templates\emails\order\retail_document_issued.html:8
+msgid "Your Receipt"
+msgstr "Η Απόδειξή σου"
+
+#: .\core\templates\emails\order\retail_document_issued.html:10
+#, python-format
+msgid ""
+"Credit receipt %(document_number)s for order #%(order_id)s is attached."
+msgstr ""
+"Επισυνάπτεται η πιστωτική απόδειξη %(document_number)s για την παραγγελία "
+"#%(order_id)s."
+
+#: .\core\templates\emails\order\retail_document_issued.html:10
+#, python-format
+msgid "Receipt %(document_number)s for order #%(order_id)s is attached."
+msgstr ""
+"Επισυνάπτεται η απόδειξη %(document_number)s για την παραγγελία "
+"#%(order_id)s."
+
+#: .\core\templates\emails\order\retail_document_issued.html:16
+msgid ""
+"Please find the credit receipt for the refund of your order attached to this"
+" email as a PDF."
+msgstr ""
+"Επισυνάπτουμε σε PDF την πιστωτική απόδειξη για την επιστροφή χρημάτων της "
+"παραγγελίας σου."
+
+#: .\core\templates\emails\order\retail_document_issued.html:16
+msgid ""
+"Please find the receipt for your order attached to this email as a PDF."
+msgstr "Επισυνάπτουμε σε PDF την απόδειξη της παραγγελίας σου."
+
+#: .\core\templates\emails\order\retail_document_issued.html:19
+#: .\core\templates\emails\order\retail_document_issued.txt:10
+msgid "Document details"
+msgstr "Στοιχεία παραστατικού"
+
+#: .\core\templates\emails\order\retail_document_issued.html:20
+#: .\core\templates\emails\order\retail_document_issued.txt:12
+msgid "Document number"
+msgstr "Αριθμός παραστατικού"
+
+#: .\core\templates\emails\order\retail_document_issued.html:26
+#: .\core\templates\emails\order\retail_document_issued.txt:17
+msgid ""
+"This credit receipt is your proof of the refund — please keep it for your "
+"records."
+msgstr ""
+"Αυτή η πιστωτική απόδειξη αποδεικνύει την επιστροφή χρημάτων — κράτησέ την "
+"για το αρχείο σου."
+
+#: .\core\templates\emails\order\retail_document_issued.html:26
+#: .\core\templates\emails\order\retail_document_issued.txt:17
+msgid ""
+"This receipt is your proof of purchase — please keep it for your records."
+msgstr ""
+"Αυτή η απόδειξη αποδεικνύει την αγορά σου — κράτησέ την για το αρχείο σου."
+
+#: .\core\templates\emails\order\retail_document_issued.txt:3
+msgid "YOUR CREDIT RECEIPT"
+msgstr "Η ΠΙΣΤΩΤΙΚΗ ΑΠΟΔΕΙΞΗ ΣΟΥ"
+
+#: .\core\templates\emails\order\retail_document_issued.txt:3
+msgid "YOUR RECEIPT"
+msgstr "Η ΑΠΟΔΕΙΞΗ ΣΟΥ"
+
+#: .\core\templates\emails\order\retail_document_issued.txt:8
+#, python-format
+msgid ""
+"Please find attached the credit receipt (%(document_number)s) for the refund"
+" of your order #%(order_id)s."
+msgstr ""
+"Επισυνάπτεται η πιστωτική απόδειξη (%(document_number)s) για την επιστροφή "
+"χρημάτων της παραγγελίας σου #%(order_id)s."
+
+#: .\core\templates\emails\order\retail_document_issued.txt:8
+#, python-format
+msgid ""
+"Please find attached the receipt (%(document_number)s) for your order "
+"#%(order_id)s."
+msgstr ""
+"Επισυνάπτεται η απόδειξη (%(document_number)s) για την παραγγελία σου "
+"#%(order_id)s."
+
+#: .\core\templates\invoices\invoice.html:178
+msgid "RETAIL CREDIT RECEIPT"
+msgstr "ΠΙΣΤΩΤΙΚΟ ΣΤΟΙΧΕΙΟ ΛΙΑΝΙΚΗΣ"
+
+#: .\core\templates\invoices\invoice.html:178
+msgid "RETAIL RECEIPT"
+msgstr "ΑΠΟΔΕΙΞΗ ΛΙΑΝΙΚΗΣ ΠΩΛΗΣΗΣ"
+
+#: .\core\templates\invoices\invoice.html:181
+#, python-format
+msgid "Credits receipt %(number)s"
+msgstr "Πιστώνει την απόδειξη %(number)s"
+
+#: .\order\admin.py:653
+msgid ""
+"Buyer identity snapshotted for the invoice. Populated only on INVOICE "
+"orders. The platform does not issue invoices: issue it in AADE's timologio "
+"app from the figures below, then record its number and MARK here (and those "
+"of a credit invoice, if one follows)."
+msgstr ""
+"Στοιχεία του αγοραστή για το τιμολόγιο. Συμπληρώνονται μόνο σε παραγγελίες "
+"ΤΙΜΟΛΟΓΙΟΥ. Η πλατφόρμα δεν εκδίδει τιμολόγια: εκδώστε το στην εφαρμογή "
+"timologio της ΑΑΔΕ με βάση τα παρακάτω στοιχεία και καταχωρίστε εδώ τον "
+"αριθμό και το MARK του (και του πιστωτικού τιμολογίου, αν ακολουθήσει)."
+
+#: .\order\admin.py:946
+msgid "Issued in timologio"
+msgstr "Εκδόθηκε στο timologio"
+
+#: .\order\admin.py:948
+msgid "To be issued in timologio"
+msgstr "Προς έκδοση στο timologio"
+
+#: .\order\admin.py:961
+msgid "To issue in timologio"
+msgstr "Για έκδοση στο timologio"
+
+#: .\order\admin.py:1007
+msgid "net"
+msgstr "καθαρή αξία"
+
+#: .\order\admin.py:1441
+msgid "Receipt not found."
+msgstr "Η απόδειξη δεν βρέθηκε."
+
+#: .\order\admin.py:1443
+msgid "Receipt PDF has not been generated yet."
+msgstr "Το PDF της απόδειξης δεν έχει δημιουργηθεί ακόμη."
+
+#: .\order\admin.py:1456
+msgid "Credit document not found."
+msgstr "Το πιστωτικό παραστατικό δεν βρέθηκε."
+
+#: .\order\admin.py:1458
+msgid "Credit document PDF has not been rendered yet."
+msgstr "Το PDF του πιστωτικού παραστατικού δεν έχει δημιουργηθεί ακόμη."
+
+#: .\order\admin.py:1470
+msgid "Issue receipt (myDATA)"
+msgstr "Έκδοση απόδειξης (myDATA)"
+
+#: .\order\admin.py:1497
+#, python-format
+msgid ""
+"A retail receipt is issued for a receipt order once it has shipped. Order "
+"#%(order_id)s is %(doc)s, status %(status)s."
+msgstr ""
+"Η απόδειξη λιανικής εκδίδεται για παραγγελία με απόδειξη μόλις αποσταλεί. Η "
+"παραγγελία #%(order_id)s είναι %(doc)s, κατάσταση %(status)s."
+
+#: .\order\admin.py:1522
+#, python-format
+msgid "Scheduled the receipt for order #%(order_id)s."
+msgstr "Προγραμματίστηκε η απόδειξη για την παραγγελία #%(order_id)s."
+
+#: .\order\admin.py:1528
+msgid "Issue credit documents (myDATA)"
+msgstr "Έκδοση πιστωτικών παραστατικών (myDATA)"
+
+#: .\order\admin.py:1563
+#, python-format
+msgid ""
+"Scheduled the credit documents for order #%(order_id)s. Nothing is issued "
+"before the receipt is registered with AADE."
+msgstr ""
+"Προγραμματίστηκαν τα πιστωτικά παραστατικά για την παραγγελία #%(order_id)s."
+" Τίποτα δεν εκδίδεται πριν η απόδειξη καταχωριστεί στην ΑΑΔΕ."
+
+#: .\order\admin.py:1572
+msgid "Regenerate receipt (same number)"
+msgstr "Αναδημιουργία απόδειξης (ίδιος αριθμός)"
+
+#: .\order\admin.py:1614
+msgid "Send receipt to myDATA"
+msgstr "Αποστολή απόδειξης στο myDATA"
+
+#: .\order\admin.py:1669
+msgid "Cancel receipt in myDATA (issued in error)"
+msgstr "Ακύρωση απόδειξης στο myDATA (εκδόθηκε από λάθος)"
+
+#: .\order\admin.py:2508
+msgid "Credit document"
+msgstr "Πιστωτικό παραστατικό"
+
+#: .\order\admin.py:2598
+msgid "Cancel in myDATA (issued in error)"
+msgstr "Ακύρωση στο myDATA (εκδόθηκε από λάθος)"
+
+#: .\order\admin.py:2607
+#, python-format
+msgid "Scheduled myDATA cancellation for %(count)d credit document(s)."
+msgstr ""
+"Προγραμματίστηκε ακύρωση στο myDATA για %(count)d πιστωτικά παραστατικά."
+
+#: .\order\models\order.py:338
+msgid "Invoice MARK (timologio)"
+msgstr "MARK τιμολογίου (timologio)"
+
+#: .\order\models\order.py:341
+msgid "MARK of the invoice issued in the timologio app."
+msgstr "MARK του τιμολογίου που εκδόθηκε στην εφαρμογή timologio."
+
+#: .\order\models\order.py:344
+msgid "Invoice number (timologio)"
+msgstr "Αριθμός τιμολογίου (timologio)"
+
+#: .\order\models\order.py:349
+msgid "Series and number of the invoice issued in timologio."
+msgstr "Σειρά και αριθμός του τιμολογίου που εκδόθηκε στο timologio."
+
+#: .\order\models\order.py:352
+msgid "Credit invoice MARK (timologio)"
+msgstr "MARK πιστωτικού τιμολογίου (timologio)"
+
+#: .\order\models\order.py:356
+msgid "MARK of a credit invoice issued in timologio for this order."
+msgstr ""
+"MARK πιστωτικού τιμολογίου που εκδόθηκε στο timologio για αυτή την "
+"παραγγελία."
+
+#: .\order\models\order.py:360
+msgid "Credit invoice number (timologio)"
+msgstr "Αριθμός πιστωτικού τιμολογίου (timologio)"
+
+#: .\order\models\order.py:365
+msgid "Series and number of that credit invoice."
+msgstr "Σειρά και αριθμός αυτού του πιστωτικού τιμολογίου."
+
+#: .\order\models\retail_credit.py:33
+msgid "Order closed without a sale"
+msgstr "Η παραγγελία έκλεισε χωρίς πώληση"
+
+#: .\order\models\retail_credit.py:62
+msgid "Credit Counter"
+msgstr "Μετρητής πιστωτικών"
+
+#: .\order\models\retail_credit.py:63
+msgid "Credit Counters"
+msgstr "Μετρητές πιστωτικών"
+
+#: .\order\models\retail_credit.py:97
+msgid "Credited receipt"
+msgstr "Πιστωμένη απόδειξη"
+
+#: .\order\models\retail_credit.py:99
+msgid "The retail receipt (11.1) this document credits. AADE does not link an 11.4 to its receipt, so the link is kept here only."
+msgstr "Η απόδειξη λιανικής (11.1) που πιστώνει αυτό το παραστατικό. Η ΑΑΔΕ δεν συνδέει ένα 11.4 με την απόδειξή του, οπότε η σύνδεση τηρείται μόνο εδώ."
+
+#: .\order\models\retail_credit.py:117
+msgid ""
+"The ledger refund this document credits. One document per refund; empty for "
+"the settlement of a closed order."
+msgstr ""
+"Η επιστροφή του καθολικού που πιστώνει αυτό το παραστατικό. Ένα παραστατικό "
+"ανά επιστροφή· κενό για τον συμψηφισμό κλειστής παραγγελίας."
+
+#: .\order\models\retail_credit.py:122
+msgid "Credit Number"
+msgstr "Αριθμός πιστωτικού"
+
+#: .\order\models\retail_credit.py:126
+#, python-brace-format
+msgid "Sequential identifier in the form ``CRD-{YEAR}-{NNNNNN}``."
+msgstr "Αύξων αριθμός της μορφής ``CRD-{YEAR}-{NNNNNN}``."
+
+#: .\order\models\retail_credit.py:150
+msgid ""
+"``{rate, subtotal, vat, gross}`` rows of what this document credits, frozen "
+"when it was issued."
+msgstr ""
+"Γραμμές ``{rate, subtotal, vat, gross}`` με όσα πιστώνει αυτό το "
+"παραστατικό, παγωμένες κατά την έκδοση."
+
+#: .\order\models\retail_credit.py:157
+msgid "Retail Credit Document"
+msgstr "Πιστωτικό στοιχείο λιανικής"
+
+#: .\order\models\retail_credit.py:158
+msgid "Retail Credit Documents"
+msgstr "Πιστωτικά στοιχεία λιανικής"
+
+#: .\order\tasks.py:1335
+#, python-brace-format
+msgid "Credit receipt {document_number} for your order #{order_id}"
+msgstr ""
+"Πιστωτική απόδειξη {document_number} για την παραγγελία σου #{order_id}"
+
+#: .\order\tasks.py:1338
+#, python-brace-format
+msgid "Receipt {document_number} for your order #{order_id}"
+msgstr "Απόδειξη {document_number} για την παραγγελία σου #{order_id}"
+
+#: .\order\models\invoice.py:127 .\settings.py:3913
+msgid "Receipt Counter"
+msgstr "Μετρητής αποδείξεων"
+
+#: .\order\models\invoice.py:128
+msgid "Receipt Counters"
+msgstr "Μετρητές αποδείξεων"
+
+#: .\order\models\invoice.py:171
+msgid ""
+"Lifecycle state of the document's AADE myDATA submission. NOT_SENT is the "
+"resting state before it is submitted."
+msgstr ""
+"Κατάσταση της υποβολής του παραστατικού στο myDATA της ΑΑΔΕ. Το NOT_SENT "
+"είναι η κατάσταση πριν από την υποβολή."
+
+#: .\order\models\invoice.py:181
+msgid ""
+"AADE invoiceType code: 11.1 (retail receipt) or 11.4 (retail credit "
+"document)."
+msgstr ""
+"Κωδικός invoiceType της ΑΑΔΕ: 11.1 (απόδειξη λιανικής) ή 11.4 (πιστωτικό "
+"στοιχείο λιανικής)."
+
+#: .\order\models\invoice.py:262
+msgid ""
+"Numeric AADE ``errorCode`` from the most recent failed submission (e.g. 101 "
+"XML syntax, 216/217 VAT category). Empty when last attempt succeeded."
+msgstr ""
+"Αριθμητικός ``errorCode`` της ΑΑΔΕ από την πιο πρόσφατη αποτυχημένη υποβολή "
+"(π.χ. 101 σύνταξη XML, 216/217 κατηγορία ΦΠΑ). Κενό όταν η τελευταία "
+"προσπάθεια πέτυχε."
+
+#: .\order\models\invoice.py:423 .\settings.py:3475 .\settings.py:3964
+msgid "Receipts"
+msgstr "Αποδείξεις"
+
+#: .\settings.py:3483 .\settings.py:3970
+msgid "Credit Documents"
+msgstr "Πιστωτικά παραστατικά"

@@ -329,6 +329,41 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
     billing_zipcode = models.CharField(
         _("Billing Zipcode"), max_length=20, blank=True, default=""
     )
+    # ── The invoice staff issue by hand in AADE's timologio app ──
+    # The platform does not issue invoices (AADE decision Α.1128/2025
+    # art. 1(2)); for a ``document_type=INVOICE`` order staff issue it in
+    # timologio from the billing fields above and record here what AADE
+    # registered, so the order shows the document that exists for it.
+    timologio_invoice_mark = models.BigIntegerField(
+        _("Invoice MARK (timologio)"),
+        null=True,
+        blank=True,
+        help_text=_("MARK of the invoice issued in the timologio app."),
+    )
+    timologio_invoice_number = models.CharField(
+        _("Invoice number (timologio)"),
+        max_length=64,
+        blank=True,
+        default="",
+        db_default="",
+        help_text=_("Series and number of the invoice issued in timologio."),
+    )
+    timologio_credit_mark = models.BigIntegerField(
+        _("Credit invoice MARK (timologio)"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "MARK of a credit invoice issued in timologio for this order."
+        ),
+    )
+    timologio_credit_number = models.CharField(
+        _("Credit invoice number (timologio)"),
+        max_length=64,
+        blank=True,
+        default="",
+        db_default="",
+        help_text=_("Series and number of that credit invoice."),
+    )
     tracking_number = models.CharField(
         _("Tracking Number"), max_length=255, blank=True, default=""
     )

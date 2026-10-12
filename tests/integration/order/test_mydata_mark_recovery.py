@@ -2,7 +2,7 @@
 
 When AADE returns error 228 (ERROR_DUPLICATE_UID) during
 ``send_invoice_to_mydata``, the service layer calls
-``recover_mark_for_invoice`` which queries ``RequestTransmittedDocs``
+``recover_mark_for_document`` which queries ``RequestTransmittedDocs``
 to find the MARK that AADE already assigned to our uid. These tests
 verify the four key scenarios:
 
@@ -13,7 +13,7 @@ verify the four key scenarios:
 
 HTTP layer is mocked at ``MyDataClient`` — no real AADE calls.
 
-Design note: ``submit_invoice`` writes the invoice's uid via
+Design note: ``submit_document`` writes the invoice's uid via
 ``_persist_submission_intent`` (a deterministic SHA-1) BEFORE calling
 ``send_invoices``. The ``request_transmitted_docs`` mock therefore
 receives a call referencing ``invoice.mydata_uid`` — we capture that
@@ -50,6 +50,7 @@ _READY_CONFIG = MyDataConfig(
     user_id="test-user",
     subscription_key="test-subscription-key",
     invoice_series_prefix="GRVP",
+    credit_series_prefix="GRVC",
     issuer_branch=0,
     request_timeout_seconds=30,
 )
@@ -177,10 +178,10 @@ class MarkRecoveryTestCase(TestCase):
         mock_send.return_value = _DUPLICATE_228_XML
 
         # The request_transmitted_docs mock is a side_effect function:
-        # by the time it is called, submit_invoice has already run
+        # by the time it is called, submit_document has already run
         # _persist_submission_intent and written invoice.mydata_uid.
         # We read the uid from the DB here and return matching XML so
-        # recover_mark_for_invoice can find the match.
+        # recover_mark_for_document can find the match.
         query_mock = MagicMock()
 
         def _query_side_effect(**kwargs):
@@ -209,7 +210,7 @@ class MarkRecoveryTestCase(TestCase):
         self.assertEqual(invoice.mydata_status, MyDataStatus.CONFIRMED)
         self.assertEqual(invoice.mydata_mark, _RECOVERED_MARK)
 
-        # Email is still delivered — customer gets their invoice PDF.
+        # The receipt is registered, so the customer gets it.
         mock_email.assert_called_once_with(order.id)
 
         # RequestTransmittedDocs was called exactly once (single page).
@@ -245,8 +246,8 @@ class MarkRecoveryTestCase(TestCase):
         self.assertIsNone(invoice.mydata_mark)
         self.assertEqual(invoice.mydata_error_code, "228")
 
-        # Email still delivered.
-        mock_email.assert_called_once_with(order.id)
+        # A receipt AADE has not registered is not emailed.
+        mock_email.assert_not_called()
 
     # ------------------------------------------------------------------
     # Scenario 3: 228 + multiple matches for the uid → REJECTED (safety)
@@ -296,7 +297,7 @@ class MarkRecoveryTestCase(TestCase):
         self.assertIsNone(invoice.mydata_mark)
         self.assertEqual(invoice.mydata_error_code, "228")
 
-        mock_email.assert_called_once_with(order.id)
+        mock_email.assert_not_called()
 
     # ------------------------------------------------------------------
     # Scenario 4: 228 + recovery query transport error → REJECTED
@@ -314,8 +315,7 @@ class MarkRecoveryTestCase(TestCase):
     ):
         """When the RequestTransmittedDocs call itself fails with a
         transport error, the task must NOT crash or retry — it must
-        fall back cleanly to the REJECTED state and still deliver the
-        email."""
+        fall back cleanly to the REJECTED state (and email nothing)."""
         _enable_mydata(self)
         order, invoice = _make_invoice()
         mock_send.return_value = _DUPLICATE_228_XML
@@ -330,8 +330,8 @@ class MarkRecoveryTestCase(TestCase):
         self.assertIsNone(invoice.mydata_mark)
         self.assertEqual(invoice.mydata_error_code, "228")
 
-        # Email still delivered despite the transport error in recovery.
-        mock_email.assert_called_once_with(order.id)
+        # Not registered, so not emailed.
+        mock_email.assert_not_called()
 
         # RequestTransmittedDocs was attempted exactly once (no recovery
         # retry — transport errors during recovery fall back immediately).

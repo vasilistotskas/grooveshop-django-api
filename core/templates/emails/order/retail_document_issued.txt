@@ -1,0 +1,23 @@
+{% load i18n %}
+========================================
+{% if is_credit %}{% trans "YOUR CREDIT RECEIPT" %}{% else %}{% trans "YOUR RECEIPT" %}{% endif %}
+========================================
+
+{% blocktrans with first_name=order.first_name last_name=order.last_name %}Dear {{ first_name }} {{ last_name }},{% endblocktrans %}
+
+{% if is_credit %}{% blocktrans with document_number=document_number order_id=order.id %}Please find attached the credit receipt ({{ document_number }}) for the refund of your order #{{ order_id }}.{% endblocktrans %}{% else %}{% blocktrans with document_number=document_number order_id=order.id %}Please find attached the receipt ({{ document_number }}) for your order #{{ order_id }}.{% endblocktrans %}{% endif %}
+
+{% trans "Document details" %}
+----------------------------------------
+{% trans "Document number" %}: {{ document_number }}
+{% if mydata_mark %}{% trans "MARK" %}: {{ mydata_mark }}
+{% endif %}{% trans "Issue date" %}: {{ issue_date|date:"SHORT_DATE_FORMAT" }}
+{% trans "Order" %} #{{ order.id }}
+
+{% if is_credit %}{% trans "This credit receipt is your proof of the refund — please keep it for your records." %}{% else %}{% trans "This receipt is your proof of purchase — please keep it for your records." %}{% endif %}
+
+{% trans "If you have any questions, please contact our customer service team." %}
+
+{{ SITE_NAME }}
+{{ INFO_EMAIL }}
+{{ SITE_URL }}

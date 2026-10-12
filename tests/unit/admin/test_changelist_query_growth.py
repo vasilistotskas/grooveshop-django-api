@@ -89,6 +89,23 @@ def _build_navigation_column():
     NavigationColumn.objects.create(menu=menu)
 
 
+def _build_retail_credit():
+    from order.factories.order import OrderFactory
+    from order.models import Invoice, RetailCredit
+    from order.models.retail_credit import CreditReason
+
+    order = OrderFactory(num_order_items=0)
+    invoice = Invoice.objects.create(
+        order=order, invoice_number=f"INV-{_uid()}"
+    )
+    return RetailCredit.objects.create(
+        order=order,
+        invoice=invoice,
+        reason=CreditReason.SETTLEMENT,
+        credit_number=f"CRD-{_uid()}",
+    )
+
+
 BUILDERS: dict[str, Callable[[], object]] = {
     # Factories that reuse a related row, so their batches do not grow.
     "product.ProductReview": lambda: __import__(
@@ -201,6 +218,7 @@ BUILDERS: dict[str, Callable[[], object]] = {
         ).OrderFactory(num_order_items=0),
         invoice_number=f"INV-{_uid()}",
     ),
+    "order.RetailCredit": _build_retail_credit,
     "order.VivaWebhookEvent": lambda: __import__(
         "order.models", fromlist=["VivaWebhookEvent"]
     ).VivaWebhookEvent.objects.create(
@@ -269,6 +287,7 @@ BUILDERS: dict[str, Callable[[], object]] = {
 
 EXEMPT: dict[str, str] = {
     "order.InvoiceCounter": "one row per numbering series",
+    "order.CreditCounter": "one row per numbering series",
     "recommendation.RecommendationSlot": "one row per surface, seeded",
     "page_config.NavigationMenu": "one row per menu slot, seeded",
     "django_celery_beat.SolarSchedule": "one row per solar event and place",

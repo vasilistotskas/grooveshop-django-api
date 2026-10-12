@@ -1052,9 +1052,9 @@ class TestSeededAccount:
                     item.product, profile.customer_group
                 )
                 assert item.price == priced.final
-        assert Invoice.objects.filter(order__user=buyer).count() == sum(
-            1 for r in demo_account.WHOLESALE_ORDERS if r.invoice
-        )
+        # A business's invoice is issued by hand in timologio: the platform
+        # seeds no document for the wholesale buyer.
+        assert not Invoice.objects.filter(order__user=buyer).exists()
 
     def test_a_second_run_writes_nothing(self, seeded):
         from loyalty.models.transaction import PointsTransaction

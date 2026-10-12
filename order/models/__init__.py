@@ -5,11 +5,13 @@ from .item import OrderItem
 from .order import Order
 from .payment_transaction import PaymentTransaction
 from .refund_notification import RefundNotification
+from .retail_credit import CreditCounter, RetailCredit
 from .stock_log import StockLog
 from .stock_reservation import StockReservation
 from .viva_webhook_event import VivaWebhookEvent
 
 __all__ = [
+    "CreditCounter",
     "Invoice",
     "InvoiceCounter",
     "Order",
@@ -19,6 +21,7 @@ __all__ = [
     "OrderItemHistory",
     "PaymentTransaction",
     "RefundNotification",
+    "RetailCredit",
     "StockLog",
     "StockReservation",
     "VivaWebhookEvent",

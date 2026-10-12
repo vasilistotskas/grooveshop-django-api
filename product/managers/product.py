@@ -9,12 +9,13 @@ from django.db.models import (
     DecimalField,
     F,
     FloatField,
+    IntegerField,
     Prefetch,
     Q,
     Value,
     When,
 )
-from django.db.models.functions import Coalesce
+from django.db.models.functions import Cast, Coalesce, Floor
 
 from core.managers import (
     TranslatableOptimizedManager,
@@ -169,6 +170,33 @@ class ProductQuerySet(
             )
         )
 
+    def with_announced_discount_percent(self) -> Self:
+        """Annotate ``announced_discount_percent``: SQL twin of the property.
+
+        Whole percent between ``prior_price`` and ``effective_price``,
+        floored, ``NULL`` unless the product announces a reduction. Reads
+        the stored columns only, so the catalogue can sort and filter on it.
+        """
+        return self.annotate(
+            announced_discount_percent=Case(
+                When(
+                    prior_price__gt=0,
+                    effective_price__isnull=False,
+                    effective_price__lt=F("prior_price"),
+                    then=Cast(
+                        Floor(
+                            (F("prior_price") - F("effective_price"))
+                            * Value(100, output_field=DecimalField())
+                            / F("prior_price")
+                        ),
+                        output_field=IntegerField(),
+                    ),
+                ),
+                default=None,
+                output_field=IntegerField(),
+            )
+        )
+
     def with_offer_kind(self) -> Self:
         """Annotate ``offer_kind_annotation``: MARKDOWN, PROMOTION or NULL.
 
@@ -197,6 +225,7 @@ class ProductQuerySet(
             .with_translations()
             .with_category()
             .with_counts()
+            .with_announced_discount_percent()
             .with_main_image()
             .with_product_attributes()
         )

@@ -98,8 +98,8 @@ class TestLowStock:
 
 
 class TestAlerts:
-    STOREFRONT = "Your store's legal details are incomplete"
-    TAX_DOCUMENTS = "Your receipts are missing company details"
+    STOREFRONT = "Your business's legal details are missing"
+    TAX_DOCUMENTS = "Details needed to issue receipts are missing"
 
     @staticmethod
     def _set(name: str, value) -> None:
@@ -143,10 +143,10 @@ class TestAlerts:
         notice = alerts[self.STOREFRONT]
         assert notice["variant"] == "warning"
         assert [str(item) for item in notice["items"]] == [
-            "Legal form (e.g. IKE, EPE)",
+            "Legal form (e.g. sole trader, IKE, AE)",
             "GEMI number",
             "VAT ID (ΑΦΜ)",
-            "Street name and number",
+            "Address (street and number)",
             "City",
             "Postal code",
             "Country",
@@ -236,7 +236,7 @@ class TestAlerts:
 
         assert "bg-orange-100" in html
         assert "bg-red-100" in html
-        assert "Add the missing details" in html
+        assert "Fill in details" in html
 
     def _mydata_alert_items(self, tenant, bind_tenant) -> list[str] | None:
         from extra_settings.models import Setting

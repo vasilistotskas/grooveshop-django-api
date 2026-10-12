@@ -19,7 +19,7 @@ from django.apps import apps
 from django.utils import formats, timezone
 from django.utils.text import Truncator
 from django.utils.translation import gettext_lazy as _
-from django.utils.translation import ngettext
+from django.utils.translation import ngettext, pgettext_lazy
 from unfold.components import register_component
 
 from admin.dashboard.base import (
@@ -671,16 +671,20 @@ def _alert(
 # Owner-facing name of each field of the merchant's legal identity
 # (``tenant.legal_identity``), which decides what is required and when.
 _IDENTITY_FIELD_LABELS = {
-    "name": _("Company name"),
-    "legal_form": _("Legal form (e.g. IKE, EPE)"),
-    "registration_number": _("GEMI number"),
-    "vat_id": _("VAT ID (ΑΦΜ)"),
-    "tax_office": _("Tax office (ΔΟΥ)"),
-    "address_line_1": _("Street name and number"),
-    "city": _("City"),
-    "postal_code": _("Postal code"),
-    "country": _("Country"),
-    "email": _("Contact email"),
+    "name": pgettext_lazy("legal details alert", "Company name"),
+    "legal_form": pgettext_lazy(
+        "legal details alert", "Legal form (e.g. sole trader, IKE, AE)"
+    ),
+    "registration_number": pgettext_lazy("legal details alert", "GEMI number"),
+    "vat_id": pgettext_lazy("legal details alert", "VAT ID (ΑΦΜ)"),
+    "tax_office": pgettext_lazy("legal details alert", "Tax office (ΔΟΥ)"),
+    "address_line_1": pgettext_lazy(
+        "legal details alert", "Address (street and number)"
+    ),
+    "city": pgettext_lazy("legal details alert", "City"),
+    "postal_code": pgettext_lazy("legal details alert", "Postal code"),
+    "country": pgettext_lazy("legal details alert", "Country"),
+    "email": pgettext_lazy("legal details alert", "Contact email"),
 }
 
 
@@ -753,14 +757,13 @@ class StoreAlerts(DashboardWidget):
                 _alert(
                     "warning",
                     "policy",
-                    _("Your store's legal details are incomplete"),
+                    _("Your business's legal details are missing"),
                     _(
-                        "Greek and EU law require your website to show who "
-                        "is selling. Please add the details that are still "
-                        "missing:"
+                        "The law requires your online store to show your "
+                        "business details. Please fill in what is missing:"
                     ),
                     items=[_IDENTITY_FIELD_LABELS[f] for f in missing],
-                    link=self._settings_link(_("Add the missing details")),
+                    link=self._settings_link(_("Fill in details")),
                 )
             )
         # Only a store that issues tax documents needs these, and for it
@@ -772,14 +775,13 @@ class StoreAlerts(DashboardWidget):
                 _alert(
                     "danger",
                     "receipt_long",
-                    _("Your receipts are missing company details"),
+                    _("Details needed to issue receipts are missing"),
                     _(
-                        "myDATA is enabled, so your store issues tax "
-                        "documents. They cannot be submitted to AADE "
-                        "without:"
+                        "myDATA is on, but receipts cannot be sent to AADE "
+                        "without the following:"
                     ),
                     items=[_IDENTITY_FIELD_LABELS[f] for f in missing],
-                    link=self._settings_link(_("Fix in settings")),
+                    link=self._settings_link(_("Fill in details")),
                 )
             )
         return alerts

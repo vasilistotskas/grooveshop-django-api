@@ -20,8 +20,6 @@ the shared definition, and the fact that blanks stay visible.
 
 from __future__ import annotations
 
-from unittest.mock import patch
-
 import pytest
 from django.urls import reverse
 from extra_settings.models import Setting
@@ -37,51 +35,19 @@ from tenant.legal_identity import (
 
 
 @pytest.fixture
-def seller_settings(request):
-    """Choose what ``Setting.get`` returns, without writing the table.
+def seller_settings(db):
+    """Write a seller setting row the way the admin does.
 
-    These tests used to write through ``Setting.objects.update_or_create``
-    and read back through ``Setting.get``. That round-trip flakes under
-    a parallel ``-n auto`` run and it flaked again on 2026-09-09:
-    four tests in this file failed on one worker with
-    ``INVOICE_SELLER_NAME was written as 'Acme MON IKE' but reads back
-    as None``, while the same file passed 13/13 in isolation and the
-    whole ``tests/integration/tenant`` directory passed 147/147.
-
-    The cause was a since-removed conftest fixture that rewrote every
-    ``EXTRA_SETTINGS_DEFAULTS`` row before each DB test. Stubbing the
-    read site, as ``tests/unit/order/test_b2b_invoicing_gate.py`` and
-    ``tests/unit/shipping_acs/test_smartpoint_gating.py`` also do,
-    keeps these tests independent of the ``Setting`` table either way.
-
-    Everything under test reads through exactly one accessor
-    (``tenant/legal_identity.py`` calls ``Setting.get`` for each seller
-    key and for the liquidation flag), so stubbing that accessor
-    exercises the real code path — the mapping, the ``.strip()``, the
-    boolean typing, the endpoint serialisation — while removing the one
-    step that was never about this feature.
-
-    Falls through to ``default`` for any key the test did not set,
-    which is what a genuine cache miss on an unconfigured setting
-    returns. Deliberately NOT delegating to ``Setting.get.__func__``:
-    under xdist worker reuse a prior test's patch may not be fully
-    unwound, and the fall-through would re-enter it.
+    ``tenant.legal_identity`` reads every key in one query (or from the
+    extra_settings cache, which is disabled under test), so a test sets
+    exactly the rows it cares about and every other key reads as unset.
     """
-    values: dict[str, object] = {}
-
-    def stub(cls, key, default=None):
-        return values.get(key, default)
-
-    patcher = patch.object(Setting, "get", classmethod(stub))
-    patcher.start()
-    request.addfinalizer(patcher.stop)
 
     def _set(key: str, value, type_="string"):
-        # ``type_`` is accepted so call sites read the same as before.
-        # It carries no behaviour now: the stub returns the object it
-        # was given, so a bool stays a bool — which is the property
-        # ``test_reads_as_a_real_boolean_not_a_string`` is pinning.
-        values[key] = value
+        Setting.objects.update_or_create(
+            name=key,
+            defaults={"value_type": type_, f"value_{type_}": value},
+        )
 
     return _set
 

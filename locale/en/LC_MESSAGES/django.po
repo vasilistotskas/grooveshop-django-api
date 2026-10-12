@@ -546,24 +546,8 @@ msgstr ""
 msgid "Company name"
 msgstr ""
 
-#: .\admin\dashboard\store\widgets.py:673
-msgid "VAT ID (ΑΦΜ)"
-msgstr ""
-
 #: .\admin\dashboard\store\widgets.py:674 .\b2b\models\profile.py:54
 msgid "Tax office (ΔΟΥ)"
-msgstr ""
-
-#: .\admin\dashboard\store\widgets.py
-msgid "Legal form (e.g. IKE, EPE)"
-msgstr ""
-
-#: .\admin\dashboard\store\widgets.py
-msgid "GEMI number"
-msgstr ""
-
-#: .\admin\dashboard\store\widgets.py
-msgid "Contact email"
 msgstr ""
 
 #: .\admin\dashboard\store\widgets.py:704
@@ -579,29 +563,79 @@ msgid ""
 "text to add."
 msgstr ""
 
-#: .\admin\dashboard\store\widgets.py
-msgid "Your store's legal details are incomplete"
-msgstr ""
-
-#: .\admin\dashboard\store\widgets.py
-msgid "Greek and EU law require your website to show who is selling. Please add the details that are still missing:"
-msgstr ""
-
-#: .\admin\dashboard\store\widgets.py
-msgid "Add the missing details"
-msgstr ""
-
-#: .\admin\dashboard\store\widgets.py
-msgid "Your receipts are missing company details"
-msgstr ""
-
-#: .\admin\dashboard\store\widgets.py
-msgid "myDATA is enabled, so your store issues tax documents. They cannot be submitted to AADE without:"
-msgstr ""
-
 #: .\admin\dashboard\store\widgets.py:743
 #: .\admin\dashboard\store\widgets.py:773
 msgid "Fix in settings"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py
+msgid "Your business's legal details are missing"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py
+msgid "The law requires your online store to show your business details. Please fill in what is missing:"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py
+msgid "Fill in details"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py
+msgid "Details needed to issue receipts are missing"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py
+msgid "myDATA is on, but receipts cannot be sent to AADE without the following:"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py
+msgctxt "legal details alert"
+msgid "Company name"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py
+msgctxt "legal details alert"
+msgid "Legal form (e.g. sole trader, IKE, AE)"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py
+msgctxt "legal details alert"
+msgid "GEMI number"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py
+msgctxt "legal details alert"
+msgid "VAT ID (ΑΦΜ)"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py
+msgctxt "legal details alert"
+msgid "Tax office (ΔΟΥ)"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py
+msgctxt "legal details alert"
+msgid "Address (street and number)"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py
+msgctxt "legal details alert"
+msgid "City"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py
+msgctxt "legal details alert"
+msgid "Postal code"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py
+msgctxt "legal details alert"
+msgid "Country"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py
+msgctxt "legal details alert"
+msgid "Contact email"
 msgstr ""
 
 #: .\admin\dashboard\store\widgets.py:766

@@ -553,25 +553,9 @@ msgstr "Σε απόθεμα"
 msgid "Company name"
 msgstr "Επωνυμία εταιρείας"
 
-#: .\admin\dashboard\store\widgets.py:673
-msgid "VAT ID (ΑΦΜ)"
-msgstr "ΑΦΜ"
-
 #: .\admin\dashboard\store\widgets.py:674 .\b2b\models\profile.py:54
 msgid "Tax office (ΔΟΥ)"
 msgstr "ΔΟΥ"
-
-#: .\admin\dashboard\store\widgets.py
-msgid "Legal form (e.g. IKE, EPE)"
-msgstr "Νομική μορφή (π.χ. ΙΚΕ, ΕΠΕ)"
-
-#: .\admin\dashboard\store\widgets.py
-msgid "GEMI number"
-msgstr "Αριθμός ΓΕΜΗ"
-
-#: .\admin\dashboard\store\widgets.py
-msgid "Contact email"
-msgstr "Email επικοινωνίας"
 
 #: .\admin\dashboard\store\widgets.py:704
 msgid "Your legal pages need an update"
@@ -587,30 +571,80 @@ msgstr ""
 " δεν άλλαξαν αυτόματα, επειδή το κείμενό τους είναι δικό σας. Ανοίξτε την "
 "καθεμία για να δείτε το κείμενο που πρέπει να προσθέσετε."
 
-#: .\admin\dashboard\store\widgets.py
-msgid "Your store's legal details are incomplete"
-msgstr "Τα νομικά στοιχεία του καταστήματός σας είναι ελλιπή"
-
-#: .\admin\dashboard\store\widgets.py
-msgid "Greek and EU law require your website to show who is selling. Please add the details that are still missing:"
-msgstr "Η ελληνική και η ευρωπαϊκή νομοθεσία απαιτούν να εμφανίζεται στον ιστότοπό σας ποιος πουλάει. Προσθέστε τα στοιχεία που λείπουν ακόμη:"
-
-#: .\admin\dashboard\store\widgets.py
-msgid "Add the missing details"
-msgstr "Προσθήκη των στοιχείων που λείπουν"
-
-#: .\admin\dashboard\store\widgets.py
-msgid "Your receipts are missing company details"
-msgstr "Στις αποδείξεις σας λείπουν στοιχεία της εταιρείας"
-
-#: .\admin\dashboard\store\widgets.py
-msgid "myDATA is enabled, so your store issues tax documents. They cannot be submitted to AADE without:"
-msgstr "Το myDATA είναι ενεργό, άρα το κατάστημά σας εκδίδει φορολογικά παραστατικά. Δεν μπορούν να υποβληθούν στην ΑΑΔΕ χωρίς:"
-
 #: .\admin\dashboard\store\widgets.py:743
 #: .\admin\dashboard\store\widgets.py:773
 msgid "Fix in settings"
 msgstr "Διόρθωση στις ρυθμίσεις"
+
+#: .\admin\dashboard\store\widgets.py
+msgid "Your business's legal details are missing"
+msgstr "Λείπουν νομικά στοιχεία της επιχείρησής σας"
+
+#: .\admin\dashboard\store\widgets.py
+msgid "The law requires your online store to show your business details. Please fill in what is missing:"
+msgstr "Ο νόμος απαιτεί να εμφανίζονται στο ηλεκτρονικό σας κατάστημα τα στοιχεία της επιχείρησης. Συμπληρώστε όσα λείπουν:"
+
+#: .\admin\dashboard\store\widgets.py
+msgid "Fill in details"
+msgstr "Συμπλήρωση στοιχείων"
+
+#: .\admin\dashboard\store\widgets.py
+msgid "Details needed to issue receipts are missing"
+msgstr "Λείπουν στοιχεία για την έκδοση αποδείξεων"
+
+#: .\admin\dashboard\store\widgets.py
+msgid "myDATA is on, but receipts cannot be sent to AADE without the following:"
+msgstr "Το myDATA είναι ενεργό, αλλά οι αποδείξεις δεν μπορούν να σταλούν στην ΑΑΔΕ χωρίς τα παρακάτω:"
+
+#: .\admin\dashboard\store\widgets.py
+msgctxt "legal details alert"
+msgid "Company name"
+msgstr "Επωνυμία"
+
+#: .\admin\dashboard\store\widgets.py
+msgctxt "legal details alert"
+msgid "Legal form (e.g. sole trader, IKE, AE)"
+msgstr "Νομική μορφή (π.χ. ατομική, ΙΚΕ, ΑΕ)"
+
+#: .\admin\dashboard\store\widgets.py
+msgctxt "legal details alert"
+msgid "GEMI number"
+msgstr "Αριθμός ΓΕΜΗ"
+
+#: .\admin\dashboard\store\widgets.py
+msgctxt "legal details alert"
+msgid "VAT ID (ΑΦΜ)"
+msgstr "ΑΦΜ"
+
+#: .\admin\dashboard\store\widgets.py
+msgctxt "legal details alert"
+msgid "Tax office (ΔΟΥ)"
+msgstr "ΔΟΥ"
+
+#: .\admin\dashboard\store\widgets.py
+msgctxt "legal details alert"
+msgid "Address (street and number)"
+msgstr "Διεύθυνση (οδός και αριθμός)"
+
+#: .\admin\dashboard\store\widgets.py
+msgctxt "legal details alert"
+msgid "City"
+msgstr "Πόλη"
+
+#: .\admin\dashboard\store\widgets.py
+msgctxt "legal details alert"
+msgid "Postal code"
+msgstr "Ταχυδρομικός κώδικας"
+
+#: .\admin\dashboard\store\widgets.py
+msgctxt "legal details alert"
+msgid "Country"
+msgstr "Χώρα"
+
+#: .\admin\dashboard\store\widgets.py
+msgctxt "legal details alert"
+msgid "Contact email"
+msgstr "Email επικοινωνίας"
 
 #: .\admin\dashboard\store\widgets.py:766
 msgid "myDATA is enabled but its credentials are missing"

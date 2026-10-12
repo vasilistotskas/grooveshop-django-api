@@ -2263,11 +2263,13 @@ def seed_newsletter() -> dict[str, int]:
     return {"created": 1}
 
 
-#: Where the storefront image serves the GrooveShop mark. The demo store
-#: IS the platform's showcase ("GrooveShop Demo"), so the platform mark is
-#: its own brand, not another store's — and it ships inside the storefront
-#: image, like every tenant's brand files, so no upload is involved.
-DEMO_FAVICON_PATH = "/platform-favicon/favicon.ico"
+#: Where the storefront image serves the demo store's own mark (an ink
+#: tile with a volt-lime G, the Groove Volt palette). It ships inside the
+#: storefront image under ``img/tenants/demo/``, like every tenant's brand
+#: files, so no upload is involved. Never ``/platform-favicon``: that set
+#: is the platform storefront's icon, i.e. webside's, and pointing the demo
+#: at it put another store's brand in its tabs and PWA icon.
+DEMO_FAVICON_PATH = "/img/tenants/demo/favicon-512x512.png"
 
 #: The store line the footer prints under the logo. `store_description`
 #: holds the default locale's wording (Greek); the other locales live in

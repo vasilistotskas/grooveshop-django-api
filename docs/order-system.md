@@ -235,8 +235,13 @@ catalogue can no longer change.
   `devtools/demo_orders.py` passes it itself. The column has
   `db_default=0` only so the release still serving during a rollout can
   keep inserting; a product with no `Vat` row is sold at 0. The item
-  admin shows the rate read-only on add and editable afterwards, so
-  staff can correct a wrong snapshot.
+  admin hides the rate on the add page (`save()` snapshots it) and keeps
+  it editable afterwards, so staff can correct a wrong snapshot, until
+  the order's invoice carries a myDATA MARK; from then on it is
+  read-only, because the registered document can no longer change. A
+  line staff add through the API is priced like a checkout line: the
+  product's VAT-inclusive `final_price`, or the price of the customer
+  group that priced a wholesale order (`metadata["b2b_pricing"]`).
 - **Nothing reads `product.vat` for an order again.** `order/invoicing.py`
   and `order/mydata/builder.py` get their lines from
   `order.taxation.order_vat_lines`, which reads `item.vat_rate`. Editing

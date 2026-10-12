@@ -67,8 +67,12 @@ class TestAnUnpaidOnlineOrder:
     def test_so_does_one_whose_payment_is_not_settled(self, payment_status):
         assert _breakdown(_order(payment_status))["remaining_amount"] == DUE
 
-    def test_the_breakdown_does_not_report_it_as_paid(self):
-        assert "paid_amount" not in _breakdown(_order())
+    def test_the_deprecated_paid_amount_is_the_amount_due_not_money_paid(self):
+        """Kept for one release for clients that still require it; it
+        carries what is OWED, so an unpaid order does not read as paid."""
+        breakdown = _breakdown(_order())
+
+        assert breakdown["paid_amount"] == breakdown["amount_due"] == DUE
 
 
 class TestAPaidOnlineOrder:

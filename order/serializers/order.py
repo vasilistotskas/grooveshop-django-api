@@ -2,7 +2,7 @@ from typing import ClassVar
 
 from django.utils.translation import gettext_lazy as _
 from djmoney.contrib.django_rest_framework import MoneyField
-from drf_spectacular.utils import extend_schema_field
+from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
 from phonenumber_field.serializerfields import PhoneNumberField
 from rest_framework import serializers
 from rest_framework.relations import PrimaryKeyRelatedField
@@ -108,6 +108,7 @@ class OrderDeliveryMethodSerializer(serializers.Serializer):
     kind = serializers.ChoiceField(choices=ShippingKind.choices)
 
 
+@extend_schema_serializer(deprecate_fields=["paid_amount"])
 class OrderSerializer(serializers.ModelSerializer[Order]):
     items = OrderItemDetailSerializer(many=True)
     country = PrimaryKeyRelatedField(
@@ -120,6 +121,17 @@ class OrderSerializer(serializers.ModelSerializer[Order]):
         queryset=PayWay.objects.all(), allow_null=True
     )
     amount_due = MoneyField(max_digits=11, decimal_places=2, read_only=True)
+    # DEPRECATED alias of ``amount_due`` (it held the amount owed, never
+    # the amount paid). Kept for one release so the storefront and the
+    # agent gateway, whose generated schemas require ``paidAmount``, keep
+    # parsing order responses while they roll out; a removed field is the
+    # dangerous direction. The contract release removes it with the
+    # ``paid_amount`` columns (steps in the ``0070_order_amount_due``
+    # docstring): this field, its entry in ``Meta.fields`` and the
+    # ``deprecate_fields`` argument above.
+    paid_amount = MoneyField(
+        source="amount_due", max_digits=11, decimal_places=2, read_only=True
+    )
     shipping_price = MoneyField(max_digits=11, decimal_places=2, read_only=True)
     payment_method_fee = MoneyField(
         max_digits=11, decimal_places=2, read_only=True
@@ -284,6 +296,8 @@ class OrderSerializer(serializers.ModelSerializer[Order]):
             "phone",
             "customer_notes",
             "amount_due",
+            # Deprecated alias of ``amount_due``: see the field.
+            "paid_amount",
             "items",
             "shipping_price",
             "payment_method_fee",
@@ -816,6 +830,9 @@ class OrderDetailSerializer(OrderSerializer):
                 "grand_total": {"type": "number"},
                 "currency": {"type": "string"},
                 "amount_due": {"type": "number"},
+                # Deprecated alias of ``amount_due``: removed in the
+                # contract release, with ``OrderSerializer.paid_amount``.
+                "paid_amount": {"type": "number", "deprecated": True},
                 "remaining_amount": {"type": "number"},
             },
         }
@@ -858,6 +875,9 @@ class OrderDetailSerializer(OrderSerializer):
             if obj.total_price_items
             else "EUR",
             "amount_due": obj.amount_due.amount,
+            # Deprecated alias of ``amount_due``: removed in the contract
+            # release, with ``OrderSerializer.paid_amount``.
+            "paid_amount": obj.amount_due.amount,
             "remaining_amount": obj.remaining_amount.amount,
         }
 

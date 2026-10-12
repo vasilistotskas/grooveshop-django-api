@@ -24,23 +24,62 @@ break it for the length of the rollout. This is the expand step:
   are nullable, so the new code's INSERTs, which no longer name them, still
   work. The columns stay in the database.
 
-Release N+1, once this is what production runs, drops them in a migration
-that declares ``contract_of = [("order", "0070_order_amount_due")]``. The
-previous release wrote ``paid_amount`` (and left ``amount_due`` at its
-default) for every order it created while it still served, so that
-migration first re-copies those, then drops::
+The API expands the same way. This release still emits ``paidAmount``
+(top level, and in ``pricingBreakdown``) beside ``amountDue``, both from
+``amount_due`` and both marked ``deprecated`` in the schema: the
+storefront's and the agent gateway's generated schemas require
+``paidAmount``, so removing it in the release that adds ``amountDue``
+would fail every order response they parse between the two rollouts. The
+``paidAmount*`` filters and ordering are gone outright (nothing outside
+Django uses them).
 
-    UPDATE order_order
-    SET amount_due = paid_amount,
-        amount_due_currency = COALESCE(paid_amount_currency, 'EUR')
-    WHERE amount_due = 0 AND paid_amount > 0;
-    ALTER TABLE order_order
-        DROP COLUMN IF EXISTS paid_amount,
-        DROP COLUMN IF EXISTS paid_amount_currency;
+Until the re-copy below runs, an order the previous release created has
+``amount_due`` 0 (its INSERTs do not name the column): ``mark_as_paid`` and
+the Viva webhook set it from the order total when the payment lands, as
+they always did for a zero. Run the re-copy statement on every schema right
+after the rollout if you do not want to wait for release N+1.
 
-Until then an order the previous release created has ``amount_due`` 0:
-``mark_as_paid`` and the Viva webhook set it from the order total when the
-payment lands, as they always did for a zero.
+Release N+1 (contract) -- the exact steps
+=========================================
+
+1. **Ship it only after the storefront and the agent gateway read
+   ``amountDue``** (regenerated clients, every storefront variant, the
+   gateway's ``PricingBreakdown`` DTO) and those releases are what
+   production runs. It removes what they still require.
+2. **Drop the two deprecated API fields**: ``OrderSerializer.paid_amount``
+   (the field, its entry in ``Meta.fields``, the ``deprecate_fields``
+   argument of ``extend_schema_serializer``) and the ``"paid_amount"`` key
+   of ``OrderDetailSerializer.get_pricing_breakdown`` (and of its
+   ``extend_schema_field`` properties). Regenerate ``schema.yml``.
+3. **A migration with ``contract_of``**, the only way ``migration_preflight``
+   accepts a ``DROP`` (``RemoveField`` cannot: the fields left the state
+   here). It re-copies what the previous release wrote while it still
+   served, then drops both columns::
+
+       class Migration(migrations.Migration):
+           dependencies = [("order", "<latest>")]
+           contract_of = [("order", "0070_order_amount_due")]
+           operations = [
+               migrations.RunSQL(
+                   "UPDATE order_order "
+                   "SET amount_due = paid_amount, "
+                   "amount_due_currency = COALESCE(paid_amount_currency, 'EUR') "
+                   "WHERE amount_due = 0 AND paid_amount > 0; "
+                   "ALTER TABLE order_order "
+                   "DROP COLUMN IF EXISTS paid_amount, "
+                   "DROP COLUMN IF EXISTS paid_amount_currency",
+                   reverse_sql=(
+                       "ALTER TABLE order_order "
+                       "ADD COLUMN IF NOT EXISTS paid_amount numeric(11, 2) NULL, "
+                       "ADD COLUMN IF NOT EXISTS paid_amount_currency varchar(3) NULL"
+                   ),
+               ),
+           ]
+
+   A deploy that skips this release (0070 still pending next to its
+   contract) is refused by the preflight.
+4. Update ``docs/order-system.md`` (§7.3 and the invariants row) to drop
+   the "deprecated alias" wording.
 """
 
 from decimal import Decimal

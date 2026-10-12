@@ -205,6 +205,14 @@ new code's INSERTs still work). The old columns are dropped in release
 N+1 with `contract_of`, after re-copying whatever the previous release
 wrote while it still served.
 
+A renamed field is also an API contract change. Clients generated from
+the previous schema (the Nuxt storefront's Zod schemas, the agent
+gateway's DTOs) require the old name, so release N keeps emitting it as a
+deprecated alias of the new one (`@extend_schema_serializer(
+deprecate_fields=[...])`, and `"deprecated": True` in a hand-written
+`extend_schema_field` dict) and release N+1, shipped only after those
+clients read the new name, removes it.
+
 ### Rollback
 
 After a contract migration runs, the image can roll back to N, not to

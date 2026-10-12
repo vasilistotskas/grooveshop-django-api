@@ -3,6 +3,136 @@
 
 
 
+## v3.104.8 (2026-10-12)
+
+### Bug fixes
+
+* fix(payments): apply Viva refund webhooks (1797) and book partial refunds as partial (#152) ([`74f974e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/74f974e8fbf5c4bc0aed9e5d60e4dc36ced2940e))
+
+* fix(payments): apply Viva refund webhooks and book partial refunds as partial
+
+A refund made in the Viva dashboard never reached the order, and a
+partial one would have been booked as full.
+
+- The 1797 handler waited for the event's transaction to verify as
+  REFUNDED, but that transaction is the refund itself: statusId F, a
+  refund or void transactionTypeId and a negative amount (R belongs to
+  the original payment). Every real event was skipped. The new
+  _verify_viva_refund reads all of that from Retrieve Transaction, needs
+  one of the order's own order codes on it, and returns the refunded
+  amount; the event's ParentId must be the order's payment. The gift-card
+  purchase path goes through the same verifier and, for the same reason,
+  voids a card only for a refund of the whole purchase.
+- REFUNDED vs PARTIALLY_REFUNDED follows the cumulative refunded amount
+  against what Viva captured (PaymentStatus.after_refund, captured_amount
+  from Retrieve Transaction). refund_order uses the same rule, because a
+  provider answers REFUNDED for a partial refund too. A refund the in-app
+  path already booked is recognised by its refund id and not applied twice.
+- order_refunded always carries amount (Money), and receivers that use it
+  require it. The gift-card redemption and the loyalty points are released
+  only on REFUNDED, once, with the last refund: crediting a slice per
+  partial refund hands back more than the refund was worth and the
+  one-credit-per-card ledger cannot top it up. The now-unused partial
+  credit (amount argument of credit_refund and its task, _split_refund) is
+  removed, as is PayWayService.refund_payment, a dead sender that booked
+  REFUNDED for any amount.
+- The dispatcher records the handler's real outcome in
+  VivaWebhookEvent.outcome for 1797 and 1798, so a refused event reads
+  skipped instead of processed.
+
+Tests run the dispatcher against Viva's documented 1797 payload and fake
+only the HTTP boundary (tests/utils/viva.py).
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1 ([`74f974e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/74f974e8fbf5c4bc0aed9e5d60e4dc36ced2940e))
+
+* fix(payments): read refund amounts from the provider, count gift-card refunds cumulatively
+
+Review of #152.
+
+- A Stripe amount is an integer in the currency's own smallest unit. The
+  charge.refunded webhook divided by a hardcoded 100; money_from_minor_units
+  takes the exponent from moneyed (EUR 100, JPY 1, BHD 1000). The Stripe
+  refund request, the refund amount the provider reports and the captured
+  amount read through it use the same exponent.
+- refund_order took order.paid_amount, the amount OWED when the order was
+  created, for both what a full refund paid back and what was captured. A
+  full refund now records and signals the amount the provider reports it
+  paid back (Stripe's response no longer says "full refund"), and a part
+  refund is compared with PaymentProvider.captured_amount, read before the
+  refund so that an unreadable figure refuses it instead of leaving money
+  returned and the order unbooked. captured_amount moved from the Viva
+  provider to the base class, where it was already generic.
+- A gift-card purchase refunded in slices (5 + 35 of 40) left the card
+  active, because each refund was compared with the whole purchase on its
+  own. GiftCardPurchase.refunded_amount (migration 0006, db_default 0)
+  accumulates the verified refunds, each counted once by its
+  VivaWebhookEvent row, and the card is voided when they reach the
+  purchase amount.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`74f974e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/74f974e8fbf5c4bc0aed9e5d60e4dc36ced2940e))
+
+* fix(search): attribute filters AND across attributes, OR within one (#151) ([`23c28d5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/23c28d5f9042a7ef02543bb3bb0c9b44d8e47cfc))
+
+* fix(search): attribute filters AND across attributes, OR within one
+
+The storefront sends the selected attribute values as one flat list,
+and both the product search (a single `attribute_values IN [...]`
+clause) and the product list (`attribute_value__in`) read it as an OR
+over everything: black and 2 m returned the products that were black
+or 2 m long.
+
+AttributeSelection groups the ids by the attribute each value belongs
+to, and every surface reads the selection through it: one
+`attribute_values IN [...]` clause per attribute for the search (a
+Meilisearch filter list ANDs its elements), one subquery per attribute
+for the product list. An id that belongs to no attribute stays a group
+of its own that matches nothing, so a stale link lists nothing instead
+of losing the filter, as an unknown category does.
+
+The attribute_values facet follows the standard faceted-search rule: an
+attribute's own selection no longer shrinks its own counts, the other
+attributes' selections still do. IndexQuerySet.filter_facet_group
+registers each attribute as a facet group, and search() sends one
+multi-search request with the main query plus a count-only query per
+selected attribute that leaves out that attribute's clause.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1 ([`23c28d5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/23c28d5f9042a7ef02543bb3bb0c9b44d8e47cfc))
+
+* fix(search): count a selected facet value from the main query
+
+A facet group's count query leaves out the group's own clause, so it
+matches more documents than the main query and can reach the engine's
+maxValuesPerFacet cap where the main query does not. Reading the whole
+group from it could drop a SELECTED value whose count the main query
+had.
+
+A document holding a selected value matches the group's clause either
+way, so the main query's count already is its count without that
+clause. Keep the selected values' counts from the main query and read
+only the group's unselected siblings from the count query; a sibling the
+cap omits is simply not listed, the truncation every facet has.
+
+FacetGroup now records the selected keys beside its members. The search
+doc names the cap and what it means for attribute_values.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`23c28d5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/23c28d5f9042a7ef02543bb3bb0c9b44d8e47cfc))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.104.7 [skip ci] ([`87ceaad`](https://github.com/vasilistotskas/grooveshop-django-api/commit/87ceaadb38d503100a922875c357cde1554fbc6d))
+
 ## v3.104.7 (2026-10-12)
 
 ### Bug fixes

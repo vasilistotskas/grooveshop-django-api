@@ -16,16 +16,16 @@ logger = logging.getLogger(__name__)
     retry_jitter=True,
 )
 def reindex_offer_products_task() -> dict[str, int]:
-    """Reindex the products whose promotions changed, in one pass.
+    """Refresh the products whose promotions changed, in one pass.
 
-    Queued by ``promotion.offer_sync.queue_reindex`` a few seconds after
-    the first change, so every change made meanwhile rides along.
+    Re-records their consumer prices, then reindexes them. Queued by
+    ``promotion.offer_sync.queue_refresh`` a few seconds after the first
+    change, so every change made meanwhile rides along.
     """
-    from product.signals import reindex_products_by_pk
-    from promotion.offer_sync import drain_pending
+    from promotion.offer_sync import drain_pending, refresh_products
 
     product_ids = drain_pending()
-    documents = reindex_products_by_pk(product_ids)
+    documents = refresh_products(product_ids)
     logger.info(
         "Offer reindex: %s products, %s documents",
         len(product_ids),
@@ -42,13 +42,13 @@ def reindex_offer_products_task() -> dict[str, int]:
     retry_jitter=True,
 )
 def reindex_offer_window_changes_task() -> dict[str, int]:
-    """Reindex the products a promotion window just opened or closed on.
+    """Refresh the products a promotion window just opened or closed on.
 
     Nothing is saved when ``starts_at`` / ``ends_at`` passes, so no signal
     fires; this beat task is what notices.
     """
-    from promotion.offer_sync import reindex_window_changes
+    from promotion.offer_sync import refresh_window_changes
 
-    product_ids = reindex_window_changes()
+    product_ids = refresh_window_changes()
     logger.info("Offer window sweep: %s products", len(product_ids))
     return {"products": len(product_ids)}

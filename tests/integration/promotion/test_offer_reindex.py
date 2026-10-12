@@ -29,25 +29,11 @@ from promotion.tasks import (
 )
 
 
-def _indexing(enabled: bool):
-    """Flip the producers' own gate, not ``MEILISEARCH["OFFLINE"]``.
-
-    The setting also gates ``Product.post_save``'s indexing, which would
-    reach for an engine the factories below do not have.
-    """
-    return (
-        patch("promotion.offer_sync.indexing_enabled", return_value=enabled),
-        patch("promotion.signals.indexing_enabled", return_value=enabled),
-    )
-
-
 @pytest.fixture(autouse=True)
-def indexing_on(db):
-    on_sync, on_signals = _indexing(True)
-    with on_sync, on_signals:
-        cache.clear()
-        yield
-        cache.clear()
+def clean_cache(db):
+    cache.clear()
+    yield
+    cache.clear()
 
 
 @pytest.fixture
@@ -109,16 +95,19 @@ class TestCoalescing:
 
         assert scheduled.call_count == 2
 
-    def test_offline_engine_queues_nothing(
+    def test_an_offline_engine_still_queues_the_price_refresh(
         self, django_capture_on_commit_callbacks, scheduled
     ):
-        off_sync, off_signals = _indexing(False)
-        with off_sync, off_signals:
-            with django_capture_on_commit_callbacks(execute=True):
-                promotion = _promotion()
-                promotion.products.set([ProductFactory(active=True)])
+        """The records of what a product costs do not depend on the index
+        being reachable: ``MEILISEARCH["OFFLINE"]`` is on for the whole
+        suite and the task is still scheduled."""
+        assert settings.MEILISEARCH["OFFLINE"] is True
 
-        assert scheduled.call_count == 0
+        with django_capture_on_commit_callbacks(execute=True):
+            promotion = _promotion()
+            promotion.products.set([ProductFactory(active=True)])
+
+        assert scheduled.call_count == 1
 
 
 @pytest.mark.django_db
@@ -366,7 +355,7 @@ class TestWindowSweep:
         reindexed.side_effect = RuntimeError("meili down")
 
         with pytest.raises(RuntimeError):
-            offer_sync.reindex_window_changes()
+            offer_sync.refresh_window_changes()
 
         assert cache.get("promotion-offer:window-cursor") is None
 

@@ -64,6 +64,44 @@ def live_offer_promotions():
     )
 
 
+def price_reducing_promotions():
+    """Promotions that lower a product's unit price whatever the cart holds.
+
+    The subset of ``live_offer_promotions`` that is a price reduction in
+    itself: a percentage or fixed amount off, with no minimum quantity,
+    no minimum subtotal, no first-order restriction and no per-customer
+    limit. A conditional promotion (and a buy-X-get-Y or gift) is a deal
+    on a basket, not a price the product is offered at, so it neither
+    moves the price a listing shows nor is a reduction to announce.
+    """
+    return live_offer_promotions().filter(
+        benefit_type__in=(BenefitType.PERCENTAGE, BenefitType.FIXED_AMOUNT),
+        min_quantity__isnull=True,
+        min_subtotal__isnull=True,
+        first_order_only=False,
+        usage_limit_per_customer__isnull=True,
+    )
+
+
+def load_price_reducing_promotions() -> list[Promotion]:
+    """``price_reducing_promotions`` ready for ``PromotionEngine``.
+
+    Empty while promotions are off (plan or merchant toggle): the cart
+    engine then grants nothing, so no price may reflect one. Scope
+    relations and category subtrees are loaded once, so pricing many
+    products against the result costs no further queries.
+    """
+    from promotion.services import PromotionEngine
+
+    if not PromotionEngine.is_enabled():
+        return []
+    promotions = list(
+        price_reducing_promotions().with_scope_relations().order_by("pk")
+    )
+    PromotionEngine.attach_category_scopes(promotions)
+    return promotions
+
+
 def _in_category_subtree(categories, prefix: str, depth: int):
     """Narrow ``categories`` to the ones that contain the product's category.
 
@@ -181,7 +219,7 @@ def scope_product_ids(promotion_ids: Iterable[int]) -> set[int]:
         )
     )
     return set(
-        Product.objects.filter(Q(promotions__in=ids) | in_scope_category)
+        Product._base_manager.filter(Q(promotions__in=ids) | in_scope_category)
         .order_by()
         .values_list("pk", flat=True)
         .distinct()

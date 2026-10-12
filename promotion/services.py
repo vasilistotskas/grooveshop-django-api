@@ -322,6 +322,37 @@ class PromotionEngine:
         return result
 
     @classmethod
+    def single_unit_discount(
+        cls,
+        promotions: list[Promotion],
+        product,
+        unit_price: Money,
+    ) -> Decimal:
+        """What ``promotions`` take off one unit of ``product`` bought alone.
+
+        Runs the cart's own benefit, stacking and allocation rules
+        (``_clamp`` / ``allocate_capped``, the same ones the cart is
+        charged with) over a one-line cart, so a listing price and the cart cannot disagree.
+        The caller passes only promotions that need nothing from the
+        basket (``promotion.offers.price_reducing_promotions``).
+        """
+        items = [_SimulatedLine(NEW_LINE_PK, product, 1, unit_price)]
+        currency = settings.DEFAULT_CURRENCY
+        entries = []
+        for promotion in promotions:
+            amount = cls._benefit_amount(
+                promotion, items, unit_price.amount, currency
+            )
+            if amount.amount > 0:
+                entries.append(AppliedPromotion(promotion, None, amount))
+        chosen = cls._clamp(
+            cls._resolve_stacking(entries, CartDiscountResult()),
+            items,
+            currency,
+        )
+        return sum((entry.amount.amount for entry in chosen), Decimal(0))
+
+    @classmethod
     def _teaser_holds(
         cls,
         entry: NearMissEntry,

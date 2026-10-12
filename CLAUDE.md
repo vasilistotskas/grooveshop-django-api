@@ -137,6 +137,7 @@ Domain models compose multiple mixins, e.g. `Product(SoftDeleteModel, Translatab
 
 - **Order / payment / shipping / notification system**: see [`docs/order-system.md`](docs/order-system.md) for the full reference — state machines, creation paths, carrier integrations, email + WS dedup, critical invariants, common-task playbook. Read this first before changing anything in `order/`, `shipping_acs/`, `shipping_boxnow/`, or `pay_way/`.
 - **Product recommendations**: see [`docs/recommendations-engine.md`](docs/recommendations-engine.md) — typed `ProductRelation`, the strategy registry (`is_available` declines rather than returning noise), two-stage retrieval into `RecommendationCandidate`, the Greek embedding measurements and the TEI-vs-in-process decision, plan tiers, and the playbook for adding a strategy/surface/preset. Read it before touching `recommendation/`, `product/models/relation.py`, or the cart `recommendations` fields.
+- **Product pricing and the EU Omnibus prior price**: see [`docs/product-pricing.md`](docs/product-pricing.md) — price spells, the frozen reduction episode on `Product`, every path that records a price change, the backfill, and the `priorPrice` / `announcedDiscountPercent` API fields. Read it before touching `Product.save`, `final_price`, VAT rates, or what a promotion does to a listed price; a price field must never change through `queryset.update()`.
 - **Platform-wide documentation** lives in the sibling `grooveshop-docs/` repository (published at `docs.grooveshop.space`): architecture, multi-tenancy, end-to-end flows and operations under `src/dev/`, the bilingual tenant-admin guide under `src/admin/`. The files in this repo's `docs/` folder are copied into that site at build time, so keep editing them here. A behaviour change that a docs page describes ships with the doc change.
 - **Client IP and throttle identity (`core/client_ip.py`)**: never read
   `REMOTE_ADDR`, `X-Forwarded-For` or `X-Real-IP` directly to identify a
@@ -182,7 +183,7 @@ App configured in `core/celery.py`. Base task class: `MonitoredTask` (logs succe
 
 Tasks are split by domain:
 - `core/tasks.py` — system health monitoring, DB backup, cache clearing, session cleanup, Meilisearch sync, abandoned cart cleanup, inactive user notifications
-- `product/tasks.py` — price drop notifications
+- `product/tasks.py` — price drop notifications, price-record reconciliation (`reevaluate_price_episodes`)
 - `search/tasks.py` — search analytics
 - `blog/tasks.py` — comment liked notifications
 - `loyalty/tasks.py` — loyalty point award/expiry tasks (all use `MonitoredTask` base class)

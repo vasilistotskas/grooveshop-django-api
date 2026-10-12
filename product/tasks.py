@@ -565,3 +565,51 @@ def send_product_alert_price_drop(product_id: int, new_price: float) -> dict:
         )
 
     return {"status": "success", "product_id": product_id, "sent": sent}
+
+
+@celery_app.task(
+    base=MonitoredTask,
+    max_retries=5,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_jitter=True,
+)
+def sync_price_records(product_ids: list[int]) -> dict[str, int]:
+    """Re-record the consumer price of ``product_ids``, then reindex them.
+
+    Queued when something that is not a Product save moves their price:
+    a VAT rate changed or was deleted.
+    """
+    from promotion.offer_sync import refresh_products
+
+    documents = refresh_products(product_ids)
+    return {"products": len(product_ids), "documents": documents}
+
+
+@celery_app.task(
+    base=MonitoredTask,
+    max_retries=5,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_jitter=True,
+)
+def reevaluate_price_episodes() -> dict[str, int]:
+    """Reconcile every product's price records with its live price.
+
+    Every path that moves a price records it as it happens (see
+    ``product.pricing.service``); this is the net under them. It picks up
+    what none of them can see: the merchant's promotions toggle, a
+    promotion that was running when this shipped, products saved by a
+    release that predates the records. A product already in line costs
+    one comparison and writes nothing.
+    """
+    from product.models.product import Product
+    from product.pricing.service import sync_product_prices
+    from product.signals import reindex_products_by_pk
+
+    changed = sync_product_prices(
+        Product._base_manager.values_list("pk", flat=True)
+    )
+    reindex_products_by_pk(changed)
+    logger.info("Price episode sweep: %s products changed", len(changed))
+    return {"products": len(changed)}

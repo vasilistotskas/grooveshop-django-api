@@ -19953,3 +19953,55 @@ msgstr ""
 #: .\order\services.py:1
 msgid "A promotion discounts a cart line that is not part of the order."
 msgstr ""
+
+#: .\product\models\product.py:156
+msgid "Effective Price"
+msgstr ""
+
+#: .\product\models\product.py:162
+msgid "Gross unit price a consumer pays now: price plus VAT, minus the markdown and any unconditional automatic promotion. Maintained automatically, never edited."
+msgstr ""
+
+#: .\product\models\product.py:169
+msgid "Prior Price"
+msgstr ""
+
+#: .\product\models\product.py:175
+msgid "EU Omnibus reference: the lowest gross price of the 30 days before the current reduction started, frozen at its start. Empty when no reduction may be announced."
+msgstr ""
+
+#: .\product\models\product.py:182
+msgid "Reduction Started At"
+msgstr ""
+
+#: .\product\models\product.py:188
+msgid "When the reduction in force began; empty when the product is not reduced."
+msgstr ""
+
+#: .\product\models\price_spell.py:57
+msgid "Product price spell"
+msgstr ""
+
+#: .\product\models\price_spell.py:58
+msgid "Product price spells"
+msgstr ""
+
+#: .\product\models\price_spell.py:36
+msgid "Consumer price"
+msgstr ""
+
+#: .\product\models\price_spell.py:41
+msgid "The gross unit price a consumer paid: price plus VAT, minus the product markdown and any unconditional automatic promotion."
+msgstr ""
+
+#: .\product\models\price_spell.py:48
+msgid "Valid from"
+msgstr ""
+
+#: .\product\models\price_spell.py:50
+msgid "Valid to"
+msgstr ""
+
+#: .\product\models\price_spell.py:53
+msgid "Empty while this is the current price."
+msgstr ""

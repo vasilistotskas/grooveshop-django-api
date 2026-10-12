@@ -3,13 +3,14 @@ import logging
 import django.dispatch
 from django.conf import settings
 from django.db import transaction
-from django.db.models.signals import post_delete, post_save
+from django.db.models.signals import post_delete, post_save, pre_delete
 from django.dispatch import receiver
 from simple_history.signals import post_create_historical_record
 
 from product.models.product import Product, ProductTranslation
 from product.models.product_attribute import ProductAttribute
 from tenant.celery import dispatch_on_commit
+from vat.models import Vat
 
 logger = logging.getLogger(__name__)
 
@@ -427,3 +428,61 @@ def update_product_search_index_on_attribute_change(sender, instance, **kwargs):
                     f"Error reindexing ProductTranslation "
                     f"pk={translation.pk}: {e}"
                 )
+
+
+@receiver(
+    post_save,
+    sender=Vat,
+    dispatch_uid="product.sync_prices_on_vat_change",
+)
+def sync_prices_on_vat_change(sender, instance, created, raw=False, **kwargs):
+    """A VAT rate edit moves the gross price of every product on it.
+
+    Fans out to the products of the rate in one task, not one save each:
+    the price records and the index documents of a large catalogue are
+    refreshed in batches.
+    """
+    from product.tasks import sync_price_records
+
+    if raw or created:
+        return
+    product_ids = list(
+        Product._base_manager.filter(vat=instance).values_list("pk", flat=True)
+    )
+    if product_ids:
+        dispatch_on_commit(
+            sync_price_records, kwargs={"product_ids": product_ids}
+        )
+
+
+@receiver(
+    pre_delete,
+    sender=Vat,
+    dispatch_uid="product.remember_vat_products_on_delete",
+)
+def remember_vat_products_on_delete(sender, instance, **kwargs):
+    """Take the rate's product ids while the rows still point at it.
+
+    Deleting a rate leaves its products without VAT (``SET_NULL``), a
+    bulk update that saves no Product and leaves no way to find them
+    afterwards.
+    """
+    instance._repriced_product_ids = list(
+        Product._base_manager.filter(vat=instance).values_list("pk", flat=True)
+    )
+
+
+@receiver(
+    post_delete,
+    sender=Vat,
+    dispatch_uid="product.sync_prices_on_vat_delete",
+)
+def sync_prices_on_vat_delete(sender, instance, **kwargs):
+    """Re-price the products the deleted rate left without VAT."""
+    from product.tasks import sync_price_records
+
+    product_ids = getattr(instance, "_repriced_product_ids", [])
+    if product_ids:
+        dispatch_on_commit(
+            sync_price_records, kwargs={"product_ids": product_ids}
+        )

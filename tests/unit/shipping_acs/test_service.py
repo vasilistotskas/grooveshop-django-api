@@ -251,6 +251,36 @@ class TestCancelVoucher:
         assert acs_client_mock.last_delete_call is None  # no-op
 
 
+class TestCanCancelVoucher:
+    """The one local rule ``cancel_voucher`` applies before it calls ACS and
+    the order's ``canBeCanceled`` reads."""
+
+    def test_true_until_the_voucher_is_on_a_pickup_list(self):
+        shipment = AcsShipmentFactory(
+            with_voucher=True, shipment_state=AcsShipmentState.NEW
+        )
+        assert AcsService.can_cancel_voucher(shipment) is True
+
+        shipment.pickup_list = AcsPickupListFactory()
+        assert AcsService.can_cancel_voucher(shipment) is False
+
+    def test_a_canceled_voucher_has_nothing_left_to_refuse(self):
+        shipment = AcsShipmentFactory(
+            with_voucher=True,
+            shipment_state=AcsShipmentState.CANCELED,
+            pickup_list=AcsPickupListFactory(),
+        )
+        assert AcsService.can_cancel_voucher(shipment) is True
+
+    def test_the_carrier_adapter_answers_with_the_same_rule(self):
+        from shipping.interfaces import get_provider
+
+        shipment = AcsShipmentFactory(
+            with_voucher=True, pickup_list=AcsPickupListFactory()
+        )
+        assert get_provider("acs").can_cancel_shipment(shipment) is False
+
+
 class TestResetShipmentForRemint:
     def test_reset_clears_voucher_and_preserves_history(self):
         from order.enum.status import OrderStatus, PaymentStatus

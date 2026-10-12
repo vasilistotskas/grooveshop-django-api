@@ -22,12 +22,14 @@ from order.enum.status import (
 )
 from order.exceptions import (
     CartNotReadyError,
+    CourierUnreachableError,
     InsufficientStockError,
     InvalidCouponError,
     InvalidGiftCardError,
     InvalidOrderDataError,
     InvalidStatusTransitionError,
     OrderCancellationError,
+    ParcelWithCourierError,
     PaymentAmountMismatchError,
     PaymentCurrencyMismatchError,
     PaymentError,
@@ -46,6 +48,7 @@ from order.signals import order_refunded
 from order.stock import StockManager
 from pay_way.enum.settlement import PaySettlement
 from promotion.services import CouponService, PromotionEngine
+from shipping.exceptions import CarrierError, CarrierUnavailableError
 from tenant.middleware import tenant_domain_set
 
 logger = logging.getLogger(__name__)
@@ -327,6 +330,7 @@ class OrderService:
                 product=gift.product,
                 quantity=gift.quantity,
                 price=Money(0, target_currency),
+                vat_rate=gift.product.vat_percent,
             )
         if skipped:
             order.metadata["promotion_gifts_skipped"] = skipped
@@ -908,6 +912,10 @@ class OrderService:
                     product=product,
                     quantity=quantity,
                     price=item_price,
+                    # The rate the cart backed this price's VAT out of —
+                    # frozen on the line so the invoice and myDATA split
+                    # ``price`` at it, whatever the catalogue says later.
+                    vat_rate=cart_item.vat_percent,
                     recommendation_impression_id=(
                         cart_item.recommendation_impression_id
                     ),
@@ -1420,6 +1428,10 @@ class OrderService:
                     product=product,
                     quantity=quantity,
                     price=item_price,
+                    # The rate the cart backed this price's VAT out of —
+                    # frozen on the line so the invoice and myDATA split
+                    # ``price`` at it, whatever the catalogue says later.
+                    vat_rate=cart_item.vat_percent,
                     recommendation_impression_id=(
                         cart_item.recommendation_impression_id
                     ),
@@ -2197,13 +2209,177 @@ class OrderService:
         }
 
     @classmethod
-    @transaction.atomic
     def cancel_order(
         cls,
         order: Order,
         reason: str = "",
         refund_payment: bool = True,
         canceled_by: int | None = None,
+        *,
+        customer_initiated: bool = True,
+    ) -> tuple[Order, dict[str, Any] | None]:
+        """Cancel an order: stock back, status CANCELED, voucher, refund.
+
+        ``customer_initiated`` is the caller's call, taken from what it
+        already knows (the cancel endpoint: the requester is not store
+        staff). A customer cancel asks the courier to cancel the voucher
+        FIRST and only goes on when the courier confirms or the order has
+        no voucher. A courier that refuses (voucher already on a pickup
+        list, parcel already at a locker) raises
+        :class:`ParcelWithCourierError`, one that gives no answer raises
+        :class:`CourierUnreachableError`, and either way nothing changes —
+        no status, no refund, no shipment. That ask is a carrier HTTP
+        call, so a customer cancel must not run inside an open
+        transaction.
+
+        Staff and system callers pass ``customer_initiated=False``: they
+        cancel and refund regardless, the courier is asked afterwards on
+        a best-effort basis, and a refusal is recorded in
+        ``metadata['cancellation']['shipment_cancel']`` and in a staff
+        history note. The default is the strict one, so a caller that
+        forgets to choose is held to the courier's answer.
+        """
+        shipment_cancel = (
+            cls._ask_courier_to_cancel(order, reason)
+            if customer_initiated
+            else None
+        )
+        try:
+            return cls._cancel_order_locked(
+                order,
+                reason,
+                refund_payment,
+                canceled_by,
+                shipment_cancel=shipment_cancel,
+            )
+        except Exception:
+            if shipment_cancel is not None and shipment_cancel["dispatched"]:
+                cls._note_shipment_canceled_without_order(order)
+            raise
+
+    @classmethod
+    def _note_shipment_canceled_without_order(cls, order: Order) -> None:
+        """Tell staff the order's shipment was canceled but the order was not.
+
+        The shipment is canceled (at the courier, or only locally when no
+        voucher had been issued) before the order row is locked, so the
+        order cancel can still fail afterwards: most likely the order
+        moved on while the courier answered (staff marking it shipped; a
+        courier that accepts the cancel has not collected the parcel),
+        and any other failure of the locked cancel ends the same way.
+        The order then stays live with no voucher behind it. Nothing
+        reverses a shipment cancel, so staff must create a new voucher;
+        the ERROR line raises the logged-errors alert and the note is
+        where staff read about the order. The note states only what is
+        known (the shipment is canceled, the order is not, and its
+        current status), never why. An order another request canceled
+        in the meantime needs neither.
+        """
+        from order.models.history import OrderHistory
+
+        current_status = Order.objects.values_list("status", flat=True).get(
+            pk=order.pk
+        )
+        if current_status == OrderStatus.CANCELED:
+            return
+        logger.error(
+            "Order %s: a customer cancel canceled its shipment, but the "
+            "order (status %s) was not canceled; it needs a new voucher",
+            order.id,
+            current_status,
+        )
+        OrderHistory.log_note(
+            order=order,
+            note=(
+                "The customer asked to cancel this order and its "
+                "shipment was canceled, but the order itself was not "
+                f"canceled (its status is {current_status}). The shipment "
+                "no longer has a voucher: create a new one if the order "
+                "is still to ship."
+            ),
+        )
+
+    @classmethod
+    def _ask_courier_to_cancel(
+        cls, order: Order, reason: str
+    ) -> dict[str, Any] | None:
+        """Cancel the order's voucher at the courier before the order moves.
+
+        Returns the ``shipment_cancel`` outcome to record on the order
+        (the same shape :meth:`cancel_attached_shipment` writes), or
+        ``None`` when the order's status no longer allows a cancel — the
+        courier is not asked about an order that will not cancel, and
+        the locked re-check in :meth:`_cancel_order_locked` raises the
+        usual status error. Raises :class:`ParcelWithCourierError` when
+        the courier refuses and :class:`CourierUnreachableError` when it
+        gives no answer (``CarrierUnavailableError``). Only courier
+        errors are the courier's answer: anything else is a fault of
+        ours and propagates as itself.
+
+        Runs before the order row is locked, outside any transaction of
+        its own: the carrier calls are three-phase so they never hold a
+        transaction open across the courier's HTTP round trip
+        (``idle_in_transaction_session_timeout`` would kill it), and the
+        order row stays unlocked while the courier answers. The locked
+        re-check afterwards is what decides the order's fate
+        (:meth:`_note_shipment_canceled_without_order` covers a
+        shipment canceled for an order that then did not cancel).
+        """
+        from shipping.services import ShippingService
+
+        current = Order.objects.get(pk=order.pk)
+        if not current.can_be_canceled:
+            return None
+
+        try:
+            dispatched = ShippingService.cancel_shipment(current, reason=reason)
+        except CarrierUnavailableError as exc:
+            logger.warning(
+                "Customer cancel of order %s stopped: the courier gave no "
+                "answer to the voucher cancel: %s",
+                order.id,
+                exc,
+                exc_info=True,
+            )
+            raise CourierUnreachableError(
+                order_id=order.id,
+                reason=str(
+                    _(
+                        "We could not reach the courier to cancel your "
+                        "parcel. Please try again in a few minutes."
+                    )
+                ),
+            ) from exc
+        except CarrierError as exc:
+            logger.warning(
+                "Customer cancel of order %s refused: the courier refused "
+                "the voucher cancel: %s",
+                order.id,
+                exc,
+                exc_info=True,
+            )
+            raise ParcelWithCourierError(
+                order_id=order.id,
+                reason=str(
+                    _(
+                        "Your parcel is already with the courier, so the "
+                        "order can no longer be canceled. Contact the store "
+                        "to arrange a return."
+                    )
+                ),
+            ) from exc
+        return {"attempted": True, "dispatched": dispatched}
+
+    @classmethod
+    @transaction.atomic
+    def _cancel_order_locked(
+        cls,
+        order: Order,
+        reason: str,
+        refund_payment: bool,
+        canceled_by: int | None,
+        *,
+        shipment_cancel: dict[str, Any] | None,
     ) -> tuple[Order, dict[str, Any] | None]:
         # Lock the order row to prevent concurrent cancellation requests
         # from both restoring stock
@@ -2342,6 +2518,14 @@ class OrderService:
                 "canceled_by": canceled_by,
                 "previous_status": old_status,
             }
+            if shipment_cancel is not None:
+                # The courier already confirmed (a customer cancel asks it
+                # first). Recording the outcome here is also what stops
+                # the cascade below, and the ``order_canceled`` signal's
+                # safety net, from asking the carrier a second time.
+                order.metadata["cancellation"]["shipment_cancel"] = (
+                    shipment_cancel
+                )
 
             order.save(
                 update_fields=["status", "status_updated_at", "metadata"]
@@ -2483,9 +2667,29 @@ class OrderService:
         from order.payment import get_payment_provider
 
         provider = get_payment_provider(order.pay_way.provider_code)
-        success, refund_response = provider.refund_payment(
-            payment_id=order.payment_id, amount=amount
-        )
+
+        # A part refund is judged against what the provider captured, not
+        # against what the order was billed (``paid_amount`` is the amount
+        # owed when the order was created). It is read BEFORE refunding:
+        # once the money has moved, an unreadable figure cannot be undone.
+        captured = None
+        if amount is not None:
+            captured = provider.captured_amount(order.payment_id)
+
+        if amount is not None and captured is None:
+            success, refund_response = (
+                False,
+                {
+                    "error": (
+                        "Could not read the amount the provider captured "
+                        "for this payment."
+                    )
+                },
+            )
+        else:
+            success, refund_response = provider.refund_payment(
+                payment_id=order.payment_id, amount=amount
+            )
 
         if not success:
             # Nothing was recorded as refunded, and the caller may only
@@ -2507,9 +2711,28 @@ class OrderService:
             )
             return False, refund_response
 
-        order.payment_status = refund_response.get(
-            "status", PaymentStatus.REFUNDED
+        # ``None`` refunds everything the provider captured, a figure only
+        # the provider knows: take what it reports it paid back.
+        refunded = (
+            amount
+            if amount is not None
+            else Money(
+                Decimal(str(refund_response["amount"])),
+                order.paid_amount.currency,
+            )
         )
+
+        # A provider answers REFUNDED for any refund it accepted, partial
+        # ones too; REFUNDED is what releases the gift-card redemption and
+        # the loyalty points, so it must mean "nothing left to refund". A
+        # full refund is that by definition, a part refund is compared
+        # with the captured amount read above.
+        payment_status = refund_response.get("status", PaymentStatus.REFUNDED)
+        if captured is not None and payment_status == PaymentStatus.REFUNDED:
+            payment_status = PaymentStatus.after_refund(
+                refunded=refunded.amount, captured=captured
+            )
+        order.payment_status = payment_status
 
         if not order.metadata:
             order.metadata = {}
@@ -2520,10 +2743,8 @@ class OrderService:
         order.metadata["refunds"].append(
             {
                 "refund_id": refund_response.get("refund_id"),
-                "amount": str(amount.amount) if amount else "full",
-                "currency": str(amount.currency)
-                if amount
-                else str(order.total_price.currency),
+                "amount": str(refunded.amount),
+                "currency": str(refunded.currency),
                 "reason": reason,
                 "refunded_at": timezone.now().isoformat(),
                 "refunded_by": refunded_by,
@@ -2533,7 +2754,7 @@ class OrderService:
         order.save(update_fields=["payment_status", "metadata"])
 
         order_refunded.send(
-            sender=cls, order=order, amount=amount, reason=reason
+            sender=cls, order=order, amount=refunded, reason=reason
         )
 
         logger.info("Order %s refunded successfully", order.id)
@@ -2851,7 +3072,12 @@ class OrderService:
         parcel already accepted at a locker) are recorded on
         ``order.metadata['cancellation']['shipment_cancel']`` so the
         admin can see why the cascade didn't reach the courier and
-        coordinate the in-transit return out of band.
+        coordinate the in-transit return out of band. A refusal is also
+        left as a staff-only ``OrderHistory`` note.
+
+        This is the staff / system path: a customer cancel asks the
+        courier first (:meth:`_ask_courier_to_cancel`) and is refused
+        when the courier refuses.
 
         Never raises — order cancellation must be allowed to complete
         even when the courier-side cancel fails.
@@ -2911,6 +3137,21 @@ class OrderService:
         # recursion or duplicate-signal failures (verified in CI on
         # 2026-05-16).
         Order.objects.filter(pk=order.pk).update(metadata=order.metadata)
+
+        if "error" in info:
+            # The carrier outcome belongs where staff read about the
+            # order, not only in a metadata blob: the order is canceled
+            # (and refunded) while the parcel may still be delivered.
+            from order.models.history import OrderHistory
+
+            OrderHistory.log_note(
+                order=order,
+                note=(
+                    "Order canceled, but the courier did not cancel the "
+                    f"parcel: {info['error']}. The parcel may still be "
+                    "delivered; arrange its return with the courier."
+                ),
+            )
 
     @classmethod
     def _dispatch_shipment_creation_task(cls, order: Order) -> None:

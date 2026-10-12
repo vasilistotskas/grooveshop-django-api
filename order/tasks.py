@@ -1990,6 +1990,7 @@ def auto_cancel_stuck_pending_orders() -> dict[str, int]:
                 locked,
                 reason=reason,
                 refund_payment=False,
+                customer_initiated=False,
             )
             return True
 

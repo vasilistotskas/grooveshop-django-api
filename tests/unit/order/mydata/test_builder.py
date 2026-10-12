@@ -332,15 +332,15 @@ class BuildInvoiceXmlTestCase(TestCase):
             invoice = generate_invoice(order)
         built = self._build(invoice)
         root = fromstring(built.xml_bytes)
-        zero_rows = [
-            row
-            for row in root.findall(_localise("invoice/invoiceDetails"))
-            if row.find(f"{AADE_NS}vatCategory").text == "7"
-        ]
-        self.assertEqual(len(zero_rows), 1)
-        self.assertEqual(
-            zero_rows[0].find(f"{AADE_NS}vatExemptionCategory").text, "30"
-        )
+        rows = root.findall(_localise("invoice/invoiceDetails"))
+        # The goods and the shipping that travels with them: every line
+        # is zero-rated, and every one of them carries the exemption.
+        self.assertGreaterEqual(len(rows), 2)
+        for row in rows:
+            self.assertEqual(row.find(f"{AADE_NS}vatCategory").text, "7")
+            self.assertEqual(
+                row.find(f"{AADE_NS}vatExemptionCategory").text, "30"
+            )
 
     # ── Tier B (invoiceType 1.1 — domestic B2B) ──────────────────
 
@@ -452,3 +452,44 @@ class BuildInvoiceXmlTestCase(TestCase):
             root.find(_localise("invoice/invoiceSummary/totalGrossValue")).text
         )
         self.assertEqual(pay_amount, summary_gross)
+
+    def test_shipping_and_payment_fee_lines_carry_the_goods_rate(self):
+        """Shipping and the fee are part of the taxable supply (VAT
+        Directive art. 78(b)), so they are taxed at the goods' rate, not
+        a flat 24%: a 13% basket gets 13% shipping and a 13% fee."""
+        order = OrderFactory(
+            num_order_items=0,
+            shipping_price=Money(Decimal("3.50"), "EUR"),
+            payment_method_fee=Money(Decimal("1.25"), "EUR"),
+        )
+        OrderItemFactory(
+            order=order,
+            product=ProductFactory(vat=VatFactory(value=13)),
+            price=Money(Decimal("11.30"), "EUR"),
+            quantity=1,
+        )
+        with patch(
+            "order.invoicing._render_pdf_bytes",
+            return_value=b"%PDF-1.4 test",
+        ):
+            invoice = generate_invoice(order)
+
+        root = fromstring(self._build(invoice).xml_bytes)
+        rows = root.findall(_localise("invoice/invoiceDetails"))
+
+        # goods, shipping, fee — in that order, all 13% (category 2).
+        self.assertEqual(
+            [
+                (
+                    row.find(f"{AADE_NS}vatCategory").text,
+                    row.find(f"{AADE_NS}netValue").text,
+                    row.find(f"{AADE_NS}vatAmount").text,
+                )
+                for row in rows
+            ],
+            [
+                ("2", "10.00", "1.30"),
+                ("2", "3.10", "0.40"),
+                ("2", "1.11", "0.14"),
+            ],
+        )

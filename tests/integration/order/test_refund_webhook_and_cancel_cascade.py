@@ -6,9 +6,11 @@ I: Stripe ``charge.refunded`` webhook flips Order.payment_status.
 
 from __future__ import annotations
 
+from decimal import Decimal
 from unittest.mock import Mock, patch
 
 import pytest
+from djmoney.money import Money
 from djstripe.models import Event
 
 from order.enum.status import OrderStatus, PaymentStatus
@@ -16,6 +18,7 @@ from order.exceptions import PaymentError
 from order.factories import OrderFactory
 from order.models.order import Order
 from order.services import OrderService
+from order.signals import order_refunded
 from order.signals.handlers import handle_stripe_charge_refunded
 
 # ---------------------------------------------------------------------------
@@ -67,6 +70,45 @@ class TestChargeRefundedWebhook:
         assert order.payment_status == PaymentStatus.REFUNDED
         assert order.metadata["refunds"][-1]["is_full_refund"] is True
         assert order.metadata["refunds"][-1]["amount_refunded"] == 5000
+
+    @pytest.mark.parametrize(
+        ("currency", "expected"),
+        [
+            # A charge reports minor units in the currency's OWN exponent:
+            # 5000 of a two-decimal currency is 50, of a zero-decimal one
+            # it is 5000.
+            ("eur", Money(Decimal(50), "EUR")),
+            ("jpy", Money(Decimal(5000), "JPY")),
+        ],
+    )
+    def test_full_refund_says_how_much_was_refunded(self, currency, expected):
+        """``order_refunded`` always carries its amount: a receiver must
+        never have to read its absence as "everything"."""
+        OrderFactory(
+            num_order_items=0,
+            payment_id=f"pi_full_refund_amount_{currency}",
+            status=OrderStatus.DELIVERED,
+            payment_status=PaymentStatus.COMPLETED,
+        )
+        event = _build_charge_event(
+            event_id=f"evt_full_refund_amount_{currency}",
+            payment_intent_id=f"pi_full_refund_amount_{currency}",
+            amount=5000,
+            amount_refunded=5000,
+            currency=currency,
+        )
+        received: list[dict] = []
+
+        def receiver(sender, **kwargs):
+            received.append(kwargs)
+
+        order_refunded.connect(receiver, weak=False)
+        try:
+            handle_stripe_charge_refunded(sender=None, event=event)
+        finally:
+            order_refunded.disconnect(receiver)
+
+        assert [r["amount"] for r in received] == [expected]
 
     def test_partial_refund_flips_payment_status_to_partially_refunded(self):
         order = OrderFactory(
@@ -216,6 +258,9 @@ class TestCancelOrderCascadesToShipment:
         assert shipment_cancel.get("dispatched") is True
 
     def test_cascade_swallows_carrier_error_so_order_still_cancels(self):
+        """A staff or system cancel (``customer_initiated=False``) is not
+        bound by the courier: it cancels and records the refusal. A
+        customer cancel is held to it (test_customer_cancel_asks_courier)."""
         order = OrderFactory(
             num_order_items=0,
             status=OrderStatus.PROCESSING,
@@ -227,7 +272,12 @@ class TestCancelOrderCascadesToShipment:
                 "carrier rejected — already in pickup list"
             ),
         ):
-            OrderService.cancel_order(order, reason="m", refund_payment=False)
+            OrderService.cancel_order(
+                order,
+                reason="m",
+                refund_payment=False,
+                customer_initiated=False,
+            )
         order.refresh_from_db()
         assert order.status == OrderStatus.CANCELED
         cancellation = order.metadata.get("cancellation", {})

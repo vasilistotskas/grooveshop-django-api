@@ -17,6 +17,13 @@ from giftcard.enum import (
 from giftcard.factories import GiftCardFactory, GiftCardPurchaseFactory
 from giftcard.models import GiftCardTransaction
 from giftcard.services import GiftCardService
+from tests.utils.viva import (
+    REVERSAL_CREATED_EVENT,
+    FakeVivaApi,
+    retrieve_refund,
+    retrieve_transaction,
+    reversal_created_event,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -191,30 +198,52 @@ class TestVivaPurchaseWebhookBranch:
         assert purchase.status == GiftCardPurchaseStatus.PENDING
 
     def _paid_purchase(self, payment_id):
-        """A PAID purchase with one issued, untouched card."""
+        """A PAID purchase with one issued, untouched card.
+
+        Completed the way the Viva webhook completes it: the purchase keeps
+        the Viva order code it was paid under (as ``payment_id``).
+        """
         purchase = GiftCardPurchaseFactory(
             amount=Money(Decimal(40), "EUR"), provider_code="viva_wallet"
         )
         purchase.payment_id = payment_id
         purchase.save(update_fields=["payment_id"])
-        card = GiftCardService.complete_purchase(purchase, "txn-paid")
+        card = GiftCardService.complete_purchase(purchase)
         return purchase, card
+
+    def _reversal(self, purchase, refund_id=None):
+        """Viva's documented 1797 for a refund of this purchase's payment."""
+        from order.views.viva_webhook import (
+            _process_gift_card_purchase_event,
+        )
+
+        refund_id = refund_id or f"refund-{purchase.pk}"
+        body = reversal_created_event(
+            refund_id=refund_id,
+            parent_id=REVERSAL_CREATED_EVENT["EventData"]["ParentId"],
+            order_code=int(purchase.payment_id),
+        )
+        return _process_gift_card_purchase_event(
+            purchase=purchase,
+            event_type_id=body["EventTypeId"],
+            event_data=body["EventData"],
+            transaction_id=refund_id,
+            txn_hash="deadbeef",
+            order_code=purchase.payment_id,
+        )
 
     def test_reversal_without_a_verified_refund_voids_nothing(
         self, enable_gift_cards
     ):
         """The endpoint is unauthenticated and the Viva order code is
-        visible to the buyer, so an unverified 1797 must not be able to
+        visible to the buyer, so a 1797 quoting a transaction that is not
+        a refund (Viva's documented ``F`` payment) must not be able to
         cancel a purchase and disable the card it paid for."""
-        from order.enum.status import PaymentStatus
-
         purchase, card = self._paid_purchase("5234567890123456")
+        payment = retrieve_transaction(orderCode=int(purchase.payment_id))
 
-        with patch(
-            "order.views.viva_webhook._verify_transaction",
-            return_value=(PaymentStatus.COMPLETED, {"amount": "40.00"}),
-        ):
-            response = self._event(purchase, 1797)
+        with FakeVivaApi(retrieve=(200, payment)):
+            response = self._reversal(purchase)
 
         purchase.refresh_from_db()
         card.refresh_from_db()
@@ -250,15 +279,13 @@ class TestVivaPurchaseWebhookBranch:
     def test_verified_reversal_voids_the_untouched_card(
         self, enable_gift_cards
     ):
-        from order.enum.status import PaymentStatus
-
         purchase, card = self._paid_purchase("7234567890123456")
+        refund = retrieve_refund(
+            amount=40.0, order_code=int(purchase.payment_id)
+        )
 
-        with patch(
-            "order.views.viva_webhook._verify_transaction",
-            return_value=(PaymentStatus.REFUNDED, {"amount": "40.00"}),
-        ):
-            response = self._event(purchase, 1797)
+        with FakeVivaApi(retrieve=(200, refund)):
+            response = self._reversal(purchase)
 
         purchase.refresh_from_db()
         card.refresh_from_db()
@@ -267,16 +294,114 @@ class TestVivaPurchaseWebhookBranch:
         assert card.status == GiftCardStatus.DISABLED
         assert card.balance.amount == Decimal(0)
 
+    def test_a_part_refund_does_not_void_value_the_buyer_still_owns(
+        self, enable_gift_cards
+    ):
+        """The card is the whole purchase; a goodwill refund of EUR 5 of
+        EUR 40 must not destroy the other EUR 35. It is booked, though:
+        the next refunds add to it."""
+        from order.models.viva_webhook_event import VivaWebhookEvent
+
+        purchase, card = self._paid_purchase("9034567890123456")
+        refund = retrieve_refund(
+            amount=5.0, order_code=int(purchase.payment_id)
+        )
+
+        with FakeVivaApi(retrieve=(200, refund)):
+            response = self._reversal(purchase)
+
+        purchase.refresh_from_db()
+        card.refresh_from_db()
+        assert response.status_code == 200
+        assert purchase.status == GiftCardPurchaseStatus.PAID
+        assert purchase.refunded_amount == Decimal(5)
+        assert card.status == GiftCardStatus.ACTIVE
+        assert card.balance.amount == Decimal(40)
+        assert (
+            VivaWebhookEvent.objects.get(
+                transaction_id=f"refund-{purchase.pk}"
+            ).outcome
+            == VivaWebhookEvent.OUTCOME_PROCESSED
+        )
+
+    def _viva_refunding(self, purchase, **refunds):
+        """A Viva that answers Retrieve for each named refund id."""
+        return FakeVivaApi(
+            transactions={
+                refund_id: (
+                    200,
+                    retrieve_refund(
+                        amount=paid_back, order_code=int(purchase.payment_id)
+                    ),
+                )
+                for refund_id, paid_back in refunds.items()
+            }
+        )
+
+    def test_refunds_that_add_up_to_the_purchase_void_the_card(
+        self, enable_gift_cards
+    ):
+        """EUR 5 and then EUR 35 of a EUR 40 purchase: the first leaves the
+        card spendable, the second completes the refund and voids it."""
+        purchase, card = self._paid_purchase("9234567890123457")
+
+        with self._viva_refunding(purchase, first=5.0, second=35.0):
+            self._reversal(purchase, refund_id="first")
+            card.refresh_from_db()
+            assert card.status == GiftCardStatus.ACTIVE
+            assert card.balance.amount == Decimal(40)
+            self._reversal(purchase, refund_id="second")
+
+        purchase.refresh_from_db()
+        card.refresh_from_db()
+        assert purchase.refunded_amount == Decimal(40)
+        assert purchase.status == GiftCardPurchaseStatus.CANCELED
+        assert card.status == GiftCardStatus.DISABLED
+        assert card.balance.amount == Decimal(0)
+
+    def test_a_replayed_refund_is_counted_once(self, enable_gift_cards):
+        """Viva redelivers: EUR 5 delivered twice is EUR 5, not EUR 10, and
+        must not bring the card closer to being voided."""
+        purchase, card = self._paid_purchase("9334567890123458")
+
+        with self._viva_refunding(purchase, first=5.0, second=35.0):
+            self._reversal(purchase, refund_id="first")
+            replay = self._reversal(purchase, refund_id="first")
+            # Acknowledged and left alone, not refused with a 500 that
+            # Viva would keep redelivering.
+            assert replay.status_code == 200
+            purchase.refresh_from_db()
+            assert purchase.refunded_amount == Decimal(5)
+            self._reversal(purchase, refund_id="second")
+
+        purchase.refresh_from_db()
+        card.refresh_from_db()
+        assert purchase.refunded_amount == Decimal(40)
+        assert card.status == GiftCardStatus.DISABLED
+
+    def test_a_refund_of_another_payment_voids_nothing(self, enable_gift_cards):
+        """Anyone may post their OWN real refund against this purchase's
+        order code; Viva's instruction is to confirm OrderCode AND
+        TransactionId."""
+        purchase, card = self._paid_purchase("9134567890123456")
+        refund = retrieve_refund(amount=40.0, order_code=1234567890123456)
+
+        with FakeVivaApi(retrieve=(200, refund)):
+            response = self._reversal(purchase)
+
+        purchase.refresh_from_db()
+        card.refresh_from_db()
+        assert response.status_code == 200
+        assert purchase.status == GiftCardPurchaseStatus.PAID
+        assert card.status == GiftCardStatus.ACTIVE
+
     def test_unverifiable_reversal_returns_500_and_voids_nothing(
         self, enable_gift_cards
     ):
         purchase, card = self._paid_purchase("8234567890123456")
 
-        with patch(
-            "order.views.viva_webhook._verify_transaction",
-            return_value=(None, {"error": "boom", "viva_error": True}),
-        ):
-            response = self._event(purchase, 1797)
+        with FakeVivaApi(retrieve=(404, ["Transaction Id does not exist."])):
+            response = self._reversal(purchase)
 
         purchase.refresh_from_db()
         card.refresh_from_db()

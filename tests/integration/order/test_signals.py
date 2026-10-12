@@ -474,10 +474,11 @@ class OrderSignalsTestCase(TestCase):
         )
 
     def test_handle_order_refunded(self):
+        refunded = Money("50.00", "USD")
         order_refunded.send(
             sender=Order,
             order=self.order,
-            amount="$50.00",
+            amount=refunded,
             reason="Defective product",
         )
 
@@ -485,9 +486,19 @@ class OrderSignalsTestCase(TestCase):
             OrderHistory.objects.filter(
                 order=self.order,
                 change_type="REFUND",
-                new_value={"amount": "$50.00", "reason": "Defective product"},
+                new_value={
+                    "amount": str(refunded),
+                    "reason": "Defective product",
+                },
             ).exists()
         )
+
+    def test_order_refunded_without_an_amount_is_an_error(self):
+        """``amount`` is part of the signal's contract: a sender that
+        leaves it out fails loudly instead of being read as a refund of
+        "everything"."""
+        with self.assertRaises(TypeError):
+            order_refunded.send(sender=Order, order=self.order)
 
     def test_handle_order_returned(self):
         order_returned.send(

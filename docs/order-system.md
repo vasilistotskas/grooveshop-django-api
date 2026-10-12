@@ -86,8 +86,8 @@ No explicit table — flips are direct assignments. Common paths:
 | `PENDING → FAILED` | `OrderService.handle_payment_failed` (Stripe `payment_intent.payment_failed`) |
 | `FAILED / PENDING / CANCELED → PENDING` | `POST /order/{id}/retry-payment` (`OrderViewSet.retry_payment`) mints a fresh Stripe PaymentIntent and reopens the payment — **only while `Order.status` is `PENDING`**. A CANCELED payment on a PENDING order (an intent canceled while the order waits) is retryable. Every endpoint that starts a payment (`create_payment_intent`, `create_checkout_session`, `retry-payment`, `confirm_agent_payment`) shares `OrderViewSet._payment_start_refusal`: a paid order gets 400 "This order has already been paid.", a CANCELED or otherwise advanced one 400 "This order is no longer open for payment." — before the provider is called, because `cancel_order` settles an unpaid payment to CANCELED too, and reopening it let a charge land on a dead order. The provider call itself runs unlocked; `PayWayService._record_opened_payment` then locks the row and, if its status, payment status or payment id changed meanwhile (a cancel, a webhook for the previous intent), raises `OrderChangedDuringPaymentError` — the view answers 409 and the new intent's client secret is never returned, so it can never be confirmed. |
 | `COMPLETED → REFUNDED` | `OrderService.refund_order()` (admin) OR `handle_stripe_charge_refunded` (full refund webhook) |
-| `COMPLETED → PARTIALLY_REFUNDED` | `handle_stripe_charge_refunded` (partial refund) |
-| `COMPLETED → REFUNDED` | Viva reversal webhook (`_handle_reversal_created`, event 1797; full or partial both write REFUNDED) |
+| `COMPLETED → PARTIALLY_REFUNDED` | `handle_stripe_charge_refunded` (partial refund), `OrderService.refund_order()` for an amount below `paid_amount`, Viva reversal webhook below |
+| `COMPLETED / PARTIALLY_REFUNDED → PARTIALLY_REFUNDED / REFUNDED` | Viva reversal webhook (`_handle_reversal_created`, event 1797): each refund Viva reports is added to the order's recorded refunds, and `PaymentStatus.after_refund` compares the cumulative total with what Viva captured on the payment (§4.3) |
 | `PENDING / PROCESSING / FAILED → CANCELED` | `Order.save()` on the `status → CANCELED` **or `RETURNED`** transition (`PAYMENT_CLOSING_STATUSES`, `Order.settle_unpaid_payment`, `order/models/order.py`) — one save shared by the service, the admin form and any script, never a second save from the cascade (that re-fires the transition). An order that closes unpaid owes nothing, so its financial state is final too: a canceled order (`0057_settle_canceled_unpaid_orders` backfilled 78 rows) and a refused or uncollected COD parcel that came back RETURNED (`0058_settle_returned_unpaid_orders` backfilled 34). A PAID return keeps COMPLETED until the refund moves it to REFUNDED. |
 | `PENDING → COMPLETED` | `AcsService._mark_cod_order_paid_if_pending` (COD reconcile) |
 | `CANCELED → COMPLETED` on a CANCELED order | `OrderService.record_payment_after_cancel` — a confirmed Stripe (`handle_payment_succeeded`, `checkout.session.completed`) or Viva (`_handle_payment_created`) charge for an order that is already canceled. Checked **before** the settled-state guard (`OrderService.is_payment_after_cancel`), because a canceled order always carries a settled payment and behind the guard the charge was dropped with a WARNING. Books the money (`mark_as_paid`), records `metadata["payment_after_cancel"]`, logs ERROR, emails ops, notes the order; the order stays CANCELED and nothing ships. Idempotent per payment id. A REFUNDED / PARTIALLY_REFUNDED canceled order still ignores a stale success. |
@@ -222,6 +222,62 @@ click-id parameter, one `CLICK_ID_PARAMS` entry, which changes the
 generated `ClickIdsEnum` the storefront's capture is typed against —
 regenerate the schema on both sides).
 
+### 3.5 VAT on an order (`OrderItem.vat_rate`, `order/taxation.py`)
+
+Prices on an order are VAT-inclusive. The VAT inside them is backed out
+at **the rate the line was sold at**, which the order records and the
+catalogue can no longer change.
+
+- **The snapshot.** `OrderItem.vat_rate` is written when the line is
+  created. Both checkout paths pass `cart_item.vat_percent` (the rate the
+  cart backed the line's price out of, wholesale prices included), a
+  promotion gift line passes its product's, and `OrderItem.save()`
+  snapshots the product's current rate for every other writer (the order
+  item admin and API, scripts); `bulk_create` skips `save()`, so
+  `devtools/demo_orders.py` passes it itself. The column has
+  `db_default=0` only so the release still serving during a rollout can
+  keep inserting; a product with no `Vat` row is sold at 0. The item
+  admin shows the rate read-only on add and editable afterwards, so
+  staff can correct a wrong snapshot.
+- **Nothing reads `product.vat` for an order again.** `order/invoicing.py`
+  and `order/mydata/builder.py` get their lines from
+  `order.taxation.order_vat_lines`, which reads `item.vat_rate`. Editing
+  a `Vat` row, moving the product to another, or deleting the row (the
+  FK is `SET_NULL`) changes neither the PDF nor the myDATA payload of an
+  existing order. Regenerating a not-yet-registered invoice therefore
+  keeps the original rates too. Lines that predate the column were
+  backfilled (`0065`) from their product's VAT at deploy time, which is
+  what the documents used before the snapshot existed.
+- **Shipping and the payment-method fee.** Incidental costs the seller
+  charges the customer belong to the taxable amount of the goods they
+  accompany (VAT Directive 2006/112/EC art. 78(b); Greek VAT Code, Law
+  5144/2024, art. 24(4)(a) — art. 19 of the repealed Law 2859/2000), so
+  they take the goods' rate. A basket that mixes rates has no single
+  rate for them: each charge is split over the rates in proportion to
+  the goods' value at each (`_rate_weights`: undiscounted line gross,
+  units when the goods are free; largest remainder, so the shares add
+  up to the cent) and every share is taxed at its own rate. A
+  single-rate basket puts 100% on that rate. There is no order-level
+  "shipping VAT rate" to store: the split is a function of the
+  snapshotted lines and the two amounts, and a stored copy could only
+  disagree with the lines when staff edit them. A charge on an order
+  with no goods (only reachable by staff deleting every line) raises,
+  since no rate can follow nothing and a guessed one would be a wrong tax
+  document. Every caller already surfaces it: `generate_order_invoice`
+  logs and retries, the admin generate/regenerate actions show the
+  message, and `submit_invoice` records a `BUILD` failure.
+- **One computation, two documents.** Every line is split into a net
+  rounded half-up to the cent and the VAT left of its gross, so each line
+  adds up to what was charged, then summed
+  (`order.taxation.split_gross`). `Invoice.subtotal`, `.total_vat`,
+  `.total` and the PDF's VAT breakdown are sums of those lines, and the
+  myDATA `invoiceDetails` / `invoiceSummary` are the same lines, so they
+  agree to the cent for any order
+  (`tests/unit/order/test_invoice_mydata_agreement.py`). The cart's
+  `vat_after_discount` rounds the same way. `Invoice.shipping` and
+  `.payment_fee` are the gross amounts, printed as reference rows;
+  net + VAT is the whole document.
+
 ## 4. Payment paths
 
 **Per-tenant payment identity.** Every tenant runs its OWN payment
@@ -294,7 +350,7 @@ load-bearing: without it the customer receives both an
 
 Webhook handler: `handle_stripe_charge_refunded` (`order/signals/handlers.py`).
 
-- Full refund: `payment_status=REFUNDED`, fires `order_refunded.send`.
+- Full refund: `payment_status=REFUNDED`, fires `order_refunded.send` with the refunded `amount`.
 - Partial refund: `payment_status=PARTIALLY_REFUNDED`, no signal fire.
 - `Order.status` is NOT auto-mutated (REFUNDED requires RETURNED first per the canonical table; that's a business call).
 
@@ -328,6 +384,53 @@ Differences from the Stripe path that are easy to miss:
   specific dispatch. Viva customers see the payment-confirmed email
   + the WS toasts that fire on later state changes (SHIPPED,
   DELIVERED).
+
+**Refund webhook (1797, `_handle_reversal_created`).** The event's
+`TransactionId` is the REFUND, a transaction of its own; `ParentId` is the
+payment it reverses
+([Viva](https://developer.viva.com/webhooks-for-payments/transaction-reversal-created/)).
+Per Viva's [status and type tables](https://developer.viva.com/integration-reference/response-codes/)
+that transaction reads `statusId` `F` (`R`, "fully or partially refunded",
+is the status of the ORIGINAL payment), a refund or void
+`transactionTypeId` (`VIVA_REFUND_TRANSACTION_TYPE_IDS`; the "Refund
+Claimed" types are chargebacks, not refunds) and a **negative** `amount`.
+The handler used to wait for the refund transaction itself to read
+REFUNDED, which Viva never reports, so every real 1797 was skipped — and
+recorded as processed, so Viva never retried. Nothing is read from the
+unauthenticated body except `ParentId`:
+
+1. `_verify_viva_refund` retrieves the refund transaction (an error raises
+   → 500 → Viva retries, and the multi-tenant candidate loop moves on) and
+   requires one of the order's issued order codes on it, `F`, a refund or
+   void type and a negative amount; the refunded amount is `-amount`. The
+   gift-card purchase path (`_process_gift_card_purchase_event`) goes
+   through the same verifier with the purchase's own order code. The card
+   is the whole purchase, so each verified refund is added to
+   `GiftCardPurchase.refunded_amount` and the card is voided once the
+   refunds reach the purchase amount (a refund id counts once: the
+   `VivaWebhookEvent` row is its idempotency key); a part refund leaves the
+   value the buyer still owns alone.
+2. `ParentId` must be the order's `payment_id`. Retrieve Transaction
+   documents no parent id, so this check can only refuse, never grant.
+3. A refund id already in `metadata["refunds"]` is skipped: Viva notifies
+   every refund, including the one `refund_order` has just made.
+4. Only a paid order (COMPLETED / PARTIALLY_REFUNDED) takes a refund. The
+   captured amount is read from Retrieve Transaction on `payment_id`
+   (`PaymentProvider.captured_amount`, the helper `refund_payment` and
+   `refund_order` use; unreadable → 500). The refund is appended to `metadata["refunds"]`
+   (`refund_id`, `amount`, `currency`, `provider`, `refunded_at`) and
+   `PaymentStatus.after_refund(refunded=<cumulative>, captured=<captured>)`
+   picks PARTIALLY_REFUNDED or REFUNDED.
+5. `order_refunded` fires with `amount` = this refund (§7.2);
+   `Order.status` is not touched.
+
+The dispatcher stores the handler's real outcome in
+`VivaWebhookEvent.outcome`: every skip above (and a 1798 that changed
+nothing) is `skipped`, a booked refund `processed`. Ops: each tenant's Viva
+account needs the *Transaction Reversal Created* webhook subscribed
+(Settings → API Access → Webhooks). Production had received no 1797 by
+2026-10-10, so check the subscription before assuming that a refund made in
+Viva's dashboard reached the order.
 
 **Post-payment redirect (fixed 2026-07-02).** Smart Checkout's
 success/failure URLs are static strings configured on the source in
@@ -699,29 +802,57 @@ All WS notifications go through `notification.consumers.NotificationConsumer` an
 
 ### 7.1 Cancel paths
 
-- **Customer**: `POST /api/v1/order/{id}/cancel` → `OrderService.cancel_order(order, reason, refund_payment=True)`.
-- **Admin**: same `cancel_order` via the "Cancel selected orders and restore stock" action. The change form's `status` field is **read-only**: a form save wrote the column straight to the row, bypassing both `cancel_order` (no stock restore — prod orders 242 and 213, 2026-09-08) and the transition table in `update_order_status`. Every other transition is an action too (`mark_as_processing` … `mark_as_returned`, `mark_as_refunded`), routed through `update_order_status`. RETURNED and REFUNDED deliberately leave stock alone (§5.1).
-- **Auto**: `auto_cancel_stuck_pending_orders` Celery beat — cancels online orders stuck in PENDING for >24h.
+- **Customer** (the owner, or a guest holding the order's uuid): `POST /api/v1/order/{id}/cancel` → `OrderService.cancel_order(order, reason, refund_payment=True, customer_initiated=True)`. The courier is asked first, see §7.1.1.
+- **Store staff**: the same endpoint, with `customer_initiated=False` — the view takes it from `is_store_staff(request.user)`, never from `is_staff`.
+- **Admin**: same `cancel_order` (`customer_initiated=False`) via the "Cancel selected orders and restore stock" action. The change form's `status` field is **read-only**: a form save wrote the column straight to the row, bypassing both `cancel_order` (no stock restore — prod orders 242 and 213, 2026-09-08) and the transition table in `update_order_status`. Every other transition is an action too (`mark_as_processing` … `mark_as_returned`, `mark_as_refunded`), routed through `update_order_status`. RETURNED and REFUNDED deliberately leave stock alone (§5.1).
+- **Auto**: `auto_cancel_stuck_pending_orders` Celery beat — cancels online orders stuck in PENDING for >24h (`customer_initiated=False`).
+- **Carrier-driven**: `AcsService._cancel_order_for_dead_shipment` (`customer_initiated=False`; the voucher is already canceled).
+
+`customer_initiated` is a required decision for every caller that is not a customer: it defaults to `True`, so a caller that forgets to choose is held to the courier's answer (§7.1.1) rather than silently skipping it.
 
 `cancel_order`:
+0. Customer only: asks the courier to cancel the voucher before anything else (§7.1.1). No lock is held and no transaction is open for that call.
 1. Locks order row.
 2. Releases stock + reservations (`StockManager.increment_stock`, `release_reservation`).
 3. Sets `status=CANCELED` (the save settles an unpaid `payment_status` to `CANCELED` — `Order.settle_unpaid_payment`), records `metadata['cancellation']`.
-4. Cascades to courier voucher via `cancel_attached_shipment` → `ShippingService.cancel_shipment` (PR #2 H). Records dispatch outcome on metadata. Carrier rejection (e.g., voucher already in pickup list) is swallowed and logged.
+4. Staff / system only: cascades to the courier voucher via `cancel_attached_shipment` → `ShippingService.cancel_shipment` (PR #2 H). Records the dispatch outcome on metadata. A carrier rejection (e.g., voucher already in pickup list) does not stop the cancel: it is logged, kept in `metadata['cancellation']['shipment_cancel']['error']`, left as a staff-only `OrderHistory` NOTE (`Order canceled, but the courier did not cancel the parcel: …`), and the admin "Cancel selected orders" action raises an error message for it. For a customer cancel the courier already confirmed in step 0, so the outcome is recorded up front and the cascade (and the `order_canceled` signal's safety net) skips.
 5. Optional refund via `refund_order` (when `refund_payment=True` AND `is_paid`).
 
 **Don't bypass**: do not call `order.save(update_fields=['status'])` directly to cancel — you'll skip stock release + email + history. Always go through `OrderService.cancel_order`.
+
+### 7.1.1 A customer cancel asks the courier first
+
+An order stays PENDING / PROCESSING from the moment its voucher exists until a tracking poll sees the parcel move (voucher creation stores the tracking number but does not advance the status). In that window the courier may already hold the parcel, so a customer cancel is only accepted once the courier agrees:
+
+1. `OrderService._ask_courier_to_cancel` re-reads the order's status (an order that no longer allows a cancel gets the usual status error and the courier is not asked), then calls `ShippingService.cancel_shipment` — the same carrier path a staff cancel uses (`AcsService.cancel_voucher`, `BoxNowService.cancel_shipment`). An order with no voucher has nothing to ask, and goes on.
+2. If the courier confirms, the order cancels and refunds as usual, and `metadata['cancellation']['shipment_cancel']` is `{"attempted": true, "dispatched": <bool>}`.
+3. If the courier does not confirm, `cancel_order` changes **nothing**: no status, no refund, no shipment change, no history row. Which answer the customer gets depends on why, and every case has the body `{"detail": <translated message>, "error": {"type": ...}}` (`OrderCancelErrorType`, `OrderCancelErrorSerializer`). Branch on `error.type`, never on `detail`.
+   - **The courier refused** (an ACS voucher already on an issued pickup list, a BoxNow parcel past `NEW`, any other carrier business error): `ParcelWithCourierError`, 400 `parcel_with_courier`. The customer is told to contact the store about a return.
+   - **The courier gave no answer** (unreachable, timed out, HTTP 5xx, an auth-layer rejection such as ACS's sporadic 406s, missing credentials, the same cancel already in flight): `CourierUnreachableError`, 503 `courier_unreachable`. Nothing is known about the parcel, so the customer is told to try again in a few minutes.
+   - **Anything else** is a fault of ours, not the courier's answer: it propagates and the endpoint answers 500 through its error log.
+
+   The split rides the carrier exception hierarchy: every carrier app's errors derive from `shipping.exceptions.CarrierError`, and the no-answer ones (`AcsRetryableError` and with it `AcsAuthError`, `AcsConfigError`, `BoxNowRetryableError`, `BoxNowAuthError`, `BoxNowConfigError`) also from `CarrierUnavailableError`. A new carrier gets the same answers by deriving its errors the same way.
+4. The courier is asked before the order row is locked, so the order can move on while it answers; the locked re-check then refuses the cancel with the usual status error. The shipment was already canceled by then (at the courier, or locally when no voucher had been issued), so the order is live with no voucher behind it; any other failure of the locked cancel ends the same way. `OrderService._note_shipment_canceled_without_order` logs an ERROR (the logged-errors alert) and leaves a staff-only NOTE (`The customer asked to cancel this order and its shipment was canceled, but the order itself was not canceled (its status is …)`) telling staff to create a new voucher. An order another request canceled in the meantime needs neither.
+
+Both carriers' cancel is idempotent on an already canceled shipment, so a customer who retries after a cancel that stopped half way is not refused (`BoxNowService.cancel_shipment` returns on a CANCELED parcel, as `AcsService.cancel_voucher` already did).
+
+**`canBeCanceled`** (order list and detail) is `Order.can_be_canceled_by_customer`: the status rule (`Order.can_be_canceled`) AND `ShippingService.can_cancel_shipment(order)`. The second half reads local rows only, never the carrier: `AcsService.can_cancel_voucher` (false once the voucher is on a pickup list, `AcsShipment.pickup_list`) and `BoxNowService.can_cancel_shipment` (false once a parcel with a `parcel_id` is past `NEW`). These are the exact guards the carriers apply before they call the courier, so the flag and the cancel cannot drift; `ShippingCarrierInterface.can_cancel_shipment` defaults to `True` for a carrier with no cancel rule. A `True` is not a promise — the cancel request still asks the courier. `Order.can_be_canceled` (status only) stays the rule for staff and system cancels. The order list has no `canBeCanceled` filter: a status-only filter beside a carrier-aware field would list orders whose own flag says no. `OrderQuerySet.for_list()` selects `acs_shipment` / `boxnow_shipment` so the list reads the flag without a query per order.
 
 ### 7.2 Refund paths
 
 - **In-app**: `OrderService.refund_order(order, amount=None|Money, reason)`, reached from `cancel_order(refund_payment=True)` on a paid order (there is no standalone refund endpoint; the admin "Mark selected orders as refunded" action only moves the status).
 - **Stripe dashboard**: webhook `charge.refunded` → `handle_stripe_charge_refunded`.
+- **Viva dashboard**: webhook 1797 → `_handle_reversal_created` (§4.3). The same webhook also reports the refunds the in-app path makes; a refund id already in `metadata["refunds"]` is not applied twice.
 
-Both fire `order_refunded.send` → `handle_order_refunded` → email + WS notification. Single boolean `refund_confirmation_email_sent` flag dedupes between paths (PR #8).
+All fire `order_refunded.send` → `handle_order_refunded` → email + WS notification. Single boolean `refund_confirmation_email_sent` flag dedupes between paths (PR #8).
+
+**What `refund_order` books comes from the provider, not from the order.** `Order.paid_amount` is the amount owed when the order was created. A full refund (`amount=None`) records and signals the `amount` the provider reports it paid back (`refund_payment`'s response carries it for both providers); a part refund is compared with `PaymentProvider.captured_amount`, read BEFORE refunding so that an unreadable figure refuses the refund (staff NOTE, nothing sent) instead of leaving money returned and the order unbooked. Stripe amounts are integers in the currency's own smallest unit, converted with `money_from_minor_units` (the exponent comes from `moneyed`, not an assumed two decimals).
+
+**The `order_refunded` contract** (`order/signals/__init__.py`). It carries `amount`, a `Money`: what THIS refund paid back, never absent (receivers that use it declare it as a required argument, so a sender that leaves it out raises). `order.payment_status` is already written and says how much of the order is back: PARTIALLY_REFUNDED while part of the payment remains refundable, REFUNDED once nothing does (`PaymentStatus.after_refund`; `refund_order` applies it too, because a provider answers REFUNDED for a partial refund as well). **Whatever hangs off the order's total is released only on REFUNDED, once, with the last refund**: the gift-card redemption (`giftcard.signals.handle_order_refunded_giftcard` → `GiftCardService.credit_refund`, the whole redemption) and the loyalty points (`loyalty.signals.handle_order_refunded_loyalty`, which is all-or-nothing and once per order). A partial refund is paid back by the provider first, so a slice of the redemption on top would hand back more than that refund was worth (a EUR 5 refund once put EUR 60 back on a gift card), and the one-credit-per-card ledger could not top the card up when the rest is refunded. The email, the toast, the history row and the Meta `Refund` event fire on every refund.
 
 **A refund the provider did not make is not recorded.** `refund_order` returns `(False, response)` and changes nothing on the order: `payment_status` stays COMPLETED, `metadata["refunds"]` gets no entry, `order_refunded` does not fire. It leaves a staff-only `OrderHistory` NOTE (`Refund via <provider> was not processed: …`; `NOTE` is not a customer-visible history type). `cancel_order` still cancels and reports `refund_info = {"refunded": False, …}` with no provider text; the admin "Cancel selected orders" action raises an error message for it.
 
-**Viva (`VivaWalletPaymentProvider.refund_payment`).** Cancel Transaction requires `amount` (cents), so the request always carries it. A partial refund sends the amount asked for. `amount=None` (every `cancel_order`) means the whole capture: the provider reads what Viva captured from Retrieve Transaction (`_captured_amount`), because `Order.paid_amount` is the amount owed at creation, not what Viva collected. If that read fails nothing is sent. HTTP 2xx is not success: Viva reports refusals in a 200 body, so only `Success` true with `ErrorCode` 0 counts, and the body's `TransactionId` (the refund transaction) is stored as `refund_id`. Before #134 the amount was omitted and the body ignored, so every in-app Viva refund booked REFUNDED while Viva kept the payment at `F`.
+**Viva (`VivaWalletPaymentProvider.refund_payment`).** Cancel Transaction requires `amount` (cents), so the request always carries it. A partial refund sends the amount asked for. `amount=None` (every `cancel_order`) means the whole capture: the provider reads what Viva captured from Retrieve Transaction (`captured_amount`), because `Order.paid_amount` is the amount owed at creation, not what Viva collected. If that read fails nothing is sent. HTTP 2xx is not success: Viva reports refusals in a 200 body, so only `Success` true with `ErrorCode` 0 counts, and the body's `TransactionId` (the refund transaction) is stored as `refund_id`. Before #134 the amount was omitted and the body ignored, so every in-app Viva refund booked REFUNDED while Viva kept the payment at `F`.
 
 ## 8. Critical invariants
 
@@ -736,6 +867,7 @@ the linked memory note or the originating PR's commit message.
 | A payment-success handler checks `is_payment_after_cancel` BEFORE its settled-state guard | §2.2 above |
 | Order `status` changes only through admin actions / `OrderService`, never the change form | §7.1 above |
 | Every checkout-created order since `0059_orderattribution` has exactly one `OrderAttribution` row (`direct` when there was no signal); for a checkout order a missing row means "older than attribution", never "direct"; `source_type=agent` only with the gateway's `X-Internal-Gateway` secret | §3.4 above |
+| An issued tax document never re-reads the catalogue's VAT: invoices and myDATA split each line at `OrderItem.vat_rate`, snapshotted at creation, and tax shipping and the payment fee at the rate(s) of the goods (`order/taxation.py`); `Invoice` totals and the myDATA `invoiceSummary` come from the same lines | §3.5 above |
 | The default cache fails open on a Redis outage (reads miss, writes no-op — `core/caches.py`), but never for keys under `STRICT_KEY_PREFIXES`: the `strict:` throttle namespace, allauth's rate limits, TOTP replay protection, the IdP's single-use codes and WebSocket tickets. The checkout, payment, coupon and gift-card throttles (`core/api/throttling.py`, `fail_closed = True`) therefore DENY with 429 during an outage, while browsing/search/cart throttles and DRF's default `anon`/`user` budgets allow | `core/api/throttling.py` module docstring |
 | The tenant resolve payload and domain set are invalidated by `Tenant.cache_generation`, never by a Redis delete: it is part of their keys, and `Tenant.save`, every `TenantDomain` write and the folded pay-way / agent-setting writes bump it in the database inside the write's transaction. A delete during an outage is a fail-open no-op, so purge-by-delete left the pre-write payload served for up to its TTL; strict keys would have made the READS raise, and resolve is on every storefront request | `tenant/cache.py` module docstring |
 | The nightly demo reset returns the published demo gift card (`GIFT_CARD_CODE`) to its issued value with one `ADJUST` ledger row, so the ledger sum stays the balance and every guest spend stays on the card's history; only on `is_demo` tenants, and silently (no mail, no dispatch) | `devtools/demo_account.py: _restore_gift_card` |
@@ -743,6 +875,7 @@ the linked memory note or the originating PR's commit message.
 | `Order.objects.filter(pk=...).values(...).first()` — NOT `refresh_from_db(fields=...)` | `project_order_state_machine_invariants.md` |
 | `_suppress_customer_status_notifications` on chained transitions | `project_order_state_machine_invariants.md` |
 | Webhook payment_status writes never regress a SETTLED state (`SETTLED_PAYMENT_STATUSES` = COMPLETED/REFUNDED/PARTIALLY_REFUNDED/CANCELED). Stripe/Viva events are unordered + may duplicate, so `handle_payment_failed`/`_handle_payment_failed` skip when already settled, and `handle_payment_succeeded`/`_handle_payment_created` skip when already REFUNDED/PARTIALLY_REFUNDED/CANCELED. Reversal (COMPLETED→REFUNDED) is left intact. | `order/enum/status.py` `SETTLED_PAYMENT_STATUSES` |
+| `order_refunded` always carries `amount`, and the gift-card redemption and loyalty points are released only when `payment_status` is REFUNDED (the last refund), never per partial refund. A Viva 1797 is applied from the REFUND transaction (`F`, refund/void type, negative amount), not from a REFUNDED status that Viva never reports | §4.3, §7.2 |
 | The "shipped" email/toast fires only at genuine SHIPPED (status==SHIPPED **and** tracking present), never at voucher-mint; PROCESSING is internal-only (no customer email/toast). `send_shipping_notification_email` self-gates. | §6.1 above |
 | Admin-WYSIWYG fields in emails render `\|safe` (.html) / `unescape(strip_tags())`+`\|safe` (.txt — Django autoescapes .txt too) | `CLAUDE.md` "Transactional email rendering" |
 | ACS COD numeric fields use Greek-locale (comma decimal) | `project_acs_cod_locale.md` |

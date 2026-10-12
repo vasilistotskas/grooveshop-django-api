@@ -17,6 +17,7 @@ Exception Hierarchy:
     ├── OrderNotFoundError
     ├── InvalidStatusTransitionError
     ├── OrderCancellationError
+    │   └── ParcelWithCourierError
     └── PaymentError
         ├── PaymentNotFoundError
         ├── PaymentVerificationError
@@ -313,6 +314,29 @@ class OrderCancellationError(OrderServiceError):
         self.order_id = order_id
         self.reason = reason
         super().__init__(f"Cannot cancel order {order_id}: {reason}")
+
+
+class ParcelWithCourierError(OrderCancellationError):
+    """
+    Raised when a customer cancel is refused because the courier would not
+    take the parcel back.
+
+    A customer cancel asks the courier to cancel the voucher before the
+    order is touched. A courier that refuses (the voucher is already on a
+    pickup list, the parcel is already at a locker) leaves the order
+    exactly as it was: no status change, no refund, no shipment change.
+    """
+
+
+class CourierUnreachableError(OrderCancellationError):
+    """
+    Raised when a customer cancel stops because the courier gave no answer.
+
+    The courier could not be reached, failed on its side or rejected the
+    call at its auth layer (``CarrierUnavailableError``), so nothing is
+    known about the parcel. Like a refusal it leaves the order exactly as
+    it was, but asking again later may succeed.
+    """
 
 
 class PaymentError(OrderServiceError):

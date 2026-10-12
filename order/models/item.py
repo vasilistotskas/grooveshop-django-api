@@ -3,6 +3,7 @@ from decimal import Decimal
 from django.contrib.postgres.indexes import BTreeIndex
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models.expressions import DatabaseDefault
 from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
@@ -11,6 +12,7 @@ from djmoney.money import Money
 
 from core.models import SortableModel, TimeStampMixinModel, UUIDModel
 from order.managers.item import OrderItemManager
+from vat.models import validate_mydata_vat_rate
 
 
 class OrderItem(TimeStampMixinModel, SortableModel, UUIDModel):
@@ -28,6 +30,26 @@ class OrderItem(TimeStampMixinModel, SortableModel, UUIDModel):
         verbose_name=_("Product"),
     )
     price = MoneyField(_("Price"), max_digits=11, decimal_places=2)
+    # The VAT percentage ``price`` was sold at (``price`` is VAT-inclusive),
+    # fixed when the line is created. The invoice and the myDATA payload
+    # split ``price`` at this rate and never read ``product.vat`` again, so
+    # editing or deleting a ``Vat`` row cannot rewrite a document already
+    # issued for the order. ``db_default`` exists for the rolling deploy
+    # (the previous release still INSERTs without the column) and for the
+    # backfill of existing rows; every creation path states the rate, and
+    # ``save`` snapshots the product's current one when a caller does not.
+    vat_rate = models.DecimalField(
+        _("VAT Rate"),
+        max_digits=11,
+        decimal_places=1,
+        db_default=Decimal(0),
+        validators=[validate_mydata_vat_rate],
+        help_text=_(
+            "VAT percentage this line was sold at, fixed when the line was "
+            "created. Invoices and myDATA use it, never the product's "
+            "current VAT."
+        ),
+    )
     quantity = models.IntegerField(_("Quantity"), default=1)
     original_quantity = models.IntegerField(
         _("Original Quantity"), null=True, blank=True
@@ -131,6 +153,10 @@ class OrderItem(TimeStampMixinModel, SortableModel, UUIDModel):
     def save(self, *args, **kwargs):
         if not self.pk and self.original_quantity is None:
             self.original_quantity = self.quantity
+        if self._state.adding and isinstance(self.vat_rate, DatabaseDefault):
+            # Nobody stated a rate (admin, staff API, a script): the line's
+            # snapshot is the rate its product carries right now.
+            self.vat_rate = self.product.vat_percent
         super().save(*args, **kwargs)
 
     def refund(self, quantity=None):

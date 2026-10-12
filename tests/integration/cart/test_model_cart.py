@@ -9,6 +9,7 @@ from django.utils import timezone
 from cart.factories.cart import CartFactory
 from cart.factories.item import CartItemFactory
 from cart.models import Cart, CartItem
+from order.taxation import split_gross
 from product.factories.product import ProductFactory
 from user.factories.account import UserAccountFactory
 from vat.factories import VatFactory
@@ -80,16 +81,19 @@ class CartModelTestCase(TestCase):
     def test_total_vat_value_is_backed_out_of_what_is_paid(self):
         """VAT is the tax inside ``total_price`` — markdown included.
 
-        The invoice backs VAT out of the (marked-down) line gross; the
-        cart must report the same figure, and it must scale with
-        quantity like every other cart total.
+        The invoice backs VAT out of each (marked-down) line gross and
+        rounds it to the cent line by line (``order.taxation``); the cart
+        must report the same figure, and it must scale with quantity like
+        every other cart total.
         """
-        gross = self.cart.total_price.amount
-        net = gross / Decimal("1.24")
-        self.assertEqual(
-            self.cart.total_vat_value.amount,
-            (gross - net).quantize(Decimal("0.01")),
+        expected = sum(
+            (
+                split_gross(item.total_price.amount, Decimal(24))[1]
+                for item in (self.cart_item_1, self.cart_item_2)
+            ),
+            Decimal(0),
         )
+        self.assertEqual(self.cart.total_vat_value.amount, expected)
 
     def test_cart_totals_reconcile(self):
         """net + VAT == total price, with VAT backed out of the gross."""
@@ -97,8 +101,10 @@ class CartModelTestCase(TestCase):
         vat = self.cart.total_vat_value.amount
         net = total - vat
         self.assertEqual(net + vat, total)
+        # Each line's VAT is rounded to the cent, so the reconciliation
+        # may drift by up to a cent per line (two lines here).
         self.assertAlmostEqual(
-            net * Decimal("1.24"), total, delta=Decimal("0.01")
+            net * Decimal("1.24"), total, delta=Decimal("0.02")
         )
 
     def test_total_items(self):

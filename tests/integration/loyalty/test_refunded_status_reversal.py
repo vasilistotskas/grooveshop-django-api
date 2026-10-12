@@ -111,6 +111,51 @@ def test_returned_alone_keeps_the_points(
     assert _balance(order.user) == earned
 
 
+def test_a_partial_refund_keeps_the_points(
+    awarded_order, django_capture_on_commit_callbacks
+):
+    """The reversal is all-or-nothing and runs once per order: spending it
+    on a EUR 5 goodwill refund would wipe the points of an order the
+    shopper keeps, and could not be redone when the rest is refunded."""
+    order, earned = awarded_order
+
+    with (
+        patch("loyalty.services.Setting.get", side_effect=_enabled),
+        django_capture_on_commit_callbacks(execute=True),
+    ):
+        order.payment_status = PaymentStatus.PARTIALLY_REFUNDED
+        order.save(update_fields=["payment_status"])
+        order_refunded.send(
+            sender=OrderService,
+            order=order,
+            amount=Money(Decimal("5.00"), "EUR"),
+        )
+
+    assert not _reversals(order).exists()
+    assert _balance(order.user) == earned
+
+
+def test_the_refund_that_completes_the_order_reverses_the_points(
+    awarded_order, django_capture_on_commit_callbacks
+):
+    order, _earned = awarded_order
+
+    with (
+        patch("loyalty.services.Setting.get", side_effect=_enabled),
+        django_capture_on_commit_callbacks(execute=True),
+    ):
+        order.payment_status = PaymentStatus.REFUNDED
+        order.save(update_fields=["payment_status"])
+        order_refunded.send(
+            sender=OrderService,
+            order=order,
+            amount=Money(Decimal("95.00"), "EUR"),
+        )
+
+    assert _reversals(order).count() == 1
+    assert _balance(order.user) == 0
+
+
 def test_refund_then_status_move_reverses_exactly_once(
     awarded_order, django_capture_on_commit_callbacks
 ):
@@ -124,7 +169,11 @@ def test_refund_then_status_move_reverses_exactly_once(
         # What OrderService.refund_order does once the provider agrees.
         order.payment_status = PaymentStatus.REFUNDED
         order.save(update_fields=["payment_status"])
-        order_refunded.send(sender=OrderService, order=order)
+        order_refunded.send(
+            sender=OrderService,
+            order=order,
+            amount=Money(Decimal("100.00"), "EUR"),
+        )
     assert _reversals(order).count() == 1
 
     with (

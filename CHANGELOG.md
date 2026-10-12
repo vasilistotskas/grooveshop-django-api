@@ -3,6 +3,320 @@
 
 
 
+## v3.104.9 (2026-10-12)
+
+### Bug fixes
+
+* fix(order): snapshot the VAT rate on order lines and tax shipping and fees with the goods (#153) ([`e04a91d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e04a91d07d9a7e51efc63cb3bcdd6a4783d8f42c))
+
+* fix(order): snapshot the VAT rate on order lines and tax shipping and fees with the goods
+
+The invoice and the myDATA payload backed VAT out of each line at the
+product's CURRENT Vat row, days after the sale, so editing or deleting a
+Vat row rewrote a tax document for money already earned. They also
+disagreed about shipping and the payment-method fee: myDATA taxed them at
+a flat 24% while the PDF and the Invoice row added them on top with no
+VAT, and the two rounded differently (summed bucket vs rounded lines).
+
+- OrderItem.vat_rate (db_default 0, backfilled from the product's current
+  VAT in 0065) is written when a line is created: both checkout paths pass
+  the rate the cart used, promotion gift lines pass their product's, and
+  OrderItem.save() snapshots the product's rate for every other writer.
+  Nothing reads product.vat for an order again.
+- order/taxation.py is the one rule both documents derive their lines
+  from. Shipping and the fee are part of the taxable amount of the goods
+  (Directive 2006/112/EC art. 78(b); Greek VAT Code, Law 5144/2024, art.
+  24(4)(a)), so they take the goods' rate, apportioned by goods value
+  when the basket mixes rates. Every line is rounded to the cent before
+  it is summed, so Invoice.subtotal / total_vat / total, the PDF VAT
+  table and the myDATA invoiceSummary agree to the cent for any order.
+  The cart's VAT figure rounds the same way.
+- No Order-level rate field: the split is a function of the snapshotted
+  lines and the two amounts.
+- The PDF lists shipping and the fee as reference rows (incl. VAT) above
+  the net subtotal; the invoice admin help no longer tells staff that
+  editing a VAT row fixes an order.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1 ([`e04a91d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e04a91d07d9a7e51efc63cb3bcdd6a4783d8f42c))
+
+* fix(order): make every VAT line add up to its gross and freeze a registered line's rate
+
+- split_gross rounded the net and the VAT independently, so on a half-cent
+  tie both rounded up and a line billed more than it was charged (two 0.13
+  lines at 4% came to 0.28 for 0.26 of goods). The net is now rounded and
+  the VAT is what is left of the gross, so net + VAT is the gross on every
+  line and the invoice and myDATA totals, built from the same lines, still
+  agree to the cent and equal what the customer was charged.
+- The order item admin left vat_rate editable on every existing line. Once
+  the order's invoice carries a myDATA MARK its totals are frozen, so an
+  edited rate would print on a regenerated PDF beside totals that no longer
+  match; the field is read-only from then on and stays editable before it,
+  so staff can still correct a wrong checkout rate.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1 ([`e04a91d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e04a91d07d9a7e51efc63cb3bcdd6a4783d8f42c))
+
+* fix(order): keep the item admin's add page rendering and cover the item-less invoice case
+
+- OrderItemAdmin listed vat_rate as read-only on the add page, where the
+  unsaved line holds a DatabaseDefault that the admin cannot format, so
+  GET /admin/order/orderitem/add/ answered 500. A new line is no longer
+  shown a rate (OrderItem.save snapshots its product's); an existing line
+  still offers it until its invoice carries a MARK.
+- An order that charges shipping but has no goods (staff deleting every
+  line) has no rate for the shipping to follow, so its invoice is refused
+  rather than filed with a guessed rate. Every caller already reports it
+  (the task logs and retries, the admin actions show the message, myDATA
+  records a BUILD failure); tests pin that the sequential invoice number
+  is not consumed and that the task gives up cleanly. Fixtures that
+  invoiced item-less orders with shipping now carry a goods line.
+- The docs name the refusal and its callers.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`e04a91d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e04a91d07d9a7e51efc63cb3bcdd6a4783d8f42c))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.104.8 [skip ci] ([`501a2e9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/501a2e9f92b1a0ce64f3b8456cbb4ad9b8b1bf9e))
+
+## v3.104.8 (2026-10-12)
+
+### Bug fixes
+
+* fix(payments): apply Viva refund webhooks (1797) and book partial refunds as partial (#152) ([`74f974e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/74f974e8fbf5c4bc0aed9e5d60e4dc36ced2940e))
+
+* fix(payments): apply Viva refund webhooks and book partial refunds as partial
+
+A refund made in the Viva dashboard never reached the order, and a
+partial one would have been booked as full.
+
+- The 1797 handler waited for the event's transaction to verify as
+  REFUNDED, but that transaction is the refund itself: statusId F, a
+  refund or void transactionTypeId and a negative amount (R belongs to
+  the original payment). Every real event was skipped. The new
+  _verify_viva_refund reads all of that from Retrieve Transaction, needs
+  one of the order's own order codes on it, and returns the refunded
+  amount; the event's ParentId must be the order's payment. The gift-card
+  purchase path goes through the same verifier and, for the same reason,
+  voids a card only for a refund of the whole purchase.
+- REFUNDED vs PARTIALLY_REFUNDED follows the cumulative refunded amount
+  against what Viva captured (PaymentStatus.after_refund, captured_amount
+  from Retrieve Transaction). refund_order uses the same rule, because a
+  provider answers REFUNDED for a partial refund too. A refund the in-app
+  path already booked is recognised by its refund id and not applied twice.
+- order_refunded always carries amount (Money), and receivers that use it
+  require it. The gift-card redemption and the loyalty points are released
+  only on REFUNDED, once, with the last refund: crediting a slice per
+  partial refund hands back more than the refund was worth and the
+  one-credit-per-card ledger cannot top it up. The now-unused partial
+  credit (amount argument of credit_refund and its task, _split_refund) is
+  removed, as is PayWayService.refund_payment, a dead sender that booked
+  REFUNDED for any amount.
+- The dispatcher records the handler's real outcome in
+  VivaWebhookEvent.outcome for 1797 and 1798, so a refused event reads
+  skipped instead of processed.
+
+Tests run the dispatcher against Viva's documented 1797 payload and fake
+only the HTTP boundary (tests/utils/viva.py).
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1 ([`74f974e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/74f974e8fbf5c4bc0aed9e5d60e4dc36ced2940e))
+
+* fix(payments): read refund amounts from the provider, count gift-card refunds cumulatively
+
+Review of #152.
+
+- A Stripe amount is an integer in the currency's own smallest unit. The
+  charge.refunded webhook divided by a hardcoded 100; money_from_minor_units
+  takes the exponent from moneyed (EUR 100, JPY 1, BHD 1000). The Stripe
+  refund request, the refund amount the provider reports and the captured
+  amount read through it use the same exponent.
+- refund_order took order.paid_amount, the amount OWED when the order was
+  created, for both what a full refund paid back and what was captured. A
+  full refund now records and signals the amount the provider reports it
+  paid back (Stripe's response no longer says "full refund"), and a part
+  refund is compared with PaymentProvider.captured_amount, read before the
+  refund so that an unreadable figure refuses it instead of leaving money
+  returned and the order unbooked. captured_amount moved from the Viva
+  provider to the base class, where it was already generic.
+- A gift-card purchase refunded in slices (5 + 35 of 40) left the card
+  active, because each refund was compared with the whole purchase on its
+  own. GiftCardPurchase.refunded_amount (migration 0006, db_default 0)
+  accumulates the verified refunds, each counted once by its
+  VivaWebhookEvent row, and the card is voided when they reach the
+  purchase amount.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`74f974e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/74f974e8fbf5c4bc0aed9e5d60e4dc36ced2940e))
+
+* fix(search): attribute filters AND across attributes, OR within one (#151) ([`23c28d5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/23c28d5f9042a7ef02543bb3bb0c9b44d8e47cfc))
+
+* fix(search): attribute filters AND across attributes, OR within one
+
+The storefront sends the selected attribute values as one flat list,
+and both the product search (a single `attribute_values IN [...]`
+clause) and the product list (`attribute_value__in`) read it as an OR
+over everything: black and 2 m returned the products that were black
+or 2 m long.
+
+AttributeSelection groups the ids by the attribute each value belongs
+to, and every surface reads the selection through it: one
+`attribute_values IN [...]` clause per attribute for the search (a
+Meilisearch filter list ANDs its elements), one subquery per attribute
+for the product list. An id that belongs to no attribute stays a group
+of its own that matches nothing, so a stale link lists nothing instead
+of losing the filter, as an unknown category does.
+
+The attribute_values facet follows the standard faceted-search rule: an
+attribute's own selection no longer shrinks its own counts, the other
+attributes' selections still do. IndexQuerySet.filter_facet_group
+registers each attribute as a facet group, and search() sends one
+multi-search request with the main query plus a count-only query per
+selected attribute that leaves out that attribute's clause.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1 ([`23c28d5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/23c28d5f9042a7ef02543bb3bb0c9b44d8e47cfc))
+
+* fix(search): count a selected facet value from the main query
+
+A facet group's count query leaves out the group's own clause, so it
+matches more documents than the main query and can reach the engine's
+maxValuesPerFacet cap where the main query does not. Reading the whole
+group from it could drop a SELECTED value whose count the main query
+had.
+
+A document holding a selected value matches the group's clause either
+way, so the main query's count already is its count without that
+clause. Keep the selected values' counts from the main query and read
+only the group's unselected siblings from the count query; a sibling the
+cap omits is simply not listed, the truncation every facet has.
+
+FacetGroup now records the selected keys beside its members. The search
+doc names the cap and what it means for attribute_values.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`23c28d5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/23c28d5f9042a7ef02543bb3bb0c9b44d8e47cfc))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.104.7 [skip ci] ([`87ceaad`](https://github.com/vasilistotskas/grooveshop-django-api/commit/87ceaadb38d503100a922875c357cde1554fbc6d))
+
+## v3.104.7 (2026-10-12)
+
+### Bug fixes
+
+* fix(order): tell a courier outage apart from a refusal on customer cancel (#150) ([`086f2bc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/086f2bc999cc5ec4d0e66400dfab59b66b487f06))
+
+* fix(order): tell a courier outage apart from a refusal on customer cancel
+
+A customer cancel turned every exception from the courier call into a
+400 parcel_with_courier, so a database error or a bug of ours told the
+customer their parcel was already with the courier, and so did a courier
+that was merely unreachable (ACS answers ~2% of calls with a transient
+406).
+
+- shipping.exceptions gains CarrierError and CarrierUnavailableError.
+  AcsError and BoxNowError derive from CarrierError; the no-answer
+  errors (AcsRetryableError and so AcsAuthError, AcsConfigError,
+  BoxNowRetryableError, BoxNowAuthError, BoxNowConfigError) also derive
+  from CarrierUnavailableError.
+- _ask_courier_to_cancel catches courier errors only: a refusal stays
+  400 parcel_with_courier, no answer is CourierUnreachableError and a
+  503 courier_unreachable ("try again in a few minutes"), anything else
+  propagates as itself to the endpoint's 500.
+- The courier is asked before the order row is locked. If the order
+  moved on meanwhile and the locked re-check refuses the cancel after
+  the courier canceled the parcel, an ERROR line and a staff note say
+  the order needs a new voucher. An order canceled by another request
+  meanwhile needs neither.
+- The order list's canBeCanceled filter is removed. It was status-only
+  while the canBeCanceled field now follows the courier, so it listed
+  orders whose own flag said no, and no client used it.
+- schema.yml regenerated; el/en catalogue entries; docs/order-system.md
+  section 7.1.1 describes the three answers.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1 ([`086f2bc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/086f2bc999cc5ec4d0e66400dfab59b66b487f06))
+
+* fix(order): word the staff note by what is known, not by a guessed cause
+
+The note written when a customer cancel canceled the shipment but not the
+order said the order had moved on and that the courier canceled its
+parcel. Neither holds every time: any failure of the locked cancel ends
+the same way, and a shipment with no voucher yet is canceled only
+locally. It now states that the shipment was canceled, that the order was
+not, and the order's current status.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`086f2bc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/086f2bc999cc5ec4d0e66400dfab59b66b487f06))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.104.6 [skip ci] ([`519371d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/519371df66216fd8019263d76d3a7e3e040d2114))
+
+## v3.104.6 (2026-10-11)
+
+### Bug fixes
+
+* fix(order): ask the courier before a customer cancel (#149)
+
+A customer cancel asks the courier to cancel the voucher first. The order
+is canceled and refunded only when the courier confirms, or when the order
+has no voucher. Once the parcel is with the courier (an ACS voucher on an
+issued pickup list, a BoxNow parcel past NEW), or the courier cannot be
+reached, the cancel is refused and nothing changes: no status, no refund,
+no shipment change.
+
+- OrderService.cancel_order takes customer_initiated (default True, so a
+  caller that forgets to choose gets the courier-first rule). The courier
+  is asked before the order row is locked and outside any transaction of
+  its own, then its outcome is recorded on metadata.cancellation so the
+  cascade and the order_canceled safety net do not ask a second time.
+- The cancel endpoint passes customer_initiated=not is_store_staff(user).
+  The admin action, auto_cancel_stuck_pending_orders and
+  AcsService._cancel_order_for_dead_shipment pass False and keep the
+  best-effort cascade. A courier refusal on that path is now also a
+  staff-only OrderHistory note and an error message on the admin action.
+- A refusal is 400 {"detail": <translated>, "error": {"type":
+  "parcel_with_courier"}} (OrderCancelErrorType, OrderCancelErrorSerializer,
+  ParcelWithCourierError); schema.yml regenerated.
+- canBeCanceled is Order.can_be_canceled_by_customer: the status rule and
+  ShippingService.can_cancel_shipment, read from local rows only. ACS reads
+  AcsShipment.pickup_list, BoxNow reads parcel_state; both are the guards
+  the carriers already apply before calling the courier, now shared through
+  ShippingCarrierInterface.can_cancel_shipment. OrderQuerySet.for_list
+  selects the shipment rows so the list stays flat in queries.
+- BoxNowService.cancel_shipment returns on an already CANCELED parcel
+  (as AcsService.cancel_voucher already did), so a retry after a cancel
+  that stopped part way is not refused.
+docs/order-system.md describes the rule; el and en catalogue entries added.
+
+
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`26d686e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/26d686e0d9974000d23c641c501ab04526f8ae41))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.104.5 [skip ci] ([`e744a07`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e744a073fe5e8ae1009c37597d33b6920c45adc9))
+
 ## v3.104.5 (2026-10-11)
 
 ### Bug fixes

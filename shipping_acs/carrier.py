@@ -49,6 +49,11 @@ class AcsCarrier(ShippingCarrierInterface):
 
         AcsService.cancel_voucher(shipment, reason=reason)
 
+    def can_cancel_shipment(self, shipment: Any) -> bool:
+        from shipping_acs.services import AcsService
+
+        return AcsService.can_cancel_voucher(shipment)
+
     def fetch_label_bytes(self, shipment: Any) -> bytes:
         from shipping_acs.services import AcsService
 

@@ -133,33 +133,21 @@ class TestVivaWebhookHistory:
             == PaymentStatus.COMPLETED
         )
 
-    @pytest.mark.parametrize(
-        ("handler", "verified", "expected"),
-        [
-            (
-                "_handle_payment_failed",
-                PaymentStatus.FAILED,
-                PaymentStatus.FAILED,
-            ),
-            (
-                "_handle_reversal_created",
-                PaymentStatus.REFUNDED,
-                PaymentStatus.REFUNDED,
-            ),
-        ],
-    )
-    def test_terminal_events(self, handler, verified, expected):
+    def test_payment_failed(self):
         from order.views import viva_webhook
 
-        order = _pending_order(f"viva_hist_{handler}")
+        order = _pending_order("viva_hist_failed")
         with (
             patch.object(
                 viva_webhook,
                 "_verify_viva_terminal_transaction",
-                return_value=verified,
+                return_value=PaymentStatus.FAILED,
             ),
             patch.object(viva_webhook, "dispatch_on_commit"),
         ):
-            getattr(viva_webhook, handler)(order, {}, "viva_txn_t")
+            viva_webhook._handle_payment_failed(order, {}, "viva_txn_t")
 
-        assert self._history(order).new_value["payment_status"] == expected
+        assert (
+            self._history(order).new_value["payment_status"]
+            == PaymentStatus.FAILED
+        )

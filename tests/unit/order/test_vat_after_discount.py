@@ -16,9 +16,10 @@ from djmoney.money import Money
 
 from cart.factories import CartFactory, CartItemFactory
 from cart.serializers.cart import CartSerializer
-from order.discounts import allocate_discount, vat_buckets
+from order.discounts import allocate_discount
 from order.factories.order import OrderFactory
 from order.invoicing import _compute_vat_breakdown
+from order.taxation import split_gross
 from product.factories import ProductFactory
 from promotion.enum import BenefitType, PromotionTrigger
 from promotion.factories import PromotionFactory
@@ -74,7 +75,9 @@ def _cart_vat(cart):
 
 
 def _order(lines, discount=None, loyalty=None, gift_card=None):
-    order = OrderFactory(num_order_items=0)
+    # No shipping: the invoice taxes it with the goods, and these tests
+    # compare the goods' VAT with the cart's.
+    order = OrderFactory(num_order_items=0, shipping_price=Money(D(0), "EUR"))
     order.items.all().delete()
     for net, rate, quantity in lines:
         product = _product(net, rate)
@@ -103,13 +106,13 @@ class TestSharedFunctions:
 
         assert sum(discounted.values()) == sum(gross.values()) - D("33.33")
 
-    def test_buckets_reconcile_to_the_cent(self):
-        buckets = vat_buckets([(D("111.60"), D("24")), (D("101.70"), D("13"))])
-
-        for row in buckets.values():
-            assert row["subtotal"] + row["vat"] == row["gross"]
-        assert buckets[D("24")]["vat"] == D("21.60")
-        assert buckets[D("13")]["vat"] == D("11.70")
+    def test_split_reconciles_to_the_cent(self):
+        for gross, rate, net, vat in (
+            (D("111.60"), D("24"), D("90.00"), D("21.60")),
+            (D("101.70"), D("13"), D("90.00"), D("11.70")),
+        ):
+            assert split_gross(gross, rate) == (net, vat)
+            assert net + vat == gross
 
 
 class TestCartVat:
@@ -117,6 +120,15 @@ class TestCartVat:
         cart = _cart([(100, 24, 2)])
 
         assert _cart_vat(cart) == D("48.00")
+
+    def test_rounding_is_line_by_line_like_the_invoice(self, enable_promotions):
+        """Three lines of 1.00 at 24%: the lines' VAT is 0.19 each, 0.57 in
+        all. Rounding the summed bucket instead would say 0.58."""
+        lines = [(0.81, 24, 1)] * 3
+
+        assert (
+            _cart_vat(_cart(lines)) == _invoice_vat(_order(lines)) == D("0.57")
+        )
 
     def test_single_rate_coupon_reduces_the_base(self, enable_promotions):
         cart = _cart([(100, 24, 1)])
@@ -175,7 +187,9 @@ class TestMarkdownVat:
         cart = CartFactory(is_guest=True)
         cart.items.all().delete()
         CartItemFactory(cart=cart, product=product, quantity=2)
-        order = OrderFactory(num_order_items=0)
+        order = OrderFactory(
+            num_order_items=0, shipping_price=Money(D(0), "EUR")
+        )
         order.items.all().delete()
         order.items.create(
             product=product, price=product.final_price, quantity=2

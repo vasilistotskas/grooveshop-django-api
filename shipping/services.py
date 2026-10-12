@@ -184,6 +184,21 @@ class ShippingService:
         return True
 
     @classmethod
+    def can_cancel_shipment(cls, order: Order) -> bool:
+        """Whether the order's carrier would still accept a cancel.
+
+        Local data only, no carrier call; True when the order has no
+        shipment. See :meth:`ShippingCarrierInterface.can_cancel_shipment`.
+        """
+        adapter = cls.adapter_for_order(order)
+        if adapter is None:
+            return True
+        shipment = adapter.shipment_for_order(order)
+        if shipment is None:
+            return True
+        return adapter.can_cancel_shipment(shipment)
+
+    @classmethod
     def fetch_label_bytes(cls, order: Order) -> bytes | None:
         """Return the label PDF for ``order`` or None when unavailable."""
         adapter = cls.adapter_for_order(order)

@@ -31,6 +31,10 @@ from core.api.serializers import ErrorResponseSerializer
 from core.api.throttling import SearchClickThrottle, SearchThrottle
 from meili._client import client as meili_client
 from meili.querysets import HIGHLIGHT_POST_TAG, HIGHLIGHT_PRE_TAG
+from product.attribute_selection import (
+    ATTRIBUTE_VALUES_FIELD,
+    AttributeSelection,
+)
 from product.models.category import ProductCategory
 from product.models.product import ProductTranslation
 from search.models import SearchClick, SearchQuery
@@ -85,7 +89,7 @@ _ALLOWED_PRODUCT_FACETS: frozenset[str] = frozenset(
         "language_code",
         "likes_count",
         "view_count",
-        "attribute_values",
+        ATTRIBUTE_VALUES_FIELD,
     }
 )
 
@@ -443,7 +447,11 @@ def blog_post_meili_search(request):
             type=str,
             location=OpenApiParameter.QUERY,
             description=_(
-                "Comma-separated attribute value IDs (attribute_values IN [ids])"
+                "Comma-separated attribute value IDs. Values of the same "
+                "attribute are alternatives (any of them); values of "
+                "different attributes must all match. With the "
+                "attribute_values facet, an attribute's own values are "
+                "counted without its own selection."
             ),
             required=False,
         ),
@@ -598,9 +606,14 @@ def product_meili_search(request):
             category__in=_category_subtree_ids(category_ids)
         )
 
-    # Apply attribute value filter (multi-select with IN operator)
+    # Apply the attribute value selection: alternatives within one
+    # attribute, every attribute narrowing the result (AttributeSelection).
+    # With the attribute_values facet requested, each attribute's own
+    # values are counted without its own selection.
     if attribute_value_ids:
-        search_qs = search_qs.filter(attribute_values__in=attribute_value_ids)
+        search_qs = AttributeSelection.from_value_ids(
+            attribute_value_ids
+        ).filter_search(search_qs, with_counts=ATTRIBUTE_VALUES_FIELD in facets)
 
     if brand_ids:
         search_qs = search_qs.filter(brand__in=brand_ids)

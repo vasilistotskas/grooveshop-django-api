@@ -48,10 +48,12 @@ from core.utils.serializers import (
     create_schema_view_config,
 )
 from order.attribution import AttributionInput
+from order.enum.cancel_error import OrderCancelErrorType
 from order.enum.create_error import OrderCreateErrorType
 from order.enum.status import OrderStatus, PaymentStatus
 from order.exceptions import (
     CartNotReadyError,
+    CourierUnreachableError,
     InsufficientStockError,
     InvalidCouponError,
     InvalidGiftCardError,
@@ -59,6 +61,7 @@ from order.exceptions import (
     InvalidStatusTransitionError,
     OrderCancellationError,
     OrderChangedDuringPaymentError,
+    ParcelWithCourierError,
     PaymentAmountMismatchError,
     PaymentCurrencyMismatchError,
     PaymentNotFoundError,
@@ -83,6 +86,7 @@ from order.serializers.order import (
     CreateCheckoutSessionResponseSerializer,
     CreatePaymentIntentRequestSerializer,
     CreatePaymentIntentResponseSerializer,
+    OrderCancelErrorSerializer,
     OrderCreateErrorSerializer,
     OrderCreateFromCartSerializer,
     OrderDetailSerializer,
@@ -128,6 +132,10 @@ serializers_config: SerializersConfig = {
     "cancel": ActionConfig(
         request=CancelOrderRequestSerializer,
         response=OrderDetailSerializer,
+        responses={
+            400: OrderCancelErrorSerializer,
+            503: OrderCancelErrorSerializer,
+        },
         operation_id="cancelOrder",
         summary=_("Cancel an order"),
         description=_("Cancel an existing order and restore product stock"),
@@ -1793,6 +1801,10 @@ class OrderViewSet(BaseModelViewSet):
                 reason=cancellation_reason,
                 refund_payment=should_refund,
                 canceled_by=user.id if user and user.is_authenticated else None,
+                # Store staff cancel and refund regardless; everyone else
+                # (the owner, a guest holding the order's uuid) is held to
+                # the courier's answer first.
+                customer_initiated=not is_admin,
             )
 
             response_serializer_class = self.get_response_serializer()
@@ -1806,6 +1818,41 @@ class OrderViewSet(BaseModelViewSet):
 
             return Response(response_data)
 
+        except CourierUnreachableError as e:
+            # Before OrderCancellationError, which it subclasses. A 503:
+            # the courier, not the request, is at fault, and the same
+            # request may succeed later.
+            logger.warning(
+                "Order %s cancel stopped: the courier gave no answer",
+                order.id,
+            )
+            return Response(
+                {
+                    "detail": e.reason,
+                    "error": {
+                        "type": OrderCancelErrorType.COURIER_UNREACHABLE,
+                    },
+                },
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        except ParcelWithCourierError as e:
+            # Before OrderCancellationError, which it subclasses. The
+            # client branches on ``error.type``, never on ``detail``,
+            # which is in the request's language.
+            logger.warning(
+                "Order %s cancel refused: the courier did not take the "
+                "parcel back",
+                order.id,
+            )
+            return Response(
+                {
+                    "detail": e.reason,
+                    "error": {
+                        "type": OrderCancelErrorType.PARCEL_WITH_COURIER,
+                    },
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         except OrderCancellationError as e:
             # The service raises this for expected state-transition
             # failures (order already shipped, already canceled, stale

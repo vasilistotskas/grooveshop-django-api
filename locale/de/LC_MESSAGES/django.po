@@ -5208,6 +5208,13 @@ msgid ""
 "order history."
 msgstr ""
 
+#: .\order\admin.py:1010
+#, python-format
+msgid ""
+"Order %(order_id)s was canceled but the courier did not cancel its "
+"parcel (%(error)s); arrange its return with the courier."
+msgstr ""
+
 #: .\order\admin.py:1131
 msgid "Order Item Information"
 msgstr ""
@@ -5375,10 +5382,6 @@ msgstr ""
 
 #: .\order\filters.py:195
 msgid "Filter canceled orders"
-msgstr ""
-
-#: .\order\filters.py:199
-msgid "Filter orders that can be canceled"
 msgstr ""
 
 #: .\order\filters.py:205
@@ -7981,8 +7984,12 @@ msgid ""
 "category and every descendant)"
 msgstr ""
 
-#: .\search\views.py:232
-msgid "Comma-separated attribute value IDs (attribute_values IN [ids])"
+#: .\search\views.py:449
+msgid ""
+"Comma-separated attribute value IDs. Values of the same attribute are "
+"alternatives (any of them); values of different attributes must all match. "
+"With the attribute_values facet, an attribute's own values are counted "
+"without its own selection."
 msgstr ""
 
 #: .\search\views.py:241
@@ -9407,8 +9414,12 @@ msgid "VAT"
 msgstr "MwSt."
 
 #: .\core\templates\invoices\invoice.html
-msgid "Payment fee"
-msgstr "Zahlungsgebühr"
+msgid "Shipping (incl. VAT)"
+msgstr "Versand (inkl. MwSt.)"
+
+#: .\core\templates\invoices\invoice.html
+msgid "Payment fee (incl. VAT)"
+msgstr "Zahlungsgebühr (inkl. MwSt.)"
 
 #: .\core\templates\invoices\invoice.html
 msgid "VAT breakdown"
@@ -10078,3 +10089,12 @@ msgid "Remove %(locale)s: the default locale's line is Store Description."
 msgstr ""
 "Entfernen Sie %(locale)s: Die Zeile der Standardsprache ist die "
 "Shopbeschreibung."
+
+#: .\order\models\item.py:41
+msgid ""
+"VAT percentage this line was sold at, fixed when the line was created. "
+"Invoices and myDATA use it, never the product's current VAT."
+msgstr ""
+"MwSt.-Satz, zu dem diese Position verkauft wurde, festgelegt bei ihrer "
+"Erstellung. Rechnungen und myDATA verwenden ihn, nie die aktuelle MwSt. des "
+"Produkts."

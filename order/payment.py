@@ -108,13 +108,31 @@ class PaymentProvider(ABC):
     def refund_payment(
         self, payment_id: str, amount: Money | None = None
     ) -> tuple[bool, dict[str, Any]]:
-        pass
+        """Refund ``amount`` of ``payment_id``; ``None`` refunds all of it.
+
+        On success the data carries ``refund_id`` and ``amount``, the
+        decimal string the provider actually paid back: for a full refund
+        that is the figure only the provider knows.
+        """
 
     @abstractmethod
     def get_payment_status(
         self, payment_id: str
     ) -> tuple[PaymentStatus, dict[str, Any]]:
         pass
+
+    def captured_amount(self, payment_id: str) -> Decimal | None:
+        """What the provider says it captured on ``payment_id``.
+
+        The order cannot supply it: ``Order.paid_amount`` is the amount
+        owed when the order was created, not what the provider collected,
+        and Viva's Cancel Transaction rejects an amount above the original
+        payment. ``get_payment_status`` already reads it from the provider.
+        ``None`` when the provider cannot say (it has logged why).
+        """
+        _status, data = self.get_payment_status(payment_id)
+        captured = data.get("amount")
+        return None if captured is None else Decimal(str(captured))
 
     @abstractmethod
     def create_checkout_session(
@@ -586,7 +604,9 @@ class StripePaymentProvider(PaymentProvider):
                 "metadata": {"tenant_schema": tenant_schema},
             }
             if amount:
-                refund_params["amount"] = round(amount.amount * 100)
+                refund_params["amount"] = round(
+                    amount.amount * amount.currency.sub_unit
+                )
             stripe_refund = stripe.Refund.create(
                 **refund_params, api_key=self.api_key
             )
@@ -606,7 +626,13 @@ class StripePaymentProvider(PaymentProvider):
                 "status": PaymentStatus.REFUNDED
                 if stripe_refund.status == "succeeded"
                 else PaymentStatus.PROCESSING,
-                "amount": str(amount.amount) if amount else "full refund",
+                # What Stripe actually paid back: a full refund (``amount``
+                # None) is the one figure only Stripe knows.
+                "amount": str(
+                    money_from_minor_units(
+                        stripe_refund.amount, stripe_refund.currency
+                    ).amount
+                ),
                 "payment_id": payment_id,
                 "stripe_status": stripe_refund.status,
             }
@@ -647,7 +673,11 @@ class StripePaymentProvider(PaymentProvider):
                 "payment_id": payment_id,
                 "raw_status": stripe_pi.status,
                 "provider": "stripe",
-                "amount": stripe_pi.amount / 100,
+                "amount": float(
+                    money_from_minor_units(
+                        stripe_pi.amount, stripe_pi.currency
+                    ).amount
+                ),
                 "currency": stripe_pi.currency.upper(),
                 "created": stripe_pi.created,
                 "last_updated": djstripe_pi.created if djstripe_pi else None,
@@ -696,6 +726,38 @@ def _alpha_currency(reported: str | None) -> str | None:
     if code.isdigit():
         return _ISO_NUMERIC_TO_ALPHA.get(code.zfill(3))
     return code.upper() or None
+
+
+def money_from_minor_units(minor: int, currency: str) -> Money:
+    """A provider's integer in the currency's smallest unit, as ``Money``.
+
+    Stripe reports every amount as an integer in the smallest unit (1099
+    for 10.99 EUR, 10 for 10 JPY; docs.stripe.com/api/charges/create). The
+    exponent is the currency's own, taken from ``moneyed`` (``sub_unit``:
+    100 for EUR, 1 for JPY, 1000 for BHD) rather than assumed to be two
+    decimals.
+    """
+    code = currency.upper()
+    return Money(Decimal(minor) / moneyed.get_currency(code).sub_unit, code)
+
+
+#: Viva ``StatusId`` of a transaction that completed successfully. A
+#: refund is a transaction of its own and carries this status too; ``R``
+#: ("fully or partially refunded") belongs to the ORIGINAL payment.
+VIVA_STATUS_FINISHED = "F"
+
+#: ``TransactionTypeId`` values that hand money back to the payer: every
+#: row of Viva's table named Refund or Void
+#: (developer.viva.com/integration-reference/response-codes/,
+#: "TransactionTypeId parameter"). The "Refund Claimed" rows (13, 46, 83,
+#: 90) are chargebacks, a dispute outcome and not a refund the merchant
+#: made, so they are deliberately absent, as is the unreferenced "Card
+#: Original Credit" (8).
+VIVA_REFUND_TRANSACTION_TYPE_IDS: frozenset[int] = frozenset(
+    {4, 7, 11, 17, 18, 21, 24, 26, 28, 30, 35, 37, 39, 41, 45, 49, 51, 53}
+    | {55, 57, 59, 61, 63, 65, 67, 71, 73, 75, 77, 79, 82, 84, 85, 86, 87}
+    | {89, 91}
+)
 
 
 class VivaWalletPaymentProvider(PaymentProvider):
@@ -956,20 +1018,6 @@ class VivaWalletPaymentProvider(PaymentProvider):
     ) -> tuple[bool, dict[str, Any]]:
         return self.create_checkout_session(amount, order_id, **kwargs)
 
-    def _captured_amount(self, payment_id: str) -> Decimal | None:
-        """What Viva says it captured on ``payment_id``, in euros.
-
-        Cancel Transaction REQUIRES ``amount`` and rejects one above the
-        original payment, so a full refund has to name the captured
-        figure. The order cannot supply it: ``Order.paid_amount`` is the
-        amount owed when the order was created, not what Viva collected.
-        Retrieve Transaction is the authority, and ``get_payment_status``
-        already reads it. ``None`` when Viva cannot say (it has logged why).
-        """
-        _status, data = self.get_payment_status(payment_id)
-        captured = data.get("amount")
-        return None if captured is None else Decimal(str(captured))
-
     def refund_payment(
         self, payment_id: str, amount: Money | None = None
     ) -> tuple[bool, dict[str, Any]]:
@@ -996,7 +1044,7 @@ class VivaWalletPaymentProvider(PaymentProvider):
             )
 
             if amount is None:
-                refund_amount = self._captured_amount(payment_id)
+                refund_amount = self.captured_amount(payment_id)
                 if refund_amount is None:
                     logger.error(
                         "Viva Wallet refund not sent: Retrieve Transaction "
@@ -1115,6 +1163,7 @@ class VivaWalletPaymentProvider(PaymentProvider):
                 "amount": data.get("amount"),
                 "currency": _alpha_currency(data.get("currencyCode")),
                 "order_code": data.get("orderCode"),
+                "transaction_type_id": data.get("transactionTypeId"),
                 "created": data.get("insDate"),
             }
 

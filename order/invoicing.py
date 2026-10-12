@@ -13,8 +13,9 @@ up WeasyPrint's native stack:
 
 - :func:`generate_invoice` — idempotent entry point; returns the
   existing Invoice if one already exists for the order.
-- :func:`_compute_vat_breakdown` — aggregates order items by VAT rate
-  so the invoice shows one row per rate band (24 %, 13 %, 6 %, 0 %).
+- :func:`_compute_vat_breakdown` — aggregates the order's taxable lines
+  (goods, shipping, payment fee; ``order.taxation``) by VAT rate so the
+  invoice shows one row per rate band (24 %, 13 %, 6 %, 0 %).
 - :func:`_build_context` — builds the template context dict.
 - :func:`_render_pdf_bytes` — calls WeasyPrint; imported lazily so
   machines without cairo/pango (Windows dev) can still import this
@@ -43,13 +44,10 @@ from extra_settings.models import Setting
 
 from core.utils.i18n import get_order_language
 from core.utils.tenant_urls import get_tenant_frontend_url
-from order.discounts import (
-    discounted_line_gross,
-    order_discount_total,
-    vat_buckets,
-)
+from order.discounts import order_discount_total
 from order.models.invoice import Invoice, InvoiceCounter
 from order.models.order import Order
+from order.taxation import breakdown_by_rate, order_vat_lines
 from pay_way.enum.pay_way import PayWayEnum
 from tenant.credentials import tenant_contact_email, tenant_site_name
 
@@ -126,68 +124,45 @@ def _buyer_snapshot(order: Order) -> dict[str, str]:
 
 
 def _compute_vat_breakdown(order: Order) -> list[dict[str, Any]]:
-    """Aggregate order items by VAT rate.
+    """Aggregate the order's taxable lines by VAT rate.
 
-    Returns one dict per rate band sorted by rate descending:
-    ``{rate, subtotal, vat, gross}`` where values are decimals in the
-    order's currency. Items without a configured VAT are grouped under
-    rate=0 so the invoice still balances.
+    Returns one dict per rate band sorted by rate descending (the Greek
+    convention): ``{rate, subtotal, vat, gross}`` where values are
+    decimals in the order's currency. The bands cover goods, shipping and
+    the payment-method fee alike — the same lines the myDATA payload is
+    built from (``order.taxation``), at the rates snapshotted on the
+    order items, so a ``Vat`` row edited or deleted after checkout changes
+    nothing here.
 
     Order-level discounts (promotions + loyalty) are allocated across
     the lines first — VAT is owed on what the customer actually paid.
     Gift-card amounts are payment, never allocated (order/discounts.py).
     """
-    items = list(order.items.select_related("product__vat").all())
-    line_gross_by_pk = discounted_line_gross(order, items)
-
-    lines = []
-    for item in items:
-        rate = Decimal(0)
-        if item.product and item.product.vat_id:
-            rate = Decimal(item.product.vat.value)
-        lines.append((line_gross_by_pk[item.pk], rate))
-
-    # Stable ordering — highest rate first is the Greek convention.
-    return [
-        {
-            "rate": str(rate),
-            "subtotal": str(values["subtotal"]),
-            "vat": str(values["vat"]),
-            "gross": str(values["gross"]),
-        }
-        for rate, values in sorted(vat_buckets(lines).items(), reverse=True)
-    ]
+    return breakdown_by_rate(order_vat_lines(order))
 
 
 def _order_totals(
     order: Order, vat_breakdown: list[dict[str, Any]]
 ) -> dict[str, Decimal]:
-    """Derive invoice totals from the VAT breakdown so rounding adds up."""
+    """Derive invoice totals from the VAT breakdown so rounding adds up.
+
+    The breakdown already holds the shipping and fee shares at their VAT
+    rates, so net + VAT is the whole document and equals myDATA's
+    ``invoiceSummary``. ``shipping`` and ``payment_fee`` are the gross
+    amounts charged, kept for the PDF's reference rows; like ``discount``
+    they never enter the total arithmetic.
+    """
     subtotal = sum(
         Decimal(row["subtotal"]) for row in vat_breakdown
     ) or Decimal(0)
     total_vat = sum(Decimal(row["vat"]) for row in vat_breakdown) or Decimal(0)
-    gross = subtotal + total_vat
-    shipping = (
-        Decimal(order.shipping_price.amount)
-        if order.shipping_price
-        else Decimal(0)
-    )
-    payment_fee = (
-        Decimal(order.payment_method_fee.amount)
-        if order.payment_method_fee
-        else Decimal(0)
-    )
-    total = gross + shipping + payment_fee
     return {
         "subtotal": subtotal,
         "total_vat": total_vat,
-        "shipping": shipping,
-        "payment_fee": payment_fee,
-        # Informational — the line values above are already net of the
-        # allocation, so ``discount`` never enters the total arithmetic.
+        "shipping": Decimal(order.shipping_price.amount),
+        "payment_fee": Decimal(order.payment_method_fee.amount),
         "discount": order_discount_total(order),
-        "total": total,
+        "total": subtotal + total_vat,
     }
 
 
@@ -287,25 +262,22 @@ def _render_items(order: Order) -> list[dict[str, Any]]:
     methods.
     """
     rows: list[dict[str, Any]] = []
-    for item in order.items.select_related("product__vat").all():
+    for item in order.items.select_related("product").all():
         product = item.product
         name = ""
         sku = ""
-        vat_rate: Decimal | None = None
         if product is not None:
             name = (
                 product.safe_translation_getter("name", any_language=True) or ""
             )
             sku = getattr(product, "sku", "") or ""
-            if product.vat_id and product.vat:
-                vat_rate = Decimal(product.vat.value)
         rows.append(
             {
                 "name": name,
                 "sku": sku,
                 "quantity": item.quantity,
                 "unit_gross": Decimal(item.price.amount),
-                "vat_rate": vat_rate,
+                "vat_rate": item.vat_rate,
                 "line_total": Decimal(item.total_price.amount),
             }
         )

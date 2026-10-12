@@ -103,6 +103,8 @@ class TestFulfilment(TestCase):
             is None
         )
         assert self.carrier.cancel_shipment(None) is None
+        # No cancel rule of its own, so it never refuses one.
+        assert self.carrier.can_cancel_shipment(None) is True
 
     def test_it_accepts_any_order_payload(self):
         assert (

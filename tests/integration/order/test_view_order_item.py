@@ -146,6 +146,8 @@ class OrderItemViewSetTestCase(TestURLFixerMixin, APITestCase):
         item = OrderItem.objects.get(pk=response.data["id"])
         self.assertEqual(item.order_id, self.order.id)
         self.assertEqual(item.price, self.other_product.price)
+        # The line is sold at the VAT its product carries right now.
+        self.assertEqual(item.vat_rate, self.other_product.vat_percent)
 
     def test_create_forbidden_for_owner(self):
         # Order lines are written by store staff, not by the order's owner.

@@ -1875,11 +1875,12 @@ class OrderCancelErrorDetailSerializer(serializers.Serializer):
 
 
 class OrderCancelErrorSerializer(serializers.Serializer):
-    """The 400 body of ``POST /order/{id}/cancel``.
+    """The 400 and 503 body of ``POST /order/{id}/cancel``.
 
-    A refusal the order service types carries ``error.type``; any other
-    refusal (the order's status no longer allows a cancel) is ``detail``
-    alone, which is why ``error`` is optional.
+    A refusal the order service types carries ``error.type``
+    (``courier_unreachable`` is the 503); any other refusal (the order's
+    status no longer allows a cancel) is ``detail`` alone, which is why
+    ``error`` is optional.
     """
 
     detail = serializers.CharField(required=False)

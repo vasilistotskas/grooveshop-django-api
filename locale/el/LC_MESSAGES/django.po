@@ -9640,6 +9640,10 @@ msgstr "Πράκτορας AI"
 msgid "Parcel already with the courier"
 msgstr "Το δέμα βρίσκεται ήδη στον courier"
 
+#: .\order\enum\cancel_error.py:19
+msgid "Courier could not be reached"
+msgstr "Δεν ήταν δυνατή η επικοινωνία με τον courier"
+
 #: .\order\enum\create_error.py:13
 msgid "Insufficient stock"
 msgstr "Ανεπαρκές απόθεμα"
@@ -9857,10 +9861,6 @@ msgstr "Φίλτρο ολοκληρωμένων παραγγελιών"
 #: .\order\filters.py:209
 msgid "Filter canceled orders"
 msgstr "Φίλτρο ακυρωμένων παραγγελιών"
-
-#: .\order\filters.py:213
-msgid "Filter orders that can be canceled"
-msgstr "Φίλτρο παραγγελιών που μπορούν να ακυρωθούν"
 
 #: .\order\filters.py:219
 msgid "Filter active orders (pending, processing, shipped, delivered)"
@@ -11700,6 +11700,14 @@ msgstr ""
 "Το δέμα σας βρίσκεται ήδη στον courier, επομένως η παραγγελία δεν "
 "μπορεί πλέον να ακυρωθεί. Επικοινωνήστε με το κατάστημα για να "
 "κανονίσετε επιστροφή."
+
+#: .\order\services.py:2321
+msgid ""
+"We could not reach the courier to cancel your parcel. Please try "
+"again in a few minutes."
+msgstr ""
+"Δεν μπορέσαμε να επικοινωνήσουμε με τον courier για να "
+"ακυρώσουμε το δέμα σας. Δοκιμάστε ξανά σε λίγα λεπτά."
 
 #: .\order\services.py:2403 .\order\services.py:2414
 msgid "The refund could not be processed."

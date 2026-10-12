@@ -189,21 +189,25 @@ one arrives — in STATE only:
 
 ### Worked example: renaming a django-money field
 
-`Order.paid_amount` → `amount_due` (`order` 0070) is the expand step of a
-rename. The new `MoneyField` is `AddField(db_default=...)`, but the
-companion `*_currency` column is a second field django-money builds
-itself, with no `db_default`, so a plain `AddField` of it is NOT NULL
-without a default and the preflight blocks it (Django also drops its
-default right after `ADD COLUMN`). Add it as
+`Order.paid_amount` → `amount_due` (`order` 0070, contract `order` 0071,
+shipped) is a rename over two releases. In the expand step the new
+`MoneyField` is `AddField(db_default=...)`, but the companion `*_currency`
+column is a second field django-money builds itself, with no
+`db_default`, so a plain `AddField` of it is NOT NULL without a default
+and the preflight blocks it (Django also drops its default right after
+`ADD COLUMN`). Add it as
 `SeparateDatabaseAndState(state_operations=[AddField(CurrencyField(...))],
 database_operations=[RunSQL("ALTER TABLE ... ADD COLUMN ..._currency
 varchar(3) NOT NULL DEFAULT 'EUR'")])`: the default stays in the database
 and the state matches what the model declares. Copy the old values with a
 `RunSQL` `UPDATE`, then take the old amount and currency fields out of
 STATE with another `SeparateDatabaseAndState` (both were nullable, so the
-new code's INSERTs still work). The old columns are dropped in release
-N+1 with `contract_of`, after re-copying whatever the previous release
-wrote while it still served.
+new code's INSERTs still work). The contract step (`order` 0071) declares
+`contract_of = [("order", "0070_order_amount_due")]`, re-copies whatever
+the previous release wrote while it still served (`UPDATE ... SET
+amount_due = paid_amount ... WHERE amount_due = 0 AND paid_amount > 0`)
+and drops both old columns in one `RunSQL`; its `reverse_sql` re-adds
+them nullable, without values.
 
 A renamed field is also an API contract change. Clients generated from
 the previous schema (the Nuxt storefront's Zod schemas, the agent
@@ -211,7 +215,8 @@ gateway's DTOs) require the old name, so release N keeps emitting it as a
 deprecated alias of the new one (`@extend_schema_serializer(
 deprecate_fields=[...])`, and `"deprecated": True` in a hand-written
 `extend_schema_field` dict) and release N+1, shipped only after those
-clients read the new name, removes it.
+clients read the new name, removes it together with the old columns (the
+`paidAmount` removal shipped with `order` 0071).
 
 ### Rollback
 

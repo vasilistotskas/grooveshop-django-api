@@ -6,16 +6,17 @@ was 0 on every order and the "pay €X" state never showed. The field is
 ``amountDue`` now, and ``remainingAmount`` is what is still to be paid:
 all of it until the payment settles.
 
-``paidAmount`` (top level and in ``pricingBreakdown``) stays for ONE
-release as a deprecated alias of ``amountDue``: the storefront's and the
-agent gateway's generated schemas require it, so removing it in the release
-that adds ``amountDue`` would fail every order response they parse between
-the two rollouts. The filters and the ordering are ``amountDue`` only:
-nothing outside Django uses the ``paidAmount`` ones.
+``paidAmount`` is gone: it was a deprecated alias of ``amountDue`` for the
+one release the storefront's and the agent gateway's generated schemas
+still required it, and ``order.0071_order_drop_paid_amount_columns`` took
+it out with the columns. It appears nowhere in a response or in the schema.
+The filters and the ordering are ``amountDue`` only.
 """
 
 from __future__ import annotations
 
+import json
+from collections.abc import Iterator
 from decimal import Decimal
 
 import pytest
@@ -59,6 +60,17 @@ def _number(value) -> Decimal:
     return Decimal(str(value))
 
 
+def _keys(node) -> Iterator[str]:
+    """Every object key at any depth of a decoded JSON document."""
+    if isinstance(node, dict):
+        for key, value in node.items():
+            yield key
+            yield from _keys(value)
+    elif isinstance(node, list):
+        for value in node:
+            yield from _keys(value)
+
+
 @pytest.fixture
 def user():
     return UserAccountFactory(num_addresses=0)
@@ -100,21 +112,20 @@ def test_an_order_settled_without_a_ledger_row_owes_nothing(user):
 @pytest.mark.parametrize(
     "payment_status", [PaymentStatus.PENDING, PaymentStatus.COMPLETED]
 )
-def test_the_deprecated_paid_amount_equals_amount_due(user, payment_status):
-    """Top level and in the breakdown, so a client still generated from the
-    previous schema parses the response and reads what it always read."""
+def test_paid_amount_is_gone_from_the_detail_and_its_breakdown(
+    user, payment_status
+):
     body = _detail(_order(user, payment_status))
 
-    assert _number(body["paidAmount"]) == _number(body["amountDue"]) == DUE
+    assert _number(body["amountDue"]) == DUE
+    assert "paidAmount" not in body
     breakdown = body["pricingBreakdown"]
-    assert (
-        _number(breakdown["paidAmount"])
-        == _number(breakdown["amountDue"])
-        == DUE
-    )
+    assert _number(breakdown["amountDue"]) == DUE
+    assert "paidAmount" not in breakdown
+    assert not {key for key in _keys(body) if key.startswith("paidAmount")}
 
 
-def test_the_list_carries_the_deprecated_alias_too(user):
+def test_paid_amount_is_gone_from_the_list(user):
     order = _order(user, PaymentStatus.PENDING)
     client = APIClient()
     client.force_authenticate(user=user)
@@ -123,7 +134,8 @@ def test_the_list_carries_the_deprecated_alias_too(user):
 
     assert response.status_code == status.HTTP_200_OK
     [row] = [r for r in response.json()["results"] if r["id"] == order.pk]
-    assert _number(row["amountDue"]) == _number(row["paidAmount"]) == DUE
+    assert _number(row["amountDue"]) == DUE
+    assert not {key for key in _keys(row) if key.startswith("paidAmount")}
 
 
 def _order_components(openapi_schema) -> dict[str, dict]:
@@ -136,9 +148,7 @@ def _order_components(openapi_schema) -> dict[str, dict]:
     }
 
 
-def test_the_schema_exposes_amount_due_and_deprecates_paid_amount(
-    openapi_schema,
-):
+def test_the_schema_exposes_amount_due_and_no_paid_amount(openapi_schema):
     """The contract the storefront and the agent gateway generate from."""
     components = _order_components(openapi_schema)
 
@@ -146,19 +156,24 @@ def test_the_schema_exposes_amount_due_and_deprecates_paid_amount(
     for name, schema in components.items():
         properties = schema["properties"]
         assert "deprecated" not in properties["amountDue"], name
-        assert properties["paidAmount"]["deprecated"] is True, name
-        # Still required, as it was: a client generated from the previous
-        # schema parses these responses until the contract release.
-        assert "paidAmount" in schema["required"], name
+        assert "amountDue" in schema["required"], name
+        assert "paidAmount" not in properties, name
+        assert "paidAmount" not in schema["required"], name
 
 
-def test_the_breakdown_schema_deprecates_paid_amount_too(openapi_schema):
+def test_the_breakdown_schema_has_no_paid_amount_either(openapi_schema):
     detail = openapi_schema["components"]["schemas"]["OrderDetail"]
     breakdown = detail["properties"]["pricingBreakdown"]["properties"]
 
     assert "deprecated" not in breakdown["amountDue"]
-    assert breakdown["paidAmount"]["deprecated"] is True
+    assert "paidAmount" not in breakdown
     assert "remainingAmount" in breakdown
+
+
+def test_paid_amount_is_nowhere_in_the_schema(openapi_schema):
+    """Not a property, a filter, an ordering value or a description."""
+    assert "paidAmount" not in json.dumps(openapi_schema)
+    assert "paid_amount" not in json.dumps(openapi_schema)
 
 
 def test_the_filters_and_ordering_are_amount_due_only(openapi_schema):

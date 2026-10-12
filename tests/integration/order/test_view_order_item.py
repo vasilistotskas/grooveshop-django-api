@@ -145,7 +145,8 @@ class OrderItemViewSetTestCase(TestURLFixerMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         item = OrderItem.objects.get(pk=response.data["id"])
         self.assertEqual(item.order_id, self.order.id)
-        self.assertEqual(item.price, self.other_product.price)
+        # VAT-inclusive, like every checkout line.
+        self.assertEqual(item.price, self.other_product.final_price)
         # The line is sold at the VAT its product carries right now.
         self.assertEqual(item.vat_rate, self.other_product.vat_percent)
 

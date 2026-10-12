@@ -139,9 +139,12 @@ class OrderItemViewSet(BaseModelViewSet):
         self.check_order_permission(serializer.validated_data["order"])
         # ``price`` is not a writable field on OrderItemWriteSerializer,
         # so the line price always comes from the product here — a
-        # client cannot name its own price.
+        # client cannot name its own price. A line's price is what the
+        # customer pays for one unit, VAT included, the same figure
+        # checkout stores (the cart line's ``final_price``), never the
+        # product's net ``price``.
         product = serializer.validated_data["product"]
-        serializer.save(price=product.price)
+        serializer.save(price=product.final_price)
 
     def perform_update(self, serializer):
         # `order` is a writable FK, so an update could reassign the item to a

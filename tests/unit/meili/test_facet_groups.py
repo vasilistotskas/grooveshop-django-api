@@ -58,6 +58,7 @@ class TestFilterFacetGroup:
             FacetGroup(
                 facet=FACET,
                 clause="attribute_values IN [10, 11]",
+                selected=frozenset({"10", "11"}),
                 members=frozenset({"10", "11", "12"}),
             )
         ]
@@ -147,56 +148,79 @@ class TestSearchWithGroupCounts:
             assert query["matchingStrategy"] == "all"
             assert query["locales"] == ["el"]
 
-    def test_members_are_counted_from_their_own_group_query(self, engine):
+    def test_siblings_are_counted_from_their_group_query(self, engine):
+        # The first group selects 10 and 11 and also governs 12; the
+        # second selects 20 and also governs 21. 30 belongs to no group.
         _multi_search(
             engine,
             {
                 "facetDistribution": {
-                    FACET: {"10": 1, "20": 1, "30": 4},
+                    # 12 is narrowed here: only documents holding a selected
+                    # value of the group are counted
+                    FACET: {"10": 1, "12": 1, "20": 1, "30": 4},
                     "category": {"7": 2},
                 }
             },
-            # without the first group's clause: 10 and 11 and 12 compete
-            {"facetDistribution": {FACET: {"10": 5, "11": 3, "99": 8}}},
+            # without the first group's clause; 99 is not a member
+            {"facetDistribution": {FACET: {"10": 1, "12": 5, "99": 8}}},
             # without the second group's clause
-            {"facetDistribution": {FACET: {"20": 6, "21": 2}}},
+            {"facetDistribution": {FACET: {"20": 1, "21": 2}}},
         )
 
         results = self._queryset().search("q")
 
         assert results["facetDistribution"] == {
-            # 30 belongs to no group: it keeps the main query's count;
-            # 99 is not a member of the first group: ignored
-            FACET: {"30": 4, "10": 5, "11": 3, "20": 6, "21": 2},
+            FACET: {"10": 1, "12": 5, "20": 1, "21": 2, "30": 4},
             "category": {"7": 2},
         }
 
-    def test_a_member_the_group_query_does_not_return_is_dropped(self, engine):
+    def test_a_selected_value_keeps_its_main_count_when_the_count_query_omits_it(
+        self, engine
+    ):
+        # The count query matches more documents than the main one, so the
+        # engine's facet value cap can push a selected value out of it.
         _multi_search(
             engine,
-            {"facetDistribution": {FACET: {"10": 1}}},
-            {"facetDistribution": {FACET: {}}},
-            {"facetDistribution": {FACET: {"20": 1}}},
+            {"facetDistribution": {FACET: {"10": 1, "20": 1}}},
+            {"facetDistribution": {FACET: {"12": 4}}},
+            {"facetDistribution": {FACET: {"21": 2}}},
         )
 
         results = self._queryset().search("q")
 
-        # 10 is counted by the first group's own query, which has no 10
-        assert results["facetDistribution"] == {FACET: {"20": 1}}
+        assert results["facetDistribution"] == {
+            FACET: {"10": 1, "12": 4, "20": 1, "21": 2}
+        }
 
-    def test_a_main_result_with_no_distribution_still_gets_the_counts(
+    def test_a_sibling_the_count_query_omits_is_not_listed(self, engine):
+        _multi_search(
+            engine,
+            {"facetDistribution": {FACET: {"10": 1, "12": 1, "20": 1}}},
+            {"facetDistribution": {FACET: {}}},
+            {"facetDistribution": {FACET: {"21": 2}}},
+        )
+
+        results = self._queryset().search("q")
+
+        # 12 is the first group's sibling and its own query lacks it
+        assert results["facetDistribution"] == {
+            FACET: {"10": 1, "20": 1, "21": 2}
+        }
+
+    def test_a_main_result_with_no_distribution_still_gets_the_siblings(
         self, engine
     ):
         _multi_search(
             engine,
             {},
-            {"facetDistribution": {FACET: {"10": 2}}},
-            {"facetDistribution": {FACET: {"20": 1}}},
+            {"facetDistribution": {FACET: {"10": 2, "12": 3}}},
+            {"facetDistribution": {FACET: {"21": 1}}},
         )
 
         results = self._queryset().search("q")
 
-        assert results["facetDistribution"] == {FACET: {"10": 2, "20": 1}}
+        # 10 is selected, so it is the main query's to count, not this one's
+        assert results["facetDistribution"] == {FACET: {"12": 3, "21": 1}}
 
     def test_engine_time_is_the_sum_of_every_query(self, engine):
         _multi_search(

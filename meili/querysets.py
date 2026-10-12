@@ -58,12 +58,15 @@ class FacetGroup:
     that group's own selection, so picking one value does not hide its
     alternatives, while every other group's selection still narrows them.
 
-    ``clause`` is the filter the group contributed; ``members`` are the
-    facet keys (as strings, the way the engine reports them) it governs.
+    ``clause`` is the filter the group contributed, ``selected`` the facet
+    keys that clause asks for and ``members`` every facet key the group
+    governs, selected or not (all as strings, the way the engine reports
+    them).
     """
 
     facet: str
     clause: str
+    selected: frozenset[str]
     members: frozenset[str]
 
 
@@ -237,11 +240,13 @@ class IndexQuerySet[T: IndexMixin]:
             .filter_facet_group("attribute_values", [10, 11], members=[10, 11, 12])
             .filter_facet_group("attribute_values", [20], members=[20, 21])
         """
-        self._add_in_filter(facet, list(selected))
+        selected = list(selected)
+        self._add_in_filter(facet, selected)
         self._state.facet_groups.append(
             FacetGroup(
                 facet=facet,
                 clause=self._state.filters[-1],
+                selected=frozenset(str(key) for key in selected),
                 members=frozenset(str(member) for member in members),
             )
         )
@@ -469,9 +474,16 @@ class IndexQuerySet[T: IndexMixin]:
 
         Each group query repeats ``params`` (the same ``q``, matching
         strategy and locales, so it matches the same documents) with the
-        group's own clause left out, ``limit`` 0 and only its facet. The
-        group's members are then counted from that query instead of the
-        main one, which has them narrowed by the group's own selection.
+        group's own clause left out, ``limit`` 0 and only its facet.
+
+        Only the group's unselected siblings are read from that query: the
+        main query has them narrowed by the group's own selection. A
+        selected value keeps the main query's count, which is already its
+        disjunctive count (a document holding it matches the group's
+        clause either way), and taking it from there keeps it listed when
+        the count query, which matches more documents, pushes it past the
+        engine's ``maxValuesPerFacet`` cap. A sibling the cap omits is
+        simply not listed, the truncation every facet has.
         """
         index_uid = self._model.get_meili_index_name()
         queries = [{"indexUid": index_uid, "q": q, **params}]
@@ -495,18 +507,15 @@ class IndexQuerySet[T: IndexMixin]:
 
         distribution = main.setdefault("facetDistribution", {})
         for group, counted in zip(groups, counts, strict=True):
+            siblings = group.members - group.selected
             own = counted.get("facetDistribution", {}).get(group.facet, {})
             distribution[group.facet] = {
                 **{
                     key: count
                     for key, count in distribution.get(group.facet, {}).items()
-                    if key not in group.members
+                    if key not in siblings
                 },
-                **{
-                    key: count
-                    for key, count in own.items()
-                    if key in group.members
-                },
+                **{key: count for key, count in own.items() if key in siblings},
             }
         main["processingTimeMs"] = sum(
             result.get("processingTimeMs", 0) for result in (main, *counts)

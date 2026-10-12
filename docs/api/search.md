@@ -214,6 +214,23 @@ locales, so they match the same documents. That is `1 + N` queries in one round
 trip, `N` being the attributes with a selection; without a selection, or
 without `attribute_values` in `facets`, it stays a single query.
 
+Only an attribute's **unselected** values are read from its count query. A
+selected value keeps the main query's count, which already is its count without
+its own clause (a product holding it matches that clause either way), and a
+sibling that a product holds together with a selected value is replaced by the
+count query's wider number.
+
+**The facet value cap.** Every facet returns at most `maxValuesPerFacet` values
+(100, `MeiliMeta.faceting` in `product/models/product.py`), taken in ascending
+alphanumeric order of the key unless `sortFacetValuesBy` says otherwise.
+`attribute_values` lists the values of every attribute side by side, so a
+catalogue with more than 100 distinct attribute values loses the rest from
+`facetDistribution`: a value past the cap is simply not listed, with or without
+a selection. The count queries match more documents than the main query, so
+they can hit the cap where the main query does not; that is why a selected
+value is counted by the main query and stays listed, and only a sibling can
+fall past the cap.
+
 The other facets (`category`, ...) follow every filter, their own included: a
 caller that wants a facet's counts without its own selection leaves that
 parameter off the facet request, as the storefront does for `categories`.

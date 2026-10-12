@@ -158,6 +158,7 @@ class TestFilterSearch:
             FacetGroup(
                 facet=ATTRIBUTE_VALUES_FIELD,
                 clause=f"{ATTRIBUTE_VALUES_FIELD} IN [{values['black'].id}]",
+                selected=frozenset({str(values["black"].id)}),
                 members=frozenset(
                     {str(values["black"].id), str(values["white"].id)}
                 ),
@@ -165,6 +166,7 @@ class TestFilterSearch:
             FacetGroup(
                 facet=ATTRIBUTE_VALUES_FIELD,
                 clause=f"{ATTRIBUTE_VALUES_FIELD} IN [{values['two_m'].id}]",
+                selected=frozenset({str(values["two_m"].id)}),
                 members=frozenset(
                     {str(values["one_m"].id), str(values["two_m"].id)}
                 ),

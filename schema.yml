@@ -18796,13 +18796,24 @@ paths:
           - type: number
         description: Maximum discount percentage
       - in: query
+        name: maxEffectivePrice
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+(\.\d+)?$
+          - type: number
+        description: Maximum price the customer pays now (VAT, markdown and unconditional
+          automatic promotions included)
+      - in: query
         name: maxFinalPrice
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+(\.\d+)?$
           - type: number
-        description: Maximum final price (after VAT and discount)
+        description: 'Deprecated: use maxEffectivePrice. Maximum price after VAT and
+          markdown, ignoring promotions'
+        deprecated: true
       - in: query
         name: maxLikes
         schema:
@@ -18876,6 +18887,15 @@ paths:
         description: Φίλτρο αντικειμένων όπου τα metadata περιέχουν όλα τα καθορισμένα
           κλειδιά (διαχωρισμένα με κόμμα)
       - in: query
+        name: minAnnouncedDiscountPercent
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+(\.\d+)?$
+          - type: number
+        description: 'Minimum announced discount percentage: only products with an
+          Omnibus prior price, computed from it'
+      - in: query
         name: minDiscount
         schema:
           oneOf:
@@ -18892,13 +18912,24 @@ paths:
           - type: number
         description: Minimum discount percentage
       - in: query
+        name: minEffectivePrice
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+(\.\d+)?$
+          - type: number
+        description: Minimum price the customer pays now (VAT, markdown and unconditional
+          automatic promotions included)
+      - in: query
         name: minFinalPrice
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+(\.\d+)?$
           - type: number
-        description: Minimum final price (after VAT and discount)
+        description: 'Deprecated: use minEffectivePrice. Minimum price after VAT and
+          markdown, ignoring promotions'
+        deprecated: true
       - in: query
         name: minLikes
         schema:
@@ -18952,12 +18983,13 @@ paths:
         required: false
         description: 'Which field(s) to use when ordering the results. Multiple fields
           can be combined with commas (e.g. ``-isMain,-createdAt``). Available fields:
-          price, -price, createdAt, -createdAt, active, -active, availabilityPriority,
-          -availabilityPriority, viewCount, -viewCount, stock, -stock, likesCount,
-          -likesCount, reviewAverage, -reviewAverage, discountPercent, -discountPercent'
+          price, -price, effectivePrice, -effectivePrice, createdAt, -createdAt, active,
+          -active, availabilityPriority, -availabilityPriority, viewCount, -viewCount,
+          stock, -stock, likesCount, -likesCount, reviewAverage, -reviewAverage, discountPercent,
+          -discountPercent, announcedDiscountPercent, -announcedDiscountPercent'
         schema:
           type: string
-          pattern: ^(?:price|\-price|createdAt|\-createdAt|active|\-active|availabilityPriority|\-availabilityPriority|viewCount|\-viewCount|stock|\-stock|likesCount|\-likesCount|reviewAverage|\-reviewAverage|discountPercent|\-discountPercent)(?:,(?:price|\-price|createdAt|\-createdAt|active|\-active|availabilityPriority|\-availabilityPriority|viewCount|\-viewCount|stock|\-stock|likesCount|\-likesCount|reviewAverage|\-reviewAverage|discountPercent|\-discountPercent))*$
+          pattern: ^(?:price|\-price|effectivePrice|\-effectivePrice|createdAt|\-createdAt|active|\-active|availabilityPriority|\-availabilityPriority|viewCount|\-viewCount|stock|\-stock|likesCount|\-likesCount|reviewAverage|\-reviewAverage|discountPercent|\-discountPercent|announcedDiscountPercent|\-announcedDiscountPercent)(?:,(?:price|\-price|effectivePrice|\-effectivePrice|createdAt|\-createdAt|active|\-active|availabilityPriority|\-availabilityPriority|viewCount|\-viewCount|stock|\-stock|likesCount|\-likesCount|reviewAverage|\-reviewAverage|discountPercent|\-discountPercent|announcedDiscountPercent|\-announcedDiscountPercent))*$
       - name: page
         required: false
         in: query
@@ -26281,7 +26313,8 @@ paths:
           - type: string
             pattern: ^-?\d+(\.\d+)?$
           - type: number
-        description: Φίλτρο μέγιστης τιμής (final_price <= value)
+        description: 'Φίλτρο μέγιστης τιμής (effective_price <= value): η τιμή που
+          πληρώνει ο πελάτης, με τις άνευ όρων αυτόματες προσφορές'
       - in: query
         name: priceMin
         schema:
@@ -26289,7 +26322,8 @@ paths:
           - type: string
             pattern: ^-?\d+(\.\d+)?$
           - type: number
-        description: Φίλτρο ελάχιστης τιμής (final_price >= value)
+        description: 'Φίλτρο ελάχιστης τιμής (effective_price >= value): η τιμή που
+          πληρώνει ο πελάτης, με τις άνευ όρων αυτόματες προσφορές'
       - in: query
         name: query
         schema:
@@ -26299,8 +26333,9 @@ paths:
         name: sort
         schema:
           type: string
-        description: Πεδίο ταξινόμησης (finalPrice, -finalPrice, -likesCount, -viewCount,
-          -createdAt)
+        description: 'Πεδίο ταξινόμησης (effectivePrice, -effectivePrice, -likesCount,
+          -viewCount, -createdAt). Τα finalPrice και -finalPrice είναι παρωχημένα:
+          αγνοούν τις προσφορές.'
       - in: query
         name: viewsMin
         schema:
@@ -37749,6 +37784,8 @@ components:
       description: Serializer for facet statistics (numeric facets).
       properties:
         finalPrice:
+          $ref: '#/components/schemas/FacetStatsItem'
+        effectivePrice:
           $ref: '#/components/schemas/FacetStatsItem'
         likesCount:
           $ref: '#/components/schemas/FacetStatsItem'

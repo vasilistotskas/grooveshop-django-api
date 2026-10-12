@@ -312,6 +312,7 @@ class FacetStatsSerializer(serializers.Serializer):
     """Serializer for facet statistics (numeric facets)."""
 
     final_price = FacetStatsItemSerializer(required=False)
+    effective_price = FacetStatsItemSerializer(required=False)
     likes_count = FacetStatsItemSerializer(required=False)
     view_count = FacetStatsItemSerializer(required=False)
 

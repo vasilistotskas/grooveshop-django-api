@@ -7970,11 +7970,11 @@ msgid "Full-text search query (empty for no search filter)"
 msgstr ""
 
 #: .\search\views.py:196
-msgid "Minimum price filter (final_price >= value)"
+msgid "Minimum price filter (effective_price >= value): the price the customer pays, unconditional automatic promotions included"
 msgstr ""
 
 #: .\search\views.py:203
-msgid "Maximum price filter (final_price <= value)"
+msgid "Maximum price filter (effective_price <= value): the price the customer pays, unconditional automatic promotions included"
 msgstr ""
 
 #: .\search\views.py:210
@@ -8000,8 +8000,7 @@ msgid ""
 msgstr ""
 
 #: .\search\views.py:241
-msgid ""
-"Sort field (finalPrice, -finalPrice, -likesCount, -viewCount, -createdAt)"
+msgid "Sort field (effectivePrice, -effectivePrice, -likesCount, -viewCount, -createdAt). finalPrice and -finalPrice are deprecated: they ignore promotions."
 msgstr ""
 
 #: .\search\views.py:249

@@ -36,14 +36,40 @@ class ProductFilter(
         lookup_expr="lte",
         help_text="Maximum price",
     )
+    min_effective_price = filters.NumberFilter(
+        field_name="effective_price",
+        lookup_expr="gte",
+        help_text=(
+            "Minimum price the customer pays now (VAT, markdown and "
+            "unconditional automatic promotions included)"
+        ),
+    )
+    max_effective_price = filters.NumberFilter(
+        field_name="effective_price",
+        lookup_expr="lte",
+        help_text=(
+            "Maximum price the customer pays now (VAT, markdown and "
+            "unconditional automatic promotions included)"
+        ),
+    )
     min_final_price = filters.NumberFilter(
         method="filter_min_final_price",
-        help_text="Minimum final price (after VAT and discount)",
+        help_text=(
+            "Deprecated: use minEffectivePrice. Minimum price after VAT "
+            "and markdown, ignoring promotions"
+        ),
     )
     max_final_price = filters.NumberFilter(
         method="filter_max_final_price",
-        help_text="Maximum final price (after VAT and discount)",
+        help_text=(
+            "Deprecated: use maxEffectivePrice. Maximum price after VAT "
+            "and markdown, ignoring promotions"
+        ),
     )
+
+    #: Query parameters the schema marks ``deprecated`` (snake_case, as the
+    #: filters are keyed); ``core.api.schema.AutoSchema`` reads it.
+    deprecated_params = frozenset({"min_final_price", "max_final_price"})
 
     min_stock = filters.NumberFilter(
         field_name="stock",

@@ -119,14 +119,41 @@ What it cannot know:
 | `effectivePrice` | `ProductSerializer`, search hits | what the customer pays now, promotions included |
 | `announcedDiscountPercent` | `ProductSerializer`, search hits, Meilisearch `announced_discount_percent` | integer percent from `priorPrice` to `effectivePrice`, null with no announcement |
 | `?minAnnouncedDiscountPercent=` / `?ordering=-announcedDiscountPercent` | `ProductFilter`, `ProductViewSet.ordering_fields` | list filter and sort on the same percent (`with_announced_discount_percent()`); the discounted rail uses both |
+| `?minEffectivePrice=` / `?maxEffectivePrice=` / `?ordering=effectivePrice` | `ProductFilter`, `ProductViewSet.ordering_fields` | list price filter and sort on `effective_price`, a stored column |
+| search `price_min` / `price_max` / `sort=effectivePrice` / `facets=effective_price` | `search/views.py`, Meilisearch `effective_price` (filterable, sortable, displayed) | price filter, sort and the price-range slider stats on the same price |
 
-All three read stored columns, so a list costs no query per row.
+Price filter and price sort follow what the customer pays, not the list
+price: a product under a 20% automatic category promotion is found by a price
+filter at its promoted price and sorts there, while a conditional promotion
+(minimum quantity or subtotal, first order, per-customer limit) changes neither,
+because the cart only honours it for a basket that meets the condition. B2B
+group prices are not in the index or the filter either (see above).
+
+`minFinalPrice` / `maxFinalPrice`, the search `sort=finalPrice` and the
+`final_price` Meilisearch field and facet are the price before promotions.
+They are **deprecated** (marked `deprecated` in the schema where the schema can
+say so) and stay for one release; they are removed, with the Meilisearch field,
+once the storefront sorts and filters on the effective price (expand/contract
+for API contracts, `docs/migrations.md`). The search `price_min` / `price_max`
+parameters keep their names and now compare with `effective_price`.
+
+**Known recording lag.** The price is recorded when the offer queue or the
+5-minute window sweep notices a promotion, then the product is reindexed, so a
+promotion's effect on filter, sort and index lands within about five minutes of
+its `starts_at` / `ends_at` (seconds for an edit, through the queue). In that
+window the listing, the filter and the cart can disagree. A product whose
+`effective_price` is not recorded yet (null) is absent from the price filter
+and sorts last until the nightly reconciliation fills it.
+
+Every price field above reads a stored column, so a list costs no query per row.
 `discountPercent`, `discountValue` and `priceSavePercent` (and the search
 `discountPercent`) are the merchant's markdown, not an announcement. They are
 **deprecated** in the schema and stay for one release; a client that struck
 them through must move to the fields above, after which they are removed with
 the expand/contract rule of `docs/migrations.md`. The Meilisearch index needs
-`manage.py meilisearch_apply_settings` once for the new displayed fields.
+`manage.py meilisearch_apply_settings` once for the new displayed, filterable
+and sortable fields (`prior_price`, `announced_discount_percent`,
+`effective_price`).
 
 ## The markdown formula
 

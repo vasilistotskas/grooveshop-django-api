@@ -15680,12 +15680,12 @@ msgstr ""
 "Ερώτημα αναζήτησης πλήρους κειμένου (κενό για χωρίς φίλτρο αναζήτησης)"
 
 #: .\search\views.py:358
-msgid "Minimum price filter (final_price >= value)"
-msgstr "Φίλτρο ελάχιστης τιμής (final_price >= value)"
+msgid "Minimum price filter (effective_price >= value): the price the customer pays, unconditional automatic promotions included"
+msgstr "Φίλτρο ελάχιστης τιμής (effective_price >= value): η τιμή που πληρώνει ο πελάτης, με τις άνευ όρων αυτόματες προσφορές"
 
 #: .\search\views.py:365
-msgid "Maximum price filter (final_price <= value)"
-msgstr "Φίλτρο μέγιστης τιμής (final_price <= value)"
+msgid "Maximum price filter (effective_price <= value): the price the customer pays, unconditional automatic promotions included"
+msgstr "Φίλτρο μέγιστης τιμής (effective_price <= value): η τιμή που πληρώνει ο πελάτης, με τις άνευ όρων αυτόματες προσφορές"
 
 #: .\search\views.py:372
 msgid "Minimum likes filter (likes_count >= value)"
@@ -15715,11 +15715,8 @@ msgstr ""
 "τους επιλογή."
 
 #: .\search\views.py:403
-msgid ""
-"Sort field (finalPrice, -finalPrice, -likesCount, -viewCount, -createdAt)"
-msgstr ""
-"Πεδίο ταξινόμησης (finalPrice, -finalPrice, -likesCount, -viewCount, "
-"-createdAt)"
+msgid "Sort field (effectivePrice, -effectivePrice, -likesCount, -viewCount, -createdAt). finalPrice and -finalPrice are deprecated: they ignore promotions."
+msgstr "Πεδίο ταξινόμησης (effectivePrice, -effectivePrice, -likesCount, -viewCount, -createdAt). Τα finalPrice και -finalPrice είναι παρωχημένα: αγνοούν τις προσφορές."
 
 #: .\search\views.py:411
 msgid "Comma-separated facet fields for counts and stats"

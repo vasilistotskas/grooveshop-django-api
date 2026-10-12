@@ -658,6 +658,7 @@ class ProductTranslation(
             "language_code",
             "likes_count",
             "final_price",
+            "effective_price",
             "view_count",
             "category",
             "category_name",
@@ -702,6 +703,7 @@ class ProductTranslation(
             "language_code",
             "likes_count",
             "final_price",
+            "effective_price",
             "view_count",
             "category",
             "category_name",
@@ -717,6 +719,7 @@ class ProductTranslation(
         sortable_fields = (
             "likes_count",
             "final_price",
+            "effective_price",
             "view_count",
             "discount_percent",
             "created_at",
@@ -789,6 +792,11 @@ class ProductTranslation(
             ),
             "view_count": lambda obj: obj.master.view_count,
             "final_price": lambda obj: float(obj.master.final_price.amount),
+            "effective_price": lambda obj: (
+                None
+                if obj.master.effective_price is None
+                else float(obj.master.effective_price)
+            ),
             "discount_percent": lambda obj: float(obj.master.discount_percent),
             "prior_price": lambda obj: (
                 None

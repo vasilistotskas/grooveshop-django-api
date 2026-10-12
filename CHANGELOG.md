@@ -3,6 +3,100 @@
 
 
 
+## v3.106.0 (2026-10-12)
+
+### Bug fixes
+
+* fix(payments): report a part-made refund, claim each refund email, settle COD atomically (#136)
+
+Three defects found in review of the payment ledger.
+
+- refund_order returned (False, response) when a refund split across an
+  order's payments was declined after an earlier share had gone through, so
+  the staff action said "was not refunded" about money that had moved and
+  wrote no admin log entry. It now returns a RefundResult (the money that
+  moved, the refund ids, the provider's answer for the share it did not
+  make). The staff action reports all of it, "X of Y refunded; the rest was
+  declined: ..." or nothing refunded, and logs whenever money moved;
+  cancel_order says only part of the payment was refunded.
+
+- The refund confirmation email compared a count of ledger refunds with a
+  count of emails sent and marked the whole count after one send, so two
+  workers could both send and one task could swallow another refund's email.
+  It is now one email per REFUND ledger row: the signal queues
+  send_refund_confirmation_email(refund.pk) on commit and the task claims the
+  row by inserting a RefundNotification (one-to-one, so the database
+  arbitrates) before it sends, releasing the claim when the send fails for
+  good. The claim is a side table, not a column on the ledger, so the
+  append-only money rows are never updated.
+
+- A COD order's payment status and its COD_COLLECTION ledger row were two
+  writes, so a failed insert left the order COMPLETED with no row and the
+  payout retry skipped it. OrderService.settle_cod_payment writes both in
+  one atomic block with the order locked and the status read under the lock;
+  the ACS reconcile, the staff "received outside ACS" action and BoxNow's
+  delivered event all go through it, and only the call that settled the
+  order sends order_paid and advances it to COMPLETED.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`e5cc8ad`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e5cc8ad0c35a0d73628702bc8dd4150052f148de))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.105.1 [skip ci] ([`5f255ca`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5f255ca634bda3e6afe92d9412fd5ee023a5fe94))
+
+### Features
+
+* feat(payments): append-only payment ledger, partial refunds and a staff Refund action (#136) (#155) ([`e5cc8ad`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e5cc8ad0c35a0d73628702bc8dd4150052f148de))
+
+* feat(payments): append-only payment ledger, partial refunds and a staff Refund action (#136)
+
+Refunds were recorded on Order.metadata["refunds"] and judged against
+Order.paid_amount, so a partial Stripe refund was booked as REFUNDED (the
+refund's status is "succeeded" for partial ones too), an order could be
+refunded once and never again, and the Stripe sync path, the
+charge.refunded webhook and the Viva paths each decided the status for
+themselves.
+
+PaymentTransaction is the single record of the money a provider moved for
+an order: CHARGE, REFUND and COD_COLLECTION rows, append-only, keyed on the
+provider's own id (unique on provider, provider_reference, kind), a REFUND
+naming the CHARGE it reverses. What can still be refunded and
+payment_status after a refund are derived from its sums in one place
+(PaymentLedger.refund_status), written by PaymentLedger.record_refund for
+refund_order, the Stripe charge.refunded webhook and the Viva reversal
+webhook alike.
+
+- refund_order refunds again until nothing is left and never past it,
+  under the order lock, payment by payment (an order paid twice under two
+  Viva checkout codes holds two charges). Stripe refunds carry
+  idempotency_key=order-<id>-refund-<n>, n counted under the lock; a
+  pending refund is booked in a settled status, requires_action / failed /
+  canceled record nothing.
+- charge.refunded reconciles the ledger to the charge's cumulative
+  amount_refunded (the event has no refund id), so a refund this app made,
+  a redelivery and an out-of-order event add nothing; partial refunds now
+  signal order_refunded too, and each refund emails the customer.
+- Charges are recorded where a provider confirms them (payment_intent.
+  succeeded, checkout.session.completed, Viva payment created) and cash
+  where the courier collects it (ACS, BoxNow). A capture the ledger never
+  held is read from the provider once, when a refund first needs it.
+- Staff "Refund (amount, reason)" dialog action on delivered / completed /
+  returned orders, through refund_order, with the ledger on the order page.
+- The item "refund" endpoint moved no money and said it did: it is now
+  order-items/<id>/restock.
+- A migration backfills CHARGE / COD_COLLECTION / REFUND rows for orders
+  already paid; metadata["refunds"], PaymentStatus.after_refund and
+  PaymentProvider.captured_amount are removed.
+- The demo reset removes a ledger with the orders it hard-deletes.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sry6SAzAiWFBP7y1KM5zX1 ([`e5cc8ad`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e5cc8ad0c35a0d73628702bc8dd4150052f148de))
+
 ## v3.105.1 (2026-10-12)
 
 ### Bug fixes

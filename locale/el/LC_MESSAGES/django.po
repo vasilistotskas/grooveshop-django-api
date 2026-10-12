@@ -11832,6 +11832,14 @@ msgstr "Δεν έχετε δικαίωμα πρόσβασης σε αυτή τη
 msgid "Only staff can process refunds."
 msgstr "Μόνο το προσωπικό μπορεί να επεξεργάζεται επιστροφές χρημάτων."
 
+#: .\order\views\item.py:163
+msgid ""
+"The wholesale group that priced this order no longer exists, so a new "
+"line cannot be priced for it."
+msgstr ""
+"Η ομάδα χονδρικής που τιμολόγησε αυτή την παραγγελία δεν υπάρχει πια, "
+"οπότε δεν μπορεί να τιμολογηθεί νέα γραμμή για αυτήν."
+
 #: .\order\views\item.py:159
 msgid "This order is not in a refundable state."
 msgstr ""

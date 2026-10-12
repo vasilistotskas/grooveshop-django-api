@@ -1,9 +1,13 @@
+from decimal import Decimal
+
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from djmoney.money import Money
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from b2b.factories import CustomerGroupFactory
+from b2b.services import B2BPricingService
 from order.enum.status import OrderStatus
 from order.factories.order import OrderFactory
 from order.models.item import OrderItem
@@ -145,9 +149,67 @@ class OrderItemViewSetTestCase(TestURLFixerMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         item = OrderItem.objects.get(pk=response.data["id"])
         self.assertEqual(item.order_id, self.order.id)
-        self.assertEqual(item.price, self.other_product.price)
+        # VAT-inclusive, like every checkout line.
+        self.assertEqual(item.price, self.other_product.final_price)
         # The line is sold at the VAT its product carries right now.
         self.assertEqual(item.vat_rate, self.other_product.vat_percent)
+
+    def _wholesale_order(self, group_id: int):
+        order = OrderFactory(
+            num_order_items=0, user=self.user, pay_way=self.pay_way
+        )
+        order.metadata = {
+            **(order.metadata or {}),
+            "b2b_pricing": {"group_id": group_id},
+        }
+        order.save(update_fields=["metadata"])
+        return order
+
+    def test_create_on_a_wholesale_order_uses_the_group_that_priced_it(self):
+        group = CustomerGroupFactory(discount_percent=Decimal("10.00"))
+        order = self._wholesale_order(group.pk)
+        # No retail discount: the group price is capped at the retail
+        # final price, so a discounted product could price both the same.
+        product = ProductFactory(
+            active=True,
+            num_images=0,
+            num_reviews=0,
+            stock=5,
+            discount_percent=Decimal(0),
+        )
+        self.client.force_authenticate(user=self.staff)
+
+        response = self.client.post(
+            self.get_order_item_list_url(),
+            {"order": order.id, "product": product.id, "quantity": 1},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        item = OrderItem.objects.get(pk=response.data["id"])
+        expected = B2BPricingService.resolve_single(product, group).final
+        self.assertEqual(item.price, expected)
+        self.assertLess(item.price, product.final_price)
+
+    def test_create_on_a_wholesale_order_whose_group_is_gone_is_refused(self):
+        group = CustomerGroupFactory()
+        order = self._wholesale_order(group.pk)
+        group.delete()
+        self.client.force_authenticate(user=self.staff)
+
+        response = self.client.post(
+            self.get_order_item_list_url(),
+            {
+                "order": order.id,
+                "product": self.other_product.id,
+                "quantity": 1,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("order", response.data)
+        self.assertFalse(OrderItem.objects.filter(order=order).exists())
 
     def test_create_forbidden_for_owner(self):
         # Order lines are written by store staff, not by the order's owner.

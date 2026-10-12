@@ -4,6 +4,7 @@ import logging
 
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
+from djmoney.money import Money
 from drf_spectacular.utils import extend_schema_view
 from rest_framework import status
 from rest_framework.decorators import action
@@ -12,6 +13,8 @@ from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from b2b.models.group import CustomerGroup
+from b2b.services import B2BPricingService
 from core.api.permissions import StoreStaffModelPermissions
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
@@ -140,8 +143,36 @@ class OrderItemViewSet(BaseModelViewSet):
         # ``price`` is not a writable field on OrderItemWriteSerializer,
         # so the line price always comes from the product here — a
         # client cannot name its own price.
+        order = serializer.validated_data["order"]
         product = serializer.validated_data["product"]
-        serializer.save(price=product.price)
+        serializer.save(price=self._line_price(order, product))
+
+    @staticmethod
+    def _line_price(order, product) -> Money:
+        """What one unit of ``product`` costs on ``order``, VAT included.
+
+        The same figure checkout stores (the cart line's ``final_price``),
+        never the product's net ``price``. A wholesale-priced order is
+        priced by the group that priced it at checkout, which the order
+        stamps in ``metadata["b2b_pricing"]``, not by the buyer's group
+        today. If that group no longer exists, nothing says what the line
+        should cost, so the line is refused rather than sold at retail.
+        """
+        stamp = (order.metadata or {}).get("b2b_pricing")
+        if stamp is None:
+            return product.final_price
+        group = CustomerGroup.objects.filter(pk=stamp["group_id"]).first()
+        if group is None:
+            raise DRFValidationError(
+                {
+                    "order": _(
+                        "The wholesale group that priced this order no "
+                        "longer exists, so a new line cannot be priced "
+                        "for it."
+                    )
+                }
+            )
+        return B2BPricingService.resolve_single(product, group).final
 
     def perform_update(self, serializer):
         # `order` is a writable FK, so an update could reassign the item to a

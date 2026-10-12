@@ -198,7 +198,7 @@ class OrderCreateUpdateSerializerTestCase(TestCase):
             "first_name": "John",
             "last_name": "Doe",
             "phone": "+12025550195",
-            "paid_amount": {
+            "amount_due": {
                 "amount": "100.00",
                 "currency": settings.DEFAULT_CURRENCY,
             },
@@ -245,18 +245,18 @@ class OrderCreateUpdateSerializerTestCase(TestCase):
         self.assertTrue(serializer.is_valid(), serializer.errors)
         self.assertNotIn("items", serializer.validated_data)
 
-    def test_paid_amount_is_read_only(self):
+    def test_amount_due_is_read_only(self):
         data_with_paid = self.valid_data.copy()
-        data_with_paid["paid_amount"] = {
+        data_with_paid["amount_due"] = {
             "amount": "999.99",
             "currency": settings.DEFAULT_CURRENCY,
         }
 
         serializer = OrderWriteSerializer(data=data_with_paid)
-        # paid_amount is read_only, so it should be ignored (not cause error)
+        # amount_due is read_only, so it should be ignored (not cause error)
         # and not appear in validated_data if serializer is valid
         if serializer.is_valid():
-            self.assertNotIn("paid_amount", serializer.validated_data)
+            self.assertNotIn("amount_due", serializer.validated_data)
 
     def test_phone_number_validation(self):
         invalid_data = self.valid_data.copy()

@@ -358,7 +358,7 @@ class OrderViewSet(BaseModelViewSet):
         "updated_at",
         "status",
         "status_updated_at",
-        "paid_amount",
+        "amount_due",
         "shipping_price",
         "payment_status",
         "user__first_name",

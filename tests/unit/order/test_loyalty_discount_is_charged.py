@@ -1,10 +1,10 @@
 """The amount charged must equal the amount the shopper was shown.
 
-A loyalty redemption used to land ONLY on ``paid_amount`` while every
+A loyalty redemption used to land ONLY on ``amount_due`` while every
 online charge site read the undiscounted ``total_price``:
 
 - the checkout sidebar showed items + shipping + fee − discount;
-- ``paid_amount`` was written with the discount applied;
+- ``amount_due`` was written with the discount applied;
 - the points were burnt;
 - Stripe and Viva were both handed ``total_price`` — the full amount;
 - the Viva webhook's amount guard compared the captured amount against
@@ -12,7 +12,7 @@ online charge site read the undiscounted ``total_price``:
   of catching it.
 
 Cash on delivery disagreed and collected the discounted figure
-(``shipping_acs`` sets ``cod_amount`` from ``paid_amount``), and that
+(``shipping_acs`` sets ``cod_amount`` from ``amount_due``), and that
 internal contradiction is what makes this a defect rather than a
 pricing choice.
 
@@ -68,9 +68,9 @@ class TestLoyaltyDiscountReachesTheCharge:
 
         assert order.calculate_order_total_amount().amount == Decimal(0)
 
-    def test_paid_amount_matches_the_amount_due(self):
+    def test_mark_as_paid_sets_an_unset_amount_due_net_of_the_discount(self):
         """``mark_as_paid`` must not restore the undiscounted total."""
-        order = OrderFactory(paid_amount=Money(0, "EUR"))
+        order = OrderFactory(amount_due=Money(0, "EUR"))
         order.loyalty_discount = Money(Decimal("5.00"), "EUR")
         order.save(
             update_fields=["loyalty_discount", "loyalty_discount_currency"]
@@ -79,6 +79,6 @@ class TestLoyaltyDiscountReachesTheCharge:
         order.mark_as_paid(payment_id="pi_test", payment_method="card")
 
         order.refresh_from_db()
-        assert order.paid_amount.amount == (
+        assert order.amount_due.amount == (
             order.total_price.amount - Decimal("5.00")
         )

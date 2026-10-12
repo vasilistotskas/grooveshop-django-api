@@ -49,7 +49,7 @@ class TestSampleOrderDataGenerator:
             "city",
             "zipcode",
             "country",
-            "paid_amount",
+            "amount_due",
             "created_at",
         ]
 
@@ -84,13 +84,13 @@ class TestSampleOrderDataGenerator:
         order_data = data["order"]
         assert isinstance(order_data["phone"], str)
 
-    def test_generated_paid_amount_is_decimal(self, generator):
+    def test_generated_amount_due_is_decimal(self, generator):
         """Test that generated paid amount is a string (formatted)."""
         data = generator.generate_order()
         order_data = data["order"]
-        # paid_amount is formatted as string like "€123.45"
-        assert isinstance(order_data["paid_amount"], str)
-        assert "€" in order_data["paid_amount"]
+        # amount_due is formatted as string like "€123.45"
+        assert isinstance(order_data["amount_due"], str)
+        assert "€" in order_data["amount_due"]
 
     def test_generated_items_is_list(self, generator):
         """Test that generated items is a list."""
@@ -137,10 +137,10 @@ class TestSampleOrderDataGenerator:
         items_total = sum(item["total_price"] for item in data["items"])
 
         # Extract numeric value from formatted string "€123.45"
-        paid_amount_str = (
-            data["order"]["paid_amount"].replace("€", "").replace(",", "")
+        amount_due_str = (
+            data["order"]["amount_due"].replace("€", "").replace(",", "")
         )
-        paid_amount = Decimal(paid_amount_str)
+        amount_due = Decimal(amount_due_str)
 
         # Total should be items + shipping (€5 if < €50, else €0)
         shipping = (
@@ -151,7 +151,7 @@ class TestSampleOrderDataGenerator:
         expected_total = items_total + shipping
 
         # Allow for small rounding differences
-        assert abs(paid_amount - expected_total) < Decimal("0.01")
+        assert abs(amount_due - expected_total) < Decimal("0.01")
 
     def test_generate_multiple_orders_are_different(self, generator):
         """Test that generating multiple orders produces different data."""

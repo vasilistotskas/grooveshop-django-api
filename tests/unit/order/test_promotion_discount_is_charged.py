@@ -66,18 +66,29 @@ class TestPromotionDiscountReachesTheCharge:
 
         assert order.calculate_order_total_amount().amount == Decimal(0)
 
-    def test_pricing_breakdown_reports_deductions(self):
+    def test_pricing_breakdown_reports_deductions_and_what_is_owed(self):
+        """An unpaid order owes its whole amount due. The deductions
+        reduce it, the gift-card portion included, so none of it is owed
+        twice and none of it is owed as zero."""
+        from order.enum.status import PaymentStatus
         from order.serializers.order import OrderDetailSerializer
 
-        order = OrderFactory()
+        order = OrderFactory(
+            payment_status=PaymentStatus.PENDING,
+            shipping_price=Money(Decimal("20.00"), "EUR"),
+            payment_method_fee=Money(0, "EUR"),
+        )
         order.discount_amount = Money(Decimal("4.00"), "EUR")
         order.gift_card_amount = Money(Decimal("6.00"), "EUR")
+        order.amount_due = order.calculate_order_total_amount()
         order.save(
             update_fields=[
                 "discount_amount",
                 "discount_amount_currency",
                 "gift_card_amount",
                 "gift_card_amount_currency",
+                "amount_due",
+                "amount_due_currency",
             ]
         )
 
@@ -88,14 +99,11 @@ class TestPromotionDiscountReachesTheCharge:
         fee = breakdown["payment_method_fee"]
         assert breakdown["discount"] == Decimal("4.00")
         assert breakdown["gift_card_amount"] == Decimal("6.00")
-        assert breakdown["grand_total"] == max(
-            items + shipping + fee - Decimal("4.00"), 0
+        assert breakdown["grand_total"] == items + shipping + fee - Decimal(
+            "4.00"
         )
-        # No phantom outstanding balance: the gift-card portion counts
-        # as settled.
-        assert breakdown["remaining_amount"] == max(
-            breakdown["grand_total"]
-            - Decimal("6.00")
-            - breakdown["paid_amount"],
-            0,
+        assert breakdown["amount_due"] == breakdown["grand_total"] - Decimal(
+            "6.00"
         )
+        assert breakdown["amount_due"] > 0
+        assert breakdown["remaining_amount"] == breakdown["amount_due"]

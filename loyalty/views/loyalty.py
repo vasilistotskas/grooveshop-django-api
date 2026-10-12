@@ -234,13 +234,13 @@ class LoyaltyViewSet(BaseModelViewSet):
         from djmoney.money import Money
 
         order.loyalty_discount = Money(discount, currency)
-        order.paid_amount = order.calculate_order_total_amount()
+        order.amount_due = order.calculate_order_total_amount()
         order.save(
             update_fields=[
                 "loyalty_discount",
                 "loyalty_discount_currency",
-                "paid_amount",
-                "paid_amount_currency",
+                "amount_due",
+                "amount_due_currency",
             ]
         )
 

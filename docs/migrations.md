@@ -187,6 +187,32 @@ one arrives — in STATE only:
   columns during N's rollout into still-empty translations, then
   `ALTER TABLE blog_blogpost DROP COLUMN IF EXISTS seo_title, ...`.
 
+### Worked example: renaming a django-money field
+
+`Order.paid_amount` → `amount_due` (`order` 0070) is the expand step of a
+rename. The new `MoneyField` is `AddField(db_default=...)`, but the
+companion `*_currency` column is a second field django-money builds
+itself, with no `db_default`, so a plain `AddField` of it is NOT NULL
+without a default and the preflight blocks it (Django also drops its
+default right after `ADD COLUMN`). Add it as
+`SeparateDatabaseAndState(state_operations=[AddField(CurrencyField(...))],
+database_operations=[RunSQL("ALTER TABLE ... ADD COLUMN ..._currency
+varchar(3) NOT NULL DEFAULT 'EUR'")])`: the default stays in the database
+and the state matches what the model declares. Copy the old values with a
+`RunSQL` `UPDATE`, then take the old amount and currency fields out of
+STATE with another `SeparateDatabaseAndState` (both were nullable, so the
+new code's INSERTs still work). The old columns are dropped in release
+N+1 with `contract_of`, after re-copying whatever the previous release
+wrote while it still served.
+
+A renamed field is also an API contract change. Clients generated from
+the previous schema (the Nuxt storefront's Zod schemas, the agent
+gateway's DTOs) require the old name, so release N keeps emitting it as a
+deprecated alias of the new one (`@extend_schema_serializer(
+deprecate_fields=[...])`, and `"deprecated": True` in a hand-written
+`extend_schema_field` dict) and release N+1, shipped only after those
+clients read the new name, removes it.
+
 ### Rollback
 
 After a contract migration runs, the image can roll back to N, not to

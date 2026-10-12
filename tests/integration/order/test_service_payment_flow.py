@@ -53,7 +53,7 @@ def _pending_stripe_order(pay_way, payment_id: str, **overrides) -> Order:
         "zipcode": "12345",
         "phone": "+306900000000",
         "shipping_price": _eur("5.00"),
-        "paid_amount": _eur("0.00"),
+        "amount_due": _eur("0.00"),
     }
     fields.update(overrides)
     return Order.objects.create(**fields)
@@ -330,7 +330,7 @@ class TestHandlePaymentSucceeded:
         assert result.payment_status == PaymentStatus.COMPLETED
         assert result.payment_method == "stripe"
         # 2 x 100 + 5 shipping
-        assert result.paid_amount == _eur("205.00")
+        assert result.amount_due == _eur("205.00")
         assert result.status_updated_at is not None
         # PROCESSING is internal: the webhook's order-confirmation email
         # covers it, so no generic status-update email is sent too.
@@ -397,7 +397,7 @@ class TestHandlePaymentSucceeded:
             "pi_settled",
             payment_status=settled_payment_status,
             status=OrderStatus.DELIVERED,
-            paid_amount=_eur("55.00"),
+            amount_due=_eur("55.00"),
         )
 
         outcome = OrderService.handle_payment_succeeded(
@@ -464,7 +464,7 @@ class TestHandlePaymentFailed:
             "pi_settled_fail",
             payment_status=settled_payment_status,
             status=OrderStatus.DELIVERED,
-            paid_amount=_eur("55.00"),
+            amount_due=_eur("55.00"),
         )
 
         outcome = OrderService.handle_payment_failed("pi_settled_fail")

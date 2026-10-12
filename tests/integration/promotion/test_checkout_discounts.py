@@ -94,7 +94,7 @@ def _create_offline_order(checkout):
 
 
 class TestOfflineCheckoutWithCoupon:
-    def test_coupon_discount_reaches_paid_amount(
+    def test_coupon_discount_reaches_amount_due(
         self, enable_promotions, checkout
     ):
         code = PromotionCodeFactory(
@@ -106,7 +106,7 @@ class TestOfflineCheckoutWithCoupon:
 
         order.refresh_from_db()
         assert order.discount_amount.amount == Decimal("10.00")
-        assert order.paid_amount.amount == order.total_price.amount - Decimal(
+        assert order.amount_due.amount == order.total_price.amount - Decimal(
             "10.00"
         )
         redemption = PromotionRedemption.objects.get(order=order)

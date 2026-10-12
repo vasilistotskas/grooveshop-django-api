@@ -273,7 +273,7 @@ class TestRefundDispatch:
         assert row.event_name == "Refund"
         assert row.status == MetaCapiEventStatus.SENT
 
-    def test_missing_amount_falls_back_to_paid_amount(
+    def test_missing_amount_falls_back_to_amount_due(
         self, capi_enabled, meta_send
     ):
         order = _order(metadata=_CONSENTED_META, num_order_items=1)
@@ -282,8 +282,8 @@ class TestRefundDispatch:
         dispatch_refund_event.run(order.id)
 
         event = _sent_event(meta_send)
-        assert event.custom_data.value == float(order.paid_amount.amount)
-        assert event.custom_data.currency == order.paid_amount.currency.code
+        assert event.custom_data.value == float(order.amount_due.amount)
+        assert event.custom_data.currency == order.amount_due.currency.code
 
     def test_refund_without_consent_is_not_sent(self, capi_enabled, meta_send):
         order = _order(metadata={}, num_order_items=1)

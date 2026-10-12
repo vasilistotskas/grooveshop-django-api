@@ -356,7 +356,7 @@ def refresh_stats_snapshot() -> dict:
     figures = Order.objects.aggregate(
         orders=Count("id"),
         revenue=Sum(
-            "paid_amount", filter=Q(payment_status=PaymentStatus.COMPLETED)
+            "amount_due", filter=Q(payment_status=PaymentStatus.COMPLETED)
         ),
         last_order_at=Max("created_at"),
     )

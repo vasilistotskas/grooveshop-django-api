@@ -21,7 +21,14 @@ from order.models.order import Order
 pytestmark = pytest.mark.django_db
 
 
+#: What an unpaid order owes. Nonzero on purpose: an unpaid order owes its
+#: full amount, so a query that counted it would show.
+UNPAID_AMOUNT_DUE = 999
+
+
 def _order(*, paid: float | None = None, days_ago: int = 0, **fields):
+    """A COMPLETED order that owed ``paid``, or a PENDING one when ``paid``
+    is ``None``."""
     order = OrderFactory(
         num_order_items=0,
         payment_status=(
@@ -29,7 +36,10 @@ def _order(*, paid: float | None = None, days_ago: int = 0, **fields):
             if paid is not None
             else PaymentStatus.PENDING
         ),
-        paid_amount=Money(paid or 0, settings.DEFAULT_CURRENCY),
+        amount_due=Money(
+            UNPAID_AMOUNT_DUE if paid is None else paid,
+            settings.DEFAULT_CURRENCY,
+        ),
         **fields,
     )
     # created_at is auto_now_add; backdate through the queryset.
@@ -55,13 +65,13 @@ class TestKpis:
         OrderFactory(
             num_order_items=0,
             payment_status=PaymentStatus.PENDING,
-            paid_amount=Money(999, settings.DEFAULT_CURRENCY),
+            amount_due=Money(999, settings.DEFAULT_CURRENCY),
         )
         assert queries.kpis.compute()["revenue"]["7d"]["amount"] == 0.0
 
     def test_average_order_value_is_over_paid_orders(self):
-        """An unpaid order's ``paid_amount`` is 0 until it is paid;
-        averaging it in understated the figure."""
+        """An unpaid order owes its full ``amount_due``; averaging it in
+        would overstate the figure."""
         _order(paid=100)
         _order(paid=50)
         _order(paid=None)

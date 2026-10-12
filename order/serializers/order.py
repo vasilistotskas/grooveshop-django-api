@@ -2,7 +2,7 @@ from typing import ClassVar
 
 from django.utils.translation import gettext_lazy as _
 from djmoney.contrib.django_rest_framework import MoneyField
-from drf_spectacular.utils import extend_schema_field
+from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
 from phonenumber_field.serializerfields import PhoneNumberField
 from rest_framework import serializers
 from rest_framework.relations import PrimaryKeyRelatedField
@@ -108,6 +108,7 @@ class OrderDeliveryMethodSerializer(serializers.Serializer):
     kind = serializers.ChoiceField(choices=ShippingKind.choices)
 
 
+@extend_schema_serializer(deprecate_fields=["paid_amount"])
 class OrderSerializer(serializers.ModelSerializer[Order]):
     items = OrderItemDetailSerializer(many=True)
     country = PrimaryKeyRelatedField(
@@ -119,7 +120,18 @@ class OrderSerializer(serializers.ModelSerializer[Order]):
     pay_way = PrimaryKeyRelatedField(
         queryset=PayWay.objects.all(), allow_null=True
     )
-    paid_amount = MoneyField(max_digits=11, decimal_places=2, read_only=True)
+    amount_due = MoneyField(max_digits=11, decimal_places=2, read_only=True)
+    # DEPRECATED alias of ``amount_due`` (it held the amount owed, never
+    # the amount paid). Kept for one release so the storefront and the
+    # agent gateway, whose generated schemas require ``paidAmount``, keep
+    # parsing order responses while they roll out; a removed field is the
+    # dangerous direction. The contract release removes it with the
+    # ``paid_amount`` columns (steps in the ``0070_order_amount_due``
+    # docstring): this field, its entry in ``Meta.fields`` and the
+    # ``deprecate_fields`` argument above.
+    paid_amount = MoneyField(
+        source="amount_due", max_digits=11, decimal_places=2, read_only=True
+    )
     shipping_price = MoneyField(max_digits=11, decimal_places=2, read_only=True)
     payment_method_fee = MoneyField(
         max_digits=11, decimal_places=2, read_only=True
@@ -283,6 +295,8 @@ class OrderSerializer(serializers.ModelSerializer[Order]):
             "city",
             "phone",
             "customer_notes",
+            "amount_due",
+            # Deprecated alias of ``amount_due``: see the field.
             "paid_amount",
             "items",
             "shipping_price",
@@ -323,7 +337,7 @@ class OrderSerializer(serializers.ModelSerializer[Order]):
         read_only_fields = (
             "id",
             "uuid",
-            "paid_amount",
+            "amount_due",
             "shipping_price",
             "payment_method_fee",
             "billing_vat_id",
@@ -438,7 +452,7 @@ class OrderDetailSerializer(OrderSerializer):
     currency = serializers.SerializerMethodField(
         help_text=(
             "ISO 4217 currency code for every monetary field on the "
-            "order (paidAmount, shippingPrice, totalPriceItems, …). "
+            "order (amountDue, shippingPrice, totalPriceItems, …). "
             "Surfaced as a top-level field because djmoney serialises "
             "money fields as bare numbers — without this, the "
             "frontend has no way to know whether ``59.98`` is EUR or "
@@ -508,17 +522,17 @@ class OrderDetailSerializer(OrderSerializer):
 
     @extend_schema_field({"type": "string", "example": "EUR"})
     def get_currency(self, obj: Order) -> str:
-        # ``paid_amount`` is the canonical reference: it's the field
-        # the customer actually paid in. Falls back to total_price_items
-        # for orders where paid_amount may be a zero Money (COD before
-        # reconciliation), and finally to the project default. Walking
+        # ``amount_due`` is the canonical reference: it's the field
+        # the customer is charged in. Falls back to total_price_items
+        # for orders where amount_due is a zero Money (fully covered by
+        # deductions), and finally to the project default. Walking
         # multiple sources keeps us safe against the rare case where
         # the order was created with one currency and reconciled in
         # another (shouldn't happen, but cheap to guard against).
         from django.conf import settings
 
         for source_name in (
-            "paid_amount",
+            "amount_due",
             "total_price_items",
             "shipping_price",
         ):
@@ -815,7 +829,10 @@ class OrderDetailSerializer(OrderSerializer):
                 "gift_card_amount": {"type": "number"},
                 "grand_total": {"type": "number"},
                 "currency": {"type": "string"},
-                "paid_amount": {"type": "number"},
+                "amount_due": {"type": "number"},
+                # Deprecated alias of ``amount_due``: removed in the
+                # contract release, with ``OrderSerializer.paid_amount``.
+                "paid_amount": {"type": "number", "deprecated": True},
                 "remaining_amount": {"type": "number"},
             },
         }
@@ -834,13 +851,12 @@ class OrderDetailSerializer(OrderSerializer):
         discount = obj.discount_amount.amount if obj.discount_amount else 0
         loyalty = obj.loyalty_discount.amount if obj.loyalty_discount else 0
         gift_card = obj.gift_card_amount.amount if obj.gift_card_amount else 0
-        paid = obj.paid_amount.amount if obj.paid_amount else 0
 
-        # What the customer owes overall — discounts reduce it, the
-        # gift-card portion settles part of it, the provider payment
-        # settles the rest. Ignoring the deductions here used to
-        # report a phantom outstanding balance on every discounted
-        # order (the Go gateway relays this payload to AI agents).
+        # What the order totals to — discounts reduce it. ``amount_due``
+        # is what the customer owes after the gift-card portion too, and
+        # ``remaining_amount`` what of that is still to be paid (the whole
+        # of it until the payment settles). The Go gateway relays this
+        # payload to AI agents.
         grand_total = max(
             items_total + shipping_total + payment_fee - discount - loyalty,
             0,
@@ -858,8 +874,11 @@ class OrderDetailSerializer(OrderSerializer):
             "currency": obj.total_price_items.currency.code
             if obj.total_price_items
             else "EUR",
-            "paid_amount": paid,
-            "remaining_amount": max(grand_total - gift_card - paid, 0),
+            "amount_due": obj.amount_due.amount,
+            # Deprecated alias of ``amount_due``: removed in the contract
+            # release, with ``OrderSerializer.paid_amount``.
+            "paid_amount": obj.amount_due.amount,
+            "remaining_amount": obj.remaining_amount.amount,
         }
 
     @extend_schema_field(
@@ -1498,7 +1517,7 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
     # away AND gated on live stock for products it would never touch, so
     # an address edit was impossible once any line had sold out.
     items = OrderItemCreateSerializer(many=True, read_only=True)
-    paid_amount = MoneyField(max_digits=11, decimal_places=2, read_only=True)
+    amount_due = MoneyField(max_digits=11, decimal_places=2, read_only=True)
     shipping_price = MoneyField(max_digits=11, decimal_places=2, read_only=True)
     payment_method_fee = MoneyField(
         max_digits=11, decimal_places=2, read_only=True
@@ -1570,7 +1589,7 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
             "place",
             "city",
             "phone",
-            "paid_amount",
+            "amount_due",
             "customer_notes",
             "items",
             "shipping_price",
@@ -1594,7 +1613,7 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
             # creation (e.g. INVOICE requires billing_vat_id). Legitimate
             # edits to these go through the admin / dedicated service flows,
             # never a customer PUT. Address/contact fields stay writable.
-            # (``paid_amount`` is already read-only via its explicit field
+            # (``amount_due`` is already read-only via its explicit field
             # declaration above, so it is intentionally not repeated here.)
             "user",
             "pay_way",

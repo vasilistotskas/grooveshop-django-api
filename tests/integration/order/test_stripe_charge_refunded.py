@@ -205,7 +205,7 @@ class TestChargeRefundedWebhook:
     ):
         """Stripe also notifies the refund ``refund_order`` just made, under
         a refund id of its own; the ledger already holds it."""
-        order = _order("pi_in_app_1", paid_amount=Money("50.00", "EUR"))
+        order = _order("pi_in_app_1", amount_due=Money("50.00", "EUR"))
         PaymentTransactionFactory(
             order=order,
             amount=Money("50.00", "EUR"),
@@ -229,7 +229,7 @@ class TestChargeRefundedWebhook:
         assert order.payment_status == PaymentStatus.PARTIALLY_REFUNDED
 
     def test_a_dashboard_refund_next_to_an_in_app_one_counts_each_once(self):
-        order = _order("pi_mixed_1", paid_amount=Money("50.00", "EUR"))
+        order = _order("pi_mixed_1", amount_due=Money("50.00", "EUR"))
         PaymentTransactionFactory(
             order=order,
             amount=Money("50.00", "EUR"),

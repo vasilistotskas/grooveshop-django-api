@@ -301,7 +301,7 @@ class PaymentLedger:
             order,
             amount=Money(
                 Decimal(str(captured)),
-                data.get("currency") or order.paid_amount.currency,
+                data.get("currency") or order.amount_due.currency,
             ),
             provider=provider_code,
             reference=payment_id,

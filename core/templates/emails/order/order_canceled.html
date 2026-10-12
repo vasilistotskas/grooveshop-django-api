@@ -19,7 +19,7 @@
     </p>
 
     {% comment %}
-       paid_amount is what the order was WORTH, not what was collected:
+       amount_due is what the order was WORTH, not what was collected:
        OrderService sets it at creation from
        calculate_order_total_amount(), before any money moves. Gating on
        it alone promised a refund to every cancelled order, including
@@ -31,10 +31,10 @@
        Django's hash comment is SINGLE-LINE only; a multi-line one
        renders itself into the customer's email verbatim.
     {% endcomment %}
-    {% if order.is_paid and order.paid_amount %}
+    {% if order.is_paid and order.amount_due %}
     <p class="mt-2">
         <strong>{% trans "Refund" %}:</strong>
-        {% blocktrans with amount=order.paid_amount %}Your payment of {{ amount }} will be refunded to your original payment method within 3-5 business days.{% endblocktrans %}
+        {% blocktrans with amount=order.amount_due %}Your payment of {{ amount }} will be refunded to your original payment method within 3-5 business days.{% endblocktrans %}
     </p>
     {% endif %}
 </div>

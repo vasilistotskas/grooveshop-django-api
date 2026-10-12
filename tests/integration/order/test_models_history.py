@@ -42,10 +42,10 @@ class OrderHistoryTestCase(TestCase):
 
     def test_log_payment_update(self):
         previous_value = {
-            "paid_amount": {"amount": 0, "currency": settings.DEFAULT_CURRENCY}
+            "amount_due": {"amount": 0, "currency": settings.DEFAULT_CURRENCY}
         }
         new_value = {
-            "paid_amount": {
+            "amount_due": {
                 "amount": 100,
                 "currency": settings.DEFAULT_CURRENCY,
             }
@@ -71,9 +71,9 @@ class OrderHistoryTestCase(TestCase):
 
     def test_log_payment_update_with_money_object(self):
         previous_value = {
-            "paid_amount": Money("0.00", settings.DEFAULT_CURRENCY)
+            "amount_due": Money("0.00", settings.DEFAULT_CURRENCY)
         }
-        new_value = {"paid_amount": Money("100.00", settings.DEFAULT_CURRENCY)}
+        new_value = {"amount_due": Money("100.00", settings.DEFAULT_CURRENCY)}
 
         result = OrderHistory.log_payment_update(
             order=self.order,
@@ -87,11 +87,11 @@ class OrderHistoryTestCase(TestCase):
         self.assertEqual(result.user, self.user)
         self.assertEqual(result.change_type, "PAYMENT")
         self.assertEqual(
-            result.previous_value["paid_amount"],
+            result.previous_value["amount_due"],
             str(Money("0.00", settings.DEFAULT_CURRENCY)),
         )
         self.assertEqual(
-            result.new_value["paid_amount"],
+            result.new_value["amount_due"],
             str(Money("100.00", settings.DEFAULT_CURRENCY)),
         )
         self.assertEqual(result.description, "Payment information updated")

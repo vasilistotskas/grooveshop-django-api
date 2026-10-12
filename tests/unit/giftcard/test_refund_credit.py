@@ -124,7 +124,7 @@ def test_viva_refunds_return_the_redemption_with_the_last_one(
         payment_status=PaymentStatus.COMPLETED,
         payment_id=payment_id,
         pay_way=PayWayFactory.create_online_payment("viva_wallet"),
-        paid_amount=Money(Decimal("40.00"), "EUR"),
+        amount_due=Money(Decimal("40.00"), "EUR"),
         metadata={"viva_order_codes": [str(order_code)]},
     )
     refunds = {"first-refund": 5.0, "last-refund": 35.0}

@@ -824,8 +824,8 @@ class TestReviewSeed:
         for order in Order.objects.filter(metadata__has_key="demo_review_seed")[
             :25
         ]:
-            assert order.paid_amount.amount > 0
-            assert order.paid_amount == order.calculate_order_total_amount()
+            assert order.amount_due.amount > 0
+            assert order.amount_due == order.calculate_order_total_amount()
             assert order._payment_consistency_errors() == {}
             assert order.pay_way_key
 

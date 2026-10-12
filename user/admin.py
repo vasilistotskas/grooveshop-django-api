@@ -252,7 +252,7 @@ class CustomerOrderDatasetAdmin(RelatedDatasetAdmin):
         "id",
         "status_label",
         "payment_status_label",
-        "paid_amount",
+        "amount_due",
         "created_at",
     )
     list_display_links = ("id",)

@@ -2,7 +2,8 @@
 
 It writes what the order rows and ``metadata["refunds"]`` PROVE, and
 nothing it would have to guess: the amount is ``paid_amount`` (what the
-order owed, which checkout verified against the provider), a refund with
+order owed, which checkout verified against the provider; the column the
+field was called before 0070 renamed it), a refund with
 no provider refund id is not invented, and ``payment_status`` is left
 alone. It runs against the historical model registry, which is what a
 migration actually receives.
@@ -10,6 +11,7 @@ migration actually receives.
 
 from __future__ import annotations
 
+import functools
 import importlib
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -35,6 +37,7 @@ CHARGE = PaymentTransactionKind.CHARGE
 REFUND = PaymentTransactionKind.REFUND
 
 
+@functools.cache
 def _historical_apps():
     """The model registry a migration actually receives (see
     ``test_invoice_component_backfill``)."""
@@ -57,12 +60,19 @@ def _paid(provider="stripe", payment_id="pi_bf_1", amount="50.00", **kwargs):
     kwargs.setdefault("pay_way", PayWayFactory.create_online_payment(provider))
     kwargs.setdefault("status", OrderStatus.DELIVERED)
     kwargs.setdefault("payment_status", PaymentStatus.COMPLETED)
-    return OrderFactory(
+    order = OrderFactory(
         num_order_items=0,
         payment_id=payment_id,
-        paid_amount=_eur(amount),
+        amount_due=_eur(amount),
         **kwargs,
     )
+    # The rows this migration reads were written by the release that still
+    # called the column ``paid_amount``; the model no longer has it, so it
+    # is written through the registry the migration receives.
+    _historical_apps().get_model("order", "Order").objects.filter(
+        pk=order.pk
+    ).update(paid_amount=Decimal(amount), paid_amount_currency="EUR")
+    return order
 
 
 def _rows(order, kind=None):

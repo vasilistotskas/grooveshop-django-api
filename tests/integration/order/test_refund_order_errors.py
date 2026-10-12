@@ -36,7 +36,7 @@ def _paid_order(**kwargs):
     kwargs.setdefault("status", OrderStatus.COMPLETED)
     kwargs.setdefault("payment_status", PaymentStatus.COMPLETED)
     kwargs.setdefault("payment_id", "pi_paid_123")
-    kwargs.setdefault("paid_amount", Money(Decimal("50.00"), "EUR"))
+    kwargs.setdefault("amount_due", Money(Decimal("50.00"), "EUR"))
     order = OrderFactory(num_order_items=0, **kwargs)
     if order.payment_id:
         PaymentTransactionFactory(

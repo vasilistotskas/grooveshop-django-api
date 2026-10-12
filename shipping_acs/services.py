@@ -418,11 +418,11 @@ class AcsService:
                 is_cod_payway
                 and shipment.charge_type == AcsChargeType.COD
                 and (not shipment.cod_amount or shipment.cod_amount.amount == 0)
-                and order.paid_amount
-                and order.paid_amount.amount > 0
+                and order.amount_due
+                and order.amount_due.amount > 0
             )
             if cod_synced:
-                shipment.cod_amount = order.paid_amount
+                shipment.cod_amount = order.amount_due
                 update_fields.extend(["cod_amount", "cod_amount_currency"])
 
             shipment.save(update_fields=update_fields)

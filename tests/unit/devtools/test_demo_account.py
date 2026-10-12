@@ -873,8 +873,8 @@ class TestSeededAccount:
         from order.models.order import Order
 
         for order in Order.objects.filter(user=self._retail()):
-            assert order.paid_amount.amount > 0, order.pk
-            assert order.paid_amount == order.calculate_order_total_amount()
+            assert order.amount_due.amount > 0, order.pk
+            assert order.amount_due == order.calculate_order_total_amount()
             assert order._payment_consistency_errors() == {}
 
     def test_shipments_carry_the_state_events_and_tracking_number(self, seeded):
@@ -914,7 +914,7 @@ class TestSeededAccount:
         for shipment in AcsShipment.objects.filter(order__user=self._retail()):
             assert shipment.charge_type == AcsChargeType.COD
             if shipment.order.pay_way.settlement == "courier_cash":
-                assert shipment.cod_amount == shipment.order.paid_amount
+                assert shipment.cod_amount == shipment.order.amount_due
                 assert shipment.delivery_products == "COD"
             else:
                 assert shipment.cod_amount.amount == 0
@@ -1046,7 +1046,7 @@ class TestSeededAccount:
             assert order.metadata["b2b_pricing"]["group_id"] == (
                 profile.customer_group.pk
             )
-            assert order.paid_amount == order.calculate_order_total_amount()
+            assert order.amount_due == order.calculate_order_total_amount()
             for item in order.items.select_related("product"):
                 priced = B2BPricingService.resolve_single(
                     item.product, profile.customer_group
@@ -1572,8 +1572,8 @@ class TestResetIsSilent:
             order = by_seed[row.days_ago]
             assert order.pay_way.settlement == row.settlement
             assert order.pay_way_key
-            assert order.paid_amount.amount > 0
-            assert order.paid_amount == order.calculate_order_total_amount()
+            assert order.amount_due.amount > 0
+            assert order.amount_due == order.calculate_order_total_amount()
             if row.payment_status in {"COMPLETED", "REFUNDED"}:
                 assert order.payment_method == order.pay_way.provider_code
             else:

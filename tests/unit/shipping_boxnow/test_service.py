@@ -117,12 +117,12 @@ class TestCreateShipmentForOrder:
         assert order.tracking_number == "9219709201"
         assert order.shipping_carrier == "boxnow"
 
-    def test_cod_collects_paid_amount_not_pre_discount_total(self):
-        """COD ``amountToBeCollected`` must equal ``paid_amount`` (order
+    def test_cod_collects_amount_due_not_pre_discount_total(self):
+        """COD ``amountToBeCollected`` must equal ``amount_due`` (order
         total minus redeemed loyalty discount), NOT ``total_price``
         (pre-discount). Regression: a discounted COD order previously
         overcharged the customer at the locker by the discount amount
-        and disagreed with ``invoiceValue`` (already paid_amount)."""
+        and disagreed with ``invoiceValue`` (already amount_due)."""
         from django.conf import settings
         from djmoney.money import Money
 
@@ -142,8 +142,8 @@ class TestCreateShipmentForOrder:
         )
         # Loyalty discount: the order lists €50 but the customer only
         # owes €40 at the locker.
-        order.paid_amount = Money("40.00", settings.DEFAULT_CURRENCY)
-        order.save(update_fields=["paid_amount", "paid_amount_currency"])
+        order.amount_due = Money("40.00", settings.DEFAULT_CURRENCY)
+        order.save(update_fields=["amount_due", "amount_due_currency"])
         assert order.total_price == Money("50.00", settings.DEFAULT_CURRENCY)
 
         BoxNowShipmentFactory(

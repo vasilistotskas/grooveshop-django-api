@@ -80,7 +80,7 @@
     {% if order.gift_card_amount.amount > 0 %}
     <p><strong>{% trans "Gift card" %}:</strong> -{{ order.gift_card_amount }}</p>
     {% endif %}
-    <p class="text-bold"><strong>{% trans "Total Paid" %}:</strong> {{ order.paid_amount }}</p>
+    <p class="text-bold"><strong>{% trans "Total Paid" %}:</strong> {{ order.amount_due }}</p>
 </div>
 
 <p class="mt-3">{% trans "We will notify you again once your order ships." %}</p>

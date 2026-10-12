@@ -1435,16 +1435,16 @@ def _handle_payment_created(order, event_data, transaction_id):
     order.payment_id = transaction_id
     order.payment_status = PaymentStatus.COMPLETED
     order.payment_method = "viva_wallet"
-    if not order.paid_amount or order.paid_amount.amount == 0:
-        order.paid_amount = order.calculate_order_total_amount()
+    if not order.amount_due:
+        order.amount_due = order.calculate_order_total_amount()
 
     update_fields = [
         "metadata",
         "payment_id",
         "payment_status",
         "payment_method",
-        "paid_amount",
-        "paid_amount_currency",
+        "amount_due",
+        "amount_due_currency",
     ]
 
     if order.status == OrderStatus.PENDING:

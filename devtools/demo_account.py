@@ -930,7 +930,7 @@ def _seed_shipment(row: OrderRow, order, now) -> bool:
         PaySettlement(order.pay_way.settlement)
         in PaySettlement.collected_on_delivery()
     )
-    owed = order.paid_amount if collected else Money(0, "EUR")
+    owed = order.amount_due if collected else Money(0, "EUR")
     if shipment.carrier == "acs":
         create_acs_shipment(
             order,

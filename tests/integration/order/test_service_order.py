@@ -79,7 +79,7 @@ class OrderServiceTestCase(TestCase):
             status=OrderStatus.PENDING,
             payment_status=PaymentStatus.COMPLETED,
             payment_id="test_payment_123",
-            paid_amount=_eur("100.00"),
+            amount_due=_eur("100.00"),
             num_order_items=0,
         )
         order.items.create(
@@ -124,7 +124,7 @@ class OrderServiceTestCase(TestCase):
         order = OrderFactory(
             payment_status=PaymentStatus.COMPLETED,
             payment_id="test_payment_123",
-            paid_amount=_eur("100.00"),
+            amount_due=_eur("100.00"),
             num_order_items=0,
         )
         PaymentTransactionFactory(
@@ -157,7 +157,7 @@ class OrderServiceTestCase(TestCase):
         order = OrderFactory(
             payment_status=PaymentStatus.COMPLETED,
             payment_id="test_payment_123",
-            paid_amount=_eur("100.00"),
+            amount_due=_eur("100.00"),
             num_order_items=0,
         )
         PaymentTransactionFactory(

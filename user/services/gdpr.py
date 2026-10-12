@@ -200,7 +200,7 @@ def compile_user_data(user) -> dict[str, Any]:
                 "uuid": str(o.uuid),
                 "status": o.status,
                 "payment_status": getattr(o, "payment_status", None),
-                "paid_amount": _serialize_money(o.paid_amount),
+                "amount_due": _serialize_money(o.amount_due),
                 "shipping_price": _serialize_money(o.shipping_price),
                 "total_price": _serialize_money(o.total_price),
                 "first_name": o.first_name,

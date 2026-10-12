@@ -637,7 +637,7 @@ class OrderAdmin(BaseModelAdmin):
                     "payment_status",
                     "payment_method",
                     "payment_id",
-                    "paid_amount",
+                    "amount_due",
                     "discount_amount",
                     "loyalty_discount",
                     "gift_card_amount",
@@ -1084,7 +1084,7 @@ class OrderAdmin(BaseModelAdmin):
         self, request: HttpRequest, form, object_id=None, **kwargs
     ) -> HttpResponse:
         order = Order.objects.get(pk=object_id)
-        amount = Money(form.cleaned_data["amount"], order.paid_amount.currency)
+        amount = Money(form.cleaned_data["amount"], order.amount_due.currency)
         reason = form.cleaned_data["reason"]
         try:
             result = OrderService.refund_order(

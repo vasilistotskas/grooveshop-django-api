@@ -83,7 +83,7 @@ class OrderItemFilterTest(APITestCase):
             city="Test City",
             zipcode="12345",
             shipping_price=Money(10, "EUR"),
-            paid_amount=Money(0, "EUR"),
+            amount_due=Money(0, "EUR"),
         )
         Order.objects.filter(id=cls.order1.id).update(
             created_at=cls.now - timedelta(hours=1)
@@ -104,7 +104,7 @@ class OrderItemFilterTest(APITestCase):
             city="Test City",
             zipcode="12345",
             shipping_price=Money(10, "EUR"),
-            paid_amount=Money(100, "EUR"),
+            amount_due=Money(100, "EUR"),
         )
         Order.objects.filter(id=cls.order2.id).update(
             created_at=cls.now - timedelta(days=2)
@@ -125,7 +125,7 @@ class OrderItemFilterTest(APITestCase):
             city="Test City",
             zipcode="54321",
             shipping_price=Money(15, "EUR"),
-            paid_amount=Money(200, "EUR"),
+            amount_due=Money(200, "EUR"),
         )
         Order.objects.filter(id=cls.order3.id).update(
             created_at=cls.now - timedelta(days=1)

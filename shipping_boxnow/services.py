@@ -327,25 +327,25 @@ class BoxNowService:
             update_fields = ["metadata", "updated_at"]
 
             # COD collects the customer's ACTUAL payable at the locker,
-            # which is ``paid_amount`` (order total minus any redeemed
+            # which is ``amount_due`` (order total minus any redeemed
             # loyalty discount) — NOT ``total_price`` (pre-discount).
             # Using total_price overcharged every discounted COD order by
             # the discount and disagreed with ``invoiceValue`` below
-            # (also paid_amount). Mirrors the ACS COD sync
+            # (also amount_due). Mirrors the ACS COD sync
             # (shipping_acs/services.py) including the ``> 0`` guard that
             # keeps the amount inside BoxNow's valid (0, 5000) range.
-            # Filled here (not at row creation) because paid_amount is
+            # Filled here (not at row creation) because amount_due is
             # only persisted after the create_shipment_row hook fires.
             # Idempotent: re-runs see the existing non-zero amount and
             # skip the recompute.
-            paid_amount = getattr(order, "paid_amount", None)
+            amount_due = getattr(order, "amount_due", None)
             if (
                 shipment.payment_mode == BoxNowPaymentMode.COD
                 and shipment.amount_to_be_collected.amount == 0
-                and paid_amount
-                and paid_amount.amount > 0
+                and amount_due
+                and amount_due.amount > 0
             ):
-                shipment.amount_to_be_collected = paid_amount
+                shipment.amount_to_be_collected = amount_due
                 update_fields.extend(
                     [
                         "amount_to_be_collected",
@@ -365,8 +365,8 @@ class BoxNowService:
         notify_phone = bn_creds["notify_phone"] or "+302100000000"
         site_name = tenant_site_name() or "GrooveShop"
         warehouse_id = str(bn_creds["warehouse_id"] or "2")
-        paid_amount = getattr(order, "paid_amount", None)
-        invoice_value = str(paid_amount.amount) if paid_amount else "0.00"
+        amount_due = getattr(order, "amount_due", None)
+        invoice_value = str(amount_due.amount) if amount_due else "0.00"
         # ``notifyOnAccepted`` is the PARTNER (operations) email per
         # BoxNow API §3.4 — BoxNow sends us the success-notification +
         # PDF label here. The customer gets BoxNow's own customer-facing

@@ -17,7 +17,7 @@ columns as given.
 
 ``bulk_create`` also skips the two things ``Order.save()`` derives, and
 both are written here: ``pay_way_key`` through the model's own snapshot,
-and ``paid_amount`` — what the shopper owed, as on a real order.
+and ``amount_due`` — what the shopper owed, as on a real order.
 """
 
 from __future__ import annotations
@@ -116,14 +116,14 @@ def create_orders(fixtures: Sequence[FixtureOrder]) -> list[Any]:
                 )
             )
         updated_at = fixture.updated_at or fixture.placed_at
-        order.paid_amount = owed(fixture.fields, fixture.lines)
+        order.amount_due = owed(fixture.fields, fixture.lines)
         order.created_at = fixture.placed_at
         order.updated_at = updated_at
         order.status_updated_at = updated_at
     written = OrderItem.objects.bulk_create(items)
     Order.objects.bulk_update(
         created,
-        ["paid_amount", "created_at", "updated_at", "status_updated_at"],
+        ["amount_due", "created_at", "updated_at", "status_updated_at"],
     )
 
     placed = {order.pk: order.created_at for order in created}

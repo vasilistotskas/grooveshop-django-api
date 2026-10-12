@@ -968,7 +968,7 @@ class CartViewSet(BaseModelViewSet):
 
         # Loyalty discount reduces the charge — same pricing math as
         # redeem_points (validated, unquantised Decimal), so the intent
-        # equals what order creation persists as paid_amount.
+        # equals what order creation persists as amount_due.
         loyalty_points = request_serializer.validated_data.get(
             "loyalty_points_to_redeem"
         )

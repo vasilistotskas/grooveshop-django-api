@@ -400,6 +400,7 @@ class Product(
 
     @property
     def discount_value(self) -> Money:
+        """The markdown, taken off the NET price."""
         value = (self.price.amount * self.discount_percent) / 100
         return Money(_quantize_cents(value), settings.DEFAULT_CURRENCY)
 
@@ -498,8 +499,17 @@ class Product(
 
     @property
     def vat_value(self) -> Money:
+        """VAT of the price actually charged.
+
+        The markdown reduces the NET price and VAT is charged on what is
+        left, so ``final_price == price - discount_value + vat_value`` and
+        ``final_price == price * (1 - p) * (1 + vat)``: a 10% markdown
+        takes 10% off what the shopper pays. ``discount_value`` stays the
+        markdown on the net price.
+        """
         if self.vat:
-            value = (self.price.amount * self.vat.value) / 100
+            net = self.price.amount - self.discount_value.amount
+            value = (net * self.vat.value) / 100
             return Money(_quantize_cents(value), settings.DEFAULT_CURRENCY)
         return Money(0, settings.DEFAULT_CURRENCY)
 

@@ -96,7 +96,10 @@ class ProductModelTestCase(TestCase):
         expected_discount_value = (
             self.product.price * self.product.discount_percent
         ) / 100
-        expected_vat_value = (self.product.price * self.vat.value) / 100
+        # VAT is charged on the net price AFTER the markdown.
+        expected_vat_value = (
+            (self.product.price - expected_discount_value) * self.vat.value
+        ) / 100
         expected_final_price = (
             self.product.price + expected_vat_value - expected_discount_value
         )
@@ -175,7 +178,8 @@ class ProductModelTestCase(TestCase):
         self.assertEqual(self.product.vat_percent, self.vat.value)
 
     def test_vat_value(self):
-        expected_vat_value = (self.product.price.amount * self.vat.value) / 100
+        net = self.product.price.amount - self.product.discount_value.amount
+        expected_vat_value = (net * self.vat.value) / 100
         self.assertEqual(self.product.vat_value.amount, expected_vat_value)
 
     def test_product_with_tags(self):
@@ -283,7 +287,10 @@ class ProductQuerySetTestCase(TestCase):
         product3 = queryset.get(id=self.product3.id)
 
         expected_vat_value1 = (
-            self.product1.price.amount * self.vat.value
+            self.product1.price.amount
+            * (100 - self.product1.discount_percent)
+            / 100
+            * self.vat.value
         ) / 100
         expected_vat_value2 = Decimal("0.00")
         expected_vat_value3 = Decimal("0.00")
@@ -299,7 +306,10 @@ class ProductQuerySetTestCase(TestCase):
         expected_discount_value = (
             self.product1.price.amount * self.product1.discount_percent
         ) / 100
-        expected_vat_value = (self.product1.price.amount * self.vat.value) / 100
+        expected_vat_value = (
+            (self.product1.price.amount - expected_discount_value)
+            * self.vat.value
+        ) / 100
         expected_final_price = (
             self.product1.price.amount
             + expected_vat_value

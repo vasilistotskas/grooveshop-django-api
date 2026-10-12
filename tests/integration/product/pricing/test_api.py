@@ -79,9 +79,9 @@ class TestProductApi:
         assert response.status_code == status.HTTP_200_OK
         body = response.json()
         assert body["priorPrice"] == 124.0
-        assert body["effectivePrice"] == 104.0
-        # 20% of the net price, 16% of the gross prior price.
-        assert body["announcedDiscountPercent"] == 16
+        assert body["effectivePrice"] == 99.2
+        # 20% off what the customer pays.
+        assert body["announcedDiscountPercent"] == 20
         assert body["discountPercent"] == 20.0
 
     def test_a_product_that_is_not_reduced_announces_nothing(
@@ -159,7 +159,7 @@ class TestSearch:
         document = translation.meili_serialize()
 
         assert document["prior_price"] == 124.0
-        assert document["announced_discount_percent"] == 16
+        assert document["announced_discount_percent"] == 20
 
     def test_the_document_of_an_unreduced_product_has_none(self, category, vat):
         product = plain_product(category, vat)
@@ -185,6 +185,6 @@ class TestSearch:
             data = ProductTranslationSerializer(hit, context={}).data
 
         assert data["prior_price"] == 124.0
-        assert data["effective_price"] == 104.0
-        assert data["announced_discount_percent"] == 16
+        assert data["effective_price"] == 99.2
+        assert data["announced_discount_percent"] == 20
         assert not any("pricespell" in q["sql"].lower() for q in queries)

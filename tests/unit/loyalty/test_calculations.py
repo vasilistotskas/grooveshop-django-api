@@ -28,15 +28,16 @@ from user.factories.account import UserAccountFactory
 def _product(
     *,
     price="100.00",
-    vat="24.00",
+    vat="21.60",
     discount="10.00",
-    final="114.00",
+    final="111.60",
     coefficient="1.00",
     fixed=0,
 ):
     product = MagicMock()
     product.price.amount = Decimal(price)
     product.vat_value.amount = Decimal(vat)
+    product.vat_percent = Decimal(24)
     product.discount_value.amount = Decimal(discount)
     product.final_price.amount = Decimal(final)
     product.points_coefficient = Decimal(coefficient)
@@ -50,7 +51,7 @@ def _product(
         (PriceBasis.PRICE_EXCL_VAT_NO_DISCOUNT, Decimal("100.00")),
         (PriceBasis.PRICE_EXCL_VAT_WITH_DISCOUNT, Decimal("90.00")),
         (PriceBasis.PRICE_INCL_VAT_NO_DISCOUNT, Decimal("124.00")),
-        (PriceBasis.FINAL_PRICE, Decimal("114.00")),
+        (PriceBasis.FINAL_PRICE, Decimal("111.60")),
     ],
 )
 def test_price_basis_selects_its_price_component(basis, expected):

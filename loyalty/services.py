@@ -75,7 +75,7 @@ class LoyaltyService:
         Supports four price basis options:
         - price_excl_vat_no_discount: product.price
         - price_excl_vat_with_discount: product.price - product.discount_value
-        - price_incl_vat_no_discount: product.price + product.vat_value
+        - price_incl_vat_no_discount: product.price plus VAT on it
         - final_price: product.final_price (price + vat - discount)
         """
         basis = Setting.get("LOYALTY_PRICE_BASIS", default="final_price")
@@ -86,8 +86,10 @@ class LoyaltyService:
                 str(product.discount_value.amount)
             )
         elif basis == PriceBasis.PRICE_INCL_VAT_NO_DISCOUNT:
-            return Decimal(str(product.price.amount)) + Decimal(
-                str(product.vat_value.amount)
+            return (
+                Decimal(str(product.price.amount))
+                * (Decimal(100) + product.vat_percent)
+                / Decimal(100)
             )
         else:  # FINAL_PRICE (default)
             return Decimal(str(product.final_price.amount))

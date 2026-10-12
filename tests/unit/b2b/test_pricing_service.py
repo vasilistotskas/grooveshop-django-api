@@ -108,7 +108,7 @@ class TestNoStackingAndFloor:
         # Product already 20% off retail; the group's 10% applies to the
         # UNDISCOUNTED net (100 → 90, would be 111.60 gross) — never
         # 10% on top of the markdown. The FLOOR then kicks in: retail
-        # final is 100+24-20 = 104.00, cheaper than the naive 111.60,
+        # final is 100 x 0.8 x 1.24 = 99.20, cheaper than the naive 111.60,
         # so the buyer gets the better one.
         product = _product("100.00", discount="20", vat_rate=24)
         group = CustomerGroupFactory(discount_percent=Decimal(10))
@@ -116,9 +116,9 @@ class TestNoStackingAndFloor:
         resolved = B2BPricingService.resolve(product, group)
 
         assert resolved.final.amount == product.final_price.amount
-        assert resolved.final.amount == Decimal("104.00")
+        assert resolved.final.amount == Decimal("99.20")
         # Net is re-derived from the floored gross.
-        assert resolved.net.amount == Decimal("83.87")
+        assert resolved.net.amount == Decimal("80.00")
 
     def test_deep_retail_sale_floors_fixed_override(self):
         product = _product("100.00", discount="50", vat_rate=24)
@@ -129,8 +129,8 @@ class TestNoStackingAndFloor:
 
         resolved = B2BPricingService.resolve_map([product], group)[product.pk]
 
-        # Retail final = 100 + 24 - 50 = 74.00 < override 90×1.24.
-        assert resolved.final.amount == Decimal("74.00")
+        # Retail final = 100 x 0.5 x 1.24 = 62.00 < override 90×1.24.
+        assert resolved.final.amount == Decimal("62.00")
 
     def test_wholesale_below_sale_price_wins(self):
         product = _product("100.00", discount="10", vat_rate=24)
@@ -138,6 +138,6 @@ class TestNoStackingAndFloor:
 
         resolved = B2BPricingService.resolve(product, group)
 
-        # 60 × 1.24 = 74.40 < retail final 114.00 — no floor.
+        # 60 × 1.24 = 74.40 < retail final 111.60 — no floor.
         assert resolved.net.amount == Decimal("60.00")
         assert resolved.final.amount == Decimal("74.40")

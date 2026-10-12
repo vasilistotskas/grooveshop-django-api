@@ -287,8 +287,16 @@ class CartAdmin(BaseModelAdmin):
             getattr(obj.total_price, "amount", 0) > 0
             and getattr(obj.total_discount_value, "amount", 0) > 0
         ):
-            original = obj.total_price.amount + obj.total_discount_value.amount
-            savings_percent = (obj.total_discount_value.amount / original) * 100
+            # Both sides on the NET price: ``total_discount_value`` is the
+            # markdown on it, so the base is the list net price.
+            list_net = sum(
+                item.quantity * item.product.price.amount
+                for item in obj.get_items()
+            )
+            if list_net > 0:
+                savings_percent = float(
+                    obj.total_discount_value.amount / list_net * 100
+                )
 
         return _(
             "Final total: %(final)s. Discounts: -%(disc)s. VAT: "

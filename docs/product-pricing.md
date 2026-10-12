@@ -127,9 +127,23 @@ them through must move to the fields above, after which they are removed with
 the expand/contract rule of `docs/migrations.md`. The Meilisearch index needs
 `manage.py meilisearch_apply_settings` once for the new displayed fields.
 
-One thing this page does not change and the owner should know:
-`Product.final_price` takes VAT on the undiscounted net price and subtracts
-the markdown (a percent of the NET price), so a 20% markdown is less than a
-20% reduction of the gross price. The announced percent is computed from the
-gross prior and effective prices, which is why it differs from
-`discountPercent`.
+## The markdown formula
+
+The markdown reduces the NET price and VAT is charged on what is left:
+`final_price = price * (1 - p) * (1 + vat)`, so a 10% markdown takes 10% off
+what the shopper pays (30.00 net at 24% VAT: 37.20 list, 33.48 with 10% off).
+`Product.discount_value` is the markdown on the net price, `Product.vat_value`
+is the VAT of the price actually charged, and
+`final_price == price - discount_value + vat_value`. The SQL twins in
+`product/managers/product.py` follow the same definition. Before migration
+`0051` the VAT was taken on the undiscounted net, which made a 10% markdown
+worth about 8%.
+
+`0051_reprice_discounted_products` records that change as an ordinary price
+drop: for every marked-down product whose current spell still holds the old
+formula's price, the spell is closed, a new one opens at the new price and the
+episode is re-evaluated by `evaluate_reduction` (a drop inside an episode keeps
+its reference within 60 days of the start; later it is a new reduction measured
+against the last 30 days). Products carrying a promotion are left to the nightly
+sweep, which re-prices them the same way. Spells written before the change keep
+the prices customers were actually charged.

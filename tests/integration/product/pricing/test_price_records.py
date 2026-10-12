@@ -117,12 +117,12 @@ class TestProductSave:
         product = make_product(vat, category, price="100.00", discount="10")
 
         [spell] = spells_of(product)
-        # 100 + 24 VAT - 10 markdown
-        assert spell.price.amount == Decimal("114.00")
+        # 100 net - 10 markdown = 90 net, + 24% VAT
+        assert spell.price.amount == Decimal("111.60")
         assert spell.valid_from == clock.now
         assert spell.valid_to is None
         fresh = reload(product)
-        assert fresh.effective_price == Decimal("114.00")
+        assert fresh.effective_price == Decimal("111.60")
         assert fresh.reduction_started_at == clock.now
         assert fresh.prior_price is None  # on sale for under 30 days
         assert fresh.announced_discount_percent is None
@@ -164,7 +164,7 @@ class TestProductSave:
 
         assert len(spells_of(product)) == 2
         fresh = reload(product)
-        assert fresh.effective_price == Decimal("114.00")
+        assert fresh.effective_price == Decimal("111.60")
         assert fresh.reduction_started_at == clock.now
 
     def test_a_partial_save_plans_from_what_it_persists(
@@ -178,10 +178,10 @@ class TestProductSave:
         product.save(update_fields=["discount_percent"])
 
         assert reload(product).price.amount == Decimal("100.00")
-        assert reload(product).effective_price == Decimal("114.00")
+        assert reload(product).effective_price == Decimal("111.60")
         assert [s.price.amount for s in spells_of(product)] == [
             Decimal("124.00"),
-            Decimal("114.00"),
+            Decimal("111.60"),
         ]
 
     def test_update_fields_may_be_an_iterator(self, clock, vat, category):
@@ -191,7 +191,7 @@ class TestProductSave:
 
         product.save(update_fields=(name for name in ["discount_percent"]))
 
-        assert reload(product).effective_price == Decimal("114.00")
+        assert reload(product).effective_price == Decimal("111.60")
 
     def test_a_soft_deleted_product_stays_current_and_restores_clean(
         self, clock, vat, category
@@ -252,10 +252,9 @@ class TestReductionEpisodes:
 
         fresh = reload(product)
         assert fresh.prior_price == Decimal("124.00")
-        assert fresh.effective_price == Decimal("104.00")
-        # The markdown is 20% of the NET price; what the customer saves
-        # from the prior gross price is 16%, and that is what is announced.
-        assert fresh.announced_discount_percent == 16
+        assert fresh.effective_price == Decimal("99.20")
+        # The markdown takes 20% off what the customer pays.
+        assert fresh.announced_discount_percent == 20
         assert fresh.reduction_started_at == clock.now
 
     def test_a_markdown_in_the_first_30_days_announces_nothing(
@@ -284,7 +283,7 @@ class TestReductionEpisodes:
 
         fresh = reload(product)
         assert fresh.prior_price == Decimal("124.00")
-        assert fresh.announced_discount_percent == 16
+        assert fresh.announced_discount_percent == 20
 
     def test_a_deeper_markdown_within_60_days_keeps_the_reference(
         self, clock, vat, category
@@ -300,7 +299,7 @@ class TestReductionEpisodes:
 
         fresh = reload(product)
         assert fresh.prior_price == Decimal("124.00")
-        assert fresh.announced_discount_percent == 32
+        assert fresh.announced_discount_percent == 40
 
     def test_a_deeper_markdown_after_60_days_re_anchors(
         self, clock, vat, category
@@ -315,8 +314,8 @@ class TestReductionEpisodes:
         product.save()
 
         fresh = reload(product)
-        assert fresh.prior_price == Decimal("104.00")
-        assert fresh.announced_discount_percent == 19
+        assert fresh.prior_price == Decimal("99.20")
+        assert fresh.announced_discount_percent == 25
 
     def test_removing_the_markdown_ends_it_and_the_next_is_new(
         self, clock, vat, category
@@ -398,7 +397,7 @@ class TestVatChange:
 
         fresh = reload(product)
         assert fresh.prior_price == Decimal("124.00")
-        assert fresh.effective_price == Decimal("103.00")
+        assert fresh.effective_price == Decimal("101.70")
 
     def test_deleting_a_rate_re_prices_its_products_without_vat(
         self, clock, vat, category
@@ -574,7 +573,7 @@ class TestPromotions:
         offer.products.set([product])
         offer_sync.refresh_products([product.pk])
 
-        assert reload(product).effective_price == Decimal("114.00")
+        assert reload(product).effective_price == Decimal("111.60")
 
     def test_an_excluded_product_is_not_reduced(self, clock, vat, category):
         product = make_product(vat, category)
@@ -601,7 +600,7 @@ class TestPromotions:
 
         fresh = reload(product)
         assert fresh.prior_price == Decimal("124.00")
-        assert fresh.effective_price == Decimal("102.60")
+        assert fresh.effective_price == Decimal("100.44")
 
     def test_promotions_switched_off_cost_nothing_extra(
         self, clock, vat, category
@@ -638,7 +637,7 @@ class TestSweep:
         reevaluate_price_episodes()
 
         fresh = reload(product)
-        assert fresh.effective_price == Decimal("104.00")
+        assert fresh.effective_price == Decimal("99.20")
         assert fresh.prior_price == Decimal("124.00")
 
     def test_a_product_already_in_line_is_left_alone(
@@ -700,6 +699,9 @@ class TestBackfill:
         first, second = spells_of(product)
         assert first.price.amount == Decimal("124.00")
         assert first.valid_to == second.valid_from == started
+        # History is replayed with the formula that charged those prices
+        # (VAT on the undiscounted net); migration 0051 moves the current
+        # spell to the new one.
         assert second.price.amount == Decimal("104.00")
         fresh = reload(product)
         assert fresh.effective_price == Decimal("104.00")

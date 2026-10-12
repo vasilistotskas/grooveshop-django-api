@@ -20,6 +20,7 @@ from order.enum.status import (
 from order.models.history import OrderHistory, OrderItemHistory
 from order.models.item import OrderItem
 from order.models.order import Order
+from order.models.payment_transaction import PaymentTransaction
 from order.notifications import (
     notify_order_created_live,
     notify_order_refunded_live,
@@ -676,9 +677,14 @@ def handle_order_completed(
 
 @receiver(order_refunded, dispatch_uid="order.handle_order_refunded")
 def handle_order_refunded(
-    sender: type[Order], order: Order, amount: Money, **kwargs: Any
+    sender: type[Order],
+    order: Order,
+    amount: Money,
+    refund: PaymentTransaction,
+    **kwargs: Any,
 ) -> None:
-    """Handle order refunded signal."""
+    """Handle order refunded signal, sent once per REFUND ledger row
+    (``refund``) the ledger took."""
     try:
         refund_reason = kwargs.get("reason", "")
 
@@ -696,15 +702,16 @@ def handle_order_refunded(
         if order.user_id:
             dispatch_on_commit(notify_order_refunded_live, [order.id])
 
-        # Email confirmation, one per refund: the task sends while the
-        # payment ledger holds more refunds than the emails already sent
-        # cover, so a repeat of the same signal sends nothing. A refund the
-        # ledger already holds never signals again (the provider's webhook
-        # for a refund this app made adds no row), so the in-app and
-        # webhook paths cannot double-email the customer. Guest orders DO
-        # get the email — unlike the live notification which is
-        # account-bound, the email uses ``order.email`` as the recipient.
-        dispatch_on_commit(send_refund_confirmation_email, [order.id])
+        # Email confirmation, one per refund: the task is queued for this
+        # refund's ledger row and claims it before sending, so a task
+        # delivered twice sends once and one refund's email cannot stand in
+        # for another's. A refund the ledger already holds never signals
+        # again (the provider's webhook for a refund this app made adds no
+        # row), so the in-app and webhook paths cannot double-email the
+        # customer. Guest orders DO get the email — unlike the live
+        # notification which is account-bound, the email uses
+        # ``order.email`` as the recipient.
+        dispatch_on_commit(send_refund_confirmation_email, [refund.pk])
 
         logger.info("Order %s refunded", order.id)
 
@@ -1128,7 +1135,7 @@ def handle_stripe_charge_refunded(sender, **kwargs):
                 )
                 return
             refund = Money(new_refund, refunded_to_date.currency)
-            PaymentLedger.record_refund(
+            refund_row, _created = PaymentLedger.record_refund(
                 order, charge=paid, amount=refund, reference=event_id
             )
 
@@ -1143,7 +1150,9 @@ def handle_stripe_charge_refunded(sender, **kwargs):
             },
         )
 
-        order_refunded.send(sender=Order, order=order, amount=refund)
+        order_refunded.send(
+            sender=Order, order=order, amount=refund, refund=refund_row
+        )
 
     except KeyError, TypeError:
         # Malformed payload only. Everything else must PROPAGATE (G0231):

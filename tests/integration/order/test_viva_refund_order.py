@@ -105,12 +105,11 @@ class TestARefundVivaRefusesLeavesTheOrderUnrefunded:
         order = _paid_viva_order()
 
         with FakeVivaApi(cancel=(200, CANCEL_REFUSED)):
-            success, response = OrderService.refund_order(
-                order, reason="changed mind"
-            )
+            result = OrderService.refund_order(order, reason="changed mind")
 
-        assert success is False
-        assert response["error"] == "The transaction cannot be reversed."
+        assert result.complete is False
+        assert result.paid_something is False
+        assert result.declined["error"] == "The transaction cannot be reversed."
         order.refresh_from_db()
         assert order.payment_status == PaymentStatus.COMPLETED
         assert not _refund_rows(order).exists()
@@ -246,11 +245,12 @@ class TestARefundVivaAcceptsIsRecorded:
         fake = FakeVivaApi()
 
         with fake:
-            success, _response = OrderService.refund_order(
+            result = OrderService.refund_order(
                 order, amount=Money(Decimal("5.00"), "EUR")
             )
 
-        assert success is True
+        assert result.complete is True
+        assert result.refunded == Money(Decimal("5.00"), "EUR")
         [delete] = fake.deletes
         assert fake.query(delete) == {"amount": ["500"]}
         order.refresh_from_db()
@@ -275,11 +275,11 @@ class TestACaptureTheLedgerNeverRecorded:
         fake = FakeVivaApi(captured=21.10)
 
         with fake:
-            success, _response = OrderService.refund_order(
+            result = OrderService.refund_order(
                 order, amount=Money(Decimal("5.00"), "EUR")
             )
 
-        assert success is True
+        assert result.complete is True
         assert fake.retrieved == [PAYMENT_ID]
         [charge] = order.payment_transactions.filter(
             kind=PaymentTransactionKind.CHARGE
@@ -299,12 +299,12 @@ class TestACaptureTheLedgerNeverRecorded:
         fake = FakeVivaApi(retrieve=(404, ["Transaction Id does not exist."]))
 
         with fake:
-            success, response = OrderService.refund_order(
+            result = OrderService.refund_order(
                 order, amount=Money(Decimal("5.00"), "EUR")
             )
 
-        assert success is False
-        assert "captured" in response["error"]
+        assert result.complete is False
+        assert "captured" in result.declined["error"]
         assert fake.deletes == []
         order.refresh_from_db()
         assert order.payment_status == PaymentStatus.COMPLETED

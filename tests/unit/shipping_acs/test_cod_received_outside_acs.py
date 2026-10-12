@@ -17,6 +17,7 @@ from unittest.mock import patch
 import pytest
 from django.contrib.admin.sites import AdminSite
 from django.contrib.messages.storage.fallback import FallbackStorage
+from django.db import DatabaseError
 from django.test import RequestFactory
 from django.urls import reverse
 from django.utils import timezone, translation
@@ -24,6 +25,7 @@ from djmoney.money import Money
 
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
+from order.payment_ledger import PaymentLedger
 from order.services import OrderService
 from shipping_acs.admin import AcsShipmentAdmin
 from shipping_acs.enum.charge_type import AcsChargeType
@@ -117,6 +119,31 @@ def test_recording_is_a_noop_for_an_order_already_marked_paid(staff_user):
     shipment.order.refresh_from_db()
     assert shipment.order.payment_status == PaymentStatus.COMPLETED
     assert not advance.called
+
+
+def test_a_failing_ledger_insert_rolls_the_whole_settlement_back(staff_user):
+    """The stamp, the payment status and the ledger row are one step: a
+    failed insert leaves a parcel that can be settled again, not an order
+    paid with no record of the money."""
+    shipment = _shipment()
+
+    with (
+        patch.object(
+            PaymentLedger,
+            "record_cod_collection",
+            side_effect=DatabaseError("insert failed"),
+        ),
+        pytest.raises(DatabaseError),
+    ):
+        AcsService.record_cod_received_outside_acs(
+            shipment, user=staff_user, note="Bank transfer 2026-05-30"
+        )
+
+    shipment.refresh_from_db()
+    assert shipment.cod_received_outside_acs_at is None
+    shipment.order.refresh_from_db()
+    assert shipment.order.payment_status == PaymentStatus.PENDING
+    assert not shipment.order.payment_transactions.exists()
 
 
 @pytest.mark.parametrize(

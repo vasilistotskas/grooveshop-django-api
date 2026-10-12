@@ -22424,3 +22424,25 @@ msgstr "Απαιτείται προϊόν παραγγελίας για την �
 #, python-brace-format
 msgid "Cannot restock more than the available quantity. Available: {available_quantity}"
 msgstr "Δεν μπορούν να επανέλθουν στο απόθεμα περισσότερα από τα διαθέσιμα τεμάχια. Διαθέσιμα: {available_quantity}"
+
+#: .\order\admin.py:1089
+#, python-format
+msgid "Order %(order_id)s: %(refunded)s of %(requested)s refunded; the rest was declined: %(reason)s"
+msgstr "Παραγγελία %(order_id)s: επιστράφηκαν %(refunded)s από %(requested)s· το υπόλοιπο απορρίφθηκε: %(reason)s"
+
+#: .\order\models\refund_notification.py:31
+msgid "The refund whose confirmation email this claims."
+msgstr "Η επιστροφή της οποίας το email επιβεβαίωσης δεσμεύεται εδώ."
+
+#: .\order\models\refund_notification.py:37
+msgid "Refund Notification"
+msgstr "Ειδοποίηση επιστροφής"
+
+#: .\order\models\refund_notification.py:38
+msgid "Refund Notifications"
+msgstr "Ειδοποιήσεις επιστροφών"
+
+#: .\order\models\refund_notification.py:41
+#, python-format
+msgid "Notification of refund %(refund)s"
+msgstr "Ειδοποίηση για την επιστροφή %(refund)s"

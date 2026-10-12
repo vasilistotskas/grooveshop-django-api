@@ -1646,7 +1646,7 @@ def _handle_reversal_created(order, event_data, transaction_id):
 
     previous_payment_status = order.payment_status
     refund = Money(refunded, charge.amount.currency)
-    _row, created = PaymentLedger.record_refund(
+    refund_row, created = PaymentLedger.record_refund(
         order, charge=charge, amount=refund, reference=transaction_id
     )
     if not created:
@@ -1670,4 +1670,6 @@ def _handle_reversal_created(order, event_data, transaction_id):
         },
     )
 
-    order_refunded.send(sender=Order, order=order, amount=refund)
+    order_refunded.send(
+        sender=Order, order=order, amount=refund, refund=refund_row
+    )

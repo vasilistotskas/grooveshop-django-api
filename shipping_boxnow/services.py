@@ -1769,20 +1769,20 @@ class BoxNowService:
         Meta CAPI Purchase dispatch runs (COD orders are past the
         PENDING → PROCESSING transition that normally emits it).
         """
-        from order.enum.status import PaymentStatus
-        from order.payment_ledger import PaymentLedger
+        from order.services import OrderService
         from order.signals import order_paid
 
         order = shipment.order
-        if order.payment_status != PaymentStatus.PENDING:
-            return
-        order.mark_as_paid(payment_method=_COD_PAYMENT_METHOD)
-        PaymentLedger.record_cod_collection(
+        # The status flip and the ledger row are one atomic step under the
+        # order lock (``settle_cod_payment``); ``order_paid`` is only sent
+        # by the call that settled it.
+        if not OrderService.settle_cod_payment(
             order,
             amount=shipment.amount_to_be_collected,
             provider=_COD_PAYMENT_METHOD,
             reference=shipment.parcel_id,
-        )
+        ):
+            return
         logger.info(
             "BoxNow COD delivered: order=%s payment_status PENDING -> "
             "COMPLETED (parcel=%s)",

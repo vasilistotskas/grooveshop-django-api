@@ -16,6 +16,7 @@ from __future__ import annotations
 from decimal import Decimal
 
 import pytest
+import stripe
 from django.contrib.admin.models import LogEntry
 from django.contrib.admin.sites import AdminSite
 from django.contrib.messages import get_messages
@@ -197,6 +198,49 @@ class TestRefundAction:
         order.refresh_from_db()
         assert order.payment_status == PaymentStatus.COMPLETED
         assert not _refunds(order).exists()
+        # Nothing moved, so there is nothing staff are on record for.
+        assert not LogEntry.objects.filter(object_id=str(order.pk)).exists()
+
+    def test_a_refund_declined_part_way_says_how_much_moved(
+        self, order_admin, staff_user
+    ):
+        """Paid twice, so the refund is split: the first payment's share
+        goes through and the second is refused. Money moved, so it must not
+        read as "was not refunded", and staff are on record for it."""
+        order = _delivered_order("60.00")
+        PaymentTransactionFactory(
+            order=order,
+            amount=Money(Decimal("40.00"), "EUR"),
+            provider_reference="pi_second",
+        )
+        request = _post(staff_user, {"amount": "100.00", "reason": "Return"})
+        calls = {"n": 0}
+
+        class _SecondPaymentRefused(FakeStripeRefunds):
+            def _create(self, **kwargs):
+                calls["n"] += 1
+                if calls["n"] == 2:
+                    raise stripe.APIError("card_declined")
+                return super()._create(**kwargs)
+
+        with _SecondPaymentRefused():
+            order_admin.refund_payment(request, object_id=order.pk)
+
+        assert _messages(request) == [
+            (
+                f"Order {order.pk}: €60.00 of €100.00 refunded; the rest was "
+                "declined: card_declined"
+            )
+        ]
+        order.refresh_from_db()
+        assert order.payment_status == PaymentStatus.PARTIALLY_REFUNDED
+        [refund] = _refunds(order)
+        assert refund.amount == Money(Decimal("60.00"), "EUR")
+        entry = LogEntry.objects.get(object_id=str(order.pk))
+        assert entry.user_id == staff_user.pk
+        assert "60.00" in entry.change_message
+        assert "100.00" in entry.change_message
+        assert "Return" in entry.change_message
 
     @pytest.mark.parametrize(
         "data",

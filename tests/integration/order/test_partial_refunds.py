@@ -70,18 +70,23 @@ class TestRefundingMoreThanOnce:
         order = _order("100.00")
 
         with FakeStripeRefunds() as stripe_api:
-            first, _ = OrderService.refund_order(
+            first = OrderService.refund_order(
                 order, amount=_eur("30.00"), reason="one item back"
             )
             assert _status(order) == PaymentStatus.PARTIALLY_REFUNDED
-            second, _ = OrderService.refund_order(
+            second = OrderService.refund_order(
                 order, amount=_eur("25.00"), reason="another item back"
             )
             assert _status(order) == PaymentStatus.PARTIALLY_REFUNDED
             # Nothing named: everything that is left, which is 45.
-            final, _ = OrderService.refund_order(order, reason="the rest")
+            final = OrderService.refund_order(order, reason="the rest")
 
-        assert (first, second, final) == (True, True, True)
+        assert [r.complete for r in (first, second, final)] == [True] * 3
+        assert [r.refunded for r in (first, second, final)] == [
+            _eur("30.00"),
+            _eur("25.00"),
+            _eur("45.00"),
+        ]
         assert _status(order) == PaymentStatus.REFUNDED
         assert [r.amount.amount for r in _refund_rows(order)] == [
             Decimal("30.00"),
@@ -121,13 +126,11 @@ class TestRefundingMoreThanOnce:
         order = _order("100.00")
 
         with FakeStripeRefunds():
-            _success, response = OrderService.refund_order(
-                order, amount=_eur("30.00")
-            )
+            result = OrderService.refund_order(order, amount=_eur("30.00"))
 
-        assert response["refund_id"] == "re_1"
-        assert response["refund_ids"] == ["re_1"]
-        assert Decimal(response["amount"]) == Decimal("30.00")
+        assert result.refund_ids == ("re_1",)
+        assert result.refunded == _eur("30.00")
+        assert result.declined is None
 
 
 class TestNeverMoreThanIsLeft:
@@ -150,9 +153,9 @@ class TestNeverMoreThanIsLeft:
         order = _order("100.00")
         with FakeStripeRefunds():
             OrderService.refund_order(order, amount=_eur("30.00"))
-            success, _ = OrderService.refund_order(order, amount=_eur("70.00"))
+            result = OrderService.refund_order(order, amount=_eur("70.00"))
 
-        assert success is True
+        assert result.complete is True
         assert _status(order) == PaymentStatus.REFUNDED
 
     def test_nothing_more_can_be_refunded_once_it_is_all_back(self):
@@ -174,9 +177,9 @@ class TestNeverMoreThanIsLeft:
             OrderService.refund_order(order, amount=_eur("10.00"))
             assert _status(order) == PaymentStatus.PARTIALLY_REFUNDED
 
-            success, _ = OrderService.refund_order(order, amount=_eur("10.00"))
+            result = OrderService.refund_order(order, amount=_eur("10.00"))
 
-        assert success is True
+        assert result.complete is True
 
 
 class TestIdempotency:
@@ -200,15 +203,13 @@ class TestIdempotency:
             with mock.patch.object(
                 PaymentLedger, "record_refund", side_effect=real_record
             ):
-                success, response = OrderService.refund_order(
-                    order, amount=_eur("40.00")
-                )
+                result = OrderService.refund_order(order, amount=_eur("40.00"))
 
-        assert success is True
+        assert result.complete is True
         assert stripe_api.keys == [f"order-{order.pk}-refund-1"] * 2
         # Two requests, ONE refund at Stripe, one row in the ledger.
         assert len(stripe_api.created) == 1
-        assert response["refund_id"] == "re_1"
+        assert result.refund_ids == ("re_1",)
         assert [r.provider_reference for r in _refund_rows(order)] == ["re_1"]
         assert PaymentLedger.refundable(order) == Decimal("60.00")
 
@@ -227,12 +228,11 @@ class TestIdempotency:
                 with pytest.raises(RuntimeError):
                     OrderService.refund_order(order, amount=_eur("40.00"))
 
-            success, response = OrderService.refund_order(
-                order, amount=_eur("25.00")
-            )
+            result = OrderService.refund_order(order, amount=_eur("25.00"))
 
-        assert success is False
-        assert response["stripe_error"] is True
+        assert result.complete is False
+        assert result.paid_something is False
+        assert result.declined["stripe_error"] is True
         assert len(stripe_api.created) == 1
         assert not _refund_rows(order).exists()
         assert _status(order) == PaymentStatus.COMPLETED
@@ -281,10 +281,10 @@ class TestAStripeRefundThatIsNotSettled:
         order = _order("100.00")
 
         with FakeStripeRefunds(status="pending"):
-            success, response = OrderService.refund_order(order)
+            result = OrderService.refund_order(order)
 
-        assert success is True
-        assert response["stripe_status"] == "pending"
+        assert result.complete is True
+        assert result.refunded == _eur("100.00")
         assert _status(order) == PaymentStatus.REFUNDED
         assert len(refunded_signals) == 1
 
@@ -310,10 +310,11 @@ class TestAStripeRefundThatIsNotSettled:
         order = _order("100.00")
 
         with FakeStripeRefunds(status=status):
-            success, response = OrderService.refund_order(order)
+            result = OrderService.refund_order(order)
 
-        assert success is False
-        assert response["stripe_status"] == status
+        assert result.complete is False
+        assert result.paid_something is False
+        assert result.declined["stripe_status"] == status
         assert not _refund_rows(order).exists()
         # Not PROCESSING: nothing was refunded, the payment still reads paid.
         assert _status(order) == PaymentStatus.COMPLETED
@@ -343,10 +344,10 @@ class TestAStripeRefundThatIsNotSettled:
         order = _order("100.00")
 
         with FakeStripeRefunds(fail_with=stripe.APIError("down")):
-            success, response = OrderService.refund_order(order)
+            result = OrderService.refund_order(order)
 
-        assert success is False
-        assert response["stripe_error"] is True
+        assert result.complete is False
+        assert result.declined["stripe_error"] is True
         assert not _refund_rows(order).exists()
         assert refunded_signals == []
 
@@ -363,9 +364,10 @@ class TestAnOrderPaidTwice:
         order = self._paid_twice()
 
         with FakeStripeRefunds() as stripe_api:
-            success, response = OrderService.refund_order(order)
+            result = OrderService.refund_order(order)
 
-        assert success is True
+        assert result.complete is True
+        assert result.refunded == _eur("100.00")
         assert [
             (c["payment_intent"], c["amount"]) for c in stripe_api.calls
         ] == [("pi_ledger", 6000), ("pi_second", 4000)]
@@ -374,7 +376,7 @@ class TestAnOrderPaidTwice:
             f"order-{order.pk}-refund-2",
         ]
         assert _status(order) == PaymentStatus.REFUNDED
-        assert response["refund_ids"] == ["re_1", "re_2"]
+        assert result.refund_ids == ("re_1", "re_2")
         # One signal per refund the ledger took.
         assert [r["amount"].amount for r in refunded_signals] == [
             Decimal("60.00"),
@@ -407,10 +409,15 @@ class TestAnOrderPaidTwice:
                 return super()._create(**kwargs)
 
         with _Stripe():
-            success, response = OrderService.refund_order(order)
+            result = OrderService.refund_order(order)
 
-        assert success is False
-        assert response["stripe_error"] is True
+        # Not "failed": the first payment's 60.00 moved, and the caller is
+        # told so, along with what the second payment's refusal was.
+        assert result.complete is False
+        assert result.paid_something is True
+        assert result.refunded == _eur("60.00")
+        assert result.refund_ids == ("re_1",)
+        assert result.declined["stripe_error"] is True
         # The first payment's refund was made and is on the ledger.
         assert [r.provider_reference for r in _refund_rows(order)] == ["re_1"]
         assert _status(order) == PaymentStatus.PARTIALLY_REFUNDED
@@ -444,10 +451,10 @@ class TestACaptureTheLedgerNeverRecorded:
             ) as retrieve,
             mock.patch("order.payment.PaymentIntent.sync_from_stripe_data"),
         ):
-            first, _ = OrderService.refund_order(order, amount=_eur("20.00"))
-            second, _ = OrderService.refund_order(order, amount=_eur("30.00"))
+            first = OrderService.refund_order(order, amount=_eur("20.00"))
+            second = OrderService.refund_order(order, amount=_eur("30.00"))
 
-        assert (first, second) == (True, True)
+        assert (first.complete, second.complete) == (True, True)
         # Read once; from then on the ledger answers.
         assert retrieve.call_count == 1
         [charge] = order.payment_transactions.filter(
@@ -475,9 +482,10 @@ class TestACaptureTheLedgerNeverRecorded:
             ),
             mock.patch("order.payment.PaymentIntent.sync_from_stripe_data"),
         ):
-            success, response = OrderService.refund_order(order)
+            result = OrderService.refund_order(order)
 
-        assert success is False
-        assert "captured" in response["error"]
+        assert result.complete is False
+        assert result.paid_something is False
+        assert "captured" in result.declined["error"]
         assert stripe_api.calls == []
         assert not order.payment_transactions.exists()

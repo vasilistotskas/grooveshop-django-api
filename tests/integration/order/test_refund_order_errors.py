@@ -83,9 +83,10 @@ class TestRefundOrderRefusals:
                 True,
                 {"refund_id": "re_1", "amount": "50.00"},
             )
-            success, _response = OrderService.refund_order(order, amount=amount)
+            result = OrderService.refund_order(order, amount=amount)
 
-        assert success is True
+        assert result.complete is True
+        assert result.refunded == amount
         get_provider.assert_called_once_with("stripe")
         provider.refund_payment.assert_called_once_with(
             payment_id="pi_paid_123",
@@ -180,7 +181,10 @@ class TestRefundOrderRefusals:
             )
             result = OrderService.refund_order(order, reason="customer")
 
-        assert result == (False, {"error": "charge_already_refunded"})
+        assert result.complete is False
+        assert result.paid_something is False
+        assert result.refund_ids == ()
+        assert result.declined == {"error": "charge_already_refunded"}
         refunded_signal.assert_not_called()
         order.refresh_from_db()
         assert order.payment_status == PaymentStatus.COMPLETED
@@ -239,6 +243,33 @@ class TestCancelOrderWhenTheRefundFails:
         assert order.status == OrderStatus.CANCELED
         assert order.payment_status == PaymentStatus.COMPLETED
         assert not _refund_rows(order).exists()
+
+    def test_a_refund_declined_part_way_says_part_of_it_was_made(self):
+        """Paid twice, the second payment's refund declined: the first
+        share moved, so the cancel must not claim nothing did."""
+        order = _cancellable_paid_order()
+        PaymentTransactionFactory(
+            order=order,
+            amount=Money(Decimal("20.00"), "EUR"),
+            provider_reference="pi_second",
+        )
+
+        with patch("order.payment.get_payment_provider") as get_provider:
+            get_provider.return_value.refund_payment.side_effect = [
+                (True, {"refund_id": "re_1", "amount": "50.00"}),
+                (False, {"error": "stripe said: declined acct_123"}),
+            ]
+            _canceled, refund_info = OrderService.cancel_order(
+                order, reason="changed mind", refund_payment=True
+            )
+
+        assert refund_info == {
+            "refunded": False,
+            "error": "The refund could not be processed.",
+            "message": "Order canceled but only part of the payment was refunded",
+        }
+        assert [r.provider_reference for r in _refund_rows(order)] == ["re_1"]
+        assert _status_in_db(order) == PaymentStatus.PARTIALLY_REFUNDED
 
     def test_refund_payment_false_never_calls_the_provider(self):
         order = _cancellable_paid_order()

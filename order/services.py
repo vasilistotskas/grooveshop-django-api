@@ -100,7 +100,36 @@ class PaymentEventOutcome:
     applied: bool
 
 
-__all__ = ["OrderService", "PaymentEventOutcome"]
+@dataclass(frozen=True, slots=True)
+class RefundResult:
+    """What one ``OrderService.refund_order`` call paid back.
+
+    A refund can be split across the payments of an order, one provider
+    call each, and a later one can be declined after an earlier one went
+    through. ``refunded`` is therefore the money that actually moved (and
+    is in the ledger), never a yes/no: a caller that only learns "failed"
+    would tell staff nothing was refunded when part of it was.
+
+    ``declined`` is the provider's answer for the share it did not make,
+    ``None`` when every share was. Its ``error`` can carry raw provider
+    text, so it is for logs and staff screens, never for a customer.
+    """
+
+    refunded: Money
+    refund_ids: tuple[str, ...] = ()
+    declined: dict[str, Any] | None = None
+
+    @property
+    def complete(self) -> bool:
+        """Every share of the refund was made."""
+        return self.declined is None
+
+    @property
+    def paid_something(self) -> bool:
+        return self.refunded.amount > 0
+
+
+__all__ = ["OrderService", "PaymentEventOutcome", "RefundResult"]
 
 
 def _log_price_drift_if_needed(cart_item, current_price) -> None:
@@ -2575,7 +2604,7 @@ class OrderService:
                 and order.pay_way
             ):
                 try:
-                    success, refund_response = cls.refund_order(
+                    result = cls.refund_order(
                         order=order,
                         amount=None,
                         reason=f"Order canceled: {reason}"
@@ -2583,27 +2612,39 @@ class OrderService:
                         else "Order canceled",
                     )
 
-                    if success:
+                    if result.complete:
                         refund_info = {
                             "refunded": True,
-                            "refund_id": refund_response.get("refund_id"),
+                            "refund_id": (
+                                result.refund_ids[-1]
+                                if result.refund_ids
+                                else None
+                            ),
                             "message": "Payment refunded successfully",
                         }
                     else:
-                        # ``refund_response["error"]`` carries raw provider
+                        # ``declined["error"]`` carries raw provider
                         # exception text (see order/payment.py) — log it,
                         # never return it (CodeQL py/stack-trace-exposure).
                         logger.error(
                             "Refund failed for canceled order %s: %s",
                             order.id,
-                            refund_response.get("error"),
+                            (result.declined or {}).get("error"),
                         )
                         refund_info = {
                             "refunded": False,
                             "error": str(
                                 _("The refund could not be processed.")
                             ),
-                            "message": "Order canceled but refund failed",
+                            # A refund split across payments can be declined
+                            # part-way: say so, the shares made are in the
+                            # order's history.
+                            "message": (
+                                "Order canceled but only part of the "
+                                "payment was refunded"
+                                if result.paid_something
+                                else "Order canceled but refund failed"
+                            ),
                         }
                 except Exception:
                     logger.exception(
@@ -2628,13 +2669,14 @@ class OrderService:
             ) from e
 
     @staticmethod
-    def _refund_not_made(
+    def _note_refund_declined(
         order: Order, provider_code: str, response: dict[str, Any]
-    ) -> tuple[bool, dict[str, Any]]:
-        """Report a refund that was not made: nothing is recorded, and the
-        caller may only log the outcome (the admin cancel action once dropped
-        it altogether), so the reason is left where staff look, the order's
-        history. ``NOTE`` rows are not customer-visible
+    ) -> None:
+        """Leave the reason a refund was not made where staff look.
+
+        Nothing is recorded for it, and a caller may only log the outcome
+        (the admin cancel action once dropped it altogether), so the reason
+        goes in the order's history. ``NOTE`` rows are not customer-visible
         (``CUSTOMER_VISIBLE_HISTORY_TYPES``), which matters because the
         provider's own wording goes in."""
         from order.models.history import OrderHistory
@@ -2648,7 +2690,6 @@ class OrderService:
                 + (f" ({details})" if details else "")
             ),
         )
-        return False, response
 
     @staticmethod
     def _nothing_to_refund(order: Order, payment_status: str) -> StrOrPromise:
@@ -2670,7 +2711,7 @@ class OrderService:
         order: Order,
         amount: Money | None = None,
         reason: str = "",
-    ) -> tuple[bool, dict[str, Any]]:
+    ) -> RefundResult:
         """Refund ``amount`` of what *order* paid through a provider, or
         everything still refundable when ``amount`` is ``None``.
 
@@ -2680,9 +2721,12 @@ class OrderService:
         refunds racing for one remainder are serialised here and the second
         is refused (G0280). Each refund a provider accepts is recorded as a
         ``PaymentTransaction`` and ``payment_status`` follows from the
-        ledger's sums (``PaymentLedger.record_refund``). A refund the
-        provider did not make records nothing and returns
-        ``(False, response)``.
+        ledger's sums (``PaymentLedger.record_refund``).
+
+        Returns what was paid back. A refund split across payments can be
+        declined part-way: the shares already made stay recorded and are
+        reported in ``refunded``, and ``declined`` holds the provider's
+        answer for the one that was not (``RefundResult``).
         """
         from order.payment import get_payment_provider
 
@@ -2716,15 +2760,16 @@ class OrderService:
                 )
                 is None
             ):
-                return cls._refund_not_made(
-                    order,
-                    provider_code,
-                    {
-                        "error": (
-                            "Could not read the amount the provider captured "
-                            "for this payment."
-                        )
-                    },
+                declined = {
+                    "error": (
+                        "Could not read the amount the provider captured "
+                        "for this payment."
+                    )
+                }
+                cls._note_refund_declined(order, provider_code, declined)
+                return RefundResult(
+                    refunded=Money(0, order.paid_amount.currency),
+                    declined=declined,
                 )
 
         refundable = PaymentLedger.refundable(order)
@@ -2738,11 +2783,11 @@ class OrderService:
                 ).format(refund=amount.amount, refundable=refundable)
             )
 
-        refunded = Decimal(0)
+        plan = PaymentLedger.plan_refund(order, amount)
+        refunded = Money(0, plan[0][1].currency)
         refund_ids: list[str] = []
-        failure: tuple[bool, dict[str, Any]] | None = None
-        response: dict[str, Any] = {}
-        for charge, share in PaymentLedger.plan_refund(order, amount):
+        declined: dict[str, Any] | None = None
+        for charge, share in plan:
             # Under the lock, and counted from the ledger: an attempt that
             # wrote no row (a timeout, a rollback) is retried under the key
             # it already used, so the provider hands back the refund it made
@@ -2759,12 +2804,15 @@ class OrderService:
                 idempotency_key=idempotency_key,
             )
             if not success:
-                failure = cls._refund_not_made(order, charge.provider, response)
+                # What the earlier shares paid back is already recorded and
+                # stays so; the caller is told about both.
+                cls._note_refund_declined(order, charge.provider, response)
+                declined = response
                 break
 
             paid_back = Money(Decimal(str(response["amount"])), share.currency)
             refund_id = response.get("refund_id") or idempotency_key
-            _row, created = PaymentLedger.record_refund(
+            row, created = PaymentLedger.record_refund(
                 order,
                 charge=charge,
                 amount=paid_back,
@@ -2772,22 +2820,24 @@ class OrderService:
                 description=reason,
             )
             if created:
-                refunded += paid_back.amount
+                refunded += paid_back
                 refund_ids.append(refund_id)
                 # One signal per refund the ledger took, so a failure on a
                 # later payment leaves nothing unannounced.
                 order_refunded.send(
-                    sender=cls, order=order, amount=paid_back, reason=reason
+                    sender=cls,
+                    order=order,
+                    amount=paid_back,
+                    reason=reason,
+                    refund=row,
                 )
                 logger.info("Order %s refunded %s", order.id, paid_back)
 
-        if failure is not None:
-            return failure
-        return True, {
-            **response,
-            "amount": str(refunded),
-            "refund_ids": refund_ids,
-        }
+        return RefundResult(
+            refunded=refunded,
+            refund_ids=tuple(refund_ids),
+            declined=declined,
+        )
 
     @classmethod
     def _apply_polled_payment_status(
@@ -3195,6 +3245,42 @@ class OrderService:
         from shipping.services import ShippingService
 
         ShippingService.dispatch_create_shipment_task(order)
+
+    @classmethod
+    @transaction.atomic
+    def settle_cod_payment(
+        cls, order: Order, *, amount: Money, provider: str, reference: str
+    ) -> bool:
+        """Mark a cash-on-delivery order paid and record the collection.
+
+        What a courier's COD evidence (ACS payout row, ACS "received
+        outside" action, BoxNow ``delivered`` event) does to an order, in
+        one place. The payment status and the ``COD_COLLECTION`` ledger row
+        are one step: written together under the order lock or not at all,
+        so a ledger insert that fails leaves the order PENDING and the next
+        attempt (a payout retry) starts over. Written separately, a
+        failure in between left the order COMPLETED with no ledger row, and
+        that retry then skipped it for already being paid.
+
+        The status is read under the lock, not taken from the caller's
+        possibly stale *order*, so two callers racing for one order (the
+        nightly payout reconcile and the staff action) settle it once.
+        Returns ``True`` only for the call that settled it, and the caller
+        then runs what follows a payment (``order_paid``, the auto-advance
+        to COMPLETED); ``False`` when the order was not PENDING.
+        """
+        payment_status = (
+            Order.objects.select_for_update()
+            .values_list("payment_status", flat=True)
+            .get(pk=order.pk)
+        )
+        if payment_status != PaymentStatus.PENDING:
+            return False
+        order.mark_as_paid(payment_method=provider)
+        PaymentLedger.record_cod_collection(
+            order, amount=amount, provider=provider, reference=reference
+        )
+        return True
 
     @staticmethod
     def is_payment_after_cancel(order: Order) -> bool:

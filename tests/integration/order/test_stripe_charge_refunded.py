@@ -306,6 +306,8 @@ class TestChargeRefundedWebhook:
             _deliver("evt_email_once_1", "pi_email_once_1", 5000)
 
         assert mock_email.call_count == 1
+        # The task is queued for the refund's own ledger row.
+        [refund] = _refunds(order)
         mock_email.assert_called_with(
-            args=[order.id], headers={"_schema_name": "public"}
+            args=[refund.pk], headers={"_schema_name": "public"}
         )

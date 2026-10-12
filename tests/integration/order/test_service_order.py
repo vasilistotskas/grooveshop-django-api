@@ -11,7 +11,7 @@ from order.enum.status import OrderStatus, PaymentStatus
 from order.exceptions import OrderCancellationError, PaymentError
 from order.factories import PaymentTransactionFactory
 from order.factories.order import OrderFactory
-from order.services import OrderService
+from order.services import OrderService, RefundResult
 from order.stock import StockManager
 from product.factories.product import ProductFactory
 from tests.utils.shipping import enable_rate
@@ -87,9 +87,8 @@ class OrderServiceTestCase(TestCase):
         )
 
         with patch.object(OrderService, "refund_order") as mock_refund:
-            mock_refund.return_value = (
-                True,
-                {"refund_id": "refund_123", "status": PaymentStatus.REFUNDED},
+            mock_refund.return_value = RefundResult(
+                refunded=_eur("100.00"), refund_ids=("refund_123",)
             )
             canceled_order, refund_info = OrderService.cancel_order(
                 order=order, reason="Customer requested", refund_payment=True
@@ -138,12 +137,13 @@ class OrderServiceTestCase(TestCase):
             {"refund_id": "refund_123", "amount": "100.00"},
         )
 
-        success, response = OrderService.refund_order(
+        result = OrderService.refund_order(
             order=order, amount=None, reason="Test refund"
         )
 
-        self.assertTrue(success)
-        self.assertEqual(response["refund_id"], "refund_123")
+        self.assertTrue(result.complete)
+        self.assertEqual(result.refunded, _eur("100.00"))
+        self.assertEqual(result.refund_ids, ("refund_123",))
         self.assertEqual(order.payment_status, PaymentStatus.REFUNDED)
         [refund] = order.payment_transactions.filter(
             kind=PaymentTransactionKind.REFUND
@@ -170,11 +170,12 @@ class OrderServiceTestCase(TestCase):
             {"refund_id": "refund_456", "amount": "25.00"},
         )
 
-        success, _response = OrderService.refund_order(
+        result = OrderService.refund_order(
             order=order, amount=_eur("25.00"), reason="Partial refund"
         )
 
-        self.assertTrue(success)
+        self.assertTrue(result.complete)
+        self.assertEqual(result.refunded, _eur("25.00"))
         self.assertEqual(order.payment_status, PaymentStatus.PARTIALLY_REFUNDED)
         [refund] = order.payment_transactions.filter(
             kind=PaymentTransactionKind.REFUND

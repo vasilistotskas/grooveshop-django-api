@@ -19879,3 +19879,25 @@ msgstr ""
 #, python-brace-format
 msgid "Cannot restock more than the available quantity. Available: {available_quantity}"
 msgstr ""
+
+#: .\order\admin.py:1089
+#, python-format
+msgid "Order %(order_id)s: %(refunded)s of %(requested)s refunded; the rest was declined: %(reason)s"
+msgstr ""
+
+#: .\order\models\refund_notification.py:31
+msgid "The refund whose confirmation email this claims."
+msgstr ""
+
+#: .\order\models\refund_notification.py:37
+msgid "Refund Notification"
+msgstr ""
+
+#: .\order\models\refund_notification.py:38
+msgid "Refund Notifications"
+msgstr ""
+
+#: .\order\models\refund_notification.py:41
+#, python-format
+msgid "Notification of refund %(refund)s"
+msgstr ""

@@ -1054,7 +1054,7 @@ class OrderAdmin(BaseModelAdmin):
         amount = Money(form.cleaned_data["amount"], order.paid_amount.currency)
         reason = form.cleaned_data["reason"]
         try:
-            refunded, _response = OrderService.refund_order(
+            result = OrderService.refund_order(
                 order, amount=amount, reason=reason
             )
         except PaymentError as exc:
@@ -1062,17 +1062,38 @@ class OrderAdmin(BaseModelAdmin):
             # more than the remainder, not paid through a provider).
             self.message_user(request, str(exc), messages.ERROR)
         else:
-            if refunded:
+            if result.paid_something:
+                # Money moved, so staff are on record for it even when the
+                # rest was declined.
                 self.log_change(
                     request,
                     order,
-                    f"Refunded {amount}: {reason}",
+                    f"Refunded {result.refunded} of {amount}: {reason}",
                 )
+            if result.complete and result.paid_something:
                 self.message_user(
                     request,
                     _("Order %(order_id)s refunded %(amount)s.")
-                    % {"order_id": order.id, "amount": money(amount.amount)},
+                    % {
+                        "order_id": order.id,
+                        "amount": money(result.refunded.amount),
+                    },
                     messages.SUCCESS,
+                )
+            elif result.paid_something:
+                self.message_user(
+                    request,
+                    _(
+                        "Order %(order_id)s: %(refunded)s of %(requested)s "
+                        "refunded; the rest was declined: %(reason)s"
+                    )
+                    % {
+                        "order_id": order.id,
+                        "refunded": money(result.refunded.amount),
+                        "requested": money(amount.amount),
+                        "reason": (result.declined or {}).get("error", ""),
+                    },
+                    messages.ERROR,
                 )
             else:
                 self.message_user(

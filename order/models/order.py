@@ -43,6 +43,11 @@ from shipping.enum import ShippingKind
 # reads it, and a task must not import a view.
 AMOUNT_MISMATCH_FLAG = "viva_amount_mismatch"
 
+# The partial unique index on ``Order.payment_id``. ``OrderService`` reads
+# it back off a database error, to tell "this payment already has an
+# order" from any other integrity failure.
+PAYMENT_ID_UNIQUE_CONSTRAINT = "order_payment_id_unique"
+
 
 class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
     """
@@ -489,7 +494,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
                     models.Q(payment_id__isnull=False)
                     & ~models.Q(payment_id="")
                 ),
-                name="order_payment_id_unique",
+                name=PAYMENT_ID_UNIQUE_CONSTRAINT,
             ),
         ]
 

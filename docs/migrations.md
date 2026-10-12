@@ -47,9 +47,15 @@ that index. For a live table:
   changed nothing. The PreSync hook stops before the new image rolls, so the
   old pods keep serving. It never deletes or merges rows: which of two rows is
   the real one is a person's call. Fix the data, then re-run.
+- **A duplicate that arrives after the count still fails the build** (the old
+  pods keep inserting while it runs), and `CREATE INDEX CONCURRENTLY` leaves an
+  INVALID index when it fails. A failed build outside a transaction drops its
+  own leftover (`DROP INDEX CONCURRENTLY IF EXISTS`) before re-raising the
+  build's error, so nothing keeps costing writes until someone retries; the
+  next run also drops any leftover first.
 - Check production for duplicates before the release that ships it, with the
   `GROUP BY ... HAVING count(*) > 1` query in the migration's docstring
-  (`order` `0066_order_payment_id_unique` is the worked example).
+  (`order` `0069_order_payment_id_unique` is the worked example).
 
 ## The release still serving reads the new schema
 

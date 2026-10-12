@@ -5,7 +5,7 @@ from typing import Any, ClassVar
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.db import connection, transaction
+from django.db import IntegrityError, connection, transaction
 from django.db.models import QuerySet, Sum
 from django.utils import timezone
 from django.utils.translation import get_language
@@ -40,7 +40,7 @@ from order.exceptions import (
 )
 from order.models.attribution import OrderAttribution
 from order.models.item import OrderItem
-from order.models.order import Order
+from order.models.order import PAYMENT_ID_UNIQUE_CONSTRAINT, Order
 from order.models.stock_log import StockLog
 from order.models.stock_reservation import StockReservation
 from order.payment import (
@@ -130,6 +130,14 @@ class RefundResult:
 
 
 __all__ = ["OrderService", "PaymentEventOutcome", "RefundResult"]
+
+
+def _violated_constraint(error: IntegrityError) -> str | None:
+    """The constraint a database integrity error names, when the driver
+    says (psycopg reports it as ``diag.constraint_name``, which for a
+    unique index is the index name)."""
+    diagnostics = getattr(error.__cause__, "diag", None)
+    return getattr(diagnostics, "constraint_name", None)
 
 
 def _log_price_drift_if_needed(cart_item, current_price) -> None:
@@ -507,14 +515,18 @@ class OrderService:
     def _order_created_for_payment(cls, payment_intent_id: str, cart):
         """The order this payment intent already produced for ``cart``.
 
-        Returns ``None`` when no order carries the intent. Called under
-        the cart row lock, so two submits of one checkout (a double
-        click, a retry after a timeout, Back and resubmit while the
-        hosted payment is still open) serialise here and the second one
-        finds the first one's committed order instead of creating its
-        own and taking the stock a second time. ``Order.payment_id`` is
-        unique (``order_payment_id_unique``), which backs this up for
-        any caller that does not hold the lock.
+        Returns ``None`` when no order carries the intent. Called twice:
+        first without a lock, before the provider is asked, so a repeat
+        is answered from what is stored; then under the cart row lock,
+        where two submits of one checkout (a double click, a retry after
+        a timeout, Back and resubmit while the hosted payment is still
+        open) serialise and the second one finds the first one's
+        committed order instead of creating its own and taking the stock
+        a second time. ``Order.payment_id`` is unique
+        (``order_payment_id_unique``), which backs this up for submits of
+        two DIFFERENT carts: the cart lock does not serialise those, the
+        index rejects the second insert and ``create_order_from_cart``
+        answers it as it answers the sequential case.
 
         An intent that belongs to a different cart or user, or to an
         order that was canceled or deleted, is not a repeat of this
@@ -567,8 +579,10 @@ class OrderService:
 
         This method implements the payment-first approach where payment is confirmed
         before order creation. It performs the following steps:
-        0. Retrieves the payment intent from the provider and checks its
-           state, OUTSIDE any transaction (``_retrieve_payment_intent``)
+        0. Returns the order this payment intent already created for the
+           cart, if any, before the provider is asked anything; otherwise
+           retrieves the intent from the provider and checks its state,
+           OUTSIDE any transaction (``_retrieve_payment_intent``)
         then, in ONE transaction (``_create_order_for_verified_intent``):
         1. Locks the cart; returns the order this payment intent already
            created for it, if any (idempotent)
@@ -621,6 +635,18 @@ class OrderService:
             ... )
         """
         try:
+            # A repeat of a submit that already created its order is
+            # answered from what is stored, before the provider is asked
+            # anything: the order exists, so its answer must not depend
+            # on the provider being reachable (a retry after a timeout is
+            # exactly when it may not be). No lock here; the locked lookup
+            # below is what serialises two first submits racing.
+            if payment_intent_id:
+                existing_order = cls._order_created_for_payment(
+                    payment_intent_id, cart
+                )
+                if existing_order is not None:
+                    return existing_order
             payment_status, payment_data = cls._retrieve_payment_intent(
                 payment_intent_id, pay_way
             )
@@ -1284,6 +1310,24 @@ class OrderService:
         ):
             raise
         except Exception as e:
+            if (
+                isinstance(e, IntegrityError)
+                and _violated_constraint(e) == PAYMENT_ID_UNIQUE_CONSTRAINT
+            ):
+                # Another cart's checkout committed an order on this
+                # intent between the lookup above and this insert (the
+                # cart lock only serialises submits of ONE cart). It is
+                # the sequential case's answer: the intent is taken.
+                logger.warning(
+                    "Payment intent %s was taken by another order while "
+                    "this one was being created",
+                    payment_intent_id,
+                )
+                raise PaymentVerificationError(
+                    payment_intent_id,
+                    "payment intent was attached to another order "
+                    "while this one was being created",
+                ) from e
             logger.exception(
                 "Unexpected error creating order from cart",
             )

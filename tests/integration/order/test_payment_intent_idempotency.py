@@ -20,6 +20,7 @@ What is pinned here:
 """
 
 import threading
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 import pytest
@@ -197,6 +198,64 @@ class TestARepeatSubmitReturnsTheFirstOrder(_Checkout):
 
         admin_email.assert_not_called()
 
+    @patch("order.payment.get_payment_provider")
+    def test_a_repeat_is_answered_without_asking_the_provider(
+        self, mock_get_provider
+    ):
+        """The order exists, so its answer cannot depend on the provider
+        being reachable: a retry after a timeout is exactly when it may
+        not be."""
+        mock_get_provider.return_value = _provider_reporting(
+            PaymentStatus.PENDING
+        )
+        first = self._create()
+
+        mock_get_provider.reset_mock()
+        provider = Mock()
+        provider.get_payment_status.side_effect = ConnectionError(
+            "the provider is unreachable"
+        )
+        mock_get_provider.return_value = provider
+
+        second = self._create()
+
+        assert second.pk == first.pk
+        mock_get_provider.assert_not_called()
+        provider.get_payment_status.assert_not_called()
+
+    @patch("order.payment.get_payment_provider")
+    def test_the_locked_lookup_catches_a_first_submit_that_raced_the_other(
+        self, mock_get_provider
+    ):
+        """Two first submits both miss the lock-free lookup (neither order
+        exists yet); the one that takes the cart lock second finds the
+        other's committed order under it. The lock-free miss is simulated:
+        the second call's first lookup answers "none"."""
+        mock_get_provider.return_value = _provider_reporting(
+            PaymentStatus.PENDING
+        )
+        first = self._create()
+        real_lookup = OrderService._order_created_for_payment
+        lookups = []
+
+        def miss_once_then_look(payment_intent_id, cart):
+            lookups.append(payment_intent_id)
+            if len(lookups) == 1:
+                return None
+            return real_lookup(payment_intent_id, cart)
+
+        with patch.object(
+            OrderService,
+            "_order_created_for_payment",
+            side_effect=miss_once_then_look,
+        ):
+            second = self._create()
+
+        assert len(lookups) == 2, "the lookup under the cart lock never ran"
+        assert second.pk == first.pk
+        assert Order.objects.filter(payment_id=PAYMENT_INTENT_ID).count() == 1
+        assert self._stock() == (18, 14)
+
 
 @pytest.mark.django_db
 class TestAnIntentThatIsNotThisCheckoutsIsRefused(_Checkout):
@@ -253,6 +312,69 @@ class TestAnIntentThatIsNotThisCheckoutsIsRefused(_Checkout):
             .count()
             == 1
         )
+
+    @patch("order.payment.get_payment_provider")
+    def test_two_carts_racing_for_one_intent_are_answered_like_the_sequential_case(
+        self, mock_get_provider
+    ):
+        """The cart lock only serialises submits of ONE cart. Two carts
+        can both miss the lookup (neither order exists yet), and then the
+        unique index rejects the second insert. That must come out as the
+        sequential case does (``payment_verification``), not as a generic
+        ``invalid_order_data``. The race is simulated by blinding the
+        lookups; the index and the insert are real."""
+        mock_get_provider.return_value = _provider_reporting(
+            PaymentStatus.PENDING
+        )
+        other_cart = Cart.objects.create(user=None)
+        CartItem.objects.create(
+            cart=other_cart, product=self.product1, quantity=1
+        )
+
+        with patch.object(
+            OrderService, "_order_created_for_payment", return_value=None
+        ):
+            first = self._create()
+            with pytest.raises(PaymentVerificationError) as caught:
+                self._create(cart=other_cart, user=None)
+
+        assert isinstance(caught.value.__cause__, IntegrityError)
+        assert list(
+            Order.objects.filter(payment_id=PAYMENT_INTENT_ID).values_list(
+                "pk", flat=True
+            )
+        ) == [first.pk]
+        assert self._stock() == (18, 14), (
+            "the refused order must not keep the stock it took"
+        )
+
+    @pytest.mark.parametrize(
+        "cause",
+        [None, "some_other_constraint"],
+        ids=["no driver diagnostics", "another constraint"],
+    )
+    @patch("order.payment.get_payment_provider")
+    def test_any_other_integrity_error_is_still_invalid_order_data(
+        self, mock_get_provider, cause
+    ):
+        """Only the ``payment_id`` index means "this payment is taken":
+        every other integrity failure keeps its generic answer."""
+        from order.exceptions import InvalidOrderDataError
+
+        mock_get_provider.return_value = _provider_reporting(
+            PaymentStatus.PENDING
+        )
+        error = IntegrityError("some other integrity failure")
+        if cause is not None:
+            driver_error = Exception("the driver's error")
+            driver_error.diag = SimpleNamespace(constraint_name=cause)
+            error.__cause__ = driver_error
+
+        with (
+            patch.object(Order.objects, "create", side_effect=error),
+            pytest.raises(InvalidOrderDataError),
+        ):
+            self._create()
 
 
 @pytest.mark.django_db

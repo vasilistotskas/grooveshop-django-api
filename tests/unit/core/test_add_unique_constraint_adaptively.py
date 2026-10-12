@@ -1,6 +1,6 @@
 """``AddUniqueConstraintAdaptively``, run against the real ``order_order``.
 
-The operation ships ``order.0066_order_payment_id_unique`` onto a live
+The operation ships ``order.0069_order_payment_id_unique`` onto a live
 table, so what matters is what it does to data that already exists:
 
 * duplicates make it fail with a message that names them, BEFORE anything
@@ -17,6 +17,8 @@ so each test drops it first and the operation puts it back.
 """
 
 from __future__ import annotations
+
+from unittest.mock import patch
 
 import pytest
 from django.apps import apps as global_apps
@@ -200,5 +202,49 @@ def test_outside_a_transaction_the_index_is_built_concurrently():
         assert 'ON "order_order" ("payment_id") WHERE' in creates[0]
         assert _index_state() == (True, True)
     finally:
+        if _index_state() is None:
+            _run()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_a_build_that_fails_after_the_count_leaves_no_index_behind():
+    """The old pods keep inserting while the index is built, so a duplicate
+    can arrive after the up-front count. The concurrent build then fails
+    half way, and Postgres leaves its INVALID index in place. The failed
+    build drops it before re-raising, so nothing lingers (an invalid index
+    still costs every write) and a retry after the data is fixed builds a
+    valid one.
+
+    The late duplicate is simulated by blinding the count; the duplicates
+    are committed rows and the build is the real ``CONCURRENTLY`` one.
+    """
+    _drop_index()
+    try:
+        _orders("pi_late", "pi_late")
+        with (
+            patch.object(
+                AddUniqueConstraintAdaptively,
+                "_refuse_duplicates",
+                lambda *args, **kwargs: None,
+            ),
+            pytest.raises(IntegrityError),
+        ):
+            _run()
+
+        assert _index_state() is None, (
+            "the failed build left its INVALID index behind"
+        )
+
+        keep = Order.objects.filter(payment_id="pi_late").order_by("pk").first()
+        Order.objects.filter(payment_id="pi_late").exclude(pk=keep.pk).update(
+            payment_id=""
+        )
+        _run()
+
+        assert _index_state() == (True, True)
+    finally:
+        Order.objects.all_with_deleted().filter(payment_id="pi_late").update(
+            payment_id=""
+        )
         if _index_state() is None:
             _run()

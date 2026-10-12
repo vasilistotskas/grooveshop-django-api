@@ -55,7 +55,7 @@ class Migration(migrations.Migration):
     atomic = False
 
     dependencies = [
-        ("order", "0065_backfill_orderitem_vat_rate"),
+        ("order", "0068_refund_notification"),
     ]
 
     operations = [

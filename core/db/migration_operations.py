@@ -388,6 +388,14 @@ class AddUniqueConstraintAdaptively(Operation):
     leftover of an interrupted build is dropped first (``IF NOT EXISTS``
     would skip it).
 
+    **A duplicate that arrives AFTER the count still fails the build**,
+    and it can: the old pods keep inserting while the index is built. The
+    build then fails the same half-way way, so a failed build drops its own
+    INVALID index before re-raising instead of leaving it to cost every
+    write until someone retries. The error that propagates is the build's.
+    Only outside a transaction: inside one a failed statement leaves
+    nothing behind, and the transaction is already aborted.
+
     ``statement_timeout`` is lifted for the build, as in
     ``AddIndexAdaptively``. The migration using this MUST set
     ``atomic = False``, or the non-transactional branch can never be taken.
@@ -441,9 +449,28 @@ class AddUniqueConstraintAdaptively(Operation):
             try:
                 _drop_if_invalid(cursor, name)
                 self._refuse_duplicates(model, connection)
-                cursor.execute(sql)
+                try:
+                    cursor.execute(sql)
+                except Exception:
+                    if not connection.in_atomic_block:
+                        self._drop_failed_build(cursor)
+                    raise
             finally:
                 _restore_statement_timeout(cursor, previous)
+
+    def _drop_failed_build(self, cursor) -> None:
+        """Remove the INVALID index a failed ``CREATE INDEX CONCURRENTLY``
+        leaves behind. Never raises: the build's own error is the one the
+        operator needs, and a cleanup that fails is logged for them."""
+        name = self.constraint.name
+        try:
+            cursor.execute(f'DROP INDEX CONCURRENTLY IF EXISTS "{name}"')
+        except Exception:
+            logger.exception(
+                "The build of %s failed and its INVALID index could not be "
+                "dropped; drop it by hand before retrying",
+                name,
+            )
 
     def _refuse_duplicates(self, model, connection) -> None:
         rows = model._base_manager.using(connection.alias)

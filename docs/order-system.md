@@ -127,17 +127,26 @@ Two entry points in `order/services.py` (the legacy `OrderService.create_order`
   read first, with no lock.
 - **Idempotent per payment intent.** `Order.payment_id` is unique
   (`order_payment_id_unique`, a partial unique index over non-empty ids), and
-  right after taking the cart row lock, BEFORE cart validation,
-  `_order_created_for_payment` looks the intent up: the order it produced for
-  THIS cart is returned as it is (the view answers `201` again, the same
-  response the first submit got), so a double click, a retry after a timeout or
-  Back-and-resubmit while the hosted payment is open yields one order and one
-  stock decrement. It runs before validation because the first order has
-  already taken the stock (and, once paid, emptied the cart), which a repeat
-  would otherwise be refused for. An intent that belongs to another cart, or to
-  a canceled or deleted order, is not a repeat: `PaymentVerificationError`
-  (400 `payment_verification`) — answering would hand one shopper another's
-  order, creating would take a payment already committed elsewhere.
+  `_order_created_for_payment` looks the intent up twice: first WITHOUT a lock,
+  before the provider is asked, so a repeat is answered from what is stored
+  and does not depend on the provider being reachable (a retry after a timeout
+  is when it may not be); then right after taking the cart row lock, BEFORE
+  cart validation, which is what serialises two first submits of one cart. The
+  order it produced for THIS cart is returned as it is (the view answers `201`
+  again, the same response the first submit got), so a double click, a retry
+  after a timeout or Back-and-resubmit while the hosted payment is open yields
+  one order and one stock decrement. Both run before cart validation because
+  the first order has already taken the stock (and, once paid, emptied the
+  cart), which a repeat would otherwise be refused for. An intent that belongs
+  to another cart, or to a canceled or deleted order, is not a repeat:
+  `PaymentVerificationError` (400 `payment_verification`) — answering would
+  hand one shopper another's order, creating would take a payment already
+  committed elsewhere. The cart lock does not serialise two DIFFERENT carts
+  submitting one intent: both can miss the lookup, and the unique index then
+  rejects the second insert. `create_order_from_cart` reads the violated
+  constraint's name off the database error (`PAYMENT_ID_UNIQUE_CONSTRAINT`;
+  any other integrity error keeps its generic `invalid_order_data`) and
+  answers it the same way, `payment_verification`.
   Limits: the repeat must reach the service (the view validates the cart
   first, so a repeat after the first order emptied the last units, or after the
   cart was deleted on payment, is refused there as before, with no duplicate);
@@ -1019,7 +1028,7 @@ the linked memory note or the originating PR's commit message.
 | No carrier mint while `Order.awaits_online_payment` (`ShipmentAwaitingPaymentError`) | §5 above |
 | A payment-success handler checks `is_payment_after_cancel` BEFORE its settled-state guard | §2.2 above |
 | Order `status` changes only through admin actions / `OrderService`, never the change form | §7.1 above |
-| One order per provider payment: `Order.payment_id` is unique when non-empty (`order_payment_id_unique`), and `create_order_from_cart` answers a repeat of the same cart's intent with the first order (found under the cart lock, before cart validation) and refuses an intent of another cart or of a canceled / deleted order | §3.1 above |
+| One order per provider payment: `Order.payment_id` is unique when non-empty (`order_payment_id_unique`), and `create_order_from_cart` answers a repeat of the same cart's intent with the first order (found before the provider is asked, and again under the cart lock, both before cart validation) and refuses an intent of another cart or of a canceled / deleted order, a unique-index race between two carts included, all as `payment_verification` | §3.1 above |
 | No provider HTTP call inside the order-creation transaction (nor in a view-level `atomic`): the intent is read first, and the transaction only re-compares its amount and currency with the total computed under lock | §3.1 above |
 | Product rows are locked in ascending pk order, in one statement, before the first row that references a product is inserted (`StockManager.lock_products`); a cart-item lock never joins the products (`of=("self",)`) | §3.1 above |
 | Every checkout-created order since `0059_orderattribution` has exactly one `OrderAttribution` row (`direct` when there was no signal); for a checkout order a missing row means "older than attribution", never "direct"; `source_type=agent` only with the gateway's `X-Internal-Gateway` secret | §3.4 above |

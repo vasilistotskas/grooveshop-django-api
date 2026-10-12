@@ -3,6 +3,40 @@
 
 
 
+## v3.111.1 (2026-10-12)
+
+### Bug fixes
+
+* fix(pricing): filter and sort listings on the effective price (#169)
+
+Price filters and price sort ran on final_price (price, VAT, markdown),
+so a product under an unconditional automatic promotion was ranked and
+bounded at a price the cart no longer charges.
+
+Product list: minEffectivePrice / maxEffectivePrice filters and an
+effectivePrice ordering key read the stored Product.effective_price.
+minFinalPrice / maxFinalPrice stay for one release and are marked
+deprecated in the OpenAPI schema (FilterSet.deprecated_params, read by
+AutoSchema).
+
+Search: Meilisearch indexes effective_price as filterable, sortable and
+displayed. price_min / price_max compare with it, sort accepts
+effectivePrice / -effectivePrice and effective_price is a facet (its
+stats feed the price-range slider). sort=finalPrice and the final_price
+field stay, deprecated, until the storefront has switched.
+
+Conditional promotions never enter effective_price, so they change
+neither filter nor sort. The index needs
+`manage.py meilisearch_apply_settings` after deploy.
+
+Closes #140
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`2fc726e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2fc726ec01435971335673fb5758446302fefac4))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.111.0 [skip ci] ([`d81cc93`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d81cc936337cb169ca3abb79b3bdcd5c87ad1396))
+
 ## v3.111.0 (2026-10-12)
 
 ### Chores

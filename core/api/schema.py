@@ -21,6 +21,28 @@ class AutoSchema(SpectacularAutoSchema):
     arrays **must** declare ``pagination_class=None`` in the decorator.
     """
 
+    def _get_filter_parameters(self):
+        """Flag the filterset's ``deprecated_params`` as deprecated.
+
+        drf-spectacular's django-filter extension has no per-filter
+        deprecation. A filterset lists the snake_case names it is retiring
+        in ``deprecated_params`` (the expand/contract rule of
+        ``docs/migrations.md`` for API contracts) and they surface as
+        ``deprecated: true`` in the schema.
+        """
+        parameters = super()._get_filter_parameters()
+        get_filterset_class = getattr(self.view, "get_filterset_class", None)
+        filterset_class = (
+            get_filterset_class()
+            if callable(get_filterset_class)
+            else getattr(self.view, "filterset_class", None)
+        )
+        deprecated = getattr(filterset_class, "deprecated_params", ())
+        for parameter in parameters:
+            if parameter.get("name") in deprecated:
+                parameter["deprecated"] = True
+        return parameters
+
     def _get_paginator(self):
         action = getattr(self.view, "action", None)
         if action:

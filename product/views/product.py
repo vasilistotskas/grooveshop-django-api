@@ -198,6 +198,9 @@ class ProductViewSet(BaseModelViewSet):
 
     ordering_fields = [
         "price",
+        # What the customer pays now, promotions included: the key the
+        # storefront's price sort uses. ``price`` is the NET list price.
+        "effective_price",
         "created_at",
         "active",
         "availability_priority",

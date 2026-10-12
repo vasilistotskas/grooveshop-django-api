@@ -86,6 +86,7 @@ class ProductViewSetTestCase(TestCase):
     def test_ordering_fields_configuration(self):
         expected_fields = [
             "price",
+            "effective_price",
             "created_at",
             "active",
             "availability_priority",

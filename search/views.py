@@ -71,6 +71,10 @@ _VALID_LANGUAGE_CODES = frozenset(
 # the camelCase names and they were passed straight to order_by, so sorting
 # silently did nothing — the index only knows the snake_case names.
 _PRODUCT_SORT_FIELD_MAP: dict[str, str] = {
+    "effectivePrice": "effective_price",
+    "-effectivePrice": "-effective_price",
+    # Deprecated: the price before promotions. Removed once the storefront
+    # sorts on ``effectivePrice`` (docs/product-pricing.md).
     "finalPrice": "final_price",
     "-finalPrice": "-final_price",
     "likesCount": "likes_count",
@@ -86,6 +90,7 @@ _ALLOWED_PRODUCT_FACETS: frozenset[str] = frozenset(
         "brand",
         "price_range",
         "final_price",
+        "effective_price",
         "language_code",
         "likes_count",
         "view_count",
@@ -408,14 +413,22 @@ def blog_post_meili_search(request):
             name="price_min",
             type=float,
             location=OpenApiParameter.QUERY,
-            description=_("Minimum price filter (final_price >= value)"),
+            description=_(
+                "Minimum price filter (effective_price >= value): the price "
+                "the customer pays, unconditional automatic promotions "
+                "included"
+            ),
             required=False,
         ),
         OpenApiParameter(
             name="price_max",
             type=float,
             location=OpenApiParameter.QUERY,
-            description=_("Maximum price filter (final_price <= value)"),
+            description=_(
+                "Maximum price filter (effective_price <= value): the price "
+                "the customer pays, unconditional automatic promotions "
+                "included"
+            ),
             required=False,
         ),
         OpenApiParameter(
@@ -487,7 +500,9 @@ def blog_post_meili_search(request):
             type=str,
             location=OpenApiParameter.QUERY,
             description=_(
-                "Sort field (finalPrice, -finalPrice, -likesCount, -viewCount, -createdAt)"
+                "Sort field (effectivePrice, -effectivePrice, -likesCount, "
+                "-viewCount, -createdAt). finalPrice and -finalPrice are "
+                "deprecated: they ignore promotions."
             ),
             required=False,
         ),
@@ -589,9 +604,9 @@ def product_meili_search(request):
 
     # Apply price range filters
     if price_min is not None:
-        search_qs = search_qs.filter(final_price__gte=price_min)
+        search_qs = search_qs.filter(effective_price__gte=price_min)
     if price_max is not None:
-        search_qs = search_qs.filter(final_price__lte=price_max)
+        search_qs = search_qs.filter(effective_price__lte=price_max)
 
     # Apply popularity filters
     if likes_min is not None:

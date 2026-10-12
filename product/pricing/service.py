@@ -204,19 +204,18 @@ def _plan(
 def plan_for_save(product: Product) -> PricePlan:
     """Plan a product's records before it is saved, and set its columns.
 
-    Locks the product row first when it exists, so two concurrent saves
-    queue instead of both closing the same spell. The derived columns are
-    assigned to the instance, so the save that follows writes them in the
-    same statement; ``record_spells`` writes the spells once it has a pk.
+    Takes no lock of its own: a multi-product transaction must acquire
+    product row locks in pk order (see ``StockManager.lock_products``), and
+    a per-save lock here would be a second, unordered acquisition. Two
+    concurrent saves of one product that both try to open a spell are
+    refused by the one-current-spell-per-product constraint, and the loser's
+    save rolls back instead of recording a wrong price. The derived columns
+    are assigned to the instance, so the save that follows writes them in
+    the same statement; ``record_spells`` writes the spells once it has a pk.
     """
     now = timezone.now()
     history = None
     if product.pk is not None:
-        list(
-            Product._base_manager.select_for_update()
-            .filter(pk=product.pk)
-            .values_list("pk", flat=True)
-        )
         history = _load_histories([product.pk], now).get(product.pk)
     plan = _plan(product, history, load_price_reducing_promotions(), now)
     plan.apply_to_product()

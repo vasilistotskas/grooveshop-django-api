@@ -3,6 +3,72 @@
 
 
 
+## v3.111.2 (2026-10-12)
+
+### Bug fixes
+
+* fix(admin): split the seller-details alert into a storefront notice and a tax-document error (#170) ([`d71fd71`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d71fd71ee4a730eda037c6080b305b1b82cadedd))
+
+* fix(admin): split the seller-details alert into a storefront notice and a tax-document error
+
+The dashboard showed superusers a red "Invoice seller details are
+incomplete" error whenever the company name, VAT ID or tax office was
+empty, including on stores that issue no tax documents at all.
+
+The same INVOICE_SELLER_* values are the legal identity published on the
+storefront (Directive 2000/31/EC art. 5(1), N. 4919/2022 art. 22 §3-4),
+so there are two separate questions:
+
+- Storefront details (REQUIRED_DISCLOSURE_FIELDS) missing: a calm
+  warning notice, shown to everyone who can change store settings.
+- Tax-document details (new REQUIRED_TAX_DOCUMENT_FIELDS: name, VAT ID,
+  tax office) missing while MYDATA_ENABLED: a danger alert, because
+  submissions to AADE fail.
+
+Both are derived from tenant.legal_identity, read once per load. The
+alerts now follow extra_settings.change_setting, so a merchant's owner
+and admins see them, not only superusers; staff do not.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`d71fd71`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d71fd71ee4a730eda037c6080b305b1b82cadedd))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.111.1 [skip ci] ([`1a7515a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1a7515af272802d101f01f6da08e32f99013408b))
+
+### Documentation
+
+* docs(search): reindex every store after a release adds an index field (#171)
+
+The pricing page told the deployer to run meilisearch_apply_settings, which
+the PreSync hook already runs with --all-tenants on every deploy, and left
+out the step that is not automatic: rebuilding the existing documents so
+they carry the new field. Run without --all-tenants that command targets the
+public schema, which holds no products. The command reference now lists its
+--tenant and --all-tenants options.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`9c7b2da`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9c7b2dad8844b032ec12c8940eca2ed493e49727))
+
+### Performance improvements
+
+* perf(admin): read the merchant legal identity in one query and reword the alerts
+
+Setting.get caches per key and only warms the rest after a row hit, so
+the 14 identity keys cost a query each on an unset store or cold cache.
+merchant_legal_identity now reads the extra_settings cache for every key
+and fetches the absent ones together, so the dashboard returns to its
+previous query budget and every caller (storefront view, invoicing,
+widget) benefits.
+
+The alert copy is reworded in English and Greek, and the field labels
+get their own message context so they read right in this alert instead
+of borrowing msgids from unrelated forms.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`d71fd71`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d71fd71ee4a730eda037c6080b305b1b82cadedd))
+
 ## v3.111.1 (2026-10-12)
 
 ### Bug fixes

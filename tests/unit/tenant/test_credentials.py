@@ -9,7 +9,7 @@ Two contracts are covered here:
    - Returns "" when both are absent.
 
 2. **Third-party credential helpers** (Stripe, Viva Wallet, ACS,
-   BoxNow, Meta CAPI/Pixel) — NO fallback:
+   BoxNow, myDATA, Meta CAPI/Pixel) — NO fallback:
    - Tenant field value is returned when set (non-empty).
    - Returns "" (or False for the nullable ``live_mode`` flag) when
      the tenant field is empty or there is no active tenant — even
@@ -25,6 +25,7 @@ from tenant.credentials import (
     _get_tenant_field,
     acs_credentials,
     box_now_credentials,
+    mydata_credentials,
     tenant_contact_email,
     tenant_from_email,
     tenant_logo_url,
@@ -157,6 +158,12 @@ _TENANT_ONLY = [
             "notify_phone": "+30690000001",
             "webhook_secret": "T_WHS",
         },
+    ),
+    *_group(
+        mydata_credentials,
+        "mydata_",
+        "MYDATA_",
+        {"user_id": "T_MUID", "subscription_key": "T_MKEY"},
     ),
     _single(
         tenant_meta_capi_access_token,

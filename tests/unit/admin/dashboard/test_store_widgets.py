@@ -119,6 +119,46 @@ class TestAlerts:
             ]
         assert "Invoice seller details are incomplete" in titles
 
+    def _mydata_alert_items(self, tenant, bind_tenant) -> list[str] | None:
+        from extra_settings.models import Setting
+
+        Setting.objects.update_or_create(
+            name="MYDATA_ENABLED",
+            defaults={"value_type": "bool", "value_bool": True},
+        )
+        bind_tenant(tenant)
+        superuser = UserAccountFactory(admin=True)
+        with translation.override("en"):
+            for alert in _context(widgets.StoreAlerts, superuser)["alerts"]:
+                if "myDATA is enabled" in str(alert["title"]):
+                    return list(alert["items"])
+        return None
+
+    def test_missing_mydata_credentials_are_read_off_the_tenant(
+        self, bind_tenant
+    ):
+        from tests.utils.staff import store_tenant
+
+        items = self._mydata_alert_items(
+            store_tenant("widget_mydata_missing"), bind_tenant
+        )
+
+        assert items == ["mydata_user_id", "mydata_subscription_key"]
+
+    def test_configured_mydata_credentials_raise_no_alert(self, bind_tenant):
+        from tests.utils.staff import store_tenant
+
+        items = self._mydata_alert_items(
+            store_tenant(
+                "widget_mydata_ok",
+                mydata_user_id="u",
+                mydata_subscription_key="k",
+            ),
+            bind_tenant,
+        )
+
+        assert items is None
+
     def test_a_store_dashboard_never_counts_background_task_failures(
         self, monkeypatch
     ):

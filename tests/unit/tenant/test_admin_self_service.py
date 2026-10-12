@@ -110,10 +110,47 @@ class TestTenantAdminScoping:
             "from_email",
             "viva_wallet_client_id",
             "acs_api_key",
+            "mydata_user_id",
+            "mydata_subscription_key",
         ):
             assert own_field not in readonly, (
                 f"{own_field} is their own to set but was read-only"
             )
+
+    def test_the_change_form_saves_secrets_encrypted(
+        self, tenant, bind_tenant_and_schema
+    ):
+        from django.db import connection
+
+        user = _superuser()
+        bind_tenant_and_schema(None)
+        form_class = self._admin().get_form(
+            _request(user),
+            tenant,
+            fields=["stripe_secret_key", "mydata_subscription_key"],
+        )
+        form = form_class(
+            {
+                "stripe_secret_key": "sk_live_from_admin",
+                "mydata_subscription_key": "mydata-from-admin",
+            },
+            instance=tenant,
+        )
+        assert form.is_valid(), form.errors
+        form.save()
+
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT stripe_secret_key_encrypted, mydata_subscription_key "
+                "FROM tenant_tenant WHERE id = %s",
+                [tenant.pk],
+            )
+            stripe, mydata = cursor.fetchone()
+        assert "sk_live_from_admin" not in stripe
+        assert "mydata-from-admin" not in mydata
+        tenant.refresh_from_db()
+        assert tenant.stripe_secret_key == "sk_live_from_admin"
+        assert tenant.mydata_subscription_key == "mydata-from-admin"
 
     def test_cannot_create_or_delete_stores(
         self, tenant, bind_tenant_and_schema

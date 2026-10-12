@@ -201,6 +201,8 @@ TENANT_SELF_EDITABLE_FIELDS: frozenset[str] = frozenset(
         "box_now_warehouse_id",
         "box_now_notify_phone",
         "box_now_webhook_secret",
+        "mydata_user_id",
+        "mydata_subscription_key",
         # Security-adjacent but store-owned
         "totp_issuer",
     }

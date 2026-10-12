@@ -22468,3 +22468,28 @@ msgstr "Ειδοποιήσεις επιστροφών"
 #, python-format
 msgid "Notification of refund %(refund)s"
 msgstr "Ειδοποίηση για την επιστροφή %(refund)s"
+
+#: .\tenant\models.py:1078
+msgid "myDATA user ID"
+msgstr "Αναγνωριστικό χρήστη myDATA"
+
+#: .\tenant\models.py:1084
+msgid ""
+"The aade-user-id of the store's TAXISnet myDATA developer account. No "
+"platform fallback — empty disables myDATA."
+msgstr ""
+"Το aade-user-id του λογαριασμού προγραμματιστή myDATA του καταστήματος στο"
+" TAXISnet. Χωρίς εναλλακτική τιμή πλατφόρμας — κενό απενεργοποιεί το "
+"myDATA."
+
+#: .\tenant\models.py:1089
+msgid "myDATA subscription key"
+msgstr "Κλειδί συνδρομής myDATA"
+
+#: .\tenant\models.py:1095
+msgid ""
+"The Ocp-Apim-Subscription-Key from the myDATA developer portal. Secret. No"
+" platform fallback — empty disables myDATA."
+msgstr ""
+"Το Ocp-Apim-Subscription-Key από την πύλη προγραμματιστών myDATA. Μυστικό."
+" Χωρίς εναλλακτική τιμή πλατφόρμας — κενό απενεργοποιεί το myDATA."

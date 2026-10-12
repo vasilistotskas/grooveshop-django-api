@@ -749,14 +749,19 @@ class StoreAlerts(DashboardWidget):
         from extra_settings.models import Setting
 
         from order.models.invoice import Invoice, MyDataStatus
+        from tenant.credentials import mydata_credentials
 
         if not Setting.get("MYDATA_ENABLED", default=False):
             return []
         alerts = []
+        credentials = mydata_credentials()
         missing = [
-            key
-            for key in ("MYDATA_USER_ID", "MYDATA_SUBSCRIPTION_KEY")
-            if not Setting.get(key, default="")
+            field
+            for field, key in (
+                ("mydata_user_id", "user_id"),
+                ("mydata_subscription_key", "subscription_key"),
+            )
+            if not credentials[key]
         ]
         if missing:
             alerts.append(
@@ -767,9 +772,7 @@ class StoreAlerts(DashboardWidget):
                     _("Every submission to AADE will fail until they are set."),
                     items=missing,
                     link=(
-                        self.changelist_url(
-                            "extra_settings.Setting", "q=MYDATA_"
-                        ),
+                        self.changelist_url("tenant.Tenant"),
                         _("Fix in settings"),
                     ),
                 )

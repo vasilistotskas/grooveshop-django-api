@@ -518,6 +518,9 @@ class TenantAdminSerializer(serializers.ModelSerializer):
             "box_now_warehouse_id",
             "box_now_notify_phone",
             "box_now_webhook_secret",
+            # --- Invoicing — myDATA ---
+            "mydata_user_id",
+            "mydata_subscription_key",
             # --- Timestamps ---
             "created_at",
             "updated_at",

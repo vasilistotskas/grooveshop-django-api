@@ -6,7 +6,7 @@ when there is no active tenant — public schema, management commands,
 Celery workers without a TenantTask, tests).
 
 Third-party CREDENTIAL helpers are the deliberate exception: Stripe,
-Viva Wallet, ACS, BoxNow, and Meta CAPI/Pixel values live ONLY on the
+Viva Wallet, ACS, BoxNow, myDATA, and Meta CAPI/Pixel values live ONLY on the
 ``Tenant`` model — there is no platform-wide settings fallback for
 them. A merchant's payment/shipping/ad-tracking secrets must never
 silently leak across tenants (or resurrect a stale platform-wide env
@@ -539,6 +539,32 @@ def acs_credentials() -> dict[str, str]:
         # from the billing code when the explicit field is empty — both
         # this helper and that derivation path remain valid.
         "station_origin": _get_tenant_field("acs_station_origin"),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Invoicing — myDATA
+# ---------------------------------------------------------------------------
+
+
+def mydata_credentials() -> dict[str, str]:
+    """Return the myDATA (AADE) credentials for the current tenant.
+
+    Tenant-only — NO platform-wide fallback: each store invoices under its
+    own TAXISnet account. Empty means myDATA is not configured for this
+    tenant (``order.mydata.config.MyDataConfig.is_ready`` is False). The
+    on/off switch, environment and series settings are not credentials
+    and stay ``extra_settings`` rows.
+
+    Returns:
+        {
+            "user_id":          str,   # aade-user-id header
+            "subscription_key": str,   # Ocp-Apim-Subscription-Key header
+        }
+    """
+    return {
+        "user_id": _get_tenant_field("mydata_user_id"),
+        "subscription_key": _get_tenant_field("mydata_subscription_key"),
     }
 
 

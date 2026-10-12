@@ -19937,6 +19937,7 @@ msgstr ""
 msgid ""
 "The Ocp-Apim-Subscription-Key from the myDATA developer portal. Secret. No"
 " platform fallback — empty disables myDATA."
+msgstr ""
 
 #: .\order\models\item.py:53
 msgid "Discount Allocation"

@@ -21,6 +21,7 @@ from typing import Any
 
 from allauth.account.signals import user_signed_up
 from django.dispatch import receiver
+from djmoney.money import Money
 
 from meta_capi.tasks import (
     dispatch_complete_registration_event,
@@ -62,9 +63,9 @@ def _on_order_created(sender: Any, order: Any, **kwargs: Any) -> None:
 
 @receiver(order_refunded, dispatch_uid="meta_capi.send_refund")
 def _on_order_refunded(
-    sender: Any, order: Any, amount: Any | None = None, **kwargs: Any
+    sender: Any, order: Any, amount: Money, **kwargs: Any
 ) -> None:
-    schedule_refund(order.id, amount)
+    schedule_refund(order.id, amount.amount)
 
 
 @receiver(user_signed_up, dispatch_uid="meta_capi.send_complete_registration")

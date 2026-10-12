@@ -10,6 +10,7 @@ from order.payment import (
     StripePaymentProvider,
     VivaWalletPaymentProvider,
     get_payment_provider,
+    money_from_minor_units,
 )
 
 
@@ -102,6 +103,8 @@ class PaymentModuleTestCase(TestCase):
         mock_refund = mock.Mock()
         mock_refund.id = "re_test_payment_id_mock"
         mock_refund.status = "succeeded"
+        mock_refund.amount = 5000
+        mock_refund.currency = "eur"
         mock_stripe_refund.return_value = mock_refund
 
         with mock.patch("order.payment.Refund.sync_from_stripe_data"):
@@ -117,6 +120,8 @@ class PaymentModuleTestCase(TestCase):
             self.assertEqual(
                 refund_data["refund_id"], "re_test_payment_id_mock"
             )
+            # What Stripe paid back, in major units: 5000 minor units of EUR.
+            self.assertEqual(Decimal(refund_data["amount"]), Decimal(50))
 
     @mock.patch("order.payment.stripe.PaymentIntent.retrieve")
     @mock.patch("order.payment.PaymentIntent.sync_from_stripe_data")
@@ -565,3 +570,58 @@ class StripeApiVersionConfigTestCase(TestCase):
             djstripe_settings.STRIPE_API_VERSION, stripe.api_version
         )
         self.assertNotEqual(djstripe_settings.STRIPE_API_VERSION, "2024-04-10")
+
+
+class MinorUnitsTestCase(TestCase):
+    """Stripe amounts are integers in the currency's OWN smallest unit.
+
+    The exponent comes from the currency (``moneyed``), never from an
+    assumed two decimals: 500 JPY is five hundred yen, not five.
+    """
+
+    def test_two_decimal_currency(self):
+        self.assertEqual(
+            money_from_minor_units(5000, "eur"), Money(Decimal(50), "EUR")
+        )
+
+    def test_zero_decimal_currency(self):
+        self.assertEqual(
+            money_from_minor_units(500, "jpy"), Money(Decimal(500), "JPY")
+        )
+
+    def test_three_decimal_currency(self):
+        self.assertEqual(
+            money_from_minor_units(5000, "BHD"), Money(Decimal(5), "BHD")
+        )
+
+    def test_stripe_refund_request_uses_the_currency_exponent(self):
+        with (
+            mock.patch("tenant.credentials.stripe_credentials") as creds,
+            mock.patch("order.payment.stripe.Refund.create") as create,
+            mock.patch("order.payment.Refund.sync_from_stripe_data"),
+        ):
+            creds.return_value = {"secret_key": "sk_test_dummy"}
+            create.return_value = mock.Mock(
+                id="re_1", status="succeeded", amount=500, currency="jpy"
+            )
+            success, data = StripePaymentProvider().refund_payment(
+                "pi_1", Money(Decimal(500), "JPY")
+            )
+
+        self.assertTrue(success)
+        self.assertEqual(create.call_args.kwargs["amount"], 500)
+        self.assertEqual(Decimal(data["amount"]), Decimal(500))
+
+    def test_stripe_captured_amount_is_in_major_units(self):
+        with (
+            mock.patch("tenant.credentials.stripe_credentials") as creds,
+            mock.patch("order.payment.stripe.PaymentIntent.retrieve") as get,
+            mock.patch("order.payment.PaymentIntent.sync_from_stripe_data"),
+        ):
+            creds.return_value = {"secret_key": "sk_test_dummy"}
+            get.return_value = mock.Mock(
+                status="succeeded", amount=500, currency="jpy", created=1
+            )
+            captured = StripePaymentProvider().captured_amount("pi_1")
+
+        self.assertEqual(captured, Decimal(500))

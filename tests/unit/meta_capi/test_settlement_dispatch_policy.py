@@ -14,6 +14,7 @@ from types import SimpleNamespace
 from unittest import mock
 
 import pytest
+from djmoney.money import Money
 
 from meta_capi.signals import _on_order_created, _on_order_refunded
 from pay_way.enum.settlement import PaySettlement
@@ -56,11 +57,19 @@ def test_order_created_schedules_purchase_per_settlement(
         purchase.assert_not_called()
 
 
-@pytest.mark.parametrize("amount", [Decimal("9.99"), None])
-def test_order_refunded_schedules_refund_with_amount(amount):
+def test_order_refunded_schedules_refund_with_amount():
     with mock.patch("meta_capi.signals.schedule_refund") as refund:
         _on_order_refunded(
-            sender=None, order=SimpleNamespace(id=43), amount=amount
+            sender=None,
+            order=SimpleNamespace(id=43),
+            amount=Money(Decimal("9.99"), "EUR"),
         )
 
-    refund.assert_called_once_with(43, amount)
+    refund.assert_called_once_with(43, Decimal("9.99"))
+
+
+def test_order_refunded_without_an_amount_is_an_error():
+    """``amount`` is part of the signal's contract: a sender that leaves it
+    out fails loudly, it is not read as a refund of "everything"."""
+    with pytest.raises(TypeError, match="amount"):
+        _on_order_refunded(sender=None, order=SimpleNamespace(id=43))

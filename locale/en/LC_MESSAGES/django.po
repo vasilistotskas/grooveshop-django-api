@@ -7370,6 +7370,10 @@ msgstr ""
 msgid "Payment ID"
 msgstr ""
 
+#: .\giftcard\models.py:85
+msgid "Refunded Amount"
+msgstr ""
+
 #: .\giftcard\models.py:80
 msgid "Gift Card Purchase"
 msgstr ""

@@ -88,6 +88,155 @@ RETRIEVE_TRANSACTION: dict[str, Any] = {
     "cardCountryCode": "GR",
 }
 
+
+def retrieve_transaction(**overrides: Any) -> dict[str, Any]:
+    """The Retrieve Transaction example with *overrides* applied."""
+    return {**deepcopy(RETRIEVE_TRANSACTION), **overrides}
+
+
+def retrieve_refund(
+    *, amount: float, order_code: int, type_id: int = 7, **overrides: Any
+) -> dict[str, Any]:
+    """Retrieve Transaction answering for a REFUND transaction.
+
+    Viva publishes no refund example for this call. The shape is the
+    documented one with what the docs state about a refund: it has
+    ``statusId`` ``F`` (``R`` belongs to the original payment), a refund
+    or void ``transactionTypeId`` (4/7 for a card) and a negative
+    ``amount`` ("transactions which reverse previous payments will always
+    have a negative amount",
+    developer.viva.com/integration-reference/response-codes/), and it
+    carries the ``orderCode`` of the payment it reverses.
+    """
+    return retrieve_transaction(
+        **{
+            "amount": -amount,
+            "orderCode": order_code,
+            "statusId": "F",
+            "transactionTypeId": type_id,
+            **overrides,
+        }
+    )
+
+
+# Transaction Reversal Created (EventTypeId 1797): the sample body of
+# developer.viva.com/webhooks-for-payments/transaction-reversal-created.
+# ``EventData.TransactionId`` is the REFUND, ``ParentId`` the payment it
+# reverses; ``StatusId`` is ``F`` and ``TransactionTypeId`` 7 (Card Void).
+# The sample's ``Amount`` of -1000 does not agree with its own
+# ``OriginalAmount`` of -12, which is one more reason the handler reads the
+# amount from Retrieve Transaction and never from this body.
+REVERSAL_CREATED_EVENT: dict[str, Any] = {
+    "Url": "Your webhook url",
+    "EventData": {
+        "Moto": False,
+        "BinId": 42,
+        "IsDcc": False,
+        "Ucaf": None,
+        "Email": "jdoe@vivawallet.com",
+        "Phone": "799999999999",
+        "BankId": "NET_VISA",
+        "Systemic": False,
+        "BatchId": "ea25a6d4-b1ab-4c44-813e-4a36e9f3b6b2",
+        "Switching": False,
+        "ParentId": "d406ca77-f045-4902-9176-506f56fcd793",
+        "Amount": -1000,
+        "ChannelId": "b8e0e6c6-3a7c-47c3-9db8-4725e96a4902",
+        "TerminalId": 90000000,
+        "MerchantId": "11ac9cd4-c9ea-48d3-b414-1f10ce664aad",
+        "OrderCode": 3464811134270497,
+        "ProductId": None,
+        "StatusId": "F",
+        "FullName": "John Doe",
+        "ResellerId": None,
+        "DualMessage": False,
+        "InsDate": "2022-05-26T03:06:14.04",
+        "TotalFee": 0,
+        "CardToken": "2BFCB1FD4F000DB41CB5BA76CAFB68D76AB87752",
+        "CardNumber": "414746XXXXXX0133",
+        "Descriptor": None,
+        "TipAmount": 0,
+        "SourceCode": "Default",
+        "SourceName": "Default",
+        "Latitude": None,
+        "Longitude": None,
+        "CompanyName": "Luxembourg Services",
+        "TransactionId": "addffca1-25d2-4739-acb4-b05e385e8563",
+        "CompanyTitle": "Luxembourg Services",
+        "PanEntryMode": "01",
+        "ReferenceNumber": 66727,
+        "ResponseCode": "00",
+        "CurrencyCode": "978",
+        "OrderCulture": "en-GB",
+        "MerchantTrns": None,
+        "CustomerTrns": None,
+        "IsManualRefund": False,
+        "TargetPersonId": None,
+        "TargetWalletId": None,
+        "AcquirerApproved": False,
+        "LoyaltyTriggered": False,
+        "TransactionTypeId": 7,
+        "AuthorizationId": None,
+        "TotalInstallments": 0,
+        "CardCountryCode": "SG",
+        "CardIssuingBank": "Citibank Singapore Ltd.",
+        "RedeemedAmount": 0,
+        "ClearanceDate": None,
+        "ConversionRate": 1,
+        "CurrentInstallment": 0,
+        "OriginalAmount": -12,
+        "Tags": ["Sample tag 3", "Sample tag 2", "Sample tag 1"],
+        "BillId": None,
+        "ConnectedAccountId": None,
+        "ResellerSourceCode": None,
+        "ResellerSourceName": None,
+        "MerchantCategoryCode": 8099,
+        "ResellerCompanyName": None,
+        "CardUniqueReference": "5984325974181FFDE001404E14C6B88CF3613891",
+        "OriginalCurrencyCode": "978",
+        "ExternalTransactionId": None,
+        "ResellerSourceAddress": None,
+        "CardExpirationDate": "2030-12-31T00:00:00",
+        "ServiceId": None,
+        "RetrievalReferenceNumber": "214523066721",
+        "AssignedMerchantUsers": [],
+        "AssignedResellerUsers": [],
+        "CardTypeId": 0,
+        "ResponseEventId": None,
+        "ElectronicCommerceIndicator": "7",
+        "OrderServiceId": 0,
+        "ApplicationIdentifierTerminal": None,
+        "IntegrationId": None,
+        "CardProductCategoryId": 1,
+        "CardProductAccountTypeId": 1,
+        "DigitalWalletId": 3,
+        "DccSessionId": None,
+        "DccMarkup": None,
+        "DccDifferenceOverEcb": None,
+    },
+    "Created": "2022-05-26T00:06:14.2190894Z",
+    "CorrelationId": "22-146-83163D56",
+    "EventTypeId": 1797,
+    "Delay": None,
+    "RetryCount": 0,
+    "RetryDelayInSeconds": None,
+    "MessageId": "81911f2e-bd91-43d7-bf66-617e6191a1ce",
+    "RecipientId": "11ac9cd4-c9ea-48d3-b414-1f10ce664aad",
+    "MessageTypeId": 512,
+}
+
+
+def reversal_created_event(
+    *, refund_id: str, parent_id: str, order_code: int
+) -> dict[str, Any]:
+    """The documented 1797 body, naming this refund, payment and order."""
+    body = deepcopy(REVERSAL_CREATED_EVENT)
+    body["EventData"].update(
+        TransactionId=refund_id, ParentId=parent_id, OrderCode=order_code
+    )
+    return body
+
+
 CREDENTIALS = {
     "merchant_id": "merchant-id",
     "api_key": "api-key",
@@ -120,6 +269,9 @@ class FakeVivaApi:
     ``captured`` is the amount Retrieve Transaction reports for the
     payment, in euros. ``cancel`` is the ``(HTTP status, body)`` Cancel
     Transaction answers with, ``retrieve`` the same for Retrieve.
+    ``transactions`` answers Retrieve for particular transaction ids (a
+    refund and the payment it reverses are two transactions); any other id
+    gets ``retrieve``.
     """
 
     def __init__(
@@ -128,12 +280,14 @@ class FakeVivaApi:
         captured: float = 21.1,
         cancel: tuple[int, Any] = (200, CANCEL_SUCCESS),
         retrieve: tuple[int, Any] | None = None,
+        transactions: dict[str, tuple[int, Any]] | None = None,
     ):
         self.cancel = cancel
         self.retrieve = retrieve or (
             200,
             {**deepcopy(RETRIEVE_TRANSACTION), "amount": captured},
         )
+        self.transactions = transactions or {}
         self.sent: list[requests.PreparedRequest] = []
         self._patches = [
             mock.patch(
@@ -173,12 +327,24 @@ class FakeVivaApi:
         if request.method == "GET" and path.startswith(
             "/checkout/v2/transactions/"
         ):
-            return _response(request, *self.retrieve)
+            transaction_id = path.rsplit("/", 1)[-1]
+            return _response(
+                request, *self.transactions.get(transaction_id, self.retrieve)
+            )
         if request.method == "DELETE" and path.startswith("/api/transactions/"):
             return _response(request, *self.cancel)
         raise AssertionError(
             f"Unexpected Viva request: {request.method} {path}"
         )
+
+    @property
+    def retrieved(self) -> list[str]:
+        """The transaction ids Retrieve Transaction was asked about."""
+        return [
+            urlsplit(r.url or "").path.rsplit("/", 1)[-1]
+            for r in self.sent
+            if r.method == "GET"
+        ]
 
     @property
     def deletes(self) -> list[requests.PreparedRequest]:

@@ -144,13 +144,39 @@ class TestSignalHandlerExceptionIsolation:
                 args=[order.id], headers={"_schema_name": "public"}
             )
 
-    def test_refunded_handler_calls_delay_on_commit(self):
-        """Handler queues reverse_order_points via transaction.on_commit."""
+    def test_partially_refunded_handler_reverses_nothing(self):
+        """The reversal is all-or-nothing and runs once per order, so a
+        partial refund must not spend it."""
+        from order.enum.status import PaymentStatus
         from order.models.order import Order
         from user.factories.account import UserAccountFactory
 
         user = UserAccountFactory()
         order = _create_order(user=user)
+        order.payment_status = PaymentStatus.PARTIALLY_REFUNDED
+
+        with (
+            patch("loyalty.tasks.reverse_order_points") as mock_task,
+            patch(
+                "loyalty.signals.transaction.on_commit",
+                side_effect=lambda cb: cb(),
+            ),
+        ):
+            from loyalty.signals import handle_order_refunded_loyalty
+
+            handle_order_refunded_loyalty(sender=Order, order=order)
+
+            mock_task.apply_async.assert_not_called()
+
+    def test_refunded_handler_calls_delay_on_commit(self):
+        """Handler queues reverse_order_points via transaction.on_commit."""
+        from order.enum.status import PaymentStatus
+        from order.models.order import Order
+        from user.factories.account import UserAccountFactory
+
+        user = UserAccountFactory()
+        order = _create_order(user=user)
+        order.payment_status = PaymentStatus.REFUNDED
 
         with (
             patch("loyalty.tasks.reverse_order_points") as mock_task,

@@ -1,3 +1,4 @@
+from collections.abc import Iterable
 from datetime import timedelta
 
 from django.db import transaction
@@ -52,6 +53,46 @@ class StockManager:
         if not isinstance(ttl, int) or ttl <= 0:
             return cls.RESERVATION_TTL_MINUTES_DEFAULT
         return ttl
+
+    @classmethod
+    def lock_products(cls, product_ids: Iterable[int]) -> None:
+        """Lock every product row, once, in ascending pk order.
+
+        A transaction that takes MORE THAN ONE product lock must take them
+        all through here, first. ``Product`` rows are the one resource
+        two checkouts, a cancel and a cart reservation fight over, and
+        PostgreSQL only breaks the resulting cycle by aborting one of
+        them. A cycle needs two transactions taking the same rows in
+        different orders, so one global order (the primary key) rules it
+        out. ``ORDER BY id`` puts the lock step above the sort in the
+        plan, so the rows are locked in that order.
+
+        It has to come BEFORE the first insert that carries a foreign
+        key to ``product`` (``OrderItem``, ``StockLog``): PostgreSQL takes
+        ``FOR KEY SHARE`` on the referenced row for every such insert,
+        and ``FOR KEY SHARE`` conflicts with ``FOR UPDATE``. Two
+        transactions that each hold it on a shared product and then ask
+        for ``FOR UPDATE`` wait for each other, whatever order the
+        ``FOR UPDATE`` statements come in.
+
+        Every later ``select_for_update`` on one of these rows (the per-
+        product locks inside ``reserve_stock``, ``decrement_stock`` and
+        friends) re-locks what this transaction already holds and cannot
+        block.
+
+        ``of=("self",)`` and ``values_list`` keep the statement to the
+        product table: a join would lock the joined rows too, in an order
+        of its own.
+        """
+        ids = sorted(set(product_ids))
+        if not ids:
+            return
+        list(
+            Product.objects.filter(pk__in=ids)
+            .order_by("pk")
+            .select_for_update(of=("self",))
+            .values_list("pk", flat=True)
+        )
 
     @classmethod
     @transaction.atomic
@@ -841,12 +882,7 @@ class StockManager:
                 # this that lock lands AFTER the reservation rows are
                 # already locked, which is the opposite order to
                 # `reserve_stock` and deadlocks on a contended product.
-                product_ids = sorted({r.product_id for r in batch})
-                list(
-                    Product.objects.select_for_update()
-                    .filter(id__in=product_ids)
-                    .order_by("id")
-                )
+                cls.lock_products(r.product_id for r in batch)
 
                 # Re-read the batch under the product locks, keeping
                 # only what is still unconsumed, and lock those rows too.

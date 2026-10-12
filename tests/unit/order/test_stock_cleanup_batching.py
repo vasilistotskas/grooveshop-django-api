@@ -21,7 +21,6 @@ from order.models.stock_log import StockLog
 from order.models.stock_reservation import StockReservation
 from order.stock import StockManager
 from product.factories.product import ProductFactory
-from product.models.product import Product
 
 pytestmark = pytest.mark.django_db
 
@@ -135,20 +134,15 @@ def test_a_concurrently_converted_reservation_is_neither_logged_nor_counted(
     _expired(product, 3)
     victim = StockReservation.objects.order_by("id").first()
 
-    real_lock = StockManager  # marker for readability
-    assert real_lock is not None
+    original = StockManager.lock_products
 
-    original = Product.objects.select_for_update
-
-    def _convert_one_then_lock(*args, **kwargs):
+    def _convert_one_then_lock(product_ids):
         # Stands in for another worker converting the reservation to a
         # sale in the window between the unlocked SELECT and the locks.
         StockReservation.objects.filter(id=victim.id).update(consumed=True)
-        return original(*args, **kwargs)
+        return original(product_ids)
 
-    monkeypatch.setattr(
-        Product.objects, "select_for_update", _convert_one_then_lock
-    )
+    monkeypatch.setattr(StockManager, "lock_products", _convert_one_then_lock)
 
     released = StockManager.cleanup_expired_reservations()
 

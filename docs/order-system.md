@@ -103,15 +103,82 @@ Two entry points in `order/services.py` (the legacy `OrderService.create_order`
 — dead code with zero production callers — was removed 2026-08-24):
 
 ### 3.1 `create_order_from_cart` — payment-first / online
-- **Caller**: Stripe Checkout flow.
+- **Caller**: `OrderViewSet.create` for an intent-based ONLINE pay way (Stripe)
+  whose request carries `payment_intent_id`. Every client reaches it through
+  `POST /api/v1/order`: the storefront, and the agent gateway's UCP/ACP
+  checkout (which sends no intent, so it takes §3.2). Nothing else calls it.
 - Sets `status=PENDING`, `payment_status=<provider-returned>`.
 - **Does NOT** dispatch courier task here. Online payments defer
   the dispatch to the payment-success webhook (PR #1 commit
   `59527a87` — see `project_shipping_dispatch_on_commit.md`).
+- **The provider is asked before the transaction opens.**
+  `_retrieve_payment_intent` runs `get_payment_status` (for Stripe
+  `PaymentIntent.retrieve` plus the dj-stripe sync, an HTTP round trip) and
+  refuses an intent that is not PENDING / PROCESSING / COMPLETED. Inside the
+  transaction that call held the cart row and every live automatic
+  `Promotion` row, which every concurrent checkout (Viva and COD included)
+  also locks, for as long as Stripe took to answer. Nothing is locked while
+  the provider answers, and `OrderViewSet.create` is deliberately NOT
+  `@transaction.atomic`: a view-level block would put the call back inside a
+  transaction, idle on a connection that `idle_in_transaction_session_timeout`
+  kills. `_create_order_for_verified_intent` is the one transaction; it
+  re-compares only what depends on server state, the intent's amount and
+  currency against the total it computes under lock (Step 3, which also
+  prices loyalty and gift cards under their own locks). Order of checks
+  therefore changed: a cart that cannot be checked out costs one provider
+  read first, with no lock.
+- **Idempotent per payment intent.** `Order.payment_id` is unique
+  (`order_payment_id_unique`, a partial unique index over non-empty ids), and
+  right after taking the cart row lock, BEFORE cart validation,
+  `_order_created_for_payment` looks the intent up: the order it produced for
+  THIS cart is returned as it is (the view answers `201` again, the same
+  response the first submit got), so a double click, a retry after a timeout or
+  Back-and-resubmit while the hosted payment is open yields one order and one
+  stock decrement. It runs before validation because the first order has
+  already taken the stock (and, once paid, emptied the cart), which a repeat
+  would otherwise be refused for. An intent that belongs to another cart, or to
+  a canceled or deleted order, is not a repeat: `PaymentVerificationError`
+  (400 `payment_verification`) — answering would hand one shopper another's
+  order, creating would take a payment already committed elsewhere.
+  Limits: the repeat must reach the service (the view validates the cart
+  first, so a repeat after the first order emptied the last units, or after the
+  cart was deleted on payment, is refused there as before, with no duplicate);
+  and a repeat is answered with the first order even if the body now carries a
+  different address, because the intent was paid for that one.
+- **Product locks are taken in ascending pk order, all in one statement, before
+  the first row that references a product is inserted.** The cart-item query
+  locks only the cart lines (`of=("self",)`; the join used to lock the products
+  too, in the cart's line order), then
+  `OrderService._lock_order_products` → `StockManager.lock_products` locks
+  every product the order touches (cart lines, the cart session's reservations,
+  free-gift products) once, `ORDER BY` pk. Two carts holding the same products
+  in different line orders used to take them in opposite orders, which
+  PostgreSQL resolves by aborting one checkout. It must precede the
+  `OrderItem` inserts because each takes `FOR KEY SHARE` on its product, which
+  conflicts with `FOR UPDATE`: two checkouts that insert first and lock after
+  wait on each other whatever order they then ask in. The per-product locks in
+  `StockManager` that follow re-lock rows already held and cannot block.
+  `cancel_order` (a restore takes one lock per product), the bulk discount
+  admin actions and the guest→user cart merge follow the same rule;
+  `reserve_stock` is not affected, each call being its own transaction.
+  Not covered: an admin edit that changes the quantity of several
+  `OrderItem` rows in one request (`handle_order_item_post_save` →
+  `StockManager.adjust_stock`) locks their products in form order.
 
 ### 3.2 `create_order_from_cart_offline` — order-first / COD / Viva
-- **Caller**: Nuxt checkout for offline pay-ways + Viva redirect flow.
+- **Caller**: Nuxt checkout for offline pay-ways + Viva redirect flow, and the
+  agent gateway's UCP/ACP checkout.
 - Sets `status=PENDING`, `payment_status=PENDING`.
+- Same lock order as §3.1 (cart row, then promotions, then products in pk
+  order before any `OrderItem` insert). There is no provider call here.
+- **Not idempotent.** A hosted-payment order (Viva) keeps the cart, so a
+  repeat submit creates a second PENDING order that takes its own stock until
+  the stuck-order sweep cancels it. Reusing the open order needs a key over
+  the whole request (cart lines and prices, pay way, address, loyalty points,
+  gift-card codes) and has to run before BOTH stock validations (the view's and
+  the service's: the open order already took the stock), and what the first
+  creation consumed (the coupon, the gift-card balance, the loyalty points) is
+  not recoverable from the inputs. It is a separate change, not a lookup.
 - For **COD/offline**: dispatches courier task via
   `_dispatch_shipment_creation_task` immediately. The
   dispatch is wrapped in `transaction.on_commit` inside
@@ -813,7 +880,7 @@ All WS notifications go through `notification.consumers.NotificationConsumer` an
 `cancel_order`:
 0. Customer only: asks the courier to cancel the voucher before anything else (§7.1.1). No lock is held and no transaction is open for that call.
 1. Locks order row.
-2. Releases stock + reservations (`StockManager.increment_stock`, `release_reservation`).
+2. Locks every product it touches in pk order (`StockManager.lock_products`, §3.1), then releases stock + reservations (`StockManager.increment_stock`, `release_reservation`).
 3. Sets `status=CANCELED` (the save settles an unpaid `payment_status` to `CANCELED` — `Order.settle_unpaid_payment`), records `metadata['cancellation']`.
 4. Staff / system only: cascades to the courier voucher via `cancel_attached_shipment` → `ShippingService.cancel_shipment` (PR #2 H). Records the dispatch outcome on metadata. A carrier rejection (e.g., voucher already in pickup list) does not stop the cancel: it is logged, kept in `metadata['cancellation']['shipment_cancel']['error']`, left as a staff-only `OrderHistory` NOTE (`Order canceled, but the courier did not cancel the parcel: …`), and the admin "Cancel selected orders" action raises an error message for it. For a customer cancel the courier already confirmed in step 0, so the outcome is recorded up front and the cascade (and the `order_canceled` signal's safety net) skips.
 5. Optional refund via `refund_order` (when `refund_payment=True` AND `is_paid`).
@@ -866,6 +933,9 @@ the linked memory note or the originating PR's commit message.
 | No carrier mint while `Order.awaits_online_payment` (`ShipmentAwaitingPaymentError`) | §5 above |
 | A payment-success handler checks `is_payment_after_cancel` BEFORE its settled-state guard | §2.2 above |
 | Order `status` changes only through admin actions / `OrderService`, never the change form | §7.1 above |
+| One order per provider payment: `Order.payment_id` is unique when non-empty (`order_payment_id_unique`), and `create_order_from_cart` answers a repeat of the same cart's intent with the first order (found under the cart lock, before cart validation) and refuses an intent of another cart or of a canceled / deleted order | §3.1 above |
+| No provider HTTP call inside the order-creation transaction (nor in a view-level `atomic`): the intent is read first, and the transaction only re-compares its amount and currency with the total computed under lock | §3.1 above |
+| Product rows are locked in ascending pk order, in one statement, before the first row that references a product is inserted (`StockManager.lock_products`); a cart-item lock never joins the products (`of=("self",)`) | §3.1 above |
 | Every checkout-created order since `0059_orderattribution` has exactly one `OrderAttribution` row (`direct` when there was no signal); for a checkout order a missing row means "older than attribution", never "direct"; `source_type=agent` only with the gateway's `X-Internal-Gateway` secret | §3.4 above |
 | An issued tax document never re-reads the catalogue's VAT: invoices and myDATA split each line at `OrderItem.vat_rate`, snapshotted at creation, and tax shipping and the payment fee at the rate(s) of the goods (`order/taxation.py`); `Invoice` totals and the myDATA `invoiceSummary` come from the same lines | §3.5 above |
 | The default cache fails open on a Redis outage (reads miss, writes no-op — `core/caches.py`), but never for keys under `STRICT_KEY_PREFIXES`: the `strict:` throttle namespace, allauth's rate limits, TOTP replay protection, the IdP's single-use codes and WebSocket tickets. The checkout, payment, coupon and gift-card throttles (`core/api/throttling.py`, `fail_closed = True`) therefore DENY with 429 during an outage, while browsing/search/cart throttles and DRF's default `anon`/`user` budgets allow | `core/api/throttling.py` module docstring |

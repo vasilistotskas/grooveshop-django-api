@@ -476,6 +476,22 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
                 opclasses=["gin_trgm_ops"] * 2,
             ),
         ]
+        constraints = [
+            # One order per provider payment. Every webhook resolves its
+            # order with ``.filter(payment_id=...).first()``, so a second
+            # order on the same intent would never be paid, would hold
+            # its stock until the stuck-order sweep, and would email the
+            # shopper. "No payment id yet" is spelled both "" and NULL
+            # and must stay repeatable, hence the condition.
+            models.UniqueConstraint(
+                fields=["payment_id"],
+                condition=(
+                    models.Q(payment_id__isnull=False)
+                    & ~models.Q(payment_id="")
+                ),
+                name="order_payment_id_unique",
+            ),
+        ]
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)

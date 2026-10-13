@@ -96,7 +96,9 @@ def tenant_from_email() -> str:
       authenticated platform envelope, tenant brand in the inbox sender
       line. The tenant's own address belongs in ``Reply-To`` (send
       sites already pass ``tenant_contact_email()``).
-    - No tenant context (public/admin sends): bare
+    - Public schema (platform/admin sends): ``"{SITE_NAME}"
+      <DEFAULT_FROM_EMAIL>``.
+    - No tenant bound to the connection at all: bare
       ``DEFAULT_FROM_EMAIL``.
 
     The verification flag IS the safety property. Putting a merchant's
@@ -126,8 +128,11 @@ def tenant_from_email() -> str:
         # No sender configured at all — an empty address inside a
         # display-name form ("Store <>") would be invalid RFC 5322.
         return ""
+    # Any binding (a store row, or the public schema's FakeTenant, which
+    # ``bound_tenant`` reads as None) carries a display name; only a
+    # connection with no tenant at all sends the bare address.
     name = tenant_site_name()
-    if name and tenant is not None:
+    if name and getattr(connection, "tenant", None) is not None:
         return formataddr((name, address))
     return address
 

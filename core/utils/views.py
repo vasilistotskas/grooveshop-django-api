@@ -135,6 +135,17 @@ def cache_methods(timeout, methods, *, cache=None):
             decorated_func = method_decorator(cache_decorator)(
                 method_decorator(vary_decorator)(func)
             )
+            # ``method_decorator`` copies ``func.__dict__`` shallowly, so
+            # the wrapper would hold the SAME ``kwargs`` dict as ``func``
+            # — for an inherited method, the base class's. drf-spectacular
+            # keeps a method's ``@extend_schema`` in ``kwargs["schema"]``,
+            # and skips its own isolation for a method defined on the
+            # class (which this wrapper is), so every cached viewset wrote
+            # into one dict and the last one decorated documented all of
+            # them: ``GET /api/v1/country`` was served as PayWay rows.
+            # The same copy drf-spectacular's ``isolate_view_method`` makes.
+            if hasattr(func, "kwargs"):
+                decorated_func.kwargs = dict(func.kwargs)
             setattr(cls, method_name, decorated_func)
         return cls
 

@@ -3,6 +3,54 @@
 
 
 
+## v3.112.1 (2026-10-13)
+
+### Bug fixes
+
+* fix(product): drop the deprecated price filter and markdown fields (#173)
+
+Release N+1 of the Omnibus price contract (#163, #167, #169). The
+storefront reads priorPrice, effectivePrice and announcedDiscountPercent
+and no longer reads what they replaced, so the client surfaces that had
+no reader left go:
+
+- Product.discountValue and Product.priceSavePercent (ProductSerializer
+  fields, Meta.fields, read_only_fields and the deprecate_fields entry).
+  The model properties stay: the cart line reads them.
+- The minFinalPrice / maxFinalPrice list filters, and with them the
+  AutoSchema._get_filter_parameters override that only existed to mark
+  them deprecated (no filterset declares deprecated_params any more).
+- The final_price search facet, FacetStats.finalPrice and final_price as
+  a Meilisearch filterable attribute. The document field itself stays
+  (displayed and sortable): every search hit still carries finalPrice,
+  which the agent gateway reads, and the gateway's search_products tool
+  still lists sort=finalPrice. Only a settings update is needed on deploy,
+  no reindex.
+
+What stays, deprecated, because the agent gateway still reads it: the
+product and search hit discountPercent (Merchant Center / Meta / TikTok
+feeds decide a sale price from it, and the MCP product summaries expose
+it) and the search sort=finalPrice / -finalPrice. The merchant's
+discount_percent input, its filters and its ordering are not a deprecated
+surface and are unchanged.
+
+schema.yml loses the removed fields and parameters. Tests: the pricing
+API contract asserts the removed fields are absent from the Product
+schema, the filters from the product list parameters and the
+final_price facet from search; the list view tests filter on the
+effective price. docs/product-pricing.md and docs/search state what is
+removed and what remains.
+
+Must not merge before the storefront release regenerated without these
+fields runs in production: its generated Zod marks discountValue and
+priceSavePercent required.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`88ba3d0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/88ba3d0d9a0a1f1b1be28e21a410e21d45abe47e))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.112.0 [skip ci] ([`638f941`](https://github.com/vasilistotskas/grooveshop-django-api/commit/638f941cb1f04c9c083ab14cb4b618d1e88c6adf))
+
 ## v3.112.0 (2026-10-13)
 
 ### Bug fixes

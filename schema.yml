@@ -15730,6 +15730,13 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         required: true
+      - in: query
+        name: uuid
+        schema:
+          type: string
+          format: uuid
+        description: The order's UUID. Required when the order belongs to a guest
+          (no account); ignored for signed-in owners and store staff.
       tags:
       - Orders
       requestBody:
@@ -15805,6 +15812,13 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         required: true
+      - in: query
+        name: uuid
+        schema:
+          type: string
+          format: uuid
+        description: The order's UUID. Required when the order belongs to a guest
+          (no account); ignored for signed-in owners and store staff.
       tags:
       - Orders
       requestBody:
@@ -15874,6 +15888,13 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         required: true
+      - in: query
+        name: uuid
+        schema:
+          type: string
+          format: uuid
+        description: The order's UUID. Required when the order belongs to a guest
+          (no account); ignored for signed-in owners and store staff.
       tags:
       - Orders
       requestBody:
@@ -15941,6 +15962,13 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         required: true
+      - in: query
+        name: uuid
+        schema:
+          type: string
+          format: uuid
+        description: The order's UUID. Required when the order belongs to a guest
+          (no account); ignored for signed-in owners and store staff.
       tags:
       - Orders
       requestBody:
@@ -16106,6 +16134,13 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         required: true
+      - in: query
+        name: uuid
+        schema:
+          type: string
+          format: uuid
+        description: The order's UUID. Required when the order belongs to a guest
+          (no account); ignored for signed-in owners and store staff.
       tags:
       - Orders
       security:
@@ -16221,6 +16256,13 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         required: true
+      - in: query
+        name: uuid
+        schema:
+          type: string
+          format: uuid
+        description: The order's UUID. Required when the order belongs to a guest
+          (no account); ignored for signed-in owners and store staff.
       tags:
       - Orders
       requestBody:

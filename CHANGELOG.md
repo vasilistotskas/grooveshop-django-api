@@ -3,6 +3,65 @@
 
 
 
+## v3.116.0 (2026-10-13)
+
+### Bug fixes
+
+* fix(shipping_boxnow): read box_now_live_mode from the bound tenant row
+
+box_now_credentials() read the flag off connection.tenant, which under
+schema_context is a bare FakeTenant: live_mode came back False, so a
+commit hook or task that entered the store with schema_context (an order
+cancel cancelling its voucher) would have sent webside's production keys
+to the stage API. It now reads through bound_tenant(), like every other
+credential, and the schema_context credentials test covers the flag.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`dd282a1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/dd282a18c50fc74c47d94833109902c7ccf948f5))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.115.2 [skip ci] ([`dca80e5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/dca80e50e745f528c50b918adf4a2a4cb4a2ae7a))
+
+### Features
+
+* feat(shipping_boxnow): per-tenant BoxNow API environment (#178) ([`dd282a1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/dd282a18c50fc74c47d94833109902c7ccf948f5))
+
+* feat(shipping_boxnow): make the BoxNow API environment a per-tenant choice
+
+BoxNow stage keys only authenticate against the stage API and production
+keys only against the production API, but the API host was one
+platform-wide setting, so no two tenants could differ: the production
+demo store could not run on stage keys beside webside on production.
+
+Tenant.box_now_live_mode (default off = stage) now picks the hosts.
+BoxNowClient reads it through box_now_credentials() and uses the
+BOXNOW_PRODUCTION_* or BOXNOW_STAGE_* API and location hosts; both sets
+come from settings/env. BOXNOW_API_BASE_URL and
+BOXNOW_LOCATION_API_BASE_URL are gone. The OAuth token cache key now
+carries the environment so flipping the flag never serves the other
+environment's token.
+
+Staging mirrors the production tenant rows, flag included, so a deployment
+named staging (BOXNOW_LIVE_MODE_ALLOWED off when SYSTEM_ENV=staging)
+refuses a live tenant with BoxNowConfigError instead of booking a real
+parcel. Webhook verification only reads the webhook secret and is
+unaffected.
+
+Migration tenant 0054 adds the column with db_default and carries the
+current behaviour over: on SYSTEM_ENV=production every tenant with a
+BoxNow client id becomes live (webside stays on production), anywhere
+else every tenant stays off.
+
+The flag is shown with the other BoxNow fields in the tenant admin and
+the platform admin API, and is merchant-editable like
+viva_wallet_live_mode.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`dd282a1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/dd282a18c50fc74c47d94833109902c7ccf948f5))
+
 ## v3.115.2 (2026-10-13)
 
 ### Bug fixes

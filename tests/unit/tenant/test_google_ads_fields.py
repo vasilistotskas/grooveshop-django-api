@@ -12,7 +12,9 @@ from __future__ import annotations
 import pytest
 from django.core.exceptions import ValidationError
 
+from tenant.admin import TenantAdmin
 from tenant.models import Tenant
+from tenant.serializers import TenantAdminSerializer, TenantConfigSerializer
 
 
 def _unsaved_tenant(**kwargs) -> Tenant:
@@ -90,3 +92,49 @@ class TestConversionLabels:
         # Provisioned but no actions yet — a legitimate intermediate
         # state while the campaign is being set up.
         _unsaved_tenant(google_ads_conversion_id=self.ID).clean()
+
+
+class TestAddPaymentInfoLabel:
+    def test_is_one_of_the_validated_label_fields(self) -> None:
+        assert (
+            "google_ads_add_payment_info_label"
+            in Tenant.GOOGLE_ADS_LABEL_FIELDS
+        )
+
+    def test_defaults_to_empty_in_the_database_too(self) -> None:
+        # ``db_default`` keeps the column writable by the previous
+        # release's INSERTs during the PreSync rollout.
+        field = Tenant._meta.get_field("google_ads_add_payment_info_label")
+        assert field.db_default == ""
+
+    def test_resolve_payload_field_is_optional(self) -> None:
+        # Read-only would be REQUIRED in the schema, and a storefront
+        # deployed ahead of this backend would reject every resolve.
+        field = TenantConfigSerializer().fields[
+            "google_ads_add_payment_info_label"
+        ]
+        assert not field.read_only
+        assert not field.required
+
+    def test_resolve_payload_reads_the_model_value(self) -> None:
+        tenant = _unsaved_tenant(
+            google_ads_add_payment_info_label="7T1qCJOa0vocEPTc8tNE"
+        )
+        field = TenantConfigSerializer().fields[
+            "google_ads_add_payment_info_label"
+        ]
+        assert field.get_attribute(tenant) == "7T1qCJOa0vocEPTc8tNE"
+
+    def test_admin_serializer_exposes_it(self) -> None:
+        assert (
+            "google_ads_add_payment_info_label"
+            in TenantAdminSerializer.Meta.fields
+        )
+
+    def test_is_in_the_marketing_fieldset(self) -> None:
+        fields = [
+            name
+            for _title, options in TenantAdmin.fieldsets
+            for name in options["fields"]
+        ]
+        assert "google_ads_add_payment_info_label" in fields

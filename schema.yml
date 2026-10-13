@@ -48827,6 +48827,8 @@ components:
         googleAdsBeginCheckoutLabel:
           type: string
           readOnly: true
+        googleAdsAddPaymentInfoLabel:
+          type: string
         googleAdsPageViewLabel:
           type: string
           readOnly: true

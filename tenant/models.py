@@ -667,6 +667,17 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         default="",
         help_text=_("Conversion label for starting the checkout."),
     )
+    google_ads_add_payment_info_label = models.CharField(
+        _("Google Ads Add-Payment-Info Label"),
+        max_length=64,
+        blank=True,
+        default="",
+        db_default="",
+        help_text=_(
+            "Conversion label for the shopper submitting payment details "
+            "at checkout. Sent with the cart value and currency."
+        ),
+    )
     google_ads_page_view_label = models.CharField(
         _("Google Ads Page-View Label"),
         max_length=64,
@@ -1515,6 +1526,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         "google_ads_purchase_label",
         "google_ads_add_to_cart_label",
         "google_ads_begin_checkout_label",
+        "google_ads_add_payment_info_label",
         "google_ads_page_view_label",
     )
 

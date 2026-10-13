@@ -20,7 +20,11 @@ from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import OrderFactory, PaymentTransactionFactory
 from order.models.order import Order
 from order.models.payment_transaction import PaymentTransaction
-from order.payment_ledger import PaymentLedger
+from order.payment_ledger import (
+    MANUAL_REFUND_PROVIDER,
+    PaymentLedger,
+    is_cash_collection,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -127,7 +131,7 @@ class TestTheSums:
 
         assert PaymentLedger.captured(order) == 0
 
-    def test_a_cash_collection_is_not_refundable_through_a_provider(self):
+    def test_a_cash_collection_is_received_money_the_merchant_refunds(self):
         order = _order()
         PaymentLedger.record_cod_collection(
             order,
@@ -136,8 +140,40 @@ class TestTheSums:
             reference="VOUCHER-1",
         )
 
-        assert PaymentLedger.captured(order) == 0
-        assert PaymentLedger.refundable(order) == 0
+        assert PaymentLedger.captured(order) == Decimal("40.00")
+        assert PaymentLedger.refundable(order) == Decimal("40.00")
+        [(collection, share)] = PaymentLedger.plan_refund(order, None)
+        assert is_cash_collection(collection)
+        assert share == _eur("40.00")
+
+    def test_a_cash_refund_is_recorded_against_the_collection(self):
+        order = _order()
+        PaymentLedger.record_cod_collection(
+            order,
+            amount=_eur("40.00"),
+            provider="acs_cod",
+            reference="VOUCHER-1",
+        )
+        [(collection, _share)] = PaymentLedger.plan_refund(order, None)
+
+        row, created = PaymentLedger.record_cod_refund(
+            order,
+            collection=collection,
+            amount=_eur("15.00"),
+            reference="TRX-1",
+            description="partial",
+        )
+
+        assert created
+        assert row.charge == collection
+        assert row.provider == MANUAL_REFUND_PROVIDER
+        assert PaymentLedger.refundable(order) == Decimal("25.00")
+        assert PaymentLedger.has_cod_refund(order, collection, "TRX-1")
+        assert not PaymentLedger.has_cod_refund(order, collection, "TRX-2")
+        assert (
+            PaymentLedger.refund_status(order)
+            == PaymentStatus.PARTIALLY_REFUNDED
+        )
 
     def test_a_payment_with_nothing_left_is_not_listed(self):
         order = _order()

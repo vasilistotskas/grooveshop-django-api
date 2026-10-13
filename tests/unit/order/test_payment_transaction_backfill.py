@@ -181,7 +181,8 @@ class TestCharges:
             # No courier voucher is read: the reference is the order's own.
             assert row.provider_reference == f"order-{order.pk}"
             assert row.amount == _eur("50.00")
-        assert PaymentLedger.refundable(acs) == 0
+        # Collected cash is refundable: the merchant pays it back.
+        assert PaymentLedger.refundable(acs) == Decimal("50.00")
 
     def test_the_payment_status_is_left_alone(self):
         order = _paid(payment_status=PaymentStatus.REFUNDED)

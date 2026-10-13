@@ -67,7 +67,11 @@ from order.models.retail_credit import CreditCounter, RetailCredit
 from order.models.stock_log import StockLog
 from order.models.viva_webhook_event import VivaWebhookEvent
 from order.payment import payment_provider_label
-from order.payment_ledger import PaymentLedger
+from order.payment_ledger import (
+    REPAYMENT_REFERENCE_MAX_LENGTH,
+    PaymentLedger,
+    is_cash_collection,
+)
 from order.services import OrderService
 from order.taxation import breakdown_by_rate, order_vat_lines
 from user.models import UserAccount
@@ -254,13 +258,23 @@ class RefundOrderForm(BaseDialogForm):
         widget=UnfoldAdminTextInputWidget,
         help_text=_("Recorded with the refund on the order's payment ledger."),
     )
+    repayment_reference = forms.CharField(
+        label=_("How it was paid back"),
+        max_length=REPAYMENT_REFERENCE_MAX_LENGTH,
+        required=False,
+        widget=UnfoldAdminTextInputWidget,
+        help_text=_(
+            "Cash collected on delivery is paid back by you, not through a "
+            "provider. Give the bank transfer id or how else it was paid; "
+            "required for that part of a refund."
+        ),
+    )
 
     def __init__(self, request, object_id=None, *args, **kwargs):
         super().__init__(request, object_id, *args, **kwargs)
+        self.order = Order.objects.get(pk=object_id) if object_id else None
         refundable = (
-            PaymentLedger.refundable(Order.objects.get(pk=object_id))
-            if object_id
-            else Decimal(0)
+            PaymentLedger.refundable(self.order) if self.order else Decimal(0)
         )
         if refundable > 0:
             amount = self.fields["amount"]
@@ -268,6 +282,40 @@ class RefundOrderForm(BaseDialogForm):
             amount.help_text = _(
                 "Up to %(refundable)s can still be refunded."
             ) % {"refundable": money(refundable)}
+        # Asked only where cash a courier collected can be paid back: there
+        # is no provider to refund it, so staff say how they did.
+        if not self._has_refundable_cash():
+            del self.fields["repayment_reference"]
+
+    def _has_refundable_cash(self) -> bool:
+        return self.order is not None and any(
+            is_cash_collection(balance.charge)
+            for balance in PaymentLedger.balances(self.order)
+        )
+
+    def clean(self):
+        cleaned = super().clean()
+        amount = cleaned.get("amount")
+        if (
+            self.order is not None
+            and amount is not None
+            and "repayment_reference" in self.fields
+            and not cleaned.get("repayment_reference")
+            and any(
+                is_cash_collection(charge)
+                for charge, _share in PaymentLedger.plan_refund(
+                    self.order, Money(amount, self.order.amount_due.currency)
+                )
+            )
+        ):
+            self.add_error(
+                "repayment_reference",
+                _(
+                    "Say how the cash was paid back: this refund returns "
+                    "money collected on delivery."
+                ),
+            )
+        return cleaned
 
 
 class OrderItemInline(TabularInline):
@@ -1210,9 +1258,10 @@ class OrderAdmin(BaseModelAdmin):
         dialog=ActionDialog(
             title=_("Refund order"),
             description=_(
-                "Pays the amount back through the payment provider and "
-                "records it on the order's payment ledger. A part refund "
-                "can be followed by more until nothing is left. The order "
+                "Pays the amount back through the payment provider, or "
+                "records the cash on delivery you paid back yourself, on "
+                "the order's payment ledger. A part refund can be "
+                "followed by more until nothing is left. The order "
                 "status and its stock are not changed."
             ),
             form_class=RefundOrderForm,
@@ -1226,7 +1275,12 @@ class OrderAdmin(BaseModelAdmin):
         reason = form.cleaned_data["reason"]
         try:
             result = OrderService.refund_order(
-                order, amount=amount, reason=reason
+                order,
+                amount=amount,
+                reason=reason,
+                repayment_reference=form.cleaned_data.get(
+                    "repayment_reference", ""
+                ),
             )
         except PaymentError as exc:
             # The service names the exact reason (nothing left to refund,

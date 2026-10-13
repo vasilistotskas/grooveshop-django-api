@@ -13,6 +13,7 @@ from order.factories import PaymentTransactionFactory
 from order.factories.order import OrderFactory
 from order.services import OrderService, RefundResult
 from order.stock import StockManager
+from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
 from tests.utils.shipping import enable_rate
 from user.factories.account import UserAccountFactory
@@ -183,9 +184,13 @@ class OrderServiceTestCase(TestCase):
         self.assertEqual(refund.amount, _eur("25.00"))
 
     def test_refund_order_refuses_an_unpaid_order(self):
+        # An ONLINE pay way, explicitly: OrderFactory picks a random one, and
+        # an unpaid cash-on-delivery order is refused with its own message
+        # (tests/integration/order/test_cod_refund.py).
         order = OrderFactory(
             payment_status=PaymentStatus.PENDING,
             payment_id="test_payment_123",
+            pay_way=PayWayFactory.create_online_payment(),
             num_order_items=0,
         )
 

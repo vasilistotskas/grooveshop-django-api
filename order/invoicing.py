@@ -403,13 +403,19 @@ def _persist_invoice_row(
         # the shipping and the fee while their rows were gone, so a
         # legally registered document went out to the customer with
         # arithmetic that does not add up.
+        #
+        # Decimals, like ``_order_totals``: the row's columns are
+        # ``MoneyField``s, and ``floatformat`` renders a ``Money`` as an
+        # empty string, so the registered PDF printed blank shipping,
+        # subtotal and TOTAL amounts (and a zero ``Money`` is truthy, so
+        # an empty payment-fee row appeared too).
         totals = {
-            "subtotal": existing.subtotal,
-            "total_vat": existing.total_vat,
-            "shipping": existing.shipping,
-            "payment_fee": existing.payment_fee,
-            "discount": existing.discount,
-            "total": existing.total,
+            "subtotal": existing.subtotal.amount,
+            "total_vat": existing.total_vat.amount,
+            "shipping": existing.shipping.amount,
+            "payment_fee": existing.payment_fee.amount,
+            "discount": existing.discount.amount,
+            "total": existing.total.amount,
         }
     else:
         vat_breakdown = _compute_vat_breakdown(order)

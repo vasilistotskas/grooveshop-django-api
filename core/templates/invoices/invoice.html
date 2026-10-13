@@ -212,7 +212,7 @@
     <div class="block">
       <h2>{% trans "Payment" %}</h2>
       {% if pay_way_name %}<p>{% trans "Method" %}: {{ pay_way_name }}</p>{% endif %}
-      <p>{% trans "Status" %}: {{ order.payment_status }}</p>
+      <p>{% trans "Status" %}: {{ order.get_payment_status_display }}</p>
       {% if order.payment_id %}<p><small>{% trans "Ref" %}: {{ order.payment_id }}</small></p>{% endif %}
     </div>
   </div>

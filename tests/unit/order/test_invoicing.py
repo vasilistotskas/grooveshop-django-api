@@ -294,14 +294,57 @@ class GenerateInvoiceIdempotencyTestCase(TestCase):
         ):
             self.assertIn(key, totals, f"{key} missing from the frozen totals")
 
-        self.assertEqual(totals["shipping"].amount, Decimal("3.50"))
-        self.assertEqual(totals["payment_fee"].amount, Decimal("1.25"))
+        # Plain Decimals, the type ``_order_totals`` hands the template:
+        # ``floatformat`` renders a ``Money`` as an empty string.
+        for key, value in totals.items():
+            self.assertIsInstance(value, Decimal, key)
+        self.assertEqual(totals["shipping"], Decimal("3.50"))
+        self.assertEqual(totals["payment_fee"], Decimal("1.25"))
         # Net + VAT is the whole document: shipping and the fee are taxed
         # inside it, the rows above are reference amounts.
         self.assertEqual(
-            totals["subtotal"].amount + totals["total_vat"].amount,
-            totals["total"].amount,
+            totals["subtotal"] + totals["total_vat"], totals["total"]
         )
+
+    @patch(
+        "order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 ... %EOF"
+    )
+    def test_the_registered_receipt_prints_its_amounts(self, _mock_render):
+        """Render the real template for the post-MARK regen.
+
+        The regen that adds the MARK and the AADE QR is the PDF the
+        customer keeps. It printed "EUR" with no amount for shipping,
+        the subtotal and the total, because the frozen totals reached
+        ``floatformat`` as ``Money``; the test above only inspected the
+        dict, and the PDF renderer is mocked everywhere.
+        """
+        from django.template.defaultfilters import floatformat
+        from django.template.loader import render_to_string
+
+        from order.invoicing import _build_context, _persist_invoice_row
+
+        order = self._make_order()
+        order.shipping_price = Money(Decimal("3.50"), "EUR")
+        order.save(update_fields=["shipping_price"])
+        invoice = generate_invoice(order)
+        invoice.mydata_mark = 400001234567890
+        invoice.save(update_fields=["mydata_mark"])
+
+        invoice, breakdown, totals = _persist_invoice_row(order, invoice)
+        html = render_to_string(
+            "invoices/invoice.html",
+            _build_context(order, invoice, breakdown, totals),
+        )
+
+        for key in ("shipping", "subtotal", "total"):
+            self.assertIn(
+                f"{floatformat(totals[key], 2)} {invoice.currency}", html, key
+            )
+        self.assertNotIn('<td class="num"> EUR</td>', html)
+        # No payment fee on this order: its row stays out.
+        self.assertNotIn(floatformat(Decimal(0), 2) + " EUR", html)
+        self.assertIn(str(order.get_payment_status_display()), html)
+        self.assertNotIn(f": {order.payment_status}<", html)
 
     @patch(
         "order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 ... %EOF"

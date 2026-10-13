@@ -1,6 +1,7 @@
 """Per-tenant credential helpers.
 
-Most helpers read the named field from ``connection.tenant`` and fall
+Most helpers read the named field from the bound tenant row
+(``tenant.membership.bound_tenant`` -- never a bare ``FakeTenant``) and fall
 back to the matching global setting when the tenant field is empty (or
 when there is no active tenant — public schema, management commands,
 Celery workers without a TenantTask, tests).
@@ -32,6 +33,8 @@ from typing import TypedDict
 from django.conf import settings
 from django.db import connection
 
+from tenant.membership import bound_tenant
+
 logger = logging.getLogger(__name__)
 
 
@@ -61,7 +64,7 @@ def _get_tenant_field(
     When ``settings_fallback`` is ``None`` the function returns ``""``
     in the fallback case.
     """
-    tenant = getattr(connection, "tenant", None)
+    tenant = bound_tenant()
     if tenant is not None:
         value = getattr(tenant, field_name, "") or ""
         if value:
@@ -93,7 +96,9 @@ def tenant_from_email() -> str:
       authenticated platform envelope, tenant brand in the inbox sender
       line. The tenant's own address belongs in ``Reply-To`` (send
       sites already pass ``tenant_contact_email()``).
-    - No tenant context (public/admin sends): bare
+    - Public schema (platform/admin sends): ``"{SITE_NAME}"
+      <DEFAULT_FROM_EMAIL>``.
+    - No tenant bound to the connection at all: bare
       ``DEFAULT_FROM_EMAIL``.
 
     The verification flag IS the safety property. Putting a merchant's
@@ -111,7 +116,7 @@ def tenant_from_email() -> str:
     """
     from email.utils import formataddr
 
-    tenant = getattr(connection, "tenant", None)
+    tenant = bound_tenant()
     address = getattr(settings, "DEFAULT_FROM_EMAIL", "") or ""
 
     if _in_tenant_schema():
@@ -123,8 +128,11 @@ def tenant_from_email() -> str:
         # No sender configured at all — an empty address inside a
         # display-name form ("Store <>") would be invalid RFC 5322.
         return ""
+    # Any binding (a store row, or the public schema's FakeTenant, which
+    # ``bound_tenant`` reads as None) carries a display name; only a
+    # connection with no tenant at all sends the bare address.
     name = tenant_site_name()
-    if name and tenant is not None:
+    if name and getattr(connection, "tenant", None) is not None:
         return formataddr((name, address))
     return address
 
@@ -436,7 +444,7 @@ def viva_wallet_credentials() -> VivaWalletCredentials:
             "live_mode":                 bool,
         }
     """
-    tenant = getattr(connection, "tenant", None)
+    tenant = bound_tenant()
     return {
         "merchant_id": _get_tenant_field("viva_wallet_merchant_id"),
         "api_key": _get_tenant_field("viva_wallet_api_key"),

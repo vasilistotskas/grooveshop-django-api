@@ -41,32 +41,9 @@ from urllib.parse import urlsplit, urlunsplit
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.db import connection
 from django.utils.translation import gettext_lazy as _
-from django_tenants.postgresql_backend.base import FakeTenant
-from django_tenants.utils import get_public_schema_name
 
-
-def _bound_tenant():
-    """The store every helper here builds for, or None for no store.
-
-    ``connection.tenant`` is not always that store's row. Under
-    ``schema_context`` — a public-schema ``TenantTask``, the order
-    signals' ``on_commit`` dispatch, a management command — django-tenants
-    binds a bare ``FakeTenant`` carrying only the schema name: on the
-    public schema it stands for no store at all, and on a store's schema
-    for that store's row, read here so its domains and locales decide the
-    link rather than the platform defaults. A store schema without a row
-    is no store either.
-    """
-    tenant = getattr(connection, "tenant", None)
-    if not isinstance(tenant, FakeTenant):
-        return tenant
-    if tenant.schema_name == get_public_schema_name():
-        return None
-    from tenant.models import Tenant
-
-    return Tenant.objects.filter(schema_name=tenant.schema_name).first()
+from tenant.membership import bound_tenant
 
 
 def get_tenant_base_url() -> str:
@@ -82,7 +59,7 @@ def get_tenant_base_url() -> str:
     transient states during tenant creation) — falls through to the
     settings value in that case rather than raising.
     """
-    tenant = _bound_tenant()
+    tenant = bound_tenant()
     domains_manager = getattr(tenant, "domains", None) if tenant else None
     if domains_manager is not None:
         try:
@@ -180,7 +157,7 @@ def get_tenant_frontend_url(path: str, *, language: str) -> str:
     """
     if path and not path.startswith("/"):
         path = "/" + path
-    prefix = storefront_locale_prefix(_bound_tenant(), language)
+    prefix = storefront_locale_prefix(bound_tenant(), language)
     return f"{get_tenant_base_url()}{prefix}{path}"
 
 
@@ -194,7 +171,7 @@ def localize_storefront_url(url: str, *, language: str) -> str:
     (see ``UserAccountAdapter.send_mail``). Same rule, same tenant.
     """
     parts = urlsplit(url)
-    prefix = storefront_locale_prefix(_bound_tenant(), language)
+    prefix = storefront_locale_prefix(bound_tenant(), language)
     if not prefix:
         return url
     return urlunsplit(parts._replace(path=f"{prefix}{parts.path}"))
@@ -273,7 +250,7 @@ def get_tenant_api_base_url() -> str:
     tenants that don't expose ``.domains`` — falls through to the
     settings value rather than raising.
     """
-    api_domain = resolve_tenant_api_domain(_bound_tenant())
+    api_domain = resolve_tenant_api_domain(bound_tenant())
     if api_domain:
         return f"https://{api_domain}"
 
@@ -435,7 +412,7 @@ def get_tenant_assets_base_url() -> str:
 
     Always returns a URL without trailing slash.
     """
-    assets_domain = resolve_tenant_assets_domain(_bound_tenant())
+    assets_domain = resolve_tenant_assets_domain(bound_tenant())
     if assets_domain:
         return f"https://{assets_domain}"
 
@@ -455,7 +432,7 @@ def get_tenant_static_base_url() -> str:
 
     Always returns a URL without trailing slash.
     """
-    static_domain = resolve_tenant_static_domain(_bound_tenant())
+    static_domain = resolve_tenant_static_domain(bound_tenant())
     if static_domain:
         return f"https://{static_domain}"
 

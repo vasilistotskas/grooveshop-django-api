@@ -16,7 +16,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from django.db import connection
 from django_tenants.utils import get_public_schema_name
 
 from core.utils.tenant_urls import (
@@ -29,6 +28,7 @@ from tenant.credentials import (
     tenant_logo_url,
     tenant_site_name,
 )
+from tenant.membership import bound_tenant
 
 
 def build_email_context(*, language: str, **extra: Any) -> dict[str, Any]:
@@ -69,7 +69,7 @@ def _is_platform_tenant() -> bool:
     the public schema (admin and platform contexts), counts as platform
     so those emails keep the platform brand.
     """
-    tenant = getattr(connection, "tenant", None)
+    tenant = bound_tenant()
     schema = getattr(tenant, "schema_name", "") if tenant else ""
     if not schema or schema == get_public_schema_name():
         return True

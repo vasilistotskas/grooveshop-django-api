@@ -39,9 +39,9 @@ def _current_tenant_host() -> str | None:
     keys (the SSR cache is shared across every tenant). None on the
     public/platform schema — a platform purge is deliberately global.
     """
-    from django.db import connection
+    from tenant.membership import bound_tenant
 
-    tenant = getattr(connection, "tenant", None)
+    tenant = bound_tenant()
     domains = getattr(tenant, "domains", None)
     if domains is None:  # public schema, or a bare FakeTenant
         return None

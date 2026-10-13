@@ -52,26 +52,70 @@ def get_current_tenant() -> Any | None:
     return tenant
 
 
+_ROW_ATTR = "_resolved_tenant_row"
+
+
+def bound_tenant() -> Any | None:
+    """The REAL ``Tenant`` row bound to this connection, or None.
+
+    Every reader of a per-tenant field (credentials, plan flags,
+    branding, locales, Cloudflare zone) must come through here instead
+    of reading ``connection.tenant`` directly. Under
+    ``schema_context(name)`` -- a commit hook that re-enters its schema,
+    a management command, a webhook loop -- django-tenants binds a bare
+    ``FakeTenant`` carrying only ``schema_name``, so every field read
+    off it is silently absent: a store with myDATA, Viva or ACS
+    credentials reads as unconfigured and the work is skipped without an
+    error. ``tenant_context(row)`` and ``TenantMainMiddleware`` bind the
+    row itself, and that is returned as is.
+
+    A ``FakeTenant`` on a store's schema is upgraded to its row by
+    ``schema_name`` -- the lookup django-tenants itself uses -- and the
+    row is remembered on that FakeTenant, so it lives exactly as long as
+    the binding: one query per ``schema_context`` block, and the next
+    block re-reads the credentials the merchant has just saved. A
+    schema with no row, and the public schema under a FakeTenant, are no
+    store: None, so a missing credential still reads as missing and
+    nothing falls back to another tenant's or the platform's values.
+    """
+    return real_tenant(getattr(connection, "tenant", None))
+
+
+def real_tenant(tenant: Any | None) -> Any | None:
+    """*tenant* itself, or the row behind it when it is a ``FakeTenant``.
+
+    The upgrade ``bound_tenant`` applies to the connection's tenant, for
+    callers that already hold one (``get_current_tenant()``).
+    """
+    from django_tenants.postgresql_backend.base import FakeTenant
+    from django_tenants.utils import get_public_schema_name
+
+    if not isinstance(tenant, FakeTenant):
+        return tenant
+    if tenant.schema_name == get_public_schema_name():
+        return None
+    if _ROW_ATTR not in vars(tenant):
+        from tenant.models import Tenant
+
+        setattr(
+            tenant,
+            _ROW_ATTR,
+            Tenant.objects.filter(schema_name=tenant.schema_name).first(),
+        )
+    return vars(tenant)[_ROW_ATTR]
+
+
 def resolve_current_tenant() -> Any | None:
     """The real ``Tenant`` row for the active schema, or None on public.
 
     ``get_current_tenant`` hands back whatever django-tenants bound to
-    the connection, and under ``schema_context(name)`` — a management
-    command, a shell, a webhook loop — that is a bare ``FakeTenant``
-    carrying only ``schema_name``. Callers that need a real field
-    (``plan``, ``vertical``) use this instead: it upgrades a FakeTenant
-    to the row with one query, which is cheap for the rare paths that
-    hit it (``TenantTask`` binds the real row for Celery, and the HTTP
-    middleware always does).
+    the connection, which under ``schema_context`` is a bare
+    ``FakeTenant``. Callers that need a real field (``plan``,
+    ``vertical``) use this; see ``bound_tenant``.
     """
-    from tenant.models import Tenant
-
-    tenant = get_current_tenant()
-    if tenant is None:
+    if get_current_tenant() is None:
         return None
-    if isinstance(tenant, Tenant):
-        return tenant
-    return Tenant.objects.filter(schema_name=tenant.schema_name).first()
+    return bound_tenant()
 
 
 def tenant_plan_allows(flag: str) -> bool:
@@ -94,17 +138,15 @@ def tenant_plan_allows(flag: str) -> bool:
     ``is_enabled()`` closes every entry point at once, because all of
     them funnel through those methods.
 
-    ``getattr`` with a permissive default rather than a direct
-    attribute read: under ``schema_context`` django-tenants attaches a
-    ``FakeTenant`` carrying only ``schema_name``, so the plan fields are
-    absent. Failing open there is deliberate — a background task must
-    not start refusing legitimate work because of how its schema was
-    entered. The path that matters is the HTTP one, where
-    ``TenantMainMiddleware`` attaches a real ``Tenant`` row.
+    Read off the real row (``bound_tenant``), so a commit hook or task
+    that entered its schema with ``schema_context`` is gated by the same
+    plan as an HTTP request. A schema with no row, and the public
+    schema, are not plan-gated.
     """
-    tenant = get_current_tenant()
+    # Public schema and a schema with no row -- platform routines are
+    # not plan-gated.
+    tenant = real_tenant(get_current_tenant())
     if tenant is None:
-        # Public schema — platform routines are not plan-gated.
         return True
     return bool(getattr(tenant, flag, True))
 

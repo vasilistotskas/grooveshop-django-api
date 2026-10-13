@@ -1,8 +1,8 @@
 from allauth.mfa.adapter import DefaultMFAAdapter
 from django.conf import settings
-from django.db import connection
 
 from tenant.credentials import tenant_site_name, tenant_totp_issuer
+from tenant.membership import bound_tenant
 
 
 def _webauthn_rp_id() -> str:
@@ -22,7 +22,7 @@ def _webauthn_rp_id() -> str:
       3. ``settings.APP_MAIN_HOST_NAME`` — platform fallback.
       4. ``'localhost'`` — final fallback for unit tests.
     """
-    tenant = getattr(connection, "tenant", None)
+    tenant = bound_tenant()
     if tenant is not None:
         try:
             domain = tenant.domains.filter(is_primary=True).first()

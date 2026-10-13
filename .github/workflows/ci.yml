@@ -30,6 +30,9 @@ env:
   MEILI_HOST: 127.0.0.1
   UV_VERSION: '0.12.5'
   FORCE_COLOR: 1
+  # oasdiff, pinned by digest; the same image as api-contract.yml and as
+  # the deploy gate in grooveshop-infrastructure (prepare-helm values).
+  OASDIFF_IMAGE: tufin/oasdiff:v1.32.1@sha256:3b14fe0112e5d1bf862f91ab234a4bcd161a3f399e98f8b0b665ce70857694ac
 
 jobs:
   security-scan:
@@ -102,6 +105,17 @@ jobs:
       - name: Type check (ty)
         run: uv run ty check
 
+      - name: Compile translations
+        # The schema depends on the compiled catalogue: without the .mo
+        # files drf-spectacular inlines the choice enums instead of
+        # referencing their components, so the generated schema would not
+        # match the committed one (or what production serves, whose image
+        # compiles them in the Dockerfile). gettext provides msgfmt, which
+        # the runner image does not ship.
+        run: |
+          sudo apt-get install -y --no-install-recommends gettext
+          uv run python manage.py compilemessages --ignore=.venv
+
       - name: OpenAPI schema validate
         # spectacular --validate runs the OpenAPI spec through
         # openapi-spec-validator and exits non-zero on any error.
@@ -119,6 +133,27 @@ jobs:
           --file /tmp/_schema_check.yml
         env:
           DJANGO_SETTINGS_MODULE: settings
+
+      - name: OpenAPI schema.yml is up to date
+        # Every contract check reads the COMMITTED schema.yml: the
+        # storefront generates its types from it, the API contract
+        # workflow diffs it against the PR's base, and the deploy gate in
+        # grooveshop-infrastructure checks it against the storefront that
+        # will be live. A serializer change committed without
+        # ``manage.py spectacular --file schema.yml`` would slip past all
+        # of them. Structure only: descriptions, titles and examples are
+        # generated in whichever language is active, so the committed
+        # prose may be Greek while this run's is English.
+        run: |
+          docker run --rm --user "$(id -u):$(id -g)" \
+            -v "$PWD/schema.yml:/s/committed.yml:ro" \
+            -v /tmp/_schema_check.yml:/s/generated.yml:ro \
+            "$OASDIFF_IMAGE" diff --allow-external-refs=false \
+            --exclude-elements description,title,summary,examples \
+            --fail-on-diff /s/committed.yml /s/generated.yml || {
+            echo "::error file=schema.yml::schema.yml does not match the code. Run: uv run python manage.py spectacular --file schema.yml"
+            exit 1
+          }
 
   migrations:
     name: Migration Check
@@ -178,7 +213,7 @@ jobs:
             --mount type=tmpfs,destination=/var/lib/postgresql \
             postgres:18.6-alpine3.23 \
             -c max_locks_per_transaction=256 -c max_connections=200
-          for i in $(seq 1 30); do
+          for _ in $(seq 1 30); do
             docker exec ci-postgres pg_isready -U postgres && exit 0
             sleep 2
           done
@@ -312,7 +347,7 @@ jobs:
             --mount type=tmpfs,destination=/var/lib/postgresql \
             postgres:18.6-alpine3.23 \
             -c max_locks_per_transaction=256 -c max_connections=200
-          for i in $(seq 1 30); do
+          for _ in $(seq 1 30); do
             docker exec ci-postgres pg_isready -U postgres && exit 0
             sleep 2
           done
@@ -483,7 +518,7 @@ jobs:
             --mount type=tmpfs,destination=/var/lib/postgresql \
             postgres:18.6-alpine3.23 \
             -c max_locks_per_transaction=256 -c max_connections=200
-          for i in $(seq 1 30); do
+          for _ in $(seq 1 30); do
             docker exec ci-postgres pg_isready -U postgres && exit 0
             sleep 2
           done

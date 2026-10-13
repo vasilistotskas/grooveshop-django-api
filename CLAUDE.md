@@ -276,16 +276,35 @@ plain `default=` is dropped right after `ADD COLUMN`.
 0; `accepted_downtime = "<reason>"` on a migration is the reported
 escape hatch. Full rule and the worked SEO example: `docs/migrations.md`.
 
+### API fields follow the same rule, storefront first
+
+The storefront parses every response with Zod schemas generated from
+`schema.yml` and answers 422 to anything they reject, so **removing,
+renaming or loosening (optional, nullable, new enum value) a response
+field breaks the storefront that is live**. Ship it in two steps: a
+storefront release that no longer requires the field reaches production,
+then the Django release that changes it. On 2026-10-13 the reverse order
+took add to cart down on webside for ~8 minutes. Three checks enforce it:
+CI's "OpenAPI schema.yml is up to date" step (the committed `schema.yml`
+must match the code structurally — regenerate it with
+`uv run python manage.py spectacular --file schema.yml`), the
+`API contract` workflow (a PR that breaks clients of the base fails unless
+labelled `api-breaking-change`), and the deploy gate in
+`grooveshop-infrastructure` that refuses a deploy pairing a Django release
+with a storefront it breaks.
+
 ### CI/CD
 
 GitHub Actions (`.github/workflows/ci.yml`) jobs:
 1. **Security Scan** — Trivy filesystem scan (HIGH/CRITICAL fail the job).
-2. **Code Quality** — Ruff format + lint, `ty check`, OpenAPI schema validation.
+2. **Code Quality** — Ruff format + lint, `ty check`, OpenAPI schema validation, and the committed `schema.yml` matching the code (structurally, via oasdiff).
 3. **Migration Check** — replays a deploy: migrates at the base commit, then runs the head's `makemigrations --check` and `migration_preflight`, then both django-tenants migration paths on top.
 4. **Testing** — 4 duration-balanced pytest shards (pytest-split, `.test_durations`) against PostgreSQL 18 + Redis + Meilisearch, each uploading raw coverage data.
 5. **Testing (multi-tenant lane)** — `tests_mt` serially with the real tenant router and middleware.
 6. **Coverage Gate** — combines the shard data and enforces `fail_under`.
 7. **Release** — python-semantic-release (pinned via `uvx`) cuts the version, changelog and GitHub release on `main`; the Docker image workflow triggers on the published release. Nothing is built or published to PyPI — this is a deployed application, not a library.
+
+`.github/workflows/api-contract.yml` is separate: on a PR that changes `schema.yml` it runs `oasdiff breaking` from the base branch's schema to the PR's and fails on a break unless the PR has the `api-breaking-change` label (its own workflow so that toggling the label re-runs only it).
 
 ## Code Style
 

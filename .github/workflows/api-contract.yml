@@ -1,0 +1,85 @@
+# Flag a pull request whose schema.yml breaks clients of the API.
+#
+# The storefront answers 422 to every response its generated schemas
+# reject, so removing or loosening a response field breaks the storefront
+# that is live until one that no longer reads it is deployed. On
+# 2026-10-13 a release that dropped two product fields took add to cart
+# down on webside for ~8 minutes; replaying production's history found ten
+# such windows since 2026-09-01.
+#
+# This is the earliest of three layers. It compares the PR's schema.yml
+# with the base branch's (``oasdiff breaking``: what in the PR breaks a
+# client of the base). A break fails the check unless the PR carries the
+# ``api-breaking-change`` label, which records that the break is meant and
+# that the storefront that stops relying on it ships first. The deploy
+# gate in grooveshop-infrastructure (the backend-api-contract PreSync Job)
+# then refuses any deploy whose order is wrong, and a log alert catches
+# what slips through. CI's "OpenAPI schema.yml is up to date" step keeps
+# the committed file honest, which all three rely on.
+#
+# Its own workflow, not a job in ci.yml, so that adding or removing the
+# label re-runs this one cheap job instead of the whole test suite.
+name: API contract
+
+on:
+  pull_request:
+    branches: ['main']
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+    paths:
+      - 'schema.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # oasdiff, pinned by digest; the same image as ci.yml and as the deploy
+  # gate in grooveshop-infrastructure (prepare-helm values).
+  OASDIFF_IMAGE: tufin/oasdiff:v1.32.1@sha256:3b14fe0112e5d1bf862f91ab234a4bcd161a3f399e98f8b0b665ce70857694ac
+  BREAKING_LABEL: api-breaking-change
+
+jobs:
+  breaking:
+    name: Breaking API changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Compare schema.yml with the base branch
+        env:
+          # The base is read at the exact commit the PR targets. The
+          # repository is public, so no token is needed.
+          BASE_SCHEMA: https://raw.githubusercontent.com/${{ github.repository }}/${{ github.event.pull_request.base.sha }}/schema.yml
+          ACCEPTED: ${{ contains(github.event.pull_request.labels.*.name, 'api-breaking-change') }}
+        run: |
+          oasdiff() {
+            docker run --rm --user "$(id -u):$(id -g)" \
+              -v "$PWD/schema.yml:/s/schema.yml:ro" \
+              "$OASDIFF_IMAGE" breaking --allow-external-refs=false "$@" \
+              -- "$BASE_SCHEMA" /s/schema.yml
+          }
+          # Annotations on the PR, then the verdict.
+          oasdiff --format githubactions || true
+          set +e
+          oasdiff --fail-on ERR --format text
+          code=$?
+          set -e
+          if [ "$code" -eq 0 ]; then
+            echo "No breaking changes."
+            exit 0
+          fi
+          if [ "$code" -ne 1 ]; then
+            echo "::error::oasdiff could not compare the schemas (exit $code)"
+            exit "$code"
+          fi
+          if [ "$ACCEPTED" = "true" ]; then
+            echo "::warning::Breaking API changes accepted by the '$BREAKING_LABEL' label. Deploy the storefront that no longer relies on them BEFORE this release; the deploy gate refuses the other order."
+            exit 0
+          fi
+          echo "::error::This PR breaks API clients. If that is intended, add the '$BREAKING_LABEL' label and ship the storefront that stops relying on these fields first (docs/migrations.md has the same expand/contract rule for columns)."
+          exit 1

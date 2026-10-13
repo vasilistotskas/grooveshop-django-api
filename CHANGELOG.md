@@ -3,6 +3,47 @@
 
 
 
+## v3.112.0 (2026-10-13)
+
+### Bug fixes
+
+* fix(tenant): let a store operator edit its Google Ads conversion fields
+
+The conversion ID and the per-action labels are the merchant's own
+marketing configuration, like the Meta, TikTok and GA4 ids already in
+TENANT_SELF_EDITABLE_FIELDS, but were missing from it, so Owner and
+Admin saw them read-only. Add all six.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`cd96204`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cd9620447f48060734affc59a020a7b322881530))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.111.2 [skip ci] ([`ad5c366`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ad5c366f3b04c85958b80d4986852c3f42618653))
+
+### Features
+
+* feat(tenant): add a Google Ads add-payment-info conversion label (#172) ([`cd96204`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cd9620447f48060734affc59a020a7b322881530))
+
+* feat(tenant): add a Google Ads add-payment-info conversion label
+
+The storefront already fires the GA4 add_payment_info event when a
+shopper submits payment details, but a store had no Google Ads label to
+record it against. Add google_ads_add_payment_info_label beside the
+other per-action labels: validated with the conversion ID (a label
+without it is refused), editable in the Marketing tab, in the admin
+serializer and in the tenant resolve payload.
+
+The column is add-only with db_default so the previous release keeps
+inserting during the PreSync rollout. The resolve field is optional in
+the schema (required=False, like openai_pixel_id), so deploy order
+between Django and the storefront does not matter.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`cd96204`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cd9620447f48060734affc59a020a7b322881530))
+
 ## v3.111.2 (2026-10-12)
 
 ### Bug fixes

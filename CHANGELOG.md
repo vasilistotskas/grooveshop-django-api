@@ -3,6 +3,29 @@
 
 
 
+## v3.122.0 (2026-10-13)
+
+### Features
+
+* feat(tenant): serve each store feature's effective state, and purge its pages on a switch (#191)
+
+- TenantConfig.features on /tenant/resolve: every optional store
+  feature's effective state (the plan flag AND every store setting it
+  needs), read through the same permission classes that answer 404 for
+  it (tenant/features.py: STORE_FEATURES, effective_features); all off
+  on the platform. A change to one of those settings bumps the store's
+  resolve-cache generation.
+- A feature switch purges the store's cached pages: the new store_pages
+  surface clears the storefront's settings read and every page it
+  rendered for the store (host-scoped, edge purge follows).
+  on_switch_change watches several settings and plan flags; a store
+  setting purges at once, a plan flag after
+  STOREFRONT_TENANT_CACHE_SECONDS, once the storefront's in-memory copy
+  of the resolve payload has expired. A purge the storefront did not
+  complete is retried (StorePagesPurgeFailed).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`9dd844a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9dd844a509ec3b2a9f655639b4c9c19851d04346))
+
 ## v3.121.0 (2026-10-13)
 
 ### Features

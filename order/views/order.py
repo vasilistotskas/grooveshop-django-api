@@ -106,6 +106,30 @@ from tenant.membership import is_store_staff
 
 logger = logging.getLogger(__name__)
 
+# The pk-addressed actions a guest may call on their own order. A guest
+# proves ownership with the order's uuid in ``?uuid=``
+# (``check_object_permissions``), so each one declares it.
+GUEST_UUID_QUERY_ACTIONS = frozenset(
+    {
+        "cancel",
+        "payment_status",
+        "create_payment_intent",
+        "create_checkout_session",
+        "confirm_agent_payment",
+        "retry_payment",
+    }
+)
+GUEST_ORDER_UUID_PARAMETER = OpenApiParameter(
+    name="uuid",
+    location=OpenApiParameter.QUERY,
+    required=False,
+    type=OpenApiTypes.UUID,
+    description=_(
+        "The order's UUID. Required when the order belongs to a guest "
+        "(no account); ignored for signed-in owners and store staff."
+    ),
+)
+
 serializers_config: SerializersConfig = {
     "list": ActionConfig(response=OrderSerializer),
     "retrieve": ActionConfig(response=OrderDetailSerializer),
@@ -139,6 +163,7 @@ serializers_config: SerializersConfig = {
         operation_id="cancelOrder",
         summary=_("Cancel an order"),
         description=_("Cancel an existing order and restore product stock"),
+        parameters=[GUEST_ORDER_UUID_PARAMETER],
         tags=["Orders"],
     ),
     "my_orders": ActionConfig(
@@ -175,6 +200,7 @@ serializers_config: SerializersConfig = {
         description=_(
             "Create a payment intent for Stripe payments on an existing order"
         ),
+        parameters=[GUEST_ORDER_UUID_PARAMETER],
         tags=["Orders"],
     ),
     "create_checkout_session": ActionConfig(
@@ -186,6 +212,7 @@ serializers_config: SerializersConfig = {
             "Create a hosted checkout session (Stripe or Viva Wallet). "
             "The customer will be redirected to the provider's checkout page to complete payment."
         ),
+        parameters=[GUEST_ORDER_UUID_PARAMETER],
         tags=["Orders"],
     ),
     "confirm_agent_payment": ActionConfig(
@@ -199,6 +226,7 @@ serializers_config: SerializersConfig = {
             "Only available when agent-delegated payments are enabled "
             "for the store and the order's payment method is Stripe."
         ),
+        parameters=[GUEST_ORDER_UUID_PARAMETER],
         tags=["Orders"],
     ),
     "payment_status": ActionConfig(
@@ -209,6 +237,7 @@ serializers_config: SerializersConfig = {
             "Retrieve the current payment status from the payment provider. "
             "This fetches the latest status directly from Stripe/PayPal."
         ),
+        parameters=[GUEST_ORDER_UUID_PARAMETER],
         tags=["Orders"],
     ),
     "retry_payment": ActionConfig(
@@ -223,6 +252,7 @@ serializers_config: SerializersConfig = {
             "payment failed or was never completed, so the customer can try again "
             "without starting a new order."
         ),
+        parameters=[GUEST_ORDER_UUID_PARAMETER],
         tags=["Orders"],
     ),
     "reorder": ActionConfig(
@@ -422,15 +452,7 @@ class OrderViewSet(BaseModelViewSet):
             "acs_label",
             "shipment_label",
         }
-        guest_allowed_actions = {
-            "retrieve_by_uuid",
-            "cancel",
-            "payment_status",
-            "create_payment_intent",
-            "create_checkout_session",
-            "confirm_agent_payment",
-            "retry_payment",
-        }
+        guest_allowed_actions = {"retrieve_by_uuid", *GUEST_UUID_QUERY_ACTIONS}
         admin_only_actions = {
             "destroy",
             "add_tracking",
@@ -478,16 +500,10 @@ class OrderViewSet(BaseModelViewSet):
             return
 
         if obj.user_id is None:
-            guest_allowed_actions = {
+            if self.action not in {
                 "retrieve_by_uuid",
-                "cancel",
-                "payment_status",
-                "create_payment_intent",
-                "create_checkout_session",
-                "confirm_agent_payment",
-                "retry_payment",
-            }
-            if self.action not in guest_allowed_actions:
+                *GUEST_UUID_QUERY_ACTIONS,
+            }:
                 raise PermissionDenied(
                     _("Guest orders can only be accessed via UUID.")
                 )

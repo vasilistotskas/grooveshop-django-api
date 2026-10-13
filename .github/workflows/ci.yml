@@ -105,6 +105,17 @@ jobs:
       - name: Type check (ty)
         run: uv run ty check
 
+      - name: Compile translations
+        # The schema depends on the compiled catalogue: without the .mo
+        # files drf-spectacular inlines the choice enums instead of
+        # referencing their components, so the generated schema would not
+        # match the committed one (or what production serves, whose image
+        # compiles them in the Dockerfile). gettext provides msgfmt, which
+        # the runner image does not ship.
+        run: |
+          sudo apt-get install -y --no-install-recommends gettext
+          uv run python manage.py compilemessages --ignore=.venv
+
       - name: OpenAPI schema validate
         # spectacular --validate runs the OpenAPI spec through
         # openapi-spec-validator and exits non-zero on any error.

@@ -266,11 +266,12 @@ class TestSearchApi:
             ids["promoted"],
         ]
 
-    def test_the_deprecated_final_price_sort_ignores_promotions(self, indexed):
-        marker, ids = indexed
+    @pytest.mark.parametrize("sort", ["finalPrice", "-finalPrice"])
+    def test_the_final_price_sort_is_no_longer_offered(self, indexed, sort):
+        marker, _ = indexed
 
-        # 111.60 before the two 124.00 listings, whatever the promotion.
-        assert self._masters(marker, sort="finalPrice")[0] == ids["plain"]
+        # An unknown sort is ignored, so the order is the unsorted one.
+        assert self._masters(marker, sort=sort) == self._masters(marker)
 
     def test_the_effective_price_facet_reports_the_promoted_range(
         self, indexed

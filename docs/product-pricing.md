@@ -131,18 +131,18 @@ because the cart only honours it for a basket that meets the condition. B2B
 group prices are not in the index or the filter either (see above).
 
 The price before promotions (`finalPrice`) is still a field of the product and of
-every search hit: the cart, orders and the agent gateway's feeds read it. Its
-filter and facet surfaces are gone: `minFinalPrice` / `maxFinalPrice`, the
-`final_price` search facet (and `facetStats.finalPrice`) and the Meilisearch
-`final_price` filterable attribute were removed once the storefront filtered
-and ranged on the effective price (expand/contract for API contracts,
-`docs/migrations.md`). An unknown `facets` value is ignored by the search
-view, so an old client asking for `final_price` gets no stats rather than an
-error. One surface remains: the search `sort=finalPrice` / `-finalPrice`
-(Meilisearch `final_price` sortable and displayed) is **deprecated**, because
-the agent gateway's `search_products` tool still lists it as an allowed sort;
-it is removed, with the sortable attribute, once the gateway offers
-`effectivePrice` instead. The search `price_min` / `price_max` parameters keep
+every search hit: the cart and orders read it, and the storefront's product card
+falls back to it for a hit whose `effectivePrice` is not recorded yet. Its
+filter, facet and sort surfaces are gone: `minFinalPrice` / `maxFinalPrice`, the
+`final_price` search facet (and `facetStats.finalPrice`), the search
+`sort=finalPrice` / `-finalPrice` and the Meilisearch `final_price` filterable
+and sortable attributes were removed once the storefront and the agent gateway
+filtered, ranged and sorted on the effective price (expand/contract for API
+contracts, `docs/migrations.md`). An unknown `facets` or `sort` value is
+ignored by the search view, so an old client asking for `final_price` gets no
+stats, or the default order, rather than an error. The Meilisearch
+`final_price` document field and displayed attribute stay for as long as a hit's
+`finalPrice` is read. The search `price_min` / `price_max` parameters keep
 their names and compare with `effective_price`.
 
 **Known recording lag.** The price is recorded when the offer queue or the
@@ -154,15 +154,15 @@ window the listing, the filter and the cart can disagree. A product whose
 and sorts last until the nightly reconciliation fills it.
 
 Every price field above reads a stored column, so a list costs no query per row.
-`discountPercent` (and the search `discountPercent`) is the merchant's
-markdown, not an announcement. It is **deprecated** in the schema and stays
-until the agent gateway's Merchant Center / Meta / TikTok feeds and MCP tools
-stop reading it; then it is removed with the expand/contract rule of
-`docs/migrations.md`. `discountValue` and `priceSavePercent` were removed from
-the product: a client that struck a price through must use the fields above.
-The merchant's input (`Product.discount_percent`, the admin form, the product
-write API, the `minDiscountPercent` / `maxDiscountPercent` filters and the
-`discountPercent` ordering) is unchanged.
+`discountPercent`, `discountValue` and `priceSavePercent` are the merchant's
+markdown, not an announcement, and are gone from the product and search-hit
+payloads (and `discount_percent` from the Meilisearch displayed attributes):
+a client that struck a price through must use the fields above. The
+merchant's input (`Product.discount_percent`, the admin form, the product
+write API, the `minDiscountPercent` / `maxDiscountPercent` filters, the
+`discountPercent` ordering, and the indexed `discount_percent` that the
+`stock:desc, discount_percent:desc` ranking rule and the on-offer flag use) is
+unchanged.
 
 The deploy's PreSync hook applies the new displayed, filterable and sortable fields
 (`prior_price`, `announced_discount_percent`, `effective_price`) with

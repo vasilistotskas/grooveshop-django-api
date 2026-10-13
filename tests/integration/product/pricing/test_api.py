@@ -82,7 +82,7 @@ class TestProductApi:
         assert body["effectivePrice"] == 99.2
         # 20% off what the customer pays.
         assert body["announcedDiscountPercent"] == 20
-        assert body["discountPercent"] == 20.0
+        assert "discountPercent" not in body
 
     def test_a_product_that_is_not_reduced_announces_nothing(
         self, category, vat
@@ -158,15 +158,14 @@ class TestProductApi:
 
         assert queries_for(8) == queries_for(2)
 
-    def test_the_schema_deprecates_the_markdown_percent_only(
+    def test_the_schema_no_longer_carries_the_markdown_fields(
         self, openapi_schema
     ):
         properties = openapi_schema["components"]["schemas"]["Product"][
             "properties"
         ]
 
-        assert properties["discountPercent"]["deprecated"] is True
-        for name in ("discountValue", "priceSavePercent"):
+        for name in ("discountPercent", "discountValue", "priceSavePercent"):
             assert name not in properties
         for name in (
             "priorPrice",
@@ -175,9 +174,31 @@ class TestProductApi:
         ):
             assert "deprecated" not in properties[name]
 
+    def test_the_search_hit_schemas_no_longer_carry_the_markdown_percent(
+        self, openapi_schema
+    ):
+        schemas = openapi_schema["components"]["schemas"]
+
+        for name in ("ProductMeiliSearchResult", "FederatedSearchResult"):
+            assert "discountPercent" not in schemas[name]["properties"]
+
 
 @pytest.mark.django_db
 class TestSearch:
+    def test_the_index_exposes_the_effective_price_not_the_markdown_percent(
+        self,
+    ):
+        meili = ProductTranslation.MeiliMeta
+
+        # ``final_price`` is still displayed (the storefront falls back to
+        # it) but nothing sorts on it; ``discount_percent`` stays sortable
+        # for the ranking rule and is no longer displayed.
+        assert "final_price" in meili.displayed_fields
+        assert "final_price" not in meili.sortable_fields
+        assert "effective_price" in meili.sortable_fields
+        assert "discount_percent" not in meili.displayed_fields
+        assert "discount_percent" in meili.sortable_fields
+
     def test_the_document_carries_the_two_announcement_fields(
         self, category, vat
     ):

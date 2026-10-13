@@ -707,7 +707,6 @@ class ProductTranslation(
             "category",
             "category_name",
             "stock",
-            "discount_percent",
             "prior_price",
             "announced_discount_percent",
             "active",
@@ -717,7 +716,6 @@ class ProductTranslation(
         )
         sortable_fields = (
             "likes_count",
-            "final_price",
             "effective_price",
             "view_count",
             "discount_percent",

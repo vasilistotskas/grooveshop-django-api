@@ -15173,8 +15173,8 @@ msgstr ""
 "τους επιλογή."
 
 #: .\search\views.py:403
-msgid "Sort field (effectivePrice, -effectivePrice, -likesCount, -viewCount, -createdAt). finalPrice and -finalPrice are deprecated: they ignore promotions."
-msgstr "Πεδίο ταξινόμησης (effectivePrice, -effectivePrice, -likesCount, -viewCount, -createdAt). Τα finalPrice και -finalPrice είναι παρωχημένα: αγνοούν τις προσφορές."
+msgid "Sort field (effectivePrice, -effectivePrice, -likesCount, -viewCount, -createdAt)."
+msgstr "Πεδίο ταξινόμησης (effectivePrice, -effectivePrice, -likesCount, -viewCount, -createdAt)."
 
 #: .\search\views.py:411
 msgid "Comma-separated facet fields for counts and stats"

@@ -22365,174 +22365,171 @@ msgstr "Αποδείξεις"
 msgid "Credit Documents"
 msgstr "Πιστωτικά παραστατικά"
 
-#: .\admin\dashboard\store\widgets.py:48
+#: .\admin\dashboard\store\widgets.py:49
 msgid "7 days"
 msgstr "7 ημέρες"
 
-#: .\admin\dashboard\store\widgets.py:49
+#: .\admin\dashboard\store\widgets.py:50
 msgid "30 days"
 msgstr "30 ημέρες"
 
-#: .\admin\dashboard\store\widgets.py:50
+#: .\admin\dashboard\store\widgets.py:51
 msgid "13 weeks"
 msgstr "13 εβδομάδες"
 
-#: .\admin\dashboard\store\widgets.py:50
+#: .\admin\dashboard\store\widgets.py:51
 msgid "Last 13 weeks"
 msgstr "Τελευταίες 13 εβδομάδες"
 
-#: .\admin\dashboard\store\widgets.py:51
+#: .\admin\dashboard\store\widgets.py:52
 msgid "12 months"
 msgstr "12 μήνες"
 
-#: .\admin\dashboard\store\widgets.py:55
+#: .\admin\dashboard\store\widgets.py:56
 #, python-format
 msgid "Paid revenue per %(bucket)s"
 msgstr "Εισπραγμένα έσοδα ανά %(bucket)s"
 
-#: .\admin\dashboard\store\widgets.py:56
+#: .\admin\dashboard\store\widgets.py:57
 #, python-format
 msgid "Orders placed per %(bucket)s"
 msgstr "Παραγγελίες ανά %(bucket)s"
 
-#: .\admin\dashboard\store\widgets.py:61
+#: .\admin\dashboard\store\widgets.py:62
 msgctxt "chart bucket"
 msgid "day"
 msgstr "ημέρα"
 
-#: .\admin\dashboard\store\widgets.py:62
+#: .\admin\dashboard\store\widgets.py:63
 msgctxt "chart bucket"
 msgid "week"
 msgstr "εβδομάδα"
 
-#: .\admin\dashboard\store\widgets.py:63
+#: .\admin\dashboard\store\widgets.py:64
 msgctxt "chart bucket"
 msgid "month"
 msgstr "μήνα"
 
-#: .\admin\dashboard\store\widgets.py:154
+#: .\admin\dashboard\store\widgets.py:160
 #, python-format
 msgid "Good morning, %(name)s"
 msgstr "Καλημέρα, %(name)s"
 
-#: .\admin\dashboard\store\widgets.py:156
+#: .\admin\dashboard\store\widgets.py:162
 #, python-format
 msgid "Good afternoon, %(name)s"
 msgstr "Καλό απόγευμα, %(name)s"
 
-#: .\admin\dashboard\store\widgets.py:158
+#: .\admin\dashboard\store\widgets.py:164
 #, python-format
 msgid "Good evening, %(name)s"
 msgstr "Καλησπέρα, %(name)s"
 
-#: .\admin\dashboard\store\widgets.py:192
+#: .\admin\dashboard\store\widgets.py:198
 msgid "vs the period before"
 msgstr "σε σχέση με την προηγούμενη περίοδο"
 
-#: .\admin\dashboard\store\widgets.py:201
+#: .\admin\dashboard\store\widgets.py:208
 #, python-format
 msgid "%(percent)s of paying customers ordered again"
 msgstr "Το %(percent)s των πελατών με πληρωμένη παραγγελία παρήγγειλε ξανά"
 
-#: .\admin\dashboard\store\widgets.py:232
+#: .\admin\dashboard\store\widgets.py:239
 msgid "Average order"
 msgstr "Μέση παραγγελία"
 
-#: .\admin\dashboard\store\widgets.py:239
+#: .\admin\dashboard\store\widgets.py:246
 msgid "Paid orders"
 msgstr "Πληρωμένες παραγγελίες"
 
-#: .\admin\dashboard\store\widgets.py:270
+#: .\admin\dashboard\store\widgets.py:277
 #, python-format
 msgid "%(measure)s · %(period)s"
 msgstr "%(measure)s · %(period)s"
 
-#: .\admin\dashboard\store\widgets.py:285
+#: .\admin\dashboard\store\widgets.py:292
 msgid "No orders in this period"
 msgstr "Καμία παραγγελία σε αυτή την περίοδο"
 
-#: .\admin\dashboard\store\widgets.py:316
+#: .\admin\dashboard\store\widgets.py:323
 msgid "Orders to process"
 msgstr "Παραγγελίες προς επεξεργασία"
 
-#: .\admin\dashboard\store\widgets.py:317
+#: .\admin\dashboard\store\widgets.py:324
 msgid "Placed and waiting"
 msgstr "Καταχωρήθηκαν και περιμένουν"
 
-#: .\admin\dashboard\store\widgets.py:326
+#: .\admin\dashboard\store\widgets.py:333
 msgid "Running low on stock"
 msgstr "Χαμηλό απόθεμα"
 
-#: .\admin\dashboard\store\widgets.py:337
+#: .\admin\dashboard\store\widgets.py:344
 msgid "Receipts rejected by myDATA"
 msgstr "Αποδείξεις που απέρριψε το myDATA"
 
-#: .\admin\dashboard\store\widgets.py:338
+#: .\admin\dashboard\store\widgets.py:345
+#: .\admin\dashboard\store\widgets.py:383
 #, python-format
 msgid "In the last %(days)s days"
 msgstr "Τις τελευταίες %(days)s ημέρες"
 
-#: .\admin\dashboard\store\widgets.py:348
+#: .\admin\dashboard\store\widgets.py:362
 msgid "Reviews to approve"
 msgstr "Κριτικές προς έγκριση"
 
-#: .\admin\dashboard\store\widgets.py:349
+#: .\admin\dashboard\store\widgets.py:363
 msgid "Hidden from shoppers until approved"
 msgstr "Κρυφές από τους πελάτες μέχρι να εγκριθούν"
 
-#: .\admin\dashboard\store\widgets.py:358
+#: .\admin\dashboard\store\widgets.py:372
 msgid "Blog comments to approve"
 msgstr "Σχόλια blog προς έγκριση"
 
-#: .\admin\dashboard\store\widgets.py:359
+#: .\admin\dashboard\store\widgets.py:373
 msgid "Hidden from readers until approved"
 msgstr "Κρυφά από τους αναγνώστες μέχρι να εγκριθούν"
 
-#: .\admin\dashboard\store\widgets.py:368
+#: .\admin\dashboard\store\widgets.py:382
 msgid "New messages"
 msgstr "Νέα μηνύματα"
 
-#: .\admin\dashboard\store\widgets.py:369
-msgid "From the contact form this week"
-msgstr "Από τη φόρμα επικοινωνίας αυτή την εβδομάδα"
-
-#: .\admin\dashboard\store\widgets.py:378
+#: .\admin\dashboard\store\widgets.py:395
 msgid "Business accounts to verify"
 msgstr "Επαγγελματικοί λογαριασμοί προς έλεγχο"
 
-#: .\admin\dashboard\store\widgets.py:379
+#: .\admin\dashboard\store\widgets.py:396
 msgid "Waiting for wholesale prices"
 msgstr "Περιμένουν τιμές χονδρικής"
 
-#: .\admin\dashboard\store\widgets.py:423
+#: .\admin\dashboard\store\widgets.py:440
 msgid "Latest orders"
 msgstr "Πρόσφατες παραγγελίες"
 
-#: .\admin\dashboard\store\widgets.py:466
+#: .\admin\dashboard\store\widgets.py:483
 msgid "Best sellers"
 msgstr "Δημοφιλέστερα προϊόντα"
 
-#: .\admin\dashboard\store\widgets.py:467
+#: .\admin\dashboard\store\widgets.py:484
 #, python-format
 msgid "Units paid for · %(period)s"
 msgstr "Πληρωμένα τεμάχια · %(period)s"
 
-#: .\admin\dashboard\store\widgets.py:471
+#: .\admin\dashboard\store\widgets.py:488
 msgid "No paid orders in this period"
 msgstr "Καμία πληρωμένη παραγγελία σε αυτή την περίοδο"
 
-#: .\admin\dashboard\store\widgets.py:475
+#: .\admin\dashboard\store\widgets.py:492
 msgid "Sold"
 msgstr "Τεμάχια"
 
-#: .\admin\dashboard\store\widgets.py:549
+#: .\admin\dashboard\store\widgets.py:566
 #, python-format
 msgid "%(count)s order · %(share)s"
 msgid_plural "%(count)s orders · %(share)s"
 msgstr[0] "%(count)s παραγγελία · %(share)s"
 msgstr[1] "%(count)s παραγγελίες · %(share)s"
 
-#: .\admin\dashboard\store\widgets.py:562
+#: .\admin\dashboard\store\widgets.py:579
 msgid ""
 "No attributed orders in this period. Orders are attributed from the visit "
 "that placed them."
@@ -22540,19 +22537,19 @@ msgstr ""
 "Καμία παραγγελία με απόδοση πηγής σε αυτή την περίοδο. Οι παραγγελίες "
 "αποδίδονται στην επίσκεψη κατά την οποία καταχωρήθηκαν."
 
-#: .\admin\dashboard\store\widgets.py:593
+#: .\admin\dashboard\store\widgets.py:610
 msgid "Clicked a result"
 msgstr "Πάτησαν σε αποτέλεσμα"
 
-#: .\admin\dashboard\store\widgets.py:600
+#: .\admin\dashboard\store\widgets.py:617
 msgid "Add synonyms, products or content for these."
 msgstr "Προσθέστε συνώνυμα, προϊόντα ή περιεχόμενο για αυτές."
 
-#: .\admin\dashboard\store\widgets.py:608
+#: .\admin\dashboard\store\widgets.py:625
 msgid "What shoppers look for most."
 msgstr "Τι αναζητούν περισσότερο οι πελάτες."
 
-#: .\admin\dashboard\store\widgets.py:611
+#: .\admin\dashboard\store\widgets.py:628
 msgid "No searches in this period"
 msgstr "Καμία αναζήτηση σε αυτή την περίοδο"
 

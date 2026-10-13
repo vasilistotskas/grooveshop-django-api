@@ -88,6 +88,8 @@ class PlatformAdminSite(
 
     # Its own UNFOLD config block — see module docstring.
     settings_name = "UNFOLD_PLATFORM"
+    # The schema views are on the public URLconf too (footer link).
+    api_docs_url_name = "swagger-ui"
 
     # Header/title/subheader come from ``UNFOLD_PLATFORM`` alone.
     index_title = _("Control plane")

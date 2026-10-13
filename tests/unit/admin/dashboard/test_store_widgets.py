@@ -199,6 +199,20 @@ class TestAttention:
             _superuser(), MYDATA_ENABLED=False
         )
 
+    def test_a_rolling_count_opens_its_list_with_the_same_window(self):
+        """The row counts the last N days; the list it opens must not
+        show everything since the beginning."""
+        from contact.factories import ContactFactory
+
+        ContactFactory()
+        rows = {
+            str(row["label"]): row
+            for row in _context(widgets.StoreAttention, _superuser())["rows"]
+        }
+
+        assert "created_at__gte=" in rows["New messages"]["href"]
+        assert str(rows["New messages"]["detail"]) == "In the last 7 days"
+
     def test_myDATA_rejections_are_not_also_an_alert(self):
         """One place for them: the row above, not the superuser alert."""
         from order.models.invoice import Invoice, MyDataStatus

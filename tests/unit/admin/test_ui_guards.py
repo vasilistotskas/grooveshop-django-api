@@ -110,6 +110,20 @@ def test_both_admin_sites_load_the_project_stylesheet() -> None:
         assert any(style.endswith("css/styles.css") for style in styles), name
 
 
+def test_the_footer_api_docs_link_resolves_on_each_sites_urlconf() -> None:
+    """The footer reverses ``api_docs_url_name`` on the site's own
+    URLconf; a name missing there would 500 every page."""
+    from django.urls import reverse
+
+    from admin.admin import MyAdminSite
+    from admin.platform_site import PlatformAdminSite
+
+    assert reverse(MyAdminSite.api_docs_url_name, urlconf="core.urls")
+    assert reverse(
+        PlatformAdminSite.api_docs_url_name, urlconf="tenant.urls_public"
+    )
+
+
 _RESPONSIVE_COLUMNS = re.compile(r"\b((?:sm|md|lg|xl|2xl):grid-cols-\d+)\b")
 _ONE_COLUMN = re.compile(r"(?<![\w:-])grid-cols-1(?![\w-])")
 

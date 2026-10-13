@@ -14,7 +14,7 @@ A period query computes the one window asked for (``variants``).
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime, time, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from typing import Any
 
 from django.apps import apps
@@ -52,11 +52,16 @@ class Period:
         ]
 
     def window(self) -> tuple[datetime, datetime, datetime]:
-        """``(prior_start, start, now)``: this period and the one before."""
+        """``(prior_start, start, now)``: this period and the one before.
+
+        The prior span is subtracted in UTC: an aware datetime minus a
+        timedelta is wall-clock arithmetic in its own zone, so a span
+        crossing a DST change would come out an hour long or short.
+        """
         now = timezone.now()
         start = timezone.make_aware(
             datetime.combine(self.buckets()[0], time.min)
-        )
+        ).astimezone(UTC)
         return start - (now - start), start, now
 
     @property
@@ -93,6 +98,9 @@ LOW_STOCK_BELOW = 10
 
 # How far back a myDATA rejection still needs someone.
 MYDATA_REJECTED_DAYS = 7
+
+# Contact messages carry no read state; "new" is this many days back.
+NEW_MESSAGES_DAYS = 7
 
 
 def _paid() -> Q:
@@ -214,7 +222,8 @@ def sales_series(key: str) -> list[dict[str, Any]]:
 @dashboard_query(
     "store:best-sellers:v1",
     ttl=900,
-    depends_on=("order.Order",),
+    # A partial refund can save only the line (refunded_quantity).
+    depends_on=("order.Order", "order.OrderItem"),
     per_language=True,
     variants=PERIOD_KEYS,
 )
@@ -436,10 +445,8 @@ def attention_counts() -> dict[str, int]:
         "pending_comments": model("blog.BlogComment")
         .objects.filter(approved=False)
         .count(),
-        # No read state exists on a message, so "new" is the Contact
-        # admin's own "This Week" window.
         "new_contact_messages": model("contact.Contact")
-        .objects.filter(created_at__gte=now - timedelta(days=7))
+        .objects.filter(created_at__gte=now - timedelta(days=NEW_MESSAGES_DAYS))
         .count(),
         "pending_business_profiles": model("b2b.BusinessProfile")
         .objects.filter(status=BusinessProfileStatus.PENDING)

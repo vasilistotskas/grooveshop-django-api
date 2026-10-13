@@ -19,6 +19,7 @@ missing setting must see the banner go on the next load.
 
 from __future__ import annotations
 
+from datetime import timedelta
 from typing import Any
 from urllib.parse import urlencode
 
@@ -89,6 +90,11 @@ def _bucket_label(start, bucket: str) -> str:
     if bucket == "month":
         return formats.date_format(start, "M")
     return formats.date_format(start, "d/m")
+
+
+def _days_ago(days: int) -> str:
+    """The cutoff a rolling count used, for the list its row opens."""
+    return (timezone.now() - timedelta(days=days)).isoformat()
 
 
 def _number(value: float) -> str:
@@ -339,7 +345,14 @@ class StoreAttention(DashboardWidget):
                 _("In the last %(days)s days")
                 % {"days": queries.MYDATA_REJECTED_DAYS},
                 "order.Invoice",
-                f"mydata_status__exact={MyDataStatus.REJECTED}",
+                urlencode(
+                    {
+                        "mydata_status__exact": MyDataStatus.REJECTED,
+                        "updated_at__gte": _days_ago(
+                            queries.MYDATA_REJECTED_DAYS
+                        ),
+                    }
+                ),
             ),
             (
                 features.reviews,
@@ -367,9 +380,12 @@ class StoreAttention(DashboardWidget):
                 "mail",
                 "default",
                 _("New messages"),
-                _("From the contact form this week"),
+                _("In the last %(days)s days")
+                % {"days": queries.NEW_MESSAGES_DAYS},
                 "contact.Contact",
-                "",
+                urlencode(
+                    {"created_at__gte": _days_ago(queries.NEW_MESSAGES_DAYS)}
+                ),
             ),
             (
                 features.wholesale.live,

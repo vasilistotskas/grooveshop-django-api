@@ -77,6 +77,23 @@ class TestPeriods:
         )
         assert start - prior_start == now - start
 
+    def test_the_period_before_is_as_long_across_a_dst_change(
+        self, monkeypatch
+    ):
+        """Athens leaves summer time on 25 Oct 2026: a 7-day period from
+        26 Oct is compared with a span that crosses the change. Wall-clock
+        arithmetic made that span an hour longer."""
+        from datetime import UTC
+
+        from django.utils import timezone as django_timezone
+
+        fixed = datetime(2026, 11, 1, 10, 0, tzinfo=UTC)
+        monkeypatch.setattr(django_timezone, "now", lambda: fixed)
+        with django_timezone.override("Europe/Athens"):
+            prior_start, start, now = queries.PERIODS_BY_KEY["7d"].window()
+
+        assert start - prior_start == now - start
+
     def test_an_unknown_period_is_refused(self):
         with pytest.raises(ValueError):
             queries.overview.get("forever")

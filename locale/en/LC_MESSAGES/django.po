@@ -19273,7 +19273,7 @@ msgid "Refund order"
 msgstr ""
 
 #: .\order\admin.py:1041
-msgid "Pays the amount back through the payment provider and records it on the order's payment ledger. A part refund can be followed by more until nothing is left. The order status and its stock are not changed."
+msgid "Pays the amount back through the payment provider, or records the cash on delivery you paid back yourself, on the order's payment ledger. A part refund can be followed by more until nothing is left. The order status and its stock are not changed."
 msgstr ""
 
 #: .\order\admin.py:1073
@@ -20208,4 +20208,33 @@ msgid ""
 "stage when off. BoxNow stage and production keys only work against their own "
 "API, so set this to match the keys entered here. There is NO platform "
 "fallback: off means stage."
+msgstr ""
+
+#: .\order\admin.py:259
+msgid "How it was paid back"
+msgstr ""
+
+#: .\order\admin.py:262
+msgid "Cash collected on delivery is paid back by you, not through a provider. Give the bank transfer id or how else it was paid; required for that part of a refund."
+msgstr ""
+
+#: .\order\admin.py:294
+msgid "Say how the cash was paid back: this refund returns money collected on delivery."
+msgstr ""
+
+#: .\order\services.py:2996
+msgid "The payment on delivery has not been collected yet, so there is nothing to refund."
+msgstr ""
+
+#: .\order\services.py:3103
+msgid "Say how the cash was paid back (a bank transfer id, for example): part of this refund returns money collected on delivery."
+msgstr ""
+
+#: .\order\services.py:3112
+#, python-brace-format
+msgid "The repayment reference can be at most {max_length} characters."
+msgstr ""
+
+#: .\order\services.py:3120
+msgid "A refund with this reference is already recorded for this order."
 msgstr ""

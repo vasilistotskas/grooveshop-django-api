@@ -1,7 +1,8 @@
 """The payment ledger: what providers moved for an order, and what follows.
 
-``PaymentTransaction`` rows are the only record of the money captured for
-an order and the money refunded from it. Everything else is read from
+``PaymentTransaction`` rows are the only record of the money received for
+an order (a provider's CHARGE, a courier's COD_COLLECTION) and the money
+refunded from it. Everything else is read from
 them: how much can still be refunded, which payment a refund goes
 against, and whether ``Order.payment_status`` is REFUNDED or
 PARTIALLY_REFUNDED (:meth:`PaymentLedger.refund_status`, the one place
@@ -38,6 +39,21 @@ logger = logging.getLogger(__name__)
 _ZERO = Decimal(0)
 _AMOUNT = DecimalField(max_digits=11, decimal_places=2)
 
+#: The rows that put money into the ledger and can be paid back out of it.
+_RECEIPT_KINDS = (
+    PaymentTransactionKind.CHARGE,
+    PaymentTransactionKind.COD_COLLECTION,
+)
+
+#: Who moved the money of a refund the merchant made themselves, outside any
+#: payment provider (a bank transfer, cash handed over). Not a registered
+#: provider code, so nothing can mistake it for one.
+MANUAL_REFUND_PROVIDER = "manual"
+
+#: The longest "how was it paid back" reference accepted; the ledger prefixes
+#: it with the order and the collection it refunds.
+REPAYMENT_REFERENCE_MAX_LENGTH = 100
+
 #: What a provider can say about a payment that was captured. Viva reports
 #: ``R`` for a payment that was refunded afterwards, which is still a
 #: capture; Stripe keeps a refunded PaymentIntent ``succeeded``.
@@ -53,6 +69,12 @@ class ChargeBalance(NamedTuple):
     refundable: Decimal
 
 
+def is_cash_collection(row: PaymentTransaction) -> bool:
+    """Money a courier collected in cash: there is no provider to refund it
+    through, so the merchant pays it back themselves."""
+    return row.kind == PaymentTransactionKind.COD_COLLECTION
+
+
 def _total(rows: QuerySet[PaymentTransaction]) -> Decimal:
     return rows.aggregate(
         total=Coalesce(Sum("amount", output_field=_AMOUNT), _ZERO)
@@ -62,16 +84,18 @@ def _total(rows: QuerySet[PaymentTransaction]) -> Decimal:
 class PaymentLedger:
     @staticmethod
     def captured(order: Order) -> Decimal:
-        """What providers captured for *order*."""
+        """What was received for *order*: what providers captured and what
+        couriers collected in cash."""
         return _total(
             PaymentTransaction.objects.filter(
-                order=order, kind=PaymentTransactionKind.CHARGE
+                order=order, kind__in=_RECEIPT_KINDS
             )
         )
 
     @staticmethod
     def refunded(order: Order) -> Decimal:
-        """What providers refunded out of *order*'s payments."""
+        """What was paid back out of *order*'s payments, by a provider or
+        by the merchant."""
         return _total(
             PaymentTransaction.objects.filter(
                 order=order, kind=PaymentTransactionKind.REFUND
@@ -85,10 +109,11 @@ class PaymentLedger:
 
     @classmethod
     def balances(cls, order: Order) -> list[ChargeBalance]:
-        """Every payment of *order* with money left in it, oldest first."""
+        """Every payment of *order* with money left in it, oldest first: a
+        provider's CHARGE or a courier's COD_COLLECTION."""
         charges = (
             PaymentTransaction.objects.filter(
-                order=order, kind=PaymentTransactionKind.CHARGE
+                order=order, kind__in=_RECEIPT_KINDS
             )
             .annotate(
                 already_refunded=Coalesce(
@@ -106,7 +131,7 @@ class PaymentLedger:
 
     @classmethod
     def refundable(cls, order: Order) -> Decimal:
-        """What can still be refunded for *order*: captured minus refunded,
+        """What can still be refunded for *order*: received minus refunded,
         payment by payment (a refund is made against one payment)."""
         return sum((b.refundable for b in cls.balances(order)), _ZERO)
 
@@ -148,8 +173,10 @@ class PaymentLedger:
 
         A refund goes against one payment, so an amount larger than any
         single payment's remainder is split across payments, oldest first.
-        The caller has already refused an amount above
-        :meth:`refundable`.
+        A share against cash a courier collected (:func:`is_cash_collection`)
+        has no provider to refund it: the merchant pays it back and says
+        how (:meth:`record_cod_refund`). The caller has already refused an
+        amount above :meth:`refundable`.
         """
         plan: list[tuple[PaymentTransaction, Money]] = []
         left = None if amount is None else amount.amount
@@ -231,9 +258,12 @@ class PaymentLedger:
         amount: Money,
         reference: str,
         description: str = "",
+        provider: str | None = None,
     ) -> tuple[PaymentTransaction, bool]:
         """Record that *charge* was refunded *amount* under *reference* (the
         provider's refund id), and bring ``order.payment_status`` in line.
+        *provider* is who moved the money: the charge's own provider unless
+        the refund was made outside it.
 
         The status is written here, from the ledger, whoever the writer is,
         so no path decides REFUNDED or PARTIALLY_REFUNDED for itself. A
@@ -245,7 +275,7 @@ class PaymentLedger:
             order,
             kind=PaymentTransactionKind.REFUND,
             amount=amount,
-            provider=charge.provider,
+            provider=provider or charge.provider,
             reference=reference,
             charge=charge,
             description=description[:255],
@@ -254,6 +284,52 @@ class PaymentLedger:
             order.payment_status = cls.refund_status(order)
             order.save(update_fields=["payment_status"])
         return row, created
+
+    @staticmethod
+    def cod_refund_reference(
+        order: Order, collection: PaymentTransaction, reference: str
+    ) -> str:
+        """The ledger key of a refund of *collection* paid back under
+        *reference* (a bank transfer id): scoped to the order and the
+        collection, so one transfer id cannot be booked twice against the
+        same cash and two orders can never collide on it."""
+        return f"order-{order.pk}-{collection.pk}-{reference}"
+
+    @classmethod
+    def has_cod_refund(
+        cls, order: Order, collection: PaymentTransaction, reference: str
+    ) -> bool:
+        """Whether *collection* was already refunded under *reference*."""
+        return PaymentTransaction.objects.filter(
+            provider=MANUAL_REFUND_PROVIDER,
+            kind=PaymentTransactionKind.REFUND,
+            provider_reference=cls.cod_refund_reference(
+                order, collection, reference
+            ),
+        ).exists()
+
+    @classmethod
+    def record_cod_refund(
+        cls,
+        order: Order,
+        *,
+        collection: PaymentTransaction,
+        amount: Money,
+        reference: str,
+        description: str = "",
+    ) -> tuple[PaymentTransaction, bool]:
+        """Record that the merchant paid *amount* of the cash *collection*
+        back to the customer themselves, under *reference* (how: a bank
+        transfer id). The same status derivation as any refund
+        (:meth:`record_refund`)."""
+        return cls.record_refund(
+            order,
+            charge=collection,
+            amount=amount,
+            reference=cls.cod_refund_reference(order, collection, reference),
+            description=description,
+            provider=MANUAL_REFUND_PROVIDER,
+        )
 
     @classmethod
     def ensure_charge(

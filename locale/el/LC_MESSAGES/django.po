@@ -21759,8 +21759,8 @@ msgid "Refund order"
 msgstr "Επιστροφή χρημάτων παραγγελίας"
 
 #: .\order\admin.py:1041
-msgid "Pays the amount back through the payment provider and records it on the order's payment ledger. A part refund can be followed by more until nothing is left. The order status and its stock are not changed."
-msgstr "Επιστρέφει το ποσό μέσω του παρόχου πληρωμών και το καταγράφει στο καθολικό πληρωμών της παραγγελίας. Μετά από μερική επιστροφή μπορούν να ακολουθήσουν κι άλλες μέχρι να μην απομένει τίποτα. Η κατάσταση της παραγγελίας και το απόθεμά της δεν αλλάζουν."
+msgid "Pays the amount back through the payment provider, or records the cash on delivery you paid back yourself, on the order's payment ledger. A part refund can be followed by more until nothing is left. The order status and its stock are not changed."
+msgstr "Επιστρέφει το ποσό μέσω του παρόχου πληρωμών ή καταγράφει την αντικαταβολή που επιστρέψατε εσείς οι ίδιοι, στο καθολικό πληρωμών της παραγγελίας. Μετά από μερική επιστροφή μπορούν να ακολουθήσουν κι άλλες μέχρι να μην απομένει τίποτα. Η κατάσταση της παραγγελίας και το απόθεμά της δεν αλλάζουν."
 
 #: .\order\admin.py:1073
 #, python-format
@@ -22730,3 +22730,32 @@ msgstr ""
 "παραγωγής λειτουργούν μόνο στο δικό τους API, γι' αυτό ρυθμίστε το ώστε να "
 "ταιριάζει με τα κλειδιά που έχουν καταχωριστεί εδώ. ΔΕΝ υπάρχει εφεδρική "
 "τιμή πλατφόρμας: ανενεργό σημαίνει stage."
+
+#: .\order\admin.py:259
+msgid "How it was paid back"
+msgstr "Πώς επιστράφηκαν τα χρήματα"
+
+#: .\order\admin.py:262
+msgid "Cash collected on delivery is paid back by you, not through a provider. Give the bank transfer id or how else it was paid; required for that part of a refund."
+msgstr "Τα μετρητά που εισπράχθηκαν με αντικαταβολή τα επιστρέφετε εσείς, όχι μέσω παρόχου. Δώστε τον κωδικό τραπεζικής μεταφοράς ή τον τρόπο που έγινε η επιστροφή· απαιτείται για αυτό το τμήμα της επιστροφής."
+
+#: .\order\admin.py:294
+msgid "Say how the cash was paid back: this refund returns money collected on delivery."
+msgstr "Δηλώστε πώς επιστράφηκαν τα μετρητά: αυτή η επιστροφή αφορά χρήματα που εισπράχθηκαν με αντικαταβολή."
+
+#: .\order\services.py:2996
+msgid "The payment on delivery has not been collected yet, so there is nothing to refund."
+msgstr "Η αντικαταβολή δεν έχει εισπραχθεί ακόμη, επομένως δεν υπάρχει κάτι προς επιστροφή."
+
+#: .\order\services.py:3103
+msgid "Say how the cash was paid back (a bank transfer id, for example): part of this refund returns money collected on delivery."
+msgstr "Δηλώστε πώς επιστράφηκαν τα μετρητά (π.χ. κωδικός τραπεζικής μεταφοράς): μέρος αυτής της επιστροφής αφορά χρήματα που εισπράχθηκαν με αντικαταβολή."
+
+#: .\order\services.py:3112
+#, python-brace-format
+msgid "The repayment reference can be at most {max_length} characters."
+msgstr "Η αναφορά επιστροφής μπορεί να έχει το πολύ {max_length} χαρακτήρες."
+
+#: .\order\services.py:3120
+msgid "A refund with this reference is already recorded for this order."
+msgstr "Μια επιστροφή με αυτή την αναφορά έχει ήδη καταγραφεί για αυτή την παραγγελία."

@@ -49,7 +49,11 @@ from order.payment import (
     provider_supports,
     registered_provider_codes,
 )
-from order.payment_ledger import PaymentLedger
+from order.payment_ledger import (
+    REPAYMENT_REFERENCE_MAX_LENGTH,
+    PaymentLedger,
+    is_cash_collection,
+)
 from order.signals import order_refunded
 from order.stock import StockManager
 from pay_way.enum.settlement import PaySettlement
@@ -2989,6 +2993,11 @@ class OrderService:
                 "This order was not paid through a payment provider, so "
                 "there is nothing to refund here."
             )
+        if order.pay_way and order.pay_way.is_collected_on_delivery:
+            return _(
+                "The payment on delivery has not been collected yet, so "
+                "there is nothing to refund."
+            )
         return _("This order has not been paid yet.")
 
     @classmethod
@@ -2998,11 +3007,24 @@ class OrderService:
         order: Order,
         amount: Money | None = None,
         reason: str = "",
+        *,
+        repayment_reference: str = "",
     ) -> RefundResult:
-        """Refund ``amount`` of what *order* paid through a provider, or
-        everything still refundable when ``amount`` is ``None``.
+        """Refund ``amount`` of what *order* paid, or everything still
+        refundable when ``amount`` is ``None``.
 
-        What can be refunded is read from the payment ledger (captured minus
+        A payment a provider captured is refunded through that provider.
+        Cash a courier collected on delivery (a ``COD_COLLECTION`` row) has
+        no provider to refund it: the merchant pays the customer back
+        themselves, and ``repayment_reference`` (a bank transfer id, say) is
+        how they say so. It is required exactly when the refund touches
+        such cash, checked before any provider is called, and is the
+        idempotency key of that share: the same reference cannot book the
+        same cash twice. Each share, either way, is one REFUND row and one
+        ``order_refunded``, so the credit note and everything else that
+        listens run as they do for a provider refund.
+
+        What can be refunded is read from the payment ledger (received minus
         refunded, payment by payment) under the order lock, so an order can
         be refunded again until nothing is left, and never past it: two
         refunds racing for one remainder are serialised here and the second
@@ -3071,41 +3093,88 @@ class OrderService:
             )
 
         plan = PaymentLedger.plan_refund(order, amount)
+
+        # The cash shares need the merchant's word on how they were paid
+        # back, and may not repeat a reference already booked. Both are
+        # settled before the first provider call, so a refusal never leaves
+        # a mixed refund half made.
+        reference = repayment_reference.strip()
+        cash = [c for c, _share in plan if is_cash_collection(c)]
+        if cash:
+            if not reference:
+                raise PaymentError(
+                    _(
+                        "Say how the cash was paid back (a bank transfer id, "
+                        "for example): part of this refund returns money "
+                        "collected on delivery."
+                    )
+                )
+            if len(reference) > REPAYMENT_REFERENCE_MAX_LENGTH:
+                raise PaymentError(
+                    _(
+                        "The repayment reference can be at most "
+                        "{max_length} characters."
+                    ).format(max_length=REPAYMENT_REFERENCE_MAX_LENGTH)
+                )
+            if any(
+                PaymentLedger.has_cod_refund(order, collection, reference)
+                for collection in cash
+            ):
+                raise PaymentError(
+                    _(
+                        "A refund with this reference is already recorded "
+                        "for this order."
+                    )
+                )
+
         refunded = Money(0, plan[0][1].currency)
         refund_ids: list[str] = []
         declined: dict[str, Any] | None = None
         for charge, share in plan:
-            # Under the lock, and counted from the ledger: an attempt that
-            # wrote no row (a timeout, a rollback) is retried under the key
-            # it already used, so the provider hands back the refund it made
-            # instead of making another.
-            idempotency_key = (
-                f"order-{order.pk}-refund-"
-                f"{PaymentLedger.next_refund_number(order)}"
-            )
-            success, response = get_payment_provider(
-                charge.provider
-            ).refund_payment(
-                payment_id=charge.provider_reference,
-                amount=share,
-                idempotency_key=idempotency_key,
-            )
-            if not success:
-                # What the earlier shares paid back is already recorded and
-                # stays so; the caller is told about both.
-                cls._note_refund_declined(order, charge.provider, response)
-                declined = response
-                break
+            if is_cash_collection(charge):
+                paid_back = share
+                row, created = PaymentLedger.record_cod_refund(
+                    order,
+                    collection=charge,
+                    amount=share,
+                    reference=reference,
+                    description=reason,
+                )
+                refund_id = row.provider_reference
+            else:
+                # Under the lock, and counted from the ledger: an attempt
+                # that wrote no row (a timeout, a rollback) is retried
+                # under the key it already used, so the provider hands back
+                # the refund it made instead of making another.
+                idempotency_key = (
+                    f"order-{order.pk}-refund-"
+                    f"{PaymentLedger.next_refund_number(order)}"
+                )
+                success, response = get_payment_provider(
+                    charge.provider
+                ).refund_payment(
+                    payment_id=charge.provider_reference,
+                    amount=share,
+                    idempotency_key=idempotency_key,
+                )
+                if not success:
+                    # What the earlier shares paid back is already recorded
+                    # and stays so; the caller is told about both.
+                    cls._note_refund_declined(order, charge.provider, response)
+                    declined = response
+                    break
 
-            paid_back = Money(Decimal(str(response["amount"])), share.currency)
-            refund_id = response.get("refund_id") or idempotency_key
-            row, created = PaymentLedger.record_refund(
-                order,
-                charge=charge,
-                amount=paid_back,
-                reference=refund_id,
-                description=reason,
-            )
+                paid_back = Money(
+                    Decimal(str(response["amount"])), share.currency
+                )
+                refund_id = response.get("refund_id") or idempotency_key
+                row, created = PaymentLedger.record_refund(
+                    order,
+                    charge=charge,
+                    amount=paid_back,
+                    reference=refund_id,
+                    description=reason,
+                )
             if created:
                 refunded += paid_back
                 refund_ids.append(refund_id)

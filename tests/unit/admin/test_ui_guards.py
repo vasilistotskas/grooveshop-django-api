@@ -110,6 +110,16 @@ def test_both_admin_sites_load_the_project_stylesheet() -> None:
         assert any(style.endswith("css/styles.css") for style in styles), name
 
 
+def test_the_admin_stylesheet_leaves_unfolds_icons_alone() -> None:
+    """``static/css/admin.css`` is in no cascade layer, so each of its
+    rules outranks Unfold's layered utilities. A ``display`` there on
+    ``.material-symbols-outlined`` showed every icon Unfold hides with
+    ``hidden``: the ⌘K palette's spinner turned forever."""
+    css = (BASE_DIR / "static/css/admin.css").read_text(encoding="utf-8")
+    rules = re.sub(r"/\*.*?\*/", "", css, flags=re.DOTALL)
+    assert ".material-symbols-outlined" not in rules
+
+
 def test_the_footer_api_docs_link_resolves_on_each_sites_urlconf() -> None:
     """The footer reverses ``api_docs_url_name`` on the site's own
     URLconf; a name missing there would 500 every page."""

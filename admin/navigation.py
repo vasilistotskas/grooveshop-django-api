@@ -13,7 +13,8 @@ decided in one place:
   it is not listed; on the plan but switched off in the store settings,
   its setup pages stay with an "Off" badge and its counters go; a page
   that only receives shopper input (reviews, feedback, newsletter) goes
-  with its setting;
+  with its setting (``StoreFeatures.absent_models``, which the ⌘K
+  palette reads too);
 - a carrier's pages are listed only while that carrier is active;
 - a badge counts work that is waiting, from one cached query.
 
@@ -151,9 +152,12 @@ def _store_profile(request: Any) -> Item | None:
 def store_sidebar(request: Any) -> list[Item]:
     user = request.user
     features = store_features(request)
+    absent = features.absent_models()
     counts = _counts(request)
 
     def page(label: str, title: str, icon: str = "", **extra: Any):
+        if label in absent:
+            return None
         return _page(request, label, title, icon, **extra)
 
     sales = _group(
@@ -207,9 +211,7 @@ def store_sidebar(request: Any) -> list[Item]:
                 _("Reviews"),
                 "star_rate",
                 **_count_badge(counts["pending_reviews"]),
-            )
-            if features.reviews
-            else None,
+            ),
         ],
     )
 
@@ -224,12 +226,8 @@ def store_sidebar(request: Any) -> list[Item]:
                 "mail",
                 **_count_badge(counts["new_contact_messages"]),
             ),
-            page("contact.Feedback", _("Feedback"), "reviews")
-            if features.feedback
-            else None,
-            page("product.ProductFavourite", _("Favourites"), "favorite")
-            if features.favourites
-            else None,
+            page("contact.Feedback", _("Feedback"), "reviews"),
+            page("product.ProductFavourite", _("Favourites"), "favorite"),
             _menu(
                 _("Notifications"),
                 "notifications",
@@ -270,9 +268,7 @@ def store_sidebar(request: Any) -> list[Item]:
                     page("user.UserSubscription", _("Subscriptions")),
                     page("user.SubscriptionTopic", _("Subscription Topics")),
                 ],
-            )
-            if features.newsletter
-            else None,
+            ),
         ],
     )
 
@@ -345,9 +341,7 @@ def store_sidebar(request: Any) -> list[Item]:
                     page("blog.BlogPost", _("Blog Posts")),
                     page("blog.BlogCategory", _("Blog Categories")),
                     page("blog.BlogAuthor", _("Blog Authors")),
-                    page("blog.BlogComment", _("Blog Comments"))
-                    if features.blog_comments
-                    else None,
+                    page("blog.BlogComment", _("Blog Comments")),
                     page("blog.BlogTag", _("Blog Tags")),
                 ],
                 **_count_badge(

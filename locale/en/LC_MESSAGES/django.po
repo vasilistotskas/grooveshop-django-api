@@ -19914,11 +19914,6 @@ msgstr "Order Canceled"
 msgid "Paid orders"
 msgstr "Order"
 
-#: .\admin\dashboard\store\widgets.py:277
-#, python-format
-msgid "%(measure)s · %(period)s"
-msgstr ""
-
 #: .\admin\dashboard\store\widgets.py:292
 msgid "No orders in this period"
 msgstr ""
@@ -19990,9 +19985,8 @@ msgstr "Order"
 msgid "Best sellers"
 msgstr ""
 
-#: .\admin\dashboard\store\widgets.py:476
-#, python-format
-msgid "Units paid for · %(period)s"
+#: .\admin\dashboard\store\widgets.py:468
+msgid "Units paid for"
 msgstr ""
 
 #: .\admin\dashboard\store\widgets.py:480
@@ -20182,12 +20176,6 @@ msgstr ""
 #: .\core\templates\admin\dashboard\store\search.html:7
 msgid "Store search"
 msgstr ""
-
-#: .\core\templates\admin\dashboard\store\search.html:18
-#, fuzzy
-#| msgid "Price"
-msgid "Search list"
-msgstr "Price"
 
 #: .\core\templates\admin\dashboard\store\sources.html:6
 msgid "Where orders come from"

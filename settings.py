@@ -3005,15 +3005,9 @@ UNFOLD_PLATFORM = {
     # The ops consoles, for platform superusers (admin/navigation.py).
     "SITE_DROPDOWN": "admin.navigation.ops_site_dropdown",
     "ENVIRONMENT": "admin.permissions.platform_environment",
-    # ⌘K command palette. Without this block the palette falls back to
-    # unfold's defaults (``search_models: False``) and only matches
-    # sidebar APP TITLES — typing a tenant name, domain or user email
-    # returned nothing. The callable is the same schema-aware one the
-    # merchant admin uses: on the public schema it returns the
-    # SHARED_APPS whitelist, which is exactly the model set this site
-    # registers.
+    # ⌘K command palette history. What the palette finds is decided by
+    # admin.search.CommandSearchMixin, not by this block.
     "COMMAND": {
-        "search_models": "core.utils.admin.command_search_models",
         "show_history": True,
     },
     # The project's Tailwind build and admin tweaks, as on the store
@@ -3303,12 +3297,9 @@ UNFOLD = {
         "en": "🇬🇧",
         "de": "🇩🇪",
     },
-    # ⌘K / Ctrl+K command palette: cross-model record search + history.
-    # ``search_models`` is schema-aware — the public (platform) admin
-    # may only search SHARED_APPS models; the rest exist solely inside
-    # tenant schemas and would raise ProgrammingError on every search.
+    # ⌘K / Ctrl+K command palette history. What the palette finds is
+    # decided by admin.search.CommandSearchMixin, not by this block.
     "COMMAND": {
-        "search_models": "core.utils.admin.command_search_models",
         "show_history": True,
     },
     "STYLES": [

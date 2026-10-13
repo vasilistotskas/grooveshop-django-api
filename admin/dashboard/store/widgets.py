@@ -137,10 +137,6 @@ class StorePeriodWidget(DashboardWidget):
     def variant(self) -> str | None:
         return selected_period(self.request).key
 
-    @property
-    def period_label(self) -> Any:
-        return PERIOD_LABELS[selected_period(self.request).key][1]
-
 
 # ── Header ──────────────────────────────────────────────────────────────
 
@@ -274,12 +270,8 @@ class StoreSalesChart(StorePeriodWidget):
         values = [row[metric] for row in data]
         return {
             "title": title,
-            "description": _("%(measure)s · %(period)s")
-            % {
-                "measure": description
-                % {"bucket": BUCKET_NAMES[period.bucket]},
-                "period": self.period_label,
-            },
+            "description": description
+            % {"bucket": BUCKET_NAMES[period.bucket]},
             "metrics": [
                 {
                     "label": METRICS[key][0],
@@ -473,8 +465,7 @@ class StoreBestSellers(StorePeriodWidget):
     def shape(self, data: list[dict[str, Any]]) -> dict[str, Any]:
         return {
             "title": _("Best sellers"),
-            "description": _("Units paid for · %(period)s")
-            % {"period": self.period_label},
+            "description": _("Units paid for"),
             "action_href": changelist_link(self.request, "product.Product"),
             "empty_icon": "inventory_2",
             "empty_text": _("No paid orders in this period"),
@@ -522,7 +513,6 @@ class StoreFunnel(StorePeriodWidget):
             }
 
         return {
-            "description": self.period_label,
             "has_data": bool(started),
             "steps": [
                 step(_("Carts started"), started),
@@ -550,7 +540,6 @@ class StoreOrderSources(StorePeriodWidget):
         if data["other"]:
             rows.append((str(_("Other")), data["other"]))
         return {
-            "description": self.period_label,
             "rows": [
                 {
                     "title": title,
@@ -584,7 +573,6 @@ class StoreSearch(StorePeriodWidget):
     def shape(self, data: dict[str, Any]) -> dict[str, Any]:
         clicks = data["clicks"]
         return {
-            "description": self.period_label,
             "stats": [
                 {"value": _number(data["searches"]), "label": _("Searches")},
                 {
@@ -604,7 +592,6 @@ class StoreSearch(StorePeriodWidget):
             ],
             "lists": [
                 {
-                    "key": "zero",
                     "label": _("Found nothing"),
                     "hint": _("Add synonyms, products or content for these."),
                     "variant": "warning",
@@ -612,7 +599,6 @@ class StoreSearch(StorePeriodWidget):
                     "empty_text": _("Every search found something"),
                 },
                 {
-                    "key": "top",
                     "label": _("Top searches"),
                     "hint": _("What shoppers look for most."),
                     "variant": "default",

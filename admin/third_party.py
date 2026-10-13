@@ -12,9 +12,9 @@ def patch_djstripe_search_fields() -> None:
     dj-stripe 2.11.0 moved most Stripe payload columns into the
     ``stripe_data`` JSONField but left five admins searching fields
     that no longer exist on their models, so ANY search against them
-    raises ``FieldError``. Unfold's ⌘K palette
-    (``UNFOLD["COMMAND"]["search_models"]``) searches every registered
-    admin, so a single stale admin 500s the whole palette.
+    raises ``FieldError``. The ⌘K palette (``admin.search``) searches
+    every admin the viewer can open, so a single stale admin 500s the
+    whole palette.
 
     Stale entries are replaced with ``stripe_data`` (the raw Stripe
     JSON still contains the old values, and ``icontains`` works on it

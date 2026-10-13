@@ -295,3 +295,5 @@ class TaggedItemInline(GenericTabularInline):
     ct_fk_field = "object_id"
     tab = True
     per_page = 20
+    # Paged, so it needs a fixed order: unordered pages can repeat a row.
+    ordering = ("pk",)

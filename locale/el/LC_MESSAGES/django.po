@@ -4033,6 +4033,23 @@ msgstr ""
 "dashboard. Επηρεάζει τον proxy Nuxt /api/settings και τη δημοσιευμένη "
 "ταυτότητα πωλητή."
 
+#: .\core\cache\surfaces.py:608
+msgid "Storefront pages"
+msgstr "Σελίδες καταστήματος"
+
+#: .\core\cache\surfaces.py:609
+msgid ""
+"Every page the storefront has rendered and cached for this store, and its "
+"settings read. Purges itself when a store feature is switched on or off, "
+"because the navigation, footer and product cards of every page show what "
+"the store offers."
+msgstr ""
+"Όλες οι σελίδες του καταστήματος που έχουν αποθηκευτεί στην cache, και η "
+"ανάγνωση των ρυθμίσεών του. Καθαρίζεται αυτόματα όταν ενεργοποιείται ή "
+"απενεργοποιείται μια λειτουργία του καταστήματος, επειδή η πλοήγηση, το "
+"υποσέλιδο και οι κάρτες προϊόντων κάθε σελίδας δείχνουν τι προσφέρει το "
+"κατάστημα."
+
 #: .\core\cache\surfaces.py:604
 msgid "Sitemap & SEO"
 msgstr "Sitemap & SEO"

@@ -101,6 +101,19 @@ class TestSurfacesPurgeRenderedPages:
         # and `:rss*`, which match no key Nitro ever writes.
         assert not any(p.startswith("cache:nitro:routes:__") for p in patterns)
 
+    def test_store_pages_surface_purges_the_settings_read_and_every_page(
+        self,
+    ):
+        """A feature switch shows on every page (navigation, footer), so
+        this surface clears the whole route family; the purge endpoint
+        keeps only the purging store's keys."""
+        assert get_surface("store_pages").nuxt_patterns == (
+            "cache:nitro:handlers:settingsPublic*",
+            # Trailing star on a whole segment: the endpoint lists the
+            # family by prefix (``getKeys``), with no regex filter.
+            "cache:nitro:routes:_:*",
+        )
+
 
 class TestSiteRootPathname:
     """Nitro stores "/" under the literal segment ``index``.

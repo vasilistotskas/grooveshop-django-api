@@ -818,6 +818,13 @@ CACHE_CLEAR_PREFIXES: list[str] = [
 # so Cloudflare/Traefik are bypassed and the call is fast.
 NUXT_INTERNAL_BASE_URL = getenv("NUXT_INTERNAL_BASE_URL", "")
 NUXT_CACHE_PURGE_TOKEN = getenv("NUXT_CACHE_PURGE_TOKEN", "")
+# How long each storefront pod keeps a store's resolve payload in memory
+# (``TENANT_CACHE_TTL`` in the storefront's server/utils/tenant.ts). A
+# purge that a plan-flag change triggers waits this long, or a page could
+# re-render from the old copy and be cached with the old flag again.
+STOREFRONT_TENANT_CACHE_SECONDS = int(
+    getenv("STOREFRONT_TENANT_CACHE_SECONDS", "300")
+)
 
 # The platform's own Cloudflare zone, which caches the storefront pages of
 # every store on a platform hostname (``core.cache.edge``). A store on its

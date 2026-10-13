@@ -70,7 +70,7 @@ def handle_order_canceled_giftcard(
 # Gift cards switched off or on: record the pause, or close it and move
 # active cards' expiry forward by it (``GiftCardService.sync_pause``).
 on_switch_change(
-    setting=IsGiftCardsRuntimeEnabled,
-    plan_flag="gift_cards_enabled",
+    setting_gates=(IsGiftCardsRuntimeEnabled,),
+    plan_flags=("gift_cards_enabled",),
     task="giftcard.tasks.sync_gift_card_pause",
 )

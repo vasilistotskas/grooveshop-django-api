@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 import pytest
 from django.utils import timezone
@@ -103,6 +103,6 @@ def test_the_store_switch_queues_the_pause_sync(bind_tenant_and_schema):
     with patch("tenant.switches.dispatch_on_commit") as dispatch:
         switch_store_settings(GIFT_CARDS_ENABLED=True)
 
-    dispatch.assert_called_once_with(
-        sync_gift_card_pause, schema_name="shop_one"
-    )
+    assert [
+        c for c in dispatch.call_args_list if c.args[0] is sync_gift_card_pause
+    ] == [call(sync_gift_card_pause, schema_name="shop_one")]

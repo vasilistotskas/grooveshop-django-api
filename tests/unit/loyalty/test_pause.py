@@ -8,7 +8,7 @@ points while it is off, so that time must not eat into them.
 from __future__ import annotations
 
 from datetime import timedelta
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 import pytest
 from django.utils import timezone
@@ -112,4 +112,6 @@ def test_the_store_switch_queues_the_pause_sync(bind_tenant_and_schema):
     with patch("tenant.switches.dispatch_on_commit") as dispatch:
         switch_store_settings(LOYALTY_ENABLED=True)
 
-    dispatch.assert_called_once_with(sync_loyalty_pause, schema_name="shop_one")
+    assert [
+        c for c in dispatch.call_args_list if c.args[0] is sync_loyalty_pause
+    ] == [call(sync_loyalty_pause, schema_name="shop_one")]

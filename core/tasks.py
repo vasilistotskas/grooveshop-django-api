@@ -145,6 +145,24 @@ def invalidate_cache_surfaces_task():
     return {"status": "success", "surfaces": surfaces}
 
 
+@celery_app.task(base=MonitoredTask)
+def purge_store_pages_task():
+    """Purge every page the storefront has cached for the current store.
+
+    Queued by ``tenant.signals`` when one of the store's feature switches
+    really changes; runs in that store's schema (``TenantTask``). No
+    retry, as for ``invalidate_cache_surfaces_task``: ``CacheService.purge``
+    isolates and logs each surface's failures.
+    """
+    # Imported here: ``CacheService`` reaches the cache backend and the
+    # Nuxt client at import time.
+    from core.cache.service import CacheService
+    from core.cache.surfaces import STORE_PAGES_SURFACE
+
+    report = CacheService.purge([STORE_PAGES_SURFACE], include_related=False)
+    return {"status": "success", "nuxt": report.nuxt_headline}
+
+
 @celery_app.task(
     base=MonitoredTask,
     max_retries=5,

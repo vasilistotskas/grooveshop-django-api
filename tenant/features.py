@@ -69,13 +69,31 @@ STORE_FEATURES: dict[str, StoreFeature] = {
 }
 
 
+def feature_setting_gates() -> tuple[type[IsSettingEnabled], ...]:
+    """Every store-setting gate some feature depends on, once each."""
+    return tuple(
+        dict.fromkeys(
+            gate
+            for feature in STORE_FEATURES.values()
+            for gate in feature.settings
+        )
+    )
+
+
+def feature_plan_flags() -> tuple[str, ...]:
+    """Every plan flag on ``Tenant`` some feature depends on, once each."""
+    return tuple(
+        dict.fromkeys(
+            feature.plan.feature_flag
+            for feature in STORE_FEATURES.values()
+            if feature.plan is not None
+        )
+    )
+
+
 def feature_setting_keys() -> frozenset[str]:
     """Every store setting some feature depends on."""
-    return frozenset(
-        gate.setting_key
-        for feature in STORE_FEATURES.values()
-        for gate in feature.settings
-    )
+    return frozenset(gate.setting_key for gate in feature_setting_gates())
 
 
 def effective_features(tenant) -> dict[str, bool]:

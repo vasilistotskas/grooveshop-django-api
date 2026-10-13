@@ -15,7 +15,9 @@ import pytest
 from django.conf import settings
 from extra_settings.models import Setting
 
+from core.cache.service import PurgeReport, SurfaceResult
 from core.cache.surfaces import STORE_PAGES_SURFACE
+from core.exceptions import StorePagesPurgeFailed
 from core.tasks import purge_store_pages_task
 from tenant.features import (
     feature_plan_flags,
@@ -131,3 +133,34 @@ def test_the_task_purges_the_store_pages_surface_alone():
         purge_store_pages_task.run()
 
     purge.assert_called_once_with([STORE_PAGES_SURFACE], include_related=False)
+
+
+def failed_purge() -> PurgeReport:
+    return PurgeReport(
+        surfaces=[SurfaceResult(code=STORE_PAGES_SURFACE, nuxt_error="503")]
+    )
+
+
+def test_a_failed_purge_is_retried():
+    """One switch queues one purge: if the storefront fails it, nothing
+    later makes up for it, and the feature stays on show."""
+    with (
+        patch(
+            "core.cache.service.CacheService.purge",
+            return_value=failed_purge(),
+        ),
+        patch("core.cache.nuxt.is_configured", return_value=True),
+        pytest.raises(StorePagesPurgeFailed),
+    ):
+        purge_store_pages_task.run()
+
+
+def test_an_unconfigured_purge_endpoint_is_not_retried():
+    with (
+        patch(
+            "core.cache.service.CacheService.purge",
+            return_value=failed_purge(),
+        ),
+        patch("core.cache.nuxt.is_configured", return_value=False),
+    ):
+        assert purge_store_pages_task.run()["status"] == "success"

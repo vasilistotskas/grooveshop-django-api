@@ -12,7 +12,8 @@ retrying — from "this task has a bug", which retrying only repeats.
 Exception Hierarchy:
     CoreTaskError (base)
     ├── HealthCheckFailed    — a monitored dependency reported unhealthy
-    └── ManagementCommandFailed — a wrapped `call_command` did not succeed
+    ├── ManagementCommandFailed — a wrapped `call_command` did not succeed
+    └── StorePagesPurgeFailed — the storefront did not purge a store's pages
 """
 
 from __future__ import annotations
@@ -37,6 +38,18 @@ class HealthCheckFailed(CoreTaskError):
             f"Health check failed for {component}"
             + (f": {detail}" if detail else "")
         )
+
+
+class StorePagesPurgeFailed(CoreTaskError):
+    """The storefront's purge endpoint failed to purge a store's pages.
+
+    Raised so the purge is retried: until it succeeds, the store keeps
+    showing a feature it has just switched off.
+    """
+
+    def __init__(self, surfaces: list[str]):
+        self.surfaces = surfaces
+        super().__init__(f"Store page purge failed for {surfaces}")
 
 
 class ManagementCommandFailed(CoreTaskError):

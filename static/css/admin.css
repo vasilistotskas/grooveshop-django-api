@@ -1,12 +1,8 @@
-/* Material Symbols sizing — the font ships at a default 24px that misaligns
-   with Unfold's compact UI density. Keep this small tweak. */
-.material-symbols-outlined {
-    font-size: 20px;
-    line-height: 1;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-}
+/* No rule for .material-symbols-outlined here. Unfold sizes and displays
+   its icons in its own layered stylesheet, and an unlayered rule outranks
+   every layered one: a `display` here showed each icon Unfold hides with
+   `hidden` (the ⌘K palette's spinner span forever), and a `font-size`
+   overrode every `text-*` size an icon is given. */
 
 /* Dashboard hover rows: ensure foreground stays readable in dark mode when the
    row background shifts. Uses design tokens instead of hardcoded hex. */

@@ -1,13 +1,31 @@
 from __future__ import annotations
 
 from corsheaders.signals import check_request_enabled
+from django.conf import settings
 from django.db import connection
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 
 from tenant.cache import bump_cache_generation
+from tenant.features import (
+    feature_plan_flags,
+    feature_setting_gates,
+    feature_setting_keys,
+)
 from tenant.middleware import origin_belongs_to_tenant
 from tenant.models import Tenant, TenantDomain
+from tenant.switches import on_switch_change
+
+# Every page the storefront has cached for a store shows what the store
+# offers (navigation, footer, product cards), so a feature switch purges
+# them all. The storefront reads the plan flags from its copy of the
+# resolve payload, so that purge waits until the copy has expired.
+on_switch_change(
+    setting_gates=feature_setting_gates(),
+    plan_flags=feature_plan_flags(),
+    task="core.tasks.purge_store_pages_task",
+    plan_countdown=settings.STOREFRONT_TENANT_CACHE_SECONDS,
+)
 
 
 @receiver(check_request_enabled, dispatch_uid="tenant.allow_tenant_origin")
@@ -78,15 +96,18 @@ def bump_generation_on_agent_setting_change(sender, instance, **kwargs):
     that is FOLDED into the cached TenantConfig payload.
 
     ``AGENT_COMMERCE_ENABLED`` / ``PRODUCT_FEEDS_ENABLED`` are combined
-    with the plan flag inside ``TenantConfigSerializer`` — without this
-    bump a merchant toggle would sit behind the resolve cache for the
-    full TTL. Setting rows live in the TENANT schema, so the current
-    connection schema identifies whose generation to bump.
+    with the plan flag inside ``TenantConfigSerializer``, and so is every
+    feature switch in ``TenantConfig.features`` (``tenant/features.py``)
+    — without this bump a merchant toggle would sit behind the resolve
+    cache for the full TTL. Setting rows live in the TENANT schema, so
+    the current connection schema identifies whose generation to bump.
     """
     if getattr(instance, "name", "") not in {
         "AGENT_COMMERCE_ENABLED",
         "PRODUCT_FEEDS_ENABLED",
         "AGENT_HOSTED_PAYMENT_ENABLED",
+        # Folded into ``TenantConfig.features``.
+        *feature_setting_keys(),
     }:
         return
     _bump_generation_for_current_schema()

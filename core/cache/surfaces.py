@@ -8,6 +8,9 @@ from core.cache.registry import CacheSurface, register_surface
 #: Where Nitro keeps its cached page renders (``_nuxt_routes``).
 NUXT_ROUTE_PREFIX = "cache:nitro:routes:"
 
+#: Every page the storefront has cached for a store, and its settings read.
+STORE_PAGES_SURFACE = "store_pages"
+
 
 def _nuxt(*names: str) -> tuple[str, ...]:
     """Build Nuxt Nitro handler patterns from EXACT handler names.
@@ -596,6 +599,30 @@ def register_default_surfaces() -> None:
             related=("pay_way", "shipping", "loyalty"),
             icon="tune",
             group="config",
+        )
+    )
+
+    register_surface(
+        CacheSurface(
+            code=STORE_PAGES_SURFACE,
+            label=_("Storefront pages"),
+            description=_(
+                "Every page the storefront has rendered and cached for"
+                " this store, and its settings read. Purges itself when a"
+                " store feature is switched on or off, because the"
+                " navigation, footer and product cards of every page show"
+                " what the store offers."
+            ),
+            django_patterns=(),
+            # The settings read first, so a page rendered between the
+            # two deletions already reads the new switch. Then every
+            # rendered page: one pattern for the whole route family,
+            # which the purge endpoint narrows to this store's keys
+            # (``host``). Purging route keys also queues the edge purge.
+            nuxt_patterns=_nuxt("settingsPublic")
+            + (f"{NUXT_ROUTE_PREFIX}_:*",),
+            icon="web",
+            group="content",
         )
     )
 

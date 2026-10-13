@@ -46,6 +46,30 @@ class TenantShippingCarrierSerializer(serializers.Serializer):
         list_serializer_class = ActiveShippingCarrierListSerializer
 
 
+class StoreFeaturesSerializer(serializers.Serializer):
+    """Each optional feature's effective state for the store: its plan
+    flag AND its store settings (``tenant/features.py``), so a client reads
+    one answer instead of combining the two tiers and copying defaults."""
+
+    blog = serializers.BooleanField(read_only=True)
+    blog_comments = serializers.BooleanField(read_only=True)
+    product_reviews = serializers.BooleanField(read_only=True)
+    account_reviews = serializers.BooleanField(read_only=True)
+    favourites = serializers.BooleanField(read_only=True)
+    newsletter = serializers.BooleanField(read_only=True)
+    feedback = serializers.BooleanField(read_only=True)
+    loyalty = serializers.BooleanField(read_only=True)
+    promotions = serializers.BooleanField(read_only=True)
+    gift_cards = serializers.BooleanField(read_only=True)
+    wholesale = serializers.BooleanField(read_only=True)
+    product_suggestions = serializers.BooleanField(read_only=True)
+
+    def to_representation(self, instance) -> dict[str, bool]:
+        from tenant.features import effective_features
+
+        return effective_features(instance)
+
+
 class _ResendCooldownField(serializers.IntegerField):
     """``settings.ACCOUNT_RESEND_COOLDOWN_SECONDS``, read at render time.
 
@@ -171,6 +195,14 @@ class TenantConfigSerializer(serializers.Serializer):
     static_domain = serializers.SerializerMethodField()
 
     # --- Feature flags ---
+    # Each optional feature's EFFECTIVE state, plan flag AND store
+    # settings, from one table (``tenant/features.py``): what the agent
+    # gateway gates its tools on. Read-only, so REQUIRED in the schema,
+    # deliberately: it is always served, and the gateway's consumer
+    # contract requires it, which is what makes the deploy gate refuse a
+    # gateway release before a Django release serving it reaches
+    # production. The tenant row itself is the source.
+    features = StoreFeaturesSerializer(source="*", read_only=True)
     loyalty_enabled = serializers.BooleanField(read_only=True)
     blog_enabled = serializers.BooleanField(read_only=True)
     promotions_enabled = serializers.BooleanField(read_only=True)

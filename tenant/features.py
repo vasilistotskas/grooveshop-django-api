@@ -1,0 +1,121 @@
+"""Whether each optional store feature is on for a store, in one place.
+
+A feature is on when its plan flag on ``Tenant`` (if it has one) and every
+store setting it needs are on. The table names the same permission classes
+that answer 404 for the feature, so what ``TenantConfig.features`` tells a
+client can never disagree with what the API serves, and no client has to
+combine the two tiers, or copy the settings' defaults, itself.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+from django_tenants.utils import get_public_schema_name, schema_context
+
+from tenant.permissions import (
+    IsAccountReviewsEnabled,
+    IsB2BEnabled,
+    IsB2BWholesaleEnabled,
+    IsBlogCommentsEnabled,
+    IsBlogEnabled,
+    IsFavouritesEnabled,
+    IsFeedbackEnabled,
+    IsGiftCardsEnabled,
+    IsGiftCardsRuntimeEnabled,
+    IsLoyaltyEnabled,
+    IsLoyaltyRuntimeEnabled,
+    IsNewsletterEnabled,
+    IsProductReviewsEnabled,
+    IsPromotionsEnabled,
+    IsPromotionsRuntimeEnabled,
+    IsRecommendationsEnabled,
+    IsRecommendationsRuntimeEnabled,
+    IsSettingEnabled,
+    IsTenantFeatureEnabled,
+)
+
+
+@dataclass(frozen=True)
+class StoreFeature:
+    """A feature's plan flag (``None`` when the plan does not gate it) and
+    the store settings it needs, all of them on."""
+
+    plan: type[IsTenantFeatureEnabled] | None
+    settings: tuple[type[IsSettingEnabled], ...] = ()
+
+
+STORE_FEATURES: dict[str, StoreFeature] = {
+    "blog": StoreFeature(IsBlogEnabled),
+    "blog_comments": StoreFeature(IsBlogEnabled, (IsBlogCommentsEnabled,)),
+    "product_reviews": StoreFeature(None, (IsProductReviewsEnabled,)),
+    "account_reviews": StoreFeature(
+        None, (IsProductReviewsEnabled, IsAccountReviewsEnabled)
+    ),
+    "favourites": StoreFeature(None, (IsFavouritesEnabled,)),
+    "newsletter": StoreFeature(None, (IsNewsletterEnabled,)),
+    "feedback": StoreFeature(None, (IsFeedbackEnabled,)),
+    "loyalty": StoreFeature(IsLoyaltyEnabled, (IsLoyaltyRuntimeEnabled,)),
+    "promotions": StoreFeature(
+        IsPromotionsEnabled, (IsPromotionsRuntimeEnabled,)
+    ),
+    "gift_cards": StoreFeature(
+        IsGiftCardsEnabled, (IsGiftCardsRuntimeEnabled,)
+    ),
+    "wholesale": StoreFeature(IsB2BEnabled, (IsB2BWholesaleEnabled,)),
+    "product_suggestions": StoreFeature(
+        IsRecommendationsEnabled, (IsRecommendationsRuntimeEnabled,)
+    ),
+}
+
+
+def feature_setting_gates() -> tuple[type[IsSettingEnabled], ...]:
+    """Every store-setting gate some feature depends on, once each."""
+    return tuple(
+        dict.fromkeys(
+            gate
+            for feature in STORE_FEATURES.values()
+            for gate in feature.settings
+        )
+    )
+
+
+def feature_plan_flags() -> tuple[str, ...]:
+    """Every plan flag on ``Tenant`` some feature depends on, once each."""
+    return tuple(
+        dict.fromkeys(
+            feature.plan.feature_flag
+            for feature in STORE_FEATURES.values()
+            if feature.plan is not None
+        )
+    )
+
+
+def feature_setting_keys() -> frozenset[str]:
+    """Every store setting some feature depends on."""
+    return frozenset(gate.setting_key for gate in feature_setting_gates())
+
+
+def effective_features(tenant) -> dict[str, bool]:
+    """Every feature's state for ``tenant``: its plan flag read off the row,
+    its settings read in its own schema. The platform is not a store, so
+    every feature is off there."""
+    if tenant.schema_name == get_public_schema_name():
+        return dict.fromkeys(STORE_FEATURES, False)
+
+    from extra_settings.models import Setting
+
+    with schema_context(tenant.schema_name):
+        setting_on = {
+            gate: bool(Setting.get(gate.setting_key, default=gate.default))
+            for feature in STORE_FEATURES.values()
+            for gate in feature.settings
+        }
+    return {
+        name: (
+            feature.plan is None
+            or bool(getattr(tenant, feature.plan.feature_flag))
+        )
+        and all(setting_on[gate] for gate in feature.settings)
+        for name, feature in STORE_FEATURES.items()
+    }

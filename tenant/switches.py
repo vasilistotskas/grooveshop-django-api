@@ -4,11 +4,11 @@ An optional feature is on when the plan flag on ``Tenant`` and the
 store's own setting are both on, and either can move: the merchant saves
 the setting in the store's schema, the platform saves the plan flag on
 the shared ``Tenant`` row. ``on_switch_change`` queues a task in the
-store's schema, once the change commits, whenever either STORED value
-really changes. Not on a save that keeps the value, a partial ``Tenant``
-save whose ``update_fields`` leaves the flag out, a fixture load, or the
-extra-settings seeding of a new schema, which writes the default the
-store already had.
+store's schema, once the change commits, whenever one of the STORED
+values it watches really changes. Not on a save that keeps the value, a
+partial ``Tenant`` save whose ``update_fields`` leaves the flags out, a
+fixture load, or the extra-settings seeding of a new schema, which
+writes the default the store already had.
 """
 
 from __future__ import annotations
@@ -25,24 +25,34 @@ from tenant.permissions import IsSettingEnabled
 
 
 def on_switch_change(
-    *, setting: type[IsSettingEnabled], plan_flag: str, task: str
+    *,
+    setting_gates: tuple[type[IsSettingEnabled], ...],
+    plan_flags: tuple[str, ...],
+    task: str,
+    plan_countdown: int = 0,
 ) -> None:
     """Queue ``task`` (a dotted path) in the store's schema whenever the
-    store's ``setting`` or the ``plan_flag`` on its ``Tenant`` changes."""
-    setting_mark = f"_switch_before_{setting.setting_key}"
-    plan_mark = f"_plan_before_{plan_flag}"
-    uid = f"tenant.switch.{setting.setting_key}.{plan_flag}"
+    setting of one of the store's ``setting_gates``, or one of the
+    ``plan_flags`` on its ``Tenant``, really changes.
 
-    def queue(schema_name: str) -> None:
-        dispatch_on_commit(import_string(task), schema_name=schema_name)
+    ``plan_countdown`` holds the task that many seconds when a plan flag
+    moved, for work that must wait until a copy of the ``Tenant`` row
+    cached elsewhere has expired.
+    """
+    defaults = {gate.setting_key: gate.default for gate in setting_gates}
+    uid = f"tenant.switch.{task}"
+    setting_mark = f"_switch_before:{task}"
+    plan_mark = f"_plan_before:{task}"
 
-    def is_the_setting(instance: Any) -> bool:
-        return getattr(instance, "name", "") == setting.setting_key
+    def watched_key(instance: Any) -> str | None:
+        name = getattr(instance, "name", "")
+        return name if name in defaults else None
 
     def remember_setting(
         sender: Any, instance: Any, raw: bool = False, **kwargs: Any
     ) -> None:
-        if raw or not is_the_setting(instance):
+        key = watched_key(instance)
+        if raw or key is None:
             return
         stored = (
             sender.objects.filter(pk=instance.pk)
@@ -55,7 +65,7 @@ def on_switch_change(
         setattr(
             instance,
             setting_mark,
-            setting.default if stored is None else stored,
+            defaults[key] if stored is None else stored,
         )
 
     def setting_saved(
@@ -63,14 +73,16 @@ def on_switch_change(
     ) -> None:
         # Setting rows live in the store's schema, so the connection
         # names the store; the platform's own row moves nothing.
-        if raw or not is_the_setting(instance):
+        if raw or watched_key(instance) is None:
             return
         if connection.schema_name == get_public_schema_name():
             return
         before = getattr(instance, setting_mark, None)
         if before is None or bool(before) == bool(instance.value_bool):
             return
-        queue(connection.schema_name)
+        dispatch_on_commit(
+            import_string(task), schema_name=connection.schema_name
+        )
 
     def remember_plan(
         sender: Any, instance: Any, raw: bool = False, **kwargs: Any
@@ -79,7 +91,7 @@ def on_switch_change(
         if not raw and instance.pk:
             stored = (
                 sender.objects.filter(pk=instance.pk)
-                .values_list(plan_flag, flat=True)
+                .values(*plan_flags)
                 .first()
             )
         setattr(instance, plan_mark, stored)
@@ -94,14 +106,24 @@ def on_switch_change(
         if raw or created:
             return
         update_fields = kwargs.get("update_fields")
-        if update_fields is not None and plan_flag not in update_fields:
-            return
+        saved = (
+            plan_flags
+            if update_fields is None
+            else tuple(flag for flag in plan_flags if flag in update_fields)
+        )
         before = getattr(instance, plan_mark, None)
-        if before is None or before == getattr(instance, plan_flag):
+        if before is None or all(
+            before[flag] == getattr(instance, flag) for flag in saved
+        ):
             return
         if instance.schema_name == get_public_schema_name():
             return
-        queue(instance.schema_name)
+        # Passed only when set, so every other switch queues the very
+        # call it always did.
+        options = {"countdown": plan_countdown} if plan_countdown else {}
+        dispatch_on_commit(
+            import_string(task), schema_name=instance.schema_name, **options
+        )
 
     setting_model = "extra_settings.Setting"
     pre_save.connect(

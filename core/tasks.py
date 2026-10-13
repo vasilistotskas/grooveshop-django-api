@@ -25,7 +25,11 @@ from core import celery_app
 from core.cache import edge as edge_cache
 from core.cache import invalidation as cache_invalidation
 from core.cache.edge import EdgePurgeError
-from core.exceptions import HealthCheckFailed, ManagementCommandFailed
+from core.exceptions import (
+    HealthCheckFailed,
+    ManagementCommandFailed,
+    StorePagesPurgeFailed,
+)
 from core.utils.email_context import build_email_context
 from core.utils.i18n import get_user_language
 from tenant.celery import TenantTask
@@ -143,6 +147,39 @@ def invalidate_cache_surfaces_task():
     """
     surfaces = cache_invalidation.run_queued_purge()
     return {"status": "success", "surfaces": surfaces}
+
+
+@celery_app.task(
+    base=MonitoredTask,
+    max_retries=5,
+    autoretry_for=(StorePagesPurgeFailed,),
+    retry_backoff=True,
+    retry_jitter=True,
+)
+def purge_store_pages_task():
+    """Purge every page the storefront has cached for the current store.
+
+    Queued by ``tenant.signals`` when one of the store's feature switches
+    really changes; runs in that store's schema (``TenantTask``).
+
+    Retried while the storefront's purge endpoint fails (unreachable, an
+    error answer): one switch queues one purge, so nothing later would
+    make up for it, and the store would keep showing the feature until
+    each page's copy expired. A purge is idempotent, so a retry is safe.
+    An endpoint that is not configured is reported by ``CacheService``
+    and not retried, since nothing would change.
+    """
+    # Imported here: ``CacheService`` reaches the cache backend and the
+    # Nuxt client at import time.
+    from core.cache import nuxt as nuxt_client
+    from core.cache.service import CacheService
+    from core.cache.surfaces import STORE_PAGES_SURFACE
+
+    report = CacheService.purge([STORE_PAGES_SURFACE], include_related=False)
+    failed = [s.code for s in report.failed_surfaces]
+    if failed and nuxt_client.is_configured():
+        raise StorePagesPurgeFailed(failed)
+    return {"status": "success", "nuxt": report.nuxt_headline}
 
 
 @celery_app.task(

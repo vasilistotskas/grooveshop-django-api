@@ -69,3 +69,23 @@ def test_a_tenant_save_that_leaves_the_flag_alone_reprices_nothing():
         tenant.save()
 
     dispatch.assert_not_called()
+
+
+def test_saving_the_switch_unchanged_reprices_nothing(bind_tenant_and_schema):
+    bind_tenant_and_schema(SimpleNamespace(schema_name="shop_one"))
+    switch_store_settings(PROMOTIONS_ENABLED=True)
+
+    with patch(DISPATCH) as dispatch:
+        switch_store_settings(PROMOTIONS_ENABLED=True)
+
+    dispatch.assert_not_called()
+
+
+def test_a_partial_tenant_save_without_the_flag_reprices_nothing():
+    tenant = store_tenant("shop_four", promotions_enabled=False)
+
+    with patch(DISPATCH) as dispatch:
+        tenant.promotions_enabled = True
+        tenant.save(update_fields=["name"])
+
+    dispatch.assert_not_called()

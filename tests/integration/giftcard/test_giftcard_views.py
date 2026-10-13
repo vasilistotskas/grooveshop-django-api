@@ -414,6 +414,15 @@ class TestPurchaseStatus:
         assert response.status_code == 200, response.data
         assert response.data["status"] == "PAID"
 
+    def test_still_answers_after_the_plan_loses_gift_cards(self):
+        purchase = GiftCardPurchaseFactory(status=GiftCardPurchaseStatus.PAID)
+
+        with _gift_cards(), _plan_without_gift_cards():
+            response = _client().get(STATUS_URL, {"uuid": str(purchase.uuid)})
+
+        assert response.status_code == 200, response.data
+        assert response.data["status"] == "PAID"
+
     def test_known_uuid_returns_the_status(self):
         purchase = GiftCardPurchaseFactory(status=GiftCardPurchaseStatus.PAID)
 

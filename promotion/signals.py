@@ -38,6 +38,7 @@ from promotion.models import Promotion, PromotionRedemption
 from promotion.offer_sync import queue_refresh
 from promotion.offers import scope_product_ids
 from tenant.celery import dispatch_on_commit
+from tenant.permissions import IsPromotionsRuntimeEnabled
 
 _SCOPE_THROUGHS = (
     Promotion.products.through,
@@ -139,6 +140,36 @@ def _reprice_store(schema_name: str) -> None:
     dispatch_on_commit(reevaluate_price_episodes, schema_name=schema_name)
 
 
+def _is_promotions_switch(instance: Any) -> bool:
+    return (
+        getattr(instance, "name", "") == IsPromotionsRuntimeEnabled.setting_key
+    )
+
+
+@receiver(
+    pre_save,
+    sender="extra_settings.Setting",
+    dispatch_uid="promotion.remember_promotions_setting",
+)
+def remember_promotions_setting(
+    sender: Any, instance: Any, raw: bool = False, **kwargs: Any
+) -> None:
+    """Snapshot the stored switch so the post_save handler sees a change.
+    A store with no row yet has the setting's default."""
+    if raw or not _is_promotions_switch(instance):
+        return
+    stored = (
+        sender.objects.filter(pk=instance.pk)
+        .values_list("value_bool", flat=True)
+        .first()
+        if instance.pk
+        else None
+    )
+    instance._promotions_on_before = (
+        IsPromotionsRuntimeEnabled.default if stored is None else stored
+    )
+
+
 @receiver(
     post_save,
     sender="extra_settings.Setting",
@@ -149,9 +180,12 @@ def reprice_on_promotions_setting_change(
 ) -> None:
     """The merchant switched promotions off or on. Setting rows live in
     the tenant schema, so the connection names the store."""
-    if raw or getattr(instance, "name", "") != "PROMOTIONS_ENABLED":
+    if raw or not _is_promotions_switch(instance):
         return
     if connection.schema_name == get_public_schema_name():
+        return
+    before = getattr(instance, "_promotions_on_before", None)
+    if before is None or bool(before) == bool(instance.value_bool):
         return
     _reprice_store(connection.schema_name)
 
@@ -189,6 +223,11 @@ def reprice_on_promotions_plan_change(
 ) -> None:
     """The platform moved the store's promotions plan flag."""
     if raw or created:
+        return
+    update_fields = kwargs.get("update_fields")
+    if update_fields is not None and "promotions_enabled" not in update_fields:
+        # A partial save leaves the stored flag alone, whatever the
+        # instance holds in memory.
         return
     before = getattr(instance, "_promotions_plan_before", None)
     if before is None or before == instance.promotions_enabled:

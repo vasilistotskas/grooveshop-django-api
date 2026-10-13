@@ -24,8 +24,16 @@ from rest_framework.test import APIClient
 from product.factories.category import ProductCategoryFactory
 from product.factories.product import ProductFactory
 from recommendation.enum import Surface
+from tests.utils.store_settings import switch_store_settings
 
 pytestmark = pytest.mark.django_db
+
+
+@pytest.fixture(autouse=True)
+def _store_shows_suggestions():
+    """The merchant has product suggestions switched on (they ship off)."""
+    switch_store_settings(PRODUCT_SUGGESTIONS_ENABLED=True)
+
 
 URL = reverse("recommendation-list")
 

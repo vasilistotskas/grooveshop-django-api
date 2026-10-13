@@ -94,13 +94,18 @@ class GiftCardViewSet(BaseModelViewSet):
     serializers_config = serializers_config
 
     def get_permissions(self):
-        gates = [IsGiftCardsEnabled]
-        # A purchase's status keeps answering after a switch-off: the
-        # shopper polling it has already paid, and the card is issued.
-        if self.action != "purchase_status":
-            gates.append(IsGiftCardsRuntimeEnabled)
-        caller = IsAuthenticated if self.action == "mine" else AllowAny
-        self.permission_classes = [*gates, caller]
+        # A purchase's status keeps answering after either switch goes
+        # off: the shopper polling it has already paid, and the card is
+        # issued. A store that never sold cards has no purchase to find.
+        if self.action == "purchase_status":
+            self.permission_classes = [AllowAny]
+        else:
+            caller = IsAuthenticated if self.action == "mine" else AllowAny
+            self.permission_classes = [
+                IsGiftCardsEnabled,
+                IsGiftCardsRuntimeEnabled,
+                caller,
+            ]
         return super().get_permissions()
 
     def get_throttles(self):

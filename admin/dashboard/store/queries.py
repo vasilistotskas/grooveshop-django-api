@@ -96,9 +96,6 @@ RECENT_ORDERS = 6
 # stock 0 is out of stock, a different concern.
 LOW_STOCK_BELOW = 10
 
-# How far back a myDATA rejection still needs someone.
-MYDATA_REJECTED_DAYS = 7
-
 # Contact messages carry no read state; "new" is this many days back.
 NEW_MESSAGES_DAYS = 7
 
@@ -451,10 +448,10 @@ def attention_counts() -> dict[str, int]:
         "pending_business_profiles": model("b2b.BusinessProfile")
         .objects.filter(status=BusinessProfileStatus.PENDING)
         .count(),
+        # Every receipt still rejected, however old: REJECTED is
+        # terminal until someone corrects the details and resends it or
+        # cancels it, and either changes the status.
         "mydata_rejected": model("order.Invoice")
-        .objects.filter(
-            mydata_status=MyDataStatus.REJECTED,
-            updated_at__gte=now - timedelta(days=MYDATA_REJECTED_DAYS),
-        )
+        .objects.filter(mydata_status=MyDataStatus.REJECTED)
         .count(),
     }

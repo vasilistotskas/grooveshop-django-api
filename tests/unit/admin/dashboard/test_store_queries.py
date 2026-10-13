@@ -396,6 +396,27 @@ class TestAttentionCounts:
 
         assert queries.attention_counts.compute()["new_contact_messages"] == 1
 
+    def test_a_rejected_receipt_counts_until_someone_handles_it(self):
+        """REJECTED is terminal until a resend or a cancel changes it, so
+        a month-old rejection is still waiting work."""
+        from order.models.invoice import Invoice, MyDataStatus
+
+        old = Invoice.objects.create(
+            order=OrderFactory(num_order_items=0),
+            invoice_number="INV-2026-000903",
+            mydata_status=MyDataStatus.REJECTED,
+        )
+        Invoice.objects.filter(pk=old.pk).update(
+            updated_at=timezone.now() - timedelta(days=30)
+        )
+        Invoice.objects.create(
+            order=OrderFactory(num_order_items=0),
+            invoice_number="INV-2026-000904",
+            mydata_status=MyDataStatus.CONFIRMED,
+        )
+
+        assert queries.attention_counts.compute()["mydata_rejected"] == 1
+
     def test_low_stock_is_the_warning_band_only(self):
         from product.factories.product import ProductFactory
 

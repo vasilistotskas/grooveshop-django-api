@@ -342,17 +342,9 @@ class StoreAttention(DashboardWidget):
                 "report",
                 "danger",
                 _("Receipts rejected by myDATA"),
-                _("In the last %(days)s days")
-                % {"days": queries.MYDATA_REJECTED_DAYS},
+                _("Correct the details and send them again"),
                 "order.Invoice",
-                urlencode(
-                    {
-                        "mydata_status__exact": MyDataStatus.REJECTED,
-                        "updated_at__gte": _days_ago(
-                            queries.MYDATA_REJECTED_DAYS
-                        ),
-                    }
-                ),
+                urlencode({"mydata_status__exact": MyDataStatus.REJECTED}),
             ),
             (
                 features.reviews,

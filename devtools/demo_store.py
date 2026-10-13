@@ -55,6 +55,9 @@ from devtools.demo_media import (
     media_path,
     storage_name,
 )
+from devtools.demo_price_history import (
+    seed_price_history as _seed_price_history,
+)
 from devtools.demo_promotions import seed_promotions as _seed_promotions
 from devtools.demo_reviews import seed_reviews as _seed_reviews
 
@@ -2442,6 +2445,11 @@ def seed_pay_ways() -> dict[str, int]:
         .update(cost=amount, cost_currency=currency)
     )
     return {"updated": changed} if changed else {"unchanged": 1}
+
+
+def seed_price_history() -> dict[str, int]:
+    """Back-date the marked-down products' prices — see ``demo_price_history``."""
+    return _seed_price_history()
 
 
 def seed_promotions() -> dict[str, int]:

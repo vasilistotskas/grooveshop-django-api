@@ -19,7 +19,7 @@ from tests.utils.store_settings import switch_store_settings
 
 pytestmark = pytest.mark.django_db
 
-DISPATCH = "promotion.signals.dispatch_on_commit"
+DISPATCH = "tenant.switches.dispatch_on_commit"
 
 
 def test_the_store_switch_reprices_its_store(bind_tenant_and_schema):
@@ -39,7 +39,8 @@ def test_another_store_setting_reprices_nothing(bind_tenant_and_schema):
     with patch(DISPATCH) as dispatch:
         switch_store_settings(LOYALTY_ENABLED=True)
 
-    dispatch.assert_not_called()
+    queued = [call.args[0] for call in dispatch.call_args_list]
+    assert reevaluate_price_episodes not in queued
 
 
 def test_the_platforms_own_setting_reprices_nothing():

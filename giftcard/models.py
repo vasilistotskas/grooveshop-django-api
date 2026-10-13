@@ -21,7 +21,7 @@ from django_stubs_ext.db.models import TypedModelMeta
 from djmoney.models.fields import MoneyField
 from djmoney.money import Money
 
-from core.models import TimeStampMixinModel, UUIDModel
+from core.models import FeaturePauseModel, TimeStampMixinModel, UUIDModel
 from giftcard.enum import (
     GiftCardPurchaseStatus,
     GiftCardSource,
@@ -318,4 +318,20 @@ class GiftCardTransaction(TimeStampMixinModel):
             "kind": self.get_kind_display(),
             "amount": self.amount,
             "card": self.gift_card_id,
+        }
+
+
+class GiftCardPause(FeaturePauseModel):
+    """A span during which the store had gift cards switched off. When
+    they come back on, every active card's expiry moves forward by it,
+    so a card loses no validity while it could not be spent."""
+
+    class Meta(FeaturePauseModel.Meta):
+        verbose_name = _("Gift Card Pause")
+        verbose_name_plural = _("Gift Card Pauses")
+        db_table = "giftcard_pause"
+
+    def __str__(self):
+        return gettext("Gift cards off from %(start)s") % {
+            "start": self.started_at
         }

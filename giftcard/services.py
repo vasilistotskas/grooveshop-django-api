@@ -17,6 +17,7 @@ from decimal import Decimal
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.db.models import F
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from djmoney.money import Money
@@ -28,7 +29,12 @@ from giftcard.enum import (
     GiftCardStatus,
     GiftCardTransactionKind,
 )
-from giftcard.models import GiftCard, GiftCardPurchase, GiftCardTransaction
+from giftcard.models import (
+    GiftCard,
+    GiftCardPause,
+    GiftCardPurchase,
+    GiftCardTransaction,
+)
 from tenant.celery import dispatch_on_commit
 
 logger = logging.getLogger(__name__)
@@ -488,17 +494,42 @@ class GiftCardService:
     # ── expiry ─────────────────────────────────────────────────────
 
     @classmethod
+    def sync_pause(cls) -> None:
+        """Bring the store's record of gift-card pauses in line with its
+        switch: open a span while gift cards are off; when they are back
+        on, close it and move every active card's expiry forward by it,
+        so no card loses validity while it could not be spent.
+
+        Run when the switch changes (``tenant.switches``) and by the
+        daily expiry sweep, which also opens a span for a store that was
+        already off before spans were recorded.
+        """
+        now = timezone.now()
+        if not cls.is_enabled():
+            GiftCardPause.open_at(now)
+            return
+        span = GiftCardPause.close_at(now)
+        if span is None or span.ended_at is None:
+            return
+        GiftCard.objects.filter(
+            status=GiftCardStatus.ACTIVE,
+            expires_at__gt=span.started_at,
+        ).update(
+            expires_at=F("expires_at") + (span.ended_at - span.started_at),
+            updated_at=now,
+        )
+
+    @classmethod
     def expire_cards(cls) -> int:
         """Write EXPIRE rows for expired cards with a positive balance.
 
         The negative row equals the remaining balance (never more —
         the loyalty min-clamp rule), so an expired card sums to zero.
 
-        Nothing expires while gift cards are off: no card can be spent
-        then, so zeroing balances would destroy money the store keeps
-        for when it turns them back on. A card past its date is expired
-        by the first sweep after that.
+        Nothing expires while gift cards are off, and the time they were
+        off does not count (``sync_pause``).
         """
+        cls.sync_pause()
         if not cls.is_enabled():
             return 0
         now = timezone.now()

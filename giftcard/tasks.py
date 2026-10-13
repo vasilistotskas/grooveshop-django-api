@@ -259,6 +259,23 @@ def send_gift_card_expiry_reminders(self) -> dict:
     retry_backoff=True,
     retry_jitter=True,
 )
+def sync_gift_card_pause(self) -> dict:
+    """The store switched gift cards off or on: record the pause, or close
+    it and move active cards' expiry forward by it."""
+    from giftcard.services import GiftCardService
+
+    GiftCardService.sync_pause()
+    return {"status": "success"}
+
+
+@celery_app.task(
+    base=MonitoredTask,
+    bind=True,
+    max_retries=5,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_jitter=True,
+)
 def expire_gift_cards(self) -> dict:
     """Daily sweep: EXPIRE-out the remaining balance of expired cards."""
     from giftcard.services import GiftCardService

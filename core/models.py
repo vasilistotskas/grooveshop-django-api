@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import uuid
 import zlib
-from typing import Any
+from datetime import datetime, timedelta
+from typing import Any, Self
 
 from django.contrib.postgres.indexes import BTreeIndex, GinIndex
 from django.core.serializers.json import DjangoJSONEncoder
@@ -271,6 +272,70 @@ class TimeStampMixinModel(models.Model):
             BTreeIndex(fields=["created_at"], name="%(class)s_created_at_ix"),
             BTreeIndex(fields=["updated_at"], name="%(class)s_updated_at_ix"),
         ]
+
+
+class FeaturePauseModel(models.Model):
+    """A span during which the store had an optional feature switched off.
+
+    One concrete subclass per feature, in that feature's own app, so the
+    time a feature was off never counts against what it holds: a gift
+    card's validity, a loyalty point's age. At most one span is open
+    (``ended_at`` empty) at a time, enforced by the database.
+    """
+
+    started_at = models.DateTimeField(_("Started At"))
+    ended_at = models.DateTimeField(_("Ended At"), null=True, blank=True)
+
+    class Meta(TypedModelMeta):
+        abstract = True
+        ordering = ["-started_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["ended_at"],
+                condition=Q(ended_at__isnull=True),
+                nulls_distinct=False,
+                name="%(app_label)s_%(class)s_one_open_span",
+            ),
+        ]
+
+    @classmethod
+    def open_at(cls, moment: datetime) -> None:
+        """Open a span at ``moment`` unless one is open already."""
+        if not cls._default_manager.filter(ended_at__isnull=True).exists():
+            cls._default_manager.create(started_at=moment)
+
+    @classmethod
+    def close_at(cls, moment: datetime) -> Self | None:
+        """Close the open span at ``moment`` and return it, if any."""
+        with transaction.atomic():
+            span = (
+                cls._default_manager.select_for_update()
+                .filter(ended_at__isnull=True)
+                .first()
+            )
+            if span is None:
+                return None
+            span.ended_at = moment
+            span.save(update_fields=["ended_at"])
+            return span
+
+    @classmethod
+    def active_cutoff(cls, moment: datetime, span: timedelta) -> datetime:
+        """The point before ``moment`` from which ``span`` of time with
+        the feature ON has passed: anything older than it has been
+        live for longer than ``span``, the off time not counted."""
+        remaining = span
+        cursor = moment
+        for pause in cls._default_manager.filter(
+            started_at__lt=moment
+        ).order_by("-started_at"):
+            end = min(pause.ended_at or moment, cursor)
+            live = cursor - end
+            if live >= remaining:
+                return cursor - remaining
+            remaining -= live
+            cursor = min(pause.started_at, cursor)
+        return cursor - remaining
 
 
 class UUIDModel(models.Model):

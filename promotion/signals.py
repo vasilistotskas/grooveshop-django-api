@@ -20,25 +20,20 @@ the nightly Meilisearch sync repairs it.
 
 from __future__ import annotations
 
-from typing import Any
-
-from django.db import connection
 from django.db.models import Count
 from django.db.models.signals import (
     m2m_changed,
     post_delete,
     post_save,
     pre_delete,
-    pre_save,
 )
 from django.dispatch import receiver
-from django_tenants.utils import get_public_schema_name
 
 from promotion.models import Promotion, PromotionRedemption
 from promotion.offer_sync import queue_refresh
 from promotion.offers import scope_product_ids
-from tenant.celery import dispatch_on_commit
 from tenant.permissions import IsPromotionsRuntimeEnabled
+from tenant.switches import on_switch_change
 
 _SCOPE_THROUGHS = (
     Promotion.products.through,
@@ -128,110 +123,12 @@ def reindex_offer_on_redemption_delete(sender, instance, **kwargs):
         queue_refresh(promotion_ids=[instance.promotion_id])
 
 
-def _reprice_store(schema_name: str) -> None:
-    """Re-run the store's price sweep once the change commits.
-
-    Every promoted price, ``on_offer`` and the search documents follow
-    the switch now rather than at the 03:00 sweep, which left the lists
-    showing promotion prices the cart no longer honoured for up to a day.
-    """
-    from product.tasks import reevaluate_price_episodes
-
-    dispatch_on_commit(reevaluate_price_episodes, schema_name=schema_name)
-
-
-def _is_promotions_switch(instance: Any) -> bool:
-    return (
-        getattr(instance, "name", "") == IsPromotionsRuntimeEnabled.setting_key
-    )
-
-
-@receiver(
-    pre_save,
-    sender="extra_settings.Setting",
-    dispatch_uid="promotion.remember_promotions_setting",
+# Switching promotions off or on moves every promoted price at once, so it
+# re-runs the store's whole price sweep now rather than at 03:00, which
+# left lists and search showing promotion prices the cart no longer
+# honoured for up to a day.
+on_switch_change(
+    setting=IsPromotionsRuntimeEnabled,
+    plan_flag="promotions_enabled",
+    task="product.tasks.reevaluate_price_episodes",
 )
-def remember_promotions_setting(
-    sender: Any, instance: Any, raw: bool = False, **kwargs: Any
-) -> None:
-    """Snapshot the stored switch so the post_save handler sees a change.
-    A store with no row yet has the setting's default."""
-    if raw or not _is_promotions_switch(instance):
-        return
-    stored = (
-        sender.objects.filter(pk=instance.pk)
-        .values_list("value_bool", flat=True)
-        .first()
-        if instance.pk
-        else None
-    )
-    instance._promotions_on_before = (
-        IsPromotionsRuntimeEnabled.default if stored is None else stored
-    )
-
-
-@receiver(
-    post_save,
-    sender="extra_settings.Setting",
-    dispatch_uid="promotion.reprice_on_promotions_setting_change",
-)
-def reprice_on_promotions_setting_change(
-    sender: Any, instance: Any, raw: bool = False, **kwargs: Any
-) -> None:
-    """The merchant switched promotions off or on. Setting rows live in
-    the tenant schema, so the connection names the store."""
-    if raw or not _is_promotions_switch(instance):
-        return
-    if connection.schema_name == get_public_schema_name():
-        return
-    before = getattr(instance, "_promotions_on_before", None)
-    if before is None or bool(before) == bool(instance.value_bool):
-        return
-    _reprice_store(connection.schema_name)
-
-
-@receiver(
-    pre_save,
-    sender="tenant.Tenant",
-    dispatch_uid="promotion.remember_promotions_plan",
-)
-def remember_promotions_plan(
-    sender: Any, instance: Any, raw: bool = False, **kwargs: Any
-) -> None:
-    """Snapshot the plan flag so the post_save handler sees a change."""
-    if raw or not instance.pk:
-        instance._promotions_plan_before = None
-        return
-    instance._promotions_plan_before = (
-        sender.objects.filter(pk=instance.pk)
-        .values_list("promotions_enabled", flat=True)
-        .first()
-    )
-
-
-@receiver(
-    post_save,
-    sender="tenant.Tenant",
-    dispatch_uid="promotion.reprice_on_promotions_plan_change",
-)
-def reprice_on_promotions_plan_change(
-    sender: Any,
-    instance: Any,
-    created: bool,
-    raw: bool = False,
-    **kwargs: Any,
-) -> None:
-    """The platform moved the store's promotions plan flag."""
-    if raw or created:
-        return
-    update_fields = kwargs.get("update_fields")
-    if update_fields is not None and "promotions_enabled" not in update_fields:
-        # A partial save leaves the stored flag alone, whatever the
-        # instance holds in memory.
-        return
-    before = getattr(instance, "_promotions_plan_before", None)
-    if before is None or before == instance.promotions_enabled:
-        return
-    if instance.schema_name == get_public_schema_name():
-        return
-    _reprice_store(instance.schema_name)

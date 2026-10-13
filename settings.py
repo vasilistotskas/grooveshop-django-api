@@ -2474,6 +2474,24 @@ EXTRA_SETTINGS_DEFAULTS = [
         ),
     },
     {
+        "name": "FUNDING_BANNER",
+        "type": "json",
+        "value": {"enabled": False},
+        "validator": "tenant.validators.validate_funding_banner_setting",
+        "description": (
+            "EU/ESPA co-funding strip at the very top of every "
+            'storefront page, as JSON: {"enabled": bool, "image": '
+            '"<logo strip: /path or https URL>", "alt": "<accessible '
+            'name of the logos>", "link": "<page describing the funded '
+            'operation: /path or https URL>", "label"?: "<visible link '
+            'text>"}. `image`, `alt` and `link` are required when '
+            "enabled; `image` and `link` are at most 1000 characters, "
+            "`alt` 300, `label` 120. Links must be site-relative paths "
+            "or https URLs. A disabled banner is just "
+            '{"enabled": false}.'
+        ),
+    },
+    {
         "name": "DEMO_ACCOUNT_ENABLED",
         "type": "bool",
         "value": False,

@@ -113,6 +113,13 @@ def test_the_announcement_bar_is_public_and_empty_by_default():
     assert values["ANNOUNCEMENT_BAR"] == "{}"
 
 
+def test_the_funding_banner_is_public_and_disabled_by_default():
+    """Legally required co-funding strip shown to every visitor."""
+    values = _public_settings()
+
+    assert json.loads(values["FUNDING_BANNER"]) == {"enabled": False}
+
+
 def test_the_auth_panel_is_public_and_empty_by_default():
     """Shown on the sign-in pages before anyone has authenticated."""
     values = _public_settings()

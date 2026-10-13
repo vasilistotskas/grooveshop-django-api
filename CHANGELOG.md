@@ -3,6 +3,35 @@
 
 
 
+## v3.115.1 (2026-10-13)
+
+### Bug fixes
+
+* fix(core): stop cached viewsets sharing one OpenAPI annotation (#182)
+
+drf-spectacular keeps a view method's @extend_schema in the method's
+kwargs["schema"]. cache_methods replaces list/retrieve with a
+method_decorator wrapper, and update_wrapper copies the wrapped
+function's __dict__ shallowly, so every wrapper held the same kwargs dict
+as BaseModelViewSet.list (which BaseModelViewSet's own
+@extend_schema_view gives one). drf-spectacular isolates an inherited
+method before annotating it, but not a method defined on the class,
+which the wrapper is, so each cached viewset's @extend_schema_view wrote
+into one shared dict and the last one decorated documented all of them.
+
+Wherever the response cache is on (production, CI) the generated schema
+documented GET /api/v1/country as returning PayWay rows and lost 19
+components; with DISABLE_CACHE, as developers generate schema.yml, it was
+right, so the committed file never showed it. The wrapper now gets its
+own copy of kwargs, the copy drf-spectacular's isolate_view_method makes.
+Regenerating with the cache on now matches the committed schema.yml.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`cf918f4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cf918f4048eb118077e4ef2ccb2e73328a8a5265))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.115.0 [skip ci] ([`29e882b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/29e882b09023a700568e964b6fbbd68cb5e7705d))
+
 ## v3.115.0 (2026-10-13)
 
 ### Bug fixes

@@ -3,6 +3,33 @@
 
 
 
+## v3.121.0 (2026-10-13)
+
+### Features
+
+* feat(tenant): a store feature switched off is off on every route and job (#187)
+
+A store feature switched off (its plan flag or the store's own setting)
+is now off on every route and job that serves it:
+
+- New runtime gates (IsAccountReviewsEnabled, IsGiftCardsRuntimeEnabled,
+  IsRecommendationsRuntimeEnabled) close the product reviews and blog
+  comments actions, the account's favourites/reviews/comments/likes
+  actions, the agent loyalty and favourites views, gift cards (purchase
+  status stays open) and recommendations.
+- A cart lists and applies no coupon while promotions are off.
+- Gift-card scheduled delivery, reminders and expiry, and loyalty point
+  expiry, pause while their feature is off; a refund always reverses
+  loyalty points.
+- Time a feature is off does not count: GiftCardPause and LoyaltyPause
+  record each span, and switching back on moves active gift cards'
+  expiry and the points cutoff past it.
+- tenant/switches.py: on_switch_change queues work only on a real change
+  of the store setting or the plan flag; the promotions switch reprices
+  at once.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`d823e1d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d823e1d85d55f68bc84fe20e9d4cbe0bc7d9ba52))
+
 ## v3.120.0 (2026-10-13)
 
 ### Features

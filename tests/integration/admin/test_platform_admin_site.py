@@ -389,13 +389,11 @@ class TestPlatformDashboardPage(TestCase):
 
 
 class TestCommandPalette(TestCase):
-    """The ⌘K palette must find RECORDS, and its config must not drift.
+    """The control plane's ⌘K palette finds RECORDS, not only pages.
 
-    Without a ``COMMAND`` block, ``UNFOLD_PLATFORM`` fell back to
-    unfold's defaults (``search_models: False``): every keystroke still
-    cost a 500ms-debounced round trip to ``/admin/search/``, but only
-    sidebar APP TITLES were matched — typing a tenant's name, domain or
-    a user's email returned nothing.
+    Typing a tenant's name, domain or a user's email must return the
+    row; at one point only sidebar app titles were matched and those
+    searches returned nothing.
     """
 
     @classmethod
@@ -441,35 +439,25 @@ class TestCommandPalette(TestCase):
         assert response.status_code == 200
         assert response.content == b""
 
-    def test_both_sites_share_the_schema_aware_search_callable(self):
-        """One callable, two sites — scoping rules cannot drift.
+    def test_every_model_it_can_search_has_a_public_table(self):
+        """The palette searches every model this site registers, on the
+        public schema. A model of a store-only app has no table there:
+        each keystroke would answer 500 (ProgrammingError)."""
+        from django.apps import apps
+        from django.conf import settings
 
-        On a tenant schema it returns True (search everything); on the
-        public schema it returns the SHARED_APPS whitelist, because
-        every other registered model's table exists only inside tenant
-        schemas and would raise ProgrammingError per keystroke.
-        """
-        from unfold.settings import get_config
-
-        callable_path = "core.utils.admin.command_search_models"
-        for settings_name in ("UNFOLD", "UNFOLD_PLATFORM"):
-            command = get_config(settings_name)["COMMAND"]
-            assert command["search_models"] == callable_path, settings_name
-
-    def test_the_whitelist_covers_only_registered_platform_models(self):
-        """Every whitelisted model must be ON the platform site — a
-        result row links to ``platform_admin:<app>_<model>_change``,
-        which 404s (NoReverseMatch → 500) for unregistered models."""
-        from core.utils.admin import command_search_models
-
-        registered = {
-            model._meta.label for model in platform_admin_site._registry
+        # An entry names the app's module or its AppConfig class.
+        shared = {
+            config.label
+            for config in apps.get_app_configs()
+            if config.name in settings.SHARED_APPS
+            or f"{type(config).__module__}.{type(config).__name__}"
+            in settings.SHARED_APPS
         }
-        request = RequestFactory().get("/admin/search/")
-        whitelist = command_search_models(request)
-        assert isinstance(whitelist, list)
-        missing = set(whitelist) - registered
-        assert not missing, f"whitelisted but not registered: {missing}"
+        registered = {
+            model._meta.app_label for model in platform_admin_site._registry
+        }
+        assert registered <= shared, registered - shared
 
 
 class TestAdminLoginLandsInTheAdmin(SimpleTestCase):

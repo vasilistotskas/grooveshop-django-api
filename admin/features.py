@@ -136,6 +136,31 @@ class StoreFeatures:
             boxnow=BoxNowCarrier.code in active_carriers,
         )
 
+    def absent_apps(self) -> frozenset[str]:
+        """App labels of what this store does not have - a feature off
+        its plan, a carrier it does not use. The sidebar lists none of
+        their pages, and the ⌘K palette (``admin.search``) none of their
+        screens or records."""
+        absent = {
+            app
+            for app, availability in (
+                ("loyalty", self.loyalty),
+                ("promotion", self.promotions),
+                ("giftcard", self.gift_cards),
+                ("b2b", self.wholesale),
+                ("recommendation", self.recommendations),
+            )
+            if not availability.configurable
+        }
+        for app, present in (
+            ("blog", self.blog),
+            ("shipping_acs", self.acs),
+            ("shipping_boxnow", self.boxnow),
+        ):
+            if not present:
+                absent.add(app)
+        return frozenset(absent)
+
 
 def store_features(request: Any) -> StoreFeatures:
     """The request's feature state, read once and kept on the request."""

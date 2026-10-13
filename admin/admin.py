@@ -18,6 +18,7 @@ from admin.forms import (
     PlatformPasswordChangeForm,
 )
 from admin.mixins import AdminFooterMixin, AdminSiteLoginNextMixin
+from admin.search import CommandSearchMixin
 from core.cache import CacheService
 from core.cache.nuxt import is_configured as nuxt_purge_configured
 from core.cache.registry import GROUP_LABELS, iter_surfaces
@@ -66,7 +67,12 @@ def _purge_log_table(logs) -> dict:
     }
 
 
-class MyAdminSite(AdminFooterMixin, AdminSiteLoginNextMixin, UnfoldAdminSite):
+class MyAdminSite(
+    CommandSearchMixin,
+    AdminFooterMixin,
+    AdminSiteLoginNextMixin,
+    UnfoldAdminSite,
+):
     index_title = _("Dashboard")
     api_docs_url_name = "swagger-ui"
 
@@ -121,6 +127,13 @@ class MyAdminSite(AdminFooterMixin, AdminSiteLoginNextMixin, UnfoldAdminSite):
             return True
         membership = get_membership(user, tenant)
         return membership is not None and membership.is_tenant_staff
+
+    def command_hidden_apps(self, request) -> frozenset[str]:
+        """The ⌘K palette leaves out what this store does not have, as
+        its sidebar does."""
+        from admin.features import store_features
+
+        return store_features(request).absent_apps()
 
     def password_change(self, request, extra_context=None):
         """Unfold's password-change view, saving to the PUBLIC schema.

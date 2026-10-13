@@ -20197,3 +20197,15 @@ msgstr ""
 #, python-format
 msgid "Version %(version)s"
 msgstr ""
+
+#: .\tenant\models.py:1060
+msgid "BoxNow Live Mode"
+msgstr ""
+
+#: .\tenant\models.py:1064
+msgid ""
+"Which BoxNow environment this tenant's keys belong to: production when on, "
+"stage when off. BoxNow stage and production keys only work against their own "
+"API, so set this to match the keys entered here. There is NO platform "
+"fallback: off means stage."
+msgstr ""

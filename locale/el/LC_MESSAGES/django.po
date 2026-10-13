@@ -22713,3 +22713,20 @@ msgstr "Από πού έρχονται οι παραγγελίες"
 #, python-format
 msgid "Version %(version)s"
 msgstr "Έκδοση %(version)s"
+
+#: .\tenant\models.py:1060
+msgid "BoxNow Live Mode"
+msgstr "Λειτουργία Live BoxNow"
+
+#: .\tenant\models.py:1064
+msgid ""
+"Which BoxNow environment this tenant's keys belong to: production when on, "
+"stage when off. BoxNow stage and production keys only work against their own "
+"API, so set this to match the keys entered here. There is NO platform "
+"fallback: off means stage."
+msgstr ""
+"Σε ποιο περιβάλλον BoxNow ανήκουν τα κλειδιά αυτού του καταστήματος: "
+"παραγωγή όταν είναι ενεργό, stage όταν είναι ανενεργό. Τα κλειδιά stage και "
+"παραγωγής λειτουργούν μόνο στο δικό τους API, γι' αυτό ρυθμίστε το ώστε να "
+"ταιριάζει με τα κλειδιά που έχουν καταχωριστεί εδώ. ΔΕΝ υπάρχει εφεδρική "
+"τιμή πλατφόρμας: ανενεργό σημαίνει stage."

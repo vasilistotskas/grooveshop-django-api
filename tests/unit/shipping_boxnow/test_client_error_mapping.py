@@ -86,7 +86,7 @@ class TestConstruction:
         assert client.api_base_url == _API
         assert client.location_api_base_url == _LOCATIONS
         assert client.partner_id == "4242"
-        assert client._token_cache_key == "boxnow:access_token:4242"
+        assert client._token_cache_key == "boxnow:access_token:stage:4242"
 
     def test_default_session_mounts_the_retrying_adapter(self):
         client = _client(session=None)
@@ -157,7 +157,7 @@ class TestTokenLifecycle:
             assert client._get_access_token() == "fresh"
 
         cache_set.assert_called_once_with(
-            "boxnow:access_token:4242", "fresh", timeout=ttl
+            "boxnow:access_token:stage:4242", "fresh", timeout=ttl
         )
 
 

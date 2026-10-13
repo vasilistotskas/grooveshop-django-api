@@ -48,6 +48,16 @@ class VivaWalletCredentials(TypedDict):
     live_mode: bool
 
 
+class BoxNowCredentials(TypedDict):
+    client_id: str
+    client_secret: str
+    partner_id: str
+    warehouse_id: str
+    notify_phone: str
+    webhook_secret: str
+    live_mode: bool
+
+
 class StripeCredentials(TypedDict):
     secret_key: str
     publishable_key: str
@@ -581,7 +591,7 @@ def mydata_credentials() -> dict[str, str]:
 # ---------------------------------------------------------------------------
 
 
-def box_now_credentials() -> dict[str, str]:
+def box_now_credentials() -> BoxNowCredentials:
     """Return all BoxNow credentials for the current tenant.
 
     Tenant-only — NO platform-wide fallback. Empty means BoxNow is not
@@ -595,9 +605,11 @@ def box_now_credentials() -> dict[str, str]:
     for the storefront BoxNow widget, but it's included here so the
     ``BoxNowClient`` constructor receives a single source of truth.
 
-    Platform-scoped transport config (``BOXNOW_API_BASE_URL``,
-    ``BOXNOW_LOCATION_API_BASE_URL``, ``BOXNOW_HTTP_TIMEOUT``) is NOT
-    per-merchant identity and stays in ``settings``.
+    ``live_mode`` says which BoxNow environment the keys belong to
+    (production when True, stage otherwise); ``BoxNowClient`` maps it to
+    the platform's ``BOXNOW_PRODUCTION_*`` / ``BOXNOW_STAGE_*`` hosts.
+    Platform-scoped transport config (those hosts, ``BOXNOW_HTTP_TIMEOUT``)
+    is NOT per-merchant identity and stays in ``settings``.
 
     Returns:
         {
@@ -607,8 +619,10 @@ def box_now_credentials() -> dict[str, str]:
             "warehouse_id":   str,
             "notify_phone":   str,
             "webhook_secret": str,
+            "live_mode":      bool,
         }
     """
+    tenant = bound_tenant()
     return {
         "client_id": _get_tenant_field("box_now_client_id"),
         "client_secret": _get_tenant_field("box_now_client_secret"),
@@ -616,4 +630,5 @@ def box_now_credentials() -> dict[str, str]:
         "warehouse_id": _get_tenant_field("box_now_warehouse_id"),
         "notify_phone": _get_tenant_field("box_now_notify_phone"),
         "webhook_secret": _get_tenant_field("box_now_webhook_secret"),
+        "live_mode": bool(getattr(tenant, "box_now_live_mode", None)),
     }

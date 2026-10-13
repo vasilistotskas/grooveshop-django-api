@@ -39,11 +39,13 @@ class BoxNowClient:
     All credentials default to the active tenant's ``Tenant.box_now_*``
     fields (via ``tenant.credentials.box_now_credentials()`` — no
     platform-wide fallback); pass explicit values to override (useful
-    in tests).
+    in tests). The API hosts follow ``Tenant.box_now_live_mode``: the
+    production hosts when it is on, the stage hosts when it is off.
 
     OAuth tokens are cached in Django's cache backend (Redis in production)
-    under ``boxnow:access_token:{partner_id}`` so that Daphne workers and
-    Celery workers share a single token without racing to refresh it.
+    under ``boxnow:access_token:{environment}:{partner_id}`` so that Daphne
+    workers and Celery workers share a single token without racing to
+    refresh it.
     """
 
     def __init__(
@@ -63,19 +65,22 @@ class BoxNowClient:
         self.client_id = client_id or creds["client_id"]
         self.client_secret = client_secret or creds["client_secret"]
         self.partner_id = str(partner_id or creds["partner_id"])
-        self.api_base_url = (
-            api_base_url
-            or getattr(
-                settings, "BOXNOW_API_BASE_URL", "https://api-stage.boxnow.gr"
+        self.live_mode = bool(creds["live_mode"])
+        if self.live_mode and not settings.BOXNOW_LIVE_MODE_ALLOWED:
+            raise BoxNowConfigError(
+                "Tenant.box_now_live_mode is on, but this deployment is not "
+                "allowed to reach the production BoxNow API."
             )
-        ).rstrip("/")
+        self.environment = "production" if self.live_mode else "stage"
+        if self.live_mode:
+            default_api = settings.BOXNOW_PRODUCTION_API_BASE_URL
+            default_location = settings.BOXNOW_PRODUCTION_LOCATION_API_BASE_URL
+        else:
+            default_api = settings.BOXNOW_STAGE_API_BASE_URL
+            default_location = settings.BOXNOW_STAGE_LOCATION_API_BASE_URL
+        self.api_base_url = (api_base_url or default_api).rstrip("/")
         self.location_api_base_url = (
-            location_api_base_url
-            or getattr(
-                settings,
-                "BOXNOW_LOCATION_API_BASE_URL",
-                "https://locationapi-stage.boxnow.gr",
-            )
+            location_api_base_url or default_location
         ).rstrip("/")
         self.timeout = timeout or getattr(settings, "BOXNOW_HTTP_TIMEOUT", 10)
 
@@ -101,9 +106,12 @@ class BoxNowClient:
             self._session.mount("https://", adapter)
             self._session.mount("http://", adapter)
 
-        # Cache key scoped to partner_id so stage and prod credentials stored
-        # in the same Redis instance never collide.
-        self._token_cache_key = f"boxnow:access_token:{self.partner_id}"
+        # Cache key scoped to environment and partner_id: a stage token is
+        # not valid on the production API, so flipping the tenant's mode
+        # must never serve the other environment's cached token.
+        self._token_cache_key = (
+            f"boxnow:access_token:{self.environment}:{self.partner_id}"
+        )
 
     # ------------------------------------------------------------------
     # OAuth
@@ -113,7 +121,8 @@ class BoxNowClient:
         """
         Return a valid OAuth bearer token, fetching a new one when necessary.
 
-        The token is cached under ``boxnow:access_token:{partner_id}`` for
+        The token is cached under
+        ``boxnow:access_token:{environment}:{partner_id}`` for
         ``expires_in - 60`` seconds so the cache entry expires before the
         real token does (defensive margin).
 

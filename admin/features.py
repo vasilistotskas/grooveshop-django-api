@@ -136,11 +136,27 @@ class StoreFeatures:
             boxnow=BoxNowCarrier.code in active_carriers,
         )
 
+    def absent_models(self) -> frozenset[str]:
+        """Model labels of the pages that only receive shopper input
+        (reviews, feedback, favourites, newsletter, blog comments) while
+        their store setting is off. Neither the sidebar nor the ⌘K
+        palette (``admin.search``) offers them."""
+        gated = {
+            "product.ProductReview": self.reviews,
+            "contact.Feedback": self.feedback,
+            "product.ProductFavourite": self.favourites,
+            "user.UserSubscription": self.newsletter,
+            "user.SubscriptionTopic": self.newsletter,
+            "blog.BlogComment": self.blog_comments,
+        }
+        return frozenset(label for label, on in gated.items() if not on)
+
     def absent_apps(self) -> frozenset[str]:
         """App labels of what this store does not have - a feature off
-        its plan, a carrier it does not use. The sidebar lists none of
-        their pages, and the ⌘K palette (``admin.search``) none of their
-        screens or records."""
+        its plan, a carrier it does not use. The store's sidebar lists
+        none of their pages (a platform superuser's System section keeps
+        its carrier logs), and the ⌘K palette (``admin.search``) none of
+        their screens beyond what the sidebar shows."""
         absent = {
             app
             for app, availability in (

@@ -128,12 +128,13 @@ class MyAdminSite(
         membership = get_membership(user, tenant)
         return membership is not None and membership.is_tenant_staff
 
-    def command_hidden_apps(self, request) -> frozenset[str]:
-        """The ⌘K palette leaves out what this store does not have, as
-        its sidebar does."""
+    def command_hidden(self, request) -> frozenset[str]:
+        """The ⌘K palette leaves out what this store does not have or
+        has switched off, as its sidebar does."""
         from admin.features import store_features
 
-        return store_features(request).absent_apps()
+        features = store_features(request)
+        return features.absent_apps() | features.absent_models()
 
     def password_change(self, request, extra_context=None):
         """Unfold's password-change view, saving to the PUBLIC schema.

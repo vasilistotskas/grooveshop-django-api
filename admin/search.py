@@ -21,8 +21,10 @@ open, including the ones the sidebar leaves out, and any record on them
    the model's own admin search and ordering, the sidebar's models first,
    with a link to the full results when there are more.
 
-A screen of an app ``command_hidden_apps`` names (a feature the store
-does not have) is left out of 2 and 3, as the sidebar leaves it out.
+Screens ``command_hidden`` names - on a store, the apps of a feature it
+does not have and the pages its settings switch off - are left out of 2
+and 3, as the sidebar leaves them out; a page the sidebar still lists
+stays searchable.
 """
 
 from __future__ import annotations
@@ -124,6 +126,15 @@ def _link(entry: dict[str, Any]) -> str:
     return str(entry.get("link_callback") or entry["link"])
 
 
+def sidebar_icons(sidebar: list[dict[str, Any]]) -> dict[str, str]:
+    """Each page the sidebar lists (its address without a query), in
+    sidebar order, with the icon it has there ("" for none)."""
+    icons: dict[str, str] = {}
+    for entry, *_where in _sidebar_entries(sidebar):
+        icons.setdefault(_path(_link(entry)), entry.get("icon") or "")
+    return icons
+
+
 def page_results(
     sidebar: list[dict[str, Any]], screens: list[Screen], term: str
 ) -> list[SearchResult]:
@@ -151,7 +162,7 @@ def page_results(
         )
         offer(0, rank, order, link, result)
 
-    listed = {_path(_link(entry)) for entry, *_ in entries}
+    listed = {_path(_link(entry)) for entry, *_where in entries}
     for order, screen in enumerate(screens):
         if screen.link in listed:
             continue
@@ -163,7 +174,7 @@ def page_results(
         )
         offer(1, _rank(screen.title, term), order, screen.link, result)
 
-    return [result for *_, result in sorted(ranked.values())]
+    return [result for *_rank, result in sorted(ranked.values())]
 
 
 def record_results(
@@ -199,7 +210,7 @@ def record_results(
 
         opts = screen.model._meta
         change = f"{site.name}:{opts.app_label}_{opts.model_name}_change"
-        icon = icons.get(screen.link, "data_object")
+        icon = icons.get(screen.link) or "data_object"
         results.extend(
             SearchResult(
                 title=str(obj),
@@ -228,12 +239,15 @@ class CommandSearchMixin:
     keyboard handling stay Unfold's; only what is found changes.
     """
 
-    def command_hidden_apps(self, request: HttpRequest) -> frozenset[str]:
-        """App labels whose screens the palette leaves out."""
+    def command_hidden(self, request: HttpRequest) -> frozenset[str]:
+        """App labels ("blog") and model labels ("blog.BlogComment") the
+        palette leaves out, unless this site's sidebar lists the page."""
         return frozenset()
 
-    def _command_screens(self, request: HttpRequest) -> list[Screen]:
-        hidden = self.command_hidden_apps(request)
+    def _command_screens(
+        self, request: HttpRequest, listed: set[str]
+    ) -> list[Screen]:
+        hidden = self.command_hidden(request)
         # Django's app list: every model this viewer may open, by app.
         return [
             Screen(
@@ -243,9 +257,12 @@ class CommandSearchMixin:
                 link=model["admin_url"],
             )
             for app in self.get_app_list(request)
-            if app["app_label"] not in hidden
             for model in app["models"]
             if model.get("admin_url")
+            and (
+                model["admin_url"] in listed
+                or not {app["app_label"], model["model"]._meta.label} & hidden
+            )
         ]
 
     def search(self, request, extra_context=None):
@@ -255,13 +272,10 @@ class CommandSearchMixin:
             return HttpResponse()
 
         sidebar = self.get_sidebar_list(request)
-        screens = self._command_screens(request)
+        icons = sidebar_icons(sidebar)
+        screens = self._command_screens(request, set(icons))
         results = page_results(sidebar, screens, term)
         if len(term) >= MIN_RECORD_TERM:
-            icons: dict[str, str] = {}
-            for entry, *_ in _sidebar_entries(sidebar):
-                if entry.get("icon"):
-                    icons.setdefault(_path(_link(entry)), entry["icon"])
             results += record_results(self, request, term, screens, icons)
 
         paginator = Paginator(results, max(len(results), 1))

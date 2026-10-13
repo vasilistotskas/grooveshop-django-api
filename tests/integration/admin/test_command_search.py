@@ -16,7 +16,13 @@ from django.test import RequestFactory
 from django.urls import reverse
 from django.utils import translation
 
-from admin.search import RECORDS_PER_MODEL, Screen, fold, page_results
+from admin.search import (
+    RECORDS_PER_MODEL,
+    Screen,
+    fold,
+    page_results,
+    sidebar_icons,
+)
 from order.factories.order import OrderFactory
 from tests.utils.staff import (
     bind_store_tenant,
@@ -222,6 +228,45 @@ class TestStoreSearch:
         links = [result.link for result in self._results("gift")]
 
         assert [link for link in links if "/giftcard/" in link]
+
+    @pytest.mark.parametrize("enabled", [True, False])
+    def test_a_page_its_settings_switch_off_is_not_offered(
+        self, bound, monkeypatch, enabled
+    ):
+        from extra_settings.models import Setting
+
+        from tenant.permissions import IsProductReviewsEnabled
+
+        real_get = Setting.get.__func__
+
+        def get(cls, name, default=None):
+            if name == IsProductReviewsEnabled.setting_key:
+                return enabled
+            return real_get(cls, name, default)
+
+        monkeypatch.setattr(Setting, "get", classmethod(get))
+        bound()
+        reviews = reverse("admin:product_productreview_changelist")
+
+        links = [result.link for result in self._results("review")]
+
+        assert (reviews in links) is enabled
+
+    def test_what_the_sidebar_lists_stays_searchable(self, bound):
+        # No active carrier: the store's ACS pages go, but a platform
+        # superuser's System section still lists ACS tracking events.
+        bound()
+        request = RequestFactory().get("/admin/search/", {"s": "acs"})
+        request.user = stamp_platform_identity(UserAccountFactory(admin=True))
+        listed = set(sidebar_icons(admin.site.get_sidebar_list(request)))
+
+        models = {
+            screen.model._meta.label
+            for screen in admin.site._command_screens(request, listed)
+        }
+
+        assert "shipping_acs.AcsTrackingEvent" in models
+        assert "shipping_acs.AcsShipment" not in models
 
     def test_records_are_capped_with_a_link_to_the_rest(self, bound):
         bound()

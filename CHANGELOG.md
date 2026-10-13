@@ -3,6 +3,30 @@
 
 
 
+## v3.118.0 (2026-10-13)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.117.1 [skip ci] ([`ccb58e6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ccb58e693d733ccdb8c39bff59bb2d119d1819b4))
+
+### Features
+
+* feat(admin): a command palette that finds pages first, and dashboard cards that fit (#183)
+
+- The command palette's spinner turns only while it searches: the
+  unlayered `.material-symbols-outlined` rule in admin.css beat Unfold's
+  layered `hidden`, so it was always visible.
+- The palette (admin/search.py, both admin sites) lists sidebar pages
+  first, matched ignoring case and accents, then other screens by name,
+  then up to five records per screen with a "View all" link. Pages the
+  store switched off in its settings are left out, as in the sidebar.
+- Dashboard cards fit a third-width column: "View all" moves to the
+  footer, subtitles stop repeating the period, the search card uses stat
+  rows and stacked lists, the funnel uses Unfold's progress component.
+- Paged product attribute and tag inlines keep a fixed order (pk).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`64fc165`](https://github.com/vasilistotskas/grooveshop-django-api/commit/64fc1655ebdcd0eb61ceb0eaef2029b8d069ebfe))
+
 ## v3.117.1 (2026-10-13)
 
 ### Bug fixes

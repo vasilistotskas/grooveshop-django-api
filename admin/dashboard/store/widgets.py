@@ -6,16 +6,23 @@ Each class is an Unfold component rendered by a partial under
 ``admin.dashboard.store.queries``; everything below runs per request, in
 the viewer's language.
 
+The page shows one period at a time, picked by ``?period=`` (links, not
+script: the address can be shared and the back button works), and the
+sales chart one measure, picked by ``?metric=``. Optional features follow
+``admin.features``: a widget for a feature the store does not have, or
+has switched off, is not drawn; a link is drawn only for someone who may
+open its page.
+
 Alerts are the exception to caching by design: a merchant who fixes a
 missing setting must see the banner go on the next load.
 """
 
 from __future__ import annotations
 
-from datetime import timedelta
 from typing import Any
+from urllib.parse import urlencode
 
-from django.apps import apps
+from django.urls import reverse
 from django.utils import formats, timezone
 from django.utils.text import Truncator
 from django.utils.translation import gettext_lazy as _
@@ -24,244 +31,388 @@ from unfold.components import register_component
 
 from admin.dashboard.base import (
     DashboardWidget,
-    bar_chart_options,
-    chart_json,
-    color,
-    doughnut_chart,
+    bar_chart,
+    change_percent,
     percent,
     percent_text,
+    sparkline,
 )
 from admin.dashboard.store import queries
+from admin.dashboard.store.queries import PERIODS, PERIODS_BY_KEY, Period
 from admin.displays import ORDER_STATUS_VARIANT, label_cell, link_cell, money
-from order.enum.status import OrderStatus
+from admin.features import store_features
+from admin.navigation import changelist_link
+from order.enum.status import OrderStatus, PaymentStatus
 
-REVENUE_PERIOD_LABELS = {
-    "7d": (_("7d"), _("Last 7 days")),
-    "30d": (_("1m"), _("Last 30 days")),
-    "90d": (_("3m"), _("Last 3 months")),
-    "365d": (_("1y"), _("Last 12 months")),
+PERIOD_LABELS = {
+    "7d": (_("7 days"), _("Last 7 days")),
+    "30d": (_("30 days"), _("Last 30 days")),
+    "13w": (_("13 weeks"), _("Last 13 weeks")),
+    "12m": (_("12 months"), _("Last 12 months")),
 }
 
-# One colour per order status, from the scales Unfold defines. Distinct
-# shades rather than ORDER_STATUS_VARIANT, which gives processing and
-# shipped (and delivered and completed) the same colour.
-ORDER_STATUS_COLOR = {
-    OrderStatus.PENDING: color("orange-400"),
-    OrderStatus.PROCESSING: color("blue-400"),
-    OrderStatus.SHIPPED: color("primary-400"),
-    OrderStatus.DELIVERED: color("green-400"),
-    OrderStatus.COMPLETED: color("green-600"),
-    OrderStatus.CANCELED: color("red-500"),
-    OrderStatus.RETURNED: color("orange-600"),
-    OrderStatus.REFUNDED: color("base-400"),
+METRICS = {
+    "revenue": (_("Revenue"), _("Paid revenue per %(bucket)s")),
+    "orders": (_("Orders"), _("Orders placed per %(bucket)s")),
+}
+DEFAULT_METRIC = "revenue"
+
+BUCKET_NAMES = {
+    "day": pgettext_lazy("chart bucket", "day"),
+    "week": pgettext_lazy("chart bucket", "week"),
+    "month": pgettext_lazy("chart bucket", "month"),
 }
 
-ORDER_SOURCE_COLORS = (
-    color("primary-500"),
-    color("green-500"),
-    color("orange-400"),
-    color("blue-400"),
-    color("red-400"),
-    color("primary-300"),
-)
-ORDER_SOURCE_OTHER_COLOR = color("base-400")
+
+def selected_period(request: Any) -> Period:
+    return PERIODS_BY_KEY.get(
+        request.GET.get("period", ""), PERIODS_BY_KEY[queries.DEFAULT_PERIOD]
+    )
 
 
-def _day_label(day) -> str:
-    return formats.date_format(day, "d/m")
+def selected_metric(request: Any) -> str:
+    metric = request.GET.get("metric", "")
+    return metric if metric in METRICS else DEFAULT_METRIC
 
 
-# ── KPI cards ───────────────────────────────────────────────────────────
+def _dashboard_href(request: Any, **changes: str) -> str:
+    """The dashboard with ``changes`` applied to its period and metric."""
+    params = {
+        "period": selected_period(request).key,
+        "metric": selected_metric(request),
+        **changes,
+    }
+    return f"?{urlencode(params)}"
+
+
+def _bucket_label(start, bucket: str) -> str:
+    if bucket == "month":
+        return formats.date_format(start, "M")
+    return formats.date_format(start, "d/m")
+
+
+def _number(value: float) -> str:
+    return formats.number_format(value, use_l10n=True, force_grouping=True)
+
+
+def _trend(current: float, prior: float) -> dict[str, str] | None:
+    change = change_percent(current, prior)
+    if change is None:
+        return None
+    rising = change >= 0
+    return {
+        "text": percent_text(change, signed=True),
+        "variant": "success" if rising else "danger",
+        "icon": "trending_up" if rising else "trending_down",
+    }
+
+
+def _kpi_card(
+    label: Any,
+    value: str,
+    trend: dict[str, str] | None,
+    line: list[float],
+    footer: Any,
+    href: str | None,
+) -> dict[str, Any]:
+    return {
+        "label": label,
+        "value": value,
+        "trend": trend,
+        "spark": sparkline(line) if any(line) else None,
+        "footer": footer,
+        "href": href,
+    }
+
+
+class StorePeriodWidget(DashboardWidget):
+    """A widget whose query is asked for the period on display."""
+
+    def variant(self) -> str | None:
+        return selected_period(self.request).key
+
+    @property
+    def period_label(self) -> Any:
+        return PERIOD_LABELS[selected_period(self.request).key][1]
+
+
+# ── Header ──────────────────────────────────────────────────────────────
 
 
 @register_component
-class StoreRevenueCard(DashboardWidget):
-    """Revenue for a selectable window; every window ships in the page
-    and Alpine switches between them (``$persist`` keeps the choice)."""
+class StoreDashboardHeader(DashboardWidget):
+    """Greeting, date, the period switch and the one action every
+    store takes most: adding a product."""
 
-    query = queries.kpis
-
-    def shape(self, data: dict[str, Any]) -> dict[str, Any]:
-        periods = []
-        for key, _days in queries.REVENUE_PERIODS:
-            short_label, long_label = REVENUE_PERIOD_LABELS[key]
-            figure = data["revenue"][key]
-            trend = figure["trend_pct"]
-            periods.append(
-                {
-                    "key": key,
-                    "short_label": short_label,
-                    "long_label": long_label,
-                    "amount": money(figure["amount"]),
-                    "trend": None
-                    if trend is None
-                    else {
-                        "text": percent_text(trend, signed=True),
-                        "variant": "success" if trend >= 0 else "danger",
-                        "icon": "trending_up"
-                        if trend >= 0
-                        else "trending_down",
-                    },
-                }
-            )
-        return {"periods": periods, "default_period": periods[0]["key"]}
-
-
-@register_component
-class StorePendingOrdersCard(DashboardWidget):
-    query = queries.kpis
-
-    def shape(self, data: dict[str, Any]) -> dict[str, Any]:
+    def shape(self, data: None) -> dict[str, Any]:
+        user = self.request.user
+        name = (getattr(user, "first_name", "") or "").strip()
+        hour = timezone.localtime().hour
+        if not name:
+            title = _("Dashboard")
+        elif hour < 12:
+            title = _("Good morning, %(name)s") % {"name": name}
+        elif hour < 18:
+            title = _("Good afternoon, %(name)s") % {"name": name}
+        else:
+            title = _("Good evening, %(name)s") % {"name": name}
+        period = selected_period(self.request)
         return {
-            "icon": "pending_actions",
-            "tone": "warning",
-            "value": data["pending_orders"],
-            "label": _("Pending orders"),
-            "href": self.changelist_url("order.Order", "status__exact=PENDING"),
-            "footer": _("Open to triage"),
-        }
-
-
-@register_component
-class StoreNewCustomersCard(DashboardWidget):
-    query = queries.kpis
-
-    def shape(self, data: dict[str, Any]) -> dict[str, Any]:
-        today = data["new_customers_today"]
-        return {
-            "icon": "person_add",
-            "tone": "info",
-            "value": data["new_customers_30d"],
-            "label": _("New customers"),
-            "badge": (
+            "title": title,
+            "date": formats.date_format(timezone.localdate(), "l, j E"),
+            "period_label": PERIOD_LABELS[period.key][1],
+            "periods": [
                 {
-                    "text": _("+%(count)s today") % {"count": today},
-                    "variant": "info",
+                    "label": PERIOD_LABELS[option.key][0],
+                    "href": _dashboard_href(self.request, period=option.key),
+                    "active": option.key == period.key,
                 }
-                if today
+                for option in PERIODS
+            ],
+            "new_product_href": (
+                reverse("admin:product_product_add")
+                if user.has_perm("product.add_product")
                 else None
             ),
-            "href": self.changelist_url("user.UserAccount"),
-            "footer": _("Last 30 days"),
         }
 
 
+# ── Headline figures ────────────────────────────────────────────────────
+
+
 @register_component
-class StoreAverageOrderValueCard(DashboardWidget):
-    query = queries.kpis
+class StoreKpis(StorePeriodWidget):
+    """Revenue, orders, average order and new customers for the period,
+    each against the period before it, with its trend over the buckets."""
+
+    query = queries.overview
 
     def shape(self, data: dict[str, Any]) -> dict[str, Any]:
+        series = queries.sales_series.get(self.variant())
+        compared = _("vs the period before")
+        # An average of no orders is not zero: "—", and nothing to compare.
+        average = data["revenue"] / data["paid"] if data["paid"] else None
+        prior_average = (
+            data["prior_revenue"] / data["prior_paid"]
+            if data["prior_paid"]
+            else 0.0
+        )
+        if data["paying_customers"]:
+            customers_footer = _(
+                "%(percent)s of paying customers ordered again"
+            ) % {
+                "percent": percent_text(
+                    percent(data["repeat_customers"], data["paying_customers"])
+                )
+            }
+        else:
+            customers_footer = compared
         return {
-            "icon": "receipt_long",
-            "tone": "primary",
-            "value": money(data["avg_order_value"]),
-            "label": _("Average order value"),
-            "footer": _("Paid orders, last 30 days"),
+            "cards": [
+                _kpi_card(
+                    _("Revenue"),
+                    money(data["revenue"]),
+                    _trend(data["revenue"], data["prior_revenue"]),
+                    [row["revenue"] for row in series],
+                    compared,
+                    changelist_link(
+                        self.request,
+                        "order.Order",
+                        f"payment_status__exact={PaymentStatus.COMPLETED}",
+                    ),
+                ),
+                _kpi_card(
+                    _("Orders"),
+                    _number(data["orders"]),
+                    _trend(data["orders"], data["prior_orders"]),
+                    [row["orders"] for row in series],
+                    compared,
+                    changelist_link(self.request, "order.Order"),
+                ),
+                _kpi_card(
+                    _("Average order"),
+                    "—" if average is None else money(average),
+                    None if average is None else _trend(average, prior_average),
+                    [
+                        row["revenue"] / row["paid"] if row["paid"] else 0.0
+                        for row in series
+                    ],
+                    _("Paid orders"),
+                    None,
+                ),
+                _kpi_card(
+                    _("New customers"),
+                    _number(data["new_customers"]),
+                    _trend(data["new_customers"], data["prior_new_customers"]),
+                    [row["customers"] for row in series],
+                    customers_footer,
+                    changelist_link(self.request, "user.UserAccount"),
+                ),
+            ]
         }
 
 
-# ── Charts ──────────────────────────────────────────────────────────────
+# ── Sales chart ─────────────────────────────────────────────────────────
 
 
 @register_component
-class StorePerformanceChart(DashboardWidget):
-    """Orders per day as bars, paid revenue as a line on a € axis."""
+class StoreSalesChart(StorePeriodWidget):
+    """One measure per bucket of the period, revenue or orders."""
 
-    query = queries.performance
+    query = queries.sales_series
 
     def shape(self, data: list[dict[str, Any]]) -> dict[str, Any]:
-        has_data = any(day["orders"] or day["revenue"] for day in data)
-        chart = {
-            "labels": [_day_label(day["day"]) for day in data],
-            "datasets": [
+        period = selected_period(self.request)
+        metric = selected_metric(self.request)
+        title, description = METRICS[metric]
+        values = [row[metric] for row in data]
+        return {
+            "title": title,
+            "description": _("%(measure)s · %(period)s")
+            % {
+                "measure": description
+                % {"bucket": BUCKET_NAMES[period.bucket]},
+                "period": self.period_label,
+            },
+            "metrics": [
                 {
-                    "label": str(_("Orders")),
-                    "type": "bar",
-                    "data": [day["orders"] for day in data],
-                    "backgroundColor": color("primary-500"),
-                    "borderRadius": 6,
-                    "borderSkipped": "start",
-                    "maxBarThickness": 28,
-                    "yAxisID": "y",
-                    "order": 2,
-                },
-                {
-                    "label": str(_("Revenue")),
-                    "type": "line",
-                    "data": [day["revenue"] for day in data],
-                    "borderColor": color("green-500"),
-                    "backgroundColor": color("green-500"),
-                    "borderWidth": 2,
-                    "pointRadius": 3,
-                    # Monotone: a smoothed line never overshoots below zero
-                    # between two days.
-                    "cubicInterpolationMode": "monotone",
-                    "yAxisID": "y1",
-                    "order": 1,
-                },
+                    "label": METRICS[key][0],
+                    "href": _dashboard_href(self.request, metric=key),
+                    "active": key == metric,
+                }
+                for key in METRICS
             ],
-        }
-        return {
-            "title": _("Revenue and orders"),
-            "description": _("Last 14 days"),
-            "empty_text": _("No orders in the last 14 days"),
-            "class": "lg:col-span-2",
-            "has_data": has_data,
-            "data": chart_json(chart),
-            "options": chart_json(
-                bar_chart_options(legend=True, currency_axis=True)
+            "has_data": any(values),
+            "empty_text": _("No orders in this period"),
+            "chart": bar_chart(
+                [_bucket_label(row["start"], period.bucket) for row in data],
+                values,
+                label=str(title),
+                currency=metric == "revenue",
             ),
         }
 
 
-@register_component
-class StoreOrderStatusChart(DashboardWidget):
-    query = queries.order_status
-
-    def shape(self, data: list[dict[str, Any]]) -> dict[str, Any]:
-        return {
-            "title": _("Order status"),
-            "description": _("All orders"),
-            "empty_text": _("No orders yet"),
-            "chart": doughnut_chart(
-                [str(OrderStatus(row["status"]).label) for row in data],
-                [row["count"] for row in data],
-                [ORDER_STATUS_COLOR[row["status"]] for row in data],
-            )
-            if data
-            else None,
-        }
+# ── Work waiting ────────────────────────────────────────────────────────
 
 
 @register_component
-class StoreOrderSourceChart(DashboardWidget):
-    query = queries.order_source
+class StoreAttention(DashboardWidget):
+    """Everything waiting for someone, as counts that open the filtered
+    list. A row needs its feature, a count, and a page the viewer may
+    open; the same counts drive the sidebar badges."""
 
-    def shape(self, data: dict[str, Any]) -> dict[str, Any]:
-        from order.attribution import source_label
+    query = queries.attention_counts
 
-        labels = [
-            str(source_label(row["source"], row["source_type"]))
-            for row in data["top"]
+    def shape(self, data: dict[str, int]) -> dict[str, Any]:
+        from order.models.invoice import MyDataStatus
+
+        features = store_features(self.request)
+        candidates = [
+            (
+                True,
+                "pending_orders",
+                "receipt_long",
+                "primary",
+                _("Orders to process"),
+                _("Placed and waiting"),
+                "order.Order",
+                f"status__exact={OrderStatus.PENDING}",
+            ),
+            (
+                True,
+                "low_stock",
+                "inventory_2",
+                "warning",
+                _("Running low on stock"),
+                _("Active products with fewer than %(count)s left")
+                % {"count": queries.LOW_STOCK_BELOW},
+                "product.Product",
+                f"active__exact=1&stock__gt=0&stock__lt={queries.LOW_STOCK_BELOW}",
+            ),
+            (
+                features.mydata,
+                "mydata_rejected",
+                "report",
+                "danger",
+                _("Receipts rejected by myDATA"),
+                _("In the last %(days)s days")
+                % {"days": queries.MYDATA_REJECTED_DAYS},
+                "order.Invoice",
+                f"mydata_status__exact={MyDataStatus.REJECTED}",
+            ),
+            (
+                features.reviews,
+                "pending_reviews",
+                "star_rate",
+                "default",
+                _("Reviews to approve"),
+                _("Hidden from shoppers until approved"),
+                "product.ProductReview",
+                "status__exact=NEW",
+            ),
+            (
+                features.blog_comments,
+                "pending_comments",
+                "chat_bubble",
+                "default",
+                _("Blog comments to approve"),
+                _("Hidden from readers until approved"),
+                "blog.BlogComment",
+                "approved__exact=0",
+            ),
+            (
+                True,
+                "new_contact_messages",
+                "mail",
+                "default",
+                _("New messages"),
+                _("From the contact form this week"),
+                "contact.Contact",
+                "",
+            ),
+            (
+                features.wholesale.live,
+                "pending_business_profiles",
+                "business_center",
+                "default",
+                _("Business accounts to verify"),
+                _("Waiting for wholesale prices"),
+                "b2b.BusinessProfile",
+                "status__exact=PENDING",
+            ),
         ]
-        values = [row["count"] for row in data["top"]]
-        colors = list(ORDER_SOURCE_COLORS[: len(values)])
-        if data["other"]:
-            labels.append(str(_("Other")))
-            values.append(data["other"])
-            colors.append(ORDER_SOURCE_OTHER_COLOR)
-        return {
-            "title": _("Orders by source"),
-            "description": _("Last 30 days"),
-            "empty_text": _(
-                "No attributed orders in the last 30 days. Orders are "
-                "attributed from the visit that placed them."
-            ),
-            "chart": doughnut_chart(labels, values, colors) if values else None,
-        }
+        rows = []
+        for (
+            shown,
+            key,
+            icon,
+            variant,
+            label,
+            detail,
+            model,
+            query,
+        ) in candidates:
+            count = data[key]
+            if not shown or not count:
+                continue
+            href = changelist_link(self.request, model, query)
+            if href is None:
+                continue
+            rows.append(
+                {
+                    "icon": icon,
+                    "variant": variant,
+                    "label": label,
+                    "detail": detail,
+                    "count": _number(count),
+                    "href": href,
+                }
+            )
+        return {"rows": rows}
 
 
-# ── Queues ──────────────────────────────────────────────────────────────
+# ── Orders and products ─────────────────────────────────────────────────
 
 
 @register_component
@@ -270,17 +421,17 @@ class StoreRecentOrders(DashboardWidget):
 
     def shape(self, data: list[dict[str, Any]]) -> dict[str, Any]:
         return {
-            "title": _("Recent orders"),
-            "action_href": self.changelist_url("order.Order"),
+            "title": _("Latest orders"),
+            "action_href": changelist_link(self.request, "order.Order"),
             "empty_icon": "shopping_bag",
             "empty_text": _("No orders yet"),
             "table": {
                 "headers": [
                     _("Order"),
                     _("Customer"),
+                    _("Placed"),
                     _("Status"),
                     {"content": _("Total"), "class": "text-right"},
-                    _("Placed"),
                 ],
                 "rows": [
                     [
@@ -288,7 +439,10 @@ class StoreRecentOrders(DashboardWidget):
                             self.change_url("order.Order", row["id"]),
                             f"#{row['id']}",
                         ),
-                        row["email"] or "—",
+                        row["email"] or _("Guest"),
+                        formats.date_format(
+                            timezone.localtime(row["created_at"]), "d/m H:i"
+                        ),
                         label_cell(
                             OrderStatus(row["status"]).label,
                             ORDER_STATUS_VARIANT[row["status"]],
@@ -297,9 +451,6 @@ class StoreRecentOrders(DashboardWidget):
                             "content": money(row["amount"]),
                             "class": "text-right",
                         },
-                        formats.date_format(
-                            timezone.localtime(row["created_at"]), "d/m H:i"
-                        ),
                     ]
                     for row in data
                 ],
@@ -308,64 +459,32 @@ class StoreRecentOrders(DashboardWidget):
 
 
 @register_component
-class StorePendingReviews(DashboardWidget):
-    query = queries.pending_reviews
+class StoreBestSellers(StorePeriodWidget):
+    query = queries.best_sellers
 
     def shape(self, data: list[dict[str, Any]]) -> dict[str, Any]:
         return {
-            "title": _("Reviews awaiting approval"),
-            "action_href": self.changelist_url(
-                "product.ProductReview", "status__exact=NEW"
-            ),
-            "empty_icon": "task_alt",
-            "empty_text": _("No reviews are waiting"),
+            "title": _("Best sellers"),
+            "description": _("Units paid for · %(period)s")
+            % {"period": self.period_label},
+            "action_href": changelist_link(self.request, "product.Product"),
+            "empty_icon": "inventory_2",
+            "empty_text": _("No paid orders in this period"),
             "table": {
                 "headers": [
                     _("Product"),
-                    _("Customer"),
-                    _("Rating"),
-                    _("Received"),
+                    {"content": _("Sold"), "class": "text-right"},
                 ],
                 "rows": [
                     [
                         link_cell(
-                            self.change_url("product.ProductReview", row["id"]),
-                            Truncator(row["product"] or "—").chars(40),
+                            self.change_url("product.Product", row["id"]),
+                            Truncator(row["name"] or "—").chars(48),
                         ),
-                        row["user_email"] or _("Anonymous"),
-                        label_cell(f"★ {row['rate']}/10", "warning"),
-                        formats.date_format(
-                            timezone.localtime(row["created_at"]), "d/m"
-                        ),
-                    ]
-                    for row in data
-                ],
-            },
-        }
-
-
-@register_component
-class StoreContactMessages(DashboardWidget):
-    query = queries.contact_messages
-
-    def shape(self, data: list[dict[str, Any]]) -> dict[str, Any]:
-        return {
-            "title": _("Contact messages"),
-            "action_href": self.changelist_url("contact.Contact"),
-            "empty_icon": "mail",
-            "empty_text": _("No messages yet"),
-            "table": {
-                "headers": [_("From"), _("Message"), _("Received")],
-                "rows": [
-                    [
-                        link_cell(
-                            self.change_url("contact.Contact", row["id"]),
-                            row["name"] or row["email"],
-                        ),
-                        Truncator(row["message"]).chars(60),
-                        formats.date_format(
-                            timezone.localtime(row["created_at"]), "d/m"
-                        ),
+                        {
+                            "content": _number(row["units"]),
+                            "class": "text-right",
+                        },
                     ]
                     for row in data
                 ],
@@ -377,7 +496,7 @@ class StoreContactMessages(DashboardWidget):
 
 
 @register_component
-class StoreFunnel(DashboardWidget):
+class StoreFunnel(StorePeriodWidget):
     """Carts started → orders → paid, each bar relative to carts started."""
 
     query = queries.funnel
@@ -390,11 +509,12 @@ class StoreFunnel(DashboardWidget):
             # localised float ("62,5") is not valid CSS.
             return {
                 "title": title,
-                "description": count,
+                "description": _number(count),
                 "value": round(percent(count, started)),
             }
 
         return {
+            "description": self.period_label,
             "has_data": bool(started),
             "steps": [
                 step(_("Carts started"), started),
@@ -406,248 +526,96 @@ class StoreFunnel(DashboardWidget):
 
 
 @register_component
-class StoreRepeatCustomers(DashboardWidget):
-    query = queries.retention
+class StoreOrderSources(StorePeriodWidget):
+    """Where the period's attributed orders came from, as shares."""
 
-    def shape(self, data: dict[str, int]) -> dict[str, Any]:
+    query = queries.order_sources
+
+    def shape(self, data: dict[str, Any]) -> dict[str, Any]:
+        from order.attribution import source_label
+
+        total = data["total"]
+        rows = [
+            (str(source_label(row["source"], row["source_type"])), row["count"])
+            for row in data["top"]
+        ]
+        if data["other"]:
+            rows.append((str(_("Other")), data["other"]))
         return {
-            "icon": "autorenew",
-            "tone": "success",
-            "value": percent_text(percent(data["repeat"], data["paying"])),
-            "label": _("Repeat customers"),
-            "footer": _(
-                "%(repeat)s of %(paying)s paying customers ordered again"
-            )
-            % {"repeat": data["repeat"], "paying": data["paying"]},
+            "description": self.period_label,
+            "rows": [
+                {
+                    "title": title,
+                    "description": ngettext(
+                        "%(count)s order · %(share)s",
+                        "%(count)s orders · %(share)s",
+                        count,
+                    )
+                    % {
+                        "count": _number(count),
+                        "share": percent_text(percent(count, total)),
+                    },
+                    "value": round(percent(count, total)),
+                }
+                for title, count in rows
+            ],
+            "empty_text": _(
+                "No attributed orders in this period. Orders are attributed "
+                "from the visit that placed them."
+            ),
         }
 
 
 @register_component
-class StoreTopProducts(DashboardWidget):
-    query = queries.top_products
+class StoreSearch(StorePeriodWidget):
+    """Store search in one card: how much, how often nothing was found,
+    and the two lists to act on."""
 
-    def shape(self, data: list[dict[str, Any]]) -> dict[str, Any]:
-        return {
-            "title": _("Most viewed products"),
-            "action_href": self.changelist_url("product.Product"),
-            "empty_icon": "inventory_2",
-            "empty_text": _("No products yet"),
-            "table": {
-                "headers": [
-                    _("Product"),
-                    {"content": _("Views"), "class": "text-right"},
-                ],
-                "rows": [
-                    [
-                        link_cell(
-                            self.change_url("product.Product", row["id"]),
-                            Truncator(row["name"] or "—").chars(48),
-                        ),
-                        {
-                            "content": formats.number_format(
-                                row["views"], use_l10n=True, force_grouping=True
-                            ),
-                            "class": "text-right",
-                        },
-                    ]
-                    for row in data
-                ],
-            },
-        }
-
-
-# ── Search ──────────────────────────────────────────────────────────────
-
-
-@register_component
-class StoreSearchKpis(DashboardWidget):
-    query = queries.search_insights
+    query = queries.search
 
     def shape(self, data: dict[str, Any]) -> dict[str, Any]:
         clicks = data["clicks"]
         return {
-            "kpis": [
+            "description": self.period_label,
+            "stats": [
+                {"value": _number(data["searches"]), "label": _("Searches")},
                 {
-                    "icon": "search",
-                    "tone": "primary",
-                    "value": formats.number_format(
-                        data["searches"], use_l10n=True, force_grouping=True
-                    ),
-                    "label": _("Searches"),
-                    "footer": _("Last 30 days, empty searches excluded"),
-                },
-                {
-                    "icon": "search_off",
-                    "tone": "warning",
                     "value": percent_text(
                         percent(data["zero"], data["meaningful"])
                     ),
                     "label": _("Found nothing"),
-                    "footer": ngettext(
-                        "%(count)s search, last 30 days",
-                        "%(count)s searches, last 30 days",
-                        data["zero"],
-                    )
-                    % {"count": data["zero"]},
                 },
                 {
-                    "icon": "ads_click",
-                    "tone": "success",
                     # "—" until click tracking has recorded anything: a
                     # zero nobody measured would read as "nobody clicks".
-                    "value": "—" if clicks is None else clicks,
-                    "label": _("Result clicks"),
-                    "footer": (
-                        _("No clicks recorded yet")
-                        if clicks is None
-                        else _("%(rate)s of searches, last 30 days")
-                        % {
-                            "rate": percent_text(
-                                percent(clicks, data["searches"])
-                            )
-                        }
-                    ),
+                    "value": "—"
+                    if clicks is None
+                    else percent_text(percent(clicks, data["searches"])),
+                    "label": _("Clicked a result"),
                 },
-            ]
-        }
-
-
-@register_component
-class StoreSearchVolume(DashboardWidget):
-    query = queries.search_insights
-
-    def shape(self, data: dict[str, Any]) -> dict[str, Any]:
-        volume = data["volume"]
-        chart = {
-            "labels": [_day_label(day["day"]) for day in volume],
-            "datasets": [
+            ],
+            "lists": [
                 {
-                    "label": str(_("Searches")),
-                    "type": "bar",
-                    "data": [day["count"] for day in volume],
-                    "backgroundColor": color("blue-400"),
-                    "borderRadius": 6,
-                    "borderSkipped": "start",
-                    "maxBarThickness": 28,
-                }
+                    "key": "zero",
+                    "label": _("Found nothing"),
+                    "hint": _("Add synonyms, products or content for these."),
+                    "variant": "warning",
+                    "rows": data["zero_queries"],
+                    "empty_text": _("Every search found something"),
+                },
+                {
+                    "key": "top",
+                    "label": _("Top searches"),
+                    "hint": _("What shoppers look for most."),
+                    "variant": "default",
+                    "rows": data["top_queries"],
+                    "empty_text": _("No searches in this period"),
+                },
             ],
         }
-        return {
-            "title": _("Search volume"),
-            "description": _("Last 14 days, empty searches excluded"),
-            "empty_text": _("No searches in the last 14 days"),
-            "class": "lg:col-span-2",
-            "has_data": any(day["count"] for day in volume),
-            "data": chart_json(chart),
-            "options": chart_json(
-                bar_chart_options(legend=False, currency_axis=False)
-            ),
-        }
 
 
-def _query_table(rows: list[dict[str, Any]], variant: str) -> dict[str, Any]:
-    return {
-        "headers": [
-            _("Query"),
-            {"content": _("Searches"), "class": "text-right"},
-        ],
-        "rows": [
-            [
-                row["query"],
-                {
-                    "content": label_cell(row["count"], variant),
-                    "class": "text-right",
-                },
-            ]
-            for row in rows
-        ],
-    }
-
-
-@register_component
-class StoreTopQueries(DashboardWidget):
-    query = queries.search_insights
-
-    def shape(self, data: dict[str, Any]) -> dict[str, Any]:
-        return {
-            "title": _("Top searches"),
-            "description": _("Last 30 days"),
-            "empty_icon": "search",
-            "empty_text": _("No searches yet"),
-            "table": _query_table(data["top_queries"], "primary"),
-        }
-
-
-@register_component
-class StoreZeroResultQueries(DashboardWidget):
-    """What visitors looked for and did not find: the synonym, content
-    and catalogue worklist."""
-
-    query = queries.search_insights
-
-    def shape(self, data: dict[str, Any]) -> dict[str, Any]:
-        return {
-            "title": _("Searches that found nothing"),
-            "description": _("Candidates for synonyms, content or products"),
-            "empty_icon": "task_alt",
-            "empty_text": _("Every search found something"),
-            "table": _query_table(data["zero_queries"], "warning"),
-        }
-
-
-# ── Per-request: stock and alerts ───────────────────────────────────────
-
-
-@register_component
-class StoreLowStock(DashboardWidget):
-    """Active products about to run out (superusers). Fresh per request:
-    it is the list a merchant works through while restocking."""
-
-    def shape(self, data: None) -> dict[str, Any]:
-        if not self.is_superuser:
-            return {"visible": False}
-        Product = apps.get_model("product", "Product")
-        products = (
-            Product.objects.filter(
-                active=True, stock__gt=0, stock__lt=queries.LOW_STOCK_BELOW
-            )
-            .order_by("stock", "id")
-            .prefetch_related("translations")[:10]
-        )
-        rows = [
-            [
-                link_cell(
-                    self.change_url("product.Product", product.id),
-                    Truncator(
-                        product.safe_translation_getter(
-                            "name", any_language=True
-                        )
-                        or "—"
-                    ).chars(48),
-                ),
-                {
-                    "content": label_cell(product.stock, "danger"),
-                    "class": "text-right",
-                },
-            ]
-            for product in products
-        ]
-        return {
-            "visible": bool(rows),
-            "title": _("Running low"),
-            "description": _("Active products with fewer than %(count)s left")
-            % {"count": queries.LOW_STOCK_BELOW},
-            "action_href": self.changelist_url(
-                "product.Product", f"stock__lt={queries.LOW_STOCK_BELOW}"
-            ),
-            "table": {
-                "headers": [
-                    _("Product"),
-                    {"content": _("In stock"), "class": "text-right"},
-                ],
-                "rows": rows,
-            },
-        }
+# ── Per-request: alerts ─────────────────────────────────────────────────
 
 
 def _alert(
@@ -789,7 +757,6 @@ class StoreAlerts(DashboardWidget):
     def _mydata(self) -> list[dict[str, Any]]:
         from extra_settings.models import Setting
 
-        from order.models.invoice import Invoice, MyDataStatus
         from tenant.credentials import mydata_credentials
 
         if not Setting.get("MYDATA_ENABLED", default=False):
@@ -815,29 +782,6 @@ class StoreAlerts(DashboardWidget):
                     link=(
                         self.changelist_url("tenant.Tenant"),
                         _("Fix in settings"),
-                    ),
-                )
-            )
-        rejected = Invoice.objects.filter(
-            mydata_status=MyDataStatus.REJECTED,
-            updated_at__gte=timezone.now() - timedelta(days=7),
-        ).count()
-        if rejected:
-            alerts.append(
-                _alert(
-                    "warning",
-                    "report",
-                    ngettext(
-                        "%(count)s invoice rejected by myDATA in the last 7 days",
-                        "%(count)s invoices rejected by myDATA in the last 7 days",
-                        rejected,
-                    )
-                    % {"count": rejected},
-                    link=(
-                        self.changelist_url(
-                            "order.Invoice", "mydata_status__exact=REJECTED"
-                        ),
-                        _("Review rejected invoices"),
                     ),
                 )
             )

@@ -1,0 +1,27 @@
+{% comment %}
+The period's headline figures: value, change against the period before,
+the trend across the period's buckets, and what the figure is.
+
+No grid-cols-1 (a grid is one column without it): Unfold's stylesheet
+loads after ours, so its one-column rule would override the sm:
+breakpoint below, which only ours carries.
+{% endcomment %}
+{% load unfold %}
+<div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    {% for card in cards %}
+        {% component "unfold/components/card.html" with href=card.href %}
+            <div class="flex gap-2 items-center justify-between">
+                <p class="font-medium text-sm text-subtle">{{ card.label }}</p>
+                {% if card.trend %}
+                    {% comment %}href=None: the label would otherwise inherit the card's href and nest a link in it, which the browser repairs by closing the card.{% endcomment %}
+                    {% include "unfold/helpers/label.html" with text=card.trend.text variant=card.trend.variant icon=card.trend.icon href=None %}
+                {% endif %}
+            </div>
+            {% component "unfold/components/title.html" with class="mt-2 tabular-nums" %}{{ card.value }}{% endcomponent %}
+            {% if card.spark %}
+                {% component "unfold/components/chart/line.html" with data=card.spark.data options=card.spark.options class="h-10 mt-3" %}{% endcomponent %}
+            {% endif %}
+            <p class="mt-2 text-subtle text-xs">{{ card.footer }}</p>
+        {% endcomponent %}
+    {% endfor %}
+</div>

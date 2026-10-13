@@ -1,0 +1,11 @@
+{% comment %}
+A row of mutually exclusive choices drawn as one control: `items` are
+{label, href, active}. Links, not buttons - each choice is an address.
+{% endcomment %}
+<nav class="bg-base-100 flex gap-0.5 p-0.5 rounded-default dark:bg-base-800{% if class %} {{ class }}{% endif %}" aria-label="{{ label }}">
+    {% for item in items %}
+        <a href="{{ item.href }}"
+           {% if item.active %}aria-current="true"{% endif %}
+           class="font-medium px-2.5 py-1 rounded-default text-sm transition-colors whitespace-nowrap {% if item.active %}bg-white shadow-xs text-important dark:bg-base-900{% else %}text-subtle hover:text-important{% endif %}">{{ item.label }}</a>
+    {% endfor %}
+</nav>

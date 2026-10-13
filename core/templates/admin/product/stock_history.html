@@ -27,7 +27,7 @@ header builds the breadcrumbs from `opts` and `original`.
         </div>
     </div>
 
-    <div class="grid gap-4 grid-cols-1 sm:grid-cols-3">
+    <div class="grid gap-4 sm:grid-cols-3">
         {% trans "In stock" as stock_label %}
         {% include "admin/dashboard/components/kpi.html" with icon="inventory_2" tone="primary" value=product.stock label=stock_label %}
         {% trans "Low-stock threshold" as threshold_label %}

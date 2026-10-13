@@ -1,0 +1,35 @@
+{% extends "admin/base.html" %}
+{% comment %}
+Django's documented hook for the admin's chrome, overriding Unfold's own
+admin/base_site.html. Its first three blocks are Unfold's, verbatim (diff
+them on every django-unfold upgrade); the two that follow are what this
+file adds through the empty blocks Unfold leaves for it:
+
+- nav-global-side: a link to the store's own storefront in the header,
+  on the store admin only (`storefront_url`, MyAdminSite.each_context);
+- footer: admin/footer.html, on every page but popups.
+{% endcomment %}
+{% load i18n %}
+
+{% block title %}{% if subtitle %}{{ subtitle }} | {% endif %}{{ title }} | {{ site_title|default:_('Django site admin') }}{% endblock %}
+
+{% block branding %}
+    {% include "unfold/helpers/site_branding.html" %}
+{% endblock %}
+
+{% block nav-global %}{% endblock %}
+
+{% block nav-global-side %}
+    {% if storefront_url %}
+        <a href="{{ storefront_url }}" target="_blank" rel="noopener" class="flex font-medium gap-1 items-center px-2 py-1.5 rounded-default text-font-default-light whitespace-nowrap hover:bg-base-100 hover:text-primary-600 dark:text-font-default-dark dark:hover:bg-white/[.06] dark:hover:text-primary-500">
+            {% trans "View store" %}
+            <span class="material-symbols-outlined md-18" aria-hidden="true">open_in_new</span>
+        </a>
+    {% endif %}
+{% endblock %}
+
+{% block footer %}
+    {% if not is_popup %}
+        {% include "admin/footer.html" %}
+    {% endif %}
+{% endblock %}

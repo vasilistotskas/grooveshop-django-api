@@ -2952,23 +2952,14 @@ ROSETTA_ACCESS_CONTROL_FUNCTION = (
 # belongs on the control plane.
 # ─────────────────────────────────────────────────────────────────────
 
-# "Help & Guides" — the documentation site's tenant-admin guide, shown
-# in BOTH admin site dropdowns. Env-gated like the ops links below so a
-# local checkout renders no link at all rather than one to a site that
+# The documentation site's tenant-admin guide, linked from every admin
+# page's footer as "Help & Guides". Env-gated like the ops links below so
+# a local checkout renders no link at all rather than one to a site that
 # may not carry this build's pages yet; production sets the platform
 # docs host in backend-config.
-ADMIN_DOCS_LINKS = [
-    {
-        "icon": "help",
-        "title": _("Help & Guides"),
-        "link": url,
-        "attrs": {"target": "_blank", "rel": "noopener"},
-    }
-    for url in [getenv("ADMIN_DOCS_URL", "").strip()]
-    if url
-]
+ADMIN_DOCS_URL = getenv("ADMIN_DOCS_URL", "").strip()
 
-# Platform ops consoles, listed in the store admin's site menu for
+# Platform ops consoles, listed in both admins' site menu for
 # platform superusers only, and only when the URL is configured. In dev,
 # set ADMIN_FLOWER_URL=http://localhost:5556 etc. in `.env`; production
 # usually does not expose these surfaces at all.
@@ -3011,26 +3002,26 @@ UNFOLD_PLATFORM = {
     "SITE_SYMBOL": "hub",
     "SHOW_HISTORY": True,
     "SHOW_VIEW_ON_SITE": False,
-    "SITE_DROPDOWN": [*ADMIN_DOCS_LINKS],
+    # The ops consoles, for platform superusers (admin/navigation.py).
+    "SITE_DROPDOWN": "admin.navigation.ops_site_dropdown",
     "ENVIRONMENT": "admin.permissions.platform_environment",
     # ⌘K command palette. Without this block the palette falls back to
     # unfold's defaults (``search_models: False``) and only matches
     # sidebar APP TITLES — typing a tenant name, domain or user email
-    # returned nothing, and Enter on the empty result list hit the
-    # unguarded ``selectItem`` upstream crash (see
-    # ``unfold_command_palette_fix.js``). The callable is the same
-    # schema-aware one the merchant admin uses: on the public schema it
-    # returns the SHARED_APPS whitelist, which is exactly the model set
-    # this site registers.
+    # returned nothing. The callable is the same schema-aware one the
+    # merchant admin uses: on the public schema it returns the
+    # SHARED_APPS whitelist, which is exactly the model set this site
+    # registers.
     "COMMAND": {
         "search_models": "core.utils.admin.command_search_models",
         "show_history": True,
     },
-    # The palette crash guard only — the TinyMCE save-sync script the
-    # merchant admin also carries has no target here (no HTMLField
-    # models are registered on the control plane).
-    "SCRIPTS": [
-        lambda request: static("admin/js/unfold_command_palette_fix.js"),
+    # The project's Tailwind build and admin tweaks, as on the store
+    # admin: the dashboard, billing page and footer templates use
+    # classes Unfold's own stylesheet does not ship.
+    "STYLES": [
+        lambda request: static("css/styles.css"),
+        lambda request: static("css/admin.css"),
     ],
     "SIDEBAR": {
         "show_search": True,
@@ -3080,6 +3071,15 @@ UNFOLD_PLATFORM = {
                             urlconf=PUBLIC_SCHEMA_URLCONF,
                         ),
                     },
+                    # What offboarding kept of a destroyed store.
+                    {
+                        "title": _("Tenant Archives"),
+                        "icon": "inventory",
+                        "link": reverse_lazy(
+                            "platform_admin:tenant_tenantarchive_changelist",
+                            urlconf=PUBLIC_SCHEMA_URLCONF,
+                        ),
+                    },
                 ],
             },
             {
@@ -3099,6 +3099,16 @@ UNFOLD_PLATFORM = {
                         "icon": "group",
                         "link": reverse_lazy(
                             "platform_admin:auth_group_changelist",
+                            urlconf=PUBLIC_SCHEMA_URLCONF,
+                        ),
+                    },
+                    # Platform staff's own signed-in sessions (public
+                    # schema); each store's are in its own admin.
+                    {
+                        "title": _("User Sessions"),
+                        "icon": "devices",
+                        "link": reverse_lazy(
+                            "platform_admin:usersessions_usersession_changelist",
                             urlconf=PUBLIC_SCHEMA_URLCONF,
                         ),
                     },
@@ -3234,7 +3244,8 @@ UNFOLD = {
     "SITE_HEADER": getenv("UNFOLD_SITE_HEADER", "GrooveShop"),
     "SITE_SUBHEADER": getenv("UNFOLD_SITE_SUBHEADER", "Commerce control"),
     "SITE_SYMBOL": "storefront",
-    "SITE_URL": "/",
+    # The store's own storefront ("View site" in the account menu).
+    "SITE_URL": "admin.navigation.storefront_url",
     # Each store's own marks; see ``admin/branding.py`` for the rule.
     "SITE_ICON": "admin.branding.site_icon",
     "SITE_LOGO": "admin.branding.site_logo",
@@ -3245,7 +3256,8 @@ UNFOLD = {
     "BORDER_RADIUS": "0.625rem",
     "ENVIRONMENT": "admin.environment.environment_callback",
     # Prefixes the browser-tab title (e.g. "[PROD]") so staff never
-    # edit the wrong environment by mistake.
+    # edit the wrong environment by mistake. Both are silent for a
+    # store's own staff in production (admin/environment.py).
     "ENVIRONMENT_TITLE_PREFIX": (
         "admin.environment.environment_title_prefix_callback"
     ),
@@ -3311,642 +3323,16 @@ UNFOLD = {
     # 302 success and django-simple-history writes a row, but the field
     # value is unchanged because the form body has the page-load
     # textarea value, not the edited iframe content.
-    #
-    # ``unfold_command_palette_fix.js`` guards the ⌘K palette's
-    # ``selectItem`` against Enter-with-no-results (upstream crash,
-    # still present in django-unfold 0.108.0 — see the file header).
     "SCRIPTS": [
         lambda request: static("admin/js/tinymce_save_sync.js"),
-        lambda request: static("admin/js/unfold_command_palette_fix.js"),
     ],
+    # Built per request (admin/navigation.py): each entry is listed only
+    # for a user its admin page would open for, and only while the
+    # store's plan and settings have the feature it belongs to.
     "SIDEBAR": {
         "show_search": True,
         "show_all_applications": False,
-        "navigation": [
-            # ── Dashboard ─────────────────────────────────────────────
-            {
-                "title": _("Navigation"),
-                "separator": True,
-                "items": [
-                    {
-                        "title": _("Dashboard"),
-                        "icon": "dashboard",
-                        "link": reverse_lazy(
-                            "admin:index", urlconf=ROOT_URLCONF
-                        ),
-                    },
-                ],
-            },
-            # ── Catalog (catalog management) ──────────────────────────
-            {
-                "title": _("Catalog"),
-                "separator": True,
-                "collapsible": True,
-                "items": [
-                    {
-                        "title": _("Products"),
-                        "icon": "inventory_2",
-                        "link": reverse_lazy(
-                            "admin:product_product_changelist",
-                            urlconf=ROOT_URLCONF,
-                        ),
-                        "badge": "admin.badges.low_stock_badge",
-                        "badge_variant": "danger",
-                    },
-                    {
-                        "title": _("Categories"),
-                        "icon": "category",
-                        "link": reverse_lazy(
-                            "admin:product_productcategory_changelist",
-                            urlconf=ROOT_URLCONF,
-                        ),
-                    },
-                    {
-                        "title": _("Reviews"),
-                        "icon": "star_rate",
-                        "link": reverse_lazy(
-                            "admin:product_productreview_changelist",
-                            urlconf=ROOT_URLCONF,
-                        ),
-                        "badge": "admin.badges.pending_reviews_badge",
-                        "badge_variant": "info",
-                    },
-                    {
-                        "title": _("Tags"),
-                        "icon": "label",
-                        "link": reverse_lazy(
-                            "admin:tag_tag_changelist", urlconf=ROOT_URLCONF
-                        ),
-                    },
-                    {
-                        "title": _("Attributes"),
-                        "icon": "tune",
-                        "link": reverse_lazy(
-                            "admin:product_attribute_changelist",
-                            urlconf=ROOT_URLCONF,
-                        ),
-                    },
-                    {
-                        "title": _("Attribute Values"),
-                        "icon": "format_list_bulleted",
-                        "link": reverse_lazy(
-                            "admin:product_attributevalue_changelist",
-                            urlconf=ROOT_URLCONF,
-                        ),
-                    },
-                    {
-                        "title": _("Variant Groups"),
-                        "icon": "workspaces",
-                        "link": reverse_lazy(
-                            "admin:product_productvariantgroup_changelist",
-                            urlconf=ROOT_URLCONF,
-                        ),
-                    },
-                ],
-            },
-            # ── Blog (content management) ─────────────────────────────
-            {
-                "title": _("Blog"),
-                "separator": True,
-                "collapsible": True,
-                "items": [
-                    {
-                        "title": _("Blog Posts"),
-                        "icon": "article",
-                        "link": reverse_lazy(
-                            "admin:blog_blogpost_changelist",
-                            urlconf=ROOT_URLCONF,
-                        ),
-                        "badge": "admin.badges.draft_blog_posts_badge",
-                        "badge_variant": "warning",
-                    },
-                    {
-                        "title": _("Blog Categories"),
-                        "icon": "folder_open",
-                        "link": reverse_lazy(
-                            "admin:blog_blogcategory_changelist",
-                            urlconf=ROOT_URLCONF,
-                        ),
-                    },
-                    {
-                        "title": _("Blog Authors"),
-                        "icon": "edit_note",
-                        "link": reverse_lazy(
-                            "admin:blog_blogauthor_changelist",
-                            urlconf=ROOT_URLCONF,
-                        ),
-                    },
-                    {
-                        "title": _("Blog Comments"),
-                        "icon": "chat_bubble",
-                        "link": reverse_lazy(
-                            "admin:blog_blogcomment_changelist",
-                            urlconf=ROOT_URLCONF,
-                        ),
-                        "badge": "admin.badges.pending_comments_badge",
-                        "badge_variant": "info",
-                    },
-                    {
-                        "title": _("Blog Tags"),
-                        "icon": "tag",
-                        "link": reverse_lazy(
-                            "admin:blog_blogtag_changelist",
-                            urlconf=ROOT_URLCONF,
-                        ),
-                    },
-                ],
-            },
-            # ── Sales (day-to-day order operations) ───────────────────
-            {
-                "title": _("Sales"),
-                "separator": True,
-                "collapsible": True,
-                "items": [
-                    {
-                        "title": _("Orders"),
-                        "icon": "receipt_long",
-                        "link": reverse_lazy(
-                            "admin:order_order_changelist", urlconf=ROOT_URLCONF
-                        ),
-                        "badge": "admin.badges.pending_orders_badge",
-                        "badge_variant": "danger",
-                    },
-                    {
-                        "title": _("Carts"),
-                        "icon": "shopping_cart",
-                        "link": reverse_lazy(
-                            "admin:cart_cart_changelist", urlconf=ROOT_URLCONF
-                        ),
-                        "badge": "admin.badges.abandoned_carts_badge",
-                        "badge_variant": "warning",
-                    },
-                    {
-                        "title": _("Receipts"),
-                        "icon": "receipt",
-                        "link": reverse_lazy(
-                            "admin:order_invoice_changelist",
-                            urlconf=ROOT_URLCONF,
-                        ),
-                    },
-                    {
-                        "title": _("Credit Documents"),
-                        "icon": "assignment_return",
-                        "link": reverse_lazy(
-                            "admin:order_retailcredit_changelist",
-                            urlconf=ROOT_URLCONF,
-                        ),
-                    },
-                    {
-                        "title": _("Payment Methods"),
-                        "icon": "payments",
-                        "link": reverse_lazy(
-                            "admin:pay_way_payway_changelist",
-                            urlconf=ROOT_URLCONF,
-                        ),
-                    },
-                    {
-                        "title": _("Promotions"),
-                        "icon": "sell",
-                        "link": reverse_lazy(
-                            "admin:promotion_promotion_changelist",
-                            urlconf=ROOT_URLCONF,
-                        ),
-                        "badge": "admin.badges.live_promotions_badge",
-                        "badge_variant": "success",
-                    },
-                    {
-                        "title": _("Coupon Codes"),
-                        "icon": "confirmation_number",
-                        "link": reverse_lazy(
-                            "admin:promotion_promotioncode_changelist",
-                            urlconf=ROOT_URLCONF,
-                        ),
-                    },
-                    {
-                        "title": _("Gift Cards"),
-                        "icon": "card_giftcard",
-                        "link": reverse_lazy(
-                            "admin:giftcard_giftcard_changelist",
-                            urlconf=ROOT_URLCONF,
-                        ),
-                    },
-                    {
-                        "title": _("Business Customers"),
-                        "icon": "business_center",
-                        "link": reverse_lazy(
-                            "admin:b2b_businessprofile_changelist",
-                            urlconf=ROOT_URLCONF,
-                        ),
-                        "badge": "admin.badges.pending_business_profiles_badge",
-                        "badge_variant": "warning",
-                    },
-                    {
-                        "title": _("Customer Groups"),
-                        "icon": "group_work",
-                        "link": reverse_lazy(
-                            "admin:b2b_customergroup_changelist",
-                            urlconf=ROOT_URLCONF,
-                        ),
-                    },
-                    {
-                        "title": _("B2B Price Lists"),
-                        "icon": "request_quote",
-                        "link": reverse_lazy(
-                            "admin:b2b_pricelistitem_changelist",
-                            urlconf=ROOT_URLCONF,
-                        ),
-                    },
-                    {
-                        "title": _("VAT Rates"),
-                        "icon": "percent",
-                        "link": reverse_lazy(
-                            "admin:vat_vat_changelist", urlconf=ROOT_URLCONF
-                        ),
-                    },
-                    {
-                        "title": _("Notifications"),
-                        "icon": "notifications_active",
-                        "link": reverse_lazy(
-                            "admin:notification_notification_changelist",
-                            urlconf=ROOT_URLCONF,
-                        ),
-                    },
-                    {
-                        "title": _("Contact Messages"),
-                        "icon": "contact_mail",
-                        "link": reverse_lazy(
-                            "admin:contact_contact_changelist",
-                            urlconf=ROOT_URLCONF,
-                        ),
-                        "badge": "admin.badges.new_messages_badge",
-                        "badge_variant": "info",
-                    },
-                    {
-                        "title": _("Feedback"),
-                        "icon": "reviews",
-                        "link": reverse_lazy(
-                            "admin:contact_feedback_changelist",
-                            urlconf=ROOT_URLCONF,
-                        ),
-                    },
-                ],
-            },
-            # ── Shipping (carrier-facing fulfilment) ─────────────────
-            {
-                "title": _("Shipping"),
-                "separator": True,
-                "collapsible": True,
-                "items": [
-                    {
-                        "title": _("Shipping Providers"),
-                        "icon": "local_shipping",
-                        "link": reverse_lazy(
-                            "admin:shipping_shippingprovider_changelist",
-                            urlconf=ROOT_URLCONF,
-                        ),
-                    },
-                    {
-                        "title": _("BoxNow Shipments"),
-                        "icon": "package_2",
-                        "link": reverse_lazy(
-                            "admin:shipping_boxnow_boxnowshipment_changelist",
-                            urlconf=ROOT_URLCONF,
-                        ),
-                    },
-                    {
-                        "title": _("ACS Shipments"),
-                        "icon": "local_post_office",
-                        "link": reverse_lazy(
-                            "admin:shipping_acs_acsshipment_changelist",
-                            urlconf=ROOT_URLCONF,
-                        ),
-                    },
-                    {
-                        "title": _("BoxNow Lockers"),
-                        "icon": "lock",
-                        "link": reverse_lazy(
-                            "admin:shipping_boxnow_boxnowlocker_changelist",
-                            urlconf=ROOT_URLCONF,
-                        ),
-                    },
-                    {
-                        "title": _("ACS Stations"),
-                        "icon": "store",
-                        "link": reverse_lazy(
-                            "admin:shipping_acs_acsstation_changelist",
-                            urlconf=ROOT_URLCONF,
-                        ),
-                    },
-                ],
-            },
-            # ── Customers ────────────────────────────────────────────
-            {
-                "title": _("Customers"),
-                "separator": True,
-                "collapsible": True,
-                "items": [
-                    {
-                        "title": _("Users"),
-                        "icon": "people",
-                        "link": reverse_lazy(
-                            "admin:user_useraccount_changelist",
-                            urlconf=ROOT_URLCONF,
-                        ),
-                    },
-                    {
-                        "title": _("User Addresses"),
-                        "icon": "home",
-                        "link": reverse_lazy(
-                            "admin:user_useraddress_changelist",
-                            urlconf=ROOT_URLCONF,
-                        ),
-                    },
-                    {
-                        "title": _("Subscriptions"),
-                        "icon": "mail",
-                        "link": reverse_lazy(
-                            "admin:user_usersubscription_changelist",
-                            urlconf=ROOT_URLCONF,
-                        ),
-                    },
-                ],
-            },
-            # ── Loyalty ──────────────────────────────────────────────
-            {
-                "title": _("Loyalty"),
-                "separator": True,
-                "collapsible": True,
-                "items": [
-                    {
-                        "title": _("Loyalty Tiers"),
-                        "icon": "workspace_premium",
-                        "link": reverse_lazy(
-                            "admin:loyalty_loyaltytier_changelist",
-                            urlconf=ROOT_URLCONF,
-                        ),
-                    },
-                    {
-                        "title": _("Points Transactions"),
-                        "icon": "account_balance_wallet",
-                        "link": reverse_lazy(
-                            "admin:loyalty_pointstransaction_changelist",
-                            urlconf=ROOT_URLCONF,
-                        ),
-                    },
-                ],
-            },
-            # ── Newsletter (staff-accessible) ────────────────────────
-            # Countries, Regions and Sites used to sit here too. They are
-            # PUBLIC-schema reference data shared by every store
-            # (``tenant.role_scopes.PLATFORM_ONLY_APP_LABELS``): a store
-            # role never gets a permission on them, so the links 403'd
-            # for staff, and for a platform superuser they showed the
-            # platform's rows dressed as the store's. They live on the
-            # control plane only (``UNFOLD_PLATFORM``).
-            {
-                "title": _("Newsletter"),
-                "separator": True,
-                "collapsible": True,
-                "items": [
-                    {
-                        "title": _("Subscription Topics"),
-                        "icon": "topic",
-                        "link": reverse_lazy(
-                            "admin:user_subscriptiontopic_changelist",
-                            urlconf=ROOT_URLCONF,
-                        ),
-                    },
-                ],
-            },
-            # ── Settings (content-side toggles, staff-accessible) ────
-            # Extra Settings exposes runtime-tunable flags (cookie
-            # banner, feature toggles, public copy) that the storefront
-            # reads via /api/v1/settings/get. Any admin needs to flip
-            # these — keep it out of the superuser-only System zone.
-            {
-                "title": _("Settings"),
-                "separator": True,
-                "collapsible": True,
-                "items": [
-                    {
-                        "title": _("Extra Settings"),
-                        "icon": "settings",
-                        "link": reverse_lazy(
-                            "admin:extra_settings_setting_changelist",
-                            urlconf=ROOT_URLCONF,
-                        ),
-                    },
-                ],
-            },
-            # ──────────────────────────────────────────────────────────
-            # SYSTEM ZONE — superuser-only. One parent group with three
-            # nested subtrees (Security & Access / Audit & Logs /
-            # Reconciliation). The nested rendering
-            # is provided by our `core/templates/unfold/helpers/
-            # app_list{,_item}.html` overrides — unfold's Python layer
-            # already recursively processes child `items` arrays
-            # (`UnfoldAdminSite._get_navigation_items`), so the only
-            # custom code is the recursive template partial.
-            # ──────────────────────────────────────────────────────────
-            {
-                "title": _("System"),
-                "separator": True,
-                "collapsible": True,
-                "permission": "admin.permissions.is_superuser",
-                "items": [
-                    {
-                        "title": _("Security & Access"),
-                        "icon": "security",
-                        "permission": "admin.permissions.is_superuser",
-                        "items": [
-                            {
-                                "title": _("User Sessions"),
-                                "icon": "devices",
-                                "link": reverse_lazy(
-                                    "admin:usersessions_usersession_changelist",
-                                    urlconf=ROOT_URLCONF,
-                                ),
-                                "permission": "admin.permissions.is_superuser",
-                            },
-                            {
-                                "title": _("MFA Authenticators"),
-                                "icon": "verified_user",
-                                "link": reverse_lazy(
-                                    "admin:mfa_authenticator_changelist",
-                                    urlconf=ROOT_URLCONF,
-                                ),
-                                "permission": "admin.permissions.is_superuser",
-                            },
-                            {
-                                "title": _("Social Accounts"),
-                                "icon": "hub",
-                                "link": reverse_lazy(
-                                    "admin:socialaccount_socialaccount_changelist",
-                                    urlconf=ROOT_URLCONF,
-                                ),
-                                "permission": "admin.permissions.is_superuser",
-                            },
-                            {
-                                "title": _("Email Addresses"),
-                                "icon": "alternate_email",
-                                "link": reverse_lazy(
-                                    "admin:account_emailaddress_changelist",
-                                    urlconf=ROOT_URLCONF,
-                                ),
-                                "permission": "admin.permissions.is_superuser",
-                            },
-                            {
-                                "title": _("API Tokens"),
-                                "icon": "key",
-                                "link": reverse_lazy(
-                                    "admin:knox_authtoken_changelist",
-                                    urlconf=ROOT_URLCONF,
-                                ),
-                                "permission": "admin.permissions.is_superuser",
-                            },
-                        ],
-                    },
-                    {
-                        "title": _("Audit & Logs"),
-                        "icon": "fact_check",
-                        "permission": "admin.permissions.is_superuser",
-                        "items": [
-                            {
-                                "title": _("Stock Logs"),
-                                "icon": "inventory",
-                                "link": reverse_lazy(
-                                    "admin:order_stocklog_changelist",
-                                    urlconf=ROOT_URLCONF,
-                                ),
-                                "permission": "admin.permissions.is_superuser",
-                            },
-                            {
-                                "title": _("Order History"),
-                                "icon": "history",
-                                "link": reverse_lazy(
-                                    "admin:order_orderhistory_changelist",
-                                    urlconf=ROOT_URLCONF,
-                                ),
-                                "permission": "admin.permissions.is_superuser",
-                            },
-                            {
-                                "title": _("Order Item History"),
-                                "icon": "manage_history",
-                                "link": reverse_lazy(
-                                    "admin:order_orderitemhistory_changelist",
-                                    urlconf=ROOT_URLCONF,
-                                ),
-                                "permission": "admin.permissions.is_superuser",
-                            },
-                            {
-                                "title": _("BoxNow Events"),
-                                "icon": "event_note",
-                                "link": reverse_lazy(
-                                    "admin:shipping_boxnow_boxnowparcelevent_changelist",
-                                    urlconf=ROOT_URLCONF,
-                                ),
-                                "permission": "admin.permissions.is_superuser",
-                            },
-                            {
-                                "title": _("ACS Tracking Events"),
-                                "icon": "track_changes",
-                                "link": reverse_lazy(
-                                    "admin:shipping_acs_acstrackingevent_changelist",
-                                    urlconf=ROOT_URLCONF,
-                                ),
-                                "permission": "admin.permissions.is_superuser",
-                            },
-                            {
-                                "title": _("Viva Webhook Events"),
-                                "icon": "webhook",
-                                "link": reverse_lazy(
-                                    "admin:order_vivawebhookevent_changelist",
-                                    urlconf=ROOT_URLCONF,
-                                ),
-                                "permission": "admin.permissions.is_superuser",
-                            },
-                            {
-                                "title": _("Meta CAPI Event Log"),
-                                "icon": "share",
-                                "link": reverse_lazy(
-                                    "admin:meta_capi_metacapieventlog_changelist",
-                                    urlconf=ROOT_URLCONF,
-                                ),
-                                "permission": "admin.permissions.is_superuser",
-                            },
-                            # ``core.CachePurgeLog`` is deliberately NOT
-                            # here. ``core`` is SHARED_APPS-only, so
-                            # ``core_cachepurgelog`` exists in the public
-                            # schema alone and a tenant host's search
-                            # path falls through to it: the section
-                            # showed one merchant every purge ever run
-                            # across every store, actor column included.
-                            # It belongs to the control plane, like
-                            # Sites. The store's own purge controls are
-                            # the Cache Management view, which stays.
-                            {
-                                "title": _("User Data Exports"),
-                                "icon": "download",
-                                "link": reverse_lazy(
-                                    "admin:user_userdataexport_changelist",
-                                    urlconf=ROOT_URLCONF,
-                                ),
-                                "permission": "admin.permissions.is_superuser",
-                            },
-                        ],
-                    },
-                    {
-                        "title": _("Reconciliation"),
-                        "icon": "balance",
-                        "permission": "admin.permissions.is_superuser",
-                        "items": [
-                            {
-                                "title": _("ACS Pickup Lists"),
-                                "icon": "assignment",
-                                "link": reverse_lazy(
-                                    "admin:shipping_acs_acspickuplist_changelist",
-                                    urlconf=ROOT_URLCONF,
-                                ),
-                                "permission": "admin.permissions.is_superuser",
-                            },
-                            {
-                                "title": _("ACS COD Payouts"),
-                                "icon": "account_balance",
-                                "link": reverse_lazy(
-                                    "admin:shipping_acs_acscodpayout_changelist",
-                                    urlconf=ROOT_URLCONF,
-                                ),
-                                "permission": "admin.permissions.is_superuser",
-                            },
-                            {
-                                "title": _("Receipt Counter"),
-                                "icon": "tag",
-                                "link": reverse_lazy(
-                                    "admin:order_invoicecounter_changelist",
-                                    urlconf=ROOT_URLCONF,
-                                ),
-                                "permission": "admin.permissions.is_superuser",
-                            },
-                            {
-                                "title": _("Credit Counter"),
-                                "icon": "tag",
-                                "link": reverse_lazy(
-                                    "admin:order_creditcounter_changelist",
-                                    urlconf=ROOT_URLCONF,
-                                ),
-                                "permission": "admin.permissions.is_superuser",
-                            },
-                        ],
-                    },
-                    # Background Jobs (Celery beat schedules + task
-                    # results) are deliberately NOT here. The beat
-                    # schedule is one public-schema table that drives
-                    # every store's fan-out tasks, so it belongs to the
-                    # control plane (``UNFOLD_PLATFORM``), not to any
-                    # one store's console.
-                ],
-            },
-        ],
+        "navigation": "admin.navigation.store_sidebar",
     },
     # Cross-model tab strips that appear on related changelist / detail
     # pages. Lets staff hop across linked admins (Order → Invoice;
@@ -3956,6 +3342,7 @@ UNFOLD = {
         {
             "models": [
                 "order.order",
+                "order.orderitem",
                 "order.invoice",
                 "order.retailcredit",
                 "order.stocklog",
@@ -3967,6 +3354,15 @@ UNFOLD = {
                     "title": _("Orders"),
                     "link": reverse_lazy(
                         "admin:order_order_changelist", urlconf=ROOT_URLCONF
+                    ),
+                },
+                # Line items have their own changelist (filter by
+                # product: who bought it) but no sidebar entry.
+                {
+                    "title": _("Order Items"),
+                    "link": reverse_lazy(
+                        "admin:order_orderitem_changelist",
+                        urlconf=ROOT_URLCONF,
                     ),
                 },
                 {
@@ -4153,9 +3549,8 @@ UNFOLD = {
             ],
         },
     ],
-    # Built per request: each tool is listed only for whoever can open
-    # it (admin/navigation.py).
-    "SITE_DROPDOWN": "admin.navigation.store_site_dropdown",
+    # The ops consoles, for platform superusers (admin/navigation.py).
+    "SITE_DROPDOWN": "admin.navigation.ops_site_dropdown",
 }
 
 SESSION_CACHE_ALIAS = "default"

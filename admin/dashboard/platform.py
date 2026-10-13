@@ -57,7 +57,10 @@ class PlatformEstateCards(DashboardWidget):
         ).count()
 
         return {
-            "class": "grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4",
+            # No grid-cols-1 (a grid is one column without it): Unfold's
+            # stylesheet loads after ours, so its .grid-cols-1 would
+            # override sm:grid-cols-2, which only ours carries.
+            "class": "grid gap-4 sm:grid-cols-2 xl:grid-cols-4",
             "kpis": [
                 {
                     "icon": "storefront",

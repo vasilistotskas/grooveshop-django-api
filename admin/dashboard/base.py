@@ -12,10 +12,11 @@ Charts follow the contract of Unfold's bundled ``renderCharts`` (its
 each dataset's ``backgroundColor``/``borderColor`` - and nowhere else -
 so series colours are CSS variables that follow the theme, using only
 the scales Unfold defines (base, primary, blue, green, orange, red).
-Axis and legend text take the configured ``base-400``. When
-``data-options`` is present Unfold uses it INSTEAD of its defaults, so
-every option a chart needs is spelled out here, JSON only (no JS
-callbacks survive ``json.dumps``).
+Axis text takes the configured ``base-400``. When ``data-options`` is
+present Unfold uses it INSTEAD of its defaults, so every option a chart
+needs is spelled out here, JSON only (no JS callbacks survive
+``json.dumps``). One measure per chart: two scales on one canvas read
+as a relationship that is not there.
 """
 
 from __future__ import annotations
@@ -35,16 +36,22 @@ class DashboardWidget(BaseComponent):
     """A widget backed by an optional cached query.
 
     ``shape`` turns the query's plain data into template context on
-    every request - labels, URLs and chart JSON are never cached.
+    every request - labels, URLs and chart JSON are never cached. A
+    query with variants is asked for ``variant()``.
     """
 
     query: DashboardQuery | None = None
 
     def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
         context = super().get_context_data(**kwargs)
-        data = self.query.get() if self.query is not None else None
+        data = (
+            self.query.get(self.variant()) if self.query is not None else None
+        )
         context.update(self.shape(data))
         return context
+
+    def variant(self) -> str | None:
+        return None
 
     def shape(self, data: Any) -> dict[str, Any]:
         return {}
@@ -85,6 +92,11 @@ def percent_text(value: float, *, signed: bool = False) -> str:
     return f"{'+' if signed and value >= 0 else ''}{text}%"
 
 
+def change_percent(current: float, prior: float) -> float | None:
+    """The change from ``prior``; None when there is nothing to compare."""
+    return round((current - prior) / prior * 100, 1) if prior else None
+
+
 def color(token: str) -> str:
     """A theme colour, e.g. ``color("green-500")``."""
     return f"var(--color-{token})"
@@ -98,96 +110,106 @@ def chart_json(value: dict[str, Any]) -> str:
     return json.dumps(value)
 
 
-def _legend(position: str) -> dict[str, Any]:
-    return {
-        "display": True,
-        "position": position,
-        "align": "end" if position == "top" else "center",
-        "labels": {
-            "color": _text_color(),
-            "boxWidth": 8,
-            "boxHeight": 8,
-            "padding": 12,
-            "usePointStyle": True,
-        },
-    }
-
-
-def _axis(**extra: Any) -> dict[str, Any]:
-    axis: dict[str, Any] = {
-        "beginAtZero": True,
-        "border": {"display": False},
-        "ticks": {"color": _text_color(), "precision": 0},
-    }
-    axis.update(extra)
-    return axis
-
-
 def bar_chart_options(
-    *, legend: bool, currency_axis: bool, stacked: bool = False
+    *, legend: bool, stacked: bool = False, currency: bool = False
 ) -> dict[str, Any]:
-    """Options for a bar chart, optionally with a line on a € axis.
+    """Options for bars on one axis, optionally stacked.
 
-    ``currency_axis`` adds a right-hand ``y1`` axis formatted through
-    Chart.js's JSON-safe ``Intl.NumberFormat`` passthrough. Both min
-    AND max fraction digits are set: Chart.js merges its own minimum
-    into the spec, and min > max throws a RangeError that aborts
-    ``renderCharts`` for every chart on the page.
+    ``currency`` formats the axis through Chart.js's JSON-safe
+    ``Intl.NumberFormat`` passthrough. Both min AND max fraction digits
+    are set: Chart.js merges its own minimum into the spec, and
+    min > max throws a RangeError that aborts ``renderCharts`` for every
+    chart on the page.
     """
-    scales: dict[str, Any] = {
-        "x": {
-            "stacked": stacked,
-            "grid": {"display": False},
-            "border": {"display": False},
-            "ticks": {"color": _text_color(), "maxRotation": 0},
-        },
-        "y": _axis(position="left", stacked=stacked),
-    }
-    if currency_axis:
-        scales["y1"] = _axis(
-            position="right",
-            grid={"drawOnChartArea": False},
-            ticks={
-                "color": _text_color(),
-                "format": {
-                    "style": "currency",
-                    "currency": "EUR",
-                    "minimumFractionDigits": 0,
-                    "maximumFractionDigits": 0,
-                },
-            },
-        )
+    ticks: dict[str, Any] = {"color": _text_color(), "precision": 0}
+    if currency:
+        ticks["format"] = {
+            "style": "currency",
+            "currency": "EUR",
+            "minimumFractionDigits": 0,
+            "maximumFractionDigits": 0,
+        }
     return {
         "responsive": True,
         "maintainAspectRatio": False,
         "animation": False,
         "interaction": {"mode": "index", "intersect": False},
         "plugins": {
-            "legend": _legend("top") if legend else {"display": False},
+            "legend": (
+                {
+                    "display": True,
+                    "position": "top",
+                    "align": "end",
+                    "labels": {
+                        "color": _text_color(),
+                        "boxWidth": 8,
+                        "boxHeight": 8,
+                        "padding": 12,
+                        "usePointStyle": True,
+                    },
+                }
+                if legend
+                else {"display": False}
+            ),
             "tooltip": {"enabled": True, "padding": 10},
         },
-        "scales": scales,
+        "scales": {
+            "x": {
+                "stacked": stacked,
+                "grid": {"display": False},
+                "border": {"display": False},
+                "ticks": {
+                    "color": _text_color(),
+                    "maxRotation": 0,
+                    "autoSkip": True,
+                    "maxTicksLimit": 8,
+                },
+            },
+            "y": {
+                "stacked": stacked,
+                "beginAtZero": True,
+                "border": {"display": False},
+                "ticks": ticks,
+            },
+        },
     }
 
 
-def doughnut_chart(
-    labels: list[str], values: list[int], colors: list[str]
+def bar_chart(
+    labels: list[str], values: list[float], *, label: str, currency: bool
 ) -> dict[str, str]:
-    """``data``/``options`` JSON for the project doughnut component.
-
-    No border: the gaps (``spacing``) show the card behind the chart,
-    so the slices separate in both themes without a colour that only
-    suits one of them.
-    """
+    """``data``/``options`` JSON for one measure as bars."""
     data = {
         "labels": labels,
         "datasets": [
             {
+                "label": label,
                 "data": values,
-                "backgroundColor": colors,
-                "borderWidth": 0,
-                "spacing": 2,
-                "hoverOffset": 6,
+                "backgroundColor": color("primary-500"),
+                "borderRadius": 4,
+                "borderSkipped": "start",
+                "maxBarThickness": 32,
+            }
+        ],
+    }
+    options = bar_chart_options(legend=False, currency=currency)
+    return {"data": chart_json(data), "options": chart_json(options)}
+
+
+def sparkline(values: list[float]) -> dict[str, str]:
+    """``data``/``options`` JSON for a KPI card's trend line: no axes,
+    no labels, nothing to hover - the card's figures carry the values."""
+    data = {
+        "labels": [""] * len(values),
+        "datasets": [
+            {
+                "data": values,
+                "borderColor": color("primary-500"),
+                "backgroundColor": color("primary-500"),
+                "borderWidth": 2,
+                "pointRadius": 0,
+                "tension": 0.35,
+                "fill": False,
             }
         ],
     }
@@ -195,10 +217,12 @@ def doughnut_chart(
         "responsive": True,
         "maintainAspectRatio": False,
         "animation": False,
-        "cutout": "68%",
+        "events": [],
+        "layout": {"padding": 2},
         "plugins": {
-            "legend": _legend("bottom"),
-            "tooltip": {"enabled": True},
+            "legend": {"display": False},
+            "tooltip": {"enabled": False},
         },
+        "scales": {"x": {"display": False}, "y": {"display": False}},
     }
     return {"data": chart_json(data), "options": chart_json(options)}

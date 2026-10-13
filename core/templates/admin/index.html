@@ -3,7 +3,9 @@
 The STORE dashboard: layout only. Every block is a widget - an Unfold
 component class in admin/dashboard/store/widgets.py rendering a partial
 under admin/dashboard/ - that loads its own data (cached queries in
-admin/dashboard/store/queries.py).
+admin/dashboard/store/queries.py) for the period in ?period=. A widget
+with nothing to show for this store, this user or this period draws its
+own empty state, or nothing at all.
 
 {# #} is SINGLE-LINE in Django templates; use {% comment %} for prose.
 {% endcomment %}
@@ -12,62 +14,27 @@ admin/dashboard/store/queries.py).
 {% block title %}{% trans "Dashboard" %} | {{ site_title }}{% endblock %}
 
 {% block content %}
-{% url "admin:product_product_add" as new_product_url %}
-{% url "admin:order_order_changelist" as orders_url %}
-{% url "admin:user_useraccount_changelist" as customers_url %}
 <div class="flex flex-col gap-6">
-    <div class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-        <div>
-            {% component "unfold/components/title.html" %}{% trans "Dashboard" %}{% endcomponent %}
-            {% component "unfold/components/text.html" with class="mt-1 text-subtle" %}{% trans "Revenue, orders and customer activity at a glance." %}{% endcomponent %}
-        </div>
-        <div class="flex flex-wrap gap-2">
-            {% component "unfold/components/button.html" with href=new_product_url icon="add_circle" variant="primary" %}{% trans "New product" %}{% endcomponent %}
-            {% component "unfold/components/button.html" with href=orders_url icon="receipt_long" variant="default" %}{% trans "Orders" %}{% endcomponent %}
-            {% component "unfold/components/button.html" with href=customers_url icon="group" variant="default" %}{% trans "Customers" %}{% endcomponent %}
-        </div>
-    </div>
+    {% component "admin/dashboard/store/header.html" with component_class="StoreDashboardHeader" %}{% endcomponent %}
 
     {% component "admin/dashboard/components/alerts.html" with component_class="StoreAlerts" %}{% endcomponent %}
 
-    <div class="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
-        {% component "admin/dashboard/store/revenue.html" with component_class="StoreRevenueCard" %}{% endcomponent %}
-        {% component "admin/dashboard/components/kpi.html" with component_class="StorePendingOrdersCard" %}{% endcomponent %}
-        {% component "admin/dashboard/components/kpi.html" with component_class="StoreNewCustomersCard" %}{% endcomponent %}
-        {% component "admin/dashboard/components/kpi.html" with component_class="StoreAverageOrderValueCard" %}{% endcomponent %}
-    </div>
+    {% component "admin/dashboard/store/kpis.html" with component_class="StoreKpis" %}{% endcomponent %}
 
     <div class="grid gap-6 grid-cols-1 lg:grid-cols-3">
-        {% component "admin/dashboard/components/bar_chart_card.html" with component_class="StorePerformanceChart" %}{% endcomponent %}
-        {% component "admin/dashboard/components/doughnut_card.html" with component_class="StoreOrderStatusChart" %}{% endcomponent %}
+        {% component "admin/dashboard/store/sales_chart.html" with component_class="StoreSalesChart" class="lg:col-span-2" %}{% endcomponent %}
+        {% component "admin/dashboard/store/attention.html" with component_class="StoreAttention" %}{% endcomponent %}
     </div>
 
     <div class="grid gap-6 grid-cols-1 lg:grid-cols-3">
         {% component "admin/dashboard/components/table_card.html" with component_class="StoreRecentOrders" class="lg:col-span-2" %}{% endcomponent %}
-        {% component "admin/dashboard/components/doughnut_card.html" with component_class="StoreOrderSourceChart" %}{% endcomponent %}
-    </div>
-
-    <div class="grid gap-6 grid-cols-1 lg:grid-cols-2">
-        {% component "admin/dashboard/components/table_card.html" with component_class="StorePendingReviews" %}{% endcomponent %}
-        {% component "admin/dashboard/components/table_card.html" with component_class="StoreContactMessages" %}{% endcomponent %}
+        {% component "admin/dashboard/components/table_card.html" with component_class="StoreBestSellers" %}{% endcomponent %}
     </div>
 
     <div class="grid gap-6 grid-cols-1 lg:grid-cols-3">
         {% component "admin/dashboard/store/funnel.html" with component_class="StoreFunnel" %}{% endcomponent %}
-        {% component "admin/dashboard/components/kpi.html" with component_class="StoreRepeatCustomers" %}{% endcomponent %}
-        {% component "admin/dashboard/components/table_card.html" with component_class="StoreTopProducts" %}{% endcomponent %}
-    </div>
-
-    {% component "admin/dashboard/components/table_card.html" with component_class="StoreLowStock" %}{% endcomponent %}
-
-    <div class="grid gap-6 grid-cols-1 lg:grid-cols-3">
-        {% component "admin/dashboard/components/kpi_list.html" with component_class="StoreSearchKpis" %}{% endcomponent %}
-        {% component "admin/dashboard/components/bar_chart_card.html" with component_class="StoreSearchVolume" %}{% endcomponent %}
-    </div>
-
-    <div class="grid gap-6 grid-cols-1 lg:grid-cols-2">
-        {% component "admin/dashboard/components/table_card.html" with component_class="StoreTopQueries" %}{% endcomponent %}
-        {% component "admin/dashboard/components/table_card.html" with component_class="StoreZeroResultQueries" %}{% endcomponent %}
+        {% component "admin/dashboard/store/sources.html" with component_class="StoreOrderSources" %}{% endcomponent %}
+        {% component "admin/dashboard/store/search.html" with component_class="StoreSearch" %}{% endcomponent %}
     </div>
 </div>
 {% endblock %}

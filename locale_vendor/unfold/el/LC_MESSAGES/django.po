@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: grooveshop-django-api (django-unfold)\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-01 03:32+0300\n"
+"POT-Creation-Date: 2026-10-13 09:51+0300\n"
 "PO-Revision-Date: 2026-10-01 00:00+0000\n"
 "Last-Translator: \n"
 "Language-Team: Greek\n"
@@ -214,8 +214,8 @@ msgid ""
 "Please correct these errors in your data where possible, then reupload it "
 "using the form above."
 msgstr ""
-"Διορθώστε αυτά τα σφάλματα στα δεδομένα σας όπου είναι δυνατό και ανεβάστε "
-"τα ξανά με την παραπάνω φόρμα."
+"Διορθώστε αυτά τα σφάλματα στα δεδομένα σας όπου είναι δυνατό και ανεβάστε τα"
+" ξανά με την παραπάνω φόρμα."
 
 msgid "Row"
 msgstr "Γραμμή"
@@ -228,6 +228,94 @@ msgstr "Η εξαγωγή θα περιλάβει τα παρακάτω πεδί
 
 msgid "This importer will import the following fields: "
 msgstr "Η εισαγωγή θα περιλάβει τα παρακάτω πεδία: "
+
+#, python-format
+msgid "Recover deleted %(name)s"
+msgstr "Ανάκτηση διαγραμμένων: %(name)s"
+
+msgid ""
+"Choose a date from the list below to revert to a previous version of this "
+"object."
+msgstr ""
+"Επιλέξτε μια ημερομηνία από την παρακάτω λίστα για να επαναφέρετε μια "
+"προηγούμενη έκδοση αυτού του αντικειμένου."
+
+msgid ""
+"This object doesn't have a change history. It probably wasn't added via this "
+"admin site."
+msgstr ""
+"Αυτό το αντικείμενο δεν έχει ιστορικό αλλαγών. Μάλλον δεν προστέθηκε από "
+"αυτόν τον διαχειριστικό ιστότοπο."
+
+msgid "Press the save button below to recover this version of the object."
+msgstr ""
+"Πατήστε το κουμπί αποθήκευσης παρακάτω για να ανακτήσετε αυτή την έκδοση του "
+"αντικειμένου."
+
+msgid ""
+"Choose a date from the list below to recover a deleted version of an object."
+msgstr ""
+"Επιλέξτε μια ημερομηνία από την παρακάτω λίστα για να ανακτήσετε μια "
+"διαγραμμένη έκδοση ενός αντικειμένου."
+
+msgid "There are no deleted objects to recover"
+msgstr "Δεν υπάρχουν διαγραμμένα αντικείμενα για ανάκτηση"
+
+msgid "Press the save button below to revert to this version of the object."
+msgstr ""
+"Πατήστε το κουμπί αποθήκευσης παρακάτω για να επαναφέρετε αυτή την έκδοση του"
+" αντικειμένου."
+
+msgid "compare"
+msgstr "σύγκριση"
+
+msgid "Comment"
+msgstr "Σχόλιο"
+
+msgid "DATETIME_FORMAT"
+msgstr "d/m/Y P"
+
+#, python-format
+msgid ""
+"\n"
+"            Compare <strong class=\"font-semibold underline\">%(date1)s</strong> with <strong class=\"font-semibold underline\">%(date2)s</strong>\n"
+"        "
+msgstr ""
+"\n"
+"            Σύγκριση <strong class=\"font-semibold underline\">%(date1)s</strong> με <strong class=\"font-semibold underline\">%(date2)s</strong>\n"
+"        "
+
+msgid "Go back to history list"
+msgstr "Επιστροφή στο ιστορικό"
+
+msgid "Revert to this version"
+msgstr "Επαναφορά σε αυτή την έκδοση"
+
+msgid ""
+"\n"
+"                Fields/entries marked with <sup class=\"follow\">*</sup> are not under reversion control.\n"
+"                It may be that not all marked information are correct.\n"
+"            "
+msgstr ""
+"\n"
+"                Τα πεδία/στοιχεία με <sup class=\"follow\">*</sup> δεν παρακολουθούνται από το ιστορικό εκδόσεων.\n"
+"                Ίσως δεν είναι σωστές όλες οι σημειωμένες πληροφορίες.\n"
+"            "
+
+msgid "previous"
+msgstr "προηγούμενο"
+
+msgid "next"
+msgstr "επόμενο"
+
+msgid "There are no differences."
+msgstr "Δεν υπάρχουν διαφορές."
+
+msgid "Edit comment:"
+msgstr "Σχόλιο επεξεργασίας:"
+
+msgid "(no comment exists)"
+msgstr "(δεν υπάρχει σχόλιο)"
 
 msgid ""
 "Choose a date from the list below to revert to a previous version of this "
@@ -247,8 +335,8 @@ msgstr "Αυτό το αντικείμενο δεν έχει ιστορικό α
 msgid ""
 "Press the 'Revert' button below to revert to this version of the object."
 msgstr ""
-"Πατήστε το κουμπί «Επαναφορά» παρακάτω για να επαναφέρετε αυτή την έκδοση "
-"του αντικειμένου."
+"Πατήστε το κουμπί «Επαναφορά» παρακάτω για να επαναφέρετε αυτή την έκδοση του"
+" αντικειμένου."
 
 msgid "Press the 'Change History' button below to edit the history."
 msgstr ""
@@ -257,9 +345,6 @@ msgstr ""
 
 msgid "Changed by"
 msgstr "Αλλαγή από"
-
-msgid "Comment"
-msgstr "Σχόλιο"
 
 msgid "Change reason"
 msgstr "Αιτία αλλαγής"
@@ -286,12 +371,12 @@ msgid "Select action to run"
 msgstr "Επιλέξτε ενέργεια για εκτέλεση"
 
 msgid ""
-"Raw passwords are not stored, so there is no way to see this user’s "
-"password, but you can change the password using <a href=\"{}\" class=\"text-"
+"Raw passwords are not stored, so there is no way to see this user’s password,"
+" but you can change the password using <a href=\"{}\" class=\"text-"
 "primary-600 dark:text-primary-500\">this form</a>."
 msgstr ""
-"Οι κωδικοί πρόσβασης δεν αποθηκεύονται αυτούσιοι, οπότε δεν υπάρχει τρόπος "
-"να δείτε τον κωδικό αυτού του χρήστη, μπορείτε όμως να τον αλλάξετε με <a "
+"Οι κωδικοί πρόσβασης δεν αποθηκεύονται αυτούσιοι, οπότε δεν υπάρχει τρόπος να"
+" δείτε τον κωδικό αυτού του χρήστη, μπορείτε όμως να τον αλλάξετε με <a "
 "href=\"{}\" class=\"text-primary-600 dark:text-primary-500\">αυτή τη "
 "φόρμα</a>."
 
@@ -401,11 +486,8 @@ msgstr "Πατήστε για ακύρωση"
 msgid "No results found"
 msgstr "Δεν βρέθηκαν αποτελέσματα"
 
-msgid ""
-"This page yielded into no results. Create a new item or reset your filters."
-msgstr ""
-"Αυτή η σελίδα δεν έχει αποτελέσματα. Δημιουργήστε ένα νέο στοιχείο ή "
-"επαναφέρετε τα φίλτρα σας."
+msgid "This page yielded into no results."
+msgstr "Αυτή η σελίδα δεν έδωσε αποτελέσματα."
 
 msgid "Reset filters"
 msgstr "Επαναφορά φίλτρων"

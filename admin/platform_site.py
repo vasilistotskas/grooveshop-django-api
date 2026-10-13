@@ -31,7 +31,7 @@ from django.utils.translation import gettext_lazy as _
 from unfold.sites import UnfoldAdminSite
 
 from admin.forms import PlatformAdminAuthenticationForm
-from admin.mixins import AdminSiteLoginNextMixin
+from admin.mixins import AdminFooterMixin, AdminSiteLoginNextMixin
 
 # Apps whose models belong on the control plane. Anything outside this
 # set is per-store and lives in the tenant's own admin.
@@ -81,7 +81,9 @@ PLATFORM_EXCLUDED_MODELS: frozenset[str] = frozenset(
 )
 
 
-class PlatformAdminSite(AdminSiteLoginNextMixin, UnfoldAdminSite):
+class PlatformAdminSite(
+    AdminFooterMixin, AdminSiteLoginNextMixin, UnfoldAdminSite
+):
     """Control-plane admin, served only on the PUBLIC schema."""
 
     # Its own UNFOLD config block — see module docstring.

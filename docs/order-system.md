@@ -282,11 +282,12 @@ Orders made outside checkout — the demo seed (`devtools/demo_account.py`,
   `ORDER_SOURCE_TYPE_VARIANT`, `admin/displays.py`), the
   `attribution__source_type` and `OrderSourceFilter` filters, six
   read-only `attribution_*` fields in the "Additional Information" tab,
-  and the dashboard's "Orders by source" doughnut
-  (`admin/dashboard/store/queries.py: order_source`, drawn by
-  `widgets.py: StoreOrderSourceChart`; last 30 days, top six plus
-  "Other", orders without a row left out). `source_label()` turns a
-  stored `(source, source_type)` into the name staff read.
+  and the dashboard's "Where orders come from" card
+  (`admin/dashboard/store/queries.py: order_sources`, drawn by
+  `widgets.py: StoreOrderSources`; the dashboard's selected period, top
+  five as shares plus "Other", orders without a row left out).
+  `source_label()` turns a stored `(source, source_type)` into the name
+  staff read.
 - **Trust.** Every input but the agent protocol is shopper-controlled,
   so the row is analytics only and never an authorisation or pricing
   signal. The agent source type is the one verified claim (see Input).

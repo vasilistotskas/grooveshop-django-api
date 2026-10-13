@@ -25,10 +25,19 @@ def test_every_key_is_under_the_purgeable_prefix():
             assert key.startswith("admin:dashboard:"), key
 
 
-def test_translated_content_gets_a_key_per_language():
-    keys = queries.top_products.all_keys()
-    assert len(keys) == len(settings.LANGUAGES)
-    assert queries.kpis.all_keys() == [queries.kpis.key()]
+def test_a_key_per_period_and_per_language_where_they_vary():
+    assert len(queries.recent_orders.all_keys()) == 1
+    assert len(queries.overview.all_keys()) == len(queries.PERIODS)
+    assert len(queries.best_sellers.all_keys()) == len(queries.PERIODS) * len(
+        settings.LANGUAGES
+    )
+
+
+def test_a_period_query_caches_each_period_apart():
+    queries.overview.get("7d")
+
+    assert cache.get(queries.overview.key("7d")) is not None
+    assert cache.get(queries.overview.key("30d")) is None
 
 
 def test_an_order_write_clears_order_queries_after_commit(
@@ -36,14 +45,16 @@ def test_an_order_write_clears_order_queries_after_commit(
 ):
     from order.factories.order import OrderFactory
 
-    queries.kpis.get()
-    queries.contact_messages.get()
+    queries.overview.get("7d")
+    queries.overview.get("30d")
+    queries.search.get("30d")
 
     with django_capture_on_commit_callbacks(execute=True):
         OrderFactory(num_order_items=0)
 
-    assert cache.get(queries.kpis.key()) is None
-    assert cache.get(queries.contact_messages.key()) is not None
+    assert cache.get(queries.overview.key("7d")) is None
+    assert cache.get(queries.overview.key("30d")) is None
+    assert cache.get(queries.search.key("30d")) is not None
 
 
 def test_the_clear_waits_for_the_commit(monkeypatch):
@@ -56,13 +67,13 @@ def test_the_clear_waits_for_the_commit(monkeypatch):
     monkeypatch.setattr(
         dashboard_cache.transaction, "on_commit", pending.append
     )
-    queries.kpis.get()
+    queries.recent_orders.get()
     OrderFactory(num_order_items=0)
 
-    assert cache.get(queries.kpis.key()) is not None
+    assert cache.get(queries.recent_orders.key()) is not None
     for callback in pending:
         callback()
-    assert cache.get(queries.kpis.key()) is None
+    assert cache.get(queries.recent_orders.key()) is None
 
 
 def test_a_login_clears_nothing(django_capture_on_commit_callbacks):
@@ -71,11 +82,11 @@ def test_a_login_clears_nothing(django_capture_on_commit_callbacks):
     from user.factories.account import UserAccountFactory
 
     user = UserAccountFactory()
-    queries.kpis.get()
+    queries.overview.get("30d")
     with django_capture_on_commit_callbacks(execute=True):
         user.save(update_fields=["last_login"])
 
-    assert cache.get(queries.kpis.key()) is not None
+    assert cache.get(queries.overview.key("30d")) is not None
 
 
 def test_widget_classes_are_prefixed_by_site():

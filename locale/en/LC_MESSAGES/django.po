@@ -189,15 +189,7 @@ msgid "Last order"
 msgstr "Order"
 
 #: .\admin\dashboard\store\widgets.py:39
-msgid "7d"
-msgstr ""
-
-#: .\admin\dashboard\store\widgets.py:39
 msgid "Last 7 days"
-msgstr ""
-
-#: .\admin\dashboard\store\widgets.py:40
-msgid "1m"
 msgstr ""
 
 #: .\admin\dashboard\store\widgets.py:40 .\admin\dashboard\store\widgets.py:145
@@ -206,72 +198,13 @@ msgstr ""
 msgid "Last 30 days"
 msgstr ""
 
-#: .\admin\dashboard\store\widgets.py:41
-msgid "3m"
-msgstr ""
-
-#: .\admin\dashboard\store\widgets.py:41
-msgid "Last 3 months"
-msgstr ""
-
-#: .\admin\dashboard\store\widgets.py:42
-msgid "1y"
-msgstr ""
-
 #: .\admin\dashboard\store\widgets.py:42
 msgid "Last 12 months"
-msgstr ""
-
-#: .\admin\dashboard\store\widgets.py:119
-msgid "Pending orders"
-msgstr ""
-
-#: .\admin\dashboard\store\widgets.py:121
-msgid "Open to triage"
 msgstr ""
 
 #: .\admin\dashboard\store\widgets.py:135
 msgid "New customers"
 msgstr ""
-
-#: .\admin\dashboard\store\widgets.py:138
-#, python-format
-msgid "+%(count)s today"
-msgstr ""
-
-#: .\admin\dashboard\store\widgets.py:158
-#, fuzzy
-#| msgid "Order Canceled"
-msgid "Average order value"
-msgstr "Order Canceled"
-
-#: .\admin\dashboard\store\widgets.py:159
-msgid "Paid orders, last 30 days"
-msgstr ""
-
-#: .\admin\dashboard\store\widgets.py:205
-msgid "Revenue and orders"
-msgstr ""
-
-#: .\admin\dashboard\store\widgets.py:206
-msgid "Last 14 days"
-msgstr ""
-
-#: .\admin\dashboard\store\widgets.py:207
-msgid "No orders in the last 14 days"
-msgstr ""
-
-#: .\admin\dashboard\store\widgets.py:223
-#, fuzzy
-#| msgid "Order Details"
-msgid "Order status"
-msgstr "Order Details"
-
-#: .\admin\dashboard\store\widgets.py:224
-#, fuzzy
-#| msgid "Order"
-msgid "All orders"
-msgstr "Order"
 
 #: .\admin\dashboard\store\widgets.py:225
 #: .\admin\dashboard\store\widgets.py:276
@@ -282,22 +215,6 @@ msgstr ""
 #: .\core\admin.py:214 .\core\enum.py:19 .\user\models\subscription.py:33
 msgid "Other"
 msgstr ""
-
-#: .\admin\dashboard\store\widgets.py:254
-msgid "Orders by source"
-msgstr ""
-
-#: .\admin\dashboard\store\widgets.py:257
-msgid ""
-"No attributed orders in the last 30 days. Orders are attributed from the "
-"visit that placed them."
-msgstr ""
-
-#: .\admin\dashboard\store\widgets.py:273
-#, fuzzy
-#| msgid "Order"
-msgid "Recent orders"
-msgstr "Order"
 
 #: .\admin\dashboard\store\widgets.py:279
 #: .\core\templates\emails\order\invoice_issued.html:22
@@ -349,14 +266,6 @@ msgstr "Total"
 msgid "Placed"
 msgstr ""
 
-#: .\admin\dashboard\store\widgets.py:316
-msgid "Reviews awaiting approval"
-msgstr ""
-
-#: .\admin\dashboard\store\widgets.py:321
-msgid "No reviews are waiting"
-msgstr ""
-
 #: .\admin\dashboard\store\widgets.py:324
 #: .\admin\dashboard\store\widgets.py:437
 #: .\admin\dashboard\store\widgets.py:645 .\b2b\models\price.py:32
@@ -382,31 +291,10 @@ msgstr "Product"
 msgid "Rating"
 msgstr ""
 
-#: .\admin\dashboard\store\widgets.py:327
-#: .\admin\dashboard\store\widgets.py:358
-#, fuzzy
-#| msgid "Order Delivered"
-msgid "Received"
-msgstr "Order Delivered"
-
 #: .\admin\dashboard\store\widgets.py:335 .\blog\admin.py:714
 #: .\blog\models\comment.py:84 .\contact\admin.py:386 .\contact\models.py:243
 #: .\product\models\alert.py:99 .\user\admin.py:508 .\user\admin.py:959
 msgid "Anonymous"
-msgstr ""
-
-#: .\admin\dashboard\store\widgets.py:353
-#, fuzzy
-#| msgid "Contact us"
-msgid "Contact messages"
-msgstr "Contact us"
-
-#: .\admin\dashboard\store\widgets.py:356
-msgid "No messages yet"
-msgstr ""
-
-#: .\admin\dashboard\store\widgets.py:358
-msgid "From"
 msgstr ""
 
 #: .\admin\dashboard\store\widgets.py:358 .\contact\admin.py:196
@@ -435,73 +323,14 @@ msgstr "Order Canceled"
 msgid "Paid"
 msgstr ""
 
-#: .\admin\dashboard\store\widgets.py:417
-msgid "Repeat customers"
-msgstr ""
-
-#: .\admin\dashboard\store\widgets.py:419
-#, python-format
-msgid "%(repeat)s of %(paying)s paying customers ordered again"
-msgstr ""
-
-#: .\admin\dashboard\store\widgets.py:431
-#, fuzzy
-#| msgid "Product"
-msgid "Most viewed products"
-msgstr "Product"
-
-#: .\admin\dashboard\store\widgets.py:434
-msgid "No products yet"
-msgstr ""
-
-#: .\admin\dashboard\store\widgets.py:438
-msgid "Views"
-msgstr ""
-
 #: .\admin\dashboard\store\widgets.py:476
 #: .\admin\dashboard\store\widgets.py:525
 #: .\admin\dashboard\store\widgets.py:552
 msgid "Searches"
 msgstr ""
 
-#: .\admin\dashboard\store\widgets.py:477
-msgid "Last 30 days, empty searches excluded"
-msgstr ""
-
 #: .\admin\dashboard\store\widgets.py:485
 msgid "Found nothing"
-msgstr ""
-
-#: .\admin\dashboard\store\widgets.py:487
-#, python-format
-msgid "%(count)s search, last 30 days"
-msgid_plural "%(count)s searches, last 30 days"
-msgstr[0] ""
-msgstr[1] ""
-
-#: .\admin\dashboard\store\widgets.py:499
-msgid "Result clicks"
-msgstr ""
-
-#: .\admin\dashboard\store\widgets.py:501
-msgid "No clicks recorded yet"
-msgstr ""
-
-#: .\admin\dashboard\store\widgets.py:503
-#, python-format
-msgid "%(rate)s of searches, last 30 days"
-msgstr ""
-
-#: .\admin\dashboard\store\widgets.py:536
-msgid "Search volume"
-msgstr ""
-
-#: .\admin\dashboard\store\widgets.py:537
-msgid "Last 14 days, empty searches excluded"
-msgstr ""
-
-#: .\admin\dashboard\store\widgets.py:538
-msgid "No searches in the last 14 days"
 msgstr ""
 
 #: .\admin\dashboard\store\widgets.py:551 .\search\models.py:54
@@ -512,24 +341,8 @@ msgstr ""
 msgid "Top searches"
 msgstr ""
 
-#: .\admin\dashboard\store\widgets.py:576
-msgid "No searches yet"
-msgstr ""
-
-#: .\admin\dashboard\store\widgets.py:590
-msgid "Searches that found nothing"
-msgstr ""
-
-#: .\admin\dashboard\store\widgets.py:591
-msgid "Candidates for synonyms, content or products"
-msgstr ""
-
 #: .\admin\dashboard\store\widgets.py:593
 msgid "Every search found something"
-msgstr ""
-
-#: .\admin\dashboard\store\widgets.py:637
-msgid "Running low"
 msgstr ""
 
 #: .\admin\dashboard\store\widgets.py:638
@@ -646,17 +459,6 @@ msgstr ""
 msgid "Every submission to AADE will fail until they are set."
 msgstr ""
 
-#: .\admin\dashboard\store\widgets.py:787
-#, python-format
-msgid "%(count)s invoice rejected by myDATA in the last 7 days"
-msgid_plural "%(count)s invoices rejected by myDATA in the last 7 days"
-msgstr[0] ""
-msgstr[1] ""
-
-#: .\admin\dashboard\store\widgets.py:796
-msgid "Review rejected invoices"
-msgstr ""
-
 #: .\admin\dashboard\store\widgets.py:808
 msgid "myDATA is using the AADE sandbox"
 msgstr ""
@@ -763,20 +565,12 @@ msgstr ""
 msgid "Include related surfaces"
 msgstr ""
 
-#: .\admin\navigation.py:29
-msgid "Rosetta"
-msgstr ""
-
 #: .\admin\navigation.py:37
 msgid "Cache"
 msgstr ""
 
 #: .\admin\navigation.py:46
 msgid "Email Templates"
-msgstr ""
-
-#: .\admin\navigation.py:53
-msgid "API Swagger"
 msgstr ""
 
 #: .\admin\permissions.py:15 .\admin\platform_site.py:91
@@ -4718,28 +4512,8 @@ msgstr ""
 msgid "View all"
 msgstr ""
 
-#: .\core\templates\admin\dashboard\store\funnel.html:2
-msgid "Conversion"
-msgstr ""
-
-#: .\core\templates\admin\dashboard\store\funnel.html:3
-msgid "Last 30 days, relative to carts started"
-msgstr ""
-
 #: .\core\templates\admin\dashboard\store\funnel.html:13
 msgid "Carts that ended in a paid order"
-msgstr ""
-
-#: .\core\templates\admin\dashboard\store\funnel.html:17
-msgid "No carts or orders in the last 30 days"
-msgstr ""
-
-#: .\core\templates\admin\dashboard\store\revenue.html:8
-msgid "Compared with the window before it"
-msgstr ""
-
-#: .\core\templates\admin\dashboard\store\revenue.html:31
-msgid "Revenue period"
 msgstr ""
 
 #: .\core\templates\admin\email_template_management.html:10
@@ -4760,10 +4534,6 @@ msgstr ""
 
 #: .\core\templates\admin\email_templates\preview.html:15
 msgid "Email preview"
-msgstr ""
-
-#: .\core\templates\admin\index.html:22
-msgid "Revenue, orders and customer activity at a glance."
 msgstr ""
 
 #: .\core\templates\admin\index.html:25
@@ -5517,16 +5287,6 @@ msgstr ""
 msgid "This is an automated message from %(site_name)s."
 msgstr ""
 
-#: .\core\templates\emails\order\invoice_issued.html:4
-#: .\core\templates\emails\order\invoice_issued.html:8
-msgid "Your Invoice"
-msgstr ""
-
-#: .\core\templates\emails\order\invoice_issued.html:10
-#, python-format
-msgid "Invoice %(invoice_number)s for order #%(order_id)s is attached."
-msgstr ""
-
 #: .\core\templates\emails\order\invoice_issued.html:14
 #: .\core\templates\emails\order\invoice_issued.txt:6
 #: .\core\templates\emails\order\order_completed.html:13
@@ -5539,32 +5299,10 @@ msgstr ""
 msgid "Dear %(first_name)s %(last_name)s,"
 msgstr ""
 
-#: .\core\templates\emails\order\invoice_issued.html:16
-msgid "Please find the invoice for your order attached to this email as a PDF."
-msgstr ""
-
-#: .\core\templates\emails\order\invoice_issued.html:19
-#: .\core\templates\emails\order\invoice_issued.txt:10
-#, fuzzy
-#| msgid "Order Details"
-msgid "Invoice Details"
-msgstr "Order Details"
-
-#: .\core\templates\emails\order\invoice_issued.html:20
-#: .\core\templates\emails\order\invoice_issued.txt:12
-msgid "Invoice number"
-msgstr ""
-
 #: .\core\templates\emails\order\invoice_issued.html:21
 #: .\core\templates\emails\order\invoice_issued.txt:13
 #: .\core\templates\invoices\invoice.html:183
 msgid "Issue date"
-msgstr ""
-
-#: .\core\templates\emails\order\invoice_issued.html:25
-#: .\core\templates\emails\order\invoice_issued.txt:16
-msgid ""
-"This invoice is your proof of purchase — please keep it for your records."
 msgstr ""
 
 #: .\core\templates\emails\order\invoice_issued.html:27
@@ -5573,17 +5311,6 @@ msgstr ""
 #| msgid "If you have any questions, please contact our customer service."
 msgid "If you have any questions, please contact our customer service team."
 msgstr "If you have any questions, please contact our customer service."
-
-#: .\core\templates\emails\order\invoice_issued.txt:3
-msgid "YOUR INVOICE"
-msgstr ""
-
-#: .\core\templates\emails\order\invoice_issued.txt:8
-#, python-format
-msgid ""
-"Please find attached the invoice (%(invoice_number)s) for your order "
-"#%(order_id)s."
-msgstr ""
 
 #: .\core\templates\emails\order\order_canceled.html:4
 msgid "Order Canceled"
@@ -5836,19 +5563,6 @@ msgstr "Order Details"
 msgid "Shipping Address"
 msgstr "Shipping Address"
 
-#: .\core\templates\emails\order\order_payment_confirmed.html:37
-#: .\core\templates\emails\order\order_received.html:42
-msgid "Invoice details (Τιμολόγιο)"
-msgstr ""
-
-#: .\core\templates\emails\order\order_payment_confirmed.html:45
-#: .\core\templates\emails\order\order_received.html:50
-#: .\core\templates\emails\order\order_received.txt:26
-msgid ""
-"Check these details carefully — the invoice is issued with exactly what is "
-"shown here."
-msgstr ""
-
 #: .\core\templates\emails\order\order_payment_confirmed.html:49
 #: .\core\templates\emails\order\order_received.html:54
 #: .\core\templates\emails\order\order_status_generic.html:82
@@ -5923,11 +5637,6 @@ msgstr ""
 #: .\core\templates\emails\order\order_payment_confirmed.txt:10
 #: .\core\templates\emails\order\order_received.txt:14
 msgid "SHIPPING ADDRESS"
-msgstr ""
-
-#: .\core\templates\emails\order\order_payment_confirmed.txt:16
-#: .\core\templates\emails\order\order_received.txt:20
-msgid "INVOICE DETAILS (ΤΙΜΟΛΟΓΙΟ)"
 msgstr ""
 
 #: .\core\templates\emails\order\order_payment_confirmed.txt:23
@@ -6395,77 +6104,6 @@ msgstr ""
 msgid "days ago"
 msgstr ""
 
-#: .\core\templates\emails\shipping_acs\unprinted_vouchers_alert.html:4
-#: .\core\templates\emails\shipping_acs\unprinted_vouchers_alert.html:7
-msgid "ACS Pickup List Not Issued"
-msgstr ""
-
-#: .\core\templates\emails\shipping_acs\unprinted_vouchers_alert.html:4
-#: .\core\templates\emails\shipping_acs\unprinted_vouchers_alert.html:7
-msgid "ACS Vouchers Awaiting a Printed Label"
-msgstr ""
-
-#: .\core\templates\emails\shipping_acs\unprinted_vouchers_alert.html:8
-#: .\core\templates\emails\shipping_acs\unprinted_vouchers_alert.txt:3
-#, python-format
-msgid ""
-"Today's pickup list was rejected by ACS. %(counter)s voucher has no printed "
-"label:"
-msgid_plural ""
-"Today's pickup list was rejected by ACS. %(counter)s vouchers have no "
-"printed label:"
-msgstr[0] ""
-msgstr[1] ""
-
-#: .\core\templates\emails\shipping_acs\unprinted_vouchers_alert.html:8
-#: .\core\templates\emails\shipping_acs\unprinted_vouchers_alert.txt:3
-#, python-format
-msgid ""
-"%(counter)s voucher still has no printed label before today's pickup list:"
-msgid_plural ""
-"%(counter)s vouchers still have no printed label before today's pickup list:"
-msgstr[0] ""
-msgstr[1] ""
-
-#: .\core\templates\emails\shipping_acs\unprinted_vouchers_alert.html:27
-#: .\core\templates\emails\shipping_acs\unprinted_vouchers_alert.txt:7
-msgid "ACS replied"
-msgstr ""
-
-#: .\core\templates\emails\shipping_acs\unprinted_vouchers_alert.html:29
-#: .\core\templates\emails\shipping_acs\unprinted_vouchers_alert.txt:9
-msgid ""
-"ACS refuses the whole pickup list when any voucher on it is unprinted, and "
-"its API cannot issue a partial one — so these also hold back every other "
-"parcel waiting today. Open each order in the admin and download its ACS "
-"label; that is what marks the voucher printed. Then use “Issue ACS pickup "
-"list now” on the ACS shipments page instead of waiting for tomorrow's run."
-msgstr ""
-
-#: .\core\templates\emails\shipping_acs\unprinted_vouchers_alert.html:31
-msgid "Open the unprinted ACS vouchers in the admin"
-msgstr ""
-
-#: .\core\templates\emails\shipping_acs\unprinted_vouchers_alert.html:31
-msgid ""
-"select them, run “Print labels for selected shipments”, then press “Issue "
-"ACS pickup list now”."
-msgstr ""
-
-#: .\core\templates\emails\shipping_acs\unprinted_vouchers_alert.txt:1
-msgid "ACS PICKUP LIST NOT ISSUED"
-msgstr ""
-
-#: .\core\templates\emails\shipping_acs\unprinted_vouchers_alert.txt:1
-msgid "ACS VOUCHERS AWAITING A PRINTED LABEL"
-msgstr ""
-
-#: .\core\templates\emails\shipping_acs\unprinted_vouchers_alert.txt:11
-msgid ""
-"Unprinted ACS vouchers in the admin — select them, run “Print labels for "
-"selected shipments”, then press “Issue ACS pickup list now”:"
-msgstr ""
-
 #: .\core\templates\emails\subscription\confirmation.html:4
 #: .\core\templates\emails\subscription\confirmation.html:7
 msgid "Confirm your subscription"
@@ -6764,10 +6402,6 @@ msgstr ""
 msgid "Reg. No."
 msgstr ""
 
-#: .\core\templates\invoices\invoice.html:178
-msgid "INVOICE"
-msgstr ""
-
 #: .\core\templates\invoices\invoice.html:181
 msgid "MARK"
 msgstr ""
@@ -6780,10 +6414,6 @@ msgstr "Order Items"
 
 #: .\core\templates\invoices\invoice.html:191
 msgid "Scan to verify"
-msgstr ""
-
-#: .\core\templates\invoices\invoice.html:199
-msgid "Bill to"
 msgstr ""
 
 #: .\core\templates\invoices\invoice.html:224 .\notification\enum.py:15
@@ -6850,10 +6480,6 @@ msgstr ""
 
 #: .\core\templates\invoices\invoice.html:302
 msgid "Gross"
-msgstr ""
-
-#: .\core\templates\unfold\helpers\app_list.html:54
-msgid "You don’t have permission to view or edit anything."
 msgstr ""
 
 #: .\core\urls.py:158
@@ -8684,12 +8310,6 @@ msgstr ""
 msgid "Billing / Invoice"
 msgstr ""
 
-#: .\order\admin.py:480
-msgid ""
-"Buyer identity snapshotted for the Τιμολόγιο. Populated only on INVOICE "
-"orders."
-msgstr ""
-
 #: .\order\admin.py:486
 msgid "Customer Information"
 msgstr ""
@@ -8879,52 +8499,12 @@ msgstr ""
 msgid "Order %(order_id)s: unexpected error (%(error)s) — check logs"
 msgstr ""
 
-#: .\order\admin.py:1046
-msgid "Invoice not found."
-msgstr ""
-
-#: .\order\admin.py:1048
-msgid "Invoice PDF has not been generated yet."
-msgstr ""
-
-#: .\order\admin.py:1060
-msgid "Generate invoice"
-msgstr ""
-
 #: .\order\admin.py:1075 .\order\admin.py:1136 .\order\admin.py:1176
 #: .\order\admin.py:1231 .\order\admin.py:1283 .\order\admin.py:1385
 #, fuzzy
 #| msgid "Order Details"
 msgid "Order not found."
 msgstr "Order Details"
-
-#: .\order\admin.py:1082
-#, python-format
-msgid ""
-"Order #%(order_id)s has document_type=%(doc)s, not INVOICE. Generating "
-"anyway as an explicit admin override — update the order's document type if "
-"this is ongoing."
-msgstr ""
-
-#: .\order\admin.py:1098
-#, python-format
-msgid "Invoice generation failed: %(err)s"
-msgstr ""
-
-#: .\order\admin.py:1105
-#, python-format
-msgid "Invoice %(num)s ready for order #%(order_id)s."
-msgstr ""
-
-#: .\order\admin.py:1112
-#, python-format
-msgid ""
-"Invoice row %(num)s exists but the PDF was not rendered — check server logs."
-msgstr ""
-
-#: .\order\admin.py:1120
-msgid "Regenerate invoice (same number)"
-msgstr ""
 
 #: .\order\admin.py:1147
 #, python-format
@@ -8936,10 +8516,6 @@ msgstr ""
 msgid ""
 "Invoice %(num)s refreshed for order #%(order_id)s (number preserved; PDF + "
 "snapshots regenerated)."
-msgstr ""
-
-#: .\order\admin.py:1162
-msgid "Send invoice to myDATA"
 msgstr ""
 
 #: .\order\admin.py:1184
@@ -8960,10 +8536,6 @@ msgstr ""
 msgid ""
 "Scheduled myDATA submission for invoice %(num)s (order #%(order_id)s). "
 "Refresh the Invoice admin to see the MARK once AADE responds."
-msgstr ""
-
-#: .\order\admin.py:1217
-msgid "Cancel invoice in myDATA"
 msgstr ""
 
 #: .\order\admin.py:1239
@@ -9302,10 +8874,6 @@ msgstr ""
 
 #: .\order\filters.py:137
 msgid "Filter by region name (case-insensitive)"
-msgstr ""
-
-#: .\order\filters.py:143
-msgid "Filter by payment method name (case-insensitive)"
 msgstr ""
 
 #: .\order\filters.py:147
@@ -9688,14 +9256,6 @@ msgstr ""
 msgid "Next Number"
 msgstr "Order Items"
 
-#: .\order\models\invoice.py:127 .\settings.py:3818
-msgid "Invoice Counter"
-msgstr ""
-
-#: .\order\models\invoice.py:128
-msgid "Invoice Counters"
-msgstr ""
-
 #: .\order\models\invoice.py:131
 #, python-format
 msgid "%(year)s: next number %(number)s"
@@ -9795,21 +9355,8 @@ msgstr ""
 msgid "myDATA Status"
 msgstr "Status"
 
-#: .\order\models\invoice.py:286
-msgid ""
-"Lifecycle state of the invoice's AADE myDATA submission. NOT_SENT is the "
-"resting state when the myDATA integration is disabled or the invoice "
-"predates it."
-msgstr ""
-
 #: .\order\models\invoice.py:292
 msgid "myDATA Invoice Type"
-msgstr ""
-
-#: .\order\models\invoice.py:297
-msgid ""
-"AADE invoiceType code — e.g. 11.1 (B2C retail), 1.1 (B2B sales invoice), 5.1 "
-"(linked credit note)."
 msgstr ""
 
 #: .\order\models\invoice.py:302
@@ -9889,13 +9436,6 @@ msgstr ""
 msgid "myDATA Error Code"
 msgstr ""
 
-#: .\order\models\invoice.py:378
-msgid ""
-"Numeric AADE ``errorCode`` from the most recent failed submission (e.g. 101 "
-"XML syntax, 102 inactive VAT, 216/217 VAT category). Empty when last attempt "
-"succeeded."
-msgstr ""
-
 #: .\order\models\invoice.py:384
 msgid "myDATA Error Message"
 msgstr ""
@@ -9920,10 +9460,6 @@ msgstr ""
 
 #: .\order\models\invoice.py:402
 msgid "Timestamp AADE assigned the MARK."
-msgstr ""
-
-#: .\order\models\invoice.py:407 .\settings.py:3388 .\settings.py:3859
-msgid "Invoices"
 msgstr ""
 
 #: .\order\models\item.py:33
@@ -10557,25 +10093,6 @@ msgstr ""
 msgid "Not enough stock available. Only {product_stock} remaining."
 msgstr ""
 
-#: .\order\serializers\item.py:139
-msgid "Quantity to refund. If not provided, refunds all."
-msgstr ""
-
-#: .\order\serializers\item.py:145
-msgid "Optional reason for the refund"
-msgstr ""
-
-#: .\order\serializers\item.py:154
-msgid "Order item is required for refund operation"
-msgstr ""
-
-#: .\order\serializers\item.py:160
-#, python-brace-format
-msgid ""
-"Cannot refund more than the available quantity. Available: "
-"{available_quantity}"
-msgstr ""
-
 #: .\order\serializers\order.py:75
 msgid ""
 "Names of the ad click-id parameters the landing URL carried. Their values "
@@ -11076,21 +10593,12 @@ msgstr ""
 msgid "This order has already been refunded."
 msgstr ""
 
-#: .\order\services.py:2455
-msgid "This order has no payment ID to refund."
-msgstr ""
-
 #: .\order\services.py:2458
 msgid "This order has not been paid yet."
 msgstr ""
 
 #: .\order\services.py:2468 .\order\services.py:2577
 msgid "This order has no payment method configured."
-msgstr ""
-
-#: .\order\services.py:2474
-#, python-brace-format
-msgid "Refund amount ({refund}) cannot exceed paid amount ({paid})."
 msgstr ""
 
 #: .\order\services.py:2573
@@ -11137,11 +10645,6 @@ msgstr ""
 msgid "Your Order #{order_id} Has Shipped"
 msgstr ""
 
-#: .\order\tasks.py:1384
-#, python-brace-format
-msgid "Invoice {invoice_number} for your order #{order_id}"
-msgstr ""
-
 #: .\order\tasks.py:1749
 #, python-brace-format
 msgid "Reminder: Complete Your Order #{order_id}"
@@ -11152,49 +10655,15 @@ msgstr ""
 msgid "Did you forget something? — {site_name}"
 msgstr ""
 
-#: .\order\views\item.py:45
-msgid "Process a refund for an order item"
-msgstr ""
-
-#: .\order\views\item.py:46
-msgid "Process a refund for an order item."
-msgstr ""
-
 #: .\order\views\item.py:118 .\order\views\order.py:501
 #: .\order\views\order.py:507
 msgid "You do not have permission to access this order."
-msgstr ""
-
-#: .\order\views\item.py:149
-msgid "Only staff can process refunds."
 msgstr ""
 
 #: .\order\views\item.py:163
 msgid ""
 "The wholesale group that priced this order no longer exists, so a new "
 "line cannot be priced for it."
-msgstr ""
-
-#: .\order\views\item.py:159
-msgid "This order is not in a refundable state."
-msgstr ""
-
-#: .\order\views\item.py:164
-msgid "This item has already been fully refunded."
-msgstr ""
-
-#: .\order\views\item.py:190
-msgid "Refund processed successfully."
-msgstr ""
-
-#: .\order\views\item.py:212
-msgid ""
-"A validation error occurred while processing the refund. Please check your "
-"input and try again."
-msgstr ""
-
-#: .\order\views\item.py:228
-msgid "An error occurred while processing the refund. Please try again later."
 msgstr ""
 
 #: .\order\views\order.py:122
@@ -12416,16 +11885,6 @@ msgstr ""
 
 #: .\pay_way\services.py:340 .\pay_way\services.py:404
 msgid "No payment ID found for order"
-msgstr ""
-
-#: .\pay_way\services.py:397
-#, python-format
-msgid ""
-"Cannot refund an order that has not been paid. Current status: %(status)s"
-msgstr ""
-
-#: .\pay_way\services.py:414 .\pay_way\services.py:422
-msgid "Manual refund process required"
 msgstr ""
 
 #: .\product\admin.py:99
@@ -15003,10 +14462,6 @@ msgstr ""
 msgid "Group Results"
 msgstr ""
 
-#: .\settings.py:3232
-msgid "Navigation"
-msgstr ""
-
 #: .\settings.py:3269
 msgid "Reviews"
 msgstr ""
@@ -15038,12 +14493,6 @@ msgstr ""
 #: .\settings.py:3456
 msgid "VAT Rates"
 msgstr ""
-
-#: .\settings.py:3471
-#, fuzzy
-#| msgid "Contact us"
-msgid "Contact Messages"
-msgstr "Contact us"
 
 #: .\settings.py:3497 .\shipping\models\provider.py:110
 #, fuzzy
@@ -15089,10 +14538,6 @@ msgstr ""
 
 #: .\settings.py:3623 .\user\admin.py:776
 msgid "Settings"
-msgstr ""
-
-#: .\settings.py:3628
-msgid "Extra Settings"
 msgstr ""
 
 #: .\settings.py:3654
@@ -16119,16 +15564,6 @@ msgstr ""
 
 #: .\shipping_acs\serializers\shipment.py:56
 msgid "Relative URL to download the voucher PDF via the Django proxy."
-msgstr ""
-
-#: .\shipping_acs\tasks.py:364
-#, python-brace-format
-msgid "ACS pickup list NOT issued — {n} voucher(s) need printing"
-msgstr ""
-
-#: .\shipping_acs\tasks.py:368
-#, python-brace-format
-msgid "Print {n} ACS voucher(s) before today's pickup list"
 msgstr ""
 
 #: .\shipping_acs\tasks.py:880
@@ -20395,4 +19830,370 @@ msgstr ""
 
 #: .\settings.py:3483 .\settings.py:3970
 msgid "Credit Documents"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py:48
+msgid "7 days"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py:49
+msgid "30 days"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py:50
+msgid "13 weeks"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py:50
+msgid "Last 13 weeks"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py:51
+msgid "12 months"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py:55
+#, python-format
+msgid "Paid revenue per %(bucket)s"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py:56
+#, fuzzy, python-format
+#| msgid "Order Canceled"
+msgid "Orders placed per %(bucket)s"
+msgstr "Order Canceled"
+
+#: .\admin\dashboard\store\widgets.py:61
+msgctxt "chart bucket"
+msgid "day"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py:62
+msgctxt "chart bucket"
+msgid "week"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py:63
+msgctxt "chart bucket"
+msgid "month"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py:154
+#, python-format
+msgid "Good morning, %(name)s"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py:156
+#, python-format
+msgid "Good afternoon, %(name)s"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py:158
+#, python-format
+msgid "Good evening, %(name)s"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py:192
+msgid "vs the period before"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py:201
+#, python-format
+msgid "%(percent)s of paying customers ordered again"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py:232
+#, fuzzy
+#| msgid "Order Canceled"
+msgid "Average order"
+msgstr "Order Canceled"
+
+#: .\admin\dashboard\store\widgets.py:239
+#, fuzzy
+#| msgid "Order"
+msgid "Paid orders"
+msgstr "Order"
+
+#: .\admin\dashboard\store\widgets.py:270
+#, python-format
+msgid "%(measure)s · %(period)s"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py:285
+msgid "No orders in this period"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py:316
+#, fuzzy
+#| msgid "Order Delivered"
+msgid "Orders to process"
+msgstr "Order Delivered"
+
+#: .\admin\dashboard\store\widgets.py:317
+msgid "Placed and waiting"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py:326
+msgid "Running low on stock"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py:337
+msgid "Receipts rejected by myDATA"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py:338
+#, python-format
+msgid "In the last %(days)s days"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py:348
+msgid "Reviews to approve"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py:349
+msgid "Hidden from shoppers until approved"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py:358
+msgid "Blog comments to approve"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py:359
+msgid "Hidden from readers until approved"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py:368
+#, fuzzy
+#| msgid "Contact us"
+msgid "New messages"
+msgstr "Contact us"
+
+#: .\admin\dashboard\store\widgets.py:369
+msgid "From the contact form this week"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py:378
+msgid "Business accounts to verify"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py:379
+msgid "Waiting for wholesale prices"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py:423
+#, fuzzy
+#| msgid "Order"
+msgid "Latest orders"
+msgstr "Order"
+
+#: .\admin\dashboard\store\widgets.py:466
+msgid "Best sellers"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py:467
+#, python-format
+msgid "Units paid for · %(period)s"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py:471
+msgid "No paid orders in this period"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py:475
+msgid "Sold"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py:549
+#, python-format
+msgid "%(count)s order · %(share)s"
+msgid_plural "%(count)s orders · %(share)s"
+msgstr[0] ""
+msgstr[1] ""
+
+#: .\admin\dashboard\store\widgets.py:562
+msgid ""
+"No attributed orders in this period. Orders are attributed from the visit "
+"that placed them."
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py:593
+msgid "Clicked a result"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py:600
+msgid "Add synonyms, products or content for these."
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py:608
+msgid "What shoppers look for most."
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py:611
+msgid "No searches in this period"
+msgstr ""
+
+#: .\admin\mixins.py:78
+msgid "API docs"
+msgstr ""
+
+#: .\admin\navigation.py:131
+msgid "Off"
+msgstr ""
+
+#: .\admin\navigation.py:144
+msgid "Store Profile"
+msgstr ""
+
+#: .\admin\navigation.py:197
+msgid "Images"
+msgstr ""
+
+#: .\admin\navigation.py:201
+msgid "Category Images"
+msgstr ""
+
+#: .\admin\navigation.py:220
+msgid "Addresses"
+msgstr ""
+
+#: .\admin\navigation.py:223
+#, fuzzy
+#| msgid "Contact us"
+msgid "Messages"
+msgstr "Contact us"
+
+#: .\admin\navigation.py:230
+msgid "Favourites"
+msgstr ""
+
+#: .\admin\navigation.py:238
+msgid "Recipients"
+msgstr ""
+
+#: .\admin\navigation.py:299
+msgid "Purchases"
+msgstr ""
+
+#: .\admin\navigation.py:300
+msgid "Transactions"
+msgstr ""
+
+#: .\admin\navigation.py:310
+msgid "Slots"
+msgstr ""
+
+#: .\admin\navigation.py:311
+msgid "Events"
+msgstr ""
+
+#: .\admin\navigation.py:314
+msgid "Candidates"
+msgstr ""
+
+#: .\admin\navigation.py:327
+msgid "Pages"
+msgstr ""
+
+#: .\admin\navigation.py:329 .\admin\navigation.py:332
+msgid "Menus"
+msgstr ""
+
+#: .\admin\navigation.py:333
+msgid "Menu Columns"
+msgstr ""
+
+#: .\admin\navigation.py:378
+msgid "Pickup Points"
+msgstr ""
+
+# Email Template Translations
+#: .\admin\navigation.py:397
+#, fuzzy
+#| msgid "Questions?"
+msgid "Store Settings"
+msgstr "Questions?"
+
+#: .\admin\navigation.py:439
+msgid "Social Login Apps"
+msgstr ""
+
+#: .\admin\navigation.py:440
+msgid "OAuth Clients"
+msgstr ""
+
+#: .\admin\navigation.py:441
+msgid "OAuth Tokens"
+msgstr ""
+
+#: .\admin\navigation.py:487
+msgid "Payment Intents"
+msgstr ""
+
+#: .\admin\navigation.py:488
+msgid "Charges"
+msgstr ""
+
+#: .\admin\navigation.py:489
+msgid "Refunds"
+msgstr ""
+
+#: .\admin\navigation.py:490
+msgid "Stripe Customers"
+msgstr ""
+
+#: .\admin\navigation.py:491
+msgid "Stripe Events"
+msgstr ""
+
+#: .\admin\navigation.py:493
+msgid "Webhook Endpoints"
+msgstr ""
+
+#: .\core\templates\admin\base_site.html:25
+#, fuzzy
+#| msgid "Order"
+msgid "View store"
+msgstr "Order"
+
+#: .\core\templates\admin\dashboard\store\attention.html:7
+msgid "Needs attention"
+msgstr ""
+
+#: .\core\templates\admin\dashboard\store\attention.html:32
+msgid "All caught up: nothing is waiting for you."
+msgstr ""
+
+#: .\core\templates\admin\dashboard\store\funnel.html:2
+msgid "Checkout funnel"
+msgstr ""
+
+#: .\core\templates\admin\dashboard\store\funnel.html:16
+msgid "No carts or orders in this period"
+msgstr ""
+
+#: .\core\templates\admin\dashboard\store\header.html:8
+msgid "Period"
+msgstr ""
+
+#: .\core\templates\admin\dashboard\store\sales_chart.html:2
+msgid "Chart measure"
+msgstr ""
+
+#: .\core\templates\admin\dashboard\store\search.html:7
+msgid "Store search"
+msgstr ""
+
+#: .\core\templates\admin\dashboard\store\search.html:18
+#, fuzzy
+#| msgid "Price"
+msgid "Search list"
+msgstr "Price"
+
+#: .\core\templates\admin\dashboard\store\sources.html:6
+msgid "Where orders come from"
+msgstr ""
+
+#: .\core\templates\admin\footer.html:10
+#, python-format
+msgid "Version %(version)s"
 msgstr ""

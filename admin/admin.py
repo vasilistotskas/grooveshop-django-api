@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from urllib.parse import urlsplit
 
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
@@ -11,7 +12,7 @@ from unfold.sites import UnfoldAdminSite
 
 from admin.displays import format_dt, label_cell
 from admin.forms import CachePurgeForm, PlatformAdminAuthenticationForm
-from admin.mixins import AdminSiteLoginNextMixin
+from admin.mixins import AdminFooterMixin, AdminSiteLoginNextMixin
 from core.cache import CacheService
 from core.cache.nuxt import is_configured as nuxt_purge_configured
 from core.cache.registry import GROUP_LABELS, iter_surfaces
@@ -60,8 +61,9 @@ def _purge_log_table(logs) -> dict:
     }
 
 
-class MyAdminSite(AdminSiteLoginNextMixin, UnfoldAdminSite):
+class MyAdminSite(AdminFooterMixin, AdminSiteLoginNextMixin, UnfoldAdminSite):
     index_title = _("Dashboard")
+    api_docs_url_name = "swagger-ui"
 
     # Admin sessions are platform-staff-only — no legacy tenant-schema
     # login path. UnfoldAdminSite.__init__ only overrides this when it
@@ -144,7 +146,8 @@ class MyAdminSite(AdminSiteLoginNextMixin, UnfoldAdminSite):
 
         ``UNFOLD["SITE_HEADER"]``/``["SITE_TITLE"]`` are the deployment's
         identity; on a store's own host the operator must always see
-        WHICH store they are editing, so its name replaces them.
+        WHICH store they are editing, so its name replaces them, with
+        its storefront's domain beneath and a link to it in the header.
         """
         context = super().each_context(request)
         from tenant.membership import get_current_tenant
@@ -154,6 +157,10 @@ class MyAdminSite(AdminSiteLoginNextMixin, UnfoldAdminSite):
             name = tenant.store_name or tenant.name
             context["site_header"] = name
             context["site_title"] = _("%(name)s Admin") % {"name": name}
+            storefront = context.get("site_url") or ""
+            if storefront:
+                context["site_subheader"] = urlsplit(storefront).netloc
+                context["storefront_url"] = storefront
         return context
 
     def get_urls(self):

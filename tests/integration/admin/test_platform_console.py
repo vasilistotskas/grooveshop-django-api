@@ -149,9 +149,17 @@ class TestPlatformOnlySectionsLiveOnTheControlPlane(TestCase):
         return set(walk(navigation))
 
     def test_the_store_sidebar_links_none_of_them(self):
-        from django.conf import settings
+        """Built per request: asked as a platform superuser, who may
+        open every page, so nothing is hidden by permissions."""
+        from django.test import RequestFactory
 
-        linked = self._linked(settings.UNFOLD["SIDEBAR"]["navigation"])
+        from admin.navigation import store_sidebar
+        from tests.utils.staff import stamp_platform_identity
+        from user.factories.account import UserAccountFactory
+
+        request = RequestFactory().get("/admin/")
+        request.user = stamp_platform_identity(UserAccountFactory(admin=True))
+        linked = self._linked(store_sidebar(request))
         stray = {pair for pair in linked if pair[0] in self.INFRA_LABELS}
         assert not stray, (
             f"platform-only sections in the store sidebar: {stray}"

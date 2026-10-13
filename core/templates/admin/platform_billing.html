@@ -34,7 +34,7 @@ purpose, including what is NOT enforced. When enforcement is automated
     {# ────────────────────────────────────────────────────────────── #}
     {# Billing counters                                                #}
     {# ────────────────────────────────────────────────────────────── #}
-    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {% for kpi in billing_kpis %}
             {% include "admin/dashboard/components/kpi.html" with icon=kpi.icon tone=kpi.tone value=kpi.value label=kpi.label %}
         {% endfor %}

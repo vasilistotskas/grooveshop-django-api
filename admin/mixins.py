@@ -20,7 +20,7 @@ class AdminSiteLoginNextMixin:
     ``https://webside.gr/account`` on 2026-08-21.
 
     Unfold documents ``UNFOLD["LOGIN"]["redirect_after"]`` for this, but
-    0.108.0 (re-checked 2026-09-30) still only DECLARES the key — the single
+    0.109.0 (re-checked 2026-10-13) still only DECLARES the key — the single
     occurrence in the package is its ``None`` default, and nothing reads
     it. So put ``next`` on the URL instead, which every layer below
     already understands.
@@ -45,6 +45,45 @@ class AdminSiteLoginNextMixin:
             index = reverse("admin:index", current_app=self.name)
             return redirect(f"{request.path}?{REDIRECT_FIELD_NAME}={index}")
         return super().login(request, extra_context)
+
+
+class AdminFooterMixin:
+    """The footer every admin site renders (``admin/footer.html``).
+
+    The running release (support starts with "which version?"), the
+    help site, and the API docs for platform superusers - the only
+    people who read them. Lives in a mixin for the same reason as the
+    login fix above: both sites render it.
+    """
+
+    #: The URL name of the API docs on this site's URLconf, if it has any.
+    api_docs_url_name: str | None = None
+
+    def each_context(self, request):
+        from django.conf import settings
+        from django.urls import reverse
+        from django.utils.translation import gettext as _
+
+        from tenant.membership import is_platform_superuser
+
+        context = super().each_context(request)
+        links = []
+        if settings.ADMIN_DOCS_URL:
+            links.append(
+                {"title": _("Help & Guides"), "link": settings.ADMIN_DOCS_URL}
+            )
+        if self.api_docs_url_name and is_platform_superuser(request.user):
+            links.append(
+                {
+                    "title": _("API docs"),
+                    "link": reverse(self.api_docs_url_name),
+                }
+            )
+        context["admin_footer"] = {
+            "version": settings.RELEASE_VERSION,
+            "links": links,
+        }
+        return context
 
 
 # ``tenant`` is SHARED-only but is NOT withheld from a store's admin.

@@ -17691,6 +17691,16 @@ msgstr ""
 msgid "Conversion label for starting the checkout."
 msgstr ""
 
+#: .\tenant\models.py:651
+msgid "Google Ads Add-Payment-Info Label"
+msgstr ""
+
+#: .\tenant\models.py:651
+msgid ""
+"Conversion label for the shopper submitting payment details at "
+"checkout. Sent with the cart value and currency."
+msgstr ""
+
 #: .\tenant\models.py:654
 msgid "Google Ads Page-View Label"
 msgstr ""

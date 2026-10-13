@@ -329,6 +329,10 @@ class TenantConfigSerializer(serializers.Serializer):
     google_ads_purchase_label = serializers.CharField(read_only=True)
     google_ads_add_to_cart_label = serializers.CharField(read_only=True)
     google_ads_begin_checkout_label = serializers.CharField(read_only=True)
+    # ``required=False`` like ``openai_pixel_id`` above: a new field must
+    # not be REQUIRED in the schema, or a storefront deployed before this
+    # backend rejects every ``/tenant/resolve`` response.
+    google_ads_add_payment_info_label = serializers.CharField(required=False)
     google_ads_page_view_label = serializers.CharField(read_only=True)
 
     # --- Authentication ---
@@ -469,6 +473,7 @@ class TenantAdminSerializer(serializers.ModelSerializer):
             "google_ads_purchase_label",
             "google_ads_add_to_cart_label",
             "google_ads_begin_checkout_label",
+            "google_ads_add_payment_info_label",
             "google_ads_page_view_label",
             "meta_capi_access_token",
             "meta_capi_dataset_id",

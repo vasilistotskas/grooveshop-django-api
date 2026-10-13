@@ -18979,6 +18979,16 @@ msgstr "Ετικέτα Έναρξης Checkout Google Ads"
 msgid "Conversion label for starting the checkout."
 msgstr "Ετικέτα μετατροπής για την έναρξη του checkout."
 
+#: .\tenant\models.py:651
+msgid "Google Ads Add-Payment-Info Label"
+msgstr "Ετικέτα Προσθήκης Στοιχείων Πληρωμής Google Ads"
+
+#: .\tenant\models.py:651
+msgid ""
+"Conversion label for the shopper submitting payment details at "
+"checkout. Sent with the cart value and currency."
+msgstr "Ετικέτα μετατροπής για την υποβολή των στοιχείων πληρωμής από τον πελάτη στο checkout. Στέλνεται με την αξία του καλαθιού και το νόμισμα."
+
 #: .\tenant\models.py:654
 msgid "Google Ads Page-View Label"
 msgstr "Ετικέτα Προβολής Σελίδας Google Ads"

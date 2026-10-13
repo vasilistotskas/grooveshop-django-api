@@ -649,7 +649,6 @@ jobs:
             **/uv.lock
 
       - name: Python Semantic Release
-        id: release
         # Inline instead of the python-semantic-release ACTION: its
         # Docker image pip-installs dependencies UNPINNED at workflow
         # runtime, so a transitive release can break every run at once
@@ -657,35 +656,11 @@ jobs:
         # dependency, so run it from the LOCKED environment: every
         # transitive pin comes from uv.lock, and --locked refuses to run
         # if the lock is stale. --only-group dev skips the runtime deps.
+        # The version commit it pushes already carries the re-locked
+        # uv.lock (build_command + assets in pyproject.toml).
         env:
           GH_TOKEN: ${{ secrets.DJANGO_TOKEN }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          before=$(git describe --tags --abbrev=0)
           uv run --locked --only-group dev semantic-release -v version
-          after=$(git describe --tags --abbrev=0)
-          echo "version=${after#v}" >> "$GITHUB_OUTPUT"
-          if [ "$before" != "$after" ]; then
-            echo "released=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "released=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Sync uv.lock to released version
-        # ``python-semantic-release`` only bumps ``pyproject.toml``;
-        # ``uv.lock`` keeps the previous version in its
-        # ``[[package]]`` entry for the project itself, so subsequent
-        # ``uv sync --locked`` runs on the next push fail with
-        # "lockfile needs to be updated". Refresh the lockfile and
-        # commit it back so main stays consistent.
-        if: steps.release.outputs.released == 'true'
-        run: |
-          uv lock
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          if ! git diff --quiet uv.lock; then
-            git add uv.lock
-            git commit -m "chore(deps): sync uv.lock to ${{ steps.release.outputs.version }} [skip ci]"
-            git push
-          fi

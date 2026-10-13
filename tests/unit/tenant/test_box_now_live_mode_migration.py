@@ -43,11 +43,15 @@ def test_a_new_tenant_defaults_to_stage():
 
 def test_the_column_default_lives_in_the_database(tenants):
     # ``db_default``: the release still serving during the rollout never
-    # names the column, so its INSERTs must still work.
+    # names the column, so its INSERTs must still work. Scoped to the
+    # active schema: the test database also holds a ``test_migration_seed``
+    # copy of ``tenant_tenant`` (no defaults), and an unscoped query
+    # returned whichever row came first.
     with connection.cursor() as cursor:
         cursor.execute(
             "SELECT column_default FROM information_schema.columns "
-            "WHERE table_name = 'tenant_tenant' "
+            "WHERE table_schema = current_schema() "
+            "AND table_name = 'tenant_tenant' "
             "AND column_name = 'box_now_live_mode'"
         )
         assert cursor.fetchone()[0] == "false"

@@ -309,7 +309,8 @@ Gating is two-tier like everything else: `Tenant.recommendations_enabled`
 `IsRecommendationsEnabled` in `tenant/permissions.py`) **and** the
 per-schema `PRODUCT_SUGGESTIONS_ENABLED` extra-setting
 (`EXTRA_SETTINGS_DEFAULTS`, listed in `PUBLIC_SETTING_KEYS`,
-`core/api/views.py`).
+`core/api/views.py`), which `IsRecommendationsRuntimeEnabled` enforces on
+both endpoints as well, so the server answers 404 whichever half is off.
 
 ## 8. Caching — the 2026-09-10 lesson
 

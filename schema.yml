@@ -48033,6 +48033,62 @@ components:
         * `header` - Κεφαλίδα
         * `footer` - Υποσέλιδο
         * `mobile` - Κινητό
+    StoreFeatures:
+      type: object
+      description: |-
+        Each optional feature's effective state for the store: its plan
+        flag AND its store settings (``tenant/features.py``), so a client reads
+        one answer instead of combining the two tiers and copying defaults.
+      properties:
+        blog:
+          type: boolean
+          readOnly: true
+        blogComments:
+          type: boolean
+          readOnly: true
+        productReviews:
+          type: boolean
+          readOnly: true
+        accountReviews:
+          type: boolean
+          readOnly: true
+        favourites:
+          type: boolean
+          readOnly: true
+        newsletter:
+          type: boolean
+          readOnly: true
+        feedback:
+          type: boolean
+          readOnly: true
+        loyalty:
+          type: boolean
+          readOnly: true
+        promotions:
+          type: boolean
+          readOnly: true
+        giftCards:
+          type: boolean
+          readOnly: true
+        wholesale:
+          type: boolean
+          readOnly: true
+        productSuggestions:
+          type: boolean
+          readOnly: true
+      required:
+      - accountReviews
+      - blog
+      - blogComments
+      - favourites
+      - feedback
+      - giftCards
+      - loyalty
+      - newsletter
+      - productReviews
+      - productSuggestions
+      - promotions
+      - wholesale
     StrategyEnum:
       enum:
       - curated
@@ -48723,6 +48779,10 @@ components:
         staticDomain:
           type: string
           readOnly: true
+        features:
+          allOf:
+          - $ref: '#/components/schemas/StoreFeatures'
+          readOnly: true
         loyaltyEnabled:
           type: boolean
           readOnly: true
@@ -48844,6 +48904,7 @@ components:
       - defaultLocale
       - errorHex
       - faviconUrl
+      - features
       - gaTrackingId
       - giftCardsEnabled
       - googleAdsAddToCartLabel

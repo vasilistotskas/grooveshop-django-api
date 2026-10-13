@@ -78,15 +78,20 @@ def bump_generation_on_agent_setting_change(sender, instance, **kwargs):
     that is FOLDED into the cached TenantConfig payload.
 
     ``AGENT_COMMERCE_ENABLED`` / ``PRODUCT_FEEDS_ENABLED`` are combined
-    with the plan flag inside ``TenantConfigSerializer`` — without this
-    bump a merchant toggle would sit behind the resolve cache for the
-    full TTL. Setting rows live in the TENANT schema, so the current
-    connection schema identifies whose generation to bump.
+    with the plan flag inside ``TenantConfigSerializer``, and so is every
+    feature switch in ``TenantConfig.features`` (``tenant/features.py``)
+    — without this bump a merchant toggle would sit behind the resolve
+    cache for the full TTL. Setting rows live in the TENANT schema, so
+    the current connection schema identifies whose generation to bump.
     """
+    from tenant.features import feature_setting_keys
+
     if getattr(instance, "name", "") not in {
         "AGENT_COMMERCE_ENABLED",
         "PRODUCT_FEEDS_ENABLED",
         "AGENT_HOSTED_PAYMENT_ENABLED",
+        # Folded into ``TenantConfig.features``.
+        *feature_setting_keys(),
     }:
         return
     _bump_generation_for_current_schema()

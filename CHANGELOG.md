@@ -3,6 +3,67 @@
 
 
 
+## v3.115.2 (2026-10-13)
+
+### Bug fixes
+
+* fix(admin): the password change page renders on a store host again
+
+The store admin ran Unfold's whole password-change view inside the
+public schema, so the new password reached the platform user's row.
+The page's context now builds the store's sidebar, which reads the
+store's tables (the active carriers), and under public that query
+failed: /admin/password_change/ answered 500 on every store host.
+
+Only the save needs the public schema. PlatformPasswordChangeForm is
+Unfold's form with save() scoped to public; the view renders under the
+host's schema, and the session it re-hashes is the store's, where it
+lives. A multi-tenant lane test covers both the page and the save.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`4683e65`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4683e65c7be4f6e9c6cc9b796a0fd44f96124d1c))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.115.1 [skip ci] ([`2980e70`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2980e70d1cea5b4c73f6b81bca66f55a36178087))
+
+### Continuous integration
+
+* ci: check schema.yml freshness and flag breaking API changes (#181) ([`b740d8c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b740d8c7c4727a153160a376fe330715b4d94c71))
+
+* ci: check schema.yml freshness and flag breaking API changes
+
+The storefront answers 422 to any response its generated schemas reject,
+so removing or loosening a response field breaks the storefront that is
+live. On 2026-10-13 a release that dropped two product fields took add to
+cart down on webside for ~8 minutes; replaying production's history found
+ten such windows since 2026-09-01.
+
+- Code Quality now fails when the committed schema.yml does not match the
+  code (oasdiff diff, structure only: descriptions are generated in the
+  active language). Every contract check reads the committed file.
+- New "API contract" workflow: on a PR that changes schema.yml, oasdiff
+  breaking from the base branch's schema to the PR's; a break fails
+  unless the PR is labelled api-breaking-change. Its own workflow so the
+  label re-runs only this job.
+- The PostgreSQL wait loops use `_` for the unused counter (SC2034).
+
+oasdiff is pinned by digest to the same image as the deploy gate in
+grooveshop-infrastructure.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`b740d8c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b740d8c7c4727a153160a376fe330715b4d94c71))
+
+* ci: compile translations before checking schema.yml freshness
+
+Without the compiled catalogue drf-spectacular inlines the choice enums,
+so the schema CI generates did not match the committed one, generated
+with translations compiled (as production's image is).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`b740d8c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b740d8c7c4727a153160a376fe330715b4d94c71))
+
 ## v3.115.1 (2026-10-13)
 
 ### Bug fixes

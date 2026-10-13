@@ -3,6 +3,24 @@
 
 
 
+## v3.113.0 (2026-10-13)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.112.1 [skip ci] ([`7793f1b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7793f1b30851f8a9e1441b35a1df18c02214cb2c))
+
+### Features
+
+* feat(agent): expose the effective price on favourites (#174)
+
+The agent favourites row carried only final_price, the price before
+promotions. Add effective_price, prior_price and announced_discount_percent
+with the same definitions the product serializers use (extracted into
+EffectivePriceFieldsSerializer) and mark final_price deprecated; the agent
+gateway is its only client and moves to effectivePrice next.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`33638ca`](https://github.com/vasilistotskas/grooveshop-django-api/commit/33638ca1ca7d4f7769b2fb32b41b03584e9a4934))
+
 ## v3.112.1 (2026-10-13)
 
 ### Bug fixes

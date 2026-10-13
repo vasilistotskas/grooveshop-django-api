@@ -115,10 +115,24 @@ class ProductVariantsActionTestCase(APITestCase):
             "price",
             "final_price",
             "discount_percent",
+            "effective_price",
+            "prior_price",
+            "announced_discount_percent",
             "main_image_path",
             "attribute_values",
         }
         self.assertTrue(expected.issubset(set(variant.keys())))
+        # The same price fields, and values, as the product itself.
+        product = self.client.get(
+            reverse("product-detail", args=[self.white_product.pk])
+        ).data
+        for field in (
+            "effective_price",
+            "prior_price",
+            "announced_discount_percent",
+        ):
+            self.assertEqual(variant[field], product[field], field)
+        self.assertIsNotNone(variant["effective_price"])
         # attribute_values contains only the variant-axis value (Colour),
         # never the plain spec attribute (Material).
         axis_names = {

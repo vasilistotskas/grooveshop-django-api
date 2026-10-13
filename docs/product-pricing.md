@@ -118,6 +118,7 @@ What it cannot know:
 | `priorPrice` | `ProductSerializer`, search hits, Meilisearch `prior_price` | the reference, null when nothing may be announced |
 | `effectivePrice` | `ProductSerializer`, search hits | what the customer pays now, promotions included |
 | `announcedDiscountPercent` | `ProductSerializer`, search hits, Meilisearch `announced_discount_percent` | integer percent from `priorPrice` to `effectivePrice`, null with no announcement |
+| `effectivePrice`, `priorPrice`, `announcedDiscountPercent` | `AgentFavouriteSerializer` (`/api/v1/agent/me/favourites`) | the same three fields, one definition (`EffectivePriceFieldsSerializer`) shared with `ProductSerializer`; the row's `finalPrice` is **deprecated** there, to go once the agent gateway reads `effectivePrice` |
 | `?minAnnouncedDiscountPercent=` / `?ordering=-announcedDiscountPercent` | `ProductFilter`, `ProductViewSet.ordering_fields` | list filter and sort on the same percent (`with_announced_discount_percent()`); the discounted rail uses both |
 | `?minEffectivePrice=` / `?maxEffectivePrice=` / `?ordering=effectivePrice` | `ProductFilter`, `ProductViewSet.ordering_fields` | list price filter and sort on `effective_price`, a stored column |
 | search `price_min` / `price_max` / `sort=effectivePrice` / `facets=effective_price` | `search/views.py`, Meilisearch `effective_price` (filterable, sortable, displayed) | price filter, sort and the price-range slider stats on the same price |

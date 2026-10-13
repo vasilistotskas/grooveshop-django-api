@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from django.utils.translation import gettext_lazy as _
+from drf_spectacular.utils import extend_schema_serializer
 from rest_framework import serializers
+
+from product.serializers.product import EffectivePriceFieldsSerializer
 
 
 class AgentProfileSerializer(serializers.Serializer):
@@ -15,7 +18,14 @@ class AgentProfileSerializer(serializers.Serializer):
     )
 
 
-class AgentFavouriteSerializer(serializers.Serializer):
+# ``final_price`` stops at VAT and the markdown, so it can differ from
+# what the shopper pays; ``effective_price`` is that amount. The agent
+# gateway is the only client and reads ``effectivePrice`` next
+# (docs/migrations.md: expand, then contract).
+@extend_schema_serializer(deprecate_fields=["final_price"])
+class AgentFavouriteSerializer(
+    EffectivePriceFieldsSerializer, serializers.Serializer
+):
     """Compact favourite row for agents — the storefront's favourite
     serializers embed the full product detail payload, which is far more
     than a tool result should carry."""

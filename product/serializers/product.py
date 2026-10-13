@@ -28,6 +28,28 @@ class TranslatedFieldsFieldExtend(TranslatedFieldExtended):
     pass
 
 
+class EffectivePriceFieldsSerializer(serializers.Serializer):
+    """What a shopper pays and the Omnibus-lawful announcement of it.
+
+    One definition for every serializer that shows a product's price, so
+    the shapes cannot drift between the catalogue and the agent surface.
+    """
+
+    # What a consumer pays now, promotions that need nothing from the
+    # basket included; ``final_price`` stops at VAT and the markdown.
+    effective_price = MoneyField(
+        max_digits=11, decimal_places=2, read_only=True, allow_null=True
+    )
+    # The EU Omnibus reference: the lowest price of the 30 days before the
+    # current reduction began. ``null`` means nothing may be announced.
+    prior_price = MoneyField(
+        max_digits=11, decimal_places=2, read_only=True, allow_null=True
+    )
+    announced_discount_percent = serializers.IntegerField(
+        read_only=True, allow_null=True
+    )
+
+
 # ``discount_percent`` is the merchant's markdown, not an announcement: a
 # "was" price struck through and a "-N%" badge built from it carry no
 # prior price, which the EU Omnibus rule requires. ``prior_price`` and
@@ -36,7 +58,9 @@ class TranslatedFieldsFieldExtend(TranslatedFieldExtended):
 # reading it (docs/migrations.md: expand, then contract).
 @extend_schema_serializer(deprecate_fields=["discount_percent"])
 class ProductSerializer(
-    TranslatableModelSerializer, serializers.ModelSerializer[Product]
+    TranslatableModelSerializer,
+    serializers.ModelSerializer[Product],
+    EffectivePriceFieldsSerializer,
 ):
     translations = TranslatedFieldsFieldExtend(shared_model=Product)
     category = PrimaryKeyRelatedField(queryset=ProductCategory.objects.all())
@@ -54,19 +78,6 @@ class ProductSerializer(
     price = MoneyField(max_digits=11, decimal_places=2)
     final_price = MoneyField(max_digits=11, decimal_places=2, read_only=True)
     vat_value = MoneyField(max_digits=11, decimal_places=2, read_only=True)
-    # What a consumer pays now, promotions that need nothing from the
-    # basket included; ``final_price`` stops at VAT and the markdown.
-    effective_price = MoneyField(
-        max_digits=11, decimal_places=2, read_only=True, allow_null=True
-    )
-    # The EU Omnibus reference: the lowest price of the 30 days before the
-    # current reduction began. ``null`` means nothing may be announced.
-    prior_price = MoneyField(
-        max_digits=11, decimal_places=2, read_only=True, allow_null=True
-    )
-    announced_discount_percent = serializers.IntegerField(
-        read_only=True, allow_null=True
-    )
     weight = MeasurementSerializerField(
         measurement=Weight, required=False, allow_null=True
     )

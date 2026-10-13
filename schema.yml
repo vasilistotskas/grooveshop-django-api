@@ -46669,7 +46669,9 @@ components:
       description: |-
         A single sibling product within a variant group, trimmed to what a
         storefront swatch card needs: identity, image, price and its
-        variant-axis attribute values (Colour, Memory, …).
+        variant-axis attribute values (Colour, Memory, …). Its price fields
+        are the product's, so a variant shows what a shopper pays and the
+        Omnibus-lawful announcement exactly as the product card does.
       properties:
         id:
           type: integer
@@ -46753,6 +46755,28 @@ components:
           exclusiveMinimum: true
           readOnly: true
           title: Ποσοστό Έκπτωσης
+        effectivePrice:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          readOnly: true
+          nullable: true
+        priorPrice:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          readOnly: true
+          nullable: true
+        announcedDiscountPercent:
+          type: integer
+          readOnly: true
+          nullable: true
         mainImagePath:
           type: string
           readOnly: true
@@ -46763,12 +46787,15 @@ components:
           readOnly: true
       required:
       - active
+      - announcedDiscountPercent
       - attributeValues
       - discountPercent
+      - effectivePrice
       - finalPrice
       - id
       - mainImagePath
       - price
+      - priorPrice
       - slug
       - stock
       - translations

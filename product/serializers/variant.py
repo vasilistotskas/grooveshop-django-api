@@ -4,17 +4,24 @@ from parler_rest.serializers import TranslatableModelSerializer
 from rest_framework import serializers
 
 from product.models.product import Product
-from product.serializers.product import TranslatedFieldsFieldExtend
+from product.serializers.product import (
+    EffectivePriceFieldsSerializer,
+    TranslatedFieldsFieldExtend,
+)
 from product.serializers.product_attribute import ProductAttributeSerializer
 
 
 class ProductVariantSerializer(
-    TranslatableModelSerializer, serializers.ModelSerializer[Product]
+    TranslatableModelSerializer,
+    serializers.ModelSerializer[Product],
+    EffectivePriceFieldsSerializer,
 ):
     """
     A single sibling product within a variant group, trimmed to what a
     storefront swatch card needs: identity, image, price and its
-    variant-axis attribute values (Colour, Memory, …).
+    variant-axis attribute values (Colour, Memory, …). Its price fields
+    are the product's, so a variant shows what a shopper pays and the
+    Omnibus-lawful announcement exactly as the product card does.
     """
 
     translations = TranslatedFieldsFieldExtend(shared_model=Product)
@@ -33,6 +40,9 @@ class ProductVariantSerializer(
             "price",
             "final_price",
             "discount_percent",
+            "effective_price",
+            "prior_price",
+            "announced_discount_percent",
             "main_image_path",
             "attribute_values",
         )

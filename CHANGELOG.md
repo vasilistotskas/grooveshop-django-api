@@ -3,6 +3,122 @@
 
 
 
+## v3.115.0 (2026-10-13)
+
+### Bug fixes
+
+* fix(admin): rolling-window rows open the same window, DST-safe periods
+
+- "Needs attention" rows that count the last N days (receipts myDATA
+  rejected, new messages) open their list filtered to the same cutoff,
+  not everything since the beginning; the messages row says "In the
+  last 7 days" instead of "this week", which it never was. The window
+  is one constant per row.
+- Period.window subtracts the prior span in UTC: an aware datetime minus
+  a timedelta is wall-clock arithmetic in its own zone, so a span
+  crossing a DST change came out an hour long.
+- Best sellers are cleared by order-line writes too: a partial refund
+  can save only the line.
+- The platform admin's footer links the API docs, which its URLconf
+  serves as well.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`2ab7fc3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2ab7fc3aea6b2963923b5d0cfdfa496f57f3eec9))
+
+* fix(admin): a receipt myDATA rejected stays on the dashboard until handled
+
+The "Needs attention" row counted rejections updated in the last seven
+days, a window carried over from the old superuser alert, so a receipt
+nobody corrected dropped off the dashboard after a week while it was
+still not accepted by AADE. REJECTED is terminal until someone corrects
+the details and resends the receipt, or cancels it, and either changes
+the status; the row now counts every receipt still rejected and opens
+exactly that list, with the action as its detail line.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`2ab7fc3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2ab7fc3aea6b2963923b5d0cfdfa496f57f3eec9))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.114.1 [skip ci] ([`5fadd2f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5fadd2fc94c37b64ee818c5b90c8968de4a0a0fa))
+
+### Features
+
+* feat(admin): per-request store sidebar, a period dashboard and a shared footer (#179) ([`2ab7fc3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2ab7fc3aea6b2963923b5d0cfdfa496f57f3eec9))
+
+* feat(admin): per-request store sidebar, a period dashboard and a shared footer
+
+The store sidebar was a static list of 40 links in nine groups: a group
+for the dashboard alone, a 15-link "Sales" catch-all, menus for features
+the store does not have, links that answered 403 for the user's role,
+and pages no menu reached (brands, content pages, menus, page layouts,
+recommendation slots, the store's own profile and team). It is now
+built per request (admin/navigation.py, the callable Unfold accepts for
+SIDEBAR.navigation):
+
+- Sales, Catalog, Customers, Marketing, Content, Shipping, Settings, and
+  System for platform superusers; related pages fold into one sub-menu,
+  a sub-menu left with one entry is listed in its place.
+- An entry is listed only when its ModelAdmin would open for the user
+  (module + view/change permission, as Django's app list checks).
+- Features follow admin/features.py, read through the code that enforces
+  them for shoppers: off the plan, hidden everywhere; on the plan but
+  switched off in the store settings, the setup pages stay with an "Off"
+  badge while counters and dashboard rows go; pages that only receive
+  shopper input (reviews, feedback, newsletter, favourites, blog
+  comments) go with their setting; a carrier's pages need it active.
+- Badges count waiting work only, from one cached query shared with the
+  dashboard. Email templates, translations and the cache page move from
+  the site-name menu into Settings, which now holds only the platform's
+  ops consoles, for platform superusers, on both sites.
+- Tests pin every rule, and that every registered store and platform
+  model is reachable from a menu (Tenant Archives and User Sessions are
+  added to the platform sidebar).
+
+The dashboard shows one period (7 days, 30 days, 13 weeks, 12 months)
+picked by ?period=: whole calendar buckets, so the headline figures are
+the sums of the chart's bars, each against the span before it. Queries
+cache per period (DashboardQuery variants). Revenue, orders, average
+order and new customers with trend lines; one measure per chart
+(?metric=); "Needs attention" (orders to process, low stock, receipts
+myDATA rejected, reviews and blog comments to approve, new messages,
+business accounts to verify), each only for a viewer who may open its
+list; latest orders, best sellers (units paid for), checkout funnel,
+order sources as shares, and one store-search card. The two doughnuts,
+the review and message tables, most-viewed products and the separate
+search charts are gone. The seller-details alerts are unchanged;
+myDATA rejections move from the superuser alert into "Needs attention",
+so a store owner sees them.
+
+Both admin sites render a footer (release, help site, API docs for
+platform superusers); the store header links to the storefront and its
+sidebar shows the storefront's domain. The environment label is hidden
+from a store's own staff in production. The platform admin now loads
+the project stylesheet, and a grid no longer pairs grid-cols-1 with a
+breakpoint only our stylesheet carries (Unfold's loads later and won);
+a guard test keeps it so.
+
+django-unfold 0.109.0 renders sidebar sub-navigation and guards the
+palette's selectItem itself, so the nested app_list templates and
+unfold_command_palette_fix.js are deleted; its new strings are
+translated. LOGIN.redirect_after is still not read, so the login mixin
+stays.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`2ab7fc3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2ab7fc3aea6b2963923b5d0cfdfa496f57f3eec9))
+
+### Testing
+
+* test(admin): the period switch and footer tests check what they claim
+
+The period test passed on any aria-current in the page, and the measure
+switch always carries one; it now reads the marked links in page order,
+one per switch. The footer test asserts the release is not empty before
+looking for it.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`2ab7fc3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2ab7fc3aea6b2963923b5d0cfdfa496f57f3eec9))
+
 ## v3.114.1 (2026-10-13)
 
 ### Bug fixes

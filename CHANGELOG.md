@@ -3,6 +3,25 @@
 
 
 
+## v3.119.0 (2026-10-13)
+
+### Features
+
+* feat(product): give each variant its effective and Omnibus prior price (#189)
+
+GET /product/{id}/variants returned each sibling's list price and the
+merchant's markdown, but not what a shopper pays now (promotions
+included) or the EU Omnibus prior price a reduction may be announced
+from. A variant could therefore not show the price its own product card
+shows, and the agent gateway's MCP variant listing had no lawful price.
+
+ProductVariantSerializer now mixes in EffectivePriceFieldsSerializer,
+the one definition ProductSerializer and the agent favourites already
+share. The fields read stored columns, so the endpoint's query count is
+unchanged (its N+1 test still holds).
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`7c7fd7c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7c7fd7cc7099ee43e5afef6ad8a1fbb99339769b))
+
 ## v3.118.2 (2026-10-13)
 
 ### Bug fixes

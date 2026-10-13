@@ -84,9 +84,10 @@ deployment settings.
 
 A price field must never be changed with `queryset.update()`: it skips all of
 the above (nothing in the code base does today). The nightly sweep exists for
-what no path can see: the merchant's `PROMOTIONS_ENABLED` toggle, a promotion
-running when this shipped, a product saved by a release that predates the
-records. A promotion's start is recorded when the queue or sweep notices it
+what no path can see: a promotion running when this shipped, a product saved
+by a release that predates the records. Switching promotions off or on (the
+store's `PROMOTIONS_ENABLED`, the plan's `promotions_enabled`) runs the same
+sweep for that store at once (`promotion/signals.py`). A promotion's start is recorded when the queue or sweep notices it
 (seconds to five minutes), not at its `starts_at`.
 
 Spells are legal records. `clean_old_history` only touches simple-history

@@ -48,12 +48,10 @@ from tenant.permissions import (
     IsProductReviewsEnabled,
     IsPromotionsEnabled,
     IsRecommendationsEnabled,
+    IsRecommendationsRuntimeEnabled,
     IsSettingEnabled,
 )
 
-# The storefront's runtime switch for product suggestions; the server
-# never reads it, so no permission class carries its name.
-PRODUCT_SUGGESTIONS_SETTING = "PRODUCT_SUGGESTIONS_ENABLED"
 # Whether the store sends its receipts to AADE's myDATA.
 MYDATA_SETTING = "MYDATA_ENABLED"
 
@@ -123,7 +121,7 @@ class StoreFeatures:
             ),
             recommendations=_availability(
                 IsRecommendationsEnabled.feature_flag,
-                bool(Setting.get(PRODUCT_SUGGESTIONS_SETTING, default=False)),
+                _setting(IsRecommendationsRuntimeEnabled),
             ),
             blog=blog,
             blog_comments=blog and _setting(IsBlogCommentsEnabled),

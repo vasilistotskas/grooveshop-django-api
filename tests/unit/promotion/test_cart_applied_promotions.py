@@ -296,3 +296,24 @@ def test_near_miss_names_the_reward_to_add(enable_promotions, make_cart):
         "slug",
         "main_image_path",
     }
+
+
+def test_a_cart_lists_no_coupon_while_promotions_are_off(make_cart):
+    """No code applies then, and a coupon listed with no discount and no
+    way to remove it is worse than none. The code stays on the cart for
+    when the store turns promotions back on."""
+    cart, _ = make_cart([(100, 1)])
+    code = PromotionCodeFactory(
+        promotion=PromotionFactory(
+            benefit_type=BenefitType.FIXED_AMOUNT,
+            benefit_value=Decimal(5),
+            stackable=True,
+        )
+    )
+    CartPromotionCode.objects.create(cart=cart, code=code)
+
+    data = CartSerializer(cart).data
+
+    assert data["applied_coupon_codes"] == []
+    assert data["applied_coupons"] == []
+    assert cart.applied_codes.filter(code=code).exists()

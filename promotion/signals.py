@@ -10,9 +10,12 @@ promotion id (the task resolves its products later). A change that
 destroys the old scope — deleting the promotion, removing or clearing
 members — records the product ids NOW, while the rows still exist.
 
-Not covered: the reverse side of the M2M (``product.promotions.add``) and
-the merchant's ``PROMOTIONS_ENABLED`` toggle; the nightly Meilisearch
-sync repairs both.
+Switching promotions off or on (the merchant's ``PROMOTIONS_ENABLED``, or
+the plan's ``promotions_enabled``) moves every promoted price at once, so
+it re-runs the store's whole price sweep instead.
+
+Not covered: the reverse side of the M2M (``product.promotions.add``);
+the nightly Meilisearch sync repairs it.
 """
 
 from __future__ import annotations
@@ -29,6 +32,8 @@ from django.dispatch import receiver
 from promotion.models import Promotion, PromotionRedemption
 from promotion.offer_sync import queue_refresh
 from promotion.offers import scope_product_ids
+from tenant.permissions import IsPromotionsRuntimeEnabled
+from tenant.switches import on_switch_change
 
 _SCOPE_THROUGHS = (
     Promotion.products.through,
@@ -116,3 +121,14 @@ def reindex_offer_on_redemption(sender, instance, created, raw=False, **kwargs):
 def reindex_offer_on_redemption_delete(sender, instance, **kwargs):
     if _crossed_usage_limit(instance.promotion_id, created=False):
         queue_refresh(promotion_ids=[instance.promotion_id])
+
+
+# Switching promotions off or on moves every promoted price at once, so it
+# re-runs the store's whole price sweep now rather than at 03:00, which
+# left lists and search showing promotion prices the cart no longer
+# honoured for up to a day.
+on_switch_change(
+    setting=IsPromotionsRuntimeEnabled,
+    plan_flag="promotions_enabled",
+    task="product.tasks.reevaluate_price_episodes",
+)

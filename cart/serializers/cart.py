@@ -160,6 +160,15 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
             cache[obj.pk] = PromotionEngine.evaluate(obj, user=obj.user)
         return cache[obj.pk]
 
+    @staticmethod
+    def _codes_apply() -> bool:
+        # With promotions off no code applies and the cart lists none, so
+        # nothing dead is shown that the shopper could not remove; the
+        # codes wait on the cart until the store turns promotions back on.
+        from promotion.services import PromotionEngine
+
+        return PromotionEngine.is_enabled()
+
     @extend_schema_field(OpenApiTypes.DECIMAL)
     def get_total_vat_value(self, obj: Cart):
         line_discounts = self._promotion_result(obj).line_discounts
@@ -179,6 +188,8 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
         # queryset and always hits the database, so it walks straight
         # past the `applied_codes__code` prefetch and costs a query per
         # cart on the staff list. Iterating the prefetched rows uses it.
+        if not self._codes_apply():
+            return []
         return [row.code.code for row in obj.applied_codes.all()]
 
     @extend_schema_field(
@@ -232,6 +243,8 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
         # read "a better offer applies" while it was waiving shipping),
         # nor say why a code that stopped applying is idle. The engine
         # already decided all of it; this hands its verdict over.
+        if not self._codes_apply():
+            return []
         result = self._promotion_result(obj)
         rejections: dict[str, str] = {}
         for code, reason in result.rejected:

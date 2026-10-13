@@ -11,6 +11,7 @@ from django.utils.translation import gettext_lazy as _
 from extra_settings.models import Setting
 
 from loyalty.enum import PriceBasis, TransactionType
+from loyalty.models.pause import LoyaltyPause
 from loyalty.models.tier import LoyaltyTier
 from loyalty.models.transaction import PointsTransaction
 
@@ -291,10 +292,12 @@ class LoyaltyService:
         the original EARN amounts, then the new-customer BONUS granted for
         this order, clamping to prevent negative balance. Only the EARN
         reversal comes off XP: the bonus never added any.
-        """
-        if not cls.is_enabled():
-            return 0
 
+        Runs whether or not the programme is on: an order cancelled or
+        refunded while loyalty is off must still give back what it
+        redeemed and take back what it earned, or the balances are wrong
+        when the store turns loyalty back on.
+        """
         from order.models.order import Order
 
         try:
@@ -627,19 +630,41 @@ class LoyaltyService:
             user.save(update_fields=["loyalty_tier"])
 
     @classmethod
+    def sync_pause(cls) -> None:
+        """Bring the store's record of loyalty pauses in line with its
+        switch: a span stays open while the programme is off and closes
+        when it is back on. Run when the switch changes
+        (``tenant.switches``) and by the daily expiry sweep.
+        """
+        now = timezone.now()
+        if cls.is_enabled():
+            LoyaltyPause.close_at(now)
+        else:
+            LoyaltyPause.open_at(now)
+
+    @classmethod
     def process_expiration(cls) -> int:
         """Process all expired points.
 
         Returns count of EXPIRE transactions created. When
-        LOYALTY_POINTS_EXPIRATION_DAYS is 0, no expiration occurs.
+        LOYALTY_POINTS_EXPIRATION_DAYS is 0, no expiration occurs. None
+        occurs while the programme is off either, and a point's age
+        counts only the time the programme was on (``LoyaltyPause``):
+        shoppers cannot spend points while it is off, so that time must
+        not eat into them.
         """
+        cls.sync_pause()
+        if not cls.is_enabled():
+            return 0
         expiration_days = Setting.get(
             "LOYALTY_POINTS_EXPIRATION_DAYS", default=0
         )
         if expiration_days <= 0:
             return 0
 
-        cutoff_date = timezone.now() - timedelta(days=expiration_days)
+        cutoff_date = LoyaltyPause.active_cutoff(
+            timezone.now(), timedelta(days=expiration_days)
+        )
         expirable = list(
             PointsTransaction.objects.get_expirable_transactions(cutoff_date)
         )

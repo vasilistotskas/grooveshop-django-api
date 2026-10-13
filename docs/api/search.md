@@ -168,9 +168,11 @@ products:
   cursor lives in the tenant's cache and only moves after the reindex was
   dispatched; a missing cursor falls back to a one-day window.
 
-Not signalled: the reverse side of the M2M (`product.promotions.add(...)`) and
-flipping `PROMOTIONS_ENABLED`; the nightly `sync_meilisearch_indexes` repairs
-both.
+Flipping promotions off or on (the store's `PROMOTIONS_ENABLED` or the plan's
+`promotions_enabled`) queues the store's whole price sweep at once
+(`promotion/signals.py`), which reindexes every product it changes. Not
+signalled: the reverse side of the M2M (`product.promotions.add(...)`); the
+nightly `sync_meilisearch_indexes` repairs it.
 
 Response is `ProductMeiliSearchResponse`: the common envelope above plus
 `facetDistribution` and `facetStats` when `facets` was requested.

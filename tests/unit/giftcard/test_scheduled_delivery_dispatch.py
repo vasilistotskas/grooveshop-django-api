@@ -31,6 +31,9 @@ from giftcard.enum import GiftCardStatus
 from giftcard.models import GiftCard
 from giftcard.tasks import deliver_scheduled_gift_cards
 
+# The store sells gift cards; the last test switches them off.
+pytestmark = pytest.mark.usefixtures("enable_gift_cards")
+
 
 @pytest.fixture
 def due_card(db):
@@ -76,3 +79,22 @@ def test_sweep_skips_already_delivered_cards(due_card):
 
     task.delay.assert_not_called()
     assert result == {"status": "success", "sent": 0}
+
+
+@pytest.mark.django_db
+def test_sweep_waits_while_gift_cards_are_off(due_card):
+    """The recipient could not redeem the card; it goes out on the
+    first sweep after the store turns gift cards back on."""
+    with (
+        patch(
+            "giftcard.services.Setting.get",
+            side_effect=lambda key, default=None: (
+                False if key == "GIFT_CARDS_ENABLED" else default
+            ),
+        ),
+        patch("giftcard.tasks.deliver_gift_card_email") as task,
+    ):
+        result = deliver_scheduled_gift_cards()
+
+    task.delay.assert_not_called()
+    assert result == {"status": "skipped", "reason": "gift cards off"}

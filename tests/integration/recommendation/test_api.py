@@ -20,8 +20,15 @@ from tests.utils.staff import (
     store_tenant,
     unbind_store_tenant,
 )
+from tests.utils.store_settings import switch_store_settings
 
 pytestmark = pytest.mark.django_db
+
+
+@pytest.fixture(autouse=True)
+def _store_shows_suggestions():
+    """The merchant has product suggestions switched on (they ship off)."""
+    switch_store_settings(PRODUCT_SUGGESTIONS_ENABLED=True)
 
 
 def _product(**kwargs):
@@ -149,6 +156,23 @@ class TestPlanGate:
         assert (
             client.get(self.url, {"seed": seed.id}).status_code
             == status.HTTP_200_OK
+        )
+
+    @pytest.mark.parametrize("gated_tenant", ["on"], indirect=True)
+    def test_the_store_switch_off_is_a_404_on_both_endpoints(
+        self, client, gated_tenant
+    ):
+        switch_store_settings(PRODUCT_SUGGESTIONS_ENABLED=False)
+        seed = _product()
+        assert (
+            client.get(self.url, {"seed": seed.id}).status_code
+            == status.HTTP_404_NOT_FOUND
+        )
+        assert (
+            client.post(
+                reverse("recommendation-event"), {}, format="json"
+            ).status_code
+            == status.HTTP_404_NOT_FOUND
         )
 
 

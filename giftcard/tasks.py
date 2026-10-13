@@ -86,8 +86,16 @@ def deliver_gift_card_email(self, gift_card_id: int) -> dict:
     retry_jitter=True,
 )
 def deliver_scheduled_gift_cards(self) -> dict:
-    """Daily sweep: send cards whose ``deliver_at`` has arrived."""
+    """Daily sweep: send cards whose ``deliver_at`` has arrived.
+
+    Paused while gift cards are off: the recipient could not redeem the
+    card, so it goes out on the first sweep after they are back on.
+    """
     from giftcard.models import GiftCard
+    from giftcard.services import GiftCardService
+
+    if not GiftCardService.is_enabled():
+        return {"status": "skipped", "reason": "gift cards off"}
 
     due = GiftCard.objects.filter(
         delivered_at__isnull=True,
@@ -177,7 +185,8 @@ def send_gift_card_expiry_reminders(self) -> dict:
 
     Window is merchant-tunable (``GIFT_CARD_EXPIRY_REMINDER_DAYS``,
     0 disables); each card is reminded exactly once via
-    ``expiry_reminder_sent_at``.
+    ``expiry_reminder_sent_at``. Paused while gift cards are off, when
+    nothing expires either.
     """
     from datetime import timedelta
 
@@ -185,6 +194,10 @@ def send_gift_card_expiry_reminders(self) -> dict:
 
     from giftcard.enum import GiftCardStatus
     from giftcard.models import GiftCard
+    from giftcard.services import GiftCardService
+
+    if not GiftCardService.is_enabled():
+        return {"status": "skipped", "reason": "gift cards off"}
 
     days = int(Setting.get("GIFT_CARD_EXPIRY_REMINDER_DAYS", default=30) or 0)
     if days <= 0:
@@ -236,6 +249,23 @@ def send_gift_card_expiry_reminders(self) -> dict:
         sent += 1
 
     return {"status": "success", "sent": sent}
+
+
+@celery_app.task(
+    base=MonitoredTask,
+    bind=True,
+    max_retries=5,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_jitter=True,
+)
+def sync_gift_card_pause(self) -> dict:
+    """The store switched gift cards off or on: record the pause, or close
+    it and move active cards' expiry forward by it."""
+    from giftcard.services import GiftCardService
+
+    GiftCardService.sync_pause()
+    return {"status": "success"}
 
 
 @celery_app.task(

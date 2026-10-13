@@ -36,7 +36,7 @@ from giftcard.serializers import (
 )
 from giftcard.services import GiftCardError, GiftCardService
 from order.payment import provider_supports
-from tenant.permissions import IsGiftCardsEnabled
+from tenant.permissions import IsGiftCardsEnabled, IsGiftCardsRuntimeEnabled
 
 logger = logging.getLogger(__name__)
 
@@ -85,18 +85,27 @@ class GiftCardViewSet(BaseModelViewSet):
     """Shopper-facing gift-card endpoints.
 
     Balance check + purchase are guest-capable (gated by the tenant's
-    gift-cards plan flag with 404 semantics); redemption itself happens
-    at order creation via ``gift_card_codes``.
+    gift-cards plan flag and the merchant's runtime switch, both with
+    404 semantics); redemption itself happens at order creation via
+    ``gift_card_codes``.
     """
 
     queryset = GiftCard.objects.none()
     serializers_config = serializers_config
 
     def get_permissions(self):
-        if self.action == "mine":
-            self.permission_classes = [IsGiftCardsEnabled, IsAuthenticated]
+        # A purchase's status keeps answering after either switch goes
+        # off: the shopper polling it has already paid, and the card is
+        # issued. A store that never sold cards has no purchase to find.
+        if self.action == "purchase_status":
+            self.permission_classes = [AllowAny]
         else:
-            self.permission_classes = [IsGiftCardsEnabled, AllowAny]
+            caller = IsAuthenticated if self.action == "mine" else AllowAny
+            self.permission_classes = [
+                IsGiftCardsEnabled,
+                IsGiftCardsRuntimeEnabled,
+                caller,
+            ]
         return super().get_permissions()
 
     def get_throttles(self):

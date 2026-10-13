@@ -94,13 +94,15 @@ class LoyaltyViewSet(BaseModelViewSet):
     """
 
     queryset = PointsTransaction.objects.none()
-    # IsLoyaltyEnabled fires first and raises 404 when the tenant's
-    # loyalty_enabled flag is False. IsAuthenticated covers the rest:
-    # the queryset filters by request.user and lives in the tenant
-    # schema, so an authenticated caller here is by construction a
-    # customer of THIS store (see tenant/membership.py).
+    # The plan flag and the merchant's runtime switch fire first, each
+    # raising 404, so a store with the programme off serves no points,
+    # history or redemption. IsAuthenticated covers the rest: the
+    # queryset filters by request.user and lives in the tenant schema,
+    # so an authenticated caller here is by construction a customer of
+    # THIS store (see tenant/membership.py).
     permission_classes = [
         IsLoyaltyEnabled,
+        IsLoyaltyRuntimeEnabled,
         IsAuthenticated,
     ]
     serializers_config = serializers_config

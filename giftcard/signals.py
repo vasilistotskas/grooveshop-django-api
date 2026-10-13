@@ -15,6 +15,8 @@ from order.enum.status import PaymentStatus
 from order.models.order import Order
 from order.signals import order_canceled, order_refunded
 from tenant.celery import dispatch_on_commit
+from tenant.permissions import IsGiftCardsRuntimeEnabled
+from tenant.switches import on_switch_change
 
 logger = logging.getLogger(__name__)
 
@@ -63,3 +65,12 @@ def handle_order_canceled_giftcard(
         logger.exception(
             "Failed to queue gift-card cancel credit for order %s", order.id
         )
+
+
+# Gift cards switched off or on: record the pause, or close it and move
+# active cards' expiry forward by it (``GiftCardService.sync_pause``).
+on_switch_change(
+    setting=IsGiftCardsRuntimeEnabled,
+    plan_flag="gift_cards_enabled",
+    task="giftcard.tasks.sync_gift_card_pause",
+)

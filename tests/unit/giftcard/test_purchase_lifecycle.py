@@ -84,7 +84,10 @@ class TestExpiryReminders:
         )
 
         def _get(key, default=None):
-            return {"GIFT_CARD_EXPIRY_REMINDER_DAYS": 30}.get(key, default)
+            return {
+                "GIFT_CARDS_ENABLED": True,
+                "GIFT_CARD_EXPIRY_REMINDER_DAYS": 30,
+            }.get(key, default)
 
         with patch("extra_settings.models.Setting.get", side_effect=_get):
             first = send_gift_card_expiry_reminders.apply().result
@@ -97,6 +100,22 @@ class TestExpiryReminders:
         assert card.expiry_reminder_sent_at is not None
         assert far_card.expiry_reminder_sent_at is None
 
+    def test_no_reminders_while_gift_cards_are_off(self):
+        """Nothing expires while gift cards are off, so nothing is
+        announced either."""
+        from giftcard.tasks import send_gift_card_expiry_reminders
+
+        def _get(key, default=None):
+            return {
+                "GIFT_CARDS_ENABLED": False,
+                "GIFT_CARD_EXPIRY_REMINDER_DAYS": 30,
+            }.get(key, default)
+
+        with patch("extra_settings.models.Setting.get", side_effect=_get):
+            result = send_gift_card_expiry_reminders()
+
+        assert result == {"status": "skipped", "reason": "gift cards off"}
+
     def test_zero_setting_disables_reminders(self, enable_gift_cards):
         from giftcard.tasks import send_gift_card_expiry_reminders
 
@@ -106,7 +125,10 @@ class TestExpiryReminders:
         )
 
         def _get(key, default=None):
-            return {"GIFT_CARD_EXPIRY_REMINDER_DAYS": 0}.get(key, default)
+            return {
+                "GIFT_CARDS_ENABLED": True,
+                "GIFT_CARD_EXPIRY_REMINDER_DAYS": 0,
+            }.get(key, default)
 
         with patch("extra_settings.models.Setting.get", side_effect=_get):
             result = send_gift_card_expiry_reminders.apply().result

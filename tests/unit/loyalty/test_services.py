@@ -110,9 +110,10 @@ class TestDisabledSystem:
         user.refresh_from_db()
         assert user.total_xp == xp_before
 
-    def test_reverse_order_points_is_a_no_op(self):
-        """An order with EARN rows would be reversed; disabled, its
-        points and the XP they gave stay exactly where they are."""
+    def test_reverse_order_points_still_runs(self):
+        """An order cancelled while the programme is off still takes back
+        what it earned, points and XP, so the balance is right when the
+        store turns loyalty back on."""
         from user.factories.account import UserAccountFactory
 
         user = UserAccountFactory(num_addresses=0)
@@ -130,13 +131,38 @@ class TestDisabledSystem:
         with loyalty_settings(LOYALTY_ENABLED=False):
             result = LoyaltyService.reverse_order_points(order.id)
 
-        assert result == 0
-        assert not PointsTransaction.objects.filter(
-            transaction_type=TransactionType.ADJUST
-        ).exists()
-        assert LoyaltyService.get_user_balance(user) == 20
+        assert result == 20
+        assert LoyaltyService.get_user_balance(user) == 0
         user.refresh_from_db()
-        assert user.total_xp == 20
+        assert user.total_xp == 0
+
+    def test_points_do_not_expire(self):
+        """Shoppers cannot spend points while the programme is off, so
+        none lapse until the store turns it back on."""
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from user.factories.account import UserAccountFactory
+
+        user = UserAccountFactory(num_addresses=0)
+        earned = PointsTransaction.objects.create(
+            user=user,
+            points=20,
+            transaction_type=TransactionType.EARN,
+            description="Earned long ago",
+        )
+        PointsTransaction.objects.filter(pk=earned.pk).update(
+            created_at=timezone.now() - timedelta(days=400)
+        )
+
+        with loyalty_settings(
+            LOYALTY_ENABLED=False, LOYALTY_POINTS_EXPIRATION_DAYS=365
+        ):
+            created = LoyaltyService.process_expiration()
+
+        assert created == 0
+        assert LoyaltyService.get_user_balance(user) == 20
 
     def test_redeem_points_raises_validation_error(self):
         """redeem_points raises ValidationError when disabled."""
@@ -359,10 +385,7 @@ class TestBalanceClampingOnExpiration:
         )
         assert LoyaltyService.get_user_balance(user) == 20
 
-        def mock_settings(key, default=None):
-            return {"LOYALTY_POINTS_EXPIRATION_DAYS": 365}.get(key, default)
-
-        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+        with loyalty_settings(LOYALTY_POINTS_EXPIRATION_DAYS=365):
             count = LoyaltyService.process_expiration()
 
         assert count == 1

@@ -41,7 +41,10 @@ from recommendation.serializers import (
     RecommendationQuerySerializer,
     RecommendationResponseSerializer,
 )
-from tenant.permissions import IsRecommendationsEnabled
+from tenant.permissions import (
+    IsRecommendationsEnabled,
+    IsRecommendationsRuntimeEnabled,
+)
 
 
 def _session_key(request) -> str:
@@ -76,7 +79,9 @@ def _user_id(request) -> int | None:
     },
 )
 @api_view(["GET"])
-@permission_classes([AllowAny, IsRecommendationsEnabled])
+@permission_classes(
+    [AllowAny, IsRecommendationsEnabled, IsRecommendationsRuntimeEnabled]
+)
 @throttle_classes([AnonRateThrottle, UserRateThrottle])
 def recommendations(request):
     query = RecommendationQuerySerializer(data=request.query_params)
@@ -132,7 +137,9 @@ def recommendations(request):
     },
 )
 @api_view(["POST"])
-@permission_classes([AllowAny, IsRecommendationsEnabled])
+@permission_classes(
+    [AllowAny, IsRecommendationsEnabled, IsRecommendationsRuntimeEnabled]
+)
 @throttle_classes(
     [RecommendationEventThrottle, AnonRateThrottle, UserRateThrottle]
 )

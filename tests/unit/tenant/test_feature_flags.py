@@ -235,7 +235,8 @@ class TestLoyaltyFeatureFlag:
 
         client = APIClient()
         url = reverse("loyalty:loyalty-summary")
-        response = client.get(url)
+        with _loyalty_runtime(True):
+            response = client.get(url)
         # 401 (unauthenticated, not 404) — auth check still enforced
         assert response.status_code in (
             status.HTTP_401_UNAUTHORIZED,
@@ -268,7 +269,9 @@ class TestLoyaltyFeatureFlag:
 
         client = APIClient()
         url = reverse("loyalty:loyalty-summary")
-        response = client.get(url)
+        # The merchant switch is on, so only the plan gate is under test.
+        with _loyalty_runtime(True):
+            response = client.get(url)
         # IsLoyaltyEnabled passed → IsAuthenticated rejected anon with 401.
         # Must NOT be 404.
         assert response.status_code in (

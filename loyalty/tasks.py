@@ -78,6 +78,20 @@ def reverse_order_points(self, order_id: int) -> dict:
     autoretry_for=(Exception,),
     retry_backoff=True,
 )
+def sync_loyalty_pause() -> dict:
+    """The store switched loyalty off or on: open or close the pause
+    that keeps points from ageing while it is off."""
+    from loyalty.services import LoyaltyService
+
+    LoyaltyService.sync_pause()
+    return {"status": "success"}
+
+
+@celery_app.task(
+    base=MonitoredTask,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+)
 def process_points_expiration() -> dict:
     """Daily periodic task to expire old points."""
     from loyalty.services import LoyaltyService

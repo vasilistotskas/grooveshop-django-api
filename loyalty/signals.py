@@ -15,6 +15,8 @@ from order.signals import (
     order_status_changed,
 )
 from tenant.celery import dispatch_on_commit
+from tenant.permissions import IsLoyaltyRuntimeEnabled
+from tenant.switches import on_switch_change
 from user.models.account import UserAccount
 
 # Cache key + TTL for the tier-level lookup table used by
@@ -311,3 +313,12 @@ def notify_tier_up_live(
 
     user_id = user.pk
     dispatch_on_commit(notify_loyalty_tier_up_live, [user_id])
+
+
+# Loyalty switched off or on: open or close the pause that keeps points
+# from ageing while the programme is off (``LoyaltyService.sync_pause``).
+on_switch_change(
+    setting=IsLoyaltyRuntimeEnabled,
+    plan_flag="loyalty_enabled",
+    task="loyalty.tasks.sync_loyalty_pause",
+)

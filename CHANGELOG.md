@@ -3,6 +3,52 @@
 
 
 
+## v3.118.2 (2026-10-13)
+
+### Bug fixes
+
+* fix(order): declare the guest ?uuid= parameter on the order actions (#188)
+
+A guest proves ownership of a pk-addressed order (cancel, payment status,
+payment intent, checkout session, agent payment, retry payment) with the
+order's uuid in ?uuid=, but no operation published that parameter, so a
+typed client had to step outside the generated contract to send it. The
+agent gateway's consumer contract flagged it on create_checkout_session.
+
+One constant now names those actions; the permission checks and the
+OpenAPI parameter both read it, and a test keeps every one of them
+declaring the parameter.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`9e611fc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9e611fc1f29cf8020e2911d328c1548d5cda9da3))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.118.1 [skip ci] ([`f44c0d7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f44c0d74843e868be0f8de7f8af2fb66734be6fa))
+
+### Continuous integration
+
+* ci(release): commit uv.lock in the version commit (#186) ([`a9a6858`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a9a6858c9900559130835a0c9d60943e45aa2526))
+
+* ci(release): commit uv.lock in the version commit
+
+The release job pushed python-semantic-release's version commit and
+tag, then re-locked uv.lock and pushed it as a second commit. When the
+job failed in between (v3.118.0: GitHub rejected the tag push), main was
+left with pyproject.toml on the new version and a stale uv.lock, so
+every `uv sync --locked` on main failed until the lock was synced by
+hand, and a workflow_dispatch could not recover it either: its
+Migration Check starts from HEAD~1, the stale commit.
+
+PSR now re-locks the project's own version in build_command, the
+documented uv integration (`uv lock --upgrade-package "$PACKAGE_NAME"`),
+and stages uv.lock through `assets`, so the version, changelog and lock
+land in one commit and every commit on main is consistent. A failing
+build_command aborts the release before anything is committed.
+UV_CACHE_DIR is passed through so uv keeps using the job's cache. The
+separate sync step and the version bookkeeping only it read are gone.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`a9a6858`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a9a6858c9900559130835a0c9d60943e45aa2526))
+
 ## v3.118.1 (2026-10-13)
 
 ### Bug fixes

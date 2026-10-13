@@ -3,6 +3,25 @@
 
 
 
+## v3.114.0 (2026-10-13)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.113.0 [skip ci] ([`647074c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/647074c5551461b74b8bd12b5cffcb670e30e483))
+
+### Features
+
+* feat(devtools): seed an honest Omnibus price history for the demo store (#176)
+
+The demo catalogue is seeded already marked down, so no product had a
+full-price spell older than the look-back window and the storefront
+showed no sale badges. A new price-history step records a full-price
+spell before each marked-down product reduction (inside the progressive
+window) and lets product.pricing.service derive prior_price,
+effective_price and reduction_started_at. Idempotent, demo products only.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`de2b1ae`](https://github.com/vasilistotskas/grooveshop-django-api/commit/de2b1aef5a9d49b825504474341ead001e0ba5b1))
+
 ## v3.113.0 (2026-10-13)
 
 ### Chores

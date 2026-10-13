@@ -3,6 +3,29 @@
 
 
 
+## v3.117.1 (2026-10-13)
+
+### Bug fixes
+
+* fix(product): drop the deprecated discount percent and the final price sort (#175)
+
+The agent gateway no longer reads the product and search-hit
+discountPercent nor sends the search sort=finalPrice, and the storefront
+types are regenerated without them. Remove discountPercent from the
+product read payloads and the search hits (and from the Meilisearch
+displayed attributes), the finalPrice and -finalPrice search sorts, and
+final_price from the sortable attributes. The merchant's
+Product.discount_percent, its write API, admin, filters, ordering and the
+indexed discount_percent the ranking rule uses are unchanged; final_price
+stays a displayed document field because the storefront card falls back
+to a hit's finalPrice.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`b937cd2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b937cd2b1963e336eee84eb064315ac2b50ce778))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.117.0 [skip ci] ([`1761da8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1761da8062de37812e1b97c5a0c5516867ecde8d))
+
 ## v3.117.0 (2026-10-13)
 
 ### Chores

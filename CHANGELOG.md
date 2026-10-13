@@ -3,6 +3,36 @@
 
 
 
+## v3.118.1 (2026-10-13)
+
+### Bug fixes
+
+* fix(order): print the totals on the registered receipt PDF (#185)
+
+Once AADE returns the MARK, the receipt PDF is rendered again with the
+MARK and the AADE QR, from the totals frozen on the Invoice row. Those
+columns are MoneyFields, and the template's floatformat renders a Money
+as an empty string: every registered receipt printed EUR with no amount
+for shipping, the subtotal and the TOTAL (and an empty payment-fee row,
+a zero Money being truthy). The frozen branch now hands the template
+Decimals, as _order_totals does; credit documents already did.
+
+The payment status on the receipt is the translated label, not the raw
+value (PENDING).
+
+The existing test asserted Money on the totals and the PDF renderer is
+mocked, so nothing rendered the template: a new test renders it for the
+registered regen and checks the amounts print. Found on the demo store's
+receipt INV-2026-000008.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`fab23da`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fab23dac0fa2316f4956243cb3b2c32351e65cca))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.118.0 [skip ci]
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`8335956`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8335956c441799ec514c3f7ae65614f19fb5a755))
+
 ## v3.118.0 (2026-10-13)
 
 ### Chores

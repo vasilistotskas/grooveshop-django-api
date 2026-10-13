@@ -3,6 +3,28 @@
 
 
 
+## v3.120.0 (2026-10-13)
+
+### Features
+
+* feat(tenant): log every feature gate refusal (#190)
+
+A switched-off feature answers a bare 404 so its route looks
+unregistered, which also makes it indistinguishable in the access log
+from a missing object. A client still calling a route its store has
+switched off (a storefront or gateway release that predates the gate)
+therefore broke silently: on 2026-10-13 delta-sigma's search answered
+404 through IsBlogEnabled and nothing flagged it, and the OpenAPI
+contract check cannot see it because the route is still documented.
+
+Both gate families (IsTenantFeatureEnabled, IsSettingEnabled) now refuse
+through one helper that logs "feature_gate:refused" with the gate, the
+switch, the route and the method, then raises the same NotFound. The
+response is unchanged. The infrastructure's GrooveShopFeatureGateRefused
+alert counts these lines.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`d040720`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d040720bc2f98e9fed492e9f8f6924f4e42662fa))
+
 ## v3.119.0 (2026-10-13)
 
 ### Features

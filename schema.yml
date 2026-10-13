@@ -33105,6 +33105,28 @@ components:
         serializers embed the full product detail payload, which is far more
         than a tool result should carry.
       properties:
+        effectivePrice:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          readOnly: true
+          nullable: true
+        priorPrice:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          readOnly: true
+          nullable: true
+        announcedDiscountPercent:
+          type: integer
+          readOnly: true
+          nullable: true
         productId:
           type: integer
           description: ID προϊόντος
@@ -33114,6 +33136,7 @@ components:
         finalPrice:
           type: string
           description: Τρέχουσα τιμή με ΦΠΑ
+          deprecated: true
         currency:
           type: string
           description: Νόμισμα τιμής
@@ -33126,10 +33149,13 @@ components:
           description: Πότε προστέθηκε το προϊόν στα αγαπημένα
       required:
       - addedAt
+      - announcedDiscountPercent
       - currency
+      - effectivePrice
       - finalPrice
       - inStock
       - name
+      - priorPrice
       - productId
     AgentProfile:
       type: object

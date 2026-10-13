@@ -175,6 +175,11 @@ class AgentFavouritesView(AgentAPIView):
                     )
                     or "",
                     "final_price": str(price.amount),
+                    "effective_price": product.effective_price,
+                    "prior_price": product.prior_price,
+                    "announced_discount_percent": (
+                        product.announced_discount_percent
+                    ),
                     "currency": str(price.currency),
                     "in_stock": product.stock > 0,
                     "added_at": favourite.created_at,

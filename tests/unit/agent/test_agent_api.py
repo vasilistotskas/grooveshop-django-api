@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import secrets
 from datetime import timedelta
+from decimal import Decimal
 
 from allauth.idp.oidc.models import Client, Token
 from django.urls import reverse
@@ -20,6 +21,7 @@ from rest_framework.test import APITestCase
 from order.factories.order import OrderFactory
 from product.factories.favourite import ProductFavouriteFactory
 from product.factories.product import ProductFactory
+from product.models.product import Product
 from tenant.models import Tenant, TenantMembershipRole, UserTenantMembership
 from user.factories.account import UserAccountFactory
 
@@ -167,8 +169,46 @@ class AgentAPITestCase(APITestCase):
         row = response.data[0]
         self.assertEqual(row["product_id"], active.id)
         self.assertTrue(row["in_stock"])
-        for key in ("name", "final_price", "currency", "added_at"):
+        for key in (
+            "name",
+            "final_price",
+            "effective_price",
+            "prior_price",
+            "announced_discount_percent",
+            "currency",
+            "added_at",
+        ):
             self.assertIn(key, row)
+
+    def test_favourites_expose_the_announced_reduction(self) -> None:
+        product = ProductFactory(active=True, stock=5)
+        # A queryset update leaves the stored price record as the test
+        # sets it; the view must report it unchanged.
+        Product.objects.filter(pk=product.pk).update(
+            effective_price=Decimal("80.00"), prior_price=Decimal("100.00")
+        )
+        ProductFavouriteFactory(user=self.user, product=product)
+
+        self._bearer(["favourites:read"])
+        response = self.client.get(reverse("agent-favourites"))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        row = response.data[0]
+        self.assertEqual(Decimal(str(row["effective_price"])), Decimal(80))
+        self.assertEqual(Decimal(str(row["prior_price"])), Decimal(100))
+        self.assertEqual(row["announced_discount_percent"], 20)
+
+    def test_favourites_report_no_announcement_without_prior_price(
+        self,
+    ) -> None:
+        product = ProductFactory(active=True, stock=5)
+        Product.objects.filter(pk=product.pk).update(prior_price=None)
+        ProductFavouriteFactory(user=self.user, product=product)
+
+        self._bearer(["favourites:read"])
+        response = self.client.get(reverse("agent-favourites"))
+        row = response.data[0]
+        self.assertIsNone(row["prior_price"])
+        self.assertIsNone(row["announced_discount_percent"])
 
     def test_favourites_requires_scope(self) -> None:
         self._bearer(["profile"])

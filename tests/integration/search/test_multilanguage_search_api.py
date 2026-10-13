@@ -207,11 +207,11 @@ class TestProductSearchFiltersAndOrdering:
         by_price = sorted(translations, key=lambda t: t.master.price)
         return marker, [t.id for t in by_price]
 
-    def test_sort_orders_by_final_price(self, priced):
+    def test_sort_orders_by_effective_price(self, priced):
         marker, cheapest_first = priced
 
-        ascending = search(self.url, query=marker, sort="finalPrice")
-        descending = search(self.url, query=marker, sort="-finalPrice")
+        ascending = search(self.url, query=marker, sort="effectivePrice")
+        descending = search(self.url, query=marker, sort="-effectivePrice")
 
         assert ids(ascending) == cheapest_first
         assert ids(descending) == cheapest_first[::-1]
@@ -220,10 +220,10 @@ class TestProductSearchFiltersAndOrdering:
         marker, cheapest_first = priced
 
         first = search(
-            self.url, query=marker, sort="finalPrice", limit=2, offset=0
+            self.url, query=marker, sort="effectivePrice", limit=2, offset=0
         )
         second = search(
-            self.url, query=marker, sort="finalPrice", limit=2, offset=2
+            self.url, query=marker, sort="effectivePrice", limit=2, offset=2
         )
 
         assert ids(first) == cheapest_first[:2]

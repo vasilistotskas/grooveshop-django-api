@@ -4,7 +4,6 @@ from djmoney.contrib.django_rest_framework import MoneyField
 from djmoney.money import Money
 from drf_spectacular.utils import (
     extend_schema_field,
-    extend_schema_serializer,
 )
 from measurement.measures import Weight
 from parler_rest.serializers import TranslatableModelSerializer
@@ -50,13 +49,11 @@ class EffectivePriceFieldsSerializer(serializers.Serializer):
     )
 
 
-# ``discount_percent`` is the merchant's markdown, not an announcement: a
-# "was" price struck through and a "-N%" badge built from it carry no
-# prior price, which the EU Omnibus rule requires. ``prior_price`` and
-# ``announced_discount_percent`` are what a customer may be shown. It
-# stays, deprecated, until the agent gateway's feeds and MCP tools stop
-# reading it (docs/migrations.md: expand, then contract).
-@extend_schema_serializer(deprecate_fields=["discount_percent"])
+# The merchant's markdown (``Product.discount_percent``) is an input, not an
+# announcement: a "was" price struck through and a "-N%" badge built from it
+# carry no prior price, which the EU Omnibus rule requires. The read payload
+# shows ``prior_price`` and ``announced_discount_percent``; the markdown is
+# written through ``ProductWriteSerializer``.
 class ProductSerializer(
     TranslatableModelSerializer,
     serializers.ModelSerializer[Product],
@@ -116,7 +113,6 @@ class ProductSerializer(
             "low_stock_threshold",
             "active",
             "weight",
-            "discount_percent",
             "vat_percent",
             "vat_value",
             "final_price",

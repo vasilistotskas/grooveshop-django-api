@@ -14249,7 +14249,7 @@ msgid ""
 msgstr ""
 
 #: .\search\views.py:403
-msgid "Sort field (effectivePrice, -effectivePrice, -likesCount, -viewCount, -createdAt). finalPrice and -finalPrice are deprecated: they ignore promotions."
+msgid "Sort field (effectivePrice, -effectivePrice, -likesCount, -viewCount, -createdAt)."
 msgstr ""
 
 #: .\search\views.py:411

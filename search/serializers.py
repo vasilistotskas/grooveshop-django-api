@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from drf_spectacular.utils import extend_schema_serializer
 from rest_framework import serializers
 
 from blog.models.post import BlogPostTranslation
@@ -59,11 +58,6 @@ def _amount(value):
     return None if value is None else float(value)
 
 
-# ``discount_percent`` is the merchant's markdown input, not something a
-# customer may be told: ``announced_discount_percent`` (computed from the
-# prior price) replaces it. Kept for one release; see
-# ``product.serializers.product.ProductSerializer``.
-@extend_schema_serializer(deprecate_fields=["discount_percent"])
 class ProductTranslationSerializer(
     serializers.ModelSerializer[ProductTranslation]
 ):
@@ -79,7 +73,6 @@ class ProductTranslationSerializer(
     effective_price = serializers.SerializerMethodField()
     prior_price = serializers.SerializerMethodField()
     announced_discount_percent = serializers.SerializerMethodField()
-    discount_percent = serializers.SerializerMethodField()
     offer_kind = serializers.SerializerMethodField()
     stock = serializers.SerializerMethodField()
     likes_count = serializers.SerializerMethodField()
@@ -112,7 +105,6 @@ class ProductTranslationSerializer(
             "effective_price",
             "prior_price",
             "announced_discount_percent",
-            "discount_percent",
             "offer_kind",
             "stock",
             "likes_count",
@@ -199,9 +191,6 @@ class ProductTranslationSerializer(
     def get_announced_discount_percent(self, obj):
         return obj.master.announced_discount_percent if obj.master else None
 
-    def get_discount_percent(self, obj):
-        return obj.master.discount_percent if obj.master else None
-
     def get_offer_kind(self, obj):
         return obj.master.offer_kind if obj.master else None
 
@@ -238,7 +227,6 @@ class BlogPostMeiliSearchResultSerializer(serializers.Serializer):
     content_type = serializers.CharField()
 
 
-@extend_schema_serializer(deprecate_fields=["discount_percent"])
 class ProductMeiliSearchResultSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     language_code = serializers.CharField()
@@ -257,7 +245,6 @@ class ProductMeiliSearchResultSerializer(serializers.Serializer):
     effective_price = serializers.FloatField(allow_null=True)
     prior_price = serializers.FloatField(allow_null=True)
     announced_discount_percent = serializers.IntegerField(allow_null=True)
-    discount_percent = serializers.IntegerField(allow_null=True)
     offer_kind = serializers.ChoiceField(
         choices=OfferKind.choices, allow_null=True, required=False
     )
@@ -348,7 +335,6 @@ class FederationMetadataSerializer(serializers.Serializer):
     )
 
 
-@extend_schema_serializer(deprecate_fields=["discount_percent"])
 class FederatedSearchResultSerializer(serializers.Serializer):
     """
     Serializer for individual federated search result.
@@ -380,7 +366,6 @@ class FederatedSearchResultSerializer(serializers.Serializer):
     announced_discount_percent = serializers.IntegerField(
         allow_null=True, required=False
     )
-    discount_percent = serializers.IntegerField(allow_null=True, required=False)
     offer_kind = serializers.ChoiceField(
         choices=OfferKind.choices, allow_null=True, required=False
     )

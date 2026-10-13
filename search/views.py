@@ -73,10 +73,6 @@ _VALID_LANGUAGE_CODES = frozenset(
 _PRODUCT_SORT_FIELD_MAP: dict[str, str] = {
     "effectivePrice": "effective_price",
     "-effectivePrice": "-effective_price",
-    # Deprecated: the price before promotions. Removed once the storefront
-    # sorts on ``effectivePrice`` (docs/product-pricing.md).
-    "finalPrice": "final_price",
-    "-finalPrice": "-final_price",
     "likesCount": "likes_count",
     "-likesCount": "-likes_count",
     "viewCount": "view_count",
@@ -500,8 +496,7 @@ def blog_post_meili_search(request):
             location=OpenApiParameter.QUERY,
             description=_(
                 "Sort field (effectivePrice, -effectivePrice, -likesCount, "
-                "-viewCount, -createdAt). finalPrice and -finalPrice are "
-                "deprecated: they ignore promotions."
+                "-viewCount, -createdAt)."
             ),
             required=False,
         ),

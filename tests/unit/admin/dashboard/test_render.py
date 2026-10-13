@@ -7,6 +7,8 @@ processor resolving a setting no admin template reads.
 
 from __future__ import annotations
 
+import re
+
 import pytest
 from django.core.cache import cache
 from django.db import connection
@@ -66,16 +68,23 @@ def _seed(size: int) -> None:
 
 def test_the_period_switch_renders_as_links(client_):
     html = client_.get(
-        reverse("admin:index"), {"period": "13w"}
+        reverse("admin:index"), {"period": "13w", "metric": "orders"}
     ).content.decode()
     for period in queries.PERIODS:
         assert f"period={period.key}" in html
-    assert 'aria-current="true"' in html
+    # One marked link per switch, in page order: the period switch (in
+    # the page header) and then the chart's measure switch. Both keep
+    # the other's choice in their links.
+    marked = re.findall(
+        r'href="\?period=(\w+)&amp;metric=(\w+)"\s+aria-current="true"', html
+    )
+    assert marked == [("13w", "orders"), ("13w", "orders")]
 
 
 def test_the_footer_names_the_release(client_):
     from django.conf import settings
 
+    assert settings.RELEASE_VERSION
     html = client_.get(reverse("admin:index")).content.decode()
     assert settings.RELEASE_VERSION in html
 

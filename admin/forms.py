@@ -3,6 +3,8 @@ from __future__ import annotations
 from django import forms
 from django.contrib.admin.forms import AdminAuthenticationForm
 from django.utils.translation import gettext_lazy as _
+from django_tenants.utils import get_public_schema_name, schema_context
+from unfold.forms import AdminOwnPasswordChangeForm
 from unfold.widgets import (
     UnfoldAdminCheckboxSelectMultipleWidget,
     UnfoldBooleanSwitchWidget,
@@ -47,6 +49,23 @@ class PlatformAdminAuthenticationForm(AdminAuthenticationForm):
             self.confirm_login_allowed(self.user_cache)
 
         return self.cleaned_data
+
+
+class PlatformPasswordChangeForm(AdminOwnPasswordChangeForm):
+    """Unfold's own password-change form, saved to the PUBLIC schema.
+
+    An admin session is always a platform identity whose row lives in
+    the public schema (``PlatformStaffBackend``), while the page runs
+    under the schema the host resolved — a store's, on a store host,
+    where that row does not exist. Only the save needs public: the page
+    itself (the store's sidebar reads the store's tables) and the
+    session it re-hashes (the store's session table) belong to the
+    store.
+    """
+
+    def save(self, commit=True):
+        with schema_context(get_public_schema_name()):
+            return super().save(commit)
 
 
 class CachePurgeForm(forms.Form):

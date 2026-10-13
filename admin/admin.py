@@ -4,14 +4,19 @@ import logging
 from urllib.parse import urlsplit
 
 from django.contrib import messages
+from django.contrib.auth.views import PasswordChangeView
 from django.core.exceptions import PermissionDenied
 from django.shortcuts import redirect, render
-from django.urls import path
+from django.urls import path, reverse
 from django.utils.translation import gettext_lazy as _
 from unfold.sites import UnfoldAdminSite
 
 from admin.displays import format_dt, label_cell
-from admin.forms import CachePurgeForm, PlatformAdminAuthenticationForm
+from admin.forms import (
+    CachePurgeForm,
+    PlatformAdminAuthenticationForm,
+    PlatformPasswordChangeForm,
+)
 from admin.mixins import AdminFooterMixin, AdminSiteLoginNextMixin
 from core.cache import CacheService
 from core.cache.nuxt import is_configured as nuxt_purge_configured
@@ -118,28 +123,34 @@ class MyAdminSite(AdminFooterMixin, AdminSiteLoginNextMixin, UnfoldAdminSite):
         return membership is not None and membership.is_tenant_staff
 
     def password_change(self, request, extra_context=None):
-        """Run the admin's own password-change view against the PUBLIC schema.
+        """Unfold's password-change view, saving to the PUBLIC schema.
 
         ``request.user`` for a platform-staff session is always the
         public-schema row (see ``PlatformStaffBackend``), but the view
         runs under whatever schema the current HOST resolved to — on a
-        tenant host that's the tenant schema, where the staff user's
-        row does not exist. ``PasswordChangeForm.save()`` would try to
-        UPDATE the wrong (or a missing) row.
+        store host that's the store's schema, where the staff user's
+        row does not exist. ``PlatformPasswordChangeForm`` saves that
+        row in public; everything else stays on the store's schema.
+        Running the whole view in public instead broke the page: its
+        context builds the store's sidebar, which reads store tables.
+
+        Unfold's ``password_change`` names its form class inline, so
+        this is that method with the form swapped.
         """
-        from tenant.auth_backends import (
-            is_platform_staff_session,
-        )
-
-        if is_platform_staff_session(request):
-            from django_tenants.utils import (
-                get_public_schema_name,
-                schema_context,
-            )
-
-            with schema_context(get_public_schema_name()):
-                return super().password_change(request, extra_context)
-        return super().password_change(request, extra_context)
+        request.current_app = self.name
+        defaults = {
+            "form_class": PlatformPasswordChangeForm,
+            "success_url": reverse(
+                f"{self.name}:password_change_done", current_app=self.name
+            ),
+            "extra_context": {
+                **self.each_context(request),
+                **(extra_context or {}),
+            },
+        }
+        if self.password_change_template is not None:
+            defaults["template_name"] = self.password_change_template
+        return PasswordChangeView.as_view(**defaults)(request)
 
     def each_context(self, request):
         """Title the admin with the store being served.

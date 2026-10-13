@@ -226,11 +226,12 @@ class TestPlatformHostFlow:
 
 
 class TestAdminPasswordChange:
-    """``MyAdminSite.password_change`` runs a platform-staff session's
-    self-service password change inside ``schema_context(public)`` —
-    ``request.user`` is always the public-schema row for such a
-    session, regardless of which schema the request's host resolved
-    to.
+    """``MyAdminSite.password_change`` saves a platform-staff session's
+    new password to the public-schema row — ``request.user`` is always
+    that row for such a session, whichever schema the request's host
+    resolved — while the page itself renders under the host's schema.
+    The schema split needs real schemas; ``tests_mt/
+    test_admin_password_change_on_a_store_host.py`` covers it.
     """
 
     def test_get_renders_form(self, tenant_a, bind_tenant_and_schema):

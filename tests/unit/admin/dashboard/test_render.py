@@ -7,6 +7,8 @@ processor resolving a setting no admin template reads.
 
 from __future__ import annotations
 
+import re
+
 import pytest
 from django.core.cache import cache
 from django.db import connection
@@ -20,11 +22,15 @@ from user.factories.account import UserAccountFactory
 pytestmark = pytest.mark.django_db
 
 # Superuser, warm cache: session + user + usersessions, the per-request
-# alerts (legal pages, and the 14 settings of the merchant's legal
-# identity, each a query of its own here because the test database has
-# no settings cache) and low stock. Re-measure before raising.
-WARM_BUDGET = 22
-COLD_BUDGET = 55
+# alerts (legal pages, and the settings of the merchant's legal identity)
+# and the sidebar's feature switches (eleven store settings and the active
+# carriers). Every setting read is a query of its own HERE: the test
+# database has no Setting rows, and ``Setting.get`` caches a key only
+# once its row is read - in production every declared setting has a row
+# and these reads are cache hits. Measured 2026-10-13 (39 warm, 64 cold);
+# re-measure before raising.
+WARM_BUDGET = 39
+COLD_BUDGET = 64
 
 
 @pytest.fixture
@@ -60,11 +66,27 @@ def _seed(size: int) -> None:
     ContactFactory.create_batch(size)
 
 
-def test_the_revenue_window_switch_renders(client_):
+def test_the_period_switch_renders_as_links(client_):
+    html = client_.get(
+        reverse("admin:index"), {"period": "13w", "metric": "orders"}
+    ).content.decode()
+    for period in queries.PERIODS:
+        assert f"period={period.key}" in html
+    # One marked link per switch, in page order: the period switch (in
+    # the page header) and then the chart's measure switch. Both keep
+    # the other's choice in their links.
+    marked = re.findall(
+        r'href="\?period=(\w+)&amp;metric=(\w+)"\s+aria-current="true"', html
+    )
+    assert marked == [("13w", "orders"), ("13w", "orders")]
+
+
+def test_the_footer_names_the_release(client_):
+    from django.conf import settings
+
+    assert settings.RELEASE_VERSION
     html = client_.get(reverse("admin:index")).content.decode()
-    for key, _days in queries.REVENUE_PERIODS:
-        assert f'data-period="{key}"' in html
-    assert "dashboard-revenue-period" in html
+    assert settings.RELEASE_VERSION in html
 
 
 def test_budget(client_):

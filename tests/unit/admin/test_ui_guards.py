@@ -95,3 +95,64 @@ def test_admin_file_uses_unfold_vocabulary(path: Path) -> None:
             if pattern.search(line)
         ]
         assert not hits, f"{path.name}: {reason} at {hits[:5]}"
+
+
+def test_both_admin_sites_load_the_project_stylesheet() -> None:
+    """The admin templates use classes Unfold's stylesheet does not ship;
+    the platform admin once rendered without ours, so its dashboard's
+    breakpoint classes did not exist there."""
+    from django.test import RequestFactory
+    from unfold.settings import get_config
+
+    request = RequestFactory().get("/admin/")
+    for name in ("UNFOLD", "UNFOLD_PLATFORM"):
+        styles = [str(style(request)) for style in get_config(name)["STYLES"]]
+        assert any(style.endswith("css/styles.css") for style in styles), name
+
+
+def test_the_footer_api_docs_link_resolves_on_each_sites_urlconf() -> None:
+    """The footer reverses ``api_docs_url_name`` on the site's own
+    URLconf; a name missing there would 500 every page."""
+    from django.urls import reverse
+
+    from admin.admin import MyAdminSite
+    from admin.platform_site import PlatformAdminSite
+
+    assert reverse(MyAdminSite.api_docs_url_name, urlconf="core.urls")
+    assert reverse(
+        PlatformAdminSite.api_docs_url_name, urlconf="tenant.urls_public"
+    )
+
+
+_RESPONSIVE_COLUMNS = re.compile(r"\b((?:sm|md|lg|xl|2xl):grid-cols-\d+)\b")
+_ONE_COLUMN = re.compile(r"(?<![\w:-])grid-cols-1(?![\w-])")
+
+
+@pytest.mark.parametrize(
+    "path", ADMIN_FILES, ids=lambda p: str(p.relative_to(BASE_DIR))
+)
+def test_a_responsive_grid_is_not_overridden_by_unfolds_stylesheet(
+    path: Path,
+) -> None:
+    """Unfold's stylesheet loads AFTER ours (``unfold/layouts/
+    skeleton.html``). A breakpoint class only our build carries loses to
+    Unfold's plain ``.grid-cols-1`` - same layer, same specificity, later
+    file - so a grid written ``grid-cols-1 sm:grid-cols-2`` stays one
+    column at every width. Leave ``grid-cols-1`` out (a grid is one
+    column without it)."""
+    import unfold
+
+    unfold_css = (
+        Path(unfold.__file__).parent / "static/unfold/css/styles.css"
+    ).read_text(encoding="utf-8")
+    hits = []
+    for lineno, line in enumerate(
+        path.read_text(encoding="utf-8").splitlines(), start=1
+    ):
+        if not _ONE_COLUMN.search(line):
+            continue
+        for variant in _RESPONSIVE_COLUMNS.findall(line):
+            escaped = "." + variant.replace(":", "\\:") + "{"
+            if escaped not in unfold_css:
+                hits.append(f"line {lineno}: {variant}")
+    assert not hits, f"{path.name}: overridden by .grid-cols-1 at {hits}"

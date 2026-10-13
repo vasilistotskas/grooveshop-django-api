@@ -395,9 +395,7 @@ class TestCommandPalette(TestCase):
     unfold's defaults (``search_models: False``): every keystroke still
     cost a 500ms-debounced round trip to ``/admin/search/``, but only
     sidebar APP TITLES were matched — typing a tenant's name, domain or
-    a user's email returned nothing, and Enter on the empty result list
-    hit django-unfold's unguarded ``selectItem`` (still in 0.108.0) (client-side
-    TypeError; guarded by ``unfold_command_palette_fix.js``).
+    a user's email returned nothing.
     """
 
     @classmethod
@@ -438,8 +436,7 @@ class TestCommandPalette(TestCase):
 
     @override_settings(ROOT_URLCONF="tenant.urls_public")
     def test_an_empty_term_is_an_empty_200(self):
-        """The server contract behind the client-side crash guard:
-        an empty palette is a legitimate state the JS must survive."""
+        """An empty palette is a legitimate state, not an error."""
         response = self._search("")
         assert response.status_code == 200
         assert response.content == b""
@@ -473,23 +470,6 @@ class TestCommandPalette(TestCase):
         assert isinstance(whitelist, list)
         missing = set(whitelist) - registered
         assert not missing, f"whitelisted but not registered: {missing}"
-
-    def test_the_palette_crash_guard_ships_on_both_sites(self):
-        """django-unfold's ``selectItem`` (0.108.0) dereferences the
-        highlighted row without checking one exists; the guard script
-        must load wherever the palette renders."""
-        from unfold.settings import get_config
-
-        request = RequestFactory().get("/admin/")
-        for settings_name in ("UNFOLD", "UNFOLD_PLATFORM"):
-            scripts = [
-                script(request) if callable(script) else script
-                for script in get_config(settings_name)["SCRIPTS"]
-            ]
-            assert any(
-                str(script).endswith("unfold_command_palette_fix.js")
-                for script in scripts
-            ), f"{settings_name} dropped the palette crash guard"
 
 
 class TestAdminLoginLandsInTheAdmin(SimpleTestCase):

@@ -1,6 +1,5 @@
 {% load i18n unfold %}
-{% trans "Conversion" as title %}
-{% trans "Last 30 days, relative to carts started" as description %}
+{% trans "Checkout funnel" as title %}
 {% component "unfold/components/card.html" with title=title description=description %}
     {% if has_data %}
         <div class="flex flex-col gap-4">
@@ -14,7 +13,7 @@
             {% include "unfold/helpers/label.html" with text=overall variant="primary" %}
         </div>
     {% else %}
-        {% trans "No carts or orders in the last 30 days" as empty_text %}
+        {% trans "No carts or orders in this period" as empty_text %}
         {% include "admin/dashboard/components/empty_state.html" with icon="filter_alt" text=empty_text %}
     {% endif %}
 {% endcomponent %}

@@ -1,0 +1,17 @@
+{% comment %}
+Shares of the period's attributed orders, one bar per source - bars,
+not a doughnut: lengths on a common baseline compare at a glance.
+{% endcomment %}
+{% load i18n unfold %}
+{% trans "Where orders come from" as title %}
+{% component "unfold/components/card.html" with title=title description=description %}
+    {% if rows %}
+        <div class="flex flex-col gap-4">
+            {% for row in rows %}
+                {% component "unfold/components/progress.html" with title=row.title description=row.description value=row.value %}{% endcomponent %}
+            {% endfor %}
+        </div>
+    {% else %}
+        {% include "admin/dashboard/components/empty_state.html" with icon="travel_explore" text=empty_text %}
+    {% endif %}
+{% endcomponent %}

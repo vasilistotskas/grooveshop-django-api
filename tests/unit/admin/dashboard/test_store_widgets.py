@@ -10,25 +10,31 @@ from django.core.cache import cache
 from django.template.loader import render_to_string
 from django.test import RequestFactory
 from django.utils import translation
+from extra_settings.models import Setting
 
 from admin.dashboard.store import queries, widgets
 from order.enum.status import OrderStatus
 from order.factories.order import OrderFactory
-from product.factories.product import ProductFactory
 from tenant.models import TenantMembershipRole
 from user.factories.account import UserAccountFactory
 
 pytestmark = [pytest.mark.django_db, pytest.mark.assert_english]
 
 
-def _request(user=None):
-    request = RequestFactory().get("/admin/")
+def _request(user=None, **query):
+    request = RequestFactory().get("/admin/", query)
     request.user = user or AnonymousUser()
     return request
 
 
-def _context(widget_class, user=None) -> dict:
-    return widget_class(request=_request(user)).get_context_data()
+def _context(widget_class, user=None, **query) -> dict:
+    return widget_class(request=_request(user, **query)).get_context_data()
+
+
+def _superuser():
+    from tests.utils.staff import stamp_platform_identity
+
+    return stamp_platform_identity(UserAccountFactory(admin=True))
 
 
 @pytest.fixture(autouse=True)
@@ -42,59 +48,222 @@ def test_cached_data_holds_no_language():
     The old single payload cached translated labels, so every admin saw
     the language of whoever warmed the cache first.
     """
-    OrderFactory(num_order_items=0, status=OrderStatus.PENDING)
-
     with translation.override("el"):
-        queries.order_status.get()
+        queries.overview.get("30d")
+        queries.sales_series.get("30d")
     with translation.override("en"):
-        chart = _context(widgets.StoreOrderStatusChart)["chart"]
+        cards = _context(widgets.StoreKpis)["cards"]
 
-    assert json.loads(chart["data"])["labels"] == ["Pending"]
+    assert [str(card["label"]) for card in cards] == [
+        "Revenue",
+        "Orders",
+        "Average order",
+        "New customers",
+    ]
 
 
 def test_no_hex_colour_reaches_a_chart():
-    """Series colours are theme variables, so dark mode recolours them
-    (the doughnut used to draw a #ffffff ring in dark mode)."""
-    OrderFactory(num_order_items=0, status=OrderStatus.PENDING)
+    """Series colours are theme variables, so dark mode recolours them."""
+    OrderFactory(num_order_items=0)
 
-    for widget_class in (
-        widgets.StoreOrderStatusChart,
-        widgets.StorePerformanceChart,
-    ):
-        context = _context(widget_class)
-        chart = context.get("chart") or context
-        assert "#" not in chart["data"], widget_class.__name__
-        assert "var(--color-" in chart["data"], widget_class.__name__
+    chart = _context(widgets.StoreSalesChart)["chart"]
+    assert "#" not in chart["data"]
+    assert "var(--color-" in chart["data"]
+    for card in _context(widgets.StoreKpis)["cards"]:
+        if card["spark"]:
+            assert "#" not in card["spark"]["data"]
 
 
-def test_an_empty_source_chart_renders_an_explanation_not_a_canvas():
+class TestPeriodAndMeasure:
+    def test_the_querystring_picks_the_period_and_the_measure(self):
+        context = _context(
+            widgets.StoreSalesChart, period="7d", metric="orders"
+        )
+
+        assert str(context["title"]) == "Orders"
+        assert len(json.loads(context["chart"]["data"])["labels"]) == 7
+        orders_link = next(m for m in context["metrics"] if m["active"])
+        assert "period=7d" in orders_link["href"]
+
+    def test_an_unknown_choice_falls_back_to_the_defaults(self):
+        context = _context(
+            widgets.StoreSalesChart, period="forever", metric="x"
+        )
+
+        assert str(context["title"]) == "Revenue"
+        labels = json.loads(context["chart"]["data"])["labels"]
+        assert len(labels) == 30
+
+    def test_the_header_marks_the_period_on_display(self):
+        context = _context(
+            widgets.StoreDashboardHeader, _superuser(), period="12m"
+        )
+
+        active = [p for p in context["periods"] if p["active"]]
+        assert [str(p["label"]) for p in active] == ["12 months"]
+        assert "metric=revenue" in active[0]["href"]
+
+    def test_the_new_product_button_needs_the_add_permission(self):
+        assert (
+            _context(widgets.StoreDashboardHeader)["new_product_href"] is None
+        )
+        assert _context(widgets.StoreDashboardHeader, _superuser())[
+            "new_product_href"
+        ]
+
+
+class TestKpis:
+    def test_a_trend_needs_a_period_before_to_compare(self):
+        cards = _context(widgets.StoreKpis)["cards"]
+
+        assert all(card["trend"] is None for card in cards)
+
+    def test_an_average_of_no_paid_orders_is_a_dash_not_zero(self):
+        cards = {
+            str(card["label"]): card
+            for card in _context(widgets.StoreKpis)["cards"]
+        }
+
+        assert cards["Average order"]["value"] == "—"
+        assert cards["Average order"]["trend"] is None
+
+    def test_links_only_where_the_viewer_may_go(self):
+        anonymous = _context(widgets.StoreKpis)["cards"]
+        assert all(card["href"] is None for card in anonymous)
+
+        cards = _context(widgets.StoreKpis, _superuser())["cards"]
+        assert cards[0]["href"].endswith("payment_status__exact=COMPLETED")
+
+
+class TestAttention:
+    def _labels(self, user, **settings_values) -> list[str]:
+        for name, value in settings_values.items():
+            Setting.objects.update_or_create(
+                name=name, defaults={"value_type": "bool", "value_bool": value}
+            )
+        return [
+            str(row["label"])
+            for row in _context(widgets.StoreAttention, user)["rows"]
+        ]
+
+    def test_a_row_needs_work_waiting(self):
+        assert self._labels(_superuser()) == []
+
+        OrderFactory(num_order_items=0, status=OrderStatus.PENDING)
+        cache.clear()
+        assert self._labels(_superuser()) == ["Orders to process"]
+
+    def test_a_switched_off_feature_has_no_row(self):
+        from product.enum.review import ReviewStatus
+        from product.factories.review import ProductReviewFactory
+
+        ProductReviewFactory(status=ReviewStatus.NEW)
+
+        assert "Reviews to approve" in self._labels(
+            _superuser(), PRODUCT_REVIEWS_ENABLED=True
+        )
+        cache.clear()
+        assert "Reviews to approve" not in self._labels(
+            _superuser(), PRODUCT_REVIEWS_ENABLED=False
+        )
+
+    def test_a_row_needs_a_page_the_viewer_may_open(self):
+        OrderFactory(num_order_items=0, status=OrderStatus.PENDING)
+
+        assert self._labels(AnonymousUser()) == []
+
+    def test_nothing_waiting_says_so(self):
+        html = render_to_string(
+            "admin/dashboard/store/attention.html",
+            _context(widgets.StoreAttention, _superuser()),
+        )
+        assert "All caught up" in html
+
+    def test_receipts_myDATA_rejected_reach_whoever_may_open_receipts(self):
+        """The store's own tax documents: every viewer of receipts sees
+        the rejections while the store sends them to myDATA, not only
+        platform superusers."""
+        from order.models.invoice import Invoice, MyDataStatus
+
+        Invoice.objects.create(
+            order=OrderFactory(num_order_items=0),
+            invoice_number="INV-2026-000901",
+            mydata_status=MyDataStatus.REJECTED,
+        )
+
+        assert "Receipts rejected by myDATA" in self._labels(
+            _superuser(), MYDATA_ENABLED=True
+        )
+        cache.clear()
+        assert "Receipts rejected by myDATA" not in self._labels(
+            _superuser(), MYDATA_ENABLED=False
+        )
+
+    def test_a_rolling_count_opens_its_list_with_the_same_window(self):
+        """The row counts the last N days; the list it opens must not
+        show everything since the beginning."""
+        from contact.factories import ContactFactory
+
+        ContactFactory()
+        rows = {
+            str(row["label"]): row
+            for row in _context(widgets.StoreAttention, _superuser())["rows"]
+        }
+
+        assert "created_at__gte=" in rows["New messages"]["href"]
+        assert str(rows["New messages"]["detail"]) == "In the last 7 days"
+
+    def test_myDATA_rejections_are_not_also_an_alert(self):
+        """One place for them: the row above, not the superuser alert."""
+        from order.models.invoice import Invoice, MyDataStatus
+
+        Setting.objects.update_or_create(
+            name="MYDATA_ENABLED",
+            defaults={"value_type": "bool", "value_bool": True},
+        )
+        Invoice.objects.create(
+            order=OrderFactory(num_order_items=0),
+            invoice_number="INV-2026-000902",
+            mydata_status=MyDataStatus.REJECTED,
+        )
+        titles = [
+            str(alert["title"])
+            for alert in _context(widgets.StoreAlerts, _superuser())["alerts"]
+        ]
+
+        assert not any("rejected" in title for title in titles)
+
+
+def test_an_empty_source_card_renders_an_explanation():
     html = render_to_string(
-        "admin/dashboard/components/doughnut_card.html",
-        _context(widgets.StoreOrderSourceChart),
+        "admin/dashboard/store/sources.html",
+        _context(widgets.StoreOrderSources),
     )
-    assert "<canvas" not in html
     assert "attributed" in html
 
 
-class TestLowStock:
-    def test_superusers_only(self):
-        ProductFactory(stock=3, active=True)
+def test_best_sellers_link_each_product():
+    from order.enum.status import PaymentStatus
+    from order.factories.item import OrderItemFactory
+    from product.factories.product import ProductFactory
 
-        assert _context(widgets.StoreLowStock)["visible"] is False
-        superuser = UserAccountFactory(admin=True)
-        assert _context(widgets.StoreLowStock, superuser)["visible"] is True
+    product = ProductFactory()
+    order = OrderFactory(
+        num_order_items=0, payment_status=PaymentStatus.COMPLETED
+    )
+    OrderItemFactory(
+        order=order,
+        product=product,
+        quantity=2,
+        original_quantity=2,
+        refunded_quantity=0,
+        is_refunded=False,
+    )
 
-    def test_warning_band_and_cap(self):
-        superuser = UserAccountFactory(admin=True)
-        ProductFactory(stock=0, active=True)
-        ProductFactory(stock=15, active=True)
-        for stock in range(1, 10):
-            ProductFactory(stock=stock, active=True)
-            ProductFactory(stock=stock, active=True)
+    rows = _context(widgets.StoreBestSellers)["table"]["rows"]
 
-        rows = _context(widgets.StoreLowStock, superuser)["table"]["rows"]
-
-        assert len(rows) == 10
+    assert f"/product/product/{product.id}/" in str(rows[0][0])
+    assert rows[0][1]["content"] == "2"
 
 
 class TestAlerts:

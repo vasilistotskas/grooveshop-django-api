@@ -1,0 +1,19 @@
+{% comment %}
+Every admin page's footer: the site, the running release, and the links
+AdminFooterMixin chose for this user.
+{% endcomment %}
+{% load i18n %}
+<footer class="border-t border-base-200 px-4 py-4 text-font-subtle-light dark:border-base-800 dark:text-font-subtle-dark">
+    <div class="container flex flex-col gap-2 mx-auto md:flex-row md:items-center md:justify-between">
+        <span>{{ site_header }}</span>
+        <div class="flex flex-wrap gap-x-5 gap-y-1 items-center">
+            <span class="tabular-nums">{% blocktranslate with version=admin_footer.version %}Version {{ version }}{% endblocktranslate %}</span>
+            {% for link in admin_footer.links %}
+                <a href="{{ link.link }}" target="_blank" rel="noopener" class="flex gap-1 items-center text-font-default-light hover:text-primary-600 dark:text-font-default-dark dark:hover:text-primary-500">
+                    {{ link.title }}
+                    <span class="material-symbols-outlined md-18" aria-hidden="true">open_in_new</span>
+                </a>
+            {% endfor %}
+        </div>
+    </div>
+</footer>

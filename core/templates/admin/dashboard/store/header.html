@@ -1,0 +1,14 @@
+{% load i18n unfold %}
+<div class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+    <div>
+        {% component "unfold/components/title.html" %}{{ title }}{% endcomponent %}
+        {% component "unfold/components/text.html" with class="mt-1 text-subtle" %}{{ date }} · {{ period_label }}{% endcomponent %}
+    </div>
+    <div class="flex flex-wrap gap-3 items-center">
+        {% trans "Period" as period_aria %}
+        {% include "admin/dashboard/components/segmented.html" with items=periods label=period_aria %}
+        {% if new_product_href %}
+            {% component "unfold/components/button.html" with href=new_product_href icon="add" variant="primary" %}{% trans "New product" %}{% endcomponent %}
+        {% endif %}
+    </div>
+</div>

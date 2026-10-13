@@ -1604,9 +1604,7 @@ class ProductAdmin(
             "has_activity": bool(totals),
             "chart_data": chart_json(chart),
             "chart_options": chart_json(
-                bar_chart_options(
-                    legend=True, currency_axis=False, stacked=True
-                )
+                bar_chart_options(legend=True, stacked=True)
             ),
             "table": {
                 "headers": [

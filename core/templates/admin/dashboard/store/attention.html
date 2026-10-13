@@ -1,0 +1,35 @@
+{% comment %}
+Work waiting for someone: each row opens the list it counts. The icon
+tile takes the classes of unfold/helpers/label.html for its variant, so
+it matches the count beside it.
+{% endcomment %}
+{% load i18n unfold %}
+{% trans "Needs attention" as title %}
+{% component "unfold/components/card.html" with title=title class=class %}
+    {% if rows %}
+        <ul class="flex flex-col -mx-3 -my-2">
+            {% for row in rows %}
+                <li>
+                    <a href="{{ row.href }}" class="flex gap-3 items-center px-3 py-2.5 rounded-default hover:bg-base-50 dark:hover:bg-white/[.04]">
+                        <span class="flex h-9 items-center justify-center rounded-default shrink-0 w-9
+                            {% if row.variant == "primary" %}bg-primary-100 text-primary-700 dark:bg-primary-500/20 dark:text-primary-400
+                            {% elif row.variant == "warning" %}bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-400
+                            {% elif row.variant == "danger" %}bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400
+                            {% else %}bg-base-500/8 text-base-700 dark:bg-base-500/20 dark:text-base-200{% endif %}">
+                            <span class="material-symbols-outlined">{{ row.icon }}</span>
+                        </span>
+                        <span class="flex flex-col grow min-w-0">
+                            <span class="font-medium text-important">{{ row.label }}</span>
+                            <span class="text-subtle text-xs">{{ row.detail }}</span>
+                        </span>
+                        {% include "unfold/helpers/label.html" with text=row.count variant=row.variant %}
+                        <span class="material-symbols-outlined text-base-400">chevron_right</span>
+                    </a>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        {% trans "All caught up: nothing is waiting for you." as empty_text %}
+        {% include "admin/dashboard/components/empty_state.html" with icon="task_alt" text=empty_text %}
+    {% endif %}
+{% endcomponent %}

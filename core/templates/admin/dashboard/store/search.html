@@ -1,0 +1,45 @@
+{% comment %}
+Store search in one card: three figures, then the two lists to act on
+behind a switch. Alpine (bundled by Unfold) shows one list; both ship in
+the page, so switching costs no request.
+{% endcomment %}
+{% load i18n unfold %}
+{% trans "Store search" as title %}
+{% component "unfold/components/card.html" with title=title description=description %}
+    <div class="grid gap-2 grid-cols-3">
+        {% for stat in stats %}
+            <div class="bg-base-50 flex flex-col gap-0.5 px-3 py-2.5 rounded-default dark:bg-white/[.04]">
+                <span class="font-semibold tabular-nums text-important text-lg">{{ stat.value }}</span>
+                <span class="leading-tight text-subtle text-xs">{{ stat.label }}</span>
+            </div>
+        {% endfor %}
+    </div>
+    <div x-data="{ list: '{{ lists.0.key }}' }" class="flex flex-col gap-3 mt-4">
+        <div class="bg-base-100 flex gap-0.5 p-0.5 rounded-default dark:bg-base-800" role="group" aria-label="{% trans 'Search list' %}">
+            {% for list in lists %}
+                <button type="button"
+                        x-on:click="list = '{{ list.key }}'"
+                        x-bind:aria-pressed="list === '{{ list.key }}'"
+                        x-bind:class="list === '{{ list.key }}' ? 'bg-white shadow-xs text-important dark:bg-base-900' : 'text-subtle hover:text-important'"
+                        class="cursor-pointer flex-1 font-medium px-2.5 py-1 rounded-default text-sm transition-colors">{{ list.label }}</button>
+            {% endfor %}
+        </div>
+        {% for list in lists %}
+            <div x-cloak x-show="list === '{{ list.key }}'">
+                {% if list.rows %}
+                    <ul class="flex flex-col">
+                        {% for row in list.rows %}
+                            <li class="border-b border-base-200 flex gap-3 items-center justify-between py-2 dark:border-base-800">
+                                <span class="text-important truncate">{{ row.query }}</span>
+                                {% include "unfold/helpers/label.html" with text=row.count variant=list.variant %}
+                            </li>
+                        {% endfor %}
+                    </ul>
+                    <p class="mt-2 text-subtle text-xs">{{ list.hint }}</p>
+                {% else %}
+                    {% include "admin/dashboard/components/empty_state.html" with icon="search" text=list.empty_text %}
+                {% endif %}
+            </div>
+        {% endfor %}
+    </div>
+{% endcomponent %}

@@ -15,6 +15,10 @@ Rules:
   prefix is what the "settings" purge surface already clears.
 - A query whose data is translated content (a product's name) sets
   ``per_language``: one key per configured language.
+- A query asked for one of several windows (the dashboard's period
+  switch) lists them in ``variants`` and computes ``compute(variant)``:
+  one key per variant, so a request computes only the window it shows
+  and a write still clears every window.
 - ``depends_on`` lists the models whose writes change the answer; each
   write clears exactly those keys, after the transaction commits so a
   read in between cannot re-cache the old answer. The TTL bounds
@@ -45,21 +49,44 @@ class DashboardQuery:
     ttl: int
     depends_on: tuple[str, ...]
     per_language: bool
-    compute: Callable[[], Any]
+    compute: Callable[..., Any]
+    variants: tuple[str, ...] = ()
 
-    def key(self, language: str | None = None) -> str:
-        base = f"{KEY_PREFIX}:{self.name}"
-        if not self.per_language:
-            return base
-        return f"{base}:{language or get_language()}"
+    def key(
+        self, variant: str | None = None, language: str | None = None
+    ) -> str:
+        parts = [KEY_PREFIX, self.name]
+        if self.variants:
+            parts.append(self._variant(variant))
+        if self.per_language:
+            parts.append(language or get_language())
+        return ":".join(parts)
 
     def all_keys(self) -> list[str]:
-        if not self.per_language:
-            return [self.key()]
-        return [self.key(code) for code, _name in settings.LANGUAGES]
+        variants: tuple[str | None, ...] = self.variants or (None,)
+        languages: list[str | None] = (
+            [code for code, _name in settings.LANGUAGES]
+            if self.per_language
+            else [None]
+        )
+        return [
+            self.key(variant, language)
+            for variant in variants
+            for language in languages
+        ]
 
-    def get(self) -> Any:
-        return cache.get_or_set(self.key(), self.compute, self.ttl)
+    def get(self, variant: str | None = None) -> Any:
+        if not self.variants:
+            return cache.get_or_set(self.key(), self.compute, self.ttl)
+        chosen = self._variant(variant)
+        return cache.get_or_set(
+            self.key(chosen), lambda: self.compute(chosen), self.ttl
+        )
+
+    def _variant(self, variant: str | None) -> str:
+        if variant not in self.variants:
+            raise ValueError(f"{self.name}: unknown variant {variant!r}")
+        return variant
 
 
 _QUERIES: list[DashboardQuery] = []
@@ -71,14 +98,16 @@ def dashboard_query(
     ttl: int,
     depends_on: tuple[str, ...] = (),
     per_language: bool = False,
-) -> Callable[[Callable[[], Any]], DashboardQuery]:
-    def register(compute: Callable[[], Any]) -> DashboardQuery:
+    variants: tuple[str, ...] = (),
+) -> Callable[[Callable[..., Any]], DashboardQuery]:
+    def register(compute: Callable[..., Any]) -> DashboardQuery:
         query = DashboardQuery(
             name=name,
             ttl=ttl,
             depends_on=depends_on,
             per_language=per_language,
             compute=compute,
+            variants=variants,
         )
         _QUERIES.append(query)
         return query

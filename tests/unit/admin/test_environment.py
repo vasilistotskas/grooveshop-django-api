@@ -16,6 +16,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from django.test import override_settings
@@ -38,11 +39,37 @@ SETTINGS_FILE = Path(__file__).resolve().parents[3] / "settings.py"
     ],
 )
 def test_the_admin_names_the_deployment(system_env, badge, prefix):
+    """As a platform superuser sees it: on every deployment."""
+    request = SimpleNamespace(user=_platform_superuser())
     with override_settings(SYSTEM_ENV=system_env):
-        label, variant = environment_callback(None)
+        label, variant = environment_callback(request)
 
         assert (str(label), variant) == badge
-        assert environment_title_prefix_callback(None) == prefix
+        assert environment_title_prefix_callback(request) == prefix
+
+
+@pytest.mark.parametrize("system_env", ["production", "prod"])
+def test_a_stores_own_staff_see_no_label_in_production(system_env):
+    """They only ever work in production; the red badge said nothing
+    they did not know and read as an alarm on every page."""
+    request = SimpleNamespace(user=SimpleNamespace(is_superuser=False))
+    with override_settings(SYSTEM_ENV=system_env):
+        assert environment_callback(request) is None
+        assert environment_title_prefix_callback(request) is None
+
+
+def test_a_stores_own_staff_still_see_staging():
+    request = SimpleNamespace(user=SimpleNamespace(is_superuser=False))
+    with override_settings(SYSTEM_ENV="staging"):
+        label, variant = environment_callback(request)
+
+        assert (str(label), variant) == ("Staging", "warning")
+
+
+def _platform_superuser():
+    from tests.utils.staff import stamp_platform_identity
+
+    return stamp_platform_identity(SimpleNamespace(is_superuser=True))
 
 
 def test_staging_runs_the_production_profile():

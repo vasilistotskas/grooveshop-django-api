@@ -617,6 +617,8 @@ class ProductAttributeInline(TabularInline):
 
     tab = True
     per_page = 20
+    # Paged, so it needs a fixed order: unordered pages can repeat a row.
+    ordering = ("pk",)
     verbose_name = _("Product Attribute")
     verbose_name_plural = _("Product Attributes")
 

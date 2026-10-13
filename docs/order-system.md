@@ -427,7 +427,8 @@ accounts:
   so per-tenant verification keys work with no view changes; POST
   delivery still resolves the order by payload as source of truth.
 - **BoxNow** — HMAC secret per-tenant (`box_now_webhook_secret`),
-  resolved from the signed `parcelId` before verification.
+  resolved from the signed `parcelId` before verification. The API
+  environment (stage or production) is per-tenant too (`box_now_live_mode`, §5.2).
 - **Availability gate** — `PayWayService.is_provider_configured()`
   hides credential-less providers from the shopper pay-way list AND
   refuses checkout-session/SPT creation for them.
@@ -845,6 +846,24 @@ accepting Cyprus orders at the Greek flat rate.
 
 - **REST + webhook** for tracking events.
 - Voucher mint: same 3-phase design as ACS.
+- **Environment is per tenant.** `Tenant.box_now_live_mode` says whether
+  the tenant's keys are BoxNow production keys (on) or stage keys (off,
+  the default). `BoxNowClient` maps it to the platform's
+  `BOXNOW_PRODUCTION_*` or `BOXNOW_STAGE_*` API and location hosts
+  (settings/env; both sets are always present). BoxNow stage and
+  production keys only authenticate against their own API, so a showcase
+  store can run on stage keys beside a real store on production. The OAuth
+  token cache key carries the environment. After flipping the flag, run
+  the locker sync again: stage and production lockers are different sets.
+- **A deployment named `staging` can never reach the production API.**
+  Staging mirrors the production tenant rows, flag included;
+  `BOXNOW_LIVE_MODE_ALLOWED` is off when `SYSTEM_ENV=staging`, and
+  `BoxNowClient` raises `BoxNowConfigError` for a live tenant there
+  instead of booking a real parcel. Webhook verification reads only the
+  tenant's `webhook_secret` and is unaffected. Migration `tenant` 0054
+  set the flag from what the platform URL did before: on the production
+  deployment every tenant that has BoxNow keys is live, anywhere else
+  every tenant is off.
 - "Create BoxNow parcel now" (shipment detail action) re-dispatches a
   row left in `pending_creation` by a business error, once its data is
   fixed — the counterpart of ACS's "Issue ACS voucher now".

@@ -590,6 +590,7 @@ class TenantAdmin(BaseModelAdmin):
                     "box_now_warehouse_id",
                     "box_now_notify_phone",
                     "box_now_webhook_secret",
+                    "box_now_live_mode",
                 ],
             },
         ),

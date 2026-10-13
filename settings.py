@@ -4069,16 +4069,31 @@ STRIPE_WEBHOOK_DEBUG = getenv("STRIPE_WEBHOOK_DEBUG", "false").lower() == "true"
 
 # ---------- BoxNow Shipping ----------
 # Per-merchant identity (OAuth2 client id/secret, partner ID, warehouse
-# ID, notify phone, webhook secret) lives ONLY on the ``Tenant`` model
-# (see ``tenant/credentials.py:box_now_credentials()``) — no platform
-# fallback. Only transport/platform config stays here.
-BOXNOW_API_BASE_URL = getenv(
-    "BOXNOW_API_BASE_URL", "https://api-stage.boxnow.gr"
+# ID, notify phone, webhook secret) AND the environment those keys belong
+# to (``Tenant.box_now_live_mode``) live ONLY on the ``Tenant`` model (see
+# ``tenant/credentials.py:box_now_credentials()``) — no platform fallback.
+# BoxNow issues separate stage and production keys and each only
+# authenticates against its own API, so the platform carries BOTH hosts and
+# the tenant's flag picks one (``shipping_boxnow/client.py``).
+BOXNOW_PRODUCTION_API_BASE_URL = getenv(
+    "BOXNOW_PRODUCTION_API_BASE_URL", "https://api-production.boxnow.gr"
 )
-BOXNOW_LOCATION_API_BASE_URL = getenv(
-    "BOXNOW_LOCATION_API_BASE_URL",
+BOXNOW_PRODUCTION_LOCATION_API_BASE_URL = getenv(
+    "BOXNOW_PRODUCTION_LOCATION_API_BASE_URL",
+    "https://locationapi-production.boxnow.gr",
+)
+BOXNOW_STAGE_API_BASE_URL = getenv(
+    "BOXNOW_STAGE_API_BASE_URL", "https://api-stage.boxnow.gr"
+)
+BOXNOW_STAGE_LOCATION_API_BASE_URL = getenv(
+    "BOXNOW_STAGE_LOCATION_API_BASE_URL",
     "https://locationapi-stage.boxnow.gr",
 )
+# Staging mirrors the production tenant rows, so a refresh brings the
+# live flag (and the live keys) with it. The deployment named ``staging``
+# therefore refuses to talk to the production BoxNow API at all: a stale
+# flag fails loudly instead of booking a real parcel.
+BOXNOW_LIVE_MODE_ALLOWED = SYSTEM_ENV != "staging"
 BOXNOW_DEFAULT_COMPARTMENT_SIZE = int(
     getenv("BOXNOW_DEFAULT_COMPARTMENT_SIZE", "1")
 )

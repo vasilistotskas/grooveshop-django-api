@@ -99,7 +99,7 @@ class TestAuthenticate:
 
     @staticmethod
     def _token_cache_key(client) -> str:
-        return f"boxnow:access_token:{client.partner_id}"
+        return f"boxnow:access_token:{client.environment}:{client.partner_id}"
 
     @pytest.mark.django_db
     def test_authenticate_success(self):

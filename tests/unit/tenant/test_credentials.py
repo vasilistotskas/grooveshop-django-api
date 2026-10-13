@@ -157,6 +157,7 @@ _TENANT_ONLY = [
             "warehouse_id": "7",
             "notify_phone": "+30690000001",
             "webhook_secret": "T_WHS",
+            "live_mode": True,
         },
     ),
     *_group(

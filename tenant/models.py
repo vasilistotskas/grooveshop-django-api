@@ -1067,6 +1067,18 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
             "No platform fallback — empty disables BoxNow."
         ),
     )
+    box_now_live_mode = models.BooleanField(
+        _("BoxNow Live Mode"),
+        default=False,
+        db_default=False,
+        help_text=_(
+            "Which BoxNow environment this tenant's keys belong to: "
+            "production when on, stage when off. BoxNow stage and "
+            "production keys only work against their own API, so set this "
+            "to match the keys entered here. There is NO platform "
+            "fallback: off means stage."
+        ),
+    )
     box_now_webhook_secret = EncryptedCharField(
         _("BoxNow Webhook Secret"),
         max_length=255,

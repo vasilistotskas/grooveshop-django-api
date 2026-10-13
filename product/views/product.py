@@ -37,6 +37,7 @@ from product.serializers.variant import ProductVariantsResponseSerializer
 from product.views.review import PRODUCT_REVIEW_ORDERING
 from tag.serializers.tag import TagSerializer
 from tenant.membership import is_store_staff
+from tenant.permissions import IsProductReviewsEnabled
 
 serializers_config: SerializersConfig = {
     **crud_config(
@@ -194,6 +195,10 @@ class ProductViewSet(BaseModelViewSet):
             "destroy",
         ):
             return [StoreStaffModelPermissions()]
+        if self.action == "reviews":
+            # The product's reviews are the reviews feature: with it off
+            # they are gone here too, as on /product/review.
+            return [IsProductReviewsEnabled(), AllowAny()]
         return [AllowAny()]
 
     ordering_fields = [

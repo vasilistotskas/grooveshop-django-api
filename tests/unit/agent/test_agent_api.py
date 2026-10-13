@@ -23,6 +23,7 @@ from product.factories.favourite import ProductFavouriteFactory
 from product.factories.product import ProductFactory
 from product.models.product import Product
 from tenant.models import Tenant, TenantMembershipRole, UserTenantMembership
+from tests.utils.store_settings import switch_store_settings
 from user.factories.account import UserAccountFactory
 
 
@@ -60,9 +61,12 @@ class AgentAPITestCase(APITestCase):
             name="Agent Test Tenant",
             slug="agent-test-tenant",
             owner_email="owner-agent-test@example.com",
+            loyalty_enabled=True,
         )
         cls.tenant.auto_create_schema = False
         cls.tenant.save()
+        # A store that runs the programme: plan flag above, switch here.
+        switch_store_settings(LOYALTY_ENABLED=True)
         UserTenantMembership.objects.create(
             user=cls.user,
             tenant=cls.tenant,
@@ -214,6 +218,24 @@ class AgentAPITestCase(APITestCase):
         self._bearer(["profile"])
         response = self.client.get(reverse("agent-favourites"))
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_loyalty_is_404_while_the_store_has_the_programme_off(
+        self,
+    ) -> None:
+        switch_store_settings(LOYALTY_ENABLED=False)
+        self._bearer(["loyalty:read"])
+
+        response = self.client.get(reverse("agent-loyalty"))
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_favourites_are_404_while_the_store_has_them_off(self) -> None:
+        switch_store_settings(FAVOURITES_ENABLED=False)
+        self._bearer(["favourites:read"])
+
+        response = self.client.get(reverse("agent-favourites"))
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_loyalty_returns_summary_shape(self) -> None:
         self._bearer(["loyalty:read"])

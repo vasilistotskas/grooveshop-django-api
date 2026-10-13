@@ -139,8 +139,7 @@ class IsB2BEnabled(IsTenantFeatureEnabled):
 
 class IsRecommendationsEnabled(IsTenantFeatureEnabled):
     """Deny access with 404 when the tenant's recommendations plan flag
-    is off. The runtime half is the PRODUCT_SUGGESTIONS_ENABLED
-    extra-setting, read by the storefront via /settings/get."""
+    is off. The runtime half is ``IsRecommendationsRuntimeEnabled``."""
 
     feature_flag = "recommendations_enabled"
 
@@ -190,6 +189,17 @@ class IsProductReviewsEnabled(IsSettingEnabled):
     """404 when the merchant has turned product reviews off."""
 
     setting_key = "PRODUCT_REVIEWS_ENABLED"
+
+
+class IsAccountReviewsEnabled(IsSettingEnabled):
+    """404 when the merchant has hidden the "My reviews" account page.
+
+    A store preference stacked UNDER ``IsProductReviewsEnabled``: with
+    reviews off the shopper's own reviews are gone too, and this switch
+    can additionally hide just the account page.
+    """
+
+    setting_key = "ACCOUNT_REVIEWS_ENABLED"
 
 
 class IsBlogCommentsEnabled(IsSettingEnabled):
@@ -284,4 +294,28 @@ class IsPromotionsRuntimeEnabled(IsSettingEnabled):
     """
 
     setting_key = "PROMOTIONS_ENABLED"
+    default = False
+
+
+class IsGiftCardsRuntimeEnabled(IsSettingEnabled):
+    """404 when the merchant has switched gift cards off at runtime.
+
+    The merchant tier of the gift-cards gate; ``IsGiftCardsEnabled``
+    above is the plan tier. Fails CLOSED like the other commercial
+    gates, matching ``GiftCardService.is_enabled``.
+    """
+
+    setting_key = "GIFT_CARDS_ENABLED"
+    default = False
+
+
+class IsRecommendationsRuntimeEnabled(IsSettingEnabled):
+    """404 when the merchant has switched product suggestions off.
+
+    The merchant tier of the recommendations gate;
+    ``IsRecommendationsEnabled`` above is the plan tier. Fails CLOSED,
+    the setting's own default.
+    """
+
+    setting_key = "PRODUCT_SUGGESTIONS_ENABLED"
     default = False

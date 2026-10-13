@@ -8,6 +8,7 @@ from drf_spectacular.utils import OpenApiParameter, extend_schema_view
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.generics import get_object_or_404
+from rest_framework.permissions import BasePermission
 from rest_framework.response import Response
 
 from blog.filters.comment import BlogCommentFilter
@@ -34,6 +35,13 @@ from product.filters.review import ProductReviewFilter
 from product.serializers.favourite import ProductFavouriteSerializer
 from product.serializers.review import ProductReviewSerializer
 from tenant.membership import is_store_staff
+from tenant.permissions import (
+    IsAccountReviewsEnabled,
+    IsBlogCommentsEnabled,
+    IsBlogEnabled,
+    IsFavouritesEnabled,
+    IsProductReviewsEnabled,
+)
 from user.filters import UserAddressFilter
 from user.filters.account import UserAccountFilter
 from user.serializers.account import (
@@ -195,8 +203,21 @@ class UserAccountViewSet(BaseModelViewSet):
     queryset = User.objects.none()
     serializers_config = serializers_config
     permission_classes = [IsOwnerOrAdmin]
+    # The sub-resources that belong to an optional store feature answer
+    # 404 while it is off, exactly as the feature's own routes do.
+    action_feature_gates: dict[str, tuple[type[BasePermission], ...]] = {
+        "favourite_products": (IsFavouritesEnabled,),
+        "product_reviews": (IsProductReviewsEnabled, IsAccountReviewsEnabled),
+        "blog_post_comments": (IsBlogEnabled, IsBlogCommentsEnabled),
+        "liked_blog_posts": (IsBlogEnabled,),
+    }
     ordering_fields = ["id", "email", "username", "created_at", "updated_at"]
     ordering = ["-created_at"]
+
+    def get_permissions(self):
+        gates = self.action_feature_gates.get(self.action or "", ())
+        return [*(gate() for gate in gates), *super().get_permissions()]
+
     # Every sub-resource action paginates another model, so each names
     # its own sortable columns; the user fields above never apply there.
     action_ordering = {

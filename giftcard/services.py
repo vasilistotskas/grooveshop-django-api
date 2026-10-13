@@ -493,7 +493,14 @@ class GiftCardService:
 
         The negative row equals the remaining balance (never more —
         the loyalty min-clamp rule), so an expired card sums to zero.
+
+        Nothing expires while gift cards are off: no card can be spent
+        then, so zeroing balances would destroy money the store keeps
+        for when it turns them back on. A card past its date is expired
+        by the first sweep after that.
         """
+        if not cls.is_enabled():
+            return 0
         now = timezone.now()
         expired = GiftCard.objects.filter(
             status=GiftCardStatus.ACTIVE,

@@ -112,7 +112,8 @@ class TestCheck:
             "reason": "gift_card_invalid",
         }
 
-    def test_merchant_toggle_off_is_400_even_for_a_real_code(self):
+    def test_merchant_toggle_off_is_404_even_for_a_real_code(self):
+        # Switched off, the route is gone, as with the plan flag off.
         GiftCardFactory(code="GC-REAL-REAL-REAL")
 
         with _gift_cards(enabled=False):
@@ -120,11 +121,7 @@ class TestCheck:
                 CHECK_URL, {"code": "GC-REAL-REAL-REAL"}, format="json"
             )
 
-        assert response.status_code == 400
-        assert response.data == {
-            "detail": "Gift cards are not available.",
-            "reason": "gift_card_invalid",
-        }
+        assert response.status_code == 404
 
     def test_missing_code_is_a_field_error(self):
         with _gift_cards():
@@ -185,7 +182,7 @@ def _viva(provider: Mock):
 
 
 class TestPurchaseRefusals:
-    def test_merchant_toggle_off_refuses_and_creates_nothing(self):
+    def test_merchant_toggle_off_is_404_and_creates_nothing(self):
         with _gift_cards(enabled=False):
             response = _client().post(
                 PURCHASE_URL,
@@ -193,11 +190,7 @@ class TestPurchaseRefusals:
                 format="json",
             )
 
-        assert response.status_code == 400
-        assert response.json() == {
-            "detail": "Gift cards are not available.",
-            "reason": "gift_card_invalid",
-        }
+        assert response.status_code == 404
         assert not GiftCardPurchase.objects.exists()
 
     def test_guest_without_buyer_email_is_refused(self):
@@ -411,6 +404,16 @@ class TestPurchaseViva:
 
 
 class TestPurchaseStatus:
+    def test_still_answers_after_the_merchant_switches_gift_cards_off(self):
+        # The shopper polling it has already paid; the card is issued.
+        purchase = GiftCardPurchaseFactory(status=GiftCardPurchaseStatus.PAID)
+
+        with _gift_cards(enabled=False):
+            response = _client().get(STATUS_URL, {"uuid": str(purchase.uuid)})
+
+        assert response.status_code == 200, response.data
+        assert response.data["status"] == "PAID"
+
     def test_known_uuid_returns_the_status(self):
         purchase = GiftCardPurchaseFactory(status=GiftCardPurchaseStatus.PAID)
 
@@ -449,6 +452,15 @@ class TestMine:
             response = _client().get(MINE_URL)
 
         assert response.status_code == 401
+
+    def test_merchant_toggle_off_is_404_with_cards_on_file(self):
+        user = UserAccountFactory()
+        GiftCardFactory(code="GC-MINE-0000-KEPT", issued_to=user)
+
+        with _gift_cards(enabled=False):
+            response = _client(user).get(MINE_URL)
+
+        assert response.status_code == 404
 
     def test_lists_only_my_cards_newest_first(self):
         user = UserAccountFactory()

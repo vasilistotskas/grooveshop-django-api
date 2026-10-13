@@ -291,10 +291,12 @@ class LoyaltyService:
         the original EARN amounts, then the new-customer BONUS granted for
         this order, clamping to prevent negative balance. Only the EARN
         reversal comes off XP: the bonus never added any.
-        """
-        if not cls.is_enabled():
-            return 0
 
+        Runs whether or not the programme is on: an order cancelled or
+        refunded while loyalty is off must still give back what it
+        redeemed and take back what it earned, or the balances are wrong
+        when the store turns loyalty back on.
+        """
         from order.models.order import Order
 
         try:
@@ -631,8 +633,13 @@ class LoyaltyService:
         """Process all expired points.
 
         Returns count of EXPIRE transactions created. When
-        LOYALTY_POINTS_EXPIRATION_DAYS is 0, no expiration occurs.
+        LOYALTY_POINTS_EXPIRATION_DAYS is 0, no expiration occurs, and
+        none occurs while the programme is off either: shoppers cannot
+        spend points then, so letting them lapse would destroy value the
+        store keeps for when it turns loyalty back on.
         """
+        if not cls.is_enabled():
+            return 0
         expiration_days = Setting.get(
             "LOYALTY_POINTS_EXPIRATION_DAYS", default=0
         )

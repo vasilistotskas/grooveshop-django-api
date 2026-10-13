@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from unittest.mock import patch
 
 import pytest
 from django.utils import timezone
@@ -224,6 +225,25 @@ class TestExpiry:
 
         assert GiftCardService.expire_cards() == 0
         assert empty.transactions.count() == 0
+
+    def test_nothing_expires_while_gift_cards_are_off(self):
+        """No card can be spent then, so its balance is kept for when
+        the store turns gift cards back on."""
+        card = GiftCardFactory(
+            initial_value=Money(Decimal(50), "EUR"),
+            expires_at=timezone.now() - timezone.timedelta(days=1),
+        )
+
+        with patch(
+            "giftcard.services.Setting.get",
+            side_effect=lambda key, default=None: (
+                False if key == "GIFT_CARDS_ENABLED" else default
+            ),
+        ):
+            expired = GiftCardService.expire_cards()
+
+        assert expired == 0
+        assert card.balance.amount == Decimal(50)
 
 
 class TestCompletePurchase:

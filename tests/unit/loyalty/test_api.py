@@ -25,11 +25,19 @@ from order.enum.status import OrderStatus
 from order.factories.item import OrderItemFactory
 from order.factories.order import OrderFactory
 from product.factories.product import ProductFactory
+from tests.utils.store_settings import switch_store_settings
 from user.factories.account import UserAccountFactory
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def _store_runs_the_programme(db):
+    """The store has loyalty switched on; a test that patches
+    ``Setting.get`` decides for itself."""
+    switch_store_settings(LOYALTY_ENABLED=True)
 
 
 def _mock_settings_enabled(key, default=None):
@@ -452,7 +460,8 @@ class TestRedeemEndpoint:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
     def test_redeem_disabled_system(self):
-        """Redemption when system is disabled returns 400."""
+        """With the programme switched off the route is gone (404), as
+        with the plan flag off."""
         user = UserAccountFactory(num_addresses=0)
         PointsTransaction.objects.create(
             user=user,
@@ -486,7 +495,7 @@ class TestRedeemEndpoint:
                 format="json",
             )
 
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.status_code == status.HTTP_404_NOT_FOUND
 
     def test_redeem_invalid_currency_rejected_by_serializer(self):
         """Redemption with invalid currency is rejected by serializer validation."""

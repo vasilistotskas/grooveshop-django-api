@@ -22,6 +22,11 @@ from loyalty.services import LoyaltyService
 from order.serializers.order import OrderSerializer
 from order.services import OrderService
 from product.models.favourite import ProductFavourite
+from tenant.permissions import (
+    IsFavouritesEnabled,
+    IsLoyaltyEnabled,
+    IsLoyaltyRuntimeEnabled,
+)
 
 # Agents want "my recent items", not a paginated browse — cap the lists.
 AGENT_ORDERS_LIMIT = 20
@@ -138,7 +143,10 @@ class AgentOrdersView(AgentAPIView):
 
 
 class AgentFavouritesView(AgentAPIView):
+    # The store's own switch first: with favourites off an agent finds
+    # none, as the storefront does.
     permission_classes = [
+        IsFavouritesEnabled,
         TokenPermission.has_scope(SCOPE_FAVOURITES_READ),
     ]
 
@@ -190,7 +198,11 @@ class AgentFavouritesView(AgentAPIView):
 
 
 class AgentLoyaltyView(AgentAPIView):
+    # Plan flag and the store's switch, as on /loyalty: with the
+    # programme off an agent finds no points either.
     permission_classes = [
+        IsLoyaltyEnabled,
+        IsLoyaltyRuntimeEnabled,
         TokenPermission.has_scope(SCOPE_LOYALTY_READ),
     ]
 

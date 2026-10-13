@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from io import StringIO
 from pathlib import Path
 from types import SimpleNamespace
@@ -24,6 +25,7 @@ from types import SimpleNamespace
 import pytest
 from django.core.management.base import CommandError
 from django.test import TestCase
+from django.utils import timezone
 
 from contact.models import FeedbackCategory
 from devtools import demo_reviews, demo_store
@@ -44,6 +46,7 @@ from page_config.schemas import (
     validate_section_props,
 )
 from product.enum.review import RateEnum
+from product.models import Product
 from tenant.validators import validate_business_hours_setting
 
 
@@ -1950,3 +1953,94 @@ class TestPayWays:
         assert demo_store.seed_pay_ways() == {"skipped_not_a_demo_tenant": 1}
         cod.refresh_from_db()
         assert cod.cost.amount == 0
+
+
+class TestPriceHistory:
+    """The seeded markdowns are announced by the platform's own rule."""
+
+    @pytest.fixture
+    def seeded(self, demo_tenant, monkeypatch):
+        monkeypatch.setattr(demo_store, "ensure_assets", lambda keys: {})
+        monkeypatch.setattr(
+            demo_store, "ensure_asset", lambda key: f"uploads/{key}.avif"
+        )
+        monkeypatch.setattr(
+            demo_store, "storage_name", lambda key: f"uploads/{key}.avif"
+        )
+        demo_store.seed_categories()
+        demo_store.seed_products()
+        return demo_store.seed_price_history()
+
+    @staticmethod
+    def _marked_down():
+        from product.models import Product
+
+        slugs = [r.slug for r in demo_store.PRODUCTS if Decimal(r.discount) > 0]
+        return Product.objects.filter(slug__in=slugs)
+
+    def test_marked_down_products_announce_their_markdown(self, seeded):
+        from product.pricing.evaluation import announced_discount_percent
+
+        assert seeded["rebuilt"] == self._marked_down().count() > 0
+        for product in self._marked_down():
+            full = Product(
+                price=product.price,
+                vat=product.vat,
+                discount_percent=Decimal(0),
+            ).final_price.amount
+            assert product.prior_price == full, product.slug
+            assert product.effective_price == product.final_price.amount
+            announced = announced_discount_percent(
+                product.prior_price, product.effective_price
+            )
+            assert announced == int(product.discount_percent), product.slug
+
+    def test_history_is_lawful_and_inside_the_windows(self, seeded):
+        from product.pricing.constants import (
+            PROGRESSIVE_REDUCTION_WINDOW,
+            REFERENCE_WINDOW,
+        )
+
+        for product in self._marked_down():
+            full, current = product.price_spells.order_by("valid_from")
+            started = product.reduction_started_at
+            assert current.valid_from == started
+            assert started - full.valid_from >= REFERENCE_WINDOW
+            assert timezone.now() - started < PROGRESSIVE_REDUCTION_WINDOW
+
+    def test_a_second_run_stacks_nothing(self, seeded):
+        from product.models.price_spell import ProductPriceSpell
+
+        before = list(
+            ProductPriceSpell.objects.order_by("id").values_list(
+                "id", "valid_from"
+            )
+        )
+        report = demo_store.seed_price_history()
+        demo_store.seed_products()
+
+        assert report == {"unchanged": seeded["rebuilt"]}
+        assert before == list(
+            ProductPriceSpell.objects.order_by("id").values_list(
+                "id", "valid_from"
+            )
+        )
+        for product in self._marked_down():
+            assert product.price_spells.count() == 2
+            assert product.prior_price is not None
+
+    def test_an_unmarked_product_announces_nothing(self, seeded):
+        from product.models import Product
+
+        slugs = [
+            r.slug for r in demo_store.PRODUCTS if Decimal(r.discount) == 0
+        ]
+        assert slugs
+        for product in Product.objects.filter(slug__in=slugs):
+            assert product.prior_price is None, product.slug
+            assert product.price_spells.count() == 1
+
+    def test_the_step_is_registered_after_products_and_promotions(self):
+        names = seed_demo_store.STEP_NAMES
+        assert names.index("price-history") > names.index("promotions")
+        assert names.index("price-history") > names.index("products")

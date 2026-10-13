@@ -174,6 +174,22 @@ without `--all-tenants` the command runs in the public schema, which holds no
 products. Taking an attribute out of the filterable list (as `final_price` was)
 needs only the settings step: the documents keep the field, so no reindex.
 
+## The demo store's price history
+
+The demo catalogue is seeded already marked down, so left alone its products
+have no full-price spell older than 30 days and the rule above announces
+nothing. The `price-history` step of `manage.py seed_demo_store`
+(`devtools/demo_price_history.py`) therefore records, for every marked-down
+demo product, a full-price spell that began before the look-back window and
+ends where the reduction starts, a fixed point inside the 60-day progressive
+window. Only that full-price spell is written by the seed; the reduction's
+spell and `effective_price` / `prior_price` / `reduction_started_at` come from
+`sync_product_prices`, the same path the app uses. It is demo-only because it
+deletes and back-dates spells, which the platform never does: it touches only
+the seed's own `demo-` products. Re-running changes nothing while a product's
+history is already what the seed writes; re-seed a changed price with
+`manage.py seed_demo_store --schema demo --only price-history`.
+
 ## The markdown formula
 
 The markdown reduces the NET price and VAT is charged on what is left:

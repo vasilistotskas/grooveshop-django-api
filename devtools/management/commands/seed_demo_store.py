@@ -91,6 +91,10 @@ STEPS: tuple[tuple[str, str], ...] = (
     # the whole point — the rows this replaces were made by hand and
     # several had come to target deactivated products.
     ("promotions", "seed_promotions"),
+    # After products and promotions: it back-dates each marked-down
+    # product's price history so the platform's own Omnibus evaluation
+    # can announce the reduction (see `devtools/demo_price_history.py`).
+    ("price-history", "seed_price_history"),
     ("layouts", "seed_layouts"),
     ("navigation", "seed_navigation"),
     ("content-pages", "publish_content_pages"),

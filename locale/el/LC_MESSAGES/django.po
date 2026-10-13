@@ -22442,11 +22442,6 @@ msgstr "Μέση παραγγελία"
 msgid "Paid orders"
 msgstr "Πληρωμένες παραγγελίες"
 
-#: .\admin\dashboard\store\widgets.py:277
-#, python-format
-msgid "%(measure)s · %(period)s"
-msgstr "%(measure)s · %(period)s"
-
 #: .\admin\dashboard\store\widgets.py:292
 msgid "No orders in this period"
 msgstr "Καμία παραγγελία σε αυτή την περίοδο"
@@ -22512,10 +22507,9 @@ msgstr "Πρόσφατες παραγγελίες"
 msgid "Best sellers"
 msgstr "Δημοφιλέστερα προϊόντα"
 
-#: .\admin\dashboard\store\widgets.py:476
-#, python-format
-msgid "Units paid for · %(period)s"
-msgstr "Πληρωμένα τεμάχια · %(period)s"
+#: .\admin\dashboard\store\widgets.py:468
+msgid "Units paid for"
+msgstr "Πληρωμένα τεμάχια"
 
 #: .\admin\dashboard\store\widgets.py:480
 msgid "No paid orders in this period"
@@ -22700,10 +22694,6 @@ msgstr "Μέγεθος γραφήματος"
 #: .\core\templates\admin\dashboard\store\search.html:7
 msgid "Store search"
 msgstr "Αναζήτηση καταστήματος"
-
-#: .\core\templates\admin\dashboard\store\search.html:18
-msgid "Search list"
-msgstr "Λίστα αναζητήσεων"
 
 #: .\core\templates\admin\dashboard\store\sources.html:6
 msgid "Where orders come from"

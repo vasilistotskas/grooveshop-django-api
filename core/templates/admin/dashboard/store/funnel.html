@@ -1,14 +1,20 @@
+{% comment %}
+The checkout funnel: each step's count and a bar relative to carts
+started. Unfold's progress row stretches the count to the height of a
+title that wraps - in a third-width column "Orders placed" does - so
+the row is aligned to the top through the component's own class.
+{% endcomment %}
 {% load i18n unfold %}
 {% trans "Checkout funnel" as title %}
-{% component "unfold/components/card.html" with title=title description=description %}
+{% component "unfold/components/card.html" with title=title %}
     {% if has_data %}
         <div class="flex flex-col gap-4">
             {% for step in steps %}
-                {% component "unfold/components/progress.html" with title=step.title description=step.description value=step.value %}{% endcomponent %}
+                {% component "unfold/components/progress.html" with title=step.title description=step.description value=step.value class="[&>:first-child]:gap-3 [&>:first-child]:items-start" %}{% endcomponent %}
             {% endfor %}
         </div>
         {% component "unfold/components/separator.html" with class="my-4" %}{% endcomponent %}
-        <div class="flex items-center justify-between">
+        <div class="flex gap-3 items-center justify-between">
             <p class="font-medium text-sm">{% trans "Carts that ended in a paid order" %}</p>
             {% include "unfold/helpers/label.html" with text=overall variant="primary" %}
         </div>

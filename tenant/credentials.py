@@ -622,7 +622,7 @@ def box_now_credentials() -> BoxNowCredentials:
             "live_mode":      bool,
         }
     """
-    tenant = getattr(connection, "tenant", None)
+    tenant = bound_tenant()
     return {
         "client_id": _get_tenant_field("box_now_client_id"),
         "client_secret": _get_tenant_field("box_now_client_secret"),

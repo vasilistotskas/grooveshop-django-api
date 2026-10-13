@@ -92,6 +92,7 @@ FAMILIES = {
             "box_now_warehouse_id": "wh",
             "box_now_notify_phone": "+302100000000",
             "box_now_webhook_secret": "whsecret",
+            "box_now_live_mode": True,
         },
         {
             "client_id": "cid",
@@ -100,6 +101,7 @@ FAMILIES = {
             "warehouse_id": "wh",
             "notify_phone": "+302100000000",
             "webhook_secret": "whsecret",
+            "live_mode": True,
         },
     ),
     "mydata": (

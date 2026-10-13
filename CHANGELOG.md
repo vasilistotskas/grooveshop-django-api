@@ -3,6 +3,65 @@
 
 
 
+## v3.117.0 (2026-10-13)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.116.0 [skip ci] ([`6f2e04c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6f2e04c6e9ed6186823c14bcc625e667589441d9))
+
+### Features
+
+* feat(order): refund collected cash on delivery on the payment ledger (#180) ([`8a1120c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8a1120c4798df9c074a9b59603d2a3c32fd76e8f))
+
+* feat(order): refund collected cash on delivery on the payment ledger
+
+A cash-on-delivery order's money enters the ledger as a COD_COLLECTION row,
+but captured, balances and plan_refund read CHARGE rows only, so a collected
+COD order had nothing refundable: refund_order refused it ("not paid through
+a payment provider") and a merchant who paid the customer back by bank
+transfer had no REFUND row, no status change and no myDATA 11.4 credit note.
+
+The ledger now counts COD_COLLECTION as money received, so plan_refund can
+plan a share against collected cash. That share has no provider to call: the
+same OrderService.refund_order records it as a REFUND row made by the
+merchant (provider "manual"), keyed on a required repayment_reference (how it
+was paid back) scoped to the order and the collection, which is also its
+idempotency key. The reference is required exactly when the plan touches
+cash and is checked before any provider call, so a mixed refund is never made
+half. Each share is one REFUND row and one order_refunded, so the credit
+note, the email, loyalty and Meta CAPI run as for a Stripe or Viva refund,
+and payment_status stays derived from the ledger.
+
+The staff Refund action is the same dialog: it asks "How it was paid back"
+only where the order has cash left to refund and validates it against the
+typed amount. An order whose cash was not collected yet says so.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`8a1120c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8a1120c4798df9c074a9b59603d2a3c32fd76e8f))
+
+### Testing
+
+* test(order): pin an online pay way on the unpaid-refund test
+
+OrderFactory picks a random PayWay, and an unpaid cash-on-delivery order
+is now refused with its own message, so the test asserting the generic
+'not paid yet' one failed whenever the draw was COD.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`8a1120c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8a1120c4798df9c074a9b59603d2a3c32fd76e8f))
+
+* test(tenant): scope the BoxNow column-default probe to the active schema (#184)
+
+The test database also holds a test_migration_seed copy of tenant_tenant,
+created without column defaults, and the information_schema query did
+not name a schema: it returned whichever row came first, so the test
+failed at random (CI shard 4 on #180). Every other such query in the
+suite already filters on the schema.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`5bc2c7c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5bc2c7c238469beff6ec5a4ec026119e115ffdd8))
+
 ## v3.116.0 (2026-10-13)
 
 ### Bug fixes

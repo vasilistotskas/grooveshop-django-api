@@ -173,27 +173,18 @@ class TestProductListApi:
         ]
         assert descending == ascending[::-1]
 
-    def test_the_deprecated_final_price_filter_still_ignores_promotions(
-        self, catalogue
-    ):
-        ids = self._get(maxFinalPrice="100")
-
-        assert ids == []
-
-    def test_the_old_params_are_marked_deprecated_in_the_schema(
+    def test_the_final_price_filters_are_gone_from_the_schema(
         self, openapi_schema
     ):
-        parameters = {
-            parameter["name"]: parameter
+        names = {
+            parameter["name"]
             for parameter in openapi_schema["paths"]["/api/v1/product"]["get"][
                 "parameters"
             ]
         }
 
-        for name in ("minFinalPrice", "maxFinalPrice"):
-            assert parameters[name]["deprecated"] is True
-        for name in ("minEffectivePrice", "maxEffectivePrice"):
-            assert "deprecated" not in parameters[name]
+        assert {"minFinalPrice", "maxFinalPrice"}.isdisjoint(names)
+        assert {"minEffectivePrice", "maxEffectivePrice"} <= names
 
     def test_the_filter_and_sort_cost_no_query_per_row(self, vat):
         category = ProductCategoryFactory()
@@ -289,3 +280,10 @@ class TestSearchApi:
         stats = self._search(marker, facets="effective_price")["facetStats"]
 
         assert stats["effectivePrice"] == {"min": 99.2, "max": 124.0}
+
+    def test_the_final_price_facet_is_no_longer_offered(self, indexed):
+        marker, _ = indexed
+
+        body = self._search(marker, facets="final_price")
+
+        assert "finalPrice" not in body.get("facetStats", {})

@@ -115,14 +115,14 @@ BlogPostTranslation.meilisearch.filter(title__contains="guide")
 # the CONTAINS filter is still generated and sent to Meilisearch.
 # Whether it matches anything (or Meilisearch rejects it) is a
 # Meilisearch-side concern, not something this code validates.
-ProductTranslation.meilisearch.filter(final_price__contains="99")
+ProductTranslation.meilisearch.filter(effective_price__contains="99")
 ```
 
 ### ❌ Invalid Usage
 
 ```python
 # Non-string VALUE - raises TypeError, regardless of field
-ProductTranslation.meilisearch.filter(final_price__contains=99)
+ProductTranslation.meilisearch.filter(effective_price__contains=99)
 # TypeError: CONTAINS operator only supports string values, not int. ...
 
 ProductTranslation.meilisearch.filter(active__contains=True)
@@ -175,8 +175,8 @@ python_posts = BlogPostTranslation.meilisearch.filter(
 # Combine CONTAINS with other lookups
 results = ProductTranslation.meilisearch.filter(
     name__contains="pro",
-    final_price__gte=500,
-    final_price__lte=2000,
+    effective_price__gte=500,
+    effective_price__lte=2000,
     language_code="en",
     active=True,
 )
@@ -241,8 +241,10 @@ from product.models import ProductTranslation
 
 try:
     # This will raise TypeError — the VALUE (99, an int) is not a string.
-    # A string value like final_price__contains="99" would NOT raise here.
-    results = ProductTranslation.meilisearch.filter(final_price__contains=99)
+    # A string value like effective_price__contains="99" would NOT raise here.
+    results = ProductTranslation.meilisearch.filter(
+        effective_price__contains=99
+    )
 except TypeError as e:
     print(f"Error: {e}")
     # Error: CONTAINS operator only supports string values, not int. ...
@@ -392,16 +394,18 @@ uv run python manage.py meilisearch_enable_experimental --feature containsFilter
 **Error**: `TypeError: CONTAINS operator only supports string values, not int. ...`
 
 This is raised when the **value** passed to `__contains` isn't a string —
-`final_price__contains="99"` (a string value) does NOT raise; only a
-non-string value like `final_price__contains=99` (an int) does.
+`effective_price__contains="99"` (a string value) does NOT raise; only a
+non-string value like `effective_price__contains=99` (an int) does.
 
 **Solution**: Use appropriate lookup for the field type:
 ```python
 # ❌ Wrong (non-string value)
-ProductTranslation.meilisearch.filter(final_price__contains=99)
+ProductTranslation.meilisearch.filter(effective_price__contains=99)
 
 # ✅ Correct
-ProductTranslation.meilisearch.filter(final_price__gte=99, final_price__lte=999)
+ProductTranslation.meilisearch.filter(
+    effective_price__gte=99, effective_price__lte=999
+)
 ```
 
 ### Slow Query Performance

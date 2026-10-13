@@ -657,7 +657,6 @@ class ProductTranslation(
             "name",
             "language_code",
             "likes_count",
-            "final_price",
             "effective_price",
             "view_count",
             "category",

@@ -28,20 +28,13 @@ class TranslatedFieldsFieldExtend(TranslatedFieldExtended):
     pass
 
 
-# ``discount_percent``, ``discount_value`` and ``price_save_percent`` are
-# the merchant's markdown, not an announcement: a "was" price struck
-# through and a "-N%" badge built from them carry no prior price, which
-# the EU Omnibus rule requires. ``prior_price`` and
-# ``announced_discount_percent`` are what a customer may be shown; the
-# fields below stay for one release so the storefront can move off them
-# (docs/migrations.md: expand, then contract).
-@extend_schema_serializer(
-    deprecate_fields=[
-        "discount_percent",
-        "discount_value",
-        "price_save_percent",
-    ]
-)
+# ``discount_percent`` is the merchant's markdown, not an announcement: a
+# "was" price struck through and a "-N%" badge built from it carry no
+# prior price, which the EU Omnibus rule requires. ``prior_price`` and
+# ``announced_discount_percent`` are what a customer may be shown. It
+# stays, deprecated, until the agent gateway's feeds and MCP tools stop
+# reading it (docs/migrations.md: expand, then contract).
+@extend_schema_serializer(deprecate_fields=["discount_percent"])
 class ProductSerializer(
     TranslatableModelSerializer, serializers.ModelSerializer[Product]
 ):
@@ -60,7 +53,6 @@ class ProductSerializer(
     )
     price = MoneyField(max_digits=11, decimal_places=2)
     final_price = MoneyField(max_digits=11, decimal_places=2, read_only=True)
-    discount_value = MoneyField(max_digits=11, decimal_places=2, read_only=True)
     vat_value = MoneyField(max_digits=11, decimal_places=2, read_only=True)
     # What a consumer pays now, promotions that need nothing from the
     # basket included; ``final_price`` stops at VAT and the markdown.
@@ -114,8 +106,6 @@ class ProductSerializer(
             "active",
             "weight",
             "discount_percent",
-            "discount_value",
-            "price_save_percent",
             "vat_percent",
             "vat_value",
             "final_price",
@@ -138,8 +128,6 @@ class ProductSerializer(
             "variant_group",
             "brand",
             "brand_name",
-            "discount_value",
-            "price_save_percent",
             "vat_percent",
             "vat_value",
             "final_price",

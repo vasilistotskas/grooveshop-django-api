@@ -129,13 +129,20 @@ filter at its promoted price and sorts there, while a conditional promotion
 because the cart only honours it for a basket that meets the condition. B2B
 group prices are not in the index or the filter either (see above).
 
-`minFinalPrice` / `maxFinalPrice`, the search `sort=finalPrice` and the
-`final_price` Meilisearch field and facet are the price before promotions.
-They are **deprecated** (marked `deprecated` in the schema where the schema can
-say so) and stay for one release; they are removed, with the Meilisearch field,
-once the storefront sorts and filters on the effective price (expand/contract
-for API contracts, `docs/migrations.md`). The search `price_min` / `price_max`
-parameters keep their names and now compare with `effective_price`.
+The price before promotions (`finalPrice`) is still a field of the product and of
+every search hit: the cart, orders and the agent gateway's feeds read it. Its
+filter and facet surfaces are gone: `minFinalPrice` / `maxFinalPrice`, the
+`final_price` search facet (and `facetStats.finalPrice`) and the Meilisearch
+`final_price` filterable attribute were removed once the storefront filtered
+and ranged on the effective price (expand/contract for API contracts,
+`docs/migrations.md`). An unknown `facets` value is ignored by the search
+view, so an old client asking for `final_price` gets no stats rather than an
+error. One surface remains: the search `sort=finalPrice` / `-finalPrice`
+(Meilisearch `final_price` sortable and displayed) is **deprecated**, because
+the agent gateway's `search_products` tool still lists it as an allowed sort;
+it is removed, with the sortable attribute, once the gateway offers
+`effectivePrice` instead. The search `price_min` / `price_max` parameters keep
+their names and compare with `effective_price`.
 
 **Known recording lag.** The price is recorded when the offer queue or the
 5-minute window sweep notices a promotion, then the product is reindexed, so a
@@ -146,19 +153,25 @@ window the listing, the filter and the cart can disagree. A product whose
 and sorts last until the nightly reconciliation fills it.
 
 Every price field above reads a stored column, so a list costs no query per row.
-`discountPercent`, `discountValue` and `priceSavePercent` (and the search
-`discountPercent`) are the merchant's markdown, not an announcement. They are
-**deprecated** in the schema and stay for one release; a client that struck
-them through must move to the fields above, after which they are removed with
-the expand/contract rule of `docs/migrations.md`. The deploy's PreSync hook
-applies the new displayed, filterable and sortable fields
+`discountPercent` (and the search `discountPercent`) is the merchant's
+markdown, not an announcement. It is **deprecated** in the schema and stays
+until the agent gateway's Merchant Center / Meta / TikTok feeds and MCP tools
+stop reading it; then it is removed with the expand/contract rule of
+`docs/migrations.md`. `discountValue` and `priceSavePercent` were removed from
+the product: a client that struck a price through must use the fields above.
+The merchant's input (`Product.discount_percent`, the admin form, the product
+write API, the `minDiscountPercent` / `maxDiscountPercent` filters and the
+`discountPercent` ordering) is unchanged.
+
+The deploy's PreSync hook applies the new displayed, filterable and sortable fields
 (`prior_price`, `announced_discount_percent`, `effective_price`) with
 `meilisearch_apply_settings --all-tenants`. Documents indexed before such a
 field existed only gain it when they are rebuilt, so a release that adds one
 is followed by
 `manage.py meilisearch_sync_index product.ProductTranslation --all-tenants`;
 without `--all-tenants` the command runs in the public schema, which holds no
-products.
+products. Taking an attribute out of the filterable list (as `final_price` was)
+needs only the settings step: the documents keep the field, so no reindex.
 
 ## The markdown formula
 

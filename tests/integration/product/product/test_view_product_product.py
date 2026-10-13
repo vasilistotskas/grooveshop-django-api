@@ -103,7 +103,6 @@ class ProductViewSetTestCase(APITestCase):
                 "active",
                 "translations",
                 "final_price",
-                "discount_value",
                 "review_average",
                 "review_count",
                 "likes_count",
@@ -129,7 +128,6 @@ class ProductViewSetTestCase(APITestCase):
             "active",
             "translations",
             "final_price",
-            "discount_value",
             "review_average",
             "review_count",
             "likes_count",
@@ -198,7 +196,6 @@ class ProductViewSetTestCase(APITestCase):
             "active",
             "translations",
             "final_price",
-            "discount_value",
             "review_average",
             "review_count",
             "likes_count",
@@ -248,7 +245,6 @@ class ProductViewSetTestCase(APITestCase):
             "active",
             "translations",
             "final_price",
-            "discount_value",
             "review_average",
             "review_count",
             "likes_count",
@@ -280,7 +276,6 @@ class ProductViewSetTestCase(APITestCase):
             "active",
             "translations",
             "final_price",
-            "discount_value",
             "review_average",
             "review_count",
             "likes_count",
@@ -587,7 +582,7 @@ class ProductViewSetTestCase(APITestCase):
 
         url = self.get_product_list_url()
         response = self.client.get(
-            url, {"min_final_price": "200", "max_final_price": "400"}
+            url, {"min_effective_price": "200", "max_effective_price": "400"}
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -595,6 +590,6 @@ class ProductViewSetTestCase(APITestCase):
         products = response.data["results"]
 
         for product in products:
-            final_price = float(product["final_price"])
-            self.assertGreaterEqual(final_price, 200)
-            self.assertLessEqual(final_price, 400)
+            effective_price = float(product["effective_price"])
+            self.assertGreaterEqual(effective_price, 200)
+            self.assertLessEqual(effective_price, 400)

@@ -158,13 +158,16 @@ class TestProductApi:
 
         assert queries_for(8) == queries_for(2)
 
-    def test_the_schema_deprecates_the_markdown_fields(self, openapi_schema):
+    def test_the_schema_deprecates_the_markdown_percent_only(
+        self, openapi_schema
+    ):
         properties = openapi_schema["components"]["schemas"]["Product"][
             "properties"
         ]
 
-        for name in ("discountPercent", "discountValue", "priceSavePercent"):
-            assert properties[name]["deprecated"] is True
+        assert properties["discountPercent"]["deprecated"] is True
+        for name in ("discountValue", "priceSavePercent"):
+            assert name not in properties
         for name in (
             "priorPrice",
             "effectivePrice",

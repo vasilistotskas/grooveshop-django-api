@@ -83,15 +83,3 @@ class TestFormula:
         )
 
         assert translation.meili_serialize()["final_price"] == 33.48
-
-    def test_the_price_filter_uses_the_charged_price(self, vat):
-        from product.filters.product import ProductFilter
-
-        product = make(vat)
-
-        found = ProductFilter(
-            {"min_final_price": "33.48", "max_final_price": "33.48"},
-            queryset=Product.objects.all(),
-        ).qs
-
-        assert product in found

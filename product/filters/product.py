@@ -52,25 +52,6 @@ class ProductFilter(
             "unconditional automatic promotions included)"
         ),
     )
-    min_final_price = filters.NumberFilter(
-        method="filter_min_final_price",
-        help_text=(
-            "Deprecated: use minEffectivePrice. Minimum price after VAT "
-            "and markdown, ignoring promotions"
-        ),
-    )
-    max_final_price = filters.NumberFilter(
-        method="filter_max_final_price",
-        help_text=(
-            "Deprecated: use maxEffectivePrice. Maximum price after VAT "
-            "and markdown, ignoring promotions"
-        ),
-    )
-
-    #: Query parameters the schema marks ``deprecated`` (snake_case, as the
-    #: filters are keyed); ``core.api.schema.AutoSchema`` reads it.
-    deprecated_params = frozenset({"min_final_price", "max_final_price"})
-
     min_stock = filters.NumberFilter(
         field_name="stock",
         lookup_expr="gte",
@@ -245,22 +226,6 @@ class ProductFilter(
         if value is not None:
             return queryset.with_announced_discount_percent().filter(
                 announced_discount_percent__gte=value
-            )
-        return queryset
-
-    def filter_min_final_price(self, queryset, name, value):
-        """Filter products with minimum final price"""
-        if value is not None:
-            return queryset.with_final_price_annotation().filter(
-                final_price_annotation__gte=value
-            )
-        return queryset
-
-    def filter_max_final_price(self, queryset, name, value):
-        """Filter products with maximum final price"""
-        if value is not None:
-            return queryset.with_final_price_annotation().filter(
-                final_price_annotation__lte=value
             )
         return queryset
 

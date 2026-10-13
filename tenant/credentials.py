@@ -1,6 +1,7 @@
 """Per-tenant credential helpers.
 
-Most helpers read the named field from ``connection.tenant`` and fall
+Most helpers read the named field from the bound tenant row
+(``tenant.membership.bound_tenant`` -- never a bare ``FakeTenant``) and fall
 back to the matching global setting when the tenant field is empty (or
 when there is no active tenant — public schema, management commands,
 Celery workers without a TenantTask, tests).
@@ -32,6 +33,8 @@ from typing import TypedDict
 from django.conf import settings
 from django.db import connection
 
+from tenant.membership import bound_tenant
+
 logger = logging.getLogger(__name__)
 
 
@@ -61,7 +64,7 @@ def _get_tenant_field(
     When ``settings_fallback`` is ``None`` the function returns ``""``
     in the fallback case.
     """
-    tenant = getattr(connection, "tenant", None)
+    tenant = bound_tenant()
     if tenant is not None:
         value = getattr(tenant, field_name, "") or ""
         if value:
@@ -111,7 +114,7 @@ def tenant_from_email() -> str:
     """
     from email.utils import formataddr
 
-    tenant = getattr(connection, "tenant", None)
+    tenant = bound_tenant()
     address = getattr(settings, "DEFAULT_FROM_EMAIL", "") or ""
 
     if _in_tenant_schema():
@@ -436,7 +439,7 @@ def viva_wallet_credentials() -> VivaWalletCredentials:
             "live_mode":                 bool,
         }
     """
-    tenant = getattr(connection, "tenant", None)
+    tenant = bound_tenant()
     return {
         "merchant_id": _get_tenant_field("viva_wallet_merchant_id"),
         "api_key": _get_tenant_field("viva_wallet_api_key"),

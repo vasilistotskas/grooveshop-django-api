@@ -183,12 +183,11 @@ class ShippingRate(TimeStampMixinModel):
             )
 
         from django.conf import settings as django_settings
-        from django.db import connection
 
-        tenant_currency = (
-            getattr(connection.tenant, "default_currency", None)
-            if getattr(connection, "tenant", None) is not None
-            else None
+        from tenant.membership import bound_tenant
+
+        tenant_currency = getattr(
+            bound_tenant(), "default_currency", None
         ) or getattr(django_settings, "DEFAULT_CURRENCY", "EUR")
 
         for field_name, money in (

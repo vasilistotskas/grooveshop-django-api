@@ -8,7 +8,6 @@ from allauth.core.internal.httpkit import clean_client_ip
 from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
 from django.conf import settings
 from django.core.exceptions import PermissionDenied
-from django.db import connection
 from django.http import HttpRequest
 from django.utils import translation
 from django.utils.encoding import force_str
@@ -22,6 +21,7 @@ from core.utils.tenant_urls import (
     localize_storefront_url,
 )
 from tenant.credentials import tenant_from_email, tenant_site_name
+from tenant.membership import bound_tenant
 from tenant.middleware import tenant_domain_set
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -216,9 +216,9 @@ class SocialAccountAdapter(DefaultSocialAccountAdapter):
         ``next`` and accept a redirect onto the first store's domain.
         """
         url = request.POST.get("next") or request.GET.get("next")
-        allowed_hosts = tenant_domain_set(
-            getattr(connection, "tenant", None)
-        ) or {settings.APP_MAIN_HOST_NAME}
+        allowed_hosts = tenant_domain_set(bound_tenant()) or {
+            settings.APP_MAIN_HOST_NAME
+        }
         if url and url_has_allowed_host_and_scheme(
             url, allowed_hosts=allowed_hosts
         ):

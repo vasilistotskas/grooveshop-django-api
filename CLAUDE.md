@@ -62,7 +62,7 @@ Single `settings.py` at the project root (not inside any app). Uses `SYSTEM_ENV`
 All apps live at the project root (flat structure, no `src/` directory):
 
 - **core/** — Shared infrastructure: base views, serializers, permissions, middleware, filters, caching, Celery config, URL routing. The `core/urls.py` is the root URL conf that mounts all other apps under `api/v1/`.
-- **tenant/** — Multi-tenancy control plane: `Tenant`/`TenantDomain`, provisioning, billing, lifecycle, staff identity and roles, per-tenant credentials (`tenant/credentials.py` — no platform-wide fallback for money/secrets; the secrets are Fernet-encrypted at rest, key setup and rotation in `docs/secret-encryption.md`)
+- **tenant/** — Multi-tenancy control plane: `Tenant`/`TenantDomain`, provisioning, billing, lifecycle, staff identity and roles, per-tenant credentials (`tenant/credentials.py` — no platform-wide fallback for money/secrets; the secrets are Fernet-encrypted at rest, key setup and rotation in `docs/secret-encryption.md`). Read a per-tenant field through `tenant.membership.bound_tenant()`, never `connection.tenant`: under `schema_context` that is a bare `FakeTenant` with no fields, and `bound_tenant` returns the real row
 - **product/**, **order/**, **cart/**, **blog/**, **user/** — Main domain apps
 - **promotion/**, **giftcard/**, **b2b/** — Rule-based promotions and coupons; stored-value gift cards with a ledger; wholesale program (business profiles, VIES, group pricing)
 - **shipping/**, **shipping_acs/**, **shipping_boxnow/** — Carrier abstraction (`shipping/interfaces.py`) and the two carrier integrations

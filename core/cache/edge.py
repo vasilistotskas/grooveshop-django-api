@@ -36,6 +36,8 @@ from django.conf import settings
 from django.core.cache import cache
 from django.db import connection
 
+from tenant.membership import bound_tenant
+
 logger = logging.getLogger(__name__)
 
 EDGE_CACHE_TAG = "storefront-html"
@@ -184,4 +186,4 @@ def run_scheduled_purge() -> int:
     cache.delete(_pending_key(connection.schema_name))
     if connection.schema_name == "public":
         return purge_all_storefronts()
-    return purge_tenant(connection.tenant)
+    return purge_tenant(bound_tenant())

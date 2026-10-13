@@ -5,7 +5,7 @@ from typing import Any, ClassVar
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError, connection, transaction
+from django.db import IntegrityError, transaction
 from django.db.models import QuerySet, Sum
 from django.utils import timezone
 from django.utils.translation import get_language
@@ -55,6 +55,7 @@ from order.stock import StockManager
 from pay_way.enum.settlement import PaySettlement
 from promotion.services import CouponService, PromotionEngine
 from shipping.exceptions import CarrierError, CarrierUnavailableError
+from tenant.membership import bound_tenant
 from tenant.middleware import tenant_domain_set
 
 logger = logging.getLogger(__name__)
@@ -188,7 +189,7 @@ class OrderAttributionService:
         """
         classified = classify(
             attribution,
-            own_hosts=tenant_domain_set(getattr(connection, "tenant", None)),
+            own_hosts=tenant_domain_set(bound_tenant()),
         )
         return OrderAttribution.objects.create(
             order=order,

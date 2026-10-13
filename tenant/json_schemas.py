@@ -36,6 +36,13 @@ _FONTS = [
     # have none). Mirrored in shared/theme/constants.ts.
     "ibm-plex-sans",
     "jetbrains-mono",
+    # The Groove Volt display face (Greek subset). Mirrored in
+    # shared/theme/constants.ts.
+    "geologica",
+    # Editorial serif and humanist sans, both with Greek subsets.
+    # Mirrored in shared/theme/constants.ts.
+    "vollkorn",
+    "commissioner",
 ]
 
 _CONTAINERS = ["narrow", "default", "wide"]

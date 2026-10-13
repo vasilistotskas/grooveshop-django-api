@@ -577,6 +577,12 @@ def test_theme_metadata_bad_font_display_raises():
         t.clean_fields()
 
 
+@pytest.mark.parametrize("font", ["geologica", "vollkorn", "commissioner"])
+def test_theme_metadata_accepts_the_newer_fonts(font):
+    t = _unsaved_tenant(theme_metadata={"fontSans": font, "fontDisplay": font})
+    t.clean()  # must not raise
+
+
 def test_theme_metadata_font_mono_is_valid():
     t = _unsaved_tenant(
         theme_metadata={

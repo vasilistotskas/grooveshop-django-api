@@ -33,8 +33,44 @@ fully accessible.
 
 from __future__ import annotations
 
+import logging
+from typing import NoReturn
+
 from rest_framework.exceptions import NotFound
 from rest_framework.permissions import BasePermission
+
+logger = logging.getLogger(__name__)
+
+#: The message of every refusal, fixed so a log query can match it
+#: exactly (the ``GrooveShopFeatureGateRefused`` alert in
+#: grooveshop-infrastructure does).
+REFUSED_MESSAGE = "feature_gate:refused"
+
+
+def refuse(request, gate: BasePermission, switch: str) -> NoReturn:
+    """Answer 404 for a switched-off feature, and say so in the log.
+
+    The response stays a bare 404, indistinguishable from a route that
+    was never registered. The log line is the one place that tells the
+    two apart: a client that keeps calling a route its store does not
+    serve (a storefront or gateway release that predates the switch)
+    looks like any other 404 in the access log, and on 2026-10-13 that
+    is how a store's search broke with nothing flagging it.
+    """
+    match = getattr(request, "resolver_match", None)
+    route = match.route if match is not None else ""
+    logger.info(
+        REFUSED_MESSAGE,
+        extra={
+            "fields": {
+                "gate": type(gate).__name__,
+                "switch": switch,
+                "route": route,
+                "method": request.method,
+            }
+        },
+    )
+    raise NotFound()
 
 
 class IsTenantFeatureEnabled(BasePermission):
@@ -67,7 +103,7 @@ class IsTenantFeatureEnabled(BasePermission):
             return True
         enabled = bool(getattr(tenant, self.feature_flag, True))
         if not enabled:
-            raise NotFound()
+            refuse(request, self, self.feature_flag)
         return True
 
 
@@ -146,7 +182,7 @@ class IsSettingEnabled(BasePermission):
         from extra_settings.models import Setting
 
         if not bool(Setting.get(self.setting_key, default=self.default)):
-            raise NotFound()
+            refuse(request, self, self.setting_key)
         return True
 
 

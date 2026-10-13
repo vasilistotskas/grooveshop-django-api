@@ -3,6 +3,55 @@
 
 
 
+## v3.114.1 (2026-10-13)
+
+### Bug fixes
+
+* fix(tenant): read per-tenant fields from the real row under schema_context (#177) ([`077d35a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/077d35a6e52ecbcbfcd91eae29fad0111cd16807))
+
+* fix(tenant): read per-tenant fields from the real row under schema_context
+
+schema_context(name) binds a bare django-tenants FakeTenant that carries
+only schema_name. The order commit hooks re-enter their schema that way,
+and tenant.credentials read its fields straight off connection.tenant,
+so every credential read as empty there. On production a shipped order
+on a store with myDATA configured never dispatched the receipt:
+handle_order_shipped saw issues_automatically() == False.
+
+Add tenant.membership.bound_tenant()/real_tenant(), which return the row
+django-tenants itself looks up by schema_name, remembered on the
+FakeTenant so it lives exactly as long as the binding. A schema with no
+row, or the public schema, is no store, so a missing credential still
+reads as missing with no fallback.
+
+Route every reader through it: tenant.credentials (Viva, Stripe, ACS,
+BoxNow, Meta, myDATA, branding, From address), tenant_plan_allows (plan
+flags no longer fail open in commit hooks and tasks), email platform
+brand check, MFA rp id, Nuxt purge host, Cloudflare scheduled purge,
+order attribution hosts, social connect redirect and shipping rate
+currency. The URL helpers' private _bound_tenant moves here.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`077d35a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/077d35a6e52ecbcbfcd91eae29fad0111cd16807))
+
+* fix(tenant): keep the platform display name on public-schema mail
+
+Reading the tenant through bound_tenant() turned the public schema's
+FakeTenant into None, so tenant_from_email() sent platform mail (contact
+and feedback notifications, inactive-user reminders) from a bare address
+instead of "{SITE_NAME}" <DEFAULT_FROM_EMAIL>. The display-name guard
+now checks the connection's binding again; the fields are still read
+from the real row.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`077d35a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/077d35a6e52ecbcbfcd91eae29fad0111cd16807))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.114.0 [skip ci] ([`b02c0cf`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b02c0cf0be1d57e31541ef2ae7a5ed592e9eab15))
+
 ## v3.114.0 (2026-10-13)
 
 ### Chores

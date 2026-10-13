@@ -302,7 +302,7 @@ GitHub Actions (`.github/workflows/ci.yml`) jobs:
 4. **Testing** — 4 duration-balanced pytest shards (pytest-split, `.test_durations`) against PostgreSQL 18 + Redis + Meilisearch, each uploading raw coverage data.
 5. **Testing (multi-tenant lane)** — `tests_mt` serially with the real tenant router and middleware.
 6. **Coverage Gate** — combines the shard data and enforces `fail_under`.
-7. **Release** — python-semantic-release (pinned via `uvx`) cuts the version, changelog and GitHub release on `main`; the Docker image workflow triggers on the published release. Nothing is built or published to PyPI — this is a deployed application, not a library.
+7. **Release** — python-semantic-release (run from the locked dev group) cuts the version, changelog and GitHub release on `main`; its version commit also carries the re-locked `uv.lock` (`build_command` + `assets` in `pyproject.toml`), so `main` never holds a stale lock. The Docker image workflow triggers on the published release. Nothing is built or published to PyPI — this is a deployed application, not a library.
 
 `.github/workflows/api-contract.yml` is separate: on a PR that changes `schema.yml` it runs `oasdiff breaking` from the base branch's schema to the PR's and fails on a break unless the PR has the `api-breaking-change` label (its own workflow so that toggling the label re-runs only it).
 

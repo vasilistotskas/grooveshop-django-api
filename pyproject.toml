@@ -171,9 +171,19 @@ directory = "htmlcov"
 [tool.semantic_release]
 version_toml = ["pyproject.toml:project.version"]
 branch = "main"
-# No build_command: this is a deployed application, not a library. The
-# Docker image workflow triggers on the published release and never
-# consumes sdist/wheel assets, so nothing is built or uploaded.
+# The version commit carries uv.lock too: once PSR has stamped
+# pyproject.toml, build_command re-locks only the project's own version
+# and ``assets`` stages the lock into that same commit. A lock synced by a
+# second, later push left main with a stale lock whenever the release job
+# failed in between (v3.118.0: GitHub rejected the tag push), and every
+# ``uv sync --locked`` on main failed until it was synced by hand. Nothing
+# else is built: this is a deployed application, and the Docker image
+# workflow triggers on the published release.
+build_command = 'uv lock --upgrade-package "$PACKAGE_NAME"'
+# setup-uv points uv at the job's restored cache through UV_CACHE_DIR,
+# which PSR does not pass to build_command unless listed here.
+build_command_env = ["UV_CACHE_DIR"]
+assets = ["uv.lock"]
 commit_message = "chore(release): release version {version} [skip ci]"
 
 [tool.semantic_release.commit_parser_options]

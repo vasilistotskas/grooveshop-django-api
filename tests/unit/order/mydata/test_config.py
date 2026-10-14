@@ -78,10 +78,13 @@ def test_the_credentials_are_no_longer_extra_settings_definitions():
     assert "MYDATA_SUBSCRIPTION_KEY" not in names
 
 
-def _store(bind_tenant, schema, **setting_values):
+def _store(bind_tenant, schema, *, is_demo=False, **setting_values):
     bind_tenant(
         store_tenant(
-            schema, mydata_user_id="store-user", mydata_subscription_key="k"
+            schema,
+            mydata_user_id="store-user",
+            mydata_subscription_key="k",
+            is_demo=is_demo,
         )
     )
     for name, (value_type, field, value) in setting_values.items():
@@ -134,27 +137,103 @@ def test_the_credit_documents_have_a_series_of_their_own(bind_tenant):
     assert load_config().credit_series_prefix == "STORE-C"
 
 
+@pytest.mark.parametrize("environment", ["dev", "prod"])
 @pytest.mark.parametrize("ground", ["", "   "])
-def test_without_a_recorded_fhm_exemption_the_store_is_never_ready(
-    bind_tenant, ground
+def test_a_store_taking_real_orders_is_never_ready_without_the_ground(
+    bind_tenant, settings, ground, environment
 ):
     """Retail receipts come from a fiscal device or a licensed provider
     (ν.4308/2014 art. 12 §8, §10); the ERP channel is only for a business
-    exempt from the ΦΗΜ. Switched on, with credentials and automatic
-    issuing, a store that has not recorded that ground issues nothing."""
+    exempt from the ΦΗΜ. A real store on the production deployment,
+    switched on with credentials and automatic issuing, issues nothing
+    without the recorded ground — in the sandbox too, because the setting
+    defaults to the sandbox and its customers would get test receipts."""
+    settings.REAL_ORDERS_DEPLOYMENT = True
     _store(
         bind_tenant,
         "mydata_cfg_no_ground",
         MYDATA_ENABLED=("bool", "value_bool", True),
         MYDATA_FHM_EXEMPTION_GROUND=("string", "value_string", ground),
         MYDATA_AUTO_SUBMIT=("bool", "value_bool", True),
+        MYDATA_ENVIRONMENT=("string", "value_string", environment),
     )
 
     config = load_config()
 
     assert config.fhm_exemption_ground == ""
+    assert config.takes_real_orders
+    assert not config.issues_to_sandbox_only
     assert not config.is_ready()
     assert not config.issues_automatically()
+
+
+@pytest.mark.parametrize(
+    ("real_orders_deployment", "is_demo"),
+    [(True, True), (False, False)],
+    ids=["a demo store in production", "any store outside production"],
+)
+def test_a_store_taking_no_real_orders_may_issue_to_the_sandbox(
+    bind_tenant, settings, real_orders_deployment, is_demo
+):
+    """AADE's sandbox registers test documents only, so a store that takes
+    no real orders needs no ground to issue there."""
+    settings.REAL_ORDERS_DEPLOYMENT = real_orders_deployment
+    _store(
+        bind_tenant,
+        "mydata_cfg_sandbox",
+        is_demo=is_demo,
+        MYDATA_ENABLED=("bool", "value_bool", True),
+        MYDATA_AUTO_SUBMIT=("bool", "value_bool", True),
+        MYDATA_ENVIRONMENT=("string", "value_string", "dev"),
+    )
+
+    config = load_config()
+
+    assert config.issues_to_sandbox_only
+    assert config.is_ready()
+    assert config.issues_automatically()
+
+
+def test_a_demo_store_needs_the_ground_for_aade_production(
+    bind_tenant, settings
+):
+    """The exception is the sandbox, not the store: a demo store sending to
+    AADE's production environment issues real documents."""
+    settings.REAL_ORDERS_DEPLOYMENT = True
+    _store(
+        bind_tenant,
+        "mydata_cfg_demo_prod",
+        is_demo=True,
+        MYDATA_ENABLED=("bool", "value_bool", True),
+        MYDATA_ENVIRONMENT=("string", "value_string", "prod"),
+    )
+
+    config = load_config()
+
+    assert not config.issues_to_sandbox_only
+    assert not config.is_ready()
+
+
+@pytest.mark.parametrize("environment", ["production", "PROD", ""])
+def test_an_unknown_environment_is_refused_not_guessed(
+    bind_tenant, environment
+):
+    """A typo must not quietly become the sandbox (and so skip the ground):
+    an environment that is neither is not ready, even with the ground."""
+    _store(
+        bind_tenant,
+        "mydata_cfg_bad_env",
+        MYDATA_ENABLED=("bool", "value_bool", True),
+        MYDATA_FHM_EXEMPTION_GROUND=("string", "value_string", _GROUND),
+        MYDATA_ENVIRONMENT=("string", "value_string", environment),
+    )
+
+    config = load_config()
+
+    assert config.environment is None
+    assert not config.is_ready()
+    with pytest.raises(ValueError, match="MYDATA_ENVIRONMENT"):
+        _ = config.base_url
 
 
 def test_the_exemption_ground_is_a_store_setting_that_ships_blank():

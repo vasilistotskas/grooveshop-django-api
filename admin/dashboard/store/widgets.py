@@ -757,9 +757,27 @@ class StoreAlerts(DashboardWidget):
             return []
         config = load_config()
         alerts = []
+        settings_link = (
+            self.changelist_url("extra_settings.Setting", "q=MYDATA_"),
+            _("Open the myDATA settings"),
+        )
+        if config.environment is None:
+            alerts.append(
+                _alert(
+                    "danger",
+                    "cloud_off",
+                    _("myDATA has no valid environment"),
+                    _(
+                        "MYDATA_ENVIRONMENT must be 'dev' (the AADE sandbox) "
+                        "or 'prod'. Until it is, no receipt is issued."
+                    ),
+                    link=settings_link,
+                )
+            )
         # The ERP channel is only for a business exempt from the fiscal
-        # device (ΦΗΜ); without the recorded ground nothing is issued.
-        if not config.fhm_exemption_ground:
+        # device (ΦΗΜ); a store that takes real orders and has not recorded
+        # the ground issues nothing. Sandbox test documents need none.
+        elif not (config.fhm_exemption_ground or config.issues_to_sandbox_only):
             alerts.append(
                 _alert(
                     "danger",
@@ -773,12 +791,7 @@ class StoreAlerts(DashboardWidget):
                         "MYDATA_ENABLED off and issue receipts in your "
                         "fiscal device or e-invoicing provider."
                     ),
-                    link=(
-                        self.changelist_url(
-                            "extra_settings.Setting", "q=MYDATA_"
-                        ),
-                        _("Open the myDATA settings"),
-                    ),
+                    link=settings_link,
                 )
             )
         missing = [

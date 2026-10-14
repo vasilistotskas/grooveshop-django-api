@@ -10,12 +10,17 @@ code deploy needed.
 Retail receipts are issued through a fiscal device (ΦΗΜ) or a licensed
 provider (ν.4308/2014 art. 12 §8, §10). The ERP channel this package
 implements is only for a business exempt from the ΦΗΜ, so a store that
-has not recorded that exemption (``MYDATA_FHM_EXEMPTION_GROUND``) is
-never ready, whatever else is set.
+takes real orders and has not recorded that exemption
+(``MYDATA_FHM_EXEMPTION_GROUND``) is never ready. AADE's sandbox (``dev``)
+registers test documents only ("για τη φάση της ανάπτυξης και διενέργειας
+δοκιμών", myDATA REST API documentation), so a store that takes no real
+orders — a demo store, or any store outside the production deployment —
+may issue to the sandbox without one.
 
 The dev/prod base URLs are **hard-coded constants** because they are
 published AADE endpoints, not customer-supplied. Accidentally pointing
-prod code at a user-set URL would be a bug factory.
+prod code at a user-set URL would be a bug factory. An environment value
+that is neither is refused (the store is not ready), never guessed.
 """
 
 from __future__ import annotations
@@ -23,11 +28,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
+from django.conf import settings
 from extra_settings.models import Setting
 
 from tenant.credentials import mydata_credentials
+from tenant.membership import bound_tenant
 
-_BASE_URLS: dict[str, str] = {
+type Environment = Literal["dev", "prod"]
+
+_BASE_URLS: dict[Environment, str] = {
     # Published by AADE: https://www.aade.gr/en/mydata
     "dev": "https://mydataapidev.aade.gr",
     "prod": "https://mydatapi.aade.gr/myDATA",
@@ -45,8 +54,12 @@ class MyDataConfig:
 
     enabled: bool
     fhm_exemption_ground: str
+    #: The store takes real orders: a store not flagged ``is_demo``, on
+    #: the production deployment (``settings.REAL_ORDERS_DEPLOYMENT``).
+    takes_real_orders: bool
     auto_submit: bool
-    environment: Literal["dev", "prod"]
+    #: ``None`` when ``MYDATA_ENVIRONMENT`` is neither ``dev`` nor ``prod``.
+    environment: Environment | None
     user_id: str
     subscription_key: str
     invoice_series_prefix: str
@@ -57,17 +70,28 @@ class MyDataConfig:
     @property
     def base_url(self) -> str:
         """Return the AADE endpoint base URL for this environment."""
+        if self.environment is None:
+            raise ValueError("MYDATA_ENVIRONMENT is neither 'dev' nor 'prod'")
         return _BASE_URLS[self.environment]
+
+    @property
+    def issues_to_sandbox_only(self) -> bool:
+        """The documents go to AADE's sandbox, from a store that takes no
+        real orders: test registrations, never a tax document a customer
+        relies on, so no ΦΗΜ exemption is needed for them."""
+        return self.environment == "dev" and not self.takes_real_orders
 
     def is_ready(self) -> bool:
         """True when the platform issues this store's retail documents:
-        myDATA is enabled, the store has recorded the legal ground of its
-        ΦΗΜ exemption, and its credentials are populated. The call sites
+        myDATA is enabled with a known environment, the store has
+        recorded the legal ground of its ΦΗΜ exemption (or only issues to
+        the sandbox), and its credentials are populated. The call sites
         should no-op rather than raise when False — the store then issues
         its documents outside the platform."""
         return bool(
             self.enabled
-            and self.fhm_exemption_ground
+            and self.environment is not None
+            and (self.fhm_exemption_ground or self.issues_to_sandbox_only)
             and self.user_id
             and self.subscription_key
         )
@@ -94,24 +118,31 @@ class MyDataConfig:
         }
 
 
+def _environment(value: object) -> Environment | None:
+    if value == "dev":
+        return "dev"
+    if value == "prod":
+        return "prod"
+    return None
+
+
 def load_config() -> MyDataConfig:
     """Build a :class:`MyDataConfig` from the current ``extra_settings``
     values and the active tenant's credentials. Call per task
     invocation — not cached."""
-    env = Setting.get("MYDATA_ENVIRONMENT", default="dev")
-    # Defend against typos in the admin — anything we don't recognise
-    # falls back to ``dev`` so a misconfigured prod flag can't hit the
-    # wrong base URL.
-    if env not in _BASE_URLS:
-        env = "dev"
     credentials = mydata_credentials()
+    tenant = bound_tenant()
     return MyDataConfig(
         enabled=bool(Setting.get("MYDATA_ENABLED", default=False)),
         fhm_exemption_ground=str(
             Setting.get("MYDATA_FHM_EXEMPTION_GROUND", default="")
         ).strip(),
+        takes_real_orders=settings.REAL_ORDERS_DEPLOYMENT
+        and not (tenant is not None and tenant.is_demo),
         auto_submit=bool(Setting.get("MYDATA_AUTO_SUBMIT", default=False)),
-        environment=env,  # type: ignore[arg-type]
+        environment=_environment(
+            Setting.get("MYDATA_ENVIRONMENT", default="dev")
+        ),
         user_id=credentials["user_id"],
         subscription_key=credentials["subscription_key"],
         invoice_series_prefix=str(

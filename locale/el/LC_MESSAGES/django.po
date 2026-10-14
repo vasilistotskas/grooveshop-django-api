@@ -22800,3 +22800,15 @@ msgstr ""
 #: .\admin\dashboard\store\widgets.py
 msgid "Open the myDATA settings"
 msgstr "Άνοιγμα ρυθμίσεων myDATA"
+
+#: .\admin\dashboard\store\widgets.py
+msgid "myDATA has no valid environment"
+msgstr "Το myDATA δεν έχει έγκυρο περιβάλλον"
+
+#: .\admin\dashboard\store\widgets.py
+msgid ""
+"MYDATA_ENVIRONMENT must be 'dev' (the AADE sandbox) or 'prod'. Until it is, "
+"no receipt is issued."
+msgstr ""
+"Το MYDATA_ENVIRONMENT πρέπει να είναι 'dev' (το δοκιμαστικό περιβάλλον της "
+"ΑΑΔΕ) ή 'prod'. Μέχρι τότε δεν εκδίδεται καμία απόδειξη."

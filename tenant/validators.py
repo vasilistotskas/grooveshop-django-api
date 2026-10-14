@@ -392,6 +392,77 @@ def validate_auth_panel_setting(value: object) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# FUNDING_BANNER extra_setting
+# ---------------------------------------------------------------------------
+
+_FUNDING_BANNER_KEYS = {"enabled", "image", "alt", "link", "label"}
+_FUNDING_BANNER_URL_MAX = 1000
+_FUNDING_BANNER_ALT_MAX = 300
+_FUNDING_BANNER_LABEL_MAX = 120
+# A site-relative path (but not protocol-relative ``//host``) or https.
+_FUNDING_BANNER_URL_RE = re.compile(r"^(/(?!/)|https://)\S")
+
+
+def _funding_banner_url_ok(value: object) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) <= _FUNDING_BANNER_URL_MAX
+        and _FUNDING_BANNER_URL_RE.match(value) is not None
+        and not any(c.isspace() for c in value)
+    )
+
+
+def validate_funding_banner_setting(value: object) -> bool:
+    """django-extra-settings validator for ``FUNDING_BANNER``.
+
+    Boolean contract, like ``validate_business_hours_setting``.
+
+    Shape: ``{"enabled": bool, "image": str, "alt": str, "link": str,
+    "label"?: str}`` — the EU/ESPA co-funding strip a beneficiary must
+    show above the fold. ``image`` and ``link`` are a site-relative
+    path or an ``https://`` URL (never ``http:``, ``javascript:`` or a
+    protocol-relative ``//`` URL). ``alt`` is the accessible name of
+    the logos, so it may not be blank. ``enabled`` is required;
+    ``image``, ``alt`` and ``link`` are required when it is true, and
+    a disabled banner may be just ``{"enabled": false}``.
+    """
+    if not isinstance(value, dict):
+        return False
+    data = {str(k): v for k, v in value.items()}
+    if set(data) - _FUNDING_BANNER_KEYS:
+        return False
+    enabled = data.get("enabled")
+    if not isinstance(enabled, bool):
+        return False
+
+    image = data.get("image")
+    if image is not None and not _funding_banner_url_ok(image):
+        return False
+    link = data.get("link")
+    if link is not None and not _funding_banner_url_ok(link):
+        return False
+    alt = data.get("alt")
+    if alt is not None and (
+        not isinstance(alt, str) or len(alt) > _FUNDING_BANNER_ALT_MAX
+    ):
+        return False
+    label = data.get("label")
+    if label is not None and (
+        not isinstance(label, str) or len(label) > _FUNDING_BANNER_LABEL_MAX
+    ):
+        return False
+
+    if enabled:
+        return (
+            image is not None
+            and link is not None
+            and isinstance(alt, str)
+            and bool(alt.strip())
+        )
+    return True
+
+
+# ---------------------------------------------------------------------------
 # Reserved schema names
 # ---------------------------------------------------------------------------
 

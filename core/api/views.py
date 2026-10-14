@@ -738,6 +738,9 @@ PUBLIC_SETTING_KEYS = frozenset(
         # The sign-in pages' photo and line. Operator-authored and shown
         # to every visitor before they authenticate, so public.
         "AUTH_PANEL",
+        # The EU/ESPA co-funding strip at the very top of every page.
+        # Operator-authored and shown to every visitor, so public.
+        "FUNDING_BANNER",
         # Demo-store credentials, deliberately public: the login page
         # shows them so a prospect can see the logged-in storefront.
         # Default off + empty everywhere; the demo seeder writes them

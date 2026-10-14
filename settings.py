@@ -37,6 +37,14 @@ SYSTEM_ENV = getenv("SYSTEM_ENV", "dev")
 # Staging runs the production profile on purpose, so a release rehearses
 # exactly what production will run, and still says it is staging.
 PRODUCTION_PROFILE = SYSTEM_ENV in ("production", "staging")
+# Whether this deployment's stores take real orders from real customers.
+# Staging (mirrored rows, rehearsals), a developer machine and CI never
+# sell; anything else, production or a SYSTEM_ENV this file does not
+# know, is taken to, so a store there needs what a real sale requires (a
+# recorded ΦΗΜ exemption before myDATA issues a receipt,
+# ``order.mydata.config``). Listed as the exceptions, so an unknown name
+# fails closed.
+REAL_ORDERS_DEPLOYMENT = SYSTEM_ENV not in ("staging", "dev", "ci")
 
 SECRET_KEY = getenv("SECRET_KEY", "")
 if not SECRET_KEY:
@@ -2399,13 +2407,13 @@ EXTRA_SETTINGS_DEFAULTS = [
         "name": "MYDATA_ENABLED",
         "type": "bool",
         "value": False,
-        "description": "Whether the platform issues this store's retail receipts (11.1) and retail credit documents (11.4) itself, over the myDATA ERP channel. Off: the store issues them in its own fiscal device (ΦΗΜ) or licensed e-invoicing provider, and the platform builds and sends nothing. The ERP channel is only for a business exempt from the ΦΗΜ (ν.4308/2014 art. 12 §8 and §10), so nothing is issued until MYDATA_FHM_EXEMPTION_GROUND is filled in. Invoices are never issued here: staff issue them in AADE's timologio app.",
+        "description": "Whether the platform issues this store's retail receipts (11.1) and retail credit documents (11.4) itself, over the myDATA ERP channel. Off: the store issues them in its own fiscal device (ΦΗΜ) or licensed e-invoicing provider, and the platform builds and sends nothing. The ERP channel is only for a business exempt from the ΦΗΜ (ν.4308/2014 art. 12 §8 and §10), so a store that takes real orders issues nothing until MYDATA_FHM_EXEMPTION_GROUND is filled in; a demo store, or any store outside the production deployment, may issue to the AADE sandbox without it. Invoices are never issued here: staff issue them in AADE's timologio app.",
     },
     {
         "name": "MYDATA_FHM_EXEMPTION_GROUND",
         "type": "string",
         "value": "",
-        "description": "The legal ground on which this business is exempt from issuing retail receipts through a fiscal device (ΦΗΜ) or a licensed provider: the ΠΟΛ.1002/2014 provision, the accountant who confirmed it, and the date, e.g. 'ΠΟΛ.1002/2014 §<paragraph>, confirmed by <accountant>, <date>'. Online sales are not exempt as such. While this is blank the platform issues nothing over the myDATA ERP channel, even with MYDATA_ENABLED on. Since ν.5222/2025 art. 238 (28/7/2025) exempt businesses are pointed to timologio or a licensed provider, so the accountant must also confirm the ERP channel is still allowed.",
+        "description": "The legal ground on which this business is exempt from issuing retail receipts through a fiscal device (ΦΗΜ) or a licensed provider: the ΠΟΛ.1002/2014 provision, the accountant who confirmed it, and the date, e.g. 'ΠΟΛ.1002/2014 §<paragraph>, confirmed by <accountant>, <date>'. Online sales are not exempt as such. While this is blank the platform issues nothing over the myDATA ERP channel, even with MYDATA_ENABLED on — except test documents to the AADE sandbox (MYDATA_ENVIRONMENT 'dev') from a demo store or a store outside the production deployment, which take no real orders. Since ν.5222/2025 art. 238 (28/7/2025) exempt businesses are pointed to timologio or a licensed provider, so the accountant must also confirm the ERP channel is still allowed.",
     },
     {
         "name": "MYDATA_AUTO_SUBMIT",
@@ -2417,7 +2425,7 @@ EXTRA_SETTINGS_DEFAULTS = [
         "name": "MYDATA_ENVIRONMENT",
         "type": "string",
         "value": "dev",
-        "description": "Target environment: 'dev' (mydataapidev.aade.gr) or 'prod' (mydatapi.aade.gr/myDATA). Dev and prod are separate portals with separate credentials.",
+        "description": "Target environment: 'dev' (the AADE sandbox, mydataapidev.aade.gr, for development and tests: its documents are not tax documents) or 'prod' (mydatapi.aade.gr/myDATA). Any other value is refused and nothing is issued. Dev and prod are separate portals with separate credentials.",
     },
     {
         "name": "MYDATA_INVOICE_SERIES_PREFIX",

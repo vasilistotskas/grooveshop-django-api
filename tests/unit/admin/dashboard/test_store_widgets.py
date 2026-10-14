@@ -447,7 +447,9 @@ class TestAlerts:
 
         assert items is None
 
-    def _mydata_titles(self, tenant, bind_tenant, *, ground: str) -> list[str]:
+    def _mydata_titles(
+        self, tenant, bind_tenant, *, ground: str, environment: str = "dev"
+    ) -> list[str]:
         from extra_settings.models import Setting
 
         Setting.objects.update_or_create(
@@ -458,6 +460,10 @@ class TestAlerts:
             name="MYDATA_FHM_EXEMPTION_GROUND",
             defaults={"value_type": "string", "value_string": ground},
         )
+        Setting.objects.update_or_create(
+            name="MYDATA_ENVIRONMENT",
+            defaults={"value_type": "string", "value_string": environment},
+        )
         bind_tenant(tenant)
         superuser = UserAccountFactory(admin=True)
         with translation.override("en"):
@@ -467,11 +473,14 @@ class TestAlerts:
             ]
 
     def test_mydata_on_without_an_exemption_ground_is_a_danger_alert(
-        self, bind_tenant
+        self, bind_tenant, settings
     ):
-        """Switched on with credentials but no recorded ΦΗΜ exemption, the
-        platform issues nothing; the owner is told why, not left guessing."""
+        """Switched on with credentials but no recorded ΦΗΜ exemption, a
+        store taking real orders issues nothing; the owner is told why, not
+        left guessing."""
         from tests.utils.staff import store_tenant
+
+        settings.REAL_ORDERS_DEPLOYMENT = True
 
         titles = self._mydata_titles(
             store_tenant(
@@ -499,6 +508,43 @@ class TestAlerts:
         )
 
         assert "myDATA is on, but no receipt is issued" not in titles
+
+    def test_a_demo_store_in_the_sandbox_needs_no_ground(
+        self, bind_tenant, settings
+    ):
+        from tests.utils.staff import store_tenant
+
+        settings.REAL_ORDERS_DEPLOYMENT = True
+        titles = self._mydata_titles(
+            store_tenant(
+                "widget_mydata_demo_sandbox",
+                mydata_user_id="u",
+                mydata_subscription_key="k",
+                is_demo=True,
+            ),
+            bind_tenant,
+            ground="",
+        )
+
+        assert "myDATA is on, but no receipt is issued" not in titles
+        assert "myDATA is using the AADE sandbox" in titles
+
+    def test_an_invalid_environment_is_a_danger_alert(self, bind_tenant):
+        from tests.utils.staff import store_tenant
+
+        titles = self._mydata_titles(
+            store_tenant(
+                "widget_mydata_bad_env",
+                mydata_user_id="u",
+                mydata_subscription_key="k",
+            ),
+            bind_tenant,
+            ground="ΠΟΛ.1002/2014 §4, accountant, 2026-10-14",
+            environment="production",
+        )
+
+        assert "myDATA has no valid environment" in titles
+        assert "myDATA is using the AADE sandbox" not in titles
 
     def test_a_store_dashboard_never_counts_background_task_failures(
         self, monkeypatch

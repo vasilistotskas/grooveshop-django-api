@@ -26,6 +26,7 @@ FIRST_MARK = 400000000000001
 READY_CONFIG = MyDataConfig(
     enabled=True,
     fhm_exemption_ground="ΠΟΛ.1002/2014 (test fixture)",
+    takes_real_orders=True,
     auto_submit=True,
     environment="dev",
     user_id="test-user",

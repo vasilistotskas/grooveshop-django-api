@@ -11,6 +11,8 @@ from tests.utils.staff import store_tenant
 
 pytestmark = pytest.mark.django_db
 
+_GROUND = "ΠΟΛ.1002/2014 §4, confirmed by the store's accountant, 2026-10-14"
+
 
 def test_the_credentials_are_the_tenants_own(bind_tenant):
     bind_tenant(
@@ -23,6 +25,10 @@ def test_the_credentials_are_the_tenants_own(bind_tenant):
     Setting.objects.update_or_create(
         name="MYDATA_ENABLED",
         defaults={"value_type": "bool", "value_bool": True},
+    )
+    Setting.objects.update_or_create(
+        name="MYDATA_FHM_EXEMPTION_GROUND",
+        defaults={"value_type": "string", "value_string": _GROUND},
     )
 
     config = load_config()
@@ -89,6 +95,7 @@ def test_the_platform_issues_by_itself_only_with_auto_submit(bind_tenant):
         bind_tenant,
         "mydata_cfg_auto",
         MYDATA_ENABLED=("bool", "value_bool", True),
+        MYDATA_FHM_EXEMPTION_GROUND=("string", "value_string", _GROUND),
         MYDATA_AUTO_SUBMIT=("bool", "value_bool", True),
     )
     assert load_config().issues_automatically()
@@ -125,3 +132,35 @@ def test_the_credit_documents_have_a_series_of_their_own(bind_tenant):
         defaults={"value_type": "string", "value_string": "STORE-C"},
     )
     assert load_config().credit_series_prefix == "STORE-C"
+
+
+@pytest.mark.parametrize("ground", ["", "   "])
+def test_without_a_recorded_fhm_exemption_the_store_is_never_ready(
+    bind_tenant, ground
+):
+    """Retail receipts come from a fiscal device or a licensed provider
+    (ν.4308/2014 art. 12 §8, §10); the ERP channel is only for a business
+    exempt from the ΦΗΜ. Switched on, with credentials and automatic
+    issuing, a store that has not recorded that ground issues nothing."""
+    _store(
+        bind_tenant,
+        "mydata_cfg_no_ground",
+        MYDATA_ENABLED=("bool", "value_bool", True),
+        MYDATA_FHM_EXEMPTION_GROUND=("string", "value_string", ground),
+        MYDATA_AUTO_SUBMIT=("bool", "value_bool", True),
+    )
+
+    config = load_config()
+
+    assert config.fhm_exemption_ground == ""
+    assert not config.is_ready()
+    assert not config.issues_automatically()
+
+
+def test_the_exemption_ground_is_a_store_setting_that_ships_blank():
+    defaults = {
+        item["name"]: item for item in django_settings.EXTRA_SETTINGS_DEFAULTS
+    }
+    ground = defaults["MYDATA_FHM_EXEMPTION_GROUND"]
+    assert ground["type"] == "string"
+    assert ground["value"] == ""

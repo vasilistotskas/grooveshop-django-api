@@ -17,9 +17,12 @@ from unittest.mock import patch
 from django.test import TestCase, TransactionTestCase, override_settings
 from djmoney.money import Money
 
+from order.enum.document_type import OrderDocumentTypeEnum
+from order.enum.status import OrderStatus
 from order.factories.item import OrderItemFactory
 from order.factories.order import OrderFactory
 from order.invoicing import (
+    ReceiptNotIssuable,
     _build_context,
     _build_qr_svg,
     _compute_vat_breakdown,
@@ -29,7 +32,9 @@ from order.invoicing import (
     generate_invoice,
 )
 from order.models.invoice import Invoice, InvoiceCounter
+from order.models.order import Order
 from product.factories.product import ProductFactory
+from tests.utils.mydata import issuable, mydata_enabled
 from vat.factories import VatFactory
 
 
@@ -228,7 +233,14 @@ class OrderTotalsTestCase(TestCase):
 class GenerateInvoiceIdempotencyTestCase(TestCase):
     """``generate_invoice`` must be safe to call multiple times —
     ``handle_order_completed`` might re-fire on a status re-save and we
-    rely on the idempotency guarantee rather than a separate flag."""
+    rely on the idempotency guarantee rather than a separate flag.
+
+    The store issues through the platform here (by hand: nothing is
+    dispatched by a signal), and every order is a shipped receipt order —
+    the only kind ``generate_invoice`` issues for."""
+
+    def setUp(self) -> None:
+        self.enterContext(mydata_enabled(auto_submit=False))
 
     def _make_order(self) -> object:
         vat = VatFactory(value=24)
@@ -240,7 +252,7 @@ class GenerateInvoiceIdempotencyTestCase(TestCase):
             price=Money(Decimal("12.40"), "EUR"),
             quantity=1,
         )
-        return order
+        return issuable(order)
 
     @patch(
         "order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 ... %EOF"
@@ -435,8 +447,10 @@ class GenerateInvoiceIdempotencyTestCase(TestCase):
         shipping. No VAT rate follows nothing, so the invoice is refused
         (the admin actions and the task already report the failure) — and
         the sequential register must not lose a number to it."""
-        order = OrderFactory(
-            num_order_items=0, shipping_price=Money(Decimal("3.50"), "EUR")
+        order = issuable(
+            OrderFactory(
+                num_order_items=0, shipping_price=Money(Decimal("3.50"), "EUR")
+            )
         )
 
         def counters():
@@ -489,6 +503,111 @@ class GenerateInvoiceIdempotencyTestCase(TestCase):
             ).next_number,
             "resuming a failed render must not consume a new counter slot",
         )
+
+
+class GenerateInvoiceRefusalTestCase(TestCase):
+    """``generate_invoice`` is where a receipt number is allocated, so it
+    is where the platform's rule is enforced, whoever calls it: a receipt
+    only for a shipped receipt order, only while the store issues through
+    the platform, and a regeneration never creates one."""
+
+    def _order(self, **kwargs):
+        order = OrderFactory(num_order_items=0, **kwargs)
+        OrderItemFactory(
+            order=order,
+            product=ProductFactory(vat=VatFactory(value=24)),
+            price=Money(Decimal("12.40"), "EUR"),
+            quantity=1,
+        )
+        return order
+
+    def _assert_refused(self, order, **kwargs) -> None:
+        counters = list(InvoiceCounter.objects.values_list("next_number"))
+        with (
+            patch("order.invoicing._render_pdf_bytes") as render,
+            self.assertRaises(ReceiptNotIssuable),
+        ):
+            generate_invoice(order, **kwargs)
+        render.assert_not_called()
+        self.assertFalse(Invoice.objects.filter(order=order).exists())
+        self.assertEqual(
+            list(InvoiceCounter.objects.values_list("next_number")), counters
+        )
+
+    def test_a_store_that_issues_outside_the_platform_gets_none(self):
+        self._assert_refused(issuable(self._order()))
+
+    def test_an_invoice_order_gets_none(self):
+        order = self._order(
+            document_type=OrderDocumentTypeEnum.INVOICE.value,
+            status=OrderStatus.PROCESSING,
+        )
+        Order.objects.filter(pk=order.pk).update(status=OrderStatus.SHIPPED)
+        order.refresh_from_db()
+
+        with mydata_enabled(auto_submit=False):
+            self._assert_refused(order)
+
+    def test_an_order_that_has_not_shipped_gets_none(self):
+        for status in (
+            OrderStatus.PENDING,
+            OrderStatus.PROCESSING,
+            OrderStatus.CANCELED,
+        ):
+            with self.subTest(status=status):
+                order = self._order(
+                    document_type=OrderDocumentTypeEnum.RECEIPT.value,
+                    status=status,
+                )
+                with mydata_enabled(auto_submit=False):
+                    self._assert_refused(order)
+
+    def test_regenerating_an_order_without_a_receipt_creates_none(self):
+        with mydata_enabled(auto_submit=False):
+            self._assert_refused(issuable(self._order()), force=True)
+
+    def test_an_old_row_is_not_returned_for_an_order_that_gets_no_receipt(
+        self,
+    ):
+        """A row written before the rule (an invoice order, say) must not
+        come back as "the receipt", or the issuing task would send it on
+        to AADE."""
+        order = self._order(
+            document_type=OrderDocumentTypeEnum.INVOICE.value,
+            status=OrderStatus.PROCESSING,
+        )
+        InvoiceCounter.objects.create(year=2026, next_number=2)
+        Invoice.objects.create(order=order, invoice_number="INV-2026-000001")
+
+        with mydata_enabled(auto_submit=False):
+            for force in (False, True):
+                with (
+                    self.subTest(force=force),
+                    patch("order.invoicing._render_pdf_bytes") as render,
+                    self.assertRaises(ReceiptNotIssuable),
+                ):
+                    generate_invoice(order, force=force)
+                render.assert_not_called()
+
+    def test_a_receipt_is_regenerated_after_its_order_moved_on(self):
+        """Re-rendering needs a receipt order, not a shipped status: a
+        receipt keeps its PDF fixable after the order is completed."""
+        order = issuable(self._order())
+        with (
+            mydata_enabled(auto_submit=False),
+            patch(
+                "order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4"
+            ),
+        ):
+            first = generate_invoice(order)
+            Order.objects.filter(pk=order.pk).update(
+                status=OrderStatus.COMPLETED
+            )
+            order.refresh_from_db()
+            again = generate_invoice(order, force=True)
+
+        self.assertEqual(again.pk, first.pk)
+        self.assertEqual(again.invoice_number, first.invoice_number)
 
 
 class RenderItemsTestCase(TestCase):

@@ -35,6 +35,7 @@ from product.factories import ProductCategoryFactory, ProductFactory
 from promotion.enum import BenefitType, PromotionTrigger, TargetScope
 from promotion.factories import PromotionFactory
 from promotion.services import PromotionEngine
+from tests.utils.mydata import issuable, mydata_enabled
 from tests.utils.shipping import enable_rate
 from user.factories import UserAccountFactory
 from vat.factories import VatFactory
@@ -159,10 +160,13 @@ def _shipping(order):
 
 
 def _documents(order):
-    with patch(
-        "order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test"
+    with (
+        mydata_enabled(auto_submit=False),
+        patch(
+            "order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test"
+        ),
     ):
-        invoice = generate_invoice(order)
+        invoice = generate_invoice(issuable(order))
     built = build_receipt_xml(
         invoice,
         issuer_vat="123456789",

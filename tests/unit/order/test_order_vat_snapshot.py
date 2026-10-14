@@ -42,6 +42,7 @@ from pay_way.factories import PayWayFactory
 from product.factories import ProductFactory
 from promotion.enum import BenefitType, PromotionTrigger
 from promotion.factories import PromotionFactory
+from tests.utils.mydata import issuable, mydata_enabled
 from tests.utils.shipping import enable_rate
 from user.factories import UserAccountFactory
 from vat.factories import VatFactory
@@ -129,10 +130,13 @@ def _rates(order):
 
 def _issue(order):
     """The invoice and the myDATA detail lines, as the pipeline builds them."""
-    with patch(
-        "order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test"
+    with (
+        mydata_enabled(auto_submit=False),
+        patch(
+            "order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test"
+        ),
     ):
-        invoice = generate_invoice(order)
+        invoice = generate_invoice(issuable(order))
     built = build_receipt_xml(
         invoice,
         issuer_vat="123456789",

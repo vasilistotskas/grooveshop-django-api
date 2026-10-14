@@ -2,7 +2,8 @@
 
 ``mydata_enabled`` makes the integration read as enabled and configured (the
 config loader and the seller VAT are the seams the service documents as
-patchable); ``FakeAade`` is AADE's ``SendInvoices`` / ``CancelInvoice``: it
+patchable); ``issuable`` turns an order into one the platform issues a
+receipt for; ``FakeAade`` is AADE's ``SendInvoices`` / ``CancelInvoice``: it
 records every payload it receives, parsed, and answers each with a Success
 carrying a new MARK. Nothing here reaches the network.
 """
@@ -24,6 +25,7 @@ FIRST_MARK = 400000000000001
 
 READY_CONFIG = MyDataConfig(
     enabled=True,
+    fhm_exemption_ground="ΠΟΛ.1002/2014 (test fixture)",
     auto_submit=True,
     environment="dev",
     user_id="test-user",
@@ -53,6 +55,7 @@ def mydata_enabled(*, auto_submit: bool = True, ready: bool = True):
         "order.mydata.config.load_config",
         "order.mydata.service.load_config",
         "order.signals.handlers.load_mydata_config",
+        "order.invoicing.load_mydata_config",
     )
     with ExitStack() as stack:
         for target in targets:
@@ -64,6 +67,25 @@ def mydata_enabled(*, auto_submit: bool = True, ready: bool = True):
             )
         )
         yield config
+
+
+def issuable(order):
+    """``order`` as ``order.invoicing.generate_invoice`` issues a receipt
+    for it: a receipt order that has shipped (``receipt_issuable``).
+
+    Written with ``update()``: shipping it through the state machine would
+    signal ``order_shipped``, which dispatches the issuing task itself.
+    """
+    from order.enum.document_type import OrderDocumentTypeEnum
+    from order.enum.status import OrderStatus
+
+    type(order).objects.filter(pk=order.pk).update(
+        document_type=OrderDocumentTypeEnum.RECEIPT.value,
+        status=OrderStatus.SHIPPED,
+    )
+    order.document_type = OrderDocumentTypeEnum.RECEIPT.value
+    order.status = OrderStatus.SHIPPED
+    return order
 
 
 def _doc(xml_bytes: bytes) -> SimpleNamespace:

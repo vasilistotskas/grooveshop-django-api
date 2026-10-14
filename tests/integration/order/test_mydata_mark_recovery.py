@@ -37,23 +37,11 @@ from order.factories.item import OrderItemFactory
 from order.factories.order import OrderFactory
 from order.invoicing import generate_invoice
 from order.models.invoice import MyDataStatus
-from order.mydata.config import MyDataConfig
 from order.mydata.exceptions import MyDataTransportError
 from order.tasks import send_invoice_to_mydata
 from product.factories.product import ProductFactory
+from tests.utils.mydata import issuable, mydata_enabled
 from vat.factories import VatFactory
-
-_READY_CONFIG = MyDataConfig(
-    enabled=True,
-    auto_submit=True,
-    environment="dev",
-    user_id="test-user",
-    subscription_key="test-subscription-key",
-    invoice_series_prefix="GRVP",
-    credit_series_prefix="GRVC",
-    issuer_branch=0,
-    request_timeout_seconds=30,
-)
 
 _RECOVERED_MARK = 999000111
 
@@ -113,19 +101,6 @@ def _make_transmitted_xml_with_uid(
     ).encode()
 
 
-def _enable_mydata(test_case: TestCase) -> None:
-    """Patch the myDATA integration boundary (same helper as the main
-    test module — see test_mydata_submission.py for rationale)."""
-    for target, retval in (
-        ("order.mydata.config.load_config", _READY_CONFIG),
-        ("order.mydata.service.load_config", _READY_CONFIG),
-        ("order.mydata.service._resolve_issuer_vat", "123456789"),
-    ):
-        p = patch(target, return_value=retval)
-        p.start()
-        test_case.addCleanup(p.stop)
-
-
 def _make_invoice():
     """Create order + generate invoice (no uid pre-setting needed)."""
     vat = VatFactory(value=24)
@@ -146,7 +121,7 @@ def _make_invoice():
         "order.invoicing._render_pdf_bytes",
         return_value=b"%PDF-1.4 test",
     ):
-        invoice = generate_invoice(order)
+        invoice = generate_invoice(issuable(order))
     return order, invoice
 
 
@@ -173,7 +148,7 @@ class MarkRecoveryTestCase(TestCase):
         """When RequestTransmittedDocs returns exactly one doc matching
         our uid, the invoice must be flipped to CONFIRMED with the
         recovered MARK and the email chain must still fire."""
-        _enable_mydata(self)
+        self.enterContext(mydata_enabled())
         order, invoice = _make_invoice()
         mock_send.return_value = _DUPLICATE_228_XML
 
@@ -232,7 +207,7 @@ class MarkRecoveryTestCase(TestCase):
     ):
         """When RequestTransmittedDocs returns no docs matching our uid,
         the invoice must stay REJECTED and no MARK must be written."""
-        _enable_mydata(self)
+        self.enterContext(mydata_enabled())
         order, invoice = _make_invoice()
         mock_send.return_value = _DUPLICATE_228_XML
 
@@ -263,7 +238,7 @@ class MarkRecoveryTestCase(TestCase):
         our uid, the safety guard must prevent writing any MARK and the
         invoice must stay REJECTED. Writing the wrong MARK would be
         worse than staying REJECTED."""
-        _enable_mydata(self)
+        self.enterContext(mydata_enabled())
         order, invoice = _make_invoice()
         mock_send.return_value = _DUPLICATE_228_XML
 
@@ -316,7 +291,7 @@ class MarkRecoveryTestCase(TestCase):
         """When the RequestTransmittedDocs call itself fails with a
         transport error, the task must NOT crash or retry — it must
         fall back cleanly to the REJECTED state (and email nothing)."""
-        _enable_mydata(self)
+        self.enterContext(mydata_enabled())
         order, invoice = _make_invoice()
         mock_send.return_value = _DUPLICATE_228_XML
 
@@ -350,7 +325,7 @@ class MarkRecoveryTestCase(TestCase):
         """The matching doc can live on a second page. Recovery must read
         the ``<continuationToken>`` wrapper (nextPartitionKey/nextRowKey),
         feed those keys to the next call, and still confirm the invoice."""
-        _enable_mydata(self)
+        self.enterContext(mydata_enabled())
         order, invoice = _make_invoice()
         mock_send.return_value = _DUPLICATE_228_XML
 

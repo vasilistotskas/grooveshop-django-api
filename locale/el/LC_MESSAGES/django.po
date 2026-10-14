@@ -9042,14 +9042,6 @@ msgstr ""
 "Η παραγγελία #%(order_id)s δεν έχει ακόμη δημιουργημένο τιμολόγιο — "
 "δημιουργήστε πρώτα το τιμολόγιο και μετά υποβάλετέ το στο myDATA."
 
-#: .\order\admin.py:1198
-msgid ""
-"myDATA integration is not ready — check MYDATA_ENABLED and credentials in "
-"Settings before retrying."
-msgstr ""
-"Η ενσωμάτωση myDATA δεν είναι έτοιμη — ελέγξτε το MYDATA_ENABLED και τα "
-"διαπιστευτήρια στις Ρυθμίσεις πριν προσπαθήσετε ξανά."
-
 #: .\order\admin.py:1208
 #, python-format
 msgid ""
@@ -11484,26 +11476,6 @@ msgstr ""
 "εξαντλημένα επιστρέφονται στο skipped_items· οι ποσότητες περιορίζονται στο "
 "τρέχον απόθεμα."
 
-#: .\order\views\order.py:235
-msgid "Get invoice download metadata for an order"
-msgstr "Λήψη μεταδεδομένων λήψης τιμολογίου για παραγγελία"
-
-#: .\order\views\order.py:237
-#, python-brace-format
-msgid ""
-"Return the order's invoice metadata and an absolute URL to the streaming "
-"download endpoint (``/order/{id}/invoice/download``). The URL is gated by "
-"the same owner/admin permission check as this metadata endpoint — no raw "
-"storage URLs are exposed to the client. 404 if the invoice has not been "
-"generated yet (e.g. order not completed)."
-msgstr ""
-"Επιστρέφει τα μεταδεδομένα τιμολογίου της παραγγελίας και ένα απόλυτο URL "
-"προς το endpoint λήψης μέσω ροής (``/order/{id}/invoice/download``). Το URL "
-"προστατεύεται από τον ίδιο έλεγχο δικαιώματος ιδιοκτήτη/διαχειριστή όπως και"
-" αυτό το endpoint μεταδεδομένων — δεν εκτίθενται ακατέργαστα URL αποθήκευσης"
-" στον client. 404 αν το τιμολόγιο δεν έχει δημιουργηθεί ακόμα (π.χ. η "
-"παραγγελία δεν έχει ολοκληρωθεί)."
-
 #: .\order\views\order.py:248
 msgid "Cancel the BoxNow shipment for an order"
 msgstr "Ακύρωση της αποστολής BoxNow για παραγγελία"
@@ -11793,26 +11765,6 @@ msgstr "Δεν βρέθηκε παραγγελία για το αναγνωρι�
 #: .\order\views\order.py:2018
 msgid "Authentication is required to view your orders"
 msgstr "Απαιτείται ταυτοποίηση για να δείτε τις παραγγελίες σας"
-
-#: .\order\views\order.py:2045 .\order\views\order.py:2093
-msgid "Invoice has not been generated for this order yet."
-msgstr "Δεν έχει δημιουργηθεί ακόμα τιμολόγιο για αυτή την παραγγελία."
-
-#: .\order\views\order.py:2055
-msgid "Download the invoice PDF"
-msgstr "Λήψη PDF τιμολογίου"
-
-#: .\order\views\order.py:2057
-msgid ""
-"Streams the rendered PDF through Django auth. 404 when the invoice has not "
-"been generated yet. Same ownership check as the metadata endpoint — returns "
-"a signed S3 stream on prod and a filesystem stream in dev without exposing "
-"the storage URL to the client."
-msgstr ""
-"Μεταδίδει το παραχθέν PDF μέσω ταυτοποίησης Django. 404 όταν το τιμολόγιο "
-"δεν έχει δημιουργηθεί ακόμα. Ίδιος έλεγχος ιδιοκτησίας όπως και το endpoint "
-"μεταδεδομένων — επιστρέφει υπογεγραμμένη ροή S3 σε παραγωγή και ροή αρχείου "
-"συστήματος σε ανάπτυξη, χωρίς να εκθέτει το URL αποθήκευσης στον client."
 
 #: .\order\views\order.py:2110
 msgid "Authentication is required to reorder a past order."
@@ -22018,7 +21970,6 @@ msgstr "Ισχύει έως"
 msgid "Empty while this is the current price."
 msgstr "Κενό όσο αυτή είναι η τρέχουσα τιμή."
 
-
 #: .\core\templates\emails\order\order_payment_confirmed.html:37
 #: .\core\templates\emails\order\order_received.html:42
 msgid "Invoice request"
@@ -22766,3 +22717,86 @@ msgstr "Η αναφορά επιστροφής μπορεί να έχει το �
 #: .\order\services.py:3120
 msgid "A refund with this reference is already recorded for this order."
 msgstr "Μια επιστροφή με αυτή την αναφορά έχει ήδη καταγραφεί για αυτή την παραγγελία."
+
+#: .\order\invoicing.py
+#, python-format
+msgid "Order #%(order_id)s has no receipt to regenerate."
+msgstr "Η παραγγελία #%(order_id)s δεν έχει απόδειξη για επαναδημιουργία."
+
+#: .\order\invoicing.py
+#, python-format
+msgid ""
+"This store issues its receipts outside the platform, so no receipt is "
+"created for order #%(order_id)s."
+msgstr ""
+"Το κατάστημα εκδίδει τις αποδείξεις του εκτός της πλατφόρμας, οπότε δεν "
+"δημιουργείται απόδειξη για την παραγγελία #%(order_id)s."
+
+#: .\order\admin.py
+msgid "Issued by the store outside the platform"
+msgstr "Εκδίδεται από το κατάστημα εκτός της πλατφόρμας"
+
+#: .\order\views\order.py
+msgid "This order has no registered receipt."
+msgstr "Η παραγγελία δεν έχει καταχωρισμένη απόδειξη."
+
+#: .\order\views\order.py
+msgid "Get receipt download metadata for an order"
+msgstr "Λήψη μεταδεδομένων λήψης απόδειξης για παραγγελία"
+
+#: .\order\views\order.py
+#, python-brace-format
+msgid ""
+"Return the order's retail receipt metadata and an absolute URL to the "
+"streaming download endpoint (``/order/{id}/invoice/download``). The URL is "
+"gated by the same owner/admin permission check as this metadata endpoint — "
+"no raw storage URLs are exposed to the client. 404 unless the receipt is "
+"registered with AADE (myDATA): none issued yet, pending, rejected or "
+"cancelled, or a store that issues its receipts outside the platform."
+msgstr ""
+"Επιστρέφει τα μεταδεδομένα της απόδειξης λιανικής της παραγγελίας και ένα "
+"απόλυτο URL προς το endpoint λήψης μέσω ροής "
+"(``/order/{id}/invoice/download``). Το URL προστατεύεται από τον ίδιο "
+"έλεγχο δικαιώματος ιδιοκτήτη/διαχειριστή όπως και αυτό το endpoint "
+"μεταδεδομένων — δεν εκτίθενται ακατέργαστα URL αποθήκευσης στον client. 404 "
+"εκτός αν η απόδειξη έχει καταχωριστεί στην ΑΑΔΕ (myDATA): δεν έχει εκδοθεί "
+"ακόμη, εκκρεμεί, απορρίφθηκε ή ακυρώθηκε, ή το κατάστημα εκδίδει τις "
+"αποδείξεις του εκτός της πλατφόρμας."
+
+#: .\order\views\order.py
+msgid "Download the receipt PDF"
+msgstr "Λήψη PDF απόδειξης"
+
+#: .\order\views\order.py
+msgid ""
+"Streams the retail receipt PDF through Django auth, from the configured "
+"storage (S3 in production, the filesystem in development), so the storage "
+"URL is never exposed to the client. 404 unless the receipt is registered "
+"with AADE (myDATA). Same ownership check as the metadata endpoint."
+msgstr ""
+"Μεταδίδει το PDF της απόδειξης λιανικής μέσω ταυτοποίησης Django, από τον "
+"ρυθμισμένο χώρο αποθήκευσης (S3 σε παραγωγή, σύστημα αρχείων σε ανάπτυξη), "
+"ώστε το URL αποθήκευσης να μην εκτίθεται ποτέ στον client. 404 εκτός αν η "
+"απόδειξη έχει καταχωριστεί στην ΑΑΔΕ (myDATA). Ίδιος έλεγχος ιδιοκτησίας "
+"όπως και το endpoint μεταδεδομένων."
+
+#: .\admin\dashboard\store\widgets.py
+msgid "myDATA is on, but no receipt is issued"
+msgstr "Το myDATA είναι ενεργό, αλλά δεν εκδίδεται καμία απόδειξη"
+
+#: .\admin\dashboard\store\widgets.py
+msgid ""
+"The platform may issue retail receipts only for a business exempt from the "
+"fiscal device (ΦΗΜ). Record the legal ground in "
+"MYDATA_FHM_EXEMPTION_GROUND, or switch MYDATA_ENABLED off and issue "
+"receipts in your fiscal device or e-invoicing provider."
+msgstr ""
+"Η πλατφόρμα μπορεί να εκδίδει αποδείξεις λιανικής μόνο για επιχείρηση που "
+"απαλλάσσεται από τον φορολογικό ηλεκτρονικό μηχανισμό (ΦΗΜ). Καταχωρίστε τη "
+"νομική βάση στο MYDATA_FHM_EXEMPTION_GROUND ή απενεργοποιήστε το "
+"MYDATA_ENABLED και εκδίδετε τις αποδείξεις από τον ΦΗΜ ή τον πάροχο "
+"ηλεκτρονικής τιμολόγησής σας."
+
+#: .\admin\dashboard\store\widgets.py
+msgid "Open the myDATA settings"
+msgstr "Άνοιγμα ρυθμίσεων myDATA"

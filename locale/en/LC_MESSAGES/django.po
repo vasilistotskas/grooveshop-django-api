@@ -8537,12 +8537,6 @@ msgid ""
 "first, then submit to myDATA."
 msgstr ""
 
-#: .\order\admin.py:1198
-msgid ""
-"myDATA integration is not ready — check MYDATA_ENABLED and credentials in "
-"Settings before retrying."
-msgstr ""
-
 #: .\order\admin.py:1208
 #, python-format
 msgid ""
@@ -10779,20 +10773,6 @@ msgid ""
 "skipped_items; quantities are capped at current stock."
 msgstr ""
 
-#: .\order\views\order.py:235
-msgid "Get invoice download metadata for an order"
-msgstr ""
-
-#: .\order\views\order.py:237
-#, python-brace-format
-msgid ""
-"Return the order's invoice metadata and an absolute URL to the streaming "
-"download endpoint (``/order/{id}/invoice/download``). The URL is gated by "
-"the same owner/admin permission check as this metadata endpoint — no raw "
-"storage URLs are exposed to the client. 404 if the invoice has not been "
-"generated yet (e.g. order not completed)."
-msgstr ""
-
 #: .\order\views\order.py:248
 msgid "Cancel the BoxNow shipment for an order"
 msgstr ""
@@ -11036,22 +11016,6 @@ msgstr ""
 
 #: .\order\views\order.py:2018
 msgid "Authentication is required to view your orders"
-msgstr ""
-
-#: .\order\views\order.py:2045 .\order\views\order.py:2093
-msgid "Invoice has not been generated for this order yet."
-msgstr ""
-
-#: .\order\views\order.py:2055
-msgid "Download the invoice PDF"
-msgstr ""
-
-#: .\order\views\order.py:2057
-msgid ""
-"Streams the rendered PDF through Django auth. 404 when the invoice has not "
-"been generated yet. Same ownership check as the metadata endpoint — returns "
-"a signed S3 stream on prod and a filesystem stream in dev without exposing "
-"the storage URL to the client."
 msgstr ""
 
 #: .\order\views\order.py:2110
@@ -19518,7 +19482,6 @@ msgstr ""
 msgid "Empty while this is the current price."
 msgstr ""
 
-
 #: .\core\templates\emails\order\order_payment_confirmed.html:37
 #: .\core\templates\emails\order\order_received.html:42
 msgid "Invoice request"
@@ -20237,4 +20200,68 @@ msgstr ""
 
 #: .\order\services.py:3120
 msgid "A refund with this reference is already recorded for this order."
+msgstr ""
+
+#: .\order\invoicing.py
+#, python-format
+msgid "Order #%(order_id)s has no receipt to regenerate."
+msgstr ""
+
+#: .\order\invoicing.py
+#, python-format
+msgid ""
+"This store issues its receipts outside the platform, so no receipt is "
+"created for order #%(order_id)s."
+msgstr ""
+
+#: .\order\admin.py
+msgid "Issued by the store outside the platform"
+msgstr ""
+
+#: .\order\views\order.py
+msgid "This order has no registered receipt."
+msgstr ""
+
+#: .\order\views\order.py
+msgid "Get receipt download metadata for an order"
+msgstr ""
+
+#: .\order\views\order.py
+#, python-brace-format
+msgid ""
+"Return the order's retail receipt metadata and an absolute URL to the "
+"streaming download endpoint (``/order/{id}/invoice/download``). The URL is "
+"gated by the same owner/admin permission check as this metadata endpoint — "
+"no raw storage URLs are exposed to the client. 404 unless the receipt is "
+"registered with AADE (myDATA): none issued yet, pending, rejected or "
+"cancelled, or a store that issues its receipts outside the platform."
+msgstr ""
+
+#: .\order\views\order.py
+msgid "Download the receipt PDF"
+msgstr ""
+
+#: .\order\views\order.py
+msgid ""
+"Streams the retail receipt PDF through Django auth, from the configured "
+"storage (S3 in production, the filesystem in development), so the storage "
+"URL is never exposed to the client. 404 unless the receipt is registered "
+"with AADE (myDATA). Same ownership check as the metadata endpoint."
+msgstr ""
+""
+
+#: .\admin\dashboard\store\widgets.py
+msgid "myDATA is on, but no receipt is issued"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py
+msgid ""
+"The platform may issue retail receipts only for a business exempt from the "
+"fiscal device (ΦΗΜ). Record the legal ground in "
+"MYDATA_FHM_EXEMPTION_GROUND, or switch MYDATA_ENABLED off and issue "
+"receipts in your fiscal device or e-invoicing provider."
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py
+msgid "Open the myDATA settings"
 msgstr ""

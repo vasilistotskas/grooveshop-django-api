@@ -2390,16 +2390,22 @@ EXTRA_SETTINGS_DEFAULTS = [
             "storefront when it applies. Rare, hence default False."
         ),
     },
-    # myDATA (AADE / IAPR) integration. Credentials come from the
-    # AADE developer portal after subscription approval — separate
-    # accounts for dev and prod. Keep ``MYDATA_ENABLED`` off and
-    # ``MYDATA_ENVIRONMENT=dev`` until a real submission round-trips
-    # successfully against the sandbox.
+    # myDATA (AADE / IAPR) ERP channel. Retail receipts are issued through a
+    # fiscal device (ΦΗΜ) or a licensed provider (ν.4308/2014 art. 12 §8,
+    # §10); the ERP channel is only for a business exempt from the ΦΗΜ, so
+    # issuing needs both switches below. Credentials come from the AADE
+    # developer portal, separate for dev and prod.
     {
         "name": "MYDATA_ENABLED",
         "type": "bool",
         "value": False,
-        "description": "Master toggle for the retail documents the platform issues over the myDATA ERP channel (receipt 11.1 when an order ships, credit document 11.4 for a refund). When off the integration is a pure no-op. Invoices are never issued here: staff issue them in AADE's timologio app.",
+        "description": "Whether the platform issues this store's retail receipts (11.1) and retail credit documents (11.4) itself, over the myDATA ERP channel. Off: the store issues them in its own fiscal device (ΦΗΜ) or licensed e-invoicing provider, and the platform builds and sends nothing. The ERP channel is only for a business exempt from the ΦΗΜ (ν.4308/2014 art. 12 §8 and §10), so nothing is issued until MYDATA_FHM_EXEMPTION_GROUND is filled in. Invoices are never issued here: staff issue them in AADE's timologio app.",
+    },
+    {
+        "name": "MYDATA_FHM_EXEMPTION_GROUND",
+        "type": "string",
+        "value": "",
+        "description": "The legal ground on which this business is exempt from issuing retail receipts through a fiscal device (ΦΗΜ) or a licensed provider: the ΠΟΛ.1002/2014 provision, the accountant who confirmed it, and the date, e.g. 'ΠΟΛ.1002/2014 §<paragraph>, confirmed by <accountant>, <date>'. Online sales are not exempt as such. While this is blank the platform issues nothing over the myDATA ERP channel, even with MYDATA_ENABLED on. Since ν.5222/2025 art. 238 (28/7/2025) exempt businesses are pointed to timologio or a licensed provider, so the accountant must also confirm the ERP channel is still allowed.",
     },
     {
         "name": "MYDATA_AUTO_SUBMIT",

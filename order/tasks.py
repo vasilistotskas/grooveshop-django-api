@@ -1235,12 +1235,12 @@ def generate_order_invoice(self, order_id: int) -> bool:
     ``MyDataConfig.issues_automatically``) or by staff from the order.
     Exactly once per order: ``order.invoicing.generate_invoice`` returns
     the existing row, and an order whose receipt already carries a MARK
-    has nothing left to issue. An order that is not a receipt order (an
-    invoice order is issued by hand in timologio) or has not shipped is
-    refused here, whoever asked.
+    has nothing left to issue. ``generate_invoice`` refuses an order that
+    is not a shipped receipt order (an invoice order is issued by hand in
+    timologio) and a store that issues outside the platform, whoever
+    asked; that refusal is final, not retried.
     """
-    from order.invoicing import generate_invoice, receipt_issuable
-    from order.mydata.config import load_config
+    from order.invoicing import ReceiptNotIssuable, generate_invoice
 
     try:
         order = Order.objects.select_related(
@@ -1254,19 +1254,16 @@ def generate_order_invoice(self, order_id: int) -> bool:
         )
         return False
 
-    if not receipt_issuable(order) or not load_config().is_ready():
-        logger.info(
-            "No receipt issued for order #%s (type=%s, status=%s, "
-            "myDATA ready=%s)",
-            order_id,
-            order.document_type,
-            order.status,
-            load_config().is_ready(),
-        )
-        return False
-
     try:
         invoice = generate_invoice(order)
+    except ReceiptNotIssuable as refusal:
+        logger.info(
+            "No receipt issued for order #%s: %s",
+            order_id,
+            refusal,
+            extra={"order_id": order_id},
+        )
+        return False
     except Exception as e:
         logger.exception(
             "Error generating receipt for order #%s",

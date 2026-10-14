@@ -447,3 +447,14 @@ class Invoice(TimeStampMixinModel, UUIDModel, MyDataRegistration):
     def has_document(self) -> bool:
         """True when the PDF has been generated and stored."""
         return bool(self.document_file and self.document_file.name)
+
+    def is_deliverable(self) -> bool:
+        """True when the receipt may reach the customer: AADE registered it
+        (CONFIRMED, with its MARK) and its PDF is stored. A receipt that is
+        pending, rejected or cancelled is not a valid tax document, so it
+        is never offered for download."""
+        return (
+            self.mydata_status == MyDataStatus.CONFIRMED
+            and self.mydata_mark is not None
+            and self.has_document()
+        )

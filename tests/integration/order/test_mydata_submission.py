@@ -30,7 +30,6 @@ from order.factories.item import OrderItemFactory
 from order.factories.order import OrderFactory
 from order.invoicing import generate_invoice
 from order.models.invoice import Invoice, MyDataStatus
-from order.mydata.config import MyDataConfig
 from order.mydata.exceptions import MyDataTransportError
 from order.tasks import (
     cancel_mydata_invoice,
@@ -38,46 +37,8 @@ from order.tasks import (
     send_invoice_to_mydata,
 )
 from product.factories.product import ProductFactory
+from tests.utils.mydata import issuable, mydata_enabled
 from vat.factories import VatFactory
-
-_READY_CONFIG = MyDataConfig(
-    enabled=True,
-    auto_submit=True,
-    environment="dev",
-    user_id="test-user",
-    subscription_key="test-subscription-key",
-    invoice_series_prefix="GRVP",
-    credit_series_prefix="GRVC",
-    issuer_branch=0,
-    request_timeout_seconds=30,
-)
-
-
-def _enable_mydata(test_case: TestCase) -> None:
-    """Patch the myDATA integration boundary so the rest of the call
-    chain sees "enabled and configured".
-
-    Patching ``load_config`` +
-    ``_resolve_issuer_vat`` removes the dependency on ``Setting``
-    entirely for these tests — the same boundary the service-level
-    docstring already calls out as "kept separate so tests can
-    monkey-patch without spinning the whole config stack".
-    """
-    # Patch both bound names: ``order.tasks`` lazy-imports
-    # ``load_config`` inside the task body (so patching the source
-    # module is enough there), but ``order.mydata.service`` does a
-    # top-level ``from order.mydata.config import load_config`` and
-    # therefore holds its own bound reference that the source-module
-    # patch doesn't reach.
-    for target, retval in (
-        ("order.mydata.config.load_config", _READY_CONFIG),
-        ("order.mydata.service.load_config", _READY_CONFIG),
-        ("order.signals.handlers.load_mydata_config", _READY_CONFIG),
-        ("order.mydata.service._resolve_issuer_vat", "123456789"),
-    ):
-        p = patch(target, return_value=retval)
-        p.start()
-        test_case.addCleanup(p.stop)
 
 
 def _make_invoice():
@@ -97,7 +58,8 @@ def _make_invoice():
     # the chain before the test body runs) and renders the invoice
     # ahead of the test's own ``generate_invoice`` (changing
     # ``captured_contexts`` length). Pinning here keeps the test
-    # body's signals deterministic.
+    # body's signals deterministic; ``issuable`` then ships it with no
+    # signal, the only kind of order a receipt is issued for.
     from order.enum.document_type import OrderDocumentTypeEnum
 
     vat = VatFactory(value=24)
@@ -118,7 +80,7 @@ def _make_invoice():
         "order.invoicing._render_pdf_bytes",
         return_value=b"%PDF-1.4 test",
     ):
-        invoice = generate_invoice(order)
+        invoice = generate_invoice(issuable(order))
     return order, invoice
 
 
@@ -206,7 +168,7 @@ class GenerateOrderInvoiceChainTestCase(TestCase):
         self, mock_email, mock_submit, _mock_render
     ):
         order = self._shipped_order()
-        # No _enable_mydata(self) call — integration is off.
+        # No mydata_enabled() — the integration is off.
         self.assertFalse(generate_order_invoice(order.id))
         mock_email.assert_not_called()
         mock_submit.assert_not_called()
@@ -218,7 +180,7 @@ class GenerateOrderInvoiceChainTestCase(TestCase):
     def test_routes_to_mydata_when_enabled(
         self, mock_email, mock_submit, _mock_render
     ):
-        _enable_mydata(self)
+        self.enterContext(mydata_enabled())
         order = self._shipped_order()
         result = generate_order_invoice(order.id)
         self.assertTrue(result)
@@ -234,7 +196,7 @@ class GenerateOrderInvoiceChainTestCase(TestCase):
         Α.1128/2025): whoever asks, the platform builds nothing."""
         from order.enum.document_type import OrderDocumentTypeEnum
 
-        _enable_mydata(self)
+        self.enterContext(mydata_enabled())
         order = self._shipped_order(
             document_type=OrderDocumentTypeEnum.INVOICE,
             billing_vat_id="123456789",
@@ -249,7 +211,7 @@ class GenerateOrderInvoiceChainTestCase(TestCase):
     def test_an_order_that_has_not_shipped_gets_no_receipt(
         self, mock_submit, mock_render
     ):
-        _enable_mydata(self)
+        self.enterContext(mydata_enabled())
         for status in (
             OrderStatus.PENDING,
             OrderStatus.PROCESSING,
@@ -265,7 +227,7 @@ class GenerateOrderInvoiceChainTestCase(TestCase):
     def test_a_registered_receipt_is_not_issued_again(
         self, mock_submit, _mock_render
     ):
-        _enable_mydata(self)
+        self.enterContext(mydata_enabled())
         order = self._shipped_order()
         generate_order_invoice(order.id)
         Invoice.objects.filter(order=order).update(mydata_mark=1)
@@ -295,7 +257,7 @@ class SendInvoiceToMydataTestCase(TestCase):
         returns a synthetic Success without calling AADE (G0262)."""
         from order.mydata.service import submit_document
 
-        _enable_mydata(self)
+        self.enterContext(mydata_enabled())
         _order, invoice = _make_invoice()
         invoice.mydata_mark = 800000165789545
         invoice.mydata_uid = "ffeeddccbbaa99887766554433221100ffeeddcc"
@@ -317,7 +279,7 @@ class SendInvoiceToMydataTestCase(TestCase):
         """Happy path: AADE returns Success → MARK + qr_url persisted,
         PDF regenerated (so customer's copy carries the MARK), email
         queued as the last step in the chain."""
-        _enable_mydata(self)
+        self.enterContext(mydata_enabled())
         order, invoice = _make_invoice()
         mock_send.return_value = _SUCCESS_XML
 
@@ -344,7 +306,7 @@ class SendInvoiceToMydataTestCase(TestCase):
         """A receipt AADE refused (e.g. 216 bad vatCategory) is not
         issued, so the customer is not sent one: staff see the REJECTED
         row and the note on the order, fix it and resubmit."""
-        _enable_mydata(self)
+        self.enterContext(mydata_enabled())
         order, invoice = _make_invoice()
         mock_send.return_value = _VALIDATION_ERROR_XML
 
@@ -365,7 +327,7 @@ class SendInvoiceToMydataTestCase(TestCase):
         """Transport errors retry automatically via Celery. Once
         retries are exhausted the receipt stays SUBMITTED for staff to
         resubmit; it is not emailed unregistered."""
-        _enable_mydata(self)
+        self.enterContext(mydata_enabled())
         order, invoice = _make_invoice()
         mock_send.side_effect = MyDataTransportError("upstream 503")
 
@@ -393,7 +355,7 @@ class SendInvoiceToMydataTestCase(TestCase):
         terminal rejection: the invoice must stay SUBMITTED and remain
         eligible for retry/manual resubmit — never flipped to REJECTED
         (G0260)."""
-        _enable_mydata(self)
+        self.enterContext(mydata_enabled())
         order, invoice = _make_invoice()
         mock_send.return_value = _TECHNICAL_ERROR_XML
 
@@ -420,7 +382,7 @@ class SendInvoiceToMydataTestCase(TestCase):
         answers 228 every time because the content is identical).
         Now the task treats it as terminal and logs the uid for manual
         reconciliation."""
-        _enable_mydata(self)
+        self.enterContext(mydata_enabled())
         order, invoice = _make_invoice()
         duplicate_xml = b"""<?xml version="1.0" encoding="UTF-8"?>
 <ResponseDoc>
@@ -449,7 +411,7 @@ class SendInvoiceToMydataTestCase(TestCase):
     def test_missing_invoice_returns_false(self):
         """An order without a receipt row has nothing to submit and
         nothing to email."""
-        _enable_mydata(self)
+        self.enterContext(mydata_enabled())
         order = OrderFactory(
             num_order_items=0,
             status=OrderStatus.PENDING,
@@ -484,7 +446,7 @@ class CancelMydataInvoiceTestCase(TestCase):
     def test_persists_cancellation_mark_on_success(
         self, _mock_email, _mock_credits, mock_cancel, mock_send, _mock_render
     ):
-        _enable_mydata(self)
+        self.enterContext(mydata_enabled())
         order, invoice = _make_invoice()
         mock_send.return_value = _SUCCESS_XML
         send_invoice_to_mydata(order.id)
@@ -498,7 +460,7 @@ class CancelMydataInvoiceTestCase(TestCase):
         self.assertEqual(invoice.mydata_cancellation_mark, 900000000000001)
 
     def test_no_mark_skips_without_error(self):
-        _enable_mydata(self)
+        self.enterContext(mydata_enabled())
         order = OrderFactory(
             num_order_items=0,
             status=OrderStatus.PENDING,
@@ -512,7 +474,7 @@ class CancelMydataInvoiceTestCase(TestCase):
         )
         # No submission — invoice has no MARK.
         with patch("order.invoicing._render_pdf_bytes", return_value=b"x"):
-            generate_invoice(order)
+            generate_invoice(issuable(order))
 
         result = cancel_mydata_invoice(order.id)
         self.assertFalse(result)
@@ -533,7 +495,7 @@ class MydataEmailWithMarkTestCase(TestCase):
 
     @patch("order.mydata.client.MyDataClient.send_invoices")
     def test_email_attachment_has_mark_embedded(self, mock_send):
-        _enable_mydata(self)
+        self.enterContext(mydata_enabled())
         mock_send.return_value = _SUCCESS_XML
 
         # Real render path (no ``_render_pdf_bytes`` patch) so the
@@ -565,7 +527,7 @@ class MydataEmailWithMarkTestCase(TestCase):
                 price=Money(Decimal("12.40"), "EUR"),
                 quantity=1,
             )
-            generate_invoice(order)
+            generate_invoice(issuable(order))
             # Clear any emails the order_created signal already sent
             # (confirmation email runs eagerly under
             # CELERY_TASK_ALWAYS_EAGER + on_commit-immediate fixture).

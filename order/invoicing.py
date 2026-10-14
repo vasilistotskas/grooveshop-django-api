@@ -19,7 +19,9 @@ pin ``_compute_vat_breakdown`` and ``_build_context`` without spinning
 up WeasyPrint's native stack:
 
 - :func:`generate_invoice` — idempotent entry point; returns the
-  existing Invoice if one already exists for the order.
+  existing Invoice if one already exists for the order, and refuses
+  (:class:`ReceiptNotIssuable`) an order the platform issues no receipt
+  for.
 - :func:`_compute_vat_breakdown` — aggregates the order's taxable lines
   (goods, shipping, payment fee; ``order.taxation``) by VAT rate so the
   invoice shows one row per rate band (24 %, 13 %, 6 %, 0 %).
@@ -45,6 +47,7 @@ from django.core.files.base import ContentFile
 from django.db import transaction
 from django.template.loader import render_to_string
 from django.utils import timezone
+from django.utils.translation import gettext as _
 from django.utils.translation import override as translation_override
 from extra_settings.models import Setting
 
@@ -56,6 +59,7 @@ from order.enum.status import OrderStatus
 from order.models.invoice import Invoice, InvoiceCounter
 from order.models.order import Order
 from order.models.retail_credit import RetailCredit
+from order.mydata.config import load_config as load_mydata_config
 from order.taxation import breakdown_by_rate, order_vat_lines
 from pay_way.enum.pay_way import PayWayEnum
 from tenant.credentials import tenant_contact_email, tenant_site_name
@@ -94,6 +98,13 @@ def receipt_issuable(order: Order) -> bool:
         order.document_type == OrderDocumentTypeEnum.RECEIPT.value
         and order.status in RECEIPT_ISSUING_STATUSES
     )
+
+
+class ReceiptNotIssuable(Exception):
+    """:func:`generate_invoice` refused: the platform issues no receipt
+    for this order now — it is not a shipped receipt order, or the store
+    issues its receipts outside the platform (``MyDataConfig.is_ready``) —
+    or a regeneration was asked for an order that has no receipt."""
 
 
 def _seller_snapshot() -> dict[str, str]:
@@ -461,15 +472,57 @@ def generate_invoice(order: Order, *, force: bool = False) -> Invoice:
     A row committed by a run whose render then failed is resumed rather
     than returned as-is — otherwise the early return would hand back a
     PDF-less invoice forever.
+
+    Issuing is where the platform's rule lives, because this is the one
+    step that allocates a number: a call without ``force`` issues, so it
+    is refused for an order :func:`receipt_issuable` rejects and while
+    the store issues its receipts outside the platform, even when a row
+    already exists (an old one would otherwise go on to AADE).
+    ``force=True`` only re-renders an existing receipt and never creates
+    one. Every refusal raises :class:`ReceiptNotIssuable`, whoever asked.
     """
     existing = Invoice.objects.filter(order_id=order.id).first()
-    if existing and not force and existing.has_document():
-        logger.debug(
-            "Invoice %s already exists for order %s — returning existing",
-            existing.invoice_number,
-            order.id,
-        )
-        return existing
+    if force:
+        # Re-rendering is for the receipt of a receipt order, whatever
+        # status the order has moved on to; a row an invoice order kept
+        # from before the rule is not a receipt to print again.
+        if (
+            existing is None
+            or order.document_type != OrderDocumentTypeEnum.RECEIPT.value
+        ):
+            raise ReceiptNotIssuable(
+                _("Order #%(order_id)s has no receipt to regenerate.")
+                % {"order_id": order.id}
+            )
+    else:
+        if not receipt_issuable(order):
+            raise ReceiptNotIssuable(
+                _(
+                    "A retail receipt is issued for a receipt order once it "
+                    "has shipped. Order #%(order_id)s is %(doc)s, status "
+                    "%(status)s."
+                )
+                % {
+                    "order_id": order.id,
+                    "doc": order.get_document_type_display(),
+                    "status": order.get_status_display(),
+                }
+            )
+        if not load_mydata_config().is_ready():
+            raise ReceiptNotIssuable(
+                _(
+                    "This store issues its receipts outside the platform, "
+                    "so no receipt is created for order #%(order_id)s."
+                )
+                % {"order_id": order.id}
+            )
+        if existing is not None and existing.has_document():
+            logger.debug(
+                "Invoice %s already exists for order %s — returning existing",
+                existing.invoice_number,
+                order.id,
+            )
+            return existing
 
     invoice, vat_breakdown, totals = _persist_invoice_row(order, existing)
 

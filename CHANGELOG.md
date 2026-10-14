@@ -3,6 +3,66 @@
 
 
 
+## v3.123.2 (2026-10-14)
+
+### Bug fixes
+
+* fix(order): issue retail receipts only with a recorded ΦΗΜ exemption, and show customers only registered ones (#199) ([`daedf44`](https://github.com/vasilistotskas/grooveshop-django-api/commit/daedf44f3be4279ca56576d5bae2424a9aefa57f))
+
+* fix(order): issue retail receipts only with a recorded ΦΗΜ exemption, and show customers only registered ones
+
+Retail receipts come from a fiscal device (ΦΗΜ) or a licensed provider
+(ν.4308/2014 art. 12 §8, §10; AADE myDATA FAQ 23/5/2022 Q37). The ERP
+channel in order/mydata/ is only for a business exempt from the ΦΗΜ, so
+a store that has not recorded that exemption issues outside the
+platform and the platform issues nothing.
+
+- MYDATA_FHM_EXEMPTION_GROUND (new setting, blank by default): the
+  ΠΟΛ.1002/2014 provision, the accountant and the date. MyDataConfig
+  .is_ready() requires it, so every issuing path stays off without it.
+- generate_invoice refuses (ReceiptNotIssuable) an order receipt_issuable
+  rejects and a store that issues outside the platform, also when an old
+  row exists; force=True only re-renders an existing receipt. The issuing
+  task relies on that refusal instead of its own copy of the rule.
+- Order admin: the five "Invoicing & myDATA" actions take the
+  retail_documents permission (hidden and refused unless the platform
+  issues, read once per request); their in-body readiness checks go.
+  Regenerate no longer mints a numbered receipt for an order without
+  one. The Receipt card says when the store issues outside the platform.
+- hasInvoice and the receipt endpoints serve only a receipt AADE has
+  registered (Invoice.is_deliverable), never a pending, rejected or
+  cancelled one.
+- Dashboard: a danger alert when myDATA is on without the ground; the
+  alert reads the config only when myDATA is on.
+- The demo account seeds no receipts, and the nightly counter rewind
+  that existed for them is gone.
+docs/order-system.md §7.4: who may issue, the settings, and the
+  settled questions (no deadline for a retail credit in the law;
+  CancelInvoice has no time limit, only "never used").
+
+Closes #195
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`daedf44`](https://github.com/vasilistotskas/grooveshop-django-api/commit/daedf44f3be4279ca56576d5bae2424a9aefa57f))
+
+* fix(order): regenerate only a receipt order's receipt, and deliver only one with its MARK
+
+- generate_invoice(force=True) refuses an order that is not a receipt
+  order, so a row an invoice order kept from before the rule is never
+  re-rendered as a retail receipt; a receipt order's receipt stays
+  re-renderable after the order moves past SHIPPED.
+- Invoice.is_deliverable also requires the MARK: CONFIRMED without one
+  is not a registration.
+- The download endpoint's description says what it does: it streams the
+  PDF through Django from the configured storage.
+- The no-PDF endpoint tests use registered rows, so the missing PDF is
+  what they prove; a CONFIRMED-without-MARK receipt is a 404.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`daedf44`](https://github.com/vasilistotskas/grooveshop-django-api/commit/daedf44f3be4279ca56576d5bae2424a9aefa57f))
+
 ## v3.123.1 (2026-10-14)
 
 ### Bug fixes

@@ -3,6 +3,36 @@
 
 
 
+## v3.123.3 (2026-10-14)
+
+### Bug fixes
+
+* fix(order): let stores that take no real orders issue to the AADE sandbox without a ΦΗΜ ground (#201)
+
+AADE's dev environment registers test documents only ("για τη φάση της
+ανάπτυξης και διενέργειας δοκιμών", myDATA REST API documentation), so
+the recorded ΦΗΜ exemption that #195 requires is not needed there, but
+only for a store that takes no real orders: MYDATA_ENVIRONMENT defaults
+to 'dev', so exempting the sandbox everywhere would let any real store
+that switches myDATA on email sandbox "receipts" to its customers.
+
+- MyDataConfig.takes_real_orders: the store is not flagged is_demo and
+  the deployment is REAL_ORDERS_DEPLOYMENT (false only for SYSTEM_ENV
+  staging/dev/ci, so an unknown deployment name fails closed).
+  issues_to_sandbox_only = environment 'dev' and not takes_real_orders;
+  is_ready() accepts it in place of the ground.
+- MYDATA_ENVIRONMENT is no longer guessed: anything but 'dev' or 'prod'
+  is refused (environment None, not ready, base_url raises) instead of
+  silently becoming the sandbox, which would now skip the ground.
+- Dashboard: a danger alert for an invalid environment; the missing-ground
+  alert only where the ground is actually required.
+- Setting descriptions and docs/order-system.md §7.4 describe the
+  exception.
+
+Refs #195
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`9a6e1d0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9a6e1d0c54305cb7f21f27fa46758c2eca0314e0))
+
 ## v3.123.2 (2026-10-14)
 
 ### Bug fixes

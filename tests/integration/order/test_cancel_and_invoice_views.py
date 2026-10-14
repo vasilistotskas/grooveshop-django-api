@@ -66,10 +66,16 @@ class CancelOrderStateTransitionTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
 
-def _rendered_receipt(user, *, mydata_status=MyDataStatus.CONFIRMED):
+_MARK = 400001234567890
+
+
+def _rendered_receipt(
+    user, *, mydata_status=MyDataStatus.CONFIRMED, mydata_mark=_MARK
+):
     """A shipped receipt order of ``user`` with its rendered receipt, in the
     given AADE state. Issued by a store that issues through the platform,
-    by hand, so no signal issues anything on its own."""
+    by hand, so no signal issues anything on its own. Only a registered
+    (CONFIRMED) or cancelled receipt carries a MARK."""
     from order.invoicing import generate_invoice
 
     order = issuable(OrderFactory(user=user))
@@ -81,7 +87,14 @@ def _rendered_receipt(user, *, mydata_status=MyDataStatus.CONFIRMED):
         ),
     ):
         invoice = generate_invoice(order)
-    Invoice.objects.filter(pk=invoice.pk).update(mydata_status=mydata_status)
+    registered = mydata_status in (
+        MyDataStatus.CONFIRMED,
+        MyDataStatus.CANCELED,
+    )
+    Invoice.objects.filter(pk=invoice.pk).update(
+        mydata_status=mydata_status,
+        mydata_mark=mydata_mark if registered else None,
+    )
     invoice.refresh_from_db()
     return order, invoice
 
@@ -109,13 +122,15 @@ class OrderInvoiceEndpointTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_returns_404_when_invoice_row_exists_but_no_pdf(self) -> None:
-        """Invoice row without a rendered PDF should still 404 —
-        ``has_invoice`` / ``has_document`` is the real gate."""
+        """A registered receipt whose PDF is not stored still 404s: the
+        customer gets the document, not a row."""
         order = OrderFactory(user=self.user)
         InvoiceCounter.objects.create(year=2026, next_number=1)
         Invoice.objects.create(
             order=order,
             invoice_number="INV-2026-000001",
+            mydata_status=MyDataStatus.CONFIRMED,
+            mydata_mark=_MARK,
             # document_file intentionally left blank
         )
         response = self.client.get(self._url(order.pk))
@@ -153,6 +168,13 @@ class OrderInvoiceEndpointTestCase(APITestCase):
                 self.assertEqual(
                     response.status_code, status.HTTP_404_NOT_FOUND
                 )
+
+    def test_returns_404_for_a_confirmed_receipt_without_a_mark(self) -> None:
+        order, _invoice = _rendered_receipt(self.user, mydata_mark=None)
+
+        response = self.client.get(self._url(order.pk))
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_download_url_points_at_streaming_endpoint(self) -> None:
         """The metadata endpoint must return an absolute URL to the
@@ -193,6 +215,8 @@ class OrderInvoiceDownloadEndpointTestCase(APITestCase):
         Invoice.objects.create(
             order=order,
             invoice_number="INV-2026-000001",
+            mydata_status=MyDataStatus.CONFIRMED,
+            mydata_mark=_MARK,
         )
         response = self.client.get(self._url(order.pk))
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)

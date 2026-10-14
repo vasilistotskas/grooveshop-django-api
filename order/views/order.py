@@ -2126,11 +2126,11 @@ class OrderViewSet(BaseModelViewSet):
         tags=["Orders"],
         summary=_("Download the receipt PDF"),
         description=_(
-            "Streams the retail receipt PDF through Django auth. 404 "
-            "unless the receipt is registered with AADE (myDATA). Same "
-            "ownership check as the metadata endpoint — returns a signed "
-            "S3 stream on prod and a filesystem stream in dev without "
-            "exposing the storage URL to the client."
+            "Streams the retail receipt PDF through Django auth, from the "
+            "configured storage (S3 in production, the filesystem in "
+            "development), so the storage URL is never exposed to the "
+            "client. 404 unless the receipt is registered with AADE "
+            "(myDATA). Same ownership check as the metadata endpoint."
         ),
         # ``200: None`` declared a 200 with no body for a PDF stream.
         responses={

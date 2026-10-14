@@ -579,11 +579,35 @@ class GenerateInvoiceRefusalTestCase(TestCase):
         InvoiceCounter.objects.create(year=2026, next_number=2)
         Invoice.objects.create(order=order, invoice_number="INV-2026-000001")
 
+        with mydata_enabled(auto_submit=False):
+            for force in (False, True):
+                with (
+                    self.subTest(force=force),
+                    patch("order.invoicing._render_pdf_bytes") as render,
+                    self.assertRaises(ReceiptNotIssuable),
+                ):
+                    generate_invoice(order, force=force)
+                render.assert_not_called()
+
+    def test_a_receipt_is_regenerated_after_its_order_moved_on(self):
+        """Re-rendering needs a receipt order, not a shipped status: a
+        receipt keeps its PDF fixable after the order is completed."""
+        order = issuable(self._order())
         with (
             mydata_enabled(auto_submit=False),
-            self.assertRaises(ReceiptNotIssuable),
+            patch(
+                "order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4"
+            ),
         ):
-            generate_invoice(order)
+            first = generate_invoice(order)
+            Order.objects.filter(pk=order.pk).update(
+                status=OrderStatus.COMPLETED
+            )
+            order.refresh_from_db()
+            again = generate_invoice(order, force=True)
+
+        self.assertEqual(again.pk, first.pk)
+        self.assertEqual(again.invoice_number, first.invoice_number)
 
 
 class RenderItemsTestCase(TestCase):

@@ -483,7 +483,13 @@ def generate_invoice(order: Order, *, force: bool = False) -> Invoice:
     """
     existing = Invoice.objects.filter(order_id=order.id).first()
     if force:
-        if existing is None:
+        # Re-rendering is for the receipt of a receipt order, whatever
+        # status the order has moved on to; a row an invoice order kept
+        # from before the rule is not a receipt to print again.
+        if (
+            existing is None
+            or order.document_type != OrderDocumentTypeEnum.RECEIPT.value
+        ):
             raise ReceiptNotIssuable(
                 _("Order #%(order_id)s has no receipt to regenerate.")
                 % {"order_id": order.id}

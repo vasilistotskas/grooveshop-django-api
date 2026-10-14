@@ -217,7 +217,11 @@ def test_shipped_receipt_is_dispatched_under_schema_context():
         status=OrderStatus.SHIPPED,
         document_type=OrderDocumentTypeEnum.RECEIPT,
     )
-    settings_by_key = {"MYDATA_ENABLED": True, "MYDATA_AUTO_SUBMIT": True}
+    settings_by_key = {
+        "MYDATA_ENABLED": True,
+        "MYDATA_FHM_EXEMPTION_GROUND": "ΠΟΛ.1002/2014 (test fixture)",
+        "MYDATA_AUTO_SUBMIT": True,
+    }
 
     def fake_get(name, default=None):
         return settings_by_key.get(name, default)
@@ -239,7 +243,11 @@ def test_shipped_receipt_is_not_dispatched_without_credentials():
         status=OrderStatus.SHIPPED,
         document_type=OrderDocumentTypeEnum.RECEIPT,
     )
-    settings_by_key = {"MYDATA_ENABLED": True, "MYDATA_AUTO_SUBMIT": True}
+    settings_by_key = {
+        "MYDATA_ENABLED": True,
+        "MYDATA_FHM_EXEMPTION_GROUND": "ΠΟΛ.1002/2014 (test fixture)",
+        "MYDATA_AUTO_SUBMIT": True,
+    }
 
     with (
         patch(

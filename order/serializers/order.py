@@ -371,9 +371,11 @@ class OrderDetailSerializer(OrderSerializer):
     )
     has_invoice = serializers.SerializerMethodField(
         help_text=(
-            "True when a PDF invoice has been generated — the frontend "
-            "can show the download CTA without issuing a separate "
-            "request to the invoice endpoint to find out."
+            "True when the order has a retail receipt registered with AADE "
+            "(myDATA) and its PDF, so the frontend can show the download "
+            "CTA without asking the receipt endpoint. False while the "
+            "receipt is pending, rejected or cancelled, and always for a "
+            "store that issues its receipts outside the platform."
         )
     )
     boxnow_shipment = serializers.SerializerMethodField(
@@ -531,7 +533,7 @@ class OrderDetailSerializer(OrderSerializer):
     @extend_schema_field({"type": "boolean"})
     def get_has_invoice(self, obj: Order) -> bool:
         invoice = getattr(obj, "invoice", None)
-        return bool(invoice and invoice.has_document())
+        return bool(invoice and invoice.is_deliverable())
 
     def _serialized_shipment(self, obj: Order) -> dict | None:
         """Compute the carrier shipment payload once per response.

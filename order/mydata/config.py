@@ -7,6 +7,12 @@ everywhere. Mutable at runtime — operators flip ``MYDATA_ENABLED`` via
 the Django admin and a store edits its credentials on its tenant row; no
 code deploy needed.
 
+Retail receipts are issued through a fiscal device (ΦΗΜ) or a licensed
+provider (ν.4308/2014 art. 12 §8, §10). The ERP channel this package
+implements is only for a business exempt from the ΦΗΜ, so a store that
+has not recorded that exemption (``MYDATA_FHM_EXEMPTION_GROUND``) is
+never ready, whatever else is set.
+
 The dev/prod base URLs are **hard-coded constants** because they are
 published AADE endpoints, not customer-supplied. Accidentally pointing
 prod code at a user-set URL would be a bug factory.
@@ -38,6 +44,7 @@ class MyDataConfig:
     """
 
     enabled: bool
+    fhm_exemption_ground: str
     auto_submit: bool
     environment: Literal["dev", "prod"]
     user_id: str
@@ -53,10 +60,17 @@ class MyDataConfig:
         return _BASE_URLS[self.environment]
 
     def is_ready(self) -> bool:
-        """True when myDATA is enabled and all required credentials
-        are populated. The call sites should no-op rather than raise
-        when False — the integration is opt-in, not mandatory."""
-        return bool(self.enabled and self.user_id and self.subscription_key)
+        """True when the platform issues this store's retail documents:
+        myDATA is enabled, the store has recorded the legal ground of its
+        ΦΗΜ exemption, and its credentials are populated. The call sites
+        should no-op rather than raise when False — the store then issues
+        its documents outside the platform."""
+        return bool(
+            self.enabled
+            and self.fhm_exemption_ground
+            and self.user_id
+            and self.subscription_key
+        )
 
     def issues_automatically(self) -> bool:
         """True when the platform issues its retail documents by itself:
@@ -93,6 +107,9 @@ def load_config() -> MyDataConfig:
     credentials = mydata_credentials()
     return MyDataConfig(
         enabled=bool(Setting.get("MYDATA_ENABLED", default=False)),
+        fhm_exemption_ground=str(
+            Setting.get("MYDATA_FHM_EXEMPTION_GROUND", default="")
+        ).strip(),
         auto_submit=bool(Setting.get("MYDATA_AUTO_SUBMIT", default=False)),
         environment=env,  # type: ignore[arg-type]
         user_id=credentials["user_id"],

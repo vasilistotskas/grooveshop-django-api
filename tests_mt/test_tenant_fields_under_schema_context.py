@@ -25,7 +25,11 @@ from tenant.models import Tenant
 
 pytestmark = pytest.mark.django_db
 
-_SETTINGS = {"MYDATA_ENABLED": True, "MYDATA_AUTO_SUBMIT": True}
+_SETTINGS = {
+    "MYDATA_ENABLED": True,
+    "MYDATA_FHM_EXEMPTION_GROUND": "ΠΟΛ.1002/2014 (test fixture)",
+    "MYDATA_AUTO_SUBMIT": True,
+}
 
 
 def _setting_get(name, default=None):

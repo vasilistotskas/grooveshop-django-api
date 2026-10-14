@@ -1000,24 +1000,13 @@ class TestSeededAccount:
             demo_account.GIFT_CARD_SPENT
         )
 
-    def test_invoices_have_a_number_a_document_and_the_orders_date(
-        self, seeded
-    ):
+    def test_the_shopper_has_no_receipts(self, seeded):
+        """A receipt is a tax document AADE registers; a demo store issues
+        none (``MYDATA_ENABLED`` stays off), so no order of the shopper
+        carries one."""
         from order.models.invoice import Invoice
 
-        wanted = sum(1 for r in demo_account.ORDERS if r.invoice)
-        invoices = Invoice.objects.filter(order__user=self._retail())
-        assert invoices.count() == wanted
-        for invoice in invoices.select_related("order"):
-            assert invoice.has_document()
-            assert invoice.invoice_number.startswith("INV-")
-            assert invoice.issue_date <= timezone.localdate()
-            assert (
-                invoice.issue_date
-                <= (invoice.order.created_at + timedelta(days=1)).date()
-            )
-            assert invoice.mydata_status == "NOT_SENT"
-            assert invoice.total.amount > 0
+        assert not Invoice.objects.filter(order__user=self._retail()).exists()
 
     def test_the_wholesale_account_is_an_approved_business_on_group_prices(
         self, seeded
@@ -1076,7 +1065,6 @@ class TestSeededAccount:
             "orders",
             "b2b_orders",
             "shipments",
-            "invoices",
             "points",
             "notifications",
             "redemptions",
@@ -1240,33 +1228,22 @@ class TestResetRebuildsTheAccounts:
         assert not Notification.objects.filter(pk=visitor.pk).exists()
         assert NotificationUser.objects.filter(user=user).count() == 5
 
-    def test_the_invoice_numbers_do_not_climb_night_after_night(self):
-        """The wipe gives the numbers it frees back to the counter, so the
-        sequence is the same after a hundred nights as after one."""
-        from order.models.invoice import Invoice, InvoiceCounter
-
-        _prepare_store()
-        demo_account.seed_demo_account()
-        numbers = sorted(
-            Invoice.objects.values_list("invoice_number", flat=True)
-        )
-
-        for _night in range(2):
-            demo_account.reset_demo_account()
-
-        assert (
-            sorted(Invoice.objects.values_list("invoice_number", flat=True))
-            == numbers
-        )
-        counter = InvoiceCounter.objects.get()
-        assert counter.next_number == len(numbers) + 1
-
     def test_wiping_an_invoice_removes_its_pdf_as_well_as_its_row(self):
+        """``Invoice.order`` is PROTECT, so the wipe removes any receipt a
+        demo order carries (an earlier seed issued some) before the order
+        goes — the row and its PDF."""
+        from order.invoicing import generate_invoice
         from order.models.invoice import Invoice
         from order.models.order import Order
+        from tests.utils.mydata import issuable, mydata_enabled
 
         _prepare_store()
         demo_account.seed_demo_account()
+        with mydata_enabled(auto_submit=False):
+            for order in Order.objects.filter(
+                user__email=demo_account.RETAIL_EMAIL
+            )[:2]:
+                generate_invoice(issuable(order))
         invoices = list(Invoice.objects.all())
         storage = invoices[0].document_file.storage
         paths = [invoice.document_file.name for invoice in invoices]

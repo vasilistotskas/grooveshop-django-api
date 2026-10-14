@@ -26,9 +26,10 @@ What each account gets:
 
   - the shopper: fourteen orders across every status, with the ACS and
     BoxNow rows (and tracking events) an order in that state really has,
-    receipts, a redeemed coupon, a part-spent gift card, a loyalty ledger
-    that makes the account Silver, five notifications and a Cyprus
-    address;
+    a redeemed coupon, a part-spent gift card, a loyalty ledger that makes
+    the account Silver, five notifications and a Cyprus address. No
+    receipts: a demo store issues none (``MYDATA_ENABLED`` stays off), and
+    a receipt is a real tax document, never a fixture;
   - the buyer: an approved business profile on the wholesale group's
     price list (a VAT number that cannot belong to anyone) and a few
     invoice-type orders. It signs in with the login the store already
@@ -39,9 +40,8 @@ Orders are written with `bulk_create` and backdated, never through
 must not send a confirmation email, must not move stock, and must not
 enter the state machine — it is a fixture, not a sale. The same goes for
 everything that hangs off one: the carrier rows are written directly and
-never reach a carrier, a retail receipt is issued by `generate_invoice` and
-not by the task that emails and submits it to myDATA, and the
-notifications skip the `post_save` that would push them to a socket.
+never reach a carrier, and the notifications skip the `post_save` that
+would push them to a socket.
 """
 
 from __future__ import annotations
@@ -117,8 +117,6 @@ class OrderRow:
     promotion_code: str = ""
     #: Spends ``GIFT_CARD_SPENT`` of the demo gift card.
     gift_card: bool = False
-    #: Issues an invoice (and renders its PDF).
-    invoice: bool = False
     #: Every line went back.
     refunded: bool = False
 
@@ -207,7 +205,7 @@ def _shipment(base: ShipmentRow, state: str, voucher: str) -> ShipmentRow:
 #: Fourteen orders, newest first: two on their way with a courier, one
 #: in a BoxNow depot, a spread of delivered ones across ACS and BoxNow
 #: (one to Cyprus), a return, a refund, a cancellation, and orders that
-#: carry a coupon, a gift-card spend and an invoice. The parcels still in
+#: carry a coupon and a gift-card spend. The parcels still in
 #: flight are the four newest, so their tracking is always fresh.
 ORDERS: tuple[OrderRow, ...] = (
     OrderRow(
@@ -263,7 +261,6 @@ ORDERS: tuple[OrderRow, ...] = (
         shipment=_shipment(_LOCKER_THESSALONIKI, "delivered", "DEMO0000000011"),
         shipping_price="2.50",
         promotion_code="SAVE5",
-        invoice=True,
     ),
     OrderRow(
         status="COMPLETED",
@@ -275,7 +272,6 @@ ORDERS: tuple[OrderRow, ...] = (
             "acs", "delivered", "DEMO0000000015", _ACS_STATION
         ),
         shipping_price="4.20",
-        invoice=True,
     ),
     OrderRow(
         status="COMPLETED",
@@ -289,7 +285,6 @@ ORDERS: tuple[OrderRow, ...] = (
         shipment=ShipmentRow(
             "acs", "delivered", "DEMO0000000021", _ACS_STATION_ATHENS
         ),
-        invoice=True,
     ),
     OrderRow(
         status="RETURNED",
@@ -355,7 +350,6 @@ ORDERS: tuple[OrderRow, ...] = (
             "acs", "delivered", "DEMO0000000063", _ACS_STATION
         ),
         shipping_price="4.20",
-        invoice=True,
     ),
     OrderRow(
         status="COMPLETED",
@@ -722,7 +716,7 @@ def _seed_orders(
     """Fixture orders, written silently and backdated.
 
     Returns how many were written and every ``(row, order)`` the account
-    now has, so the follow-ups (carrier rows, redemptions, invoices) can
+    now has, so the follow-ups (carrier rows, redemptions) can
     run on orders that already existed too — a re-run converges.
 
     The writing itself is ``devtools.demo_orders.create_orders``; read
@@ -1021,36 +1015,6 @@ def _seed_gift_spend(order) -> bool:
     return True
 
 
-def _seed_invoice(order) -> bool:
-    """Issue the order's invoice, dated the day after it was placed.
-
-    Through ``generate_invoice`` — the numbering, snapshots and PDF are
-    the real ones — and not through ``generate_order_invoice``, the task
-    that also emails the buyer and submits the document to myDATA. The
-    first call dates the invoice today, so its date is corrected and the
-    document rendered again: a PDF that says today beside an order from
-    three weeks ago would be the first thing a prospect notices.
-    """
-    from django.utils import timezone
-
-    from order.invoicing import generate_invoice
-    from order.models.invoice import Invoice
-
-    if Invoice.objects.filter(order=order).exists():
-        return False
-    invoice = generate_invoice(order)
-    issued = min(
-        (order.created_at + timedelta(days=1)).date(), timezone.localdate()
-    )
-    Invoice.objects.filter(pk=invoice.pk).update(
-        issue_date=issued,
-        created_at=order.created_at,
-        updated_at=order.created_at,
-    )
-    generate_invoice(order, force=True)
-    return True
-
-
 def _seed_points(user, orders: dict[int, Any]) -> int:
     """The loyalty ledger, and the XP and tier it adds up to.
 
@@ -1249,9 +1213,6 @@ def _seed_account_history(user, pairs, *, with_extras: bool) -> dict[str, int]:
         orders = {row.days_ago: order for row, order in pairs}
         _bump(report, "points", _seed_points(user, orders))
         _bump(report, "notifications", _seed_notifications(user, orders))
-    for row, order in pairs:
-        if row.invoice:
-            _bump(report, "invoices", int(_seed_invoice(order)))
     return report
 
 
@@ -1410,7 +1371,6 @@ def reset_demo_account() -> dict[str, int]:
 
     for key, value in _wipe_guest_checkouts(before=started_at).items():
         _bump(report, key, value)
-    _bump(report, "invoice_counters_rewound", _rewind_invoice_counters())
 
     seeded = seed_demo_account()
     for key, value in seeded.items():
@@ -1549,13 +1509,13 @@ def _delete_payment_ledgers(order_ids) -> int:
 
 
 def _delete_invoices(order_ids) -> int:
-    """Remove the invoices of these orders, rows AND their PDFs.
+    """Remove the receipts of these orders, rows AND their PDFs.
 
-    ``Invoice.order`` is ``PROTECT``, so they have to go before the
-    orders do. Deleting the row alone leaves the PDF in the tenant's
-    private storage, and with the counter rewound the next invoice would
-    be written under the same name and stored beside it with a suffix:
-    the volume would gain a file for every invoice, every night.
+    A demo store issues no receipts, but its orders can still carry some:
+    the fixtures used to seed them, and nothing stops an operator from
+    issuing one. ``Invoice.order`` is ``PROTECT``, so they have to go
+    before the orders do, and deleting the row alone would leave the PDF
+    orphaned in the tenant's private storage.
     """
     from order.models.invoice import Invoice
 
@@ -1565,43 +1525,6 @@ def _delete_invoices(order_ids) -> int:
             invoice.document_file.delete(save=False)
     Invoice.objects.filter(pk__in=[i.pk for i in invoices]).delete()
     return len(invoices)
-
-
-def _rewind_invoice_counters() -> int:
-    """Hand the invoice numbers a reset freed back to the counter.
-
-    Invoice numbers are gapless by law, which is why the counter is
-    never derived from a row count. On a demo store the fixture invoices
-    are deleted and reissued every night, so without this the sequence
-    would climb by the fixtures' count forever. The counter goes back to
-    one past the highest number still on file, and only ever on a store
-    flagged ``is_demo``.
-    """
-    from order.models.invoice import (
-        INVOICE_NUMBER_FORMAT,
-        Invoice,
-        InvoiceCounter,
-    )
-
-    rewound = 0
-    for counter in InvoiceCounter.objects.all():
-        prefix = INVOICE_NUMBER_FORMAT.split("{number")[0].format(
-            year=counter.year
-        )
-        highest = max(
-            (
-                int(number.removeprefix(prefix))
-                for number in Invoice.objects.filter(
-                    invoice_number__startswith=prefix
-                ).values_list("invoice_number", flat=True)
-            ),
-            default=0,
-        )
-        if counter.next_number != highest + 1:
-            counter.next_number = highest + 1
-            counter.save(update_fields=["next_number"])
-            rewound += 1
-    return rewound
 
 
 def _wipe_visitor_data(user) -> int:

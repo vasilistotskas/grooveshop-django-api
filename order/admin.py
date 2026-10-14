@@ -56,7 +56,11 @@ from order.enum.status import (
     PaymentStatus,
 )
 from order.exceptions import PaymentError
-from order.invoicing import generate_invoice, receipt_issuable
+from order.invoicing import (
+    ReceiptNotIssuable,
+    generate_invoice,
+    receipt_issuable,
+)
 from order.models.attribution import OrderAttribution
 from order.models.history import OrderHistory, OrderItemHistory
 from order.models.invoice import Invoice, InvoiceCounter, MyDataStatus
@@ -921,12 +925,12 @@ class OrderAdmin(BaseModelAdmin):
         self, request, context, add=False, change=False, form_url="", obj=None
     ):
         if obj is not None:
-            context["order_summary"] = self._summary(obj)
+            context["order_summary"] = self._summary(request, obj)
         return super().render_change_form(
             request, context, add, change, form_url, obj
         )
 
-    def _summary(self, order) -> list[dict]:
+    def _summary(self, request, order) -> list[dict]:
         shipment = self.shipment_state(order)
         invoice = Invoice.objects.filter(order=order).first()
         return [
@@ -977,13 +981,17 @@ class OrderAdmin(BaseModelAdmin):
                 else "—",
                 "footer": self.shipping_info(order),
             },
-            self._document_card(order, invoice),
+            self._document_card(
+                order, invoice, platform_issues=self._issues_receipts(request)
+            ),
         ]
 
     @staticmethod
-    def _document_card(order, invoice) -> dict:
+    def _document_card(order, invoice, *, platform_issues: bool) -> dict:
         """The order's tax document: the receipt the platform issues, or,
-        for an invoice order, the invoice staff issue in timologio."""
+        for an invoice order, the invoice staff issue in timologio. A store
+        that issues its receipts outside the platform has no receipt here,
+        and the card says so rather than leaving an unexplained gap."""
         if order.document_type == OrderDocumentTypeEnum.INVOICE.value:
             number = (
                 order.timologio_invoice_number or order.timologio_invoice_mark
@@ -995,15 +1003,21 @@ class OrderAdmin(BaseModelAdmin):
                 if number
                 else _("To be issued in timologio"),
             }
+        if invoice is not None:
+            return {
+                "title": _("Receipt"),
+                "value": invoice.invoice_number,
+                "footer": label_cell(
+                    invoice.get_mydata_status_display(),
+                    MYDATA_STATUS_VARIANT.get(invoice.mydata_status, "default"),
+                ),
+            }
         return {
             "title": _("Receipt"),
-            "value": invoice.invoice_number if invoice else "—",
-            "footer": label_cell(
-                invoice.get_mydata_status_display(),
-                MYDATA_STATUS_VARIANT.get(invoice.mydata_status, "default"),
-            )
-            if invoice
-            else "",
+            "value": "—",
+            "footer": ""
+            if platform_issues
+            else _("Issued by the store outside the platform"),
         }
 
     @admin.display(description=_("To issue in timologio"))
@@ -1349,6 +1363,26 @@ class OrderAdmin(BaseModelAdmin):
             ).exists()
         )
 
+    def has_retail_documents_permission(self, request, object_id=None):
+        """The "Invoicing & myDATA" actions exist only for a store whose
+        retail receipts the platform issues. Any other store issues them
+        outside the platform, so the actions are hidden and refused."""
+        return self._issues_receipts(request)
+
+    @staticmethod
+    def _issues_receipts(request) -> bool:
+        """Whether the platform issues this store's retail receipts
+        (``MyDataConfig.is_ready``), read once per request: Unfold asks the
+        permission once per action, and the order page also needs it for
+        its Receipt card."""
+        from order.mydata.config import load_config
+
+        issues = getattr(request, "_platform_issues_receipts", None)
+        if issues is None:
+            issues = load_config().is_ready()
+            request._platform_issues_receipts = issues
+        return issues
+
     def _bulk_update_status(
         self, request, queryset, target_status, success_message
     ):
@@ -1524,6 +1558,7 @@ class OrderAdmin(BaseModelAdmin):
         description=_("Issue receipt (myDATA)"),
         variant=ActionVariant.PRIMARY,
         icon="receipt_long",
+        permissions=["change", "retail_documents"],
     )
     def issue_receipt_now(self, request, object_id):
         """Issue the order's retail receipt now (generate, register with
@@ -1535,7 +1570,6 @@ class OrderAdmin(BaseModelAdmin):
         before it was created). Exactly once per order: an order that
         already has its receipt is not issued a second one.
         """
-        from order.mydata.config import load_config
         from order.tasks import generate_order_invoice
 
         try:
@@ -1560,16 +1594,6 @@ class OrderAdmin(BaseModelAdmin):
             )
             return self._redirect_to_order_change(object_id)
 
-        if not load_config().is_ready():
-            messages.warning(
-                request,
-                _(
-                    "myDATA integration is not ready — check MYDATA_ENABLED "
-                    "and credentials in Settings before retrying."
-                ),
-            )
-            return self._redirect_to_order_change(object_id)
-
         generate_order_invoice.delay(order.id)
         messages.success(
             request,
@@ -1582,6 +1606,7 @@ class OrderAdmin(BaseModelAdmin):
         description=_("Issue credit documents (myDATA)"),
         variant=ActionVariant.PRIMARY,
         icon="receipt",
+        permissions=["change", "retail_documents"],
     )
     def issue_credit_documents_now(self, request, object_id):
         """Issue the retail credit documents the order owes, and resubmit
@@ -1591,23 +1616,12 @@ class OrderAdmin(BaseModelAdmin):
         the receipt is registered); this is for a store that issues by
         hand and for a credit that was refused or never answered.
         """
-        from order.mydata.config import load_config
         from order.tasks import issue_pending_credits
 
         try:
             order = Order.objects.get(pk=object_id)
         except Order.DoesNotExist:
             messages.error(request, _("Order not found."))
-            return self._redirect_to_order_change(object_id)
-
-        if not load_config().is_ready():
-            messages.warning(
-                request,
-                _(
-                    "myDATA integration is not ready — check MYDATA_ENABLED "
-                    "and credentials in Settings before retrying."
-                ),
-            )
             return self._redirect_to_order_change(object_id)
 
         issue_pending_credits.delay(order.id)
@@ -1626,15 +1640,18 @@ class OrderAdmin(BaseModelAdmin):
         description=_("Regenerate receipt (same number)"),
         variant=ActionVariant.WARNING,
         icon="refresh",
+        permissions=["change", "retail_documents"],
     )
     def regenerate_invoice(self, request, object_id):
-        """Re-render the invoice PDF + snapshots in place.
+        """Re-render the receipt PDF + snapshots in place.
 
         Preserves the original ``invoice_number`` and ``issue_date`` so
         the sequential register stays gap-free (Greek tax law). Only
         the PDF, seller / buyer snapshots, and derived totals are
         refreshed — use this to fix a corrupted PDF or to apply an
         updated seller address/VAT ID without breaking audit traceability.
+        An order with no receipt has nothing to regenerate: issuing one is
+        "Issue receipt".
         """
         try:
             order = Order.objects.get(pk=object_id)
@@ -1644,6 +1661,9 @@ class OrderAdmin(BaseModelAdmin):
 
         try:
             invoice = generate_invoice(order, force=True)
+        except ReceiptNotIssuable as refusal:
+            messages.warning(request, str(refusal))
+            return self._redirect_to_order_change(object_id)
         except Exception as exc:
             logger.exception(
                 "Admin invoice regeneration failed for order %s", order.id
@@ -1668,6 +1688,7 @@ class OrderAdmin(BaseModelAdmin):
         description=_("Send receipt to myDATA"),
         variant=ActionVariant.PRIMARY,
         icon="cloud_upload",
+        permissions=["change", "retail_documents"],
     )
     def send_invoice_to_mydata_now(self, request, object_id):
         """Dispatch a manual myDATA submission for this order.
@@ -1694,18 +1715,7 @@ class OrderAdmin(BaseModelAdmin):
             )
             return self._redirect_to_order_change(object_id)
 
-        from order.mydata.config import load_config
         from order.tasks import send_invoice_to_mydata
-
-        if not load_config().is_ready():
-            messages.warning(
-                request,
-                _(
-                    "myDATA integration is not ready — check MYDATA_ENABLED "
-                    "and credentials in Settings before retrying."
-                ),
-            )
-            return self._redirect_to_order_change(object_id)
 
         send_invoice_to_mydata.delay(order.id)
         messages.success(
@@ -1723,6 +1733,7 @@ class OrderAdmin(BaseModelAdmin):
         description=_("Cancel receipt in myDATA (issued in error)"),
         variant=ActionVariant.DANGER,
         icon="cancel",
+        permissions=["change", "retail_documents"],
     )
     def cancel_mydata_invoice_now(self, request, object_id):
         """Schedule a ``CancelInvoice`` call for this order's MARK.
@@ -2319,9 +2330,11 @@ class InvoiceAdmin(BaseModelAdmin):
     Greek tax law allows no edits to an issued invoice and no gaps in
     the register, so this admin browses, searches and downloads only —
     nobody deletes here, superusers included: a deleted row is a gap.
-    ``OrderAdmin``'s ``Generate invoice`` creates one; its ``Regenerate``
-    re-renders the PDF and snapshots in place, keeping the number and
-    issue date (``order.invoicing.generate_invoice(force=True)``).
+    ``OrderAdmin``'s "Issue receipt (myDATA)" creates one; its
+    "Regenerate receipt" re-renders the PDF and snapshots of an existing
+    receipt in place, keeping the number and issue date
+    (``order.invoicing.generate_invoice(force=True)``), and never creates
+    one.
     """
 
     list_display = (

@@ -27,6 +27,7 @@ from order.invoicing import generate_invoice
 from order.mydata.builder import build_receipt_xml
 from pay_way.enum.settlement import PaySettlement
 from product.factories.product import ProductFactory
+from tests.utils.mydata import issuable, mydata_enabled
 from vat.factories import VatFactory
 
 AADE_NS = "{http://www.aade.gr/myDATA/invoice/v1.0}"
@@ -49,11 +50,14 @@ class BuildInvoiceXmlTestCase(TestCase):
             price=Money(Decimal("12.40"), "EUR"),
             quantity=2,
         )
-        with patch(
-            "order.invoicing._render_pdf_bytes",
-            return_value=b"%PDF-1.4 test",
+        with (
+            mydata_enabled(auto_submit=False),
+            patch(
+                "order.invoicing._render_pdf_bytes",
+                return_value=b"%PDF-1.4 test",
+            ),
         ):
-            return generate_invoice(order)
+            return generate_invoice(issuable(order))
 
     def _build(self, invoice):
         return build_receipt_xml(
@@ -325,11 +329,14 @@ class BuildInvoiceXmlTestCase(TestCase):
             price=Money(Decimal("5.00"), "EUR"),
             quantity=1,
         )
-        with patch(
-            "order.invoicing._render_pdf_bytes",
-            return_value=b"%PDF-1.4 test",
+        with (
+            mydata_enabled(auto_submit=False),
+            patch(
+                "order.invoicing._render_pdf_bytes",
+                return_value=b"%PDF-1.4 test",
+            ),
         ):
-            invoice = generate_invoice(order)
+            invoice = generate_invoice(issuable(order))
         built = self._build(invoice)
         root = fromstring(built.xml_bytes)
         rows = root.findall(_localise("invoice/invoiceDetails"))
@@ -370,11 +377,14 @@ class BuildInvoiceXmlTestCase(TestCase):
             price=Money(Decimal("50.00"), "EUR"),
             quantity=1,
         )
-        with patch(
-            "order.invoicing._render_pdf_bytes",
-            return_value=b"%PDF-1.4 test",
+        with (
+            mydata_enabled(auto_submit=False),
+            patch(
+                "order.invoicing._render_pdf_bytes",
+                return_value=b"%PDF-1.4 test",
+            ),
         ):
-            invoice = generate_invoice(order)
+            invoice = generate_invoice(issuable(order))
         built = self._build(invoice)
         self.assertEqual(built.invoice_type, "11.1")
         root = fromstring(built.xml_bytes)
@@ -423,11 +433,14 @@ class BuildInvoiceXmlTestCase(TestCase):
             price=Money(Decimal("11.30"), "EUR"),
             quantity=1,
         )
-        with patch(
-            "order.invoicing._render_pdf_bytes",
-            return_value=b"%PDF-1.4 test",
+        with (
+            mydata_enabled(auto_submit=False),
+            patch(
+                "order.invoicing._render_pdf_bytes",
+                return_value=b"%PDF-1.4 test",
+            ),
         ):
-            invoice = generate_invoice(order)
+            invoice = generate_invoice(issuable(order))
 
         root = fromstring(self._build(invoice).xml_bytes)
         rows = root.findall(_localise("invoice/invoiceDetails"))

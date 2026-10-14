@@ -30,6 +30,7 @@ from order.mydata.types import (
 )
 from product.factories import ProductFactory
 from tests.utils.discounts import snapshot_discounts
+from tests.utils.mydata import issuable, mydata_enabled
 from vat.factories import VatFactory
 
 pytestmark = pytest.mark.django_db
@@ -71,10 +72,13 @@ def _order(lines, *, shipping, fee, discount=None, loyalty=None):
 
 def _documents(order):
     """The persisted ``Invoice`` and the myDATA payload built from it."""
-    with patch(
-        "order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test"
+    with (
+        mydata_enabled(auto_submit=False),
+        patch(
+            "order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test"
+        ),
     ):
-        invoice = generate_invoice(order)
+        invoice = generate_invoice(issuable(order))
     built = build_receipt_xml(
         invoice,
         issuer_vat="123456789",

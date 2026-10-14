@@ -16030,13 +16030,14 @@ paths:
   /api/v1/order/{id}/invoice:
     get:
       operationId: retrieveOrderInvoice
-      description: Επιστρέφει τα μεταδεδομένα τιμολογίου της παραγγελίας και ένα απόλυτο
-        URL προς το endpoint λήψης μέσω ροής (``/order/{id}/invoice/download``). Το
-        URL προστατεύεται από τον ίδιο έλεγχο δικαιώματος ιδιοκτήτη/διαχειριστή όπως
-        και αυτό το endpoint μεταδεδομένων — δεν εκτίθενται ακατέργαστα URL αποθήκευσης
-        στον client. 404 αν το τιμολόγιο δεν έχει δημιουργηθεί ακόμα (π.χ. η παραγγελία
-        δεν έχει ολοκληρωθεί).
-      summary: Λήψη μεταδεδομένων λήψης τιμολογίου για παραγγελία
+      description: 'Επιστρέφει τα μεταδεδομένα της απόδειξης λιανικής της παραγγελίας
+        και ένα απόλυτο URL προς το endpoint λήψης μέσω ροής (``/order/{id}/invoice/download``).
+        Το URL προστατεύεται από τον ίδιο έλεγχο δικαιώματος ιδιοκτήτη/διαχειριστή
+        όπως και αυτό το endpoint μεταδεδομένων — δεν εκτίθενται ακατέργαστα URL αποθήκευσης
+        στον client. 404 εκτός αν η απόδειξη έχει καταχωριστεί στην ΑΑΔΕ (myDATA):
+        δεν έχει εκδοθεί ακόμη, εκκρεμεί, απορρίφθηκε ή ακυρώθηκε, ή το κατάστημα
+        εκδίδει τις αποδείξεις του εκτός της πλατφόρμας.'
+      summary: Λήψη μεταδεδομένων λήψης απόδειξης για παραγγελία
       parameters:
       - in: path
         name: id
@@ -16090,12 +16091,12 @@ paths:
   /api/v1/order/{id}/invoice/download:
     get:
       operationId: downloadOrderInvoice
-      description: Μεταδίδει το παραχθέν PDF μέσω ταυτοποίησης Django. 404 όταν το
-        τιμολόγιο δεν έχει δημιουργηθεί ακόμα. Ίδιος έλεγχος ιδιοκτησίας όπως και
-        το endpoint μεταδεδομένων — επιστρέφει υπογεγραμμένη ροή S3 σε παραγωγή και
-        ροή αρχείου συστήματος σε ανάπτυξη, χωρίς να εκθέτει το URL αποθήκευσης στον
-        client.
-      summary: Λήψη PDF τιμολογίου
+      description: Μεταδίδει το PDF της απόδειξης λιανικής μέσω ταυτοποίησης Django.
+        404 εκτός αν η απόδειξη έχει καταχωριστεί στην ΑΑΔΕ (myDATA). Ίδιος έλεγχος
+        ιδιοκτησίας όπως και το endpoint μεταδεδομένων — επιστρέφει υπογεγραμμένη
+        ροή S3 σε παραγωγή και ροή αρχείου συστήματος σε ανάπτυξη, χωρίς να εκθέτει
+        το URL αποθήκευσης στον client.
+      summary: Λήψη PDF απόδειξης
       parameters:
       - in: path
         name: id
@@ -40355,9 +40356,11 @@ components:
         hasInvoice:
           type: boolean
           readOnly: true
-          description: True when a PDF invoice has been generated — the frontend can
-            show the download CTA without issuing a separate request to the invoice
-            endpoint to find out.
+          description: True when the order has a retail receipt registered with AADE
+            (myDATA) and its PDF, so the frontend can show the download CTA without
+            asking the receipt endpoint. False while the receipt is pending, rejected
+            or cancelled, and always for a store that issues its receipts outside
+            the platform.
         boxnowShipment:
           allOf:
           - $ref: '#/components/schemas/BoxNowShipmentDetail'

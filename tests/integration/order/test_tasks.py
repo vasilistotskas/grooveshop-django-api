@@ -26,7 +26,7 @@ from order.tasks import (
     send_shipping_notification_email,
 )
 from pay_way.factories import PayWayFactory
-from tests.utils.mydata import mydata_enabled
+from tests.utils.mydata import issuable, mydata_enabled
 
 
 def _sell_something(order):
@@ -714,7 +714,8 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         from order.invoicing import generate_invoice
 
         _sell_something(self.order)
-        generate_invoice(self.order)
+        with mydata_enabled(auto_submit=False):
+            generate_invoice(issuable(self.order))
 
         # Clear any emails the order_created signal already sent so we
         # only assert on the invoice email below.

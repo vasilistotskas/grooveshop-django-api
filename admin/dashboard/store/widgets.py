@@ -749,21 +749,45 @@ class StoreAlerts(DashboardWidget):
         return alerts
 
     def _mydata(self) -> list[dict[str, Any]]:
-        from extra_settings.models import Setting
+        from order.mydata.config import load_config
 
-        from tenant.credentials import mydata_credentials
-
-        if not Setting.get("MYDATA_ENABLED", default=False):
+        # The request already knows whether myDATA is on; the rest of the
+        # config is read only for a store that switched it on.
+        if not store_features(self.request).mydata:
             return []
+        config = load_config()
         alerts = []
-        credentials = mydata_credentials()
+        # The ERP channel is only for a business exempt from the fiscal
+        # device (ΦΗΜ); without the recorded ground nothing is issued.
+        if not config.fhm_exemption_ground:
+            alerts.append(
+                _alert(
+                    "danger",
+                    "gavel",
+                    _("myDATA is on, but no receipt is issued"),
+                    _(
+                        "The platform may issue retail receipts only for a "
+                        "business exempt from the fiscal device (ΦΗΜ). "
+                        "Record the legal ground in "
+                        "MYDATA_FHM_EXEMPTION_GROUND, or switch "
+                        "MYDATA_ENABLED off and issue receipts in your "
+                        "fiscal device or e-invoicing provider."
+                    ),
+                    link=(
+                        self.changelist_url(
+                            "extra_settings.Setting", "q=MYDATA_"
+                        ),
+                        _("Open the myDATA settings"),
+                    ),
+                )
+            )
         missing = [
             field
-            for field, key in (
-                ("mydata_user_id", "user_id"),
-                ("mydata_subscription_key", "subscription_key"),
+            for field, value in (
+                ("mydata_user_id", config.user_id),
+                ("mydata_subscription_key", config.subscription_key),
             )
-            if not credentials[key]
+            if not value
         ]
         if missing:
             alerts.append(
@@ -779,10 +803,7 @@ class StoreAlerts(DashboardWidget):
                     ),
                 )
             )
-        if (
-            not missing
-            and Setting.get("MYDATA_ENVIRONMENT", default="dev") == "dev"
-        ):
+        if not missing and config.environment == "dev":
             alerts.append(
                 _alert(
                     "info",

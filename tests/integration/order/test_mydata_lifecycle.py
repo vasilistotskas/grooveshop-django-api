@@ -657,8 +657,10 @@ class TestDocuments:
             captured.append(context)
             return b"%PDF-1.4 receipt"
 
-        with patch(
-            "order.invoicing._render_pdf_bytes", side_effect=fake_render
+        _mark_shipped(order)
+        with (
+            mydata_enabled(auto_submit=False),
+            patch("order.invoicing._render_pdf_bytes", side_effect=fake_render),
         ):
             generate_invoice(order)
 
@@ -731,7 +733,7 @@ class TestInvoiceOrdersInTheAdmin:
         order.refresh_from_db()
         assert order.timologio_invoice_mark == 400001234567890
         assert order.timologio_credit_mark == 400001234567999
-        card = admin._document_card(order, None)
+        card = admin._document_card(order, None, platform_issues=False)
         assert card["value"] == "Α-123"
         assert "timologio" in str(card["footer"])
 
@@ -739,5 +741,7 @@ class TestInvoiceOrdersInTheAdmin:
         order = _order()
         with mydata_enabled(), FakeAade():
             invoice = _receipt(order)
-        card = self._admin()._document_card(order, invoice)
+        card = self._admin()._document_card(
+            order, invoice, platform_issues=True
+        )
         assert card["value"] == invoice.invoice_number

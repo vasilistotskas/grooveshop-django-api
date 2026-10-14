@@ -1,11 +1,12 @@
 """Pre-flight gate for enabling myDATA e-invoicing on a tenant.
 
-Greek standard VAT is 24% (23% stopped being valid in June 2016), and
-myDATA B2B e-invoicing becomes mandatory during 2026. Production
-webside was found running products at the stale 23% rate — fixed, but
-nothing caught it automatically. This command is the check an operator
-runs BEFORE flipping ``MYDATA_ENABLED`` on for a tenant, and CI/ops can
-run it on a schedule since it exits non-zero on any violation.
+Greek standard VAT is 24% (23% stopped being valid in June 2016).
+Production webside was found running products at the stale 23% rate —
+fixed, but nothing caught it automatically. This command is the
+catalogue check an operator runs BEFORE the platform starts issuing a
+tenant's retail receipts (``MYDATA_ENABLED`` with a recorded
+``MYDATA_FHM_EXEMPTION_GROUND``), and CI/ops can run it on a schedule
+since it exits non-zero on any violation.
 
 Reports per tenant:
 

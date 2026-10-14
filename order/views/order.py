@@ -270,14 +270,16 @@ serializers_config: SerializersConfig = {
     "invoice": ActionConfig(
         response=InvoiceDownloadResponseSerializer,
         operation_id="retrieveOrderInvoice",
-        summary=_("Get invoice download metadata for an order"),
+        summary=_("Get receipt download metadata for an order"),
         description=_(
-            "Return the order's invoice metadata and an absolute URL to "
-            "the streaming download endpoint (``/order/{id}/invoice/"
-            "download``). The URL is gated by the same owner/admin "
-            "permission check as this metadata endpoint — no raw "
-            "storage URLs are exposed to the client. 404 if the invoice "
-            "has not been generated yet (e.g. order not completed)."
+            "Return the order's retail receipt metadata and an absolute "
+            "URL to the streaming download endpoint (``/order/{id}/"
+            "invoice/download``). The URL is gated by the same owner/admin "
+            "permission check as this metadata endpoint — no raw storage "
+            "URLs are exposed to the client. 404 unless the receipt is "
+            "registered with AADE (myDATA): none issued yet, pending, "
+            "rejected or cancelled, or a store that issues its receipts "
+            "outside the platform."
         ),
         tags=["Orders"],
     ),
@@ -2103,19 +2105,17 @@ class OrderViewSet(BaseModelViewSet):
 
     @action(detail=True, methods=["GET"])
     def invoice(self, request, *args, **kwargs):
-        """Return invoice metadata + download URL for an order.
+        """Return receipt metadata + download URL for an order.
 
-        404 when the invoice has not been generated yet (e.g. order
-        still PENDING). Permission check is done via the viewset's
-        standard ``get_object`` flow which already covers owner/admin
-        and guest-via-uuid access.
+        404 unless the receipt is registered with AADE
+        (``Invoice.is_deliverable``). Permission check is done via the
+        viewset's standard ``get_object`` flow which already covers
+        owner/admin and guest-via-uuid access.
         """
         order = self.get_object()
         invoice = getattr(order, "invoice", None)
-        if invoice is None or not invoice.has_document():
-            raise NotFound(
-                _("Invoice has not been generated for this order yet.")
-            )
+        if invoice is None or not invoice.is_deliverable():
+            raise NotFound(_("This order has no registered receipt."))
         serializer = InvoiceDownloadResponseSerializer(
             invoice, context={"request": request}
         )
@@ -2124,12 +2124,12 @@ class OrderViewSet(BaseModelViewSet):
     @extend_schema(
         operation_id="downloadOrderInvoice",
         tags=["Orders"],
-        summary=_("Download the invoice PDF"),
+        summary=_("Download the receipt PDF"),
         description=_(
-            "Streams the rendered PDF through Django auth. 404 when "
-            "the invoice has not been generated yet. Same ownership "
-            "check as the metadata endpoint — returns a signed S3 "
-            "stream on prod and a filesystem stream in dev without "
+            "Streams the retail receipt PDF through Django auth. 404 "
+            "unless the receipt is registered with AADE (myDATA). Same "
+            "ownership check as the metadata endpoint — returns a signed "
+            "S3 stream on prod and a filesystem stream in dev without "
             "exposing the storage URL to the client."
         ),
         # ``200: None`` declared a 200 with no body for a PDF stream.
@@ -2160,10 +2160,8 @@ class OrderViewSet(BaseModelViewSet):
         """
         order = self.get_object()
         invoice = getattr(order, "invoice", None)
-        if invoice is None or not invoice.has_document():
-            raise NotFound(
-                _("Invoice has not been generated for this order yet.")
-            )
+        if invoice is None or not invoice.is_deliverable():
+            raise NotFound(_("This order has no registered receipt."))
         return FileResponse(
             invoice.document_file.open("rb"),
             content_type="application/pdf",

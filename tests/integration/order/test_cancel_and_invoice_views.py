@@ -19,7 +19,8 @@ from rest_framework.test import APITestCase
 
 from order.enum.status import OrderStatus
 from order.factories.order import OrderFactory
-from order.models.invoice import Invoice, InvoiceCounter
+from order.models.invoice import Invoice, InvoiceCounter, MyDataStatus
+from tests.utils.mydata import issuable, mydata_enabled
 from user.factories.account import UserAccountFactory
 
 
@@ -65,6 +66,35 @@ class CancelOrderStateTransitionTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
 
+def _rendered_receipt(user, *, mydata_status=MyDataStatus.CONFIRMED):
+    """A shipped receipt order of ``user`` with its rendered receipt, in the
+    given AADE state. Issued by a store that issues through the platform,
+    by hand, so no signal issues anything on its own."""
+    from order.invoicing import generate_invoice
+
+    order = issuable(OrderFactory(user=user))
+    with (
+        mydata_enabled(auto_submit=False),
+        patch(
+            "order.invoicing._render_pdf_bytes",
+            return_value=b"%PDF-1.4\n%FAKE\n%EOF",
+        ),
+    ):
+        invoice = generate_invoice(order)
+    Invoice.objects.filter(pk=invoice.pk).update(mydata_status=mydata_status)
+    invoice.refresh_from_db()
+    return order, invoice
+
+
+_NOT_REGISTERED = (
+    MyDataStatus.NOT_SENT,
+    MyDataStatus.PENDING,
+    MyDataStatus.SUBMITTED,
+    MyDataStatus.REJECTED,
+    MyDataStatus.CANCELED,
+)
+
+
 class OrderInvoiceEndpointTestCase(APITestCase):
     def setUp(self) -> None:
         self.user = UserAccountFactory()
@@ -91,15 +121,8 @@ class OrderInvoiceEndpointTestCase(APITestCase):
         response = self.client.get(self._url(order.pk))
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
-    @patch(
-        "order.invoicing._render_pdf_bytes",
-        return_value=b"%PDF-1.4\n%...\n%EOF",
-    )
-    def test_returns_metadata_when_pdf_exists(self, _mock_render) -> None:
-        from order.invoicing import generate_invoice
-
-        order = OrderFactory(user=self.user)
-        invoice = generate_invoice(order)
+    def test_returns_metadata_for_a_registered_receipt(self) -> None:
+        order, invoice = _rendered_receipt(self.user)
 
         response = self.client.get(self._url(order.pk))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -118,21 +141,25 @@ class OrderInvoiceEndpointTestCase(APITestCase):
         response = self.client.get(self._url(order.pk))
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-    @patch(
-        "order.invoicing._render_pdf_bytes",
-        return_value=b"%PDF-1.4\n%...\n%EOF",
-    )
-    def test_download_url_points_at_streaming_endpoint(
-        self, _mock_render
-    ) -> None:
+    def test_returns_404_for_a_receipt_aade_has_not_registered(self) -> None:
+        """A pending, rejected or cancelled receipt is not a valid tax
+        document, so the customer never gets it, PDF or not."""
+        for mydata_status in _NOT_REGISTERED:
+            with self.subTest(mydata_status=mydata_status):
+                order, _invoice = _rendered_receipt(
+                    self.user, mydata_status=mydata_status
+                )
+                response = self.client.get(self._url(order.pk))
+                self.assertEqual(
+                    response.status_code, status.HTTP_404_NOT_FOUND
+                )
+
+    def test_download_url_points_at_streaming_endpoint(self) -> None:
         """The metadata endpoint must return an absolute URL to the
         Django-gated streaming action — NOT a raw S3 / filesystem URL.
         That's the whole point of routing through Django: identical
         behaviour on both backends + mandatory ownership check."""
-        from order.invoicing import generate_invoice
-
-        order = OrderFactory(user=self.user)
-        generate_invoice(order)
+        order, _invoice = _rendered_receipt(self.user)
 
         response = self.client.get(self._url(order.pk))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -170,15 +197,19 @@ class OrderInvoiceDownloadEndpointTestCase(APITestCase):
         response = self.client.get(self._url(order.pk))
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
-    @patch(
-        "order.invoicing._render_pdf_bytes",
-        return_value=b"%PDF-1.4\n%FAKE\n%EOF",
-    )
-    def test_streams_pdf_as_attachment(self, _mock_render) -> None:
-        from order.invoicing import generate_invoice
+    def test_returns_404_for_a_receipt_aade_has_not_registered(self) -> None:
+        for mydata_status in _NOT_REGISTERED:
+            with self.subTest(mydata_status=mydata_status):
+                order, _invoice = _rendered_receipt(
+                    self.user, mydata_status=mydata_status
+                )
+                response = self.client.get(self._url(order.pk))
+                self.assertEqual(
+                    response.status_code, status.HTTP_404_NOT_FOUND
+                )
 
-        order = OrderFactory(user=self.user)
-        invoice = generate_invoice(order)
+    def test_streams_a_registered_receipt_as_attachment(self) -> None:
+        order, invoice = _rendered_receipt(self.user)
 
         response = self.client.get(self._url(order.pk))
         self.assertEqual(response.status_code, status.HTTP_200_OK)

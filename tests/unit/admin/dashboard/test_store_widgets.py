@@ -447,6 +447,59 @@ class TestAlerts:
 
         assert items is None
 
+    def _mydata_titles(self, tenant, bind_tenant, *, ground: str) -> list[str]:
+        from extra_settings.models import Setting
+
+        Setting.objects.update_or_create(
+            name="MYDATA_ENABLED",
+            defaults={"value_type": "bool", "value_bool": True},
+        )
+        Setting.objects.update_or_create(
+            name="MYDATA_FHM_EXEMPTION_GROUND",
+            defaults={"value_type": "string", "value_string": ground},
+        )
+        bind_tenant(tenant)
+        superuser = UserAccountFactory(admin=True)
+        with translation.override("en"):
+            return [
+                str(alert["title"])
+                for alert in _context(widgets.StoreAlerts, superuser)["alerts"]
+            ]
+
+    def test_mydata_on_without_an_exemption_ground_is_a_danger_alert(
+        self, bind_tenant
+    ):
+        """Switched on with credentials but no recorded ΦΗΜ exemption, the
+        platform issues nothing; the owner is told why, not left guessing."""
+        from tests.utils.staff import store_tenant
+
+        titles = self._mydata_titles(
+            store_tenant(
+                "widget_mydata_no_ground",
+                mydata_user_id="u",
+                mydata_subscription_key="k",
+            ),
+            bind_tenant,
+            ground="",
+        )
+
+        assert "myDATA is on, but no receipt is issued" in titles
+
+    def test_a_recorded_exemption_ground_raises_no_alert(self, bind_tenant):
+        from tests.utils.staff import store_tenant
+
+        titles = self._mydata_titles(
+            store_tenant(
+                "widget_mydata_ground",
+                mydata_user_id="u",
+                mydata_subscription_key="k",
+            ),
+            bind_tenant,
+            ground="ΠΟΛ.1002/2014 §4, accountant, 2026-10-14",
+        )
+
+        assert "myDATA is on, but no receipt is issued" not in titles
+
     def test_a_store_dashboard_never_counts_background_task_failures(
         self, monkeypatch
     ):

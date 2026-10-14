@@ -60,6 +60,7 @@ from shipping_boxnow.factories import (
     BoxNowShipmentFactory,
 )
 from shipping_boxnow.tasks import boxnow_send_arrival_notification
+from tests.utils.mydata import issuable, mydata_enabled
 from user.adapter import UserAccountAdapter
 from user.factories.account import UserAccountFactory
 from user.factories.subscription import UserSubscriptionFactory
@@ -375,10 +376,13 @@ class TestMoreOrderEmails:
         # An invoice taxes the order's shipping at the rate of the goods it
         # travels with, so the order needs a goods line to be invoiced.
         OrderItemFactory(order=order)
-        with patch(
-            "order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4"
+        with (
+            mydata_enabled(auto_submit=False),
+            patch(
+                "order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4"
+            ),
         ):
-            generate_invoice(order)
+            generate_invoice(issuable(order))
         mail.outbox = []
 
         assert send_invoice_email(order.id) is True

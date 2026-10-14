@@ -3,6 +3,24 @@
 
 
 
+## v3.123.1 (2026-10-14)
+
+### Bug fixes
+
+* fix(pay_way): drop the leftover PayWay.configuration column (#194)
+
+0027 (v3.92.0) took the field out of Django's state and kept the
+nullable column so the release still serving during that rollout could
+write it. The contract half that drops it was never written, so every
+store schema still carries an unused jsonb column. v3.92.0 has run
+everywhere since 2026-10-01, so 0031 drops it with a RunSQL declaring
+contract_of 0027, as 0030 did for the translation name column.
+
+
+Claude-Session: https://claude.ai/code/session_01CN2pguPjcNuff5kpCu1GKX
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`4cb7ca2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4cb7ca220924329b97bb431a0dd357c76519e3b2))
+
 ## v3.123.0 (2026-10-14)
 
 ### Bug fixes

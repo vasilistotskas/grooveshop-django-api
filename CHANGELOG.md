@@ -3,6 +3,54 @@
 
 
 
+## v3.123.0 (2026-10-14)
+
+### Bug fixes
+
+* fix(tenant): seeding a new schema's settings is not a feature switch (#193)
+
+extra-settings seeds a missing row with get_or_create, which INSERTs the
+model's blank value (value_bool False) and only then saves the declared
+default. on_switch_change judged that blank insert against the store's
+default, so every default-on feature setting that #191 watches queued
+the store-pages purge twice for each new schema. With no broker - the
+Migration Check's migrate_schemas - the dispatch crashed the migrate, so
+every pull request based on main failed that check.
+
+The insert is no longer a switch, and the save that follows is judged
+against the default the store had, as the module docstring already
+promised. A switch made right after seeding still purges.
+
+
+Claude-Session: https://claude.ai/code/session_011vpHaGB5emaGHkhDzh3mB5
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`d056729`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d0567299ec745c463c96c8d798ec598521d4b482))
+
+### Features
+
+* feat(tenant): accept the Vollkorn and Commissioner fonts and add a FUNDING_BANNER setting (#192) ([`0549d0d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0549d0dc23d0276279b608d1161f71a893605e5a))
+
+* feat(tenant): accept the vollkorn, commissioner and geologica fonts
+
+Theme metadata validation now allows the two new storefront fonts and
+geologica, which the storefront already allowed.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_011vpHaGB5emaGHkhDzh3mB5 ([`0549d0d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0549d0dc23d0276279b608d1161f71a893605e5a))
+
+* feat(tenant): add the FUNDING_BANNER setting for an EU co-funding strip
+
+Public JSON setting {enabled, image, alt, link, label?} with a validator
+that rejects unknown keys, wrong types, http:/javascript: and
+protocol-relative URLs, and requires image, alt and link when enabled.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_011vpHaGB5emaGHkhDzh3mB5
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`0549d0d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0549d0dc23d0276279b608d1161f71a893605e5a))
+
 ## v3.122.0 (2026-10-13)
 
 ### Features

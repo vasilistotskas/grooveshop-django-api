@@ -80,6 +80,43 @@ def test_saving_a_feature_setting_unchanged_purges_nothing(
     assert purges(dispatch) == []
 
 
+def test_seeding_a_missing_feature_setting_purges_nothing(
+    bind_tenant_and_schema,
+):
+    """extra-settings seeds a new schema's rows with ``get_or_create``,
+    which inserts the blank value before it saves the default. A store
+    that gains the row keeps the default it already had, so nothing
+    switched; the blank insert used to read as one, and the migrate of a
+    new schema queued (and, with no broker, crashed on) the purge."""
+    gate = next(
+        gate for gate in feature_setting_gates() if gate.default is True
+    )
+    bind_tenant_and_schema(SimpleNamespace(schema_name="shop_one"))
+    Setting.objects.filter(name=gate.setting_key).delete()
+
+    with patch(DISPATCH) as dispatch:
+        Setting.set_defaults_from_settings()
+
+    assert purges(dispatch) == []
+    assert Setting.get(gate.setting_key) is True
+
+
+def test_a_switch_right_after_seeding_still_purges(bind_tenant_and_schema):
+    gate = next(
+        gate for gate in feature_setting_gates() if gate.default is True
+    )
+    bind_tenant_and_schema(SimpleNamespace(schema_name="shop_one"))
+    Setting.objects.filter(name=gate.setting_key).delete()
+    Setting.set_defaults_from_settings()
+
+    with patch(DISPATCH) as dispatch:
+        switch_store_settings(**{gate.setting_key: False})
+
+    assert purges(dispatch) == [
+        call(purge_store_pages_task, schema_name="shop_one")
+    ]
+
+
 def test_the_platforms_own_setting_purges_nothing():
     with patch(DISPATCH) as dispatch:
         switch_store_settings(PRODUCT_REVIEWS_ENABLED=False)

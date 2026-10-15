@@ -161,6 +161,15 @@ def test_a_localized_artwork_carries_its_own_size(missing):
 
 
 @pytest.mark.django_db
+def test_a_localized_artwork_carries_its_own_alt():
+    """The default alt describes another picture, in another language."""
+    without_alt = {k: v for k, v in _EN.items() if k != "alt"}
+    assert not validate_funding_banner_setting(
+        {**_VALID, "i18n": {"en": without_alt}}
+    )
+
+
+@pytest.mark.django_db
 @pytest.mark.parametrize("key", ["link", "enabled", "i18n", "extra"])
 def test_a_locale_overrides_only_the_artwork_and_the_words(key):
     """The link is one path the storefront prefixes per locale."""

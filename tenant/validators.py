@@ -479,9 +479,13 @@ def _funding_banner_i18n_ok(i18n: object) -> bool:
         if not _funding_banner_text_ok(override):
             return False
         # The alt is the logos' accessible name in that language: an
-        # override may change it, never blank it.
+        # override may change it, never blank it, and a localized artwork
+        # brings its own (the default's describes another picture, in
+        # another language).
         alt = override.get("alt")
         if alt is not None and not alt.strip():
+            return False
+        if "image" in override and alt is None:
             return False
     return True
 
@@ -543,6 +547,42 @@ def validate_funding_banner_setting(value: object) -> bool:
             and bool(alt.strip())
         )
     return True
+
+
+# ---------------------------------------------------------------------------
+# STORE_GEO_LAT / STORE_GEO_LNG extra_settings
+# ---------------------------------------------------------------------------
+
+# Decimal degrees: an optional minus sign, digits, an optional fraction,
+# and nothing else. Mirrored by the storefront's ``parseDegrees``
+# (shared/utils/coordinates.ts), which reads the value the same way.
+_DECIMAL_DEGREES_RE = re.compile(r"^-?\d{1,3}(\.\d+)?$")
+
+
+def _degrees_ok(value: object, limit: int) -> bool:
+    # Empty is the documented "no location" (no geo output, no map pin).
+    if value in (None, ""):
+        return True
+    if not isinstance(value, str):
+        return False
+    text = value.strip()
+    return bool(_DECIMAL_DEGREES_RE.match(text)) and abs(float(text)) <= limit
+
+
+def validate_latitude_setting(value: object) -> bool:
+    """django-extra-settings validator for ``STORE_GEO_LAT``.
+
+    The store's latitude is published as its location, on the map and in
+    the LocalBusiness structured data, so a value the storefront cannot
+    read as decimal degrees within ±90 is refused here rather than
+    silently dropped there.
+    """
+    return _degrees_ok(value, 90)
+
+
+def validate_longitude_setting(value: object) -> bool:
+    """django-extra-settings validator for ``STORE_GEO_LNG`` (±180)."""
+    return _degrees_ok(value, 180)
 
 
 # ---------------------------------------------------------------------------

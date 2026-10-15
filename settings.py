@@ -1833,19 +1833,23 @@ EXTRA_SETTINGS_DEFAULTS = [
         "name": "STORE_GEO_LAT",
         "type": "string",
         "value": "",
+        "validator": "tenant.validators.validate_latitude_setting",
         "description": (
-            "Physical store latitude (decimal degrees, as a string). "
-            "Consumed with STORE_GEO_LNG by the LocalBusiness "
-            "schema.org block; empty disables geo output."
+            "The store's latitude, in decimal degrees (e.g. 40.565129, "
+            "within ±90). With STORE_GEO_LNG it is the store's location: "
+            "the pin of the location map section and the coordinates "
+            "of the LocalBusiness structured data. Empty means no "
+            "location."
         ),
     },
     {
         "name": "STORE_GEO_LNG",
         "type": "string",
         "value": "",
+        "validator": "tenant.validators.validate_longitude_setting",
         "description": (
-            "Physical store longitude (decimal degrees, as a string). "
-            "See STORE_GEO_LAT."
+            "The store's longitude, in decimal degrees (e.g. 22.119096, "
+            "within ±180). See STORE_GEO_LAT."
         ),
     },
     # Meta Conversions API
@@ -2507,7 +2511,10 @@ EXTRA_SETTINGS_DEFAULTS = [
             "and `link` are at most 1000 characters, "
             "`alt` 300, `label` 120. Links must be site-relative paths "
             "or https URLs. A disabled banner is just "
-            '{"enabled": false}.'
+            '{"enabled": false}. `i18n` overrides it per language: '
+            '{"en": {"image", "width", "height", "alt", "label"}}, any '
+            "of them, the artwork always with its own size; the link is "
+            "shared and the storefront adds the locale prefix."
         ),
     },
     {

@@ -12,6 +12,10 @@ Usage:
 
 Safe to re-run:``set_defaults_from_settings`` is idempotent — it only
 creates missing rows and leaves existing values untouched.
+
+It also brings every existing row's description and validator in line
+with settings.py (``tenant.settings_metadata.sync_setting_metadata``, which
+``migrate`` runs too), never its value.
 """
 
 from __future__ import annotations
@@ -109,7 +113,10 @@ class Command(BaseCommand):
                 with schema_context(tenant.schema_name):
                     from extra_settings.models import Setting
 
+                    from tenant.settings_metadata import sync_setting_metadata
+
                     Setting.set_defaults_from_settings()
+                    sync_setting_metadata()
 
                 self.stdout.write(
                     self.style.SUCCESS(

@@ -3,6 +3,54 @@
 
 
 
+## v3.125.0 (2026-10-15)
+
+### Bug fixes
+
+* fix(settings): setting rows follow settings.py; store coordinates are validated
+
+django-extra-settings copies a setting's description and validator into
+a row only when it creates the row, and validates against the stored
+path. Every store provisioned before a description was corrected kept
+the old text in its admin, and every store provisioned before a
+validator was added never ran it. sync_setting_metadata now aligns the
+existing rows' description and validator with EXTRA_SETTINGS_DEFAULTS
+after every migrate (each deploy's migrate_schemas reaches every store)
+and in backfill_extra_settings_defaults; a value is never touched.
+
+STORE_GEO_LAT / STORE_GEO_LNG get validators: decimal degrees within
++-90 / +-180, or empty for no location. They are published as the
+store's location (map pin, structured data), and the storefront reads
+them with the same rule. Their descriptions name the map.
+
+A localized funding-banner artwork must bring its own alt: the
+default's describes another picture, in another language.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`b2f3dac`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b2f3dac51ac6a9e22d2e9513f26812a21e59baa9))
+
+### Features
+
+* feat(settings): the funding banner per language, validated store coordinates, setting rows follow settings.py (#204) ([`b2f3dac`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b2f3dac51ac6a9e22d2e9513f26812a21e59baa9))
+
+* feat(settings): the funding banner speaks every language the store serves
+
+FUNDING_BANNER takes an i18n overlay, the partial per-locale override
+ANNOUNCEMENT_BAR and PageSection.i18n already use: a locale may replace
+the artwork (always with its own width and height), the alt and the
+label. The programme publishes the strip in Greek and in English, so a
+store serving English pages showed the Greek logos with a Greek
+accessible name on every one of them.
+
+The link and the on/off switch stay one value for every language; the
+storefront prefixes the path with the visitor's locale. A localized alt
+may change the logos' accessible name, never blank it.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`b2f3dac`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b2f3dac51ac6a9e22d2e9513f26812a21e59baa9))
+
 ## v3.124.0 (2026-10-15)
 
 ### Features

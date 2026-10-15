@@ -3,6 +3,44 @@
 
 
 
+## v3.124.0 (2026-10-15)
+
+### Features
+
+* feat(page-config): list published layouts, pin the map to the store's location, size the funding banner (#203)
+
+Published layouts in one read:
+- GET /api/v1/page-config answers every layout the store has published
+  with its page type and last modification: the later of the layout's
+  own updated_at and its newest section's, since a section edit changes
+  the page without touching the layout row. The storefront's sitemap
+  lists the store's custom pages from it (they were missing from every
+  store's sitemap) and gates its layout-backed static routes with it
+  instead of one request per page type.
+
+The location map pins the store's location:
+- The store's coordinates were held twice, in STORE_GEO_LAT/LNG (read by
+  the LocalBusiness structured data) and on each location_map section
+  (which drew the map). They drifted: one store's map showed the owner's
+  pin while its structured data pointed about 750 m away. The section
+  contract loses lat and lng, like business_hours reads BUSINESS_HOURS.
+- Migration 0035 adopts a section's pin as the store's location when the
+  store has none, never overwrites one it has, strips the coordinates
+  from the props and every per-locale override, and clears
+  django-extra-settings' cache for what it writes. The demo seeder stops
+  writing them.
+
+The funding banner carries its artwork's size:
+- FUNDING_BANNER requires the artwork's intrinsic width and height with
+  an image (positive integers, never without one): the storefront draws
+  the box at that ratio before the artwork loads, so the strip at the
+  top of every page stops pushing it down.
+
+The sitemap_seo surface also purges the storefront's cached
+/sitemap.xml route, which replaces the sitemap module's per-pod cache.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`c152852`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c15285275b9d1b68c98aa38cfff57f0e482dff49))
+
 ## v3.123.3 (2026-10-14)
 
 ### Bug fixes

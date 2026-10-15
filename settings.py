@@ -2507,7 +2507,10 @@ EXTRA_SETTINGS_DEFAULTS = [
             "and `link` are at most 1000 characters, "
             "`alt` 300, `label` 120. Links must be site-relative paths "
             "or https URLs. A disabled banner is just "
-            '{"enabled": false}.'
+            '{"enabled": false}. `i18n` overrides it per language: '
+            '{"en": {"image", "width", "height", "alt", "label"}}, any '
+            "of them, the artwork always with its own size; the link is "
+            "shared and the storefront adds the locale prefix."
         ),
     },
     {

@@ -403,7 +403,12 @@ _FUNDING_BANNER_KEYS = {
     "label",
     "width",
     "height",
+    "i18n",
 }
+# What a locale may replace: the artwork (the official strip exists per
+# language) and the words. ``link`` and ``enabled`` are one decision for
+# every language — the storefront puts the locale prefix on the path.
+_FUNDING_BANNER_OVERRIDE_KEYS = {"image", "width", "height", "alt", "label"}
 _FUNDING_BANNER_URL_MAX = 1000
 _FUNDING_BANNER_ALT_MAX = 300
 _FUNDING_BANNER_LABEL_MAX = 120
@@ -429,6 +434,58 @@ def _funding_banner_pixels_ok(value: object) -> bool:
     )
 
 
+def _funding_banner_artwork_ok(data: dict) -> bool:
+    """``image`` with its intrinsic ``width`` and ``height``, or none of
+    the three: a size means nothing without the picture it measures."""
+    image = data.get("image")
+    sizes = (data.get("width"), data.get("height"))
+    if image is None:
+        return all(size is None for size in sizes)
+    return _funding_banner_url_ok(image) and all(
+        _funding_banner_pixels_ok(size) for size in sizes
+    )
+
+
+def _funding_banner_text_ok(data: dict) -> bool:
+    alt = data.get("alt")
+    if alt is not None and (
+        not isinstance(alt, str) or len(alt) > _FUNDING_BANNER_ALT_MAX
+    ):
+        return False
+    label = data.get("label")
+    return label is None or (
+        isinstance(label, str) and len(label) <= _FUNDING_BANNER_LABEL_MAX
+    )
+
+
+def _funding_banner_i18n_ok(i18n: object) -> bool:
+    from core.utils.i18n import available_language_codes
+
+    if not isinstance(i18n, dict):
+        return False
+    codes = available_language_codes()
+    default = settings.PARLER_DEFAULT_LANGUAGE_CODE
+    for code, override in i18n.items():
+        if code not in codes or code == default:
+            return False
+        if (
+            not isinstance(override, dict)
+            or not override
+            or set(override) - _FUNDING_BANNER_OVERRIDE_KEYS
+        ):
+            return False
+        if not _funding_banner_artwork_ok(override):
+            return False
+        if not _funding_banner_text_ok(override):
+            return False
+        # The alt is the logos' accessible name in that language: an
+        # override may change it, never blank it.
+        alt = override.get("alt")
+        if alt is not None and not alt.strip():
+            return False
+    return True
+
+
 def validate_funding_banner_setting(value: object) -> bool:
     """django-extra-settings validator for ``FUNDING_BANNER``.
 
@@ -447,6 +504,15 @@ def validate_funding_banner_setting(value: object) -> bool:
     ``enabled`` is required; ``image``, ``alt`` and ``link`` are
     required when it is true, and a disabled banner may be just
     ``{"enabled": false}``.
+
+    ``i18n`` is a PARTIAL per-locale override, the same convention as
+    ``ANNOUNCEMENT_BAR`` and ``PageSection.i18n`` (so the default locale
+    is not a key): ``{"<locale>": {"image"?, "width"?, "height"?,
+    "alt"?, "label"?}}``. The artwork is per language — the programme
+    publishes the strip in Greek and in English — so an override may
+    replace it, always with its own size, and the words with it. The
+    ``link`` stays one value: it is a path the storefront prefixes with
+    the visitor's locale.
     """
     if not isinstance(value, dict):
         return False
@@ -457,29 +523,18 @@ def validate_funding_banner_setting(value: object) -> bool:
     if not isinstance(enabled, bool):
         return False
 
-    image = data.get("image")
-    if image is not None and not _funding_banner_url_ok(image):
-        return False
-    sizes = (data.get("width"), data.get("height"))
-    if image is None:
-        if any(size is not None for size in sizes):
-            return False
-    elif not all(_funding_banner_pixels_ok(size) for size in sizes):
+    if not _funding_banner_artwork_ok(data):
         return False
     link = data.get("link")
     if link is not None and not _funding_banner_url_ok(link):
         return False
-    alt = data.get("alt")
-    if alt is not None and (
-        not isinstance(alt, str) or len(alt) > _FUNDING_BANNER_ALT_MAX
-    ):
+    if not _funding_banner_text_ok(data):
         return False
-    label = data.get("label")
-    if label is not None and (
-        not isinstance(label, str) or len(label) > _FUNDING_BANNER_LABEL_MAX
-    ):
+    if not _funding_banner_i18n_ok(data.get("i18n", {})):
         return False
 
+    image = data.get("image")
+    alt = data.get("alt")
     if enabled:
         return (
             image is not None

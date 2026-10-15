@@ -123,3 +123,74 @@ def test_length_caps(key, limit):
 def test_wrong_types_rejected():
     assert not validate_funding_banner_setting({**_VALID, "alt": 5})
     assert not validate_funding_banner_setting({**_VALID, "label": 5})
+
+
+_EN = {
+    "image": "/media/espa-en.avif",
+    "width": 1920,
+    "height": 234,
+    "alt": "Co-funded by the European Union",
+    "label": "See the operation",
+}
+
+
+@pytest.mark.django_db
+def test_a_locale_may_replace_the_artwork_and_the_words():
+    """The programme publishes the strip per language."""
+    assert validate_funding_banner_setting({**_VALID, "i18n": {"en": _EN}})
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("key", ["alt", "label"])
+def test_a_locale_may_override_one_text_alone(key):
+    assert validate_funding_banner_setting(
+        {**_VALID, "i18n": {"en": {key: _EN[key]}}}
+    )
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("missing", ["image", "width", "height"])
+def test_a_localized_artwork_carries_its_own_size(missing):
+    """The default's size would draw another picture's box."""
+    assert not validate_funding_banner_setting(
+        {
+            **_VALID,
+            "i18n": {"en": {k: v for k, v in _EN.items() if k != missing}},
+        }
+    )
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("key", ["link", "enabled", "i18n", "extra"])
+def test_a_locale_overrides_only_the_artwork_and_the_words(key):
+    """The link is one path the storefront prefixes per locale."""
+    assert not validate_funding_banner_setting(
+        {**_VALID, "i18n": {"en": {**_EN, key: "/elsewhere"}}}
+    )
+
+
+@pytest.mark.django_db
+def test_the_default_locale_is_not_an_override_key():
+    from django.conf import settings
+
+    assert not validate_funding_banner_setting(
+        {**_VALID, "i18n": {settings.PARLER_DEFAULT_LANGUAGE_CODE: _EN}}
+    )
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "i18n",
+    [
+        {"fr": _EN},
+        {"en": {}},
+        {"en": "Co-funded"},
+        ["en"],
+        {"en": {**_EN, "alt": "   "}},
+        {"en": {**_EN, "image": "http://example.gr/espa-en.avif"}},
+        {"en": {**_EN, "width": 0}},
+        {"en": {**_EN, "label": "a" * 121}},
+    ],
+)
+def test_bad_overrides_rejected(i18n):
+    assert not validate_funding_banner_setting({**_VALID, "i18n": i18n})

@@ -3,6 +3,26 @@
 
 
 
+## v3.125.2 (2026-10-15)
+
+### Bug fixes
+
+* fix(devtools): remove credit documents before receipts in the demo reset
+
+RetailCredit is PROTECT towards its order, its receipt and its refund
+ledger, so a refunded demo order made Invoice deletion raise
+ProtectedError and abort the whole nightly reset_demo_store_task. The
+demo store issues to the AADE sandbox, so refunds there mint credits;
+production demo CRD-2026-000001..3 failed the reset on 2026-10-14 and
+2026-10-15.
+
+_delete_invoices now deletes the orders' credit documents and their
+PDFs first, then the receipts, on both the shared-account and the
+guest-checkout paths.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01HiCxfotdhPomV2A6xn6qWr ([`4ddf859`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4ddf859ac7e66c7e7c5e08c45af4639cce60be16))
+
 ## v3.125.1 (2026-10-15)
 
 ### Bug fixes

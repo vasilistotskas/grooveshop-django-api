@@ -159,8 +159,6 @@ def test_location_map_props():
         "location_map",
         {
             "embed_url": "https://www.google.com/maps/embed?pb=abc",
-            "lat": 40.563156,
-            "lng": 22.110502,
             "address": "Fyteia, Veria",
         },
     )
@@ -168,8 +166,14 @@ def test_location_map_props():
         validate_section_props(
             "location_map", {"embed_url": "http://insecure.example"}
         )
+
+
+def test_location_map_takes_the_store_location_not_its_own():
+    """The pin is the store's STORE_GEO_LAT / STORE_GEO_LNG, the same
+    location its structured data reports: a section that carried its own
+    drifted from it."""
     with pytest.raises(ValidationError):
-        validate_section_props("location_map", {"lat": 400})
+        validate_section_props("location_map", {"lat": 40.5, "lng": 22.1})
 
 
 def test_business_hours_carries_no_props():

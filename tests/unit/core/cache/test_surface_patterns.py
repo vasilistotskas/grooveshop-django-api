@@ -101,6 +101,15 @@ class TestSurfacesPurgeRenderedPages:
         # and `:rss*`, which match no key Nitro ever writes.
         assert not any(p.startswith("cache:nitro:routes:__") for p in patterns)
 
+    def test_sitemap_surface_purges_the_cached_sitemap(self):
+        """The storefront caches /sitemap.xml as a route, per host, under
+        Nitro's escaped pathname ``sitemapxml``; the module's own cache
+        sat in pod memory, out of every purge's reach."""
+        assert (
+            "cache:nitro:routes:_:*sitemapxml*"
+            in get_surface("sitemap_seo").nuxt_patterns
+        )
+
     def test_store_pages_surface_purges_the_settings_read_and_every_page(
         self,
     ):

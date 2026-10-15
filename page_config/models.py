@@ -5,7 +5,8 @@ from typing import TYPE_CHECKING
 from django.core.exceptions import ValidationError
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
-from django.db.models import Q
+from django.db.models import F, Max, Q
+from django.db.models.functions import Coalesce, Greatest
 from django.utils import timezone
 from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
@@ -135,13 +136,27 @@ class PublishedTranslatableQuerySet(TranslatableOptimizedQuerySet):
         )
 
 
+class PageLayoutQuerySet(PublishedTranslatableQuerySet):
+    def with_last_modified(self) -> Self:
+        """Annotate ``last_modified``: the later of the layout's own
+        ``updated_at`` and its newest section's. A section is edited on
+        its own row, so the layout's timestamp alone misses every change
+        to what the page shows."""
+        return self.annotate(
+            last_modified=Greatest(
+                F("updated_at"),
+                Coalesce(Max("sections__updated_at"), F("updated_at")),
+            )
+        )
+
+
 class PageLayoutManager(TranslatableOptimizedManager):
-    queryset_class = PublishedTranslatableQuerySet
+    queryset_class = PageLayoutQuerySet
 
-    def get_queryset(self) -> PublishedTranslatableQuerySet:
-        return PublishedTranslatableQuerySet(self.model, using=self._db)
+    def get_queryset(self) -> PageLayoutQuerySet:
+        return PageLayoutQuerySet(self.model, using=self._db)
 
-    def published(self) -> PublishedTranslatableQuerySet:
+    def published(self) -> PageLayoutQuerySet:
         return self.get_queryset().published()
 
 

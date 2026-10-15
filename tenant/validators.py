@@ -395,10 +395,19 @@ def validate_auth_panel_setting(value: object) -> bool:
 # FUNDING_BANNER extra_setting
 # ---------------------------------------------------------------------------
 
-_FUNDING_BANNER_KEYS = {"enabled", "image", "alt", "link", "label"}
+_FUNDING_BANNER_KEYS = {
+    "enabled",
+    "image",
+    "alt",
+    "link",
+    "label",
+    "width",
+    "height",
+}
 _FUNDING_BANNER_URL_MAX = 1000
 _FUNDING_BANNER_ALT_MAX = 300
 _FUNDING_BANNER_LABEL_MAX = 120
+_FUNDING_BANNER_PIXELS_MAX = 10000
 # A site-relative path (but not protocol-relative ``//host``) or https.
 _FUNDING_BANNER_URL_RE = re.compile(r"^(/(?!/)|https://)\S")
 
@@ -412,19 +421,32 @@ def _funding_banner_url_ok(value: object) -> bool:
     )
 
 
+def _funding_banner_pixels_ok(value: object) -> bool:
+    return (
+        isinstance(value, int)
+        and not isinstance(value, bool)
+        and 0 < value <= _FUNDING_BANNER_PIXELS_MAX
+    )
+
+
 def validate_funding_banner_setting(value: object) -> bool:
     """django-extra-settings validator for ``FUNDING_BANNER``.
 
     Boolean contract, like ``validate_business_hours_setting``.
 
-    Shape: ``{"enabled": bool, "image": str, "alt": str, "link": str,
-    "label"?: str}`` — the EU/ESPA co-funding strip a beneficiary must
-    show above the fold. ``image`` and ``link`` are a site-relative
-    path or an ``https://`` URL (never ``http:``, ``javascript:`` or a
-    protocol-relative ``//`` URL). ``alt`` is the accessible name of
-    the logos, so it may not be blank. ``enabled`` is required;
-    ``image``, ``alt`` and ``link`` are required when it is true, and
-    a disabled banner may be just ``{"enabled": false}``.
+    Shape: ``{"enabled": bool, "image": str, "width": int, "height":
+    int, "alt": str, "link": str, "label"?: str}`` — the EU/ESPA
+    co-funding strip a beneficiary must show above the fold. ``image``
+    and ``link`` are a site-relative path or an ``https://`` URL (never
+    ``http:``, ``javascript:`` or a protocol-relative ``//`` URL).
+    ``width`` and ``height`` are the artwork's intrinsic size in
+    pixels, required with an ``image`` and meaningless without one: the
+    storefront draws the artwork's box at that ratio before it loads, so
+    the strip at the top of every page does not push it down (CLS).
+    ``alt`` is the accessible name of the logos, so it may not be blank.
+    ``enabled`` is required; ``image``, ``alt`` and ``link`` are
+    required when it is true, and a disabled banner may be just
+    ``{"enabled": false}``.
     """
     if not isinstance(value, dict):
         return False
@@ -437,6 +459,12 @@ def validate_funding_banner_setting(value: object) -> bool:
 
     image = data.get("image")
     if image is not None and not _funding_banner_url_ok(image):
+        return False
+    sizes = (data.get("width"), data.get("height"))
+    if image is None:
+        if any(size is not None for size in sizes):
+            return False
+    elif not all(_funding_banner_pixels_ok(size) for size in sizes):
         return False
     link = data.get("link")
     if link is not None and not _funding_banner_url_ok(link):

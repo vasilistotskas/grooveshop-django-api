@@ -110,6 +110,23 @@ class PageLayoutSerializer(serializers.ModelSerializer):
         )
 
 
+class PublishedPageLayoutSerializer(serializers.ModelSerializer):
+    """One published layout of the store, as the storefront's sitemap
+    lists it (``public_published_layouts``).
+
+    ``last_modified`` is the later of the layout's own ``updated_at`` and
+    its newest section's: editing a section changes the page without
+    touching the layout row, and a sitemap ``<lastmod>`` that missed it
+    would tell crawlers the page had not changed.
+    """
+
+    last_modified = serializers.DateTimeField(read_only=True)
+
+    class Meta:
+        model = PageLayout
+        fields = ("page_type", "last_modified")
+
+
 class PageSectionWriteSerializer(serializers.ModelSerializer):
     """Section ordering is determined by array index in the request body."""
 

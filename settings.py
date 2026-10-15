@@ -2495,11 +2495,16 @@ EXTRA_SETTINGS_DEFAULTS = [
         "description": (
             "EU/ESPA co-funding strip at the very top of every "
             'storefront page, as JSON: {"enabled": bool, "image": '
-            '"<logo strip: /path or https URL>", "alt": "<accessible '
-            'name of the logos>", "link": "<page describing the funded '
+            '"<logo strip: /path or https URL>", "width": <intrinsic '
+            'width in pixels>, "height": <intrinsic height in pixels>, '
+            '"alt": "<accessible name of the logos>", "link": "<page '
+            "describing the funded "
             'operation: /path or https URL>", "label"?: "<visible link '
             'text>"}. `image`, `alt` and `link` are required when '
-            "enabled; `image` and `link` are at most 1000 characters, "
+            "enabled, and `width` and `height` with `image`: the "
+            "storefront reserves the artwork's box at that ratio so the "
+            "strip does not push the page down as it loads. `image` "
+            "and `link` are at most 1000 characters, "
             "`alt` 300, `label` 120. Links must be site-relative paths "
             "or https URLs. A disabled banner is just "
             '{"enabled": false}.'

@@ -193,8 +193,8 @@ DEMO_SETTINGS: dict[str, Any] = {
             "sun": None,
         },
     },
-    # Thessaloniki city centre — the location_map section and the
-    # LocalBusiness geo block need both.
+    # Thessaloniki city centre: the store's location, which the
+    # location_map section pins and the LocalBusiness geo block reports.
     "STORE_GEO_LAT": "40.6403",
     "STORE_GEO_LNG": "22.9439",
     # Every B2B invoice is structurally incomplete without these; the
@@ -487,15 +487,11 @@ CONTACT_SECTIONS: tuple[dict[str, Any], ...] = (
         "component_type": "location_map",
         "title": "",
         "props": {
-            "lat": 40.6403,
-            "lng": 22.9439,
             "address": "Τσιμισκή 100, Θεσσαλονίκη 54622",
         },
         "i18n": {
             "en": {
                 "props": {
-                    "lat": 40.6403,
-                    "lng": 22.9439,
                     "address": "100 Tsimiski St, Thessaloniki 54622",
                 }
             }

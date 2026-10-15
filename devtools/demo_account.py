@@ -1509,22 +1509,33 @@ def _delete_payment_ledgers(order_ids) -> int:
 
 
 def _delete_invoices(order_ids) -> int:
-    """Remove the receipts of these orders, rows AND their PDFs.
+    """Remove the receipts of these orders and their credit documents,
+    rows AND their PDFs.
 
     A demo store issues no receipts, but its orders can still carry some:
     the fixtures used to seed them, and nothing stops an operator from
     issuing one. ``Invoice.order`` is ``PROTECT``, so they have to go
     before the orders do, and deleting the row alone would leave the PDF
     orphaned in the tenant's private storage.
+
+    A refunded receipt also carries a credit document, and
+    ``RetailCredit`` is ``PROTECT`` towards its order, its receipt and its
+    refund ledger, so the credits go first of all. Prod demo CRD-2026-
+    000001..3 aborted every nightly reset from 2026-10-14 on.
     """
     from order.models.invoice import Invoice
+    from order.models.retail_credit import RetailCredit
 
-    invoices = list(Invoice.objects.filter(order_id__in=order_ids))
-    for invoice in invoices:
-        if invoice.has_document():
-            invoice.document_file.delete(save=False)
-    Invoice.objects.filter(pk__in=[i.pk for i in invoices]).delete()
-    return len(invoices)
+    documents = [
+        *RetailCredit.objects.filter(order_id__in=order_ids),
+        *Invoice.objects.filter(order_id__in=order_ids),
+    ]
+    for document in documents:
+        if document.has_document():
+            document.document_file.delete(save=False)
+    RetailCredit.objects.filter(order_id__in=order_ids).delete()
+    Invoice.objects.filter(order_id__in=order_ids).delete()
+    return len(documents)
 
 
 def _wipe_visitor_data(user) -> int:

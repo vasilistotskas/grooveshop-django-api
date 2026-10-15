@@ -1714,6 +1714,43 @@ class TestGuestCheckoutsAreCleared:
         assert not Order.objects.all_with_deleted().filter(pk=order.pk).exists()
         assert not PaymentTransaction.objects.filter(order_id=order.pk).exists()
 
+    def test_a_refunded_guest_receipt_and_its_credit_are_cleared_too(self):
+        """``RetailCredit`` is ``PROTECT`` towards the order, the receipt
+        and the refund: prod demo CRD-2026-000001..3 aborted the nightly
+        reset with ``ProtectedError`` from 2026-10-14 on."""
+        from order.enum.payment_transaction import PaymentTransactionKind
+        from order.factories import PaymentTransactionFactory
+        from order.models import Invoice, RetailCredit
+        from order.models.order import Order
+        from order.models.payment_transaction import PaymentTransaction
+
+        order, _product, _reservation = self._guest_order_holding_stock()
+        charge = PaymentTransactionFactory(order=order)
+        refund = PaymentTransactionFactory(
+            order=order,
+            charge=charge,
+            kind=PaymentTransactionKind.REFUND,
+            provider_reference="re_demo",
+        )
+        invoice = Invoice.objects.create(
+            order=order, invoice_number="INV-2026-900001"
+        )
+        RetailCredit.objects.create(
+            order=order,
+            invoice=invoice,
+            refund=refund,
+            credit_number="CRD-2026-900001",
+        )
+
+        demo_account._wipe_guest_checkouts(
+            before=order.created_at + timedelta(seconds=1)
+        )
+
+        assert not Order.objects.all_with_deleted().filter(pk=order.pk).exists()
+        assert not RetailCredit.objects.filter(order_id=order.pk).exists()
+        assert not Invoice.objects.filter(order_id=order.pk).exists()
+        assert not PaymentTransaction.objects.filter(order_id=order.pk).exists()
+
     def test_an_order_placed_after_the_run_began_is_kept(self):
         from order.models.order import Order
 

@@ -3,6 +3,24 @@
 
 
 
+## v3.125.1 (2026-10-15)
+
+### Bug fixes
+
+* fix(settings): report a stored value that fails a newly attached validator (#205)
+
+sync_setting_metadata (since the last release) attaches each setting's
+current validator to every store's existing row and never touches the
+value. A value the new validator refuses now gets a warning naming the
+setting and the store, never the value, since a setting may hold a
+credential; the admin asks for a valid one at the next edit.
+
+value_type is documented as deliberately not synced: extra_settings keeps
+each value in a column per type, so flipping an existing row's type would
+orphan its value; a type change ships as a converting data migration.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`a901ebe`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a901ebea991bcbf7ef10b670fab9193fa9bb789d))
+
 ## v3.125.0 (2026-10-15)
 
 ### Bug fixes

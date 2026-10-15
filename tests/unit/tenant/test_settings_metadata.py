@@ -44,16 +44,35 @@ def test_an_existing_row_gets_the_current_description_and_validator():
     assert row.validator == _LATITUDE["validator"]
 
 
-def test_the_value_is_never_touched_even_when_the_new_validator_refuses_it():
-    """The admin asks for a valid one at the next edit; data is not lost."""
+def test_the_value_is_never_touched_even_when_the_new_validator_refuses_it(
+    caplog,
+):
+    """It is reported in the log; the admin asks for a valid one at the
+    next edit. The log names the setting, never the value."""
     row = _stale_latitude(value="37.9oops")
 
-    sync_setting_metadata()
+    with caplog.at_level("WARNING", logger="tenant.settings_metadata"):
+        sync_setting_metadata()
+
+    assert any(
+        "STORE_GEO_LAT" in record.getMessage()
+        and "37.9oops" not in record.getMessage()
+        for record in caplog.records
+    )
 
     row.refresh_from_db()
     assert row.value == "37.9oops"
     with pytest.raises(ValidationError):
         row.full_clean()
+
+
+def test_a_valid_value_is_not_reported(caplog):
+    _stale_latitude()
+
+    with caplog.at_level("WARNING", logger="tenant.settings_metadata"):
+        sync_setting_metadata()
+
+    assert not caplog.records
 
 
 def test_a_second_run_changes_nothing():

@@ -405,11 +405,12 @@ SECTION_PROPS: dict[str, dict[str, Schema]] = {
     "why_microlearning": {},
     # Data comes from the BUSINESS_HOURS setting.
     "business_hours": {"surface": SURFACE},
+    # The pin is the store's own location, the STORE_GEO_LAT / STORE_GEO_LNG
+    # settings its structured data reads too (migration 0035 moved the
+    # coordinates sections used to carry).
     "location_map": {
         "surface": SURFACE,
         "embed_url": HTTPS_URL,
-        "lat": number(-90, 90),
-        "lng": number(-180, 180),
         "address": text(300),
     },
     "partner_strip": {

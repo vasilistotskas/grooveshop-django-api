@@ -17369,6 +17369,33 @@ paths:
           description: No response body
         '404':
           description: No response body
+  /api/v1/page-config:
+    get:
+      operationId: api_v1_page_config_list
+      description: |-
+        Every layout this store has published, with when its page last
+        changed.
+
+        One read for what used to take one request per page type: the
+        storefront's sitemap lists the store's custom pages from it, and
+        gates the static routes that answer 404 until their layout is
+        published. Which page type a static route renders, and so which
+        layouts are custom pages, is the storefront's routing and stays
+        there.
+      tags:
+      - Page Config
+      security:
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PublishedPageLayout'
+          description: ''
   /api/v1/page-config/{page_type}:
     get:
       operationId: api_v1_page_config_retrieve
@@ -47140,6 +47167,29 @@ components:
           description: Τιμές ρυθμίσεων με κλειδί το όνομα της ρύθμισης.
       required:
       - settings
+    PublishedPageLayout:
+      type: object
+      description: |-
+        One published layout of the store, as the storefront's sitemap
+        lists it (``public_published_layouts``).
+
+        ``last_modified`` is the later of the layout's own ``updated_at`` and
+        its newest section's: editing a section changes the page without
+        touching the layout row, and a sitemap ``<lastmod>`` that missed it
+        would tell crawlers the page had not changed.
+      properties:
+        pageType:
+          type: string
+          title: Τύπος σελίδας
+          description: Αναγνωριστικό της σελίδας (π.χ. "home", "products", "blog").
+          maxLength: 50
+        lastModified:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - lastModified
+      - pageType
     RateEnum:
       enum:
       - 1
@@ -50528,14 +50578,6 @@ components:
           type: string
           maxLength: 1000
           pattern: ^https://
-        lat:
-          type: number
-          minimum: -90
-          maximum: 90
-        lng:
-          type: number
-          minimum: -180
-          maximum: 180
         address:
           type: string
           maxLength: 300

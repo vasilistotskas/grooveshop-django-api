@@ -35,6 +35,7 @@ from page_config.serializers import (
     PageLayoutAdminDetailSerializer,
     PageLayoutAdminSerializer,
     PageLayoutSerializer,
+    PublishedPageLayoutSerializer,
 )
 from tenant.membership import is_store_staff
 
@@ -123,6 +124,30 @@ def public_navigation(request):
         if items:
             menus[menu.slot] = items
     return Response(menus)
+
+
+@extend_schema(  # ty: ignore[invalid-argument-type]
+    responses=PublishedPageLayoutSerializer(many=True),
+    tags=["Page Config"],
+)
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def public_published_layouts(request):
+    """Every layout this store has published, with when its page last
+    changed.
+
+    One read for what used to take one request per page type: the
+    storefront's sitemap lists the store's custom pages from it, and
+    gates the static routes that answer 404 until their layout is
+    published. Which page type a static route renders, and so which
+    layouts are custom pages, is the storefront's routing and stays
+    there."""
+    layouts = (
+        PageLayout.objects.published()
+        .with_last_modified()
+        .order_by("page_type")
+    )
+    return Response(PublishedPageLayoutSerializer(layouts, many=True).data)
 
 
 class NavigationMenuAdminViewSet(BaseModelViewSet):

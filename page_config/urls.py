@@ -6,6 +6,7 @@ from page_config.views import (
     PageLayoutAdminViewSet,
     public_navigation,
     public_page_config,
+    public_published_layouts,
 )
 
 app_name = "page_config"
@@ -27,6 +28,11 @@ urlpatterns = [
             }
         ),
         name="content-page-detail",
+    ),
+    path(
+        "page-config",
+        public_published_layouts,
+        name="page-config-published",
     ),
     # Fixed routes must come before the catch-all <str:page_type>
     path(

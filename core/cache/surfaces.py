@@ -643,7 +643,13 @@ def register_default_surfaces() -> None:
             # ``cache:nitro:routes:__sitemap__*`` / ``:rss*`` patterns
             # matched no key in Redis and this surface's Nuxt half was a
             # no-op. Verified against the live keyspace.
+            #
+            # The sitemap ITSELF is a route-rule cache (``/sitemap.xml``,
+            # keyed per host): @nuxtjs/sitemap's own cache lived in each
+            # pod's memory, where no purge reached it, so the storefront
+            # turned it off and caches the response in Redis instead.
             nuxt_patterns=_nuxt_functions("sitemap", "rss", "RssFeed")
+            + _nuxt_routes("/sitemap.xml")
             + _nuxt("nuxt-ai-ready"),
             icon="map",
             group="content",

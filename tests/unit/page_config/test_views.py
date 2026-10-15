@@ -1,6 +1,9 @@
+from datetime import timedelta
+
 from django.db import connection
 from django.test import TestCase
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 from rest_framework.test import APIClient
 
 from page_config.models import (
@@ -117,6 +120,75 @@ class TestPublicPageConfig(TestCase):
     def test_404_for_nonexistent(self):
         response = self.client.get("/api/v1/page-config/nonexistent")
         assert response.status_code == 404
+
+
+class TestPublishedLayouts(TestCase):
+    """The store's published layouts in one read, for the storefront's
+    sitemap: which custom pages exist, and when each last changed."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.published_at = timezone.now() - timedelta(days=30)
+
+    def _layout(self, page_type, *, is_published=True, published_at=None):
+        return PageLayout.objects.create(
+            page_type=page_type,
+            title=page_type,
+            is_published=is_published,
+            published_at=published_at or self.published_at,
+        )
+
+    def test_lists_only_published_layouts_by_page_type(self):
+        self._layout("kelari")
+        self._layout("about")
+        self._layout("draft", is_published=False)
+        self._layout(
+            "scheduled", published_at=timezone.now() + timedelta(days=1)
+        )
+
+        response = self.client.get("/api/v1/page-config")
+
+        assert response.status_code == 200
+        assert [row["pageType"] for row in response.json()] == [
+            "about",
+            "kelari",
+        ]
+
+    def test_last_modified_follows_the_newest_section_edit(self):
+        layout = self._layout("kelari")
+        section = PageSection.objects.create(
+            layout=layout,
+            component_type=ComponentType.FEATURES_GRID,
+            title="Shelf",
+            sort_order=0,
+        )
+        layout_edited = timezone.now() - timedelta(days=10)
+        section_edited = timezone.now() - timedelta(days=2)
+        PageLayout.objects.filter(pk=layout.pk).update(updated_at=layout_edited)
+        PageSection.objects.filter(pk=section.pk).update(
+            updated_at=section_edited
+        )
+
+        (row,) = self.client.get("/api/v1/page-config").json()
+
+        assert parse_datetime(row["lastModified"]) == section_edited
+
+    def test_last_modified_is_the_layout_s_own_without_sections(self):
+        layout = self._layout("kelari")
+        layout_edited = timezone.now() - timedelta(days=10)
+        PageLayout.objects.filter(pk=layout.pk).update(updated_at=layout_edited)
+
+        (row,) = self.client.get("/api/v1/page-config").json()
+
+        assert parse_datetime(row["lastModified"]) == layout_edited
+
+    def test_a_store_without_layouts_lists_nothing(self):
+        PageLayout.objects.all().delete()
+
+        response = self.client.get("/api/v1/page-config")
+
+        assert response.status_code == 200
+        assert response.json() == []
 
 
 class TestPageLayoutAdminViewSet(TestCase):

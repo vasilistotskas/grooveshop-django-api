@@ -14,6 +14,8 @@ from tenant.validators import validate_funding_banner_setting
 _VALID = {
     "enabled": True,
     "image": "/media/espa.avif",
+    "width": 1800,
+    "height": 197,
     "alt": "ΕΣΠΑ 2021-2027",
     "link": "https://example.gr/espa",
     "label": "Συγχρηματοδοτείται από την ΕΕ",
@@ -26,6 +28,29 @@ def test_a_full_banner_is_valid():
 
 def test_a_disabled_banner_needs_only_the_flag():
     assert validate_funding_banner_setting({"enabled": False})
+
+
+@pytest.mark.parametrize("key", ["width", "height"])
+def test_an_image_needs_its_intrinsic_size(key):
+    """Without it the storefront cannot reserve the artwork's box, and
+    the strip pushes every page down as it loads."""
+    assert not validate_funding_banner_setting(
+        {k: v for k, v in _VALID.items() if k != key}
+    )
+
+
+def test_a_size_without_an_image_is_rejected():
+    assert not validate_funding_banner_setting(
+        {"enabled": False, "width": 1800, "height": 197}
+    )
+
+
+@pytest.mark.parametrize(
+    "size",
+    [0, -1, 10001, 1800.5, "1800", True, None],
+)
+def test_bad_sizes_rejected(size):
+    assert not validate_funding_banner_setting({**_VALID, "width": size})
 
 
 def test_label_is_optional():

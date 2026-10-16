@@ -308,10 +308,10 @@ class TestSearchAnalyticsMiddleware:
         request.user = Mock(is_authenticated=False)
         request.session = Mock(session_key="test-session")
 
-        # Mock SearchQuery.objects.create to raise an exception
+        # The task's write raises
         with patch.object(
             SearchQuery.objects,
-            "create",
+            "get_or_create",
             side_effect=Exception("Database error"),
         ):
             # Request should still succeed

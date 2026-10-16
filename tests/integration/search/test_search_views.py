@@ -374,7 +374,7 @@ class TestAnalyticsLoggingFailuresDontBreakSearch:
 
         with patch.object(
             SearchQuery.objects,
-            "create",
+            "get_or_create",
             side_effect=Exception("Database error"),
         ):
             response = api_client.get(

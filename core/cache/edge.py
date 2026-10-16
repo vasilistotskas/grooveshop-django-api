@@ -26,7 +26,9 @@ them for a year (``s-maxage``) and without a tag, so a suspended or
 destroyed tenant's images would outlive media-stream's own flush at the
 edge. They are purged by URL prefix (``tenant_media_purges``,
 ``purge_media``), which needs no tag and also reaches images cached before
-the purge existed.
+the purge existed. The purge removes cached copies only: for a suspended
+tenant the originals are still served, so a request for a known URL caches
+it again.
 
 Cloudflare's Free plan allows five purge requests a minute per account,
 so a merchant's edits are coalesced into one purge per tenant

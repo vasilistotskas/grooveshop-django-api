@@ -356,9 +356,13 @@ class TestTenantMediaPurges:
         ]
 
     def test_hosts_are_lowercased_like_the_edge_cache_key(self):
-        tenant = _tenant("media_case", ["Case.Grooveshop.Space"])
+        tenant = _tenant(
+            "media_case",
+            ["Case.Grooveshop.Space", "Assets.Case.Grooveshop.Space"],
+        )
         assert edge.tenant_media_purges(tenant)[0]["prefixes"] == [
-            _prefix(SHARED, "media_case")
+            _prefix("assets.case.grooveshop.space", "media_case"),
+            _prefix(SHARED, "media_case"),
         ]
 
     def test_a_shared_host_outside_the_platform_zone_is_not_ours_to_purge(

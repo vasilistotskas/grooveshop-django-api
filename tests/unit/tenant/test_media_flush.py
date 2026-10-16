@@ -168,12 +168,17 @@ class TestLifecyclePlansTheEdgePurge:
 
     def test_suspend_hands_the_task_zone_ids_never_a_token(self):
         from tenant.lifecycle import suspend_tenant
-        from tenant.models import SuspendedReason
+        from tenant.models import SuspendedReason, TenantDomain
 
         tenant = store_tenant(
             "edge_suspend",
             cloudflare_zone_id="b" * 32,
             cloudflare_api_token="own-token-secret",
+        )
+        # An own-domain assets host, so the tenant's own zone (whose token
+        # must stay out of the broker) is part of the plan.
+        TenantDomain.objects.create(
+            domain="assets.shop.example", tenant=tenant, is_primary=False
         )
         with mock.patch("tenant.tasks.flush_tenant_media_task.delay") as delay:
             suspend_tenant(tenant, reason=SuspendedReason.BILLING)
@@ -186,9 +191,49 @@ class TestLifecyclePlansTheEdgePurge:
                 "prefixes": [
                     "assets.grooveshop.space/media_stream-image/media/edge_suspend/"
                 ],
-            }
+            },
+            {
+                "zone_id": "b" * 32,
+                "prefixes": [
+                    "assets.shop.example/media_stream-image/media/edge_suspend/"
+                ],
+            },
         ]
         assert "own-token-secret" not in repr(delay.call_args)
+
+    def test_a_failing_plan_query_does_not_abort_the_destroy(self):
+        """The plan runs inside destroy_tenant's transaction; a query error
+        there must cost only the edge purge, not the destroy."""
+        from datetime import timedelta
+
+        from django.db import connection
+        from django.utils import timezone
+
+        from tenant.lifecycle import destroy_tenant
+        from tenant.models import Tenant
+
+        tenant = store_tenant(
+            "edge_plan_fails",
+            is_active=False,
+            suspended_at=timezone.now() - timedelta(hours=25),
+        )
+
+        def failing_plan(_tenant):
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT * FROM table_that_does_not_exist")
+
+        with (
+            mock.patch(
+                "core.cache.edge.tenant_media_purges", side_effect=failing_plan
+            ),
+            mock.patch("tenant.tasks.flush_tenant_media_task.delay") as delay,
+            mock.patch.object(Tenant, "delete", autospec=True),
+            mock.patch("tenant.offboarding.purge_search_indexes"),
+            mock.patch("tenant.offboarding.purge_tenant_files"),
+        ):
+            destroy_tenant(tenant)
+
+        delay.assert_called_once_with("edge_plan_fails", [])
 
     def test_destroy_plans_before_the_row_and_its_domains_are_gone(self):
         from datetime import timedelta

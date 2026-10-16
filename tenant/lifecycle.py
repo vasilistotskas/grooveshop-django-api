@@ -92,11 +92,12 @@ def suspend_tenant(tenant, *, reason: str) -> bool:
         update_fields.append("suspended_at")
     tenant.save(update_fields=update_fields)
 
-    # Drop the tenant's processed images from the media-stream cache and
-    # the Cloudflare edge so a suspended store stops serving assets (they
-    # would otherwise persist for the cache TTL — up to 180/360 days).
-    # Best-effort and off the critical path: a broker, media-stream or
-    # Cloudflare outage must never block the suspension itself.
+    # Drop the tenant's cached processed images from media-stream and the
+    # Cloudflare edge (they would otherwise persist for the cache TTL — up
+    # to 180/360 days). This clears copies only: the originals stay on the
+    # static file server, so a request for a known image URL is processed
+    # and cached again. Best-effort and off the critical path: a broker,
+    # media-stream or Cloudflare outage must never block the suspension.
     _dispatch_media_flush(tenant.schema_name, _media_edge_purges(tenant))
     return True
 
@@ -106,11 +107,17 @@ def _media_edge_purges(tenant) -> list[MediaPurge]:
 
     Read from the tenant row, so a caller that deletes the row must call
     this first. Best-effort: an unreadable row only costs the edge purge.
+    The reads run in a savepoint: ``destroy_tenant`` calls this inside its
+    transaction, where a failed query left unrolled would abort the
+    transaction and fail the destroy itself.
     """
+    from django.db import transaction
+
     try:
         from core.cache import edge
 
-        return edge.tenant_media_purges(tenant)
+        with transaction.atomic():
+            return edge.tenant_media_purges(tenant)
     except Exception:
         logging.getLogger(__name__).warning(
             "could not plan the edge purge of %s's images",

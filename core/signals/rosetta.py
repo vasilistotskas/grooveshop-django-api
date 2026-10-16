@@ -57,6 +57,10 @@ def persist_rosetta_entry_to_db(
 
     entry = sender  # polib.POEntry
     msgid = entry.msgid or ""
+    # An entry saved as fuzzy is a draft gettext will not serve, so the
+    # overlay must not serve it either: store it empty, which removes
+    # any earlier override of the key (`_overlay_rows` skips empty rows).
+    fuzzy = entry.fuzzy
 
     try:
         if entry.msgid_plural:
@@ -69,7 +73,7 @@ def persist_rosetta_entry_to_db(
                         plural_index=int(plural_index),
                         defaults={
                             "msgid_plural": entry.msgid_plural,
-                            "msgstr": msgstr or "",
+                            "msgstr": "" if fuzzy else msgstr or "",
                         },
                     )
         else:
@@ -79,7 +83,7 @@ def persist_rosetta_entry_to_db(
                 plural_index=0,
                 defaults={
                     "msgid_plural": "",
-                    "msgstr": entry.msgstr or "",
+                    "msgstr": "" if fuzzy else entry.msgstr or "",
                 },
             )
     except Exception:

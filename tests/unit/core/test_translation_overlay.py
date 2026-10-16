@@ -106,6 +106,7 @@ def test_persist_rosetta_entry_creates_singular_row():
         msgid_plural="",
         msgstr="Αποθήκευση",
         msgstr_plural={},
+        fuzzy=False,
     )
 
     persist_rosetta_entry_to_db(
@@ -135,6 +136,7 @@ def test_persist_rosetta_entry_updates_existing_row():
         msgid_plural="",
         msgstr="Αποθήκευση",
         msgstr_plural={},
+        fuzzy=False,
     )
     persist_rosetta_entry_to_db(
         sender=entry,
@@ -157,6 +159,7 @@ def test_persist_rosetta_entry_writes_plural_rows():
         msgid_plural="%d cats",
         msgstr="",
         msgstr_plural={0: "1 γάτα", 1: "%d γάτες"},
+        fuzzy=False,
     )
 
     persist_rosetta_entry_to_db(
@@ -173,6 +176,34 @@ def test_persist_rosetta_entry_writes_plural_rows():
     ).order_by("plural_index")
     assert [r.msgstr for r in rows] == ["1 γάτα", "%d γάτες"]
     assert all(r.msgid_plural == "%d cats" for r in rows)
+
+
+@pytest.mark.django_db
+def test_persist_rosetta_entry_saved_as_fuzzy_overrides_nothing():
+    """A fuzzy entry is a draft gettext does not serve. Saving one stores
+    an empty row, which also withdraws an earlier override of the key."""
+    Translation.objects.create(
+        language_code="en", msgid="Order Received", msgstr="Order Delivered"
+    )
+    entry = SimpleNamespace(
+        msgid="Order Received",
+        msgid_plural="",
+        msgstr="Order Delivered",
+        msgstr_plural={},
+        fuzzy=True,
+    )
+
+    persist_rosetta_entry_to_db(
+        sender=entry,
+        user=MagicMock(),
+        old_msgstr="Order Delivered",
+        old_fuzzy=True,
+        pofile="/tmp/django.po",
+        language_code="en",
+    )
+
+    row = Translation.objects.get(language_code="en", msgid="Order Received")
+    assert row.msgstr == ""
 
 
 @pytest.mark.django_db
@@ -246,10 +277,12 @@ def test_apply_db_overlay_tolerates_missing_translation_table():
 
 
 @pytest.mark.django_db
-def test_apply_db_overlay_logs_how_many_rows_override_the_catalog(caplog):
-    """The count of rows that DISAGREE with django.po is the number
+def test_apply_db_overlay_logs_how_many_rows_change_the_served_text(caplog):
+    """The count of rows that change what gettext serves is the number
     that matters — it is how a stale import retitling emails shows up
-    in a pod's logs instead of in a customer's inbox."""
+    in a pod's logs instead of in a customer's inbox. A key the .po
+    leaves untranslated serves its msgid, so a row for it counts too
+    ("Brand new" would otherwise be served as is)."""
     import logging
 
     catalog = trans_real.translation("el")._catalog
@@ -271,5 +304,5 @@ def test_apply_db_overlay_logs_how_many_rows_override_the_catalog(caplog):
         apply_db_overlay("el")
 
     record = next(r for r in caplog.records if r.name == "core.rosetta_storage")
-    assert "3 rows, 1 override" in record.getMessage()
-    assert record.overriding == 1
+    assert "3 rows, 2 change" in record.getMessage()
+    assert record.overriding == 2

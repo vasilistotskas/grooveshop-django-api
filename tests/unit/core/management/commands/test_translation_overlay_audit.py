@@ -64,7 +64,7 @@ def rows():
             plural_index=1,
             msgstr="%d γάτες",
         ),
-        unmatched=Translation.objects.create(
+        untranslated=Translation.objects.create(
             language_code="el", msgid="Brand new", msgstr="Ολοκαίνουργιο"
         ),
     )
@@ -83,13 +83,16 @@ def _remaining() -> set[str]:
 def test_reports_every_class_and_lists_only_the_custom_rows(rows):
     output = _run()
 
-    assert "el: 4 rows — 1 custom, 2 redundant, 1 unmatched" in output
+    assert "el: 4 rows — 2 custom, 2 redundant" in output
     assert f"#{rows.custom.id}" in output
     assert "db: 'Η Παραγγελία Παραδόθηκε'" in output
-    assert "po: 'Παραλάβαμε την παραγγελία σας'" in output
+    assert "served: 'Παραλάβαμε την παραγγελία σας'" in output
+    # A key the .po leaves untranslated serves its msgid, so a row
+    # that replaces it is doing work too.
+    assert f"#{rows.untranslated.id}" in output
+    assert "served: 'Brand new'" in output
     # Rows that change nothing are a number, not a listing.
     assert "'Save'" not in output
-    assert "'Brand new'" not in output
     # A bare audit is read-only.
     assert Translation.objects.count() == 4
     assert cache.get(TRANSLATION_VERSION_CACHE_KEY) is None
@@ -104,7 +107,7 @@ def test_prune_deletes_only_the_redundant_rows(rows):
 
 
 def test_drop_ids_deletes_exactly_the_named_rows(rows):
-    _run("--drop-ids", str(rows.custom.id), str(rows.unmatched.id))
+    _run("--drop-ids", str(rows.custom.id), str(rows.untranslated.id))
 
     assert _remaining() == {"Save", "1 cat"}
     assert cache.get(TRANSLATION_VERSION_CACHE_KEY) is not None
@@ -126,3 +129,33 @@ def test_drop_before_deletes_the_rows_older_than_the_cutoff(rows):
 def test_an_unknown_language_is_refused():
     with pytest.raises(CommandError, match="Unknown language"):
         call_command("translation_overlay_audit", "-l", "xx", stdout=StringIO())
+
+
+def test_a_source_language_row_that_rewrites_the_msgid_is_custom():
+    """English keys are untranslated in django.po, so the catalogue
+    serves the msgid. A row that changes it is listed, and one that
+    repeats it is redundant (production 2026-10-16: "Order Received"
+    served as "Order Delivered" to English shoppers)."""
+    wrong = Translation.objects.create(
+        language_code="en", msgid="Order Received", msgstr="Order Delivered"
+    )
+    Translation.objects.create(language_code="en", msgid="Save", msgstr="Save")
+    plural = Translation.objects.create(
+        language_code="en",
+        msgid="1 cat",
+        msgid_plural="%d cats",
+        plural_index=1,
+        msgstr="%d cats",
+    )
+    out = StringIO()
+    with patch(
+        "core.management.commands.translation_overlay_audit._disk_catalog",
+        return_value={},
+    ):
+        call_command("translation_overlay_audit", "-l", "en", stdout=out)
+    output = out.getvalue()
+
+    assert "en: 3 rows — 1 custom, 2 redundant" in output
+    assert f"#{wrong.id}" in output
+    assert "served: 'Order Received'" in output
+    assert f"#{plural.id}" not in output

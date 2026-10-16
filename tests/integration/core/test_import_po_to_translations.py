@@ -105,3 +105,38 @@ def test_force_overwrites_rosetta_edit(tmp_path, settings):
     assert row.msgstr == "Παραλάβαμε την παραγγελία σας — #{order_id}", (
         "--force must overwrite the existing msgstr from .po."
     )
+
+
+FUZZY_PO = """\
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: en\n"
+
+#, fuzzy
+#| msgid "Order Delivered"
+msgid "Order Received"
+msgstr "Order Delivered"
+
+msgid "Save"
+msgstr "Save changes"
+"""
+
+
+@pytest.mark.django_db
+def test_fuzzy_entries_are_never_imported(tmp_path, settings):
+    """A fuzzy entry is makemessages' guess, which gettext never compiles.
+    Importing it made English "Order Received" read "Order Delivered"
+    in production until 2026-10-16."""
+    root = tmp_path / "locale" / "en" / "LC_MESSAGES"
+    root.mkdir(parents=True)
+    (root / "django.po").write_text(FUZZY_PO, encoding="utf-8")
+    settings.LOCALE_PATHS = [tmp_path / "locale"]
+
+    call_command("import_po_to_translations", "--language", "en")
+
+    assert set(
+        Translation.objects.filter(language_code="en").values_list(
+            "msgid", "msgstr"
+        )
+    ) == {("Save", "Save changes")}

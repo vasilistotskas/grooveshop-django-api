@@ -110,6 +110,24 @@ def overlay_key(
     return (msgid, plural_index) if msgid_plural else msgid
 
 
+def served_without_overlay(
+    compiled: str | None, msgid: str, msgid_plural: str, plural_index: int
+) -> str:
+    """The text gettext serves for a row's key when the row is absent.
+
+    ``compiled`` is the catalogue's value for the key. With none, gettext
+    falls back to the source text: the msgid, or for plural forms past
+    the first the msgid_plural. So a row for a key the .po leaves
+    untranslated (every English key) still changes what is served
+    whenever its msgstr differs from that source text. In April 2026 an
+    import mapped English "Order Received" to "Order Delivered" that way,
+    and nothing reported it because the .po had no English value.
+    """
+    if compiled is not None:
+        return compiled
+    return msgid_plural if msgid_plural and plural_index > 0 else msgid
+
+
 def apply_db_overlay(language_code: str | None = None) -> None:
     """Overlay DB msgstrs onto Django's in-memory gettext catalog.
 
@@ -160,13 +178,16 @@ def apply_db_overlay(language_code: str | None = None) -> None:
         overriding = 0
         for msgid, msgid_plural, plural_index, msgstr in rows:
             key = overlay_key(msgid, msgid_plural, plural_index)
-            # A row that disagrees with the compiled .po is the overlay
-            # doing real work — a deliberate Rosetta edit, or a stale
-            # import silently retitling emails (order #281, 2026-09-12:
-            # "Order Received" served as "Η Παραγγελία Παραδόθηκε" from
-            # an April row nobody knew was there). Count them so the
-            # number is in the logs of every pod that serves them.
-            if underlying.get(key) not in (None, msgstr):
+            # A row that changes the served text is the overlay doing
+            # real work — a deliberate Rosetta edit, or a stale import
+            # silently retitling emails (order #281, 2026-09-12: "Order
+            # Received" served as "Η Παραγγελία Παραδόθηκε" from an April
+            # row nobody knew was there). Count them so the number is in
+            # the logs of every pod that serves them.
+            served = served_without_overlay(
+                underlying.get(key), msgid, msgid_plural, plural_index
+            )
+            if served != msgstr:
                 overriding += 1
             # TranslationCatalog.__setitem__ writes to self._catalogs[0];
             # plain-dict _catalog (older Django) also supports subscript
@@ -176,8 +197,8 @@ def apply_db_overlay(language_code: str | None = None) -> None:
 
         if applied:
             logger.info(
-                "Translation overlay applied for %s: %d rows, %d override "
-                "a different django.po value (translation_overlay_audit "
+                "Translation overlay applied for %s: %d rows, %d change "
+                "the text django.po serves (translation_overlay_audit "
                 "lists them)",
                 lang,
                 applied,

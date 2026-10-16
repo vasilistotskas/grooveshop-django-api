@@ -10,16 +10,22 @@ bulk import: on 2026-09-12 an April row 'Order Received' → 'Η
 "delivered" (order #281), and a fresh `manage.py shell` — which never
 applies the overlay — kept insisting the catalogue was fine.
 
-Each row is classified against the on-disk catalogue:
+Each row is classified against the text gettext would serve without
+it: the compiled .po value, or, when the .po has none (every English
+key, any untranslated one), the source text itself
+(`rosetta_storage.served_without_overlay`):
 
-  custom     msgstr differs from the .po value — the row is doing work.
+  custom     msgstr differs from that text — the row is doing work.
              Listed in full. Whether it is an edit to keep or a stale
              import to drop is a human call, so it is never deleted
              without being named (`--drop-ids` / `--drop-before`).
-  redundant  msgstr equals the .po value — the row changes nothing.
+  redundant  msgstr equals that text — the row changes nothing.
              `--prune` deletes these.
-  unmatched  the compiled catalogue has nothing for the key (the msgid
-             is gone from the .po, or untranslated there). Left alone.
+
+A key the .po leaves untranslated is not "nothing to compare with": in
+April 2026 an import mapped English "Order Received" to "Order
+Delivered", and English order confirmations carried that subject for
+months while this command filed the row away as unmatched.
 
 Every write bumps the translation version key so each pod and worker
 rebuilds its catalog from disk on its next request or task.
@@ -42,6 +48,7 @@ from core.rosetta_storage import (
     _configured_languages,
     _reload_translations,
     overlay_key,
+    served_without_overlay,
 )
 
 
@@ -50,11 +57,10 @@ class LanguageAudit:
     language: str
     custom: list[tuple[Translation, str]] = field(default_factory=list)
     redundant: list[Translation] = field(default_factory=list)
-    unmatched: list[Translation] = field(default_factory=list)
 
     @property
     def total(self) -> int:
-        return len(self.custom) + len(self.redundant) + len(self.unmatched)
+        return len(self.custom) + len(self.redundant)
 
 
 def _disk_catalog(language: str):
@@ -73,15 +79,18 @@ def audit_language(language: str) -> LanguageAudit:
     result = LanguageAudit(language)
     rows = Translation.objects.filter(language_code=language).exclude(msgstr="")
     for row in rows.order_by("updated_at", "id"):
-        po = catalog.get(
-            overlay_key(row.msgid, row.msgid_plural, row.plural_index)
+        served = served_without_overlay(
+            catalog.get(
+                overlay_key(row.msgid, row.msgid_plural, row.plural_index)
+            ),
+            row.msgid,
+            row.msgid_plural,
+            row.plural_index,
         )
-        if po is None:
-            result.unmatched.append(row)
-        elif po == row.msgstr:
+        if served == row.msgstr:
             result.redundant.append(row)
         else:
-            result.custom.append((row, po))
+            result.custom.append((row, served))
     return result
 
 
@@ -176,15 +185,16 @@ class Command(BaseCommand):
     def _report(self, audit: LanguageAudit) -> None:
         self.stdout.write(
             f"{audit.language}: {audit.total} rows — "
-            f"{len(audit.custom)} custom, {len(audit.redundant)} redundant, "
-            f"{len(audit.unmatched)} unmatched"
+            f"{len(audit.custom)} custom, {len(audit.redundant)} redundant"
         )
         if not audit.custom:
             return
-        self.stdout.write("  custom rows (msgstr overrides django.po):")
-        for row, po in audit.custom:
+        self.stdout.write(
+            "  custom rows (msgstr changes the text django.po serves):"
+        )
+        for row, served in audit.custom:
             self.stdout.write(
                 f"    #{row.id} {row.updated_at:%Y-%m-%d} {_cut(row.msgid)!r}"
             )
             self.stdout.write(f"        db: {_cut(row.msgstr)!r}")
-            self.stdout.write(f"        po: {_cut(po)!r}")
+            self.stdout.write(f"        served: {_cut(served)!r}")

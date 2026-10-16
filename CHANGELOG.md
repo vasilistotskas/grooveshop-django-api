@@ -3,6 +3,38 @@
 
 
 
+## v3.125.3 (2026-10-16)
+
+### Bug fixes
+
+* fix(tenant): purge a suspended or destroyed tenant's images from the Cloudflare edge (#223)
+
+Suspending or destroying a tenant flushed media-stream's cache, but
+Cloudflare keeps the processed images for a year (media-stream sends
+s-maxage=31104000, public, immutable) and the storefront tag purge does not
+reach them: the images carry no Cache-Tag. A suspended store's images could
+keep serving from the edge long after media-stream dropped them.
+
+The flush task now purges the tenant's images by URL prefix
+(<assets-host>/media_stream-image/media/<schema>/) in every zone that holds
+them: the platform zone for the shared assets host and any white-label
+host on a platform hostname, the tenant's own zone for an own-domain assets
+host. A prefix purge needs no tag and also reaches images cached before the
+purge existed. It runs after media-stream's flush, never before, so the
+edge cannot refetch images media-stream still holds.
+
+The plan (zone ids and prefixes, never tokens) is read while the tenant row
+exists and travels as a task argument; credentials are resolved when the
+purge runs. destroy_tenant plans before it deletes the row, so the domains
+go with it only after the plan is made. A zone whose credentials are gone
+(a destroyed tenant's own Cloudflare account) is logged for a manual purge
+and skipped; any other failure retries with the task.
+
+
+Claude-Session: https://claude.ai/code/session_01VHqqSodFfL9aLgezEZV6qb
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`56af40e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/56af40e1e636dd0d30a069875d518968b5000f34))
+
 ## v3.125.2 (2026-10-15)
 
 ### Bug fixes

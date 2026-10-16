@@ -235,3 +235,27 @@ class TestSaveSearchQueryTask:
         )
         row = SearchQuery.objects.get()
         assert len(row.query) == 500
+
+    def test_a_retried_write_stores_the_query_once(self):
+        """The task retries on a lost connection, which can come after
+        the row was committed: the second attempt finds it by the
+        query's uuid instead of inserting another."""
+        from search.tasks import save_search_query
+
+        kwargs = {
+            "query": "ηχεία",
+            "language_code": "el",
+            "content_type": "product",
+            "results_count": 3,
+            "estimated_total_hits": 3,
+            "processing_time_ms": 4,
+            "user_id": None,
+            "session_key": None,
+            "ip_address": None,
+            "user_agent": "pytest",
+            "query_uuid": str(uuid4()),
+        }
+        save_search_query.run(**kwargs)
+        save_search_query.run(**kwargs)
+
+        assert SearchQuery.objects.count() == 1

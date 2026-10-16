@@ -20275,3 +20275,13 @@ msgid ""
 "MYDATA_ENVIRONMENT must be 'dev' (the AADE sandbox) or 'prod'. Until it is, "
 "no receipt is issued."
 msgstr ""
+
+#: .\core\templates\emails\order\order_received.html
+#: .\core\templates\emails\order\order_received.txt
+msgid "Thank you — we have received your order."
+msgstr ""
+
+#: .\core\templates\emails\order\order_received.html
+#: .\core\templates\emails\order\order_received.txt
+msgid "We will email you as your order progresses."
+msgstr ""

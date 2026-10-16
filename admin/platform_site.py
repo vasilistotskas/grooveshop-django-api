@@ -27,6 +27,7 @@ fields and inlines change.
 
 from __future__ import annotations
 
+from django.utils.module_loading import import_string
 from django.utils.translation import gettext_lazy as _
 from unfold.sites import UnfoldAdminSite
 
@@ -80,6 +81,14 @@ PLATFORM_EXCLUDED_MODELS: frozenset[str] = frozenset(
         "user.UserDataExport",
     }
 )
+
+# Models whose platform admin is not the store admin's. The copy is the
+# rule; an entry here is for a model the two sites describe differently.
+# ``UserAccount`` rows are shoppers in a store and platform identities in
+# public, and the store's admin reads store-only tables.
+PLATFORM_ADMIN_CLASSES: dict[str, str] = {
+    "user.UserAccount": "user.admin.PlatformUserAdmin",
+}
 
 
 class PlatformAdminSite(
@@ -194,4 +203,10 @@ def register_platform_models() -> None:
             continue
         if model in platform_admin_site._registry:
             continue
-        platform_admin_site.register(model, model_admin.__class__)
+        platform_class = PLATFORM_ADMIN_CLASSES.get(model._meta.label)
+        platform_admin_site.register(
+            model,
+            import_string(platform_class)
+            if platform_class
+            else model_admin.__class__,
+        )

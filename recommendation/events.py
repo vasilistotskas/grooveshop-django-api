@@ -77,7 +77,7 @@ def record_events(
             product_id=int(item["product_id"]),
             position=item.get("position"),
             impression_id=uuid.UUID(str(impression_id)),
-            session_key=(session_key or "")[:40],
+            session_key=session_key or "",
             user_id=user_id,
             cart_uuid=_as_uuid(cart_uuid),
         )

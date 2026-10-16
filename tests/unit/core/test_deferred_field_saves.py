@@ -39,8 +39,17 @@ from simple_history.models import registered_models
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
+# .claude/worktrees holds other checkouts of this repository.
 _EXCLUDED_DIRS = frozenset(
-    {".venv", "tests", "tests_mt", "migrations", "node_modules", ".git"}
+    {
+        ".venv",
+        "tests",
+        "tests_mt",
+        "migrations",
+        "node_modules",
+        ".git",
+        ".claude",
+    }
 )
 _DEFERRING_CALLS = frozenset({"only", "defer"})
 

@@ -122,16 +122,41 @@ class TestPlatformSiteRegistry(SimpleTestCase):
         Sites / User Sessions were un-wrapped (2026-08-26).
         """
         from django.contrib import admin as django_admin
+        from django.utils.module_loading import import_string
+
+        from admin.platform_site import PLATFORM_ADMIN_CLASSES
+
+        def expected(model, default):
+            declared = PLATFORM_ADMIN_CLASSES.get(model._meta.label)
+            return import_string(declared) if declared else type(default)
 
         mismatched = [
             model._meta.label
             for model, platform_admin in platform_admin_site._registry.items()
             if (default := django_admin.site._registry.get(model)) is not None
-            and type(default) is not type(platform_admin)
+            and type(platform_admin) is not expected(model, default)
         ]
         assert not mismatched, (
             f"platform site holds stale admin classes for: {mismatched}"
         )
+
+    def test_the_platform_account_admin_reads_no_store_table(self):
+        """Its own class, not the store's copy: the store's reads loyalty,
+        orders and addresses, which the public schema does not have."""
+        from user.admin import PlatformUserAdmin
+        from user.models import UserAccount
+
+        platform_admin = platform_admin_site._registry[UserAccount]
+
+        assert type(platform_admin) is PlatformUserAdmin
+        fields = {
+            field
+            for _name, options in platform_admin.fieldsets
+            for field in options["fields"]
+        }
+        assert not {f for f in fields if f.startswith("loyalty_")}
+        assert platform_admin.change_form_datasets == []
+        assert platform_admin.actions_detail == []
 
     def test_reuses_the_shared_model_admin_classes(self):
         """Copied from the default registry so the two cannot drift."""

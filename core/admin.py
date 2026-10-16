@@ -1,6 +1,7 @@
 import logging
 
 from django.contrib import admin
+from django.utils.functional import cached_property
 from django.utils.translation import gettext_lazy as _
 from django_celery_beat.admin import (
     ClockedScheduleAdmin as BaseClockedScheduleAdmin,
@@ -9,7 +10,11 @@ from django_celery_beat.admin import (
     CrontabScheduleAdmin as BaseCrontabScheduleAdmin,
 )
 from django_celery_beat.admin import PeriodicTaskAdmin as BasePeriodicTaskAdmin
-from django_celery_beat.admin import PeriodicTaskForm, TaskSelectWidget
+from django_celery_beat.admin import (
+    PeriodicTaskForm,
+    TaskChoiceField,
+    TaskSelectWidget,
+)
 from django_celery_beat.models import (
     ClockedSchedule,
     CrontabSchedule,
@@ -117,14 +122,35 @@ def override_third_party_admins():
 
 
 class UnfoldTaskSelectWidget(UnfoldAdminSelectWidget, TaskSelectWidget):
-    pass
+    @cached_property
+    def _modules(self):
+        """Import every app's ``tasks`` module, so the list is complete.
+
+        Directly, not through ``loader.import_default_modules()`` as the
+        base widget does: that sends Celery's ``import_modules`` signal,
+        on which the Django fixup runs every Django system check, on
+        each render of this form. On the platform host dj-stripe's check
+        queries ``djstripe_webhookendpoint``, a store-only table, swallows
+        the DatabaseError and leaves the admin's transaction aborted, so
+        the periodic-task form answered 500 there.
+        """
+        self.celery_app.autodiscover_tasks(force=True)
 
 
 class UnfoldPeriodicTaskForm(PeriodicTaskForm):
+    # Declared here rather than swapped in ``__init__``: the form's
+    # field copy in ``BaseForm.__init__`` already builds the widget's
+    # choices, and the base widget would import the task modules its
+    # own way before the swap.
+    regtask = TaskChoiceField(
+        label=PeriodicTaskForm.base_fields["regtask"].label,
+        required=False,
+        widget=UnfoldTaskSelectWidget(),
+    )
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["task"].widget = UnfoldAdminTextInputWidget()
-        self.fields["regtask"].widget = UnfoldTaskSelectWidget()
 
 
 # Ordered prefix → category map for the ~80 flat extra_settings rows.

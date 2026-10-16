@@ -24,8 +24,17 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
+# .claude/worktrees holds other checkouts of this repository.
 _EXCLUDED_DIRS = frozenset(
-    {".venv", "tests", "tests_mt", "migrations", "node_modules", ".git"}
+    {
+        ".venv",
+        "tests",
+        "tests_mt",
+        "migrations",
+        "node_modules",
+        ".git",
+        ".claude",
+    }
 )
 # Django's own generated boilerplate. Its guard re-raises with an
 # actionable message and is the documented way to write it.

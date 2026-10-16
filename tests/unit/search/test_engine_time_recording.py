@@ -106,7 +106,7 @@ class TestMiddlewarePrefersTheRequestAttribute:
                 captured.update(kwargs)
 
             search.tasks.save_search_query.delay = _capture
-            middleware._track_search_async(http_request, response)
+            middleware._track_search_async(http_request, response, "product")
         finally:
             if original is not None:  # pragma: no cover - defensive
                 mw.save_search_query = original

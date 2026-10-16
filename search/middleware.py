@@ -5,6 +5,12 @@ Records every successful (HTTP 200) response from a search-query
 endpoint (``/api/v1/search/product``, ``/search/blog/post``,
 ``/search/federated``) as a ``SearchQuery`` row, written by a Celery task
 so the response is never blocked.
+
+Which requests count is decided by the ROUTE that served them, not by
+the path: a ``/search/`` substring also matched the admin's command
+palette (``/admin/search/``), recorded every keystroke as an empty
+"federated" storefront search, and on the platform host sent the task
+to a schema with no ``search_query`` table (2026-10-13).
 """
 
 from __future__ import annotations
@@ -14,11 +20,13 @@ import json
 import logging
 from collections.abc import Callable
 from typing import cast
+from uuid import uuid4
 
 from django.http import HttpRequest, HttpResponseBase
 from django.utils.deprecation import MiddlewareMixin
 
 from core.client_ip import trusted_client_ip
+from core.sessions import persisted_session_key
 
 logger = logging.getLogger(__name__)
 
@@ -27,9 +35,9 @@ class SearchAnalyticsMiddleware(MiddlewareMixin):
     """
     Middleware to track search queries and results.
 
-    Matches any path containing ``/search/`` except the non-query
-    ``/search/trending`` and ``/search/analytics`` endpoints, and records
-    only HTTP 200 responses — so ``/search/click`` (202) is skipped too.
+    Tracks the three query routes of ``search/urls.py`` and only their
+    HTTP 200 responses. Trending, analytics and click are routes of the
+    same app but not searches.
 
     - Extracts the query parameters and the results metadata
     - Dispatches a Celery task to persist the record
@@ -47,32 +55,38 @@ class SearchAnalyticsMiddleware(MiddlewareMixin):
         # Get response first
         response = cast(HttpResponseBase, self.get_response(request))
 
-        # Track search if this is a search endpoint
-        if self._is_search_endpoint(request):
-            self._track_search_async(request, response)
+        route = self._query_route(request)
+        if route is not None:
+            self._track_search_async(
+                request, response, self._QUERY_ROUTES[route]
+            )
 
         return response
 
-    # Non-query endpoints that live under /search/ but are NOT searches.
-    _NON_QUERY_SEARCH_SUFFIXES = ("/trending", "/analytics")
+    # The query routes of ``search/urls.py`` and the content type each
+    # one records.
+    _QUERY_ROUTES = {
+        "search-product": "product",
+        "search-blog-post": "blog_post",
+        "search-federated": "federated",
+    }
 
-    def _is_search_endpoint(self, request: HttpRequest) -> bool:
-        """
-        Check if the request is to a real search-query endpoint.
+    def _query_route(self, request: HttpRequest) -> str | None:
+        """The query route that served this request, if any.
 
-        A bare ``/search/`` substring check also matched ``/search/trending``
-        and ``/search/analytics``, recording them as SearchQuery rows and
-        polluting the analytics with requests that were never actual searches
-        (G0338). Exclude those non-query endpoints explicitly.
+        ``resolver_match`` is set once the URL is resolved, so it is
+        there after ``get_response``. Unresolved requests have none.
         """
-        path = request.path
-        if "/search/" not in path:
-            return False
-        stripped = path.rstrip("/")
-        return not stripped.endswith(self._NON_QUERY_SEARCH_SUFFIXES)
+        match = getattr(request, "resolver_match", None)
+        if match is None or match.view_name not in self._QUERY_ROUTES:
+            return None
+        return match.view_name
 
     def _track_search_async(
-        self, request: HttpRequest, response: HttpResponseBase
+        self,
+        request: HttpRequest,
+        response: HttpResponseBase,
+        content_type: str,
     ) -> None:
         """
         Track search query without blocking the response.
@@ -92,9 +106,6 @@ class SearchAnalyticsMiddleware(MiddlewareMixin):
             # Extract query parameters
             query = request.GET.get("query", "")
             language_code = request.GET.get("language_code", "")
-
-            # Determine content type from endpoint path
-            content_type = self._determine_content_type(request.path)
 
             # Parse response data to extract results metadata
             results_count = 0
@@ -137,6 +148,9 @@ class SearchAnalyticsMiddleware(MiddlewareMixin):
                     ) or response_data.get("query_id")
             except (json.JSONDecodeError, AttributeError, KeyError) as e:
                 logger.debug(f"Could not parse response data: {e!s}")
+            # Every stored search has a key, minted here when the
+            # response carried none: the task's retry is keyed on it.
+            query_uuid = query_uuid or str(uuid4())
 
             # The view stamps Meilisearch's own processing time here (see
             # ``search.views._record_engine_time``), summed over every
@@ -148,12 +162,11 @@ class SearchAnalyticsMiddleware(MiddlewareMixin):
 
             # Extract user information
             user = request.user if request.user.is_authenticated else None
-            # `session_key` is None until Django first PERSISTS the
-            # session, which an anonymous search never does — so the
-            # common case here is "no key", spelled "" like every other
-            # absent string on the row.
-            session = getattr(request, "session", None)
-            session_key = getattr(session, "session_key", None) or ""
+            # Only a session that exists: an anonymous search never
+            # loads its session, so ``session_key`` would be whatever
+            # cookie the client sent. No session is spelled "", like
+            # every other absent string on the row.
+            session_key = persisted_session_key(request)
             ip_address = self._get_client_ip(request)
             user_agent = request.META.get("HTTP_USER_AGENT", "")
 
@@ -192,26 +205,6 @@ class SearchAnalyticsMiddleware(MiddlewareMixin):
                     "query": request.GET.get("query", ""),
                 },
             )
-
-    def _determine_content_type(self, path: str) -> str:
-        """
-        Determine content type from request path.
-
-        Args:
-            path: The request path
-
-        Returns:
-            Content type string ('product', 'blog_post', or 'federated')
-        """
-        if "product" in path:
-            return "product"
-        elif "blog" in path:
-            return "blog_post"
-        elif "federated" in path:
-            return "federated"
-        else:
-            # Default to federated for unknown search endpoints
-            return "federated"
 
     def _get_client_ip(self, request: HttpRequest) -> str | None:
         """

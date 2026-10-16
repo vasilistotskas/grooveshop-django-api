@@ -80,6 +80,10 @@ class AddressRow:
     zipcode: str
     floor: FloorChoicesEnum
     is_main: bool
+    #: ``Region.alpha`` (ISO 3166-2). The checkout requires a region for
+    #: a country that has them, so a saved address without one cannot
+    #: be used as is.
+    region: str
     #: ISO 3166-1 alpha-2.
     country: str = "GR"
 
@@ -132,6 +136,7 @@ ADDRESSES: tuple[AddressRow, ...] = (
         zipcode="54622",
         floor=FloorChoicesEnum.THIRD_FLOOR,
         is_main=True,
+        region="GR-17",
     ),
     AddressRow(
         title="Γραφείο",
@@ -143,6 +148,7 @@ ADDRESSES: tuple[AddressRow, ...] = (
         zipcode="10679",
         floor=FloorChoicesEnum.FIRST_FLOOR,
         is_main=False,
+        region="GR-14",
     ),
     AddressRow(
         title="Κύπρος",
@@ -154,6 +160,7 @@ ADDRESSES: tuple[AddressRow, ...] = (
         zipcode="1011",
         floor=FloorChoicesEnum.SECOND_FLOOR,
         is_main=False,
+        region="CY-01",
         country="CY",
     ),
 )
@@ -619,14 +626,42 @@ def _ensure_user(email: str, password: str, first: str, last: str):
     return user, created
 
 
+def _demo_phone(alpha_2: str) -> str:
+    """libphonenumber's example mobile number for the country: valid for
+    the checkout's phone check, and reserved for examples, so it rings
+    nobody."""
+    import phonenumbers
+
+    number = phonenumbers.example_number_for_type(
+        alpha_2, phonenumbers.PhoneNumberType.MOBILE
+    )
+    return phonenumbers.format_number(
+        number, phonenumbers.PhoneNumberFormat.E164
+    )
+
+
 def _seed_addresses(user, rows: Sequence[AddressRow] = ADDRESSES) -> int:
+    """The account's saved addresses, complete enough to check out with.
+
+    Region and phone used to be left empty. The checkout preselects the
+    main saved address and requires both, and in saved-address mode it
+    renders neither field, so «Continue to delivery» did nothing for
+    either demo account (owner review, 2026-10-16).
+    """
     from country.models import Country
+    from region.models import Region
     from user.models.address import UserAddress
 
     countries = {
         country.alpha_2: country
         for country in Country.objects.filter(
             alpha_2__in={row.country for row in rows}
+        )
+    }
+    regions = {
+        region.alpha: region
+        for region in Region.objects.filter(
+            alpha__in={row.region for row in rows}
         )
     }
     written = 0
@@ -644,6 +679,8 @@ def _seed_addresses(user, rows: Sequence[AddressRow] = ADDRESSES) -> int:
                 "floor": row.floor,
                 "is_main": row.is_main,
                 "country": countries.get(row.country),
+                "region": regions.get(row.region),
+                "phone": _demo_phone(row.country),
             },
         )
         written += int(created)
@@ -1377,6 +1414,31 @@ def reset_demo_account() -> dict[str, int]:
         report[f"seeded_{key}"] = value
     _bump(report, "stock_restored", _restore_demo_stock())
     _bump(report, "gift_card_restored", _restore_gift_card())
+    for key, value in _restore_price_history().items():
+        report[f"price_history_{key}"] = value
+    return report
+
+
+def _restore_price_history() -> dict[str, int]:
+    """Keep the demo's markdowns announced.
+
+    Without a full-price spell older than the Omnibus look-back window a
+    reduction may not be shown, and the demo then has no product on
+    offer. Its catalogue is seeded already marked down, so the history
+    comes from ``demo_price_history``. Until 2026-10-16 that ran only as
+    a ``seed_demo_store`` step, which production's demo never got: all
+    12 markdowns were unannounced. The step leaves a correct history
+    alone, so it is safe every night and repairs one that a price change
+    has broken. A rebuild changes what product pages show, hence the
+    purge.
+    """
+    from devtools.demo_price_history import seed_price_history
+    from devtools.demo_store import purge_caches
+
+    report = seed_price_history()
+    if report.get("rebuilt"):
+        for key, value in purge_caches().items():
+            report[f"purged_{key}"] = value
     return report
 
 

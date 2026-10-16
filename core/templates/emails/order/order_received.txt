@@ -1,16 +1,16 @@
 {% load i18n %}{% trans "ORDER RECEIVED" %}
 
-{% if order.is_paid %}{% trans "Thank you — we have received your order and your payment is confirmed." %}{% else %}{% trans "Thank you — we have received your order. It is waiting for payment." %}{% endif %}
+{% if order.is_paid %}{% trans "Thank you — we have received your order and your payment is confirmed." %}{% elif collected_on_delivery %}{% trans "Thank you — we have received your order." %}{% else %}{% trans "Thank you — we have received your order. It is waiting for payment." %}{% endif %}
 
 {% trans "Order" %} #{{ order.id }}
 {% trans "Date" %}: {{ order.created_at|date:"SHORT_DATE_FORMAT" }}
-{% trans "Payment Status" %}: {% if order.is_paid %}{% trans "Paid" %}{% else %}{% trans "Awaiting payment" %}{% endif %}
-
+{% if order.is_paid %}{% trans "Payment Status" %}: {% trans "Paid" %}
+{% endif %}
 {% if payment_instructions_text %}{% trans "HOW TO COMPLETE YOUR PAYMENT" %}
 {# already tag-stripped + entity-unescaped plain text; |safe stops the .txt template re-escaping & < > #}
 {{ payment_instructions_text|safe }}
-{% trans "Please include your order number" %} #{{ order.id }} {% trans "in the payment reference." %}
-
+{% if payment_reference_needed %}{% trans "Please include your order number" %} #{{ order.id }} {% trans "in the payment reference." %}
+{% endif %}
 {% endif %}{% trans "SHIPPING ADDRESS" %}
 {{ order.first_name }} {{ order.last_name }}
 {{ order.street }} {{ order.street_number }}
@@ -35,7 +35,8 @@
 {% endif %}{% if order.gift_card_amount.amount > 0 %}{% trans "Gift card" %}: -{{ order.gift_card_amount }}
 {% endif %}{% trans "Total" %}: {{ order.calculate_order_total_amount }}
 
-{% if expects_payment_confirmation %}{% trans "You will receive a second email as soon as we confirm your payment." %}{% endif %}
+{% if expects_payment_confirmation %}{% trans "You will receive a second email as soon as we confirm your payment." %}
+{% endif %}{% trans "We will email you as your order progresses." %}
 
 {{ SITE_NAME }}
 {{ INFO_EMAIL }}

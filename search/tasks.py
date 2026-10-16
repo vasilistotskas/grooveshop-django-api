@@ -1,5 +1,7 @@
 import logging
 
+from django.db import InterfaceError, OperationalError
+
 from core import celery_app
 from core.tasks import MonitoredTask
 
@@ -18,7 +20,10 @@ CLICK_SCORE_MAX_ITEMS = 50
 @celery_app.task(
     base=MonitoredTask,
     max_retries=3,
-    autoretry_for=(Exception,),
+    # Only a lost connection is worth another try. A DataError or a
+    # ProgrammingError fails the same way every time; retrying one wrote
+    # three RETRY rows before each FAILURE (2026-10-13).
+    autoretry_for=(OperationalError, InterfaceError),
     retry_backoff=True,
 )
 def save_search_query(
@@ -33,7 +38,7 @@ def save_search_query(
     session_key: str | None,
     ip_address: str | None,
     user_agent: str | None,
-    query_uuid: str | None = None,
+    query_uuid: str,
 ) -> None:
     """Persist a SearchQuery analytics record asynchronously.
 
@@ -58,20 +63,27 @@ def save_search_query(
                 user_id,
             )
 
-    SearchQuery.objects.create(
+    # Retried on a lost connection, which can come after the row was
+    # written: keyed on the query's uuid, a second attempt finds the row
+    # instead of inserting another. Every message carries it (the view
+    # mints it, the middleware when the body had none), the same one on
+    # every attempt.
+    SearchQuery.objects.get_or_create(
         uuid=query_uuid,
-        # CharField(max_length=500) is only enforced by the database on
-        # .create(); an unbounded pasted query must not kill the task.
-        query=query[:500],
-        language_code=language_code or "",
-        content_type=content_type,
-        results_count=results_count,
-        estimated_total_hits=estimated_total_hits,
-        processing_time_ms=processing_time_ms,
-        user=user,
-        session_key=session_key or "",
-        ip_address=ip_address,
-        user_agent=user_agent or "",
+        defaults={
+            # CharField(max_length=500) is only enforced by the database
+            # on write; an unbounded pasted query must not kill the task.
+            "query": query[:500],
+            "language_code": language_code or "",
+            "content_type": content_type,
+            "results_count": results_count,
+            "estimated_total_hits": estimated_total_hits,
+            "processing_time_ms": processing_time_ms,
+            "user": user,
+            "session_key": session_key or "",
+            "ip_address": ip_address,
+            "user_agent": user_agent or "",
+        },
     )
 
 

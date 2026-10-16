@@ -33,6 +33,7 @@ from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 
 from core.api.serializers import ErrorResponseSerializer
 from core.api.throttling import RecommendationEventThrottle
+from core.sessions import persisted_session_key
 from recommendation.engine import SuggestionContext, suggest
 from recommendation.hydrate import hydrate_pairs
 from recommendation.serializers import (
@@ -45,11 +46,6 @@ from tenant.permissions import (
     IsRecommendationsEnabled,
     IsRecommendationsRuntimeEnabled,
 )
-
-
-def _session_key(request) -> str:
-    session = getattr(request, "session", None)
-    return (getattr(session, "session_key", None) or "")[:40]
 
 
 def _user_id(request) -> int | None:
@@ -167,7 +163,7 @@ def recommendation_event(request):
             for item in data["items"]
         ],
         seed_id=data.get("seed_id"),
-        session_key=_session_key(request),
+        session_key=persisted_session_key(request),
         user_id=_user_id(request),
         cart_uuid=str(cart_uuid) if cart_uuid else None,
     )

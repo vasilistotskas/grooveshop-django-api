@@ -160,7 +160,11 @@ class Command(BaseCommand):
         skipped = 0
 
         for entry in po:
-            if entry.obsolete:
+            # A fuzzy entry is makemessages' guess, not a translation:
+            # gettext never compiles it. Importing it made the guess live
+            # through the overlay. English "Order Received" was served as
+            # "Order Delivered" from such a row until 2026-10-16.
+            if entry.obsolete or entry.fuzzy:
                 continue
 
             if entry.msgid_plural:

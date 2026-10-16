@@ -47,7 +47,9 @@ from admin.mixins import IsSuperuserOnlyModelAdmin
 from loyalty.enum import TransactionType
 from loyalty.models.transaction import PointsTransaction
 from loyalty.services import LoyaltyService
+from tenant.deletion import PublicSchemaDeletionMixin
 from tenant.membership import is_platform_superuser
+from tenant.models import TenantMembershipRole, UserTenantMembership
 from user.forms import UserAccountCreationForm
 from user.models import UserAccount
 from user.models.address import UserAddress
@@ -635,6 +637,165 @@ class UserAdmin(ExportActionMixin, BaseModelAdmin):
         return is_platform_superuser(request.user)
 
     actions_detail = ["adjust_loyalty_points"]
+
+
+class PlatformIdentityKindFilter(DropdownFilter):
+    """Who a platform identity is: an operator, a store's staff, or
+    nobody any more (no superuser flag and no active store role)."""
+
+    title = _("Kind")
+    parameter_name = "kind"
+
+    def lookups(self, request, model_admin):
+        return [
+            ("superuser", _("Platform superusers")),
+            ("store_staff", _("Store staff")),
+            ("dormant", _("Dormant")),
+        ]
+
+    def queryset(self, request, queryset):
+        active_role = Q(tenant_memberships__is_active=True)
+        if self.value() == "superuser":
+            return queryset.filter(is_superuser=True)
+        if self.value() == "store_staff":
+            return queryset.filter(active_role).distinct()
+        if self.value() == "dormant":
+            return queryset.filter(is_superuser=False).exclude(active_role)
+        return queryset
+
+
+class TenantMembershipInlineForm(forms.ModelForm):
+    """A store role is a staff grant: the reserved MEMBER, no longer
+    issued (``TenantMembershipRole``) and the model's default, is neither
+    offered nor preselected. Left on it, a role added here was active yet
+    granted no access to the store's admin."""
+
+    class Meta:
+        model = UserTenantMembership
+        fields = ("tenant", "role", "is_active")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        role = self.fields["role"]
+        role.choices = [
+            choice
+            for choice in role.choices
+            if choice[0] != TenantMembershipRole.MEMBER
+        ]
+        if self.instance._state.adding:
+            self.initial["role"] = TenantMembershipRole.STAFF
+
+
+class TenantMembershipInline(TabularInline):
+    model = UserTenantMembership
+    form = TenantMembershipInlineForm
+    fk_name = "user"
+    fields = ("tenant", "role", "is_active")
+    autocomplete_fields = ("tenant",)
+    extra = 0
+    verbose_name = _("Store role")
+    verbose_name_plural = _("Store roles")
+
+
+class PlatformUserAdmin(PublicSchemaDeletionMixin, UserAdmin):
+    """The account admin of the PLATFORM site.
+
+    The public ``user_useraccount`` holds platform identities only: the
+    operators and each store's staff, whose access is a
+    ``UserTenantMembership``. The store admin's ``UserAdmin`` describes
+    shoppers, and on the platform its loyalty fields, order dataset and
+    loyalty action read tables that exist only in store schemas
+    (``GET /admin/user/useraccount/2/change/`` answered 500 on
+    production, 2026-10-15). This one shows who the identity is, which
+    stores it may operate and in what role, and deletes without touching
+    store-only tables.
+    """
+
+    list_display = [
+        "identity",
+        "store_roles",
+        "is_active",
+        "is_staff",
+        "is_superuser",
+        "last_login",
+        "created_at",
+    ]
+    list_filter = [
+        PlatformIdentityKindFilter,
+        "is_active",
+        "is_staff",
+        "is_superuser",
+    ]
+    search_fields = ["email", "username", "first_name", "last_name"]
+    search_help_text = _("Search by email, username or name.")
+    list_select_related = []
+    readonly_fields = ["id", "last_login", "created_at", "updated_at"]
+    date_hierarchy = None
+    fieldsets = (
+        (
+            _("Account"),
+            {
+                "classes": ("tab",),
+                "fields": (
+                    "email",
+                    "username",
+                    "password",
+                    "first_name",
+                    "last_name",
+                ),
+            },
+        ),
+        (
+            _("Permissions"),
+            {
+                "classes": ("tab",),
+                "fields": (
+                    "is_active",
+                    "is_staff",
+                    "is_superuser",
+                    "groups",
+                    "user_permissions",
+                ),
+            },
+        ),
+        (
+            _("Activity"),
+            {
+                "classes": ("tab",),
+                "fields": ("id", "last_login", "created_at", "updated_at"),
+            },
+        ),
+    )
+    inlines = [TenantMembershipInline]
+    change_form_datasets = []
+    actions_detail = []
+
+    def get_queryset(self, request):
+        # The admin base queryset, without UserAdmin's subscription and
+        # address counts: shopper data, empty on the platform.
+        return (
+            super(UserAdmin, self)
+            .get_queryset(request)
+            .prefetch_related("tenant_memberships__tenant")
+        )
+
+    @display(description=_("Stores"))
+    def store_roles(self, obj):
+        memberships = obj.tenant_memberships.all()
+        if not memberships:
+            return "—"
+        return format_html_join(
+            ", ",
+            "{} · {}{}",
+            (
+                (
+                    membership.tenant.name,
+                    membership.get_role_display(),
+                    "" if membership.is_active else f" ({_('inactive')})",
+                )
+                for membership in memberships
+            ),
+        )
 
 
 @admin.register(UserAddress)

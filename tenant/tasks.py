@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 from core import celery_app
 from core.tasks import MonitoredTask
 from tenant.celery import TenantTask, run_for_all_tenants
+
+if TYPE_CHECKING:
+    from core.cache.edge import MediaPurge
 
 logger = logging.getLogger(__name__)
 
@@ -266,9 +270,14 @@ def process_tenant_billing():
 
 
 # NOT a fanout and NOT beat-scheduled: dispatched on demand from
-# tenant.lifecycle.suspend_tenant with a specific schema name. Runs in
-# public (it only makes an HTTP call to media-stream with the schema as
-# a string — no tenant-schema access), so no _schema_name is needed.
+# tenant.lifecycle.suspend_tenant and destroy_tenant with a specific schema
+# name. Runs in public (it makes an HTTP call to media-stream with the
+# schema as a string, then one to Cloudflare per zone; the only table it
+# reads is the public Tenant row), so no _schema_name is needed.
+#
+# ``edge_purges`` is planned by the caller while the tenant row still
+# exists and names zones, never tokens: credentials are resolved here
+# (core.cache.edge.purge_media), so no secret travels through the broker.
 @celery_app.task(
     base=MonitoredTask,
     max_retries=5,
@@ -276,10 +285,16 @@ def process_tenant_billing():
     retry_backoff=True,
     retry_jitter=True,
 )
-def flush_tenant_media_task(schema_name: str):
+def flush_tenant_media_task(
+    schema_name: str, edge_purges: list[MediaPurge] | None = None
+):
+    from core.cache import edge
     from tenant.media_flush import flush_tenant_media
 
-    return {"flushed": flush_tenant_media(schema_name)}
+    flushed = flush_tenant_media(schema_name)
+    # After the flush, never before: see edge.purge_media.
+    edge.purge_media(schema_name, edge_purges or [])
+    return {"flushed": flushed, "edge_zones": len(edge_purges or [])}
 
 
 @celery_app.task(

@@ -259,30 +259,3 @@ class TestSaveSearchQueryTask:
         save_search_query.run(**kwargs)
 
         assert SearchQuery.objects.count() == 1
-
-    def test_a_message_without_a_uuid_still_stores_its_own_row(self):
-        """A message queued before every search carried a uuid must not
-        match an older row whose uuid is null."""
-        from search.tasks import save_search_query
-
-        SearchQuery.objects.create(
-            query="old",
-            content_type="product",
-            results_count=0,
-            estimated_total_hits=0,
-        )
-        save_search_query.run(
-            query="new",
-            language_code="el",
-            content_type="product",
-            results_count=0,
-            estimated_total_hits=0,
-            processing_time_ms=None,
-            user_id=None,
-            session_key=None,
-            ip_address=None,
-            user_agent="pytest",
-        )
-
-        assert SearchQuery.objects.filter(query="new").exists()
-        assert SearchQuery.objects.count() == 2

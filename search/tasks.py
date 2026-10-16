@@ -1,5 +1,4 @@
 import logging
-from uuid import uuid4
 
 from django.db import InterfaceError, OperationalError
 
@@ -39,7 +38,7 @@ def save_search_query(
     session_key: str | None,
     ip_address: str | None,
     user_agent: str | None,
-    query_uuid: str | None = None,
+    query_uuid: str,
 ) -> None:
     """Persist a SearchQuery analytics record asynchronously.
 
@@ -66,10 +65,11 @@ def save_search_query(
 
     # Retried on a lost connection, which can come after the row was
     # written: keyed on the query's uuid, a second attempt finds the row
-    # instead of inserting another. The middleware sends one with every
-    # search; a message queued before it did gets one here.
+    # instead of inserting another. Every message carries it (the view
+    # mints it, the middleware when the body had none), the same one on
+    # every attempt.
     SearchQuery.objects.get_or_create(
-        uuid=query_uuid or uuid4(),
+        uuid=query_uuid,
         defaults={
             # CharField(max_length=500) is only enforced by the database
             # on write; an unbounded pasted query must not kill the task.

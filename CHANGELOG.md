@@ -3,6 +3,183 @@
 
 
 
+## v3.125.4 (2026-10-16)
+
+### Bug fixes
+
+* fix: owner review batch 1 — order email, sidebar, platform admin, demo seed, search analytics, translations (#221) ([`58dc145`](https://github.com/vasilistotskas/grooveshop-django-api/commit/58dc145db63919098d495249b8f781de7b1942f0))
+
+* fix(i18n): never serve a fuzzy guess through the translation overlay
+
+Production's overlay held 54 English and 46 German rows, all of them
+wrong: English "Order Received" was served as "Order Delivered", "Order
+Completed" as "Order Canceled", and "Payment Status" in Greek. They were
+makemessages' fuzzy guesses, which gettext never compiles, copied into
+the overlay by import_po_to_translations, which skipped obsolete entries
+but not fuzzy ones.
+
+- import_po_to_translations skips fuzzy entries.
+- A Rosetta save of an entry still marked fuzzy stores it empty, which
+  withdraws any earlier override of the key.
+- translation_overlay_audit compares each row with the text gettext
+  serves without it: the .po value, or the source text when the .po has
+  none (served_without_overlay). English keys are untranslated in
+  django.po, so all 100 rows had been filed as "unmatched, left alone"
+  while every pod applied them. The "unmatched" class is gone; such a
+  row is custom, and the pods' log counts it the same way.
+
+The production rows were dropped with the audit's --drop-before.
+
+Closes #220
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`58dc145`](https://github.com/vasilistotskas/grooveshop-django-api/commit/58dc145db63919098d495249b8f781de7b1942f0))
+
+* fix(email): say only what holds for the way the order is paid
+
+The order confirmation the webside owner reviewed (cash on delivery)
+showed "Payment status: awaiting payment", a "How to complete your
+payment" box with the pay way's instructions, and asked the shopper to
+put the order number in a payment reference nobody writes.
+
+- Subject and heading: «Λάβαμε την Παραγγελία σας!», the subject keeping
+  the order number so each order stays its own thread.
+- The payment-status row only on a paid order.
+- The instructions box only where the shopper has to act to pay: a bank
+  transfer, and BOX NOW's pay-on-the-go, paid through the carrier's link
+  before the locker opens. The payment-reference line for the transfer
+  alone.
+- Cash collected by the courier: no box and no "waiting for payment"
+  lead, just the thanks.
+- Every confirmation ends with «Θα ενημερωθείτε με νέο μήνυμα σχετικά με
+  την πορεία της παραγγελίας σας»; status emails do follow.
+
+Closes #211
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`58dc145`](https://github.com/vasilistotskas/grooveshop-django-api/commit/58dc145db63919098d495249b8f781de7b1942f0))
+
+* fix(admin): light up only the sidebar entry of the open page
+
+Unfold marked a sidebar entry active whenever any tab of its TABS group
+was open, so on the Orders page Orders, Receipts and Credit Documents
+were all highlighted, and the same in Blog, Attributes, ACS and BOX NOW.
+admin.navigation now sets every item's active itself: an entry on its
+own pages, a menu when one of its items is, and for a page that is only
+a tab (Order Items, Order History) the first sidebar entry of its group.
+
+Closes #212
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`58dc145`](https://github.com/vasilistotskas/grooveshop-django-api/commit/58dc145db63919098d495249b8f781de7b1942f0))
+
+* fix(admin): a platform admin that reads no store table
+
+Opening a user on the platform admin answered 500 (relation
+"loyalty_points_transaction" does not exist): the platform site copies
+the store admin's UserAdmin, which shows loyalty, an order dataset and
+customer inlines. Walking every platform page found two more of the
+same kind.
+
+- PlatformUserAdmin (PLATFORM_ADMIN_CLASSES): a platform identity's
+  account, stores and roles (an inline and a "Stores" column), a
+  superuser / store staff / dormant filter, and no shopper data.
+- Deleting a platform identity reached tables that exist only in store
+  schemas (account_emailaddress, …). tenant.deletion collects nothing
+  from tenant-only apps in the public schema, for the delete and its
+  confirmation page. Scoped to identities: a store's rows never point at
+  a public identity, unlike Country or Region.
+- tenant_only_app_labels read labels off the dotted app path, so
+  allauth.idp.oidc became "oidc" instead of allauth_idp_oidc. Both label
+  helpers now resolve the AppConfig label.
+- The periodic-task form answered 500 on the platform: its task picker
+  made Celery's Django fixup run every system check on each render, and
+  dj-stripe's check queried a store-only table and left the transaction
+  aborted. The picker imports the task modules directly.
+- tests_mt walks every model on the platform site (list, add, change)
+  on the real public schema, and deletes an identity.
+
+Closes #213
+Closes #217
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`58dc145`](https://github.com/vasilistotskas/grooveshop-django-api/commit/58dc145db63919098d495249b8f781de7b1942f0))
+
+* fix(devtools): keep the demo's offers announced and its addresses usable
+
+- The demo's 12 markdowns were never announced: production's demo had
+  never run the price-history step, so no product had a full-price spell
+  before its reduction. The nightly reset now runs that step (it leaves
+  a correct history alone) and purges the store's caches when it rebuilt
+  one.
+- The demo accounts' saved addresses had no region and no phone. The
+  checkout preselects the main one and requires both without rendering
+  either field, so «Continue to delivery» did nothing. Each address now
+  has its region and the country's example mobile number from
+  libphonenumber.
+
+Closes #214
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`58dc145`](https://github.com/vasilistotskas/grooveshop-django-api/commit/58dc145db63919098d495249b8f781de7b1942f0))
+
+* fix(search): record real searches from stored sessions only
+
+- SearchAnalyticsMiddleware decides by the route that served the
+  request, not by a /search/ substring. The admin's command palette
+  (/admin/search/) was recorded as an empty "federated" storefront
+  search on every keystroke, and on the platform host the task failed
+  for want of a search_query table.
+- core.sessions.persisted_session_key: the session key only when that
+  session exists. Before a session loads, session_key is the raw
+  cookie, so a 227-character value made the insert fail; recommendation
+  events cut such values to 40 and stored them. Both use the helper now.
+- save_search_query retries a lost connection only, not a DataError.
+
+Closes #207
+Closes #208
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`58dc145`](https://github.com/vasilistotskas/grooveshop-django-api/commit/58dc145db63919098d495249b8f781de7b1942f0))
+
+* fix: address review findings on the owner-review batch
+
+- Translation overlay: a pgettext key carries its context before the
+  separator, and Django serves an untranslated one without it, so a
+  context row restating its message no longer counts as an override.
+- Order received email: a bank transfer the store already marked as
+  received asks for no payment, no reference and no confirmation.
+- Search analytics: the task's retry finds the row it already wrote by
+  the query's uuid instead of inserting a second one; the middleware
+  mints the uuid when the response carried none.
+- Platform account admin: the store-role inline no longer offers the
+  reserved MEMBER role and starts a new role at STAFF.
+docs/product-pricing.md: the full cache purge command.
+- Repo-wide source scans skip .claude, whose worktrees are other
+  checkouts of this repository.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`58dc145`](https://github.com/vasilistotskas/grooveshop-django-api/commit/58dc145db63919098d495249b8f781de7b1942f0))
+
+* fix(search): every stored search is keyed by the uuid its message carries
+
+query_uuid is required: every search view mints it and the middleware
+mints one when the body had none, so each retry of a message writes
+under the same key. The fallback minted a new uuid on each attempt and
+could still insert a duplicate after a committed write.
+
+The admin.py scan compares paths relative to the checkout, so a
+checkout under .claude/worktrees still finds its own admin files.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`58dc145`](https://github.com/vasilistotskas/grooveshop-django-api/commit/58dc145db63919098d495249b8f781de7b1942f0))
+
+### Testing
+
+* test(search): patch the write the search task now makes
+
+The task stores a query with get_or_create, which a patched
+manager create no longer reaches: the view test saw the row written
+and the middleware test passed without a failure to swallow.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`58dc145`](https://github.com/vasilistotskas/grooveshop-django-api/commit/58dc145db63919098d495249b8f781de7b1942f0))
+
 ## v3.125.3 (2026-10-16)
 
 ### Bug fixes

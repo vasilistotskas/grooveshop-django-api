@@ -29,7 +29,15 @@ ALLOWED = {
     "core/context_processors.py",
     "devtools",
 }
-SKIP_DIRS = {"tests", "tests_mt", "migrations", ".venv", "node_modules"}
+# .claude/worktrees holds other checkouts of this repository.
+SKIP_DIRS = {
+    "tests",
+    "tests_mt",
+    "migrations",
+    ".venv",
+    "node_modules",
+    ".claude",
+}
 
 
 def _is_allowed(rel: str) -> bool:

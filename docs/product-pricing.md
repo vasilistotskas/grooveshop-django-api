@@ -198,7 +198,7 @@ anything was rebuilt. Until 2026-10-16 the step ran only from
 `seed_demo_store`, which production's demo never got: all its markdowns were
 unannounced. To repair one at once, run
 `manage.py seed_demo_store --schema demo --only price-history` followed by
-`--only cache-purge`.
+`manage.py seed_demo_store --schema demo --only cache-purge`.
 
 ## The markdown formula
 

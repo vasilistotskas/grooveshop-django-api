@@ -36,9 +36,12 @@ pytestmark = pytest.mark.django_db
 INSTRUCTIONS = "Πληρώστε στον λογαριασμό GR00 0000 0000 0000."
 
 
-def _send(settlement: PaySettlement) -> tuple[str, str, str]:
-    """Send the confirmation for an unpaid order; return the subject and
-    the text and HTML bodies."""
+def _send(
+    settlement: PaySettlement,
+    payment_status: PaymentStatus = PaymentStatus.PENDING,
+) -> tuple[str, str, str]:
+    """Send the confirmation for an order, unpaid unless told otherwise;
+    return the subject and the text and HTML bodies."""
     pay_way = PayWayFactory(settlement=settlement, active=True)
     for language in ("el", "en", "de"):
         pay_way.set_current_language(language)
@@ -50,7 +53,7 @@ def _send(settlement: PaySettlement) -> tuple[str, str, str]:
             pay_way=pay_way,
             language_code="el",
             status=OrderStatus.PENDING,
-            payment_status=PaymentStatus.PENDING,
+            payment_status=payment_status,
         )
 
     with patch("order.tasks.EmailMultiAlternatives") as mail:
@@ -111,3 +114,18 @@ def test_a_bank_transfer_keeps_its_instructions_and_reference():
         assert "αναμένουμε την πληρωμή σας" in body
         # Unpaid, so no payment-status row.
         assert "Κατάσταση πληρωμής" not in body
+
+
+def test_a_bank_transfer_already_received_asks_for_no_payment():
+    """The store can mark a transfer received before the email goes out:
+    the email then confirms the payment and asks for nothing."""
+    _subject, text, html = _send(
+        PaySettlement.OFFLINE_TRANSFER, PaymentStatus.COMPLETED
+    )
+
+    assert "Πώς να ολοκληρώσετε την πληρωμή σας" not in html
+    for body in (text, html):
+        assert INSTRUCTIONS not in body
+        assert "αιτιολογία της πληρωμής" not in body
+        assert "αναμένουμε την πληρωμή σας" not in body
+        assert "Κατάσταση πληρωμής" in body

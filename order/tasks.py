@@ -204,14 +204,23 @@ def send_order_confirmation_email(self, order_id: int) -> bool:
             # shopper (owner review 2026-10-16, webside order 413). The
             # "include the order number in the payment reference" line
             # belongs to the transfer alone: nobody writes a reference
-            # for the others.
+            # for the others. All of it only while the shopper still
+            # owes the payment: a transfer the store already marked
+            # received (``order.is_paid``) gets neither, nor a promise of
+            # a confirmation that has happened.
+            settled = order.is_paid
             settlement = PaySettlement(pay_way.settlement) if pay_way else None
             payment_reference_needed = (
-                settlement == PaySettlement.OFFLINE_TRANSFER
+                not settled and settlement == PaySettlement.OFFLINE_TRANSFER
             )
-            if pay_way and settlement in (
-                PaySettlement.OFFLINE_TRANSFER,
-                PaySettlement.CARRIER_TERMINAL,
+            if (
+                pay_way
+                and not settled
+                and settlement
+                in (
+                    PaySettlement.OFFLINE_TRANSFER,
+                    PaySettlement.CARRIER_TERMINAL,
+                )
             ):
                 payment_instructions = (
                     pay_way.safe_translation_getter(
@@ -237,7 +246,7 @@ def send_order_confirmation_email(self, order_id: int) -> bool:
             # days later), so promising a confirmation email there
             # promises something that never arrives.
             expects_payment_confirmation = bool(
-                pay_way and not is_paid and not pay_way.is_collected_on_delivery
+                pay_way and not settled and not pay_way.is_collected_on_delivery
             )
 
             context = build_email_context(

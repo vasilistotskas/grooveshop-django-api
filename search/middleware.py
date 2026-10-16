@@ -20,6 +20,7 @@ import json
 import logging
 from collections.abc import Callable
 from typing import cast
+from uuid import uuid4
 
 from django.http import HttpRequest, HttpResponseBase
 from django.utils.deprecation import MiddlewareMixin
@@ -147,6 +148,9 @@ class SearchAnalyticsMiddleware(MiddlewareMixin):
                     ) or response_data.get("query_id")
             except (json.JSONDecodeError, AttributeError, KeyError) as e:
                 logger.debug(f"Could not parse response data: {e!s}")
+            # Every stored search has a key, minted here when the
+            # response carried none: the task's retry is keyed on it.
+            query_uuid = query_uuid or str(uuid4())
 
             # The view stamps Meilisearch's own processing time here (see
             # ``search.views._record_engine_time``), summed over every

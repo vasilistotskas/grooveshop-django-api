@@ -1,4 +1,5 @@
 import logging
+from uuid import uuid4
 
 from django.db import InterfaceError, OperationalError
 
@@ -63,20 +64,26 @@ def save_search_query(
                 user_id,
             )
 
-    SearchQuery.objects.create(
-        uuid=query_uuid,
-        # CharField(max_length=500) is only enforced by the database on
-        # .create(); an unbounded pasted query must not kill the task.
-        query=query[:500],
-        language_code=language_code or "",
-        content_type=content_type,
-        results_count=results_count,
-        estimated_total_hits=estimated_total_hits,
-        processing_time_ms=processing_time_ms,
-        user=user,
-        session_key=session_key or "",
-        ip_address=ip_address,
-        user_agent=user_agent or "",
+    # Retried on a lost connection, which can come after the row was
+    # written: keyed on the query's uuid, a second attempt finds the row
+    # instead of inserting another. The middleware sends one with every
+    # search; a message queued before it did gets one here.
+    SearchQuery.objects.get_or_create(
+        uuid=query_uuid or uuid4(),
+        defaults={
+            # CharField(max_length=500) is only enforced by the database
+            # on write; an unbounded pasted query must not kill the task.
+            "query": query[:500],
+            "language_code": language_code or "",
+            "content_type": content_type,
+            "results_count": results_count,
+            "estimated_total_hits": estimated_total_hits,
+            "processing_time_ms": processing_time_ms,
+            "user": user,
+            "session_key": session_key or "",
+            "ip_address": ip_address,
+            "user_agent": user_agent or "",
+        },
     )
 
 

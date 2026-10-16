@@ -49,7 +49,7 @@ from loyalty.models.transaction import PointsTransaction
 from loyalty.services import LoyaltyService
 from tenant.deletion import PublicSchemaDeletionMixin
 from tenant.membership import is_platform_superuser
-from tenant.models import UserTenantMembership
+from tenant.models import TenantMembershipRole, UserTenantMembership
 from user.forms import UserAccountCreationForm
 from user.models import UserAccount
 from user.models.address import UserAddress
@@ -664,8 +664,31 @@ class PlatformIdentityKindFilter(DropdownFilter):
         return queryset
 
 
+class TenantMembershipInlineForm(forms.ModelForm):
+    """A store role is a staff grant: the reserved MEMBER, no longer
+    issued (``TenantMembershipRole``) and the model's default, is neither
+    offered nor preselected. Left on it, a role added here was active yet
+    granted no access to the store's admin."""
+
+    class Meta:
+        model = UserTenantMembership
+        fields = ("tenant", "role", "is_active")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        role = self.fields["role"]
+        role.choices = [
+            choice
+            for choice in role.choices
+            if choice[0] != TenantMembershipRole.MEMBER
+        ]
+        if self.instance._state.adding:
+            self.initial["role"] = TenantMembershipRole.STAFF
+
+
 class TenantMembershipInline(TabularInline):
     model = UserTenantMembership
+    form = TenantMembershipInlineForm
     fk_name = "user"
     fields = ("tenant", "role", "is_active")
     autocomplete_fields = ("tenant",)

@@ -518,3 +518,17 @@ class TestSearchAnalyticsMiddlewareEdgeCases:
             SearchQuery.objects.latest("timestamp").session_key
             == stored.session_key
         )
+
+    def test_a_response_without_a_query_id_is_sent_with_a_key(
+        self, request_factory, middleware
+    ):
+        """The task's retry finds its own row by this key, so every
+        message carries one, minted here when the response had none."""
+        request = request_factory.get("/api/v1/search/product", {"query": "x"})
+        request.user = Mock(is_authenticated=False)
+        request.session = Mock(session_key="")
+
+        with patch("search.tasks.save_search_query.delay") as delay:
+            middleware(request)
+
+        assert delay.call_args.kwargs["query_uuid"]

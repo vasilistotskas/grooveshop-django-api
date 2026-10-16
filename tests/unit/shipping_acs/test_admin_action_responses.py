@@ -166,7 +166,8 @@ class TestNoUrlBackedActionCanReturnNone:
         admins = [
             p
             for p in root.rglob("admin.py")
-            if ".venv" not in p.parts and "site-packages" not in p.parts
+            # .claude/worktrees holds other checkouts of this repository.
+            if not {".venv", "site-packages", ".claude"} & set(p.parts)
         ]
         assert admins, "found no admin.py to check — path assumption broke"
 

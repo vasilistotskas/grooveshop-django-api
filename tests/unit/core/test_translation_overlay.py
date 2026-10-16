@@ -306,3 +306,23 @@ def test_apply_db_overlay_logs_how_many_rows_change_the_served_text(caplog):
     record = next(r for r in caplog.records if r.name == "core.rosetta_storage")
     assert "3 rows, 2 change" in record.getMessage()
     assert record.overriding == 2
+
+
+@pytest.mark.django_db
+def test_a_context_row_restating_its_untranslated_message_changes_nothing(
+    caplog,
+):
+    """A pgettext key is stored as "<context>\\x04<msgid>"; untranslated,
+    Django serves the message without the context, so a row restating
+    that message changes nothing and must not count as an override."""
+    import logging
+
+    Translation.objects.create(
+        language_code="el", msgid="button\x04Save", msgstr="Save"
+    )
+
+    with caplog.at_level(logging.INFO, logger="core.rosetta_storage"):
+        apply_db_overlay("el")
+
+    record = next(r for r in caplog.records if r.name == "core.rosetta_storage")
+    assert record.overriding == 0

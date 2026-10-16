@@ -121,11 +121,14 @@ def served_without_overlay(
     untranslated (every English key) still changes what is served
     whenever its msgstr differs from that source text. In April 2026 an
     import mapped English "Order Received" to "Order Delivered" that way,
-    and nothing reported it because the .po had no English value.
+    and nothing reported it because the .po had no English value. A
+    pgettext key carries its context before ``\\x04``; untranslated,
+    Django serves the message without it.
     """
     if compiled is not None:
         return compiled
-    return msgid_plural if msgid_plural and plural_index > 0 else msgid
+    source = msgid_plural if msgid_plural and plural_index > 0 else msgid
+    return source.rpartition("\x04")[2]
 
 
 def apply_db_overlay(language_code: str | None = None) -> None:

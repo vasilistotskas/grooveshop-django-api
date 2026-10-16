@@ -189,8 +189,16 @@ spell and `effective_price` / `prior_price` / `reduction_started_at` come from
 `sync_product_prices`, the same path the app uses. It is demo-only because it
 deletes and back-dates spells, which the platform never does: it touches only
 the seed's own `demo-` products. Re-running changes nothing while a product's
-history is already what the seed writes; re-seed a changed price with
-`manage.py seed_demo_store --schema demo --only price-history`.
+history is already what the seed writes.
+
+The nightly demo reset (`devtools/demo_account.py: reset_demo_account`) runs
+the same step, so a history that a price change broke, or one that was never
+seeded, is repaired by the next night, and the store's caches are purged when
+anything was rebuilt. Until 2026-10-16 the step ran only from
+`seed_demo_store`, which production's demo never got: all its markdowns were
+unannounced. To repair one at once, run
+`manage.py seed_demo_store --schema demo --only price-history` followed by
+`--only cache-purge`.
 
 ## The markdown formula
 

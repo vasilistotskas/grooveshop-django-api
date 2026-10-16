@@ -1944,3 +1944,75 @@ class TestDemoGiftCardIsRestored:
         card.refresh_from_db()
         assert card.balance.amount == 0
         assert card.transactions.count() == 3
+
+
+class TestSavedAddressesCanCheckOut(TestCase):
+    """The checkout preselects the main saved address and requires a
+    region and a valid phone, without rendering either field in
+    saved-address mode. A seeded address missing them made «Continue
+    to delivery» do nothing for both demo accounts (2026-10-16)."""
+
+    def test_every_row_names_a_seeded_region_of_its_country(self):
+        from region.models import Region
+
+        for row in demo_account.ADDRESSES:
+            assert Region.objects.filter(
+                alpha=row.region, country__alpha_2=row.country
+            ).exists(), row
+
+    def test_the_phone_is_a_valid_mobile_of_the_country(self):
+        import phonenumbers
+
+        for country in {row.country for row in demo_account.ADDRESSES}:
+            number = phonenumbers.parse(demo_account._demo_phone(country))
+            assert phonenumbers.is_valid_number_for_region(number, country)
+
+    def test_seeded_addresses_carry_both(self):
+        from user.factories.account import UserAccountFactory
+
+        user = UserAccountFactory()
+        demo_account._seed_addresses(user)
+
+        addresses = list(user.addresses.all())
+        assert len(addresses) == len(demo_account.ADDRESSES)
+        for address in addresses:
+            assert address.region_id, address.title
+            assert str(address.phone), address.title
+
+
+class TestPriceHistoryUpkeep(TestCase):
+    """The nightly reset keeps the markdowns announced, and purges the
+    store's caches only when it had to rebuild one."""
+
+    def test_a_rebuild_purges_the_caches(self):
+        with (
+            mock.patch(
+                "devtools.demo_price_history.seed_price_history",
+                return_value={"rebuilt": 2, "unchanged": 10},
+            ),
+            mock.patch(
+                "devtools.demo_store.purge_caches",
+                return_value={"django_keys": 3},
+            ) as purge,
+        ):
+            report = demo_account._restore_price_history()
+
+        purge.assert_called_once()
+        assert report == {
+            "rebuilt": 2,
+            "unchanged": 10,
+            "purged_django_keys": 3,
+        }
+
+    def test_a_correct_history_purges_nothing(self):
+        with (
+            mock.patch(
+                "devtools.demo_price_history.seed_price_history",
+                return_value={"unchanged": 12},
+            ),
+            mock.patch("devtools.demo_store.purge_caches") as purge,
+        ):
+            report = demo_account._restore_price_history()
+
+        purge.assert_not_called()
+        assert report == {"unchanged": 12}

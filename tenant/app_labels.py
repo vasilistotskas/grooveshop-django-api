@@ -13,6 +13,22 @@ from django.apps import apps
 from django.conf import settings
 
 
+def _label(entry: str) -> str:
+    """The app label an ``INSTALLED_APPS`` entry registers.
+
+    The label is the AppConfig's, not the entry's last dotted part:
+    ``allauth.idp.oidc`` registers ``allauth_idp_oidc``. Reading it off
+    the dotted path gave ``oidc``, so that app's tables were not known
+    as tenant-only, and deleting a platform identity reached them in the
+    public schema, where they do not exist.
+    """
+    for config in apps.get_app_configs():
+        dotted = f"{type(config).__module__}.{type(config).__qualname__}"
+        if entry in (config.name, dotted):
+            return config.label
+    return entry.rsplit(".", 1)[-1]
+
+
 def tenant_only_app_labels() -> list[str]:
     """App labels whose tables live only in tenant schemas.
 
@@ -20,11 +36,11 @@ def tenant_only_app_labels() -> list[str]:
     ``extra_settings``, ``sessions``) has a public copy and is therefore
     not tenant-only.
     """
-    shared = set(settings.SHARED_APPS)
+    shared = {_label(app) for app in settings.SHARED_APPS}
     return [
-        app.split(".")[-1] if "." in app else app
-        for app in settings.TENANT_APPS
-        if app not in shared
+        label
+        for label in dict.fromkeys(_label(app) for app in settings.TENANT_APPS)
+        if label not in shared
     ]
 
 
@@ -45,26 +61,20 @@ def shared_only_app_labels() -> list[str]:
     clients a store genuinely owns. Membership of ``TENANT_APPS`` is the
     honest test of "does this store have its own copy".
 
-    The comparison is on LABELS, not on raw ``INSTALLED_APPS`` entries.
-    Two entries can differ as strings and still name the same app label:
-    ``unfold.contrib.simple_history`` sits in SHARED_APPS and
-    ``simple_history`` in TENANT_APPS, and both reduce to
-    ``simple_history``. Comparing entries put that label in this set,
-    which would have withheld a genuinely per-tenant app's admin.
-    Collapsing to labels first also errs in the safe direction: if ANY
-    tenant entry yields a label, it is never withheld — the worst case
-    is a platform model staying visible, which is the status quo, rather
-    than a store model disappearing.
+    The comparison is on the app LABELS the entries register
+    (``_label``), not on the raw ``INSTALLED_APPS`` strings: an app
+    named by its module path in one list and by its AppConfig class in
+    the other is still one app. ``unfold.contrib.simple_history``
+    registers ``unfold_simple_history``, a different app from
+    ``simple_history`` (which models the history tables), so the latter
+    stays per-tenant.
     """
 
-    def label(entry: str) -> str:
-        return entry.split(".")[-1] if "." in entry else entry
-
-    tenant_labels = {label(app) for app in settings.TENANT_APPS}
+    tenant_labels = {_label(app) for app in settings.TENANT_APPS}
     return [
-        label(app)
-        for app in settings.SHARED_APPS
-        if label(app) not in tenant_labels
+        label
+        for label in dict.fromkeys(_label(app) for app in settings.SHARED_APPS)
+        if label not in tenant_labels
     ]
 
 

@@ -3,6 +3,33 @@
 
 
 
+## v3.125.5 (2026-10-16)
+
+### Bug fixes
+
+* fix(tenant): a failed edge-purge plan cannot abort a tenant destroy (#224)
+
+destroy_tenant plans the Cloudflare purge inside its transaction.
+_media_edge_purges caught any error to stay best-effort, but a failed
+query left PostgreSQL's transaction aborted, so the destroy itself then
+failed ("current transaction is aborted"). The plan's reads now run in a
+savepoint, so a failure costs only the edge purge.
+
+The suspend comment and the edge module docstring said a suspended store
+stops serving its images. The flush and the purge drop cached copies
+only; the originals stay on the static file server, so a request for a
+known URL is processed and cached again. Both now say so.
+
+Tests: the lowercase test now has a mixed-case assets row (it only ever
+saw an already-lowercase host), the suspend test plans the tenant's own
+zone so the "no token in the task arguments" check has a token to leak,
+and a destroy whose plan query fails is covered.
+
+
+Claude-Session: https://claude.ai/code/session_01VHqqSodFfL9aLgezEZV6qb
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`d85aca0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d85aca00af3039c1b154ac47bbab82a03cd3e93f))
+
 ## v3.125.4 (2026-10-16)
 
 ### Bug fixes

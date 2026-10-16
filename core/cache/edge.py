@@ -21,6 +21,13 @@ Which zone a tenant's pages live in, and whose token purges them:
 A store matching neither is not behind a Cloudflare cache of ours, and
 there is nothing to purge.
 
+Processed images are the other kind of edge content. media-stream serves
+them for a year (``s-maxage``) and without a tag, so a suspended or
+destroyed tenant's images would outlive media-stream's own flush at the
+edge. They are purged by URL prefix (``tenant_media_purges``,
+``purge_media``), which needs no tag and also reaches images cached before
+the purge existed.
+
 Cloudflare's Free plan allows five purge requests a minute per account,
 so a merchant's edits are coalesced into one purge per tenant
 (``schedule_tenant_purge``) rather than sent one save at a time.
@@ -29,7 +36,10 @@ so a merchant's edits are coalesced into one purge per tenant
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import TypedDict
+from urllib.parse import urlparse
 
 import requests
 from django.conf import settings
@@ -41,6 +51,11 @@ from tenant.membership import bound_tenant
 logger = logging.getLogger(__name__)
 
 EDGE_CACHE_TAG = "storefront-html"
+
+#: media-stream's route under every assets host, ending where the tenant
+#: schema starts (``media/:tenantSchema/uploads/…`` below ``/media_stream-image``).
+#: A contract with media-stream's ``IMAGE_SOURCES``.
+MEDIA_PATH = "media_stream-image/media"
 
 #: How long a merchant's edits are gathered before one purge is sent.
 PURGE_DELAY_SECONDS = 30
@@ -96,12 +111,12 @@ def tenant_zones(tenant) -> list[Zone]:
     return zones
 
 
-def purge_tags(zone: Zone, tags: list[str]) -> None:
-    """Purge ``tags`` from one zone. Raises ``EdgePurgeError`` on failure."""
+def _purge(zone: Zone, selector: dict[str, list[str]]) -> None:
+    """Send one purge request. Raises ``EdgePurgeError`` on failure."""
     try:
         response = requests.post(
             _API.format(zone_id=zone.zone_id),
-            json={"tags": tags},
+            json=selector,
             headers={"Authorization": f"Bearer {zone.api_token}"},
             timeout=_TIMEOUT_SECONDS,
         )
@@ -117,6 +132,131 @@ def purge_tags(zone: Zone, tags: list[str]) -> None:
             f"Cloudflare purge of zone {zone.zone_id} answered "
             f"{response.status_code}: {errors}"
         )
+
+
+def purge_tags(zone: Zone, tags: list[str]) -> None:
+    """Purge ``tags`` from one zone. Raises ``EdgePurgeError`` on failure."""
+    _purge(zone, {"tags": tags})
+
+
+def purge_prefixes(zone: Zone, prefixes: list[str]) -> None:
+    """Purge every cached URL under ``prefixes`` (host and path, no scheme).
+
+    Raises ``EdgePurgeError`` on failure.
+    """
+    _purge(zone, {"prefixes": prefixes})
+
+
+class MediaPurge(TypedDict):
+    """The prefixes of one tenant's images in one zone.
+
+    JSON-native on purpose: it travels as a Celery argument, so it names the
+    zone but never carries that zone's API token.
+    """
+
+    zone_id: str
+    prefixes: list[str]
+
+
+def _media_prefix(host: str, schema_name: str) -> str:
+    return f"{host.lower()}/{MEDIA_PATH}/{schema_name}/"
+
+
+def tenant_media_purges(tenant) -> list[MediaPurge]:
+    """Where a tenant's processed images are cached at the Cloudflare edge.
+
+    Every tenant's images are served from the platform assets host
+    (``MEDIA_STREAM_BASE_URL``), which lives in the platform zone. A tenant
+    with a white-label assets host adds that host, in the platform zone when
+    the host is a platform hostname and in the tenant's own zone otherwise.
+    Read from the tenant row, so it must run while the row still exists.
+    """
+    from core.utils.tenant_urls import resolve_tenant_assets_domain
+
+    schema_name = tenant.schema_name
+    own_host = resolve_tenant_assets_domain(tenant).lower()
+    platform = platform_zone()
+    own_host_on_platform = bool(own_host) and _on_platform_zone(own_host)
+
+    purges: list[MediaPurge] = []
+    if platform:
+        shared_host = (
+            urlparse(settings.MEDIA_STREAM_BASE_URL).hostname or ""
+        ).lower()
+        hosts = {
+            host
+            for host in (shared_host, own_host)
+            if host and _on_platform_zone(host)
+        }
+        if hosts:
+            purges.append(
+                {
+                    "zone_id": platform.zone_id,
+                    "prefixes": sorted(
+                        _media_prefix(host, schema_name) for host in hosts
+                    ),
+                }
+            )
+    if (
+        own_host
+        and not own_host_on_platform
+        and tenant.cloudflare_zone_id
+        and tenant.cloudflare_api_token
+    ):
+        purges.append(
+            {
+                "zone_id": tenant.cloudflare_zone_id,
+                "prefixes": [_media_prefix(own_host, schema_name)],
+            }
+        )
+    return purges
+
+
+def _media_zone(schema_name: str, zone_id: str) -> Zone | None:
+    """The credentials for ``zone_id``, resolved when the purge runs."""
+    from tenant.models import Tenant
+
+    platform = platform_zone()
+    if platform and platform.zone_id == zone_id:
+        return platform
+    tenant = Tenant.objects.filter(
+        schema_name=schema_name, cloudflare_zone_id=zone_id
+    ).first()
+    if tenant and tenant.cloudflare_api_token:
+        return Zone(zone_id=zone_id, api_token=tenant.cloudflare_api_token)
+    return None
+
+
+def purge_media(schema_name: str, purges: Sequence[MediaPurge]) -> None:
+    """Purge a tenant's images from the edge, after media-stream dropped them.
+
+    Run it after media-stream's own flush, never before: a purge that came
+    first would let the edge refetch the images media-stream still holds and
+    keep them for another year.
+
+    Every zone is attempted. A zone whose credentials are gone (a destroyed
+    tenant's own account) is logged and skipped: a retry cannot fix it.
+    Raises ``EdgePurgeError`` once the rest are done if any zone failed, and
+    the purge is idempotent, so the caller may retry.
+    """
+    failures: list[str] = []
+    for purge in purges:
+        zone = _media_zone(schema_name, purge["zone_id"])
+        if zone is None:
+            logger.error(
+                "No Cloudflare credentials left to purge zone %s for tenant "
+                "%s; purge %s by hand",
+                purge["zone_id"],
+                schema_name,
+                ", ".join(purge["prefixes"]),
+            )
+            continue
+        try:
+            purge_prefixes(zone, purge["prefixes"])
+        except EdgePurgeError as exc:
+            failures.append(str(exc))
+    if failures:
+        raise EdgePurgeError("; ".join(failures))
 
 
 def purge_tenant(tenant) -> int:

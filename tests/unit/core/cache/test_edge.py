@@ -279,3 +279,185 @@ class TestCommand:
             pytest.raises(CommandError, match="429"),
         ):
             call_command("purge_edge_cache")
+
+
+SHARED = "assets.grooveshop.space"
+
+
+def _prefix(host, schema):
+    return f"{host}/media_stream-image/media/{schema}/"
+
+
+@pytest.fixture
+def _shared_assets_host(settings):
+    settings.MEDIA_STREAM_BASE_URL = f"https://{SHARED}"
+
+
+@pytest.mark.usefixtures("_shared_assets_host")
+class TestTenantMediaPurges:
+    def test_a_store_on_the_shared_assets_host_is_purged_in_the_platform_zone(
+        self,
+    ):
+        tenant = _tenant("media_shared", ["shared.grooveshop.space"])
+        assert edge.tenant_media_purges(tenant) == [
+            {
+                "zone_id": PLATFORM_ZONE,
+                "prefixes": [_prefix(SHARED, "media_shared")],
+            }
+        ]
+
+    def test_the_prefix_ends_in_the_schema_so_a_lookalike_schema_survives(
+        self,
+    ):
+        tenant = _tenant("shop", ["shop.grooveshop.space"])
+        prefix = edge.tenant_media_purges(tenant)[0]["prefixes"][0]
+        assert prefix.endswith("/media/shop/")
+        assert not _prefix(SHARED, "shop2").startswith(prefix)
+
+    def test_a_white_label_host_on_the_platform_zone_adds_a_prefix(self):
+        tenant = _tenant(
+            "media_white",
+            ["white.grooveshop.space", "assets.white.grooveshop.space"],
+        )
+        assert edge.tenant_media_purges(tenant) == [
+            {
+                "zone_id": PLATFORM_ZONE,
+                "prefixes": [
+                    _prefix(SHARED, "media_white"),
+                    _prefix("assets.white.grooveshop.space", "media_white"),
+                ],
+            }
+        ]
+
+    def test_an_own_domain_assets_host_is_purged_in_the_stores_own_zone(self):
+        tenant = _tenant(
+            "media_own",
+            ["shop.example", "assets.shop.example"],
+            cloudflare_zone_id=OWN_ZONE,
+            cloudflare_api_token="own-token",
+        )
+        assert edge.tenant_media_purges(tenant) == [
+            {
+                "zone_id": PLATFORM_ZONE,
+                "prefixes": [_prefix(SHARED, "media_own")],
+            },
+            {
+                "zone_id": OWN_ZONE,
+                "prefixes": [_prefix("assets.shop.example", "media_own")],
+            },
+        ]
+
+    def test_an_own_assets_host_without_own_credentials_is_left_alone(self):
+        tenant = _tenant(
+            "media_nocreds", ["shop.example", "assets.shop.example"]
+        )
+        assert [p["zone_id"] for p in edge.tenant_media_purges(tenant)] == [
+            PLATFORM_ZONE
+        ]
+
+    def test_hosts_are_lowercased_like_the_edge_cache_key(self):
+        tenant = _tenant("media_case", ["Case.Grooveshop.Space"])
+        assert edge.tenant_media_purges(tenant)[0]["prefixes"] == [
+            _prefix(SHARED, "media_case")
+        ]
+
+    def test_a_shared_host_outside_the_platform_zone_is_not_ours_to_purge(
+        self, settings
+    ):
+        settings.MEDIA_STREAM_BASE_URL = "http://localhost:3003"
+        tenant = _tenant("media_local", ["local.grooveshop.space"])
+        assert edge.tenant_media_purges(tenant) == []
+
+    def test_no_platform_credentials_means_nothing_to_purge(self, settings):
+        settings.CLOUDFLARE_PLATFORM_API_TOKEN = ""
+        tenant = _tenant("media_unset", ["unset.grooveshop.space"])
+        assert edge.tenant_media_purges(tenant) == []
+
+
+class TestPurgePrefixes:
+    def test_sends_the_prefixes_with_the_zones_own_token(self):
+        with mock.patch.object(edge.requests, "post", side_effect=_ok) as post:
+            edge.purge_prefixes(edge.Zone(OWN_ZONE, "own-token"), ["h/p/"])
+        assert post.call_args.args[0].endswith(f"/zones/{OWN_ZONE}/purge_cache")
+        assert post.call_args.kwargs["json"] == {"prefixes": ["h/p/"]}
+        assert (
+            post.call_args.kwargs["headers"]["Authorization"]
+            == "Bearer own-token"
+        )
+
+    def test_a_refusal_raises(self):
+        refused = mock.Mock(status_code=400, text="bad prefix")
+        refused.json.return_value = {"success": False, "errors": ["bad"]}
+        with (
+            mock.patch.object(edge.requests, "post", return_value=refused),
+            pytest.raises(edge.EdgePurgeError, match="400"),
+        ):
+            edge.purge_prefixes(edge.Zone(OWN_ZONE, "t"), ["h/p/"])
+
+
+class TestPurgeMedia:
+    PLATFORM_PURGE = {"zone_id": PLATFORM_ZONE, "prefixes": ["a/m/acme/"]}
+    OWN_PURGE = {"zone_id": OWN_ZONE, "prefixes": ["b/m/acme/"]}
+
+    def test_the_platform_zone_uses_the_platform_token(self):
+        with mock.patch.object(edge, "purge_prefixes") as purge:
+            edge.purge_media("acme", [self.PLATFORM_PURGE])
+        purge.assert_called_once_with(
+            edge.Zone(PLATFORM_ZONE, "platform-token"), ["a/m/acme/"]
+        )
+
+    def test_an_own_zone_uses_the_tenants_decrypted_token(self):
+        _tenant(
+            "acme",
+            ["shop.example"],
+            cloudflare_zone_id=OWN_ZONE,
+            cloudflare_api_token="own-token",
+        )
+        with mock.patch.object(edge, "purge_prefixes") as purge:
+            edge.purge_media("acme", [self.OWN_PURGE])
+        purge.assert_called_once_with(
+            edge.Zone(OWN_ZONE, "own-token"), ["b/m/acme/"]
+        )
+
+    def test_another_tenants_zone_id_is_not_resolved_for_this_schema(self):
+        _tenant(
+            "other",
+            ["other.example"],
+            cloudflare_zone_id=OWN_ZONE,
+            cloudflare_api_token="other-token",
+        )
+        with mock.patch.object(edge, "purge_prefixes") as purge:
+            edge.purge_media("acme", [self.OWN_PURGE])
+        purge.assert_not_called()
+
+    def test_a_zone_whose_credentials_are_gone_is_logged_not_raised(
+        self, caplog
+    ):
+        # A destroyed tenant's own account: nothing a retry could fix.
+        with mock.patch.object(edge, "purge_prefixes") as purge:
+            edge.purge_media("acme", [self.OWN_PURGE])
+        purge.assert_not_called()
+        assert "purge b/m/acme/ by hand" in caplog.text
+
+    def test_every_zone_is_tried_and_a_failure_is_raised_afterwards(self):
+        _tenant(
+            "acme",
+            ["shop.example"],
+            cloudflare_zone_id=OWN_ZONE,
+            cloudflare_api_token="own-token",
+        )
+        with (
+            mock.patch.object(
+                edge,
+                "purge_prefixes",
+                side_effect=[edge.EdgePurgeError("platform down"), None],
+            ) as purge,
+            pytest.raises(edge.EdgePurgeError, match="platform down"),
+        ):
+            edge.purge_media("acme", [self.PLATFORM_PURGE, self.OWN_PURGE])
+        assert purge.call_count == 2
+
+    def test_nothing_to_purge_sends_nothing(self):
+        with mock.patch.object(edge.requests, "post") as post:
+            edge.purge_media("acme", [])
+        post.assert_not_called()

@@ -21,9 +21,13 @@ from __future__ import annotations
 
 import logging
 from datetime import timedelta
+from typing import TYPE_CHECKING
 
 from django.utils import timezone
 from django_tenants.utils import get_public_schema_name
+
+if TYPE_CHECKING:
+    from core.cache.edge import MediaPurge
 
 # Minimum time a tenant must be suspended before it can be destroyed:
 # an accidental suspension followed by an immediate destroy is the
@@ -88,20 +92,41 @@ def suspend_tenant(tenant, *, reason: str) -> bool:
         update_fields.append("suspended_at")
     tenant.save(update_fields=update_fields)
 
-    # Drop the tenant's processed images from the media-stream cache so a
-    # suspended store stops serving assets (they would otherwise persist
-    # for the cache TTL — up to 180/360 days). Best-effort and off the
-    # critical path: a broker or media-stream outage must never block the
-    # suspension itself.
-    _dispatch_media_flush(tenant.schema_name)
+    # Drop the tenant's processed images from the media-stream cache and
+    # the Cloudflare edge so a suspended store stops serving assets (they
+    # would otherwise persist for the cache TTL — up to 180/360 days).
+    # Best-effort and off the critical path: a broker, media-stream or
+    # Cloudflare outage must never block the suspension itself.
+    _dispatch_media_flush(tenant.schema_name, _media_edge_purges(tenant))
     return True
 
 
-def _dispatch_media_flush(schema_name: str) -> None:
+def _media_edge_purges(tenant) -> list[MediaPurge]:
+    """Where the tenant's images sit at the Cloudflare edge.
+
+    Read from the tenant row, so a caller that deletes the row must call
+    this first. Best-effort: an unreadable row only costs the edge purge.
+    """
+    try:
+        from core.cache import edge
+
+        return edge.tenant_media_purges(tenant)
+    except Exception:
+        logging.getLogger(__name__).warning(
+            "could not plan the edge purge of %s's images",
+            tenant.schema_name,
+            exc_info=True,
+        )
+        return []
+
+
+def _dispatch_media_flush(
+    schema_name: str, edge_purges: list[MediaPurge] | None = None
+) -> None:
     try:
         from tenant.tasks import flush_tenant_media_task
 
-        flush_tenant_media_task.delay(schema_name)
+        flush_tenant_media_task.delay(schema_name, edge_purges or [])
     except Exception:
         logging.getLogger(__name__).warning(
             "could not dispatch media flush for %s", schema_name
@@ -271,11 +296,14 @@ def destroy_tenant(tenant, *, actor: str = "") -> dict:
             },
         )
 
+        # The domains and credentials the edge purge needs go with the row.
+        edge_purges = _media_edge_purges(tenant)
+
         tenant.delete(force_drop=True)
 
     indexes = offboarding.purge_search_indexes(schema_name)
     files = offboarding.purge_tenant_files(schema_name)
-    _dispatch_media_flush(schema_name)
+    _dispatch_media_flush(schema_name, edge_purges)
 
     return {
         "schema_name": schema_name,

@@ -222,7 +222,7 @@ class TestTheLifecycleRoutes:
         assert tenant.is_active is False
         assert tenant.suspended_at is not None, "no destroy-cooldown anchor"
         assert tenant.suspended_reason == "non-payment"
-        flush.assert_called_once_with(tenant.schema_name)
+        flush.assert_called_once_with(tenant.schema_name, [])
 
     def test_suspend_requires_a_reason(self, operator_client):
         tenant = store_tenant("api_suspend_noreason", is_active=True)

@@ -31,14 +31,16 @@ def test_one_row_per_item_sharing_the_impression():
         surface=Surface.PDP,
         impression_id=str(impression),
         items=_items(a, b),
-        session_key="s" * 60,
+        # A stored session's key: the view passes nothing else
+        # (``core.sessions.persisted_session_key``).
+        session_key="s" * 32,
     )
 
     assert written == 2
     rows = RecommendationEvent.objects.filter(impression_id=impression)
     assert {r.product_id for r in rows} == {a.id, b.id}
     assert {r.position for r in rows} == {0, 1}
-    assert all(len(r.session_key) == 40 for r in rows)
+    assert all(r.session_key == "s" * 32 for r in rows)
 
 
 def test_the_cart_identity_is_kept_and_a_bad_one_reads_as_none():

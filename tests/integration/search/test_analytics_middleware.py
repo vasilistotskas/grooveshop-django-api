@@ -14,6 +14,7 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.http import HttpResponse
 from django.test import RequestFactory
+from django.urls import Resolver404, resolve
 
 from search.middleware import SearchAnalyticsMiddleware
 from search.models import SearchQuery
@@ -21,10 +22,22 @@ from search.models import SearchQuery
 User = get_user_model()
 
 
+class _ResolvingRequestFactory(RequestFactory):
+    """Requests as the middleware sees them once the handler has resolved
+    the URL: with ``resolver_match``, None for a path no route serves."""
+
+    def get(self, path, *args, **kwargs):
+        request = super().get(path, *args, **kwargs)
+        try:
+            request.resolver_match = resolve(path)
+        except Resolver404:
+            request.resolver_match = None
+        return request
+
+
 @pytest.fixture
 def request_factory():
-    """Provide Django RequestFactory for creating test requests."""
-    return RequestFactory()
+    return _ResolvingRequestFactory()
 
 
 @pytest.fixture
@@ -64,7 +77,7 @@ class TestSearchAnalyticsMiddleware:
         """Test that product search queries are tracked."""
         # Create request to product search endpoint
         request = request_factory.get(
-            "/api/search/product", {"query": "laptop", "language_code": "en"}
+            "/api/v1/search/product", {"query": "laptop", "language_code": "en"}
         )
         request.user = Mock(is_authenticated=False)
         request.session = Mock(session_key="test-session-123")
@@ -88,7 +101,8 @@ class TestSearchAnalyticsMiddleware:
     def test_tracks_blog_search(self, request_factory, middleware):
         """Test that blog post search queries are tracked."""
         request = request_factory.get(
-            "/api/search/blog", {"query": "article", "language_code": "el"}
+            "/api/v1/search/blog/post",
+            {"query": "article", "language_code": "el"},
         )
         request.user = Mock(is_authenticated=False)
         request.session = Mock(session_key="test-session-456")
@@ -106,7 +120,7 @@ class TestSearchAnalyticsMiddleware:
     def test_tracks_federated_search(self, request_factory, middleware):
         """Test that federated search queries are tracked."""
         request = request_factory.get(
-            "/api/search/federated",
+            "/api/v1/search/federated",
             {"query": "test query", "language_code": "de"},
         )
         request.user = Mock(is_authenticated=False)
@@ -127,7 +141,7 @@ class TestSearchAnalyticsMiddleware:
     ):
         """Test that authenticated user information is captured."""
         request = request_factory.get(
-            "/api/search/product", {"query": "laptop"}
+            "/api/v1/search/product", {"query": "laptop"}
         )
         request.user = authenticated_user
         request.session = Mock(session_key="auth-session-123")
@@ -141,7 +155,7 @@ class TestSearchAnalyticsMiddleware:
     def test_captures_ip_address(self, request_factory, middleware):
         """Test that client IP address is captured."""
         request = request_factory.get(
-            "/api/search/product", {"query": "laptop"}
+            "/api/v1/search/product", {"query": "laptop"}
         )
         request.user = Mock(is_authenticated=False)
         request.session = Mock(session_key="test-session")
@@ -159,7 +173,7 @@ class TestSearchAnalyticsMiddleware:
         rather than the leftmost (which an attacker can spoof).
         """
         request = request_factory.get(
-            "/api/search/product", {"query": "laptop"}
+            "/api/v1/search/product", {"query": "laptop"}
         )
         request.user = Mock(is_authenticated=False)
         request.session = Mock(session_key="test-session")
@@ -175,7 +189,7 @@ class TestSearchAnalyticsMiddleware:
     def test_captures_user_agent(self, request_factory, middleware):
         """Test that user agent string is captured."""
         request = request_factory.get(
-            "/api/search/product", {"query": "laptop"}
+            "/api/v1/search/product", {"query": "laptop"}
         )
         request.user = Mock(is_authenticated=False)
         request.session = Mock(session_key="test-session")
@@ -189,7 +203,7 @@ class TestSearchAnalyticsMiddleware:
     def test_handles_empty_query(self, request_factory, middleware):
         """Test that empty queries are tracked."""
         request = request_factory.get(
-            "/api/search/product", {"query": "", "language_code": "en"}
+            "/api/v1/search/product", {"query": "", "language_code": "en"}
         )
         request.user = Mock(is_authenticated=False)
         request.session = Mock(session_key="test-session")
@@ -205,7 +219,7 @@ class TestSearchAnalyticsMiddleware:
     def test_handles_missing_language_code(self, request_factory, middleware):
         """Test that queries without language_code are tracked."""
         request = request_factory.get(
-            "/api/search/product", {"query": "laptop"}
+            "/api/v1/search/product", {"query": "laptop"}
         )
         request.user = Mock(is_authenticated=False)
         request.session = Mock(session_key="test-session")
@@ -243,7 +257,7 @@ class TestSearchAnalyticsMiddleware:
 
         middleware = SearchAnalyticsMiddleware(get_response)
 
-        for path in ("/api/search/trending", "/api/search/analytics"):
+        for path in ("/api/v1/search/trending", "/api/v1/search/analytics"):
             request = request_factory.get(path, {"query": "laptop"})
             request.user = Mock(is_authenticated=False)
             request.session = Mock(session_key="s")
@@ -263,7 +277,7 @@ class TestSearchAnalyticsMiddleware:
         middleware = SearchAnalyticsMiddleware(get_response)
 
         request = request_factory.get(
-            "/api/search/product", {"query": "laptop"}
+            "/api/v1/search/product", {"query": "laptop"}
         )
         request.user = Mock(is_authenticated=False)
 
@@ -289,7 +303,7 @@ class TestSearchAnalyticsMiddleware:
         middleware = SearchAnalyticsMiddleware(get_response)
 
         request = request_factory.get(
-            "/api/search/product", {"query": "laptop"}
+            "/api/v1/search/product", {"query": "laptop"}
         )
         request.user = Mock(is_authenticated=False)
         request.session = Mock(session_key="test-session")
@@ -313,7 +327,7 @@ class TestSearchAnalyticsMiddleware:
         middleware = SearchAnalyticsMiddleware(get_response)
 
         request = request_factory.get(
-            "/api/search/product", {"query": "laptop"}
+            "/api/v1/search/product", {"query": "laptop"}
         )
         request.user = Mock(is_authenticated=False)
         request.session = Mock(session_key="test-session")
@@ -335,7 +349,7 @@ class TestSearchAnalyticsMiddleware:
         special_query = "laptop!@#$%^&*()_+-=[]{}|;:,.<>?"
 
         request = request_factory.get(
-            "/api/search/product", {"query": special_query}
+            "/api/v1/search/product", {"query": special_query}
         )
         request.user = Mock(is_authenticated=False)
         request.session = Mock(session_key="test-session")
@@ -350,7 +364,7 @@ class TestSearchAnalyticsMiddleware:
         unicode_query = "υπολογιστής café 日本語"
 
         request = request_factory.get(
-            "/api/search/product", {"query": unicode_query}
+            "/api/v1/search/product", {"query": unicode_query}
         )
         request.user = Mock(is_authenticated=False)
         request.session = Mock(session_key="test-session")
@@ -365,7 +379,7 @@ class TestSearchAnalyticsMiddleware:
         long_query = "a" * 500
 
         request = request_factory.get(
-            "/api/search/product", {"query": long_query}
+            "/api/v1/search/product", {"query": long_query}
         )
         request.user = Mock(is_authenticated=False)
         request.session = Mock(session_key="test-session")
@@ -395,7 +409,7 @@ class TestSearchAnalyticsMiddlewareEdgeCases:
         middleware = SearchAnalyticsMiddleware(get_response)
 
         request = request_factory.get(
-            "/api/search/product", {"query": "laptop"}
+            "/api/v1/search/product", {"query": "laptop"}
         )
         request.user = Mock(is_authenticated=False)
         # No session attribute
@@ -419,7 +433,7 @@ class TestSearchAnalyticsMiddlewareEdgeCases:
         middleware = SearchAnalyticsMiddleware(get_response)
 
         request = request_factory.get(
-            "/api/search/product", {"query": "laptop"}
+            "/api/v1/search/product", {"query": "laptop"}
         )
         request.user = Mock(is_authenticated=False)
         request.session = Mock(session_key="test-session")
@@ -430,10 +444,10 @@ class TestSearchAnalyticsMiddlewareEdgeCases:
         search_query = SearchQuery.objects.latest("timestamp")
         assert search_query.user_agent == ""
 
-    def test_determines_content_type_for_unknown_endpoint(
+    def test_a_path_no_search_route_serves_is_not_tracked(
         self, request_factory
     ):
-        """Test that unknown search endpoints default to 'federated'."""
+        """Tracking follows the route, not a ``/search/`` substring."""
 
         def get_response(request):
             response_data = {"results": [], "estimated_total_hits": 0}
@@ -445,11 +459,62 @@ class TestSearchAnalyticsMiddlewareEdgeCases:
 
         middleware = SearchAnalyticsMiddleware(get_response)
 
-        request = request_factory.get("/api/search/unknown", {"query": "test"})
+        request = request_factory.get("/api/v1/search/unknown", {"query": "x"})
         request.user = Mock(is_authenticated=False)
         request.session = Mock(session_key="test-session")
 
+        initial_count = SearchQuery.objects.count()
+        middleware(request)
+        assert SearchQuery.objects.count() == initial_count
+
+    def test_the_admin_command_palette_is_not_a_storefront_search(
+        self, request_factory
+    ):
+        """``/admin/search/`` answers 200 for every palette keystroke; it
+        was recorded as an empty "federated" search (2026-10-13)."""
+        from django.urls import reverse
+
+        def get_response(request):
+            return HttpResponse("{}", content_type="application/json")
+
+        middleware = SearchAnalyticsMiddleware(get_response)
+
+        request = request_factory.get(reverse("admin:search"), {"s": "ord"})
+        request.user = Mock(is_authenticated=False)
+        request.session = Mock(session_key="test-session")
+
+        with patch("search.tasks.save_search_query.delay") as delay:
+            middleware(request)
+        delay.assert_not_called()
+
+    def test_a_session_cookie_with_no_stored_session_is_not_recorded(
+        self, request_factory, middleware
+    ):
+        """The raw cookie is ``session_key`` until the session loads; a
+        227-character one made the insert fail (2026-10-13)."""
+        from django.contrib.sessions.backends.db import SessionStore
+
+        request = request_factory.get("/api/v1/search/product", {"query": "x"})
+        request.user = Mock(is_authenticated=False)
+        request.session = SessionStore(session_key="a" * 227)
+
         middleware(request)
 
-        search_query = SearchQuery.objects.latest("timestamp")
-        assert search_query.content_type == "federated"
+        assert SearchQuery.objects.latest("timestamp").session_key == ""
+
+    def test_a_stored_session_is_recorded(self, request_factory, middleware):
+        from django.contrib.sessions.backends.db import SessionStore
+
+        stored = SessionStore()
+        stored["seen"] = True
+        stored.save()
+        request = request_factory.get("/api/v1/search/product", {"query": "x"})
+        request.user = Mock(is_authenticated=False)
+        request.session = SessionStore(session_key=stored.session_key)
+
+        middleware(request)
+
+        assert (
+            SearchQuery.objects.latest("timestamp").session_key
+            == stored.session_key
+        )

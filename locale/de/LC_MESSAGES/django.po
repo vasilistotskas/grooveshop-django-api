@@ -10176,3 +10176,13 @@ msgstr ""
 #: .\product\models\price_spell.py:53
 msgid "Empty while this is the current price."
 msgstr ""
+
+#: .\core\templates\emails\order\order_received.html
+#: .\core\templates\emails\order\order_received.txt
+msgid "Thank you — we have received your order."
+msgstr "Vielen Dank — wir haben Ihre Bestellung erhalten."
+
+#: .\core\templates\emails\order\order_received.html
+#: .\core\templates\emails\order\order_received.txt
+msgid "We will email you as your order progresses."
+msgstr "Wir informieren Sie per E-Mail über den Fortschritt Ihrer Bestellung."

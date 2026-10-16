@@ -6119,7 +6119,7 @@ msgstr "Ομάδα"
 #: .\core\templates\emails\order\order_received.html:4
 #: .\core\templates\emails\order\order_received.html:7
 msgid "Order Received"
-msgstr "Παραλάβαμε την παραγγελία σας"
+msgstr "Λάβαμε την Παραγγελία σας!"
 
 #: .\core\templates\emails\order\order_received.html:8
 #: .\core\templates\emails\order\order_received.txt:3
@@ -6165,7 +6165,7 @@ msgstr ""
 
 #: .\core\templates\emails\order\order_received.txt:1
 msgid "ORDER RECEIVED"
-msgstr "Η ΠΑΡΑΓΓΕΛΙΑ ΕΛΗΦΘΗ"
+msgstr "ΛΑΒΑΜΕ ΤΗΝ ΠΑΡΑΓΓΕΛΙΑ ΣΑΣ!"
 
 #: .\core\templates\emails\order\order_received.txt:9
 msgid "HOW TO COMPLETE YOUR PAYMENT"
@@ -11312,7 +11312,7 @@ msgstr "Η πληρωμή επιβεβαιώθηκε — Παραγγελία #{
 #: .\order\tasks.py:188
 #, python-brace-format
 msgid "Order Received - #{order_id}"
-msgstr "Παραλάβαμε την παραγγελία σας — #{order_id}"
+msgstr "Λάβαμε την Παραγγελία σας! — #{order_id}"
 
 #: .\order\tasks.py:605
 #, python-brace-format
@@ -22812,3 +22812,13 @@ msgid ""
 msgstr ""
 "Το MYDATA_ENVIRONMENT πρέπει να είναι 'dev' (το δοκιμαστικό περιβάλλον της "
 "ΑΑΔΕ) ή 'prod'. Μέχρι τότε δεν εκδίδεται καμία απόδειξη."
+
+#: .\core\templates\emails\order\order_received.html
+#: .\core\templates\emails\order\order_received.txt
+msgid "Thank you — we have received your order."
+msgstr "Ευχαριστούμε — λάβαμε την παραγγελία σας."
+
+#: .\core\templates\emails\order\order_received.html
+#: .\core\templates\emails\order\order_received.txt
+msgid "We will email you as your order progresses."
+msgstr "Θα ενημερωθείτε με νέο μήνυμα σχετικά με την πορεία της παραγγελίας σας."

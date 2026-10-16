@@ -21,11 +21,17 @@ decided in one place:
 Unfold renders one level of sub-navigation: an item with ``items``
 becomes a toggle. A parent left with one child is replaced by that
 child, so nobody opens a menu to find a single link.
+
+Every item carries its own ``active`` (``_mark_active``). Left to
+Unfold, an entry whose page is a tab of a ``UNFOLD["TABS"]`` group lit
+up whenever any tab of that group was open, so Orders, Receipts and
+Credit Documents (or every Blog entry) were all highlighted at once.
 """
 
 from __future__ import annotations
 
 from typing import Any
+from urllib.parse import urlparse
 
 from django.apps import apps
 from django.conf import settings
@@ -135,6 +141,56 @@ def _availability_badge(
 
 def _tool(title: str, icon: str, link: str) -> Item:
     return {"title": title, "icon": icon, "link": link}
+
+
+def _link_path(link: Any) -> str:
+    return urlparse(str(link)).path
+
+
+def _tab_stand_in(path: str, sidebar_paths: set[str]) -> str | None:
+    """The sidebar entry that stands for a page with no entry of its own.
+
+    Order Items, Order History, Stock Log and the like are only tabs of
+    their ``UNFOLD["TABS"]`` group. On their pages the group's first tab
+    that is in the sidebar (Orders, Blog Posts, …) is the one lit up.
+    """
+    for group in settings.UNFOLD.get("TABS", []):
+        tab_paths = [_link_path(tab["link"]) for tab in group["items"]]
+        current = next((tab for tab in tab_paths if path.startswith(tab)), None)
+        if current is None or current in sidebar_paths:
+            continue
+        return next((tab for tab in tab_paths if tab in sidebar_paths), None)
+    return None
+
+
+def _mark_active(request: Any, groups: list[Item]) -> None:
+    """Decide every item's ``active`` here, by one rule.
+
+    An item is active on its own pages: the request path starts with its
+    link's path (the changelist and every page below it). The dashboard
+    only on the index itself. A menu is active when one of its items is.
+    """
+    path = request.path
+    index = reverse("admin:index")
+    items = [item for group in groups for item in group["items"]]
+    leaves = [child for item in items for child in item.get("items", [item])]
+    sidebar_paths = {_link_path(leaf["link"]) for leaf in leaves}
+    stand_in = _tab_stand_in(path, sidebar_paths)
+
+    def is_active(link: Any) -> bool:
+        link_path = _link_path(link)
+        if link_path == index:
+            return path == index
+        return path.startswith(link_path) or link_path == stand_in
+
+    for item in items:
+        children = item.get("items")
+        if children:
+            for child in children:
+                child["active"] = is_active(child["link"])
+            item["active"] = any(child["active"] for child in children)
+        else:
+            item["active"] = is_active(item["link"])
 
 
 def _store_profile(request: Any) -> Item | None:
@@ -505,7 +561,7 @@ def store_sidebar(request: Any) -> list[Item]:
             }
         ],
     )
-    return [
+    groups = [
         group
         for group in (
             dashboard,
@@ -520,6 +576,8 @@ def store_sidebar(request: Any) -> list[Item]:
         )
         if group
     ]
+    _mark_active(request, groups)
+    return groups
 
 
 def storefront_url(request: Any) -> str:

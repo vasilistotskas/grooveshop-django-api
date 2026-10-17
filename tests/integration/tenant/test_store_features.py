@@ -13,6 +13,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
 
+from product.enum.review import RateEnum
 from tenant.features import STORE_FEATURES, effective_features
 from tenant.models import Tenant
 from tenant.serializers import StoreFeaturesSerializer, TenantConfigSerializer
@@ -190,16 +191,18 @@ def test_chat_widget_needs_agent_commerce_at_both_tiers():
 def test_hidden_reviews_hide_the_star_average_and_count(on):
     from product.factories.product import ProductFactory
     from product.factories.review import ProductReviewFactory
-    from product.serializers.product import ProductSerializer
+    from product.serializers.product import ProductRetrieveSerializer
 
     switch_store_settings(**{**EVERY_SWITCH, "PRODUCT_REVIEWS_ENABLED": on})
     product = ProductFactory(num_images=0, num_reviews=0)
     ProductReviewFactory(product=product, rate=4, status="TRUE")
 
-    data = ProductSerializer(product).data
+    data = ProductRetrieveSerializer(product).data
 
     assert (data["review_count"] > 0) is on
     assert (data["review_average"] > 0) is on
+    assert any(row["count"] for row in data["rating_distribution"]) is on
+    assert len(data["rating_distribution"]) == len(RateEnum.values)
 
 
 @pytest.mark.parametrize("on", [True, False])

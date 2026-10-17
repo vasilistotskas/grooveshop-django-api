@@ -103,7 +103,7 @@ widget still has a live `/chat` (flipping it back needs no deploy).
 A store whose reviews are hidden also hides the star average and the
 review count. While `product_reviews` is off, the product serializers
 (`ProductSerializer` and its detail tiers) serve `reviewAverage: 0.0` and
-`reviewCount: 0`, what a product without reviews serves, and the search hit
+`reviewCount: 0`, and the product page's `ratingDistribution` all zeros, what a product without reviews serves, and the search hit
 serializer serves `reviewCount: 0` and `reviewAverage: null`. The fields
 keep their shape: making a field nullable is a loosening that the live
 storefront's schemas reject.

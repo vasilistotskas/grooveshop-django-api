@@ -213,12 +213,17 @@ class ProductRetrieveSerializer(ProductDetailSerializer):
         gaps. Approved only, like the public review list: a pending or
         rejected review must not move the bars.
         """
-        counts = dict(
-            obj.reviews.get_queryset()
-            .approved()
-            .order_by()
-            .values_list("rate")
-            .annotate(count=Count("pk"))
+        # Hidden reviews hide the bars too: all zeros, without the query.
+        counts = (
+            dict(
+                obj.reviews.get_queryset()
+                .approved()
+                .order_by()
+                .values_list("rate")
+                .annotate(count=Count("pk"))
+            )
+            if self.reviews_visible
+            else {}
         )
         return [
             {"rate": rate, "count": counts.get(rate, 0)}

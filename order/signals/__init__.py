@@ -23,6 +23,12 @@ order_completed = Signal()
 # points — is released only on REFUNDED, once, with the last refund; a
 # slice per partial refund cannot be made whole again by the next one.
 order_refunded = Signal()
+# Dispatched once per CHARGEBACK row recorded on the payment ledger
+# (``PaymentLedger.record_chargeback``): a lost dispute took ``amount``
+# (``Money``) back. Deliberately not ``order_refunded``: nothing was paid
+# back to the customer, so no refund email, Meta event or gift-card
+# release follows. ``chargeback`` is the ledger row.
+order_charged_back = Signal()
 order_returned = Signal()
 # Dispatched the first time an order gets a tracking number / carrier.
 # Kept distinct from ``order_shipped`` (which fires on status transition

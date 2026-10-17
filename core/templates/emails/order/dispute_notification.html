@@ -1,35 +1,46 @@
 {% extends "emails/base/email_base.html" %}
 {% load i18n %}
 
-{% block email_title %}Stripe Dispute - Order #{{ order.id }} - {{ SITE_NAME }}{% endblock %}
+{% block email_title %}Dispute - Order #{{ order.id }} - {{ SITE_NAME }}{% endblock %}
 
 {% block email_content %}
-<h1>Stripe dispute opened — Order #{{ order.id }}</h1>
+{% if lost %}
+<h1>{% blocktrans with order_id=order.id provider=provider_name %}{{ provider }} dispute lost — Order #{{ order_id }}{% endblocktrans %}</h1>
 
-<p>A Stripe dispute has been opened against this order. The order
+<p>{% if chargeback %}{% trans "The dispute closed against you and the money was taken back. It is recorded as a chargeback on the order's payment ledger, so it can no longer be refunded. The order status and payment status have NOT been changed." %}{% else %}{% trans "The dispute closed against you and the money was taken back. Nothing was left on the payment to record as a chargeback, so the payment ledger is unchanged. The order status and payment status have NOT been changed." %}{% endif %}</p>
+{% else %}
+<h1>{{ provider_name }} dispute opened — Order #{{ order.id }}</h1>
+
+<p>A {{ provider_name }} dispute has been opened against this order. The order
 status has NOT been changed automatically — please review the dispute
-in the Stripe dashboard and decide whether to accept or contest it.</p>
+in the {{ provider_name }} dashboard and decide whether to accept or contest it.</p>
+{% endif %}
 
 <div class="email-card" style="border-left: 4px solid #dc2626;">
     <h2>Dispute</h2>
     <p><strong>Dispute ID:</strong> <code>{{ dispute_id }}</code></p>
     <p><strong>Reason:</strong> {{ reason|default:"unknown" }}</p>
+    {% if chargeback %}
+    <p><strong>{% trans "Chargeback" %}:</strong> {{ chargeback.amount }}</p>
+    {% endif %}
     <p><strong>Order:</strong> #{{ order.id }}</p>
     <p><strong>Customer:</strong> {{ order.first_name }} {{ order.last_name }} &lt;{{ order.email }}&gt;</p>
     {% if order.payment_id %}
-    <p><strong>Stripe payment intent:</strong> <code>{{ order.payment_id }}</code></p>
+    <p><strong>Payment reference:</strong> <code>{{ order.payment_id }}</code></p>
     {% endif %}
     <p><strong>Order placed:</strong> {{ order.created_at|date:"SHORT_DATETIME_FORMAT" }}</p>
     <p><strong>Order total:</strong> {{ order.total_price }}</p>
 </div>
 
+{% if not lost %}
 <p class="mt-3">Next steps:</p>
 <ul>
-    <li>Open the Stripe dashboard, find dispute <code>{{ dispute_id }}</code>.</li>
+    <li>Open the {{ provider_name }} dashboard, find dispute <code>{{ dispute_id }}</code>.</li>
     <li>Decide whether to submit evidence (contest) or accept the dispute.</li>
-    <li>Respond before Stripe's deadline — defaults to 7 calendar days for chargebacks.</li>
+    <li>Respond before the provider's deadline — defaults to 7 calendar days for chargebacks.</li>
     <li>Update order metadata or status manually if you accept the dispute.</li>
 </ul>
+{% endif %}
 
 <p class="mt-3">This email is operational; staff only.</p>
 {% endblock %}

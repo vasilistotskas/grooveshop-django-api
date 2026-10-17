@@ -777,6 +777,33 @@ VIVA_REFUND_TRANSACTION_TYPE_IDS: frozenset[int] = frozenset(
 )
 
 
+#: ``TransactionTypeId`` values of a "Refund Claimed" transaction: money a
+#: cardholder's bank took back (a chargeback), not a refund the merchant made
+#: (developer.viva.com/integration-reference/response-codes/,
+#: "TransactionTypeId parameter": 13 Card Refund Claimed, 46 Direct Debit
+#: Refund Claimed, 83 Refund Claimed Klarna, 90 Refund Claimed Wero). Viva does
+#: not document whether a chargeback reaches us as a Transaction Reversal
+#: Created (1797) event, so these are the documented claim types on the event
+#: we already receive; the dispute lifecycle is read from the original
+#: payment's status instead (``VIVA_DISPUTE_*_STATUS_IDS``).
+VIVA_REFUND_CLAIMED_TRANSACTION_TYPE_IDS: frozenset[int] = frozenset(
+    {13, 46, 83, 90}
+)
+
+#: ``StatusId`` of the ORIGINAL payment while a cardholder disputes it, as
+#: Retrieve Transaction reports it (developer.viva.com/integration-reference/
+#: response-codes/, StatusId table): ``M`` "cardholder has disputed the
+#: transaction", ``MA`` "Dispute Awaiting Response", ``MI`` "Dispute in
+#: Progress". ``MS`` (Suspected Dispute) is deliberately not one: nothing has
+#: been disputed yet. While a payment is in one of these Viva rejects a
+#: merchant refund of it.
+VIVA_DISPUTE_OPEN_STATUS_IDS: frozenset[str] = frozenset({"M", "MA", "MI"})
+#: ``ML``: "A disputed transaction has been refunded (Dispute Lost)".
+VIVA_DISPUTE_LOST_STATUS_ID = "ML"
+#: ``MW``: "Dispute Won".
+VIVA_DISPUTE_WON_STATUS_ID = "MW"
+
+
 class VivaWalletPaymentProvider(PaymentProvider):
     DEMO_AUTH_URL = "https://demo-accounts.vivapayments.com/connect/token"
     LIVE_AUTH_URL = "https://accounts.vivapayments.com/connect/token"

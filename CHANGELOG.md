@@ -3,6 +3,75 @@
 
 
 
+## v3.130.0 (2026-10-17)
+
+### Features
+
+* feat(shipping): shipping options carry the logo's media path (#233)
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01VHqqSodFfL9aLgezEZV6qb ([`3d0d590`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3d0d5902d6175fe8955290c850c651cfb7b96ba2))
+
+## v3.129.0 (2026-10-17)
+
+### Bug fixes
+
+* fix(order): cap a chargeback at what the payment holds and retry disputes of a suspended store
+
+record_chargeback records at most captured minus refunds minus earlier chargebacks, for every provider, and logs when it caps. The red history entry says what was disputed and what had already been returned. When nothing is left no row is written, but the entry and the staff email still go out, once. A Viva 2054 for a suspended or inactive tenant now answers 503 like the payment path, so Viva redelivers instead of losing the dispute. The history entry and email share one helper between Stripe and Viva.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DKyCtCCkFTgcH6VAVK3AJm ([`9f47a41`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9f47a41a5fb55dc154774e234e821be5a6dfaa9c))
+
+### Features
+
+* feat(order): record chargebacks, follow Stripe and Viva disputes, refuse refunds during one (#231) ([`9f47a41`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9f47a41a5fb55dc154774e234e821be5a6dfaa9c))
+
+* feat(order): record chargebacks on the payment ledger
+
+Add a CHARGEBACK kind that names the charge it took money from, next to REFUND, and swap the CHECK constraint so both may name a charge. PaymentLedger.record_chargeback is idempotent on the provider's dispute id, lowers what is refundable, and moves no payment_status and fires no order_refunded. refunded_on and refund_status count REFUND rows only, so Stripe's charge.refunded arithmetic is unchanged. A new order_charged_back signal carries the row, and the order history gets a CHARGEBACK entry the admin renders in red, in the history tab too.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DKyCtCCkFTgcH6VAVK3AJm ([`9f47a41`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9f47a41a5fb55dc154774e234e821be5a6dfaa9c))
+
+* feat(loyalty): reverse points once refunds and chargebacks cover the payment
+
+The refund handler's all-or-nothing decision moves into one helper that also asks PaymentLedger.fully_returned, and a chargeback answers it through order_charged_back. A partial refund or chargeback still reverses nothing; the reversal stays idempotent.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DKyCtCCkFTgcH6VAVK3AJm ([`9f47a41`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9f47a41a5fb55dc154774e234e821be5a6dfaa9c))
+
+* feat(order): record a lost Stripe dispute as a chargeback
+
+Add a charge.dispute.closed receiver. A lost dispute records one CHARGEBACK row keyed on the dispute id, writes the red history entry and emails staff through the existing dispute notification. A won dispute clears the disputed flag; other closing statuses leave a note. Redeliveries add nothing. Translations, the order-system docs and tests included.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DKyCtCCkFTgcH6VAVK3AJm ([`9f47a41`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9f47a41a5fb55dc154774e234e821be5a6dfaa9c))
+
+* feat(order): follow Viva disputes and refuse refunds while one is open
+
+Viva has no dispute webhook, so handle Account Transaction Created (2054): the store is found through the ledger by SaleTransactionId, the event is authenticated by Retrieve Transaction for that sale, and the retrieved StatusId drives it (M, MA, MI note and email once; ML records a chargeback; MW notes the win). No SubTypeId is read. A 1797 refund-claim type (13, 46, 83, 90) books the chargeback under the same key, the original sale, so one dispute is recorded once. The dispute email names its provider. A refund is refused while a dispute is open, for Stripe and Viva, where both document the restriction; an inquiry is not refused. Docs and translations included.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+Claude-Session: https://claude.ai/code/session_01DKyCtCCkFTgcH6VAVK3AJm ([`9f47a41`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9f47a41a5fb55dc154774e234e821be5a6dfaa9c))
+
+* feat(loyalty): a charged-back order keeps the points spent on it spent
+
+A refund or cancellation gives back the points the customer redeemed on
+the order, since the store undid it. A lost card dispute is the customer
+taking the money back through their bank, so only the points the order
+earned come off; the redeemed ones are not restored (owner decision on
+the chargebacks work). reverse_order_points decides it once, for every
+path that reverses an order, from the order's CHARGEBACK ledger rows.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DKyCtCCkFTgcH6VAVK3AJm
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`9f47a41`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9f47a41a5fb55dc154774e234e821be5a6dfaa9c))
+
 ## v3.128.0 (2026-10-17)
 
 ### Documentation

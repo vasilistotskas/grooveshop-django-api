@@ -2,12 +2,14 @@
 
 ``PaymentTransaction`` rows are the only record of the money received for
 an order (a provider's CHARGE, a courier's COD_COLLECTION) and the money
-refunded from it. Everything else is read from
-them: how much can still be refunded, which payment a refund goes
-against, and whether ``Order.payment_status`` is REFUNDED or
-PARTIALLY_REFUNDED (:meth:`PaymentLedger.refund_status`, the one place
-that decides it, for the in-app refund, the Stripe ``charge.refunded``
-webhook and the Viva reversal webhook alike).
+refunded from it and the money a lost dispute took back (a CHARGEBACK).
+Everything else is read from them: how much can still be refunded, which
+payment a refund goes against, and whether ``Order.payment_status`` is
+REFUNDED or PARTIALLY_REFUNDED (:meth:`PaymentLedger.refund_status`, the
+one place that decides it, for the in-app refund, the Stripe
+``charge.refunded`` webhook and the Viva reversal webhook alike). A
+chargeback lowers what is refundable but never moves ``payment_status``:
+the money is already gone, it was not paid back.
 
 Every ``record_*`` method must run with the order row locked by the
 caller (``select_for_update``): the sums read here and the row written
@@ -30,6 +32,7 @@ from djmoney.money import Money
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import PaymentStatus
 from order.models.payment_transaction import PaymentTransaction
+from order.signals import order_charged_back
 
 if TYPE_CHECKING:
     from order.models.order import Order
@@ -69,6 +72,19 @@ class ChargeBalance(NamedTuple):
     refundable: Decimal
 
 
+class ChargebackOutcome(NamedTuple):
+    """What :meth:`PaymentLedger.record_chargeback` did: the row (``None``
+    when nothing was left to take), whether it is new, the amount the
+    provider named, the amount recorded (capped at what the payment held)
+    and what refunds and chargebacks had already taken from the payment."""
+
+    row: PaymentTransaction | None
+    created: bool
+    requested: Money
+    recorded: Money
+    returned: Decimal
+
+
 def is_cash_collection(row: PaymentTransaction) -> bool:
     """Money a courier collected in cash: there is no provider to refund it
     through, so the merchant pays it back themselves."""
@@ -103,20 +119,71 @@ class PaymentLedger:
         )
 
     @staticmethod
+    def charged_back(order: Order) -> Decimal:
+        """What card networks took back out of *order*'s payments after a
+        lost dispute."""
+        return _total(
+            PaymentTransaction.objects.filter(
+                order=order, kind=PaymentTransactionKind.CHARGEBACK
+            )
+        )
+
+    @staticmethod
+    def dispute_open(order: Order, metadata: dict | None) -> bool:
+        """Whether a cardholder dispute against *order*'s payment is open,
+        from the ``disputed`` / ``dispute_id`` / ``dispute_status`` flags
+        the provider handlers keep in ``Order.metadata`` (*metadata* is
+        passed in so a caller holding the order lock reads it fresh).
+
+        Stripe ("you can't issue a refund on a disputed charge until your
+        customer's card issuer decides in your favor",
+        docs.stripe.com/disputes/withdrawing) and Viva (a disputed payment
+        cannot be refunded by the merchant) both refuse a refund meanwhile.
+        An inquiry (``warning_*``) is not a dispute: Stripe lets the
+        merchant refund it to resolve it. A dispute that closed against the
+        merchant is no longer open: its CHARGEBACK row, keyed on the
+        dispute id, says so.
+        """
+        metadata = metadata or {}
+        dispute_id = metadata.get("dispute_id")
+        if not metadata.get("disputed") or not dispute_id:
+            return False
+        if str(metadata.get("dispute_status", "")).startswith("warning_"):
+            return False
+        return not PaymentTransaction.objects.filter(
+            order=order,
+            kind=PaymentTransactionKind.CHARGEBACK,
+            provider_reference=dispute_id,
+        ).exists()
+
+    @classmethod
+    def fully_returned(cls, order: Order) -> bool:
+        """Whether refunds and chargebacks together cover everything that
+        was received for *order*. The one place that decides it, for what
+        hangs off the order's total (the loyalty points)."""
+        captured = cls.captured(order)
+        return (
+            captured > 0
+            and cls.refunded(order) + cls.charged_back(order) >= captured
+        )
+
+    @staticmethod
     def refunded_on(charge: PaymentTransaction) -> Decimal:
-        """What has been refunded out of this one payment."""
-        return _total(charge.refunds.all())
+        """What has been refunded out of this one payment (a chargeback is
+        not a refund: Stripe's ``charge.refunded`` reports refunds only)."""
+        return _total(charge.refunds.filter(kind=PaymentTransactionKind.REFUND))
 
     @classmethod
     def balances(cls, order: Order) -> list[ChargeBalance]:
         """Every payment of *order* with money left in it, oldest first: a
-        provider's CHARGE or a courier's COD_COLLECTION."""
+        provider's CHARGE or a courier's COD_COLLECTION. Money a chargeback
+        took back is not left in it."""
         charges = (
             PaymentTransaction.objects.filter(
                 order=order, kind__in=_RECEIPT_KINDS
             )
             .annotate(
-                already_refunded=Coalesce(
+                already_returned=Coalesce(
                     Sum("refunds__amount", output_field=_AMOUNT), _ZERO
                 )
             )
@@ -124,7 +191,7 @@ class PaymentLedger:
         )
         balances = []
         for charge in charges:
-            left = charge.amount.amount - charge.already_refunded
+            left = charge.amount.amount - charge.already_returned
             if left > 0:
                 balances.append(ChargeBalance(charge, left))
         return balances
@@ -284,6 +351,90 @@ class PaymentLedger:
             order.payment_status = cls.refund_status(order)
             order.save(update_fields=["payment_status"])
         return row, created
+
+    @staticmethod
+    def left_on(charge: PaymentTransaction) -> Decimal:
+        """What is still in this one payment: captured minus what refunds
+        and chargebacks took out of it."""
+        return charge.amount.amount - _total(charge.refunds.all())
+
+    @classmethod
+    def record_chargeback(
+        cls,
+        order: Order,
+        *,
+        charge: PaymentTransaction,
+        amount: Money,
+        reference: str,
+        description: str = "",
+    ) -> ChargebackOutcome:
+        """Record that a lost dispute took *amount* back out of *charge*,
+        keyed on the provider's dispute id *reference*.
+
+        Never more than the payment still holds: *amount* is capped at what
+        is left of *charge* (:meth:`left_on`), because money already refunded
+        or charged back cannot be taken again. Stripe reports the disputed
+        amount, which should fit; Viva reports only the whole sale, so a
+        payment partly refunded before the dispute is capped. A cap is
+        logged. When nothing is left no row is written
+        (``row`` is ``None``): the caller still tells staff.
+
+        The money is gone, so it leaves what can be refunded: staff cannot
+        refund it a second time. ``payment_status`` is NOT touched and
+        ``order_refunded`` is NOT sent: nothing was paid back to the
+        customer, so there is no refund email, no Meta ``Refund`` event and
+        no gift-card release. The one side effect is
+        ``order_charged_back``, sent when a row is new, which the loyalty
+        app answers by reversing the points once refunds and chargebacks
+        cover the whole payment. A dispute the ledger already holds
+        (providers redeliver) changes nothing and returns ``created=False``.
+        """
+        left = cls.left_on(charge)
+        returned = charge.amount.amount - left
+        existing = PaymentTransaction.objects.filter(
+            provider=charge.provider,
+            provider_reference=reference,
+            kind=PaymentTransactionKind.CHARGEBACK,
+        ).first()
+        if existing is not None:
+            return ChargebackOutcome(
+                existing, False, amount, existing.amount, returned
+            )
+
+        recorded = Money(
+            max(min(amount.amount, left), _ZERO), charge.amount.currency
+        )
+        if recorded.amount < amount.amount:
+            logger.warning(
+                "Chargeback %s of %s on order %s exceeds the %s left on "
+                "payment %s: recording %s",
+                reference,
+                amount,
+                order.pk,
+                left,
+                charge.provider_reference,
+                recorded,
+            )
+        if recorded.amount <= 0:
+            return ChargebackOutcome(None, False, amount, recorded, returned)
+
+        row, created = cls._record(
+            order,
+            kind=PaymentTransactionKind.CHARGEBACK,
+            amount=recorded,
+            provider=charge.provider,
+            reference=reference,
+            charge=charge,
+            description=description[:255],
+        )
+        if created:
+            order_charged_back.send(
+                sender=type(order),
+                order=order,
+                amount=recorded,
+                chargeback=row,
+            )
+        return ChargebackOutcome(row, created, amount, recorded, returned)
 
     @staticmethod
     def cod_refund_reference(

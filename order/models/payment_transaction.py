@@ -7,7 +7,10 @@ from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from djmoney.models.fields import MoneyField
 
-from order.enum.payment_transaction import PaymentTransactionKind
+from order.enum.payment_transaction import (
+    CHARGE_REVERSAL_KINDS,
+    PaymentTransactionKind,
+)
 
 
 class PaymentTransaction(models.Model):
@@ -22,6 +25,7 @@ class PaymentTransaction(models.Model):
     the order costs, never what was paid.
 
     ``amount`` is always positive; ``kind`` gives the direction. A REFUND
+    or a CHARGEBACK (money a card network took back after a lost dispute)
     names the CHARGE it reverses in ``charge``, so an order paid twice
     (two Viva checkout codes) is refunded payment by payment. The unique
     constraint on ``(provider, provider_reference, kind)`` is what absorbs
@@ -74,7 +78,9 @@ class PaymentTransaction(models.Model):
         # be removed in one statement.
         on_delete=models.CASCADE,
         verbose_name=_("Refunded charge"),
-        help_text=_("Set on a refund: the charge it paid back."),
+        help_text=_(
+            "Set on a refund or a chargeback: the charge it took money from."
+        ),
     )
     description = models.CharField(
         _("Description"),
@@ -100,14 +106,14 @@ class PaymentTransaction(models.Model):
             ),
             models.CheckConstraint(
                 condition=(
-                    models.Q(kind=PaymentTransactionKind.REFUND)
+                    models.Q(kind__in=CHARGE_REVERSAL_KINDS)
                     & models.Q(charge__isnull=False)
                 )
                 | (
-                    ~models.Q(kind=PaymentTransactionKind.REFUND)
+                    ~models.Q(kind__in=CHARGE_REVERSAL_KINDS)
                     & models.Q(charge__isnull=True)
                 ),
-                name="payment_transaction_refund_names_charge",
+                name="payment_transaction_reversal_names_charge",
             ),
         ]
         indexes = [

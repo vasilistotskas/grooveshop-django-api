@@ -543,6 +543,31 @@ The event carries the charge's CUMULATIVE `amount_refunded` and no refund id (St
 - `Order.status` is NOT auto-mutated (REFUNDED requires RETURNED first per the canonical table; that's a business call).
 - The `webhook_processed_<event id>` metadata flag is gone from this handler: the ledger is the guard. (The sibling payment handlers keep theirs.)
 
+#### 4.2.1 Stripe dispute (`charge.dispute.created`, `charge.dispute.closed`)
+
+Webhook handlers: `handle_stripe_dispute_created` and `handle_stripe_dispute_closed` (`order/signals/handlers.py`). Both find the order by the dispute's `payment_intent` and are guarded by the `webhook_processed_<event id>` metadata flag.
+
+- **Opened** flags the order (`metadata["disputed"]`, `dispute_id`, `dispute_status`), writes a NOTE and emails staff (`send_dispute_notification_email`). The ledger is untouched: until the dispute closes the money is still the merchant's to defend.
+- **Closed, `status == "lost"`**: the money is gone. `PaymentLedger.record_chargeback` records ONE CHARGEBACK row against the order's CHARGE (read from the provider by `ensure_charge` when the ledger lacks it), keyed on the dispute id, so a repeat adds nothing. The row lowers `refundable`, so staff cannot refund money already taken back. The order gets a red `CHARGEBACK` history entry ("Chargeback €X"; `ORDER_HISTORY_CHANGE_TYPE_VARIANT`, shown in the order admin's history tab) and staff get the same dispute email with `lost=True`.
+- **Closed, any other status** (`won`; `warning_closed`, an inquiry that never became a dispute): clears `metadata["disputed"]` and leaves a NOTE. No row.
+- **A refund is refused while a dispute is open.** Stripe: "you can't issue a refund on a disputed charge until your customer's card issuer decides in your favor" (docs.stripe.com/disputes/withdrawing). `OrderService.refund_order` raises `PaymentError` when `PaymentLedger.dispute_open` holds (flagged, no CHARGEBACK row for that dispute id yet). An inquiry (`dispute_status` `warning_*`) is not refused: Stripe lets the merchant refund one to resolve it. An inquiry that escalates to a dispute is not tracked (there is no `charge.dispute.updated` receiver), so Stripe's own refusal is what staff see then. `cancel_order` still cancels and reports the refund as failed.
+- **`payment_status` does not move** on a lost dispute, and **`order_refunded` does not fire**: nothing was paid back, so there is no customer email, no Meta `Refund` event and no gift-card release. `refunded` and `refunded_on` count REFUND rows only, so the `charge.refunded` delta arithmetic (§4.2) is unchanged; a partly refunded order that is then charged back stays PARTIALLY_REFUNDED.
+- **Loyalty**: `order_charged_back` (sent once per new CHARGEBACK row) reverses the earned points once refunds plus chargebacks cover everything received (`PaymentLedger.fully_returned`, the same decision the refund path takes; §7.3). Unlike a refund or cancellation, it does **not** give back the points the customer redeemed on the order: the customer took the money back through their bank, so what they spent stays spent (owner decision 2026-10-17; `LoyaltyService.reverse_order_points` skips the restore when the order has a CHARGEBACK row). Staff can re-grant by hand.
+
+#### Dispute lifecycle per provider
+
+| | Stripe | Viva Wallet |
+|---|---|---|
+| Opened | `charge.dispute.created` | 2054 *Account Transaction Created* whose sale reads `M` / `MA` / `MI` |
+| Lost | `charge.dispute.closed`, `status == "lost"` | 2054 whose sale reads `ML`, or a 1797 refund claim (types 13 / 46 / 83 / 90) |
+| Won | `charge.dispute.closed`, `won` | 2054 whose sale reads `MW` |
+| Ledger key of the CHARGEBACK | the dispute id | the CHARGE's own Viva transaction id (the original sale) |
+| Refund while open | refused (documented) | refused (a disputed payment cannot be refunded by the merchant) |
+
+Viva has no dispute webhook, and does not document whether a chargeback arrives as a 1797, so a claim type on the 1797 we already receive is handled and the dispute is otherwise followed through its sale's `StatusId` (developer.viva.com/integration-reference/response-codes/, StatusId table: `M` "cardholder has disputed the transaction", `MA` "Dispute Awaiting Response", `MI` "Dispute in Progress", `ML` "Dispute Lost", `MW` "Dispute Won"; `MS` "Suspected Dispute" is not acted on). The 2054 payload has no `OrderCode` and Viva documents no subtype for the chargeback debit (SubTypeId 2 `FeeChargeBack` is the fee for losing, 162/163 reserve and release funds), so **no SubTypeId is interpreted**: the handler (`_handle_account_transaction_event`) reads `EventData.SaleTransactionId`, finds the store by the ledger (a Viva CHARGE with that id, or an order paid by it: database lookups only, no Viva call for a clearance, fee or payout that is none of ours), authenticates by Retrieve Transaction for that sale, matches the order by the retrieved `orderCode` and acts on the retrieved status. Anything else (no sale id, an unknown sale, another status) is acknowledged and ignored. Each 2054 is deduplicated on `VivaWebhookEvent` (its own `TransactionId` and 2054). The chargeback amount is the retrieved sale's amount (absolute), because Viva documents no disputed amount; the ledger caps it at what the payment still holds (see below). Each store must subscribe the 2054 webhook in its Viva dashboard (Settings > API Access > Webhooks > Create Webhook, one subscription per event type). A 2054 (or a 1797 claim) for a suspended or inactive tenant answers 503, exactly as the payment path does, so Viva redelivers (hourly, 24 attempts): acknowledging it would lose the chargeback for good.
+
+**The chargeback is capped at what the payment still holds.** `PaymentLedger.record_chargeback` records at most captured minus refunds minus earlier chargebacks (`PaymentLedger.left_on`), whichever provider reports it, and logs a warning when it caps (Stripe's amount should fit; Viva's whole-sale amount does not once the sale was partly refunded). A capped entry says so in the red history line ("Chargeback €70.00 (disputed €100.00, €30.00 already returned)"). When nothing is left no row is written, but the history entry ("Chargeback of €X not recorded: nothing is left on the payment") and the staff email still go out, once (`order.disputes.announce_chargeback`; Viva remembers it in `metadata["dispute_resolved_id"]`, because each wallet movement of a dispute is an event of its own).
+
 ### 4.3 Viva Wallet online
 
 Webhook handler: `order/views/viva_webhook.py::_handle_payment_created`.
@@ -588,7 +613,9 @@ Per Viva's [status and type tables](https://developer.viva.com/integration-refer
 that transaction reads `statusId` `F` (`R`, "fully or partially refunded",
 is the status of the ORIGINAL payment), a refund or void
 `transactionTypeId` (`VIVA_REFUND_TRANSACTION_TYPE_IDS`; the "Refund
-Claimed" types are chargebacks, not refunds) and a **negative** `amount`.
+Claimed" types, `VIVA_REFUND_CLAIMED_TRANSACTION_TYPE_IDS`, are chargebacks
+and are booked as such, see *Dispute lifecycle per provider*) and a
+**negative** `amount`.
 The handler used to wait for the refund transaction itself to read
 REFUNDED, which Viva never reports, so every real 1797 was skipped — and
 recorded as processed, so Viva never retried. Nothing is read from the
@@ -633,7 +660,7 @@ nothing) is `skipped`, a booked refund `processed`. Ops: each tenant's Viva
 account needs the *Transaction Reversal Created* webhook subscribed
 (Settings → API Access → Webhooks). Production had received no 1797 by
 2026-10-10, so check the subscription before assuming that a refund made in
-Viva's dashboard reached the order.
+Viva's dashboard reached the order. Dispute tracking needs a second subscription, *Account Transaction Created* (2054), in the same place.
 
 **Post-payment redirect (fixed 2026-07-02).** Smart Checkout's
 success/failure URLs are static strings configured on the source in
@@ -1028,6 +1055,7 @@ is **per store, per kind**. `OpsAlertKind` is the whole list:
 | Retail receipt registered with myDATA | `send_invoice_email` | from `send_invoice_to_mydata`, once the MARK is persisted (§7.4) | `invoice_email_sent` |
 | Retail credit document registered with myDATA | `send_credit_email(credit_id)` | from `send_credit_to_mydata` (§7.4) | `credit_email_sent_<credit id>` in `Order.metadata` |
 | Dispute opened (staff) | `send_dispute_notification_email` | `charge.dispute.created` webhook | n/a (rare) |
+| Dispute lost (staff) | `send_dispute_notification_email(lost=True)` | `charge.dispute.closed` webhook, once per CHARGEBACK row (§4.2.1) | the ledger row (a repeat records nothing) |
 
 All transactional emails carry `List-Unsubscribe: mailto:` headers
 via `build_transactional_list_headers` (PR #4).
@@ -1193,19 +1221,19 @@ Every path ends in `PaymentLedger.record_refund` (§7.3), so there is one rule f
 | Column | Meaning |
 |---|---|
 | `order` | the order (`payment_transactions`) |
-| `kind` | `CHARGE` (a provider captured money), `REFUND` (a provider paid it back, or the merchant paid cash back themselves), `COD_COLLECTION` (a courier collected cash). No chargeback kind yet: a dispute is not a loss until it closes against the merchant, and no handler writes one. |
+| `kind` | `CHARGE` (a provider captured money), `REFUND` (a provider paid it back, or the merchant paid cash back themselves), `CHARGEBACK` (a lost dispute took the money back: written when it closes against the merchant, never when it opens; it is not a refund and moves no `payment_status`), `COD_COLLECTION` (a courier collected cash). |
 | `amount` | always positive; the kind gives the direction |
 | `provider` | `stripe`, `viva_wallet`, or the courier's `acs_cod` / `boxnow_cod`; `manual` on a REFUND the merchant made themselves (cash on delivery paid back by bank transfer or in cash) |
 | `provider_reference` | the provider's own id: PaymentIntent, Viva transaction, refund id, voucher / parcel (a Stripe dashboard refund has no id in `charge.refunded`, so it carries the event id) |
-| `charge` | on a REFUND, the CHARGE it reverses (an order paid twice is refunded payment by payment); null otherwise (a DB check enforces both) |
+| `charge` | on a REFUND or a CHARGEBACK, the CHARGE it reverses (an order paid twice is refunded payment by payment); null otherwise (a DB check enforces both) |
 | `description` | the reason given for a refund |
 | `created_at` | when it was recorded |
 
-`UNIQUE (provider, provider_reference, kind)` is the idempotency of every writer: a delivery repeated by the provider records nothing the second time (`record_*` return `created=False`). Writers (all under the order row lock): `OrderService.handle_payment_succeeded`, `handle_stripe_checkout_completed`, `_handle_payment_created` (CHARGE); `OrderService.settle_cod_payment`, reached from `AcsService._mark_cod_order_paid_if_pending` and `BoxNowService._mark_cod_order_paid_on_delivery` (COD_COLLECTION, written in the same atomic step as the payment status, §4.4); `OrderService.refund_order`, `handle_stripe_charge_refunded`, `_handle_reversal_created` (REFUND, through `record_refund`).
+`UNIQUE (provider, provider_reference, kind)` is the idempotency of every writer: a delivery repeated by the provider records nothing the second time (`record_*` return `created=False`). Writers (all under the order row lock): `OrderService.handle_payment_succeeded`, `handle_stripe_checkout_completed`, `_handle_payment_created` (CHARGE); `OrderService.settle_cod_payment`, reached from `AcsService._mark_cod_order_paid_if_pending` and `BoxNowService._mark_cod_order_paid_on_delivery` (COD_COLLECTION, written in the same atomic step as the payment status, §4.4); `OrderService.refund_order`, `handle_stripe_charge_refunded`, `_handle_reversal_created` (REFUND, through `record_refund`); `handle_stripe_dispute_closed` (CHARGEBACK, through `record_chargeback`). The Viva handlers (`_handle_account_transaction_event`, and `_handle_reversal_created` for a refund-claim type) book it through the same `record_chargeback`.
 
 **`RefundNotification`** (`order/models/refund_notification.py`) is the claim on a refund's confirmation email: one row per REFUND row (a one-to-one, so the database arbitrates between two tasks), inserted before the email is sent and deleted when the send fails for good. It is a side table, not a column on the ledger, so the ledger's rows stay the money facts they are and are never updated; who has been told about a refund is delivery bookkeeping with a lifecycle of its own. It follows its ledger row on delete (`CASCADE`).
 
-Everything else is read from the sums: `PaymentLedger.captured` (money received: CHARGE and COD_COLLECTION), `refunded` (REFUND, by a provider or by the merchant), `refundable` (per payment, collected cash included), and **`refund_status(order)`, the one function that decides REFUNDED versus PARTIALLY_REFUNDED** (refunded ≥ captured). `record_refund` writes the derived status onto the order in the same step as the row, so no path decides it for itself and it cannot go backwards. `payment_status` stays a column (every filter, serializer and guard reads it); the ledger is what it is derived from after a refund.
+Everything else is read from the sums: `PaymentLedger.captured` (money received: CHARGE and COD_COLLECTION), `refunded` (REFUND, by a provider or by the merchant), `charged_back` (CHARGEBACK), `fully_returned` (refunded plus charged back covers captured, what the loyalty reversal asks), `refundable` (per payment, collected cash included, less what a chargeback took), and **`refund_status(order)`, the one function that decides REFUNDED versus PARTIALLY_REFUNDED** (refunded ≥ captured). `record_refund` writes the derived status onto the order in the same step as the row, so no path decides it for itself and it cannot go backwards. `payment_status` stays a column (every filter, serializer and guard reads it); the ledger is what it is derived from after a refund.
 
 **What the customer owes is not what was collected.** `Order.amount_due` (`amountDue` in the API) is what the order costs the customer: `calculate_order_total_amount()` (lines and extras, less promotion, loyalty and gift card), written at creation and again where a deduction changes (the standalone loyalty redemption). It says nothing about money collected, which is the ledger's CHARGE and COD_COLLECTION rows.
 

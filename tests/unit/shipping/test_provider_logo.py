@@ -75,6 +75,8 @@ def test_logo_for_kind_no_uploads_returns_empty_primary():
     assert not pickup
     assert provider.logo_url_for_kind("home_delivery") is None
     assert provider.logo_url_for_kind("pickup_point") is None
+    assert provider.logo_path_for_kind("home_delivery") is None
+    assert provider.logo_path_for_kind("pickup_point") is None
 
 
 def test_logo_for_kind_primary_only_shared_across_kinds():
@@ -153,6 +155,7 @@ def test_options_endpoint_returns_null_logo_when_no_upload(
     assert acs_rows, "ACS rows missing from options response"
     for row in acs_rows:
         assert row["logoUrl"] is None
+        assert row["logoPath"] is None
 
 
 @patch(
@@ -197,6 +200,12 @@ def test_options_endpoint_pickup_kind_uses_pickup_logo_when_set(
     assert home_rows[0]["logoUrl"] != pickup_rows[0]["logoUrl"]
     assert "acs-home" in home_rows[0]["logoUrl"]
     assert "acs-smartpoint" in pickup_rows[0]["logoUrl"]
+    # The same logos as relative paths, for media-stream.
+    assert home_rows[0]["logoPath"].startswith("media/")
+    assert "/uploads/shipping/" in home_rows[0]["logoPath"]
+    assert "acs-home" in home_rows[0]["logoPath"]
+    assert "acs-smartpoint" in pickup_rows[0]["logoPath"]
+    assert home_rows[0]["logoUrl"].endswith(home_rows[0]["logoPath"])
 
 
 @patch(

@@ -20,6 +20,7 @@ class OrderHistory(TranslatableModel, TimeStampMixinModel, UUIDModel):
         ADDRESS = "ADDRESS", _("Address Update")
         NOTE = "NOTE", _("Note Added")
         REFUND = "REFUND", _("Refund Processed")
+        CHARGEBACK = "CHARGEBACK", _("Chargeback")
         OTHER = "OTHER", _("Other Change")
 
     translations = TranslatedFields(
@@ -224,6 +225,49 @@ class OrderHistory(TranslatableModel, TimeStampMixinModel, UUIDModel):
             description=f"Refund processed for {refund_data.get('amount', 'unknown amount')}",
             ip_address=ip_address,
             user_agent=user_agent,
+        )
+
+    @classmethod
+    def log_chargeback(
+        cls, order, *, recorded, requested, returned, dispute_id
+    ):
+        """A lost dispute took *recorded* back, of the *requested* the
+        provider named; *returned* had already left the payment through
+        refunds and chargebacks. Shown in red in the admin
+        (``ORDER_HISTORY_CHANGE_TYPE_VARIANT``), and kept out of the
+        customer timeline with the other internal rows."""
+        values = {
+            "amount": recorded,
+            "requested": requested,
+            "returned": returned,
+        }
+        if recorded.amount <= 0:
+            description = (
+                gettext(
+                    "Chargeback of %(requested)s not recorded: nothing is left "
+                    "on the payment (%(returned)s already returned)"
+                )
+                % values
+            )
+        elif recorded.amount < requested.amount:
+            description = (
+                gettext(
+                    "Chargeback %(amount)s (disputed %(requested)s, "
+                    "%(returned)s already returned)"
+                )
+                % values
+            )
+        else:
+            description = gettext("Chargeback %(amount)s") % values
+        return cls.objects.create(
+            order=order,
+            change_type=cls.OrderHistoryChangeType.CHARGEBACK,
+            new_value={
+                "amount": str(recorded),
+                "requested": str(requested),
+                "dispute_id": dispute_id,
+            },
+            description=description,
         )
 
 

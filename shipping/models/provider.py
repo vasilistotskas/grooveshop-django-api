@@ -178,6 +178,17 @@ class ShippingProvider(TimeStampMixinModel):
         field = self.logo_for_kind(kind)
         return field.url if self._filename_of(field) else None
 
+    def logo_path_for_kind(self, kind: str) -> str | None:
+        """Relative media path (``media/{schema}/uploads/shipping/…``) for
+        ``logo_for_kind(kind)``, or ``None`` when no logo is uploaded for
+        that kind. The storefront renders it through media-stream at the
+        size it shows, as it does every other image path.
+        """
+        field = self.logo_for_kind(kind)
+        return (
+            self._relative_path_of(field) if self._filename_of(field) else None
+        )
+
     # ------------------------------------------------------------------
     # Project-convention properties (parity with PayWay.icon /
     # ProductImage.main_image_path) — kept even though the storefront

@@ -14,6 +14,7 @@ from django.contrib.auth.models import AnonymousUser
 from django.test import TestCase, override_settings
 from rest_framework.test import APIRequestFactory
 
+from cart.agent_token import hash_cart_token
 from core.api.throttling import (
     CartMutationAnonThrottle,
     OrderCreateAnonThrottle,
@@ -62,6 +63,18 @@ class CartMutationAnonThrottleTestCase(TestCase):
             view=None,
         )
         self.assertNotEqual(key_a, key_b)
+
+    def test_gateway_cart_token_keys_on_its_hash_never_the_token(self) -> None:
+        token = "a-cart-token-value"
+        key = self.throttle.get_cache_key(
+            _anon_request(
+                self.factory,
+                **{"X-Internal-Gateway": SECRET, "X-Cart-Token": token},
+            ),
+            view=None,
+        )
+        self.assertIn(f"gw:{hash_cart_token(token)}", key)
+        self.assertNotIn(token, key)
 
     def test_wrong_secret_falls_back_to_ip(self) -> None:
         request = _anon_request(

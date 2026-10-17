@@ -89,6 +89,26 @@ class BoundedTokenAuthentication(KnoxTokenAuthentication):
         return user, auth_token
 
 
+def is_auth_token_live(user_id: int, digest: str) -> bool:
+    """Whether the knox token with this digest is still a valid login.
+
+    For credentials derived from a login (the cart agent token) that must
+    stop working the moment it ends: logout and password changes delete
+    the row, and the expiry and absolute-age caps apply as they do to
+    ``BoundedTokenAuthentication``. Read-only: it neither renews nor
+    deletes the token.
+    """
+    auth_token = AuthToken.objects.filter(
+        user_id=user_id, digest=digest
+    ).first()
+    if auth_token is None:
+        return False
+    now = timezone.now()
+    if auth_token.expiry is not None and auth_token.expiry <= now:
+        return False
+    return now - auth_token.created <= KNOX_ABSOLUTE_MAX_AGE
+
+
 class SessionTokenStrategy(BaseSessionTokenStrategy):
     def create_access_token(self, request):
         user = request.user

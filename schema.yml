@@ -8660,6 +8660,15 @@ paths:
         description: Cart UUID for guest users. Used to identify and maintain guest
           cart sessions. Sequential integer IDs were enumerable metadata, so the public
           identifier is the UUID inherited from ``UUIDModel``.
+      - in: header
+        name: X-Cart-Token
+        schema:
+          type: string
+        description: 'Cart token from ``POST /api/v1/cart/agent-token``: acts on the
+          signed-in shopper''s own cart, for the shopping assistant. When sent, ``X-Cart-Id``
+          is ignored. An unknown, expired or revoked token is refused with 401, never
+          answered with another cart; an endpoint that does not accept it refuses
+          it with 403.'
       tags:
       - Cart
       security:
@@ -8846,6 +8855,58 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: ''
+  /api/v1/cart/agent-token:
+    post:
+      operationId: createCartAgentToken
+      description: 'Εκδίδει ένα βραχύβιο διακριτικό που επιτρέπει στον βοηθό αγορών
+        να ενεργεί στο δικό του καλάθι του συνδεδεμένου αγοραστή: να το διαβάζει,
+        να προσθέτει, να ενημερώνει και να αφαιρεί προϊόντα, να εφαρμόζει και να αφαιρεί
+        κουπόνια. Τίποτα άλλο: ούτε πληρωμή, ούτε δέσμευση αποθέματος, ούτε ολοκλήρωση
+        αγοράς, ούτε διαγραφή του καλαθιού. Στείλτε το ως κεφαλίδα ``X-Cart-Token``.
+        Σταματά να λειτουργεί όταν λήξει ή όταν ο αγοραστής αποσυνδεθεί· εκδώστε νέο
+        όταν μια κλήση απορρίπτεται με 401.'
+      summary: Έκδοση διακριτικού καλαθιού για τον βοηθό αγορών
+      tags:
+      - Cart
+      security:
+      - cookieAuth: []
+      responses:
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartAgentTokenResponse'
+          description: ''
   /api/v1/cart/coupon:
     post:
       operationId: applyCartCoupon
@@ -8862,6 +8923,15 @@ paths:
         description: Cart UUID for guest users. Used to identify and maintain guest
           cart sessions. Sequential integer IDs were enumerable metadata, so the public
           identifier is the UUID inherited from ``UUIDModel``.
+      - in: header
+        name: X-Cart-Token
+        schema:
+          type: string
+        description: 'Cart token from ``POST /api/v1/cart/agent-token``: acts on the
+          signed-in shopper''s own cart, for the shopping assistant. When sent, ``X-Cart-Id``
+          is ignored. An unknown, expired or revoked token is refused with 401, never
+          answered with another cart; an endpoint that does not accept it refuses
+          it with 403.'
       tags:
       - Cart
       requestBody:
@@ -8928,6 +8998,15 @@ paths:
         description: Cart UUID for guest users. Used to identify and maintain guest
           cart sessions. Sequential integer IDs were enumerable metadata, so the public
           identifier is the UUID inherited from ``UUIDModel``.
+      - in: header
+        name: X-Cart-Token
+        schema:
+          type: string
+        description: 'Cart token from ``POST /api/v1/cart/agent-token``: acts on the
+          signed-in shopper''s own cart, for the shopping assistant. When sent, ``X-Cart-Id``
+          is ignored. An unknown, expired or revoked token is refused with 401, never
+          answered with another cart; an endpoint that does not accept it refuses
+          it with 403.'
       tags:
       - Cart
       security:
@@ -8991,6 +9070,15 @@ paths:
         description: Cart UUID for guest users. Used to identify and maintain guest
           cart sessions. Sequential integer IDs were enumerable metadata, so the public
           identifier is the UUID inherited from ``UUIDModel``.
+      - in: header
+        name: X-Cart-Token
+        schema:
+          type: string
+        description: 'Cart token from ``POST /api/v1/cart/agent-token``: acts on the
+          signed-in shopper''s own cart, for the shopping assistant. When sent, ``X-Cart-Id``
+          is ignored. An unknown, expired or revoked token is refused with 401, never
+          answered with another cart; an endpoint that does not accept it refuses
+          it with 403.'
       tags:
       - Cart
       security:
@@ -9120,6 +9208,15 @@ paths:
           type: string
           format: uuid
         description: Guest cart UUID. Used to identify and maintain guest cart sessions.
+      - in: header
+        name: X-Cart-Token
+        schema:
+          type: string
+        description: 'Cart token from ``POST /api/v1/cart/agent-token``: acts on the
+          signed-in shopper''s own cart, for the shopping assistant. When sent, ``X-Cart-Id``
+          is ignored. An unknown, expired or revoked token is refused with 401, never
+          answered with another cart; an endpoint that does not accept it refuses
+          it with 403.'
       - in: query
         name: cart
         schema:
@@ -9516,6 +9613,15 @@ paths:
           type: string
           format: uuid
         description: Guest cart UUID. Used to identify and maintain guest cart sessions.
+      - in: header
+        name: X-Cart-Token
+        schema:
+          type: string
+        description: 'Cart token from ``POST /api/v1/cart/agent-token``: acts on the
+          signed-in shopper''s own cart, for the shopping assistant. When sent, ``X-Cart-Id``
+          is ignored. An unknown, expired or revoked token is refused with 401, never
+          answered with another cart; an endpoint that does not accept it refuses
+          it with 403.'
       tags:
       - Cart Items
       requestBody:
@@ -9584,6 +9690,15 @@ paths:
           type: string
           format: uuid
         description: Guest cart UUID. Used to identify and maintain guest cart sessions.
+      - in: header
+        name: X-Cart-Token
+        schema:
+          type: string
+        description: 'Cart token from ``POST /api/v1/cart/agent-token``: acts on the
+          signed-in shopper''s own cart, for the shopping assistant. When sent, ``X-Cart-Id``
+          is ignored. An unknown, expired or revoked token is refused with 401, never
+          answered with another cart; an endpoint that does not accept it refuses
+          it with 403.'
       - in: path
         name: id
         schema:
@@ -9651,6 +9766,15 @@ paths:
           type: string
           format: uuid
         description: Guest cart UUID. Used to identify and maintain guest cart sessions.
+      - in: header
+        name: X-Cart-Token
+        schema:
+          type: string
+        description: 'Cart token from ``POST /api/v1/cart/agent-token``: acts on the
+          signed-in shopper''s own cart, for the shopping assistant. When sent, ``X-Cart-Id``
+          is ignored. An unknown, expired or revoked token is refused with 401, never
+          answered with another cart; an endpoint that does not accept it refuses
+          it with 403.'
       - in: path
         name: id
         schema:
@@ -9725,6 +9849,15 @@ paths:
           type: string
           format: uuid
         description: Guest cart UUID. Used to identify and maintain guest cart sessions.
+      - in: header
+        name: X-Cart-Token
+        schema:
+          type: string
+        description: 'Cart token from ``POST /api/v1/cart/agent-token``: acts on the
+          signed-in shopper''s own cart, for the shopping assistant. When sent, ``X-Cart-Id``
+          is ignored. An unknown, expired or revoked token is refused with 401, never
+          answered with another cart; an endpoint that does not accept it refuses
+          it with 403.'
       - in: path
         name: id
         schema:
@@ -9808,6 +9941,15 @@ paths:
           type: string
           format: uuid
         description: Guest cart UUID. Used to identify and maintain guest cart sessions.
+      - in: header
+        name: X-Cart-Token
+        schema:
+          type: string
+        description: 'Cart token from ``POST /api/v1/cart/agent-token``: acts on the
+          signed-in shopper''s own cart, for the shopping assistant. When sent, ``X-Cart-Id``
+          is ignored. An unknown, expired or revoked token is refused with 401, never
+          answered with another cart; an endpoint that does not accept it refuses
+          it with 403.'
       - in: path
         name: id
         schema:
@@ -36080,6 +36222,19 @@ components:
       - totalWeightGrams
       - updatedAt
       - uuid
+    CartAgentTokenResponse:
+      type: object
+      description: Response of ``POST /api/v1/cart/agent-token``.
+      properties:
+        token:
+          type: string
+          description: Στείλτε το ως κεφαλίδα X-Cart-Token.
+        expiresIn:
+          type: integer
+          description: Δευτερόλεπτα μέχρι να σταματήσει να λειτουργεί το διακριτικό.
+      required:
+      - expiresIn
+      - token
     CartCoupon:
       type: object
       description: |-

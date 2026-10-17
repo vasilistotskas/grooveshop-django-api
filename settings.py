@@ -523,6 +523,8 @@ REST_FRAMEWORK = {
         "payment_anon": None if DEBUG else "5/minute",
         "cart_mutation": None if DEBUG else "60/minute",
         "cart_mutation_anon": None if DEBUG else "30/minute",
+        # Each mint hands out a credential for the shopper's cart.
+        "cart_agent_token": None if DEBUG else "10/minute",
         # Order creation moves stock, can mint a courier voucher and can
         # open a provider payment session — and guest checkout means the
         # anonymous budget is the one that matters.
@@ -2752,6 +2754,13 @@ REST_KNOX = {
 # BoundedTokenAuthentication in core/api/tokens.py reads this setting.
 KNOX_ABSOLUTE_MAX_AGE = datetime.timedelta(days=30)
 KNOX_TOKEN_MODEL = "knox.AuthToken"
+
+# Lifetime of the cart-scoped token the storefront mints for the shopping
+# assistant (``POST /api/v1/cart/agent-token``): one pass per conversation.
+# The storefront mints a new one when a call is refused.
+CART_AGENT_TOKEN_TTL_SECONDS = int(
+    getenv("CART_AGENT_TOKEN_TTL_SECONDS", "1800")
+)
 
 MEASUREMENT_BIDIMENSIONAL_SEPARATOR = "/"
 

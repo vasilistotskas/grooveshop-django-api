@@ -47,6 +47,7 @@ FAIL_CLOSED = {
     "AcsAddressValidationThrottle",
     "BoxNowNearestThrottle",
     "StaffLoginThrottle",
+    "CartAgentTokenThrottle",
 }
 FAIL_OPEN = {
     "UserOrIpRateThrottle",

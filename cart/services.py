@@ -6,6 +6,11 @@ from typing import TYPE_CHECKING
 
 from django.db import transaction
 
+from cart.agent_token import (
+    CartTokenNotPermitted,
+    cart_token_from_request,
+    resolve_cart_token,
+)
 from cart.models import Cart, CartItem
 from order.models.stock_reservation import StockReservation
 
@@ -49,13 +54,29 @@ def cart_uuid_from_request(request: Request | HttpRequest) -> uuid.UUID | None:
 
 
 class CartService:
-    def __init__(self, request: Request | HttpRequest):
+    """Resolves the cart a request addresses.
+
+    ``accepts_cart_token`` says whether the caller's endpoint may be
+    driven by an ``X-Cart-Token`` (see ``cart.agent_token``). A token
+    wins over ``X-Cart-Id``, which is then ignored. A token is refused,
+    never replaced by another cart: an invalid one raises
+    ``CartTokenInvalid``, and one sent where it is not accepted raises
+    ``CartTokenNotPermitted``.
+    """
+
+    def __init__(
+        self,
+        request: Request | HttpRequest,
+        *,
+        accepts_cart_token: bool = False,
+    ):
         if not request:
             raise CartServiceInitException(
                 "Request must be provided to initialize CartService."
             )
 
         self.request = request
+        self.accepts_cart_token = accepts_cart_token
         self.cart: Cart | None = None
         self.cart_items: list[CartItem] = []
 
@@ -65,6 +86,12 @@ class CartService:
 
     def _extract_cart_info(self):
         self.cart_id: uuid.UUID | None = cart_uuid_from_request(self.request)
+        self.token_cart: Cart | None = None
+        token = cart_token_from_request(self.request)
+        if token:
+            if not self.accepts_cart_token:
+                raise CartTokenNotPermitted
+            self.token_cart = resolve_cart_token(token)
 
     def __str__(self):
         return f"Cart {self.cart.user if self.cart and self.cart.user else 'Anonymous'}"
@@ -76,8 +103,24 @@ class CartService:
         if self.cart:
             yield from self.cart_items
 
+    @property
+    def owner(self):
+        """Whom the cart belongs to as far as this request is concerned.
+
+        The signed-in user, or the owner of the cart a cart token
+        names: that request is anonymous yet acts on a signed-in
+        cart, whose pricing (a wholesale buyer's) and coupons must
+        follow the owner, never ``request.user``. ``None`` for guests.
+        """
+        if self.token_cart is not None:
+            return self.token_cart.user
+        user = self.request.user
+        return user if user.is_authenticated else None
+
     def _initialize_cart(self):
-        if self.request.user.is_authenticated and self.cart_id:
+        if self.token_cart is not None:
+            self.cart = self.get_existing_cart()
+        elif self.request.user.is_authenticated and self.cart_id:
             guest_cart = (
                 Cart.objects.guest_carts().filter(uuid=self.cart_id).first()
             )
@@ -108,10 +151,13 @@ class CartService:
         if cart is not None:
             from b2b.services import B2BPricingService
 
-            B2BPricingService.bind_cart(cart, self.request.user)
+            B2BPricingService.bind_cart(cart, self.owner)
         return cart
 
     def get_existing_cart(self):
+        if self.token_cart is not None:
+            return self._bind_pricing(self.token_cart)
+
         user = self.request.user
 
         if user.is_authenticated:
@@ -135,6 +181,9 @@ class CartService:
             return None
 
     def get_or_create_cart(self):
+        if self.token_cart is not None:
+            return self._bind_pricing(self.token_cart)
+
         user = self.request.user
 
         if user.is_authenticated:
@@ -264,6 +313,12 @@ class CartService:
         except ValueError, TypeError:
             return None
 
+        if self.token_cart is not None:
+            return (
+                Cart.objects.for_detail()
+                .filter(uuid=normalized, pk=self.token_cart.pk)
+                .first()
+            )
         if self.request.user.is_authenticated:
             return (
                 Cart.objects.for_detail()

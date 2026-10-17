@@ -3,6 +3,21 @@
 
 
 
+## v3.125.6 (2026-10-17)
+
+### Bug fixes
+
+* fix(tenant): a suspended store stops serving its images (#225)
+
+- suspension parks MEDIA_ROOT/{schema} at MEDIA_ROOT/.suspended/{schema}, which the static server denies, then flushes media-stream and purges the edge
+- activation moves the tree back before the store is live; a failed move or a live tree in the way raises and keeps the store suspended
+- an own-zone media purge carries its token encrypted and prefers the tenant's current token while the row exists
+- the dev/CI media route refuses dot-segment paths, like the production static server
+- giftcard: the pause's off time is added as elapsed seconds, so a span across DST no longer shifts expiries by an hour
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01VHqqSodFfL9aLgezEZV6qb ([`397472d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/397472d43d04473f6d7d90351d1a65bb19be6238))
+
 ## v3.125.5 (2026-10-16)
 
 ### Bug fixes

@@ -14,6 +14,7 @@ from unfold.decorators import display
 from admin.base import BaseTranslatableAdmin, BaseTranslatableTabularInline
 from admin.displays import format_dt
 from region.models import Region
+from tenant.deletion import PublicReferenceDataDeletionMixin
 
 
 class RegionStatusFilter(DropdownFilter):
@@ -46,6 +47,10 @@ class RegionStatusFilter(DropdownFilter):
 class RegionInline(BaseTranslatableTabularInline):
     model = Region
     extra = 0
+    # A region is deleted from its own page, where stores that still use
+    # it are checked (``PublicReferenceDataDeletionMixin``). An inline
+    # delete would run the stock collector, which cannot see their rows.
+    can_delete = False
     fields = ("alpha", "name", "sort_order")
     ordering_field = "sort_order"
     hide_ordering_field = True
@@ -54,7 +59,7 @@ class RegionInline(BaseTranslatableTabularInline):
 
 
 @admin.register(Region)
-class RegionAdmin(BaseTranslatableAdmin):
+class RegionAdmin(PublicReferenceDataDeletionMixin, BaseTranslatableAdmin):
     list_display = (
         "region_info",
         "country_display",

@@ -22,7 +22,7 @@ from core.result_backend import SCHEMA_META_KEY, store_of
 from tests.utils.staff import store_tenant
 from user.factories.account import UserAccountFactory
 
-pytestmark = pytest.mark.django_db
+pytestmark = [pytest.mark.django_db, pytest.mark.assert_english]
 
 
 class _Schema:

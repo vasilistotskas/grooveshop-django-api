@@ -22833,3 +22833,8 @@ msgstr[1] "Οι εγγραφές παλαιότερες από %(days)d ημέρ
 #: .\contact\admin.py:178
 msgid "Entries are kept indefinitely (CONTACT_RETENTION_DAYS is 0)."
 msgstr "Οι εγγραφές διατηρούνται επ' αόριστον (το CONTACT_RETENTION_DAYS είναι 0)."
+
+#: .\tenant\reference_guard.py:51
+#, python-format
+msgid "%(store)s: used by %(rows)s"
+msgstr "%(store)s: χρησιμοποιείται από %(rows)s"

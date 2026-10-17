@@ -12,6 +12,7 @@ from admin.base import BaseTranslatableAdmin
 from admin.displays import format_dt, header_two_line
 from country.models import Country
 from region.admin import RegionInline
+from tenant.deletion import PublicReferenceDataDeletionMixin
 
 
 class CountryStatusFilter(DropdownFilter):
@@ -50,7 +51,7 @@ class CountryStatusFilter(DropdownFilter):
 
 
 @admin.register(Country)
-class CountryAdmin(BaseTranslatableAdmin):
+class CountryAdmin(PublicReferenceDataDeletionMixin, BaseTranslatableAdmin):
     list_display = (
         "country_info",
         "codes_display",

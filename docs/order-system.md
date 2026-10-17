@@ -233,6 +233,23 @@ address it cannot place (prod order #316: street "1", street number
 - The storefront applies the same rules inline from the same country row
   (`shared/utils/postalCode.ts`); only the normalisation and the two
   street rules are mirrored in code, and they must stay in lockstep.
+- **Countries and regions are public, shared rows; what uses them is not.**
+  `country` and `region` are in `SHARED_APPS` only (their tables exist
+  once, in `public`; a store's `search_path` falls through to them), and
+  `tenant.role_scopes.REFERENCE_DATA_APP_LABELS` gives stores `view` on
+  them and nothing else. Orders, saved addresses, shipping rates and
+  pay-way exclusions are in each store's own schema. So deleting one is
+  refused when ANY store's rows point at it
+  (`tenant/reference_guard.py`): the admin lists the stores on its
+  confirmation page (`tenant.deletion.PublicReferenceDataDeletionMixin`)
+  and a `pre_delete` receiver in `tenant/signals.py` refuses every other
+  path. A country is also refused when a store uses one of its regions,
+  because the regions go with it. Soft-deleted orders count (the foreign
+  key is still there); simple-history rows do not. Deleting a row nobody
+  uses works from the platform admin. Both ends of a store's use are
+  found from the models' own reverse relations, hidden ones included, so
+  a new model with a foreign key to `Country` is covered without a list
+  to update.
 
 ### 3.4 Acquisition source (`order/attribution.py`)
 

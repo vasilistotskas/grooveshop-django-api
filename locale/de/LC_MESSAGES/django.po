@@ -10197,3 +10197,8 @@ msgstr[1] ""
 #: .\contact\admin.py:178
 msgid "Entries are kept indefinitely (CONTACT_RETENTION_DAYS is 0)."
 msgstr ""
+
+#: .\tenant\reference_guard.py:51
+#, python-format
+msgid "%(store)s: used by %(rows)s"
+msgstr ""

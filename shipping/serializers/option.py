@@ -132,6 +132,16 @@ class ShippingOptionSerializer(serializers.Serializer):
             "so this is always a full URL when present."
         ),
     )
+    logo_path = serializers.CharField(
+        allow_null=True,
+        required=False,
+        help_text=_(
+            "Relative media path of the same logo as ``logo_url`` "
+            "(``media/{schema}/uploads/shipping/…``), for the "
+            "storefront to render through media-stream at the size it "
+            "shows. Null when no logo is uploaded."
+        ),
+    )
     metadata = serializers.DictField()
     pay_ways = ShippingOptionPayWaySerializer(
         many=True,

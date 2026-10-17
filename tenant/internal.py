@@ -40,24 +40,26 @@ def is_internal_caller(token: str) -> bool:
 def build_domains_payload() -> dict:
     """The tenant state media-stream serves by.
 
+    Both lists follow the one rule ``SuspendedTenantMiddleware`` applies
+    to a store's own requests, ``is_active``, so every store is in
+    exactly one of them.
+
     ``domains``: active tenants' domains + derived api./assets./static.
     service subdomains of each primary domain (the infra TEMPLATE
     provisions those for every tenant).
 
-    ``suspendedSchemas``: the stores that must not be served, by the rule
-    ``SuspendedTenantMiddleware`` applies to their requests
-    (``is_active=False``). media-stream refuses their images. A deny
-    list, not an allow list: a store created between two polls is served
-    at once, and an empty list (or a feed media-stream cannot read)
-    refuses nothing.
+    ``suspendedSchemas``: the stores that must not be served. media-stream
+    refuses their images. A deny list, not an allow list: a store created
+    between two polls is served at once, and an empty list (or a feed
+    media-stream cannot read) refuses nothing.
     """
     from django_tenants.utils import get_public_schema_name
 
     from tenant.models import Tenant, TenantDomain
 
-    rows = TenantDomain.objects.filter(
-        tenant__is_active=True, tenant__suspended_at__isnull=True
-    ).values_list("domain", "is_primary")
+    rows = TenantDomain.objects.filter(tenant__is_active=True).values_list(
+        "domain", "is_primary"
+    )
 
     domains: set[str] = set()
     for domain, is_primary in rows:

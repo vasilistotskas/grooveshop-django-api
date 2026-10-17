@@ -159,11 +159,16 @@ class TenantAdmin(BaseModelAdmin):
         "is_active",
     ]
     search_fields = ["name", "slug", "owner_email"]
+    # ``is_active`` changes only through the Suspend / Activate actions
+    # (``tenant.lifecycle``), as on the platform API: ticking it in the
+    # form skipped the media flush and left ``suspended_at`` behind, a store
+    # active by one rule and suspended by another.
     readonly_fields = [
         "schema_name",
         "uuid",
         "created_at",
         "updated_at",
+        "is_active",
         "suspended_at",
         "suspended_reason",
         "billing_notice_stage",

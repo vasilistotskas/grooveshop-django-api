@@ -98,6 +98,18 @@ class TestTenantAdminScoping:
                 f"{platform_field} is editable by a merchant"
             )
 
+    def test_the_active_flag_is_read_only_for_platform_operators_too(
+        self, tenant, bind_tenant_and_schema
+    ):
+        """Suspend / Activate are the only way to change it: ticking it in
+        the form skipped the media flush and left ``suspended_at`` behind,
+        a store active by one rule and suspended by another."""
+        bind_tenant_and_schema(tenant)
+        readonly = set(
+            self._admin().get_readonly_fields(_request(_superuser()))
+        )
+        assert "is_active" in readonly
+
     def test_their_own_settings_stay_editable(
         self, tenant, bind_tenant_and_schema
     ):

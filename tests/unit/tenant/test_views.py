@@ -455,21 +455,23 @@ class TestInternalDomains:
 
     @pytest.mark.django_db
     def test_suspended_tenants_excluded(self, resolve_client, db, settings):
-        from django.utils import timezone
+        from tenant.lifecycle import suspend_tenant
+        from tenant.models import SuspendedReason
 
         settings.AGENT_GATEWAY_INTERNAL_SECRET = "gw-secret"
         tenant = store_tenant("domains_suspended")
-        tenant.suspended_at = timezone.now()
-        tenant.save(update_fields=["suspended_at"])
         TenantDomain.objects.create(
             tenant=tenant, domain="suspended.example", is_primary=True
         )
+        suspend_tenant(tenant, reason=SuspendedReason.MANUAL)
 
         response = resolve_client.get(
             "/api/v1/tenant/internal/domains",
             HTTP_X_INTERNAL_TOKEN="gw-secret",
         )
-        assert "suspended.example" not in response.json()["domains"]
+        payload = response.json()
+        assert "suspended.example" not in payload["domains"]
+        assert "domains_suspended" in payload["suspendedSchemas"]
 
     @pytest.mark.django_db
     def test_lists_the_suspended_stores_media_stream_must_refuse(

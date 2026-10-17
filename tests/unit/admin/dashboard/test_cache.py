@@ -65,7 +65,9 @@ def test_the_clear_waits_for_the_commit(monkeypatch):
 
     pending = []
     monkeypatch.setattr(
-        dashboard_cache.transaction, "on_commit", pending.append
+        dashboard_cache.transaction,
+        "on_commit",
+        lambda func, using=None, robust=False: pending.append(func),
     )
     queries.recent_orders.get()
     OrderFactory(num_order_items=0)

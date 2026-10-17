@@ -101,11 +101,12 @@ class TestSuspendAndActivate:
         tenant = store_tenant("park_suspend")
         seen = {}
 
-        def dispatched(schema, plan):
-            seen["parked"] = (media_root / ".suspended" / schema).exists()
+        def dispatched(*, args, **_options):
+            seen["parked"] = (media_root / ".suspended" / args[0]).exists()
 
         with mock.patch(
-            "tenant.tasks.flush_tenant_media_task.delay", side_effect=dispatched
+            "tenant.tasks.flush_tenant_media_task.apply_async",
+            side_effect=dispatched,
         ):
             assert suspend_tenant(tenant, reason=SuspendedReason.MANUAL) is True
 
@@ -123,11 +124,13 @@ class TestSuspendAndActivate:
             mock.patch(
                 "tenant.media_parking.os.rename", side_effect=OSError("EIO")
             ),
-            mock.patch("tenant.tasks.flush_tenant_media_task.delay") as delay,
+            mock.patch(
+                "tenant.tasks.flush_tenant_media_task.apply_async"
+            ) as dispatch,
         ):
             assert suspend_tenant(tenant, reason=SuspendedReason.MANUAL) is True
 
-        delay.assert_called_once()
+        dispatch.assert_called_once()
         tenant.refresh_from_db()
         assert tenant.is_active is False
         assert "could not park the media of park_fails" in caplog.text
@@ -140,17 +143,21 @@ class TestSuspendAndActivate:
 
         _uploads(media_root, "park_activate")
         tenant = store_tenant("park_activate")
-        with mock.patch("tenant.tasks.flush_tenant_media_task.delay"):
+        with mock.patch("tenant.tasks.flush_tenant_media_task.apply_async"):
             suspend_tenant(tenant, reason=SuspendedReason.MANUAL)
 
-        with mock.patch("tenant.tasks.flush_tenant_media_task.delay") as delay:
+        with mock.patch(
+            "tenant.tasks.flush_tenant_media_task.apply_async"
+        ) as dispatch:
             assert activate_tenant(tenant) is True
 
         assert (media_root / "park_activate" / "uploads" / "logo.png").exists()
-        delay.assert_called_once()
-        assert delay.call_args.args[0] == "park_activate"
+        dispatch.assert_called_once()
+        assert dispatch.call_args.kwargs["args"][0] == "park_activate"
 
-    def test_activate_with_nothing_parked_dispatches_nothing(self, media_root):
+    def test_activate_with_nothing_parked_still_flushes(self, media_root):
+        """The flush is what makes media-stream re-read the tenant feed
+        and serve the store again, so it is sent restored or not."""
         from tenant.lifecycle import activate_tenant
 
         tenant = store_tenant(
@@ -159,10 +166,13 @@ class TestSuspendAndActivate:
             suspended_at=timezone.now() - timedelta(hours=1),
         )
 
-        with mock.patch("tenant.tasks.flush_tenant_media_task.delay") as delay:
+        with mock.patch(
+            "tenant.tasks.flush_tenant_media_task.apply_async"
+        ) as dispatch:
             assert activate_tenant(tenant) is True
 
-        delay.assert_not_called()
+        dispatch.assert_called_once()
+        assert dispatch.call_args.kwargs["args"][0] == "park_none"
 
 
 class TestDestroyPurgesTheOwnZone:
@@ -189,7 +199,9 @@ class TestDestroyPurgesTheOwnZone:
             domain="assets.shop.example", tenant=tenant, is_primary=False
         )
         with (
-            mock.patch("tenant.tasks.flush_tenant_media_task.delay") as delay,
+            mock.patch(
+                "tenant.tasks.flush_tenant_media_task.apply_async"
+            ) as dispatch,
             mock.patch.object(
                 Tenant,
                 "delete",
@@ -203,7 +215,7 @@ class TestDestroyPurgesTheOwnZone:
             mock.patch("tenant.offboarding.purge_search_indexes"),
         ):
             destroy_tenant(tenant)
-        schema, plan = delay.call_args.args
+        schema, plan = dispatch.call_args.kwargs["args"]
 
         # What the Celery task does with the plan, after the row is gone.
         with mock.patch.object(edge, "purge_prefixes") as purge:
@@ -221,14 +233,16 @@ class TestActivationNeverLeavesImagesParked:
 
         _uploads(media_root, "restore_fails")
         tenant = store_tenant("restore_fails")
-        with mock.patch("tenant.tasks.flush_tenant_media_task.delay"):
+        with mock.patch("tenant.tasks.flush_tenant_media_task.apply_async"):
             suspend_tenant(tenant, reason=SuspendedReason.MANUAL)
 
         with (
             mock.patch(
                 "tenant.media_parking.os.rename", side_effect=OSError("EIO")
             ),
-            mock.patch("tenant.tasks.flush_tenant_media_task.delay") as delay,
+            mock.patch(
+                "tenant.tasks.flush_tenant_media_task.apply_async"
+            ) as dispatch,
             pytest.raises(OSError),
         ):
             activate_tenant(tenant)
@@ -236,7 +250,7 @@ class TestActivationNeverLeavesImagesParked:
         tenant.refresh_from_db()
         assert tenant.is_active is False
         assert tenant.suspended_at is not None
-        delay.assert_not_called()
+        dispatch.assert_not_called()
 
     def test_a_live_tree_in_the_way_keeps_the_store_suspended(self, media_root):
         from tenant.lifecycle import activate_tenant, suspend_tenant
@@ -244,13 +258,15 @@ class TestActivationNeverLeavesImagesParked:
 
         _uploads(media_root, "restore_conflict")
         tenant = store_tenant("restore_conflict")
-        with mock.patch("tenant.tasks.flush_tenant_media_task.delay"):
+        with mock.patch("tenant.tasks.flush_tenant_media_task.apply_async"):
             suspend_tenant(tenant, reason=SuspendedReason.MANUAL)
         # Something wrote to the served tree while the store was suspended.
         (media_root / "restore_conflict").mkdir()
 
         with (
-            mock.patch("tenant.tasks.flush_tenant_media_task.delay") as delay,
+            mock.patch(
+                "tenant.tasks.flush_tenant_media_task.apply_async"
+            ) as dispatch,
             pytest.raises(FileExistsError),
         ):
             activate_tenant(tenant)
@@ -264,7 +280,7 @@ class TestActivationNeverLeavesImagesParked:
             / "uploads"
             / "logo.png"
         ).exists()
-        delay.assert_not_called()
+        dispatch.assert_not_called()
 
 
 class TestPurgeTokenFreshness:

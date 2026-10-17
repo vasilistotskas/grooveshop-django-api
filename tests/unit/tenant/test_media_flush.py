@@ -72,11 +72,46 @@ class TestSuspendDispatchesFlush:
         from tenant.models import SuspendedReason
 
         tenant = store_tenant("media_flush_tenant")
-        with mock.patch("tenant.tasks.flush_tenant_media_task.delay") as delay:
+        with mock.patch(
+            "tenant.tasks.flush_tenant_media_task.apply_async"
+        ) as dispatch:
             assert (
                 suspend_tenant(tenant, reason=SuspendedReason.BILLING) is True
             )
-        delay.assert_called_once_with("media_flush_tenant", [])
+        dispatch.assert_called_once()
+        assert dispatch.call_args.kwargs["args"] == ["media_flush_tenant", []]
+
+    def test_the_flush_is_queued_only_once_the_suspension_commits(
+        self, monkeypatch
+    ):
+        """media-stream re-reads the tenant feed when the flush reaches
+        it, so a task that ran before the commit would read the store as
+        still active and keep serving it until the next poll."""
+        from django.db import transaction
+
+        from tenant.lifecycle import suspend_tenant
+        from tenant.models import SuspendedReason
+
+        tenant = store_tenant("media_flush_on_commit")
+        pending = []
+        monkeypatch.setattr(
+            transaction,
+            "on_commit",
+            lambda func, using=None, robust=False: pending.append(func),
+        )
+
+        with mock.patch(
+            "tenant.tasks.flush_tenant_media_task.apply_async"
+        ) as dispatch:
+            suspend_tenant(tenant, reason=SuspendedReason.MANUAL)
+            dispatch.assert_not_called()
+
+            for func in pending:
+                func()
+
+        dispatch.assert_called_once()
+        assert dispatch.call_args.kwargs["args"][0] == "media_flush_on_commit"
+        assert dispatch.call_args.kwargs["headers"]["_schema_name"] == "public"
 
     def test_noop_resuspend_does_not_dispatch(self):
         from tenant.lifecycle import suspend_tenant
@@ -85,11 +120,13 @@ class TestSuspendDispatchesFlush:
         tenant = store_tenant("media_flush_resuspend")
         suspend_tenant(tenant, reason=SuspendedReason.MANUAL)
         # Already suspended — a second call is a no-op and must not flush.
-        with mock.patch("tenant.tasks.flush_tenant_media_task.delay") as delay:
+        with mock.patch(
+            "tenant.tasks.flush_tenant_media_task.apply_async"
+        ) as dispatch:
             assert (
                 suspend_tenant(tenant, reason=SuspendedReason.BILLING) is False
             )
-        delay.assert_not_called()
+        dispatch.assert_not_called()
 
     def test_dispatch_failure_does_not_break_suspend(self):
         from tenant.lifecycle import suspend_tenant
@@ -97,7 +134,7 @@ class TestSuspendDispatchesFlush:
 
         tenant = store_tenant("media_flush_broker_down")
         with mock.patch(
-            "tenant.tasks.flush_tenant_media_task.delay",
+            "tenant.tasks.flush_tenant_media_task.apply_async",
             side_effect=RuntimeError("broker down"),
         ):
             # Suspension still succeeds despite the dispatch failing.
@@ -180,10 +217,12 @@ class TestLifecyclePlansTheEdgePurge:
         TenantDomain.objects.create(
             domain="assets.shop.example", tenant=tenant, is_primary=False
         )
-        with mock.patch("tenant.tasks.flush_tenant_media_task.delay") as delay:
+        with mock.patch(
+            "tenant.tasks.flush_tenant_media_task.apply_async"
+        ) as dispatch:
             suspend_tenant(tenant, reason=SuspendedReason.BILLING)
 
-        schema, plan = delay.call_args.args
+        schema, plan = dispatch.call_args.kwargs["args"]
         assert schema == "edge_suspend"
         assert plan[0] == {
             "zone_id": "a" * 32,
@@ -197,7 +236,7 @@ class TestLifecyclePlansTheEdgePurge:
         ]
         # The own zone's token rides along only as the stored ciphertext.
         assert plan[1]["token_ciphertext"]
-        assert "own-token-secret" not in repr(delay.call_args)
+        assert "own-token-secret" not in repr(dispatch.call_args)
 
     def test_a_failing_plan_query_does_not_abort_the_destroy(self):
         """The plan runs inside destroy_tenant's transaction; a query error
@@ -224,14 +263,17 @@ class TestLifecyclePlansTheEdgePurge:
             mock.patch(
                 "core.cache.edge.tenant_media_purges", side_effect=failing_plan
             ),
-            mock.patch("tenant.tasks.flush_tenant_media_task.delay") as delay,
+            mock.patch(
+                "tenant.tasks.flush_tenant_media_task.apply_async"
+            ) as dispatch,
             mock.patch.object(Tenant, "delete", autospec=True),
             mock.patch("tenant.offboarding.purge_search_indexes"),
             mock.patch("tenant.offboarding.purge_tenant_files"),
         ):
             destroy_tenant(tenant)
 
-        delay.assert_called_once_with("edge_plan_fails", [])
+        dispatch.assert_called_once()
+        assert dispatch.call_args.kwargs["args"] == ["edge_plan_fails", []]
 
     def test_destroy_plans_before_the_row_and_its_domains_are_gone(self):
         from datetime import timedelta
@@ -252,7 +294,9 @@ class TestLifecyclePlansTheEdgePurge:
             is_primary=False,
         )
         with (
-            mock.patch("tenant.tasks.flush_tenant_media_task.delay") as delay,
+            mock.patch(
+                "tenant.tasks.flush_tenant_media_task.apply_async"
+            ) as dispatch,
             mock.patch.object(
                 Tenant,
                 "delete",
@@ -265,7 +309,7 @@ class TestLifecyclePlansTheEdgePurge:
             destroy_tenant(tenant)
 
         assert not TenantDomain.objects.filter(tenant=tenant).exists()
-        _schema, plan = delay.call_args.args
+        _schema, plan = dispatch.call_args.kwargs["args"]
         assert plan[0]["prefixes"] == [
             "assets.edge-destroy.grooveshop.space/media_stream-image/media/edge_destroy/",
             "assets.grooveshop.space/media_stream-image/media/edge_destroy/",
@@ -281,7 +325,10 @@ class TestLifecyclePlansTheEdgePurge:
                 "core.cache.edge.tenant_media_purges",
                 side_effect=RuntimeError("boom"),
             ),
-            mock.patch("tenant.tasks.flush_tenant_media_task.delay") as delay,
+            mock.patch(
+                "tenant.tasks.flush_tenant_media_task.apply_async"
+            ) as dispatch,
         ):
             assert suspend_tenant(tenant, reason=SuspendedReason.MANUAL) is True
-        delay.assert_called_once_with("edge_unplannable", [])
+        dispatch.assert_called_once()
+        assert dispatch.call_args.kwargs["args"] == ["edge_unplannable", []]

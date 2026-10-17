@@ -145,14 +145,24 @@ def _media_edge_purges(tenant) -> list[MediaPurge]:
 def _dispatch_media_flush(
     schema_name: str, edge_purges: list[MediaPurge] | None = None
 ) -> None:
-    try:
-        from tenant.tasks import flush_tenant_media_task
+    """Queue the media flush for after the state change commits.
 
-        flush_tenant_media_task.delay(schema_name, edge_purges or [])
-    except Exception:
-        logging.getLogger(__name__).warning(
-            "could not dispatch media flush for %s", schema_name
-        )
+    media-stream re-reads the tenant feed when the flush reaches it, and
+    serves or refuses the store's images by what it reads, so the task
+    must never run before the new state is visible. Robust: a broker
+    failure is logged and never fails the change that queued it.
+    """
+    from django_tenants.utils import get_public_schema_name
+
+    from tenant.celery import dispatch_on_commit
+    from tenant.tasks import flush_tenant_media_task
+
+    dispatch_on_commit(
+        flush_tenant_media_task,
+        [schema_name, edge_purges or []],
+        schema_name=get_public_schema_name(),
+        robust=True,
+    )
 
 
 def activate_tenant(tenant) -> bool:
@@ -170,18 +180,19 @@ def activate_tenant(tenant) -> bool:
     # parked and nothing to retry.
     from tenant.media_parking import restore_tenant_media
 
-    restored = restore_tenant_media(tenant.schema_name)
+    restore_tenant_media(tenant.schema_name)
 
     tenant.is_active = True
     tenant.suspended_at = None
     tenant.suspended_reason = ""
     tenant.save(update_fields=["is_active", "suspended_at", "suspended_reason"])
 
-    # Drop what was cached while the originals were away: media-stream's
-    # placeholders and 5-minute negative entries, and the edge's copies of
-    # both. Nothing restored, nothing to drop.
-    if restored:
-        _dispatch_media_flush(tenant.schema_name, _media_edge_purges(tenant))
+    # Always, restored or not: the flush is what makes media-stream re-read
+    # the tenant feed and serve the store's images again at once rather
+    # than at its next poll. It also drops what was cached while the store
+    # was suspended (placeholders, 5-minute negative entries) and the
+    # edge's copies of them.
+    _dispatch_media_flush(tenant.schema_name, _media_edge_purges(tenant))
     return True
 
 

@@ -9953,7 +9953,7 @@ msgid "Event Type ID"
 msgstr ""
 
 #: .\order\models\viva_webhook_event.py:49
-msgid "Viva ``EventTypeId`` — 1796/1797/1798"
+msgid "Viva ``EventTypeId`` — 1796/1797/1798/2054"
 msgstr ""
 
 #: .\order\models\viva_webhook_event.py:60
@@ -20443,16 +20443,22 @@ msgid "Chargeback %(amount)s"
 msgstr ""
 
 #, python-format
-msgid "[%(site)s] Stripe dispute lost — Order #%(order)s"
+msgid "[%(site)s] %(provider)s dispute lost — Order #%(order)s"
 msgstr ""
 
 #, python-format
-msgid "[%(site)s] Stripe dispute opened — Order #%(order)s"
+msgid "[%(site)s] %(provider)s dispute opened — Order #%(order)s"
 msgstr ""
 
 #, python-format
-msgid "Stripe dispute lost — Order #%(order_id)s"
+msgid "%(provider)s dispute lost — Order #%(order_id)s"
 msgstr ""
 
 msgid "The dispute closed against you and the money was taken back. It is recorded as a chargeback on the order's payment ledger, so it can no longer be refunded. The order status and payment status have NOT been changed."
+msgstr ""
+
+msgid "Account Transaction Created"
+msgstr ""
+
+msgid "A dispute is open on this payment and the payment provider does not accept a refund until it is decided. Refund once it has closed."
 msgstr ""

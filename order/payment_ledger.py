@@ -115,6 +115,34 @@ class PaymentLedger:
             )
         )
 
+    @staticmethod
+    def dispute_open(order: Order, metadata: dict | None) -> bool:
+        """Whether a cardholder dispute against *order*'s payment is open,
+        from the ``disputed`` / ``dispute_id`` / ``dispute_status`` flags
+        the provider handlers keep in ``Order.metadata`` (*metadata* is
+        passed in so a caller holding the order lock reads it fresh).
+
+        Stripe ("you can't issue a refund on a disputed charge until your
+        customer's card issuer decides in your favor",
+        docs.stripe.com/disputes/withdrawing) and Viva (a disputed payment
+        cannot be refunded by the merchant) both refuse a refund meanwhile.
+        An inquiry (``warning_*``) is not a dispute: Stripe lets the
+        merchant refund it to resolve it. A dispute that closed against the
+        merchant is no longer open: its CHARGEBACK row, keyed on the
+        dispute id, says so.
+        """
+        metadata = metadata or {}
+        dispute_id = metadata.get("dispute_id")
+        if not metadata.get("disputed") or not dispute_id:
+            return False
+        if str(metadata.get("dispute_status", "")).startswith("warning_"):
+            return False
+        return not PaymentTransaction.objects.filter(
+            order=order,
+            kind=PaymentTransactionKind.CHARGEBACK,
+            provider_reference=dispute_id,
+        ).exists()
+
     @classmethod
     def fully_returned(cls, order: Order) -> bool:
         """Whether refunds and chargebacks together cover everything that

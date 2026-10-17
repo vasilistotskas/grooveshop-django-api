@@ -709,7 +709,11 @@ class TestHandleStripeDisputeCreated:
         assert order.metadata.get("disputed") is True
         assert order.metadata.get("dispute_id") == "dp_test_1"
         mock_email.assert_called_once()
-        assert mock_email.call_args.kwargs["args"] == [order.id, "dp_test_1"]
+        assert mock_email.call_args.kwargs["args"] == [
+            order.id,
+            "dp_test_1",
+            "stripe",
+        ]
         assert "_schema_name" in mock_email.call_args.kwargs["headers"]
 
     def test_dispute_without_payment_intent_is_noop(self):

@@ -481,7 +481,21 @@ def _verify_viva_terminal_transaction(
 
 
 def _verify_viva_refund(subject, transaction_id, order_codes) -> Decimal | None:
-    """Verify a reversal (1797) and return how much it refunded.
+    """Verify a reversal (1797) that is a refund and return how much it
+    refunded; ``None`` for anything else, a refund claim included."""
+    from order.payment import VIVA_REFUND_TRANSACTION_TYPE_IDS
+
+    verified = _verify_viva_reversal(
+        subject, transaction_id, order_codes, VIVA_REFUND_TRANSACTION_TYPE_IDS
+    )
+    return None if verified is None else verified[0]
+
+
+def _verify_viva_reversal(
+    subject, transaction_id, order_codes, type_ids
+) -> tuple[Decimal, int] | None:
+    """Verify a reversal (1797) of one of *type_ids* and return how much it
+    moved and its ``TransactionTypeId``.
 
     The event's ``TransactionId`` is the REFUND, a transaction of its own
     (``ParentId`` names the payment it reverses). Per Viva's documented
@@ -500,16 +514,13 @@ def _verify_viva_refund(subject, transaction_id, order_codes) -> Decimal | None:
     or anyone could post their OWN real refund against someone else's
     order.
 
-    Returns the refunded amount as a positive ``Decimal``, or ``None``
-    (skip, no mutation) for an event that is not a verified refund of one
-    of *order_codes*. Raises ``RuntimeError`` (→ 500, Viva retries) when
+    Returns the amount as a positive ``Decimal`` with the type id, or ``None``
+    (skip, no mutation) for an event that is not a verified reversal of one
+    of *order_codes* of a wanted type. Raises ``RuntimeError`` (→ 500, Viva retries) when
     verification is UNAVAILABLE, including a response with no readable
     amount.
     """
-    from order.payment import (
-        VIVA_REFUND_TRANSACTION_TYPE_IDS,
-        VIVA_STATUS_FINISHED,
-    )
+    from order.payment import VIVA_STATUS_FINISHED
 
     if not transaction_id:
         logger.error(
@@ -534,10 +545,7 @@ def _verify_viva_refund(subject, transaction_id, order_codes) -> Decimal | None:
 
     status_id = data.get("raw_status")
     type_id = data.get("transaction_type_id")
-    if (
-        status_id != VIVA_STATUS_FINISHED
-        or type_id not in VIVA_REFUND_TRANSACTION_TYPE_IDS
-    ):
+    if status_id != VIVA_STATUS_FINISHED or type_id not in type_ids:
         logger.warning(
             "Viva reversal event for %s: transaction %s is not a completed "
             "refund (statusId=%r, transactionTypeId=%r) — skipping",
@@ -564,7 +572,7 @@ def _verify_viva_refund(subject, transaction_id, order_codes) -> Decimal | None:
         )
         return None
 
-    return -signed_amount
+    return -signed_amount, type_id
 
 
 def _handle_webhook_event(request):
@@ -629,6 +637,9 @@ def _handle_webhook_event(request):
         },
     )
 
+    if event_type_id == VIVA_ACCOUNT_TRANSACTION_CREATED:
+        return _handle_account_transaction_event(request, event_data)
+
     if not order_code:
         logger.warning("No OrderCode in Viva Wallet webhook")
         return JsonResponse({"status": "ok"})
@@ -681,6 +692,33 @@ def _handle_webhook_event(request):
     # fallback) needs the real fields, including inside
     # ``VivaWalletPaymentProvider.__init__`` which authenticates this
     # very webhook.
+    return _process_in_first_verifying_tenant(
+        candidates,
+        request,
+        subject=f"order code {order_code}",
+        process=lambda: _process_event_in_tenant(
+            order_code=order_code,
+            event_type_id=event_type_id,
+            event_data=event_data,
+            transaction_id=transaction_id,
+            status_id=status_id,
+            txn_hash=txn_hash,
+        ),
+    )
+
+
+def _process_in_first_verifying_tenant(
+    candidates, request, *, subject, process
+):
+    """Run *process* inside each candidate tenant until one does not answer
+    500, and return that response (the last 500 when none does).
+
+    The verify-then-select contract of the order-code resolution above, shared
+    with the dispute path: a candidate that does not own the transaction fails
+    its Retrieve Transaction call, so ``process`` answers 500 with its atomic
+    block rolled back (no side effects) and the next candidate is tried.
+    *subject* names what matched, for the log lines.
+    """
     multi = len(candidates) > 1
     last_response = None
     for tenant in candidates:
@@ -701,21 +739,14 @@ def _handle_webhook_event(request):
                     observed_ip,
                 )
 
-            response = _process_event_in_tenant(
-                order_code=order_code,
-                event_type_id=event_type_id,
-                event_data=event_data,
-                transaction_id=transaction_id,
-                status_id=status_id,
-                txn_hash=txn_hash,
-            )
+            response = process()
 
         if response.status_code != 500:
             if multi:
                 logger.warning(
-                    "Viva webhook: order code %s matched %d tenants; "
+                    "Viva webhook: %s matched %d tenants; "
                     "processed in the one that verified (schema=%s)",
-                    order_code,
+                    subject,
                     len(candidates),
                     tenant.schema_name,
                 )
@@ -726,16 +757,16 @@ def _handle_webhook_event(request):
             # 500s for ordinary transient verification failures too.
             logger.warning(
                 "Viva webhook: candidate tenant schema=%s did not verify "
-                "the transaction for order code %s — trying next candidate",
+                "the transaction for %s — trying next candidate",
                 tenant.schema_name,
-                order_code,
+                subject,
             )
 
     if multi:
         logger.error(
-            "Viva webhook: order code %s matched %d tenants but NONE "
+            "Viva webhook: %s matched %d tenants but NONE "
             "verified the transaction — returning 500 so Viva retries",
-            order_code,
+            subject,
             len(candidates),
         )
     return last_response
@@ -1569,15 +1600,21 @@ def _handle_reversal_created(order, event_data, transaction_id):
     redelivers: both hit the ledger's unique constraint on the refund
     transaction id and change nothing.
 
+    A reversal whose type is a refund claim (``VIVA_REFUND_CLAIMED_*``) is a
+    chargeback and goes to :func:`_record_viva_chargeback` instead, under the
+    same key as a lost dispute read from the payment's status, so one
+    dispute is booked once however Viva reports it.
+
     Returns ``OUTCOME_SKIPPED`` when the event changed nothing, so the
     audit row says so; ``None`` when a refund was booked.
     """
     from djmoney.money import Money
 
-    from order.enum.payment_transaction import PaymentTransactionKind
-    from order.models.payment_transaction import PaymentTransaction
     from order.models.viva_webhook_event import VivaWebhookEvent
-    from order.payment import VivaWalletPaymentProvider
+    from order.payment import (
+        VIVA_REFUND_CLAIMED_TRANSACTION_TYPE_IDS,
+        VIVA_REFUND_TRANSACTION_TYPE_IDS,
+    )
     from order.payment_ledger import PaymentLedger
     from order.signals import order_refunded
 
@@ -1589,48 +1626,26 @@ def _handle_reversal_created(order, event_data, transaction_id):
     # Verify FIRST, whatever else could end the event early: a tenant that
     # does not own the transaction must answer 500 so the candidate loop
     # moves on (see ``_handle_payment_failed``).
-    refunded = _verify_viva_refund(
-        f"order {order.id}", transaction_id, order_viva_codes(order)
+    verified = _verify_viva_reversal(
+        f"order {order.id}",
+        transaction_id,
+        order_viva_codes(order),
+        VIVA_REFUND_TRANSACTION_TYPE_IDS
+        | VIVA_REFUND_CLAIMED_TRANSACTION_TYPE_IDS,
     )
-    if refunded is None:
+    if verified is None:
         return VivaWebhookEvent.OUTCOME_SKIPPED
+    refunded, type_id = verified
 
-    # The refund must reverse one of THIS order's payments, not another
+    # The reversal must reverse one of THIS order's payments, not another
     # payment that happens to share its order code. Retrieve Transaction
     # does not document a parent id, so this is the event's own
-    # ``ParentId``; it can only refuse, never grant — the refund itself was
+    # ``ParentId``; it can only refuse, never grant — the reversal itself was
     # verified above, and the payment it is attached to comes from our own
     # ledger rows (or, for an order whose capture was never recorded, from
     # the order's own ``payment_id``), never from the event.
     parent_id = str(event_data.get("ParentId") or "")
-    charge = (
-        PaymentTransaction.objects.filter(
-            order=order,
-            kind=PaymentTransactionKind.CHARGE,
-            provider=VivaWalletPaymentProvider.code,
-            provider_reference__iexact=parent_id,
-        ).first()
-        if parent_id
-        else None
-    )
-    if (
-        charge is None
-        and parent_id
-        and order.payment_id
-        and parent_id.lower() == order.payment_id.lower()
-    ):
-        charge = PaymentLedger.ensure_charge(
-            order,
-            provider_code=VivaWalletPaymentProvider.code,
-            payment_id=order.payment_id,
-        )
-        if charge is None:
-            # Without it the refund cannot be attached to a payment. Retry
-            # rather than guess.
-            raise RuntimeError(
-                f"Viva captured amount unavailable for payment "
-                f"{order.payment_id}"
-            )
+    charge = _viva_charge_for(order, parent_id)
     if charge is None:
         logger.error(
             "Viva reversal %s names parent %r, which is none of order %s's "
@@ -1640,6 +1655,13 @@ def _handle_reversal_created(order, event_data, transaction_id):
             order.id,
         )
         return VivaWebhookEvent.OUTCOME_SKIPPED
+
+    if type_id in VIVA_REFUND_CLAIMED_TRANSACTION_TYPE_IDS:
+        # A refund claim is money the cardholder's bank took back: a
+        # chargeback, not a refund the merchant made.
+        return _record_viva_chargeback(
+            order, charge, Money(refunded, charge.amount.currency)
+        )
 
     previous_payment_status = order.payment_status
     refund = Money(refunded, charge.amount.currency)
@@ -1670,3 +1692,321 @@ def _handle_reversal_created(order, event_data, transaction_id):
     order_refunded.send(
         sender=Order, order=order, amount=refund, refund=refund_row
     )
+
+
+def _viva_charge_for(order, payment_id: str):
+    """The ledger's CHARGE of *order* for Viva transaction *payment_id*, or
+    ``None`` when it is none of the order's payments.
+
+    For an order whose capture was never recorded, *payment_id* may be the
+    order's own ``payment_id``: the capture is then read from Viva once and
+    recorded. Raises ``RuntimeError`` (→ 500, Viva retries) when it cannot
+    be read: retry rather than guess.
+    """
+    from order.enum.payment_transaction import PaymentTransactionKind
+    from order.models.payment_transaction import PaymentTransaction
+    from order.payment import VivaWalletPaymentProvider
+    from order.payment_ledger import PaymentLedger
+
+    if not payment_id:
+        return None
+    charge = PaymentTransaction.objects.filter(
+        order=order,
+        kind=PaymentTransactionKind.CHARGE,
+        provider=VivaWalletPaymentProvider.code,
+        provider_reference__iexact=payment_id,
+    ).first()
+    if (
+        charge is None
+        and order.payment_id
+        and payment_id.lower() == order.payment_id.lower()
+    ):
+        charge = PaymentLedger.ensure_charge(
+            order,
+            provider_code=VivaWalletPaymentProvider.code,
+            payment_id=order.payment_id,
+        )
+        if charge is None:
+            raise RuntimeError(
+                f"Viva captured amount unavailable for payment "
+                f"{order.payment_id}"
+            )
+    return charge
+
+
+def _record_viva_chargeback(order, charge, amount):
+    """Book a Viva chargeback of *amount* against *charge*, with the red
+    history entry and the staff email. No customer email and no
+    ``order_refunded``: nothing was paid back.
+
+    Keyed on the CHARGE's own Viva transaction id, the original sale. The
+    ledger's key includes the kind, so it cannot collide with the CHARGE row,
+    and a refund claim (1797) and a lost dispute (2054) for the same sale hit
+    the same key and book it once.
+
+    Returns ``OUTCOME_SKIPPED`` when the ledger already holds it, ``None``
+    when it was booked.
+    """
+    from order.models.viva_webhook_event import VivaWebhookEvent
+    from order.payment import VivaWalletPaymentProvider
+    from order.payment_ledger import PaymentLedger
+    from order.tasks import send_dispute_notification_email
+
+    reference = charge.provider_reference
+    row, created = PaymentLedger.record_chargeback(
+        order, charge=charge, amount=amount, reference=reference
+    )
+    if not created:
+        logger.info(
+            "Viva chargeback for sale %s is already recorded on order %s — "
+            "skipping",
+            reference,
+            order.id,
+        )
+        return VivaWebhookEvent.OUTCOME_SKIPPED
+    OrderHistory.log_chargeback(order, row.amount, reference)
+    dispatch_on_commit(
+        send_dispute_notification_email,
+        [order.id, reference, VivaWalletPaymentProvider.code],
+        {"lost": True},
+    )
+    return None
+
+
+#: Viva ``EventTypeId`` of Account Transaction Created
+#: (developer.viva.com/webhooks-for-payments/account-transaction-created/):
+#: fires on any wallet balance change, disputes and chargebacks among them,
+#: and also on clearances, fees and payouts. Its payload carries no
+#: ``OrderCode``; ``EventData.SaleTransactionId`` is "the transaction id
+#: which is matched to the wallet transaction".
+VIVA_ACCOUNT_TRANSACTION_CREATED = 2054
+
+
+def _resolve_tenant_candidates_for_sale(sale_id: str) -> list:
+    """Every active tenant whose ledger holds a Viva CHARGE for *sale_id*, or
+    whose order was paid by that transaction.
+
+    An account transaction has no order code to resolve a tenant by, and
+    trying every Viva-configured tenant's credentials against every wallet
+    movement (fees, payouts, clearances) would cost one Viva API call per
+    tenant per event. The sale id is what a dispute is about, and ours is on
+    the ledger, so this is database lookups only; the Retrieve Transaction
+    call that follows is still what authenticates the event.
+    """
+    from order.enum.payment_transaction import PaymentTransactionKind
+    from order.models.payment_transaction import PaymentTransaction
+    from order.payment import VivaWalletPaymentProvider
+    from tenant.models import Tenant
+
+    public = get_public_schema_name()
+    candidates = []
+    for tenant in Tenant.objects.filter(
+        is_active=True, suspended_at__isnull=True
+    ).exclude(schema_name=public):
+        with schema_context(tenant.schema_name):
+            if (
+                PaymentTransaction.objects.filter(
+                    kind=PaymentTransactionKind.CHARGE,
+                    provider=VivaWalletPaymentProvider.code,
+                    provider_reference__iexact=sale_id,
+                ).exists()
+                or Order.objects.filter(payment_id__iexact=sale_id).exists()
+            ):
+                candidates.append(tenant)
+    return candidates
+
+
+def _handle_account_transaction_event(request, event_data: dict):
+    """Account Transaction Created (2054): follow a dispute of one of our
+    payments.
+
+    Everything else this event reports (clearances, fees, payouts, a sale
+    that is none of ours, an event without ``SaleTransactionId``) is
+    acknowledged and ignored. SubTypeIds are not interpreted: Viva
+    documents no subtype for the chargeback debit itself, so the dispute is
+    read from the original payment's ``StatusId`` (``M``/``MA``/``MI`` open,
+    ``ML`` lost, ``MW`` won), retrieved from Viva, never from the body.
+    """
+    sale_id = str(event_data.get("SaleTransactionId") or "")
+    if not sale_id:
+        logger.info("Viva account transaction without SaleTransactionId")
+        return JsonResponse({"status": "ok"})
+
+    candidates = _resolve_tenant_candidates_for_sale(sale_id)
+    if not candidates:
+        logger.info(
+            "Viva account transaction for a sale that is no store's payment "
+            "— ignoring"
+        )
+        return JsonResponse({"status": "ok"})
+
+    transaction_id = str(event_data.get("TransactionId") or "")
+    return _process_in_first_verifying_tenant(
+        candidates,
+        request,
+        subject="a dispute sale transaction",
+        process=lambda: _process_dispute_event_in_tenant(
+            sale_id=sale_id, transaction_id=transaction_id
+        ),
+    )
+
+
+def _process_dispute_event_in_tenant(
+    *, sale_id: str, transaction_id: str
+) -> JsonResponse:
+    """The dispute state of payment *sale_id* inside an active tenant schema.
+
+    Same contract as ``_process_event_in_tenant``: the event is deduplicated
+    on ``VivaWebhookEvent`` (its own ``TransactionId`` and 2054), a failed
+    verification answers 500 with nothing written so the candidate loop moves
+    on, and the audit row is written last.
+    """
+    from djmoney.money import Money
+
+    from order.models.viva_webhook_event import VivaWebhookEvent
+    from order.payment import (
+        VIVA_DISPUTE_LOST_STATUS_ID,
+        VIVA_DISPUTE_OPEN_STATUS_IDS,
+        VIVA_DISPUTE_WON_STATUS_ID,
+    )
+
+    def processed() -> bool:
+        return bool(
+            transaction_id
+            and VivaWebhookEvent.objects.filter(
+                transaction_id=transaction_id,
+                event_type_id=VIVA_ACCOUNT_TRANSACTION_CREATED,
+            ).exists()
+        )
+
+    if processed():
+        return JsonResponse({"status": "ok"})
+
+    try:
+        with transaction.atomic():
+            # Authenticate and match first: Retrieve Transaction names the
+            # order code, and OrderCode AND TransactionId together are what
+            # prove the sale is this order's.
+            _status, data = _retrieve_transaction(sale_id)
+            order_code = data.get("order_code")
+            if not order_code:
+                raise RuntimeError(
+                    f"Viva transaction {sale_id!r} was verified without an "
+                    "orderCode — cannot match it to an order"
+                )
+            order = (
+                Order.objects.select_for_update()
+                .filter(viva_order_code_q(order_code))
+                .first()
+            )
+            charge = _viva_charge_for(order, sale_id) if order else None
+            if order is None or charge is None:
+                logger.info(
+                    "Viva dispute event: sale %s matches no order payment — "
+                    "ignoring",
+                    sale_id,
+                )
+                return JsonResponse({"status": "ok"})
+            if processed():
+                return JsonResponse({"status": "ok"})
+
+            raw_status = data.get("raw_status") or ""
+            outcome = VivaWebhookEvent.OUTCOME_SKIPPED
+            if raw_status in VIVA_DISPUTE_OPEN_STATUS_IDS:
+                outcome = _note_viva_dispute_opened(
+                    order, charge.provider_reference, raw_status
+                )
+            elif raw_status == VIVA_DISPUTE_LOST_STATUS_ID:
+                try:
+                    claimed = abs(Decimal(str(data.get("amount"))))
+                except InvalidOperation:
+                    raise RuntimeError(
+                        f"Viva transaction {sale_id} carries no readable amount"
+                    ) from None
+                outcome = _record_viva_chargeback(
+                    order,
+                    charge,
+                    Money(
+                        claimed,
+                        data.get("currency") or charge.amount.currency,
+                    ),
+                )
+            elif raw_status == VIVA_DISPUTE_WON_STATUS_ID:
+                outcome = _note_viva_dispute_won(
+                    order, charge.provider_reference
+                )
+            else:
+                logger.info(
+                    "Viva dispute event: sale %s has status %r, which is no "
+                    "dispute state — ignoring",
+                    sale_id,
+                    raw_status,
+                )
+
+            if transaction_id:
+                VivaWebhookEvent.objects.create(
+                    transaction_id=transaction_id,
+                    event_type_id=VIVA_ACCOUNT_TRANSACTION_CREATED,
+                    order=order,
+                    order_code=str(order_code),
+                    status_id=raw_status[:4],
+                    outcome=outcome or VivaWebhookEvent.OUTCOME_PROCESSED,
+                )
+    except RuntimeError as exc:
+        logger.error("Viva dispute event processing error: %s", exc)
+        return JsonResponse(
+            {"error": "Internal verification error, please retry"},
+            status=500,
+        )
+    return JsonResponse({"status": "ok"})
+
+
+def _note_viva_dispute_opened(order, dispute_id: str, raw_status: str):
+    """Flag *order* as disputed and tell staff, once per dispute. The flag
+    is what refuses a refund while the dispute is open
+    (``PaymentLedger.dispute_open``)."""
+    from order.models.viva_webhook_event import VivaWebhookEvent
+    from order.payment import VivaWalletPaymentProvider
+    from order.tasks import send_dispute_notification_email
+
+    metadata = dict(order.metadata or {})
+    announced = (
+        metadata.get("disputed") and metadata.get("dispute_id") == dispute_id
+    )
+    metadata.update(
+        disputed=True, dispute_id=dispute_id, dispute_status=raw_status
+    )
+    order.metadata = metadata
+    order.save(update_fields=["metadata"])
+    if announced:
+        return VivaWebhookEvent.OUTCOME_SKIPPED
+    OrderHistory.log_note(
+        order=order,
+        note=(
+            f"Viva Wallet dispute opened: sale transaction={dispute_id}, "
+            f"status={raw_status}"
+        ),
+    )
+    dispatch_on_commit(
+        send_dispute_notification_email,
+        [order.id, dispute_id, VivaWalletPaymentProvider.code],
+    )
+    return None
+
+
+def _note_viva_dispute_won(order, dispute_id: str):
+    """Clear the dispute flag and note it, once per dispute."""
+    from order.models.viva_webhook_event import VivaWebhookEvent
+
+    metadata = dict(order.metadata or {})
+    if metadata.get("dispute_resolved_id") == dispute_id:
+        return VivaWebhookEvent.OUTCOME_SKIPPED
+    metadata.pop("disputed", None)
+    metadata["dispute_resolved_id"] = dispute_id
+    order.metadata = metadata
+    order.save(update_fields=["metadata"])
+    OrderHistory.log_note(
+        order=order,
+        note=f"Viva Wallet dispute won: sale transaction={dispute_id}",
+    )
+    return None

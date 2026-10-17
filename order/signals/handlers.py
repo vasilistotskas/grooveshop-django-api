@@ -1272,6 +1272,7 @@ def handle_stripe_dispute_created(sender, **kwargs):
             order.metadata["disputed"] = True
             order.metadata["dispute_id"] = dispute_id
             order.metadata["dispute_reason"] = reason
+            order.metadata["dispute_status"] = dispute_data.get("status", "")
             order.metadata[f"webhook_processed_{event_id}"] = True
             order.save(update_fields=["metadata"])
 
@@ -1296,7 +1297,8 @@ def handle_stripe_dispute_created(sender, **kwargs):
         )
 
         dispatch_on_commit(
-            send_dispute_notification_email, [order.id, dispute_id]
+            send_dispute_notification_email,
+            [order.id, dispute_id, StripePaymentProvider.code],
         )
 
     except KeyError, TypeError:
@@ -1321,9 +1323,9 @@ def handle_stripe_dispute_closed(sender, **kwargs):
     the customer; ``PaymentLedger.record_chargeback`` lowers what staff can
     still refund.
 
-    ``won`` clears the ``disputed`` flag the created handler set. Any other
-    closing status (``warning_closed``: an inquiry that never became a
-    dispute) leaves a history note and nothing else.
+    Any other closing status clears the ``disputed`` flag the created
+    handler set (``won``; ``warning_closed``, an inquiry that never became
+    a dispute) and leaves a history note, no row.
 
     Runs inside dj-stripe's webhook atomic, so everything but a malformed
     payload propagates (see ``charge.refunded``).
@@ -1401,7 +1403,11 @@ def handle_stripe_dispute_closed(sender, **kwargs):
 
             if not order.metadata:
                 order.metadata = {}
-            if dispute_status == "won":
+            if not lost:
+                # Closed in the merchant's favour, or an inquiry that never
+                # became a dispute: nothing is open any more. A lost one
+                # keeps the flag: it names the dispute whose CHARGEBACK row
+                # closes it (``PaymentLedger.dispute_open``).
                 order.metadata.pop("disputed", None)
             order.metadata[f"webhook_processed_{event_id}"] = True
             order.save(update_fields=["metadata"])
@@ -1410,7 +1416,7 @@ def handle_stripe_dispute_closed(sender, **kwargs):
             OrderHistory.log_chargeback(order, chargeback.amount, dispute_id)
             dispatch_on_commit(
                 send_dispute_notification_email,
-                [order.id, dispute_id],
+                [order.id, dispute_id, StripePaymentProvider.code],
                 {"lost": True},
             )
         elif not lost:

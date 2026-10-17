@@ -374,7 +374,6 @@ class TestVivaReversalWebhook:
     @pytest.mark.parametrize(
         "retrieved",
         [
-            pytest.param({"transactionTypeId": 13}, id="a-chargeback"),
             pytest.param({"statusId": "E"}, id="a-refund-that-failed"),
             pytest.param({"refund_amount": -10.0}, id="a-positive-amount"),
             pytest.param(

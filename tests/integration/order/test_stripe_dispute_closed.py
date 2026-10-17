@@ -175,7 +175,11 @@ class TestDisputeLost:
         assert entry.new_value["dispute_id"] == DISPUTE
         assert ORDER_HISTORY_CHANGE_TYPE_VARIANT[entry.change_type] == "danger"
         email.assert_called_once()
-        assert email.call_args.kwargs["args"] == [order.id, DISPUTE]
+        assert email.call_args.kwargs["args"] == [
+            order.id,
+            DISPUTE,
+            "stripe",
+        ]
         assert email.call_args.kwargs["kwargs"] == {"lost": True}
 
     def test_a_redelivered_event_adds_nothing(self, chargeback_signals):
@@ -266,6 +270,8 @@ class TestDisputeClosedOtherwise:
 
         assert not _chargebacks(order).exists()
         email.assert_not_called()
+        order.refresh_from_db()
+        assert "disputed" not in order.metadata
         note = OrderHistory.objects.filter(order=order, change_type="NOTE")
         assert "warning_closed" in note.latest("id").new_value["note"]
 
@@ -397,18 +403,20 @@ class TestLoyaltyReversal:
 
 
 def _dispute_mail(mailoutbox):
-    [mail] = [m for m in mailoutbox if "Stripe dispute" in m.subject]
+    [mail] = [m for m in mailoutbox if " dispute " in m.subject]
     return mail
 
 
 class TestStaffEmail:
-    def _send(self, order, **kwargs):
+    def _send(self, order, provider="stripe", **kwargs):
         from order.tasks import send_dispute_notification_email
 
         with patch(
             "order.tasks.tenant_contact_email", return_value="staff@example.com"
         ):
-            return send_dispute_notification_email(order.id, DISPUTE, **kwargs)
+            return send_dispute_notification_email(
+                order.id, DISPUTE, provider, **kwargs
+            )
 
     def test_a_lost_dispute_says_so_and_names_the_chargeback(self, mailoutbox):
         order, _charge = _paid_order()
@@ -426,6 +434,15 @@ class TestStaffEmail:
         assert "20.00" in mail.body
         assert "closed against you" in mail.body
         assert "NEXT STEPS" not in mail.body
+
+    def test_the_email_names_the_provider(self, mailoutbox):
+        order, _charge = _paid_order()
+
+        assert self._send(order, "viva_wallet") is True
+
+        mail = _dispute_mail(mailoutbox)
+        assert "Viva Wallet dispute opened" in mail.subject
+        assert "Stripe" not in mail.body
 
     def test_an_opened_dispute_keeps_its_original_email(self, mailoutbox):
         order, _charge = _paid_order()

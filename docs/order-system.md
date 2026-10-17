@@ -341,6 +341,50 @@ Orders made outside checkout — the demo seed (`devtools/demo_account.py`,
 - **Trust.** Every input but the agent protocol is shopper-controlled,
   so the row is analytics only and never an authorisation or pricing
   signal. The agent source type is the one verified claim (see Input).
+- **Cart first touch (`cart.CartAttribution`).** The cart records where
+  its shopper came from too, because that is often not where they
+  checked out ("checkout from Google, cart started from Instagram").
+  `OrderAttribution` and `CartAttribution` share their columns through
+  the abstract `AcquisitionSourceModel` (`order/models/attribution.py`).
+  `POST /cart/item` takes the same optional write-only `attribution`
+  object as order create (`OrderAttributionInputSerializer`, the same
+  shape and rules, `agentProtocol` believed only with the gateway
+  secret). `CartAttributionService.capture` (`cart/services.py`) is the
+  one entry point, called BEFORE the line is written, by every path that
+  can take a cart from no lines to some: the add itself (a new cart, or a
+  refill after the shopper emptied it), `OrderService.reorder_to_cart`
+  (the request's own signals: a reorder carries no capture) and the
+  guest-to-account `merge_carts`. An empty cart takes the touch,
+  replacing an earlier fill's; a cart holding lines keeps its own, so a
+  second add never overwrites it; the merge carries the guest cart's
+  touch over only when it is earlier than the account cart's (or the
+  account cart has none). An add with no `attribution` object records
+  nothing, so the agent gateway's carts and carts from before
+  `0015_cartattribution` simply have no row (a missing row is "unknown",
+  never "direct"). The cart response does not expose it; the storefront
+  never reads it.
+- **Cart source on the order.** The cart is deleted once its lines
+  become an order (`_clear_cart_for_order`), so both creation paths copy
+  the cart's first touch into `OrderAttribution.cart_source_type` /
+  `cart_source` (`OrderAttributionService.record(..., cart=cart)`), next
+  to the checkout source on the same row. Empty strings mean the cart
+  had none recorded, not "direct". Not exposed on the order API.
+- **Cart admin.** Carts show an "Order source" column and filters
+  (`attribution__source_type`, `CartSourceFilter`), built on the same
+  `AcquisitionSourceFilter` (`admin/filters.py`) as `OrderSourceFilter`,
+  and a "Checkout" column / filter ("Checkout started, awaiting
+  payment: order #N", linked) for a live cart whose checkout already
+  created an order in `awaiting_online_payment_q`. The order is found
+  through `metadata["cart_snapshot"]["cart_uuid"]` in one correlated
+  subquery on the changelist queryset. The filter is named apart from
+  the idle "Abandoned" cart type. The order list adds a "Cart source"
+  column, filters (`attribution__cart_source_type`,
+  `OrderCartSourceFilter`) and change-form fields next to the order
+  source: conversion by cart source is read from the orders list.
+- **Erasure.** Neither row holds an identity: only a referrer host, a
+  landing path and a channel name. `CartAttribution` cascades with its
+  cart (and so with the account); the order's `cart_source` stays with
+  the order, as `OrderAttribution` does. Neither is in the data export.
 
 Adding a known channel is one `KnownSource` entry (and, for a new
 click-id parameter, one `CLICK_ID_PARAMS` entry, which changes the
@@ -1298,6 +1342,7 @@ the linked memory note or the originating PR's commit message.
 | No provider HTTP call inside the order-creation transaction (nor in a view-level `atomic`): the intent is read first, and the transaction only re-compares its amount and currency with the total computed under lock | §3.1 above |
 | Product rows are locked in ascending pk order, in one statement, before the first row that references a product is inserted (`StockManager.lock_products`); a cart-item lock never joins the products (`of=("self",)`) | §3.1 above |
 | Every checkout-created order since `0059_orderattribution` has exactly one `OrderAttribution` row (`direct` when there was no signal); for a checkout order a missing row means "older than attribution", never "direct"; `source_type=agent` only with the gateway's `X-Internal-Gateway` secret | §3.4 above |
+| A cart records its first touch (`CartAttribution`) only through `CartAttributionService.capture`, called before the line is written: an empty cart takes it, a cart holding lines keeps it, a merge keeps the earlier; both order creation paths copy it to `OrderAttribution.cart_source*` because the cart is deleted with its lines | §3.4 above |
 | An issued tax document never re-reads the catalogue's VAT: invoices and myDATA split each line at `OrderItem.vat_rate`, snapshotted at creation, and tax shipping and the payment fee at the rate(s) of the goods (`order/taxation.py`); `Invoice` totals and the myDATA `invoiceSummary` come from the same lines | §3.5 above |
 | The default cache fails open on a Redis outage (reads miss, writes no-op — `core/caches.py`), but never for keys under `STRICT_KEY_PREFIXES`: the `strict:` throttle namespace, allauth's rate limits, TOTP replay protection, the IdP's single-use codes and WebSocket tickets. The checkout, payment, coupon and gift-card throttles (`core/api/throttling.py`, `fail_closed = True`) therefore DENY with 429 during an outage, while browsing/search/cart throttles and DRF's default `anon`/`user` budgets allow | `core/api/throttling.py` module docstring |
 | The tenant resolve payload and domain set are invalidated by `Tenant.cache_generation`, never by a Redis delete: it is part of their keys, and `Tenant.save`, every `TenantDomain` write and the folded pay-way / agent-setting writes bump it in the database inside the write's transaction. A delete during an outage is a fail-open no-op, so purge-by-delete left the pre-write payload served for up to its TTL; strict keys would have made the READS raise, and resolve is on every storefront request | `tenant/cache.py` module docstring |

@@ -37,6 +37,9 @@ Known = Iterable[tuple[str, str]]
 
 # Checked in order; the first token contained in the normalised key wins.
 _KEY_KINDS: tuple[tuple[tuple[str, ...], Kind], ...] = (
+    # Bearer values: replaced by the twin the rows themselves get.
+    (("cartuuid", "orderuuid"), Kind.UUID),
+    (("giftcardcode", "cardcode"), Kind.CODE),
     (("email", "mail"), Kind.EMAIL),
     (("phone", "mobile", "msisdn", "telephone"), Kind.PHONE),
     (("firstname", "givenname"), Kind.FIRST_NAME),
@@ -162,6 +165,10 @@ def _redact_member(key: Any, item: Any, subject: Any, known: Known) -> Any:
         return redact_json(item, subject, known)
     if isinstance(item, bool):
         return item
+    if kind is Kind.UUID:
+        return str(fakes.remap_uuid(item))
+    if kind is Kind.CODE:
+        return fakes.remap_code(item)
     if isinstance(item, int | float) and kind is not Kind.PHONE:
         return item
     return _fake_for(kind, subject)

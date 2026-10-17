@@ -45,12 +45,22 @@ def _canaries(tag: str) -> dict[str, str]:
     }
 
 
+# Bearer values (random per run) seeded for each tenant, by tag.
+BEARERS: dict[str, dict[str, str]] = {}
+
+
 def _seed_customer(tenant, tag: str) -> None:
     from allauth.account.models import EmailAddress
     from knox.models import AuthToken
 
+    from cart.factories.cart import CartFactory
     from contact.models import Contact, Feedback
+    from giftcard.factories import GiftCardFactory
     from order.factories.order import OrderFactory
+    from promotion.factories.promotion import (
+        PromotionCodeFactory,
+        PromotionFactory,
+    )
     from search.models import SearchQuery
     from shipping_acs.factories import AcsShipmentFactory
     from user.factories.account import UserAccountFactory
@@ -138,7 +148,27 @@ def _seed_customer(tenant, tag: str) -> None:
         Feedback.objects.create(
             name=c["name"], email=c["contact_email"], rating=4, message="ok"
         )
-        _ = order
+        cart = CartFactory(is_guest=True)
+        guest_order.metadata = {"cart_snapshot": {"cart_uuid": str(cart.uuid)}}
+        guest_order.save(update_fields=["metadata"])
+        card = GiftCardFactory(code=f"REALGIFTCODE{tag.upper()}0001")
+        promotion = PromotionFactory()
+        personal = PromotionCodeFactory(
+            promotion=promotion,
+            code=f"PERSONALCODE{tag.upper()}01",
+            assigned_to=user,
+        )
+        public = PromotionCodeFactory(
+            promotion=promotion, code=f"PUBLICCODE{tag.upper()}01"
+        )
+        BEARERS[tag] = {
+            "order_uuid": str(order.uuid),
+            "guest_order_uuid": str(guest_order.uuid),
+            "cart_uuid": str(cart.uuid),
+            "gift_code": card.code,
+            "personal_code": personal.code,
+            "public_code": public.code,
+        }
 
 
 def _scan_every_table(needles: list[str]) -> list[str]:
@@ -182,6 +212,8 @@ def _needles() -> list[str]:
         needles.extend(values.values())
         needles.extend(values["name"].split())
         needles.extend(values["guest_name"].split())
+        bearers = dict(BEARERS[tag])
+        needles.extend(v for k, v in bearers.items() if k != "public_code")
     return needles
 
 
@@ -333,3 +365,33 @@ def _snapshot(tenant) -> tuple[list[tuple], list[tuple]]:
             )
         )
     return users, orders
+
+
+def test_bearer_credentials_valid_on_production_are_replaced(seeded, staging):
+    """A copied gift-card code, personal coupon or guest order or cart UUID
+    would still work against PRODUCTION; the public coupon is marketing."""
+    import uuid
+
+    from cart.models import Cart
+    from giftcard.models import GiftCard
+    from order.models import Order
+    from promotion.models import PromotionCode
+
+    tenant, _ = seeded
+    old = BEARERS["a"]
+
+    call_command("staging_anonymise")
+
+    with tenant_context(tenant):
+        order = Order.objects.get(email__endswith="@staging.invalid", user=None)
+        assert str(order.uuid) != old["guest_order_uuid"]
+        assert order.uuid.version == 5
+        new_cart = str(order.metadata["cart_snapshot"]["cart_uuid"])
+        assert new_cart != old["cart_uuid"]
+        assert Cart.objects.filter(uuid=uuid.UUID(new_cart)).exists()
+        assert not GiftCard.objects.filter(code=old["gift_code"]).exists()
+        assert GiftCard.objects.get().code.startswith("STG-")
+        assert not PromotionCode.objects.filter(
+            code=old["personal_code"]
+        ).exists()
+        assert PromotionCode.objects.filter(code=old["public_code"]).exists()

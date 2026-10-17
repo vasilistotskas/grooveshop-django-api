@@ -39,7 +39,9 @@ _SCANNED_TYPES = (
     "jsonb",
     "inet",
     "citext",
+    "uuid",
 )
+_TOKEN_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{5,}")
 # A phone is compared by its last digits, so +30 69… and 69… are one number.
 _PHONE_TAIL = 10
 _MIN_PHONE_DIGITS = 8
@@ -69,6 +71,8 @@ class Canaries:
     phones: set[str] = field(default_factory=set)
     ips: set[str] = field(default_factory=set)
     names: set[str] = field(default_factory=set)
+    # Bearer UUIDs and codes, valid on production: matched as whole tokens.
+    tokens: set[str] = field(default_factory=set)
 
     def add_email(self, value: str) -> None:
         self.emails.add(value.strip().casefold())
@@ -76,6 +80,9 @@ class Canaries:
     def add_phone(self, value: str) -> None:
         if tail := phone_tail(value):
             self.phones.add(tail)
+
+    def add_token(self, value: str) -> None:
+        self.tokens.add(value.strip().casefold())
 
     def add_ip(self, value: str) -> None:
         self.ips.add(value.strip())
@@ -109,11 +116,14 @@ class Canaries:
         folded = {normalise(v) for v in values}
         self.emails -= {v.casefold() for v in values}
         self.ips -= values
+        self.tokens -= {v.casefold() for v in values}
         self.names -= folded | {" ".join(reversed(v.split())) for v in folded}
         self.phones -= {t for v in values if (t := phone_tail(v))}
 
     def __bool__(self) -> bool:
-        return bool(self.emails or self.phones or self.ips or self.names)
+        return bool(
+            self.emails or self.phones or self.ips or self.names or self.tokens
+        )
 
 
 def _hits(text: str, canaries: Canaries) -> Counter[str]:
@@ -127,6 +137,10 @@ def _hits(text: str, canaries: Canaries) -> Counter[str]:
     for match in _DIGIT_RUN_RE.findall(text):
         if (tail := phone_tail(match)) and tail in canaries.phones:
             found["phone"] += 1
+    if canaries.tokens:
+        for match in _TOKEN_RE.findall(text):
+            if match.casefold() in canaries.tokens:
+                found["token"] += 1
     if canaries.names:
         words = _WORD_RE.findall(normalise(text))
         for first, second in pairwise(words):

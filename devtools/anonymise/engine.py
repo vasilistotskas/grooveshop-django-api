@@ -286,6 +286,10 @@ def _fake(
         case Kind.FILENAME:
             _stem, ext = os.path.splitext(str(original))
             return f"attachment-{fakes.token(row_key)[-12:]}{ext}"
+        case Kind.UUID:
+            return fakes.remap_uuid(original)
+        case Kind.CODE:
+            return fakes.remap_code(original)
     raise AssertionError(f"unhandled kind {kind}")
 
 
@@ -325,6 +329,8 @@ def _collect(
                 canaries.add_phone(str(original))
             case Kind.IP:
                 canaries.add_ip(str(original))
+            case Kind.UUID | Kind.CODE:
+                canaries.add_token(str(original))
             case Kind.FULL_NAME:
                 canaries.add_name(*str(original).split())
             case Kind.FIRST_NAME:
@@ -361,7 +367,10 @@ def _scrub_rows(
             model._base_manager.bulk_update(batch, names, batch_size=_BATCH)
             batch.clear()
 
-    rows = model._base_manager.order_by("pk").values("pk", *attnames, *names)
+    queryset = model._base_manager.order_by("pk")
+    if rule.where is not None:
+        queryset = queryset.filter(rule.where)
+    rows = queryset.values("pk", *attnames, *names)
     for row in rows.iterator(chunk_size=_BATCH):
         linked, own = _subject(rule, row, label, schema)
         if linked is None:

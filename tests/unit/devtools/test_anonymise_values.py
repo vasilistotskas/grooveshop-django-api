@@ -150,14 +150,19 @@ def test_every_fake_fits_the_column_it_replaces():
         for name, spec in rule.fields.items():
             kind = spec.kind if isinstance(spec, rules.F) else spec
             limit = getattr(model._meta.get_field(name), "max_length", None)
-            if kind in (Kind.TEXT, Kind.JSON) or not limit:
+            if kind in (Kind.TEXT, Kind.JSON, Kind.UUID) or not limit:
                 continue
+            original = (
+                "7a1f0c9e-4c1d-4b7a-9d0e-1f2a3b4c5d6e"
+                if kind is Kind.UUID
+                else "attachment.pdf"
+            )
             longest = max(
                 len(
                     str(
                         engine._fake(
                             kind,
-                            "attachment.pdf",
+                            original,
                             f"{label}:{i}",
                             _subject(f"user:{i}"),
                             name,
@@ -170,3 +175,32 @@ def test_every_fake_fits_the_column_it_replaces():
                 too_long.append(f"{label}.{name}: {longest} > {limit}")
 
     assert not too_long, too_long
+
+
+def test_bearer_twins_differ_from_production_values_and_are_stable():
+    import uuid
+
+    original = uuid.uuid4()
+    twin = fakes.remap_uuid(original)
+
+    assert twin != original
+    assert twin.version == 5
+    assert fakes.remap_uuid(str(original)) == twin
+    assert fakes.remap_uuid(twin) == twin
+    code = fakes.remap_code("abcd1234efgh5678")
+    assert code.startswith("STG-")
+    assert fakes.remap_code("ABCD1234EFGH5678") == code
+    assert fakes.remap_code(code) == code
+
+
+def test_bearer_keys_in_json_are_replaced_with_the_rows_twin():
+    import uuid
+
+    cart = str(uuid.uuid4())
+    out = redaction.redact_json(
+        {"cart_snapshot": {"cart_uuid": cart}, "gift_card_code": "SECRET1"},
+        _subject(),
+    )
+
+    assert out["cart_snapshot"]["cart_uuid"] == str(fakes.remap_uuid(cart))
+    assert out["gift_card_code"] == fakes.remap_code("SECRET1")

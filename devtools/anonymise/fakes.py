@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import hashlib
 import random
+import uuid
 from dataclasses import dataclass
 
 from devtools.anonymise import pools
@@ -134,3 +135,30 @@ def token(key: str) -> str:
 def email_for(text: str) -> str:
     """A stable fake address for an address found inside free text."""
     return f"redacted.{_digest(text.lower())}@{EMAIL_DOMAIN}"
+
+
+_UUID_NAMESPACE = uuid.uuid5(uuid.NAMESPACE_DNS, SEED)
+CODE_PREFIX = "STG-"
+
+
+def remap_uuid(value: object) -> uuid.UUID:
+    """A bearer UUID's staging twin: version 5, so it never equals one of
+    production's random (version 4) ones, and a pure function of the
+    original, so every column that names the same cart or order agrees.
+    A twin maps to itself, which keeps a second run a no-op."""
+    original = value if isinstance(value, uuid.UUID) else uuid.UUID(str(value))
+    if original.version == 5:
+        return original
+    return uuid.uuid5(_UUID_NAMESPACE, str(original))
+
+
+def remap_code(value: object) -> str:
+    """A bearer code's staging twin (``STG-`` plus 12 upper-case hex).
+
+    Production's codes are random upper-case strings with no such prefix;
+    a twin maps to itself.
+    """
+    code = str(value).strip().upper()
+    if code.startswith(CODE_PREFIX):
+        return code
+    return f"{CODE_PREFIX}{_digest(code, 12).upper()}"

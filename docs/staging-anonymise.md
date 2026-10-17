@@ -35,6 +35,14 @@ cache-invalidated by the rewrite, and `updated_at` keeps its value.
   IP addresses, user agents, free text a customer typed, and the personal keys
   inside carrier and audit JSON. Passwords become unusable. Avatars and birth
   dates are cleared.
+- **Bearer credentials that work on production** are replaced by a staging
+  twin that cannot equal a production value: every gift-card code and every
+  personal (user-assigned) promotion code becomes `STG-` plus a digest, and
+  the guest order, guest cart and gift-card purchase UUIDs become version 5
+  UUIDs (production's are random version 4). A twin is a pure function of its
+  original, so `cart_uuid` in order metadata and recommendation events still
+  matches its cart, and a second run changes nothing. Public promotion codes
+  are marketing and stay. The residual scan also searches for the originals.
 - **Deleted**: sessions, Knox tokens, MFA and WebAuthn authenticators, social
   accounts and tokens, e-mail confirmations, OIDC tokens, GDPR export rows,
   search queries, notifications, stock reservations, admin log entries,
@@ -118,8 +126,10 @@ DB_NAME=gs_staging_scrub uv run pytest tests_mt/test_staging_anonymise.py -n0
   `uploads/users` out of the media copy. Contact attachments, invoice PDFs and
   GDPR export bundles live under the private media root, which the refresh
   does not copy.
-- **Credentials that are not identities.** Gift-card and promotion codes, the
-  Stripe API key rows and platform staff tokens are copied as they are.
+- **Credentials that are not bearer values of a customer.** The Stripe API key
+  rows, platform staff tokens and the merchants' encrypted payment and carrier
+  credentials on the `Tenant` row are copied as they are (see the
+  infrastructure repo's `docs/staging.md`).
 - **Store contact details.** A store's published contact and sender mailboxes
   stay (`NOT_PERSONAL_FIELDS`); its owner e-mail and carrier notification phone
   are replaced.

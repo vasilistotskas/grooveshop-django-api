@@ -25,6 +25,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from django.apps import apps
+from django.db.models import Q
 
 
 class Kind(StrEnum):
@@ -65,6 +66,13 @@ class Kind(StrEnum):
     TOKEN = "token"
     PASSWORD = "password"
     FILENAME = "filename"
+    # A bearer UUID (guest order, guest cart, gift-card purchase page):
+    # whoever holds it can read the record on PRODUCTION, so it is
+    # replaced by its deterministic staging twin everywhere it appears.
+    UUID = "uuid"
+    # A bearer code (gift card, personal coupon): valid on production,
+    # replaced by its staging twin.
+    CODE = "code"
 
 
 @dataclass(frozen=True)
@@ -94,6 +102,9 @@ class Scrub:
     user_fk: str | None = None
     order_fk: str | None = None
     is_user: bool = False
+    # Restrict the rule to these rows (a personal coupon's code is a
+    # bearer secret; a public one is marketing and stays).
+    where: Q | None = None
 
 
 @dataclass(frozen=True)
@@ -208,6 +219,7 @@ REGISTRY: dict[str, Scrub | Delete] = {
             "billing_zipcode": Kind.ZIPCODE,
             "metadata": Kind.JSON,
             "private_metadata": Kind.JSON,
+            "uuid": Kind.UUID,
             **_ADDRESS,
         },
     ),
@@ -306,6 +318,7 @@ REGISTRY: dict[str, Scrub | Delete] = {
             "recipient_name": Kind.FULL_NAME,
             "sender_name": F(Kind.FULL_NAME, own=True),
             "message": Kind.FREE_TEXT,
+            "code": Kind.CODE,
         },
     ),
     "giftcard.GiftCardPurchase": Scrub(
@@ -316,19 +329,24 @@ REGISTRY: dict[str, Scrub | Delete] = {
             "recipient_email": F(Kind.EMAIL, own=True),
             "recipient_name": F(Kind.FULL_NAME, own=True),
             "message": Kind.FREE_TEXT,
+            "uuid": Kind.UUID,
         },
     ),
     "giftcard.GiftCardTransaction": _scrub_all(description=Kind.TEXT),
     "promotion.PromotionCode": Scrub(
-        user_fk="assigned_to", fields={"assigned_to_email": Kind.EMAIL}
+        user_fk="assigned_to",
+        where=Q(assigned_to__isnull=False) | ~Q(assigned_to_email=""),
+        fields={"assigned_to_email": Kind.EMAIL, "code": Kind.CODE},
     ),
     "promotion.PromotionRedemption": Scrub(
         user_fk="user", fields={"email": Kind.EMAIL}
     ),
     # ── behavioural ─────────────────────────────────────────────────
     "recommendation.RecommendationEvent": Scrub(
-        user_fk="user", fields={"session_key": Kind.BLANK}
+        user_fk="user",
+        fields={"session_key": Kind.BLANK, "cart_uuid": Kind.UUID},
     ),
+    "cart.Cart": Scrub(user_fk="user", fields={"uuid": Kind.UUID}),
     # ── platform control plane ──────────────────────────────────────
     "tenant.Tenant": _scrub_all(
         owner_email=Kind.EMAIL, box_now_notify_phone=Kind.PHONE
@@ -478,7 +496,6 @@ NOT_PERSONAL: dict[str, str] = {
         "order.OrderAttribution",
         "order.RefundNotification",
         "order.VivaWebhookEvent",
-        "cart.Cart",
         "cart.CartAttribution",
         "cart.CartItem",
     ),

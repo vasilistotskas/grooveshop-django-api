@@ -16589,7 +16589,8 @@ paths:
         και χωρίς φορολογική ισχύ. Μόνο για καταστήματα επίδειξης και για παραγγελία
         για την οποία εκδίδεται απόδειξη (από την αποστολή και μετά). Όταν δεν υπάρχει
         διαθέσιμο δείγμα επιστρέφει 404. Τίποτα δεν αποθηκεύεται και τίποτα δεν στέλνεται
-        στο myDATA. Ίδιος έλεγχος ιδιοκτησίας με τα endpoints της απόδειξης.'
+        στο myDATA. Ανοιχτό στον ιδιοκτήτη της παραγγελίας, στο προσωπικό του καταστήματος
+        και στον επισκέπτη που έχει το UUID της παραγγελίας (``?uuid=``).'
       summary: Λήψη του PDF δείγματος απόδειξης
       parameters:
       - in: path
@@ -16600,11 +16601,40 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         required: true
+      - in: query
+        name: uuid
+        schema:
+          type: string
+          format: uuid
+        description: The order's UUID. Required when the order belongs to a guest
+          (no account); ignored for signed-in owners and store staff.
       tags:
       - Orders
       security:
       - cookieAuth: []
       responses:
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '403':
+          description: Δεν είστε ο ιδιοκτήτης της παραγγελίας ούτε έχετε το UUID της
+        '404':
+          description: Το δείγμα δεν είναι διαθέσιμο
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
         '200':
           content:
             application/pdf:
@@ -16612,10 +16642,6 @@ paths:
                 type: string
                 format: binary
           description: ''
-        '403':
-          description: Δεν είστε ο ιδιοκτήτης της παραγγελίας
-        '404':
-          description: Το δείγμα δεν είναι διαθέσιμο
   /api/v1/order/{id}/update_status:
     post:
       operationId: updateOrderStatus

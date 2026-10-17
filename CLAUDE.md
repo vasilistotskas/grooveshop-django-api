@@ -179,7 +179,7 @@ ASGI routing in `asgi/__init__.py` with Channels `ProtocolTypeRouter`:
 
 ### Celery
 
-App configured in `core/celery.py`. Base task class: `MonitoredTask` (logs success/failure). All tasks use `autoretry_for`, `retry_backoff`, and `retry_jitter` with exponential backoff (max 5 retries).
+App configured in `core/celery.py`. Base task class: `MonitoredTask` (logs success/failure). Retry policy is per task, never global: Celery has no setting for `autoretry_for`, backoff or `max_retries` (a `CELERY_TASK_AUTORETRY_FOR` in `settings.py` is read by nothing), so each decorator sets `autoretry_for`, `retry_backoff`, `retry_jitter` and its own `max_retries` (3 to 5; Celery defaults to 3). `autoretry_for` names a transient set from `core/retry.py` (`TRANSIENT_ERRORS`, `MAIL_TRANSIENT_ERRORS`, `SEARCH_TRANSIENT_ERRORS`, `TRANSIENT_HTTP_ERRORS`), never `Exception`: a deterministic failure retried only repeats itself. `MonitoredTask.retry` also stops at once on an SMTP 5xx or an HTTP 4xx, which no class can express. `tests/unit/core/test_celery_tasks_do_not_retry_everything.py` fails for any registered task whose `autoretry_for` contains `Exception`.
 
 Tasks are split by domain:
 - `core/tasks.py` — system health monitoring, DB backup, cache clearing, session cleanup, Meilisearch sync, abandoned cart cleanup, inactive user notifications

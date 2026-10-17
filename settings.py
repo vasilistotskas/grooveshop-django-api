@@ -918,15 +918,6 @@ CELERY_TASK_STORE_ERRORS_EVEN_IF_IGNORED = True
 # whenever this is set (django_celery_beat/schedulers.py).
 CELERY_RESULT_EXPIRES = datetime.timedelta(days=30)
 
-# Default retry policy for all tasks
-CELERY_TASK_AUTORETRY_FOR = (
-    Exception,  # Retry on any exception
-)
-CELERY_TASK_RETRY_BACKOFF = True  # Exponential backoff
-CELERY_TASK_RETRY_BACKOFF_MAX = 600  # Max 10 minutes between retries
-CELERY_TASK_RETRY_JITTER = True  # Add randomness to prevent thundering herd
-CELERY_TASK_MAX_RETRIES = 5  # Retry up to 5 times
-
 # Timezone (use UTC)
 CELERY_ENABLE_UTC = True
 CELERY_TIMEZONE = getenv("TIME_ZONE", "Europe/Athens")

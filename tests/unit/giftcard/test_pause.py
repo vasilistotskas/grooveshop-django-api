@@ -7,7 +7,7 @@ so a card loses no validity while it could not be spent.
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import call, patch
 
@@ -60,6 +60,25 @@ def test_back_on_moves_each_active_card_forward_by_the_off_time():
     assert abs(lapsed.expires_at - (now - timedelta(days=2) + off)) < tolerance
     assert abs(later.expires_at - (now + timedelta(days=300) + off)) < tolerance
     assert not GiftCardPause.objects.filter(ended_at__isnull=True).exists()
+
+
+def test_the_off_time_is_added_as_elapsed_time_across_a_dst_change():
+    """Europe/Athens leaves summer time on 2026-10-25. Ten days off is 240
+    hours, so a card keeps exactly the time it had left; adding ten
+    calendar days of wall clock would give it 241."""
+    started = datetime(2026, 10, 18, 9, 0, tzinfo=UTC)
+    ended = datetime(2026, 10, 28, 9, 0, tzinfo=UTC)
+    GiftCardPause.objects.create(started_at=started)
+    card = GiftCardFactory(expires_at=datetime(2026, 10, 20, 9, 0, tzinfo=UTC))
+
+    with (
+        _gift_cards(True),
+        patch("giftcard.services.timezone.now", return_value=ended),
+    ):
+        GiftCardService.sync_pause()
+
+    card.refresh_from_db()
+    assert card.expires_at == datetime(2026, 10, 30, 9, 0, tzinfo=UTC)
 
 
 def test_a_card_expired_before_the_pause_or_not_active_stays_put():

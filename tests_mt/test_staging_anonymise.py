@@ -17,7 +17,11 @@ import pytest
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.db import connection
-from django_tenants.utils import get_public_schema_name, tenant_context
+from django_tenants.utils import (
+    get_public_schema_name,
+    schema_context,
+    tenant_context,
+)
 
 from devtools.anonymise import engine
 
@@ -259,9 +263,12 @@ def test_platform_staff_and_the_shared_demo_login_keep_working(seeded, staging):
     from user.models import UserAccount
 
     tenant, _ = seeded
-    staff = UserAccountFactory(
-        email="operator@grooveshop.example", is_staff=True, image=None
-    )
+    # Platform staff live in the public schema. Pinned explicitly: the
+    # connection is left on whichever schema an earlier test used.
+    with schema_context(get_public_schema_name()):
+        staff = UserAccountFactory(
+            email="operator@grooveshop.example", is_staff=True, image=None
+        )
     password_hash = staff.password
     with tenant_context(tenant):
         for name, value in (
@@ -278,7 +285,8 @@ def test_platform_staff_and_the_shared_demo_login_keep_working(seeded, staging):
 
     call_command("staging_anonymise")
 
-    staff.refresh_from_db()
+    with schema_context(get_public_schema_name()):
+        staff.refresh_from_db()
     assert staff.email == "operator@grooveshop.example"
     assert staff.password == password_hash
     with tenant_context(tenant):

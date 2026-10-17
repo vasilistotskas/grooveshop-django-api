@@ -146,15 +146,8 @@ def redact_json(value: Any, subject: Any, known: Known = ()) -> Any:
     if isinstance(value, list):
         return [redact_json(item, subject, known) for item in value]
     if isinstance(value, str):
-        return _redact_string(value, subject, known)
+        return redact_text(value, subject, known)
     return value
-
-
-def _redact_string(text: str, subject: Any, known: Known) -> str:
-    for original, fake in sorted(known, key=lambda p: -len(p[0])):
-        if original:
-            text = re.sub(re.escape(original), fake, text, flags=re.IGNORECASE)
-    return EMAIL_RE.sub(lambda m: fakes.email_for(m.group()), text)
 
 
 def _redact_member(key: Any, item: Any, subject: Any, known: Known) -> Any:

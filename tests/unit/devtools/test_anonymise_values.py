@@ -63,7 +63,7 @@ def test_json_keys_that_name_a_person_are_replaced_whatever_the_shape():
     assert request["Recipient_Name"] == subject.person.full_name
     assert request["Recipient_Phone"] == subject.person.phone
     assert request["Recipient_Email"] == subject.person.email
-    assert "Real" not in str(out) or "carrier_name" in str(out)
+    assert "Real" not in str(out)
     assert request["items"][0]["first_name"] == subject.person.first_name
     assert request["items"][0]["carrier_name"] == "ACS"
 
@@ -204,3 +204,14 @@ def test_bearer_keys_in_json_are_replaced_with_the_rows_twin():
 
     assert out["cart_snapshot"]["cart_uuid"] == str(fakes.remap_uuid(cart))
     assert out["gift_card_code"] == fakes.remap_code("SECRET1")
+
+
+def test_a_phone_under_an_unlisted_json_key_is_still_rewritten():
+    subject = _subject()
+
+    out = redaction.redact_json(
+        {"contact": "+30 691 234 5678", "ref": "7000000001"}, subject
+    )
+
+    assert out["contact"] == subject.person.phone
+    assert out["ref"] == "7000000001"

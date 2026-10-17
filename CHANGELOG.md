@@ -3,6 +3,27 @@
 
 
 
+## v3.127.1 (2026-10-17)
+
+### Bug fixes
+
+* fix(core): file the alert and contact settings under their own categories (#228)
+
+The six OPS_ALERT_*_ENABLED settings and CONTACT_RETENTION_DAYS matched no
+category prefix, so the Store Settings list showed them under "Other".
+They now sit under "Operational Alerts" and, with every CONTACT_* setting,
+"Emails & Engagement".
+
+The unattributed-payout mute's description promised that payouts from the
+last 30 days stay on the dashboard; the counter has no window, a payout
+stays until someone marks it reconciled. The description now says so, and
+post_migrate syncs it onto existing store rows.
+
+
+Claude-Session: https://claude.ai/code/session_01DKyCtCCkFTgcH6VAVK3AJm
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`d18e497`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d18e4971a712fee05bab36bb32cf061e963f3144))
+
 ## v3.127.0 (2026-10-17)
 
 ### Bug fixes

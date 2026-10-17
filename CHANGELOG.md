@@ -3,6 +3,20 @@
 
 
 
+## v3.126.0 (2026-10-17)
+
+### Features
+
+* feat(tenant): the tenant feed tells media-stream which stores are suspended (#227)
+
+- the internal tenant feed adds suspendedSchemas (is_active=False, never public); both lists follow SuspendedTenantMiddleware's rule
+- the media flush is queued after the state change commits (dispatch_on_commit, robust); reactivation always flushes
+- is_active is read-only in the tenant admin, as on the platform API: only Suspend / Activate change it
+- dispatch_on_commit takes robust; on_commit test doubles take Django's real signature
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01VHqqSodFfL9aLgezEZV6qb ([`9c985be`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9c985be59243bdaa16f074cac732e96fc672459c))
+
 ## v3.125.6 (2026-10-17)
 
 ### Bug fixes

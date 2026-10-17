@@ -13,14 +13,17 @@ suspension moves the directory to ``MEDIA_ROOT/.suspended/{schema}``:
   instant, nothing copied.
 
 Reactivation moves the directory back. Neither direction merges two trees:
-when the destination already exists (files uploaded while suspended),
-nothing moves and the conflict is logged for an operator, because
-interleaving or overwriting a store's files is worse than serving a
-placeholder a little longer.
+when the destination already exists (files written while suspended),
+nothing moves and the move raises ``FileExistsError`` for an operator to
+resolve, because interleaving or overwriting a store's files is worse than
+serving a placeholder a little longer. Suspension logs it and suspends
+anyway; activation fails, so the store never goes live with its images
+still parked.
 """
 
 from __future__ import annotations
 
+import errno
 import logging
 import os
 
@@ -52,17 +55,20 @@ def restore_tenant_media(schema_name: str) -> bool:
 def _move(
     source: str, destination: str, *, action: str, schema_name: str
 ) -> bool:
-    """Rename ``source`` to ``destination``. Raises ``OSError`` if the rename fails."""
+    """Rename ``source`` to ``destination``; False if there is nothing to move.
+
+    Raises ``FileExistsError`` when ``destination`` already exists, and
+    ``OSError`` if the rename fails.
+    """
     if not os.path.isdir(source):
         return False
     if os.path.lexists(destination):
-        logger.error(
-            "Not moving the media of tenant %s (%s): %s already exists",
-            schema_name,
-            action,
+        raise FileExistsError(
+            errno.EEXIST,
+            f"Not moving the media of tenant {schema_name} ({action}): "
+            "the destination already exists",
             destination,
         )
-        return False
     os.makedirs(os.path.dirname(destination), exist_ok=True)
     os.rename(source, destination)
     logger.info(

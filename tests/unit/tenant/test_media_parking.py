@@ -64,20 +64,22 @@ class TestParking:
         assert park_tenant_media("acme") is False
         assert restore_tenant_media("acme") is False
 
-    def test_neither_direction_merges_two_trees(self, media_root, caplog):
+    def test_neither_direction_merges_two_trees(self, media_root):
         _uploads(media_root, "acme")
         park_tenant_media("acme")
-        # Files uploaded while suspended recreated the served tree.
+        # Files written while suspended recreated the served tree.
         (media_root / "acme").mkdir()
         (media_root / "acme" / "new.png").write_text("new")
 
-        assert restore_tenant_media("acme") is False
+        with pytest.raises(FileExistsError):
+            restore_tenant_media("acme")
+        with pytest.raises(FileExistsError):
+            park_tenant_media("acme")
 
         assert (media_root / "acme" / "new.png").exists()
         assert (
             media_root / ".suspended" / "acme" / "uploads" / "logo.png"
         ).exists()
-        assert "already exists" in caplog.text
 
     def test_other_stores_are_untouched(self, media_root):
         _uploads(media_root, "acme")
@@ -234,6 +236,34 @@ class TestActivationNeverLeavesImagesParked:
         tenant.refresh_from_db()
         assert tenant.is_active is False
         assert tenant.suspended_at is not None
+        delay.assert_not_called()
+
+    def test_a_live_tree_in_the_way_keeps_the_store_suspended(self, media_root):
+        from tenant.lifecycle import activate_tenant, suspend_tenant
+        from tenant.models import SuspendedReason
+
+        _uploads(media_root, "restore_conflict")
+        tenant = store_tenant("restore_conflict")
+        with mock.patch("tenant.tasks.flush_tenant_media_task.delay"):
+            suspend_tenant(tenant, reason=SuspendedReason.MANUAL)
+        # Something wrote to the served tree while the store was suspended.
+        (media_root / "restore_conflict").mkdir()
+
+        with (
+            mock.patch("tenant.tasks.flush_tenant_media_task.delay") as delay,
+            pytest.raises(FileExistsError),
+        ):
+            activate_tenant(tenant)
+
+        tenant.refresh_from_db()
+        assert tenant.is_active is False
+        assert (
+            media_root
+            / ".suspended"
+            / "restore_conflict"
+            / "uploads"
+            / "logo.png"
+        ).exists()
         delay.assert_not_called()
 
 

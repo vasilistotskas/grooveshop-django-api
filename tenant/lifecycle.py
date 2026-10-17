@@ -165,8 +165,9 @@ def activate_tenant(tenant) -> bool:
         return False
 
     # Put the parked originals back before the store is active again. A
-    # failed move raises (OSError) and leaves the store suspended, rather
-    # than active with its images still parked and nothing to retry.
+    # failed move, or a live tree already in the way, raises (OSError) and
+    # leaves the store suspended, rather than active with its images still
+    # parked and nothing to retry.
     from tenant.media_parking import restore_tenant_media
 
     restored = restore_tenant_media(tenant.schema_name)

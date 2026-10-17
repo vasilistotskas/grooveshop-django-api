@@ -57,21 +57,9 @@ INVOICE_RETENTION_BASIS = (
 )
 
 
-#: Where a suspended store's public uploads are parked, inside MEDIA_ROOT
-#: (the same volume, so parking is one rename). The leading dot is the
-#: contract: the static file server denies every dot-segment path, and a
-#: tenant schema can never contain a dot. See ``tenant.media_parking``.
-PARKED_MEDIA_DIRNAME = ".suspended"
-
-
 def tenant_media_dir(schema_name: str) -> str:
     """Public uploads — ``MEDIA_ROOT/{schema}`` (TenantFileSystemStorage)."""
     return os.path.join(settings.MEDIA_ROOT, schema_name)
-
-
-def tenant_parked_media_dir(schema_name: str) -> str:
-    """A suspended store's public uploads — ``MEDIA_ROOT/.suspended/{schema}``."""
-    return os.path.join(settings.MEDIA_ROOT, PARKED_MEDIA_DIRNAME, schema_name)
 
 
 def tenant_export_dir(schema_name: str) -> str:
@@ -192,13 +180,6 @@ def purge_tenant_files(schema_name: str) -> dict[str, bool]:
         "media": _remove_tree(
             tenant_media_dir(schema_name),
             what="public media",
-            schema_name=schema_name,
-        ),
-        # A store is destroyed only after a suspension, which parks its
-        # uploads; leaving the parked tree would keep every image on disk.
-        "parked_media": _remove_tree(
-            tenant_parked_media_dir(schema_name),
-            what="parked public media",
             schema_name=schema_name,
         ),
         "gdpr_exports": _remove_tree(

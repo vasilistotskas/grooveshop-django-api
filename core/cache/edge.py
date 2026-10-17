@@ -21,14 +21,13 @@ Which zone a tenant's pages live in, and whose token purges them:
 A store matching neither is not behind a Cloudflare cache of ours, and
 there is nothing to purge.
 
-Images are the other kind of edge content: media-stream's processed copies
-(cached for a year, ``s-maxage``, no tag) and the originals the static host
-serves (30 days). A suspended or destroyed tenant's images would outlive
-their removal at the origin, so they are purged by URL prefix
-(``tenant_media_purges``, ``purge_media``), which needs no tag and also
-reaches images cached before the purge existed. A suspension parks the
-originals out of the served path first (``tenant.media_parking``), so what
-the edge refetches after the purge is a placeholder, not the image.
+Images are the other kind of edge content: media-stream's processed copies,
+cached for a year (``s-maxage``, no tag). A suspended or destroyed tenant's
+images would outlive their refusal at media-stream, so they are purged by
+URL prefix (``tenant_media_purges``, ``purge_media``), which needs no tag
+and also reaches images cached before the purge existed. The static host
+serves no original in public (it redirects them to media-stream), so the
+only image URLs the edge holds are media-stream's.
 
 Cloudflare's Free plan allows five purge requests a minute per account,
 so a merchant's edits are coalesced into one purge per tenant
@@ -172,42 +171,28 @@ def _url_host(url: str) -> str:
 def tenant_media_purges(tenant) -> list[MediaPurge]:
     """Where a tenant's images are cached at the Cloudflare edge.
 
-    Two kinds of URL serve them: media-stream's processed images under an
-    assets host (``{host}/media_stream-image/media/{schema}/``) and the
-    originals under a static host (``{host}{MEDIA_URL path}{schema}/``).
-    Every tenant uses the platform's shared hosts (``MEDIA_STREAM_BASE_URL``,
-    ``MEDIA_URL``), purged in the platform zone. A tenant's own assets or
-    static host goes to the platform zone when it is a platform hostname and
-    to the tenant's own zone otherwise. Read from the tenant row, so it must
-    run while the row still exists.
+    media-stream's processed images, under an assets host
+    (``{host}/media_stream-image/media/{schema}/``). Every tenant uses the
+    platform's shared host (``MEDIA_STREAM_BASE_URL``), purged in the
+    platform zone. A tenant's own assets host goes to the platform zone when
+    it is a platform hostname and to the tenant's own zone otherwise. Read
+    from the tenant row, so it must run while the row still exists.
     """
     from core.db.encrypted_fields import encrypt_value
-    from core.utils.tenant_urls import (
-        resolve_tenant_assets_domain,
-        resolve_tenant_static_domain,
-    )
+    from core.utils.tenant_urls import resolve_tenant_assets_domain
 
     schema_name = tenant.schema_name
-    originals_path = urlparse(settings.MEDIA_URL).path.strip("/")
-    shared = (
-        (_url_host(settings.MEDIA_STREAM_BASE_URL), MEDIA_PATH),
-        (_url_host(settings.MEDIA_URL), originals_path),
-    )
-    owned = (
-        (resolve_tenant_assets_domain(tenant).lower(), MEDIA_PATH),
-        (resolve_tenant_static_domain(tenant).lower(), originals_path),
-    )
-
     platform_prefixes: set[str] = set()
     own_prefixes: set[str] = set()
-    for host, path in shared:
-        if host and _on_platform_zone(host):
-            platform_prefixes.add(f"{host}/{path}/{schema_name}/")
-    for host, path in owned:
-        if not host:
-            continue
-        bucket = platform_prefixes if _on_platform_zone(host) else own_prefixes
-        bucket.add(f"{host}/{path}/{schema_name}/")
+    shared_host = _url_host(settings.MEDIA_STREAM_BASE_URL)
+    if shared_host and _on_platform_zone(shared_host):
+        platform_prefixes.add(f"{shared_host}/{MEDIA_PATH}/{schema_name}/")
+    own_host = resolve_tenant_assets_domain(tenant).lower()
+    if own_host:
+        bucket = (
+            platform_prefixes if _on_platform_zone(own_host) else own_prefixes
+        )
+        bucket.add(f"{own_host}/{MEDIA_PATH}/{schema_name}/")
 
     purges: list[MediaPurge] = []
     platform = platform_zone()

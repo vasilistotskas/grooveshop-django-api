@@ -1,11 +1,14 @@
-"""Per-tenant media-cache flush against the media-stream service.
+"""Per-tenant media flush against the media-stream service.
 
-A suspended (or destroyed) tenant's processed images would otherwise
-keep serving from media-stream's cache for up to their TTL — 180 days
-private, 360 days public — because the serve path never re-checks
-tenant existence. This posts media-stream's
-``/admin/cache/flush-tenant`` (guarded by ``x-internal-secret``) so the
-assets stop serving promptly.
+Posts media-stream's ``/admin/cache/flush-tenant`` (guarded by
+``x-internal-secret``), which on every replica first re-reads the tenant
+feed (``tenant/internal.py``: ``suspendedSchemas``) and then drops the
+tenant's cached copies. media-stream refuses a suspended store's images
+by that state (503) before reading any cache, so the flush is what makes
+a suspension or a reactivation apply at once rather than at media-stream's
+next poll (``TENANT_DOMAINS_REFRESH_INTERVAL_MS``, 5 minutes). The cache
+drop keeps a destroyed tenant's copies from outliving it, up to 180 days
+private, 360 days public.
 
 Called through ``tenant.tasks.flush_tenant_media_task`` so a slow or
 down media-stream never blocks a suspension and transient failures

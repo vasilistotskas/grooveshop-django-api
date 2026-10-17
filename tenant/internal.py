@@ -38,10 +38,22 @@ def is_internal_caller(token: str) -> bool:
 
 
 def build_domains_payload() -> dict:
-    """Active tenants' domains + derived api./assets./static. service
-    subdomains of each primary domain (the infra TEMPLATE provisions
-    those for every tenant)."""
-    from tenant.models import TenantDomain
+    """The tenant state media-stream serves by.
+
+    ``domains``: active tenants' domains + derived api./assets./static.
+    service subdomains of each primary domain (the infra TEMPLATE
+    provisions those for every tenant).
+
+    ``suspendedSchemas``: the stores that must not be served, by the rule
+    ``SuspendedTenantMiddleware`` applies to their requests
+    (``is_active=False``). media-stream refuses their images. A deny
+    list, not an allow list: a store created between two polls is served
+    at once, and an empty list (or a feed media-stream cannot read)
+    refuses nothing.
+    """
+    from django_tenants.utils import get_public_schema_name
+
+    from tenant.models import Tenant, TenantDomain
 
     rows = TenantDomain.objects.filter(
         tenant__is_active=True, tenant__suspended_at__isnull=True
@@ -54,7 +66,12 @@ def build_domains_payload() -> dict:
             domains.update(
                 {f"api.{domain}", f"assets.{domain}", f"static.{domain}"}
             )
-    return {"domains": sorted(domains)}
+    suspended = (
+        Tenant.objects.filter(is_active=False)
+        .exclude(schema_name=get_public_schema_name())
+        .values_list("schema_name", flat=True)
+    )
+    return {"domains": sorted(domains), "suspendedSchemas": sorted(suspended)}
 
 
 class InternalDomainsMiddleware:

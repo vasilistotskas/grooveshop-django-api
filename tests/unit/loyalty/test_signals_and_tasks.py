@@ -106,7 +106,7 @@ class TestSignalHandlerExceptionIsolation:
             patch("loyalty.tasks.process_order_points") as mock_task,
             patch(
                 "loyalty.signals.transaction.on_commit",
-                side_effect=lambda cb: cb(),
+                side_effect=lambda cb, using=None, robust=False: cb(),
             ),
         ):
             from loyalty.signals import handle_order_completed_loyalty
@@ -131,7 +131,7 @@ class TestSignalHandlerExceptionIsolation:
             patch("loyalty.tasks.reverse_order_points") as mock_task,
             patch(
                 "loyalty.signals.transaction.on_commit",
-                side_effect=lambda cb: cb(),
+                side_effect=lambda cb, using=None, robust=False: cb(),
             ),
         ):
             from loyalty.signals import handle_order_canceled_loyalty
@@ -159,7 +159,7 @@ class TestSignalHandlerExceptionIsolation:
             patch("loyalty.tasks.reverse_order_points") as mock_task,
             patch(
                 "loyalty.signals.transaction.on_commit",
-                side_effect=lambda cb: cb(),
+                side_effect=lambda cb, using=None, robust=False: cb(),
             ),
         ):
             from loyalty.signals import handle_order_refunded_loyalty
@@ -182,7 +182,7 @@ class TestSignalHandlerExceptionIsolation:
             patch("loyalty.tasks.reverse_order_points") as mock_task,
             patch(
                 "loyalty.signals.transaction.on_commit",
-                side_effect=lambda cb: cb(),
+                side_effect=lambda cb, using=None, robust=False: cb(),
             ),
         ):
             from loyalty.signals import handle_order_refunded_loyalty
@@ -207,7 +207,7 @@ class TestSignalHandlerExceptionIsolation:
             patch("loyalty.tasks.process_order_points") as mock_task,
             patch(
                 "loyalty.signals.transaction.on_commit",
-                side_effect=lambda cb: cb(),
+                side_effect=lambda cb, using=None, robust=False: cb(),
             ),
         ):
             mock_task.apply_async.side_effect = RuntimeError("Celery down")
@@ -229,7 +229,7 @@ class TestSignalHandlerExceptionIsolation:
             patch("loyalty.tasks.reverse_order_points") as mock_task,
             patch(
                 "loyalty.signals.transaction.on_commit",
-                side_effect=lambda cb: cb(),
+                side_effect=lambda cb, using=None, robust=False: cb(),
             ),
         ):
             mock_task.apply_async.side_effect = RuntimeError("Celery down")

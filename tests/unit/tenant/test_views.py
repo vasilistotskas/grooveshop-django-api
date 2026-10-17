@@ -472,6 +472,30 @@ class TestInternalDomains:
         assert "suspended.example" not in response.json()["domains"]
 
     @pytest.mark.django_db
+    def test_lists_the_suspended_stores_media_stream_must_refuse(
+        self, resolve_client, db, settings
+    ):
+        from tenant.lifecycle import suspend_tenant
+        from tenant.models import SuspendedReason
+
+        settings.AGENT_GATEWAY_INTERNAL_SECRET = "gw-secret"
+        store_tenant("feed_live")
+        for schema in ("feed_off_b", "feed_off_a"):
+            suspend_tenant(store_tenant(schema), reason=SuspendedReason.MANUAL)
+
+        response = resolve_client.get(
+            "/api/v1/tenant/internal/domains",
+            HTTP_X_INTERNAL_TOKEN="gw-secret",
+        )
+
+        suspended = response.json()["suspendedSchemas"]
+        assert [s for s in suspended if s.startswith("feed_")] == [
+            "feed_off_a",
+            "feed_off_b",
+        ]
+        assert "public" not in suspended
+
+    @pytest.mark.django_db
     def test_middleware_serves_feed_on_unresolvable_host(self, db, settings):
         # Cluster-internal callers dial backend-service directly — a
         # Host no TenantDomain matches. The pre-tenant-resolution
@@ -510,4 +534,8 @@ class TestInternalDomains:
         assert allowed.status_code == 200
         import json
 
-        assert "mw-feed.example" in json.loads(allowed.content)["domains"]
+        payload = json.loads(allowed.content)
+        assert "mw-feed.example" in payload["domains"]
+        # The key media-stream reads, exactly as written: this path is not
+        # behind DRF's camel-case renderer.
+        assert isinstance(payload["suspendedSchemas"], list)

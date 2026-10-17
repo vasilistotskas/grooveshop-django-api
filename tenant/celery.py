@@ -155,6 +155,7 @@ def dispatch_on_commit(
     kwargs: Mapping[str, Any] | None = None,
     *,
     schema_name: str | None = None,
+    robust: bool = False,
     **options: Any,
 ) -> None:
     """Queue ``task`` for after the current transaction, schema pinned NOW.
@@ -177,6 +178,10 @@ def dispatch_on_commit(
     rather than passed as empty, so the resulting ``apply_async``
     signature is the one the call sites already produce.
 
+    ``robust`` is ``transaction.on_commit``'s: a failing dispatch (the
+    broker unreachable) is logged instead of raised into the caller,
+    for a task that must never fail the change that queued it.
+
     ``transaction.on_commit`` is reached through the module, not bound at
     import: the test suite monkeypatches it.
     """
@@ -190,5 +195,6 @@ def dispatch_on_commit(
         call["kwargs"] = dict(kwargs)
 
     transaction.on_commit(
-        lambda: task.apply_async(**call, headers=headers, **options)
+        lambda: task.apply_async(**call, headers=headers, **options),
+        robust=robust,
     )

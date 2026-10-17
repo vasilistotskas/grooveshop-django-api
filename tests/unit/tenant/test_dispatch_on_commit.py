@@ -64,7 +64,10 @@ class DispatchOnCommitTests(TestCase):
         captured: list = []
         original = connection.schema_name
 
-        with mock.patch.object(transaction, "on_commit", captured.append):
+        def on_commit(func, using=None, robust=False):
+            captured.append(func)
+
+        with mock.patch.object(transaction, "on_commit", on_commit):
             connection.schema_name = "tenant_under_test"
             try:
                 dispatch_on_commit(task, [1])
@@ -78,6 +81,20 @@ class DispatchOnCommitTests(TestCase):
         task.apply_async.assert_called_once_with(
             args=[1], headers={"_schema_name": "tenant_under_test"}
         )
+
+    def test_robust_is_passed_to_on_commit(self):
+        """A robust dispatch is logged on failure instead of raised into
+        the caller that queued it; the default stays Django's."""
+        registered: list = []
+
+        def on_commit(func, using=None, robust=False):
+            registered.append(robust)
+
+        with mock.patch.object(transaction, "on_commit", on_commit):
+            dispatch_on_commit(Mock(), [1])
+            dispatch_on_commit(Mock(), [1], robust=True)
+
+        assert registered == [False, True]
 
     def test_explicit_schema_name_wins(self):
         task = Mock()

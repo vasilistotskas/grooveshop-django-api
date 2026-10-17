@@ -3,6 +3,59 @@
 
 
 
+## v3.133.0 (2026-10-17)
+
+### Bug fixes
+
+* fix(order): read the demo flag like every tenant flag, and tidy the specimen contract
+
+specimen_available read Tenant.is_demo straight off the bound tenant, so
+order creation answered 500 whenever a tenant stand-in without the field
+was bound. is_demo_store() in tenant.membership reads it off the row with
+a default, like the other per-tenant flags, and the myDATA config uses it
+too.
+
+The specimen route now answers 404 with a fixed message instead of the
+exception text, documents its 403, and describes its 404 as an
+unavailable specimen. Tests pin the watermark and notice in el and en.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DKyCtCCkFTgcH6VAVK3AJm ([`30eb247`](https://github.com/vasilistotskas/grooveshop-django-api/commit/30eb247a912d9382ccb8f075b4237ffa98e035ba))
+
+* fix(order): throttle the specimen receipt download
+
+Every call renders a PDF with WeasyPrint on the request worker. The
+route gets its own fail-closed budget, 10 per minute per user or IP,
+through the existing throttle machinery.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DKyCtCCkFTgcH6VAVK3AJm
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`30eb247`](https://github.com/vasilistotskas/grooveshop-django-api/commit/30eb247a912d9382ccb8f075b4237ffa98e035ba))
+
+### Features
+
+* feat(order): offer a watermarked specimen receipt on demo stores (#236) ([`30eb247`](https://github.com/vasilistotskas/grooveshop-django-api/commit/30eb247a912d9382ccb8f075b4237ffa98e035ba))
+
+* feat(order): offer a watermarked specimen receipt on demo stores
+
+A demo store holds no receipt exemption, so its customers never see a
+real receipt. GET /order/{id}/specimen/download renders the same receipt
+document on demand with a specimen watermark and no QR code, for a demo
+store (Tenant.is_demo) and an order a receipt is issued for (shipped
+onwards). It creates no Invoice row, takes no counter slot, stores no
+file and never reaches myDATA; any other store answers 404.
+
+OrderDetail gains the additive hasSpecimenReceipt flag for the
+storefront.
+
+Closes 200
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DKyCtCCkFTgcH6VAVK3AJm ([`30eb247`](https://github.com/vasilistotskas/grooveshop-django-api/commit/30eb247a912d9382ccb8f075b4237ffa98e035ba))
+
 ## v3.132.0 (2026-10-17)
 
 ### Bug fixes

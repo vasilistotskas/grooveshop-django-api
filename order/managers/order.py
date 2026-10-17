@@ -20,6 +20,7 @@ from core.mixins import SoftDeleteQuerySetMixin
 from order.enum.status import (
     SETTLED_PAYMENT_STATUSES,
     OrderStatus,
+    PaymentStatus,
 )
 from pay_way.enum.settlement import PaySettlement
 
@@ -53,6 +54,23 @@ class OrderQuerySet(SoftDeleteQuerySetMixin, OptimizedQuerySet):
         """Online orders the shopper has not paid yet (see
         :func:`awaiting_online_payment_q`)."""
         return self.filter(awaiting_online_payment_q())
+
+    def refund_owed(self) -> Self:
+        """Canceled orders whose payment was not (fully) returned.
+
+        A cancel refunds a paid order through its provider, and a refund
+        the provider refuses leaves the order canceled with its payment
+        still COMPLETED; a canceled order refunded only in part still owes
+        the rest. A charge that arrives after the cancel
+        (``OrderService.record_payment_after_cancel``) lands here too.
+        """
+        return self.filter(
+            status=OrderStatus.CANCELED,
+            payment_status__in=(
+                PaymentStatus.COMPLETED,
+                PaymentStatus.PARTIALLY_REFUNDED,
+            ),
+        )
 
     def needing_follow_up(self, now=None) -> Self:
         """Orders the shopper has waited on for ``ORDER_FOLLOW_UP_DAYS``

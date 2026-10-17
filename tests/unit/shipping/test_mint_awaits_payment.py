@@ -254,7 +254,7 @@ class TestStaleDigest:
                 "tenant.credentials.tenant_admin_recipients",
                 return_value=["ops@example.com"],
             ),
-            patch("django.core.mail.send_mail") as mail,
+            patch("shipping.alerts.send_mail") as mail,
         ):
             result = check_stale_acs_shipments.run()
 
@@ -288,7 +288,7 @@ class TestStaleDigest:
                 "tenant.credentials.tenant_admin_recipients",
                 return_value=["ops@example.com"],
             ),
-            patch("django.core.mail.send_mail"),
+            patch("shipping.alerts.send_mail"),
         ):
             result = check_stale_acs_shipments.run()
 

@@ -1788,6 +1788,69 @@ EXTRA_SETTINGS_DEFAULTS = [
             "are not paid yet are never flagged. 0 turns the flag off."
         ),
     },
+    # Operational alert emails, one switch per kind (``OpsAlertKind``,
+    # ``shipping/alerts.py``). All default ON: a store opts OUT of a kind,
+    # so a kind added later reaches every store until it mutes it. Each
+    # description says where the work shows when the email is off.
+    {
+        "name": "OPS_ALERT_STALE_SHIPMENTS_ENABLED",
+        "type": "bool",
+        "value": True,
+        "description": (
+            "Email a daily digest of ACS parcels with no tracking movement "
+            "and vouchers that failed to mint. When off, the same parcels "
+            "stay on the dashboard's 'Needs attention' list."
+        ),
+    },
+    {
+        "name": "OPS_ALERT_UNREMITTED_COD_ENABLED",
+        "type": "bool",
+        "value": True,
+        "description": (
+            "Email when ACS delivered a cash-on-delivery parcel and never "
+            "paid the money out. When off, the parcels stay on the "
+            "dashboard's 'Needs attention' list."
+        ),
+    },
+    {
+        "name": "OPS_ALERT_UNATTRIBUTABLE_COD_PAYOUTS_ENABLED",
+        "type": "bool",
+        "value": True,
+        "description": (
+            "Email when an ACS cash-on-delivery payout matches none of the "
+            "store's shipments. When off, payouts recorded in the last 30 "
+            "days stay on the dashboard's 'Needs attention' list."
+        ),
+    },
+    {
+        "name": "OPS_ALERT_SHIPMENT_REJECTED_ENABLED",
+        "type": "bool",
+        "value": True,
+        "description": (
+            "Email at once when a courier permanently refuses to create a "
+            "shipment (bad address, unacceptable destination). The order "
+            "also gets a note."
+        ),
+    },
+    {
+        "name": "OPS_ALERT_WEBHOOK_FAILED_ENABLED",
+        "type": "bool",
+        "value": True,
+        "description": (
+            "Email when a verified carrier webhook could not be applied, "
+            "so a parcel state change may have been missed."
+        ),
+    },
+    {
+        "name": "OPS_ALERT_PAYMENT_AFTER_CANCEL_ENABLED",
+        "type": "bool",
+        "value": True,
+        "description": (
+            "Email when a payment arrives for an order that was already "
+            "canceled and has to be refunded. When off, such orders stay "
+            "on the dashboard's 'Needs attention' list until refunded."
+        ),
+    },
     {
         "name": "LOW_STOCK_THRESHOLD",
         "type": "int",

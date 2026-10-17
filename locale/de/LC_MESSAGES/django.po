@@ -10238,3 +10238,72 @@ msgstr "Bestellungen zum Nachfassen"
 #: .\admin\dashboard\store\widgets.py
 msgid "Shoppers still waiting for their parcel"
 msgstr "Kunden warten noch auf ihr Paket"
+
+#: .\shipping\alerts.py
+msgid "Stale shipments digest"
+msgstr "Übersicht festhängender Sendungen"
+
+#: .\shipping\alerts.py
+msgid "COD parcels never remitted"
+msgstr "Nachnahme-Pakete ohne Auszahlung"
+
+#: .\shipping\alerts.py
+msgid "COD payouts that match no shipment"
+msgstr "Nachnahme-Auszahlungen ohne passende Sendung"
+
+#: .\shipping\alerts.py
+msgid "Courier rejected a shipment"
+msgstr "Der Kurier hat eine Sendung abgelehnt"
+
+#: .\shipping\alerts.py
+msgid "Carrier webhook failed"
+msgstr "Webhook des Versanddienstleisters fehlgeschlagen"
+
+#: .\shipping\alerts.py
+msgid "Payment received for a canceled order"
+msgstr "Zahlung für eine stornierte Bestellung"
+
+#: .\shipping_acs\admin.py
+msgid "Stale: no tracking movement or never created"
+msgstr "Festhängend: keine Bewegung oder nie erstellt"
+
+#: .\shipping_acs\admin.py
+msgid "Delivered COD never paid out by ACS"
+msgstr "Zugestellte Nachnahme, von ACS nie ausgezahlt"
+
+#: .\shipping_acs\admin.py
+msgid "Matches no shipment"
+msgstr "Keiner Sendung zugeordnet"
+
+#: .\admin\dashboard\store\widgets.py
+msgid "Canceled orders to refund"
+msgstr "Stornierte Bestellungen zur Rückerstattung"
+
+#: .\admin\dashboard\store\widgets.py
+msgid "Paid, then canceled: the customer is owed money"
+msgstr "Bezahlt, dann storniert: dem Kunden steht Geld zu"
+
+#: .\admin\dashboard\store\widgets.py
+msgid "COD cash ACS has not paid out"
+msgstr "Nachnahme-Beträge, die ACS nicht ausgezahlt hat"
+
+#: .\admin\dashboard\store\widgets.py
+msgid "Delivered, and ACS reports no payout"
+msgstr "Zugestellt, und ACS meldet keine Auszahlung"
+
+#: .\admin\dashboard\store\widgets.py
+msgid "ACS payouts matching no shipment"
+msgstr "ACS-Auszahlungen ohne passende Sendung"
+
+#: .\admin\dashboard\store\widgets.py
+#, python-format
+msgid "Recorded in the last %(days)s days"
+msgstr "In den letzten %(days)s Tagen erfasst"
+
+#: .\admin\dashboard\store\widgets.py
+msgid "Stale ACS shipments"
+msgstr "Festhängende ACS-Sendungen"
+
+#: .\admin\dashboard\store\widgets.py
+msgid "No tracking movement, or the voucher was never created"
+msgstr "Keine Sendungsverfolgung oder der Voucher wurde nie erstellt"

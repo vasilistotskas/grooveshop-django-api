@@ -304,6 +304,7 @@ class StoreAttention(DashboardWidget):
 
     def shape(self, data: dict[str, int]) -> dict[str, Any]:
         from order.models.invoice import MyDataStatus
+        from shipping_acs.attention import UNATTRIBUTED_PAYOUT_DAYS
 
         features = store_features(self.request)
         candidates = [
@@ -326,6 +327,52 @@ class StoreAttention(DashboardWidget):
                 _("Shoppers still waiting for their parcel"),
                 "order.Order",
                 urlencode({"follow_up": "yes"}),
+            ),
+            (
+                True,
+                "canceled_still_paid",
+                "currency_exchange",
+                "danger",
+                _("Canceled orders to refund"),
+                _("Paid, then canceled: the customer is owed money"),
+                "order.Order",
+                urlencode({"refund_owed": "yes"}),
+            ),
+            (
+                True,
+                "unremitted_cod",
+                "payments",
+                "danger",
+                _("COD cash ACS has not paid out"),
+                _("Delivered, and ACS reports no payout"),
+                "shipping_acs.AcsShipment",
+                urlencode({"attention": "unremitted_cod"}),
+            ),
+            (
+                True,
+                "unattributed_cod_payouts",
+                "help_center",
+                "danger",
+                _("ACS payouts matching no shipment"),
+                _("Recorded in the last %(days)s days")
+                % {"days": UNATTRIBUTED_PAYOUT_DAYS},
+                "shipping_acs.AcsCodPayout",
+                urlencode(
+                    {
+                        "unattributed": "yes",
+                        "created_at__gte": _days_ago(UNATTRIBUTED_PAYOUT_DAYS),
+                    }
+                ),
+            ),
+            (
+                True,
+                "stale_shipments",
+                "local_shipping",
+                "warning",
+                _("Stale ACS shipments"),
+                _("No tracking movement, or the voucher was never created"),
+                "shipping_acs.AcsShipment",
+                urlencode({"attention": "stale"}),
             ),
             (
                 True,

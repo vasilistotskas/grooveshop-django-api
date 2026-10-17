@@ -20336,3 +20336,72 @@ msgstr ""
 #: .\admin\dashboard\store\widgets.py
 msgid "Shoppers still waiting for their parcel"
 msgstr ""
+
+#: .\shipping\alerts.py
+msgid "Stale shipments digest"
+msgstr ""
+
+#: .\shipping\alerts.py
+msgid "COD parcels never remitted"
+msgstr ""
+
+#: .\shipping\alerts.py
+msgid "COD payouts that match no shipment"
+msgstr ""
+
+#: .\shipping\alerts.py
+msgid "Courier rejected a shipment"
+msgstr ""
+
+#: .\shipping\alerts.py
+msgid "Carrier webhook failed"
+msgstr ""
+
+#: .\shipping\alerts.py
+msgid "Payment received for a canceled order"
+msgstr ""
+
+#: .\shipping_acs\admin.py
+msgid "Stale: no tracking movement or never created"
+msgstr ""
+
+#: .\shipping_acs\admin.py
+msgid "Delivered COD never paid out by ACS"
+msgstr ""
+
+#: .\shipping_acs\admin.py
+msgid "Matches no shipment"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py
+msgid "Canceled orders to refund"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py
+msgid "Paid, then canceled: the customer is owed money"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py
+msgid "COD cash ACS has not paid out"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py
+msgid "Delivered, and ACS reports no payout"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py
+msgid "ACS payouts matching no shipment"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py
+#, python-format
+msgid "Recorded in the last %(days)s days"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py
+msgid "Stale ACS shipments"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py
+msgid "No tracking movement, or the voucher was never created"
+msgstr ""

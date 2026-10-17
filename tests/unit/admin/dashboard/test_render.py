@@ -27,10 +27,11 @@ pytestmark = pytest.mark.django_db
 # carriers). Every setting read is a query of its own HERE: the test
 # database has no Setting rows, and ``Setting.get`` caches a key only
 # once its row is read - in production every declared setting has a row
-# and these reads are cache hits. Measured 2026-10-17 (39 warm, 65 cold: the
-# follow-up counter reads ORDER_FOLLOW_UP_DAYS); re-measure before raising.
+# and these reads are cache hits. Measured 2026-10-17 (39 warm, 69 cold: the
+# follow-up counter reads ORDER_FOLLOW_UP_DAYS and four more counts add a
+# query each); re-measure before raising.
 WARM_BUDGET = 39
-COLD_BUDGET = 65
+COLD_BUDGET = 69
 
 
 @pytest.fixture

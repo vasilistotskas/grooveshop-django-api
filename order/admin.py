@@ -53,7 +53,6 @@ from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.status import (
     RETURN_HANDLING_STATUSES,
     OrderStatus,
-    PaymentStatus,
 )
 from order.exceptions import PaymentError
 from order.follow_up import (
@@ -207,13 +206,7 @@ class RefundOwedFilter(DropdownFilter):
 
     def queryset(self, request, queryset):
         if self.value() == "yes":
-            return queryset.filter(
-                status=OrderStatus.CANCELED,
-                payment_status__in=(
-                    PaymentStatus.COMPLETED,
-                    PaymentStatus.PARTIALLY_REFUNDED,
-                ),
-            )
+            return queryset.refund_owed()
         return queryset
 
 

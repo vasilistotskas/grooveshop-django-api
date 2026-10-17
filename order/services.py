@@ -3677,7 +3677,7 @@ class OrderService:
         Called with the order row locked by the payment handler.
         """
         from order.models.history import OrderHistory
-        from shipping.alerts import send_ops_alert
+        from shipping.alerts import OpsAlertKind, send_ops_alert
 
         recorded = (order.metadata or {}).get("payment_after_cancel") or {}
         if recorded.get("payment_id") == payment_id:
@@ -3714,6 +3714,7 @@ class OrderService:
         )
         try:
             send_ops_alert(
+                kind=OpsAlertKind.PAYMENT_AFTER_CANCEL,
                 subject=f"Payment received for canceled order {order.id}",
                 message=(
                     f"A confirmed {payment_method} payment ({payment_id}) "

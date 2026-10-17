@@ -31,6 +31,7 @@ from admin.base import BaseModelAdmin
 from admin.displays import SHIPMENT_STATE_VARIANT, change_link, choice_label
 from admin.mixins import IsSuperuserOnlyModelAdmin
 from order.models.order import Order
+from shipping_acs.attention import stale_shipment_q, unremitted_cod_shipments
 from shipping_acs.enum.shipment_state import AcsShipmentState
 from shipping_acs.models import (
     AcsCodPayout,
@@ -187,6 +188,48 @@ class LabelPrintedFilter(DropdownFilter):
                 return queryset
 
 
+class NeedsAttentionFilter(DropdownFilter):
+    """The parcels the alert emails and the dashboard's "Needs attention"
+    counters are about, by the same rules
+    (:mod:`shipping_acs.attention`)."""
+
+    title = _("Needs attention")
+    parameter_name = "attention"
+
+    def lookups(self, request, model_admin):
+        return [
+            ("stale", _("Stale: no tracking movement or never created")),
+            ("unremitted_cod", _("Delivered COD never paid out by ACS")),
+        ]
+
+    def queryset(self, request, queryset):
+        match self.value():
+            case "stale":
+                return queryset.filter(stale_shipment_q())
+            case "unremitted_cod":
+                return queryset.filter(
+                    pk__in=unremitted_cod_shipments().values("pk")
+                )
+            case _:
+                return queryset
+
+
+class UnattributedPayoutFilter(DropdownFilter):
+    """Payouts ACS reported for a voucher that is none of the store's
+    shipments."""
+
+    title = _("Shipment")
+    parameter_name = "unattributed"
+
+    def lookups(self, request, model_admin):
+        return [("yes", _("Matches no shipment"))]
+
+    def queryset(self, request, queryset):
+        if self.value() == "yes":
+            return queryset.filter(shipment__isnull=True)
+        return queryset
+
+
 # ── Admins ─────────────────────────────────────────────────────────────────
 
 
@@ -206,6 +249,7 @@ class AcsShipmentAdmin(BaseModelAdmin):
         "shipment_state",
         "delivery_kind",
         LabelPrintedFilter,
+        NeedsAttentionFilter,
         ("created_at", RangeDateTimeFilter),
     )
     search_fields = ("voucher_no", "order__id", "order__email")
@@ -680,6 +724,7 @@ class AcsCodPayoutAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
     )
     date_hierarchy = "cod_payment_date"
     list_filter = (
+        UnattributedPayoutFilter,
         ("cod_payment_date", RangeDateFilter),
         ("parcel_delivery_date", RangeDateTimeFilter),
     )

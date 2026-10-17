@@ -944,6 +944,47 @@ accepting Cyprus orders at the Greek flat rate.
 5. Implement `_apply_order_status_transition` if your carrier emits state events.
 6. Wire the COD path if applicable (see ACS for the pattern).
 
+### 5.4 Operational alert emails (`shipping/alerts.py`)
+
+Merchant-operations mail goes to the store's operators
+(`tenant_admin_recipients()`; platform `ADMINS` only as the fallback) and
+is **per store, per kind**. `OpsAlertKind` is the whole list:
+
+| Kind | Sender | Where the work shows when the email is off |
+|---|---|---|
+| `stale_shipments` | `check_stale_acs_shipments` digest, 09:00 | Dashboard "Stale ACS shipments" (`shipping_acs.attention.stale_shipment_q`) |
+| `unremitted_cod` | `alert_unremitted_cod_payouts`, 03:00 | "COD cash ACS has not paid out" (`unremitted_cod_shipments`) |
+| `unattributable_cod_payouts` | `AcsService._alert_admins_unmatched_payouts` | "ACS payouts matching no shipment" (`unattributed_payouts`, last 30 days) |
+| `shipment_rejected` | `alert_admins_shipment_creation_failed` | An `OrderHistory` note on the order, written whether or not the email is on |
+| `webhook_failed` | `alert_admins_webhook_processing_failed` | The ERROR log only |
+| `payment_after_cancel` | `OrderService.record_payment_after_cancel` | "Canceled orders to refund" (`OrderQuerySet.refund_owed`), until refunded; plus the order note |
+
+- **One gate.** Every sender calls `send_ops_alert(kind=..., ...)`, which
+  returns `False` when the store muted the kind or has no recipient. No
+  carrier module imports `send_mail`
+  (`tests/unit/shipping/test_ops_alerts.py` enforces it). The stale digest
+  used to call `send_mail` itself, so it could not be muted.
+- **One setting per kind**, `OPS_ALERT_<KIND>_ENABLED` (`OpsAlertKind.
+  setting_name`), a boolean that defaults **on**: a store opts OUT, so a
+  kind added later reaches every store. Booleans render as checkboxes in
+  the store admin (a JSON list of kinds would be edited as raw JSON, and a
+  misspelt kind would silently mute nothing). Adding a kind means an enum
+  member **and** an `EXTRA_SETTINGS_DEFAULTS` entry; a test keeps them in
+  step. The removed senders (unprinted vouchers, pickup list blocked) are
+  not kinds: they no longer email.
+- **Muting loses nothing.** A muted digest claims no rows
+  (`stale_alert_sent` stays false), so the parcels appear in the first
+  digest after the email is switched back on. The money kinds and the
+  stale digest are mutable only because the same rule feeds a counter in
+  `attention_counts()` (`admin.dashboard.store.queries`); each counter
+  opens the list through a filter (`attention=stale|unremitted_cod` on the
+  ACS shipment list, `unattributed=yes` on the payout list,
+  `refund_owed=yes` on the order list). Payout rows ACS reported with no
+  readable voucher are never stored, so only the email and the log carry
+  them.
+- To keep one kind on a store, switch the others off in that store's
+  settings; the recipients stay `tenant_admin_recipients()`.
+
 ## 6. Email + WS notification graph
 
 ### 6.1 Email triggers (final state, post PR #8)
@@ -1197,6 +1238,8 @@ the linked memory note or the originating PR's commit message.
 | No carrier mint while `Order.awaits_online_payment` (`ShipmentAwaitingPaymentError`) | §5 above |
 | A payment-success handler checks `is_payment_after_cancel` BEFORE its settled-state guard | §2.2 above |
 | Order `status` changes only through admin actions / `OrderService`, never the change form | §7.1 above |
+| Operational mail to a store's operators goes through `send_ops_alert(kind=...)` only (the store's `OPS_ALERT_<KIND>_ENABLED` switch lives in that one gate); a kind a store may mute has a dashboard counter by the same rule as its email | §5.4 above |
+| "Follow up" is computed (`OrderQuerySet.needing_follow_up`), never stored, and its unpaid-online exclusion is `awaiting_online_payment()` (settled statuses), not `Order.awaits_online_payment` | §2.3 above |
 | One order per provider payment: `Order.payment_id` is unique when non-empty (`order_payment_id_unique`), and `create_order_from_cart` answers a repeat of the same cart's intent with the first order (found before the provider is asked, and again under the cart lock, both before cart validation) and refuses an intent of another cart or of a canceled / deleted order, a unique-index race between two carts included, all as `payment_verification` | §3.1 above |
 | No provider HTTP call inside the order-creation transaction (nor in a view-level `atomic`): the intent is read first, and the transaction only re-compares its amount and currency with the total computed under lock | §3.1 above |
 | Product rows are locked in ascending pk order, in one statement, before the first row that references a product is inserted (`StockManager.lock_products`); a cart-item lock never joins the products (`of=("self",)`) | §3.1 above |

@@ -2126,7 +2126,7 @@ class AcsService:
         Best-effort: an SMTP failure must not fail the reconcile itself
         (the payout rows that did match are already persisted).
         """
-        from shipping.alerts import send_ops_alert
+        from shipping.alerts import OpsAlertKind, send_ops_alert
 
         parts = []
         if unmatched:
@@ -2137,6 +2137,7 @@ class AcsService:
 
         try:
             sent = send_ops_alert(
+                kind=OpsAlertKind.UNATTRIBUTABLE_COD_PAYOUTS,
                 subject=(
                     f"ACS COD reconcile: {total} unattributable payout row(s)"
                 ),

@@ -22874,3 +22874,72 @@ msgstr "Παραγγελίες για follow up"
 #: .\admin\dashboard\store\widgets.py
 msgid "Shoppers still waiting for their parcel"
 msgstr "Πελάτες που περιμένουν ακόμη το δέμα τους"
+
+#: .\shipping\alerts.py
+msgid "Stale shipments digest"
+msgstr "Σύνοψη καθυστερημένων αποστολών"
+
+#: .\shipping\alerts.py
+msgid "COD parcels never remitted"
+msgstr "Δέματα αντικαταβολής χωρίς απόδοση χρημάτων"
+
+#: .\shipping\alerts.py
+msgid "COD payouts that match no shipment"
+msgstr "Αποδόσεις αντικαταβολής που δεν αντιστοιχούν σε αποστολή"
+
+#: .\shipping\alerts.py
+msgid "Courier rejected a shipment"
+msgstr "Η εταιρεία courier απέρριψε μια αποστολή"
+
+#: .\shipping\alerts.py
+msgid "Carrier webhook failed"
+msgstr "Αποτυχία webhook μεταφορέα"
+
+#: .\shipping\alerts.py
+msgid "Payment received for a canceled order"
+msgstr "Πληρωμή για ακυρωμένη παραγγελία"
+
+#: .\shipping_acs\admin.py
+msgid "Stale: no tracking movement or never created"
+msgstr "Καθυστερημένες: χωρίς κίνηση ή χωρίς voucher"
+
+#: .\shipping_acs\admin.py
+msgid "Delivered COD never paid out by ACS"
+msgstr "Παραδόθηκαν με αντικαταβολή και η ACS δεν απέδωσε τα χρήματα"
+
+#: .\shipping_acs\admin.py
+msgid "Matches no shipment"
+msgstr "Δεν αντιστοιχεί σε αποστολή"
+
+#: .\admin\dashboard\store\widgets.py
+msgid "Canceled orders to refund"
+msgstr "Ακυρωμένες παραγγελίες προς επιστροφή χρημάτων"
+
+#: .\admin\dashboard\store\widgets.py
+msgid "Paid, then canceled: the customer is owed money"
+msgstr "Πληρώθηκαν και ακυρώθηκαν: ο πελάτης δικαιούται επιστροφή"
+
+#: .\admin\dashboard\store\widgets.py
+msgid "COD cash ACS has not paid out"
+msgstr "Αντικαταβολές που η ACS δεν έχει αποδώσει"
+
+#: .\admin\dashboard\store\widgets.py
+msgid "Delivered, and ACS reports no payout"
+msgstr "Παραδόθηκαν και η ACS δεν δηλώνει απόδοση"
+
+#: .\admin\dashboard\store\widgets.py
+msgid "ACS payouts matching no shipment"
+msgstr "Αποδόσεις ACS χωρίς αντίστοιχη αποστολή"
+
+#: .\admin\dashboard\store\widgets.py
+#, python-format
+msgid "Recorded in the last %(days)s days"
+msgstr "Καταγράφηκαν τις τελευταίες %(days)s ημέρες"
+
+#: .\admin\dashboard\store\widgets.py
+msgid "Stale ACS shipments"
+msgstr "Καθυστερημένες αποστολές ACS"
+
+#: .\admin\dashboard\store\widgets.py
+msgid "No tracking movement, or the voucher was never created"
+msgstr "Χωρίς κίνηση στην παρακολούθηση ή δεν δημιουργήθηκε το voucher"

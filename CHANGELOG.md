@@ -3,6 +3,84 @@
 
 
 
+## v3.131.0 (2026-10-17)
+
+### Bug fixes
+
+* fix(product): the reviewer label never falls back to the email address
+
+The label goes into the staff email and the review changelist; an
+account with no name shows its username, never its address.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DKyCtCCkFTgcH6VAVK3AJm
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`f207546`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f2075464b785f9cc1fecdd0dff33dc71dffefe13))
+
+### Features
+
+* feat(reviews): re-moderate edited reviews, set the publish date, email staff about reviews to approve (#234) ([`f207546`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f2075464b785f9cc1fecdd0dff33dc71dffefe13))
+
+* feat(product): re-moderate edited reviews, stamp the publish date, email staff
+
+Closes the review-moderation gaps found before switching reviews on for
+the first store (issue 232).
+
+- An owner changing the rate or comment of an approved or rejected
+  review sends it back to NEW, off the public list and the averages. The
+  rule lives in ProductReviewWriteSerializer.save, the one shopper write
+  path: parler pops the translations inside super().save(), so neither
+  update() nor the model can compare the comment. A staff edit and an
+  update that changes nothing leave the status alone.
+- is_published and published_at now follow status on every path:
+  ProductReview.sync_publication on every instance save (admin change
+  form, API) and ProductReviewQuerySet.moderate for the bulk actions,
+  which used to queryset.update(status=...) and never set the date.
+- Migration 0052 backfills published_at from created_at for reviews
+  approved before this (additive, idempotent, only approved rows with no
+  date).
+- One staff email per entry into NEW (create and the reset), queued after
+  commit through the operational alert gate: new OpsAlertKind
+  REVIEW_PENDING with the OPS_ALERT_REVIEW_PENDING_ENABLED store switch
+  (default on) and the same recipients as the other alerts. The task
+  retries only transient mail errors and skips a review moderated before
+  it ran.
+- Admin: the changelist opens on the reviews waiting for approval, shows
+  product with thumbnail, customer, stars, comment excerpt, status badge,
+  verified purchase and date, and approve/reject exist on the change page
+  as well as the list.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DKyCtCCkFTgcH6VAVK3AJm ([`f207546`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f2075464b785f9cc1fecdd0dff33dc71dffefe13))
+
+* feat(product): label review statuses by what they mean
+
+The admin badges read New / True / False (Nai / Ochi in Greek). Relabel
+the choices Waiting for approval / Approved / Rejected; the stored values
+NEW, TRUE and FALSE are unchanged, so the badge colours (keyed by value)
+still follow them. The migration only records the new choice labels.
+schema.yml changes in the ReviewStatus description text only.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DKyCtCCkFTgcH6VAVK3AJm ([`f207546`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f2075464b785f9cc1fecdd0dff33dc71dffefe13))
+
+### Testing
+
+* test(product): pin review fixtures to the statuses their tests mean
+
+The review changelist now opens on the reviews waiting for approval, and
+an owner's edit of an approved or rejected review returns it to NEW.
+Two tests leaned on the factory cycling through statuses: the query
+growth guard rendered a status-dependent number of rows, and the update
+test expected a review's status to survive an edit. Build NEW rows for the
+default list, assert the reset for the update, and add a growth check that
+renders every status.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DKyCtCCkFTgcH6VAVK3AJm ([`f207546`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f2075464b785f9cc1fecdd0dff33dc71dffefe13))
+
 ## v3.130.0 (2026-10-17)
 
 ### Features

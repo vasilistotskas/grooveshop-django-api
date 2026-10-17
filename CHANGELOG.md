@@ -3,6 +3,83 @@
 
 
 
+## v3.128.0 (2026-10-17)
+
+### Documentation
+
+* docs(cart): describe the cart agent token contract
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DKyCtCCkFTgcH6VAVK3AJm ([`d1231b6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d1231b6353883e291b32893fc278c1f5840c078c))
+
+* docs(cart): a refused cart token is told apart by status, not a body code
+
+DRF serialises the exception as {"detail": ...} only; the codes are
+internal. A 401 on a token-bearing request means the token was refused.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DKyCtCCkFTgcH6VAVK3AJm ([`d1231b6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d1231b6353883e291b32893fc278c1f5840c078c))
+
+### Features
+
+* feat(cart): cart-scoped token so the shopping assistant reaches a signed-in shopper's cart (#229) ([`d1231b6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d1231b6353883e291b32893fc278c1f5840c078c))
+
+* feat(cart): cart-scoped agent token for the shopping assistant
+
+The assistant is served by the agent gateway, which calls the API
+anonymously, so a signed-in shopper's cart was unreachable: an anonymous
+caller naming it got a new guest cart, and the add reported success.
+
+POST /api/v1/cart/agent-token (Knox login only) mints a token for the
+caller's own cart, stored hashed in the tenant cache with the digest of
+the minting login. The gateway sends it as X-Cart-Token. CartService
+resolves it, not an authentication class: only the cart read, item
+add/update/remove and coupon apply/remove routes opt in, every other
+route refuses the header with 403, and an unknown, expired or revoked
+token answers 401 instead of a substitute guest cart. Each use re-checks
+that the login is live, the cart still belongs to its user and the user
+is active. The token wins over X-Cart-Id. Pricing and coupons follow the
+cart owner, so wholesale buyers keep wholesale prices.
+
+The TTL is CART_AGENT_TOKEN_TTL_SECONDS (30 minutes), the mint has its
+own throttle scope, and the gateway throttle keys on the token hash.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DKyCtCCkFTgcH6VAVK3AJm ([`d1231b6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d1231b6353883e291b32893fc278c1f5840c078c))
+
+### Refactoring
+
+* refactor(tenant): a suspension no longer moves the store's files (#230)
+
+- suspension and reactivation no longer move the store's uploads; both queue the media flush and edge purge
+- tenant/media_parking.py removed; destroy no longer looks for a parked tree
+- the edge purge plans media-stream (assets) prefixes only: the static host serves no original in public
+- tenant/media_flush.py describes the flush as it is: media-stream re-reads the tenant feed first
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01VHqqSodFfL9aLgezEZV6qb ([`4f4905b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4f4905bea3aa7d2ddb86ea18e57af7ef0dc8e1e4))
+
+### Testing
+
+* test(cart): cover the cart agent token mint throttle
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DKyCtCCkFTgcH6VAVK3AJm ([`d1231b6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d1231b6353883e291b32893fc278c1f5840c078c))
+
+* test(cart): judge personal coupons against the cart owner on a token request
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DKyCtCCkFTgcH6VAVK3AJm ([`d1231b6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d1231b6353883e291b32893fc278c1f5840c078c))
+
+* test(core): classify the cart agent token throttle as fail-closed
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DKyCtCCkFTgcH6VAVK3AJm
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`d1231b6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d1231b6353883e291b32893fc278c1f5840c078c))
+
 ## v3.127.1 (2026-10-17)
 
 ### Bug fixes

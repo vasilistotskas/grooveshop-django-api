@@ -117,18 +117,6 @@ def _park_media(schema_name: str) -> bool:
         return False
 
 
-def _restore_media(schema_name: str) -> bool:
-    try:
-        from tenant.media_parking import restore_tenant_media
-
-        return restore_tenant_media(schema_name)
-    except OSError:
-        logging.getLogger(__name__).exception(
-            "could not restore the parked media of %s", schema_name
-        )
-        return False
-
-
 def _media_edge_purges(tenant) -> list[MediaPurge]:
     """Where the tenant's images sit at the Cloudflare edge.
 
@@ -176,15 +164,22 @@ def activate_tenant(tenant) -> bool:
     if is_protected_tenant(tenant):
         return False
 
+    # Put the parked originals back before the store is active again. A
+    # failed move raises (OSError) and leaves the store suspended, rather
+    # than active with its images still parked and nothing to retry.
+    from tenant.media_parking import restore_tenant_media
+
+    restored = restore_tenant_media(tenant.schema_name)
+
     tenant.is_active = True
     tenant.suspended_at = None
     tenant.suspended_reason = ""
     tenant.save(update_fields=["is_active", "suspended_at", "suspended_reason"])
 
-    # Put the parked originals back, then drop what was cached while they
-    # were away: media-stream's placeholders and 5-minute negative entries,
-    # and the edge's copies of both. Nothing parked, nothing to drop.
-    if _restore_media(tenant.schema_name):
+    # Drop what was cached while the originals were away: media-stream's
+    # placeholders and 5-minute negative entries, and the edge's copies of
+    # both. Nothing restored, nothing to drop.
+    if restored:
         _dispatch_media_flush(tenant.schema_name, _media_edge_purges(tenant))
     return True
 

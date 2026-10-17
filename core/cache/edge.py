@@ -154,9 +154,10 @@ class MediaPurge(TypedDict):
 
     JSON-native on purpose: it travels as a Celery argument. The platform
     zone's token is read from settings when the purge runs. A tenant's own
-    zone carries its token as ``token_ciphertext``: the same Fernet token
-    the database stores (``FIELD_ENCRYPTION_KEYS``), never the clear value,
-    so a purge planned before a destroy still runs after the row is gone.
+    zone carries its token as ``token_ciphertext``: the token encrypted
+    under the same key ring the database uses (``FIELD_ENCRYPTION_KEYS``),
+    never the clear value, so a purge planned before a destroy still runs
+    after the row is gone.
     """
 
     zone_id: str
@@ -229,13 +230,26 @@ def tenant_media_purges(tenant) -> list[MediaPurge]:
     return purges
 
 
-def _media_zone(purge: MediaPurge) -> Zone | None:
-    """The credentials for one planned purge, resolved when it runs."""
+def _media_zone(schema_name: str, purge: MediaPurge) -> Zone | None:
+    """The credentials for one planned purge, resolved when it runs.
+
+    The tenant's current token while its row exists, so a token rotated
+    after the plan was made still works; the planned ciphertext once a
+    destroy has removed the row.
+    """
     from core.db.encrypted_fields import DecryptionError, decrypt_value
+    from tenant.models import Tenant
 
     platform = platform_zone()
     if platform and platform.zone_id == purge["zone_id"]:
         return platform
+    tenant = Tenant.objects.filter(
+        schema_name=schema_name, cloudflare_zone_id=purge["zone_id"]
+    ).first()
+    if tenant and tenant.cloudflare_api_token:
+        return Zone(
+            zone_id=purge["zone_id"], api_token=tenant.cloudflare_api_token
+        )
     ciphertext = purge.get("token_ciphertext", "")
     if not ciphertext:
         return None
@@ -266,7 +280,7 @@ def purge_media(schema_name: str, purges: Sequence[MediaPurge]) -> None:
     """
     failures: list[str] = []
     for purge in purges:
-        zone = _media_zone(purge)
+        zone = _media_zone(schema_name, purge)
         if zone is None:
             logger.error(
                 "No usable Cloudflare credentials to purge zone %s for tenant "

@@ -1,13 +1,14 @@
+import re
 from urllib.parse import urlsplit
 
 from allauth.idp.oidc import views as oidc_views
 from django.conf import settings
 from django.conf.urls.i18n import i18n_patterns
-from django.conf.urls.static import static
 from django.contrib import admin
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
-from django.urls import include, path
+from django.urls import include, path, re_path
 from django.utils.translation import gettext_lazy as _
+from django.views.static import serve as serve_media
 from drf_spectacular.views import (
     SpectacularAPIView,
     SpectacularRedocView,
@@ -248,9 +249,15 @@ if bool(settings.DEBUG) or settings.SYSTEM_ENV in ["dev", "ci"]:
     # if we passed the full URL. Strip down to just the path portion
     # so the dev media-serve view still mounts.
     _media_path = urlsplit(settings.MEDIA_URL).path or settings.MEDIA_URL
-    urlpatterns += static(
-        _media_path,
-        document_root=settings.MEDIA_ROOT,
-    )
+    # Never a dot-segment path, mirroring the production static server
+    # (``location ~ /\. { deny all; }``): it is what keeps a suspended
+    # store's parked uploads (MEDIA_ROOT/.suspended) unservable.
+    urlpatterns += [
+        re_path(
+            rf"^{re.escape(_media_path.lstrip('/'))}(?!(?:.*/)?\.)(?P<path>.*)$",
+            serve_media,
+            {"document_root": settings.MEDIA_ROOT},
+        ),
+    ]
 
     urlpatterns += staticfiles_urlpatterns()

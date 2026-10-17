@@ -1818,8 +1818,9 @@ EXTRA_SETTINGS_DEFAULTS = [
         "value": True,
         "description": (
             "Email when an ACS cash-on-delivery payout matches none of the "
-            "store's shipments. When off, payouts recorded in the last 30 "
-            "days stay on the dashboard's 'Needs attention' list."
+            "store's shipments. When off, every such payout stays on the "
+            "dashboard's 'Needs attention' list until it is marked "
+            "reconciled."
         ),
     },
     {

@@ -20,6 +20,7 @@ class OrderHistory(TranslatableModel, TimeStampMixinModel, UUIDModel):
         ADDRESS = "ADDRESS", _("Address Update")
         NOTE = "NOTE", _("Note Added")
         REFUND = "REFUND", _("Refund Processed")
+        CHARGEBACK = "CHARGEBACK", _("Chargeback")
         OTHER = "OTHER", _("Other Change")
 
     translations = TranslatedFields(
@@ -224,6 +225,18 @@ class OrderHistory(TranslatableModel, TimeStampMixinModel, UUIDModel):
             description=f"Refund processed for {refund_data.get('amount', 'unknown amount')}",
             ip_address=ip_address,
             user_agent=user_agent,
+        )
+
+    @classmethod
+    def log_chargeback(cls, order, amount, dispute_id):
+        """A lost dispute took *amount* back. Shown in red in the admin
+        (``ORDER_HISTORY_CHANGE_TYPE_VARIANT``), and kept out of the
+        customer timeline with the other internal rows."""
+        return cls.objects.create(
+            order=order,
+            change_type=cls.OrderHistoryChangeType.CHARGEBACK,
+            new_value={"amount": str(amount), "dispute_id": dispute_id},
+            description=gettext("Chargeback %(amount)s") % {"amount": amount},
         )
 
 

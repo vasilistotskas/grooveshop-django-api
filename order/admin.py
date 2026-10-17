@@ -100,6 +100,7 @@ ORDER_HISTORY_CHANGE_TYPE_VARIANT: dict[str, str] = {
     OrderHistory.OrderHistoryChangeType.ADDRESS: "warning",
     OrderHistory.OrderHistoryChangeType.NOTE: "default",
     OrderHistory.OrderHistoryChangeType.REFUND: "default",
+    OrderHistory.OrderHistoryChangeType.CHARGEBACK: "danger",
 }
 
 ORDER_ITEM_HISTORY_CHANGE_TYPE_VARIANT: dict[str, str] = {
@@ -397,18 +398,19 @@ class OrderHistoryInline(TabularInline):
     per_page = 15
     collapsible = True
     fields = (
-        "change_type",
+        "change_type_label",
         "description_display",
         "user_display",
         "created_at",
     )
-    readonly_fields = (
-        "change_type",
-        "description_display",
-        "user_display",
-        "created_at",
-    )
+    readonly_fields = fields
     ordering = ("-created_at",)
+
+    change_type_label = choice_label(
+        "change_type",
+        variants=ORDER_HISTORY_CHANGE_TYPE_VARIANT,
+        description=_("Change Type"),
+    )
 
     tab = True
 

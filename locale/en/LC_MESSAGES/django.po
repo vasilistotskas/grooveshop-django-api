@@ -20300,6 +20300,7 @@ msgstr ""
 #: .\tenant\reference_guard.py:51
 #, python-format
 msgid "%(store)s: used by %(rows)s"
+msgstr ""
 
 #: .\order\follow_up.py
 msgid "Not shipped yet"

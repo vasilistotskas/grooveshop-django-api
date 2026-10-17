@@ -179,6 +179,19 @@ BUILDERS: dict[str, Callable[[], object]] = {
         tenant_name="Archived store",
         destroyed_at=timezone.now(),
     ),
+    # A failed task row names its store in ``meta`` (core/result_backend.py),
+    # so the Store column must resolve it without a query per row.
+    "django_celery_results.TaskResult": lambda: __import__(
+        "django_celery_results.models", fromlist=["TaskResult"]
+    ).TaskResult.objects.create(
+        task_id=_uid(),
+        task_name="core.tasks.example",
+        status="FAILURE",
+        meta={"schema_name": "webside"},
+    ),
+    "django_celery_results.GroupResult": lambda: __import__(
+        "django_celery_results.models", fromlist=["GroupResult"]
+    ).GroupResult.objects.create(group_id=_uid(), result="[]"),
     "core.CachePurgeLog": lambda: __import__(
         "core.cache.models", fromlist=["CachePurgeLog"]
     ).CachePurgeLog.objects.create(),

@@ -14,7 +14,11 @@ from django.utils import timezone
 
 from contact.scanners import INFECTED, AttachmentScannerError
 from core import celery_app
-from core.retry import MAIL_TRANSIENT_ERRORS, TRANSIENT_ERRORS
+from core.retry import (
+    MAIL_TRANSIENT_ERRORS,
+    TRANSIENT_DB_ERRORS,
+    TRANSIENT_ERRORS,
+)
 from core.tasks import MonitoredTask
 from tenant.credentials import tenant_contact_email, tenant_from_email
 
@@ -351,7 +355,7 @@ RETENTION_BATCH_SIZE = 500
 @celery_app.task(
     base=MonitoredTask,
     max_retries=3,
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_DB_ERRORS,
     retry_backoff=True,
 )
 def purge_expired_contact_records() -> dict[str, int]:

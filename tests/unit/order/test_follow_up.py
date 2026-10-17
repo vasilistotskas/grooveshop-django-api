@@ -13,7 +13,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 from django.conf import settings
-from django.utils import timezone
+from django.utils import timezone, translation
 from extra_settings.models import Setting
 
 from order.enum.status import OrderStatus, PaymentStatus
@@ -172,9 +172,10 @@ class TestStatuses:
         shipped = _placed(self.OLD, status=OrderStatus.SHIPPED)
         delivered = _placed(self.OLD, status=OrderStatus.DELIVERED)
 
-        assert str(follow_up_reason(pending)) == "Not shipped yet"
-        assert str(follow_up_reason(processing)) == "Not shipped yet"
-        assert str(follow_up_reason(shipped)) == "In transit"
+        with translation.override("en"):
+            assert str(follow_up_reason(pending)) == "Not shipped yet"
+            assert str(follow_up_reason(processing)) == "Not shipped yet"
+            assert str(follow_up_reason(shipped)) == "In transit"
         assert follow_up_reason(delivered) is None
 
 

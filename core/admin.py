@@ -407,12 +407,11 @@ class TaskResultStoreFilter(DropdownFilter):
         return queryset.filter(ran_in_store(value))
 
 
-class TaskResultAdmin(
-    WithheldOnTenantHostModelAdmin, BaseTaskResultAdmin, ModelAdmin
-):
+class TaskResultAdmin(BaseTaskResultAdmin, BaseModelAdmin):
     """Background-task failures for every store, on the control plane only.
 
-    ``WithheldOnTenantHostModelAdmin`` keeps it off a store's own admin: a
+    ``BaseModelAdmin``'s ``WithheldOnTenantHostModelAdmin`` keeps it off a
+    store's own admin (``django_celery_results`` is a shared-only app): a
     store owner never sees another store's failures.
     """
 
@@ -449,9 +448,7 @@ class TaskResultAdmin(
         return getattr(obj, "store_label", "—")
 
 
-class GroupResultAdmin(
-    WithheldOnTenantHostModelAdmin, BaseGroupResultAdmin, ModelAdmin
-):
+class GroupResultAdmin(BaseGroupResultAdmin, BaseModelAdmin):
     pass
 
 

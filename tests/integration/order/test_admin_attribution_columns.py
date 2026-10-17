@@ -18,7 +18,7 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import translation
 
-from order.admin import OrderAdmin, OrderSourceFilter
+from order.admin import OrderAdmin, OrderCartSourceFilter, OrderSourceFilter
 from order.enum.attribution import OrderSourceType
 from order.factories import OrderAttributionFactory, OrderFactory
 from order.models.order import Order
@@ -140,6 +140,95 @@ class TestOrderSourceColumn:
         assert admin.attribution_medium(order) is None
 
 
+class TestOrderCartSourceColumn:
+    def test_the_cart_source_is_a_badge_keyed_by_type(self):
+        attribution = OrderAttributionFactory(
+            source_type=OrderSourceType.PAID,
+            source="google",
+            cart_source_type=OrderSourceType.SOCIAL,
+            cart_source="instagram",
+        )
+        order = _listed(attribution.order)
+
+        # Checkout from Google, cart started from Instagram.
+        assert _admin().order_source(order) == (
+            OrderSourceType.PAID,
+            "Google",
+        )
+        assert _admin().order_cart_source(order) == (
+            OrderSourceType.SOCIAL,
+            "Instagram",
+        )
+
+    def test_an_order_whose_cart_recorded_nothing_is_empty(self):
+        attribution = OrderAttributionFactory()
+
+        assert _admin().order_cart_source(_listed(attribution.order)) is None
+        assert (
+            _admin().attribution_cart_source(_listed(attribution.order)) is None
+        )
+        assert (
+            _admin().attribution_cart_source_type(_listed(attribution.order))
+            is None
+        )
+
+    def test_an_order_from_before_attribution_is_empty(self):
+        order = OrderFactory(num_order_items=0)
+
+        assert _admin().order_cart_source(_listed(order)) is None
+
+    def test_the_change_form_fields_read_the_row(self):
+        attribution = OrderAttributionFactory(
+            cart_source_type=OrderSourceType.SOCIAL, cart_source="instagram"
+        )
+        order = _listed(attribution.order)
+
+        with translation.override("en"):
+            assert _admin().attribution_cart_source(order) == "Instagram"
+            assert _admin().attribution_cart_source_type(order) == "Social"
+
+    def test_a_direct_cart_reads_as_direct_not_as_unknown(self):
+        attribution = OrderAttributionFactory(
+            cart_source_type=OrderSourceType.DIRECT, cart_source=""
+        )
+        order = _listed(attribution.order)
+
+        with translation.override("en"):
+            _type, label = _admin().order_cart_source(order)
+            assert str(label) == "Direct"
+
+
+class TestOrderCartSourceFilter:
+    def _filter(self, value=None):
+        params = {"cart_source": [value]} if value else {}
+        request = RequestFactory().get("/", params)
+        return OrderCartSourceFilter(request, params, Order, _admin())
+
+    def test_lookups_are_the_cart_sources_not_the_checkout_ones(self):
+        OrderAttributionFactory(
+            source="google",
+            cart_source_type=OrderSourceType.SOCIAL,
+            cart_source="instagram",
+        )
+        OrderAttributionFactory(source="bing")
+
+        assert self._filter().lookups(None, _admin()) == [
+            ("instagram", "Instagram")
+        ]
+
+    def test_filters_on_the_cart_source_not_the_checkout_one(self):
+        started_on_instagram = OrderAttributionFactory(
+            source="google",
+            cart_source_type=OrderSourceType.SOCIAL,
+            cart_source="instagram",
+        ).order
+        OrderAttributionFactory(source="instagram")
+
+        filtered = self._filter("instagram").queryset(None, Order.objects.all())
+
+        assert list(filtered) == [started_on_instagram]
+
+
 class TestOrderSourceFilter:
     def _filter(self, value=None):
         # The changelist hands filters list values, as QueryDict does.
@@ -207,6 +296,24 @@ class TestOrderChangelist:
         pks = {order.pk for order in response.context["cl"].result_list}
         assert social.pk in pks
         assert search.pk not in pks
+
+    def test_filters_by_cart_source_type(self, client):
+        from_social_cart = OrderAttributionFactory(
+            cart_source_type=OrderSourceType.SOCIAL, cart_source="instagram"
+        ).order
+        other = OrderAttributionFactory(
+            source_type=OrderSourceType.SOCIAL
+        ).order
+
+        response = self._get(
+            client,
+            attribution__cart_source_type__exact=OrderSourceType.SOCIAL,
+        )
+
+        assert response.status_code == 200
+        pks = {order.pk for order in response.context["cl"].result_list}
+        assert from_social_cart.pk in pks
+        assert other.pk not in pks
 
     def test_the_changelist_adds_no_query_per_row(self, client):
         # Item-less rows on purpose: their ``items_total`` annotation is

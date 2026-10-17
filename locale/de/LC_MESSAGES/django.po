@@ -10395,3 +10395,36 @@ msgstr "Kein Kommentar"
 #: .\core\templates\emails\product\review_pending.html
 msgid "Review it in the admin"
 msgstr "Im Admin ansehen"
+
+#: .\cart\models\attribution.py
+msgid "Cart attribution"
+msgstr ""
+
+#: .\cart\models\attribution.py
+msgid "Cart attributions"
+msgstr ""
+
+#: .\order\models\attribution.py
+msgid "Cart source type"
+msgstr ""
+
+#: .\order\models\attribution.py .\order\admin.py .\order\admin.py
+msgid "Cart source"
+msgstr ""
+
+#: .\order\models\attribution.py
+msgid "The channel the order's cart was started from, named like the order source. Empty when the cart had none recorded."
+msgstr ""
+
+#: .\cart\admin.py
+msgid "Checkout started, awaiting payment"
+msgstr ""
+
+#: .\cart\admin.py
+msgid "Checkout"
+msgstr ""
+
+#: .\cart\admin.py
+#, python-format
+msgid "Checkout started, awaiting payment: order #%(id)s"
+msgstr ""

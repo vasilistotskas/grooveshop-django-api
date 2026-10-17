@@ -41,8 +41,10 @@ from django.utils.safestring import SafeString
 from django.utils.timesince import timesince
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import ngettext_lazy
+from django_stubs_ext import StrOrPromise
 from unfold.decorators import display
 
+from order.attribution import source_label
 from order.enum.attribution import OrderSourceType
 from order.enum.status import OrderStatus, PaymentStatus
 from product.enum.review import ReviewStatus
@@ -84,6 +86,13 @@ ORDER_SOURCE_TYPE_VARIANT: dict[str, str] = {
     OrderSourceType.REFERRAL: "default",
     OrderSourceType.AGENT: "primary",
 }
+
+
+def source_badge(source_type: str, source: str) -> tuple[str, StrOrPromise]:
+    """The ``(variant key, label)`` pair a ``label=ORDER_SOURCE_TYPE_VARIANT``
+    display returns for a stored ``(source_type, source)``."""
+    return source_type, source_label(source, source_type)
+
 
 REVIEW_STATUS_VARIANT: dict[str, str] = {
     ReviewStatus.NEW: "info",

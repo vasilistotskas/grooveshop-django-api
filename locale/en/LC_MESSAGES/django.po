@@ -20300,4 +20300,39 @@ msgstr ""
 #: .\tenant\reference_guard.py:51
 #, python-format
 msgid "%(store)s: used by %(rows)s"
+
+#: .\order\follow_up.py
+msgid "Not shipped yet"
+msgstr ""
+
+#: .\order\admin.py
+msgid "Needs follow-up"
+msgstr ""
+
+#: .\order\admin.py
+msgid "Follow up"
+msgstr ""
+
+#: .\order\admin.py
+msgid "Follow-up"
+msgstr ""
+
+#: .\order\admin.py
+msgid "Needs follow-up since"
+msgstr ""
+
+#: .\order\admin.py
+msgid "Last carrier event"
+msgstr ""
+
+#: .\order\admin.py
+msgid "none yet"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py
+msgid "Orders to follow up"
+msgstr ""
+
+#: .\admin\dashboard\store\widgets.py
+msgid "Shoppers still waiting for their parcel"
 msgstr ""

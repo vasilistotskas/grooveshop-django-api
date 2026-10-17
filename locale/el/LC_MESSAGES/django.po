@@ -22838,3 +22838,39 @@ msgstr "Οι εγγραφές διατηρούνται επ' αόριστον (�
 #, python-format
 msgid "%(store)s: used by %(rows)s"
 msgstr "%(store)s: χρησιμοποιείται από %(rows)s"
+
+#: .\order\follow_up.py
+msgid "Not shipped yet"
+msgstr "Δεν έχει αποσταλεί"
+
+#: .\order\admin.py
+msgid "Needs follow-up"
+msgstr "Χρειάζεται follow up"
+
+#: .\order\admin.py
+msgid "Follow up"
+msgstr "Follow up"
+
+#: .\order\admin.py
+msgid "Follow-up"
+msgstr "Follow up"
+
+#: .\order\admin.py
+msgid "Needs follow-up since"
+msgstr "Χρειάζεται follow up από"
+
+#: .\order\admin.py
+msgid "Last carrier event"
+msgstr "Τελευταίο γεγονός μεταφορέα"
+
+#: .\order\admin.py
+msgid "none yet"
+msgstr "κανένα ακόμη"
+
+#: .\admin\dashboard\store\widgets.py
+msgid "Orders to follow up"
+msgstr "Παραγγελίες για follow up"
+
+#: .\admin\dashboard\store\widgets.py
+msgid "Shoppers still waiting for their parcel"
+msgstr "Πελάτες που περιμένουν ακόμη το δέμα τους"

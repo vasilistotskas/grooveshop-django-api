@@ -1777,6 +1777,18 @@ EXTRA_SETTINGS_DEFAULTS = [
         "value": 24,
     },
     {
+        "name": "ORDER_FOLLOW_UP_DAYS",
+        "type": "int",
+        "value": 7,
+        "description": (
+            "Flag an order for follow-up once its shopper has waited this "
+            "many calendar days (store time) without a delivery: an order "
+            "placed on day D is flagged from 00:00 on day D+N while it is "
+            "still pending, processing or shipped. Online orders that "
+            "are not paid yet are never flagged. 0 turns the flag off."
+        ),
+    },
+    {
         "name": "LOW_STOCK_THRESHOLD",
         "type": "int",
         "value": 10,

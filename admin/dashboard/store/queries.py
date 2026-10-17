@@ -415,6 +415,8 @@ def recent_orders() -> list[dict[str, Any]]:
         "blog.BlogComment",
         "contact.Contact",
         "b2b.BusinessProfile",
+        # ``ORDER_FOLLOW_UP_DAYS`` moves the follow-up count.
+        "extra_settings.Setting",
     ),
 )
 def attention_counts() -> dict[str, int]:
@@ -432,6 +434,11 @@ def attention_counts() -> dict[str, int]:
     return {
         "pending_orders": model("order.Order")
         .objects.filter(status=OrderStatus.PENDING)
+        .count(),
+        # Counted from placement, so midnight moves it with no write;
+        # the TTL bounds that.
+        "follow_up_orders": model("order.Order")
+        .objects.needing_follow_up(now)
         .count(),
         "low_stock": model("product.Product")
         .objects.filter(active=True, stock__gt=0, stock__lt=LOW_STOCK_BELOW)

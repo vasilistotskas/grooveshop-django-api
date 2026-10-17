@@ -95,6 +95,39 @@ unless deductions cover the whole total (`Order._payment_consistency_errors`)
 — the admin form edits both fields. It is not a `CheckConstraint`: the
 total is a sum over the order's lines.
 
+### 2.3 The follow-up flag (`order/follow_up.py`)
+
+A shopper who ordered N calendar days ago and still has no parcel is about
+to write in. The admin flags that order. It is computed, never stored: no
+column, job or email, and the flag disappears by itself when the order is
+delivered, completed, returned, canceled or refunded.
+
+An order needs follow-up when **all** of these hold:
+
+- it was placed on a store-timezone day at least `ORDER_FOLLOW_UP_DAYS`
+  days ago (store setting, default 7, `0` = off). Whole calendar days: an
+  order placed on day D is flagged from 00:00 on day D+N, not 24 h × N
+  after it was placed (`follow_up_cutoff`);
+- its status is PENDING, PROCESSING or SHIPPED
+  (`OrderStatus.get_status_groups()` `needs_processing` + `in_transit`);
+- it is not an online order still waiting for its payment
+  (`OrderQuerySet.awaiting_online_payment()`: `pay_way.settlement=online`
+  and `payment_status` not in `SETTLED_PAYMENT_STATUSES`). An unpaid card
+  order is an abandoned checkout, not a parcel to chase. Do **not** use
+  `Order.awaits_online_payment` for this: it is also true for an online
+  order that is refunded, partially refunded or canceled.
+
+The rule is one queryset, `OrderQuerySet.needing_follow_up(now)`; the
+changelist's `with_follow_up()` annotation (`needs_follow_up`, no query
+per row), the "Needs follow-up" filter (`follow_up=yes|no`) and the
+`follow_up_orders` dashboard counter all read it, so they cannot disagree.
+The changelist shows a blue "Follow up" badge beside the status; the
+change page adds a read-only line with the reason ("Not shipped yet" for
+PENDING/PROCESSING, "In transit" for SHIPPED), since when, and the
+carrier's last event (`AcsShipment` / `BoxNowShipment.last_event_at`). The
+counter is a row of the dashboard's "Needs attention" list linking to the
+filtered list; the Orders sidebar badge keeps the pending count.
+
 ## 3. Order creation paths
 
 Two entry points in `order/services.py` (the legacy `OrderService.create_order`
@@ -853,7 +886,10 @@ accepting Cyprus orders at the Greek flat rate.
 - The stale digest's "stranded mint" class (`pending_creation` > 24 h)
   excludes orders awaiting their online payment — the auto-cancel owns
   those, and listing them invited an "Issue ACS voucher now" for unpaid
-  goods.
+  goods. The exclusion is `awaiting_online_payment_q("order__")`, the
+  same rule as `OrderQuerySet.awaiting_online_payment()` and the
+  follow-up flag (§2.3): an online order whose payment settled in any way,
+  a refund included, is no longer "waiting".
 - `Recipient_Zipcode` is refused locally when the order's postcode does
   not match its country (`core.validators.address.postcode_matches`):
   a non-retryable `AcsAPIError` naming the field, recorded in

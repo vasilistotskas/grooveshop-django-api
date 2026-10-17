@@ -10202,3 +10202,39 @@ msgstr ""
 #, python-format
 msgid "%(store)s: used by %(rows)s"
 msgstr ""
+
+#: .\order\follow_up.py
+msgid "Not shipped yet"
+msgstr "Noch nicht versendet"
+
+#: .\order\admin.py
+msgid "Needs follow-up"
+msgstr "Nachfassen nötig"
+
+#: .\order\admin.py
+msgid "Follow up"
+msgstr "Nachfassen"
+
+#: .\order\admin.py
+msgid "Follow-up"
+msgstr "Nachfassen"
+
+#: .\order\admin.py
+msgid "Needs follow-up since"
+msgstr "Nachfassen nötig seit"
+
+#: .\order\admin.py
+msgid "Last carrier event"
+msgstr "Letztes Ereignis des Versanddienstleisters"
+
+#: .\order\admin.py
+msgid "none yet"
+msgstr "noch keines"
+
+#: .\admin\dashboard\store\widgets.py
+msgid "Orders to follow up"
+msgstr "Bestellungen zum Nachfassen"
+
+#: .\admin\dashboard\store\widgets.py
+msgid "Shoppers still waiting for their parcel"
+msgstr "Kunden warten noch auf ihr Paket"

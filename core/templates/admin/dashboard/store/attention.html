@@ -13,6 +13,7 @@ it matches the count beside it.
                     <a href="{{ row.href }}" class="flex gap-3 items-center px-3 py-2.5 rounded-default hover:bg-base-50 dark:hover:bg-white/[.04]">
                         <span class="flex h-9 items-center justify-center rounded-default shrink-0 w-9
                             {% if row.variant == "primary" %}bg-primary-100 text-primary-700 dark:bg-primary-500/20 dark:text-primary-400
+                            {% elif row.variant == "info" %}bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400
                             {% elif row.variant == "warning" %}bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-400
                             {% elif row.variant == "danger" %}bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400
                             {% else %}bg-base-500/8 text-base-700 dark:bg-base-500/20 dark:text-base-200{% endif %}">

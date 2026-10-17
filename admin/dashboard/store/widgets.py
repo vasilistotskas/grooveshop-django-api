@@ -319,6 +319,16 @@ class StoreAttention(DashboardWidget):
             ),
             (
                 True,
+                "follow_up_orders",
+                "support_agent",
+                "info",
+                _("Orders to follow up"),
+                _("Shoppers still waiting for their parcel"),
+                "order.Order",
+                urlencode({"follow_up": "yes"}),
+            ),
+            (
+                True,
                 "low_stock",
                 "inventory_2",
                 "warning",

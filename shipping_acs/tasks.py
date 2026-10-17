@@ -656,8 +656,7 @@ def check_stale_acs_shipments(self) -> dict[str, Any]:
     from django.db.models import Q
     from django.template.loader import render_to_string
 
-    from order.enum.status import PaymentStatus
-    from pay_way.enum.settlement import PaySettlement
+    from order.managers.order import awaiting_online_payment_q
     from shipping_acs.enum.shipment_state import AcsShipmentState
     from shipping_acs.models import AcsShipment
 
@@ -685,10 +684,8 @@ def check_stale_acs_shipments(self) -> dict[str, Any]:
     # mint: its voucher is dispatched by the payment webhook, and the
     # mint refuses it until then (``ShipmentAwaitingPaymentError``).
     # Reporting it would invite staff to "Issue ACS voucher now" for
-    # unpaid goods. The database form of ``Order.awaits_online_payment``.
-    awaiting_payment = Q(order__pay_way__settlement=PaySettlement.ONLINE) & ~Q(
-        order__payment_status=PaymentStatus.COMPLETED
-    )
+    # unpaid goods.
+    awaiting_payment = awaiting_online_payment_q("order__")
     stranded_mint = (
         Q(
             shipment_state=AcsShipmentState.PENDING_CREATION,

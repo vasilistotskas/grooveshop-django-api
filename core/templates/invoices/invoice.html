@@ -144,6 +144,20 @@
       color: #555;
       margin: 0 0 8px;
     }
+    /* A fixed box repeats on every page in WeasyPrint. */
+    .specimen-watermark {
+      position: fixed;
+      top: 40%;
+      left: 0;
+      width: 100%;
+      text-align: center;
+      font-size: 110pt;
+      font-weight: bold;
+      letter-spacing: 8px;
+      color: rgba(200, 0, 0, 0.16);
+      transform: rotate(-30deg);
+      z-index: 10;
+    }
     .seller-footer {
       position: running(seller-footer);
       font-size: 8pt;
@@ -152,6 +166,7 @@
   </style>
 </head>
 <body>
+  {% if specimen %}<div class="specimen-watermark">{% trans "SPECIMEN" %}</div>{% endif %}
   <div class="seller-footer">
     {{ seller.name }}
     {% if seller.vat_id %} • {% trans "VAT ID" %}: {{ seller.vat_id }}{% endif %}
@@ -176,6 +191,7 @@
     </div>
     <div class="meta">
       <div class="title">{% if is_credit %}{% trans "RETAIL CREDIT RECEIPT" %}{% else %}{% trans "RETAIL RECEIPT" %}{% endif %}</div>
+      {% if specimen %}<p><strong>{% trans "SPECIMEN - not a tax document" %}</strong></p>{% endif %}
       <p class="number">{{ document_number }}</p>
       {% if is_credit %}
         <p>{% blocktrans with number=credited_invoice.invoice_number %}Credits receipt {{ number }}{% endblocktrans %}{% if credited_invoice.mydata_mark %} ({% trans "MARK" %} {{ credited_invoice.mydata_mark }}){% endif %}</p>

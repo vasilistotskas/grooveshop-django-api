@@ -23189,3 +23189,24 @@ msgstr "Ολοκλήρωση αγοράς"
 #, python-format
 msgid "Checkout started, awaiting payment: order #%(id)s"
 msgstr "Η ολοκλήρωση αγοράς ξεκίνησε, αναμένεται πληρωμή: παραγγελία #%(id)s"
+
+#: .\core\templates\invoices\invoice.html
+msgid "SPECIMEN"
+msgstr "ΔΕΙΓΜΑ"
+
+#: .\core\templates\invoices\invoice.html
+msgid "SPECIMEN - not a tax document"
+msgstr "ΔΕΙΓΜΑ - δεν αποτελεί φορολογικό παραστατικό"
+
+#: .\order\invoicing.py
+#, python-format
+msgid "Order #%(order_id)s has no specimen receipt."
+msgstr "Η παραγγελία #%(order_id)s δεν έχει δείγμα απόδειξης."
+
+#: .\order\views\order.py
+msgid "Download the specimen receipt PDF"
+msgstr "Λήψη του PDF δείγματος απόδειξης"
+
+#: .\order\views\order.py
+msgid "Renders, on demand, a watermarked specimen of the order's retail receipt: the same document with no number, no QR code and no tax standing. Demo stores only, for an order a receipt is issued for (shipped onwards); 404 everywhere else. Nothing is stored and nothing is sent to myDATA. Same ownership check as the receipt endpoints."
+msgstr "Δημιουργεί κατά παραγγελία ένα δείγμα της απόδειξης λιανικής της παραγγελίας με υδατογράφημα: το ίδιο έγγραφο χωρίς αριθμό, χωρίς κωδικό QR και χωρίς φορολογική ισχύ. Μόνο για καταστήματα επίδειξης και για παραγγελία για την οποία εκδίδεται απόδειξη (από την αποστολή και μετά). Παντού αλλού επιστρέφει 404. Τίποτα δεν αποθηκεύεται και τίποτα δεν στέλνεται στο myDATA. Ίδιος έλεγχος ιδιοκτησίας με τα endpoints της απόδειξης."

@@ -23,14 +23,8 @@ if TYPE_CHECKING:
     from django.http import HttpRequest
     from rest_framework.request import Request
 
-    from product.models.product import Product
-
 
 class CartServiceInitException(Exception):
-    pass
-
-
-class CartNotSetException(Exception):
     pass
 
 
@@ -417,38 +411,3 @@ class CartService:
         if self.cart:
             return self.cart.items.filter(product_id=product_id).first()
         return None
-
-    def create_cart_item(self, product: Product, quantity: int):
-        if not self.cart:
-            raise CartNotSetException("Cart is not set.")
-
-        existing_item = CartItem.objects.filter(
-            cart=self.cart, product=product
-        ).first()
-
-        if existing_item:
-            existing_item.quantity += quantity
-            existing_item.save()
-            cart_item = existing_item
-        else:
-            cart_item = CartItem.objects.create(
-                cart=self.cart, product=product, quantity=quantity
-            )
-
-        self.cart_items = self.cart.get_items()
-        return cart_item
-
-    def update_cart_item(self, product_id: int, quantity: int):
-        if not self.cart:
-            raise CartNotSetException("Cart is not set.")
-        cart_item = self.cart.items.get(product_id=product_id)
-        cart_item.quantity = quantity
-        cart_item.save()
-        self.cart_items = self.cart.get_items()
-        return cart_item
-
-    def delete_cart_item(self, product_id: int):
-        if not self.cart:
-            raise CartNotSetException("Cart is not set.")
-        self.cart.items.filter(product_id=product_id).delete()
-        self.cart_items = self.cart.get_items()

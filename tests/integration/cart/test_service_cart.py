@@ -39,30 +39,19 @@ class CartServiceTest(TestCase):
 
         return request
 
+    def _fill(self, cart_service, product, quantity):
+        """Put a line in the service's cart, as the add-to-cart endpoint
+        leaves it (the endpoint itself is covered in test_view_cart_item)."""
+        CartItemFactory(
+            cart=cart_service.cart, product=product, quantity=quantity
+        )
+        cart_service.cart_items = cart_service.cart.get_items()
+
     def test_get_cart_item(self):
         cart_service = CartService(request=self.request)
-        cart_service.create_cart_item(self.product, 2)
+        self._fill(cart_service, self.product, 2)
         cart_item = cart_service.get_cart_item(self.product.pk)
         self.assertEqual(cart_item.product, self.product)
-
-    def test_create_cart_item(self):
-        CartItem.objects.all().delete()
-        cart_service = CartService(request=self.request)
-        cart_item = cart_service.create_cart_item(self.product, 3)
-        self.assertEqual(cart_item.quantity, 3)
-        self.assertEqual(CartItem.objects.count(), 1)
-
-    def test_update_cart_item(self):
-        cart_service = CartService(request=self.request)
-        cart_service.create_cart_item(self.product, 2)
-        cart_item = cart_service.update_cart_item(self.product.pk, 5)
-        self.assertEqual(cart_item.quantity, 5)
-
-    def test_delete_cart_item(self):
-        cart_service = CartService(request=self.request)
-        cart_service.create_cart_item(self.product, 2)
-        cart_service.delete_cart_item(self.product.pk)
-        self.assertEqual(CartItem.objects.count(), 0)
 
     def test_process_cart_merge_with_guest_cart_headers(self):
         guest_cart = CartFactory(user=None, num_cart_items=0)
@@ -103,13 +92,13 @@ class CartServiceTest(TestCase):
 
     def test_cart_service_length(self):
         cart_service = CartService(request=self.request)
-        cart_service.create_cart_item(self.product, 3)
+        self._fill(cart_service, self.product, 3)
 
         self.assertEqual(len(cart_service), 3)
 
     def test_cart_service_iteration(self):
         cart_service = CartService(request=self.request)
-        cart_service.create_cart_item(self.product, 2)
+        self._fill(cart_service, self.product, 2)
 
         cart_items = list(cart_service)
 
@@ -121,24 +110,15 @@ class CartServiceTest(TestCase):
 
         product = ProductFactory(num_images=0, num_reviews=0)
 
-        cart_service.create_cart_item(self.product, 3)
-        cart_service.create_cart_item(product, 4)
+        self._fill(cart_service, self.product, 3)
+        self._fill(cart_service, product, 4)
 
         self.assertEqual(len(cart_service), 7)
         self.assertEqual(self.cart.items.count(), 2)
 
-    def test_cart_service_remove_item(self):
-        cart_service = CartService(request=self.request)
-        cart_service.create_cart_item(self.product, 2)
-
-        cart_service.delete_cart_item(self.product.pk)
-
-        self.assertEqual(len(cart_service), 0)
-        self.assertEqual(self.cart.items.count(), 0)
-
     def test_merge_carts_with_items_in_both_carts(self):
         cart_service = CartService(request=self.request)
-        cart_service.create_cart_item(self.product, 2)
+        self._fill(cart_service, self.product, 2)
 
         guest_cart = CartFactory(user=None, num_cart_items=0)
         guest_product = ProductFactory(num_images=0, num_reviews=0)
@@ -158,7 +138,7 @@ class CartServiceTest(TestCase):
         # UX gate — checkout reservation stays the authoritative guard).
         product = ProductFactory(num_images=0, num_reviews=0, stock=5)
         cart_service = CartService(request=self.request)
-        cart_service.create_cart_item(product, 4)
+        self._fill(cart_service, product, 4)
 
         guest_cart = CartFactory(user=None, num_cart_items=0)
         CartItemFactory(cart=guest_cart, product=product, quantity=3)
@@ -241,18 +221,6 @@ class GuestCartServiceTest(TestCase):
 
         self.assertIsNotNone(cart)
         self.assertEqual(cart.id, guest_cart.id)
-
-    def test_create_cart_item_for_guest(self):
-        guest_cart = CartFactory(user=None)
-        request = self._create_guest_request(cart_id=guest_cart.uuid)
-
-        cart_service = CartService(request=request)
-        cart_item = cart_service.create_cart_item(self.product, 3)
-
-        self.assertEqual(cart_item.quantity, 3)
-        self.assertEqual(cart_item.product, self.product)
-        self.assertIsNone(cart_item.cart.user)
-        self.assertEqual(cart_item.cart.id, guest_cart.id)
 
     def test_guest_cart_string_representation(self):
         request = self._create_guest_request()

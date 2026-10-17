@@ -48312,15 +48312,27 @@ components:
         productSuggestions:
           type: boolean
           readOnly: true
+        productAlerts:
+          type: boolean
+          readOnly: true
+        contactAttachments:
+          type: boolean
+          readOnly: true
+        chatWidget:
+          type: boolean
+          readOnly: true
       required:
       - accountReviews
       - blog
       - blogComments
+      - chatWidget
+      - contactAttachments
       - favourites
       - feedback
       - giftCards
       - loyalty
       - newsletter
+      - productAlerts
       - productReviews
       - productSuggestions
       - promotions

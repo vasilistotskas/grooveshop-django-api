@@ -63,6 +63,9 @@ class StoreFeaturesSerializer(serializers.Serializer):
     gift_cards = serializers.BooleanField(read_only=True)
     wholesale = serializers.BooleanField(read_only=True)
     product_suggestions = serializers.BooleanField(read_only=True)
+    product_alerts = serializers.BooleanField(read_only=True)
+    contact_attachments = serializers.BooleanField(read_only=True)
+    chat_widget = serializers.BooleanField(read_only=True)
 
     def to_representation(self, instance) -> dict[str, bool]:
         from tenant.features import effective_features

@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from functools import cached_property
+
 from rest_framework import serializers
 
 from blog.models.post import BlogPostTranslation
 from product.models.product import ProductTranslation
 from promotion.enum import OfferKind
+from tenant.features import feature_on
 
 
 class BlogPostTranslationSerializer(
@@ -144,8 +147,17 @@ class ProductTranslationSerializer(
         brand = obj.master.brand if obj.master else None
         return brand.name if brand else None
 
+    @cached_property
+    def reviews_visible(self) -> bool:
+        # A view that serializes hit by hit builds one serializer per hit,
+        # so it decides once and hands the answer down in the context.
+        visible = self.context.get("reviews_visible")
+        return feature_on("product_reviews") if visible is None else visible
+
     def get_review_count(self, obj):
-        return obj.master.review_count if obj.master else 0
+        if not obj.master or not self.reviews_visible:
+            return 0
+        return obj.master.review_count
 
     def get_created_at(self, obj):
         return obj.master.created_at if obj.master else None
@@ -204,7 +216,9 @@ class ProductTranslationSerializer(
         return obj.master.view_count if obj.master else 0
 
     def get_review_average(self, obj):
-        return obj.master.review_average if obj.master else None
+        if not obj.master or not self.reviews_visible:
+            return None
+        return obj.master.review_average
 
     def get_vat_percent(self, obj):
         if obj.master and obj.master.vat:

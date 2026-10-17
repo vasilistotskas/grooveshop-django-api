@@ -18,11 +18,16 @@ from django.test.utils import CaptureQueriesContext
 from product.factories.product import ProductFactory
 from product.models.product import ProductTranslation
 from search.serializers import ProductTranslationSerializer
+from tenant.features import feature_on
 
 
 def _serialize_hits(pks):
     qs = ProductTranslation.get_search_result_queryset().filter(pk__in=pks)
-    return [ProductTranslationSerializer(obj, context={}).data for obj in qs]
+    # The search views decide once and hand the answer to every hit.
+    context = {"reviews_visible": feature_on("product_reviews")}
+    return [
+        ProductTranslationSerializer(obj, context=context).data for obj in qs
+    ]
 
 
 def _en_translation_pks(products):

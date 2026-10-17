@@ -22,6 +22,7 @@ from product.factories.product import ProductFactory
 from product.factories.review import ProductReviewFactory
 from product.models.product import ProductTranslation
 from search.serializers import ProductTranslationSerializer
+from tenant.features import feature_on
 from tests.conftest import requires_meilisearch
 from tests.utils.meilisearch import LiveSearchIndex, unique_marker
 from user.factories import UserAccountFactory
@@ -31,10 +32,13 @@ def _hits(products):
     qs = ProductTranslation.get_search_result_queryset().filter(
         master__in=products, language_code="en"
     )
+    # The search views decide once and hand the answer to every hit.
+    context = {"reviews_visible": feature_on("product_reviews")}
     return {
         row["master"]: row
         for row in (
-            ProductTranslationSerializer(obj, context={}).data for obj in qs
+            ProductTranslationSerializer(obj, context=context).data
+            for obj in qs
         )
     }
 

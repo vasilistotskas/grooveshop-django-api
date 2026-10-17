@@ -63,7 +63,7 @@ from order.mydata.config import load_config as load_mydata_config
 from order.taxation import breakdown_by_rate, order_vat_lines
 from pay_way.enum.pay_way import PayWayEnum
 from tenant.credentials import tenant_contact_email, tenant_site_name
-from tenant.membership import bound_tenant
+from tenant.membership import is_demo_store
 
 logger = logging.getLogger(__name__)
 
@@ -103,14 +103,11 @@ def receipt_issuable(order: Order) -> bool:
 
 def specimen_available(order: Order) -> bool:
     """True when the order may show a specimen receipt: the store is a
-    demo store (``Tenant.is_demo``, read through ``bound_tenant``) and the
+    demo store (``tenant.membership.is_demo_store``) and the
     order is one a real receipt would be issued for. A specimen is a
     showcase of the document, never a tax document, so no other store
     offers it."""
-    tenant = bound_tenant()
-    return bool(tenant is not None and tenant.is_demo) and receipt_issuable(
-        order
-    )
+    return is_demo_store() and receipt_issuable(order)
 
 
 class SpecimenNotAvailable(Exception):

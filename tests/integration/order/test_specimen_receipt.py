@@ -16,6 +16,7 @@ from unittest.mock import patch
 import pytest
 from django.template.loader import render_to_string
 from django.urls import reverse
+from django.utils import translation
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -194,3 +195,36 @@ def test_the_real_receipt_has_no_watermark_and_keeps_its_qr(user) -> None:
 
     assert 'class="specimen-watermark"' not in html
     assert "<svg" in html
+
+
+@pytest.mark.parametrize(
+    ("language", "watermark", "notice"),
+    [
+        ("el", "ΔΕΙΓΜΑ", "ΔΕΙΓΜΑ - δεν αποτελεί φορολογικό παραστατικό"),
+        ("en", "SPECIMEN", "SPECIMEN - not a tax document"),
+    ],
+)
+def test_specimen_watermark_and_notice_are_translated(
+    user, language, watermark, notice
+) -> None:
+    order = issuable(OrderFactory(user=user))
+
+    with translation.override(language):
+        html = _html(order, specimen_flag=True)
+
+    assert f'<div class="specimen-watermark">{watermark}</div>' in html
+    assert notice in html
+
+
+def test_a_tenant_stand_in_without_the_flag_is_not_a_demo_store(
+    bind_tenant, client, user
+) -> None:
+    """Tests bind credential-only stand-ins; the flag read must not fail
+    on one (order creation serializes ``hasSpecimenReceipt``)."""
+    bind_tenant(SimpleNamespace(schema_name="stand-in"))
+    order = issuable(OrderFactory(user=user))
+
+    response = client.get(_detail_url(order))
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json()["hasSpecimenReceipt"] is False

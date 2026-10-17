@@ -118,6 +118,17 @@ def resolve_current_tenant() -> Any | None:
     return bound_tenant()
 
 
+def is_demo_store() -> bool:
+    """True when the bound store is a demo store (``Tenant.is_demo``).
+
+    Read like every per-tenant flag, off the real row with a default: a
+    tenant stand-in that never modelled the field (and the public schema,
+    which has no row) is not a demo store, so a path that merely asks
+    cannot fail on it.
+    """
+    return bool(getattr(bound_tenant(), "is_demo", False))
+
+
 def tenant_plan_allows(flag: str) -> bool:
     """True when the active tenant's PLAN permits a feature.
 

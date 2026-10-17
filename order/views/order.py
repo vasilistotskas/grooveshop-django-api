@@ -12,6 +12,7 @@ from django.utils.translation import gettext_lazy as _
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import (
     OpenApiParameter,
+    OpenApiResponse,
     extend_schema,
     extend_schema_view,
 )
@@ -2163,13 +2164,16 @@ class OrderViewSet(BaseModelViewSet):
             "Renders, on demand, a watermarked specimen of the order's "
             "retail receipt: the same document with no number, no QR code "
             "and no tax standing. Demo stores only, for an order a receipt "
-            "is issued for (shipped onwards); 404 everywhere else. Nothing "
+            "is issued for (shipped onwards); 404 when no specimen is available. Nothing "
             "is stored and nothing is sent to myDATA. Same ownership check "
             "as the receipt endpoints."
         ),
         responses={
             (200, "application/pdf"): OpenApiTypes.BINARY,
-            404: None,
+            403: OpenApiResponse(
+                description=_("Not the order's owner"),
+            ),
+            404: OpenApiResponse(description=_("Specimen unavailable")),
         },
     )
     @action(detail=True, methods=["GET"], url_path="specimen/download")
@@ -2179,7 +2183,7 @@ class OrderViewSet(BaseModelViewSet):
         try:
             pdf_bytes = render_specimen_pdf(order)
         except SpecimenNotAvailable as exc:
-            raise NotFound(str(exc)) from exc
+            raise NotFound(_("This order has no specimen receipt.")) from exc
         return FileResponse(
             io.BytesIO(pdf_bytes),
             content_type="application/pdf",

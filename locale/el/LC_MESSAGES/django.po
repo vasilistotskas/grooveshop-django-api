@@ -23208,5 +23208,17 @@ msgid "Download the specimen receipt PDF"
 msgstr "Λήψη του PDF δείγματος απόδειξης"
 
 #: .\order\views\order.py
-msgid "Renders, on demand, a watermarked specimen of the order's retail receipt: the same document with no number, no QR code and no tax standing. Demo stores only, for an order a receipt is issued for (shipped onwards); 404 everywhere else. Nothing is stored and nothing is sent to myDATA. Same ownership check as the receipt endpoints."
-msgstr "Δημιουργεί κατά παραγγελία ένα δείγμα της απόδειξης λιανικής της παραγγελίας με υδατογράφημα: το ίδιο έγγραφο χωρίς αριθμό, χωρίς κωδικό QR και χωρίς φορολογική ισχύ. Μόνο για καταστήματα επίδειξης και για παραγγελία για την οποία εκδίδεται απόδειξη (από την αποστολή και μετά). Παντού αλλού επιστρέφει 404. Τίποτα δεν αποθηκεύεται και τίποτα δεν στέλνεται στο myDATA. Ίδιος έλεγχος ιδιοκτησίας με τα endpoints της απόδειξης."
+msgid "Renders, on demand, a watermarked specimen of the order's retail receipt: the same document with no number, no QR code and no tax standing. Demo stores only, for an order a receipt is issued for (shipped onwards); 404 when no specimen is available. Nothing is stored and nothing is sent to myDATA. Same ownership check as the receipt endpoints."
+msgstr "Δημιουργεί κατά παραγγελία ένα δείγμα της απόδειξης λιανικής της παραγγελίας με υδατογράφημα: το ίδιο έγγραφο χωρίς αριθμό, χωρίς κωδικό QR και χωρίς φορολογική ισχύ. Μόνο για καταστήματα επίδειξης και για παραγγελία για την οποία εκδίδεται απόδειξη (από την αποστολή και μετά). Όταν δεν υπάρχει διαθέσιμο δείγμα επιστρέφει 404. Τίποτα δεν αποθηκεύεται και τίποτα δεν στέλνεται στο myDATA. Ίδιος έλεγχος ιδιοκτησίας με τα endpoints της απόδειξης."
+
+#: order/views/order.py
+msgid "This order has no specimen receipt."
+msgstr "Η παραγγελία δεν έχει δείγμα απόδειξης."
+
+#: order/views/order.py
+msgid "Not the order's owner"
+msgstr "Δεν είστε ο ιδιοκτήτης της παραγγελίας"
+
+#: order/views/order.py
+msgid "Specimen unavailable"
+msgstr "Το δείγμα δεν είναι διαθέσιμο"

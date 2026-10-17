@@ -119,27 +119,17 @@ class ShippingOptionSerializer(serializers.Serializer):
             "exactly when ``delivery_days_min`` is."
         ),
     )
-    logo_url = serializers.URLField(
-        allow_null=True,
-        required=False,
-        help_text=_(
-            "Absolute URL for the operator-uploaded brand logo, "
-            "resolved per (provider, kind) so the home-delivery row "
-            "and the pickup-point row of the same carrier can show "
-            "different images. Null when no logo is uploaded — the "
-            "storefront then falls back to its bundled default. "
-            "``settings.MEDIA_URL`` is absolute in every environment "
-            "so this is always a full URL when present."
-        ),
-    )
     logo_path = serializers.CharField(
         allow_null=True,
         required=False,
         help_text=_(
-            "Relative media path of the same logo as ``logo_url`` "
-            "(``media/{schema}/uploads/shipping/…``), for the "
-            "storefront to render through media-stream at the size it "
-            "shows. Null when no logo is uploaded."
+            "Relative media path (``media/{schema}/uploads/shipping/…``) "
+            "of the operator-uploaded brand logo, resolved per (provider, "
+            "kind) so the home-delivery row and the pickup-point row of "
+            "the same carrier can show different images; the storefront "
+            "renders it through media-stream at the size it shows. Null "
+            "when no logo is uploaded — the storefront then falls back to "
+            "its bundled default."
         ),
     )
     metadata = serializers.DictField()

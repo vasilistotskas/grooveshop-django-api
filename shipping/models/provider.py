@@ -99,7 +99,7 @@ class ShippingProvider(TimeStampMixinModel):
             "illustration distinct from the carrier's home-delivery "
             "brand mark). When set, the storefront's "
             "``/api/v1/shipping/options`` endpoint surfaces it on the "
-            "pickup_point row's ``logoUrl`` so the locker card looks "
+            "pickup_point row's ``logoPath`` so the locker card looks "
             "different from the home-delivery card for the same "
             "carrier. Falls back to ``logo`` when blank."
         ),
@@ -169,15 +169,6 @@ class ShippingProvider(TimeStampMixinModel):
             return self.logo_pickup_point
         return self.logo
 
-    def logo_url_for_kind(self, kind: str) -> str | None:
-        """Absolute URL for ``logo_for_kind(kind)``, or ``None`` when
-        no logo is uploaded for that kind (after the pickup→primary
-        fallback). ``settings.MEDIA_URL`` is absolute in every
-        environment so ``.url`` here is always a full URL.
-        """
-        field = self.logo_for_kind(kind)
-        return field.url if self._filename_of(field) else None
-
     def logo_path_for_kind(self, kind: str) -> str | None:
         """Relative media path (``media/{schema}/uploads/shipping/…``) for
         ``logo_for_kind(kind)``, or ``None`` when no logo is uploaded for
@@ -191,9 +182,9 @@ class ShippingProvider(TimeStampMixinModel):
 
     # ------------------------------------------------------------------
     # Project-convention properties (parity with PayWay.icon /
-    # ProductImage.main_image_path) — kept even though the storefront
-    # consumes the absolute URL directly, because admin and search
-    # serializers elsewhere expect the relative-path / filename API.
+    # ProductImage.main_image_path): the relative-path / filename API the
+    # admin and the provider serializer read. The checkout reads the
+    # per-kind ``logo_path_for_kind`` through ``ShippingOption.logoPath``.
     # ------------------------------------------------------------------
 
     @property

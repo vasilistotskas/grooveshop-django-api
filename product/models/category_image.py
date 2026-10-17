@@ -82,12 +82,6 @@ class ProductCategoryImage(
 
         return image_to_media_path(self.image)
 
-    @property
-    def image_url(self) -> str:
-        if self.image and hasattr(self.image, "url"):
-            return self.image.url
-        return ""
-
     @classmethod
     def get_main_image(cls, category):
         return cls.objects.get_main_image(category)

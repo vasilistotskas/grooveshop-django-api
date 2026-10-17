@@ -358,7 +358,6 @@ class ShippingService:
                         "currency": str(price.currency),
                         "live_mode": provider.live_mode,
                         "priority": provider.priority,
-                        "logo_url": provider.logo_url_for_kind(kind.value),
                         "logo_path": provider.logo_path_for_kind(kind.value),
                         "metadata": provider.metadata or {},
                         "pay_ways": cls._pay_ways_for(

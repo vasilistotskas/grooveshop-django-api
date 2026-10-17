@@ -4,7 +4,7 @@ Pins the contract that:
 * The model field accepts an upload and the helper properties return
   the expected relative path + filename.
 * The shipping-options endpoint (which the storefront actually reads)
-  surfaces ``logoUrl`` for uploaded logos and ``null`` for providers
+  surfaces ``logoPath`` for uploaded logos and ``null`` for providers
   that haven't been customised yet — the storefront's bundled
   fallback handles the latter case so a fresh deploy still renders.
 """
@@ -73,8 +73,6 @@ def test_logo_for_kind_no_uploads_returns_empty_primary():
     # Both should be the same empty primary field.
     assert not home
     assert not pickup
-    assert provider.logo_url_for_kind("home_delivery") is None
-    assert provider.logo_url_for_kind("pickup_point") is None
     assert provider.logo_path_for_kind("home_delivery") is None
     assert provider.logo_path_for_kind("pickup_point") is None
 
@@ -93,9 +91,9 @@ def test_logo_for_kind_primary_only_shared_across_kinds():
         == provider.logo_for_kind("pickup_point").name
         == provider.logo.name
     )
-    assert provider.logo_url_for_kind(
+    assert provider.logo_path_for_kind(
         "home_delivery"
-    ) == provider.logo_url_for_kind("pickup_point")
+    ) == provider.logo_path_for_kind("pickup_point")
 
 
 def test_logo_for_kind_pickup_specific_takes_precedence():
@@ -154,8 +152,9 @@ def test_options_endpoint_returns_null_logo_when_no_upload(
     acs_rows = [row for row in body if row["providerCode"] == "acs"]
     assert acs_rows, "ACS rows missing from options response"
     for row in acs_rows:
-        assert row["logoUrl"] is None
         assert row["logoPath"] is None
+        # The original's absolute URL is not part of the contract.
+        assert "logoUrl" not in row
 
 
 @patch(
@@ -166,7 +165,7 @@ def test_options_endpoint_pickup_kind_uses_pickup_logo_when_set(
     _mock_setting, acs_configured_tenant
 ):
     """When ``logo_pickup_point`` is uploaded, the pickup_point
-    option row carries IT as logoUrl while the home_delivery row
+    option row carries IT as logoPath while the home_delivery row
     keeps the primary ``logo``. Same ACS carrier, different image
     per kind — the case the user reported (ACS home delivery vs ACS
     Smartpoint should look different in the picker).
@@ -197,15 +196,14 @@ def test_options_endpoint_pickup_kind_uses_pickup_logo_when_set(
     ]
     assert home_rows and pickup_rows, "ACS rows missing from options response"
     # The two rows must surface DIFFERENT logo URLs.
-    assert home_rows[0]["logoUrl"] != pickup_rows[0]["logoUrl"]
-    assert "acs-home" in home_rows[0]["logoUrl"]
-    assert "acs-smartpoint" in pickup_rows[0]["logoUrl"]
+    assert home_rows[0]["logoPath"] != pickup_rows[0]["logoPath"]
+    assert "acs-home" in home_rows[0]["logoPath"]
+    assert "acs-smartpoint" in pickup_rows[0]["logoPath"]
     # The same logos as relative paths, for media-stream.
     assert home_rows[0]["logoPath"].startswith("media/")
     assert "/uploads/shipping/" in home_rows[0]["logoPath"]
     assert "acs-home" in home_rows[0]["logoPath"]
     assert "acs-smartpoint" in pickup_rows[0]["logoPath"]
-    assert home_rows[0]["logoUrl"].endswith(home_rows[0]["logoPath"])
 
 
 @patch(
@@ -233,10 +231,10 @@ def test_options_endpoint_pickup_kind_falls_back_to_primary_logo(
     )
     body = response.json()
     acs_rows = [row for row in body if row["providerCode"] == "acs"]
-    assert len({row["logoUrl"] for row in acs_rows}) == 1, (
-        "All ACS rows must share the same logoUrl when no pickup-"
+    assert len({row["logoPath"] for row in acs_rows}) == 1, (
+        "All ACS rows must share the same logoPath when no pickup-"
         "specific logo is uploaded; got "
-        f"{[row['logoUrl'] for row in acs_rows]}"
+        f"{[row['logoPath'] for row in acs_rows]}"
     )
 
 
@@ -244,7 +242,7 @@ def test_options_endpoint_pickup_kind_falls_back_to_primary_logo(
     "extra_settings.models.Setting.get",
     side_effect=_setting_get_with_smartpoint_enabled,
 )
-def test_options_endpoint_surfaces_uploaded_logo_url(
+def test_options_endpoint_surfaces_uploaded_logo_path(
     _mock_setting, acs_configured_tenant
 ):
     ShippingProvider.objects.filter(code="acs").update(is_active=True)
@@ -263,10 +261,9 @@ def test_options_endpoint_surfaces_uploaded_logo_url(
     acs_rows = [row for row in body if row["providerCode"] == "acs"]
     assert acs_rows
     for row in acs_rows:
-        # Either signed S3 URL or local file storage URL — both are
-        # truthy strings; the contract is "non-null when uploaded".
-        assert row["logoUrl"], (
-            f"Expected truthy logoUrl after upload, got {row['logoUrl']!r}"
+        # A media path for media-stream; the contract is "non-null when uploaded".
+        assert row["logoPath"], (
+            f"Expected truthy logoPath after upload, got {row['logoPath']!r}"
         )
 
 

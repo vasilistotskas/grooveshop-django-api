@@ -87,6 +87,10 @@ class ProductImageViewSetTestCase(APITestCase):
         self.assertTrue(
             expected_basic_fields.issubset(set(response.data.keys()))
         )
+        # Clients render the media path through media-stream; the
+        # original's absolute URL is not part of the response.
+        self.assertIn("main_image_path", response.data)
+        self.assertNotIn("image_url", response.data)
 
     def test_create_request_response_serializers(self):
         payload = {

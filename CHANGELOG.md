@@ -3,6 +3,20 @@
 
 
 
+## v3.133.1 (2026-10-17)
+
+### Bug fixes
+
+* fix(api): drop the original-URL fields no client reads (#238)
+
+ProductImage, ProductCategoryImage and ShippingOption no longer return the
+absolute URL of the original file (imageUrl, logoUrl). Clients render media
+paths through media-stream (mainImagePath, logoPath); the storefront stopped
+requiring these fields in v3.254.1, which is in production.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01VHqqSodFfL9aLgezEZV6qb ([`087f2af`](https://github.com/vasilistotskas/grooveshop-django-api/commit/087f2aff0cfc439043cca608953f11a8fdeb925f))
+
 ## v3.133.0 (2026-10-17)
 
 ### Bug fixes

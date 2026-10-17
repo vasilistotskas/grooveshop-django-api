@@ -425,37 +425,38 @@ class TestProductAdmin:
 
 @pytest.mark.django_db
 class TestReviewAdmin:
-    def test_review_info_display(self, review_admin):
-        review = ProductReviewFactory()
-
-        result = review_admin.review_info(review)
-
-        assert str(review.id) in result
-
-    def test_product_link_display(self, review_admin):
+    def test_product_header_names_the_product_and_the_review(
+        self, review_admin
+    ):
         product = ProductFactory()
         review = ProductReviewFactory(product=product)
 
-        result = review_admin.product_link(review)
+        title, subtitle, *_rest = review_admin.product_header(review)
 
-        assert (
-            product.safe_translation_getter("name", any_language=True) in result
+        assert title == product.safe_translation_getter(
+            "name", any_language=True
         )
+        assert str(review.id) in subtitle
 
-    def test_user_link_display(self, review_admin):
-        user = UserAccountFactory()
+    def test_reviewer_is_first_name_and_last_initial_linked(self, review_admin):
+        user = UserAccountFactory(first_name="Maria", last_name="Papadopoulou")
         review = ProductReviewFactory(user=user)
 
-        result = review_admin.user_link(review)
+        result = review_admin.reviewer(review)
 
-        assert user.email in result or user.username in result
+        assert "Maria P." in result
+        assert str(user.pk) in result
+        assert user.email not in result
 
-    def test_rating_display(self, review_admin):
-        review = ProductReviewFactory(rate=8)
-
-        result = review_admin.rating_display(review)
-
-        assert result == "8/10"
+    def test_rating_display_is_stars(self, review_admin):
+        assert review_admin.rating_display(ProductReviewFactory(rate=8)) == (
+            "4/5"
+        )
+        assert review_admin.rating_display(
+            ProductReviewFactory(
+                rate=7, product=ProductFactory(), user=UserAccountFactory()
+            )
+        ) == ("3.5/5")
 
     def test_status_label_approved(self, review_admin):
         review = ProductReviewFactory(status="TRUE")
@@ -464,7 +465,7 @@ class TestReviewAdmin:
             result = review_admin.status_label(review)
 
         assert result[0] == "TRUE"
-        assert result[1] == "True"
+        assert result[1] == "Approved"
 
     def test_status_label_pending(self, review_admin):
         review = ProductReviewFactory(status="NEW")
@@ -473,7 +474,7 @@ class TestReviewAdmin:
             result = review_admin.status_label(review)
 
         assert result[0] == "NEW"
-        assert result[1] == "New"
+        assert result[1] == "Waiting for approval"
 
     def test_created_display(self, review_admin):
         from django.utils import timezone

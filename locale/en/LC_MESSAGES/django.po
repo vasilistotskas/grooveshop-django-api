@@ -20473,3 +20473,47 @@ msgstr ""
 #, python-format
 msgid "Chargeback %(amount)s (disputed %(requested)s, %(returned)s already returned)"
 msgstr ""
+
+#: .\shipping\alerts.py
+msgid "Review waiting for approval"
+msgstr ""
+
+#: .\product\admin.py
+msgid "Waiting for approval"
+msgstr ""
+
+#: .\product\admin.py
+msgid "All"
+msgstr ""
+
+#: .\product\admin.py
+msgid "Review #%(id)s"
+msgstr ""
+
+#: .\product\admin.py
+msgid "Verified purchase"
+msgstr ""
+
+#: .\product\admin.py
+msgid "The review was approved."
+msgstr ""
+
+#: .\product\admin.py
+msgid "The review was rejected."
+msgstr ""
+
+#: .\product\tasks.py
+msgid "Review waiting for approval: {product}"
+msgstr ""
+
+#: .\core\templates\emails\product\review_pending.html
+msgid "A review is waiting for approval"
+msgstr ""
+
+#: .\core\templates\emails\product\review_pending.html
+msgid "It stays hidden from shoppers until you approve it."
+msgstr ""
+
+#: .\core\templates\emails\product\review_pending.html
+msgid "Review it in the admin"
+msgstr ""

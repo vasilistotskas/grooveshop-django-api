@@ -23112,3 +23112,47 @@ msgstr "Το chargeback %(requested)s δεν καταγράφηκε: δεν έχ
 #, python-format
 msgid "Chargeback %(amount)s (disputed %(requested)s, %(returned)s already returned)"
 msgstr "Chargeback %(amount)s (αμφισβητήθηκαν %(requested)s, %(returned)s έχουν ήδη επιστραφεί)"
+
+#: .\shipping\alerts.py
+msgid "Review waiting for approval"
+msgstr "Κριτική σε αναμονή έγκρισης"
+
+#: .\product\admin.py
+msgid "Waiting for approval"
+msgstr "Σε αναμονή έγκρισης"
+
+#: .\product\admin.py
+msgid "All"
+msgstr "Όλες"
+
+#: .\product\admin.py
+msgid "Review #%(id)s"
+msgstr "Κριτική #%(id)s"
+
+#: .\product\admin.py
+msgid "Verified purchase"
+msgstr "Επαληθευμένη αγορά"
+
+#: .\product\admin.py
+msgid "The review was approved."
+msgstr "Η κριτική εγκρίθηκε."
+
+#: .\product\admin.py
+msgid "The review was rejected."
+msgstr "Η κριτική απορρίφθηκε."
+
+#: .\product\tasks.py
+msgid "Review waiting for approval: {product}"
+msgstr "Κριτική σε αναμονή έγκρισης: {product}"
+
+#: .\core\templates\emails\product\review_pending.html
+msgid "A review is waiting for approval"
+msgstr "Μια κριτική περιμένει έγκριση"
+
+#: .\core\templates\emails\product\review_pending.html
+msgid "It stays hidden from shoppers until you approve it."
+msgstr "Παραμένει κρυμμένη από τους αγοραστές μέχρι να την εγκρίνετε."
+
+#: .\core\templates\emails\product\review_pending.html
+msgid "Review it in the admin"
+msgstr "Δείτε την στη διαχείριση"

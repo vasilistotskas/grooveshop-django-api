@@ -91,12 +91,12 @@ class TestProductReviewQuerySet:
         published_review = ProductReviewFactory(
             user=UserAccountFactory(),
             product=ProductFactory(),
-            is_published=True,
+            status=ReviewStatus.TRUE,
         )
         unpublished_review = ProductReviewFactory(
             user=UserAccountFactory(),
             product=ProductFactory(),
-            is_published=False,
+            status=ReviewStatus.NEW,
         )
 
         published_reviews = ProductReview.objects.published()
@@ -108,12 +108,12 @@ class TestProductReviewQuerySet:
         visible_review = ProductReviewFactory(
             user=UserAccountFactory(),
             product=ProductFactory(),
-            is_published=True,
+            status=ReviewStatus.TRUE,
         )
         hidden_review = ProductReviewFactory(
             user=UserAccountFactory(),
             product=ProductFactory(),
-            is_published=False,
+            status=ReviewStatus.NEW,
         )
 
         visible_reviews = ProductReview.objects.visible()

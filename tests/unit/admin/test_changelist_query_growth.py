@@ -108,9 +108,11 @@ def _build_retail_credit():
 
 BUILDERS: dict[str, Callable[[], object]] = {
     # Factories that reuse a related row, so their batches do not grow.
+    # NEW: the changelist opens on the reviews waiting for approval, so
+    # only those rows are rendered; the factory cycles through statuses.
     "product.ProductReview": lambda: __import__(
         "product.factories.review", fromlist=["ProductReviewFactory"]
-    ).ProductReviewFactory(product=_product(), user=_user()),
+    ).ProductReviewFactory(product=_product(), user=_user(), status="NEW"),
     "product.ProductFavourite": lambda: __import__(
         "product.factories.favourite", fromlist=["ProductFavouriteFactory"]
     ).ProductFavouriteFactory(product=_product(), user=_user()),

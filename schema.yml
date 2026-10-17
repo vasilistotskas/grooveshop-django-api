@@ -24733,9 +24733,9 @@ paths:
         description: |-
           Φίλτρο ανά κατάσταση αξιολόγησης
 
-          * `NEW` - Νέο
-          * `TRUE` - Ναι
-          * `FALSE` - Όχι
+          * `NEW` - Σε αναμονή έγκρισης
+          * `TRUE` - Εγκεκριμένο
+          * `FALSE` - Απορρίφθηκε
       - in: query
         name: updatedAfter
         schema:
@@ -47803,9 +47803,9 @@ components:
       - 'FALSE'
       type: string
       description: |-
-        * `NEW` - Νέο
-        * `TRUE` - Ναι
-        * `FALSE` - Όχι
+        * `NEW` - Σε αναμονή έγκρισης
+        * `TRUE` - Εγκεκριμένο
+        * `FALSE` - Απορρίφθηκε
     ScanStatusEnum:
       enum:
       - PENDING

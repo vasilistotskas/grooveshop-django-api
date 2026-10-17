@@ -10335,3 +10335,63 @@ msgstr ""
 #: .\cart\views\cart.py
 msgid "Mint a short-lived token that lets the shopping assistant act on the signed-in shopper's own cart: read it, add, update and remove items, apply and remove coupons. Nothing else: not payment, stock reservation, checkout or deleting the cart. Send it as the ``X-Cart-Token`` header. It stops working when it expires or the shopper signs out; mint a new one when a call is refused with 401."
 msgstr ""
+
+#: .\shipping\alerts.py
+msgid "Review waiting for approval"
+msgstr "Bewertung wartet auf Freigabe"
+
+#: .\product\admin.py
+msgid "Waiting for approval"
+msgstr "Wartet auf Freigabe"
+
+#: .\product\admin.py
+msgid "Rejected"
+msgstr "Abgelehnt"
+
+#: .\product\admin.py
+msgid "All"
+msgstr "Alle"
+
+#: .\product\admin.py
+msgid "Review #%(id)s"
+msgstr "Bewertung #%(id)s"
+
+#: .\product\admin.py
+msgid "Verified purchase"
+msgstr "Verifizierter Kauf"
+
+#: .\product\admin.py
+msgid "Approve"
+msgstr "Freigeben"
+
+#: .\product\admin.py
+msgid "Reject"
+msgstr "Ablehnen"
+
+#: .\product\admin.py
+msgid "The review was approved."
+msgstr "Die Bewertung wurde freigegeben."
+
+#: .\product\admin.py
+msgid "The review was rejected."
+msgstr "Die Bewertung wurde abgelehnt."
+
+#: .\product\tasks.py
+msgid "Review waiting for approval: {product}"
+msgstr "Bewertung wartet auf Freigabe: {product}"
+
+#: .\core\templates\emails\product\review_pending.html
+msgid "A review is waiting for approval"
+msgstr "Eine Bewertung wartet auf Freigabe"
+
+#: .\core\templates\emails\product\review_pending.html
+msgid "It stays hidden from shoppers until you approve it."
+msgstr "Sie bleibt für Käufer verborgen, bis Sie sie freigeben."
+
+#: .\core\templates\emails\product\review_pending.html
+msgid "No comment"
+msgstr "Kein Kommentar"
+
+#: .\core\templates\emails\product\review_pending.html
+msgid "Review it in the admin"
+msgstr "Im Admin ansehen"

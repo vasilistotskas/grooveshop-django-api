@@ -997,6 +997,7 @@ is **per store, per kind**. `OpsAlertKind` is the whole list:
 | `shipment_rejected` | `alert_admins_shipment_creation_failed` | An `OrderHistory` note on the order, written whether or not the email is on |
 | `webhook_failed` | `alert_admins_webhook_processing_failed` | The ERROR log only |
 | `payment_after_cancel` | `OrderService.record_payment_after_cancel` | "Canceled orders to refund" (`OrderQuerySet.refund_owed`), until refunded; plus the order note |
+| `review_pending` | `product.tasks.send_review_pending_alert`, queued after commit by `ProductReviewWriteSerializer.save` | Dashboard "Reviews to approve" and the sidebar badge (`pending_reviews`) |
 
 - **One gate.** Every sender calls `send_ops_alert(kind=..., ...)`, which
   returns `False` when the store muted the kind or has no recipient. No
@@ -1024,6 +1025,16 @@ is **per store, per kind**. `OpsAlertKind` is the whole list:
   no readable voucher are stored too (see the COD reconcile above), so
   they are counted like the rest; a row leaves the count only when staff
   reconcile it.
+- **`review_pending`** is one mail per review that ENTERS `NEW`: when a
+  customer submits one, and when the owner changes the rate or the
+  comment of an approved or rejected one (which sends it back to `NEW`,
+  off the public list and the averages). A staff edit, an update that
+  changes nothing, and a review that is already `NEW` send nothing. The
+  task skips a review moderated before it ran, renders in the store's
+  `default_locale`, and links the review's admin page on the store's API
+  host. `ProductReview.sync_publication` and
+  `ProductReviewQuerySet.moderate` keep `is_published` / `published_at`
+  in step with the status on every path that changes it.
 - To keep one kind on a store, switch the others off in that store's
   settings; the recipients stay `tenant_admin_recipients()`.
 

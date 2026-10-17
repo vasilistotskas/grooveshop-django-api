@@ -6,10 +6,11 @@ from rest_framework import serializers
 
 from core.api.schema import generate_schema_multi_lang
 from core.utils.serializers import TranslatedFieldExtended
-from product.enum.review import RateEnum
+from product.enum.review import RateEnum, ReviewStatus
 from product.models.product import Product
 from product.models.review import ProductReview
 from product.serializers.product import ProductSerializer
+from tenant.celery import dispatch_on_commit
 from user.serializers.account import UserPublicSerializer
 
 User = get_user_model()
@@ -156,3 +157,55 @@ class ProductReviewWriteSerializer(
             )
 
         return attrs
+
+    def save(self, **kwargs):
+        """Put a review the owner changed back in front of staff.
+
+        The one place the rule lives, because it is the one write path
+        for a shopper (create, PUT and PATCH all end here) and the only
+        one that knows who is writing and what the new text is: parler
+        pops the translations out of ``validated_data`` inside
+        ``super().save()``, after the row is written, so neither
+        ``update()`` nor the model's ``save()`` can compare the comment.
+        The admin never reaches this serializer, so a staff edit does not
+        reset anything.
+
+        An owner's change to the rate or the comment of an approved or
+        rejected review sends it back to ``NEW``, which hides it from the
+        public list and the averages until it is approved again. An
+        update that changes nothing leaves the status alone. Staff are
+        emailed once per entry into ``NEW``: on create and on that reset.
+        """
+        created = self.instance is None
+        resubmitted = not created and self._owner_changed_the_content()
+        if resubmitted:
+            kwargs["status"] = ReviewStatus.NEW
+        review = super().save(**kwargs)
+        if created or resubmitted:
+            from product.tasks import send_review_pending_alert
+
+            dispatch_on_commit(
+                send_review_pending_alert,
+                kwargs={"review_id": review.pk},
+                robust=True,
+            )
+        return review
+
+    def _owner_changed_the_content(self) -> bool:
+        review = self.instance
+        if review.status == ReviewStatus.NEW:
+            return False
+        if review.user_id != self.context["request"].user.pk:
+            return False
+        data = self.validated_data
+        if "rate" in data and data["rate"] != review.rate:
+            return True
+        for language, fields in (data.get("translations") or {}).items():
+            if "comment" not in fields:
+                continue
+            current = review.safe_translation_getter(
+                "comment", language_code=language, any_language=False
+            )
+            if (fields["comment"] or "") != (current or ""):
+                return True
+        return False

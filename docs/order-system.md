@@ -815,8 +815,20 @@ accepting Cyprus orders at the Greek flat rate.
   voucher number arrives in the `POD` column (there is no
   `Voucher_No` in this response); `Customer_RefNo_1/2` echo
   `Reference_Key1/2` from voucher mint (`order.id` / `order.uuid`)
-  and are the fallback match keys. Unmatched rows are counted as
-  `skipped` and alert ADMINS. Backfill missed dates with
+  and are the fallback match keys. A row with no readable voucher
+  (empty `POD`, no `Customer_RefNo` match) is counted as `skipped` and
+  stored all the same, with an empty `voucher_no` and keyed on
+  `AcsCodPayout.row_fingerprint` (SHA-256 of the identifying ACS
+  columns plus the payment date): the `(voucher_no, cod_payment_date)`
+  unique constraint is partial (`voucher_no <> ''`) and a second partial
+  unique constraint covers `row_fingerprint <> ''`, so a rerun updates
+  the row and two different unreadable rows of one date both survive.
+  Rows ACS reported for a voucher we do not know (`unmatched`) and
+  unreadable ones alert the store's operators. Staff clear such a row
+  from the payout list with "Mark as reconciled" (a dialog asking for a
+  note; stamps `reconciled_at` / `reconciled_by` /
+  `reconciliation_note`, never edits the payout; service
+  `AcsService.reconcile_cod_payout`). Backfill missed dates with
   `manage.py reconcile_acs_cod --days N [--silent]` (`--silent`
   suppresses customer COMPLETED notifications — mandatory for
   backfills).
@@ -954,7 +966,7 @@ is **per store, per kind**. `OpsAlertKind` is the whole list:
 |---|---|---|
 | `stale_shipments` | `check_stale_acs_shipments` digest, 09:00 | Dashboard "Stale ACS shipments" (`shipping_acs.attention.stale_shipment_q`) |
 | `unremitted_cod` | `alert_unremitted_cod_payouts`, 03:00 | "COD cash ACS has not paid out" (`unremitted_cod_shipments`) |
-| `unattributable_cod_payouts` | `AcsService._alert_admins_unmatched_payouts` | "ACS payouts matching no shipment" (`unattributed_payouts`, last 30 days) |
+| `unattributable_cod_payouts` | `AcsService._alert_admins_unmatched_payouts` | "ACS payouts matching no shipment" (`unattributed_payouts`: every payout with no shipment and no reconciliation, no time window) |
 | `shipment_rejected` | `alert_admins_shipment_creation_failed` | An `OrderHistory` note on the order, written whether or not the email is on |
 | `webhook_failed` | `alert_admins_webhook_processing_failed` | The ERROR log only |
 | `payment_after_cancel` | `OrderService.record_payment_after_cancel` | "Canceled orders to refund" (`OrderQuerySet.refund_owed`), until refunded; plus the order note |
@@ -979,9 +991,12 @@ is **per store, per kind**. `OpsAlertKind` is the whole list:
   `attention_counts()` (`admin.dashboard.store.queries`); each counter
   opens the list through a filter (`attention=stale|unremitted_cod` on the
   ACS shipment list, `unattributed=yes` on the payout list,
-  `refund_owed=yes` on the order list). Payout rows ACS reported with no
-  readable voucher are never stored, so only the email and the log carry
-  them.
+  `refund_owed=yes` on the order list). The payout counter and its
+  `unattributed=yes` filter share one `Q` (`unattributed_payout_q`), so
+  the list shows exactly what was counted. Payout rows ACS reported with
+  no readable voucher are stored too (see the COD reconcile above), so
+  they are counted like the rest; a row leaves the count only when staff
+  reconcile it.
 - To keep one kind on a store, switch the others off in that store's
   settings; the recipients stay `tenant_admin_recipients()`.
 

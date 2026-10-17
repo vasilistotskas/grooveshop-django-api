@@ -31,7 +31,11 @@ from admin.base import BaseModelAdmin
 from admin.displays import SHIPMENT_STATE_VARIANT, change_link, choice_label
 from admin.mixins import IsSuperuserOnlyModelAdmin
 from order.models.order import Order
-from shipping_acs.attention import stale_shipment_q, unremitted_cod_shipments
+from shipping_acs.attention import (
+    stale_shipment_q,
+    unattributed_payout_q,
+    unremitted_cod_shipments,
+)
 from shipping_acs.enum.shipment_state import AcsShipmentState
 from shipping_acs.models import (
     AcsCodPayout,
@@ -71,6 +75,17 @@ class CodReceivedOutsideAcsForm(BaseDialogForm):
         help_text=_(
             "How the money arrived (bank transfer reference, hand "
             "delivery, ...). Recorded on the shipment's audit trail."
+        ),
+    )
+
+
+class ReconcilePayoutForm(BaseDialogForm):
+    note = forms.CharField(
+        label=_("Note"),
+        widget=UnfoldAdminTextareaWidget(attrs={"rows": 3}),
+        help_text=_(
+            "How the payout was accounted for (the off-system sale, the "
+            "invoice, the line of the ACS report). Kept on the payout."
         ),
     )
 
@@ -215,19 +230,38 @@ class NeedsAttentionFilter(DropdownFilter):
 
 
 class UnattributedPayoutFilter(DropdownFilter):
-    """Payouts ACS reported for a voucher that is none of the store's
-    shipments."""
+    """Payouts that tie to none of the store's shipments and that nobody
+    has reconciled: exactly what the dashboard counter counts."""
 
     title = _("Shipment")
     parameter_name = "unattributed"
 
     def lookups(self, request, model_admin):
-        return [("yes", _("Matches no shipment"))]
+        return [("yes", _("Matches no shipment, not reconciled"))]
 
     def queryset(self, request, queryset):
         if self.value() == "yes":
-            return queryset.filter(shipment__isnull=True)
+            return queryset.filter(unattributed_payout_q())
         return queryset
+
+
+class ReconciledPayoutFilter(DropdownFilter):
+    """Whether staff have reconciled the payout."""
+
+    title = _("Reconciliation")
+    parameter_name = "reconciled"
+
+    def lookups(self, request, model_admin):
+        return [("yes", _("Reconciled")), ("no", _("Not reconciled"))]
+
+    def queryset(self, request, queryset):
+        match self.value():
+            case "yes":
+                return queryset.filter(reconciled_at__isnull=False)
+            case "no":
+                return queryset.filter(reconciled_at__isnull=True)
+            case _:
+                return queryset
 
 
 # ── Admins ─────────────────────────────────────────────────────────────────
@@ -725,6 +759,7 @@ class AcsCodPayoutAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
     date_hierarchy = "cod_payment_date"
     list_filter = (
         UnattributedPayoutFilter,
+        ReconciledPayoutFilter,
         ("cod_payment_date", RangeDateFilter),
         ("parcel_delivery_date", RangeDateTimeFilter),
     )
@@ -749,12 +784,59 @@ class AcsCodPayoutAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
         "cod_amount_cash",
         "cod_amount_card",
         "cod_payment_date",
+        "row_fingerprint",
+        "reconciled_at",
+        "reconciled_by",
+        "reconciliation_note",
         "raw_payload",
         "created_at",
         "updated_at",
     )
     # Reconciles every payout, not a row: a list action, not a row one.
     actions_list = ["run_reconciliation"]
+    actions_row = ["mark_reconciled"]
+    actions_detail = ["mark_reconciled"]
+
+    @action(
+        description=_("Mark as reconciled"),
+        icon="task_alt",
+        dialog=ActionDialog(
+            title=_("Mark payout as reconciled"),
+            description=_(
+                "Use once this payout has been accounted for although no "
+                "shipment of the store explains it. It stops counting as "
+                "needing attention on the dashboard. The payout itself is "
+                "kept unchanged."
+            ),
+            form_class=ReconcilePayoutForm,
+        ),
+    )
+    def mark_reconciled(
+        self, request: HttpRequest, form, object_id=None, **kwargs
+    ) -> HttpResponse:
+        from shipping_acs.exceptions import AcsPayoutReconciliationError
+        from shipping_acs.services import AcsService
+
+        payout = AcsCodPayout.objects.get(pk=object_id)
+        try:
+            AcsService.reconcile_cod_payout(
+                payout, user=request.user, note=form.cleaned_data["note"]
+            )
+        except AcsPayoutReconciliationError as exc:
+            # The service names the exact reason (tied to a shipment,
+            # already reconciled): say it verbatim.
+            self.message_user(request, str(exc), messages.ERROR)
+        else:
+            self.message_user(
+                request, _("Payout marked as reconciled."), messages.SUCCESS
+            )
+        return HttpResponse(
+            headers={
+                "HX-Redirect": reverse(
+                    "admin:shipping_acs_acscodpayout_changelist"
+                ),
+            }
+        )
 
     @action(
         description=_("Run COD reconciliation now"),

@@ -16075,10 +16075,12 @@ msgstr "Smartpoint locker"
 #: .\shipping_acs\models\cod_payout.py:34
 msgid ""
 "ACS voucher number — links back to AcsShipment.voucher_no without a hard FK "
-"so historic rows survive shipment deletions."
+"so historic rows survive shipment deletions. Empty when ACS reported the "
+"row with no readable voucher."
 msgstr ""
 "Αριθμός voucher ACS — συνδέεται με το AcsShipment.voucher_no χωρίς αυστηρό "
-"FK ώστε οι ιστορικές εγγραφές να επιβιώνουν από διαγραφές αποστολών."
+"FK ώστε οι ιστορικές εγγραφές να επιβιώνουν από διαγραφές αποστολών. Κενό "
+"όταν η ACS δήλωσε τη γραμμή χωρίς αναγνώσιμο voucher."
 
 #: .\shipping_acs\models\cod_payout.py:47
 msgid ""
@@ -16154,11 +16156,12 @@ msgstr "Ημερομηνία πληρωμής αντικαταβολής"
 #: .\shipping_acs\models\cod_payout.py:126
 msgid ""
 "Date ACS paid (or expects to pay) the partner. Forms half of the idempotency"
-" key together with voucher_no."
+" key together with voucher_no, or the row fingerprint when there is no "
+"voucher."
 msgstr ""
 "Ημερομηνία κατά την οποία η ACS πλήρωσε (ή αναμένεται να πληρώσει) τον "
 "συνεργάτη. Αποτελεί το ένα μισό του κλειδιού ιδεμποτεντίας μαζί με το "
-"voucher_no."
+"voucher_no, ή με το αποτύπωμα της γραμμής όταν δεν υπάρχει voucher."
 
 #: .\shipping_acs\models\cod_payout.py:131
 #: .\shipping_acs\models\tracking_event.py:64
@@ -22908,8 +22911,108 @@ msgid "Delivered COD never paid out by ACS"
 msgstr "Παραδόθηκαν με αντικαταβολή και η ACS δεν απέδωσε τα χρήματα"
 
 #: .\shipping_acs\admin.py
-msgid "Matches no shipment"
-msgstr "Δεν αντιστοιχεί σε αποστολή"
+msgid "Matches no shipment, not reconciled"
+msgstr "Δεν αντιστοιχεί σε αποστολή και δεν έχει συμφωνηθεί"
+
+#: .\shipping_acs\admin.py
+msgid "Reconciled"
+msgstr "Έχει συμφωνηθεί"
+
+#: .\shipping_acs\admin.py
+msgid "Not reconciled"
+msgstr "Δεν έχει συμφωνηθεί"
+
+#: .\shipping_acs\admin.py
+msgid "Mark as reconciled"
+msgstr "Σήμανση ως συμφωνημένη"
+
+#: .\shipping_acs\admin.py
+msgid "Mark payout as reconciled"
+msgstr "Σήμανση απόδοσης ως συμφωνημένης"
+
+#: .\shipping_acs\admin.py
+msgid ""
+"Use once this payout has been accounted for although no shipment of the "
+"store explains it. It stops counting as needing attention on the dashboard. "
+"The payout itself is kept unchanged."
+msgstr ""
+"Χρησιμοποιήστε το όταν η απόδοση έχει λογιστικοποιηθεί παρόλο που καμία "
+"αποστολή του καταστήματος δεν την εξηγεί. Παύει να μετράει ως εκκρεμότητα "
+"στον πίνακα ελέγχου. Η ίδια η απόδοση μένει αναλλοίωτη."
+
+#: .\shipping_acs\admin.py
+msgid ""
+"How the payout was accounted for (the off-system sale, the invoice, the line "
+"of the ACS report). Kept on the payout."
+msgstr ""
+"Πώς λογιστικοποιήθηκε η απόδοση (η πώληση εκτός συστήματος, το τιμολόγιο, η "
+"γραμμή της αναφοράς ACS). Φυλάσσεται στην απόδοση."
+
+#: .\shipping_acs\admin.py
+msgid "Payout marked as reconciled."
+msgstr "Η απόδοση σημάνθηκε ως συμφωνημένη."
+
+#: .\shipping_acs\services.py
+msgid "This payout is tied to a shipment; there is nothing to reconcile."
+msgstr "Αυτή η απόδοση συνδέεται με αποστολή· δεν υπάρχει κάτι να συμφωνηθεί."
+
+#: .\shipping_acs\services.py
+msgid "This payout is already reconciled."
+msgstr "Αυτή η απόδοση έχει ήδη συμφωνηθεί."
+
+#: .\shipping_acs\models\cod_payout.py
+msgid "Row fingerprint"
+msgstr "Αποτύπωμα γραμμής"
+
+#: .\shipping_acs\models\cod_payout.py
+msgid ""
+"SHA-256 of the ACS fields that identify the row. Set only for a row with no "
+"readable voucher: it is that row's idempotency key, so a rerun updates it "
+"instead of storing it twice."
+msgstr ""
+"SHA-256 των πεδίων ACS που ταυτοποιούν τη γραμμή. Ορίζεται μόνο για γραμμή "
+"χωρίς αναγνώσιμο voucher: είναι το κλειδί ιδεμποτεντίας της, ώστε μια νέα "
+"εκτέλεση να την ενημερώνει αντί να την αποθηκεύει δύο φορές."
+
+#: .\shipping_acs\models\cod_payout.py
+msgid "Reconciled at"
+msgstr "Συμφωνήθηκε στις"
+
+#: .\shipping_acs\models\cod_payout.py
+msgid ""
+"When staff recorded that this payout was accounted for. A payout matching no "
+"shipment stays counted as needing attention until then."
+msgstr ""
+"Πότε κατέγραψε το προσωπικό ότι η απόδοση λογιστικοποιήθηκε. Μια απόδοση "
+"χωρίς αντίστοιχη αποστολή μετράει ως εκκρεμότητα μέχρι τότε."
+
+#: .\shipping_acs\models\cod_payout.py
+msgid "Reconciled by"
+msgstr "Συμφωνήθηκε από"
+
+#: .\shipping_acs\models\cod_payout.py
+msgid ""
+"Operator who reconciled the payout. Stores a PLATFORM-schema user id; not "
+"FK-enforced."
+msgstr ""
+"Ο χειριστής που συμφώνησε την απόδοση. Αποθηκεύει id χρήστη του σχήματος "
+"PLATFORM· δεν επιβάλλεται ως FK."
+
+#: .\shipping_acs\models\cod_payout.py
+msgid "Reconciliation note"
+msgstr "Σημείωση συμφωνίας"
+
+#: .\shipping_acs\models\cod_payout.py
+msgid ""
+"How the payout was accounted for (the off-system sale, the invoice, the ACS "
+"report line), as written by the operator."
+msgstr ""
+"Πώς λογιστικοποιήθηκε η απόδοση (η πώληση εκτός συστήματος, το τιμολόγιο, η "
+"γραμμή της αναφοράς ACS), όπως τη διατύπωσε ο χειριστής."
+
+#: .\shipping_acs\models\cod_payout.py
+msgid "without voucher"
+msgstr "χωρίς voucher"
 
 #: .\admin\dashboard\store\widgets.py
 msgid "Canceled orders to refund"
@@ -22932,9 +23035,8 @@ msgid "ACS payouts matching no shipment"
 msgstr "Αποδόσεις ACS χωρίς αντίστοιχη αποστολή"
 
 #: .\admin\dashboard\store\widgets.py
-#, python-format
-msgid "Recorded in the last %(days)s days"
-msgstr "Καταγράφηκαν τις τελευταίες %(days)s ημέρες"
+msgid "Money ACS paid out that no shipment explains"
+msgstr "Χρήματα που απέδωσε η ACS και καμία αποστολή δεν εξηγεί"
 
 #: .\admin\dashboard\store\widgets.py
 msgid "Stale ACS shipments"

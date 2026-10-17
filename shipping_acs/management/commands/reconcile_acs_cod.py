@@ -130,8 +130,9 @@ class Command(TenantCommandMixin, BaseCommand):
             self.stdout.write(
                 self.style.WARNING(
                     "Unattributable payout rows were persisted but not tied "
-                    "to an order. Grep the worker log for "
-                    "'payout matches no shipment' for each row's voucher, "
-                    "amount and receiver."
+                    "to an order. Open the ACS COD payouts list in the "
+                    "admin and filter 'Matches no shipment, not "
+                    "reconciled' for each row's voucher, amount and "
+                    "receiver."
                 )
             )

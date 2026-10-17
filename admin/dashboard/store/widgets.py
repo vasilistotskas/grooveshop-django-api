@@ -304,7 +304,6 @@ class StoreAttention(DashboardWidget):
 
     def shape(self, data: dict[str, int]) -> dict[str, Any]:
         from order.models.invoice import MyDataStatus
-        from shipping_acs.attention import UNATTRIBUTED_PAYOUT_DAYS
 
         features = store_features(self.request)
         candidates = [
@@ -354,15 +353,9 @@ class StoreAttention(DashboardWidget):
                 "help_center",
                 "danger",
                 _("ACS payouts matching no shipment"),
-                _("Recorded in the last %(days)s days")
-                % {"days": UNATTRIBUTED_PAYOUT_DAYS},
+                _("Money ACS paid out that no shipment explains"),
                 "shipping_acs.AcsCodPayout",
-                urlencode(
-                    {
-                        "unattributed": "yes",
-                        "created_at__gte": _days_ago(UNATTRIBUTED_PAYOUT_DAYS),
-                    }
-                ),
+                urlencode({"unattributed": "yes"}),
             ),
             (
                 True,

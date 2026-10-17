@@ -27,7 +27,6 @@ from order.models.order import Order
 from order.services import OrderService
 from pay_way.factories import PayWayFactory
 from shipping.alerts import OpsAlertKind
-from shipping_acs.attention import UNATTRIBUTED_PAYOUT_DAYS
 from shipping_acs.enum.charge_type import AcsChargeType
 from shipping_acs.enum.shipment_state import AcsShipmentState
 from shipping_acs.factories import AcsShipmentFactory
@@ -195,13 +194,24 @@ class TestUnattributedPayouts:
 
         assert _counts()["unattributed_cod_payouts"] == 0
 
-    def test_nothing_clears_an_orphan_so_the_count_is_a_window(self):
+    def test_an_old_orphan_is_still_counted_there_is_no_window(self):
         old = _payout("2417791935")
         AcsCodPayout.objects.filter(pk=old.pk).update(
-            created_at=timezone.now()
-            - timedelta(days=UNATTRIBUTED_PAYOUT_DAYS + 1)
+            created_at=timezone.now() - timedelta(days=400)
         )
         _payout("2431665832")
+
+        assert _counts()["unattributed_cod_payouts"] == 2
+
+    def test_a_payout_with_no_readable_voucher_is_counted(self):
+        _payout("", row_fingerprint="a" * 64)
+
+        assert _counts()["unattributed_cod_payouts"] == 1
+
+    def test_a_reconciled_payout_is_not(self):
+        _payout("2431665832", reconciled_at=timezone.now())
+        _payout("", row_fingerprint="b" * 64, reconciled_at=timezone.now())
+        _payout("2417791935")
 
         assert _counts()["unattributed_cod_payouts"] == 1
 
@@ -283,13 +293,8 @@ class TestDashboardRows:
         assert rows["COD cash ACS has not paid out"]["href"].endswith(
             "attention=unremitted_cod"
         )
-        assert (
+        assert rows["ACS payouts matching no shipment"]["href"].endswith(
             "unattributed=yes"
-            in rows["ACS payouts matching no shipment"]["href"]
-        )
-        assert (
-            "created_at__gte="
-            in rows["ACS payouts matching no shipment"]["href"]
         )
         assert rows["Canceled orders to refund"]["href"].endswith(
             "refund_owed=yes"
@@ -337,12 +342,29 @@ class TestTheListsTheRowsOpen:
             unremitted.pk
         }
 
-    def test_the_payout_list_shows_the_orphans(self, client):
-        orphan = _payout("2431665832")
+    def test_the_payout_list_shows_exactly_what_was_counted(self, client):
+        unknown = _payout("2431665832")
+        unreadable = _payout("", row_fingerprint="c" * 64)
+        old = _payout("2417791935")
+        AcsCodPayout.objects.filter(pk=old.pk).update(
+            created_at=timezone.now() - timedelta(days=400)
+        )
+        _payout("2400000001", reconciled_at=timezone.now())
         _payout("9772892603", shipment=_shipment(voucher_no="9772892603"))
 
-        assert _listed(
+        listed = _listed(
             client,
             "admin:shipping_acs_acscodpayout_changelist",
             "unattributed=yes",
-        ) == {orphan.pk}
+        )
+
+        assert listed == {unknown.pk, unreadable.pk, old.pk}
+        assert len(listed) == _counts()["unattributed_cod_payouts"]
+
+    def test_the_payout_list_filters_by_reconciliation(self, client):
+        open_payout = _payout("2431665832")
+        done = _payout("2417791935", reconciled_at=timezone.now())
+        changelist = "admin:shipping_acs_acscodpayout_changelist"
+
+        assert _listed(client, changelist, "reconciled=yes") == {done.pk}
+        assert _listed(client, changelist, "reconciled=no") == {open_payout.pk}

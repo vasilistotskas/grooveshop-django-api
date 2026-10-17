@@ -28,11 +28,6 @@ if TYPE_CHECKING:
 # mint failed for good or was lost: minting normally takes seconds.
 STRANDED_MINT_AFTER = timedelta(hours=24)
 
-# A payout row ACS reported for a voucher the store does not know stays
-# counted for this long after it was recorded. Nothing resolves such a row
-# (the parcel never existed here), so an open-ended count would never clear.
-UNATTRIBUTED_PAYOUT_DAYS = 30
-
 
 def stale_threshold_days() -> int:
     """Days without a tracking event before a parcel is stale."""
@@ -127,15 +122,22 @@ def unremitted_cod_shipments(
     )
 
 
-def unattributed_payouts(
-    now: datetime | None = None,
-) -> QuerySet[AcsCodPayout]:
-    """Recent payout rows that tie to none of the store's shipments.
+def unattributed_payout_q() -> Q:
+    """Payouts nobody has tied to a shipment or signed off, as a ``Q``.
 
-    Rows ACS reported with no readable voucher at all are never stored
-    (the reconcile only logs and emails them), so they cannot be counted.
+    Shared by the counter and the payout list's filter, so the row the
+    dashboard counts is exactly the list it opens.
     """
-    since = (now or timezone.now()) - timedelta(days=UNATTRIBUTED_PAYOUT_DAYS)
-    return AcsCodPayout.objects.filter(
-        shipment__isnull=True, created_at__gte=since
-    )
+    return Q(shipment__isnull=True, reconciled_at__isnull=True)
+
+
+def unattributed_payouts() -> QuerySet[AcsCodPayout]:
+    """Every payout row that ties to none of the store's shipments and
+    that staff have not reconciled.
+
+    That includes rows ACS reported with no readable voucher (stored with
+    an empty ``voucher_no``) and rows for a voucher the store does not
+    know. There is no time window: a row stays counted until a person
+    reconciles it (the payout list's "Mark as reconciled" action).
+    """
+    return AcsCodPayout.objects.filter(unattributed_payout_q())

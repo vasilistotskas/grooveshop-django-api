@@ -449,7 +449,7 @@ def attention_counts() -> dict[str, int]:
         # email uses.
         "stale_shipments": acs.stale_shipments(now).count(),
         "unremitted_cod": acs.unremitted_cod_shipments(now=now).count(),
-        "unattributed_cod_payouts": acs.unattributed_payouts(now).count(),
+        "unattributed_cod_payouts": acs.unattributed_payouts().count(),
         "canceled_still_paid": model("order.Order")
         .objects.refund_owed()
         .count(),

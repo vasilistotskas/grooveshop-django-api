@@ -107,12 +107,14 @@ class ProductReview(
     def reviewer_label(self) -> str:
         """The author as staff read them: first name and last initial.
 
-        Falls back to the username for an account with no name.
+        Falls back to the username for an account with no name, never to
+        the email address: the label goes into the staff email and the
+        changelist, where an address is personal data nobody needs.
         """
         first = (self.user.first_name or "").strip()
         last = (self.user.last_name or "").strip()
         if not first and not last:
-            return self.user.username or self.user.email
+            return self.user.username or ""
         initial = f" {last[0]}." if last else ""
         return f"{first}{initial}".strip()
 

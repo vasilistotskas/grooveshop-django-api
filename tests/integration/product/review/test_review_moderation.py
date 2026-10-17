@@ -712,3 +712,13 @@ class TestTheAdmin:
         stored = _stored(review)
         assert stored.is_published is True
         assert stored.published_at is not None
+
+
+@pytest.mark.django_db
+def test_the_reviewer_label_never_shows_the_email_address():
+    user = UserAccountFactory(
+        first_name="", last_name="", username="", email="maria@example.com"
+    )
+    review = ProductReviewFactory(user=user)
+
+    assert "maria@example.com" not in review.reviewer_label

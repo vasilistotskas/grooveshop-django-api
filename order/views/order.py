@@ -119,6 +119,7 @@ GUEST_UUID_QUERY_ACTIONS = frozenset(
         "create_checkout_session",
         "confirm_agent_payment",
         "retry_payment",
+        "specimen_download",
     }
 )
 GUEST_ORDER_UUID_PARAMETER = OpenApiParameter(
@@ -283,6 +284,28 @@ serializers_config: SerializersConfig = {
             "rejected or cancelled, or a store that issues its receipts "
             "outside the platform."
         ),
+        tags=["Orders"],
+    ),
+    "specimen_download": ActionConfig(
+        responses={
+            (200, "application/pdf"): OpenApiTypes.BINARY,
+            403: OpenApiResponse(
+                description=_("Not the order's owner or its UUID"),
+            ),
+            404: OpenApiResponse(description=_("Specimen unavailable")),
+        },
+        operation_id="downloadOrderSpecimenReceipt",
+        summary=_("Download the specimen receipt PDF"),
+        description=_(
+            "Renders, on demand, a watermarked specimen of the order's "
+            "retail receipt: the same document with no number, no QR code "
+            "and no tax standing. Demo stores only, for an order a receipt "
+            "is issued for (shipped onwards); 404 when no specimen is "
+            "available. Nothing is stored and nothing is sent to myDATA. "
+            "Open to the order's owner, store staff, and the guest who "
+            "holds the order's UUID (``?uuid=``)."
+        ),
+        parameters=[GUEST_ORDER_UUID_PARAMETER],
         tags=["Orders"],
     ),
     "boxnow_cancel": ActionConfig(
@@ -452,7 +475,6 @@ class OrderViewSet(BaseModelViewSet):
             "reorder",
             "invoice",
             "invoice_download",
-            "specimen_download",
             "boxnow_label",
             "acs_label",
             "shipment_label",
@@ -2157,26 +2179,6 @@ class OrderViewSet(BaseModelViewSet):
             filename=f"{invoice.invoice_number}.pdf",
         )
 
-    @extend_schema(
-        operation_id="downloadOrderSpecimenReceipt",
-        tags=["Orders"],
-        summary=_("Download the specimen receipt PDF"),
-        description=_(
-            "Renders, on demand, a watermarked specimen of the order's "
-            "retail receipt: the same document with no number, no QR code "
-            "and no tax standing. Demo stores only, for an order a receipt "
-            "is issued for (shipped onwards); 404 when no specimen is available. Nothing "
-            "is stored and nothing is sent to myDATA. Same ownership check "
-            "as the receipt endpoints."
-        ),
-        responses={
-            (200, "application/pdf"): OpenApiTypes.BINARY,
-            403: OpenApiResponse(
-                description=_("Not the order's owner"),
-            ),
-            404: OpenApiResponse(description=_("Specimen unavailable")),
-        },
-    )
     @action(
         detail=True,
         methods=["GET"],

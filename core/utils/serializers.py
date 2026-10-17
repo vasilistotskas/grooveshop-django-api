@@ -8,7 +8,11 @@ from django.db import models
 from django.utils.functional import Promise
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import OpenApiParameter, extend_schema
+from drf_spectacular.utils import (
+    OpenApiParameter,
+    OpenApiResponse,
+    extend_schema,
+)
 from parler_rest.fields import TranslatedFieldsField
 from rest_framework import serializers
 
@@ -105,7 +109,11 @@ class ActionConfig:
     responses: (
         dict[
             int | tuple[int, str],
-            type[serializers.Serializer] | dict | OpenApiTypes | None,
+            type[serializers.Serializer]
+            | dict
+            | OpenApiTypes
+            | OpenApiResponse
+            | None,
         ]
         | None
     ) = None

@@ -1789,9 +1789,7 @@ class ReviewStatusFilter(DropdownFilter):
 
     def lookups(self, request, model_admin):
         return [
-            (ReviewStatus.NEW, _("Waiting for approval")),
-            (ReviewStatus.TRUE, _("Approved")),
-            (ReviewStatus.FALSE, _("Rejected")),
+            *ReviewStatus.choices,
             (self.ALL, _("All")),
         ]
 

@@ -3,9 +3,9 @@ from django.utils.translation import gettext_lazy as _
 
 
 class ReviewStatus(models.TextChoices):
-    NEW = "NEW", _("New")
-    TRUE = "TRUE", _("True")
-    FALSE = "FALSE", _("False")
+    NEW = "NEW", _("Waiting for approval")
+    TRUE = "TRUE", _("Approved")
+    FALSE = "FALSE", _("Rejected")
 
 
 class RateEnum(models.IntegerChoices):

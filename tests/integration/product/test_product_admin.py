@@ -465,7 +465,7 @@ class TestReviewAdmin:
             result = review_admin.status_label(review)
 
         assert result[0] == "TRUE"
-        assert result[1] == "True"
+        assert result[1] == "Approved"
 
     def test_status_label_pending(self, review_admin):
         review = ProductReviewFactory(status="NEW")
@@ -474,7 +474,7 @@ class TestReviewAdmin:
             result = review_admin.status_label(review)
 
         assert result[0] == "NEW"
-        assert result[1] == "New"
+        assert result[1] == "Waiting for approval"
 
     def test_created_display(self, review_admin):
         from django.utils import timezone

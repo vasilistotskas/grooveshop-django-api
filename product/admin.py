@@ -12,6 +12,7 @@ from django.template.response import TemplateResponse
 from django.urls import path, reverse
 from django.utils import formats, timezone
 from django.utils.html import format_html, format_html_join
+from django.utils.text import Truncator
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import ngettext
 from parler.admin import TranslatableAdmin
@@ -69,6 +70,9 @@ from user.models.account import UserAccount
 # Stock status and reservation status are derived states (not backed
 # by a TextChoices field), and category image type only appears in
 # this app — kept local rather than promoted to admin.displays.
+
+#: How much of a review the changelist quotes; the change page has it all.
+COMMENT_EXCERPT_CHARS = 80
 
 STOCK_STATUS_VARIANT: dict[str, str] = {
     "out": "danger",
@@ -1769,21 +1773,53 @@ class ProductCategoryAdmin(BaseTranslatableAdmin):
         return getattr(instance, "products_cumulative_count", 0)
 
 
+class ReviewStatusFilter(DropdownFilter):
+    """Opens on the reviews waiting for approval.
+
+    Same query parameter as Django's own ``status`` filter, so the
+    dashboard's "Reviews to approve" link (``status__exact=NEW``) keeps
+    working. The unfiltered list is an explicit choice, because with the
+    default being a value, "no parameter" can no longer mean "all".
+    """
+
+    title = _("Status")
+    parameter_name = "status__exact"
+    all_option = None
+    ALL = "all"
+
+    def lookups(self, request, model_admin):
+        return [
+            (ReviewStatus.NEW, _("Waiting for approval")),
+            (ReviewStatus.TRUE, _("Approved")),
+            (ReviewStatus.FALSE, _("Rejected")),
+            (self.ALL, _("All")),
+        ]
+
+    def value(self):
+        return super().value() or ReviewStatus.NEW
+
+    def queryset(self, request, queryset):
+        if self.value() == self.ALL:
+            return queryset
+        return queryset.filter(status=self.value())
+
+
 @admin.register(ProductReview)
 class ProductReviewAdmin(BaseTranslatableAdmin):
     show_full_result_count = False  # Disable expensive COUNT(*) query
 
     list_display = (
-        "review_info",
-        "product_link",
-        "user_link",
+        "product_header",
+        "reviewer",
         "rating_display",
+        "comment_excerpt",
         "status_label",
+        "verified_purchase_display",
         "created_display",
     )
     date_hierarchy = "created_at"
     list_filter = [
-        "status",
+        ReviewStatusFilter,
         ("rate", SliderNumericFilter),
         ("created_at", RangeDateTimeFilter),
         # Removed RelatedDropdownFilter for product and user - too expensive with 1.2M products
@@ -1793,6 +1829,7 @@ class ProductReviewAdmin(BaseTranslatableAdmin):
         "approve_reviews",
         "reject_reviews",
     ]
+    actions_detail = ["approve_review", "reject_review"]
     search_fields = [
         "user__email",
         "user__username",
@@ -1801,17 +1838,32 @@ class ProductReviewAdmin(BaseTranslatableAdmin):
     ]
     list_select_related = ["product", "user"]
     autocomplete_fields = ("product", "user")
-    readonly_fields = ("created_at", "updated_at", "uuid")
+    readonly_fields = (
+        "created_at",
+        "updated_at",
+        "uuid",
+        "is_published",
+        "published_at",
+    )
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
 
-        # Optimize with minimal prefetching - only what's absolutely needed.
-        # ``product__translations`` avoids a per-row translation query
-        # from ``product_link``'s ``safe_translation_getter`` call.
+        # ``product__translations`` and the main-image prefetch keep
+        # ``product_header`` and ``comment_excerpt`` from querying per
+        # row; the verified-purchase flag is one annotation.
         return (
             qs.select_related("product", "user")
-            .prefetch_related("product__translations")
+            .prefetch_related(
+                "translations",
+                "product__translations",
+                Prefetch(
+                    "product__images",
+                    queryset=ProductImage.objects.filter(is_main=True),
+                    to_attr="_prefetched_main_images",
+                ),
+            )
+            .with_verified_purchase()
             .only(
                 # Review fields - minimal set
                 "id",
@@ -1822,9 +1874,13 @@ class ProductReviewAdmin(BaseTranslatableAdmin):
                 "created_at",
                 # Product fields
                 "product__id",
+                "product__slug",
                 # User fields
                 "user__id",
                 "user__email",
+                "user__username",
+                "user__first_name",
+                "user__last_name",
             )
         )
 
@@ -1846,45 +1902,50 @@ class ProductReviewAdmin(BaseTranslatableAdmin):
         (
             _("System Information"),
             {
-                "fields": ("uuid", "created_at", "updated_at"),
+                "fields": (
+                    "is_published",
+                    "published_at",
+                    "uuid",
+                    "created_at",
+                    "updated_at",
+                ),
                 "classes": ("collapse",),
             },
         ),
     )
 
-    @admin.display(description=_("Review"))
-    def review_info(self, obj):
-        comment = obj.safe_translation_getter(
-            "comment", any_language=True
-        ) or _("No comment")
-        comment_preview = (
-            comment[:100] + "..." if len(comment) > 100 else comment
-        )
-        return _("Review #%(id)s: %(comment)s") % {
-            "id": obj.id,
-            "comment": comment_preview,
-        }
-
-    @admin.display(description=_("Product"))
-    def product_link(self, obj):
-        if not obj.product:
-            return "-"
+    @display(description=_("Product"), header=True)
+    def product_header(self, obj):
         name = obj.product.safe_translation_getter(
             "name", any_language=True
         ) or str(obj.product_id)
-        return change_link(self.admin_site, Product, obj.product_id, name)
-
-    @admin.display(description=_("User"))
-    def user_link(self, obj):
-        if not obj.user:
-            return "-"
-        return change_link(
-            self.admin_site, UserAccount, obj.user_id, obj.user.email
+        return header_two_line(
+            name,
+            _("Review #%(id)s") % {"id": obj.id},
+            image_path=obj.product.main_image_path or None,
+            squared=True,
         )
 
-    @admin.display(description=_("Rating"))
+    @admin.display(description=_("Customer"))
+    def reviewer(self, obj):
+        return change_link(
+            self.admin_site, UserAccount, obj.user_id, obj.reviewer_label
+        )
+
+    @admin.display(description=_("Comment"))
+    def comment_excerpt(self, obj):
+        comment = obj.safe_translation_getter("comment", any_language=True)
+        if not comment:
+            return _("No comment")
+        return Truncator(comment).chars(COMMENT_EXCERPT_CHARS)
+
+    @admin.display(description=_("Rating"), ordering="rate")
     def rating_display(self, obj):
-        return f"{obj.rate}/10"
+        return obj.stars
+
+    @admin.display(description=_("Verified purchase"), boolean=True)
+    def verified_purchase_display(self, obj):
+        return obj.is_verified_purchase
 
     status_label = choice_label(
         "status", variants=REVIEW_STATUS_VARIANT, description=_("Status")
@@ -1900,7 +1961,7 @@ class ProductReviewAdmin(BaseTranslatableAdmin):
         icon="check_circle",
     )
     def approve_reviews(self, request, queryset):
-        updated = queryset.update(status=ReviewStatus.TRUE)
+        updated = queryset.moderate(ReviewStatus.TRUE)
         self.message_user(
             request,
             ngettext(
@@ -1918,7 +1979,7 @@ class ProductReviewAdmin(BaseTranslatableAdmin):
         icon="cancel",
     )
     def reject_reviews(self, request, queryset):
-        updated = queryset.update(status=ReviewStatus.FALSE)
+        updated = queryset.moderate(ReviewStatus.FALSE)
         self.message_user(
             request,
             ngettext(
@@ -1929,6 +1990,38 @@ class ProductReviewAdmin(BaseTranslatableAdmin):
             % {"count": updated},
             messages.SUCCESS,
         )
+
+    def _back_to(self, object_id):
+        return redirect(
+            reverse(
+                f"{self.admin_site.name}:product_productreview_change",
+                args=[object_id],
+            )
+        )
+
+    @action(
+        description=_("Approve"),
+        variant=ActionVariant.SUCCESS,
+        icon="check_circle",
+    )
+    def approve_review(self, request, object_id):
+        ProductReview.objects.filter(pk=object_id).moderate(ReviewStatus.TRUE)
+        self.message_user(
+            request, _("The review was approved."), messages.SUCCESS
+        )
+        return self._back_to(object_id)
+
+    @action(
+        description=_("Reject"),
+        variant=ActionVariant.DANGER,
+        icon="cancel",
+    )
+    def reject_review(self, request, object_id):
+        ProductReview.objects.filter(pk=object_id).moderate(ReviewStatus.FALSE)
+        self.message_user(
+            request, _("The review was rejected."), messages.SUCCESS
+        )
+        return self._back_to(object_id)
 
 
 @admin.register(ProductFavourite)

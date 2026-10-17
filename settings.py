@@ -1855,6 +1855,17 @@ EXTRA_SETTINGS_DEFAULTS = [
         ),
     },
     {
+        "name": "OPS_ALERT_REVIEW_PENDING_ENABLED",
+        "type": "bool",
+        "value": True,
+        "description": (
+            "Email when a customer's review needs approval: a new review, "
+            "or an approved or rejected one the customer edited. When off, "
+            "such reviews stay on the dashboard's 'Needs attention' list "
+            "and the sidebar badge."
+        ),
+    },
+    {
         "name": "LOW_STOCK_THRESHOLD",
         "type": "int",
         "value": 10,

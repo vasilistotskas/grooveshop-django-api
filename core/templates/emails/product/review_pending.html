@@ -1,0 +1,20 @@
+{% extends "emails/base/email_base.html" %}
+{% load i18n %}
+
+{% block email_title %}{% trans "A review is waiting for approval" %} - {{ SITE_NAME }}{% endblock %}
+
+{% block email_content %}
+<h1>{% trans "A review is waiting for approval" %}</h1>
+<p>{% trans "It stays hidden from shoppers until you approve it." %}</p>
+
+<div class="email-card">
+    <h2>{{ product_name }}</h2>
+    <p><strong>{% trans "Rating" %}:</strong> {{ stars }}</p>
+    <p><strong>{% trans "Customer" %}:</strong> {{ reviewer }}</p>
+    <p><strong>{% trans "Comment" %}:</strong><br>{% if comment %}{{ comment|linebreaksbr }}{% else %}{% trans "No comment" %}{% endif %}</p>
+</div>
+
+<div class="text-center mt-3 mb-3">
+    <a href="{{ admin_url }}" class="email-button">{% trans "Review it in the admin" %}</a>
+</div>
+{% endblock %}

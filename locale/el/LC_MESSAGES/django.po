@@ -23073,3 +23073,47 @@ msgstr "Έκδοση διακριτικού καλαθιού για τον βο�
 #: .\cart\views\cart.py
 msgid "Mint a short-lived token that lets the shopping assistant act on the signed-in shopper's own cart: read it, add, update and remove items, apply and remove coupons. Nothing else: not payment, stock reservation, checkout or deleting the cart. Send it as the ``X-Cart-Token`` header. It stops working when it expires or the shopper signs out; mint a new one when a call is refused with 401."
 msgstr "Εκδίδει ένα βραχύβιο διακριτικό που επιτρέπει στον βοηθό αγορών να ενεργεί στο δικό του καλάθι του συνδεδεμένου αγοραστή: να το διαβάζει, να προσθέτει, να ενημερώνει και να αφαιρεί προϊόντα, να εφαρμόζει και να αφαιρεί κουπόνια. Τίποτα άλλο: ούτε πληρωμή, ούτε δέσμευση αποθέματος, ούτε ολοκλήρωση αγοράς, ούτε διαγραφή του καλαθιού. Στείλτε το ως κεφαλίδα ``X-Cart-Token``. Σταματά να λειτουργεί όταν λήξει ή όταν ο αγοραστής αποσυνδεθεί· εκδώστε νέο όταν μια κλήση απορρίπτεται με 401."
+
+#: .\shipping\alerts.py
+msgid "Review waiting for approval"
+msgstr "Κριτική σε αναμονή έγκρισης"
+
+#: .\product\admin.py
+msgid "Waiting for approval"
+msgstr "Σε αναμονή έγκρισης"
+
+#: .\product\admin.py
+msgid "All"
+msgstr "Όλες"
+
+#: .\product\admin.py
+msgid "Review #%(id)s"
+msgstr "Κριτική #%(id)s"
+
+#: .\product\admin.py
+msgid "Verified purchase"
+msgstr "Επαληθευμένη αγορά"
+
+#: .\product\admin.py
+msgid "The review was approved."
+msgstr "Η κριτική εγκρίθηκε."
+
+#: .\product\admin.py
+msgid "The review was rejected."
+msgstr "Η κριτική απορρίφθηκε."
+
+#: .\product\tasks.py
+msgid "Review waiting for approval: {product}"
+msgstr "Κριτική σε αναμονή έγκρισης: {product}"
+
+#: .\core\templates\emails\product\review_pending.html
+msgid "A review is waiting for approval"
+msgstr "Μια κριτική περιμένει έγκριση"
+
+#: .\core\templates\emails\product\review_pending.html
+msgid "It stays hidden from shoppers until you approve it."
+msgstr "Παραμένει κρυμμένη από τους αγοραστές μέχρι να την εγκρίνετε."
+
+#: .\core\templates\emails\product\review_pending.html
+msgid "Review it in the admin"
+msgstr "Δείτε την στη διαχείριση"

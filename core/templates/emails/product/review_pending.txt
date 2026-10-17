@@ -1,0 +1,17 @@
+{% load i18n %}{% trans "A review is waiting for approval" %}
+{{ SITE_NAME }}
+================================================================================
+
+{% trans "It stays hidden from shoppers until you approve it." %}
+
+{{ product_name|safe }}
+{% trans "Rating" %}: {{ stars }}
+{% trans "Customer" %}: {{ reviewer|safe }}
+{% trans "Comment" %}: {% if comment %}{{ comment|safe }}{% else %}{% trans "No comment" %}{% endif %}
+
+{% trans "Review it in the admin" %}
+--------------------------------------------------------------------------------
+{{ admin_url }}
+
+================================================================================
+{{ SITE_NAME }}

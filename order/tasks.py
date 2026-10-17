@@ -34,6 +34,7 @@ from order.models import (
     RefundNotification,
 )
 from order.models.order import AMOUNT_MISMATCH_FLAG
+from order.payment import payment_provider_label
 from order.services import OrderService
 from pay_way.enum.settlement import PaySettlement
 from tenant.credentials import (
@@ -404,19 +405,32 @@ def _release_status_update_email(order_id: int, new_status: str) -> None:
     retry_jitter=True,
 )
 def send_dispute_notification_email(
-    self, order_id: int, dispute_id: str
+    self, order_id: int, dispute_id: str, provider_code: str, lost: bool = False
 ) -> bool:
-    """Notify staff that a Stripe dispute has been opened for an order.
+    """Notify staff that a *provider_code* dispute has been opened for an
+    order, or (``lost``) that it closed against the merchant and the money
+    was recorded as a chargeback.
 
     Sends to the staff group email configured via ``INFO_EMAIL``.  Does NOT
     change order status — that is a manual decision.  Includes structured
-    log fields so ops can correlate the Celery log line with the Stripe
+    log fields so ops can correlate the Celery log line with the provider
     dashboard entry.
     """
     try:
         order = Order.objects.select_related("user", "pay_way").get(id=order_id)
 
         reason = (order.metadata or {}).get("dispute_reason", "unknown")
+        chargeback = (
+            PaymentTransaction.objects.filter(
+                order=order,
+                kind=PaymentTransactionKind.CHARGEBACK,
+                provider_reference=dispute_id,
+            ).first()
+            if lost
+            else None
+        )
+
+        provider_name = payment_provider_label(provider_code) or provider_code
 
         # Staff-facing, rendered under no override: the active language.
         context = build_email_context(
@@ -424,11 +438,20 @@ def send_dispute_notification_email(
             order=order,
             dispute_id=dispute_id,
             reason=reason,
+            chargeback=chargeback,
+            lost=lost,
+            provider_name=provider_name,
         )
 
         subject = (
-            f"[{tenant_site_name()}] Stripe dispute opened — Order #{order_id}"
-        )
+            _("[%(site)s] %(provider)s dispute lost — Order #%(order)s")
+            if lost
+            else _("[%(site)s] %(provider)s dispute opened — Order #%(order)s")
+        ) % {
+            "site": tenant_site_name(),
+            "provider": provider_name,
+            "order": order_id,
+        }
 
         try:
             text_content = render_to_string(
@@ -442,19 +465,19 @@ def send_dispute_notification_email(
             # catching every exception here could only mask a real render
             # bug behind an inline plain-text body nobody would notice.
             text_content = (
-                f"A Stripe dispute has been opened for Order #{order_id}.\n"
+                f"A {provider_name} dispute has been opened for Order #{order_id}.\n"
                 f"Dispute ID: {dispute_id}\n"
                 f"Reason: {reason}\n\n"
-                f"Please review this dispute in the Stripe dashboard and take action."
+                f"Please review this dispute in the {provider_name} dashboard and take action."
             )
             html_content = (
-                f"<p>A Stripe dispute has been opened for "
+                f"<p>A {provider_name} dispute has been opened for "
                 f"<strong>Order #{order_id}</strong>.</p>"
                 f"<ul>"
                 f"<li>Dispute ID: {dispute_id}</li>"
                 f"<li>Reason: {reason}</li>"
                 f"</ul>"
-                f"<p>Please review this dispute in the Stripe dashboard.</p>"
+                f"<p>Please review this dispute in the {provider_name} dashboard.</p>"
             )
 
         staff_email = tenant_contact_email()

@@ -8,8 +8,10 @@ from django.dispatch import Signal, receiver
 
 from order.enum.status import OrderStatus, PaymentStatus
 from order.models.order import Order
+from order.payment_ledger import PaymentLedger
 from order.signals import (
     order_canceled,
+    order_charged_back,
     order_completed,
     order_refunded,
     order_status_changed,
@@ -106,24 +108,21 @@ def handle_order_canceled_loyalty(
         )
 
 
-@receiver(order_refunded, dispatch_uid="loyalty.handle_order_refunded_loyalty")
-def handle_order_refunded_loyalty(
-    sender: type[Order], order: Order, **kwargs: Any
-) -> None:
-    """Trigger async points reversal when order is fully refunded.
+def _queue_reversal_if_returned_in_full(order: Order) -> None:
+    """Queue the points reversal once the order's money is back in full.
 
-    Queues a Celery task to reverse any loyalty points that were
-    previously earned for this order. Only processes orders with
-    an authenticated user.
-
-    A partial refund reverses nothing. The reversal is all-or-nothing
-    and runs once per order (any ADJUST row blocks a second run), so
-    taking it on the first slice would never take the rest, and taking
-    all of it for a EUR 5 goodwill refund would wipe the points of an
-    order the shopper still keeps. The last refund moves the order to
-    REFUNDED and reverses everything.
+    The one place that decides it, for refunds and chargebacks alike:
+    REFUNDED, or refunds plus chargebacks covering everything received
+    (:meth:`PaymentLedger.fully_returned`). Anything less reverses nothing.
+    The reversal is all-or-nothing and runs once per order (any ADJUST row
+    blocks a second run), so taking it on the first slice would never take
+    the rest, and taking all of it for a EUR 5 goodwill refund would wipe
+    the points of an order the shopper still keeps. Only processes orders
+    with an authenticated user.
     """
-    if order.payment_status != PaymentStatus.REFUNDED:
+    if order.payment_status != PaymentStatus.REFUNDED and (
+        not PaymentLedger.fully_returned(order)
+    ):
         return
     try:
         if order.user_id:
@@ -135,6 +134,31 @@ def handle_order_refunded_loyalty(
         logger.exception(
             "Failed to queue loyalty reversal for order %s", order.id
         )
+
+
+@receiver(order_refunded, dispatch_uid="loyalty.handle_order_refunded_loyalty")
+def handle_order_refunded_loyalty(
+    sender: type[Order], order: Order, **kwargs: Any
+) -> None:
+    """Reverse earned points when a refund returns the order's money in
+    full (see :func:`_queue_reversal_if_returned_in_full`); a partial
+    refund reverses nothing."""
+    _queue_reversal_if_returned_in_full(order)
+
+
+@receiver(
+    order_charged_back,
+    dispatch_uid="loyalty.handle_order_charged_back_loyalty",
+)
+def handle_order_charged_back_loyalty(
+    sender: type[Order], order: Order, **kwargs: Any
+) -> None:
+    """Reverse earned points when a lost dispute takes the last of the
+    order's money back (see :func:`_queue_reversal_if_returned_in_full`).
+    Points the customer redeemed on a charged-back order are not given
+    back (:meth:`LoyaltyService.reverse_order_points`). Staff can re-grant
+    by hand."""
+    _queue_reversal_if_returned_in_full(order)
 
 
 @receiver(

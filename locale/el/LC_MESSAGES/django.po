@@ -10559,8 +10559,8 @@ msgid "Event Type ID"
 msgstr "Αναγνωριστικό τύπου συμβάντος"
 
 #: .\order\models\viva_webhook_event.py:49
-msgid "Viva ``EventTypeId`` — 1796/1797/1798"
-msgstr "Viva ``EventTypeId`` — 1796/1797/1798"
+msgid "Viva ``EventTypeId`` — 1796/1797/1798/2054"
+msgstr "Viva ``EventTypeId`` — 1796/1797/1798/2054"
 
 #: .\order\models\viva_webhook_event.py:60
 msgid "Order Code"
@@ -21786,8 +21786,8 @@ msgid "Refunded charge"
 msgstr "Επιστραφείσα χρέωση"
 
 #: .\order\models\payment_transaction.py:76
-msgid "Set on a refund: the charge it paid back."
-msgstr "Ορίζεται σε μια επιστροφή: η χρέωση που επέστρεψε."
+msgid "Set on a refund or a chargeback: the charge it took money from."
+msgstr "Ορίζεται σε επιστροφή ή chargeback: η χρέωση από την οποία αφαιρέθηκαν χρήματα."
 
 #: .\order\models\payment_transaction.py:83
 msgid "The reason given for a refund."
@@ -23073,3 +23073,42 @@ msgstr "Έκδοση διακριτικού καλαθιού για τον βο�
 #: .\cart\views\cart.py
 msgid "Mint a short-lived token that lets the shopping assistant act on the signed-in shopper's own cart: read it, add, update and remove items, apply and remove coupons. Nothing else: not payment, stock reservation, checkout or deleting the cart. Send it as the ``X-Cart-Token`` header. It stops working when it expires or the shopper signs out; mint a new one when a call is refused with 401."
 msgstr "Εκδίδει ένα βραχύβιο διακριτικό που επιτρέπει στον βοηθό αγορών να ενεργεί στο δικό του καλάθι του συνδεδεμένου αγοραστή: να το διαβάζει, να προσθέτει, να ενημερώνει και να αφαιρεί προϊόντα, να εφαρμόζει και να αφαιρεί κουπόνια. Τίποτα άλλο: ούτε πληρωμή, ούτε δέσμευση αποθέματος, ούτε ολοκλήρωση αγοράς, ούτε διαγραφή του καλαθιού. Στείλτε το ως κεφαλίδα ``X-Cart-Token``. Σταματά να λειτουργεί όταν λήξει ή όταν ο αγοραστής αποσυνδεθεί· εκδώστε νέο όταν μια κλήση απορρίπτεται με 401."
+
+msgid "Chargeback"
+msgstr "Αμφισβήτηση χρέωσης (chargeback)"
+
+#, python-format
+msgid "Chargeback %(amount)s"
+msgstr "Αμφισβήτηση χρέωσης (chargeback) %(amount)s"
+
+#, python-format
+msgid "[%(site)s] %(provider)s dispute lost — Order #%(order)s"
+msgstr "[%(site)s] Χαμένη διαφορά %(provider)s — Παραγγελία #%(order)s"
+
+#, python-format
+msgid "[%(site)s] %(provider)s dispute opened — Order #%(order)s"
+msgstr "[%(site)s] Ανοιχτή διαφορά %(provider)s — Παραγγελία #%(order)s"
+
+#, python-format
+msgid "%(provider)s dispute lost — Order #%(order_id)s"
+msgstr "Χαμένη διαφορά %(provider)s — Παραγγελία #%(order_id)s"
+
+msgid "The dispute closed against you and the money was taken back. It is recorded as a chargeback on the order's payment ledger, so it can no longer be refunded. The order status and payment status have NOT been changed."
+msgstr "Η διαφορά έκλεισε εις βάρος σας και τα χρήματα αφαιρέθηκαν. Καταγράφηκε ως chargeback στο ταμείο πληρωμών της παραγγελίας, άρα δεν μπορεί πλέον να επιστραφεί. Η κατάσταση της παραγγελίας και της πληρωμής ΔΕΝ άλλαξαν."
+
+msgid "Account Transaction Created"
+msgstr "Δημιουργία συναλλαγής λογαριασμού"
+
+msgid "A dispute is open on this payment and the payment provider does not accept a refund until it is decided. Refund once it has closed."
+msgstr "Υπάρχει ανοιχτή διαφορά για αυτή την πληρωμή και ο πάροχος πληρωμών δεν δέχεται επιστροφή μέχρι να κριθεί. Κάντε την επιστροφή αφού κλείσει."
+
+msgid "The dispute closed against you and the money was taken back. Nothing was left on the payment to record as a chargeback, so the payment ledger is unchanged. The order status and payment status have NOT been changed."
+msgstr "Η διαφορά έκλεισε εις βάρος σας και τα χρήματα αφαιρέθηκαν. Δεν είχε μείνει ποσό στην πληρωμή για να καταγραφεί ως chargeback, άρα το ταμείο πληρωμών δεν άλλαξε. Η κατάσταση της παραγγελίας και της πληρωμής ΔΕΝ άλλαξαν."
+
+#, python-format
+msgid "Chargeback of %(requested)s not recorded: nothing is left on the payment (%(returned)s already returned)"
+msgstr "Το chargeback %(requested)s δεν καταγράφηκε: δεν έχει μείνει ποσό στην πληρωμή (%(returned)s έχουν ήδη επιστραφεί)"
+
+#, python-format
+msgid "Chargeback %(amount)s (disputed %(requested)s, %(returned)s already returned)"
+msgstr "Chargeback %(amount)s (αμφισβητήθηκαν %(requested)s, %(returned)s έχουν ήδη επιστραφεί)"

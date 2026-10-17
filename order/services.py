@@ -3043,11 +3043,12 @@ class OrderService:
         # refund number the Stripe idempotency key carries and the rows
         # written below are one step. The status is read under the lock too,
         # not taken from the caller's possibly stale ``order``.
-        payment_status = (
+        locked = (
             Order.objects.select_for_update()
-            .values_list("payment_status", flat=True)
+            .values("payment_status", "metadata")
             .get(pk=order.pk)
         )
+        payment_status = locked["payment_status"]
 
         if amount is not None and amount.amount <= 0:
             raise PaymentError(
@@ -3080,6 +3081,15 @@ class OrderService:
                     refunded=Money(0, order.amount_due.currency),
                     declined=declined,
                 )
+
+        if PaymentLedger.dispute_open(order, locked["metadata"]):
+            raise PaymentError(
+                _(
+                    "A dispute is open on this payment and the payment "
+                    "provider does not accept a refund until it is decided. "
+                    "Refund once it has closed."
+                )
+            )
 
         refundable = PaymentLedger.refundable(order)
         if refundable <= 0:

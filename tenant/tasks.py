@@ -276,8 +276,9 @@ def process_tenant_billing():
 # reads is the public Tenant row), so no _schema_name is needed.
 #
 # ``edge_purges`` is planned by the caller while the tenant row still
-# exists and names zones, never tokens: credentials are resolved here
-# (core.cache.edge.purge_media), so no secret travels through the broker.
+# exists. It names zones; a tenant's own zone also carries its token as the
+# Fernet ciphertext the database stores, never in clear, so the purge still
+# runs after a destroy removed the row (core.cache.edge.purge_media).
 @celery_app.task(
     base=MonitoredTask,
     max_retries=5,

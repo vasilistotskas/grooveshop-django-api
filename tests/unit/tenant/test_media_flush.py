@@ -185,20 +185,18 @@ class TestLifecyclePlansTheEdgePurge:
 
         schema, plan = delay.call_args.args
         assert schema == "edge_suspend"
-        assert plan == [
-            {
-                "zone_id": "a" * 32,
-                "prefixes": [
-                    "assets.grooveshop.space/media_stream-image/media/edge_suspend/"
-                ],
-            },
-            {
-                "zone_id": "b" * 32,
-                "prefixes": [
-                    "assets.shop.example/media_stream-image/media/edge_suspend/"
-                ],
-            },
+        assert plan[0] == {
+            "zone_id": "a" * 32,
+            "prefixes": [
+                "assets.grooveshop.space/media_stream-image/media/edge_suspend/"
+            ],
+        }
+        assert plan[1]["zone_id"] == "b" * 32
+        assert plan[1]["prefixes"] == [
+            "assets.shop.example/media_stream-image/media/edge_suspend/"
         ]
+        # The own zone's token rides along only as the stored ciphertext.
+        assert plan[1]["token_ciphertext"]
         assert "own-token-secret" not in repr(delay.call_args)
 
     def test_a_failing_plan_query_does_not_abort_the_destroy(self):

@@ -20569,7 +20569,7 @@ msgid "Download the specimen receipt PDF"
 msgstr ""
 
 #: .\order\views\order.py
-msgid "Renders, on demand, a watermarked specimen of the order's retail receipt: the same document with no number, no QR code and no tax standing. Demo stores only, for an order a receipt is issued for (shipped onwards); 404 when no specimen is available. Nothing is stored and nothing is sent to myDATA. Same ownership check as the receipt endpoints."
+msgid "Renders, on demand, a watermarked specimen of the order's retail receipt: the same document with no number, no QR code and no tax standing. Demo stores only, for an order a receipt is issued for (shipped onwards); 404 when no specimen is available. Nothing is stored and nothing is sent to myDATA. Open to the order's owner, store staff, and the guest who holds the order's UUID (``?uuid=``)."
 msgstr ""
 
 #: order/views/order.py
@@ -20577,7 +20577,7 @@ msgid "This order has no specimen receipt."
 msgstr ""
 
 #: order/views/order.py
-msgid "Not the order's owner"
+msgid "Not the order's owner or its UUID"
 msgstr ""
 
 #: order/views/order.py

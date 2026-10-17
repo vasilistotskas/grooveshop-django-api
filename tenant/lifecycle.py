@@ -92,29 +92,17 @@ def suspend_tenant(tenant, *, reason: str) -> bool:
         update_fields.append("suspended_at")
     tenant.save(update_fields=update_fields)
 
-    # Stop serving the store's images: park the originals out of the
-    # served path first (tenant.media_parking), then drop the cached copies
-    # from media-stream and the Cloudflare edge, which would otherwise
-    # persist for the cache TTL — up to 180/360 days. In that order, a
-    # request that refills a cache after the flush finds no original.
-    # Best-effort and off the critical path: a disk, broker, media-stream
-    # or Cloudflare failure must never block the suspension itself.
-    _park_media(tenant.schema_name)
+    # Stop serving the store's images. media-stream refuses them once it
+    # reads the new state from the tenant feed, which the flush makes it do
+    # at once; the flush also drops its cached copies and the edge purge
+    # Cloudflare's, which would otherwise persist for the cache TTL — up to
+    # 180/360 days. The originals stay where they are: only media-stream
+    # reads them (in-cluster), and the static host redirects every public
+    # request for one to media-stream. Best-effort and off the critical
+    # path: a broker, media-stream or Cloudflare failure must never block
+    # the suspension itself.
     _dispatch_media_flush(tenant.schema_name, _media_edge_purges(tenant))
     return True
-
-
-def _park_media(schema_name: str) -> bool:
-    try:
-        from tenant.media_parking import park_tenant_media
-
-        return park_tenant_media(schema_name)
-    except OSError:
-        logging.getLogger(__name__).exception(
-            "could not park the media of %s; its images stay served",
-            schema_name,
-        )
-        return False
 
 
 def _media_edge_purges(tenant) -> list[MediaPurge]:
@@ -174,24 +162,15 @@ def activate_tenant(tenant) -> bool:
     if is_protected_tenant(tenant):
         return False
 
-    # Put the parked originals back before the store is active again. A
-    # failed move, or a live tree already in the way, raises (OSError) and
-    # leaves the store suspended, rather than active with its images still
-    # parked and nothing to retry.
-    from tenant.media_parking import restore_tenant_media
-
-    restore_tenant_media(tenant.schema_name)
-
     tenant.is_active = True
     tenant.suspended_at = None
     tenant.suspended_reason = ""
     tenant.save(update_fields=["is_active", "suspended_at", "suspended_reason"])
 
-    # Always, restored or not: the flush is what makes media-stream re-read
-    # the tenant feed and serve the store's images again at once rather
-    # than at its next poll. It also drops what was cached while the store
-    # was suspended (placeholders, 5-minute negative entries) and the
-    # edge's copies of them.
+    # The flush is what makes media-stream re-read the tenant feed and
+    # serve the store's images again at once rather than at its next poll.
+    # It also drops what was cached while the store was suspended and the
+    # edge's copies of it.
     _dispatch_media_flush(tenant.schema_name, _media_edge_purges(tenant))
     return True
 

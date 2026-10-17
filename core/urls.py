@@ -250,8 +250,8 @@ if bool(settings.DEBUG) or settings.SYSTEM_ENV in ["dev", "ci"]:
     # so the dev media-serve view still mounts.
     _media_path = urlsplit(settings.MEDIA_URL).path or settings.MEDIA_URL
     # Never a dot-segment path, mirroring the production static server
-    # (``location ~ /\. { deny all; }``): it is what keeps a suspended
-    # store's parked uploads (MEDIA_ROOT/.suspended) unservable.
+    # (``location ~ /\. { deny all; }``): nothing under a dot-directory or
+    # dotfile is ever served.
     urlpatterns += [
         re_path(
             rf"^{re.escape(_media_path.lstrip('/'))}(?!(?:.*/)?\.)(?P<path>.*)$",

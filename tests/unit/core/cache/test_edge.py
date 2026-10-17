@@ -352,39 +352,24 @@ class TestTenantMediaPurges:
         assert decrypt_value(purges[1]["token_ciphertext"]) == "own-token"
         assert "own-token" not in repr(purges)
 
-    def test_the_shared_static_host_serving_originals_is_purged_too(
-        self, settings
-    ):
-        settings.MEDIA_URL = "https://static.grooveshop.space/media/"
-        tenant = _tenant("media_static", ["shop-t.grooveshop.space"])
-
-        assert edge.tenant_media_purges(tenant) == [
-            {
-                "zone_id": PLATFORM_ZONE,
-                "prefixes": [
-                    _prefix(SHARED, "media_static"),
-                    "static.grooveshop.space/media/media_static/",
-                ],
-            }
-        ]
-
-    def test_an_own_static_host_is_purged_in_the_stores_own_zone(
-        self, settings
-    ):
+    def test_static_hosts_are_not_purged(self, settings):
+        """A static host serves no original in public: it redirects every
+        request for one to media-stream, so the edge holds no image there."""
         settings.MEDIA_URL = "https://static.grooveshop.space/media/"
         tenant = _tenant(
-            "media_ownstatic",
+            "media_static",
             ["shop.example", "static.shop.example"],
             cloudflare_zone_id=OWN_ZONE,
             cloudflare_api_token="own-token",
         )
 
-        purges = edge.tenant_media_purges(tenant)
-
-        assert purges[1]["zone_id"] == OWN_ZONE
-        assert purges[1]["prefixes"] == [
-            "static.shop.example/media/media_ownstatic/"
+        prefixes = [
+            prefix
+            for purge in edge.tenant_media_purges(tenant)
+            for prefix in purge["prefixes"]
         ]
+
+        assert prefixes == [_prefix(SHARED, "media_static")]
 
     def test_an_own_assets_host_without_own_credentials_is_left_alone(self):
         tenant = _tenant(

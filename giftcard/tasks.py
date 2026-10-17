@@ -10,6 +10,7 @@ from django.utils import timezone, translation
 from django.utils.translation import gettext as _
 
 from core import celery_app
+from core.retry import MAIL_TRANSIENT_ERRORS, TRANSIENT_ERRORS
 from core.tasks import MonitoredTask
 from core.utils.email_context import build_email_context
 from core.utils.i18n import get_user_language
@@ -26,7 +27,7 @@ logger = logging.getLogger(__name__)
     base=MonitoredTask,
     bind=True,
     max_retries=5,
-    autoretry_for=(Exception,),
+    autoretry_for=MAIL_TRANSIENT_ERRORS,
     retry_backoff=True,
     retry_jitter=True,
 )
@@ -81,7 +82,7 @@ def deliver_gift_card_email(self, gift_card_id: int) -> dict:
     base=MonitoredTask,
     bind=True,
     max_retries=5,
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_ERRORS,
     retry_backoff=True,
     retry_jitter=True,
 )
@@ -120,7 +121,7 @@ def deliver_scheduled_gift_cards(self) -> dict:
     base=MonitoredTask,
     bind=True,
     max_retries=5,
-    autoretry_for=(Exception,),
+    autoretry_for=MAIL_TRANSIENT_ERRORS,
     retry_backoff=True,
     retry_jitter=True,
 )
@@ -176,7 +177,7 @@ def send_gift_card_purchase_receipt(self, purchase_id: int) -> dict:
     base=MonitoredTask,
     bind=True,
     max_retries=5,
-    autoretry_for=(Exception,),
+    autoretry_for=MAIL_TRANSIENT_ERRORS,
     retry_backoff=True,
     retry_jitter=True,
 )
@@ -255,7 +256,7 @@ def send_gift_card_expiry_reminders(self) -> dict:
     base=MonitoredTask,
     bind=True,
     max_retries=5,
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_ERRORS,
     retry_backoff=True,
     retry_jitter=True,
 )
@@ -272,7 +273,7 @@ def sync_gift_card_pause(self) -> dict:
     base=MonitoredTask,
     bind=True,
     max_retries=5,
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_ERRORS,
     retry_backoff=True,
     retry_jitter=True,
 )
@@ -288,7 +289,7 @@ def expire_gift_cards(self) -> dict:
     base=MonitoredTask,
     bind=True,
     max_retries=5,
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_ERRORS,
     retry_backoff=True,
     retry_jitter=True,
 )

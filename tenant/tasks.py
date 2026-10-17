@@ -4,6 +4,12 @@ import logging
 from typing import TYPE_CHECKING
 
 from core import celery_app
+from core.cache.edge import EdgePurgeError
+from core.retry import (
+    MAIL_TRANSIENT_ERRORS,
+    TRANSIENT_ERRORS,
+    TRANSIENT_HTTP_ERRORS,
+)
 from core.tasks import MonitoredTask
 from tenant.celery import TenantTask, run_for_all_tenants
 
@@ -259,7 +265,7 @@ def fanout_clear_expired_sessions():
 @celery_app.task(
     base=MonitoredTask,
     max_retries=3,
-    autoretry_for=(Exception,),
+    autoretry_for=MAIL_TRANSIENT_ERRORS,
     retry_backoff=True,
     retry_jitter=True,
 )
@@ -282,7 +288,7 @@ def process_tenant_billing():
 @celery_app.task(
     base=MonitoredTask,
     max_retries=5,
-    autoretry_for=(Exception,),
+    autoretry_for=(*TRANSIENT_ERRORS, *TRANSIENT_HTTP_ERRORS, EdgePurgeError),
     retry_backoff=True,
     retry_jitter=True,
 )
@@ -302,7 +308,7 @@ def flush_tenant_media_task(
     base=MonitoredTask,
     bind=True,
     max_retries=3,
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_ERRORS,
     retry_backoff=True,
 )
 def purge_expired_tenant_archives(self) -> dict:

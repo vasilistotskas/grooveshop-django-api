@@ -4,10 +4,13 @@ Follows the per-app ``exceptions.py`` convention already used by
 ``order``, ``shipping*`` and ``meta_capi``.
 
 These replace bare ``raise Exception(...)`` in the health-check and
-maintenance tasks. The distinction matters because those tasks declare
-``autoretry_for=(Exception,)``: with a bare Exception there was no way to
+maintenance tasks. The distinction matters because a bare Exception cannot
 tell "the thing I am monitoring is unhealthy" — a real signal worth
 retrying — from "this task has a bug", which retrying only repeats.
+``StorePagesPurgeFailed`` is the one a task retries (``autoretry_for``);
+``HealthCheckFailed`` belongs to ``monitor_system_health``, which
+deliberately never retries, and ``ManagementCommandFailed`` is
+deterministic, so neither is in a retry set.
 
 Exception Hierarchy:
     CoreTaskError (base)

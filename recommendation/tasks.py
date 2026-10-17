@@ -22,6 +22,7 @@ from __future__ import annotations
 import logging
 
 from core.celery import celery_app
+from core.retry import TRANSIENT_ERRORS
 from core.tasks import MonitoredTask
 
 logger = logging.getLogger(__name__)
@@ -32,7 +33,7 @@ _FULL_PASS_BATCH = 200
 @celery_app.task(
     base=MonitoredTask,
     max_retries=3,
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_ERRORS,
     retry_backoff=True,
 )
 def recompute_candidates_for_product(product_id: int) -> dict[str, int]:
@@ -45,7 +46,7 @@ def recompute_candidates_for_product(product_id: int) -> dict[str, int]:
 @celery_app.task(
     base=MonitoredTask,
     max_retries=3,
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_ERRORS,
     retry_backoff=True,
 )
 def recompute_all_candidates() -> dict[str, int]:
@@ -99,7 +100,7 @@ def recompute_all_candidates() -> dict[str, int]:
 @celery_app.task(
     base=MonitoredTask,
     max_retries=3,
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_ERRORS,
     retry_backoff=True,
 )
 def record_recommendation_event(
@@ -137,7 +138,7 @@ def record_recommendation_event(
 @celery_app.task(
     base=MonitoredTask,
     max_retries=3,
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_ERRORS,
     retry_backoff=True,
 )
 def record_recommendation_attach(order_id: int) -> dict[str, int]:

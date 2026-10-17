@@ -30,6 +30,12 @@ from core.exceptions import (
     ManagementCommandFailed,
     StorePagesPurgeFailed,
 )
+from core.retry import (
+    MAIL_TRANSIENT_ERRORS,
+    SEARCH_TRANSIENT_ERRORS,
+    TRANSIENT_ERRORS,
+    is_permanent_failure,
+)
 from core.utils.email_context import build_email_context
 from core.utils.i18n import get_user_language
 from tenant.celery import TenantTask
@@ -78,6 +84,19 @@ class MonitoredTask(TenantTask):
     #: this masking exists for.
     sensitive_kwargs: frozenset[str] = frozenset()
 
+    def retry(self, *args: Any, **options: Any) -> Any:
+        """Reschedule the task, unless ``exc`` says a retry cannot help.
+
+        Both ``autoretry_for`` and an explicit ``raise self.retry(...)``
+        land here, so an SMTP 5xx or an HTTP 4xx stops at once however
+        the task asked for the retry. See ``core.retry``. Celery passes
+        ``exc`` by keyword from every call site.
+        """
+        exc = options.get("exc")
+        if exc is not None and is_permanent_failure(exc):
+            raise exc
+        return super().retry(*args, **options)
+
     def on_success(self, retval, task_id, args, kwargs):
         logger.info(
             f"Task {self.name} completed successfully. Task ID: {task_id}"
@@ -118,7 +137,7 @@ class _DeletedLogFile(TypedDict):
 @celery_app.task(
     base=MonitoredTask,
     max_retries=3,
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_ERRORS,
     retry_backoff=True,
     retry_jitter=True,
 )
@@ -203,7 +222,7 @@ def purge_edge_cache_task():
 @celery_app.task(
     base=MonitoredTask,
     max_retries=3,
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_ERRORS,
     retry_backoff=True,
 )
 def clear_all_cache_task():
@@ -238,7 +257,7 @@ def clear_all_cache_task():
 @celery_app.task(
     base=MonitoredTask,
     max_retries=3,
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_ERRORS,
     retry_backoff=True,
 )
 def clear_duplicate_history_task(excluded_fields=None, minutes=None):
@@ -302,7 +321,7 @@ def clear_duplicate_history_task(excluded_fields=None, minutes=None):
 @celery_app.task(
     base=MonitoredTask,
     max_retries=3,
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_ERRORS,
     retry_backoff=True,
 )
 def clear_old_history_task(days=365):
@@ -335,7 +354,7 @@ def clear_old_history_task(days=365):
 @celery_app.task(
     base=MonitoredTask,
     max_retries=3,
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_ERRORS,
     retry_backoff=True,
 )
 def clear_expired_notifications_task(days=365):
@@ -360,7 +379,7 @@ def clear_expired_notifications_task(days=365):
 @celery_app.task(
     base=MonitoredTask,
     max_retries=3,
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_ERRORS,
     retry_backoff=True,
 )
 def cleanup_abandoned_carts():
@@ -397,7 +416,7 @@ def cleanup_abandoned_carts():
 @celery_app.task(
     base=MonitoredTask,
     max_retries=3,
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_ERRORS,
     retry_backoff=True,
 )
 def cleanup_old_guest_carts():
@@ -443,7 +462,7 @@ def cleanup_old_guest_carts():
     max_retries=3,
     soft_time_limit=300,
     time_limit=600,
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_ERRORS,
     retry_backoff=True,
 )
 def clear_development_log_files_task(days=7):
@@ -544,7 +563,7 @@ def clear_development_log_files_task(days=7):
     max_retries=3,
     soft_time_limit=600,
     time_limit=900,
-    autoretry_for=(Exception,),
+    autoretry_for=MAIL_TRANSIENT_ERRORS,
     retry_backoff=True,
 )
 def send_inactive_user_notifications() -> dict[str, Any]:
@@ -657,7 +676,7 @@ def send_inactive_user_notifications() -> dict[str, Any]:
             # every user emailed already has ``last_reengagement_email_at``
             # set, so the next scheduled run excludes them by the
             # cooldown and continues from here. Re-raising instead would
-            # hand ``autoretry_for=(Exception,)`` a full rescan that can
+            # hand ``autoretry_for`` a full rescan that can
             # only time out again.
             timed_out = True
             logger.error(
@@ -841,7 +860,7 @@ def monitor_system_health():
     max_retries=3,
     soft_time_limit=1800,
     time_limit=2400,
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_ERRORS,
     retry_backoff=True,
     retry_jitter=True,
 )
@@ -947,7 +966,7 @@ def backup_database_task(
 @celery_app.task(
     base=MonitoredTask,
     max_retries=2,
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_ERRORS,
     retry_backoff=True,
 )
 def scheduled_database_backup():
@@ -998,7 +1017,7 @@ def scheduled_database_backup():
 @celery_app.task(
     base=MonitoredTask,
     max_retries=3,
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_ERRORS,
     retry_backoff=True,
 )
 def cleanup_old_backups(days=30, backup_dir="backups"):
@@ -1101,7 +1120,7 @@ def validate_task_configuration():
 @celery_app.task(
     base=MonitoredTask,
     max_retries=3,
-    autoretry_for=(Exception,),
+    autoretry_for=SEARCH_TRANSIENT_ERRORS,
     retry_backoff=True,
 )
 def sync_meilisearch_indexes():

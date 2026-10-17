@@ -12,6 +12,7 @@ from django.core.mail import send_mail
 
 from contact.scanners import INFECTED, AttachmentScannerError
 from core import celery_app
+from core.retry import MAIL_TRANSIENT_ERRORS, TRANSIENT_ERRORS
 from core.tasks import MonitoredTask
 from tenant.credentials import tenant_contact_email, tenant_from_email
 
@@ -21,7 +22,7 @@ logger = logging.getLogger(__name__)
 @celery_app.task(
     base=MonitoredTask,
     max_retries=3,
-    autoretry_for=(Exception,),
+    autoretry_for=MAIL_TRANSIENT_ERRORS,
     retry_backoff=True,
     retry_jitter=True,
 )
@@ -117,7 +118,7 @@ def send_contact_notification_email_task(contact_id: int) -> bool:
 @celery_app.task(
     base=MonitoredTask,
     max_retries=3,
-    autoretry_for=(Exception,),
+    autoretry_for=MAIL_TRANSIENT_ERRORS,
     retry_backoff=True,
     retry_jitter=True,
 )
@@ -273,7 +274,7 @@ def _record_scan(attachment, verdict: str, detail: str) -> None:
 @celery_app.task(
     base=MonitoredTask,
     max_retries=3,
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_ERRORS,
     retry_backoff=True,
 )
 def reap_unclaimed_attachments() -> int:
@@ -307,7 +308,7 @@ def reap_unclaimed_attachments() -> int:
 @celery_app.task(
     base=MonitoredTask,
     max_retries=3,
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_ERRORS,
     retry_backoff=True,
 )
 def purge_expired_attachment_files() -> int:

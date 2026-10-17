@@ -1,6 +1,7 @@
 import logging
 
 from core import celery_app
+from core.retry import TRANSIENT_ERRORS
 from core.tasks import MonitoredTask
 from core.utils.tenant_urls import storefront_path
 
@@ -11,7 +12,7 @@ logger = logging.getLogger(__name__)
     base=MonitoredTask,
     bind=True,
     max_retries=5,
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_ERRORS,
     retry_backoff=True,
     retry_jitter=True,
 )
@@ -49,7 +50,7 @@ def process_order_points(self, order_id: int) -> dict:
     base=MonitoredTask,
     bind=True,
     max_retries=5,
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_ERRORS,
     retry_backoff=True,
     retry_jitter=True,
 )
@@ -75,7 +76,7 @@ def reverse_order_points(self, order_id: int) -> dict:
 
 @celery_app.task(
     base=MonitoredTask,
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_ERRORS,
     retry_backoff=True,
 )
 def sync_loyalty_pause() -> dict:
@@ -89,7 +90,7 @@ def sync_loyalty_pause() -> dict:
 
 @celery_app.task(
     base=MonitoredTask,
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_ERRORS,
     retry_backoff=True,
 )
 def process_points_expiration() -> dict:
@@ -108,7 +109,7 @@ def process_points_expiration() -> dict:
     base=MonitoredTask,
     bind=True,
     max_retries=3,
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_ERRORS,
     retry_backoff=True,
     retry_jitter=True,
 )

@@ -6,6 +6,7 @@ from typing import Any
 from celery import shared_task
 from django.utils import translation
 
+from core.retry import MAIL_TRANSIENT_ERRORS
 from core.utils.email_context import build_email_context
 from core.utils.i18n import get_order_language
 from core.utils.tenant_urls import storefront_path
@@ -294,7 +295,7 @@ def process_boxnow_webhook_event(
 @shared_task(
     bind=True,
     base=TenantTask,
-    autoretry_for=(Exception,),
+    autoretry_for=MAIL_TRANSIENT_ERRORS,
     retry_backoff=True,
     retry_backoff_max=600,
     max_retries=3,

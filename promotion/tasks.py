@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 
 from core import celery_app
+from core.retry import SEARCH_TRANSIENT_ERRORS
 from core.tasks import MonitoredTask
 
 logger = logging.getLogger(__name__)
@@ -11,7 +12,7 @@ logger = logging.getLogger(__name__)
 @celery_app.task(
     base=MonitoredTask,
     max_retries=5,
-    autoretry_for=(Exception,),
+    autoretry_for=SEARCH_TRANSIENT_ERRORS,
     retry_backoff=True,
     retry_jitter=True,
 )
@@ -37,7 +38,7 @@ def reindex_offer_products_task() -> dict[str, int]:
 @celery_app.task(
     base=MonitoredTask,
     max_retries=5,
-    autoretry_for=(Exception,),
+    autoretry_for=SEARCH_TRANSIENT_ERRORS,
     retry_backoff=True,
     retry_jitter=True,
 )

@@ -8,6 +8,7 @@ from rest_framework.test import APITestCase
 from order.enum.status import OrderStatus
 from order.factories.item import OrderItemFactory
 from order.factories.order import OrderFactory
+from product.enum.review import ReviewStatus
 from product.factories.product import ProductFactory
 from product.factories.review import ProductReviewFactory
 from product.models.review import ProductReview
@@ -174,8 +175,11 @@ class ProductReviewViewSetTestCase(APITestCase):
 
         review = ProductReview.objects.get(id=response.data["id"])
         self.assertEqual(review.rate, 3)
-        # status and is_published are read-only — sent values are ignored
-        self.assertEqual(review.status, self.product_review.status)
+        # status and is_published are read-only: the sent "TRUE" is ignored,
+        # and the owner's edit puts the review in front of staff again,
+        # whatever status it had.
+        self.assertEqual(review.status, ReviewStatus.NEW)
+        self.assertFalse(review.is_published)
 
     def test_partial_update_request_response_serializers(self):
         payload = {

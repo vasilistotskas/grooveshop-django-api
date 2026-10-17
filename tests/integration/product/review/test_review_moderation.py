@@ -22,7 +22,9 @@ from django.apps import apps
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
 from django.core import mail
+from django.db import connection
 from django.test import Client
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone, translation
 from rest_framework import status
@@ -534,6 +536,32 @@ class TestTheAdmin:
         )
         assert response.status_code == 200
         return {review.pk for review in response.context["cl"].queryset}
+
+    def test_every_status_costs_the_same_for_more_rows(self, staff_client):
+        # The growth guard renders the default (waiting) list; this
+        # renders all three statuses, thumbnails and verified purchases.
+        url = reverse("admin:product_productreview_changelist")
+
+        def add(count):
+            for index in range(count):
+                _review(
+                    UserAccountFactory(num_addresses=0),
+                    ProductFactory(num_reviews=0),
+                    list(ReviewStatus)[index % 3],
+                )
+
+        def measure():
+            staff_client.get(url, {"status__exact": "all"})
+            with CaptureQueriesContext(connection) as queries:
+                response = staff_client.get(url, {"status__exact": "all"})
+            assert response.status_code == 200
+            return len(queries.captured_queries)
+
+        add(3)
+        few = measure()
+        add(6)
+
+        assert measure() == few
 
     def test_the_changelist_opens_on_the_reviews_waiting(
         self, staff_client, product

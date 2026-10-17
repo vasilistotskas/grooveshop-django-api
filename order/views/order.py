@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import logging
 
 from django.conf import settings
@@ -11,6 +12,7 @@ from django.utils.translation import gettext_lazy as _
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import (
     OpenApiParameter,
+    OpenApiResponse,
     extend_schema,
     extend_schema_view,
 )
@@ -36,6 +38,7 @@ from core.api.serializers import ErrorResponseSerializer
 from core.api.throttling import (
     OrderCreateAnonThrottle,
     OrderCreateThrottle,
+    OrderSpecimenThrottle,
     PaymentAttemptAnonThrottle,
     PaymentAttemptThrottle,
     VivaReturnThrottle,
@@ -68,6 +71,7 @@ from order.exceptions import (
     StockReservationError,
 )
 from order.filters import OrderFilter
+from order.invoicing import SpecimenNotAvailable, render_specimen_pdf
 from order.models.history import OrderHistory
 from order.models.order import Order
 from order.payment import (
@@ -448,6 +452,7 @@ class OrderViewSet(BaseModelViewSet):
             "reorder",
             "invoice",
             "invoice_download",
+            "specimen_download",
             "boxnow_label",
             "acs_label",
             "shipment_label",
@@ -2150,6 +2155,46 @@ class OrderViewSet(BaseModelViewSet):
             content_type="application/pdf",
             as_attachment=True,
             filename=f"{invoice.invoice_number}.pdf",
+        )
+
+    @extend_schema(
+        operation_id="downloadOrderSpecimenReceipt",
+        tags=["Orders"],
+        summary=_("Download the specimen receipt PDF"),
+        description=_(
+            "Renders, on demand, a watermarked specimen of the order's "
+            "retail receipt: the same document with no number, no QR code "
+            "and no tax standing. Demo stores only, for an order a receipt "
+            "is issued for (shipped onwards); 404 when no specimen is available. Nothing "
+            "is stored and nothing is sent to myDATA. Same ownership check "
+            "as the receipt endpoints."
+        ),
+        responses={
+            (200, "application/pdf"): OpenApiTypes.BINARY,
+            403: OpenApiResponse(
+                description=_("Not the order's owner"),
+            ),
+            404: OpenApiResponse(description=_("Specimen unavailable")),
+        },
+    )
+    @action(
+        detail=True,
+        methods=["GET"],
+        url_path="specimen/download",
+        throttle_classes=[OrderSpecimenThrottle],
+    )
+    def specimen_download(self, request, *args, **kwargs):
+        """Stream a freshly rendered specimen receipt (demo stores only)."""
+        order = self.get_object()
+        try:
+            pdf_bytes = render_specimen_pdf(order)
+        except SpecimenNotAvailable as exc:
+            raise NotFound(_("This order has no specimen receipt.")) from exc
+        return FileResponse(
+            io.BytesIO(pdf_bytes),
+            content_type="application/pdf",
+            as_attachment=True,
+            filename=f"specimen-{order.id}.pdf",
         )
 
     @action(detail=True, methods=["POST"])

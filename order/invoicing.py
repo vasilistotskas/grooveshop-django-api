@@ -63,6 +63,7 @@ from order.mydata.config import load_config as load_mydata_config
 from order.taxation import breakdown_by_rate, order_vat_lines
 from pay_way.enum.pay_way import PayWayEnum
 from tenant.credentials import tenant_contact_email, tenant_site_name
+from tenant.membership import is_demo_store
 
 logger = logging.getLogger(__name__)
 
@@ -98,6 +99,20 @@ def receipt_issuable(order: Order) -> bool:
         order.document_type == OrderDocumentTypeEnum.RECEIPT.value
         and order.status in RECEIPT_ISSUING_STATUSES
     )
+
+
+def specimen_available(order: Order) -> bool:
+    """True when the order may show a specimen receipt: the store is a
+    demo store (``tenant.membership.is_demo_store``) and the
+    order is one a real receipt would be issued for. A specimen is a
+    showcase of the document, never a tax document, so no other store
+    offers it."""
+    return is_demo_store() and receipt_issuable(order)
+
+
+class SpecimenNotAvailable(Exception):
+    """:func:`render_specimen_pdf` refused: the store is not a demo store,
+    or the order is not one a receipt is issued for."""
 
 
 class ReceiptNotIssuable(Exception):
@@ -318,6 +333,8 @@ def _build_context(
     invoice: Invoice,
     vat_breakdown: list[dict[str, Any]],
     totals: dict[str, Decimal],
+    *,
+    specimen: bool = False,
 ) -> dict[str, Any]:
     """Assemble the template context dict.
 
@@ -329,10 +346,15 @@ def _build_context(
     verifiable one that deep-links into the ΑΑΔΕ portal). Otherwise
     we fall back to our own order-tracking URL so the PDF still has
     a useful scan target pre-transmission.
+
+    A *specimen* carries no QR at all: it is registered nowhere, so there
+    is nothing a scan could verify.
     """
-    qr_target_url = invoice.mydata_qr_url or _verification_url(
-        order, language=get_order_language(order)
-    )
+    qr_target_url = ""
+    if not specimen:
+        qr_target_url = invoice.mydata_qr_url or _verification_url(
+            order, language=get_order_language(order)
+        )
     return {
         "invoice": invoice,
         "document_number": invoice.invoice_number,
@@ -348,10 +370,11 @@ def _build_context(
         "currency": invoice.currency,
         "pay_way_name": _pay_way_display(order),
         "verification_url": qr_target_url,
-        "qr_svg": _build_qr_svg(qr_target_url),
+        "qr_svg": _build_qr_svg(qr_target_url) if qr_target_url else "",
         # Surfaced on the PDF when present so auditors / customers can
         # see the legal registration number next to the invoice number.
         "mydata_mark": invoice.mydata_mark,
+        "specimen": specimen,
     }
 
 
@@ -546,6 +569,39 @@ def generate_invoice(order: Order, *, force: bool = False) -> Invoice:
         len(pdf_bytes),
     )
     return invoice
+
+
+def render_specimen_pdf(order: Order) -> bytes:
+    """Render the specimen («ΔΕΙΓΜΑ») of the order's retail receipt.
+
+    The same template and context as the real receipt, built from an
+    unsaved :class:`Invoice` and the live order, with a watermark and no
+    QR. Nothing is persisted: no row, no :class:`InvoiceCounter` slot, no
+    file, no myDATA call, so a specimen can neither be issued nor
+    submitted. Refuses (:class:`SpecimenNotAvailable`) outside a demo
+    store, whoever asks.
+    """
+    if not specimen_available(order):
+        raise SpecimenNotAvailable(
+            _("Order #%(order_id)s has no specimen receipt.")
+            % {"order_id": order.id}
+        )
+    vat_breakdown = _compute_vat_breakdown(order)
+    totals = _order_totals(order, vat_breakdown)
+    with translation_override(get_order_language(order)):
+        specimen = Invoice(
+            order=order,
+            invoice_number=_("SPECIMEN"),
+            issue_date=timezone.localdate(),
+            seller_snapshot=_seller_snapshot(),
+            buyer_snapshot=_buyer_snapshot(order),
+            currency=order.amount_due.currency.code,
+        )
+        return _render_pdf_bytes(
+            _build_context(
+                order, specimen, vat_breakdown, totals, specimen=True
+            )
+        )
 
 
 def render_credit_pdf(credit: RetailCredit) -> RetailCredit:

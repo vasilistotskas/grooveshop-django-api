@@ -16,6 +16,7 @@ from order.enum.cancel_error import OrderCancelErrorType
 from order.enum.create_error import OrderCreateErrorType
 from order.enum.document_type import OrderCreateDocumentTypeEnum
 from order.enum.status import OrderStatus, PaymentStatus
+from order.invoicing import specimen_available
 from order.models.attribution import OrderAttribution
 from order.models.order import Order
 from order.serializers.item import (
@@ -378,6 +379,14 @@ class OrderDetailSerializer(OrderSerializer):
             "store that issues its receipts outside the platform."
         )
     )
+    has_specimen_receipt = serializers.SerializerMethodField(
+        help_text=(
+            "True when the storefront may offer the watermarked specimen "
+            "receipt (``/order/{id}/specimen/download``): a demo store, "
+            "for an order a receipt is issued for (shipped onwards). "
+            "Always false on any other store."
+        )
+    )
     boxnow_shipment = serializers.SerializerMethodField(
         help_text=(
             "BoxNow shipment details when shipping_provider.code is "
@@ -534,6 +543,10 @@ class OrderDetailSerializer(OrderSerializer):
     def get_has_invoice(self, obj: Order) -> bool:
         invoice = getattr(obj, "invoice", None)
         return bool(invoice and invoice.is_deliverable())
+
+    @extend_schema_field({"type": "boolean"})
+    def get_has_specimen_receipt(self, obj: Order) -> bool:
+        return specimen_available(obj)
 
     def _serialized_shipment(self, obj: Order) -> dict | None:
         """Compute the carrier shipment payload once per response.
@@ -919,6 +932,7 @@ class OrderDetailSerializer(OrderSerializer):
             "pricing_breakdown",
             "tracking_details",
             "has_invoice",
+            "has_specimen_receipt",
             "boxnow_shipment",
             "acs_shipment",
             "shipment",
@@ -947,6 +961,7 @@ class OrderDetailSerializer(OrderSerializer):
             "pricing_breakdown",
             "tracking_details",
             "has_invoice",
+            "has_specimen_receipt",
             "boxnow_shipment",
             "acs_shipment",
             "shipment",

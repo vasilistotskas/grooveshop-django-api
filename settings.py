@@ -549,6 +549,11 @@ REST_FRAMEWORK = {
         # Public proxies to rate-limited carrier partner APIs.
         "acs_address": None if DEBUG else "30/minute",
         "boxnow_nearest": None if DEBUG else "10/minute",
+        # A specimen receipt is a WeasyPrint render on the request worker.
+        # A person opens one or two; the demo store's shared logins pool
+        # every visitor into one bucket, so the budget leaves room for a
+        # few at once without letting one client keep workers busy.
+        "order_specimen": None if DEBUG else "10/minute",
         # Staff token minting (tenant.staff_api) — a credential-guessing
         # surface on the platform host, so budget accordingly.
         "staff_login": None if DEBUG else "10/hour",

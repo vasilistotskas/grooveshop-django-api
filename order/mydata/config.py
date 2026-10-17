@@ -32,7 +32,7 @@ from django.conf import settings
 from extra_settings.models import Setting
 
 from tenant.credentials import mydata_credentials
-from tenant.membership import bound_tenant
+from tenant.membership import is_demo_store
 
 type Environment = Literal["dev", "prod"]
 
@@ -131,14 +131,13 @@ def load_config() -> MyDataConfig:
     values and the active tenant's credentials. Call per task
     invocation — not cached."""
     credentials = mydata_credentials()
-    tenant = bound_tenant()
     return MyDataConfig(
         enabled=bool(Setting.get("MYDATA_ENABLED", default=False)),
         fhm_exemption_ground=str(
             Setting.get("MYDATA_FHM_EXEMPTION_GROUND", default="")
         ).strip(),
         takes_real_orders=settings.REAL_ORDERS_DEPLOYMENT
-        and not (tenant is not None and tenant.is_demo),
+        and not is_demo_store(),
         auto_submit=bool(Setting.get("MYDATA_AUTO_SUBMIT", default=False)),
         environment=_environment(
             Setting.get("MYDATA_ENVIRONMENT", default="dev")

@@ -10,9 +10,24 @@ value that must be annotated first.
 
 from __future__ import annotations
 
-from django.db.models import QuerySet
+from django.db.models import (
+    Case,
+    Count,
+    IntegerField,
+    Model,
+    QuerySet,
+    Value,
+    When,
+)
 from django.utils.translation import gettext_lazy as _
-from unfold.contrib.filters.admin import RangeNumericListFilter
+from unfold.contrib.filters.admin import DropdownFilter, RangeNumericListFilter
+
+from order.attribution import KNOWN_SOURCES, source_label
+
+ACQUISITION_SOURCE_MAX_CHOICES = 30
+"""How many sources an acquisition filter offers: an unrecognised
+``utm_source`` is stored as the shopper typed it, so the distinct values
+are unbounded and the dropdown must not follow them."""
 
 
 class AnnotatedRangeFilter(RangeNumericListFilter):
@@ -46,3 +61,54 @@ class LikesCountFilter(AnnotatedRangeFilter):
 
     def annotate(self, queryset):
         return queryset.with_likes_count()
+
+
+class AcquisitionSourceFilter(DropdownFilter):
+    """The channels shoppers were actually attributed to, by name.
+
+    One filter for every list that shows where a shopper came from: a
+    subclass names the table holding the sources (``model``), its two
+    columns and the ``lookup`` that reaches the source from the
+    changelist's own model. Direct visits have no source (an empty
+    value would read as "All"), so they are reached through the
+    source-type filter instead.
+
+    The dropdown is bounded (``ACQUISITION_SOURCE_MAX_CHOICES``, one
+    aggregated query): the registry's known channels first, then the
+    most frequent of the rest. A source cut off here is still reachable
+    through the URL parameter, and its type through the type filter.
+    """
+
+    title = _("Order source")
+    parameter_name = "order_source"
+    model: type[Model]
+    source_field = "source"
+    type_field = "source_type"
+    lookup = "attribution__source"
+
+    def lookups(self, request, model_admin):
+        known = [known.key for known in KNOWN_SOURCES]
+        labels = {}
+        for source, source_type in (
+            self.model.objects.exclude(**{self.source_field: ""})
+            .values(self.source_field, self.type_field)
+            .annotate(
+                rows=Count("pk"),
+                is_known=Case(
+                    When(**{f"{self.source_field}__in": known}, then=Value(0)),
+                    default=Value(1),
+                    output_field=IntegerField(),
+                ),
+            )
+            .order_by("is_known", "-rows", self.source_field, self.type_field)
+            .values_list(self.source_field, self.type_field)[
+                :ACQUISITION_SOURCE_MAX_CHOICES
+            ]
+        ):
+            labels.setdefault(source, source_label(source, source_type))
+        return sorted(labels.items(), key=lambda item: str(item[1]).lower())
+
+    def queryset(self, request, queryset):
+        if not self.value():
+            return queryset
+        return queryset.filter(**{self.lookup: self.value()})

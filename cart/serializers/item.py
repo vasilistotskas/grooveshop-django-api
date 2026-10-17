@@ -5,6 +5,9 @@ from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from cart.models import CartItem
+from cart.services import CartAttributionService
+from order.serializers.order import OrderAttributionInputSerializer
+from order.services import OrderAttributionService
 from product.serializers.product import ProductSerializer
 
 
@@ -141,6 +144,14 @@ class CartItemDetailSerializer(CartItemSerializer):
 
 
 class CartItemCreateSerializer(serializers.ModelSerializer[CartItem]):
+    # The storefront's first-touch capture, the same shape and rules as
+    # on order create. Read by ``CartAttributionService.capture`` only
+    # when this add takes the cart from no lines to some; absent means
+    # the cart records no source (the agent gateway sends none).
+    attribution = OrderAttributionInputSerializer(
+        required=False, write_only=True
+    )
+
     def validate_quantity(self, value: int) -> int:
         if value <= 0:
             raise serializers.ValidationError(
@@ -206,6 +217,17 @@ class CartItemCreateSerializer(serializers.ModelSerializer[CartItem]):
         if not cart:
             raise serializers.ValidationError(_("Cart is not provided."))
 
+        if "attribution" in validated_data:
+            request = self.context["request"]
+            CartAttributionService.capture(
+                cart,
+                OrderAttributionService.classify_for_store(
+                    OrderAttributionService.input_from_request(
+                        request, validated_data["attribution"]
+                    )
+                ),
+            )
+
         # Atomic upsert: the previous filter().first()→create() was a
         # check-then-act race — two concurrent add-to-cart calls for the same
         # product both saw "no row" and both INSERTed, so the second 500'd on
@@ -234,7 +256,12 @@ class CartItemCreateSerializer(serializers.ModelSerializer[CartItem]):
 
     class Meta:
         model = CartItem
-        fields = ("product", "quantity", "recommendation_impression_id")
+        fields = (
+            "product",
+            "quantity",
+            "recommendation_impression_id",
+            "attribution",
+        )
 
 
 class CartItemUpdateSerializer(serializers.ModelSerializer[CartItem]):

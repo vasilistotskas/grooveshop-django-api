@@ -2,16 +2,19 @@ from __future__ import annotations
 
 import logging
 import uuid
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 from django.db import transaction
+from django.utils import timezone
 
 from cart.agent_token import (
     CartTokenNotPermitted,
     cart_token_from_request,
     resolve_cart_token,
 )
-from cart.models import Cart, CartItem
+from cart.models import Cart, CartAttribution, CartItem
+from order.attribution import ClassifiedAttribution
 from order.models.stock_reservation import StockReservation
 
 logger = logging.getLogger(__name__)
@@ -20,14 +23,8 @@ if TYPE_CHECKING:
     from django.http import HttpRequest
     from rest_framework.request import Request
 
-    from product.models.product import Product
-
 
 class CartServiceInitException(Exception):
-    pass
-
-
-class CartNotSetException(Exception):
     pass
 
 
@@ -51,6 +48,66 @@ def cart_uuid_from_request(request: Request | HttpRequest) -> uuid.UUID | None:
         return uuid.UUID(str(raw))
     except ValueError, TypeError, AttributeError:
         return None
+
+
+class CartAttributionService:
+    """The one place a cart's first-touch source is decided.
+
+    Every path that can take a cart from no lines to some goes through
+    ``capture``, called BEFORE it writes the line: a new cart's first
+    add, a refill after the shopper emptied it, a reorder, and the
+    guest-to-account merge.
+    """
+
+    @classmethod
+    def capture(
+        cls,
+        cart: Cart,
+        touch: ClassifiedAttribution,
+        *,
+        touched_at: datetime | None = None,
+    ) -> CartAttribution | None:
+        """Record *touch* as the first touch of *cart*, or keep the one
+        it has.
+
+        ``touched_at`` is when *touch* was first recorded, given only
+        when it is an earlier recording being carried over (the merge
+        hands over the guest cart's). Without it the touch is happening
+        now.
+
+        - An empty cart takes *touch*, replacing whatever an earlier
+          fill left: a cart refilled after being cleared starts over.
+        - A cart that holds lines keeps its source. A touch happening
+          now never replaces it, so the second add is a no-op.
+        - A carried-over touch still wins over a later one, so a merge
+          keeps the earliest source, and over no source at all.
+        """
+        current = CartAttribution.objects.filter(pk=cart.pk).first()
+        holds_lines = CartItem.objects.filter(cart_id=cart.pk).exists()
+        if holds_lines and (
+            touched_at is None
+            or (current is not None and current.created_at <= touched_at)
+        ):
+            return current
+        at = touched_at or timezone.now()
+        attribution, created = CartAttribution.objects.update_or_create(
+            cart=cart,
+            defaults={
+                "source_type": touch.source_type,
+                "source": touch.source,
+                "medium": touch.medium,
+                "campaign": touch.campaign,
+                "referrer_host": touch.referrer_host,
+                "landing_path": touch.landing_path,
+                # An insert stamps ``created_at`` itself; only a
+                # replacement honours this one.
+                "created_at": at,
+            },
+        )
+        if created and touched_at is not None:
+            CartAttribution.objects.filter(pk=cart.pk).update(created_at=at)
+            attribution.created_at = at
+        return attribution
 
 
 class CartService:
@@ -219,6 +276,28 @@ class CartService:
         if target_cart.id == source_cart.id:
             return
 
+        # Before any line moves: whether the target already holds lines
+        # is what decides which source the merged cart keeps. A guest
+        # cart that was emptied brings no lines, so its source brings
+        # nothing either.
+        source_touch = CartAttribution.objects.filter(pk=source_cart.pk).first()
+        if (
+            source_touch is not None
+            and CartItem.objects.filter(cart_id=source_cart.pk).exists()
+        ):
+            CartAttributionService.capture(
+                target_cart,
+                ClassifiedAttribution(
+                    source_type=source_touch.source_type,
+                    source=source_touch.source,
+                    medium=source_touch.medium,
+                    campaign=source_touch.campaign,
+                    referrer_host=source_touch.referrer_host,
+                    landing_path=source_touch.landing_path,
+                ),
+                touched_at=source_touch.created_at,
+            )
+
         lines_moved = 0
         lines_combined = 0
         lines_capped = 0
@@ -337,38 +416,3 @@ class CartService:
         if self.cart:
             return self.cart.items.filter(product_id=product_id).first()
         return None
-
-    def create_cart_item(self, product: Product, quantity: int):
-        if not self.cart:
-            raise CartNotSetException("Cart is not set.")
-
-        existing_item = CartItem.objects.filter(
-            cart=self.cart, product=product
-        ).first()
-
-        if existing_item:
-            existing_item.quantity += quantity
-            existing_item.save()
-            cart_item = existing_item
-        else:
-            cart_item = CartItem.objects.create(
-                cart=self.cart, product=product, quantity=quantity
-            )
-
-        self.cart_items = self.cart.get_items()
-        return cart_item
-
-    def update_cart_item(self, product_id: int, quantity: int):
-        if not self.cart:
-            raise CartNotSetException("Cart is not set.")
-        cart_item = self.cart.items.get(product_id=product_id)
-        cart_item.quantity = quantity
-        cart_item.save()
-        self.cart_items = self.cart.get_items()
-        return cart_item
-
-    def delete_cart_item(self, product_id: int):
-        if not self.cart:
-            raise CartNotSetException("Cart is not set.")
-        self.cart.items.filter(product_id=product_id).delete()
-        self.cart_items = self.cart.get_items()

@@ -120,6 +120,43 @@ def test_order_history_keeps_the_row_but_not_the_network_identity(subject):
     assert entry.user_agent == ""
 
 
+def test_the_cart_source_goes_with_the_cart_and_the_order_keeps_its_own(
+    subject,
+):
+    """A cart's first-touch source is deleted with the cart the account
+    owns. The order keeps its attribution row, checkout source and cart
+    source alike, as the order itself is kept (tax law): erasure does not
+    scrub either."""
+    from cart.factories.cart import CartFactory
+    from cart.models import CartAttribution
+    from order.enum.attribution import OrderSourceType
+    from order.factories import OrderAttributionFactory
+    from order.factories.order import OrderFactory
+    from order.models.attribution import OrderAttribution
+
+    cart = CartFactory(user=subject, num_cart_items=0)
+    CartAttribution.objects.create(
+        cart=cart,
+        source_type=OrderSourceType.SOCIAL,
+        source="instagram",
+        landing_path="/products/7",
+    )
+    kept = OrderAttributionFactory(
+        order=OrderFactory(user=subject),
+        source="google",
+        landing_path="/products/7",
+        cart_source_type=OrderSourceType.SOCIAL,
+        cart_source="instagram",
+    )
+
+    anonymise_and_delete_user(subject)
+
+    assert not CartAttribution.objects.exists()
+    row = OrderAttribution.objects.get(pk=kept.pk)
+    assert (row.source, row.landing_path) == ("google", "/products/7")
+    assert row.cart_source == "instagram"
+
+
 def test_a_failing_purge_is_not_reported_as_a_completed_erasure(
     subject, monkeypatch
 ):

@@ -23156,3 +23156,36 @@ msgstr "Παραμένει κρυμμένη από τους αγοραστές �
 #: .\core\templates\emails\product\review_pending.html
 msgid "Review it in the admin"
 msgstr "Δείτε την στη διαχείριση"
+
+#: .\cart\models\attribution.py
+msgid "Cart attribution"
+msgstr "Προέλευση καλαθιού"
+
+#: .\cart\models\attribution.py
+msgid "Cart attributions"
+msgstr "Προελεύσεις καλαθιών"
+
+#: .\order\models\attribution.py
+msgid "Cart source type"
+msgstr "Τύπος πηγής καλαθιού"
+
+#: .\order\models\attribution.py .\order\admin.py .\order\admin.py
+msgid "Cart source"
+msgstr "Πηγή καλαθιού"
+
+#: .\order\models\attribution.py
+msgid "The channel the order's cart was started from, named like the order source. Empty when the cart had none recorded."
+msgstr "Το κανάλι από το οποίο ξεκίνησε το καλάθι της παραγγελίας, με το όνομα που έχει η πηγή της παραγγελίας. Κενό όταν το καλάθι δεν είχε καταγεγραμμένη πηγή."
+
+#: .\cart\admin.py
+msgid "Checkout started, awaiting payment"
+msgstr "Η ολοκλήρωση αγοράς ξεκίνησε, αναμένεται πληρωμή"
+
+#: .\cart\admin.py
+msgid "Checkout"
+msgstr "Ολοκλήρωση αγοράς"
+
+#: .\cart\admin.py
+#, python-format
+msgid "Checkout started, awaiting payment: order #%(id)s"
+msgstr "Η ολοκλήρωση αγοράς ξεκίνησε, αναμένεται πληρωμή: παραγγελία #%(id)s"

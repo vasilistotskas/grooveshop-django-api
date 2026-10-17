@@ -46,7 +46,9 @@ from admin.displays import (
     label_cell,
     money,
     relative_time,
+    source_badge,
 )
+from admin.filters import AcquisitionSourceFilter
 from admin.mixins import IsSuperuserOnlyModelAdmin
 from order.attribution import source_label
 from order.enum.document_type import OrderDocumentTypeEnum
@@ -120,36 +122,28 @@ MYDATA_STATUS_VARIANT: dict[str, str] = {
 }
 
 
-class OrderSourceFilter(DropdownFilter):
-    """The sources orders were actually attributed to, by name.
+class OrderSourceFilter(AcquisitionSourceFilter):
+    """The sources orders were attributed to at checkout."""
 
-    Direct visits have no source (an empty value would read as "All"),
-    so they are reached through the source-type filter instead.
-    """
+    model = OrderAttribution
 
-    title = _("Order source")
-    parameter_name = "order_source"
 
-    def lookups(self, request, model_admin):
-        labels = {}
-        for source, source_type in (
-            OrderAttribution.objects.exclude(source="")
-            .values_list("source", "source_type")
-            .order_by("source", "source_type")
-            .distinct()
-        ):
-            labels.setdefault(source, source_label(source, source_type))
-        return sorted(labels.items(), key=lambda item: str(item[1]).lower())
+class OrderCartSourceFilter(AcquisitionSourceFilter):
+    """The sources orders' carts were started from: the order list's
+    conversion by cart source."""
 
-    def queryset(self, request, queryset):
-        if not self.value():
-            return queryset
-        return queryset.filter(attribution__source=self.value())
+    title = _("Cart source")
+    parameter_name = "cart_source"
+    model = OrderAttribution
+    source_field = "cart_source"
+    type_field = "cart_source_type"
+    lookup = "attribution__cart_source"
 
 
 def _attribution_field(field: str, description):
     """A read-only change-form field showing one ``OrderAttribution``
-    column — "-" for an order placed before attribution existed."""
+    column — "-" for an order placed before attribution existed, and for
+    a cart source its cart never recorded."""
 
     @admin.display(description=description)
     def _field(self, obj):
@@ -160,6 +154,20 @@ def _attribution_field(field: str, description):
             return attribution.get_source_type_display()
         if field == "source":
             return source_label(attribution.source, attribution.source_type)
+        if field == "cart_source_type":
+            return (
+                attribution.get_cart_source_type_display()
+                if attribution.cart_source_type
+                else None
+            )
+        if field == "cart_source":
+            return (
+                source_label(
+                    attribution.cart_source, attribution.cart_source_type
+                )
+                if attribution.cart_source_type
+                else None
+            )
         return getattr(attribution, field) or None
 
     _field.__name__ = f"attribution_{field}"
@@ -588,6 +596,7 @@ class OrderAdmin(BaseModelAdmin):
         "customer",
         "order_summary",
         "order_source",
+        "order_cart_source",
         "payment_status_label",
         "payment_method_label",
         "shipment_state",
@@ -606,6 +615,8 @@ class OrderAdmin(BaseModelAdmin):
         RecentOrdersFilter,
         ("attribution__source_type", ChoicesDropdownFilter),
         OrderSourceFilter,
+        ("attribution__cart_source_type", ChoicesDropdownFilter),
+        OrderCartSourceFilter,
         ("created_at", RangeDateTimeFilter),
         ("status_updated_at", RangeDateTimeFilter),
         ("country", AutocompleteSelectFilter),
@@ -666,6 +677,8 @@ class OrderAdmin(BaseModelAdmin):
         # Shopper-supplied analytics, recorded once at checkout.
         "attribution_source_type",
         "attribution_source",
+        "attribution_cart_source_type",
+        "attribution_cart_source",
         "attribution_medium",
         "attribution_campaign",
         "attribution_referrer_host",
@@ -815,6 +828,8 @@ class OrderAdmin(BaseModelAdmin):
                     "customer_notes",
                     "attribution_source_type",
                     "attribution_source",
+                    "attribution_cart_source_type",
+                    "attribution_cart_source",
                     "attribution_medium",
                     "attribution_campaign",
                     "attribution_referrer_host",
@@ -1144,6 +1159,12 @@ class OrderAdmin(BaseModelAdmin):
         "source_type", _("Source type")
     )
     attribution_source = _attribution_field("source", _("Order source"))
+    attribution_cart_source_type = _attribution_field(
+        "cart_source_type", _("Cart source type")
+    )
+    attribution_cart_source = _attribution_field(
+        "cart_source", _("Cart source")
+    )
     attribution_medium = _attribution_field("medium", _("Traffic medium"))
     attribution_campaign = _attribution_field("campaign", _("Campaign name"))
     attribution_referrer_host = _attribution_field(
@@ -1175,8 +1196,19 @@ class OrderAdmin(BaseModelAdmin):
         attribution = getattr(obj, "attribution", None)
         if attribution is None:
             return None
-        return attribution.source_type, source_label(
-            attribution.source, attribution.source_type
+        return source_badge(attribution.source_type, attribution.source)
+
+    @display(
+        description=_("Cart source"),
+        label=ORDER_SOURCE_TYPE_VARIANT,
+        ordering="attribution__cart_source",
+    )
+    def order_cart_source(self, obj):
+        attribution = getattr(obj, "attribution", None)
+        if attribution is None or not attribution.cart_source_type:
+            return None
+        return source_badge(
+            attribution.cart_source_type, attribution.cart_source
         )
 
     @display(description=_("Customer"), header=True, ordering="last_name")

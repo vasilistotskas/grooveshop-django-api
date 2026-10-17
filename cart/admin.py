@@ -2,13 +2,15 @@ from datetime import timedelta
 
 from django.contrib import admin
 from django.db import transaction
-from django.db.models import F, Sum
-from django.db.models.functions import Coalesce
+from django.db.models import CharField, F, OuterRef, Subquery, Sum
+from django.db.models.fields.json import KT
+from django.db.models.functions import Cast, Coalesce
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import TabularInline
 from unfold.contrib.filters.admin import (
     AutocompleteSelectFilter,
+    ChoicesDropdownFilter,
     DropdownFilter,
     RangeDateTimeFilter,
     SliderNumericFilter,
@@ -17,9 +19,18 @@ from unfold.decorators import action, display
 from unfold.enums import ActionVariant
 
 from admin.base import BaseModelAdmin
-from admin.displays import format_dt, header_two_line, money
-from admin.filters import AnnotatedRangeFilter
-from cart.models import Cart, CartItem
+from admin.displays import (
+    ORDER_SOURCE_TYPE_VARIANT,
+    change_link,
+    format_dt,
+    header_two_line,
+    money,
+    source_badge,
+)
+from admin.filters import AcquisitionSourceFilter, AnnotatedRangeFilter
+from cart.models import Cart, CartAttribution, CartItem
+from order.managers.order import awaiting_online_payment_q
+from order.models.order import Order
 
 CART_TYPE_VARIANT: dict[str, str] = {
     "user": "success",
@@ -53,6 +64,48 @@ class CartTypeFilter(DropdownFilter):
         elif self.value() == "abandoned":
             cutoff = timezone.now() - timedelta(hours=24)
             return queryset.filter(last_activity__lt=cutoff)
+        return queryset
+
+
+class CartSourceFilter(AcquisitionSourceFilter):
+    """The sources carts were started from, by name."""
+
+    model = CartAttribution
+
+
+def awaiting_payment_order_id() -> Subquery:
+    """The id of the order this cart's checkout already created and the
+    shopper has not paid online yet, if any.
+
+    The cart is left standing while a hosted payment is open
+    (``_clear_cart_for_order``), and the order names it in
+    ``metadata["cart_snapshot"]`` — both creation paths write that. One
+    correlated subquery in the changelist query, so neither the column
+    nor the filter costs a query per row.
+    """
+    return Subquery(
+        Order.objects.filter(awaiting_online_payment_q())
+        .annotate(snapshot_cart_uuid=KT("metadata__cart_snapshot__cart_uuid"))
+        .filter(snapshot_cart_uuid=Cast(OuterRef("uuid"), CharField()))
+        .order_by("-id")
+        .values("id")[:1]
+    )
+
+
+class CheckoutStateFilter(DropdownFilter):
+    """Named apart from "Abandoned" (``CartTypeFilter``): that one is a
+    cart idle for a day, this one a cart whose checkout is already an
+    order waiting for its online payment."""
+
+    title = _("Checkout")
+    parameter_name = "checkout"
+
+    def lookups(self, request, model_admin):
+        return [("awaiting_payment", _("Checkout started, awaiting payment"))]
+
+    def queryset(self, request, queryset):
+        if self.value() == "awaiting_payment":
+            return queryset.filter(awaiting_order_id__isnull=False)
         return queryset
 
 
@@ -149,6 +202,8 @@ class CartAdmin(BaseModelAdmin):
     list_display = (
         "cart_owner_display",
         "cart_type",
+        "cart_source",
+        "checkout_state",
         "activity_state",
         "items_summary",
         "price_summary",
@@ -158,6 +213,9 @@ class CartAdmin(BaseModelAdmin):
     list_filter = (
         CartTypeFilter,
         ActivityStatusFilter,
+        ("attribution__source_type", ChoicesDropdownFilter),
+        CartSourceFilter,
+        CheckoutStateFilter,
         ("last_activity", RangeDateTimeFilter),
         ("created_at", RangeDateTimeFilter),
         ("user", AutocompleteSelectFilter),
@@ -217,6 +275,11 @@ class CartAdmin(BaseModelAdmin):
         return (
             super()
             .get_queryset(request)
+            # Naming ``user`` here as well: Django applies
+            # ``list_select_related`` only to a queryset with no
+            # ``select_related`` of its own.
+            .select_related("user", "attribution")
+            .annotate(awaiting_order_id=awaiting_payment_order_id())
             .prefetch_related("items__product__vat")
         )
 
@@ -235,6 +298,29 @@ class CartAdmin(BaseModelAdmin):
         if obj.user:
             return "user", _("User")
         return "guest", _("Guest")
+
+    @display(
+        description=_("Order source"),
+        label=ORDER_SOURCE_TYPE_VARIANT,
+        ordering="attribution__source",
+    )
+    def cart_source(self, obj):
+        attribution = getattr(obj, "attribution", None)
+        if attribution is None:
+            return None
+        return source_badge(attribution.source_type, attribution.source)
+
+    @admin.display(description=_("Checkout"))
+    def checkout_state(self, obj):
+        if obj.awaiting_order_id is None:
+            return None
+        return change_link(
+            self.admin_site,
+            Order,
+            obj.awaiting_order_id,
+            _("Checkout started, awaiting payment: order #%(id)s")
+            % {"id": obj.awaiting_order_id},
+        )
 
     @display(description=_("Activity"), label=ACTIVITY_STATE_VARIANT)
     def activity_state(self, obj):

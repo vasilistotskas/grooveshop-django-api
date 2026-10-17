@@ -3,6 +3,15 @@
 
 
 
+## v3.130.0 (2026-10-17)
+
+### Features
+
+* feat(shipping): shipping options carry the logo's media path (#233)
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01VHqqSodFfL9aLgezEZV6qb ([`3d0d590`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3d0d5902d6175fe8955290c850c651cfb7b96ba2))
+
 ## v3.129.0 (2026-10-17)
 
 ### Bug fixes

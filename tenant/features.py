@@ -15,10 +15,14 @@ from django_tenants.utils import get_public_schema_name, schema_context
 
 from tenant.permissions import (
     IsAccountReviewsEnabled,
+    IsAgentCommerceEnabled,
+    IsAgentCommerceRuntimeEnabled,
     IsB2BEnabled,
     IsB2BWholesaleEnabled,
     IsBlogCommentsEnabled,
     IsBlogEnabled,
+    IsChatWidgetEnabled,
+    IsContactAttachmentsEnabled,
     IsFavouritesEnabled,
     IsFeedbackEnabled,
     IsGiftCardsEnabled,
@@ -26,6 +30,7 @@ from tenant.permissions import (
     IsLoyaltyEnabled,
     IsLoyaltyRuntimeEnabled,
     IsNewsletterEnabled,
+    IsProductAlertsEnabled,
     IsProductReviewsEnabled,
     IsPromotionsEnabled,
     IsPromotionsRuntimeEnabled,
@@ -65,6 +70,14 @@ STORE_FEATURES: dict[str, StoreFeature] = {
     "wholesale": StoreFeature(IsB2BEnabled, (IsB2BWholesaleEnabled,)),
     "product_suggestions": StoreFeature(
         IsRecommendationsEnabled, (IsRecommendationsRuntimeEnabled,)
+    ),
+    "product_alerts": StoreFeature(None, (IsProductAlertsEnabled,)),
+    "contact_attachments": StoreFeature(None, (IsContactAttachmentsEnabled,)),
+    # The widget talks to the agent gateway's chat, which only serves a
+    # store whose agent commerce is on at both tiers.
+    "chat_widget": StoreFeature(
+        IsAgentCommerceEnabled,
+        (IsAgentCommerceRuntimeEnabled, IsChatWidgetEnabled),
     ),
 }
 
@@ -119,3 +132,28 @@ def effective_features(tenant) -> dict[str, bool]:
         and all(setting_on[gate] for gate in feature.settings)
         for name, feature in STORE_FEATURES.items()
     }
+
+
+def feature_on(name: str) -> bool:
+    """Whether ``name`` is on for the store serving this request.
+
+    The same decision the feature's permission classes make, so a
+    serializer that withholds a feature's data answers exactly as the
+    feature's endpoints do: the plan flag of the current tenant (the
+    platform host has none and is never gated) and every setting it
+    needs, read in the active schema.
+    """
+    from extra_settings.models import Setting
+
+    from tenant.membership import get_current_tenant
+
+    feature = STORE_FEATURES[name]
+    tenant = get_current_tenant()
+    return not (
+        feature.plan is not None
+        and tenant is not None
+        and not getattr(tenant, feature.plan.feature_flag, True)
+    ) and all(
+        bool(Setting.get(gate.setting_key, default=gate.default))
+        for gate in feature.settings
+    )

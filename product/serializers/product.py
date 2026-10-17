@@ -1,3 +1,5 @@
+from functools import cached_property
+
 from django.db.models import Count
 from django.utils.translation import gettext_lazy as _
 from djmoney.contrib.django_rest_framework import MoneyField
@@ -19,6 +21,7 @@ from product.models.category import ProductCategory
 from product.models.product import Product
 from product.serializers.product_attribute import ProductAttributeSerializer
 from promotion.enum import OfferKind
+from tenant.features import feature_on
 from vat.models import Vat
 
 
@@ -153,6 +156,22 @@ class ProductSerializer(
             "attributes",
         )
 
+    @cached_property
+    def reviews_visible(self) -> bool:
+        # One read per response: a list renders every row through the
+        # same child serializer.
+        return feature_on("product_reviews")
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        # A store whose reviews are hidden hides the star average and
+        # the review count with them. Zero is what a product with no
+        # reviews serves, so the field keeps its shape.
+        if not self.reviews_visible:
+            data["review_average"] = 0.0
+            data["review_count"] = 0
+        return data
+
 
 class RatingDistributionSerializer(serializers.Serializer):
     rate = serializers.IntegerField()
@@ -194,12 +213,17 @@ class ProductRetrieveSerializer(ProductDetailSerializer):
         gaps. Approved only, like the public review list: a pending or
         rejected review must not move the bars.
         """
-        counts = dict(
-            obj.reviews.get_queryset()
-            .approved()
-            .order_by()
-            .values_list("rate")
-            .annotate(count=Count("pk"))
+        # Hidden reviews hide the bars too: all zeros, without the query.
+        counts = (
+            dict(
+                obj.reviews.get_queryset()
+                .approved()
+                .order_by()
+                .values_list("rate")
+                .annotate(count=Count("pk"))
+            )
+            if self.reviews_visible
+            else {}
         )
         return [
             {"rate": rate, "count": counts.get(rate, 0)}

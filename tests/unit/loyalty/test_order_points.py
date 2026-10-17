@@ -19,9 +19,11 @@ from loyalty.enum import TransactionType
 from loyalty.models.tier import LoyaltyTier
 from loyalty.models.transaction import PointsTransaction
 from loyalty.services import LoyaltyService
+from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.item import OrderItemFactory
 from order.factories.order import OrderFactory
+from order.factories.payment_transaction import PaymentTransactionFactory
 from order.models.order import Order
 from product.factories import ProductFactory
 from tests.utils.loyalty import loyalty_settings
@@ -243,6 +245,64 @@ class TestNewCustomerBonusReversal:
         assert LoyaltyService.get_user_balance(user) == 0
         user.refresh_from_db()
         assert user.total_xp == 20
+
+
+class TestRedeemedPointsOnReversal:
+    """A refund or cancellation gives back the points the customer spent
+    on the order; a lost card dispute does not (owner decision,
+    2026-10-17): the customer took the money back through their bank."""
+
+    def _order_with_redemption(self, user):
+        order = _completed_order(user)
+        _line(order, price="10.00", quantity=3)  # floor(10*1*3) = 30
+        with loyalty_settings():
+            assert LoyaltyService.award_order_points(order.id) == 30
+        PointsTransaction.objects.create(
+            user=user,
+            points=-20,
+            transaction_type=TransactionType.REDEEM,
+            reference_order=order,
+        )
+        return order
+
+    @staticmethod
+    def _restored(order) -> list[int]:
+        return list(
+            PointsTransaction.objects.filter(
+                reference_order=order,
+                transaction_type=TransactionType.ADJUST,
+                points__gt=0,
+            ).values_list("points", flat=True)
+        )
+
+    def test_a_refunded_order_gives_back_the_points_spent_on_it(self):
+        user = UserAccountFactory(num_addresses=0)
+        order = self._order_with_redemption(user)
+
+        with loyalty_settings():
+            assert LoyaltyService.reverse_order_points(order.id) == 30
+
+        assert self._restored(order) == [20]
+
+    def test_a_charged_back_order_keeps_the_points_spent_on_it_spent(self):
+        user = UserAccountFactory(num_addresses=0)
+        order = self._order_with_redemption(user)
+        charge = PaymentTransactionFactory(order=order)
+        PaymentTransactionFactory(
+            order=order,
+            kind=PaymentTransactionKind.CHARGEBACK,
+            charge=charge,
+            amount=charge.amount,
+            provider_reference="du_test_lost",
+        )
+
+        with loyalty_settings():
+            # Balance 30 earned - 20 spent = 10: the earn reversal is
+            # clamped to it, and nothing spent comes back.
+            assert LoyaltyService.reverse_order_points(order.id) == 10
+
+        assert self._restored(order) == []
+        assert LoyaltyService.get_user_balance(user) == 0
 
 
 REVERSED = [

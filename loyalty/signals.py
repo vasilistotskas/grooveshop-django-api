@@ -155,7 +155,9 @@ def handle_order_charged_back_loyalty(
 ) -> None:
     """Reverse earned points when a lost dispute takes the last of the
     order's money back (see :func:`_queue_reversal_if_returned_in_full`).
-    Staff can re-grant them by hand."""
+    Points the customer redeemed on a charged-back order are not given
+    back (:meth:`LoyaltyService.reverse_order_points`). Staff can re-grant
+    by hand."""
     _queue_reversal_if_returned_in_full(order)
 
 

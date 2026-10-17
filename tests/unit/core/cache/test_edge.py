@@ -336,15 +336,54 @@ class TestTenantMediaPurges:
             cloudflare_zone_id=OWN_ZONE,
             cloudflare_api_token="own-token",
         )
+        from core.db.encrypted_fields import decrypt_value
+
+        purges = edge.tenant_media_purges(tenant)
+
+        assert purges[0] == {
+            "zone_id": PLATFORM_ZONE,
+            "prefixes": [_prefix(SHARED, "media_own")],
+        }
+        assert purges[1]["zone_id"] == OWN_ZONE
+        assert purges[1]["prefixes"] == [
+            _prefix("assets.shop.example", "media_own")
+        ]
+        # The token travels as the stored ciphertext, never in clear.
+        assert decrypt_value(purges[1]["token_ciphertext"]) == "own-token"
+        assert "own-token" not in repr(purges)
+
+    def test_the_shared_static_host_serving_originals_is_purged_too(
+        self, settings
+    ):
+        settings.MEDIA_URL = "https://static.grooveshop.space/media/"
+        tenant = _tenant("media_static", ["shop-t.grooveshop.space"])
+
         assert edge.tenant_media_purges(tenant) == [
             {
                 "zone_id": PLATFORM_ZONE,
-                "prefixes": [_prefix(SHARED, "media_own")],
-            },
-            {
-                "zone_id": OWN_ZONE,
-                "prefixes": [_prefix("assets.shop.example", "media_own")],
-            },
+                "prefixes": [
+                    _prefix(SHARED, "media_static"),
+                    "static.grooveshop.space/media/media_static/",
+                ],
+            }
+        ]
+
+    def test_an_own_static_host_is_purged_in_the_stores_own_zone(
+        self, settings
+    ):
+        settings.MEDIA_URL = "https://static.grooveshop.space/media/"
+        tenant = _tenant(
+            "media_ownstatic",
+            ["shop.example", "static.shop.example"],
+            cloudflare_zone_id=OWN_ZONE,
+            cloudflare_api_token="own-token",
+        )
+
+        purges = edge.tenant_media_purges(tenant)
+
+        assert purges[1]["zone_id"] == OWN_ZONE
+        assert purges[1]["prefixes"] == [
+            "static.shop.example/media/media_ownstatic/"
         ]
 
     def test_an_own_assets_host_without_own_credentials_is_left_alone(self):
@@ -399,9 +438,19 @@ class TestPurgePrefixes:
             edge.purge_prefixes(edge.Zone(OWN_ZONE, "t"), ["h/p/"])
 
 
+def _own_purge(token="own-token"):
+    from core.db.encrypted_fields import encrypt_value
+
+    return {
+        "zone_id": OWN_ZONE,
+        "prefixes": ["b/m/acme/"],
+        "token_ciphertext": encrypt_value(token),
+    }
+
+
 class TestPurgeMedia:
     PLATFORM_PURGE = {"zone_id": PLATFORM_ZONE, "prefixes": ["a/m/acme/"]}
-    OWN_PURGE = {"zone_id": OWN_ZONE, "prefixes": ["b/m/acme/"]}
+    OWN_PURGE_WITHOUT_TOKEN = {"zone_id": OWN_ZONE, "prefixes": ["b/m/acme/"]}
 
     def test_the_platform_zone_uses_the_platform_token(self):
         with mock.patch.object(edge, "purge_prefixes") as purge:
@@ -410,46 +459,34 @@ class TestPurgeMedia:
             edge.Zone(PLATFORM_ZONE, "platform-token"), ["a/m/acme/"]
         )
 
-    def test_an_own_zone_uses_the_tenants_decrypted_token(self):
-        _tenant(
-            "acme",
-            ["shop.example"],
-            cloudflare_zone_id=OWN_ZONE,
-            cloudflare_api_token="own-token",
-        )
+    def test_an_own_zone_uses_the_planned_token_without_the_tenant_row(self):
+        # No tenant row exists: the plan alone carries what the purge needs,
+        # which is what makes it work after a destroy.
         with mock.patch.object(edge, "purge_prefixes") as purge:
-            edge.purge_media("acme", [self.OWN_PURGE])
+            edge.purge_media("acme", [_own_purge()])
         purge.assert_called_once_with(
             edge.Zone(OWN_ZONE, "own-token"), ["b/m/acme/"]
         )
 
-    def test_another_tenants_zone_id_is_not_resolved_for_this_schema(self):
-        _tenant(
-            "other",
-            ["other.example"],
-            cloudflare_zone_id=OWN_ZONE,
-            cloudflare_api_token="other-token",
-        )
-        with mock.patch.object(edge, "purge_prefixes") as purge:
-            edge.purge_media("acme", [self.OWN_PURGE])
-        purge.assert_not_called()
-
-    def test_a_zone_whose_credentials_are_gone_is_logged_not_raised(
+    def test_a_planned_own_zone_without_a_token_is_logged_not_raised(
         self, caplog
     ):
-        # A destroyed tenant's own account: nothing a retry could fix.
         with mock.patch.object(edge, "purge_prefixes") as purge:
-            edge.purge_media("acme", [self.OWN_PURGE])
+            edge.purge_media("acme", [self.OWN_PURGE_WITHOUT_TOKEN])
         purge.assert_not_called()
         assert "purge b/m/acme/ by hand" in caplog.text
 
+    def test_a_token_that_no_longer_decrypts_is_logged_not_raised(self, caplog):
+        undecryptable = {
+            **self.OWN_PURGE_WITHOUT_TOKEN,
+            "token_ciphertext": "x",
+        }
+        with mock.patch.object(edge, "purge_prefixes") as purge:
+            edge.purge_media("acme", [undecryptable])
+        purge.assert_not_called()
+        assert "no longer decrypts" in caplog.text
+
     def test_every_zone_is_tried_and_a_failure_is_raised_afterwards(self):
-        _tenant(
-            "acme",
-            ["shop.example"],
-            cloudflare_zone_id=OWN_ZONE,
-            cloudflare_api_token="own-token",
-        )
         with (
             mock.patch.object(
                 edge,
@@ -458,7 +495,7 @@ class TestPurgeMedia:
             ) as purge,
             pytest.raises(edge.EdgePurgeError, match="platform down"),
         ):
-            edge.purge_media("acme", [self.PLATFORM_PURGE, self.OWN_PURGE])
+            edge.purge_media("acme", [self.PLATFORM_PURGE, _own_purge()])
         assert purge.call_count == 2
 
     def test_nothing_to_purge_sends_nothing(self):

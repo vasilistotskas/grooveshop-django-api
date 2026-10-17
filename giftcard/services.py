@@ -17,7 +17,8 @@ from decimal import Decimal
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.db.models import F
+from django.db.models import DurationField, F
+from django.db.models.expressions import RawSQL
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from djmoney.money import Money
@@ -511,13 +512,20 @@ class GiftCardService:
         span = GiftCardPause.close_at(now)
         if span is None or span.ended_at is None:
             return
+        # The elapsed off time as plain seconds: a timedelta reaches
+        # PostgreSQL as an interval of whole days, which it adds as calendar
+        # days in the session time zone (Europe/Athens), so a span across a
+        # DST change would move a card by an hour more or less than the
+        # time gift cards were actually off.
+        off = RawSQL(
+            "make_interval(secs => %s)",
+            ((span.ended_at - span.started_at).total_seconds(),),
+            output_field=DurationField(),
+        )
         GiftCard.objects.filter(
             status=GiftCardStatus.ACTIVE,
             expires_at__gt=span.started_at,
-        ).update(
-            expires_at=F("expires_at") + (span.ended_at - span.started_at),
-            updated_at=now,
-        )
+        ).update(expires_at=F("expires_at") + off, updated_at=now)
 
     @classmethod
     def expire_cards(cls) -> int:

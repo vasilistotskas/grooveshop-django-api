@@ -126,8 +126,21 @@ class TestFileErasure:
         """Cleanup runs after the schema is gone; it cannot abort halfway."""
         assert offboarding.purge_tenant_files("never-existed") == {
             "media": False,
+            "parked_media": False,
             "gdpr_exports": False,
         }
+
+    def test_parked_media_of_a_suspended_store_is_erased(self, tenant_tree):
+        """A store is destroyed only after a suspension, which parks its
+        uploads under MEDIA_ROOT/.suspended; the erasure must reach them."""
+        parked = tenant_tree["media"] / ".suspended" / "acme" / "uploads"
+        parked.mkdir(parents=True)
+        (parked / "logo.png").write_text("img")
+
+        result = offboarding.purge_tenant_files("acme")
+
+        assert result["parked_media"] is True
+        assert not (tenant_tree["media"] / ".suspended" / "acme").exists()
 
 
 class TestSearchIndexErasure:

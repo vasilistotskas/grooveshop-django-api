@@ -238,6 +238,54 @@ class TestAllowedActions:
 
         assert not CartPromotionCode.objects.filter(cart=cart).exists()
 
+    def test_applies_a_personal_coupon_for_the_cart_owner(self, shopper):
+        """The request is anonymous, so the coupon must be judged against
+        the cart's owner: a code assigned to that shopper applies, and
+        is listed, though ``request.user`` is nobody."""
+        from promotion.factories import PromotionCodeFactory, PromotionFactory
+
+        user, cart, _auth, client = shopper
+        CartItemFactory(cart=cart, product=_product("100.00"), quantity=1)
+        code = PromotionCodeFactory(
+            promotion=PromotionFactory(benefit_value=Decimal(10)),
+            assigned_to=user,
+        )
+        gateway = _gateway(_mint(client))
+
+        def _get(key, default=None):
+            return {"PROMOTIONS_ENABLED": True}.get(key, default)
+
+        with patch("promotion.services.Setting.get", side_effect=_get):
+            listed = gateway.get(reverse("cart-coupons"))
+            applied = gateway.post(
+                reverse("cart-coupon"), {"code": code.code}, format="json"
+            )
+
+        assert applied.status_code == status.HTTP_200_OK, applied.content
+        assert code.code in [row["code"] for row in listed.data]
+
+    def test_a_personal_coupon_of_someone_else_is_refused(self, shopper):
+        from promotion.factories import PromotionCodeFactory, PromotionFactory
+
+        _user, cart, _auth, client = shopper
+        CartItemFactory(cart=cart, product=_product("100.00"), quantity=1)
+        code = PromotionCodeFactory(
+            promotion=PromotionFactory(benefit_value=Decimal(10)),
+            assigned_to=UserAccountFactory(num_addresses=0),
+        )
+        gateway = _gateway(_mint(client))
+
+        def _get(key, default=None):
+            return {"PROMOTIONS_ENABLED": True}.get(key, default)
+
+        with patch("promotion.services.Setting.get", side_effect=_get):
+            applied = gateway.post(
+                reverse("cart-coupon"), {"code": code.code}, format="json"
+            )
+
+        assert applied.status_code == status.HTTP_400_BAD_REQUEST
+        assert applied.data["reason"] == "discount_code_user_ineligible"
+
     def test_token_wins_over_cart_id(self, shopper):
         _user, cart, _auth, client = shopper
         guest = CartFactory(user=None, num_cart_items=0)

@@ -49,8 +49,13 @@ treats the header as a login.
 
 ## Refusals
 
-An unknown, expired or revoked token answers **401** `cart_token_invalid`.
-It is never replaced by a guest cart. Checked on every use:
+An unknown, expired or revoked token answers **401**. It is never
+replaced by a guest cart. The body is the plain DRF error, `{"detail": ...}`:
+the codes named on this page (`cart_token_invalid`, `cart_token_not_permitted`)
+are the exceptions' internal codes and are not serialised, so a client tells
+the cases apart by status. On a request that carries the token and no other
+credential, a 401 can only mean the token was refused; the caller mints a new
+one and retries. Checked on every use:
 
 - the token is still in the cache (TTL),
 - the minting Knox token still exists, has not expired and is within

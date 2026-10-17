@@ -179,7 +179,7 @@ ASGI routing in `asgi/__init__.py` with Channels `ProtocolTypeRouter`:
 
 ### Celery
 
-App configured in `core/celery.py`. Base task class: `MonitoredTask` (logs success/failure). All tasks use `autoretry_for`, `retry_backoff`, and `retry_jitter` with exponential backoff (max 5 retries).
+App configured in `core/celery.py`. Base task class: `MonitoredTask` (logs success/failure). Retry policy is per task, never global: Celery has no setting for `autoretry_for`, backoff or `max_retries` (a `CELERY_TASK_AUTORETRY_FOR` in `settings.py` is read by nothing), so each decorator sets `autoretry_for`, `retry_backoff`, `retry_jitter` and its own `max_retries` (3 to 5; Celery defaults to 3). `autoretry_for` names a transient set from `core/retry.py` (`TRANSIENT_ERRORS`, `MAIL_TRANSIENT_ERRORS`, `SEARCH_TRANSIENT_ERRORS`, `TRANSIENT_HTTP_ERRORS`), never `Exception`: a deterministic failure retried only repeats itself. `MonitoredTask.retry` also stops at once on an SMTP 5xx or an HTTP 4xx, which no class can express. `tests/unit/core/test_celery_tasks_do_not_retry_everything.py` fails for any registered task whose `autoretry_for` contains `Exception`.
 
 Tasks are split by domain:
 - `core/tasks.py` — system health monitoring, DB backup, cache clearing, session cleanup, Meilisearch sync, abandoned cart cleanup, inactive user notifications
@@ -187,13 +187,20 @@ Tasks are split by domain:
 - `search/tasks.py` — search analytics
 - `blog/tasks.py` — comment liked notifications
 - `loyalty/tasks.py` — loyalty point award/expiry tasks (all use `MonitoredTask` base class)
+- `contact/tasks.py` — notification emails, attachment scanning, and the retention sweeps: `purge_expired_attachment_files` (bytes, `CONTACT_ATTACHMENTS_RETENTION_DAYS`) and `purge_expired_contact_records` (deletes enquiries, their files, and feedback older than the per-store `CONTACT_RETENTION_DAYS`, default 365, `0` keeps). Both run per tenant through `tenant.tasks.fanout_*` with `include_suspended=True`
 
 **Only task FAILURES are stored.** `CELERY_TASK_IGNORE_RESULT` is on, so a
 successful task writes nothing; `CELERY_TASK_STORE_ERRORS_EVEN_IF_IGNORED`
 keeps failures and retries, which land in `django_celery_results` in the
 **public schema only** (the app is in SHARED_APPS, deliberately not
 TENANT_APPS) and are surfaced by the platform dashboard and its Task
-Results page. Consequences: adding a `chord()` or `group()` — which do
+Results page. The result backend is `core.result_backend.TenantDatabaseBackend`
+(not an environment setting — Celery prefers a `CELERY_RESULT_BACKEND` env var
+over the Django setting, so `tests/settings.py` pins it): it writes the
+`_schema_name` header a task was published with into `TaskResult.meta`, so
+every failure row says which store it ran for, hard time limits included. The
+Task Results admin (`core.admin.TaskResultAdmin`, platform-only) shows a Store
+column and a Store filter built on it. Consequences: adding a `chord()` or `group()` — which do
 need results — means setting `ignore_result=False` on that task, not
 flipping the global; and "did the nightly task run?" is answered by
 `PeriodicTask.last_run_at` or `MonitoredTask`'s log line, never by that

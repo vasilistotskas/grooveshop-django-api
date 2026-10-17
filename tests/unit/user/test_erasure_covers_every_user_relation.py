@@ -46,6 +46,10 @@ _NOT_SUBJECT_DATA = {
         "staff FK — the operator who closed a pickup list; recipient "
         "details live on the shipment, scrubbed via the order"
     ),
+    "shipping_acs.AcsCodPayout.reconciled_by": (
+        "staff FK — the operator who reconciled an ACS payout no shipment "
+        "explains; the row is the store's accounting record"
+    ),
     "shipping_acs.AcsShipment.cod_received_outside_acs_by": (
         "staff FK — the operator who recorded a COD settlement; the "
         "shipment is scrubbed via the order"

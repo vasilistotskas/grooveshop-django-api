@@ -5,6 +5,7 @@ from channels.layers import get_channel_layer
 from django.db import connection
 
 from core import celery_app
+from core.retry import TRANSIENT_ERRORS
 from core.tasks import MonitoredTask
 from notification.groups import user_group
 
@@ -16,7 +17,7 @@ logger = logging.getLogger(__name__)
     bind=True,
     name="Send Notification Task",
     max_retries=3,
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_ERRORS,
     retry_backoff=True,
 )
 def send_notification_task(self, data: dict, *args, **kwargs):

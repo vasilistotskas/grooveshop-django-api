@@ -16,6 +16,11 @@ from django.utils.translation import gettext as _
 from extra_settings.models import Setting
 
 from core import celery_app
+from core.retry import (
+    MAIL_TRANSIENT_ERRORS,
+    TRANSIENT_ERRORS,
+    TRANSIENT_HTTP_ERRORS,
+)
 from core.tasks import MonitoredTask
 from core.utils.email_context import build_email_context
 from core.utils.i18n import get_order_language, get_user_language
@@ -394,7 +399,7 @@ def _release_status_update_email(order_id: int, new_status: str) -> None:
     base=MonitoredTask,
     bind=True,
     max_retries=3,
-    autoretry_for=(Exception,),
+    autoretry_for=MAIL_TRANSIENT_ERRORS,
     retry_backoff=True,
     retry_jitter=True,
 )
@@ -490,7 +495,7 @@ def send_dispute_notification_email(
     base=MonitoredTask,
     bind=True,
     max_retries=3,
-    autoretry_for=(Exception,),
+    autoretry_for=MAIL_TRANSIENT_ERRORS,
     retry_backoff=True,
     retry_jitter=True,
 )
@@ -1858,7 +1863,7 @@ def cancel_mydata_credit(self, credit_id: int) -> bool:
 
 @celery_app.task(
     base=MonitoredTask,
-    autoretry_for=(Exception,),
+    autoretry_for=MAIL_TRANSIENT_ERRORS,
     max_retries=3,
     retry_backoff=True,
     retry_jitter=True,
@@ -1972,7 +1977,7 @@ def check_pending_orders() -> int:
 
 @celery_app.task(
     base=MonitoredTask,
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_ERRORS,
     max_retries=3,
     retry_backoff=True,
     retry_jitter=True,
@@ -2015,7 +2020,7 @@ def cleanup_expired_stock_reservations() -> int:
 
 @celery_app.task(
     base=MonitoredTask,
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_ERRORS,
     max_retries=3,
     retry_backoff=True,
     retry_jitter=True,
@@ -2076,7 +2081,7 @@ def complete_paid_delivered_orders() -> dict[str, int]:
 
 @celery_app.task(
     base=MonitoredTask,
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_ERRORS,
     max_retries=3,
     retry_backoff=True,
     retry_jitter=True,
@@ -2215,7 +2220,7 @@ def auto_cancel_stuck_pending_orders() -> dict[str, int]:
 
 @celery_app.task(
     base=MonitoredTask,
-    autoretry_for=(Exception,),
+    autoretry_for=MAIL_TRANSIENT_ERRORS,
     max_retries=3,
     retry_backoff=True,
     retry_jitter=True,
@@ -2345,7 +2350,7 @@ def send_checkout_abandonment_emails() -> int:
 @celery_app.task(
     base=MonitoredTask,
     bind=True,
-    autoretry_for=(requests.RequestException,),
+    autoretry_for=TRANSIENT_HTTP_ERRORS,
     retry_backoff=10,
     retry_backoff_max=600,
     retry_jitter=True,

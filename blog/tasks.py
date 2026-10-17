@@ -3,6 +3,7 @@ import logging
 from django.contrib.auth import get_user_model
 
 from core import celery_app
+from core.retry import TRANSIENT_ERRORS
 from core.tasks import MonitoredTask
 from notification.enum import (
     NotificationCategoryEnum,
@@ -21,7 +22,7 @@ User = get_user_model()
     bind=True,
     name="notify_comment_liked",
     max_retries=3,
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_ERRORS,
     retry_backoff=True,
 )
 def notify_comment_liked_task(

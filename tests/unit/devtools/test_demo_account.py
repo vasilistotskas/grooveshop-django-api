@@ -813,7 +813,16 @@ def _prepare_store():
         for slug, _qty in row.items
     }
     for slug in sorted(slugs):
-        ProductFactory(slug=slug, stock=100, num_images=0, num_reviews=0)
+        # A fixed price: a random one could put the SAVE5 order under the
+        # code's minimum, which the seed rightly refuses.
+        ProductFactory(
+            slug=slug,
+            price=Decimal("20.00"),
+            discount_percent=Decimal(0),
+            stock=100,
+            num_images=0,
+            num_reviews=0,
+        )
     wanted = {
         PaySettlement.ONLINE.value: PayWayFactory.create_online_payment,
         PaySettlement.CARRIER_TERMINAL.value: lambda: PayWayFactory(

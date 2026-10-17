@@ -8,11 +8,14 @@ finance has a single source of truth.
 
 One row per parcel per status snapshot; idempotency on
 ``voucher_no + cod_payment_date`` so the daily Celery task can rerun
-safely.
+safely.  A row ACS reported with no readable voucher is stored too
+(``voucher_no`` empty) and keyed on ``row_fingerprint`` instead, so no
+payout money is ever visible only in a log or an email.
 """
 
 from __future__ import annotations
 
+from django.conf import settings
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
 from django.utils.translation import gettext
@@ -30,10 +33,12 @@ class AcsCodPayout(TimeStampMixinModel):
     voucher_no = models.CharField(
         _("Voucher number"),
         max_length=20,
+        blank=True,
         help_text=_(
             "ACS voucher number — links back to AcsShipment.voucher_no "
             "without a hard FK so historic rows survive shipment "
-            "deletions."
+            "deletions. Empty when ACS reported the row with no "
+            "readable voucher."
         ),
     )
     shipment = models.ForeignKey(
@@ -124,7 +129,8 @@ class AcsCodPayout(TimeStampMixinModel):
         blank=True,
         help_text=_(
             "Date ACS paid (or expects to pay) the partner. Forms half "
-            "of the idempotency key together with voucher_no."
+            "of the idempotency key together with voucher_no, or the "
+            "row fingerprint when there is no voucher."
         ),
     )
     raw_payload = models.JSONField(
@@ -133,15 +139,74 @@ class AcsCodPayout(TimeStampMixinModel):
         blank=True,
         help_text=_("Full row from ACS_COD_Beneficiary_Info Table_Data."),
     )
+    row_fingerprint = models.CharField(
+        _("Row fingerprint"),
+        max_length=64,
+        blank=True,
+        default="",
+        db_default="",
+        help_text=_(
+            "SHA-256 of the ACS fields that identify the row. Set only "
+            "for a row with no readable voucher: it is that row's "
+            "idempotency key, so a rerun updates it instead of storing "
+            "it twice."
+        ),
+    )
+    reconciled_at = models.DateTimeField(
+        _("Reconciled at"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "When staff recorded that this payout was accounted for. A "
+            "payout matching no shipment stays counted as needing "
+            "attention until then."
+        ),
+    )
+    reconciled_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="acs_cod_payouts_reconciled",
+        verbose_name=_("Reconciled by"),
+        # ORM-only, like AcsShipment.cod_received_outside_acs_by: the
+        # operator is a PLATFORM-PUBLIC identity and this row lives in
+        # the tenant schema.
+        db_constraint=False,
+        help_text=_(
+            "Operator who reconciled the payout. Stores a "
+            "PLATFORM-schema user id; not FK-enforced."
+        ),
+    )
+    reconciliation_note = models.TextField(
+        _("Reconciliation note"),
+        blank=True,
+        default="",
+        db_default="",
+        help_text=_(
+            "How the payout was accounted for (the off-system sale, the "
+            "invoice, the ACS report line), as written by the operator."
+        ),
+    )
 
     class Meta(TypedModelMeta):
         verbose_name = _("ACS COD payout")
         verbose_name_plural = _("ACS COD payouts")
         ordering = ["-parcel_delivery_date", "-created_at"]
         constraints = [
+            # One key per kind of row, so neither can collide with the
+            # other: a row with a voucher is unique per voucher and date;
+            # a row without one (voucher_no empty) is unique per
+            # fingerprint.
             models.UniqueConstraint(
                 fields=["voucher_no", "cod_payment_date"],
+                condition=~models.Q(voucher_no=""),
                 name="acs_cod_payout_voucher_date_uq",
+            ),
+            models.UniqueConstraint(
+                fields=["row_fingerprint"],
+                condition=~models.Q(row_fingerprint=""),
+                name="acs_cod_payout_fingerprint_uq",
             ),
         ]
         indexes = [
@@ -159,6 +224,6 @@ class AcsCodPayout(TimeStampMixinModel):
 
     def __str__(self) -> str:
         return gettext("ACS COD payout %(voucher)s (%(amount)s)") % {
-            "voucher": self.voucher_no,
+            "voucher": self.voucher_no or gettext("without voucher"),
             "amount": self.cod_amount_total,
         }

@@ -8,7 +8,7 @@ from django.db.models import Count, Sum
 from django.http import FileResponse, Http404, HttpRequest, HttpResponse
 from django.shortcuts import redirect
 from django.urls import path, reverse
-from django.utils import timezone
+from django.utils import formats, timezone
 from django.utils.html import format_html, format_html_join
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import ngettext
@@ -53,9 +53,13 @@ from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.status import (
     RETURN_HANDLING_STATUSES,
     OrderStatus,
-    PaymentStatus,
 )
 from order.exceptions import PaymentError
+from order.follow_up import (
+    follow_up_days,
+    follow_up_reason,
+    last_carrier_event_at,
+)
 from order.invoicing import (
     ReceiptNotIssuable,
     generate_invoice,
@@ -202,14 +206,30 @@ class RefundOwedFilter(DropdownFilter):
 
     def queryset(self, request, queryset):
         if self.value() == "yes":
-            return queryset.filter(
-                status=OrderStatus.CANCELED,
-                payment_status__in=(
-                    PaymentStatus.COMPLETED,
-                    PaymentStatus.PARTIALLY_REFUNDED,
-                ),
-            )
+            return queryset.refund_owed()
         return queryset
+
+
+class FollowUpFilter(DropdownFilter):
+    """Orders the shopper has waited on for the store's follow-up
+    threshold (``ORDER_FOLLOW_UP_DAYS``); the rule is
+    ``OrderQuerySet.needing_follow_up``, the same one behind the badge
+    and the dashboard counter."""
+
+    title = _("Needs follow-up")
+    parameter_name = "follow_up"
+
+    def lookups(self, request, model_admin):
+        return [("yes", _("Yes")), ("no", _("No"))]
+
+    def queryset(self, request, queryset):
+        match self.value():
+            case "yes":
+                return queryset.needing_follow_up()
+            case "no":
+                return queryset.filter(needs_follow_up=False)
+            case _:
+                return queryset
 
 
 class RecentOrdersFilter(DropdownFilter):
@@ -562,6 +582,7 @@ class RetailCreditInline(TabularInline):
 class OrderAdmin(BaseModelAdmin):
     list_display = [
         "status_label",
+        "follow_up_flag",
         "customer",
         "order_summary",
         "order_source",
@@ -579,6 +600,7 @@ class OrderAdmin(BaseModelAdmin):
         "document_type",
         WholesaleOrderFilter,
         RefundOwedFilter,
+        FollowUpFilter,
         RecentOrdersFilter,
         ("attribution__source_type", ChoicesDropdownFilter),
         OrderSourceFilter,
@@ -627,6 +649,7 @@ class OrderAdmin(BaseModelAdmin):
         # dropdown never restored stock (prod orders 242 and 213,
         # 2026-09-08). Every action routes through the service.
         "status",
+        "follow_up_note",
         "created_at",
         "updated_at",
         "status_updated_at",
@@ -672,6 +695,7 @@ class OrderAdmin(BaseModelAdmin):
                 "fields": (
                     "uuid",
                     "status",
+                    "follow_up_note",
                     "created_at",
                     "updated_at",
                     "status_updated_at",
@@ -893,6 +917,7 @@ class OrderAdmin(BaseModelAdmin):
             super()
             .get_queryset(request)
             .with_total_amounts()
+            .with_follow_up()
             .annotate(
                 item_count=Count("items"),
                 total_items_quantity=Sum("items__quantity"),
@@ -917,6 +942,39 @@ class OrderAdmin(BaseModelAdmin):
         variants=PAYMENT_STATUS_VARIANT,
         description=_("Payment"),
     )
+
+    @display(
+        description=_("Follow-up"),
+        ordering="needs_follow_up",
+        label={"follow_up": "info"},
+    )
+    def follow_up_flag(self, obj):
+        """A blue badge beside the status when the shopper has waited."""
+        if not getattr(obj, "needs_follow_up", False):
+            return None
+        return "follow_up", _("Follow up")
+
+    @admin.display(description=_("Follow-up"))
+    def follow_up_note(self, obj):
+        """Why and since when the order needs follow-up, with the
+        carrier's last word on the parcel."""
+        if not obj or not getattr(obj, "needs_follow_up", False):
+            return "—"
+        since = timezone.localdate(obj.created_at) + timedelta(
+            days=follow_up_days()
+        )
+        last_event = last_carrier_event_at(obj)
+        return format_html(
+            "{} {}: {}. {}",
+            _("Needs follow-up since"),
+            formats.date_format(since, "SHORT_DATE_FORMAT"),
+            follow_up_reason(obj),
+            format_html(
+                "{}: {}",
+                _("Last carrier event"),
+                format_dt(last_event) if last_event else _("none yet"),
+            ),
+        )
 
     # The facts an operator opens an order for, above the tabs.
     change_form_before_template = "admin/order/order_summary.html"

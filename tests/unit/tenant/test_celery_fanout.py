@@ -167,6 +167,27 @@ class TestFanoutTaskWrappers:
         )
 
     @pytest.mark.django_db
+    def test_fanout_purge_expired_contact_records(self):
+        """A retention sweep: it must reach suspended stores too."""
+        from django.conf import settings
+
+        from tenant import tasks as tenant_tasks
+
+        with patch("tenant.tasks.run_for_all_tenants") as run:
+            tenant_tasks.fanout_purge_expired_contact_records()
+
+        run.assert_called_once_with(
+            "contact.tasks.purge_expired_contact_records",
+            include_suspended=True,
+        )
+        assert (
+            settings.CELERY_BEAT_SCHEDULE["purge-expired-contact-records"][
+                "task"
+            ]
+            == "tenant.tasks.fanout_purge_expired_contact_records"
+        )
+
+    @pytest.mark.django_db
     def test_fanout_clear_expired_sessions(self):
         from tenant import tasks as tenant_tasks
 

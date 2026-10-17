@@ -415,6 +415,10 @@ def recent_orders() -> list[dict[str, Any]]:
         "blog.BlogComment",
         "contact.Contact",
         "b2b.BusinessProfile",
+        "shipping_acs.AcsShipment",
+        "shipping_acs.AcsCodPayout",
+        # ``ORDER_FOLLOW_UP_DAYS`` moves the follow-up count.
+        "extra_settings.Setting",
     ),
 )
 def attention_counts() -> dict[str, int]:
@@ -424,6 +428,7 @@ def attention_counts() -> dict[str, int]:
     from order.enum.status import OrderStatus
     from order.models.invoice import MyDataStatus
     from product.enum.review import ReviewStatus
+    from shipping_acs import attention as acs
 
     def model(label: str):
         return apps.get_model(label)
@@ -432,6 +437,21 @@ def attention_counts() -> dict[str, int]:
     return {
         "pending_orders": model("order.Order")
         .objects.filter(status=OrderStatus.PENDING)
+        .count(),
+        # Counted from placement, so midnight moves it with no write;
+        # the TTL bounds that.
+        "follow_up_orders": model("order.Order")
+        .objects.needing_follow_up(now)
+        .count(),
+        # The operational alert emails (``shipping.alerts.OpsAlertKind``)
+        # as work: a store may mute an email, so each kind that carries
+        # money or a stuck parcel is counted here by the very rule the
+        # email uses.
+        "stale_shipments": acs.stale_shipments(now).count(),
+        "unremitted_cod": acs.unremitted_cod_shipments(now=now).count(),
+        "unattributed_cod_payouts": acs.unattributed_payouts().count(),
+        "canceled_still_paid": model("order.Order")
+        .objects.refund_owed()
         .count(),
         "low_stock": model("product.Product")
         .objects.filter(active=True, stock__gt=0, stock__lt=LOW_STOCK_BELOW)

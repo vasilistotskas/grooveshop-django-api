@@ -267,3 +267,68 @@ def test_reconcile_silent_mode_suppresses_completed_notification():
     assert order.payment_status == PaymentStatus.COMPLETED
     assert order.status == OrderStatus.COMPLETED
     assert order.metadata.get("suppress_status_ws_COMPLETED") is True
+
+
+# ---------------------------------------------------------------------------
+# Rows with no readable voucher are stored, keyed on a fingerprint
+# ---------------------------------------------------------------------------
+
+_UNREADABLE_ROW = {
+    **_BASE_ROW,
+    "POD": "",
+    "Customer_RefNo_1": "",
+    "Parcel_Receiver": "Maria",
+}
+
+
+def test_an_unreadable_row_is_stored_once_across_reruns():
+    day = date(2026, 4, 29)
+
+    first = _reconcile([_UNREADABLE_ROW], cod_payment_date=day)
+    second = _reconcile([_UNREADABLE_ROW], cod_payment_date=day)
+
+    assert first["skipped"] == second["skipped"] == 1
+    payout = AcsCodPayout.objects.get()
+    assert payout.voucher_no == ""
+    assert payout.shipment_id is None
+    assert len(payout.row_fingerprint) == 64
+    assert payout.raw_payload["Parcel_Receiver"] == "Maria"
+
+
+def test_two_different_unreadable_rows_on_one_date_are_both_stored():
+    other = {**_UNREADABLE_ROW, "Parcel_Receiver": "Nikos"}
+
+    _reconcile([_UNREADABLE_ROW, other], cod_payment_date=date(2026, 4, 29))
+
+    assert AcsCodPayout.objects.count() == 2
+    assert (
+        AcsCodPayout.objects.values("row_fingerprint").distinct().count() == 2
+    )
+
+
+def test_a_rerun_keeps_an_unreadable_rows_reconciliation():
+    """A later nightly run must not wipe a sign-off."""
+    from django.utils import timezone
+
+    day = date(2026, 4, 29)
+    _reconcile([_UNREADABLE_ROW], cod_payment_date=day)
+    AcsCodPayout.objects.update(
+        reconciled_at=timezone.now(), reconciliation_note="done"
+    )
+
+    _reconcile([_UNREADABLE_ROW], cod_payment_date=day)
+
+    payout = AcsCodPayout.objects.get()
+    assert payout.reconciled_at is not None
+    assert payout.reconciliation_note == "done"
+
+
+def test_the_alert_points_at_the_payout_list_not_the_logs(settings):
+    settings.ADMINS = [("Admin", "admin@example.com")]
+
+    with patch("shipping.alerts.send_mail") as mock_mail:
+        _reconcile([_UNREADABLE_ROW])
+
+    body = mock_mail.call_args.kwargs["message"]
+    assert "celery-worker" not in body
+    assert "Matches no shipment" in body

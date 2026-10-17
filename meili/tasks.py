@@ -12,6 +12,7 @@ from celery import shared_task
 from django.apps import apps
 from django.conf import settings
 
+from core.retry import SEARCH_TRANSIENT_ERRORS
 from meili.exceptions import MeiliTaskFailed
 from tenant.celery import TenantTask
 
@@ -28,7 +29,10 @@ class MeiliTask(TenantTask):
     Adds Meilisearch-specific retry configuration and structured logging.
     """
 
-    autoretry_for = (Exception,)
+    # What a retry can fix: the server unreachable or too slow, the DB or
+    # broker briefly gone. ``MeiliTaskFailed`` (the engine rejected the
+    # write) is not here: it fails the same way every time.
+    autoretry_for = SEARCH_TRANSIENT_ERRORS
     retry_backoff = True
     retry_backoff_max = 600  # 10 minutes max backoff
     retry_jitter = True

@@ -1,8 +1,7 @@
 import logging
 
-from django.db import InterfaceError, OperationalError
-
 from core import celery_app
+from core.retry import TRANSIENT_DB_ERRORS
 from core.tasks import MonitoredTask
 
 logger = logging.getLogger(__name__)
@@ -23,7 +22,7 @@ CLICK_SCORE_MAX_ITEMS = 50
     # Only a lost connection is worth another try. A DataError or a
     # ProgrammingError fails the same way every time; retrying one wrote
     # three RETRY rows before each FAILURE (2026-10-13).
-    autoretry_for=(OperationalError, InterfaceError),
+    autoretry_for=TRANSIENT_DB_ERRORS,
     retry_backoff=True,
 )
 def save_search_query(

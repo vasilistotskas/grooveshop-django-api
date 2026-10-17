@@ -49,7 +49,7 @@ class TestCheckStaleAcsShipments:
     def test_alerts_and_claims_stale_shipment(self, admins_configured):
         shipment = _stale_shipment()
 
-        with patch("django.core.mail.send_mail") as mock_mail:
+        with patch("shipping.alerts.send_mail") as mock_mail:
             result = check_stale_acs_shipments.run()
 
         assert result["alerted"] == 1
@@ -66,7 +66,7 @@ class TestCheckStaleAcsShipments:
             created_at=timezone.now() - timedelta(days=5)
         )
 
-        with patch("django.core.mail.send_mail") as mock_mail:
+        with patch("shipping.alerts.send_mail") as mock_mail:
             result = check_stale_acs_shipments.run()
 
         assert result["alerted"] == 1
@@ -91,7 +91,7 @@ class TestCheckStaleAcsShipments:
         # Already alerted — claim flag dedupes.
         _stale_shipment(voucher_no="9700000004", stale_alert_sent=True)
 
-        with patch("django.core.mail.send_mail") as mock_mail:
+        with patch("shipping.alerts.send_mail") as mock_mail:
             result = check_stale_acs_shipments.run()
 
         assert result == {"alerted": 0}
@@ -113,7 +113,7 @@ class TestCheckStaleAcsShipments:
             created_at=timezone.now() - timedelta(days=2)
         )
 
-        with patch("django.core.mail.send_mail") as mock_mail:
+        with patch("shipping.alerts.send_mail") as mock_mail:
             result = check_stale_acs_shipments.run()
 
         assert result["alerted"] == 1
@@ -125,7 +125,7 @@ class TestCheckStaleAcsShipments:
         settings.ADMINS = []
         shipment = _stale_shipment()
 
-        with patch("django.core.mail.send_mail") as mock_mail:
+        with patch("shipping.alerts.send_mail") as mock_mail:
             result = check_stale_acs_shipments.run()
 
         assert result == {"alerted": 0, "reason": "no_recipients"}
@@ -138,7 +138,7 @@ class TestCheckStaleAcsShipments:
         shipment = _stale_shipment()
 
         with patch(
-            "django.core.mail.send_mail", side_effect=OSError("smtp down")
+            "shipping.alerts.send_mail", side_effect=OSError("smtp down")
         ):
             result = check_stale_acs_shipments.run()
 

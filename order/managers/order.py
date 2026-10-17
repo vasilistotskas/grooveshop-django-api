@@ -3,15 +3,43 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from django.contrib.postgres.aggregates import ArrayAgg
-from django.db.models import Count, ExpressionWrapper, F, Prefetch, Sum
+from django.db.models import (
+    BooleanField,
+    Count,
+    ExpressionWrapper,
+    F,
+    Prefetch,
+    Q,
+    Sum,
+    Value,
+)
 from djmoney.models.fields import MoneyField
 
 from core.managers import OptimizedManager, OptimizedQuerySet
 from core.mixins import SoftDeleteQuerySetMixin
-from order.enum.status import OrderStatus
+from order.enum.status import (
+    SETTLED_PAYMENT_STATUSES,
+    OrderStatus,
+    PaymentStatus,
+)
+from pay_way.enum.settlement import PaySettlement
 
 if TYPE_CHECKING:
     from typing import Self
+
+
+def awaiting_online_payment_q(prefix: str = "") -> Q:
+    """An online-settled order whose payment is not financially final.
+
+    ``prefix`` reaches the order from a related model (``"order__"``). The
+    database form of "the shopper still owes money through a hosted flow",
+    deliberately NOT ``Order.awaits_online_payment``: that property is also
+    true for an online order that was refunded, partially refunded or
+    canceled, which is not waiting for anything.
+    """
+    return Q(**{f"{prefix}pay_way__settlement": PaySettlement.ONLINE}) & ~Q(
+        **{f"{prefix}payment_status__in": SETTLED_PAYMENT_STATUSES}
+    )
 
 
 class OrderQuerySet(SoftDeleteQuerySetMixin, OptimizedQuerySet):
@@ -21,6 +49,49 @@ class OrderQuerySet(SoftDeleteQuerySetMixin, OptimizedQuerySet):
     Provides chainable methods for common operations and
     standardized `for_list()` and `for_detail()` methods.
     """
+
+    def awaiting_online_payment(self) -> Self:
+        """Online orders the shopper has not paid yet (see
+        :func:`awaiting_online_payment_q`)."""
+        return self.filter(awaiting_online_payment_q())
+
+    def refund_owed(self) -> Self:
+        """Canceled orders whose payment was not (fully) returned.
+
+        A cancel refunds a paid order through its provider, and a refund
+        the provider refuses leaves the order canceled with its payment
+        still COMPLETED; a canceled order refunded only in part still owes
+        the rest. A charge that arrives after the cancel
+        (``OrderService.record_payment_after_cancel``) lands here too.
+        """
+        return self.filter(
+            status=OrderStatus.CANCELED,
+            payment_status__in=(
+                PaymentStatus.COMPLETED,
+                PaymentStatus.PARTIALLY_REFUNDED,
+            ),
+        )
+
+    def needing_follow_up(self, now=None) -> Self:
+        """Orders the shopper has waited on for ``ORDER_FOLLOW_UP_DAYS``
+        days: the one rule behind the admin badge, filter and counter
+        (``order.follow_up``)."""
+        from order.follow_up import follow_up_q
+
+        rule = follow_up_q(now)
+        return self.none() if rule is None else self.filter(rule)
+
+    def with_follow_up(self, now=None) -> Self:
+        """Annotate ``needs_follow_up`` with the same rule, for a list
+        that shows the flag without a query per row."""
+        from order.follow_up import follow_up_q
+
+        rule = follow_up_q(now)
+        return self.annotate(
+            needs_follow_up=Value(False, output_field=BooleanField())
+            if rule is None
+            else ExpressionWrapper(rule, output_field=BooleanField())
+        )
 
     def with_user(self) -> Self:
         """Select related user for order."""

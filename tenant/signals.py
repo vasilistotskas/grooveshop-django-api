@@ -3,9 +3,12 @@ from __future__ import annotations
 from corsheaders.signals import check_request_enabled
 from django.conf import settings
 from django.db import connection
-from django.db.models.signals import post_delete, post_save
+from django.db.models import ProtectedError
+from django.db.models.signals import post_delete, post_save, pre_delete
 from django.dispatch import receiver
 
+from country.models import Country
+from region.models import Region
 from tenant.cache import bump_cache_generation
 from tenant.features import (
     feature_plan_flags,
@@ -14,6 +17,7 @@ from tenant.features import (
 )
 from tenant.middleware import origin_belongs_to_tenant
 from tenant.models import Tenant, TenantDomain
+from tenant.reference_guard import references_to
 from tenant.switches import on_switch_change
 
 # Every page the storefront has cached for a store shows what the store
@@ -173,3 +177,36 @@ def reactivate_on_renewal(sender, instance, **kwargs):
     if instance.paid_until < timezone.localdate():
         return
     activate_tenant(instance)
+
+
+@receiver(
+    pre_delete,
+    sender=Country,
+    dispatch_uid="tenant.refuse_delete_country_in_use",
+)
+@receiver(
+    pre_delete,
+    sender=Region,
+    dispatch_uid="tenant.refuse_delete_region_in_use",
+)
+def refuse_delete_of_reference_data_in_use(sender, instance, **kwargs):
+    """Never delete a country or region a store's rows still point at.
+
+    The admin refuses first, on its confirmation page, naming the stores
+    (``tenant.deletion.PublicReferenceDataDeletionMixin``). This is the
+    backstop for every other path - the shell, a management command, a
+    delete issued from inside one store's schema, which would null that
+    store's orders and addresses while another store's rows still
+    reference the row.
+
+    Raises inside ``Collector.delete``'s transaction, so nothing is
+    removed.
+    """
+    in_use = references_to([instance])
+    if in_use:
+        raise ProtectedError(
+            "{} is still used: {}".format(
+                instance, "; ".join(str(refs) for refs in in_use)
+            ),
+            set(),
+        )

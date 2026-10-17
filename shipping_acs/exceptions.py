@@ -99,3 +99,11 @@ class AcsCodSettlementError(AcsError):
     Raised by ``AcsService.record_cod_received_outside_acs`` with a
     message an operator can act on (the admin action shows it verbatim).
     """
+
+
+class AcsPayoutReconciliationError(AcsError):
+    """A COD payout row cannot be marked as reconciled.
+
+    Raised by ``AcsService.reconcile_cod_payout`` with a message an
+    operator can act on (the admin action shows it verbatim).
+    """

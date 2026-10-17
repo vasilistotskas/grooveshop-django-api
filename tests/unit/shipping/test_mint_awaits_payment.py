@@ -254,7 +254,7 @@ class TestStaleDigest:
                 "tenant.credentials.tenant_admin_recipients",
                 return_value=["ops@example.com"],
             ),
-            patch("django.core.mail.send_mail") as mail,
+            patch("shipping.alerts.send_mail") as mail,
         ):
             result = check_stale_acs_shipments.run()
 
@@ -264,3 +264,32 @@ class TestStaleDigest:
         assert unpaid.stale_alert_sent is False
         assert cod.stale_alert_sent is True
         assert str(cod.order_id) in mail.call_args.kwargs["message"]
+
+    def test_a_refunded_card_order_is_not_waiting_for_its_payment(
+        self, acs_configured_tenant
+    ):
+        """Only an UNSETTLED online order is excused. A refunded one is
+        not waiting for money, so its stranded mint is still reported."""
+        from shipping_acs.tasks import check_stale_acs_shipments
+
+        refunded = AcsShipmentFactory(
+            order=OrderFactory(
+                status=OrderStatus.PROCESSING,
+                payment_status=PaymentStatus.PARTIALLY_REFUNDED,
+                pay_way=PayWayFactory.create_online_payment(),
+            )
+        )
+        AcsShipment.objects.filter(pk=refunded.pk).update(
+            created_at=timezone.now() - timedelta(hours=30)
+        )
+
+        with (
+            patch(
+                "tenant.credentials.tenant_admin_recipients",
+                return_value=["ops@example.com"],
+            ),
+            patch("shipping.alerts.send_mail"),
+        ):
+            result = check_stale_acs_shipments.run()
+
+        assert result["ids"] == [refunded.pk]

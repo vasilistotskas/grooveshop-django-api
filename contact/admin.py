@@ -9,6 +9,7 @@ from django.urls import path, reverse
 from django.utils import timezone
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import ngettext
 from unfold.admin import TabularInline
 from unfold.contrib.filters.admin import (
     DropdownFilter,
@@ -21,6 +22,7 @@ from admin.base import BaseModelAdmin
 from admin.displays import format_dt, header_two_line, relative_time
 from admin.export import ExportActionMixin
 from contact.models import Contact, ContactAttachment, Feedback
+from contact.utils import contact_retention_days
 
 FEEDBACK_RATING_VARIANT: dict[str, str] = {
     "5": "success",
@@ -154,8 +156,38 @@ class ContactAttachmentInline(TabularInline):
         return obj.scan_status, obj.get_scan_status_display()
 
 
+class RetentionNoticeMixin:
+    """Say, above the list, how long the store keeps these rows.
+
+    The period is the store's own ``CONTACT_RETENTION_DAYS`` setting, so
+    the page that holds the personal data states when it goes.
+    """
+
+    list_before_template = "admin/contact/retention_notice.html"
+
+    def changelist_view(self, request, extra_context=None):
+        days = contact_retention_days()
+        if days > 0:
+            notice = ngettext(
+                "Entries older than %(days)d day are deleted automatically "
+                "every night, together with any attached files. Change the "
+                "period with the CONTACT_RETENTION_DAYS setting.",
+                "Entries older than %(days)d days are deleted automatically "
+                "every night, together with any attached files. Change the "
+                "period with the CONTACT_RETENTION_DAYS setting.",
+                days,
+            ) % {"days": days}
+        else:
+            notice = _(
+                "Entries are kept indefinitely (CONTACT_RETENTION_DAYS is 0)."
+            )
+        return super().changelist_view(
+            request, {**(extra_context or {}), "retention_notice": notice}
+        )
+
+
 @admin.register(Contact)
-class ContactAdmin(ExportActionMixin, BaseModelAdmin):
+class ContactAdmin(RetentionNoticeMixin, ExportActionMixin, BaseModelAdmin):
     actions = ["export_csv", "export_xml"]
     list_display = [
         "contact_info",
@@ -331,7 +363,7 @@ class ContactAdmin(ExportActionMixin, BaseModelAdmin):
 
 
 @admin.register(Feedback)
-class FeedbackAdmin(ExportActionMixin, BaseModelAdmin):
+class FeedbackAdmin(RetentionNoticeMixin, ExportActionMixin, BaseModelAdmin):
     actions = ["export_csv", "export_xml"]
     list_display = [
         "submitter_info",

@@ -15,9 +15,11 @@ public schema those relations are skipped, and the shared ones
 (memberships, sessions, the admin log, tokens, OTP devices) are deleted
 as usual.
 
-Deliberately scoped to identities. For a public model that stores do
-reference across schemas (``Country``, ``Region``), skipping the tenant
-tables would leave their rows pointing at nothing.
+``PublicSchemaDeletionMixin`` alone is for identities. For a public model
+that stores DO reference across schemas (``Country``, ``Region``),
+skipping the tenant tables would leave their rows pointing at nothing, so
+``PublicReferenceDataDeletionMixin`` first asks every store whether it
+still uses the row.
 """
 
 from __future__ import annotations
@@ -33,6 +35,7 @@ from django.utils.html import format_html
 from django.utils.text import capfirst
 
 from tenant.app_labels import tenant_only_app_labels
+from tenant.reference_guard import references_to
 
 
 class _SkipTenantOnlyRelations:
@@ -125,3 +128,23 @@ class PublicSchemaDeletionMixin:
 
     def get_deleted_objects(self, objs, request):
         return public_deleted_objects(objs, request, self.admin_site)
+
+
+class PublicReferenceDataDeletionMixin(PublicSchemaDeletionMixin):
+    """For the ModelAdmin of public reference data stores point at
+    (``Country``, ``Region``).
+
+    Skipping the tenant-only tables is only safe once no store uses the
+    row, so this adds what ``PublicSchemaDeletionMixin`` alone does not
+    have: every store's schema is asked (``tenant.reference_guard``) and a
+    row any store still uses is listed, store by store, as PROTECTED. The
+    confirmation page and the bulk delete action then refuse it, instead
+    of removing the row from under that store's orders and addresses.
+    """
+
+    def get_deleted_objects(self, objs, request):
+        to_delete, model_count, perms_needed, protected = (
+            super().get_deleted_objects(objs, request)
+        )
+        in_use = [str(refs) for refs in references_to(objs)]
+        return to_delete, model_count, perms_needed, [*protected, *in_use]

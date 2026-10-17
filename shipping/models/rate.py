@@ -35,10 +35,16 @@ class ShippingRate(TimeStampMixinModel):
     # Cross-schema FK to the public ``country.Country`` row.
     # ``PROTECT``: a country referenced by a rate must be removed from
     # the rate first — silently cascading would delete pricing data a
-    # deleted-but-still-referenced order might need to reconstruct.
-    # ``related_name="+"``: no reverse accessor, matching ``Order.country``
-    # — a public-schema model has no business exposing a reverse relation
-    # into every tenant schema's rates.
+    # deleted-but-still-referenced order might need to reconstruct. The
+    # collector enforces it only where this table is visible; a delete
+    # from the public schema cannot see it, so ``tenant.reference_guard``
+    # is what refuses there.
+    # ``related_name="+"``: no reverse accessor, so ``Country`` exposes
+    # no ``rates`` into every tenant schema's rates. (``Order.country``
+    # and ``UserAddress.country`` are different: they keep ``orders`` and
+    # ``user_addresses``.) The relation still exists, and the delete
+    # guard (``tenant.reference_guard``) finds it as a hidden one, which
+    # is how a country a store prices shipping for cannot be deleted.
     country = models.ForeignKey(
         "country.Country",
         related_name="+",

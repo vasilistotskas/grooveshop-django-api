@@ -95,6 +95,39 @@ unless deductions cover the whole total (`Order._payment_consistency_errors`)
 — the admin form edits both fields. It is not a `CheckConstraint`: the
 total is a sum over the order's lines.
 
+### 2.3 The follow-up flag (`order/follow_up.py`)
+
+A shopper who ordered N calendar days ago and still has no parcel is about
+to write in. The admin flags that order. It is computed, never stored: no
+column, job or email, and the flag disappears by itself when the order is
+delivered, completed, returned, canceled or refunded.
+
+An order needs follow-up when **all** of these hold:
+
+- it was placed on a store-timezone day at least `ORDER_FOLLOW_UP_DAYS`
+  days ago (store setting, default 7, `0` = off). Whole calendar days: an
+  order placed on day D is flagged from 00:00 on day D+N, not 24 h × N
+  after it was placed (`follow_up_cutoff`);
+- its status is PENDING, PROCESSING or SHIPPED
+  (`OrderStatus.get_status_groups()` `needs_processing` + `in_transit`);
+- it is not an online order still waiting for its payment
+  (`OrderQuerySet.awaiting_online_payment()`: `pay_way.settlement=online`
+  and `payment_status` not in `SETTLED_PAYMENT_STATUSES`). An unpaid card
+  order is an abandoned checkout, not a parcel to chase. Do **not** use
+  `Order.awaits_online_payment` for this: it is also true for an online
+  order that is refunded, partially refunded or canceled.
+
+The rule is one queryset, `OrderQuerySet.needing_follow_up(now)`; the
+changelist's `with_follow_up()` annotation (`needs_follow_up`, no query
+per row), the "Needs follow-up" filter (`follow_up=yes|no`) and the
+`follow_up_orders` dashboard counter all read it, so they cannot disagree.
+The changelist shows a blue "Follow up" badge beside the status; the
+change page adds a read-only line with the reason ("Not shipped yet" for
+PENDING/PROCESSING, "In transit" for SHIPPED), since when, and the
+carrier's last event (`AcsShipment` / `BoxNowShipment.last_event_at`). The
+counter is a row of the dashboard's "Needs attention" list linking to the
+filtered list; the Orders sidebar badge keeps the pending count.
+
 ## 3. Order creation paths
 
 Two entry points in `order/services.py` (the legacy `OrderService.create_order`
@@ -233,6 +266,23 @@ address it cannot place (prod order #316: street "1", street number
 - The storefront applies the same rules inline from the same country row
   (`shared/utils/postalCode.ts`); only the normalisation and the two
   street rules are mirrored in code, and they must stay in lockstep.
+- **Countries and regions are public, shared rows; what uses them is not.**
+  `country` and `region` are in `SHARED_APPS` only (their tables exist
+  once, in `public`; a store's `search_path` falls through to them), and
+  `tenant.role_scopes.REFERENCE_DATA_APP_LABELS` gives stores `view` on
+  them and nothing else. Orders, saved addresses, shipping rates and
+  pay-way exclusions are in each store's own schema. So deleting one is
+  refused when ANY store's rows point at it
+  (`tenant/reference_guard.py`): the admin lists the stores on its
+  confirmation page (`tenant.deletion.PublicReferenceDataDeletionMixin`)
+  and a `pre_delete` receiver in `tenant/signals.py` refuses every other
+  path. A country is also refused when a store uses one of its regions,
+  because the regions go with it. Soft-deleted orders count (the foreign
+  key is still there); simple-history rows do not. Deleting a row nobody
+  uses works from the platform admin. Both ends of a store's use are
+  found from the models' own reverse relations, hidden ones included, so
+  a new model with a foreign key to `Country` is covered without a list
+  to update.
 
 ### 3.4 Acquisition source (`order/attribution.py`)
 
@@ -765,8 +815,20 @@ accepting Cyprus orders at the Greek flat rate.
   voucher number arrives in the `POD` column (there is no
   `Voucher_No` in this response); `Customer_RefNo_1/2` echo
   `Reference_Key1/2` from voucher mint (`order.id` / `order.uuid`)
-  and are the fallback match keys. Unmatched rows are counted as
-  `skipped` and alert ADMINS. Backfill missed dates with
+  and are the fallback match keys. A row with no readable voucher
+  (empty `POD`, no `Customer_RefNo` match) is counted as `skipped` and
+  stored all the same, with an empty `voucher_no` and keyed on
+  `AcsCodPayout.row_fingerprint` (SHA-256 of the identifying ACS
+  columns plus the payment date): the `(voucher_no, cod_payment_date)`
+  unique constraint is partial (`voucher_no <> ''`) and a second partial
+  unique constraint covers `row_fingerprint <> ''`, so a rerun updates
+  the row and two different unreadable rows of one date both survive.
+  Rows ACS reported for a voucher we do not know (`unmatched`) and
+  unreadable ones alert the store's operators. Staff clear such a row
+  from the payout list with "Mark as reconciled" (a dialog asking for a
+  note; stamps `reconciled_at` / `reconciled_by` /
+  `reconciliation_note`, never edits the payout; service
+  `AcsService.reconcile_cod_payout`). Backfill missed dates with
   `manage.py reconcile_acs_cod --days N [--silent]` (`--silent`
   suppresses customer COMPLETED notifications — mandatory for
   backfills).
@@ -836,7 +898,10 @@ accepting Cyprus orders at the Greek flat rate.
 - The stale digest's "stranded mint" class (`pending_creation` > 24 h)
   excludes orders awaiting their online payment — the auto-cancel owns
   those, and listing them invited an "Issue ACS voucher now" for unpaid
-  goods.
+  goods. The exclusion is `awaiting_online_payment_q("order__")`, the
+  same rule as `OrderQuerySet.awaiting_online_payment()` and the
+  follow-up flag (§2.3): an online order whose payment settled in any way,
+  a refund included, is no longer "waiting".
 - `Recipient_Zipcode` is refused locally when the order's postcode does
   not match its country (`core.validators.address.postcode_matches`):
   a non-retryable `AcsAPIError` naming the field, recorded in
@@ -890,6 +955,50 @@ accepting Cyprus orders at the Greek flat rate.
 4. Add `ShippingProvider` row in DB (admin or migration).
 5. Implement `_apply_order_status_transition` if your carrier emits state events.
 6. Wire the COD path if applicable (see ACS for the pattern).
+
+### 5.4 Operational alert emails (`shipping/alerts.py`)
+
+Merchant-operations mail goes to the store's operators
+(`tenant_admin_recipients()`; platform `ADMINS` only as the fallback) and
+is **per store, per kind**. `OpsAlertKind` is the whole list:
+
+| Kind | Sender | Where the work shows when the email is off |
+|---|---|---|
+| `stale_shipments` | `check_stale_acs_shipments` digest, 09:00 | Dashboard "Stale ACS shipments" (`shipping_acs.attention.stale_shipment_q`) |
+| `unremitted_cod` | `alert_unremitted_cod_payouts`, 03:00 | "COD cash ACS has not paid out" (`unremitted_cod_shipments`) |
+| `unattributable_cod_payouts` | `AcsService._alert_admins_unmatched_payouts` | "ACS payouts matching no shipment" (`unattributed_payouts`: every payout with no shipment and no reconciliation, no time window) |
+| `shipment_rejected` | `alert_admins_shipment_creation_failed` | An `OrderHistory` note on the order, written whether or not the email is on |
+| `webhook_failed` | `alert_admins_webhook_processing_failed` | The ERROR log only |
+| `payment_after_cancel` | `OrderService.record_payment_after_cancel` | "Canceled orders to refund" (`OrderQuerySet.refund_owed`), until refunded; plus the order note |
+
+- **One gate.** Every sender calls `send_ops_alert(kind=..., ...)`, which
+  returns `False` when the store muted the kind or has no recipient. No
+  carrier module imports `send_mail`
+  (`tests/unit/shipping/test_ops_alerts.py` enforces it). The stale digest
+  used to call `send_mail` itself, so it could not be muted.
+- **One setting per kind**, `OPS_ALERT_<KIND>_ENABLED` (`OpsAlertKind.
+  setting_name`), a boolean that defaults **on**: a store opts OUT, so a
+  kind added later reaches every store. Booleans render as checkboxes in
+  the store admin (a JSON list of kinds would be edited as raw JSON, and a
+  misspelt kind would silently mute nothing). Adding a kind means an enum
+  member **and** an `EXTRA_SETTINGS_DEFAULTS` entry; a test keeps them in
+  step. The removed senders (unprinted vouchers, pickup list blocked) are
+  not kinds: they no longer email.
+- **Muting loses nothing.** A muted digest claims no rows
+  (`stale_alert_sent` stays false), so the parcels appear in the first
+  digest after the email is switched back on. The money kinds and the
+  stale digest are mutable only because the same rule feeds a counter in
+  `attention_counts()` (`admin.dashboard.store.queries`); each counter
+  opens the list through a filter (`attention=stale|unremitted_cod` on the
+  ACS shipment list, `unattributed=yes` on the payout list,
+  `refund_owed=yes` on the order list). The payout counter and its
+  `unattributed=yes` filter share one `Q` (`unattributed_payout_q`), so
+  the list shows exactly what was counted. Payout rows ACS reported with
+  no readable voucher are stored too (see the COD reconcile above), so
+  they are counted like the rest; a row leaves the count only when staff
+  reconcile it.
+- To keep one kind on a store, switch the others off in that store's
+  settings; the recipients stay `tenant_admin_recipients()`.
 
 ## 6. Email + WS notification graph
 
@@ -1144,6 +1253,8 @@ the linked memory note or the originating PR's commit message.
 | No carrier mint while `Order.awaits_online_payment` (`ShipmentAwaitingPaymentError`) | §5 above |
 | A payment-success handler checks `is_payment_after_cancel` BEFORE its settled-state guard | §2.2 above |
 | Order `status` changes only through admin actions / `OrderService`, never the change form | §7.1 above |
+| Operational mail to a store's operators goes through `send_ops_alert(kind=...)` only (the store's `OPS_ALERT_<KIND>_ENABLED` switch lives in that one gate); a kind a store may mute has a dashboard counter by the same rule as its email | §5.4 above |
+| "Follow up" is computed (`OrderQuerySet.needing_follow_up`), never stored, and its unpaid-online exclusion is `awaiting_online_payment()` (settled statuses), not `Order.awaits_online_payment` | §2.3 above |
 | One order per provider payment: `Order.payment_id` is unique when non-empty (`order_payment_id_unique`), and `create_order_from_cart` answers a repeat of the same cart's intent with the first order (found before the provider is asked, and again under the cart lock, both before cart validation) and refuses an intent of another cart or of a canceled / deleted order, a unique-index race between two carts included, all as `payment_verification` | §3.1 above |
 | No provider HTTP call inside the order-creation transaction (nor in a view-level `atomic`): the intent is read first, and the transaction only re-compares its amount and currency with the total computed under lock | §3.1 above |
 | Product rows are locked in ascending pk order, in one statement, before the first row that references a product is inserted (`StockManager.lock_products`); a cart-item lock never joins the products (`of=("self",)`) | §3.1 above |

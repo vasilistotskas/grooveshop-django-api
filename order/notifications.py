@@ -20,12 +20,12 @@ from __future__ import annotations
 import logging
 
 from django.conf import settings
-from django.db.utils import OperationalError
 from django.utils.translation import gettext as _
 from django.utils.translation import gettext_noop
 from django.utils.translation import override as translation_override
 
 from core import celery_app
+from core.retry import TRANSIENT_DB_ERRORS
 from core.tasks import MonitoredTask
 from core.utils.tenant_urls import storefront_path
 from notification.enum import (
@@ -40,20 +40,16 @@ from order.models.order import Order
 logger = logging.getLogger(__name__)
 
 
-# Only retry on transient database/operational errors. `IntegrityError`
-# (a subclass of DatabaseError) is excluded — a unique-constraint or FK
-# violation will not resolve on retry, and a partially-completed task
-# rerun would create a second Notification row instead of fixing the
-# conflict (the helper isn't idempotent). `Exception` would catch
-# IntegrityError too, masking real bugs as flaky retries.
-RETRYABLE_DB_ERRORS = (OperationalError,)
-
-
+# Only transient database errors retry (``core.retry``). `IntegrityError`
+# is excluded — a unique-constraint or FK violation will not resolve on
+# retry, and a partially-completed task rerun would create a second
+# Notification row instead of fixing the conflict (the helper isn't
+# idempotent).
 TASK_DEFAULTS = {
     "base": MonitoredTask,
     "bind": True,
     "max_retries": 3,
-    "autoretry_for": RETRYABLE_DB_ERRORS,
+    "autoretry_for": TRANSIENT_DB_ERRORS,
     "retry_backoff": True,
     "retry_jitter": True,
 }

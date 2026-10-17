@@ -18,14 +18,12 @@ import smtplib
 from unittest.mock import patch
 
 import pytest
+from celery import Task
 from celery.exceptions import Retry
 from django.core import mail
 
-from user.tasks import (
-    _is_permanent_smtp_failure,
-    _smtp_codes,
-    send_rendered_email_task,
-)
+from core.retry import is_permanent_smtp_failure, smtp_codes
+from user.tasks import send_rendered_email_task
 
 MESSAGE = {
     "subject": "Reset your password",
@@ -61,7 +59,7 @@ class TestFailureClassification:
         ],
     )
     def test_permanence_follows_the_smtp_code(self, exc, permanent):
-        assert _is_permanent_smtp_failure(exc) is permanent
+        assert is_permanent_smtp_failure(exc) is permanent
 
     def test_all_refused_recipients_are_read_from_the_mapping(self):
         """``SMTPRecipientsRefused`` carries codes per address, not on
@@ -69,13 +67,13 @@ class TestFailureClassification:
         refused = smtplib.SMTPRecipientsRefused(
             {"gone@example.test": (550, b"5.1.1 no such user")}
         )
-        assert _smtp_codes(refused) == [550]
-        assert _is_permanent_smtp_failure(refused) is True
+        assert smtp_codes(refused) == [550]
+        assert is_permanent_smtp_failure(refused) is True
 
         deferred = smtplib.SMTPRecipientsRefused(
             {"busy@example.test": (451, b"4.3.2 try later")}
         )
-        assert _is_permanent_smtp_failure(deferred) is False
+        assert is_permanent_smtp_failure(deferred) is False
 
 
 @pytest.mark.django_db
@@ -110,7 +108,9 @@ class TestRetryBehaviour:
                     550, b"5.1.8 bad sender", "noreply@example.test"
                 ),
             ),
-            patch.object(send_rendered_email_task, "retry") as retry,
+            # The class-level patch sees the call the instance method
+            # forwards; ``MonitoredTask.retry`` must raise before it.
+            patch.object(Task, "retry") as retry,
             pytest.raises(smtplib.SMTPSenderRefused),
         ):
             send_rendered_email_task(**MESSAGE)

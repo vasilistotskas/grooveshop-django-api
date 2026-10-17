@@ -10,6 +10,7 @@ runs and admin actions never race.
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 from collections.abc import Iterable
 from datetime import date, datetime, timedelta
@@ -45,6 +46,7 @@ from tenant.credentials import tenant_site_name
 
 if TYPE_CHECKING:
     from order.models.order import Order
+    from shipping_acs.models import AcsCodPayout
 
 logger = logging.getLogger(__name__)
 
@@ -1884,7 +1886,8 @@ class AcsService:
     ) -> dict[str, int]:
         """Mirror ACS_COD_Beneficiary_Info into AcsCodPayout rows.
 
-        Idempotent: re-runs upsert by ``(voucher_no, cod_payment_date)``.
+        Idempotent: re-runs upsert by ``(voucher_no, cod_payment_date)``
+        (by ``row_fingerprint`` for a row with no readable voucher).
         Each row is linked back to its ``AcsShipment`` when the
         matching voucher number is found locally — accounting can then
         join through to the originating ``Order`` for reconciliation.
@@ -1907,8 +1910,11 @@ class AcsService:
         COD reconcile never emails customers). Internal state still
         flows: order_paid fires, history is logged, status advances.
 
-        Returns a counters dict for the Celery task to log; ``skipped``
-        rows (no voucher and no reference match) additionally alert the
+        Returns a counters dict for the Celery task to log. ``upserted``
+        counts rows with a voucher. ``skipped`` counts rows with no
+        readable voucher and no reference match: they are stored too (no
+        voucher, keyed on ``AcsCodPayout.row_fingerprint``) but not
+        attributed, and together with ``unmatched`` rows they alert the
         store's operators because unmatched payout money must be
         investigated.
         """
@@ -1967,20 +1973,6 @@ class AcsService:
             if shipment is not None and shipment.voucher_no:
                 voucher_no = shipment.voucher_no
 
-            if not voucher_no:
-                skipped += 1
-                logger.warning(
-                    "reconcile_cod_payouts: unmatched payout row — "
-                    "POD=%r Customer_RefNo_1=%r Customer_RefNo_2=%r "
-                    "Parcel_COD_Amount=%r Parcel_Delivery_Date=%r",
-                    row.get("POD"),
-                    row.get("Customer_RefNo_1"),
-                    row.get("Customer_RefNo_2"),
-                    row.get("Parcel_COD_Amount"),
-                    row.get("Parcel_Delivery_Date"),
-                )
-                continue
-
             payment_date = parse_datetime(row.get("COD_Payment_Date") or "")
             payment_date_only = (
                 payment_date.date() if payment_date else cod_payment_date
@@ -2021,6 +2013,37 @@ class AcsService:
                 ),
                 "raw_payload": row,
             }
+
+            if not voucher_no:
+                # No voucher could be read (empty POD, neither
+                # Customer_RefNo matched). The row is still real money,
+                # so it is stored like any other, keyed on a fingerprint
+                # of what identifies it: with no voucher there is no
+                # other key, and an empty voucher_no would make every
+                # such row of a date the same row.
+                skipped += 1
+                logger.warning(
+                    "reconcile_cod_payouts: payout row has no readable "
+                    "voucher — POD=%r Customer_RefNo_1=%r "
+                    "Customer_RefNo_2=%r Parcel_COD_Amount=%r "
+                    "Parcel_Delivery_Date=%r",
+                    row.get("POD"),
+                    row.get("Customer_RefNo_1"),
+                    row.get("Customer_RefNo_2"),
+                    row.get("Parcel_COD_Amount"),
+                    row.get("Parcel_Delivery_Date"),
+                )
+                AcsCodPayout.objects.update_or_create(
+                    row_fingerprint=_payout_row_fingerprint(
+                        row, payment_date_only
+                    ),
+                    defaults={
+                        **defaults,
+                        "voucher_no": "",
+                        "cod_payment_date": payment_date_only,
+                    },
+                )
+                continue
 
             AcsCodPayout.objects.update_or_create(
                 voucher_no=voucher_no,
@@ -2123,10 +2146,14 @@ class AcsService:
           and neither ``Customer_RefNo`` matched). Nothing identifies
           the row; it needs the ACS beneficiary report to interpret.
 
+        Both kinds are stored, so the email only points at the payout
+        list's "matches no shipment" filter, which is what the
+        dashboard's counter counts too.
+
         Best-effort: an SMTP failure must not fail the reconcile itself
-        (the payout rows that did match are already persisted).
+        (the payout rows are already persisted).
         """
-        from shipping.alerts import send_ops_alert
+        from shipping.alerts import OpsAlertKind, send_ops_alert
 
         parts = []
         if unmatched:
@@ -2137,6 +2164,7 @@ class AcsService:
 
         try:
             sent = send_ops_alert(
+                kind=OpsAlertKind.UNATTRIBUTABLE_COD_PAYOUTS,
                 subject=(
                     f"ACS COD reconcile: {total} unattributable payout row(s)"
                 ),
@@ -2144,13 +2172,15 @@ class AcsService:
                     f"{total} payout row(s) for COD_Payment_Date="
                     f"{cod_payment_date or 'unspecified'} could not be "
                     f"tied to an order — {', '.join(parts)}.\n\n"
-                    "The rows ARE persisted as AcsCodPayout (it is real "
-                    "money), they are just not attributed. The "
-                    "celery-worker logs carry each row's voucher, amount, "
-                    "receiver and delivery date under "
-                    "'reconcile_cod_payouts: payout matches no shipment'; "
-                    "reconcile those against the ACS COD beneficiary "
-                    "report."
+                    "Every row is stored (it is real money), it is just "
+                    "not attributed. Open the admin list 'ACS COD "
+                    "Payouts' and set the 'Shipment' filter to 'Matches "
+                    "no shipment, not reconciled': each row there shows "
+                    "its voucher, amount, receiver and delivery date. "
+                    "Reconcile it "
+                    "against the ACS COD beneficiary report, then use "
+                    "'Mark as reconciled' to clear it from the "
+                    "dashboard."
                 ),
             )
             if not sent:
@@ -2256,6 +2286,62 @@ class AcsService:
             locked.order_id,
             locked.voucher_no,
             locked.cod_amount,
+            user.pk,
+        )
+        return locked
+
+    @staticmethod
+    def reconcile_cod_payout(payout: AcsCodPayout, *, user, note: str):
+        """Record that staff accounted for a payout no shipment explains.
+
+        Money ACS paid for a voucher the store never minted (or with no
+        readable voucher at all) can never be linked to an order, so
+        nothing but a person can close it. This stamps who, when and why;
+        the dashboard counter (``attention.unattributed_payouts``) then
+        stops counting the row. The row itself is never edited or deleted.
+
+        Refuses a blank note, a payout already tied to a shipment (it is
+        attributed, nothing to reconcile) and one already reconciled.
+        Atomic under the row lock, so a double submit reconciles once.
+        """
+        from shipping_acs.exceptions import AcsPayoutReconciliationError
+        from shipping_acs.models import AcsCodPayout
+
+        note = (note or "").strip()
+        if not note:
+            raise AcsPayoutReconciliationError(gettext("A note is required."))
+
+        with transaction.atomic():
+            locked = AcsCodPayout.objects.select_for_update().get(pk=payout.pk)
+            if locked.shipment_id is not None:
+                raise AcsPayoutReconciliationError(
+                    gettext(
+                        "This payout is tied to a shipment; there is "
+                        "nothing to reconcile."
+                    )
+                )
+            if locked.reconciled_at is not None:
+                raise AcsPayoutReconciliationError(
+                    gettext("This payout is already reconciled.")
+                )
+            locked.reconciled_at = timezone.now()
+            locked.reconciled_by_id = user.pk
+            locked.reconciliation_note = note
+            locked.save(
+                update_fields=[
+                    "reconciled_at",
+                    "reconciled_by",
+                    "reconciliation_note",
+                    "updated_at",
+                ]
+            )
+
+        logger.info(
+            "ACS COD payout reconciled: payout=%s voucher=%r amount=%s "
+            "reconciled_by=%s",
+            locked.pk,
+            locked.voucher_no,
+            locked.cod_amount_total,
             user.pk,
         )
         return locked
@@ -2620,6 +2706,46 @@ class AcsService:
             ).update(arrival_notified_at=timezone.now())
 
         transaction.on_commit(_dispatch_then_mark)
+
+
+# The ACS_COD_Beneficiary_Info columns that tell one payout row from
+# another. Hashed (with the payment date) into the idempotency key of a row
+# that carries no voucher, so they are fields ACS fixes once the parcel is
+# paid; the full row stays in ``raw_payload``.
+_PAYOUT_IDENTITY_COLUMNS = (
+    "Customer_Code",
+    "POD",
+    "Customer_RefNo_1",
+    "Customer_RefNo_2",
+    "Parcel_Sender",
+    "Parcel_Receiver",
+    "Parcel_Pickup_Date",
+    "Parcel_Delivery_Date",
+    "Parcel_COD_Amount",
+    "COD_Amount_Cach",
+    "COD_Amount_CreditCard",
+    "COD_Payment_Date",
+)
+
+
+def _payout_row_fingerprint(
+    row: dict[str, Any], payment_date: date | None
+) -> str:
+    """Stable SHA-256 of the fields that identify a payout row.
+
+    The upsert key of ``AcsCodPayout`` rows with no voucher: the same ACS
+    row fetched again hashes the same, two different rows of one payment
+    date hash differently.
+    """
+    canonical = json.dumps(
+        [
+            str(row.get(column) or "").strip()
+            for column in _PAYOUT_IDENTITY_COLUMNS
+        ]
+        + [payment_date.isoformat() if payment_date else ""],
+        ensure_ascii=False,
+    )
+    return hashlib.sha256(canonical.encode()).hexdigest()
 
 
 def _to_decimal(value: Any) -> Decimal | None:

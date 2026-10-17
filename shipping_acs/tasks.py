@@ -25,10 +25,10 @@ from datetime import timedelta
 from typing import Any
 
 from celery import shared_task
-from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
+from core.retry import MAIL_TRANSIENT_ERRORS
 from core.utils.email_context import build_email_context
 from core.utils.i18n import get_order_language
 from core.utils.tenant_urls import storefront_path
@@ -297,66 +297,28 @@ def _note_unprinted_on_orders(rows: list[dict], *, acs_message: str) -> None:
 
 
 def _unremitted_cod_rows(older_than_days: int) -> list[dict]:
-    """COD parcels ACS delivered but never remitted the cash for.
+    """COD parcels ACS delivered but never remitted the cash for, as the
+    rows the alert lists. The rule is
+    :func:`shipping_acs.attention.unremitted_cod_shipments`, shared with
+    the dashboard counter."""
+    from shipping_acs.attention import unremitted_cod_shipments
 
-    Nothing else looks for these. ``poll_acs_tracking`` and
-    ``check_stale_acs_shipments`` both EXCLUDE terminal shipment states,
-    so once a parcel reaches ``delivered`` it drops out of every existing
-    watch — and a COD parcel that is delivered but never paid out is
-    precisely a delivered parcel. Production order 73 sat that way for
-    108 days (delivered 2026-05-23, EUR 24.48, no payout row on any date
-    ACS reports) and no alert had anywhere to come from.
-
-    Keyed on the payout table rather than ``payment_status`` because the
-    payout row IS the evidence: ``AcsCodPayout`` exists only once ACS
-    reports having remitted, and writing it is what flips the order paid.
-
-    The one other way out is an operator's explicit settlement,
-    ``AcsService.record_cod_received_outside_acs``: the merchant confirms
-    the money arrived by a route ACS never reported (order 73 again, which
-    would otherwise have alerted nightly with no way to clear it). Such a
-    parcel carries ``cod_received_outside_acs_at`` and is excluded here;
-    no ``AcsCodPayout`` is ever invented for it.
-    """
-    from shipping_acs.enum.charge_type import AcsChargeType
-    from shipping_acs.enum.shipment_state import AcsShipmentState
-    from shipping_acs.models import AcsCodPayout, AcsShipment
-
-    cutoff = timezone.now() - timedelta(days=older_than_days)
-    remitted = set(AcsCodPayout.objects.values_list("voucher_no", flat=True))
-
-    rows = []
-    candidates = (
-        AcsShipment.objects.real()
-        .filter(
-            voucher_no__isnull=False,
-            shipment_state=AcsShipmentState.DELIVERED,
-            charge_type=AcsChargeType.COD,
-            cod_amount__gt=0,
-            delivery_date__lt=cutoff,
-            cod_received_outside_acs_at__isnull=True,
-        )
+    return [
+        {
+            "order_id": shipment.order_id,
+            "voucher_no": shipment.voucher_no,
+            "cod_amount": str(shipment.cod_amount),
+            "delivered_on": shipment.delivery_date.date().isoformat(),
+            "days_since_delivery": (
+                timezone.now() - shipment.delivery_date
+            ).days,
+            "order_status": getattr(shipment.order, "status", None),
+            "payment_status": getattr(shipment.order, "payment_status", None),
+        }
+        for shipment in unremitted_cod_shipments(older_than_days)
         .select_related("order")
         .order_by("delivery_date")
-    )
-    for shipment in candidates:
-        if shipment.voucher_no in remitted:
-            continue
-        order = shipment.order
-        rows.append(
-            {
-                "order_id": shipment.order_id,
-                "voucher_no": shipment.voucher_no,
-                "cod_amount": str(shipment.cod_amount),
-                "delivered_on": shipment.delivery_date.date().isoformat(),
-                "days_since_delivery": (
-                    timezone.now() - shipment.delivery_date
-                ).days,
-                "order_status": getattr(order, "status", None),
-                "payment_status": getattr(order, "payment_status", None),
-            }
-        )
-    return rows
+    ]
 
 
 @shared_task(bind=True, base=TenantTask)
@@ -371,9 +333,9 @@ def alert_unremitted_cod_payouts(self) -> dict[str, Any]:
     if _skip_if_acs_unconfigured("alert_unremitted_cod_payouts"):
         return {"status": "skipped_unconfigured"}
 
-    older_than_days = int(
-        getattr(settings, "ACS_COD_REMITTANCE_ALERT_DAYS", 10)
-    )
+    from shipping_acs.attention import cod_remittance_days
+
+    older_than_days = cod_remittance_days()
     rows = _unremitted_cod_rows(older_than_days)
     if not rows:
         logger.info(
@@ -399,10 +361,11 @@ def alert_unremitted_cod_payouts(self) -> dict[str, Any]:
         f"({r['days_since_delivery']} days ago)"
         for r in rows
     )
-    from shipping.alerts import send_ops_alert
+    from shipping.alerts import OpsAlertKind, send_ops_alert
 
     try:
         sent = send_ops_alert(
+            kind=OpsAlertKind.UNREMITTED_COD,
             subject=(
                 f"ACS COD: {len(rows)} delivered parcel(s) never remitted"
             ),
@@ -650,61 +613,36 @@ def check_stale_acs_shipments(self) -> dict[str, Any]:
     chase the parcel with ACS or retire the row via the admin action
     ("Retire selected shipments"), which sets a terminal state and
     thereby stops the poller.
+
+    The classes are :func:`shipping_acs.attention.stale_shipment_q`, which
+    the dashboard counter reads too. A store that muted
+    ``OpsAlertKind.STALE_SHIPMENTS`` gets no email and no claim, and keeps
+    the count.
     """
-    from django.core.mail import send_mail
-    from django.db.models import Q
     from django.template.loader import render_to_string
 
-    from order.enum.status import PaymentStatus
-    from pay_way.enum.settlement import PaySettlement
-    from shipping_acs.enum.shipment_state import AcsShipmentState
+    from shipping.alerts import OpsAlertKind, ops_alert_enabled, send_ops_alert
+    from shipping_acs.attention import stale_shipment_q, stale_threshold_days
     from shipping_acs.models import AcsShipment
 
-    threshold_days = getattr(settings, "ACS_STALE_SHIPMENT_DAYS", 3)
-    now = timezone.now()
-    cutoff = now - timedelta(days=threshold_days)
+    # A muted digest claims nothing: the parcels stay unflagged, so they
+    # are all in the first digest after the store turns it back on, and
+    # the dashboard counts them in the meantime.
+    if not ops_alert_enabled(OpsAlertKind.STALE_SHIPMENTS):
+        return {"alerted": 0, "reason": "muted"}
 
-    stale_tracking = (
-        Q(voucher_no__isnull=False)
-        & ~Q(
-            shipment_state__in=[
-                AcsShipmentState.PENDING_CREATION,
-                AcsShipmentState.DELIVERED,
-                AcsShipmentState.RETURNED,
-                AcsShipmentState.CANCELED,
-                AcsShipmentState.LOST,
-            ]
-        )
-        & (
-            Q(last_event_at__lt=cutoff)
-            | (Q(last_event_at__isnull=True) & Q(created_at__lt=cutoff))
-        )
-    )
-    # An online order the shopper has not paid yet is not a stranded
-    # mint: its voucher is dispatched by the payment webhook, and the
-    # mint refuses it until then (``ShipmentAwaitingPaymentError``).
-    # Reporting it would invite staff to "Issue ACS voucher now" for
-    # unpaid goods. The database form of ``Order.awaits_online_payment``.
-    awaiting_payment = Q(order__pay_way__settlement=PaySettlement.ONLINE) & ~Q(
-        order__payment_status=PaymentStatus.COMPLETED
-    )
-    stranded_mint = (
-        Q(
-            shipment_state=AcsShipmentState.PENDING_CREATION,
-            created_at__lt=now - timedelta(hours=24),
-        )
-        & ~awaiting_payment
-    )
+    threshold_days = stale_threshold_days()
+    now = timezone.now()
 
     with transaction.atomic():
         shipment_ids = list(
             # ``of=("self",)``: lock only the shipment rows — the order /
-            # pay-way join above sits on the nullable side of an outer
-            # join, which PostgreSQL refuses to lock FOR UPDATE.
+            # pay-way join in the rule sits on the nullable side of an
+            # outer join, which PostgreSQL refuses to lock FOR UPDATE.
             AcsShipment.objects.real()
             .select_for_update(skip_locked=True, of=("self",))
             .filter(stale_alert_sent=False)
-            .filter(stale_tracking | stranded_mint)
+            .filter(stale_shipment_q(now, threshold_days))
             .values_list("id", flat=True)
         )
         if not shipment_ids:
@@ -712,23 +650,6 @@ def check_stale_acs_shipments(self) -> dict[str, Any]:
         AcsShipment.objects.filter(id__in=shipment_ids).update(
             stale_alert_sent=True
         )
-
-    from tenant.credentials import (
-        tenant_admin_recipients,
-        tenant_from_email,
-        tenant_site_name,
-    )
-
-    recipients = tenant_admin_recipients()
-    if not recipients:
-        logger.warning(
-            "check_stale_acs_shipments: no alert recipients configured — "
-            "rolling back claim"
-        )
-        AcsShipment.objects.filter(id__in=shipment_ids).update(
-            stale_alert_sent=False
-        )
-        return {"alerted": 0, "reason": "no_recipients"}
 
     shipments = AcsShipment.objects.filter(id__in=shipment_ids).select_related(
         "order"
@@ -758,18 +679,15 @@ def check_stale_acs_shipments(self) -> dict[str, Any]:
         n=len(rows)
     )
     try:
-        text_content = render_to_string(
-            "emails/shipping_acs/stale_shipments_alert.txt", context
-        )
-        html_content = render_to_string(
-            "emails/shipping_acs/stale_shipments_alert.html", context
-        )
-        send_mail(
-            subject=f"[{tenant_site_name()}] {subject}",
-            message=text_content,
-            from_email=tenant_from_email() or None,
-            recipient_list=recipients,
-            html_message=html_content,
+        sent = send_ops_alert(
+            kind=OpsAlertKind.STALE_SHIPMENTS,
+            subject=subject,
+            message=render_to_string(
+                "emails/shipping_acs/stale_shipments_alert.txt", context
+            ),
+            html_message=render_to_string(
+                "emails/shipping_acs/stale_shipments_alert.html", context
+            ),
         )
     except Exception as exc:
         logger.exception(
@@ -779,6 +697,15 @@ def check_stale_acs_shipments(self) -> dict[str, Any]:
             stale_alert_sent=False
         )
         return {"alerted": 0, "error": str(exc)}
+    if not sent:
+        logger.warning(
+            "check_stale_acs_shipments: no alert recipients configured — "
+            "rolling back claim"
+        )
+        AcsShipment.objects.filter(id__in=shipment_ids).update(
+            stale_alert_sent=False
+        )
+        return {"alerted": 0, "reason": "no_recipients"}
 
     logger.info(
         "Stale ACS shipment alert sent for %s shipment(s): %s",
@@ -840,7 +767,7 @@ def reconcile_acs_cod_payouts(self) -> dict[str, int]:
 @shared_task(
     bind=True,
     base=TenantTask,
-    autoretry_for=(Exception,),
+    autoretry_for=MAIL_TRANSIENT_ERRORS,
     retry_backoff=True,
     retry_backoff_max=600,
     max_retries=3,

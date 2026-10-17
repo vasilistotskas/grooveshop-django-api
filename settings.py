@@ -866,7 +866,11 @@ if not CELERY_BROKER_URL:
             "CELERY_BROKER_URL must be set in production."
         )
     CELERY_BROKER_URL = "amqp://guest:guest@rabbitmq:5672//"
-CELERY_RESULT_BACKEND = getenv("CELERY_RESULT_BACKEND", "django-db")
+# Not an environment setting: the platform dashboard and the Task Results
+# admin read ``django_celery_results``, so the backend must be the
+# database one. ``core.result_backend`` is ``django-db`` plus the store a
+# failed task belongs to.
+CELERY_RESULT_BACKEND = "core.result_backend.TenantDatabaseBackend"
 CELERY_CACHE_BACKEND = getenv("CELERY_CACHE_BACKEND", "django-cache")
 
 # Task execution
@@ -917,15 +921,6 @@ CELERY_TASK_STORE_ERRORS_EVEN_IF_IGNORED = True
 # DatabaseScheduler installs ``celery.backend_cleanup`` on its own
 # whenever this is set (django_celery_beat/schedulers.py).
 CELERY_RESULT_EXPIRES = datetime.timedelta(days=30)
-
-# Default retry policy for all tasks
-CELERY_TASK_AUTORETRY_FOR = (
-    Exception,  # Retry on any exception
-)
-CELERY_TASK_RETRY_BACKOFF = True  # Exponential backoff
-CELERY_TASK_RETRY_BACKOFF_MAX = 600  # Max 10 minutes between retries
-CELERY_TASK_RETRY_JITTER = True  # Add randomness to prevent thundering herd
-CELERY_TASK_MAX_RETRIES = 5  # Retry up to 5 times
 
 # Timezone (use UTC)
 CELERY_ENABLE_UTC = True
@@ -1153,6 +1148,15 @@ def get_celery_beat_schedule():
             # Fanout: drops the BYTES of claimed attachments past the
             # store's retention window, keeping the rows.
             "task": "tenant.tasks.fanout_purge_expired_attachment_files",
+            "schedule": SCHEDULE_PRESETS["daily_4am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_hour"],
+        },
+        "purge-expired-contact-records": {
+            # Fanout: Contact and Feedback are per-tenant. Deletes the
+            # rows (and, through the attachment signal, their files)
+            # older than the store's CONTACT_RETENTION_DAYS.
+            "task": "tenant.tasks.fanout_purge_expired_contact_records",
             "schedule": SCHEDULE_PRESETS["daily_4am"]
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
@@ -1773,6 +1777,81 @@ EXTRA_SETTINGS_DEFAULTS = [
         "value": 24,
     },
     {
+        "name": "ORDER_FOLLOW_UP_DAYS",
+        "type": "int",
+        "value": 7,
+        "description": (
+            "Flag an order for follow-up once its shopper has waited this "
+            "many calendar days (store time) without a delivery: an order "
+            "placed on day D is flagged from 00:00 on day D+N while it is "
+            "still pending, processing or shipped. Online orders that "
+            "are not paid yet are never flagged. 0 turns the flag off."
+        ),
+    },
+    # Operational alert emails, one switch per kind (``OpsAlertKind``,
+    # ``shipping/alerts.py``). All default ON: a store opts OUT of a kind,
+    # so a kind added later reaches every store until it mutes it. Each
+    # description says where the work shows when the email is off.
+    {
+        "name": "OPS_ALERT_STALE_SHIPMENTS_ENABLED",
+        "type": "bool",
+        "value": True,
+        "description": (
+            "Email a daily digest of ACS parcels with no tracking movement "
+            "and vouchers that failed to mint. When off, the same parcels "
+            "stay on the dashboard's 'Needs attention' list."
+        ),
+    },
+    {
+        "name": "OPS_ALERT_UNREMITTED_COD_ENABLED",
+        "type": "bool",
+        "value": True,
+        "description": (
+            "Email when ACS delivered a cash-on-delivery parcel and never "
+            "paid the money out. When off, the parcels stay on the "
+            "dashboard's 'Needs attention' list."
+        ),
+    },
+    {
+        "name": "OPS_ALERT_UNATTRIBUTABLE_COD_PAYOUTS_ENABLED",
+        "type": "bool",
+        "value": True,
+        "description": (
+            "Email when an ACS cash-on-delivery payout matches none of the "
+            "store's shipments. When off, payouts recorded in the last 30 "
+            "days stay on the dashboard's 'Needs attention' list."
+        ),
+    },
+    {
+        "name": "OPS_ALERT_SHIPMENT_REJECTED_ENABLED",
+        "type": "bool",
+        "value": True,
+        "description": (
+            "Email at once when a courier permanently refuses to create a "
+            "shipment (bad address, unacceptable destination). The order "
+            "also gets a note."
+        ),
+    },
+    {
+        "name": "OPS_ALERT_WEBHOOK_FAILED_ENABLED",
+        "type": "bool",
+        "value": True,
+        "description": (
+            "Email when a verified carrier webhook could not be applied, "
+            "so a parcel state change may have been missed."
+        ),
+    },
+    {
+        "name": "OPS_ALERT_PAYMENT_AFTER_CANCEL_ENABLED",
+        "type": "bool",
+        "value": True,
+        "description": (
+            "Email when a payment arrives for an order that was already "
+            "canceled and has to be refunded. When off, such orders stay "
+            "on the dashboard's 'Needs attention' list until refunded."
+        ),
+    },
+    {
         "name": "LOW_STOCK_THRESHOLD",
         "type": "int",
         "value": 10,
@@ -1986,6 +2065,20 @@ EXTRA_SETTINGS_DEFAULTS = [
             "(GDPR art. 5(1)(e) storage limitation without destroying "
             "the business record). 0 keeps files indefinitely. Raise "
             "it for a store that must retain tender documents."
+        ),
+    },
+    {
+        "name": "CONTACT_RETENTION_DAYS",
+        "type": "int",
+        "value": 365,
+        "description": (
+            "Days after which a contact enquiry or a feedback entry is "
+            "DELETED, together with the files attached to the enquiry "
+            "(GDPR art. 5(1)(e) storage limitation). One period for "
+            "both, per store. 0 keeps them indefinitely. Entries already "
+            "older than this are deleted on the next nightly run after "
+            "you set it. The notification email copy in the store's own "
+            "inbox is not touched."
         ),
     },
     {

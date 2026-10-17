@@ -1,4 +1,5 @@
 import contextlib
+import smtplib
 from unittest.mock import patch
 
 import pytest
@@ -114,12 +115,27 @@ class TestContactSignals(TestCase):
     def test_a_failed_send_is_retried(self, mock_send_mail):
         # Eager Celery runs the task inline, so its ``autoretry_for``
         # surfaces here as the ``Retry`` a worker would schedule.
-        mock_send_mail.side_effect = Exception("SMTP server error")
+        mock_send_mail.side_effect = smtplib.SMTPConnectError(
+            421, b"4.4.5 Server busy"
+        )
 
         with pytest.raises(Retry):
             Contact.objects.create(**self.contact_data)
 
         assert mock_send_mail.called
+
+    @override_settings(
+        INFO_EMAIL=_INFO_EMAIL,
+        DEFAULT_FROM_EMAIL="noreply@example.com",
+    )
+    @patch("contact.tasks.send_mail")
+    def test_a_rejected_send_is_not_retried(self, mock_send_mail):
+        mock_send_mail.side_effect = smtplib.SMTPSenderRefused(
+            550, b"5.1.8 bad sender", "noreply@example.com"
+        )
+
+        with pytest.raises(smtplib.SMTPSenderRefused):
+            Contact.objects.create(**self.contact_data)
 
     @override_settings(
         INFO_EMAIL=_INFO_EMAIL,

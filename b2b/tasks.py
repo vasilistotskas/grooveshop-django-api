@@ -9,6 +9,7 @@ from django.utils import translation
 from django.utils.translation import gettext as _
 
 from core import celery_app
+from core.retry import MAIL_TRANSIENT_ERRORS
 from core.tasks import MonitoredTask
 from core.utils.email_context import build_email_context
 from core.utils.i18n import get_user_language
@@ -31,7 +32,7 @@ _STATUS_TEMPLATES = {
     base=MonitoredTask,
     bind=True,
     max_retries=5,
-    autoretry_for=(Exception,),
+    autoretry_for=MAIL_TRANSIENT_ERRORS,
     retry_backoff=True,
     retry_jitter=True,
 )
@@ -95,7 +96,7 @@ def send_business_profile_status_email(self, profile_id: int) -> dict:
     base=MonitoredTask,
     bind=True,
     max_retries=5,
-    autoretry_for=(Exception,),
+    autoretry_for=MAIL_TRANSIENT_ERRORS,
     retry_backoff=True,
     retry_jitter=True,
 )

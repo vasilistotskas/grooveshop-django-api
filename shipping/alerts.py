@@ -13,6 +13,14 @@ Multi-tenant: these are MERCHANT-operations mails ("fix the address
 and re-dispatch") — they go to the owning tenant's operators via
 ``tenant_admin_recipients()``, falling back to platform ``ADMINS`` in
 the public schema or when the tenant carries no contact addresses.
+
+Every operational email goes through :func:`send_ops_alert`, which asks
+the store whether it wants that kind (:class:`OpsAlertKind`) before it
+sends anything. A store switches a kind off with its
+``OPS_ALERT_<KIND>_ENABLED`` setting; a muted alert is still logged, and
+each kind that carries money or a stuck parcel has a counter on the
+dashboard's "Needs attention" list (``admin.dashboard.store.queries``),
+so muting the email never hides the work.
 """
 
 from __future__ import annotations
@@ -20,14 +28,57 @@ from __future__ import annotations
 import logging
 
 from django.core.mail import send_mail
+from django.db import models
+from django.utils.translation import gettext_lazy as _
 
 logger = logging.getLogger(__name__)
 
 
-def send_ops_alert(*, subject: str, message: str) -> bool:
+class OpsAlertKind(models.TextChoices):
+    """The operational emails a store can switch off, one setting each.
+
+    The setting is ``OPS_ALERT_<KIND>_ENABLED`` (``setting_name``), a
+    boolean that defaults to on, so a kind added later reaches every store
+    until that store mutes it. ``tests/unit/shipping/test_ops_alerts.py``
+    keeps this enum and ``settings.EXTRA_SETTINGS_DEFAULTS`` in step.
+    """
+
+    STALE_SHIPMENTS = "stale_shipments", _("Stale shipments digest")
+    UNREMITTED_COD = "unremitted_cod", _("COD parcels never remitted")
+    UNATTRIBUTABLE_COD_PAYOUTS = (
+        "unattributable_cod_payouts",
+        _("COD payouts that match no shipment"),
+    )
+    SHIPMENT_REJECTED = "shipment_rejected", _("Courier rejected a shipment")
+    WEBHOOK_FAILED = "webhook_failed", _("Carrier webhook failed")
+    PAYMENT_AFTER_CANCEL = (
+        "payment_after_cancel",
+        _("Payment received for a canceled order"),
+    )
+
+    @property
+    def setting_name(self) -> str:
+        return f"OPS_ALERT_{self.value.upper()}_ENABLED"
+
+
+def ops_alert_enabled(kind: OpsAlertKind) -> bool:
+    """Whether the active store wants this kind of alert emailed."""
+    from extra_settings.models import Setting
+
+    return bool(Setting.get(kind.setting_name, default=True))
+
+
+def send_ops_alert(
+    *,
+    kind: OpsAlertKind,
+    subject: str,
+    message: str,
+    html_message: str | None = None,
+) -> bool:
     """Send an operational alert to the active tenant's operators.
 
-    Returns ``False`` (after logging) when no recipient is configured.
+    The one gate for every operational email: returns ``False`` (after
+    logging) when the store muted ``kind`` or has no recipient configured.
     Raises on SMTP errors — callers wrap in try/except so a mail
     failure never masks the original carrier error.
     """
@@ -37,6 +88,9 @@ def send_ops_alert(*, subject: str, message: str) -> bool:
         tenant_site_name,
     )
 
+    if not ops_alert_enabled(kind):
+        logger.info("Operational alert %s is muted; not emailed", kind.value)
+        return False
     recipients = tenant_admin_recipients()
     if not recipients:
         return False
@@ -45,6 +99,7 @@ def send_ops_alert(*, subject: str, message: str) -> bool:
         message=message,
         from_email=tenant_from_email() or None,
         recipient_list=recipients,
+        html_message=html_message,
     )
     return True
 
@@ -86,6 +141,7 @@ def alert_admins_shipment_creation_failed(
     )
     try:
         sent = send_ops_alert(
+            kind=OpsAlertKind.SHIPMENT_REJECTED,
             subject=(
                 f"{carrier}: shipment creation failed for order {order_id}"
             ),
@@ -98,8 +154,9 @@ def alert_admins_shipment_creation_failed(
         )
         if not sent:
             logger.warning(
-                "alert_admins_shipment_creation_failed: no recipients "
-                "configured — order=%s carrier=%s error not emailed",
+                "alert_admins_shipment_creation_failed: muted or no "
+                "recipients configured — order=%s carrier=%s error not "
+                "emailed",
                 order_id,
                 carrier,
             )
@@ -129,6 +186,7 @@ def alert_admins_webhook_processing_failed(
     """
     try:
         sent = send_ops_alert(
+            kind=OpsAlertKind.WEBHOOK_FAILED,
             subject=(
                 f"{carrier}: webhook processing failed (message {message_id})"
             ),
@@ -143,8 +201,9 @@ def alert_admins_webhook_processing_failed(
         )
         if not sent:
             logger.warning(
-                "alert_admins_webhook_processing_failed: no recipients "
-                "configured — carrier=%s message=%s error not emailed",
+                "alert_admins_webhook_processing_failed: muted or no "
+                "recipients configured — carrier=%s message=%s error not "
+                "emailed",
                 carrier,
                 message_id,
             )

@@ -12,6 +12,11 @@ from django.utils.translation import gettext_lazy as _
 from django.utils.translation import override as translation_override
 
 from core import celery_app
+from core.retry import (
+    MAIL_TRANSIENT_ERRORS,
+    SEARCH_TRANSIENT_ERRORS,
+    TRANSIENT_ERRORS,
+)
 from core.tasks import MonitoredTask
 from core.utils.email_context import build_email_context
 from core.utils.i18n import get_user_language
@@ -28,7 +33,7 @@ logger = logging.getLogger(__name__)
 @celery_app.task(
     base=MonitoredTask,
     max_retries=3,
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_ERRORS,
     retry_backoff=True,
     retry_jitter=True,
 )
@@ -123,7 +128,7 @@ def notify_back_in_stock_favourites_live(product_id: int) -> dict:
 @celery_app.task(
     base=MonitoredTask,
     max_retries=3,
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_ERRORS,
     retry_backoff=True,
     retry_jitter=True,
 )
@@ -218,7 +223,7 @@ def send_price_drop_notifications(
 @celery_app.task(
     base=MonitoredTask,
     max_retries=3,
-    autoretry_for=(Exception,),
+    autoretry_for=MAIL_TRANSIENT_ERRORS,
     retry_backoff=True,
     retry_jitter=True,
     soft_time_limit=600,
@@ -409,7 +414,7 @@ def _send_product_alert_email(
 @celery_app.task(
     base=MonitoredTask,
     max_retries=3,
-    autoretry_for=(Exception,),
+    autoretry_for=MAIL_TRANSIENT_ERRORS,
     retry_backoff=True,
     retry_jitter=True,
 )
@@ -489,7 +494,7 @@ def send_product_alert_restock(product_id: int) -> dict:
 @celery_app.task(
     base=MonitoredTask,
     max_retries=3,
-    autoretry_for=(Exception,),
+    autoretry_for=MAIL_TRANSIENT_ERRORS,
     retry_backoff=True,
     retry_jitter=True,
 )
@@ -570,7 +575,7 @@ def send_product_alert_price_drop(product_id: int, new_price: float) -> dict:
 @celery_app.task(
     base=MonitoredTask,
     max_retries=5,
-    autoretry_for=(Exception,),
+    autoretry_for=SEARCH_TRANSIENT_ERRORS,
     retry_backoff=True,
     retry_jitter=True,
 )
@@ -589,7 +594,7 @@ def sync_price_records(product_ids: list[int]) -> dict[str, int]:
 @celery_app.task(
     base=MonitoredTask,
     max_retries=5,
-    autoretry_for=(Exception,),
+    autoretry_for=SEARCH_TRANSIENT_ERRORS,
     retry_backoff=True,
     retry_jitter=True,
 )

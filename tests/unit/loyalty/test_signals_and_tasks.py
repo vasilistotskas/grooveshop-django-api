@@ -10,6 +10,7 @@ from decimal import Decimal
 from unittest.mock import patch
 
 import pytest
+from django.db import OperationalError
 from djmoney.money import Money
 
 from loyalty.enum import TransactionType
@@ -354,7 +355,7 @@ class TestTaskIdempotency:
 
 @pytest.mark.django_db
 class TestTaskRetryBehavior:
-    """When the service raises an exception, the task retries."""
+    """A lost database connection is retried; a bug is not (core/retry.py)."""
 
     def test_process_order_points_retries_on_service_error(self):
         """process_order_points calls self.retry() when LoyaltyService raises."""
@@ -369,7 +370,7 @@ class TestTaskRetryBehavior:
         with (
             patch(
                 "loyalty.services.LoyaltyService.award_order_points",
-                side_effect=ValueError("DB error"),
+                side_effect=OperationalError("connection lost"),
             ),
             patch.object(
                 process_order_points,
@@ -395,7 +396,7 @@ class TestTaskRetryBehavior:
         with (
             patch(
                 "loyalty.services.LoyaltyService.reverse_order_points",
-                side_effect=ValueError("DB error"),
+                side_effect=OperationalError("connection lost"),
             ),
             patch.object(
                 reverse_order_points,
@@ -407,3 +408,22 @@ class TestTaskRetryBehavior:
                 reverse_order_points(order.id)
 
             mock_retry.assert_called_once()
+
+    def test_a_bug_in_the_service_is_not_retried(self):
+        """A deterministic error fails the task at once instead of retrying."""
+        from loyalty.tasks import process_order_points
+        from user.factories.account import UserAccountFactory
+
+        order = _create_order(user=UserAccountFactory())
+
+        with (
+            patch(
+                "loyalty.services.LoyaltyService.award_order_points",
+                side_effect=ValueError("bad points arithmetic"),
+            ),
+            patch.object(process_order_points, "retry") as mock_retry,
+        ):
+            with pytest.raises(ValueError):
+                process_order_points(order.id)
+
+            mock_retry.assert_not_called()

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 
+from django.conf import settings
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from djmoney.money import Money
@@ -10,15 +11,18 @@ from drf_spectacular.utils import (
     OpenApiParameter,
     extend_schema_view,
 )
+from knox.models import get_token_model
 from rest_framework import status
 from rest_framework.decorators import action
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 
+from cart.agent_token import CART_TOKEN_PARAMETER, mint_cart_token
 from cart.filters.cart import CartFilter
 from cart.models import Cart
 from cart.serializers.cart import (
+    CartAgentTokenResponseSerializer,
     CartCreatePaymentIntentRequestSerializer,
     CartDetailSerializer,
     CartPaymentIntentResponseSerializer,
@@ -34,6 +38,7 @@ from cart.services import CartService
 from core.api.permissions import StoreStaffModelPermissions
 from core.api.serializers import ErrorResponseSerializer
 from core.api.throttling import (
+    CartAgentTokenThrottle,
     CartMutationAnonThrottle,
     CartMutationThrottle,
     CouponApplyThrottle,
@@ -75,6 +80,8 @@ GUEST_CART_HEADERS = [
     ),
 ]
 
+CART_TOKEN_HEADERS = [*GUEST_CART_HEADERS, CART_TOKEN_PARAMETER]
+
 serializers_config: SerializersConfig = {
     "list": ActionConfig(
         response=CartSerializer,
@@ -95,7 +102,7 @@ serializers_config: SerializersConfig = {
             "Get a cart. For guest users, include X-Cart-Id header to maintain cart session."
         ),
         tags=["Cart"],
-        parameters=GUEST_CART_HEADERS,
+        parameters=CART_TOKEN_HEADERS,
     ),
     "update": ActionConfig(
         request=CartWriteSerializer,
@@ -185,14 +192,29 @@ serializers_config: SerializersConfig = {
             "machine-readable reason."
         ),
         tags=["Cart"],
-        parameters=GUEST_CART_HEADERS,
+        parameters=CART_TOKEN_HEADERS,
     ),
     "remove_coupon": ActionConfig(
         response=CartDetailSerializer,
         operation_id="removeCartCoupon",
         summary=_("Remove the applied coupon code from the cart"),
         tags=["Cart"],
-        parameters=GUEST_CART_HEADERS,
+        parameters=CART_TOKEN_HEADERS,
+    ),
+    "agent_token": ActionConfig(
+        response=CartAgentTokenResponseSerializer,
+        operation_id="createCartAgentToken",
+        summary=_("Mint a cart token for the shopping assistant"),
+        description=_(
+            "Mint a short-lived token that lets the shopping assistant act "
+            "on the signed-in shopper's own cart: read it, add, update and "
+            "remove items, apply and remove coupons. Nothing else: not "
+            "payment, stock reservation, checkout or deleting the cart. "
+            "Send it as the ``X-Cart-Token`` header. It stops working when "
+            "it expires or the shopper signs out; mint a new one when a "
+            "call is refused with 401."
+        ),
+        tags=["Cart"],
     ),
     "list_coupons": ActionConfig(
         response=CartCouponSerializer,
@@ -215,7 +237,7 @@ serializers_config: SerializersConfig = {
             "now. Empty when the store has promotions disabled."
         ),
         tags=["Cart"],
-        parameters=GUEST_CART_HEADERS,
+        parameters=CART_TOKEN_HEADERS,
     ),
 }
 
@@ -260,13 +282,26 @@ class CartViewSet(BaseModelViewSet):
         }
     )
 
+    # What an ``X-Cart-Token`` may do on the cart, spelled out: a
+    # read, coupons, and (on the item routes) the lines. Payment
+    # intents, stock reservation and cart delete or edit are not here,
+    # so the token is refused there.
+    _CART_TOKEN_ACTIONS = frozenset(
+        {"retrieve", "apply_coupon", "remove_coupon", "list_coupons"}
+    )
+
     def initial(self, request, *args, **kwargs):
         super().initial(request, *args, **kwargs)
-        self.cart_service = CartService(request=request)
+        self.cart_service = CartService(
+            request=request,
+            accepts_cart_token=self.action in self._CART_TOKEN_ACTIONS,
+        )
 
     def get_permissions(self):
         if self.action == "list":
             self.permission_classes = [StoreStaffModelPermissions]
+        elif self.action == "agent_token":
+            self.permission_classes = [IsAuthenticated]
         elif self.action in {
             "apply_coupon",
             "remove_coupon",
@@ -283,6 +318,12 @@ class CartViewSet(BaseModelViewSet):
         return super().get_permissions()
 
     def get_throttles(self):
+        if self.action == "agent_token":
+            return [
+                CartAgentTokenThrottle(),
+                AnonRateThrottle(),
+                UserRateThrottle(),
+            ]
         if self.action == "apply_coupon":
             # Coupon apply is a brute-forceable code oracle — cap it far
             # tighter than the generic cart-mutation burst limits.
@@ -436,7 +477,7 @@ class CartViewSet(BaseModelViewSet):
             CouponService.apply(
                 cart,
                 request_serializer.validated_data["code"],
-                user=request.user if request.user.is_authenticated else None,
+                user=self.cart_service.owner,
             )
         except CouponError as exc:
             return Response(
@@ -480,17 +521,41 @@ class CartViewSet(BaseModelViewSet):
         from promotion.services import CouponPickerService
 
         cart = self.cart_service.get_existing_cart()
+        owner = self.cart_service.owner
         options = (
             CouponPickerService.available(
                 cart,
-                user=request.user if request.user.is_authenticated else None,
-                email=getattr(request.user, "email", "") or "",
+                user=owner,
+                email=getattr(owner, "email", "") or "",
             )
             if cart
             else []
         )
         serializer = CartCouponSerializer(options, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["post"], url_path="agent-token")
+    def agent_token(self, request, *args, **kwargs):
+        """Mint a cart token for the signed-in shopper's own cart.
+
+        Knox logins only: a token is bound to the login that minted it
+        and dies with it. The cart is created when the shopper has none,
+        as every other cart endpoint does.
+        """
+        if not isinstance(request.auth, get_token_model()):
+            return Response(
+                {"detail": _("A signed-in session is required.")},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        cart = self.cart_service.get_or_create_cart()
+        token = mint_cart_token(cart, request.auth)
+        return Response(
+            {
+                "token": token,
+                "expires_in": settings.CART_AGENT_TOKEN_TTL_SECONDS,
+            },
+            status=status.HTTP_200_OK,
+        )
 
     @action(detail=False, methods=["post"], url_path="reserve-stock")
     def reserve_stock(self, request, *args, **kwargs):

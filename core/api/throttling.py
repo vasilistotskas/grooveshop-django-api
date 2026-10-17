@@ -39,6 +39,7 @@ from rest_framework.throttling import (
     UserRateThrottle,
 )
 
+from cart.agent_token import cart_token_from_request, hash_cart_token
 from core.caches import REDIS_UNAVAILABLE, STRICT_NAMESPACE, BurstLogger
 from core.client_ip import trusted_client_ip
 
@@ -106,6 +107,10 @@ def _gateway_cart_ident(request) -> str | None:
         secret.encode("utf-8", "surrogateescape"),
     ):
         return None
+    token = cart_token_from_request(request)
+    if token:
+        # The token names the cart; key on its hash, never the token.
+        return hash_cart_token(token)
     return request.headers.get("X-Cart-Id") or None
 
 
@@ -228,6 +233,13 @@ class OrderCreateAnonThrottle(AnonIpRateThrottle):
 
 class CartMutationThrottle(ResilientThrottleMixin, UserRateThrottle):
     scope = "cart_mutation"
+
+
+class CartAgentTokenThrottle(ResilientThrottleMixin, UserRateThrottle):
+    """Minting hands out a credential for the shopper's cart."""
+
+    scope = "cart_agent_token"
+    fail_closed = True
 
 
 class CartMutationAnonThrottle(AnonIpRateThrottle):

@@ -605,6 +605,17 @@ class ReserveStockResponseSerializer(serializers.Serializer):
     )
 
 
+class CartAgentTokenResponseSerializer(serializers.Serializer):
+    """Response of ``POST /api/v1/cart/agent-token``."""
+
+    token = serializers.CharField(
+        help_text=_("Send as the X-Cart-Token header.")
+    )
+    expires_in = serializers.IntegerField(
+        help_text=_("Seconds until the token stops working.")
+    )
+
+
 class CartCreatePaymentIntentRequestSerializer(serializers.Serializer):
     """Request body for ``POST /api/v1/cart/create-payment-intent``.
 

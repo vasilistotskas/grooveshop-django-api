@@ -243,3 +243,53 @@ class TestPaymentIntentBinding:
         # Match the amount, not the wording — the message is localized
         # (Greek when the compiled .mo is present, English in CI).
         assert "500" in str(response.data["detail"])
+
+
+class TestCartTokenBindsToOwner:
+    """The assistant calls anonymously: pricing must follow the cart's
+    owner, not ``request.user``."""
+
+    def _gateway_for(self, user):
+        from knox.models import get_token_model
+
+        _auth, raw = get_token_model().objects.create(user)
+        login = APIClient()
+        login.credentials(HTTP_AUTHORIZATION=f"Bearer {raw}")
+        token = login.post(reverse("cart-agent-token")).data["token"]
+        gateway = APIClient()
+        gateway.credentials(HTTP_X_CART_TOKEN=token)
+        return gateway
+
+    def test_cart_read_prices_wholesale(self, b2b_tenant, enable_wholesale):
+        user, group = _wholesale_buyer(discount="10.00")
+        _cart_with_line(user, "100.00", quantity=2)
+
+        response = self._gateway_for(user).get(reverse("cart-detail"))
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["total_price"] == Decimal("180.00")
+        assert response.data["b2b_pricing"]["group_name"] == group.name
+        assert response.data["items"][0]["final_price"] == Decimal("90.00")
+
+    def test_item_endpoints_price_wholesale(self, b2b_tenant, enable_wholesale):
+        user, _group = _wholesale_buyer(discount="10.00")
+        cart, _product = _cart_with_line(user, "100.00")
+        item = cart.items.first()
+        gateway = self._gateway_for(user)
+
+        read = gateway.get(reverse("cart-item-detail", args=[item.pk]))
+        listed = gateway.get(reverse("cart-item-list"))
+
+        assert read.data["final_price"] == Decimal("90.00")
+        assert listed.data["results"][0]["final_price"] == Decimal("90.00")
+
+    def test_a_retail_owner_stays_retail(self, b2b_tenant, enable_wholesale):
+        profile = BusinessProfileFactory(
+            customer_group=CustomerGroupFactory(discount_percent=Decimal(10))
+        )  # PENDING
+        _cart_with_line(profile.user, "100.00")
+
+        response = self._gateway_for(profile.user).get(reverse("cart-detail"))
+
+        assert response.data["total_price"] == Decimal("100.00")
+        assert response.data["b2b_pricing"] is None

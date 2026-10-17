@@ -23045,3 +23045,31 @@ msgstr "Καθυστερημένες αποστολές ACS"
 #: .\admin\dashboard\store\widgets.py
 msgid "No tracking movement, or the voucher was never created"
 msgstr "Χωρίς κίνηση στην παρακολούθηση ή δεν δημιουργήθηκε το voucher"
+
+#: .\cart\agent_token.py
+msgid "The cart token is invalid or has expired."
+msgstr "Το διακριτικό καλαθιού δεν είναι έγκυρο ή έχει λήξει."
+
+#: .\cart\agent_token.py
+msgid "The cart token is not accepted by this endpoint."
+msgstr "Αυτό το σημείο πρόσβασης δεν δέχεται διακριτικό καλαθιού."
+
+#: .\cart\views\cart.py
+msgid "A signed-in session is required."
+msgstr "Απαιτείται συνδεδεμένη συνεδρία."
+
+#: .\cart\serializers\cart.py
+msgid "Send as the X-Cart-Token header."
+msgstr "Στείλτε το ως κεφαλίδα X-Cart-Token."
+
+#: .\cart\serializers\cart.py
+msgid "Seconds until the token stops working."
+msgstr "Δευτερόλεπτα μέχρι να σταματήσει να λειτουργεί το διακριτικό."
+
+#: .\cart\views\cart.py
+msgid "Mint a cart token for the shopping assistant"
+msgstr "Έκδοση διακριτικού καλαθιού για τον βοηθό αγορών"
+
+#: .\cart\views\cart.py
+msgid "Mint a short-lived token that lets the shopping assistant act on the signed-in shopper's own cart: read it, add, update and remove items, apply and remove coupons. Nothing else: not payment, stock reservation, checkout or deleting the cart. Send it as the ``X-Cart-Token`` header. It stops working when it expires or the shopper signs out; mint a new one when a call is refused with 401."
+msgstr "Εκδίδει ένα βραχύβιο διακριτικό που επιτρέπει στον βοηθό αγορών να ενεργεί στο δικό του καλάθι του συνδεδεμένου αγοραστή: να το διαβάζει, να προσθέτει, να ενημερώνει και να αφαιρεί προϊόντα, να εφαρμόζει και να αφαιρεί κουπόνια. Τίποτα άλλο: ούτε πληρωμή, ούτε δέσμευση αποθέματος, ούτε ολοκλήρωση αγοράς, ούτε διαγραφή του καλαθιού. Στείλτε το ως κεφαλίδα ``X-Cart-Token``. Σταματά να λειτουργεί όταν λήξει ή όταν ο αγοραστής αποσυνδεθεί· εκδώστε νέο όταν μια κλήση απορρίπτεται με 401."

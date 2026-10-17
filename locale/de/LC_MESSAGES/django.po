@@ -10307,3 +10307,31 @@ msgstr "Festhängende ACS-Sendungen"
 #: .\admin\dashboard\store\widgets.py
 msgid "No tracking movement, or the voucher was never created"
 msgstr "Keine Sendungsverfolgung oder der Voucher wurde nie erstellt"
+
+#: .\cart\agent_token.py
+msgid "The cart token is invalid or has expired."
+msgstr ""
+
+#: .\cart\agent_token.py
+msgid "The cart token is not accepted by this endpoint."
+msgstr ""
+
+#: .\cart\views\cart.py
+msgid "A signed-in session is required."
+msgstr ""
+
+#: .\cart\serializers\cart.py
+msgid "Send as the X-Cart-Token header."
+msgstr ""
+
+#: .\cart\serializers\cart.py
+msgid "Seconds until the token stops working."
+msgstr ""
+
+#: .\cart\views\cart.py
+msgid "Mint a cart token for the shopping assistant"
+msgstr ""
+
+#: .\cart\views\cart.py
+msgid "Mint a short-lived token that lets the shopping assistant act on the signed-in shopper's own cart: read it, add, update and remove items, apply and remove coupons. Nothing else: not payment, stock reservation, checkout or deleting the cart. Send it as the ``X-Cart-Token`` header. It stops working when it expires or the shopper signs out; mint a new one when a call is refused with 401."
+msgstr ""

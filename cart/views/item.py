@@ -12,6 +12,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 
+from cart.agent_token import CART_TOKEN_PARAMETER
 from cart.filters.item import CartItemFilter
 from cart.models import CartItem
 from cart.serializers.item import (
@@ -44,6 +45,8 @@ GUEST_CART_HEADERS = [
     ),
 ]
 
+CART_TOKEN_HEADERS = [*GUEST_CART_HEADERS, CART_TOKEN_PARAMETER]
+
 serializers_config: SerializersConfig = {
     "list": ActionConfig(
         response=CartItemSerializer,
@@ -54,7 +57,7 @@ serializers_config: SerializersConfig = {
             "Retrieve a list of cart items with filtering and search capabilities. For guest users, include X-Cart-Id header to maintain cart session."
         ),
         tags=["Cart Items"],
-        parameters=GUEST_CART_HEADERS,
+        parameters=CART_TOKEN_HEADERS,
     ),
     "create": ActionConfig(
         request=CartItemCreateSerializer,
@@ -65,7 +68,7 @@ serializers_config: SerializersConfig = {
             "Create a new cart item. Requires authentication. For guest users, include X-Cart-Id header to maintain cart session."
         ),
         tags=["Cart Items"],
-        parameters=GUEST_CART_HEADERS,
+        parameters=CART_TOKEN_HEADERS,
     ),
     "retrieve": ActionConfig(
         response=CartItemDetailSerializer,
@@ -75,7 +78,7 @@ serializers_config: SerializersConfig = {
             "Get detailed information about a specific cart item. For guest users, include X-Cart-Id header to maintain cart session."
         ),
         tags=["Cart Items"],
-        parameters=GUEST_CART_HEADERS,
+        parameters=CART_TOKEN_HEADERS,
     ),
     "update": ActionConfig(
         request=CartItemUpdateSerializer,
@@ -86,7 +89,7 @@ serializers_config: SerializersConfig = {
             "Update cart item information. Requires authentication. For guest users, include X-Cart-Id header to maintain cart session."
         ),
         tags=["Cart Items"],
-        parameters=GUEST_CART_HEADERS,
+        parameters=CART_TOKEN_HEADERS,
     ),
     "partial_update": ActionConfig(
         request=CartItemUpdateSerializer,
@@ -97,7 +100,7 @@ serializers_config: SerializersConfig = {
             "Partially update cart item information. Requires authentication. For guest users, include X-Cart-Id header to maintain cart session."
         ),
         tags=["Cart Items"],
-        parameters=GUEST_CART_HEADERS,
+        parameters=CART_TOKEN_HEADERS,
     ),
     "destroy": ActionConfig(
         operation_id="destroyCartItem",
@@ -106,7 +109,7 @@ serializers_config: SerializersConfig = {
             "Delete a cart item. Requires authentication. For guest users, include X-Cart-Id header to maintain cart session."
         ),
         tags=["Cart Items"],
-        parameters=GUEST_CART_HEADERS,
+        parameters=CART_TOKEN_HEADERS,
     ),
 }
 
@@ -167,7 +170,9 @@ class CartItemViewSet(BaseModelViewSet):
 
     def initial(self, request, *args, **kwargs):
         super().initial(request, *args, **kwargs)
-        self.cart_service = CartService(request=request)
+        self.cart_service = CartService(
+            request=request, accepts_cart_token=True
+        )
 
     def get_queryset(self):
         user = self.request.user

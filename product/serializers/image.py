@@ -25,7 +25,6 @@ class ProductImageSerializer(
     product = PrimaryKeyRelatedField(read_only=True)
     translations = TranslatedFieldsFieldExtend(shared_model=ProductImage)
 
-    image_url = serializers.SerializerMethodField()
     image_size_kb = serializers.SerializerMethodField()
     alt_text = serializers.SerializerMethodField()
 
@@ -36,7 +35,6 @@ class ProductImageSerializer(
             "uuid",
             "product",
             "image",
-            "image_url",
             "image_size_kb",
             "alt_text",
             "is_main",
@@ -50,20 +48,11 @@ class ProductImageSerializer(
             "uuid",
             "product",
             "sort_order",
-            "image_url",
             "image_size_kb",
             "alt_text",
             "main_image_path",
             "created_at",
         )
-
-    def get_image_url(self, obj: ProductImage) -> str:
-        if obj.image:
-            request = self.context.get("request")
-            if request:
-                return request.build_absolute_uri(obj.image.url)
-            return obj.image.url
-        return ""
 
     def get_image_size_kb(self, obj: ProductImage) -> float:
         if obj.image and hasattr(obj.image, "size"):

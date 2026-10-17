@@ -86,7 +86,6 @@ class ProductCategoryImageModelTestCase(TestCase):
         )
 
         self.assertIsNotNone(image.image_path)
-        self.assertIsNotNone(image.image_url)
         self.assertIn("category", image.image_path)
 
     def test_manager_methods(self):

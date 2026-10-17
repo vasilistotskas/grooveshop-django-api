@@ -14676,7 +14676,7 @@ msgid ""
 "Optional pickup-point-specific logo (e.g. a locker illustration distinct "
 "from the carrier's home-delivery brand mark). When set, the storefront's ``/"
 "api/v1/shipping/options`` endpoint surfaces it on the pickup_point row's "
-"``logoUrl`` so the locker card looks different from the home-delivery card "
+"``logoPath`` so the locker card looks different from the home-delivery card "
 "for the same carrier. Falls back to ``logo`` when blank."
 msgstr ""
 

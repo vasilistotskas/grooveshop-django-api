@@ -22,7 +22,7 @@ class ShippingProviderSerializer(serializers.ModelSerializer[ShippingProvider]):
             "Absolute URL for the optional pickup-point-specific "
             "logo (e.g. a locker illustration distinct from the "
             "carrier's home-delivery brand mark). Surfaced on the "
-            "pickup_point row's ``logoUrl`` when uploaded; otherwise "
+            "pickup_point row's ``logoPath`` when uploaded; otherwise "
             "the row falls back to ``logo``."
         ),
     )

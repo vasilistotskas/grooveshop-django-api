@@ -23101,3 +23101,14 @@ msgstr "Δημιουργία συναλλαγής λογαριασμού"
 
 msgid "A dispute is open on this payment and the payment provider does not accept a refund until it is decided. Refund once it has closed."
 msgstr "Υπάρχει ανοιχτή διαφορά για αυτή την πληρωμή και ο πάροχος πληρωμών δεν δέχεται επιστροφή μέχρι να κριθεί. Κάντε την επιστροφή αφού κλείσει."
+
+msgid "The dispute closed against you and the money was taken back. Nothing was left on the payment to record as a chargeback, so the payment ledger is unchanged. The order status and payment status have NOT been changed."
+msgstr "Η διαφορά έκλεισε εις βάρος σας και τα χρήματα αφαιρέθηκαν. Δεν είχε μείνει ποσό στην πληρωμή για να καταγραφεί ως chargeback, άρα το ταμείο πληρωμών δεν άλλαξε. Η κατάσταση της παραγγελίας και της πληρωμής ΔΕΝ άλλαξαν."
+
+#, python-format
+msgid "Chargeback of %(requested)s not recorded: nothing is left on the payment (%(returned)s already returned)"
+msgstr "Το chargeback %(requested)s δεν καταγράφηκε: δεν έχει μείνει ποσό στην πληρωμή (%(returned)s έχουν ήδη επιστραφεί)"
+
+#, python-format
+msgid "Chargeback %(amount)s (disputed %(requested)s, %(returned)s already returned)"
+msgstr "Chargeback %(amount)s (αμφισβητήθηκαν %(requested)s, %(returned)s έχουν ήδη επιστραφεί)"

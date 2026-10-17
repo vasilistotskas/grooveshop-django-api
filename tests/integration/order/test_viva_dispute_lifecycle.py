@@ -11,10 +11,12 @@ key, so one dispute is never recorded twice. Only the HTTP boundary is faked
 
 from __future__ import annotations
 
+import json
 from decimal import Decimal
 from unittest.mock import patch
 
 import pytest
+from django.test import RequestFactory
 from djmoney.money import Money
 
 from order.enum.payment_transaction import PaymentTransactionKind
@@ -27,6 +29,7 @@ from order.payment_ledger import PaymentLedger
 from order.services import OrderService
 from order.views.viva_webhook import (
     _handle_account_transaction_event,
+    _handle_webhook_event,
     _process_dispute_event_in_tenant,
     _process_event_in_tenant,
 )
@@ -203,6 +206,95 @@ class TestDisputeLost:
 
         assert _chargebacks(order).count() == 1
         email.assert_not_called()
+
+
+class TestDisputeLostOnAPartlyRefundedSale:
+    def _refund(self, order, amount):
+        PaymentLedger.record_refund(
+            order,
+            charge=order.payment_transactions.get(
+                kind=PaymentTransactionKind.CHARGE
+            ),
+            amount=Money(Decimal(amount), "EUR"),
+            reference=f"re_viva_{amount}",
+        )
+
+    def test_the_chargeback_is_capped_and_says_so(self):
+        order = _paid_order()
+        self._refund(order, "10.00")
+
+        _dispute("ML", "wallet-2")
+
+        [row] = _chargebacks(order)
+        assert row.amount == Money(Decimal("30.00"), "EUR")
+        assert PaymentLedger.refundable(order) == 0
+        entry = OrderHistory.objects.get(
+            order=order,
+            change_type=OrderHistory.OrderHistoryChangeType.CHARGEBACK,
+        )
+        assert "30.00" in entry.description
+        assert "disputed" in entry.description
+        assert "10.00 already returned" in entry.description
+
+    def test_a_fully_refunded_sale_records_no_row_and_announces_once(self):
+        order = _paid_order()
+        self._refund(order, "40.00")
+
+        first = _dispute("ML", "wallet-2")
+        second = _dispute("ML", "wallet-3")
+
+        assert not _chargebacks(order).exists()
+        assert (
+            OrderHistory.objects.filter(
+                order=order,
+                change_type=OrderHistory.OrderHistoryChangeType.CHARGEBACK,
+            ).count()
+            == 1
+        )
+        first.assert_called_once()
+        second.assert_not_called()
+
+
+class TestSuspendedStore:
+    def test_a_dispute_event_of_a_suspended_store_is_retried(self):
+        with (
+            patch(
+                "order.views.viva_webhook._resolve_tenant_candidates_for_sale",
+                return_value=[],
+            ),
+            patch(
+                "order.views.viva_webhook._sale_exists_on_unavailable_tenant",
+                return_value=True,
+            ),
+        ):
+            response = _handle_account_transaction_event(
+                None, {"SaleTransactionId": SALE, "TransactionId": "w"}
+            )
+
+        assert response.status_code == 503
+
+    def test_a_refund_claim_of_a_suspended_store_is_retried(self):
+        body = reversal_created_event(
+            refund_id=CLAIM, parent_id=SALE, order_code=ORDER_CODE
+        )
+        request = RequestFactory().post(
+            "/viva-wallet/webhook/",
+            data=json.dumps(body),
+            content_type="application/json",
+        )
+        with (
+            patch(
+                "order.views.viva_webhook._resolve_tenant_candidates",
+                return_value=[],
+            ),
+            patch(
+                "order.views.viva_webhook._order_exists_on_unavailable_tenant",
+                return_value=True,
+            ),
+        ):
+            response = _handle_webhook_event(request)
+
+        assert response.status_code == 503
 
 
 class TestDisputeWon:

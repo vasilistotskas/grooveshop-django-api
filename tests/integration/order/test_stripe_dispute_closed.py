@@ -276,6 +276,70 @@ class TestDisputeClosedOtherwise:
         assert "warning_closed" in note.latest("id").new_value["note"]
 
 
+class TestChargebackIsCappedAtWhatIsLeft:
+    def _refund(self, order, charge, amount):
+        PaymentLedger.record_refund(
+            order,
+            charge=charge,
+            amount=Money(Decimal(amount), "EUR"),
+            reference=f"re_cap_{amount}",
+        )
+
+    def test_a_partly_refunded_payment_is_charged_back_for_what_is_left(self):
+        order, charge = _paid_order()
+        self._refund(order, charge, "30.00")
+
+        email = _close(_event("evt_cap_1", amount=5000))
+
+        [row] = _chargebacks(order)
+        assert row.amount == Money(Decimal("20.00"), "EUR")
+        assert PaymentLedger.refundable(order) == 0
+        entry = OrderHistory.objects.get(
+            order=order,
+            change_type=OrderHistory.OrderHistoryChangeType.CHARGEBACK,
+        )
+        assert "20.00" in entry.description
+        assert "disputed" in entry.description
+        assert "30.00 already returned" in entry.description
+        email.assert_called_once()
+        order.refresh_from_db()
+        assert order.payment_status == PaymentStatus.PARTIALLY_REFUNDED
+
+    def test_a_fully_refunded_payment_records_no_row_but_staff_are_told(self):
+        order, charge = _paid_order()
+        self._refund(order, charge, "50.00")
+        order.metadata = {"disputed": True, "dispute_id": DISPUTE}
+        order.save(update_fields=["metadata"])
+
+        email = _close(_event("evt_cap_2", amount=5000))
+
+        assert not _chargebacks(order).exists()
+        entry = OrderHistory.objects.get(
+            order=order,
+            change_type=OrderHistory.OrderHistoryChangeType.CHARGEBACK,
+        )
+        assert "not recorded" in entry.description
+        email.assert_called_once()
+        assert email.call_args.kwargs["kwargs"] == {"lost": True}
+        order.refresh_from_db()
+        assert "disputed" not in order.metadata
+
+    def test_a_second_chargeback_cannot_take_what_the_first_took(self):
+        order, charge = _paid_order()
+        for reference, amount in (("dp_a", "30.00"), ("dp_b", "30.00")):
+            PaymentLedger.record_chargeback(
+                order,
+                charge=charge,
+                amount=Money(Decimal(amount), "EUR"),
+                reference=reference,
+            )
+
+        assert [c.amount.amount for c in _chargebacks(order)] == [
+            Decimal("30.00"),
+            Decimal("20.00"),
+        ]
+
+
 class TestChargebackAmongRefunds:
     def test_charge_refunded_arithmetic_ignores_a_chargeback(self):
         order, charge = _paid_order()

@@ -23,6 +23,7 @@ from django_tenants.utils import (
 )
 
 from core.client_ip import client_ip_or_peer
+from order.disputes import announce_chargeback
 from order.enum.status import (
     SETTLED_PAYMENT_STATUSES,
     OrderStatus,
@@ -1744,19 +1745,37 @@ def _record_viva_chargeback(order, charge, amount):
     and a refund claim (1797) and a lost dispute (2054) for the same sale hit
     the same key and book it once.
 
-    Returns ``OUTCOME_SKIPPED`` when the ledger already holds it, ``None``
-    when it was booked.
+    Viva names only the whole sale, so *amount* is capped by the ledger at
+    what the payment still holds (a sale partly refunded before the dispute).
+    When nothing is left no row is written, but staff are still told, once:
+    ``dispute_resolved_id`` remembers it, because every wallet movement of
+    the dispute arrives as an event of its own.
+
+    Returns ``OUTCOME_SKIPPED`` when it was already recorded or announced,
+    ``None`` when it was booked or announced now.
     """
     from order.models.viva_webhook_event import VivaWebhookEvent
     from order.payment import VivaWalletPaymentProvider
     from order.payment_ledger import PaymentLedger
-    from order.tasks import send_dispute_notification_email
 
     reference = charge.provider_reference
-    row, created = PaymentLedger.record_chargeback(
+    if (order.metadata or {}).get("dispute_resolved_id") == reference:
+        return VivaWebhookEvent.OUTCOME_SKIPPED
+    outcome = PaymentLedger.record_chargeback(
         order, charge=charge, amount=amount, reference=reference
     )
-    if not created:
+    if outcome.row is None:
+        metadata = dict(order.metadata or {})
+        metadata.pop("disputed", None)
+        metadata["dispute_resolved_id"] = reference
+        order.metadata = metadata
+        order.save(update_fields=["metadata"])
+    if not announce_chargeback(
+        order,
+        outcome,
+        dispute_id=reference,
+        provider_code=VivaWalletPaymentProvider.code,
+    ):
         logger.info(
             "Viva chargeback for sale %s is already recorded on order %s — "
             "skipping",
@@ -1764,12 +1783,6 @@ def _record_viva_chargeback(order, charge, amount):
             order.id,
         )
         return VivaWebhookEvent.OUTCOME_SKIPPED
-    OrderHistory.log_chargeback(order, row.amount, reference)
-    dispatch_on_commit(
-        send_dispute_notification_email,
-        [order.id, reference, VivaWalletPaymentProvider.code],
-        {"lost": True},
-    )
     return None
 
 
@@ -1780,6 +1793,56 @@ def _record_viva_chargeback(order, charge, amount):
 #: ``OrderCode``; ``EventData.SaleTransactionId`` is "the transaction id
 #: which is matched to the wallet transaction".
 VIVA_ACCOUNT_TRANSACTION_CREATED = 2054
+
+
+def _tenants_holding_sale(tenants, sale_id: str) -> list:
+    """The *tenants* whose ledger holds a Viva CHARGE for *sale_id*, or
+    whose order was paid by that transaction."""
+    from order.enum.payment_transaction import PaymentTransactionKind
+    from order.models.payment_transaction import PaymentTransaction
+    from order.payment import VivaWalletPaymentProvider
+
+    holders = []
+    for tenant in tenants:
+        try:
+            with schema_context(tenant.schema_name):
+                if (
+                    PaymentTransaction.objects.filter(
+                        kind=PaymentTransactionKind.CHARGE,
+                        provider=VivaWalletPaymentProvider.code,
+                        provider_reference__iexact=sale_id,
+                    ).exists()
+                    or Order.objects.filter(payment_id__iexact=sale_id).exists()
+                ):
+                    holders.append(tenant)
+        except Exception:
+            # A destroyed tenant's schema may be gone already (see
+            # ``_order_exists_on_unavailable_tenant``).
+            logger.warning(
+                "Viva webhook: skipped tenant %s while resolving a sale — "
+                "its schema may already be gone",
+                getattr(tenant, "schema_name", tenant),
+                exc_info=True,
+            )
+    return holders
+
+
+def _sale_exists_on_unavailable_tenant(sale_id: str) -> bool:
+    """True when the sale is a payment of a suspended or inactive tenant:
+    "come back later", not "this means nothing here"."""
+    from tenant.models import Tenant
+
+    unavailable = Tenant.objects.filter(
+        is_active=False
+    ) | Tenant.objects.filter(suspended_at__isnull=False)
+    return bool(
+        _tenants_holding_sale(
+            unavailable.exclude(
+                schema_name=get_public_schema_name()
+            ).distinct(),
+            sale_id,
+        )
+    )
 
 
 def _resolve_tenant_candidates_for_sale(sale_id: str) -> list:
@@ -1793,27 +1856,14 @@ def _resolve_tenant_candidates_for_sale(sale_id: str) -> list:
     the ledger, so this is database lookups only; the Retrieve Transaction
     call that follows is still what authenticates the event.
     """
-    from order.enum.payment_transaction import PaymentTransactionKind
-    from order.models.payment_transaction import PaymentTransaction
-    from order.payment import VivaWalletPaymentProvider
     from tenant.models import Tenant
 
-    public = get_public_schema_name()
-    candidates = []
-    for tenant in Tenant.objects.filter(
-        is_active=True, suspended_at__isnull=True
-    ).exclude(schema_name=public):
-        with schema_context(tenant.schema_name):
-            if (
-                PaymentTransaction.objects.filter(
-                    kind=PaymentTransactionKind.CHARGE,
-                    provider=VivaWalletPaymentProvider.code,
-                    provider_reference__iexact=sale_id,
-                ).exists()
-                or Order.objects.filter(payment_id__iexact=sale_id).exists()
-            ):
-                candidates.append(tenant)
-    return candidates
+    return _tenants_holding_sale(
+        Tenant.objects.filter(
+            is_active=True, suspended_at__isnull=True
+        ).exclude(schema_name=get_public_schema_name()),
+        sale_id,
+    )
 
 
 def _handle_account_transaction_event(request, event_data: dict):
@@ -1833,6 +1883,15 @@ def _handle_account_transaction_event(request, event_data: dict):
         return JsonResponse({"status": "ok"})
 
     candidates = _resolve_tenant_candidates_for_sale(sale_id)
+    if not candidates and _sale_exists_on_unavailable_tenant(sale_id):
+        # Same as the payment path: Viva redelivers on a non-2xx (hourly,
+        # 24 attempts), and a 200 would lose the dispute for good.
+        logger.error(
+            "Viva account transaction for a sale of a suspended or inactive "
+            "tenant — refusing to acknowledge so Viva redelivers. "
+            "Reactivate the tenant within 24h or the dispute is lost."
+        )
+        return JsonResponse({"status": "tenant_unavailable"}, status=503)
     if not candidates:
         logger.info(
             "Viva account transaction for a sale that is no store's payment "

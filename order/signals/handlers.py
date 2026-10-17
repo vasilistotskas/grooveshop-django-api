@@ -11,6 +11,7 @@ from djmoney.money import Money
 from djstripe.event_handlers import djstripe_receiver
 from djstripe.models import Event
 
+from order.disputes import announce_chargeback
 from order.enum.status import (
     SETTLED_PAYMENT_STATUSES,
     OrderStatus,
@@ -1391,15 +1392,16 @@ def handle_stripe_dispute_closed(sender, **kwargs):
                         f"captured payment for {payment_intent_id}"
                     )
                     raise RuntimeError(msg)
-                row, created = PaymentLedger.record_chargeback(
+                chargeback = PaymentLedger.record_chargeback(
                     order,
                     charge=charge,
                     amount=amount,
                     reference=dispute_id,
                 )
-                # A dispute the ledger already holds (another event for it)
-                # is announced once, by the delivery that recorded it.
-                chargeback = row if created else None
+                if chargeback.row is None and order.metadata:
+                    # Nothing was left to take: no row, so nothing keeps the
+                    # dispute open either.
+                    order.metadata.pop("disputed", None)
 
             if not order.metadata:
                 order.metadata = {}
@@ -1413,11 +1415,13 @@ def handle_stripe_dispute_closed(sender, **kwargs):
             order.save(update_fields=["metadata"])
 
         if chargeback is not None:
-            OrderHistory.log_chargeback(order, chargeback.amount, dispute_id)
-            dispatch_on_commit(
-                send_dispute_notification_email,
-                [order.id, dispute_id, StripePaymentProvider.code],
-                {"lost": True},
+            # A dispute the ledger already holds (another event for it) is
+            # announced once, by the delivery that recorded it.
+            announce_chargeback(
+                order,
+                chargeback,
+                dispute_id=dispute_id,
+                provider_code=StripePaymentProvider.code,
             )
         elif not lost:
             OrderHistory.log_note(

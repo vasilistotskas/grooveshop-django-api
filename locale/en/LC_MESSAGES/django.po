@@ -20462,3 +20462,14 @@ msgstr ""
 
 msgid "A dispute is open on this payment and the payment provider does not accept a refund until it is decided. Refund once it has closed."
 msgstr ""
+
+msgid "The dispute closed against you and the money was taken back. Nothing was left on the payment to record as a chargeback, so the payment ledger is unchanged. The order status and payment status have NOT been changed."
+msgstr ""
+
+#, python-format
+msgid "Chargeback of %(requested)s not recorded: nothing is left on the payment (%(returned)s already returned)"
+msgstr ""
+
+#, python-format
+msgid "Chargeback %(amount)s (disputed %(requested)s, %(returned)s already returned)"
+msgstr ""

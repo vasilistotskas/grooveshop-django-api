@@ -228,15 +228,46 @@ class OrderHistory(TranslatableModel, TimeStampMixinModel, UUIDModel):
         )
 
     @classmethod
-    def log_chargeback(cls, order, amount, dispute_id):
-        """A lost dispute took *amount* back. Shown in red in the admin
+    def log_chargeback(
+        cls, order, *, recorded, requested, returned, dispute_id
+    ):
+        """A lost dispute took *recorded* back, of the *requested* the
+        provider named; *returned* had already left the payment through
+        refunds and chargebacks. Shown in red in the admin
         (``ORDER_HISTORY_CHANGE_TYPE_VARIANT``), and kept out of the
         customer timeline with the other internal rows."""
+        values = {
+            "amount": recorded,
+            "requested": requested,
+            "returned": returned,
+        }
+        if recorded.amount <= 0:
+            description = (
+                gettext(
+                    "Chargeback of %(requested)s not recorded: nothing is left "
+                    "on the payment (%(returned)s already returned)"
+                )
+                % values
+            )
+        elif recorded.amount < requested.amount:
+            description = (
+                gettext(
+                    "Chargeback %(amount)s (disputed %(requested)s, "
+                    "%(returned)s already returned)"
+                )
+                % values
+            )
+        else:
+            description = gettext("Chargeback %(amount)s") % values
         return cls.objects.create(
             order=order,
             change_type=cls.OrderHistoryChangeType.CHARGEBACK,
-            new_value={"amount": str(amount), "dispute_id": dispute_id},
-            description=gettext("Chargeback %(amount)s") % {"amount": amount},
+            new_value={
+                "amount": str(recorded),
+                "requested": str(requested),
+                "dispute_id": dispute_id,
+            },
+            description=description,
         )
 
 

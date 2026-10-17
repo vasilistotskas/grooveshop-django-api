@@ -543,6 +543,16 @@ The event carries the charge's CUMULATIVE `amount_refunded` and no refund id (St
 - `Order.status` is NOT auto-mutated (REFUNDED requires RETURNED first per the canonical table; that's a business call).
 - The `webhook_processed_<event id>` metadata flag is gone from this handler: the ledger is the guard. (The sibling payment handlers keep theirs.)
 
+#### 4.2.1 Stripe dispute (`charge.dispute.created`, `charge.dispute.closed`)
+
+Webhook handlers: `handle_stripe_dispute_created` and `handle_stripe_dispute_closed` (`order/signals/handlers.py`). Both find the order by the dispute's `payment_intent` and are guarded by the `webhook_processed_<event id>` metadata flag.
+
+- **Opened** flags the order (`metadata["disputed"]`), writes a NOTE and emails staff (`send_dispute_notification_email`). The ledger is untouched: until the dispute closes the money is still the merchant's to defend.
+- **Closed, `status == "lost"`**: the money is gone. `PaymentLedger.record_chargeback` records ONE CHARGEBACK row against the order's CHARGE (read from the provider by `ensure_charge` when the ledger lacks it), keyed on the dispute id, so a repeat adds nothing. The row lowers `refundable`, so staff cannot refund money already taken back. The order gets a red `CHARGEBACK` history entry ("Chargeback €X"; `ORDER_HISTORY_CHANGE_TYPE_VARIANT`, shown in the order admin's history tab) and staff get the same dispute email with `lost=True`.
+- **Closed, `won`**: clears `metadata["disputed"]` and leaves a NOTE. Any other closing status (`warning_closed`, an inquiry that never became a dispute) leaves a NOTE only. No row.
+- **`payment_status` does not move** on a lost dispute, and **`order_refunded` does not fire**: nothing was paid back, so there is no customer email, no Meta `Refund` event and no gift-card release. `refunded` and `refunded_on` count REFUND rows only, so the `charge.refunded` delta arithmetic (§4.2) is unchanged; a partly refunded order that is then charged back stays PARTIALLY_REFUNDED.
+- **Loyalty**: `order_charged_back` (sent once per new CHARGEBACK row) reverses the earned points once refunds plus chargebacks cover everything received (`PaymentLedger.fully_returned`, the same decision the refund path takes; §7.3). Staff can re-grant by hand.
+
 ### 4.3 Viva Wallet online
 
 Webhook handler: `order/views/viva_webhook.py::_handle_payment_created`.
@@ -1017,6 +1027,7 @@ is **per store, per kind**. `OpsAlertKind` is the whole list:
 | Retail receipt registered with myDATA | `send_invoice_email` | from `send_invoice_to_mydata`, once the MARK is persisted (§7.4) | `invoice_email_sent` |
 | Retail credit document registered with myDATA | `send_credit_email(credit_id)` | from `send_credit_to_mydata` (§7.4) | `credit_email_sent_<credit id>` in `Order.metadata` |
 | Dispute opened (staff) | `send_dispute_notification_email` | `charge.dispute.created` webhook | n/a (rare) |
+| Dispute lost (staff) | `send_dispute_notification_email(lost=True)` | `charge.dispute.closed` webhook, once per CHARGEBACK row (§4.2.1) | the ledger row (a repeat records nothing) |
 
 All transactional emails carry `List-Unsubscribe: mailto:` headers
 via `build_transactional_list_headers` (PR #4).
@@ -1182,19 +1193,19 @@ Every path ends in `PaymentLedger.record_refund` (§7.3), so there is one rule f
 | Column | Meaning |
 |---|---|
 | `order` | the order (`payment_transactions`) |
-| `kind` | `CHARGE` (a provider captured money), `REFUND` (a provider paid it back, or the merchant paid cash back themselves), `COD_COLLECTION` (a courier collected cash). No chargeback kind yet: a dispute is not a loss until it closes against the merchant, and no handler writes one. |
+| `kind` | `CHARGE` (a provider captured money), `REFUND` (a provider paid it back, or the merchant paid cash back themselves), `CHARGEBACK` (a lost dispute took the money back: written when it closes against the merchant, never when it opens; it is not a refund and moves no `payment_status`), `COD_COLLECTION` (a courier collected cash). |
 | `amount` | always positive; the kind gives the direction |
 | `provider` | `stripe`, `viva_wallet`, or the courier's `acs_cod` / `boxnow_cod`; `manual` on a REFUND the merchant made themselves (cash on delivery paid back by bank transfer or in cash) |
 | `provider_reference` | the provider's own id: PaymentIntent, Viva transaction, refund id, voucher / parcel (a Stripe dashboard refund has no id in `charge.refunded`, so it carries the event id) |
-| `charge` | on a REFUND, the CHARGE it reverses (an order paid twice is refunded payment by payment); null otherwise (a DB check enforces both) |
+| `charge` | on a REFUND or a CHARGEBACK, the CHARGE it reverses (an order paid twice is refunded payment by payment); null otherwise (a DB check enforces both) |
 | `description` | the reason given for a refund |
 | `created_at` | when it was recorded |
 
-`UNIQUE (provider, provider_reference, kind)` is the idempotency of every writer: a delivery repeated by the provider records nothing the second time (`record_*` return `created=False`). Writers (all under the order row lock): `OrderService.handle_payment_succeeded`, `handle_stripe_checkout_completed`, `_handle_payment_created` (CHARGE); `OrderService.settle_cod_payment`, reached from `AcsService._mark_cod_order_paid_if_pending` and `BoxNowService._mark_cod_order_paid_on_delivery` (COD_COLLECTION, written in the same atomic step as the payment status, §4.4); `OrderService.refund_order`, `handle_stripe_charge_refunded`, `_handle_reversal_created` (REFUND, through `record_refund`).
+`UNIQUE (provider, provider_reference, kind)` is the idempotency of every writer: a delivery repeated by the provider records nothing the second time (`record_*` return `created=False`). Writers (all under the order row lock): `OrderService.handle_payment_succeeded`, `handle_stripe_checkout_completed`, `_handle_payment_created` (CHARGE); `OrderService.settle_cod_payment`, reached from `AcsService._mark_cod_order_paid_if_pending` and `BoxNowService._mark_cod_order_paid_on_delivery` (COD_COLLECTION, written in the same atomic step as the payment status, §4.4); `OrderService.refund_order`, `handle_stripe_charge_refunded`, `_handle_reversal_created` (REFUND, through `record_refund`); `handle_stripe_dispute_closed` (CHARGEBACK, through `record_chargeback`). The Viva claim types are only logged for now: `record_chargeback` is provider-neutral and is the seam for them.
 
 **`RefundNotification`** (`order/models/refund_notification.py`) is the claim on a refund's confirmation email: one row per REFUND row (a one-to-one, so the database arbitrates between two tasks), inserted before the email is sent and deleted when the send fails for good. It is a side table, not a column on the ledger, so the ledger's rows stay the money facts they are and are never updated; who has been told about a refund is delivery bookkeeping with a lifecycle of its own. It follows its ledger row on delete (`CASCADE`).
 
-Everything else is read from the sums: `PaymentLedger.captured` (money received: CHARGE and COD_COLLECTION), `refunded` (REFUND, by a provider or by the merchant), `refundable` (per payment, collected cash included), and **`refund_status(order)`, the one function that decides REFUNDED versus PARTIALLY_REFUNDED** (refunded ≥ captured). `record_refund` writes the derived status onto the order in the same step as the row, so no path decides it for itself and it cannot go backwards. `payment_status` stays a column (every filter, serializer and guard reads it); the ledger is what it is derived from after a refund.
+Everything else is read from the sums: `PaymentLedger.captured` (money received: CHARGE and COD_COLLECTION), `refunded` (REFUND, by a provider or by the merchant), `charged_back` (CHARGEBACK), `fully_returned` (refunded plus charged back covers captured, what the loyalty reversal asks), `refundable` (per payment, collected cash included, less what a chargeback took), and **`refund_status(order)`, the one function that decides REFUNDED versus PARTIALLY_REFUNDED** (refunded ≥ captured). `record_refund` writes the derived status onto the order in the same step as the row, so no path decides it for itself and it cannot go backwards. `payment_status` stays a column (every filter, serializer and guard reads it); the ledger is what it is derived from after a refund.
 
 **What the customer owes is not what was collected.** `Order.amount_due` (`amountDue` in the API) is what the order costs the customer: `calculate_order_total_amount()` (lines and extras, less promotion, loyalty and gift card), written at creation and again where a deduction changes (the standalone loyalty redemption). It says nothing about money collected, which is the ledger's CHARGE and COD_COLLECTION rows.
 

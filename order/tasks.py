@@ -404,9 +404,11 @@ def _release_status_update_email(order_id: int, new_status: str) -> None:
     retry_jitter=True,
 )
 def send_dispute_notification_email(
-    self, order_id: int, dispute_id: str
+    self, order_id: int, dispute_id: str, lost: bool = False
 ) -> bool:
-    """Notify staff that a Stripe dispute has been opened for an order.
+    """Notify staff that a Stripe dispute has been opened for an order, or
+    (``lost``) that it closed against the merchant and the money was
+    recorded as a chargeback.
 
     Sends to the staff group email configured via ``INFO_EMAIL``.  Does NOT
     change order status — that is a manual decision.  Includes structured
@@ -417,6 +419,15 @@ def send_dispute_notification_email(
         order = Order.objects.select_related("user", "pay_way").get(id=order_id)
 
         reason = (order.metadata or {}).get("dispute_reason", "unknown")
+        chargeback = (
+            PaymentTransaction.objects.filter(
+                order=order,
+                kind=PaymentTransactionKind.CHARGEBACK,
+                provider_reference=dispute_id,
+            ).first()
+            if lost
+            else None
+        )
 
         # Staff-facing, rendered under no override: the active language.
         context = build_email_context(
@@ -424,11 +435,15 @@ def send_dispute_notification_email(
             order=order,
             dispute_id=dispute_id,
             reason=reason,
+            chargeback=chargeback,
+            lost=lost,
         )
 
         subject = (
-            f"[{tenant_site_name()}] Stripe dispute opened — Order #{order_id}"
-        )
+            _("[%(site)s] Stripe dispute lost — Order #%(order)s")
+            if lost
+            else _("[%(site)s] Stripe dispute opened — Order #%(order)s")
+        ) % {"site": tenant_site_name(), "order": order_id}
 
         try:
             text_content = render_to_string(

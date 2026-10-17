@@ -1307,6 +1307,136 @@ def handle_stripe_dispute_created(sender, **kwargs):
         logger.exception("Malformed charge.dispute.created payload")
 
 
+@djstripe_receiver("charge.dispute.closed")
+@with_tenant_schema_from_event
+def handle_stripe_dispute_closed(sender, **kwargs):
+    """Handle Stripe dispute closure webhook.
+
+    A dispute is a loss only once it closes against the merchant
+    (``status == "lost"``): then the money is gone, so it is recorded as one
+    CHARGEBACK row on the payment ledger keyed on the dispute id (a
+    redelivery adds nothing), the order history gets a red chargeback entry
+    and staff are emailed through the same notification as an opened
+    dispute. ``payment_status`` does not move and no refund is announced to
+    the customer; ``PaymentLedger.record_chargeback`` lowers what staff can
+    still refund.
+
+    ``won`` clears the ``disputed`` flag the created handler set. Any other
+    closing status (``warning_closed``: an inquiry that never became a
+    dispute) leaves a history note and nothing else.
+
+    Runs inside dj-stripe's webhook atomic, so everything but a malformed
+    payload propagates (see ``charge.refunded``).
+    """
+    logger.debug("Processing charge.dispute.closed webhook")
+
+    try:
+        event: Event = kwargs["event"]
+        dispute_data = event.data["object"]
+        payment_intent_id = dispute_data.get("payment_intent") or ""
+        dispute_id = dispute_data["id"]
+        dispute_status = dispute_data["status"]
+        event_id = event.id
+
+        if not payment_intent_id:
+            logger.error(
+                "charge.dispute.closed event missing payment_intent: %s",
+                event_id,
+            )
+            return
+
+        with transaction.atomic():
+            order = (
+                Order.objects.select_for_update()
+                .filter(payment_id=payment_intent_id)
+                .first()
+            )
+            if order is None:
+                logger.warning(
+                    "No order found for closed dispute payment_intent %s "
+                    "(dispute=%s)",
+                    payment_intent_id,
+                    dispute_id,
+                )
+                return
+
+            if order.metadata and order.metadata.get(
+                f"webhook_processed_{event_id}"
+            ):
+                logger.info(
+                    "Webhook %s already processed for order %s, skipping",
+                    event_id,
+                    order.id,
+                )
+                return
+
+            chargeback = None
+            lost = dispute_status == "lost"
+            if lost:
+                amount = money_from_minor_units(
+                    int(dispute_data["amount"]), dispute_data["currency"]
+                )
+                charge = PaymentLedger.ensure_charge(
+                    order,
+                    provider_code=StripePaymentProvider.code,
+                    payment_id=payment_intent_id,
+                )
+                if charge is None:
+                    # Raise so Stripe redelivers: a lost dispute with no
+                    # ledger row would leave the money refundable.
+                    msg = (
+                        f"Lost dispute {dispute_id} cannot be recorded: no "
+                        f"captured payment for {payment_intent_id}"
+                    )
+                    raise RuntimeError(msg)
+                row, created = PaymentLedger.record_chargeback(
+                    order,
+                    charge=charge,
+                    amount=amount,
+                    reference=dispute_id,
+                )
+                # A dispute the ledger already holds (another event for it)
+                # is announced once, by the delivery that recorded it.
+                chargeback = row if created else None
+
+            if not order.metadata:
+                order.metadata = {}
+            if dispute_status == "won":
+                order.metadata.pop("disputed", None)
+            order.metadata[f"webhook_processed_{event_id}"] = True
+            order.save(update_fields=["metadata"])
+
+        if chargeback is not None:
+            OrderHistory.log_chargeback(order, chargeback.amount, dispute_id)
+            dispatch_on_commit(
+                send_dispute_notification_email,
+                [order.id, dispute_id],
+                {"lost": True},
+            )
+        elif not lost:
+            OrderHistory.log_note(
+                order=order,
+                note=(
+                    f"Stripe dispute closed: dispute_id={dispute_id}, "
+                    f"status={dispute_status}"
+                ),
+            )
+
+        logger.warning(
+            "Stripe dispute closed",
+            extra={
+                "order_id": order.id,
+                "dispute_id": dispute_id,
+                "status": dispute_status,
+                "event_id": event_id,
+            },
+        )
+
+    except KeyError, TypeError:
+        # Malformed payload only: see charge.refunded above.
+        logger.exception("Malformed charge.dispute.closed payload")
+
+
 @djstripe_receiver("checkout.session.completed")
 @with_tenant_schema_from_event
 def handle_stripe_checkout_completed(sender, **kwargs):

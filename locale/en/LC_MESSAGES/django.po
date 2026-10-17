@@ -19304,7 +19304,7 @@ msgid "Refunded charge"
 msgstr ""
 
 #: .\order\models\payment_transaction.py:76
-msgid "Set on a refund: the charge it paid back."
+msgid "Set on a refund or a chargeback: the charge it took money from."
 msgstr ""
 
 #: .\order\models\payment_transaction.py:83
@@ -20433,4 +20433,26 @@ msgstr ""
 
 #: .\cart\views\cart.py
 msgid "Mint a short-lived token that lets the shopping assistant act on the signed-in shopper's own cart: read it, add, update and remove items, apply and remove coupons. Nothing else: not payment, stock reservation, checkout or deleting the cart. Send it as the ``X-Cart-Token`` header. It stops working when it expires or the shopper signs out; mint a new one when a call is refused with 401."
+msgstr ""
+
+msgid "Chargeback"
+msgstr ""
+
+#, python-format
+msgid "Chargeback %(amount)s"
+msgstr ""
+
+#, python-format
+msgid "[%(site)s] Stripe dispute lost — Order #%(order)s"
+msgstr ""
+
+#, python-format
+msgid "[%(site)s] Stripe dispute opened — Order #%(order)s"
+msgstr ""
+
+#, python-format
+msgid "Stripe dispute lost — Order #%(order_id)s"
+msgstr ""
+
+msgid "The dispute closed against you and the money was taken back. It is recorded as a chargeback on the order's payment ledger, so it can no longer be refunded. The order status and payment status have NOT been changed."
 msgstr ""

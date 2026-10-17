@@ -21786,8 +21786,8 @@ msgid "Refunded charge"
 msgstr "Επιστραφείσα χρέωση"
 
 #: .\order\models\payment_transaction.py:76
-msgid "Set on a refund: the charge it paid back."
-msgstr "Ορίζεται σε μια επιστροφή: η χρέωση που επέστρεψε."
+msgid "Set on a refund or a chargeback: the charge it took money from."
+msgstr "Ορίζεται σε επιστροφή ή chargeback: η χρέωση από την οποία αφαιρέθηκαν χρήματα."
 
 #: .\order\models\payment_transaction.py:83
 msgid "The reason given for a refund."
@@ -23073,3 +23073,25 @@ msgstr "Έκδοση διακριτικού καλαθιού για τον βο�
 #: .\cart\views\cart.py
 msgid "Mint a short-lived token that lets the shopping assistant act on the signed-in shopper's own cart: read it, add, update and remove items, apply and remove coupons. Nothing else: not payment, stock reservation, checkout or deleting the cart. Send it as the ``X-Cart-Token`` header. It stops working when it expires or the shopper signs out; mint a new one when a call is refused with 401."
 msgstr "Εκδίδει ένα βραχύβιο διακριτικό που επιτρέπει στον βοηθό αγορών να ενεργεί στο δικό του καλάθι του συνδεδεμένου αγοραστή: να το διαβάζει, να προσθέτει, να ενημερώνει και να αφαιρεί προϊόντα, να εφαρμόζει και να αφαιρεί κουπόνια. Τίποτα άλλο: ούτε πληρωμή, ούτε δέσμευση αποθέματος, ούτε ολοκλήρωση αγοράς, ούτε διαγραφή του καλαθιού. Στείλτε το ως κεφαλίδα ``X-Cart-Token``. Σταματά να λειτουργεί όταν λήξει ή όταν ο αγοραστής αποσυνδεθεί· εκδώστε νέο όταν μια κλήση απορρίπτεται με 401."
+
+msgid "Chargeback"
+msgstr "Αμφισβήτηση χρέωσης (chargeback)"
+
+#, python-format
+msgid "Chargeback %(amount)s"
+msgstr "Αμφισβήτηση χρέωσης (chargeback) %(amount)s"
+
+#, python-format
+msgid "[%(site)s] Stripe dispute lost — Order #%(order)s"
+msgstr "[%(site)s] Χαμένη διαφορά Stripe — Παραγγελία #%(order)s"
+
+#, python-format
+msgid "[%(site)s] Stripe dispute opened — Order #%(order)s"
+msgstr "[%(site)s] Ανοιχτή διαφορά Stripe — Παραγγελία #%(order)s"
+
+#, python-format
+msgid "Stripe dispute lost — Order #%(order_id)s"
+msgstr "Χαμένη διαφορά Stripe — Παραγγελία #%(order_id)s"
+
+msgid "The dispute closed against you and the money was taken back. It is recorded as a chargeback on the order's payment ledger, so it can no longer be refunded. The order status and payment status have NOT been changed."
+msgstr "Η διαφορά έκλεισε εις βάρος σας και τα χρήματα αφαιρέθηκαν. Καταγράφηκε ως chargeback στο ταμείο πληρωμών της παραγγελίας, άρα δεν μπορεί πλέον να επιστραφεί. Η κατάσταση της παραγγελίας και της πληρωμής ΔΕΝ άλλαξαν."

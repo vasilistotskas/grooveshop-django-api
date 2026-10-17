@@ -1,22 +1,26 @@
-Stripe dispute opened — Order #{{ order.id }}
+{% load i18n %}{% if lost %}{% blocktrans with order_id=order.id %}Stripe dispute lost — Order #{{ order_id }}{% endblocktrans %}
+
+{% trans "The dispute closed against you and the money was taken back. It is recorded as a chargeback on the order's payment ledger, so it can no longer be refunded. The order status and payment status have NOT been changed." %}
+{% else %}Stripe dispute opened — Order #{{ order.id }}
 
 A Stripe dispute has been opened against this order. The order
 status has NOT been changed automatically — please review the dispute
 in the Stripe dashboard and decide whether to accept or contest it.
-
+{% endif %}
 DISPUTE
   Dispute ID:        {{ dispute_id }}
   Reason:            {{ reason|default:"unknown" }}
-  Order:             #{{ order.id }}
+{% if chargeback %}  {% trans "Chargeback" %}:        {{ chargeback.amount }}
+{% endif %}  Order:             #{{ order.id }}
   Customer:          {{ order.first_name }} {{ order.last_name }} <{{ order.email }}>
 {% if order.payment_id %}  Stripe PI:         {{ order.payment_id }}
 {% endif %}  Order placed:      {{ order.created_at|date:"SHORT_DATETIME_FORMAT" }}
   Order total:       {{ order.total_price }}
 
-NEXT STEPS
+{% if not lost %}NEXT STEPS
   - Open the Stripe dashboard, find dispute {{ dispute_id }}.
   - Decide whether to submit evidence (contest) or accept the dispute.
   - Respond before Stripe's deadline — defaults to 7 calendar days for chargebacks.
-  - Update order metadata or status manually if you accept the dispute.
+  - Update order metadata or status manually if you accept the dispute.{% endif %}
 
 This email is operational; staff only.

@@ -22,6 +22,12 @@ from django_celery_beat.models import (
     PeriodicTask,
     SolarSchedule,
 )
+from django_celery_results.admin import (
+    GroupResultAdmin as BaseGroupResultAdmin,
+)
+from django_celery_results.admin import TaskResultAdmin as BaseTaskResultAdmin
+from django_celery_results.models import GroupResult, TaskResult
+from django_tenants.utils import get_public_schema_name
 from extra_settings.models import Setting
 from unfold.admin import ModelAdmin
 from unfold.contrib.filters.admin import DropdownFilter
@@ -33,6 +39,7 @@ from admin.mixins import (
     IsSuperuserOnlyModelAdmin,
     WithheldOnTenantHostModelAdmin,
 )
+from core.result_backend import ran_in_store, ran_on_platform, store_of
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +86,8 @@ def override_third_party_admins():
     for model_class, admin_class in [
         (Setting, SettingAdmin),
         (PeriodicTask, PeriodicTaskAdmin),
+        (TaskResult, TaskResultAdmin),
+        (GroupResult, GroupResultAdmin),
         (IntervalSchedule, IntervalScheduleAdmin),
         (CrontabSchedule, CrontabScheduleAdmin),
         (SolarSchedule, SolarScheduleAdmin),
@@ -97,9 +106,6 @@ def override_third_party_admins():
             "knox",
             "socialaccount",
             "mfa",
-            # Linked from the System sidebar but previously rendered with
-            # default Django widgets — wrap so every admin form is unfold.
-            "django_celery_results",
             "account",
             "usersessions",
             "sites",
@@ -109,8 +115,8 @@ def override_third_party_admins():
         admin.site.unregister(model)
 
         # The mixin goes FIRST so its permission overrides win the
-        # MRO: these are third-party admins (sites.Site,
-        # django_celery_results) that never reach BaseModelAdmin.
+        # MRO: these are third-party admins (sites.Site, ...) that never
+        # reach BaseModelAdmin.
         new_admin_class = type(
             f"{model.__name__}AdminOverride",
             (WithheldOnTenantHostModelAdmin, model_admin.__class__, ModelAdmin),
@@ -362,6 +368,91 @@ class SettingAdmin(BaseModelAdmin):
 
 class PeriodicTaskAdmin(BasePeriodicTaskAdmin, BaseModelAdmin):
     form = UnfoldPeriodicTaskForm
+
+
+class TaskResultStoreFilter(DropdownFilter):
+    """Which store's task failed, from the schema ``TenantTask`` recorded.
+
+    Task results live in one public-schema table, so this is a match on
+    the stored ``meta`` (see ``core.result_backend``), not a foreign key.
+    """
+
+    title = _("Store")
+    parameter_name = "store"
+
+    #: Not a schema name: the public schema is not a store.
+    PLATFORM = "platform"
+
+    def lookups(self, request, model_admin):
+        from tenant.models import Tenant
+
+        return [
+            (self.PLATFORM, _("Platform")),
+            *(
+                (schema_name, name)
+                for schema_name, name in Tenant.objects.exclude(
+                    schema_name=get_public_schema_name()
+                )
+                .order_by("name")
+                .values_list("schema_name", "name")
+            ),
+        ]
+
+    def queryset(self, request, queryset):
+        value = self.value()
+        if not value:
+            return queryset
+        if value == self.PLATFORM:
+            return queryset.filter(ran_on_platform())
+        return queryset.filter(ran_in_store(value))
+
+
+class TaskResultAdmin(
+    WithheldOnTenantHostModelAdmin, BaseTaskResultAdmin, ModelAdmin
+):
+    """Background-task failures for every store, on the control plane only.
+
+    ``WithheldOnTenantHostModelAdmin`` keeps it off a store's own admin: a
+    store owner never sees another store's failures.
+    """
+
+    list_display = (
+        "task_id",
+        "store",
+        "periodic_task_name",
+        "task_name",
+        "date_done",
+        "status",
+        "worker",
+    )
+    list_filter = (TaskResultStoreFilter, *BaseTaskResultAdmin.list_filter)
+
+    def changelist_view(self, request, extra_context=None):
+        response = super().changelist_view(request, extra_context)
+        changelist = (getattr(response, "context_data", None) or {}).get("cl")
+        if changelist is not None:
+            from tenant.models import Tenant
+
+            # One query for the names, not one per row.
+            names = dict(Tenant.objects.values_list("schema_name", "name"))
+            for row in changelist.result_list:
+                schema_name = store_of(row)
+                row.store_label = (
+                    _("Platform")
+                    if schema_name in (None, get_public_schema_name())
+                    else names.get(schema_name, schema_name)
+                )
+        return response
+
+    @display(description=_("Store"))
+    def store(self, obj):
+        return getattr(obj, "store_label", "—")
+
+
+class GroupResultAdmin(
+    WithheldOnTenantHostModelAdmin, BaseGroupResultAdmin, ModelAdmin
+):
+    pass
 
 
 class IntervalScheduleAdmin(BaseModelAdmin):

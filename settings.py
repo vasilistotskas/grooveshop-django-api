@@ -866,7 +866,11 @@ if not CELERY_BROKER_URL:
             "CELERY_BROKER_URL must be set in production."
         )
     CELERY_BROKER_URL = "amqp://guest:guest@rabbitmq:5672//"
-CELERY_RESULT_BACKEND = getenv("CELERY_RESULT_BACKEND", "django-db")
+# Not an environment setting: the platform dashboard and the Task Results
+# admin read ``django_celery_results``, so the backend must be the
+# database one. ``core.result_backend`` is ``django-db`` plus the store a
+# failed task belongs to.
+CELERY_RESULT_BACKEND = "core.result_backend.TenantDatabaseBackend"
 CELERY_CACHE_BACKEND = getenv("CELERY_CACHE_BACKEND", "django-cache")
 
 # Task execution

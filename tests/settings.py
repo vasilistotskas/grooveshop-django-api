@@ -56,7 +56,14 @@ _PINNED_ENVIRONMENT = {
 environ.update(_PINNED_ENVIRONMENT)
 
 from settings import *  # noqa: E402, F403
-from settings import REDIS_URL  # noqa: E402
+from settings import CELERY_RESULT_BACKEND, REDIS_URL  # noqa: E402
+
+# Celery reads the ``CELERY_RESULT_BACKEND`` ENVIRONMENT variable before
+# the Django setting of the same name (``Settings.result_backend`` in
+# ``celery/app/utils.py``), and ``.env`` has long shipped ``CELERY_RESULT_BACKEND='django-db'``. Left alone, that
+# replaced ``core.result_backend`` on a developer machine only and the
+# store recorded on a stored failure silently vanished.
+environ["CELERY_RESULT_BACKEND"] = CELERY_RESULT_BACKEND
 
 # The backend the suite really runs on, declared here rather than
 # patched onto the instance after start-up. Django rebuilds the

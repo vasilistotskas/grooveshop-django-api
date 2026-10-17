@@ -13,11 +13,13 @@ import time
 from datetime import timedelta
 from decimal import Decimal
 from unittest.mock import patch
+from uuid import uuid4
 
 import pytest
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
 from django.core.cache import cache
+from django.core.cache.backends.locmem import LocMemCache
 from django.test import RequestFactory, override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -34,6 +36,7 @@ from cart.agent_token import (
 from cart.factories import CartFactory, CartItemFactory
 from cart.models import Cart
 from cart.services import CartService
+from core.api.throttling import CartAgentTokenThrottle
 from product.factories import ProductFactory
 from tests.utils.staff import (
     bind_store_tenant,
@@ -439,3 +442,37 @@ class TestNeverLogged:
         assert caplog.records
         assert token not in caplog.text
         assert "a-bad-token-value" not in caplog.text
+
+
+class TestMintThrottle:
+    def test_scope_is_budgeted_and_fails_closed(self):
+        assert CartAgentTokenThrottle.scope == "cart_agent_token"
+        assert CartAgentTokenThrottle.fail_closed is True
+        rates = settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]
+        assert "cart_agent_token" in rates
+
+    def test_a_signed_in_caller_runs_out_of_mints(self, shopper, monkeypatch):
+        # A private cache and a class-level rate: the suite runs with
+        # every rate disabled and Redis shared across workers (the
+        # pattern of the b2b profile-submit throttle test).
+        monkeypatch.setattr(
+            CartAgentTokenThrottle, "rate", "2/minute", raising=False
+        )
+        monkeypatch.setattr(
+            CartAgentTokenThrottle,
+            "cache",
+            LocMemCache(f"cart-token-throttle-{uuid4()}", {}),
+            raising=False,
+        )
+        client = shopper[3]
+
+        statuses = [
+            client.post(reverse("cart-agent-token")).status_code
+            for _ in range(3)
+        ]
+
+        assert statuses == [
+            status.HTTP_200_OK,
+            status.HTTP_200_OK,
+            status.HTTP_429_TOO_MANY_REQUESTS,
+        ]

@@ -48055,6 +48055,12 @@ components:
             τότε επιστρέφει στην ενσωματωμένη προεπιλογή του. Το ``settings.MEDIA_URL``
             είναι απόλυτο σε κάθε περιβάλλον, οπότε αυτό είναι πάντα πλήρες URL όταν
             υπάρχει.
+        logoPath:
+          type: string
+          nullable: true
+          description: Relative media path of the same logo as ``logo_url`` (``media/{schema}/uploads/shipping/…``),
+            for the storefront to render through media-stream at the size it shows.
+            Null when no logo is uploaded.
         metadata:
           type: object
           additionalProperties: {}

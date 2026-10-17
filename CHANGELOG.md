@@ -3,6 +3,107 @@
 
 
 
+## v3.132.0 (2026-10-17)
+
+### Bug fixes
+
+* fix(cart): bound the source filters and ignore an emptied guest cart on merge
+
+The acquisition source filters listed every distinct stored source, and
+an unrecognised utm_source is stored as the shopper typed it, so the
+dropdown and the query grew without limit. They now offer at most
+ACQUISITION_SOURCE_MAX_CHOICES in one aggregated query: the registry's
+known channels first, then the most frequent of the rest. Checkout's
+OrderSourceFilter shares the base and is bounded the same way.
+
+A guest cart that was emptied before login no longer carries its first
+touch into the account cart: a source that brought no lines must not
+replace the one that did.
+
+The erasure docs no longer claim attribution rows hold no identity:
+source, medium, campaign and landing path are whatever the shopper's
+link carried. They state what is stored and that erasure keeps the
+order's attribution row, cart source included, and the erasure test
+pins it.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DKyCtCCkFTgcH6VAVK3AJm
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`8ccb02a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8ccb02ad97685fd9a37da79cdbb45e24b3fa327a))
+
+### Documentation
+
+* docs(order): describe cart first-touch attribution
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DKyCtCCkFTgcH6VAVK3AJm ([`8ccb02a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8ccb02ad97685fd9a37da79cdbb45e24b3fa327a))
+
+### Features
+
+* feat(cart): carts record their first-touch order source, and orders keep it next to their own (#235) ([`8ccb02a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8ccb02ad97685fd9a37da79cdbb45e24b3fa327a))
+
+* feat(cart): record a cart's first-touch source and keep it on the order
+
+A cart now remembers where its shopper came from. CartAttribution
+(cart.0015) shares its columns with OrderAttribution through an abstract
+AcquisitionSourceModel, so OrderAttribution's table is unchanged apart
+from two additive columns, cart_source_type and cart_source (order.0075,
+db_default ''), where both checkout paths copy the cart's first touch
+because the cart is deleted once its lines become an order.
+
+CartAttributionService.capture is the single entry point, called before
+the line is written by every path that can take a cart from no lines to
+some: add to cart (a new cart or a refill after emptying), reorder and
+the guest-to-account merge. An empty cart takes the touch, a cart
+holding lines keeps its own, and the merge keeps the earlier of the two.
+
+POST /cart/item takes the same optional write-only attribution object as
+order create (same serializer, same validation, agentProtocol believed
+only with the gateway secret). An add without it records nothing, which
+is what the agent gateway's cart-token path sends. The request-to-input
+step moves out of OrderViewSet into OrderAttributionService so both
+endpoints share it. The response contract only gains the request field.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DKyCtCCkFTgcH6VAVK3AJm ([`8ccb02a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8ccb02ad97685fd9a37da79cdbb45e24b3fa327a))
+
+* feat(admin): show order source on carts and cart source on orders
+
+The cart list gains an "Order source" column and filters that read
+CartAttribution the way the order list reads OrderAttribution, both on
+one shared AcquisitionSourceFilter. A live cart whose checkout already
+created an order awaiting online payment shows "Checkout started,
+awaiting payment: order #N" (linked) with a filter of its own, named
+apart from the idle "Abandoned" one; the order is found through the
+order's cart snapshot in one correlated subquery on the changelist
+queryset, so no row costs a query.
+
+The order list and form show the cart source next to the checkout
+source, and filter by it, so conversion by cart source is read from the
+orders list.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DKyCtCCkFTgcH6VAVK3AJm ([`8ccb02a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8ccb02ad97685fd9a37da79cdbb45e24b3fa327a))
+
+### Refactoring
+
+* refactor(cart): drop the unused CartService line writers
+
+create_cart_item, update_cart_item and delete_cart_item (and the
+CartNotSetException only they raised) had no production caller: the
+cart item endpoints go through their serializers. create_cart_item
+wrote lines without recording the cart's first-touch source, so it was
+a path around CartAttributionService.
+
+The service tests that used them as setup now put lines in with
+CartItemFactory; the ones that only exercised them are dropped, the
+endpoints being covered by test_view_cart_item.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DKyCtCCkFTgcH6VAVK3AJm ([`8ccb02a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8ccb02ad97685fd9a37da79cdbb45e24b3fa327a))
+
 ## v3.131.0 (2026-10-17)
 
 ### Bug fixes

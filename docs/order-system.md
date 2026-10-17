@@ -381,10 +381,18 @@ Orders made outside checkout — the demo seed (`devtools/demo_account.py`,
   column, filters (`attribution__cart_source_type`,
   `OrderCartSourceFilter`) and change-form fields next to the order
   source: conversion by cart source is read from the orders list.
-- **Erasure.** Neither row holds an identity: only a referrer host, a
-  landing path and a channel name. `CartAttribution` cascades with its
-  cart (and so with the account); the order's `cart_source` stays with
-  the order, as `OrderAttribution` does. Neither is in the data export.
+- **Erasure.** Both rows store a channel name, a medium, a campaign, a
+  referrer host (no path or query) and a landing path (no query), all
+  capped. They hold no account identifier, but `source`, `medium`,
+  `campaign` and `landing_path` are whatever the shopper's link carried,
+  so a hand-typed link can put personal text in them; nothing scrubs
+  that. Erasure treats them as follows. `CartAttribution` cascades with
+  its cart, and so with the account. `anonymise_and_delete_user` does
+  not touch `OrderAttribution`: the order is kept as the store's
+  record, and its attribution row stays with it, `source`,
+  `landing_path` and the copied `cart_source_type` / `cart_source`
+  alike (`test_the_cart_source_goes_with_the_cart_and_the_order_keeps_its_own`
+  pins this). Neither row is in the data export.
 
 Adding a known channel is one `KnownSource` entry (and, for a new
 click-id parameter, one `CLICK_ID_PARAMS` entry, which changes the

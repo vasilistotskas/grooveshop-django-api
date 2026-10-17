@@ -20,6 +20,7 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import translation
 
+from admin.filters import ACQUISITION_SOURCE_MAX_CHOICES
 from cart.admin import CartAdmin, CartSourceFilter, CheckoutStateFilter
 from cart.models import Cart, CartAttribution
 from order.enum.attribution import OrderSourceType
@@ -115,6 +116,39 @@ class TestSourceFilter:
         filtered = self._filter("instagram").queryset(None, Cart.objects.all())
 
         assert list(filtered) == [instagram]
+
+
+class TestSourceFilterIsBounded:
+    def _filter(self):
+        request = RequestFactory().get("/")
+        return CartSourceFilter(request, {}, Cart, _admin())
+
+    def _lookups(self):
+        return self._filter().lookups(None, _admin())
+
+    def test_offers_at_most_the_cap_in_one_query(self):
+        for number in range(ACQUISITION_SOURCE_MAX_CHOICES + 10):
+            _cart(f"typed-{number}", OrderSourceType.CAMPAIGN)
+
+        source_filter = self._filter()  # unfold builds the choices here
+        with CaptureQueriesContext(connection) as queries:
+            lookups = source_filter.lookups(None, _admin())
+
+        assert len(lookups) == ACQUISITION_SOURCE_MAX_CHOICES
+        assert len(queries) == 1
+
+    def test_known_channels_survive_the_cut_and_the_most_used_come_next(self):
+        _cart("instagram")
+        # Sorting before "instagram", so only the known-first rule keeps it.
+        for number in range(ACQUISITION_SOURCE_MAX_CHOICES):
+            _cart(f"a-typed-{number}", OrderSourceType.CAMPAIGN)
+        for _ in range(3):
+            _cart("popular.example.org", OrderSourceType.REFERRAL)
+
+        sources = {value for value, _label in self._lookups()}
+
+        assert {"instagram", "popular.example.org"} <= sources
+        assert len(sources) == ACQUISITION_SOURCE_MAX_CHOICES
 
 
 class TestCheckoutColumn:

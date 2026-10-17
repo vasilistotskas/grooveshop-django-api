@@ -277,9 +277,14 @@ class CartService:
             return
 
         # Before any line moves: whether the target already holds lines
-        # is what decides which source the merged cart keeps.
+        # is what decides which source the merged cart keeps. A guest
+        # cart that was emptied brings no lines, so its source brings
+        # nothing either.
         source_touch = CartAttribution.objects.filter(pk=source_cart.pk).first()
-        if source_touch is not None:
+        if (
+            source_touch is not None
+            and CartItem.objects.filter(cart_id=source_cart.pk).exists()
+        ):
             CartAttributionService.capture(
                 target_cart,
                 ClassifiedAttribution(

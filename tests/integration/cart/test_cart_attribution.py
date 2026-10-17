@@ -281,6 +281,17 @@ class TestMergeKeepsTheEarliest:
 
         assert CartAttribution.objects.get(cart=target).source == "instagram"
 
+    def test_an_emptied_guest_cart_does_not_replace_the_account_source(self):
+        user, target, guest = self._carts()
+        now = timezone.now()
+        self._fill(target, _touch("google", OrderSourceType.SEARCH), at=now)
+        self._fill(guest, _touch("instagram"), at=now - timedelta(days=2))
+        guest.items.all().delete()
+
+        self._merge(guest, user)
+
+        assert CartAttribution.objects.get(cart=target).source == "google"
+
     def test_a_guest_cart_without_a_source_leaves_the_account_one(self):
         user, target, guest = self._carts()
         now = timezone.now()

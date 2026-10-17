@@ -10,11 +10,24 @@ value that must be annotated first.
 
 from __future__ import annotations
 
-from django.db.models import Model, QuerySet
+from django.db.models import (
+    Case,
+    Count,
+    IntegerField,
+    Model,
+    QuerySet,
+    Value,
+    When,
+)
 from django.utils.translation import gettext_lazy as _
 from unfold.contrib.filters.admin import DropdownFilter, RangeNumericListFilter
 
-from order.attribution import source_label
+from order.attribution import KNOWN_SOURCES, source_label
+
+ACQUISITION_SOURCE_MAX_CHOICES = 30
+"""How many sources an acquisition filter offers: an unrecognised
+``utm_source`` is stored as the shopper typed it, so the distinct values
+are unbounded and the dropdown must not follow them."""
 
 
 class AnnotatedRangeFilter(RangeNumericListFilter):
@@ -59,6 +72,11 @@ class AcquisitionSourceFilter(DropdownFilter):
     changelist's own model. Direct visits have no source (an empty
     value would read as "All"), so they are reached through the
     source-type filter instead.
+
+    The dropdown is bounded (``ACQUISITION_SOURCE_MAX_CHOICES``, one
+    aggregated query): the registry's known channels first, then the
+    most frequent of the rest. A source cut off here is still reachable
+    through the URL parameter, and its type through the type filter.
     """
 
     title = _("Order source")
@@ -69,12 +87,23 @@ class AcquisitionSourceFilter(DropdownFilter):
     lookup = "attribution__source"
 
     def lookups(self, request, model_admin):
+        known = [known.key for known in KNOWN_SOURCES]
         labels = {}
         for source, source_type in (
             self.model.objects.exclude(**{self.source_field: ""})
-            .values_list(self.source_field, self.type_field)
-            .order_by(self.source_field, self.type_field)
-            .distinct()
+            .values(self.source_field, self.type_field)
+            .annotate(
+                rows=Count("pk"),
+                is_known=Case(
+                    When(**{f"{self.source_field}__in": known}, then=Value(0)),
+                    default=Value(1),
+                    output_field=IntegerField(),
+                ),
+            )
+            .order_by("is_known", "-rows", self.source_field, self.type_field)
+            .values_list(self.source_field, self.type_field)[
+                :ACQUISITION_SOURCE_MAX_CHOICES
+            ]
         ):
             labels.setdefault(source, source_label(source, source_type))
         return sorted(labels.items(), key=lambda item: str(item[1]).lower())

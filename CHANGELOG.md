@@ -3,6 +3,276 @@
 
 
 
+## v3.127.0 (2026-10-17)
+
+### Bug fixes
+
+* fix(celery): retry only transient errors instead of every Exception
+
+63 tasks retried on Exception (60 decorators plus the MeiliTask class
+default), so a TypeError or IntegrityError was retried like an outage and
+re-ran side effects. Each task now names a set from the new core/retry.py:
+TRANSIENT_ERRORS (DB, network, Redis, broker), MAIL_TRANSIENT_ERRORS,
+SEARCH_TRANSIENT_ERRORS (Meilisearch communication/timeout, not
+MeiliTaskFailed) and TRANSIENT_HTTP_ERRORS.
+
+SMTP and HTTP verdicts live in a status code, not a class, so
+MonitoredTask.retry stops on an SMTP 5xx or an HTTP 4xx (except 408/429)
+for both autoretry_for and explicit self.retry. The _smtp_codes /
+_is_permanent_smtp_failure helpers move from user/tasks.py into core, and
+send_rendered_email_task now uses the shared mechanism. order/notifications
+RETRYABLE_DB_ERRORS and search's DB tuple fold into TRANSIENT_DB_ERRORS.
+
+A guard test walks celery_app.tasks and fails if any autoretry_for
+contains Exception.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DKyCtCCkFTgcH6VAVK3AJm ([`da4a040`](https://github.com/vasilistotskas/grooveshop-django-api/commit/da4a0406c0e5666c2e9f5d0624413e4ea647d3f3))
+
+* fix(tenant): refuse to delete a country or region a store still uses (#222)
+
+Country and Region are public rows every store reads, but the orders,
+saved addresses, shipping rates and pay-way exclusions that point at them
+are in each store's own schema. The deletion collector run from the
+public schema cannot see those tables: deleting any country from the
+platform admin failed on shipping_shippingrate, and a delete issued from
+inside one store's schema would null that store's orders while another
+store still referenced the row.
+
+tenant.reference_guard asks every store's schema, finding the references
+from the models' own reverse relations (hidden related_name="+" ones
+included, simple-history rows excluded). The Country and Region admins use
+PublicReferenceDataDeletionMixin, which lists the stores on the
+confirmation page and in the bulk action, and deletes an unused row
+through the public-schema collector. A pre_delete receiver refuses every
+other path. A country is also refused when a store uses one of its
+regions. Region deletion from the country's inline is switched off, since
+it would run the stock collector.
+
+Corrects the ShippingRate.country comment, which said its related_name="+"
+matched Order.country (that one is "orders").
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DKyCtCCkFTgcH6VAVK3AJm ([`da4a040`](https://github.com/vasilistotskas/grooveshop-django-api/commit/da4a0406c0e5666c2e9f5d0624413e4ea647d3f3))
+
+* fix: complete the English catalogue and cover the task result admins
+
+Combining the branches left one English entry without its msgstr, so
+compilemessages failed. The changelist query-growth test gets builders
+for the TaskResult and GroupResult admins, now first-party.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DKyCtCCkFTgcH6VAVK3AJm ([`da4a040`](https://github.com/vasilistotskas/grooveshop-django-api/commit/da4a0406c0e5666c2e9f5d0624413e4ea647d3f3))
+
+* fix: the combined batch keeps every repo-wide guard
+
+- The contact retention purge retries only a lost database connection,
+  like every task since the transient-retry change.
+- TaskResultAdmin and GroupResultAdmin extend BaseModelAdmin, which
+  already withholds them on a store host.
+- The follow-up reason test pins English, so compiled Greek catalogues
+  do not change what it compares.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DKyCtCCkFTgcH6VAVK3AJm ([`da4a040`](https://github.com/vasilistotskas/grooveshop-django-api/commit/da4a0406c0e5666c2e9f5d0624413e4ea647d3f3))
+
+### Chores
+
+* chore(celery): drop settings Celery never reads and fix the retry docs
+
+CELERY_TASK_AUTORETRY_FOR, CELERY_TASK_RETRY_BACKOFF(_MAX),
+CELERY_TASK_RETRY_JITTER and CELERY_TASK_MAX_RETRIES are not in
+celery.app.defaults' task namespace, so they configured nothing while
+reading like a global policy. CLAUDE.md's "max 5 retries" for all tasks
+was wrong too: each decorator sets its own max_retries.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DKyCtCCkFTgcH6VAVK3AJm ([`da4a040`](https://github.com/vasilistotskas/grooveshop-django-api/commit/da4a0406c0e5666c2e9f5d0624413e4ea647d3f3))
+
+### Features
+
+* feat: batch 2 store operations — follow-up flag, alert kinds, retention, task store, reference guard, transient retries (#226) ([`da4a040`](https://github.com/vasilistotskas/grooveshop-django-api/commit/da4a0406c0e5666c2e9f5d0624413e4ea647d3f3))
+
+* feat(contact): delete enquiries and feedback after the store's retention period (#206)
+
+A new per-store setting, CONTACT_RETENTION_DAYS (default 365, 0 keeps
+everything), covers both Contact enquiries and Feedback. A daily fanout
+task deletes rows older than the period, in batches, through the ORM so
+a deleted enquiry's attachment files go with it. Rows already older than
+the period are removed on the first run. The sweep reaches suspended
+stores like the other retention sweeps.
+
+The Contact and Feedback change lists now state the active period.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DKyCtCCkFTgcH6VAVK3AJm ([`da4a040`](https://github.com/vasilistotskas/grooveshop-django-api/commit/da4a0406c0e5666c2e9f5d0624413e4ea647d3f3))
+
+* feat(core): record which store a failed background task belongs to (#210)
+
+Every store's failed tasks share one public-schema table, so a row could
+not say whose it was. A result backend subclass now writes the
+_schema_name header the task was published with into TaskResult.meta. It
+reads the header rather than having TenantTask set request.meta, because
+a task killed at its hard time limit is stored by the worker's parent
+process from a request that never ran TenantTask.__call__; the header is
+on every request, so one mechanism covers raise, retry, soft and hard
+time limits. A lost worker is requeued under the acks-late settings and
+stores no row.
+
+The dynamic TaskResult admin override becomes a real TaskResultAdmin with
+a Store column (tenant name, Platform for the public schema or an
+unattributed row) and a Store filter built on meta. It stays withheld on
+a store's own admin.
+
+CELERY_RESULT_BACKEND is no longer read from the environment: Celery
+prefers that variable over the Django setting, and a stale django-db
+value silently dropped the store. tests/settings.py pins it.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DKyCtCCkFTgcH6VAVK3AJm ([`da4a040`](https://github.com/vasilistotskas/grooveshop-django-api/commit/da4a0406c0e5666c2e9f5d0624413e4ea647d3f3))
+
+* feat(order): flag orders the shopper has waited on for follow-up
+
+A shopper who ordered N calendar days ago and has no parcel is about to
+write in. Counting from placement catches both an order nobody shipped
+and a parcel stuck in transit; the reason says which.
+
+- ORDER_FOLLOW_UP_DAYS store setting (default 7, 0 = off). Whole calendar
+  days in the store timezone: an order placed on day D is flagged from
+  00:00 on day D+N.
+- One rule, OrderQuerySet.needing_follow_up(now): status PENDING,
+  PROCESSING or SHIPPED (OrderStatus.get_status_groups), and not an
+  unpaid online order. with_follow_up() annotates the same rule.
+- OrderQuerySet.awaiting_online_payment() is the database form of "the
+  shopper still owes money online": online settlement and a payment
+  status that is not settled. It is deliberately not
+  Order.awaits_online_payment, which is also true for a refunded,
+  partially refunded or canceled online order. The ACS stale-shipment
+  digest reuses it instead of its own copy, which counted only COMPLETED
+  as settled.
+- Order changelist: blue "Follow up" badge beside the status (no query
+  per row), "Needs follow-up" filter, and on the change page a read-only
+  line with the reason, since when and the carrier's last event.
+- Dashboard: follow_up_orders in attention_counts and a row in the
+  Needs-attention list linking to the filtered list. The Orders sidebar
+  badge keeps the pending count. The count depends on the setting, so a
+  change clears it; midnight moving it is bounded by the TTL.
+
+No migration, no API change, no stored state.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DKyCtCCkFTgcH6VAVK3AJm ([`da4a040`](https://github.com/vasilistotskas/grooveshop-django-api/commit/da4a0406c0e5666c2e9f5d0624413e4ea647d3f3))
+
+* feat(shipping): let each store mute operational alert emails by kind
+
+Six senders email a store's operators, and a store could not turn any of
+them off: webside gets ACS digests and COD alerts it does not want, but
+must keep "the courier rejected a shipment". The stale-shipment digest
+did not even go through send_ops_alert; it called send_mail itself.
+
+- OpsAlertKind lists the six real kinds: stale_shipments, unremitted_cod,
+  unattributable_cod_payouts, shipment_rejected, webhook_failed,
+  payment_after_cancel. The removed senders (unprinted vouchers, pickup
+  list blocked) no longer email and are not kinds.
+- send_ops_alert(kind=...) is the one gate. It returns False for a muted
+  kind or a store with no recipient. The stale digest now sends through
+  it; a muted digest claims no rows, so its parcels are all in the first
+  digest after the store switches it back on. A test fails if any
+  carrier module imports send_mail again.
+- Setting shape: one boolean setting per kind, OPS_ALERT_<KIND>_ENABLED,
+  default on. That is the owner's mute-list (a store opts out, nothing is
+  opted in, a new kind reaches every store) expressed so the store admin
+  can edit it: booleans render as checkboxes, while a JSON list of kinds
+  is edited as raw JSON and a misspelt kind silently mutes nothing. Each
+  setting has a description naming where the work shows when the email is
+  off. The recipients stay tenant_admin_recipients().
+- Muting is only safe when the work stays visible, so attention_counts
+  gains a counter per kind that carries money or a stuck parcel, each by
+  the same rule as its email (shipping_acs/attention.py,
+  OrderQuerySet.refund_owed): stale_shipments, unremitted_cod,
+  unattributed_cod_payouts (payouts recorded in the last 30 days, since
+  nothing can resolve an orphan row) and canceled_still_paid. Each is a
+  row of the dashboard's Needs-attention list opening a filtered list.
+  The stale and unremitted rules moved out of the tasks so the email and
+  the counter cannot drift.
+
+Payout rows ACS reports with no readable voucher are never stored, so
+only the email and the log carry them.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DKyCtCCkFTgcH6VAVK3AJm ([`da4a040`](https://github.com/vasilistotskas/grooveshop-django-api/commit/da4a0406c0e5666c2e9f5d0624413e4ea647d3f3))
+
+* feat(shipping): count every unreconciled ACS payout and let staff reconcile it (#219)
+
+The "ACS payouts matching no shipment" counter missed money in two ways:
+payout rows with no readable voucher were only logged and emailed, never
+stored, and the counter looked back 30 days only because nothing could
+resolve a row. A money alert may be muted only if a dashboard counter
+shows the same problem, so both gaps are closed.
+
+Unreadable rows are now stored as AcsCodPayout with an empty voucher_no
+and a row_fingerprint: the SHA-256 of the ACS columns that identify the
+row (customer code, POD, both reference numbers, sender, receiver, pickup
+and delivery dates, the three amounts, payment date) plus the payment
+date. It is their upsert key, so a rerun updates the row and two
+different unreadable rows of one date both survive. Rows with a voucher
+keep (voucher_no, cod_payment_date).
+
+Schema choice: an empty voucher_no would make every unreadable row of a
+date the same row under the old unique constraint, so that constraint
+becomes partial (voucher_no <> '') and a second partial unique constraint
+covers row_fingerprint <> ''. Both are built in one atomic migration
+(0013): narrowing a unique constraint only loosens what the serving
+release can insert, the replacement is built over rows that already met
+the wider one, and the table holds one row per paid COD parcel. Every new
+column is nullable or has db_default, so migration_preflight accepts it:
+it judges removed, renamed or tightened columns, and 0013 touches none.
+
+Resolution: reconciled_at, reconciled_by (SET_NULL, db_constraint off like
+the other platform-identity FKs) and reconciliation_note, set by a
+"Mark as reconciled" dialog action (row and detail) on the payout list
+through AcsService.reconcile_cod_payout, which refuses a blank note, a
+payout tied to a shipment and a second reconciliation. A filter on
+reconciliation joins the list.
+
+unattributed_payouts now counts every payout with no shipment and no
+reconciliation, with no time window (UNATTRIBUTED_PAYOUT_DAYS is gone).
+The counter and the payout list's unattributed=yes filter share
+unattributed_payout_q, so the list shows exactly what is counted.
+
+The alert email no longer sends staff to the celery-worker logs; it points
+at the payout list filter. docs/order-system.md and the in-code comments
+that said unreadable rows are never stored are updated.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DKyCtCCkFTgcH6VAVK3AJm ([`da4a040`](https://github.com/vasilistotskas/grooveshop-django-api/commit/da4a0406c0e5666c2e9f5d0624413e4ea647d3f3))
+
+### Testing
+
+* test: loyalty retries a lost connection, not a bug; erasure decision for reconciled_by
+
+The loyalty retry tests simulated an outage with ValueError, which the
+transient-retry change no longer retries; they now raise
+OperationalError, and a new test pins that a bug fails at once.
+AcsCodPayout.reconciled_by is a staff FK recorded like
+cod_received_outside_acs_by.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DKyCtCCkFTgcH6VAVK3AJm ([`da4a040`](https://github.com/vasilistotskas/grooveshop-django-api/commit/da4a0406c0e5666c2e9f5d0624413e4ea647d3f3))
+
+* test(devtools): demo fixture products have a fixed price
+
+_prepare_store built every demo product with ProductFactory's random
+price and discount, so the SAVE5 order sometimes came to less than the
+code's 25 EUR minimum and the seed refused it (CI shard, 20.21).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DKyCtCCkFTgcH6VAVK3AJm
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`da4a040`](https://github.com/vasilistotskas/grooveshop-django-api/commit/da4a0406c0e5666c2e9f5d0624413e4ea647d3f3))
+
 ## v3.126.0 (2026-10-17)
 
 ### Features

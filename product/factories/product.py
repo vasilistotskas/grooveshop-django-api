@@ -126,7 +126,7 @@ class ProductFactory(CustomDjangoModelFactory):
         max_value=999,
     )
     active = factory.Faker("pybool", truth_probability=85)
-    stock = factory.Faker("random_int", min=0, max=250)
+    stock = factory.Faker("random_int", min=1, max=250)
     discount_percent = factory.Faker(
         "random_element", elements=[0, 0, 0, 5, 10, 15, 20, 25, 30, 50]
     )

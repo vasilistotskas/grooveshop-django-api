@@ -128,3 +128,10 @@ def validate_feedback_content(
         errors["spam"] = _("Message appears to be spam")
 
     return {"valid": len(errors) == 0, "errors": errors, "warnings": warnings}
+
+
+def contact_retention_days() -> int:
+    """Days the active store keeps enquiries and feedback; 0 keeps all."""
+    from extra_settings.models import Setting
+
+    return int(Setting.get("CONTACT_RETENTION_DAYS", default=365))

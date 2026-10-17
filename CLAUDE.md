@@ -187,6 +187,7 @@ Tasks are split by domain:
 - `search/tasks.py` — search analytics
 - `blog/tasks.py` — comment liked notifications
 - `loyalty/tasks.py` — loyalty point award/expiry tasks (all use `MonitoredTask` base class)
+- `contact/tasks.py` — notification emails, attachment scanning, and the retention sweeps: `purge_expired_attachment_files` (bytes, `CONTACT_ATTACHMENTS_RETENTION_DAYS`) and `purge_expired_contact_records` (deletes enquiries, their files, and feedback older than the per-store `CONTACT_RETENTION_DAYS`, default 365, `0` keeps). Both run per tenant through `tenant.tasks.fanout_*` with `include_suspended=True`
 
 **Only task FAILURES are stored.** `CELERY_TASK_IGNORE_RESULT` is on, so a
 successful task writes nothing; `CELERY_TASK_STORE_ERRORS_EVEN_IF_IGNORED`

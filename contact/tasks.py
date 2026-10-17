@@ -7,8 +7,10 @@ failures are automatically retried.
 """
 
 import logging
+from datetime import timedelta
 
 from django.core.mail import send_mail
+from django.utils import timezone
 
 from contact.scanners import INFECTED, AttachmentScannerError
 from core import celery_app
@@ -261,7 +263,6 @@ def scan_contact_attachment(self, attachment_id: int) -> str:
 
 
 def _record_scan(attachment, verdict: str, detail: str) -> None:
-    from django.utils import timezone
 
     attachment.scan_status = verdict
     attachment.scan_detail = detail
@@ -289,8 +290,6 @@ def reap_unclaimed_attachments() -> int:
     ``contact.signals.delete_attachment_file``, so this only has to
     decide WHICH rows are abandoned.
     """
-    from django.utils import timezone
-
     from contact.models import ContactAttachment
 
     stale = ContactAttachment.objects.filter(
@@ -323,9 +322,6 @@ def purge_expired_attachment_files() -> int:
     The window is a merchant setting, so a store that must keep tender
     documents for a year says so without a deploy.
     """
-    from datetime import timedelta
-
-    from django.utils import timezone
     from extra_settings.models import Setting
 
     from contact.models import ContactAttachment
@@ -345,3 +341,67 @@ def purge_expired_attachment_files() -> int:
     if purged:
         logger.info("Purged bytes of %s expired contact attachments", purged)
     return purged
+
+
+#: Rows deleted per statement, so the first run on a store with years of
+#: backlog never loads them all into one deletion collector at once.
+RETENTION_BATCH_SIZE = 500
+
+
+@celery_app.task(
+    base=MonitoredTask,
+    max_retries=3,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+)
+def purge_expired_contact_records() -> dict[str, int]:
+    """Delete enquiries and feedback older than the store's retention period.
+
+    One setting, ``CONTACT_RETENTION_DAYS``, covers both ``Contact`` and
+    ``Feedback``: both are free text typed by a stranger and kept for no
+    purpose beyond answering it (GDPR art. 5(1)(e) storage limitation).
+    ``0`` keeps everything. Rows already older than the period when the
+    setting first applies go on the first run.
+
+    The deletes go through the ORM, never a raw statement, so deleting a
+    ``Contact`` cascades to its ``ContactAttachment`` rows and
+    ``contact.signals.delete_attachment_file`` removes their bytes.
+
+    Runs per tenant through
+    ``tenant.tasks.fanout_purge_expired_contact_records`` and reads the
+    period from the ACTIVE schema's setting, so one store's period never
+    reaches another store's rows.
+    """
+    from contact.models import Contact, Feedback
+    from contact.utils import contact_retention_days
+
+    days = contact_retention_days()
+    if days <= 0:
+        return {"contacts": 0, "feedback": 0}
+    cutoff = timezone.now() - timedelta(days=days)
+
+    counts = {
+        "contacts": _delete_older_than(Contact, cutoff),
+        "feedback": _delete_older_than(Feedback, cutoff),
+    }
+    if any(counts.values()):
+        logger.info(
+            "Purged %s contact enquiries and %s feedback entries older "
+            "than %s days",
+            counts["contacts"],
+            counts["feedback"],
+            days,
+        )
+    return counts
+
+
+def _delete_older_than(model, cutoff) -> int:
+    """Delete ``model`` rows created before ``cutoff``, in batches."""
+    deleted = 0
+    stale = model.objects.filter(created_at__lt=cutoff)
+    while pks := list(
+        stale.values_list("pk", flat=True)[:RETENTION_BATCH_SIZE]
+    ):
+        _, per_model = model.objects.filter(pk__in=pks).delete()
+        deleted += per_model.get(model._meta.label, 0)
+    return deleted

@@ -225,7 +225,18 @@ def fanout_purge_expired_attachment_files():
     )
 
 
-# A retention sweep like the two above, so it reaches SUSPENDED tenants
+# Enquiries and feedback past the store's CONTACT_RETENTION_DAYS are
+# personal data the platform promised to delete: reaches SUSPENDED
+# tenants too, like the sweeps above.
+@celery_app.task(base=TenantTask)
+def fanout_purge_expired_contact_records():
+    return run_for_all_tenants(
+        "contact.tasks.purge_expired_contact_records",
+        include_suspended=True,
+    )
+
+
+# A retention sweep like the ones above, so it reaches SUSPENDED tenants
 # too: an unconfirmed signup past its window is personal data kept
 # without consent, whatever the store's billing state.
 @celery_app.task(base=TenantTask)

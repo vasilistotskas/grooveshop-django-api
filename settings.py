@@ -1148,6 +1148,15 @@ def get_celery_beat_schedule():
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
         },
+        "purge-expired-contact-records": {
+            # Fanout: Contact and Feedback are per-tenant. Deletes the
+            # rows (and, through the attachment signal, their files)
+            # older than the store's CONTACT_RETENTION_DAYS.
+            "task": "tenant.tasks.fanout_purge_expired_contact_records",
+            "schedule": SCHEDULE_PRESETS["daily_4am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_hour"],
+        },
         "purge-unconfirmed-guest-subscriptions": {
             # Fanout: UserSubscription is per-tenant. A guest newsletter
             # signup never confirmed within 30 days is an address and a
@@ -1977,6 +1986,20 @@ EXTRA_SETTINGS_DEFAULTS = [
             "(GDPR art. 5(1)(e) storage limitation without destroying "
             "the business record). 0 keeps files indefinitely. Raise "
             "it for a store that must retain tender documents."
+        ),
+    },
+    {
+        "name": "CONTACT_RETENTION_DAYS",
+        "type": "int",
+        "value": 365,
+        "description": (
+            "Days after which a contact enquiry or a feedback entry is "
+            "DELETED, together with the files attached to the enquiry "
+            "(GDPR art. 5(1)(e) storage limitation). One period for "
+            "both, per store. 0 keeps them indefinitely. Entries already "
+            "older than this are deleted on the next nightly run after "
+            "you set it. The notification email copy in the store's own "
+            "inbox is not touched."
         ),
     },
     {

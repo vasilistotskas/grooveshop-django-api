@@ -22822,3 +22822,14 @@ msgstr "Ευχαριστούμε — λάβαμε την παραγγελία σ
 #: .\core\templates\emails\order\order_received.txt
 msgid "We will email you as your order progresses."
 msgstr "Θα ενημερωθείτε με νέο μήνυμα σχετικά με την πορεία της παραγγελίας σας."
+
+#: .\contact\admin.py:167
+#, python-format
+msgid "Entries older than %(days)d day are deleted automatically every night, together with any attached files. Change the period with the CONTACT_RETENTION_DAYS setting."
+msgid_plural "Entries older than %(days)d days are deleted automatically every night, together with any attached files. Change the period with the CONTACT_RETENTION_DAYS setting."
+msgstr[0] "Οι εγγραφές παλαιότερες από %(days)d ημέρα διαγράφονται αυτόματα κάθε νύχτα, μαζί με τυχόν συνημμένα αρχεία. Αλλάξτε την περίοδο από τη ρύθμιση CONTACT_RETENTION_DAYS."
+msgstr[1] "Οι εγγραφές παλαιότερες από %(days)d ημέρες διαγράφονται αυτόματα κάθε νύχτα, μαζί με τυχόν συνημμένα αρχεία. Αλλάξτε την περίοδο από τη ρύθμιση CONTACT_RETENTION_DAYS."
+
+#: .\contact\admin.py:178
+msgid "Entries are kept indefinitely (CONTACT_RETENTION_DAYS is 0)."
+msgstr "Οι εγγραφές διατηρούνται επ' αόριστον (το CONTACT_RETENTION_DAYS είναι 0)."

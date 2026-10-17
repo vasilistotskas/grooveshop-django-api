@@ -19,6 +19,7 @@ from rest_framework.test import APITestCase
 
 from cart.factories.cart import CartFactory
 from cart.factories.item import CartItemFactory
+from cart.models import CartAttribution
 from country.factories import CountryFactory
 from order.enum.attribution import OrderSourceType
 from order.enum.status import PaymentStatus
@@ -138,6 +139,70 @@ class TestOrderAttributionOnCreate(APITestCase):
             "medium": "social",
             "campaign": "Summer Drop",
         }
+
+    def test_the_carts_first_source_is_kept_next_to_the_checkout_source(
+        self, *_mocks
+    ):
+        CartAttribution.objects.create(
+            cart=self.cart,
+            source_type=OrderSourceType.SOCIAL,
+            source="instagram",
+        )
+
+        response = self._post(
+            self._cod(),
+            attribution={"utmSource": "google", "clickIds": ["gclid"]},
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED, response.json()
+        row = OrderAttribution.objects.get(order_id=response.json()["id"])
+        assert (row.source_type, row.source) == (
+            OrderSourceType.PAID,
+            "google",
+        )
+        assert (row.cart_source_type, row.cart_source) == (
+            OrderSourceType.SOCIAL,
+            "instagram",
+        )
+
+    @patch("order.payment.get_payment_provider")
+    def test_the_payment_first_path_keeps_the_carts_source_too(
+        self, mock_get_provider, *_mocks
+    ):
+        provider = MagicMock()
+        provider.get_payment_status.return_value = (
+            PaymentStatus.COMPLETED,
+            {},
+        )
+        mock_get_provider.return_value = provider
+        CartAttribution.objects.create(
+            cart=self.cart,
+            source_type=OrderSourceType.SEARCH,
+            source="google",
+        )
+        pay_way = PayWayFactory(
+            provider_code="stripe",
+            settlement=PaySettlement.ONLINE,
+            active=True,
+        )
+
+        response = self._post(pay_way, paymentIntentId="pi_test_cart_source")
+
+        assert response.status_code == status.HTTP_201_CREATED, response.json()
+        row = OrderAttribution.objects.get(order_id=response.json()["id"])
+        assert (row.cart_source_type, row.cart_source) == (
+            OrderSourceType.SEARCH,
+            "google",
+        )
+
+    def test_a_cart_without_a_source_leaves_the_cart_source_empty(
+        self, *_mocks
+    ):
+        response = self._post(self._cod())
+
+        assert response.status_code == status.HTTP_201_CREATED
+        row = OrderAttribution.objects.get(order_id=response.json()["id"])
+        assert (row.cart_source_type, row.cart_source) == ("", "")
 
     def test_no_attribution_is_a_direct_row_not_a_refusal(self, *_mocks):
         response = self._post(self._cod())

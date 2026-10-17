@@ -1,7 +1,8 @@
 import logging
+from collections.abc import Mapping
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -13,7 +14,11 @@ from django.utils.translation import gettext_lazy as _
 from django_stubs_ext import StrOrPromise
 from djmoney.money import Money
 
-from order.attribution import AttributionInput, classify
+from order.attribution import (
+    AttributionInput,
+    ClassifiedAttribution,
+    classify,
+)
 from order.discounts import add_line_discounts, spread_by_remaining_value
 from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.status import (
@@ -59,8 +64,12 @@ from order.stock import StockManager
 from pay_way.enum.settlement import PaySettlement
 from promotion.services import CouponService, PromotionEngine
 from shipping.exceptions import CarrierError, CarrierUnavailableError
+from tenant.internal import is_internal_caller
 from tenant.membership import bound_tenant
 from tenant.middleware import tenant_domain_set
+
+if TYPE_CHECKING:
+    from cart.models import Cart
 
 logger = logging.getLogger(__name__)
 
@@ -180,23 +189,68 @@ def _log_price_drift_if_needed(cart_item, current_price) -> None:
 
 
 class OrderAttributionService:
+    @staticmethod
+    def input_from_request(
+        request, payload: Mapping[str, Any] | None
+    ) -> AttributionInput:
+        """The storefront's first-touch capture plus the shopper's UA.
+
+        Shared by every endpoint that takes the capture (order create,
+        add to cart). The UA is the shopper's own: the Nuxt proxy relays
+        it (``clientIdentityHeaders``), and an in-app browser that strips
+        ``Referer`` still names itself there. The gateway's
+        ``agentProtocol`` is believed only alongside its shared secret,
+        which it sends as ``X-Internal-Gateway`` on every cart and order
+        call (the header the gateway-aware cart throttle checks too).
+        """
+        return AttributionInput.from_payload(
+            payload,
+            user_agent=request.headers.get("User-Agent", ""),
+            from_agent_gateway=is_internal_caller(
+                request.headers.get("X-Internal-Gateway", "")
+            ),
+        )
+
+    @staticmethod
+    def classify_for_store(
+        attribution: AttributionInput,
+    ) -> ClassifiedAttribution:
+        """Name the channel behind *attribution*. A referrer on one of
+        the store's own domains is an internal navigation or a return
+        from checkout, never a source."""
+        return classify(
+            attribution,
+            own_hosts=tenant_domain_set(bound_tenant()),
+        )
+
     @classmethod
     def record(
-        cls, order: Order, attribution: AttributionInput
+        cls,
+        order: Order,
+        attribution: AttributionInput,
+        *,
+        cart: Cart | None = None,
     ) -> OrderAttribution:
         """Classify where *order* came from and store it.
 
         Every new order gets a row — ``direct`` when there was no signal
         at all — so "no row" keeps meaning "placed before attribution
-        existed". A referrer on one of the store's own domains is an
-        internal navigation or a return from checkout, never a source.
+        existed". ``cart`` is the cart the order is built from: its
+        first-touch source is copied next to the checkout source,
+        because the cart is deleted once its lines become an order.
         """
-        classified = classify(
-            attribution,
-            own_hosts=tenant_domain_set(bound_tenant()),
+        from cart.models import CartAttribution
+
+        classified = cls.classify_for_store(attribution)
+        cart_source = (
+            CartAttribution.objects.filter(pk=cart.pk).first()
+            if cart is not None
+            else None
         )
         return OrderAttribution.objects.create(
             order=order,
+            cart_source_type=cart_source.source_type if cart_source else "",
+            cart_source=cart_source.source if cart_source else "",
             source_type=classified.source_type,
             source=classified.source,
             medium=classified.medium,
@@ -1100,7 +1154,7 @@ class OrderService:
             cls._seed_estimated_delivery(order_data)
             order = Order.objects.create(**order_data)
             OrderAttributionService.record(
-                order, attribution or AttributionInput()
+                order, attribution or AttributionInput(), cart=cart
             )
 
             # Reuse the already-locked/materialised cart_items list rather
@@ -1636,7 +1690,7 @@ class OrderService:
 
             order = Order.objects.create(**order_data)
             OrderAttributionService.record(
-                order, attribution or AttributionInput()
+                order, attribution or AttributionInput(), cart=cart
             )
 
             # Set payment_id for offline settlements only. Providers
@@ -2443,15 +2497,22 @@ class OrderService:
 
     @classmethod
     @transaction.atomic
-    def reorder_to_cart(cls, order: Order, user) -> dict[str, Any]:
+    def reorder_to_cart(
+        cls, order: Order, user, *, attribution: AttributionInput
+    ) -> dict[str, Any]:
         """Add each item from a past order back into the user's active cart.
 
         Items with insufficient stock or inactive products are recorded in
         `skipped_items` rather than rejecting the whole reorder. The cart
         line (existing quantity plus the reordered one) is capped at
         current stock; a shortfall is reported with reason ``partial``.
+
+        A reorder that fills an empty cart is the cart's first touch,
+        recorded from ``attribution`` (the request's own signals: a
+        reorder carries no storefront capture).
         """
         from cart.models import Cart, CartItem
+        from cart.services import CartAttributionService
 
         cart, _created = Cart.objects.get_or_create(user=user)
         # Serialise reorders into one cart: each would otherwise read "no
@@ -2462,6 +2523,8 @@ class OrderService:
 
         added: list[dict[str, Any]] = []
         skipped: list[dict[str, Any]] = []
+        touch = OrderAttributionService.classify_for_store(attribution)
+        captured = False
 
         for item in order.items.select_related("product").all():
             product = item.product
@@ -2511,6 +2574,10 @@ class OrderService:
                 skipped.append(entry)
             if to_add == 0:
                 continue
+
+            if not captured:
+                CartAttributionService.capture(cart, touch)
+                captured = True
 
             if existing:
                 existing.quantity += to_add

@@ -14,28 +14,16 @@ from order.attribution import (
 from order.enum.attribution import OrderSourceType
 
 
-class OrderAttribution(TimeStampMixinModel):
-    """Where the shopper behind an order came from.
+class AcquisitionSourceModel(TimeStampMixinModel):
+    """The columns that name a channel, shared by every row that records
+    where a shopper came from (``OrderAttribution``, ``CartAttribution``).
 
-    Written once, in the order's creation transaction, by
-    ``OrderAttributionService.record`` from ``order.attribution.classify``.
-    Its own table rather than columns on ``Order`` so the order row
-    stays about the sale, and so later attribution data (device,
-    session count) has somewhere to go. Orders placed before it existed
-    have no row.
-
-    Shopper-supplied analytics: a UTM can be typed by hand, so nothing
-    here is ever an authorisation signal. Only the referrer's host is
-    kept and click-id values never reach the server.
+    Always the output of ``order.attribution.classify``: a UTM can be
+    typed by hand, so nothing here is ever an authorisation signal. Only
+    the referrer's host is kept and click-id values never reach the
+    server.
     """
 
-    order = models.OneToOneField(
-        "order.Order",
-        on_delete=models.CASCADE,
-        primary_key=True,
-        related_name="attribution",
-        verbose_name=_("Order"),
-    )
     source_type = models.CharField(
         _("Source type"),
         max_length=16,
@@ -75,6 +63,56 @@ class OrderAttribution(TimeStampMixinModel):
         max_length=LANDING_PATH_MAX_LENGTH,
         blank=True,
         default="",
+    )
+
+    class Meta(TypedModelMeta):
+        abstract = True
+
+
+class OrderAttribution(AcquisitionSourceModel):
+    """Where the shopper behind an order came from.
+
+    Written once, in the order's creation transaction, by
+    ``OrderAttributionService.record`` from ``order.attribution.classify``.
+    Its own table rather than columns on ``Order`` so the order row
+    stays about the sale, and so later attribution data (device,
+    session count) has somewhere to go. Orders placed before it existed
+    have no row.
+
+    ``cart_source_type`` / ``cart_source`` carry the first-touch source
+    of the cart the order was built from (``cart.CartAttribution``),
+    copied at creation because the cart is deleted once its lines
+    become an order. They sit beside the checkout source so "checkout
+    from Google, cart started from Instagram" reads off one row. Empty
+    when the cart had no recorded source (a cart that predates cart
+    attribution, an order placed through an agent).
+    """
+
+    order = models.OneToOneField(
+        "order.Order",
+        on_delete=models.CASCADE,
+        primary_key=True,
+        related_name="attribution",
+        verbose_name=_("Order"),
+    )
+    cart_source_type = models.CharField(
+        _("Cart source type"),
+        max_length=16,
+        choices=OrderSourceType.choices,
+        blank=True,
+        default="",
+        db_default="",
+    )
+    cart_source = models.CharField(
+        _("Cart source"),
+        max_length=SOURCE_MAX_LENGTH,
+        blank=True,
+        default="",
+        db_default="",
+        help_text=_(
+            "The channel the order's cart was started from, named like "
+            "the order source. Empty when the cart had none recorded."
+        ),
     )
 
     class Meta(TypedModelMeta):

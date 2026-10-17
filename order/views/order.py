@@ -47,7 +47,6 @@ from core.utils.serializers import (
     SerializersConfig,
     create_schema_view_config,
 )
-from order.attribution import AttributionInput
 from order.enum.cancel_error import OrderCancelErrorType
 from order.enum.create_error import OrderCreateErrorType
 from order.enum.status import OrderStatus, PaymentStatus
@@ -97,11 +96,10 @@ from order.serializers.order import (
     UpdateStatusSerializer,
     VivaReturnLookupResponseSerializer,
 )
-from order.services import OrderService
+from order.services import OrderAttributionService, OrderService
 from pay_way.enum.settlement import PaySettlement
 from pay_way.models import PayWay
 from pay_way.services import PayWayService
-from tenant.internal import is_internal_caller
 from tenant.membership import is_store_staff
 
 logger = logging.getLogger(__name__)
@@ -1043,7 +1041,9 @@ class OrderViewSet(BaseModelViewSet):
             loyalty_points_to_redeem=loyalty_points_to_redeem,
             gift_card_codes=validated_data.get("gift_card_codes"),
             meta_context=meta_context,
-            attribution=self._attribution_input(request, validated_data),
+            attribution=OrderAttributionService.input_from_request(
+                request, validated_data.get("attribution")
+            ),
         )
 
         # Return order details
@@ -1118,7 +1118,9 @@ class OrderViewSet(BaseModelViewSet):
             loyalty_points_to_redeem=loyalty_points_to_redeem,
             gift_card_codes=validated_data.get("gift_card_codes"),
             meta_context=meta_context,
-            attribution=self._attribution_input(request, validated_data),
+            attribution=OrderAttributionService.input_from_request(
+                request, validated_data.get("attribution")
+            ),
         )
 
         # Return order details
@@ -1136,25 +1138,6 @@ class OrderViewSet(BaseModelViewSet):
 
         return Response(
             response_serializer.data, status=status.HTTP_201_CREATED
-        )
-
-    @staticmethod
-    def _attribution_input(request, validated_data: dict) -> AttributionInput:
-        """The storefront's first-touch capture plus the shopper's UA.
-
-        The UA is the shopper's own: the Nuxt proxy relays it
-        (``clientIdentityHeaders``), and an in-app browser that strips
-        ``Referer`` still names itself there. The gateway's
-        ``agentProtocol`` is believed only alongside its shared secret,
-        which it sends as ``X-Internal-Gateway`` on every cart and order
-        call (the header the gateway-aware cart throttle checks too).
-        """
-        return AttributionInput.from_payload(
-            validated_data.get("attribution"),
-            user_agent=request.headers.get("User-Agent", ""),
-            from_agent_gateway=is_internal_caller(
-                request.headers.get("X-Internal-Gateway", "")
-            ),
         )
 
     def _get_cart_and_user(self, request):
@@ -2184,7 +2167,13 @@ class OrderViewSet(BaseModelViewSet):
                 _("You can only reorder your own past orders.")
             )
 
-        result = OrderService.reorder_to_cart(order=order, user=user)
+        result = OrderService.reorder_to_cart(
+            order=order,
+            user=user,
+            attribution=OrderAttributionService.input_from_request(
+                request, None
+            ),
+        )
         response_serializer_class = self.get_response_serializer()
         serializer = response_serializer_class(data=result)
         serializer.is_valid(raise_exception=True)

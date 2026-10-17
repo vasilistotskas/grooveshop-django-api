@@ -36816,6 +36816,10 @@ components:
           format: uuid
           nullable: true
           title: Εμφάνιση σύστασης
+        attribution:
+          allOf:
+          - $ref: '#/components/schemas/OrderAttributionInputRequest'
+          writeOnly: true
       required:
       - product
     CartItemDetail:

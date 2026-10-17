@@ -12,14 +12,17 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 from unittest.mock import patch
+from uuid import uuid4
 
 import pytest
+from django.core.cache.backends.locmem import LocMemCache
 from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import translation
 from rest_framework import status
 from rest_framework.test import APIClient
 
+from core.api.throttling import OrderSpecimenThrottle
 from order.enum.status import OrderStatus
 from order.factories.order import OrderFactory
 from order.invoicing import (
@@ -228,3 +231,33 @@ def test_a_tenant_stand_in_without_the_flag_is_not_a_demo_store(
 
     assert response.status_code == status.HTTP_200_OK
     assert response.json()["hasSpecimenReceipt"] is False
+
+
+def test_the_specimen_download_is_throttled(
+    demo_store, client, user, monkeypatch
+) -> None:
+    """Each call renders a PDF on the request worker, so the Nth call in
+    the window is refused. A private in-memory cache keeps other xdist
+    workers from resetting the history."""
+    rate = 3
+    monkeypatch.setattr(
+        OrderSpecimenThrottle, "rate", f"{rate}/minute", raising=False
+    )
+    monkeypatch.setattr(
+        OrderSpecimenThrottle,
+        "cache",
+        LocMemCache(f"specimen-throttle-{uuid4()}", {}),
+        raising=False,
+    )
+    order = issuable(OrderFactory(user=user))
+
+    with patch("order.invoicing._render_pdf_bytes", return_value=FAKE_PDF):
+        statuses = [
+            client.get(_download_url(order)).status_code
+            for _ in range(rate + 2)
+        ]
+
+    assert statuses == [
+        *[status.HTTP_200_OK] * rate,
+        *[status.HTTP_429_TOO_MANY_REQUESTS] * 2,
+    ]

@@ -38,6 +38,7 @@ from core.api.serializers import ErrorResponseSerializer
 from core.api.throttling import (
     OrderCreateAnonThrottle,
     OrderCreateThrottle,
+    OrderSpecimenThrottle,
     PaymentAttemptAnonThrottle,
     PaymentAttemptThrottle,
     VivaReturnThrottle,
@@ -2176,7 +2177,12 @@ class OrderViewSet(BaseModelViewSet):
             404: OpenApiResponse(description=_("Specimen unavailable")),
         },
     )
-    @action(detail=True, methods=["GET"], url_path="specimen/download")
+    @action(
+        detail=True,
+        methods=["GET"],
+        url_path="specimen/download",
+        throttle_classes=[OrderSpecimenThrottle],
+    )
     def specimen_download(self, request, *args, **kwargs):
         """Stream a freshly rendered specimen receipt (demo stores only)."""
         order = self.get_object()

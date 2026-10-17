@@ -324,6 +324,16 @@ class BoxNowNearestThrottle(UserOrIpRateThrottle):
     fail_closed = True
 
 
+class OrderSpecimenThrottle(UserOrIpRateThrottle):
+    """Per-caller throttle for the demo store's specimen receipt, which
+    renders a PDF with WeasyPrint on the request worker for every call:
+    CPU-heavy, and the shared demo logins make the caller an easy
+    amplifier."""
+
+    scope = "order_specimen"
+    fail_closed = True
+
+
 class RecommendationEventThrottle(UserOrIpRateThrottle):
     """Budget for suggestion-strip impression/click events. Its own
     scope so a scripted client cannot starve the search allowance."""

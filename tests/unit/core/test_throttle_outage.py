@@ -46,6 +46,7 @@ FAIL_CLOSED = {
     "VivaReturnThrottle",
     "AcsAddressValidationThrottle",
     "BoxNowNearestThrottle",
+    "OrderSpecimenThrottle",
     "StaffLoginThrottle",
     "CartAgentTokenThrottle",
 }

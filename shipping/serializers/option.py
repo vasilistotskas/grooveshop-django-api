@@ -22,7 +22,11 @@ class ShippingOptionsQuerySerializer(serializers.Serializer):
         max_digits=11,
         decimal_places=2,
         default=Decimal(0),
-        help_text=_("Cart subtotal — used for free-shipping threshold checks."),
+        help_text=_(
+            "The cart's free_threshold_value: the products after "
+            "discounts, excluding shipping. Free-shipping thresholds are "
+            "checked against it."
+        ),
     )
     currency = serializers.CharField(
         required=False,

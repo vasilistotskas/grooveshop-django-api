@@ -75,8 +75,10 @@ class ShippingRate(TimeStampMixinModel):
         blank=True,
         default=None,
         help_text=_(
-            "Cart subtotal above which this combination ships free. "
-            "Blank means this combination is never free."
+            "Ships free once the products, after discounts and excluding "
+            "shipping, reach this amount. The payment-method fee is "
+            "waived on the same value. Blank means this combination is "
+            "never free."
         ),
     )
     max_weight_grams = models.PositiveIntegerField(

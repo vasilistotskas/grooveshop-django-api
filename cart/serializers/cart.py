@@ -73,6 +73,14 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
             "to show a coupon its OWN amount instead of the cart total."
         ),
     )
+    free_threshold_value = serializers.SerializerMethodField(
+        help_text=_(
+            "The value free shipping and a free payment fee are judged "
+            "on: the products after promotion and coupon discounts, "
+            "excluding shipping and fees. Compare a free-above threshold "
+            "with this, never with total_price."
+        ),
+    )
     promotion_free_shipping = serializers.SerializerMethodField(
         help_text=_("Whether a live promotion waives the shipping cost"),
     )
@@ -177,6 +185,14 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
     @extend_schema_field(OpenApiTypes.DECIMAL)
     def get_promotion_discount(self, obj: Cart):
         return self._promotion_result(obj).discount_total.amount
+
+    @extend_schema_field(OpenApiTypes.DECIMAL)
+    def get_free_threshold_value(self, obj: Cart):
+        from order.services import OrderService
+
+        return OrderService.threshold_value(
+            obj.total_price, self._promotion_result(obj).discount_total
+        ).amount
 
     @extend_schema_field(OpenApiTypes.BOOL)
     def get_promotion_free_shipping(self, obj: Cart) -> bool:
@@ -481,6 +497,7 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
             "total_weight_grams",
             "currency",
             "promotion_discount",
+            "free_threshold_value",
             "applied_promotions",
             "promotion_free_shipping",
             "applied_coupon_codes",
@@ -502,6 +519,7 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
             "total_items_unique",
             "total_weight_grams",
             "promotion_discount",
+            "free_threshold_value",
             "applied_promotions",
             "promotion_free_shipping",
             "applied_coupon_codes",

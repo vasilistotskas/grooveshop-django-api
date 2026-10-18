@@ -951,8 +951,9 @@ class OrderService:
             _cart_weight_grams = compute_total_weight_grams(
                 (item.product, item.quantity) for item in cart.items.all()
             ) + PromotionEngine.gift_weight_grams(promo_result)
+            _threshold_value = cls.threshold_value(_cart_total, promo_discount)
             _shipping_cost = cls.shipping_cost(
-                order_value=_cart_total,
+                order_value=_threshold_value,
                 country_id=shipping_address.get("country_id"),
                 region_id=shipping_address.get("region_id"),
                 shipping_provider_code=shipping_address.get(
@@ -962,17 +963,11 @@ class OrderService:
                 weight_grams=_cart_weight_grams,
                 free=promo_result.free_shipping,
             )
-            # Pay-way fee on the DISCOUNTED subtotal — mirrors the
-            # create-payment-intent endpoint exactly.
-            _order_subtotal = Money(
-                _cart_total.amount
-                - promo_discount.amount
-                + _shipping_cost.amount,
-                _cart_total.currency,
-            )
+            # Pay-way fee: waived on the same value as free shipping —
+            # mirrors the create-payment-intent endpoint exactly.
             _payment_fee = cls.calculate_payment_method_fee(
                 pay_way=pay_way,
-                order_value=_order_subtotal,
+                order_value=_threshold_value,
             )
             _expected_total = (
                 _cart_total.amount
@@ -1176,8 +1171,9 @@ class OrderService:
             cart_weight_grams = compute_total_weight_grams(
                 (ci.product, ci.quantity) for ci in cart_items
             ) + PromotionEngine.gift_weight_grams(promo_result)
+            threshold_value = cls.threshold_value(cart_total, promo_discount)
             shipping_cost = cls.shipping_cost(
-                order_value=cart_total,
+                order_value=threshold_value,
                 country_id=shipping_address.get("country_id"),
                 region_id=shipping_address.get("region_id"),
                 shipping_provider_code=shipping_address.get(
@@ -1190,18 +1186,11 @@ class OrderService:
             order_data["shipping_price"] = shipping_cost
 
             # Calculate payment method fee
-            # Note: Payment fee is calculated on the DISCOUNTED items
-            # total + shipping — the same figure the payment-intent
-            # endpoint and the verification step above used.
-            order_subtotal = Money(
-                cart_total.amount
-                - promo_discount.amount
-                + shipping_cost.amount,
-                cart_total.currency,
-            )
+            # on the same value free shipping is judged on: the products
+            # after discounts (``threshold_value``).
             payment_fee = cls.calculate_payment_method_fee(
                 pay_way=pay_way,
-                order_value=order_subtotal,
+                order_value=threshold_value,
             )
             order_data["payment_method_fee"] = payment_fee
 
@@ -1713,8 +1702,9 @@ class OrderService:
             cart_weight_grams = compute_total_weight_grams(
                 (ci.product, ci.quantity) for ci in cart_items
             ) + PromotionEngine.gift_weight_grams(promo_result)
+            threshold_value = cls.threshold_value(cart_total, promo_discount)
             shipping_cost = cls.shipping_cost(
-                order_value=cart_total,
+                order_value=threshold_value,
                 country_id=shipping_address.get("country_id"),
                 region_id=shipping_address.get("region_id"),
                 shipping_provider_code=shipping_address.get(
@@ -1727,17 +1717,11 @@ class OrderService:
             order_data["shipping_price"] = shipping_cost
 
             # Calculate payment method fee
-            # Note: Payment fee is calculated on the DISCOUNTED items
-            # total + shipping — mirrors the payment-first path.
-            order_subtotal = Money(
-                cart_total.amount
-                - promo_discount.amount
-                + shipping_cost.amount,
-                cart_total.currency,
-            )
+            # on the same value free shipping is judged on: the products
+            # after discounts (``threshold_value``).
             payment_fee = cls.calculate_payment_method_fee(
                 pay_way=pay_way,
-                order_value=order_subtotal,
+                order_value=threshold_value,
             )
             order_data["payment_method_fee"] = payment_fee
 
@@ -4418,6 +4402,26 @@ class OrderService:
             order, previous, applied=previous != PaymentStatus.FAILED
         )
 
+    @staticmethod
+    def threshold_value(cart_total: Money, discount_total: Money) -> Money:
+        """The value every "free above X" rule is judged on: the products
+        after promotion and coupon discounts, excluding shipping and the
+        pay-way fee.
+
+        Free shipping (``ShippingRate.free_shipping_threshold``) and a free
+        payment fee (``PayWay.free_threshold``) both compare against THIS,
+        so "free above 40" means the same thing to the shopper for each
+        and the cart preview and order creation cannot disagree. Every
+        caller of :meth:`shipping_cost` and
+        :meth:`calculate_payment_method_fee` takes it from here. Loyalty
+        points and gift cards are payment, not discounts, and do not move
+        it.
+        """
+        return Money(
+            max(cart_total.amount - discount_total.amount, Decimal(0)),
+            cart_total.currency,
+        )
+
     @classmethod
     def shipping_cost(
         cls,
@@ -4431,6 +4435,10 @@ class OrderService:
         free: bool = False,
     ) -> Money:
         """The shipping price for a (provider, kind, country) — or 0 when ``free``.
+
+        ``order_value`` is :meth:`threshold_value`, never the gross cart
+        total: the free-shipping threshold is judged on the products after
+        discounts.
 
         ``ShippingRate`` is the only source of a shipping price now —
         replaces ``calculate_shipping_cost`` and the generic
@@ -4548,7 +4556,8 @@ class OrderService:
 
         Args:
             pay_way: PayWay instance
-            order_value: Total order value (items + shipping)
+            order_value: :meth:`threshold_value`, the products after
+                discounts (never including shipping or this fee)
 
         Returns:
             Money: Payment method fee (0 if free threshold is met)

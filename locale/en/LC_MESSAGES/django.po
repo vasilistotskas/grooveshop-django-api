@@ -11736,8 +11736,8 @@ msgid ""
 "apply."
 msgstr ""
 
-#: .\pay_way\models.py:35
-msgid "Order amount above which this payment method becomes free"
+#: .\pay_way\models.py
+msgid "The payment method is free once the products, after discounts and excluding shipping, reach this amount. Free shipping is judged on the same value."
 msgstr ""
 
 #: .\pay_way\models.py:47
@@ -14692,10 +14692,8 @@ msgstr ""
 msgid "Free Shipping Threshold"
 msgstr "Shipping Address"
 
-#: .\shipping\models\rate.py:72
-msgid ""
-"Cart subtotal above which this combination ships free. Blank means this "
-"combination is never free."
+#: .\shipping\models\rate.py
+msgid "Ships free once the products, after discounts and excluding shipping, reach this amount. The payment-method fee is waived on the same value. Blank means this combination is never free."
 msgstr ""
 
 #: .\shipping\models\rate.py:77
@@ -14786,8 +14784,8 @@ msgid ""
 "return."
 msgstr ""
 
-#: .\shipping\serializers\option.py:25
-msgid "Cart subtotal — used for free-shipping threshold checks."
+#: .\shipping\serializers\option.py
+msgid "The cart's free_threshold_value: the products after discounts, excluding shipping. Free-shipping thresholds are checked against it."
 msgstr ""
 
 #: .\shipping\serializers\option.py:38
@@ -20687,4 +20685,8 @@ msgstr ""
 
 #: .\order\serializers\order.py
 msgid "This can't change once the order is placed: the shipping cost and VAT were priced for it."
+msgstr ""
+
+#: .\cart\serializers\cart.py
+msgid "The value free shipping and a free payment fee are judged on: the products after promotion and coupon discounts, excluding shipping and fees. Compare a free-above threshold with this, never with total_price."
 msgstr ""

@@ -566,6 +566,42 @@ class TestResolveKeyIsShapeVersioned:
             "old cache key"
         )
 
+    def test_a_field_added_inside_a_list_serializer_changes_the_key(self):
+        """``shipping_carriers`` is a many=True serializer: its child's
+        fields are part of the payload shape too."""
+        from rest_framework import serializers
+
+        from tenant.cache import _tenant_config_shape
+        from tenant.serializers import TenantShippingCarrierSerializer
+
+        _tenant_config_shape.cache_clear()
+        before = tenant_resolve_key("shop.example", SHOP)
+
+        real_get_fields = TenantShippingCarrierSerializer.get_fields
+
+        def with_extra_carrier_field(self):
+            fields = real_get_fields(self)
+            fields["brandNewCarrierField"] = serializers.CharField(
+                read_only=True
+            )
+            return fields
+
+        _tenant_config_shape.cache_clear()
+        try:
+            with patch.object(
+                TenantShippingCarrierSerializer,
+                "get_fields",
+                with_extra_carrier_field,
+            ):
+                after = tenant_resolve_key("shop.example", SHOP)
+        finally:
+            _tenant_config_shape.cache_clear()
+
+        assert after != before, (
+            "a field added inside a list serializer's child must not reuse "
+            "the old cache key"
+        )
+
     def test_key_is_stable_for_an_unchanged_shape(self):
         """Otherwise every process would miss the cache permanently."""
         assert tenant_resolve_key("shop.example", SHOP) == tenant_resolve_key(

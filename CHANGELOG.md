@@ -3,6 +3,46 @@
 
 
 
+## v3.135.1 (2026-10-18)
+
+### Bug fixes
+
+* fix(order): guests reach their receipt and the specimen through the order link (#241) ([`f826387`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f826387cc753e63a37412ad6ca8c42b39fcf7b9a))
+
+* fix(order): guests reach the specimen receipt with the order's uuid
+
+The specimen download answered 403 to a guest. It joins the actions a
+guest may call on their own order with ?uuid=, declares that parameter
+in the schema, and keeps the 404 for a store that is not a demo store.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DKyCtCCkFTgcH6VAVK3AJm ([`f826387`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f826387cc753e63a37412ad6ca8c42b39fcf7b9a))
+
+* fix(order): guests reach their receipt through the order link
+
+The receipt metadata and download routes answered 403 to a guest, who
+holds only the order's uuid. Both join the actions a guest may call
+with ?uuid=, publish the parameter in the schema, and hand a guest a
+download link that carries it. A uuid still opens no account-owned
+order.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DKyCtCCkFTgcH6VAVK3AJm ([`f826387`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f826387cc753e63a37412ad6ca8c42b39fcf7b9a))
+
+* fix(order): model the JSON error body of the receipt and specimen downloads
+
+The PDF downloads declared their 403 and 404 with a bare description or
+no body, though NotFound and PermissionDenied answer with the JSON error
+envelope. Both now reference ErrorResponse, and the 403 text is a whole
+sentence.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DKyCtCCkFTgcH6VAVK3AJm
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`f826387`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f826387cc753e63a37412ad6ca8c42b39fcf7b9a))
+
 ## v3.135.0 (2026-10-18)
 
 ### Bug fixes

@@ -3,6 +3,57 @@
 
 
 
+## v3.136.2 (2026-10-18)
+
+### Bug fixes
+
+* fix(orders): build the state-machine test orders with no provider payment (#255)
+
+Moving an order to REFUNDED is refused while money is still refundable,
+and the factory draws a random paid provider order, so the
+RETURNED -> REFUNDED case failed whenever the draw had a payment.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`f7d3f71`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f7d3f710e5c498eca2556ae20fd9428fbb4983a4))
+
+* fix(payments): bind every payment to its cart and purpose, and void gift cards on reversal (#251) ([`34a7d6b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/34a7d6be92d5f8abbcb2b8e44a63cefef77f6bcc))
+
+* fix(payments): bind every payment to its cart and purpose, and void gift cards on reversal
+
+- Every Stripe PaymentIntent the server creates carries purpose, subject
+  and tenant metadata; payment-first order creation accepts only an intent
+  bound to the cart, the order purpose and the tenant, and never one a
+  gift-card purchase holds.
+- A polled payment status settles an order only through
+  handle_payment_succeeded, the handler the webhook uses.
+- Stripe and Viva settle an order only when the collected amount (and, for
+  Viva, currency) matches the order total; a mismatch is booked, flagged,
+  alerted and never auto-cancelled.
+- A gift-card purchase whose payment is refunded, claimed back or charged
+  back voids its card and records what was already spent.
+- Viva gift-card completion matches the purchase's own order code,
+  currency and amount.
+- An ACS COD payout settles only its own order, at the amount it remits.
+- payment_status and payment_id are read-only in the order admin; a priced
+  order's country and region cannot change through the order API.
+- Soft-deleted products cannot be added to a cart or checked out.
+
+Adds the payment_mismatch and gift_card_reversal alert kinds, giftcard
+migration 0008, el/en/de translations and docs/order-system.md updates.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com> ([`34a7d6b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/34a7d6be92d5f8abbcb2b8e44a63cefef77f6bcc))
+
+* fix(payments): announce a gift-card purchase dispute once
+
+The staff alert for a disputed gift-card purchase is keyed on the dispute
+id stored on the purchase, so a redelivered event, or a later status of the
+same dispute, mails staff once.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`34a7d6b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/34a7d6be92d5f8abbcb2b8e44a63cefef77f6bcc))
+
 ## v3.136.1 (2026-10-18)
 
 ### Bug fixes

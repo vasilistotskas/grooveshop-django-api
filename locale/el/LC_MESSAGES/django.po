@@ -22749,39 +22749,16 @@ msgstr "Λήψη μεταδεδομένων λήψης απόδειξης για
 
 #: .\order\views\order.py
 #, python-brace-format
-msgid ""
-"Return the order's retail receipt metadata and an absolute URL to the "
-"streaming download endpoint (``/order/{id}/invoice/download``). The URL is "
-"gated by the same owner/admin permission check as this metadata endpoint — "
-"no raw storage URLs are exposed to the client. 404 unless the receipt is "
-"registered with AADE (myDATA): none issued yet, pending, rejected or "
-"cancelled, or a store that issues its receipts outside the platform."
-msgstr ""
-"Επιστρέφει τα μεταδεδομένα της απόδειξης λιανικής της παραγγελίας και ένα "
-"απόλυτο URL προς το endpoint λήψης μέσω ροής "
-"(``/order/{id}/invoice/download``). Το URL προστατεύεται από τον ίδιο "
-"έλεγχο δικαιώματος ιδιοκτήτη/διαχειριστή όπως και αυτό το endpoint "
-"μεταδεδομένων — δεν εκτίθενται ακατέργαστα URL αποθήκευσης στον client. 404 "
-"εκτός αν η απόδειξη έχει καταχωριστεί στην ΑΑΔΕ (myDATA): δεν έχει εκδοθεί "
-"ακόμη, εκκρεμεί, απορρίφθηκε ή ακυρώθηκε, ή το κατάστημα εκδίδει τις "
-"αποδείξεις του εκτός της πλατφόρμας."
+msgid "Return the order's retail receipt metadata and an absolute URL to the streaming download endpoint (``/order/{id}/invoice/download``). The URL is gated by the same permission check as this metadata endpoint (the order's owner, store staff, or a guest holding the order's UUID) — no raw storage URLs are exposed to the client. 404 unless the receipt is registered with AADE (myDATA): none issued yet, pending, rejected or cancelled, or a store that issues its receipts outside the platform."
+msgstr "Επιστρέφει τα μεταδεδομένα της απόδειξης λιανικής της παραγγελίας και ένα απόλυτο URL προς το endpoint λήψης μέσω ροής (``/order/{id}/invoice/download``). Το URL προστατεύεται από τον ίδιο έλεγχο πρόσβασης όπως και αυτό το endpoint μεταδεδομένων (ιδιοκτήτης της παραγγελίας, προσωπικό του καταστήματος ή επισκέπτης που έχει το UUID της παραγγελίας) — δεν εκτίθενται ακατέργαστα URL αποθήκευσης στον client. 404 εκτός αν η απόδειξη έχει καταχωριστεί στην ΑΑΔΕ (myDATA): δεν έχει εκδοθεί ακόμη, εκκρεμεί, απορρίφθηκε ή ακυρώθηκε, ή το κατάστημα εκδίδει τις αποδείξεις του εκτός της πλατφόρμας."
 
 #: .\order\views\order.py
 msgid "Download the receipt PDF"
 msgstr "Λήψη PDF απόδειξης"
 
 #: .\order\views\order.py
-msgid ""
-"Streams the retail receipt PDF through Django auth, from the configured "
-"storage (S3 in production, the filesystem in development), so the storage "
-"URL is never exposed to the client. 404 unless the receipt is registered "
-"with AADE (myDATA). Same ownership check as the metadata endpoint."
-msgstr ""
-"Μεταδίδει το PDF της απόδειξης λιανικής μέσω ταυτοποίησης Django, από τον "
-"ρυθμισμένο χώρο αποθήκευσης (S3 σε παραγωγή, σύστημα αρχείων σε ανάπτυξη), "
-"ώστε το URL αποθήκευσης να μην εκτίθεται ποτέ στον client. 404 εκτός αν η "
-"απόδειξη έχει καταχωριστεί στην ΑΑΔΕ (myDATA). Ίδιος έλεγχος ιδιοκτησίας "
-"όπως και το endpoint μεταδεδομένων."
+msgid "Streams the retail receipt PDF through Django auth, from the configured storage (S3 in production, the filesystem in development), so the storage URL is never exposed to the client. 404 unless the receipt is registered with AADE (myDATA). Same access check as the metadata endpoint."
+msgstr "Μεταδίδει το PDF της απόδειξης λιανικής μέσω ταυτοποίησης Django, από τον ρυθμισμένο χώρο αποθήκευσης (S3 σε παραγωγή, σύστημα αρχείων σε ανάπτυξη), ώστε το URL αποθήκευσης να μην εκτίθεται ποτέ στον client. 404 εκτός αν η απόδειξη έχει καταχωριστεί στην ΑΑΔΕ (myDATA). Ίδιος έλεγχος πρόσβασης όπως και το endpoint μεταδεδομένων."
 
 #: .\admin\dashboard\store\widgets.py
 msgid "myDATA is on, but no receipt is issued"

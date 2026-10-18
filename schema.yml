@@ -16174,8 +16174,9 @@ paths:
       operationId: retrieveOrderInvoice
       description: 'Επιστρέφει τα μεταδεδομένα της απόδειξης λιανικής της παραγγελίας
         και ένα απόλυτο URL προς το endpoint λήψης μέσω ροής (``/order/{id}/invoice/download``).
-        Το URL προστατεύεται από τον ίδιο έλεγχο δικαιώματος ιδιοκτήτη/διαχειριστή
-        όπως και αυτό το endpoint μεταδεδομένων — δεν εκτίθενται ακατέργαστα URL αποθήκευσης
+        Το URL προστατεύεται από τον ίδιο έλεγχο πρόσβασης όπως και αυτό το endpoint
+        μεταδεδομένων (ιδιοκτήτης της παραγγελίας, προσωπικό του καταστήματος ή επισκέπτης
+        που έχει το UUID της παραγγελίας) — δεν εκτίθενται ακατέργαστα URL αποθήκευσης
         στον client. 404 εκτός αν η απόδειξη έχει καταχωριστεί στην ΑΑΔΕ (myDATA):
         δεν έχει εκδοθεί ακόμη, εκκρεμεί, απορρίφθηκε ή ακυρώθηκε, ή το κατάστημα
         εκδίδει τις αποδείξεις του εκτός της πλατφόρμας.'
@@ -16189,6 +16190,13 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         required: true
+      - in: query
+        name: uuid
+        schema:
+          type: string
+          format: uuid
+        description: The order's UUID. Required when the order belongs to a guest
+          (no account); ignored for signed-in owners and store staff.
       tags:
       - Orders
       security:
@@ -16236,7 +16244,7 @@ paths:
       description: Μεταδίδει το PDF της απόδειξης λιανικής μέσω ταυτοποίησης Django,
         από τον ρυθμισμένο χώρο αποθήκευσης (S3 σε παραγωγή, σύστημα αρχείων σε ανάπτυξη),
         ώστε το URL αποθήκευσης να μην εκτίθεται ποτέ στον client. 404 εκτός αν η
-        απόδειξη έχει καταχωριστεί στην ΑΑΔΕ (myDATA). Ίδιος έλεγχος ιδιοκτησίας όπως
+        απόδειξη έχει καταχωριστεί στην ΑΑΔΕ (myDATA). Ίδιος έλεγχος πρόσβασης όπως
         και το endpoint μεταδεδομένων.
       summary: Λήψη PDF απόδειξης
       parameters:
@@ -16248,11 +16256,44 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         required: true
+      - in: query
+        name: uuid
+        schema:
+          type: string
+          format: uuid
+        description: The order's UUID. Required when the order belongs to a guest
+          (no account); ignored for signed-in owners and store staff.
       tags:
       - Orders
       security:
       - cookieAuth: []
       responses:
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
+          description: No response body
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
         '200':
           content:
             application/pdf:
@@ -16260,8 +16301,6 @@ paths:
                 type: string
                 format: binary
           description: ''
-        '404':
-          description: No response body
   /api/v1/order/{id}/payment_status:
     get:
       operationId: getOrderPaymentStatus

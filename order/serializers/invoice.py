@@ -12,6 +12,8 @@ frontend needs (invoice number, issue date, totals) to render a
 
 from __future__ import annotations
 
+from urllib.parse import urlencode
+
 from django.urls import reverse
 from rest_framework import serializers
 
@@ -54,6 +56,10 @@ class InvoiceDownloadResponseSerializer(serializers.ModelSerializer):
             return None
         request = self.context.get("request")
         path = reverse("order-invoice-download", kwargs={"pk": obj.order_id})
+        if obj.order.user_id is None:
+            # A guest proves ownership with the order's uuid, so the
+            # link they are handed must carry it.
+            path = f"{path}?{urlencode({'uuid': obj.order.uuid})}"
         if request is not None:
             return request.build_absolute_uri(path)
         return path

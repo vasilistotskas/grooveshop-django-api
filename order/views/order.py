@@ -119,6 +119,8 @@ GUEST_UUID_QUERY_ACTIONS = frozenset(
         "create_checkout_session",
         "confirm_agent_payment",
         "retry_payment",
+        "invoice",
+        "invoice_download",
         "specimen_download",
     }
 )
@@ -277,13 +279,33 @@ serializers_config: SerializersConfig = {
         description=_(
             "Return the order's retail receipt metadata and an absolute "
             "URL to the streaming download endpoint (``/order/{id}/"
-            "invoice/download``). The URL is gated by the same owner/admin "
-            "permission check as this metadata endpoint — no raw storage "
+            "invoice/download``). The URL is gated by the same permission "
+            "check as this metadata endpoint (the order's owner, store "
+            "staff, or a guest holding the order's UUID) — no raw storage "
             "URLs are exposed to the client. 404 unless the receipt is "
             "registered with AADE (myDATA): none issued yet, pending, "
             "rejected or cancelled, or a store that issues its receipts "
             "outside the platform."
         ),
+        parameters=[GUEST_ORDER_UUID_PARAMETER],
+        tags=["Orders"],
+    ),
+    "invoice_download": ActionConfig(
+        # ``200: None`` would declare a 200 with no body for a PDF stream.
+        responses={
+            (200, "application/pdf"): OpenApiTypes.BINARY,
+            404: None,
+        },
+        operation_id="downloadOrderInvoice",
+        summary=_("Download the receipt PDF"),
+        description=_(
+            "Streams the retail receipt PDF through Django auth, from the "
+            "configured storage (S3 in production, the filesystem in "
+            "development), so the storage URL is never exposed to the "
+            "client. 404 unless the receipt is registered with AADE "
+            "(myDATA). Same access check as the metadata endpoint."
+        ),
+        parameters=[GUEST_ORDER_UUID_PARAMETER],
         tags=["Orders"],
     ),
     "specimen_download": ActionConfig(
@@ -473,8 +495,6 @@ class OrderViewSet(BaseModelViewSet):
             "partial_update",
             "my_orders",
             "reorder",
-            "invoice",
-            "invoice_download",
             "boxnow_label",
             "acs_label",
             "shipment_label",
@@ -2131,23 +2151,6 @@ class OrderViewSet(BaseModelViewSet):
         )
         return Response(serializer.data)
 
-    @extend_schema(
-        operation_id="downloadOrderInvoice",
-        tags=["Orders"],
-        summary=_("Download the receipt PDF"),
-        description=_(
-            "Streams the retail receipt PDF through Django auth, from the "
-            "configured storage (S3 in production, the filesystem in "
-            "development), so the storage URL is never exposed to the "
-            "client. 404 unless the receipt is registered with AADE "
-            "(myDATA). Same ownership check as the metadata endpoint."
-        ),
-        # ``200: None`` declared a 200 with no body for a PDF stream.
-        responses={
-            (200, "application/pdf"): OpenApiTypes.BINARY,
-            404: None,
-        },
-    )
     @action(detail=True, methods=["GET"], url_path="invoice/download")
     def invoice_download(self, request, *args, **kwargs):
         """Stream the invoice PDF through Django auth.

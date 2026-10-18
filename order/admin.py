@@ -53,10 +53,9 @@ from admin.mixins import IsSuperuserOnlyModelAdmin
 from order.attribution import source_label
 from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.status import (
-    RETURN_HANDLING_STATUSES,
     OrderStatus,
 )
-from order.exceptions import PaymentError
+from order.exceptions import PaymentError, RefundOutstandingError
 from order.follow_up import (
     follow_up_days,
     follow_up_reason,
@@ -1445,15 +1444,16 @@ class OrderAdmin(BaseModelAdmin):
         )
 
     def has_refund_permission(self, request, object_id=None):
-        """Money moves from here, so only where a refund applies: an order
-        staff are handling a return for (delivered, completed or
-        returned). Before delivery a cancel refunds the order instead."""
-        return (
-            object_id is not None
-            and Order.objects.filter(
-                pk=object_id, status__in=RETURN_HANDLING_STATUSES
-            ).exists()
+        """Money moves from here, so only where the ledger holds money that
+        can still be refunded, whatever the order's status: a return, a
+        goodwill refund, or a canceled order whose automatic refund was
+        declined (the "Canceled orders to refund" worklist)."""
+        order = (
+            Order.objects.filter(pk=object_id).first()
+            if object_id is not None
+            else None
         )
+        return order is not None and PaymentLedger.refundable(order) > 0
 
     def has_retail_documents_permission(self, request, object_id=None):
         """The "Invoicing & myDATA" actions exist only for a store whose
@@ -1493,6 +1493,16 @@ class OrderAdmin(BaseModelAdmin):
                 self.message_user(
                     request,
                     success_message % {"order_id": order.id},
+                )
+            except RefundOutstandingError as e:
+                self.message_user(
+                    request,
+                    _(
+                        "Order %(order_id)s skipped: refund its payment "
+                        "first, %(amount)s can still be refunded."
+                    )
+                    % {"order_id": order.id, "amount": money(e.refundable)},
+                    level="warning",
                 )
             except (ValueError, OrderServiceError) as e:
                 self.message_user(
@@ -1548,7 +1558,18 @@ class OrderAdmin(BaseModelAdmin):
                         % {"order_id": order.id, "error": courier_error},
                         level="error",
                     )
-                if refund_info and not refund_info["refunded"]:
+                if refund_info and refund_info.get("dispute_open"):
+                    self.message_user(
+                        request,
+                        _(
+                            "Order %(order_id)s was canceled, but a dispute "
+                            "is open on its payment, so the refund waits "
+                            "until the dispute closes. Refund it then."
+                        )
+                        % {"order_id": order.id},
+                        level="error",
+                    )
+                elif refund_info and not refund_info["refunded"]:
                     # The order is canceled and the money is still with
                     # the shop: say so, or "marked as canceled" reads as
                     # a finished job. The cause is in the order history.

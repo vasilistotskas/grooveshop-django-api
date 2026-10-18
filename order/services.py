@@ -30,6 +30,7 @@ from order.enum.status import (
 from order.exceptions import (
     CartNotReadyError,
     CourierUnreachableError,
+    DisputeOpenError,
     InsufficientStockError,
     InvalidCouponError,
     InvalidGiftCardError,
@@ -43,6 +44,7 @@ from order.exceptions import (
     PaymentNotFoundError,
     PaymentVerificationError,
     ProductNotFoundError,
+    RefundOutstandingError,
     StockReservationError,
 )
 from order.models.attribution import OrderAttribution
@@ -2381,6 +2383,14 @@ class OrderService:
                 ],
             )
 
+        # REFUNDED says the customer was paid back, and the loyalty
+        # reversal and the status email follow the status: not while the
+        # ledger still holds money that can be refunded.
+        if new_status == OrderStatus.REFUNDED:
+            refundable = PaymentLedger.refundable(order)
+            if refundable > 0:
+                raise RefundOutstandingError(refundable)
+
         old_status = order.status
 
         if silent_for_customer:
@@ -2683,6 +2693,34 @@ class OrderService:
                 if reason
                 else "Order canceled",
             )
+        except PaymentError as exc:
+            # Refused before any provider was asked (a dispute is open,
+            # nothing is left to refund, no credentials): the reason is
+            # staff-readable, so it goes where staff look.
+            from order.models.history import OrderHistory
+
+            logger.warning(
+                "Refund for canceled order %s not made: %s", order.id, exc
+            )
+            OrderHistory.log_note(
+                order=order,
+                note=(
+                    "The canceled order was not refunded: "
+                    f"{exc}"
+                    + (
+                        " The refund waits until the dispute closes; "
+                        "refund the order then."
+                        if isinstance(exc, DisputeOpenError)
+                        else ""
+                    )
+                ),
+            )
+            return {
+                "refunded": False,
+                "error": str(_("The refund could not be processed.")),
+                "message": "Order canceled but refund failed",
+                "dispute_open": isinstance(exc, DisputeOpenError),
+            }
         except Exception:
             logger.exception(
                 "Error processing refund for canceled order %s", order.id
@@ -3241,7 +3279,7 @@ class OrderService:
                     return [], declined
 
         if PaymentLedger.dispute_open(order, locked["metadata"]):
-            raise PaymentError(
+            raise DisputeOpenError(
                 _(
                     "A dispute is open on this payment and the payment "
                     "provider does not accept a refund until it is decided. "

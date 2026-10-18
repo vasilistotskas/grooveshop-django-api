@@ -41,6 +41,14 @@ def awarded_order():
         status=OrderStatus.RETURNED,
         payment_status=PaymentStatus.COMPLETED,
         num_order_items=0,
+        # Nothing refundable. A factory order otherwise carries a random
+        # provider pay way and payment id, which ``PaymentLedger.refund_open``
+        # reads as a paid order whose capture the ledger never recorded, and
+        # ``update_order_status`` then refuses to close it as REFUNDED
+        # (``RefundOutstandingError``): the test passed or failed on the
+        # draw.
+        pay_way=None,
+        payment_id="",
     )
     OrderItemFactory(
         order=order,

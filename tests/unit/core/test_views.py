@@ -192,7 +192,6 @@ class TestUploadImage(TestCase):
 
                     with (
                         tempfile.TemporaryDirectory() as media_root,
-                        patch("core.views.os.getenv", return_value="False"),
                         patch(
                             "core.views.sanitize_filename",
                             return_value=f"test.{ext}",
@@ -224,28 +223,41 @@ class TestUploadImage(TestCase):
                     return upload_image(request)
             return upload_image(request)
 
-    @patch("core.views.os.getenv", return_value="False")
-    def test_local_storage_upload_is_tenant_scoped(self, mock_getenv):
+    def test_local_storage_upload_is_tenant_scoped(self):
         """Editor uploads are TENANT media: they must land under the
         request schema's directory (MEDIA_ROOT/{schema}/uploads/tinymce/)
         and the returned location must carry the schema-scoped URL —
         the shared schema-less uploads/ dir bypassed tenant offboarding
-        and the schema-scoped media route."""
+        and the schema-scoped media route.
+
+        The location is the storage URL as is, in every mode:
+        ``MEDIA_URL`` is absolute with and without ``DEBUG``, so a
+        prefix would double the host."""
+        import os
         import tempfile
 
+        from django.conf import settings
         from django.db import connection
 
-        with tempfile.TemporaryDirectory() as media_root:
-            with override_settings(MEDIA_ROOT=media_root):
+        for debug in (True, False):
+            with (
+                self.subTest(debug=debug),
+                patch.dict(os.environ, {"DEBUG": str(debug)}),
+                override_settings(DEBUG=debug),
+                tempfile.TemporaryDirectory() as media_root,
+                override_settings(MEDIA_ROOT=media_root),
+            ):
                 response = self._post_upload("test.jpg", sanitized="test.jpg")
 
-        data = json.loads(response.content)
-        self.assertIn("successfully", data["message"])
-        schema = connection.schema_name
-        self.assertIn(f"/{schema}/uploads/tinymce/test.jpg", data["location"])
+                data = json.loads(response.content)
+                self.assertIn("successfully", data["message"])
+                self.assertEqual(
+                    data["location"],
+                    f"{settings.MEDIA_URL}{connection.schema_name}"
+                    "/uploads/tinymce/test.jpg",
+                )
 
-    @patch("core.views.os.getenv", return_value="False")
-    def test_file_exists_gets_alternative_name(self, mock_getenv):
+    def test_file_exists_gets_alternative_name(self):
         """The storage backend generates an alternative name on
         collision — two uploads of the same filename must not overwrite
         each other and must return distinct locations."""
@@ -263,8 +275,7 @@ class TestUploadImage(TestCase):
         self.assertNotEqual(first["location"], second["location"])
         self.assertIn("uploads/tinymce/", second["location"])
 
-    @patch("core.views.os.getenv", return_value="False")
-    def test_path_traversal_protection(self, mock_getenv):
+    def test_path_traversal_protection(self):
         """A hostile filename that survives sanitization must still be
         rejected by the storage backend (SuspiciousFileOperation) rather
         than escaping MEDIA_ROOT."""

@@ -1,5 +1,4 @@
 import logging
-import os
 
 from allauth.headless.base.response import APIResponse
 from allauth.headless.mfa import response
@@ -111,15 +110,13 @@ def upload_image(request):
     # platform; os.path.join would smuggle a backslash into the name on
     # Windows.
     saved_path = storage.save(f"uploads/tinymce/{sanitized_name}", file_obj)
-    saved_url = storage.url(saved_path.replace(os.sep, "/"))
 
-    debug = os.getenv("DEBUG", "False") == "True"
-    location = f"{settings.API_BASE_URL}{saved_url}" if debug else saved_url
-
+    # MEDIA_URL is absolute in every environment (settings.py), so the
+    # storage URL is the editor's image location as is.
     return JsonResponse(
         {
             "message": "Image uploaded successfully",
-            "location": location,
+            "location": storage.url(saved_path),
         }
     )
 

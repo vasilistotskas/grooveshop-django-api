@@ -3,6 +3,91 @@
 
 
 
+## v3.134.0 (2026-10-18)
+
+### Bug fixes
+
+* fix(devtools): staging_anonymise replaces bearer credentials valid on production
+
+A gift-card code, a personal coupon, or a guest order or cart UUID that
+reaches staging still works against production, so copying one is a
+credential leak rather than a privacy one.
+
+Replace every gift-card code and every user-assigned promotion code
+with an STG- twin, and the guest order, guest cart and gift-card
+purchase UUIDs with version 5 UUIDs (production's are version 4), so a
+twin can never equal a production value. Twins are a pure function of
+the original and map to themselves, so cart_uuid in order metadata and
+recommendation events still matches its cart and a second run changes
+nothing. Public promotion codes stay. The residual scan now also reads
+uuid columns and searches for the original tokens.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DKyCtCCkFTgcH6VAVK3AJm ([`3ba903b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3ba903bb36b9b4d9e1a78afadde87058c2128503))
+
+* fix(devtools): rewrite phones in JSON strings and pin the staff test to public
+
+JSON strings went through a copy of the text redaction that skipped
+phone numbers, so a phone under a key the key list does not name
+survived and failed the residual scan. Route them through redact_text
+and drop the duplicate.
+
+The MT lane test for platform staff created the operator on whatever
+schema the previous test left bound, so it passed alone and failed in
+the full lane. Create and read it in the public schema. Make the
+vacuous assertion in the redaction test real.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DKyCtCCkFTgcH6VAVK3AJm
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`3ba903b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3ba903bb36b9b4d9e1a78afadde87058c2128503))
+
+### Features
+
+* feat(devtools): staging_anonymise replaces every customer identity and production bearer credential (#237) ([`3ba903b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3ba903bb36b9b4d9e1a78afadde87058c2128503))
+
+* feat(devtools): staging_anonymise replaces every customer identity
+
+The staging refresh restores a production dump unchanged, so staging
+held every customer's name, e-mail, phone, address and IP. Add
+manage.py staging_anonymise, run against the restored dump before it is
+swapped in.
+
+It replaces personal fields with deterministic fakes in the public
+schema and every tenant schema, keeping orders, products, stock and
+amounts real, deletes sessions, tokens, authenticators, search history
+and dj-stripe mirrors, and keeps platform staff and the shared demo
+logins working. Everything is one transaction; it refuses outside
+SYSTEM_ENV=staging.
+
+Coverage cannot rot silently: every model must be scrubbed, deleted or
+declared not personal, every personal-looking field must be scrubbed or
+explained, and anything GDPR erasure handles must be handled here (guard
+tests reuse the erasure test's detector). A residual scan reads every
+text, JSON and inet column of every table and fails the run, rolling it
+back, if an original e-mail, phone, IP or name survives.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DKyCtCCkFTgcH6VAVK3AJm ([`3ba903b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3ba903bb36b9b4d9e1a78afadde87058c2128503))
+
+### Testing
+
+* test(product): products are in stock unless a test says otherwise (#240)
+
+ProductFactory drew stock from 0..250, so roughly one product in 250
+was sold out. A FREE_GIFT is only an entitlement while the gift has the
+stock to hand over, so test_an_excluded_product_can_still_be_the_reward
+(and the other gift tests in test_product_offers) failed intermittently
+with no REWARD relation. Draw from 1..250 instead; a test that needs a
+sold-out product already says stock=0.
+
+
+Claude-Session: https://claude.ai/code/session_01DKyCtCCkFTgcH6VAVK3AJm
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`cc67bdb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cc67bdbc3f3a5934d0baa9a988c49d3ccb9c2b95))
+
 ## v3.133.1 (2026-10-17)
 
 ### Bug fixes

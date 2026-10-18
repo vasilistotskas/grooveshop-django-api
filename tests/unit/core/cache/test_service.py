@@ -61,7 +61,9 @@ class TestPurge:
             ["redis:1:k1", "redis:1:k2"]
         )
         nuxt_client_mock.request_purge.assert_called_once_with(
-            ["cache:nitro:handlers:PayWayViewSet*"], dry_run=False
+            ["cache:nitro:handlers:PayWayViewSet*"],
+            dry_run=False,
+            tenant_config=False,
         )
         assert report.total_django == 2
         assert report.total_nuxt == 3
@@ -246,3 +248,29 @@ class TestCount:
         result = CacheService.count(["x"])
 
         assert result == {"x": 3}
+
+
+@pytest.mark.django_db
+class TestTenantConfigFlag:
+    def test_a_surface_that_changes_the_tenant_config_says_so(
+        self, cache_instance_mock, nuxt_client_mock
+    ):
+        CacheService.purge(["settings"], include_related=False)
+
+        assert nuxt_client_mock.request_purge.call_args.kwargs["tenant_config"]
+
+    def test_the_store_pages_surface_says_so(
+        self, cache_instance_mock, nuxt_client_mock
+    ):
+        CacheService.purge(["store_pages"], include_related=False)
+
+        assert nuxt_client_mock.request_purge.call_args.kwargs["tenant_config"]
+
+    def test_a_catalogue_purge_does_not(
+        self, cache_instance_mock, nuxt_client_mock
+    ):
+        CacheService.purge(["products"], include_related=False)
+
+        assert not nuxt_client_mock.request_purge.call_args.kwargs[
+            "tenant_config"
+        ]

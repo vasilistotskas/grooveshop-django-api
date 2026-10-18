@@ -596,6 +596,7 @@ def register_default_surfaces() -> None:
             # (the route was ``settingsGet``), so purging this surface
             # never reached the storefront's settings cache.
             nuxt_patterns=_nuxt("settingsPublic", "tenantLegalIdentity"),
+            invalidates_tenant_config=True,
             related=("pay_way", "shipping", "loyalty"),
             icon="tune",
             group="config",
@@ -621,6 +622,7 @@ def register_default_surfaces() -> None:
             # (``host``). Purging route keys also queues the edge purge.
             nuxt_patterns=_nuxt("settingsPublic")
             + (f"{NUXT_ROUTE_PREFIX}_:*",),
+            invalidates_tenant_config=True,
             icon="web",
             group="content",
         )

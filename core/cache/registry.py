@@ -47,6 +47,11 @@ class CacheSurface:
     django_patterns: tuple[str, ...] = ()
     nuxt_patterns: tuple[str, ...] = ()
     invalidates_gateway_feeds: bool = False
+    # Purging this surface follows a change to data the storefront reads
+    # from /tenant/resolve (features, settings), so the storefront must
+    # re-resolve the store and re-key its rendered pages. Sent to the
+    # Nuxt purge endpoint as ``tenantConfig``.
+    invalidates_tenant_config: bool = False
     related: tuple[str, ...] = ()
     icon: str = "database"
     group: str = "general"

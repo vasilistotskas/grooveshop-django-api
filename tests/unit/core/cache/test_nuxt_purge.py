@@ -87,3 +87,31 @@ class TestRequestPurgeHostScoping:
         with mock.patch("core.cache.nuxt.requests.post", side_effect=fake_post):
             nuxt_client.request_purge(["cache:nitro:handlers:Blog*"])
         assert "host" not in posted["json"]
+
+
+class TestRequestPurgeTenantConfig:
+    def _post(self, **kwargs):
+        posted = {}
+
+        def _fake_post(endpoint, json=None, headers=None, timeout=None):
+            posted["json"] = json
+            resp = mock.Mock()
+            resp.raise_for_status = mock.Mock()
+            resp.json = mock.Mock(
+                return_value={"matched": 0, "deleted": 0, "blocked": 0}
+            )
+            return resp
+
+        with mock.patch(
+            "core.cache.nuxt.requests.post", side_effect=_fake_post
+        ):
+            nuxt_client.request_purge(["cache:nitro:handlers:Blog*"], **kwargs)
+        return posted["json"]
+
+    def test_sends_the_flag_when_the_purge_follows_a_config_change(
+        self, _configured
+    ):
+        assert self._post(tenant_config=True)["tenantConfig"] is True
+
+    def test_sends_nothing_otherwise(self, _configured):
+        assert "tenantConfig" not in self._post()

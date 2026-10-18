@@ -57,12 +57,20 @@ def is_configured() -> bool:
 
 
 def request_purge(
-    patterns: list[str], *, dry_run: bool = False, timeout: float = 5.0
+    patterns: list[str],
+    *,
+    dry_run: bool = False,
+    tenant_config: bool = False,
+    timeout: float = 5.0,
 ) -> NuxtPurgeResult:
     """Call the Nuxt purge endpoint with the supplied glob patterns.
 
     Returns a structured result; never raises so admin actions stay
     responsive when the frontend is briefly unreachable.
+
+    ``tenant_config`` tells the storefront this purge follows a change to
+    the store's tenant config, so it re-resolves the store and re-keys
+    its rendered pages; any other purge leaves both alone.
     """
 
     if not patterns:
@@ -79,6 +87,8 @@ def request_purge(
         "patterns": patterns,
         "dryRun": dry_run,
     }
+    if tenant_config:
+        payload["tenantConfig"] = True
     host = _current_tenant_host()
     if host:
         payload["host"] = host

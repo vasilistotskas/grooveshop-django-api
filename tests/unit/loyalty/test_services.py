@@ -307,7 +307,8 @@ class TestEmptyTransactions:
 
 @pytest.mark.django_db
 class TestBalanceClampingOnReversal:
-    """When reversal would cause negative balance, balance is clamped to 0."""
+    """With the negative balance switched off, a reversal that would go
+    below zero is clamped to 0."""
 
     def test_reversal_clamps_balance_to_zero(self):
         """If user redeemed some points, reversal should not go negative."""
@@ -341,6 +342,7 @@ class TestBalanceClampingOnReversal:
         def mock_settings(key, default=None):
             settings_map = {
                 "LOYALTY_ENABLED": True,
+                "LOYALTY_REFUND_ALLOWS_NEGATIVE_BALANCE": False,
             }
             return settings_map.get(key, default)
 

@@ -1,30 +1,37 @@
-"""A refund must never put back more than it took out.
+"""What goes back onto a gift card, and when.
 
-`credit_refund` used to credit `-redeem.amount` for every REDEEM row on
-the order — the whole redeemed value — whatever was actually refunded. A
-EUR 100 order settled with a EUR 60 gift card, then refunded EUR 5 as
-goodwill, put the entire EUR 60 back on the card, immediately spendable,
-while the shopper kept the goods. EUR 60 created out of nothing.
+``credit_refund`` used to credit ``-redeem.amount`` for every REDEEM row on
+the order, once, when the order was REFUNDED: a EUR 100 order settled with
+a EUR 60 card, a EUR 10 item returned and EUR 10 refunded by card put the
+whole EUR 60 back. Staff now refund in the VALUE of what came back
+(``OrderService.refund_order``): the provider's money first, then the cards,
+in parts, so a card gets back exactly the part of the value that is beyond
+the provider's share. This module is the card's side of that; the
+order's side is ``tests/integration/order/test_value_based_refunds.py``.
 
-The redemption now goes back ONCE, with the refund that completes the
-order (``payment_status`` REFUNDED). A partial refund is paid back by the
-provider and leaves the card alone: crediting a slice as well would hand
-back more than that refund was worth, and the one-credit-per-card ledger
-could not top the card up when the rest is refunded.
+A card is owed what it gave for the order (REDEEM) less what has come back
+(REFUND_CREDIT), read under the card's row lock: that, not a unique
+constraint, is what stops a credit being made twice.
 """
 
 from __future__ import annotations
 
+import threading
 from decimal import Decimal
 
 import pytest
+from django.db import connection
 from djmoney.money import Money
 
+from giftcard.factories import GiftCardFactory
 from giftcard.models import GiftCardTransaction, GiftCardTransactionKind
+from giftcard.services import GiftCardService
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import RefundTransactionFactory
 from order.models.order import Order
-from order.signals import order_refunded
+from order.payment_ledger import PaymentLedger
+from order.services import OrderService
+from order.signals import order_canceled, order_refunded
 from order.views.viva_webhook import _process_event_in_tenant
 from pay_way.factories import PayWayFactory
 from tests.utils.viva import (
@@ -38,6 +45,19 @@ from tests.utils.viva import (
 pytestmark = pytest.mark.django_db
 
 
+def _attempt(order):
+    """A refund attempt for the credit to name: each part of a refund is
+    credited for its own."""
+    from order.models.refund_attempt import RefundAttempt
+
+    return RefundAttempt.objects.create(
+        order=order,
+        charge=None,
+        kind="STORED_VALUE",
+        amount=Money(Decimal("1.00"), "EUR"),
+    )
+
+
 def _credited(order) -> Decimal:
     rows = GiftCardTransaction.objects.filter(
         order=order, kind=GiftCardTransactionKind.REFUND_CREDIT
@@ -45,228 +65,325 @@ def _credited(order) -> Decimal:
     return sum((row.amount for row in rows), Decimal(0))
 
 
-def _refund(order, status, amount):
-    """What every refund path does: write the status, then signal."""
-    order.payment_status = status
-    order.save(update_fields=["payment_status"])
-    order_refunded.send(
-        sender=Order,
-        order=order,
-        amount=Money(Decimal(amount), "EUR"),
-        refund=RefundTransactionFactory(
-            order=order, amount=Money(Decimal(amount), "EUR")
-        ),
-    )
-
-
-def test_a_partial_refund_credits_nothing(
-    giftcard_order_settled_with_one_card,
-):
-    order, _card = giftcard_order_settled_with_one_card
-
-    _refund(order, PaymentStatus.PARTIALLY_REFUNDED, "5.00")
-
-    assert _credited(order) == Decimal(0), (
-        "a partial refund must not return any of the redemption"
-    )
-
-
-def test_the_refund_that_completes_the_order_credits_the_whole_redemption(
-    giftcard_order_settled_with_one_card,
-):
-    """Whatever the last slice was: the amount on the signal is not the
-    credit, the redemption is."""
-    order, _card = giftcard_order_settled_with_one_card
-
-    _refund(order, PaymentStatus.REFUNDED, "5.00")
-
-    assert _credited(order) == Decimal("60.00")
-
-
-def test_a_refund_signalled_twice_credits_once(
-    giftcard_order_settled_with_one_card,
-):
-    order, _card = giftcard_order_settled_with_one_card
-
-    _refund(order, PaymentStatus.REFUNDED, "40.00")
-    _refund(order, PaymentStatus.REFUNDED, "40.00")
-
-    assert _credited(order) == Decimal("60.00")
-
-
-def test_each_card_gets_back_what_it_gave(
-    giftcard_order_settled_with_two_cards,
-):
-    order, first, second = giftcard_order_settled_with_two_cards
-
-    _refund(order, PaymentStatus.REFUNDED, "40.00")
-
-    rows = {
-        row.gift_card_id: row.amount
-        for row in GiftCardTransaction.objects.filter(
+def _credits(order) -> list[Decimal]:
+    return list(
+        GiftCardTransaction.objects.filter(
             order=order, kind=GiftCardTransactionKind.REFUND_CREDIT
         )
-    }
-    assert rows == {first.id: Decimal("30.00"), second.id: Decimal("10.00")}
-
-
-def test_viva_refunds_return_the_redemption_with_the_last_one(
-    giftcard_order_settled_with_one_card,
-):
-    """End to end from Viva's documented 1797: a EUR 100 order, EUR 60 by
-    gift card and EUR 40 charged. A EUR 5 refund leaves the card alone;
-    the EUR 35 that completes the refund returns the EUR 60, once."""
-    order, _card = giftcard_order_settled_with_one_card
-    event = REVERSAL_CREATED_EVENT["EventData"]
-    payment_id, order_code = event["ParentId"], event["OrderCode"]
-    Order.objects.filter(pk=order.pk).update(
-        status=OrderStatus.PROCESSING,
-        payment_status=PaymentStatus.COMPLETED,
-        payment_id=payment_id,
-        pay_way=PayWayFactory.create_online_payment("viva_wallet"),
-        amount_due=Money(Decimal("40.00"), "EUR"),
-        metadata={"viva_order_codes": [str(order_code)]},
-    )
-    refunds = {"first-refund": 5.0, "last-refund": 35.0}
-    viva = FakeVivaApi(
-        transactions={
-            payment_id: (
-                200,
-                retrieve_transaction(
-                    amount=40.0, orderCode=order_code, statusId="R"
-                ),
-            ),
-            **{
-                refund_id: (
-                    200,
-                    retrieve_refund(amount=paid_back, order_code=order_code),
-                )
-                for refund_id, paid_back in refunds.items()
-            },
-        }
+        .order_by("id")
+        .values_list("amount", flat=True)
     )
 
-    def deliver(refund_id):
-        body = reversal_created_event(
-            refund_id=refund_id, parent_id=payment_id, order_code=order_code
-        )
-        data = body["EventData"]
-        return _process_event_in_tenant(
-            order_code=str(order_code),
-            event_type_id=body["EventTypeId"],
-            event_data=data,
-            transaction_id=refund_id,
-            status_id=data["StatusId"],
-            txn_hash="deadbeef",
-        )
 
-    with viva:
-        deliver("first-refund")
-        assert _credited(order) == Decimal(0)
-        deliver("last-refund")
+class TestAProviderRefundLeavesTheCardAlone:
+    """Refunding the provider's money returns nothing to a card: only the
+    value beyond it does, and staff say how much."""
 
-    order.refresh_from_db()
-    assert order.payment_status == PaymentStatus.REFUNDED
-    assert _credited(order) == Decimal("60.00")
-
-
-class TestAnOrderClosedAsRefundedWithNoProviderPayment:
-    """Paid entirely with gift cards, an order has no provider payment, so
-    no refund ever fires for it. Closing it as REFUNDED is what returns the
-    cards."""
-
-    def _close(self, order):
-        from order.services import OrderService
-
-        # No provider payment, which is the case this receiver serves (a
-        # factory order carries a random provider pay way otherwise).
-        Order.objects.filter(pk=order.pk).update(
-            status=OrderStatus.RETURNED, pay_way=None, payment_id=""
-        )
-        # A fresh instance, not ``refresh_from_db``: ``Order`` snapshots
-        # its status when it is built (``_original_status``) and decides
-        # from it whether a save is a transition. The factory draws a
-        # random status, and an order drawn as REFUNDED saw no change
-        # when it was closed as REFUNDED, so no ``order_status_changed``
-        # and no credit.
-        order = Order.objects.get(pk=order.pk)
-        OrderService.update_order_status(order, OrderStatus.REFUNDED)
-
-    def test_the_redemption_goes_back(
+    def test_a_refund_row_credits_nothing_on_any_status(
         self, giftcard_order_settled_with_one_card
     ):
         order, _card = giftcard_order_settled_with_one_card
+        for status in (
+            PaymentStatus.PARTIALLY_REFUNDED,
+            PaymentStatus.REFUNDED,
+        ):
+            order.payment_status = status
+            order.save(update_fields=["payment_status"])
+            order_refunded.send(
+                sender=Order,
+                order=order,
+                amount=Money(Decimal("5.00"), "EUR"),
+                refund=RefundTransactionFactory(
+                    order=order, amount=Money(Decimal("5.00"), "EUR")
+                ),
+            )
+
+        assert _credited(order) == Decimal(0)
+
+    def test_viva_refunds_of_the_provider_money_do_not_touch_the_card(
+        self, giftcard_order_settled_with_one_card
+    ):
+        """End to end from Viva's documented 1797: a EUR 100 order, EUR 60
+        by gift card and EUR 40 charged. The EUR 5 and EUR 35 that refund
+        all of Viva's money leave the card alone and the order partly
+        refunded; the EUR 60 goes back when staff refund it."""
+        order, card = giftcard_order_settled_with_one_card
+        event = REVERSAL_CREATED_EVENT["EventData"]
+        payment_id, order_code = event["ParentId"], event["OrderCode"]
         Order.objects.filter(pk=order.pk).update(
-            payment_status=PaymentStatus.COMPLETED
+            status=OrderStatus.PROCESSING,
+            payment_status=PaymentStatus.COMPLETED,
+            payment_id=payment_id,
+            pay_way=PayWayFactory.create_online_payment("viva_wallet"),
+            amount_due=Money(Decimal("40.00"), "EUR"),
+            metadata={"viva_order_codes": [str(order_code)]},
+        )
+        refunds = {"first-refund": 5.0, "last-refund": 35.0}
+        viva = FakeVivaApi(
+            transactions={
+                payment_id: (
+                    200,
+                    retrieve_transaction(
+                        amount=40.0, orderCode=order_code, statusId="R"
+                    ),
+                ),
+                **{
+                    refund_id: (
+                        200,
+                        retrieve_refund(
+                            amount=paid_back, order_code=order_code
+                        ),
+                    )
+                    for refund_id, paid_back in refunds.items()
+                },
+            }
         )
 
-        self._close(order)
+        def deliver(refund_id):
+            body = reversal_created_event(
+                refund_id=refund_id,
+                parent_id=payment_id,
+                order_code=order_code,
+            )
+            data = body["EventData"]
+            return _process_event_in_tenant(
+                order_code=str(order_code),
+                event_type_id=body["EventTypeId"],
+                event_data=data,
+                transaction_id=refund_id,
+                status_id=data["StatusId"],
+                txn_hash="deadbeef",
+            )
+
+        with viva:
+            deliver("first-refund")
+            deliver("last-refund")
+
+        order.refresh_from_db()
+        assert order.payment_status == PaymentStatus.PARTIALLY_REFUNDED
+        assert _credited(order) == Decimal(0)
+        assert PaymentLedger.refundable_value(order) == Decimal("60.00")
+
+        OrderService.refund_order(order)
+
+        order.refresh_from_db()
+        assert order.payment_status == PaymentStatus.REFUNDED
+        assert _credited(order) == Decimal("60.00")
+        assert card.balance == Money(Decimal("60.00"), "EUR")
+
+
+class TestCreditRefund:
+    def test_a_part_needs_the_refund_that_makes_it(
+        self, giftcard_order_settled_with_one_card
+    ):
+        order, _card = giftcard_order_settled_with_one_card
+
+        with pytest.raises(ValueError, match="refund attempt"):
+            GiftCardService.credit_refund(order, Decimal("10.00"))
+
+        assert _credited(order) == 0
+
+    def test_the_database_limits_whole_credits_not_parts(
+        self, giftcard_order_settled_with_one_card
+    ):
+        """What the previous release's constraint guarded stays guarded for
+        the rows that release writes (no refund attempt): one per card per
+        order. A credit that names its refund is a part and is not."""
+        from django.db import IntegrityError, transaction
+
+        order, card = giftcard_order_settled_with_one_card
+
+        def credit(attempt):
+            return GiftCardTransaction.objects.create(
+                gift_card=card,
+                kind=GiftCardTransactionKind.REFUND_CREDIT,
+                amount=Decimal("5.00"),
+                order=order,
+                refund_attempt=attempt,
+            )
+
+        credit(None)
+        with pytest.raises(IntegrityError), transaction.atomic():
+            credit(None)
+        credit(_attempt(order))
+        credit(_attempt(order))
+
+        assert len(_credits(order)) == 3
+
+    def test_everything_goes_back_once(
+        self, giftcard_order_settled_with_one_card
+    ):
+        order, _card = giftcard_order_settled_with_one_card
+
+        assert GiftCardService.credit_refund(order) == Decimal("60.00")
+        assert GiftCardService.credit_refund(order) == Decimal(0)
 
         assert _credited(order) == Decimal("60.00")
 
-    @pytest.mark.parametrize("built_as", list(OrderStatus))
-    def test_the_status_the_factory_drew_does_not_matter(self, built_as):
-        """``OrderFactory`` draws a random status, and the order is
-        snapshotted with it: whichever it drew, closing the order as
-        REFUNDED is a transition and the card is credited."""
-        from giftcard.factories import GiftCardFactory
+    def test_a_part_goes_back_and_the_rest_is_still_owed(
+        self, giftcard_order_settled_with_one_card
+    ):
+        order, _card = giftcard_order_settled_with_one_card
+
+        assert GiftCardService.credit_refund(
+            order, Decimal("25.00"), refund_attempt=_attempt(order)
+        ) == (Decimal("25.00"))
+        assert GiftCardService.credit_refund(
+            order, Decimal("25.00"), refund_attempt=_attempt(order)
+        ) == (Decimal("25.00"))
+
+        assert _credits(order) == [Decimal("25.00"), Decimal("25.00")]
+        assert GiftCardService.credit_refund(order) == Decimal("10.00")
+
+    def test_never_more_than_the_card_gave(
+        self, giftcard_order_settled_with_one_card
+    ):
+        order, _card = giftcard_order_settled_with_one_card
+
+        credited = GiftCardService.credit_refund(
+            order, Decimal("500.00"), refund_attempt=_attempt(order)
+        )
+
+        assert credited == Decimal("60.00")
+        assert (
+            GiftCardService.credit_refund(
+                order, Decimal("1.00"), refund_attempt=_attempt(order)
+            )
+            == 0
+        )
+        assert _credited(order) == Decimal("60.00")
+
+    def test_each_credit_names_the_refund_attempt(
+        self, giftcard_order_settled_with_one_card
+    ):
+        from order.models.refund_attempt import RefundAttempt
+
+        order, _card = giftcard_order_settled_with_one_card
+        attempt = RefundAttempt.objects.create(
+            order=order,
+            charge=None,
+            kind="STORED_VALUE",
+            amount=Money(Decimal("10.00"), "EUR"),
+        )
+
+        GiftCardService.credit_refund(
+            order, Decimal("10.00"), refund_attempt=attempt
+        )
+
+        [credit] = GiftCardTransaction.objects.filter(
+            order=order, kind=GiftCardTransactionKind.REFUND_CREDIT
+        )
+        assert credit.refund_attempt == attempt
+
+    def test_each_card_gets_back_what_it_gave_when_everything_goes_back(
+        self, giftcard_order_settled_with_two_cards
+    ):
+        order, first, second = giftcard_order_settled_with_two_cards
+
+        GiftCardService.credit_refund(order)
+
+        rows = {
+            row.gift_card_id: row.amount
+            for row in GiftCardTransaction.objects.filter(
+                order=order, kind=GiftCardTransactionKind.REFUND_CREDIT
+            )
+        }
+        assert rows == {first.id: Decimal("30.00"), second.id: Decimal("10.00")}
+
+    def test_a_part_is_shared_in_proportion_to_what_each_card_gave(
+        self, giftcard_order_settled_with_two_cards
+    ):
+        order, first, second = giftcard_order_settled_with_two_cards
+
+        GiftCardService.credit_refund(
+            order, Decimal("20.00"), refund_attempt=_attempt(order)
+        )
+
+        rows = {
+            row.gift_card_id: row.amount
+            for row in GiftCardTransaction.objects.filter(
+                order=order, kind=GiftCardTransactionKind.REFUND_CREDIT
+            )
+        }
+        assert rows == {first.id: Decimal("15.00"), second.id: Decimal("5.00")}
+
+    def test_the_cents_left_over_are_not_lost(self):
         from order.factories.order import OrderFactory
 
-        order = OrderFactory(
-            status=built_as,
-            gift_card_amount=Money(Decimal("60.00"), "EUR"),
-        )
-        card = GiftCardFactory(initial_value=Money(Decimal("60.00"), "EUR"))
-        GiftCardTransaction.objects.create(
-            gift_card=card,
-            kind=GiftCardTransactionKind.REDEEM,
-            amount=Decimal("-60.00"),
-            order=order,
-        )
-        Order.objects.filter(pk=order.pk).update(
-            payment_status=PaymentStatus.COMPLETED
+        order = OrderFactory(gift_card_amount=Money(Decimal("30.00"), "EUR"))
+        cards = [
+            GiftCardFactory(initial_value=Money(Decimal("10.00"), "EUR"))
+            for _ in range(3)
+        ]
+        for card in cards:
+            GiftCardTransaction.objects.create(
+                gift_card=card,
+                kind=GiftCardTransactionKind.REDEEM,
+                amount=Decimal("-10.00"),
+                order=order,
+            )
+
+        assert GiftCardService.credit_refund(
+            order, Decimal("1.00"), refund_attempt=_attempt(order)
+        ) == (Decimal("1.00"))
+
+        assert sorted(_credits(order)) == [
+            Decimal("0.33"),
+            Decimal("0.33"),
+            Decimal("0.34"),
+        ]
+
+    def test_an_expired_card_is_given_a_window_to_spend_the_refund(
+        self, giftcard_order_settled_with_one_card
+    ):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        order, card = giftcard_order_settled_with_one_card
+        card.expires_at = timezone.now() - timedelta(days=1)
+        card.save(update_fields=["expires_at"])
+
+        GiftCardService.credit_refund(
+            order, Decimal("10.00"), refund_attempt=_attempt(order)
         )
 
-        self._close(order)
+        card.refresh_from_db()
+        assert card.expires_at is None or card.expires_at > timezone.now()
 
-        assert _credited(order) == Decimal("60.00")
 
-    def test_closing_it_again_or_after_the_refund_credits_once(
+@pytest.mark.django_db(transaction=True)
+class TestTwoCreditsRacing:
+    def test_a_card_is_credited_no_more_than_it_gave(
         self, giftcard_order_settled_with_one_card
     ):
         order, _card = giftcard_order_settled_with_one_card
-        _refund(order, PaymentStatus.REFUNDED, "40.00")
+        results: list[Decimal] = []
+
+        def credit():
+            try:
+                results.append(GiftCardService.credit_refund(order))
+            finally:
+                connection.close()
+
+        threads = [threading.Thread(target=credit) for _ in range(4)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        assert sum(results, Decimal(0)) == Decimal("60.00")
         assert _credited(order) == Decimal("60.00")
-        # The ledger has nothing left to refund, so the status may close.
-        order.payment_transactions.filter(kind="CHARGE").update(
-            amount=Money(Decimal("40.00"), "EUR")
-        )
 
-        self._close(order)
 
-        assert _credited(order) == Decimal("60.00")
-
-    def test_a_charged_back_order_is_left_alone(
+class TestACanceledOrderGivesTheRedemptionBack:
+    def test_the_cancel_credits_everything_once(
         self, giftcard_order_settled_with_one_card
     ):
-        from order.enum.payment_transaction import PaymentTransactionKind
-        from order.factories import PaymentTransactionFactory
+        order, card = giftcard_order_settled_with_one_card
 
-        order, _card = giftcard_order_settled_with_one_card
-        charge = PaymentTransactionFactory(
-            order=order, amount=Money(Decimal("40.00"), "EUR")
-        )
-        PaymentTransactionFactory(
-            order=order,
-            charge=charge,
-            kind=PaymentTransactionKind.CHARGEBACK,
-            amount=Money(Decimal("40.00"), "EUR"),
-            provider_reference="dp_lost",
-        )
-        Order.objects.filter(pk=order.pk).update(
-            payment_status=PaymentStatus.COMPLETED
-        )
+        order_canceled.send(sender=Order, order=order)
+        order_canceled.send(sender=Order, order=order)
 
-        self._close(order)
-
-        assert _credited(order) == Decimal(0)
+        assert _credited(order) == Decimal("60.00")
+        assert card.balance == Money(Decimal("60.00"), "EUR")

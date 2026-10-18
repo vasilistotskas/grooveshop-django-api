@@ -336,10 +336,14 @@ class LoyaltyService:
         ):
             return 0
 
-        # Check if already reversed — skip if ADJUST transactions exist for this order
+        # Check if already reversed — skip if ADJUST transactions exist for
+        # this order. Not the rows a refund made to give back a part of the
+        # spent points (``restore_spent_points``): the order is not reversed
+        # until the rest is.
         existing_adjustments = PointsTransaction.objects.filter(
             reference_order=order,
             transaction_type=TransactionType.ADJUST,
+            refund_attempt__isnull=True,
         )
         if existing_adjustments.exists():
             logger.info(
@@ -365,7 +369,16 @@ class LoyaltyService:
         redeemed_total = (
             redeem_transactions.aggregate(total=Sum("points"))["total"] or 0
         )
-        restored = -redeemed_total
+        # What a part-refund already gave back is not given twice.
+        already_restored = (
+            PointsTransaction.objects.filter(
+                reference_order=order,
+                transaction_type=TransactionType.ADJUST,
+                points__gt=0,
+            ).aggregate(total=Sum("points"))["total"]
+            or 0
+        )
+        restored = max(-redeemed_total - already_restored, 0)
         if restored > 0 and not PaymentLedger.charged_back(order):
             PointsTransaction.objects.create(
                 user=user,
@@ -377,11 +390,21 @@ class LoyaltyService:
 
         total_reversed = 0
         current_balance = cls.get_user_balance(user)
+        # Points the customer already spent elsewhere cannot be taken
+        # back out of a balance that no longer holds them. On (the
+        # default): the whole earning comes off and the balance goes
+        # negative, later earnings pay it off and a negative balance
+        # blocks redeeming, so earning, spending and then refunding the
+        # order cannot keep the points. Off: the reversal stops at zero and
+        # the spent points survive the refund.
+        allow_negative = bool(
+            Setting.get("LOYALTY_REFUND_ALLOWS_NEGATIVE_BALANCE", default=True)
+        )
 
         for earn_tx in earn_transactions:
             reversal_amount = earn_tx.points
             # Clamp if balance would go negative
-            if current_balance - reversal_amount < 0:
+            if not allow_negative and current_balance - reversal_amount < 0:
                 reversal_amount = current_balance
                 logger.warning(
                     "Clamping reversal for user %s: expected %s, actual %s",
@@ -407,7 +430,11 @@ class LoyaltyService:
         user.save(update_fields=["total_xp"])
 
         for bonus_tx in bonus_transactions:
-            reversal_amount = min(bonus_tx.points, current_balance)
+            reversal_amount = (
+                bonus_tx.points
+                if allow_negative
+                else min(bonus_tx.points, current_balance)
+            )
             if reversal_amount > 0:
                 PointsTransaction.objects.create(
                     user=user,
@@ -425,6 +452,54 @@ class LoyaltyService:
         cls.recalculate_tier(user)
 
         return total_reversed
+
+    @classmethod
+    @transaction.atomic
+    def restore_spent_points(
+        cls, order, points: int, refund_attempt=None
+    ) -> int:
+        """Give back *points* of the points the customer spent on *order*
+        (a refund beyond the provider's money returns the order's value in
+        proportion to what each kind of payment gave): never more than is
+        still spent on it. Returns what was restored.
+
+        Read and written under the user row lock, like the reversal, so a
+        cancel and a refund racing each other cannot restore the same
+        points twice. XP is not touched: spending never added any.
+        """
+        if points <= 0 or not order.user_id:
+            return 0
+
+        from django.contrib.auth import get_user_model
+
+        user = (
+            get_user_model().objects.select_for_update().get(pk=order.user_id)
+        )
+        rows = PointsTransaction.objects.filter(reference_order=order)
+        spent = -(
+            rows.filter(transaction_type=TransactionType.REDEEM).aggregate(
+                total=Sum("points")
+            )["total"]
+            or 0
+        )
+        restored = (
+            rows.filter(
+                transaction_type=TransactionType.ADJUST, points__gt=0
+            ).aggregate(total=Sum("points"))["total"]
+            or 0
+        )
+        grant = min(points, spent - restored)
+        if grant <= 0:
+            return 0
+        PointsTransaction.objects.create(
+            user=user,
+            points=grant,
+            transaction_type=TransactionType.ADJUST,
+            reference_order=order,
+            refund_attempt=refund_attempt,
+            description=f"Redeemed points restored for order #{order.id}",
+        )
+        return grant
 
     @classmethod
     def _validate_and_price_redemption(

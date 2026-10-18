@@ -37,6 +37,19 @@ class PointsTransaction(TimeStampMixinModel, UUIDModel):
         verbose_name=_("Reference Order"),
     )
     description = models.TextField(_("Description"), blank=True, default="")
+    refund_attempt = models.ForeignKey(
+        "order.RefundAttempt",
+        related_name="points_transactions",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        db_index=False,
+        verbose_name=_("Refund attempt"),
+        help_text=_(
+            "The refund that gave back points the customer had spent, when "
+            "this row is one."
+        ),
+    )
     created_by = models.ForeignKey(
         "user.UserAccount",
         related_name="points_adjustments_made",

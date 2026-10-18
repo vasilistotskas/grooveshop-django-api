@@ -50,7 +50,11 @@ from order.exceptions import (
 from order.models.attribution import OrderAttribution
 from order.models.item import OrderItem
 from order.models.order import PAYMENT_ID_UNIQUE_CONSTRAINT, Order
-from order.models.refund_attempt import RefundAttempt, RefundAttemptStatus
+from order.models.refund_attempt import (
+    RefundAttempt,
+    RefundAttemptKind,
+    RefundAttemptStatus,
+)
 from order.models.stock_log import StockLog
 from order.models.stock_reservation import StockReservation
 from order.payment import (
@@ -64,7 +68,7 @@ from order.payment_ledger import (
     PaymentLedger,
     is_cash_collection,
 )
-from order.signals import order_refunded
+from order.signals import order_refunded, order_stored_value_returned
 from order.stock import StockManager
 from pay_way.enum.settlement import PaySettlement
 from promotion.services import CouponService, PromotionEngine
@@ -142,6 +146,8 @@ class RefundResult:
     refunded: Money
     refund_ids: tuple[str, ...] = ()
     declined: dict[str, Any] | None = None
+    #: What went back onto gift cards and points (no provider moved it).
+    stored: Money | None = None
 
     @property
     def complete(self) -> bool:
@@ -149,8 +155,14 @@ class RefundResult:
         return self.declined is None
 
     @property
+    def value_returned(self) -> Money:
+        """Everything that went back: the provider's money and the value
+        returned onto gift cards and points."""
+        return self.refunded + (self.stored or Money(0, self.refunded.currency))
+
+    @property
     def paid_something(self) -> bool:
-        return self.refunded.amount > 0
+        return self.value_returned.amount > 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -160,6 +172,14 @@ class _SharePaid:
     attempt_pk: int
     paid_back: Money
     refund_id: str
+
+
+@dataclass(frozen=True, slots=True)
+class _StoredReturned:
+    """The share of a refund that went back onto gift cards and points."""
+
+    attempt_pk: int
+    amount: Money
 
 
 @dataclass(frozen=True, slots=True)
@@ -3149,7 +3169,10 @@ class OrderService:
     def _nothing_to_refund(order: Order, payment_status: str) -> StrOrPromise:
         """Why *order*, whose payment status is *payment_status*, has no
         refundable payment."""
-        if PaymentLedger.captured(order):
+        if (
+            PaymentLedger.captured(order)
+            or PaymentLedger.stored_value(order).returned > 0
+        ):
             return _("This order has already been refunded.")
         if payment_status in _PAID_PAYMENT_STATUSES:
             return _(
@@ -3224,7 +3247,7 @@ class OrderService:
                 declined=declined,
             )
 
-        refunded = Money(0, attempts[0].amount.currency)
+        refunded = stored = Money(0, attempts[0].amount.currency)
         refund_ids: list[str] = []
         declined = None
         for attempt in attempts:
@@ -3232,6 +3255,9 @@ class OrderService:
             if isinstance(share, _ShareDeclined):
                 declined = share.declined
                 break
+            if isinstance(share, _StoredReturned):
+                stored += share.amount
+                continue
             refunded += share.paid_back
             refund_ids.append(share.refund_id)
         if isinstance(share, _ShareDeclined):
@@ -3249,6 +3275,7 @@ class OrderService:
             refunded=refunded,
             refund_ids=tuple(refund_ids),
             declined=declined,
+            stored=stored,
         )
 
     @classmethod
@@ -3325,7 +3352,7 @@ class OrderService:
         resumed = cls._attempts_to_resume(order, amount)
         if resumed:
             for attempt in resumed:
-                if not provider_supports(
+                if attempt.charge is not None and not provider_supports(
                     attempt.charge.provider, "idempotent_refunds"
                 ):
                     raise PaymentError(
@@ -3339,7 +3366,11 @@ class OrderService:
                     )
             return resumed, None
 
-        refundable = PaymentLedger.refundable(order)
+        # The value that can still be refunded: the provider's money, then
+        # what the order paid with gift cards and points.
+        provider_refundable = PaymentLedger.refundable(order)
+        stored_refundable = PaymentLedger.stored_value_refundable(order)
+        refundable = provider_refundable + stored_refundable
         if refundable <= 0:
             raise PaymentError(cls._nothing_to_refund(order, payment_status))
         if amount is not None and amount.amount > refundable:
@@ -3350,7 +3381,17 @@ class OrderService:
                 ).format(refund=amount.amount, refundable=refundable)
             )
 
-        plan = PaymentLedger.plan_refund(order, amount)
+        # The provider is paid back first; only the excess goes back onto
+        # gift cards and points (and in proportion to what each gave).
+        currency = order.amount_due.currency
+        value = refundable if amount is None else amount.amount
+        provider_part = min(value, provider_refundable)
+        stored_part = value - provider_part
+        plan = (
+            PaymentLedger.plan_refund(order, Money(provider_part, currency))
+            if provider_part > 0
+            else []
+        )
 
         # The cash shares need the merchant's word on how they were paid
         # back, and may not repeat a reference already booked. Both are
@@ -3384,7 +3425,7 @@ class OrderService:
                     )
                 )
 
-        return [
+        attempts = [
             RefundAttempt.objects.create(
                 order=order,
                 charge=charge,
@@ -3392,16 +3433,28 @@ class OrderService:
                 reason=reason[:255],
             )
             for charge, share in plan
-        ], None
+        ]
+        if stored_part > 0:
+            attempts.append(
+                RefundAttempt.objects.create(
+                    order=order,
+                    kind=RefundAttemptKind.STORED_VALUE,
+                    charge=None,
+                    amount=Money(stored_part, currency),
+                    reason=reason[:255],
+                )
+            )
+        return attempts, None
 
     @staticmethod
     def _attempts_to_resume(
         order: Order, amount: Money | None
     ) -> list[RefundAttempt]:
-        """The live provider attempts a request is a repeat of: the one for
-        the same amount, or, for a refund of everything, all of them once
-        they hold everything that was left. Cash shares are never resumed:
-        their reference is their own idempotency key."""
+        """The live attempts a request is a repeat of: the one for the same
+        amount, or all of them when together they are the amount, or, for a
+        refund of everything, all of them once they hold everything that was
+        left. Cash shares are never resumed: their reference is their own
+        idempotency key."""
         pending = list(
             RefundAttempt.objects.live()
             .select_related("charge")
@@ -3413,11 +3466,14 @@ class OrderService:
         if not pending:
             return []
         if amount is None:
-            return pending if PaymentLedger.refundable(order) <= 0 else []
+            return pending if PaymentLedger.refundable_value(order) <= 0 else []
         match = next(
             (a for a in pending if a.amount.amount == amount.amount), None
         )
-        return [match] if match else []
+        if match:
+            return [match]
+        together = sum((a.amount.amount for a in pending), Decimal(0))
+        return pending if together == amount.amount else []
 
     @classmethod
     def _make_refund(
@@ -3426,11 +3482,14 @@ class OrderService:
         attempt: RefundAttempt,
         reason: str,
         reference: str,
-    ) -> _SharePaid | _ShareDeclined:
+    ) -> _SharePaid | _StoredReturned | _ShareDeclined:
         """Steps 2 and 3 of :meth:`refund_order` for one share."""
         from django.core.exceptions import ImproperlyConfigured
 
         from order.payment import get_payment_provider
+
+        if attempt.kind == RefundAttemptKind.STORED_VALUE:
+            return cls._return_stored_value(order, attempt, reason)
 
         charge = attempt.charge
         refund_id: str | None
@@ -3525,6 +3584,121 @@ class OrderService:
                 )
                 logger.info("Order %s refunded %s", order.id, paid_back)
         return _SharePaid(attempt.pk, paid_back, refund_id)
+
+    @classmethod
+    def _return_stored_value(
+        cls, order: Order, attempt: RefundAttempt, reason: str
+    ) -> _StoredReturned:
+        """Step 3 of :meth:`refund_order` for the share that goes back onto
+        gift cards and points: no provider is asked, so it is one
+        transaction under the order lock.
+
+        The amount is split between the cards and the points in proportion
+        to what each has not yet got back, so both are used up together and
+        the last refund returns exactly what is left (no cent or point is
+        lost to rounding). Gift cards are credited first, then the points,
+        both read under their own locks, so a cancel racing this refund
+        cannot return the same value twice; what is owed is what the
+        ledgers say, not the amount claimed.
+        """
+        from giftcard.services import GiftCardService
+        from loyalty.services import LoyaltyService
+
+        with transaction.atomic():
+            Order.objects.select_for_update().values_list("pk", flat=True).get(
+                pk=order.pk
+            )
+            settled = RefundAttempt.objects.select_for_update().get(
+                pk=attempt.pk
+            )
+            if settled.status == RefundAttemptStatus.SETTLED:
+                return _StoredReturned(
+                    attempt.pk, cls._stored_returned_by(order, settled)
+                )
+
+            stored = PaymentLedger.stored_value(order)
+            left = stored.left
+            amount = min(attempt.amount.amount, left)
+            if amount >= left:
+                gift_card_part = stored.gift_card_left
+                points_part = stored.points_left
+            else:
+                gift_card_part = (
+                    amount * stored.gift_card_left / left
+                ).quantize(Decimal("0.01"), rounding="ROUND_DOWN")
+                points_part = (
+                    int(
+                        stored.points_left
+                        * (amount - gift_card_part)
+                        / stored.points_value_left
+                    )
+                    if stored.points_value_left
+                    else 0
+                )
+            gift_card = (
+                GiftCardService.credit_refund(
+                    order, gift_card_part, refund_attempt=settled
+                )
+                if gift_card_part > 0
+                else Decimal(0)
+            )
+            points = LoyaltyService.restore_spent_points(
+                order, points_part, refund_attempt=settled
+            )
+            settled.status = RefundAttemptStatus.SETTLED
+            settled.save(update_fields=["status"])
+
+            previous_status = order.payment_status
+            order.payment_status = PaymentLedger.refund_status(order)
+            order.save(update_fields=["payment_status"])
+            returned = cls._stored_returned_by(order, settled)
+            order_stored_value_returned.send(
+                sender=cls,
+                order=order,
+                amount=returned,
+                gift_card=Money(gift_card, attempt.amount.currency),
+                points=points,
+                reason=reason,
+                previous_payment_status=previous_status,
+            )
+            logger.info(
+                "Order %s: %s back onto gift cards, %s points restored",
+                order.id,
+                gift_card,
+                points,
+            )
+        return _StoredReturned(attempt.pk, returned)
+
+    @staticmethod
+    def _stored_returned_by(order: Order, attempt: RefundAttempt) -> Money:
+        """What *attempt* actually put back onto gift cards and points, read
+        from the rows that name it. Not the amount it claimed: a cancel or a
+        racing refund may have returned part of it first, and the ledgers
+        only credit what is still owed."""
+        from django.db.models import Sum
+
+        from giftcard.models import GiftCardTransaction
+        from loyalty.models.transaction import PointsTransaction
+
+        currency = attempt.amount.currency
+        gift_card = GiftCardTransaction.objects.filter(
+            refund_attempt=attempt
+        ).aggregate(total=Sum("amount"))["total"] or Decimal(0)
+        points = (
+            PointsTransaction.objects.filter(refund_attempt=attempt).aggregate(
+                total=Sum("points")
+            )["total"]
+            or 0
+        )
+        stored = PaymentLedger.stored_value(order)
+        points_value = (
+            (stored.points_value * points / stored.points_spent).quantize(
+                Decimal("0.01")
+            )
+            if points and stored.points_spent
+            else Decimal(0)
+        )
+        return Money(gift_card + points_value, currency)
 
     @classmethod
     def _decline(

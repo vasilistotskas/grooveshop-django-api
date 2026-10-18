@@ -3,6 +3,32 @@
 
 
 
+## v3.136.0 (2026-10-18)
+
+### Chores
+
+* chore(mcp): stop declaring context7 per repository (#249)
+
+A project-scoped context7 entry takes precedence over a user-scoped server
+of the same name, so it replaced the keyed remote Context7 server each
+developer configures once at user scope with an anonymous local npx one.
+Context7 needs a personal API key, which belongs in user scope.
+
+
+Claude-Session: https://claude.ai/code/session_01JdpFTzTnqagfsY1FiSZUwz
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`0d45264`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0d4526451997687c708c9a60b5a1aa8a1805772d))
+
+### Features
+
+* feat(reviews): let a store allow reviews from every signed-in customer (#247)
+
+PRODUCT_REVIEWS_PURCHASE_REQUIRED (on by default, so no store changes)
+decides whether only buyers may review. Off, every signed-in customer
+may; a buyer's review keeps the verified-purchase badge.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`7793553`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7793553ec19dfe41d2e7c29429f5292eb94978d7))
+
 ## v3.135.6 (2026-10-18)
 
 ### Bug fixes

@@ -76,6 +76,36 @@ PLATFORM_PERMS = (
 )
 
 
+# A customer's sign-in identity. A store user holding any of these could
+# sign in as the customer: knox's add form mints a working API token, a
+# SocialAccount row links the store user's own Google login, and an
+# EmailAddress row redirects the password reset.
+CUSTOMER_IDENTITY_PERMS = (
+    "knox.add_authtoken",
+    "knox.view_authtoken",
+    "socialaccount.add_socialaccount",
+    "socialaccount.change_socialaccount",
+    "account.change_emailaddress",
+    "account.add_emailaddress",
+    "mfa.delete_authenticator",
+    "usersessions.view_usersession",
+)
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("role", ["owner", "admin", "staff"])
+@pytest.mark.parametrize("perm", CUSTOMER_IDENTITY_PERMS)
+def test_no_store_role_reaches_a_customers_sign_in_identity(
+    tenant, bind_tenant, role, perm
+):
+    user = _staff_identity()
+    _member(user, tenant, role)
+    bind_tenant(tenant)
+    assert not TenantRolePermissionBackend().has_perm(user, perm), (
+        f"{role} could take over a customer through {perm}"
+    )
+
+
 @pytest.mark.django_db
 class TestOwnerAndAdmin:
     @pytest.mark.parametrize("role", ["owner", "admin"])

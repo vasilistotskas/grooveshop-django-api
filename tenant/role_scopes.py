@@ -59,6 +59,18 @@ PLATFORM_ONLY_APP_LABELS: frozenset[str] = frozenset(
         "django_celery_results",
         "allauth_idp_oidc",
         "rosetta",
+        # A customer's sign-in identity: API tokens, linked social
+        # accounts, second factors, email addresses and browser
+        # sessions. Hiding them from the store sidebar is not enough,
+        # because a hidden admin still opens by URL: knox's add form
+        # mints a working token for any customer and shows it, and a
+        # SocialAccount or EmailAddress row lets a store user sign in
+        # as the customer. No store role is granted anything here.
+        "knox",
+        "socialaccount",
+        "mfa",
+        "account",
+        "usersessions",
     }
 )
 
@@ -75,12 +87,12 @@ REFERENCE_DATA_APP_LABELS: frozenset[str] = frozenset({"country", "region"})
 # own copy and the tenant copy wins on the search path — meaning on a
 # tenant host these admin pages show that store's own rows:
 #   user         -> that store's CUSTOMERS
-#   usersessions -> those customers' sessions
 #   extra_settings -> that store's settings
+# (``usersessions`` is per-schema too, but a customer's sessions are
+# their sign-in identity: it is in PLATFORM_ONLY_APP_LABELS above.)
 STORE_SHARED_APP_LABELS: frozenset[str] = frozenset(
     {
         "user",
-        "usersessions",
         "extra_settings",
     }
 )

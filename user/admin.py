@@ -362,11 +362,17 @@ class UserAdmin(ExportActionMixin, BaseModelAdmin):
         "user_permissions",
     )
 
+    # A customer's email is how they sign in and reset their password,
+    # so a store user who could change it could take the account over.
+    # Entered when a customer is created; changed only by the customer.
+    IDENTITY_FIELDS = ("email",)
+
     def get_readonly_fields(self, request, obj=None):
         readonly = tuple(super().get_readonly_fields(request, obj))
         if getattr(request.user, "is_superuser", False):
             return readonly
-        return readonly + self.PRIVILEGE_FIELDS
+        identity = self.IDENTITY_FIELDS if obj is not None else ()
+        return readonly + self.PRIVILEGE_FIELDS + identity
 
     ordering = ["-created_at"]
     date_hierarchy = "created_at"

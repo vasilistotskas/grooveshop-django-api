@@ -507,3 +507,35 @@ class TestAClaimedStoredShareIsHeldBack:
         with pytest.raises(PaymentError):
             OrderService.refund_order(order, amount=_eur("6.00"))
         assert _credited(order) == 0
+
+
+class TestWhatIsReportedIsWhatWentBack:
+    def test_a_cancel_that_returned_part_first_shrinks_the_report(self):
+        """The attempt claimed 25, but 20 had already gone back (a cancel
+        credited it): only the 5 that was still owed is reported."""
+        from giftcard.services import GiftCardService
+
+        order, _cards = _order(card="0.00", gift="25.00")
+        RefundAttempt.objects.create(
+            order=order,
+            charge=None,
+            kind="STORED_VALUE",
+            amount=_eur("25.00"),
+        )
+        GiftCardService.credit_refund(order, Decimal("20.00"))
+
+        result = OrderService.refund_order(order, amount=_eur("25.00"))
+
+        assert result.stored == _eur("5.00")
+        assert result.value_returned == _eur("5.00")
+        assert _credited(order) == Decimal("25.00")
+
+    def test_points_are_reported_at_what_they_were_worth(self):
+        order, _cards = _order(
+            card="0.00", gift="0.00", points_value="20.00", points=2000
+        )
+
+        result = OrderService.refund_order(order, amount=_eur("10.00"))
+
+        assert _restored(order) == 1000
+        assert result.stored == _eur("10.00")

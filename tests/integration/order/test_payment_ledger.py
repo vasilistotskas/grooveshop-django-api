@@ -217,6 +217,40 @@ class TestPaymentStatusIsDerivedFromTheSums:
         order.refresh_from_db()
         assert order.payment_status == PaymentStatus.REFUNDED
 
+    def test_a_chargeback_counts_towards_refunded(self):
+        """A chargeback took 20 and the refund took the other 30: nothing is
+        left to refund, so the order reads REFUNDED, and what that releases
+        (the gift-card redemption) is not stuck behind PARTIALLY_REFUNDED."""
+        order = _order()
+        charge = _charge(order, "50.00")
+        PaymentLedger.record_chargeback(
+            order, charge=charge, amount=_eur("20.00"), reference="dp_1"
+        )
+
+        PaymentLedger.record_refund(
+            order, charge=charge, amount=_eur("30.00"), reference="re_1"
+        )
+
+        order.refresh_from_db()
+        assert order.payment_status == PaymentStatus.REFUNDED
+        assert PaymentLedger.refundable(order) == 0
+
+    def test_a_refund_that_failed_is_not_refunded(self):
+        order = _order()
+        charge = _charge(order, "50.00")
+        PaymentLedger.record_refund(
+            order, charge=charge, amount=_eur("50.00"), reference="re_1"
+        )
+
+        PaymentLedger.record_refund_reversal(
+            order, charge=charge, amount=_eur("50.00"), reference="re_1"
+        )
+
+        order.refresh_from_db()
+        assert order.payment_status == PaymentStatus.COMPLETED
+        assert PaymentLedger.refunded(order) == 0
+        assert PaymentLedger.refundable(order) == Decimal("50.00")
+
     def test_an_order_paid_twice_is_refunded_only_when_both_are_back(self):
         order = _order()
         first = _charge(order, "50.00", "pi_first")

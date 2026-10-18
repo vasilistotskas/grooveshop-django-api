@@ -3,6 +3,19 @@
 
 
 
+## v3.136.3 (2026-10-18)
+
+### Bug fixes
+
+* fix(admin): show the product image in the review list (#256)
+
+The review list passed the product's main_image_path, the storage path
+the storefront hands to media-stream, as the image URL; the admin page
+resolved it relative to itself and every thumbnail 404ed. It now uses
+the prefetched main image's URL, as the product list does.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`3508798`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3508798e891ca1bdc72a1c58f687ceaf464952cd))
+
 ## v3.136.2 (2026-10-18)
 
 ### Bug fixes

@@ -88,10 +88,11 @@ class TestRefundOrderRefusals:
         assert result.complete is True
         assert result.refunded == amount
         get_provider.assert_called_once_with("stripe")
+        [attempt] = order.refund_attempts.all()
         provider.refund_payment.assert_called_once_with(
             payment_id="pi_paid_123",
             amount=amount,
-            idempotency_key=f"order-{order.pk}-refund-1",
+            idempotency_key=f"refund-{attempt.idempotency_key}",
         )
         # The ledger says nothing is left, so the order reads REFUNDED.
         assert _status_in_db(order) == PaymentStatus.REFUNDED

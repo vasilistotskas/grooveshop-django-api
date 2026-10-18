@@ -329,21 +329,6 @@ class TestRecording:
         assert collection.kind == PaymentTransactionKind.COD_COLLECTION
         assert collection.provider_reference == "V1"
 
-    def test_the_refund_number_counts_the_refunds_of_the_order(self):
-        order = _order()
-        charge = _charge(order)
-        assert PaymentLedger.next_refund_number(order) == 1
-
-        PaymentLedger.record_refund(
-            order, charge=charge, amount=_eur("5.00"), reference="re_1"
-        )
-        PaymentLedger.record_refund(
-            order, charge=charge, amount=_eur("5.00"), reference="re_2"
-        )
-
-        assert PaymentLedger.next_refund_number(order) == 3
-        assert PaymentLedger.next_refund_number(_order()) == 1
-
 
 class TestPlanningARefund:
     def test_everything_left_when_no_amount_is_given(self):

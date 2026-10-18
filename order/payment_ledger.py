@@ -25,13 +25,21 @@ import logging
 from decimal import Decimal
 from typing import TYPE_CHECKING, NamedTuple
 
-from django.db.models import DecimalField, QuerySet, Sum
+from django.db.models import (
+    Case,
+    DecimalField,
+    F,
+    QuerySet,
+    Sum,
+    When,
+)
 from django.db.models.functions import Coalesce
 from djmoney.money import Money
 
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import PaymentStatus
 from order.models.payment_transaction import PaymentTransaction
+from order.models.refund_attempt import RefundAttempt, RefundAttemptStatus
 from order.signals import order_charged_back
 
 if TYPE_CHECKING:
@@ -97,6 +105,26 @@ def _total(rows: QuerySet[PaymentTransaction]) -> Decimal:
     )["total"]
 
 
+def _taken_out(prefix: str = ""):
+    """The signed sum of the rows that took money out of a payment: a
+    refund or a chargeback takes it out, a refund reversal (a refund the
+    provider reported failed) gives it back."""
+    amount = f"{prefix}amount"
+    return Coalesce(
+        Sum(
+            Case(
+                When(
+                    **{f"{prefix}kind": PaymentTransactionKind.REFUND_REVERSAL},
+                    then=-F(amount),
+                ),
+                default=F(amount),
+                output_field=_AMOUNT,
+            )
+        ),
+        _ZERO,
+    )
+
+
 class PaymentLedger:
     @staticmethod
     def captured(order: Order) -> Decimal:
@@ -111,12 +139,14 @@ class PaymentLedger:
     @staticmethod
     def refunded(order: Order) -> Decimal:
         """What was paid back out of *order*'s payments, by a provider or
-        by the merchant."""
-        return _total(
-            PaymentTransaction.objects.filter(
-                order=order, kind=PaymentTransactionKind.REFUND
-            )
-        )
+        by the merchant, less refunds a provider reported failed."""
+        return PaymentTransaction.objects.filter(
+            order=order,
+            kind__in=(
+                PaymentTransactionKind.REFUND,
+                PaymentTransactionKind.REFUND_REVERSAL,
+            ),
+        ).aggregate(total=_taken_out())["total"]
 
     @staticmethod
     def charged_back(order: Order) -> Decimal:
@@ -170,28 +200,48 @@ class PaymentLedger:
     @staticmethod
     def refunded_on(charge: PaymentTransaction) -> Decimal:
         """What has been refunded out of this one payment (a chargeback is
-        not a refund: Stripe's ``charge.refunded`` reports refunds only)."""
-        return _total(charge.refunds.filter(kind=PaymentTransactionKind.REFUND))
+        not a refund: Stripe's ``charge.refunded`` reports refunds only),
+        less refunds Stripe reported failed."""
+        return charge.refunds.filter(
+            kind__in=(
+                PaymentTransactionKind.REFUND,
+                PaymentTransactionKind.REFUND_REVERSAL,
+            )
+        ).aggregate(total=_taken_out())["total"]
+
+    @staticmethod
+    def reserved_on(charge: PaymentTransaction) -> Decimal:
+        """What live refund attempts hold back from this one payment."""
+        return _total(charge.refund_attempts.live())
 
     @classmethod
     def balances(cls, order: Order) -> list[ChargeBalance]:
         """Every payment of *order* with money left in it, oldest first: a
         provider's CHARGE or a courier's COD_COLLECTION. Money a chargeback
-        took back is not left in it."""
+        took back, and money a live refund attempt holds, is not left in
+        it."""
         charges = (
             PaymentTransaction.objects.filter(
                 order=order, kind__in=_RECEIPT_KINDS
             )
-            .annotate(
-                already_returned=Coalesce(
-                    Sum("refunds__amount", output_field=_AMOUNT), _ZERO
-                )
-            )
+            .annotate(already_returned=_taken_out("refunds__"))
             .order_by("created_at", "id")
+        )
+        # Not a second join on the same query: two multi-valued relations
+        # would multiply each other's rows.
+        reserved = dict(
+            RefundAttempt.objects.live()
+            .filter(order=order)
+            .values_list("charge")
+            .annotate(held=Sum("amount", output_field=_AMOUNT))
         )
         balances = []
         for charge in charges:
-            left = charge.amount.amount - charge.already_returned
+            left = (
+                charge.amount.amount
+                - charge.already_returned
+                - reserved.get(charge.pk, _ZERO)
+            )
             if left > 0:
                 balances.append(ChargeBalance(charge, left))
         return balances
@@ -206,30 +256,22 @@ class PaymentLedger:
     def refund_status(cls, order: Order) -> PaymentStatus:
         """The payment status of an order that has had a refund.
 
-        REFUNDED means nothing is left to refund, and it is the only state
-        that releases what hangs off the order's total (the gift-card
+        REFUNDED means nothing is left to refund: refunds and chargebacks
+        together cover what was received. It is the only state that
+        releases what hangs off the order's total (the gift-card
         redemption and the loyalty points are returned once, with the last
-        refund, not in slices). Below that the order is PARTIALLY_REFUNDED.
-        Derived from the ledger's sums and nothing else, so it cannot go
-        backwards the way a status written by each path could.
+        refund, not in slices). Below that the order is PARTIALLY_REFUNDED,
+        and an order whose every refund was reversed (the provider reported
+        them failed) is back to COMPLETED. Derived from the ledger's sums
+        and nothing else, so it cannot go backwards the way a status
+        written by each path could.
         """
-        if cls.refunded(order) >= cls.captured(order):
+        refunded = cls.refunded(order)
+        if refunded <= 0:
+            return PaymentStatus.COMPLETED
+        if refunded + cls.charged_back(order) >= cls.captured(order):
             return PaymentStatus.REFUNDED
         return PaymentStatus.PARTIALLY_REFUNDED
-
-    @staticmethod
-    def next_refund_number(order: Order) -> int:
-        """The ordinal of the next refund of *order*, for the Stripe
-        idempotency key. Counted under the order lock, so two staff members
-        refunding at once cannot be handed the same number, and an attempt
-        that wrote no row (a timeout, an error that rolled back) is
-        retried under the key it already used."""
-        return (
-            PaymentTransaction.objects.filter(
-                order=order, kind=PaymentTransactionKind.REFUND
-            ).count()
-            + 1
-        )
 
     @classmethod
     def plan_refund(
@@ -326,11 +368,17 @@ class PaymentLedger:
         reference: str,
         description: str = "",
         provider: str | None = None,
+        attempt: RefundAttempt | None = None,
     ) -> tuple[PaymentTransaction, bool]:
         """Record that *charge* was refunded *amount* under *reference* (the
         provider's refund id), and bring ``order.payment_status`` in line.
         *provider* is who moved the money: the charge's own provider unless
         the refund was made outside it.
+
+        *attempt* is the claim this refund fulfils. A refund booked without
+        one (a provider's webhook) settles the oldest live attempt on the
+        charge for the same amount, so the attempt that made it cannot book
+        it a second time (:meth:`settle_attempt`).
 
         The status is written here, from the ledger, whoever the writer is,
         so no path decides REFUNDED or PARTIALLY_REFUNDED for itself. A
@@ -350,13 +398,80 @@ class PaymentLedger:
         if created:
             order.payment_status = cls.refund_status(order)
             order.save(update_fields=["payment_status"])
+        if attempt is None and created:
+            attempt = (
+                RefundAttempt.objects.live()
+                .select_for_update()
+                .filter(charge=charge, amount=amount)
+                .order_by("created_at", "id")
+                .first()
+            )
+        if attempt is not None:
+            cls.settle_attempt(attempt, row)
+        return row, created
+
+    @staticmethod
+    def settle_attempt(
+        attempt: RefundAttempt, refund: PaymentTransaction
+    ) -> None:
+        """The ledger holds the refund *attempt* was claimed for."""
+        attempt.status = RefundAttemptStatus.SETTLED
+        attempt.refund = refund
+        attempt.save(update_fields=["status", "refund"])
+
+    @classmethod
+    def record_refund_reversal(
+        cls,
+        order: Order,
+        *,
+        charge: PaymentTransaction,
+        amount: Money,
+        reference: str,
+        description: str = "",
+    ) -> tuple[PaymentTransaction, bool]:
+        """Record that a refund the ledger counted was reported failed by
+        the provider (*reference* is the provider's refund id): the money
+        was never paid back, so it counts as held again, and
+        ``order.payment_status`` is re-derived. Nothing is written for a
+        refund already reversed (providers redeliver) or when the ledger
+        holds no refund on *charge* to reverse."""
+        existing = PaymentTransaction.objects.filter(
+            provider=charge.provider,
+            provider_reference=reference,
+            kind=PaymentTransactionKind.REFUND_REVERSAL,
+        ).first()
+        if existing is not None:
+            return existing, False
+        reversible = cls.refunded_on(charge)
+        if reversible <= 0:
+            raise ValueError(
+                f"Payment {charge.provider_reference} holds no refund to "
+                f"reverse for {reference}"
+            )
+        row, created = cls._record(
+            order,
+            kind=PaymentTransactionKind.REFUND_REVERSAL,
+            amount=Money(
+                min(amount.amount, reversible), charge.amount.currency
+            ),
+            provider=charge.provider,
+            reference=reference,
+            charge=charge,
+            description=description[:255],
+        )
+        if created:
+            order.payment_status = cls.refund_status(order)
+            order.save(update_fields=["payment_status"])
         return row, created
 
     @staticmethod
     def left_on(charge: PaymentTransaction) -> Decimal:
         """What is still in this one payment: captured minus what refunds
         and chargebacks took out of it."""
-        return charge.amount.amount - _total(charge.refunds.all())
+        return (
+            charge.amount.amount
+            - charge.refunds.aggregate(total=_taken_out())["total"]
+        )
 
     @classmethod
     def record_chargeback(
@@ -468,6 +583,7 @@ class PaymentLedger:
         amount: Money,
         reference: str,
         description: str = "",
+        attempt: RefundAttempt | None = None,
     ) -> tuple[PaymentTransaction, bool]:
         """Record that the merchant paid *amount* of the cash *collection*
         back to the customer themselves, under *reference* (how: a bank
@@ -480,6 +596,7 @@ class PaymentLedger:
             reference=cls.cod_refund_reference(order, collection, reference),
             description=description,
             provider=MANUAL_REFUND_PROVIDER,
+            attempt=attempt,
         )
 
     @classmethod

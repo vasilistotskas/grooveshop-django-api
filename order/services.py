@@ -21,6 +21,7 @@ from order.attribution import (
 )
 from order.discounts import add_line_discounts, spread_by_remaining_value
 from order.enum.document_type import OrderDocumentTypeEnum
+from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import (
     SETTLED_PAYMENT_STATUSES,
     OrderStatus,
@@ -47,6 +48,7 @@ from order.exceptions import (
 from order.models.attribution import OrderAttribution
 from order.models.item import OrderItem
 from order.models.order import PAYMENT_ID_UNIQUE_CONSTRAINT, Order
+from order.models.refund_attempt import RefundAttempt, RefundAttemptStatus
 from order.models.stock_log import StockLog
 from order.models.stock_reservation import StockReservation
 from order.payment import (
@@ -142,6 +144,17 @@ class RefundResult:
     @property
     def paid_something(self) -> bool:
         return self.refunded.amount > 0
+
+
+@dataclass(frozen=True, slots=True)
+class _ShareOutcome:
+    """What making one share of a refund came to: the money booked and its
+    refund id, or the provider's answer when it was not made."""
+
+    attempt_pk: int
+    paid_back: Money | None = None
+    refund_id: str | None = None
+    declined: dict[str, Any] | None = None
 
 
 __all__ = ["OrderService", "PaymentEventOutcome", "RefundResult"]
@@ -2631,10 +2644,9 @@ class OrderService:
             else None
         )
         try:
-            return cls._cancel_order_locked(
+            canceled = cls._cancel_order_locked(
                 order,
                 reason,
-                refund_payment,
                 canceled_by,
                 shipment_cancel=shipment_cancel,
             )
@@ -2642,6 +2654,71 @@ class OrderService:
             if shipment_cancel is not None and shipment_cancel["dispatched"]:
                 cls._note_shipment_canceled_without_order(order)
             raise
+        # The cancel is committed; the refund is its own claim, call and
+        # record (``refund_order``), so no transaction is open while the
+        # provider answers.
+        return canceled, cls._refund_canceled_order(
+            canceled, reason, refund_payment
+        )
+
+    @classmethod
+    def _refund_canceled_order(
+        cls, order: Order, reason: str, refund_payment: bool
+    ) -> dict[str, Any] | None:
+        """Refund what a canceled order still holds: everything for a paid
+        order, the rest for one a provider's dashboard already refunded in
+        part. ``None`` when nothing is to be refunded."""
+        if not (
+            refund_payment
+            and order.payment_id
+            and order.pay_way
+            and (order.is_paid or PaymentLedger.refundable(order) > 0)
+        ):
+            return None
+        try:
+            result = cls.refund_order(
+                order=order,
+                amount=None,
+                reason=f"Order canceled: {reason}"
+                if reason
+                else "Order canceled",
+            )
+        except Exception:
+            logger.exception(
+                "Error processing refund for canceled order %s", order.id
+            )
+            return {
+                "refunded": False,
+                "error": str(_("The refund could not be processed.")),
+                "message": "Order canceled but refund failed",
+            }
+        if result.complete:
+            return {
+                "refunded": True,
+                "refund_id": (
+                    result.refund_ids[-1] if result.refund_ids else None
+                ),
+                "message": "Payment refunded successfully",
+            }
+        # ``declined["error"]`` carries raw provider exception text (see
+        # order/payment.py) — log it, never return it (CodeQL
+        # py/stack-trace-exposure).
+        logger.error(
+            "Refund failed for canceled order %s: %s",
+            order.id,
+            (result.declined or {}).get("error"),
+        )
+        return {
+            "refunded": False,
+            "error": str(_("The refund could not be processed.")),
+            # A refund split across payments can be declined part-way: say
+            # so, the shares made are in the order's history.
+            "message": (
+                "Order canceled but only part of the payment was refunded"
+                if result.paid_something
+                else "Order canceled but refund failed"
+            ),
+        }
 
     @classmethod
     def _note_shipment_canceled_without_order(cls, order: Order) -> None:
@@ -2762,11 +2839,10 @@ class OrderService:
         cls,
         order: Order,
         reason: str,
-        refund_payment: bool,
         canceled_by: int | None,
         *,
         shipment_cancel: dict[str, Any] | None,
-    ) -> tuple[Order, dict[str, Any] | None]:
+    ) -> Order:
         # Lock the order row to prevent concurrent cancellation requests
         # from both restoring stock
         order = Order.objects.select_for_update().get(id=order.id)
@@ -2954,68 +3030,7 @@ class OrderService:
             # we don't double-fire from this entry point.
             cls.cancel_attached_shipment(order, reason)
 
-            refund_info = None
-            if (
-                refund_payment
-                and order.is_paid
-                and order.payment_id
-                and order.pay_way
-            ):
-                try:
-                    result = cls.refund_order(
-                        order=order,
-                        amount=None,
-                        reason=f"Order canceled: {reason}"
-                        if reason
-                        else "Order canceled",
-                    )
-
-                    if result.complete:
-                        refund_info = {
-                            "refunded": True,
-                            "refund_id": (
-                                result.refund_ids[-1]
-                                if result.refund_ids
-                                else None
-                            ),
-                            "message": "Payment refunded successfully",
-                        }
-                    else:
-                        # ``declined["error"]`` carries raw provider
-                        # exception text (see order/payment.py) — log it,
-                        # never return it (CodeQL py/stack-trace-exposure).
-                        logger.error(
-                            "Refund failed for canceled order %s: %s",
-                            order.id,
-                            (result.declined or {}).get("error"),
-                        )
-                        refund_info = {
-                            "refunded": False,
-                            "error": str(
-                                _("The refund could not be processed.")
-                            ),
-                            # A refund split across payments can be declined
-                            # part-way: say so, the shares made are in the
-                            # order's history.
-                            "message": (
-                                "Order canceled but only part of the "
-                                "payment was refunded"
-                                if result.paid_something
-                                else "Order canceled but refund failed"
-                            ),
-                        }
-                except Exception:
-                    logger.exception(
-                        "Error processing refund for canceled order %s",
-                        order.id,
-                    )
-                    refund_info = {
-                        "refunded": False,
-                        "error": str(_("The refund could not be processed.")),
-                        "message": "Order canceled but refund failed",
-                    }
-
-            return order, refund_info
+            return order
 
         except Exception as e:
             logger.exception("Error canceling order %s", order.id)
@@ -3034,16 +3049,24 @@ class OrderService:
 
         Nothing is recorded for it, and a caller may only log the outcome
         (the admin cancel action once dropped it altogether), so the reason
-        goes in the order's history. ``NOTE`` rows are not customer-visible
+        goes in the order's history. A refund whose outcome is unknown (the
+        provider did not answer) says so: it may have been made, and its
+        webhook records it. ``NOTE`` rows are not customer-visible
         (``CUSTOMER_VISIBLE_HISTORY_TYPES``), which matters because the
         provider's own wording goes in."""
         from order.models.history import OrderHistory
 
         details = response.get("details")
+        outcome = (
+            "has an unknown outcome (it may have been made; the provider's "
+            "webhook records it, check its dashboard before trying again)"
+            if response.get("outcome_unknown")
+            else "was not processed"
+        )
         OrderHistory.log_note(
             order=order,
             note=(
-                f"Refund via {provider_code} was not processed: "
+                f"Refund via {provider_code} {outcome}: "
                 f"{response.get('error')}"
                 + (f" ({details})" if details else "")
             ),
@@ -3068,7 +3091,6 @@ class OrderService:
         return _("This order has not been paid yet.")
 
     @classmethod
-    @transaction.atomic
     def refund_order(
         cls,
         order: Order,
@@ -3091,25 +3113,88 @@ class OrderService:
         ``order_refunded``, so the credit note and everything else that
         listens run as they do for a provider refund.
 
-        What can be refunded is read from the payment ledger (received minus
-        refunded, payment by payment) under the order lock, so an order can
-        be refunded again until nothing is left, and never past it: two
-        refunds racing for one remainder are serialised here and the second
-        is refused (G0280). Each refund a provider accepts is recorded as a
-        ``PaymentTransaction`` and ``payment_status`` follows from the
-        ledger's sums (``PaymentLedger.record_refund``).
+        Three steps, so that no database transaction is open while a
+        provider answers (a connection idle in a transaction is killed
+        after ten seconds, and the refund would be made at the provider
+        and lost here):
+
+        1. **Claim**, under the order lock and committed: what can be
+           refunded is read from the payment ledger (received minus
+           refunded, payment by payment, less what live attempts hold), the
+           request is checked against it (G0280: never past it), and each
+           share becomes a ``RefundAttempt`` whose amount is reserved and
+           whose key the provider receives.
+        2. **Call** the provider, with no transaction open.
+        3. **Record**, under the lock again: the refund the provider
+           accepted becomes a ``PaymentTransaction`` and ``payment_status``
+           follows from the ledger's sums (``PaymentLedger.record_refund``).
+
+        A request that matches an attempt still pending (a double click, a
+        retry after a crash or a timeout) reuses it, key included, so a
+        provider that honours keys returns the refund it already made. A
+        provider that does not (Viva) is never called a second time for it:
+        the answer is lost, and its webhook books the refund.
 
         Returns what was paid back. A refund split across payments can be
         declined part-way: the shares already made stay recorded and are
         reported in ``refunded``, and ``declined`` holds the provider's
-        answer for the one that was not (``RefundResult``).
+        answer for the one that was not (``RefundResult``). A share whose
+        outcome is unknown (a timeout) is reported declined with
+        ``outcome_unknown``; its attempt stays pending until the provider's
+        webhook or a retry settles it.
         """
-        from order.payment import get_payment_provider
+        reference = repayment_reference.strip()
+        attempts, declined = cls._claim_refund(order, amount, reason, reference)
+        if declined is not None:
+            return RefundResult(
+                refunded=Money(0, order.amount_due.currency),
+                declined=declined,
+            )
+
+        refunded = Money(0, attempts[0].amount.currency)
+        refund_ids: list[str] = []
+        declined = None
+        for attempt in attempts:
+            share = cls._make_refund(order, attempt, reason, reference)
+            if share.declined is not None:
+                declined = share.declined
+                break
+            refunded += share.paid_back
+            refund_ids.append(share.refund_id)
+        if declined is not None:
+            # What the earlier shares paid back is recorded and stays so;
+            # the later ones were never called, so they hold nothing back.
+            RefundAttempt.objects.filter(
+                pk__in=[a.pk for a in attempts],
+                status=RefundAttemptStatus.PENDING,
+                refund__isnull=True,
+            ).exclude(pk=share.attempt_pk).update(
+                status=RefundAttemptStatus.DECLINED
+            )
+
+        return RefundResult(
+            refunded=refunded,
+            refund_ids=tuple(refund_ids),
+            declined=declined,
+        )
+
+    @classmethod
+    @transaction.atomic
+    def _claim_refund(
+        cls,
+        order: Order,
+        amount: Money | None,
+        reason: str,
+        reference: str,
+    ) -> tuple[list[RefundAttempt], dict[str, Any] | None]:
+        """Step 1 of :meth:`refund_order`: the attempts to make, or the
+        provider-less refusal to report as declined."""
+        from django.core.exceptions import ImproperlyConfigured
 
         # Lock before anything is read from the ledger: the remainder, the
-        # refund number the Stripe idempotency key carries and the rows
-        # written below are one step. The status is read under the lock too,
-        # not taken from the caller's possibly stale ``order``.
+        # attempts that hold part of it and the rows written below are one
+        # step. The status is read under the lock too, not taken from the
+        # caller's possibly stale ``order``.
         locked = (
             Order.objects.select_for_update()
             .values("payment_status", "metadata")
@@ -3130,24 +3215,30 @@ class OrderService:
             if (
                 order.payment_id
                 and provider_code in registered_provider_codes()
-                and PaymentLedger.ensure_charge(
-                    order,
-                    provider_code=provider_code,
-                    payment_id=order.payment_id,
-                )
-                is None
             ):
-                declined = {
-                    "error": (
-                        "Could not read the amount the provider captured "
-                        "for this payment."
+                try:
+                    charge = PaymentLedger.ensure_charge(
+                        order,
+                        provider_code=provider_code,
+                        payment_id=order.payment_id,
                     )
-                }
-                cls._note_refund_declined(order, provider_code, declined)
-                return RefundResult(
-                    refunded=Money(0, order.amount_due.currency),
-                    declined=declined,
-                )
+                except ImproperlyConfigured as exc:
+                    raise PaymentError(
+                        _(
+                            "This store has no credentials for the payment "
+                            "provider, so the payment cannot be refunded "
+                            "here."
+                        )
+                    ) from exc
+                if charge is None:
+                    declined = {
+                        "error": (
+                            "Could not read the amount the provider captured "
+                            "for this payment."
+                        )
+                    }
+                    cls._note_refund_declined(order, provider_code, declined)
+                    return [], declined
 
         if PaymentLedger.dispute_open(order, locked["metadata"]):
             raise PaymentError(
@@ -3157,6 +3248,23 @@ class OrderService:
                     "Refund once it has closed."
                 )
             )
+
+        resumed = cls._attempts_to_resume(order, amount)
+        if resumed:
+            for attempt in resumed:
+                if not provider_supports(
+                    attempt.charge.provider, "idempotent_refunds"
+                ):
+                    raise PaymentError(
+                        _(
+                            "A refund of this amount was already sent to the "
+                            "payment provider and its result is not known "
+                            "yet. It is recorded when the provider confirms "
+                            "it; check the provider's dashboard before "
+                            "trying again."
+                        )
+                    )
+            return resumed, None
 
         refundable = PaymentLedger.refundable(order)
         if refundable <= 0:
@@ -3175,7 +3283,6 @@ class OrderService:
         # back, and may not repeat a reference already booked. Both are
         # settled before the first provider call, so a refusal never leaves
         # a mixed refund half made.
-        reference = repayment_reference.strip()
         cash = [c for c, _share in plan if is_cash_collection(c)]
         if cash:
             if not reference:
@@ -3204,57 +3311,132 @@ class OrderService:
                     )
                 )
 
-        refunded = Money(0, plan[0][1].currency)
-        refund_ids: list[str] = []
-        declined: dict[str, Any] | None = None
-        for charge, share in plan:
-            if is_cash_collection(charge):
-                paid_back = share
+        return [
+            RefundAttempt.objects.create(
+                order=order,
+                charge=charge,
+                amount=share,
+                reason=reason[:255],
+            )
+            for charge, share in plan
+        ], None
+
+    @staticmethod
+    def _attempts_to_resume(
+        order: Order, amount: Money | None
+    ) -> list[RefundAttempt]:
+        """The live provider attempts a request is a repeat of: the one for
+        the same amount, or, for a refund of everything, all of them once
+        they hold everything that was left. Cash shares are never resumed:
+        their reference is their own idempotency key."""
+        pending = list(
+            RefundAttempt.objects.live()
+            .select_related("charge")
+            .select_for_update(of=("self",))
+            .filter(order=order)
+            .exclude(charge__kind=PaymentTransactionKind.COD_COLLECTION)
+            .order_by("created_at", "id")
+        )
+        if not pending:
+            return []
+        if amount is None:
+            return pending if PaymentLedger.refundable(order) <= 0 else []
+        match = next(
+            (a for a in pending if a.amount.amount == amount.amount), None
+        )
+        return [match] if match else []
+
+    @classmethod
+    def _make_refund(
+        cls,
+        order: Order,
+        attempt: RefundAttempt,
+        reason: str,
+        reference: str,
+    ) -> _ShareOutcome:
+        """Steps 2 and 3 of :meth:`refund_order` for one share."""
+        from django.core.exceptions import ImproperlyConfigured
+
+        from order.payment import get_payment_provider
+
+        charge = attempt.charge
+        if is_cash_collection(charge):
+            paid_back = attempt.amount
+            refund_id = None
+        else:
+            try:
+                provider = get_payment_provider(charge.provider)
+            except ImproperlyConfigured:
+                return cls._decline(
+                    order,
+                    attempt,
+                    charge.provider,
+                    {
+                        "error": (
+                            f"No credentials for {charge.provider} on this "
+                            "store."
+                        )
+                    },
+                )
+            # No transaction is open here: nothing is held while the
+            # provider answers.
+            success, response = provider.refund_payment(
+                payment_id=charge.provider_reference,
+                amount=attempt.amount,
+                idempotency_key=f"refund-{attempt.idempotency_key}",
+            )
+            if success and not response.get("refund_id"):
+                # Money may have moved but nothing identifies it, so it
+                # cannot be booked under a key the provider's own
+                # notification would not repeat.
+                success, response = (
+                    False,
+                    {
+                        "error": "The provider accepted the refund without "
+                        "naming it.",
+                        "outcome_unknown": True,
+                    },
+                )
+            if not success:
+                return cls._decline(order, attempt, charge.provider, response)
+            paid_back = Money(
+                Decimal(str(response["amount"])), attempt.amount.currency
+            )
+            refund_id = response["refund_id"]
+
+        with transaction.atomic():
+            Order.objects.select_for_update().values_list("pk", flat=True).get(
+                pk=order.pk
+            )
+            settled = RefundAttempt.objects.select_for_update().get(
+                pk=attempt.pk
+            )
+            if settled.status == RefundAttemptStatus.SETTLED:
+                # The provider's webhook booked this refund while the call
+                # was in flight; booking it again would count it twice.
+                return _ShareOutcome(
+                    attempt.pk, paid_back, settled.refund.provider_reference
+                )
+            if refund_id is None:
                 row, created = PaymentLedger.record_cod_refund(
                     order,
                     collection=charge,
-                    amount=share,
+                    amount=paid_back,
                     reference=reference,
                     description=reason,
+                    attempt=settled,
                 )
                 refund_id = row.provider_reference
             else:
-                # Under the lock, and counted from the ledger: an attempt
-                # that wrote no row (a timeout, a rollback) is retried
-                # under the key it already used, so the provider hands back
-                # the refund it made instead of making another.
-                idempotency_key = (
-                    f"order-{order.pk}-refund-"
-                    f"{PaymentLedger.next_refund_number(order)}"
-                )
-                success, response = get_payment_provider(
-                    charge.provider
-                ).refund_payment(
-                    payment_id=charge.provider_reference,
-                    amount=share,
-                    idempotency_key=idempotency_key,
-                )
-                if not success:
-                    # What the earlier shares paid back is already recorded
-                    # and stays so; the caller is told about both.
-                    cls._note_refund_declined(order, charge.provider, response)
-                    declined = response
-                    break
-
-                paid_back = Money(
-                    Decimal(str(response["amount"])), share.currency
-                )
-                refund_id = response.get("refund_id") or idempotency_key
                 row, created = PaymentLedger.record_refund(
                     order,
                     charge=charge,
                     amount=paid_back,
                     reference=refund_id,
                     description=reason,
+                    attempt=settled,
                 )
             if created:
-                refunded += paid_back
-                refund_ids.append(refund_id)
                 # One signal per refund the ledger took, so a failure on a
                 # later payment leaves nothing unannounced.
                 order_refunded.send(
@@ -3265,12 +3447,25 @@ class OrderService:
                     refund=row,
                 )
                 logger.info("Order %s refunded %s", order.id, paid_back)
+        return _ShareOutcome(attempt.pk, paid_back, refund_id)
 
-        return RefundResult(
-            refunded=refunded,
-            refund_ids=tuple(refund_ids),
-            declined=declined,
-        )
+    @classmethod
+    def _decline(
+        cls,
+        order: Order,
+        attempt: RefundAttempt,
+        provider_code: str,
+        response: dict[str, Any],
+    ) -> _ShareOutcome:
+        """The provider did not refund this share. A refusal frees what the
+        attempt held; an unknown outcome (a timeout) keeps it held, because
+        the refund may have been made."""
+        if not response.get("outcome_unknown"):
+            RefundAttempt.objects.filter(
+                pk=attempt.pk, status=RefundAttemptStatus.PENDING
+            ).update(status=RefundAttemptStatus.DECLINED)
+        cls._note_refund_declined(order, provider_code, response)
+        return _ShareOutcome(attempt.pk, declined=response)
 
     @classmethod
     def _apply_polled_payment_status(

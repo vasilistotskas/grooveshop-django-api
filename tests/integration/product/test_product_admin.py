@@ -438,6 +438,24 @@ class TestReviewAdmin:
         )
         assert str(review.id) in subtitle
 
+    def test_product_header_image_is_the_image_url_not_its_storage_path(
+        self, review_admin
+    ):
+        """``main_image_path`` is the storage path the storefront hands to
+        media-stream; as an ``<img src>`` the admin page resolved it
+        relative to itself (``…/productreview/media/…``, a 404)."""
+        product = ProductFactory(num_images=0)
+        image = ProductImageFactory(product=product, is_main=True)
+        review = ProductReviewFactory(product=product)
+        request = RequestFactory().get("/admin/product/productreview/")
+        request.user = UserAccountFactory(is_superuser=True, is_staff=True)
+
+        listed = review_admin.get_queryset(request).get(pk=review.pk)
+        *_rest, image_dict = review_admin.product_header(listed)
+
+        assert image_dict["path"] == image.image.url
+        assert image_dict["path"].startswith(("/", "http"))
+
     def test_reviewer_is_first_name_and_last_initial_linked(self, review_admin):
         user = UserAccountFactory(first_name="Maria", last_name="Papadopoulou")
         review = ProductReviewFactory(user=user)

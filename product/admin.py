@@ -1917,10 +1917,19 @@ class ProductReviewAdmin(BaseTranslatableAdmin):
         name = obj.product.safe_translation_getter(
             "name", any_language=True
         ) or str(obj.product_id)
+        # The image's URL, not ``main_image_path``: that is the storage path
+        # the storefront hands to media-stream, and the admin page resolved
+        # it relative to itself (``…/productreview/media/…``, a 404).
+        main_images = getattr(obj.product, "_prefetched_main_images", [])
+        main_image = main_images[0] if main_images else None
         return header_two_line(
             name,
             _("Review #%(id)s") % {"id": obj.id},
-            image_path=obj.product.main_image_path or None,
+            image_path=(
+                main_image.image.url
+                if main_image and main_image.image
+                else None
+            ),
             squared=True,
         )
 

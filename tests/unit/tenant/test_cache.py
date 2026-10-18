@@ -533,6 +533,39 @@ class TestResolveKeyIsShapeVersioned:
             "a new serializer field must not reuse the old cache key"
         )
 
+    def test_a_field_added_inside_a_nested_serializer_changes_the_key(self):
+        """``features`` is a nested serializer. Three booleans added to it
+        reused the old key on 2026-10-18 and 404ed every store until the
+        stale entries were deleted by hand."""
+        from rest_framework import serializers
+
+        from tenant.cache import _tenant_config_shape
+        from tenant.serializers import StoreFeaturesSerializer
+
+        _tenant_config_shape.cache_clear()
+        before = tenant_resolve_key("shop.example", SHOP)
+
+        real_get_fields = StoreFeaturesSerializer.get_fields
+
+        def with_extra_feature(self):
+            fields = real_get_fields(self)
+            fields["brandNewFeature"] = serializers.BooleanField(read_only=True)
+            return fields
+
+        _tenant_config_shape.cache_clear()
+        try:
+            with patch.object(
+                StoreFeaturesSerializer, "get_fields", with_extra_feature
+            ):
+                after = tenant_resolve_key("shop.example", SHOP)
+        finally:
+            _tenant_config_shape.cache_clear()
+
+        assert after != before, (
+            "a field added inside a nested serializer must not reuse the "
+            "old cache key"
+        )
+
     def test_key_is_stable_for_an_unchanged_shape(self):
         """Otherwise every process would miss the cache permanently."""
         assert tenant_resolve_key("shop.example", SHOP) == tenant_resolve_key(

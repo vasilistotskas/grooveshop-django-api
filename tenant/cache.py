@@ -66,12 +66,35 @@ def make_tenant_key(key: str, key_prefix: str, version: int) -> str:
     return f"{schema}:{key_prefix}:{version}:{key}"
 
 
+def _field_paths(serializer: Any, prefix: str = "") -> list[str]:
+    """Every field path of *serializer*, nested serializers included.
+
+    A nested serializer (``features``, ``shipping_carriers``) is walked
+    too: a field added INSIDE it changes the payload shape just as much
+    as a top-level one. Hashing only the top level missed exactly that,
+    and on 2026-10-18 three new ``features`` booleans served the old
+    cached shape and 404ed every store for ~4.5 minutes.
+    """
+    from rest_framework import serializers
+
+    paths: list[str] = []
+    for name, field in serializer.get_fields().items():
+        path = f"{prefix}{name}"
+        paths.append(path)
+        child = getattr(field, "child", None)
+        if isinstance(field, serializers.ListSerializer) and child is not None:
+            field = child
+        if isinstance(field, serializers.BaseSerializer):
+            paths.extend(_field_paths(field, f"{path}."))
+    return paths
+
+
 @lru_cache(maxsize=1)
 def _tenant_config_shape() -> str:
-    """Short fingerprint of ``TenantConfigSerializer``'s field names."""
+    """Short fingerprint of ``TenantConfigSerializer``'s full field tree."""
     from tenant.serializers import TenantConfigSerializer
 
-    names = ",".join(sorted(TenantConfigSerializer().get_fields()))
+    names = ",".join(sorted(_field_paths(TenantConfigSerializer())))
     return hashlib.blake2s(names.encode(), digest_size=4).hexdigest()
 
 

@@ -149,14 +149,20 @@ class RefundResult:
 
 
 @dataclass(frozen=True, slots=True)
-class _ShareOutcome:
-    """What making one share of a refund came to: the money booked and its
-    refund id, or the provider's answer when it was not made."""
+class _SharePaid:
+    """A share of a refund the provider made and the ledger holds."""
 
     attempt_pk: int
-    paid_back: Money | None = None
-    refund_id: str | None = None
-    declined: dict[str, Any] | None = None
+    paid_back: Money
+    refund_id: str
+
+
+@dataclass(frozen=True, slots=True)
+class _ShareDeclined:
+    """A share of a refund that was not made: the provider's answer."""
+
+    attempt_pk: int
+    declined: dict[str, Any]
 
 
 __all__ = ["OrderService", "PaymentEventOutcome", "RefundResult"]
@@ -3194,12 +3200,12 @@ class OrderService:
         declined = None
         for attempt in attempts:
             share = cls._make_refund(order, attempt, reason, reference)
-            if share.declined is not None:
+            if isinstance(share, _ShareDeclined):
                 declined = share.declined
                 break
             refunded += share.paid_back
             refund_ids.append(share.refund_id)
-        if declined is not None:
+        if isinstance(share, _ShareDeclined):
             # What the earlier shares paid back is recorded and stays so;
             # the later ones were never called, so they hold nothing back.
             RefundAttempt.objects.filter(
@@ -3391,13 +3397,14 @@ class OrderService:
         attempt: RefundAttempt,
         reason: str,
         reference: str,
-    ) -> _ShareOutcome:
+    ) -> _SharePaid | _ShareDeclined:
         """Steps 2 and 3 of :meth:`refund_order` for one share."""
         from django.core.exceptions import ImproperlyConfigured
 
         from order.payment import get_payment_provider
 
         charge = attempt.charge
+        refund_id: str | None
         if is_cash_collection(charge):
             paid_back = attempt.amount
             refund_id = None
@@ -3418,6 +3425,7 @@ class OrderService:
                 )
             # No transaction is open here: nothing is held while the
             # provider answers.
+            response: dict[str, Any]
             success, response = provider.refund_payment(
                 payment_id=charge.provider_reference,
                 amount=attempt.amount,
@@ -3427,8 +3435,10 @@ class OrderService:
                 # Money may have moved but nothing identifies it, so it
                 # cannot be booked under a key the provider's own
                 # notification would not repeat.
-                success, response = (
-                    False,
+                return cls._decline(
+                    order,
+                    attempt,
+                    charge.provider,
                     {
                         "error": "The provider accepted the refund without "
                         "naming it.",
@@ -3452,7 +3462,7 @@ class OrderService:
             if settled.status == RefundAttemptStatus.SETTLED:
                 # The provider's webhook booked this refund while the call
                 # was in flight; booking it again would count it twice.
-                return _ShareOutcome(
+                return _SharePaid(
                     attempt.pk, paid_back, settled.refund.provider_reference
                 )
             if refund_id is None:
@@ -3485,7 +3495,7 @@ class OrderService:
                     refund=row,
                 )
                 logger.info("Order %s refunded %s", order.id, paid_back)
-        return _ShareOutcome(attempt.pk, paid_back, refund_id)
+        return _SharePaid(attempt.pk, paid_back, refund_id)
 
     @classmethod
     def _decline(
@@ -3494,7 +3504,7 @@ class OrderService:
         attempt: RefundAttempt,
         provider_code: str,
         response: dict[str, Any],
-    ) -> _ShareOutcome:
+    ) -> _ShareDeclined:
         """The provider did not refund this share. A refusal frees what the
         attempt held; an unknown outcome (a timeout) keeps it held, because
         the refund may have been made."""
@@ -3503,7 +3513,7 @@ class OrderService:
                 pk=attempt.pk, status=RefundAttemptStatus.PENDING
             ).update(status=RefundAttemptStatus.DECLINED)
         cls._note_refund_declined(order, provider_code, response)
-        return _ShareOutcome(attempt.pk, declined=response)
+        return _ShareDeclined(attempt.pk, response)
 
     @classmethod
     def _apply_polled_payment_status(

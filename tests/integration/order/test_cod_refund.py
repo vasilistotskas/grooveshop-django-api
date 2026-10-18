@@ -18,6 +18,7 @@ import pytest
 from django.contrib.admin.sites import AdminSite
 from django.contrib.messages import get_messages
 from django.contrib.messages.storage.fallback import FallbackStorage
+from django.core.exceptions import PermissionDenied
 from django.test import RequestFactory
 from djmoney.money import Money
 
@@ -519,23 +520,19 @@ class TestTheStaffAction:
         assert refund.description == "Customer returned the parcel"
         assert _status(order) == PaymentStatus.REFUNDED
 
-    def test_the_action_says_when_the_cash_was_never_collected(
+    def test_the_action_is_not_offered_when_the_cash_was_never_collected(
         self, staff_user
     ):
+        """Nothing was collected, so nothing is refundable: the action is
+        not offered (the service still says why, tested above)."""
         order = courier_cash_order(
             status=OrderStatus.DELIVERED,
             payment_status=PaymentStatus.PENDING,
             payment_id="",
         )
         request = _request(staff_user, {"amount": "10.00", "reason": "Return"})
+        admin = OrderAdmin(Order, AdminSite())
 
-        OrderAdmin(Order, AdminSite()).refund_payment(
-            request, object_id=order.pk
-        )
-
-        assert [str(m) for m in get_messages(request)] == [
-            (
-                "The payment on delivery has not been collected yet, so "
-                "there is nothing to refund."
-            )
-        ]
+        assert not admin.has_refund_permission(request, object_id=order.pk)
+        with pytest.raises(PermissionDenied):
+            admin.refund_payment(request, object_id=order.pk)

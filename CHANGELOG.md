@@ -3,6 +3,155 @@
 
 
 
+## v3.136.1 (2026-10-18)
+
+### Bug fixes
+
+* fix(orders): close the gift-card refund test orders from a fresh instance (#254)
+
+test_the_redemption_goes_back failed on main after #253 (shard 3):
+nothing was credited. The test closes an OrderFactory order as REFUNDED
+after setting its status with a queryset update and refresh_from_db, but
+Order snapshots its status when it is built (_original_status) and
+decides from it whether a save is a transition. The factory draws a
+random status; an order drawn as REFUNDED saw no change when closed as
+REFUNDED, so no order_status_changed fired and the card was not credited.
+
+The helper loads a fresh instance, and a test parametrised over every
+status the factory can draw says so (the REFUNDED draw fails without the
+fix, deterministically).
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`873af7e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/873af7e149b4401e3e26be118c96255ea924f952))
+
+* fix(loyalty): build the refunded-status test order with no provider payment (#253)
+
+The order that test_status_only_refund_reverses_the_points closes as
+REFUNDED came from OrderFactory with a random provider pay way and a
+random payment id. A paid order on a registered provider whose capture the
+ledger never recorded is still refundable (PaymentLedger.refund_open), so
+update_order_status refuses to close it (RefundOutstandingError) whenever
+the draw picked a provider: main failed on the release of the refund
+fixes. The fixture says what the tests mean, an order with nothing to
+refund.
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`d56fc69`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d56fc69519bde82b7dc5fa947667a52a08c5aa90))
+
+* fix(orders): make refunds safe against slow providers, failed refunds and canceled orders that still owe money (#250) ([`26d8945`](https://github.com/vasilistotskas/grooveshop-django-api/commit/26d89457cbf1b0f68bc058a5794fb40b1bc9b8aa))
+
+* fix(orders): claim, call and record refunds so no transaction spans the provider
+
+refund_order held a transaction (and the order lock) across the provider
+HTTP call, but every connection kills a session idle in a transaction
+after ten seconds. A slow provider meant a refund made at the provider
+and lost here, and in a cancel the whole cancel rolled back.
+
+A refund is now three steps: claim a RefundAttempt under the order lock
+and commit (its amount is held back, its key is what the provider
+receives), call the provider with no transaction open, then record the
+ledger row under the lock. A retry or double click reuses the pending
+attempt, so Stripe returns the refund it already made; a provider
+without idempotency (Viva) is never asked twice. A webhook that books
+the refund mid-call settles the attempt, so it is never counted twice.
+A timeout is an unknown outcome and keeps the attempt held; a refusal
+frees it. Viva accepting a refund without naming it is no longer booked
+under a made-up id. cancel_order commits the cancel before refunding,
+and refunds whatever is still refundable, not only a COMPLETED order.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com> ([`26d8945`](https://github.com/vasilistotskas/grooveshop-django-api/commit/26d89457cbf1b0f68bc058a5794fb40b1bc9b8aa))
+
+* fix(orders): refund a canceled order that still owes money, and say why one waits
+
+The admin Refund action was offered only for delivered, completed or
+returned orders, so the "Canceled orders to refund" worklist listed orders
+staff could not refund in-app. It is now offered wherever the ledger
+still holds refundable money, whatever the status.
+
+A cancel skipped the refund of an order a provider's dashboard had
+already refunded in part (is_paid means COMPLETED only); it now refunds
+whatever is refundable. A refund refused because a dispute is open waits
+for the dispute: the order history and the admin message say so instead
+of a generic "not refunded".
+
+Marking an order REFUNDED is refused while money paid for it can still
+be refunded: the status drove the loyalty reversal and a "your refund
+has been processed" email with no money moved.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com> ([`26d8945`](https://github.com/vasilistotskas/grooveshop-django-api/commit/26d89457cbf1b0f68bc058a5794fb40b1bc9b8aa))
+
+* fix(orders): reverse a Stripe refund that was accepted and later failed
+
+Stripe books a refund as succeeded or pending and can move it to failed
+afterwards, returning the money to the merchant's balance. Nothing
+listened for that, so the ledger kept counting the money as paid back
+and the order read REFUNDED.
+
+refund.failed, refund.updated and charge.refund.updated now write a
+REFUND_REVERSAL ledger row keyed on the refund id (the three events and
+redeliveries book it once), derive payment_status again, note the order
+and email staff through a new refund_failed operational alert. The
+ledger sums treat a reversal as money held again, and a refund_status
+that sees only chargebacks and reversals returns to COMPLETED.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com> ([`26d8945`](https://github.com/vasilistotskas/grooveshop-django-api/commit/26d89457cbf1b0f68bc058a5794fb40b1bc9b8aa))
+
+* fix(orders): state the refunded amount in the refund email, and tidy refund labels
+
+The refund confirmation said "your refund has been processed" next to the
+whole order total and never the amount refunded. It now states what this
+refund paid back and, for a partial refund, what is still to be refunded
+(el, en, de catalogues updated).
+
+An order paid entirely with gift cards and points has no provider payment,
+so no refund fires for it and nothing returned its cards: closing it as
+REFUNDED now credits the redemption back, once, unless the payment was
+charged back (the rule that keeps spent points spent).
+
+The item admin said "Fully Refunded" for units that were only put back
+in stock (OrderItem.refund moves no money); it now says what happened.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com> ([`26d8945`](https://github.com/vasilistotskas/grooveshop-django-api/commit/26d89457cbf1b0f68bc058a5794fb40b1bc9b8aa))
+
+* fix(orders): document the refund attempt, the failed-refund reversal and the REFUNDED guard
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com> ([`26d8945`](https://github.com/vasilistotskas/grooveshop-django-api/commit/26d89457cbf1b0f68bc058a5794fb40b1bc9b8aa))
+
+* fix(orders): answer the review of the refund fixes
+
+A neutral label for the payment still held after a refund; the refund
+attempt's staff-typed reason is scrubbed for staging; the Refund action
+and the REFUNDED guard also admit a paid provider order whose capture the
+ledger never recorded (PaymentLedger.refund_open, no provider call); a
+charge.refunded raised before a refund failure is ignored when it arrives
+after it, so the failed refund is not booked again.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com> ([`26d8945`](https://github.com/vasilistotskas/grooveshop-django-api/commit/26d89457cbf1b0f68bc058a5794fb40b1bc9b8aa))
+
+### Testing
+
+* test(orders): cover chargebacks and reversals in the derived payment status
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com> ([`26d8945`](https://github.com/vasilistotskas/grooveshop-django-api/commit/26d89457cbf1b0f68bc058a5794fb40b1bc9b8aa))
+
+* test(orders): prove the Viva provider reports an unnamed refund as unknown
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com> ([`26d8945`](https://github.com/vasilistotskas/grooveshop-django-api/commit/26d89457cbf1b0f68bc058a5794fb40b1bc9b8aa))
+
+* test(orders): render the refund email in English whatever catalogue is compiled
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com> ([`26d8945`](https://github.com/vasilistotskas/grooveshop-django-api/commit/26d89457cbf1b0f68bc058a5794fb40b1bc9b8aa))
+
+* test(orders): pin the pay way of orders closed as REFUNDED without a provider
+
+A factory order carries a random provider pay way and a payment id, which
+the REFUNDED guard now (rightly) reads as a held payment; the tests that
+mean "no provider" say so.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`26d8945`](https://github.com/vasilistotskas/grooveshop-django-api/commit/26d89457cbf1b0f68bc058a5794fb40b1bc9b8aa))
+
 ## v3.136.0 (2026-10-18)
 
 ### Chores

@@ -3,6 +3,74 @@
 
 
 
+## v3.137.0 (2026-10-18)
+
+### Bug fixes
+
+* fix(orders): report the value a stored-value refund actually returned
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com> ([`937e15a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/937e15aaa9487a24960ed4f9aa7d8625f07a43b0))
+
+* fix(orders): answer the review of the value-based refunds
+
+The gift-card constraint is replaced, not dropped: the whole-redemption
+guard of the previous release stays for the credits that name no refund
+attempt (built concurrently before the old one goes), and only a credit
+that names its refund, a part of a refund, is unlimited. A part now needs
+its refund attempt. The earned points are reversed when a refund after a
+lost dispute returns everything the provider received. The negative
+balance tests assert the English message under the English marker.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`937e15a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/937e15aaa9487a24960ed4f9aa7d8625f07a43b0))
+
+### Features
+
+* feat(orders): refund in the value of what came back, and let a refund take back spent points (#252) ([`937e15a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/937e15aaa9487a24960ed4f9aa7d8625f07a43b0))
+
+* feat(loyalty): let a refund take back points the customer already spent
+
+reverse_order_points clamped the earn reversal at the customer's balance,
+so earning points on an order, spending them elsewhere and refunding the
+order kept the points. LOYALTY_REFUND_ALLOWS_NEGATIVE_BALANCE (on by
+default, the setting that is safe against that loop) takes the whole
+earning back and lets the balance go negative: later earnings pay it off
+and a negative balance blocks redeeming. Off keeps the clamp.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com> ([`937e15a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/937e15aaa9487a24960ed4f9aa7d8625f07a43b0))
+
+* feat(orders): refund in the value of what came back
+
+Staff entered a provider amount, so refunding the card's share released
+the WHOLE gift-card redemption and every spent point: a EUR 90 gift card
+plus EUR 10 card order, a EUR 10 item returned, put EUR 100 back for EUR
+10 of goods (the fraud audit's HIGH finding).
+
+refund_order now takes the value the customer returned. The provider is
+paid back first; only the excess goes back onto the gift cards and
+loyalty points the order paid with, in proportion to what each has not
+yet got back, so both are used up together and the last refund returns
+exactly what is left. The excess is one STORED_VALUE RefundAttempt run
+after every provider share was made; a declined card refund leaves the
+cards and points alone. What is owed is read from the gift-card and
+points ledgers under the cards' and the user's row locks, so a cancel
+and a refund that race return the value once, which is why the
+one-credit-per-card-per-order unique constraint goes: an order is now
+credited back in parts, and each credit and restore names its refund
+(GiftCardTransaction.refund_attempt, PointsTransaction.refund_attempt).
+
+payment_status is REFUNDED only when the provider's money AND the stored
+value are back, so the points the order earned are reversed with the
+last part, and an order paid entirely with gift cards and points can be
+refunded from the admin dialog, which now offers the value and says how
+it splits. The reversal of a cancel gives back only the spent points a
+refund has not.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com> ([`937e15a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/937e15aaa9487a24960ed4f9aa7d8625f07a43b0))
+
 ## v3.136.4 (2026-10-18)
 
 ### Bug fixes

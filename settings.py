@@ -1861,6 +1861,16 @@ EXTRA_SETTINGS_DEFAULTS = [
         ),
     },
     {
+        "name": "OPS_ALERT_REFUND_FAILED_ENABLED",
+        "type": "bool",
+        "value": True,
+        "description": (
+            "Email when Stripe reports a refund it had accepted as failed: "
+            "the customer was told they were refunded and has to be paid "
+            "back another way."
+        ),
+    },
+    {
         "name": "OPS_ALERT_REVIEW_PENDING_ENABLED",
         "type": "bool",
         "value": True,

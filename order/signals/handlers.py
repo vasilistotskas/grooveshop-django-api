@@ -12,6 +12,7 @@ from djstripe.event_handlers import djstripe_receiver
 from djstripe.models import Event
 
 from order.disputes import announce_chargeback
+from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import (
     SETTLED_PAYMENT_STATUSES,
     OrderStatus,
@@ -59,6 +60,7 @@ from order.tasks import (
     send_shipping_notification_email,
 )
 from pay_way.enum.settlement import PaySettlement
+from shipping.alerts import OpsAlertKind, send_ops_alert
 from tenant.celery import dispatch_on_commit
 
 logger = logging.getLogger(__name__)
@@ -1191,6 +1193,129 @@ def handle_stripe_charge_refunded(sender, **kwargs):
         # reads REFUNDED while the customer is never emailed about the
         # money coming back.
         logger.exception("Malformed charge.refunded payload")
+
+
+@djstripe_receiver("refund.failed")
+@djstripe_receiver("refund.updated")
+@djstripe_receiver("charge.refund.updated")
+@with_tenant_schema_from_event
+def handle_stripe_refund_failed(sender, **kwargs):
+    """Handle a Stripe refund that was accepted and later FAILED.
+
+    Stripe reports an accepted refund as ``succeeded`` or ``pending`` and
+    can move it to ``failed`` afterwards (docs.stripe.com/refunds): the
+    money goes back to the merchant's Stripe balance and the merchant must
+    pay the customer another way. ``refund.failed``, ``refund.updated`` and
+    ``charge.refund.updated`` all carry the Refund object; only a ``failed``
+    one matters here.
+
+    The ledger counted that refund when it was accepted, so a reversing
+    entry (``REFUND_REVERSAL``, keyed on the refund id so the three events
+    and redeliveries book it once) puts the money back as held, and
+    ``payment_status`` is derived again. Staff are told on the order and by
+    an operational email, because what was released on the strength of the
+    refund is NOT taken back: the gift-card credit and the points stay (the
+    customer is still owed the money), and the customer email and the
+    credit document stand (they record what the merchant owes). Staff pay
+    the customer by other means, or refund again once the cause is cleared.
+    """
+    logger.debug("Processing Stripe refund failure webhook")
+
+    try:
+        event: Event = kwargs["event"]
+        refund = event.data["object"]
+        if refund.get("status") != "failed":
+            return
+
+        refund_id = refund["id"]
+        payment_intent_id = refund.get("payment_intent") or ""
+        if not payment_intent_id:
+            logger.warning(
+                "Failed refund %s has no payment_intent — skipping", refund_id
+            )
+            return
+        failed = money_from_minor_units(
+            int(refund["amount"]), refund["currency"]
+        )
+        reason = refund.get("failure_reason") or "unknown"
+
+        with transaction.atomic():
+            order = (
+                Order.objects.select_for_update()
+                .filter(payment_id=payment_intent_id)
+                .first()
+            )
+            charge = (
+                PaymentTransaction.objects.filter(
+                    order=order,
+                    kind=PaymentTransactionKind.CHARGE,
+                    provider=StripePaymentProvider.code,
+                    provider_reference=payment_intent_id,
+                ).first()
+                if order is not None
+                else None
+            )
+            if order is None or charge is None:
+                logger.warning(
+                    "No recorded payment for failed refund %s "
+                    "(payment_intent=%s)",
+                    refund_id,
+                    payment_intent_id,
+                )
+                return
+
+            previous_payment_status = order.payment_status
+            try:
+                _row, created = PaymentLedger.record_refund_reversal(
+                    order,
+                    charge=charge,
+                    amount=failed,
+                    reference=refund_id,
+                    description=f"Refund failed: {reason}",
+                )
+            except ValueError:
+                logger.warning(
+                    "Failed refund %s: the ledger holds no refund on %s to "
+                    "reverse",
+                    refund_id,
+                    payment_intent_id,
+                )
+                return
+            if not created:
+                return
+
+        OrderHistory.log_payment_update(
+            order=order,
+            previous_value={"payment_status": str(previous_payment_status)},
+            new_value={
+                "payment_status": str(order.payment_status),
+                "refund_failed": refund_id,
+                "amount": str(failed.amount),
+            },
+        )
+        note = (
+            f"Stripe reported refund {refund_id} of {failed} FAILED "
+            f"({reason}): the money was not paid back to the customer and "
+            "counts as held again. The customer was told it was refunded; "
+            "pay them back another way or refund again once the cause is "
+            "cleared. Gift-card credit and points released for it stay."
+        )
+        OrderHistory.log_note(order=order, note=note)
+        try:
+            send_ops_alert(
+                kind=OpsAlertKind.REFUND_FAILED,
+                subject=f"Refund failed for order {order.id}",
+                message=f"Order {order.id}: {note}",
+            )
+        except Exception:
+            logger.exception(
+                "Could not send the failed-refund alert for order %s",
+                order.id,
+            )
+
+    except KeyError, TypeError:
+        # Malformed payload only: see charge.refunded above.
+        logger.exception("Malformed refund failure payload")
 
 
 @djstripe_receiver("charge.dispute.created")

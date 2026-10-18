@@ -68,7 +68,7 @@ def _mute(*kinds: OpsAlertKind) -> None:
 
 
 class TestTheSettingPerKind:
-    def test_seven_kinds_and_none_of_the_removed_ones(self):
+    def test_eight_kinds_and_none_of_the_removed_ones(self):
         assert {kind.value for kind in OpsAlertKind} == {
             "stale_shipments",
             "unremitted_cod",
@@ -76,6 +76,7 @@ class TestTheSettingPerKind:
             "shipment_rejected",
             "webhook_failed",
             "payment_after_cancel",
+            "refund_failed",
             "review_pending",
         }
 

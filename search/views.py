@@ -49,6 +49,7 @@ from search.serializers import (
     SearchClickResponseSerializer,
     TrendingSearchResponseSerializer,
 )
+from tenant.features import feature_on
 from tenant.membership import tenant_plan_allows
 from tenant.permissions import IsBlogEnabled
 
@@ -652,10 +653,12 @@ def product_meili_search(request):
         if enriched_results["results"]:
             relaxed_query = relaxed
 
+    reviews_visible = feature_on("product_reviews")
     serialized_data = []
     for result in enriched_results["results"]:
         obj = result["object"]
         context = {
+            "reviews_visible": reviews_visible,
             "_formatted": result.get("_formatted", {}),
             "_matchesPosition": result.get("_matchesPosition", {}),
             "_rankingScore": result.get("_rankingScore", None),
@@ -923,6 +926,7 @@ def federated_search(request):
         }
 
     # Enrich results preserving original order
+    reviews_visible = feature_on("product_reviews")
     enriched_results = []
     for index_type, obj_id, hit in hit_metadata:
         try:
@@ -939,6 +943,7 @@ def federated_search(request):
                 continue
 
             context = {
+                "reviews_visible": reviews_visible,
                 "_formatted": hit.get("_formatted", {}),
                 "_matchesPosition": hit.get("_matchesPosition", {}),
                 "_rankingScore": hit.get("_rankingScore", None),

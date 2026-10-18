@@ -58,12 +58,12 @@ def test_every_feature_setting_purges_its_store_at_once(
 
 
 def test_another_store_setting_purges_nothing(bind_tenant_and_schema):
-    assert "AGENT_COMMERCE_ENABLED" not in feature_setting_keys()
+    assert "PRODUCT_FEEDS_ENABLED" not in feature_setting_keys()
     bind_tenant_and_schema(SimpleNamespace(schema_name="shop_one"))
-    current = bool(Setting.get("AGENT_COMMERCE_ENABLED", default=False))
+    current = bool(Setting.get("PRODUCT_FEEDS_ENABLED", default=False))
 
     with patch(DISPATCH) as dispatch:
-        switch_store_settings(AGENT_COMMERCE_ENABLED=not current)
+        switch_store_settings(PRODUCT_FEEDS_ENABLED=not current)
 
     assert purges(dispatch) == []
 

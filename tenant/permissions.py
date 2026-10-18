@@ -251,6 +251,17 @@ class IsAgentCommerceRuntimeEnabled(IsSettingEnabled):
     setting_key = "AGENT_COMMERCE_ENABLED"
 
 
+class IsChatWidgetEnabled(IsSettingEnabled):
+    """404 when the merchant has hidden the shopping-assistant widget.
+
+    The merchant tier of the ``chat_widget`` feature; the plan tier and
+    the agent-commerce runtime tier it sits under are
+    ``IsAgentCommerceEnabled`` and ``IsAgentCommerceRuntimeEnabled``.
+    """
+
+    setting_key = "CHAT_WIDGET_ENABLED"
+
+
 class IsB2BWholesaleEnabled(IsSettingEnabled):
     """404 when the merchant has not turned the wholesale program on.
 

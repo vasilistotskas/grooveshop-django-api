@@ -140,3 +140,25 @@ def test_no_kept_field_outlives_its_field():
     }
 
     assert set(_KEPT) <= live, sorted(set(_KEPT) - live)
+
+
+def test_an_encrypted_field_is_cleared_whatever_its_name():
+    """The class decides, not the prefix list: a secret named
+    ``vault_note`` is as live as one named ``stripe_secret_key``."""
+    from types import SimpleNamespace
+
+    field = EncryptedCharField(max_length=10)
+    field.name = "vault_note"
+    plain = models.CharField(max_length=10)
+    plain.name = "vault_label"
+    stub = SimpleNamespace(
+        _meta=SimpleNamespace(concrete_fields=[field, plain])
+    )
+
+    assert credentials.cleared_fields(stub) == {"vault_note": ""}
+
+
+def test_stripe_key_and_endpoint_rows_are_wiped_not_kept():
+    for name in ("APIKey", "WebhookEndpoint"):
+        model = apps.get_model("djstripe", name)
+        assert isinstance(rules.resolve(model), rules.Delete), name

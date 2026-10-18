@@ -330,3 +330,16 @@ class TestWhatTheProviderAnswers:
         assert order.refund_attempts.get().status == (
             RefundAttemptStatus.DECLINED
         )
+
+    def test_the_viva_provider_itself_reports_that_outcome_as_unknown(self):
+        from order.payment import VivaWalletPaymentProvider
+
+        body = {**CANCEL_SUCCESS, "TransactionId": None}
+
+        with FakeVivaApi(captured=100.0, cancel=(200, body)):
+            success, response = VivaWalletPaymentProvider().refund_payment(
+                VIVA_PAYMENT, _eur("40.00"), idempotency_key="unused"
+            )
+
+        assert success is False
+        assert response["outcome_unknown"] is True

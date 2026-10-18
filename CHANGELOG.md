@@ -3,6 +3,27 @@
 
 
 
+## v3.135.3 (2026-10-18)
+
+### Bug fixes
+
+* fix(core): return the storage URL as the editor image location (#243)
+
+With DEBUG=True the TinyMCE upload view prefixed API_BASE_URL to the
+storage URL, but MEDIA_URL is absolute in every environment, so the
+editor got http://localhost:8000http://localhost:8000/media/... and
+showed a broken image. The view also read DEBUG from the environment
+instead of settings. The location is now storage.url() as is.
+
+storage.save() already returns a /-separated name, so the os.sep
+replace is gone with it. The tests no longer patch os.getenv, which
+hid the bug, and pin the exact location with DEBUG on and off.
+
+
+Claude-Session: https://claude.ai/code/session_01VHqqSodFfL9aLgezEZV6qb
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`b97c363`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b97c363a9e389cc4260d3701a8ad03cd09e1c69e))
+
 ## v3.135.2 (2026-10-18)
 
 ### Bug fixes

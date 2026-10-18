@@ -55,7 +55,11 @@ cache-invalidated by the rewrite, and `updated_at` keeps its value.
   wiped and the OAuth app secrets blanked. After clearing, the run checks every
   `EncryptedCharField` column of every model itself and fails if any holds a
   value. Staging's own sandbox credentials come from its sealed secrets,
-  written by `scripts/staging-arm-features.py` in the infrastructure repo.
+  written by `scripts/staging-arm-features.py` in the infrastructure repo, through
+  `credentials.arm_credentials`: it reads the `STAGING_TENANT_CREDENTIALS` JSON
+  (`{schema: {field: value}}`), accepts only the credential columns this module
+  derives, and refuses a tenant that is not on a staging host or has a live-mode
+  switch on.
 - **Deleted**: sessions, Knox tokens, MFA and WebAuthn authenticators, social
   accounts and tokens, e-mail confirmations, OIDC tokens, GDPR export rows,
   search queries, notifications, stock reservations, admin log entries,

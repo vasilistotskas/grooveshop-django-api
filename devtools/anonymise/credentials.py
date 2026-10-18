@@ -71,3 +71,69 @@ def cleared_fields(model: type[models.Model]) -> dict[str, object]:
         ):
             cleared[field.name] = False
     return cleared
+
+
+def arm_credentials(raw: str) -> dict[str, list[str]]:
+    """Write staging's own sandbox credentials onto its Tenant rows.
+
+    ``raw`` is the ``STAGING_TENANT_CREDENTIALS`` JSON document,
+    ``{schema: {field: value}}``, from staging's sealed secret; empty means
+    "none supplied". Returns ``{schema: [field names written]}`` and never
+    the values. Raises ``ValueError`` for a malformed document, a field that
+    is not a credential column of ``Tenant`` (a typo, or a live-mode switch)
+    and a tenant whose primary domain is not a staging host or that still has
+    a live-mode switch on, which would mean the refresh did not anonymise it.
+    """
+    import json
+
+    from django_tenants.utils import (
+        get_tenant_domain_model,
+        get_tenant_model,
+    )
+
+    if not raw.strip():
+        return {}
+    supplied = json.loads(raw)
+    if not isinstance(supplied, dict) or not all(
+        isinstance(values, dict) for values in supplied.values()
+    ):
+        raise ValueError(
+            "the credentials document must be {schema: {field: value}}"
+        )
+    tenant_model = get_tenant_model()
+    domain_model = get_tenant_domain_model()
+    allowed = {
+        name
+        for name, cleared in cleared_fields(tenant_model).items()
+        if cleared == ""
+    }
+    written: dict[str, list[str]] = {}
+    for schema, values in supplied.items():
+        unknown = sorted(set(values) - allowed)
+        if unknown:
+            raise ValueError(f"{schema}: not credential fields: {unknown}")
+        tenant = tenant_model.objects.get(schema_name=schema)
+        primary = (
+            domain_model.objects.filter(tenant=tenant, is_primary=True)
+            .values_list("domain", flat=True)
+            .first()
+        )
+        if not primary or "staging" not in primary:
+            raise ValueError(
+                f"{schema}: primary domain {primary!r} is not a staging host"
+            )
+        live = [
+            field.name
+            for field in tenant_model._meta.concrete_fields
+            if field.name.endswith("_live_mode") and getattr(tenant, field.name)
+        ]
+        if live:
+            raise ValueError(
+                f"{schema}: {live} is on; the staging refresh did not "
+                "anonymise this database"
+            )
+        for name, value in values.items():
+            setattr(tenant, name, str(value))
+        tenant.save(update_fields=sorted(values))
+        written[schema] = sorted(values)
+    return written

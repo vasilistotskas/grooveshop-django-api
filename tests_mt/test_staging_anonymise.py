@@ -491,3 +491,88 @@ def test_stripe_and_oauth_app_secrets_do_not_survive(seeded, staging):
     with tenant_context(tenant):
         app = SocialApp.objects.get(provider="google")
         assert (app.client_id, app.secret, app.key) == ("", "", "")
+
+
+def _stage_domain(tenant) -> None:
+    from tenant.models import TenantDomain
+
+    TenantDomain.objects.filter(tenant=tenant, is_primary=True).update(
+        domain="mt-smoke-staging.test"
+    )
+
+
+def test_staging_arms_only_its_own_sandbox_credentials(seeded, staging):
+    """Production's secret is cleared; the sealed sandbox one is written."""
+    import json
+
+    from devtools.anonymise.credentials import arm_credentials
+    from tenant.models import Tenant
+
+    tenant, _ = seeded
+    _stage_domain(tenant)
+    with schema_context(get_public_schema_name()):
+        row = Tenant.objects.get(pk=tenant.pk)
+        row.stripe_secret_key = "sk_live_production"
+        row.viva_wallet_api_key = "production-viva"
+        row.save()
+
+    call_command("staging_anonymise")
+    written = arm_credentials(
+        json.dumps({tenant.schema_name: {"stripe_secret_key": "sk_test_own"}})
+    )
+
+    assert written == {tenant.schema_name: ["stripe_secret_key"]}
+    with schema_context(get_public_schema_name()):
+        row = Tenant.objects.get(pk=tenant.pk)
+        assert row.stripe_secret_key == "sk_test_own"
+        assert row.viva_wallet_api_key == ""
+
+
+@pytest.mark.parametrize(
+    ("document", "message"),
+    [
+        ('{"mt_smoke": {"stripe_secrt_key": "x"}}', "not credential fields"),
+        ('{"mt_smoke": {"viva_wallet_live_mode": "1"}}', "not credential"),
+        ('{"mt_smoke": {"name": "x"}}', "not credential fields"),
+        ('["mt_smoke"]', "must be"),
+    ],
+)
+def test_arming_refuses_a_bad_document(seeded, staging, document, message):
+    from devtools.anonymise.credentials import arm_credentials
+
+    _stage_domain(seeded[0])
+
+    with pytest.raises(ValueError, match=message):
+        arm_credentials(document)
+
+
+def test_arming_refuses_a_tenant_that_is_not_on_a_staging_host(seeded, staging):
+    from devtools.anonymise.credentials import arm_credentials
+
+    tenant, _ = seeded
+
+    with pytest.raises(ValueError, match="not a staging host"):
+        arm_credentials(
+            f'{{"{tenant.schema_name}": {{"stripe_secret_key": "x"}}}}'
+        )
+
+
+def test_arming_refuses_a_database_that_was_not_anonymised(seeded, staging):
+    from devtools.anonymise.credentials import arm_credentials
+    from tenant.models import Tenant
+
+    tenant, _ = seeded
+    _stage_domain(tenant)
+    with schema_context(get_public_schema_name()):
+        Tenant.objects.filter(pk=tenant.pk).update(viva_wallet_live_mode=True)
+
+    with pytest.raises(ValueError, match="did not anonymise"):
+        arm_credentials(
+            f'{{"{tenant.schema_name}": {{"stripe_secret_key": "x"}}}}'
+        )
+
+
+def test_no_credentials_supplied_means_none_written(seeded, staging):
+    from devtools.anonymise.credentials import arm_credentials
+
+    assert arm_credentials("") == {}

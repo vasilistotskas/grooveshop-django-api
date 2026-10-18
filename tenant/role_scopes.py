@@ -59,6 +59,18 @@ PLATFORM_ONLY_APP_LABELS: frozenset[str] = frozenset(
         "django_celery_results",
         "allauth_idp_oidc",
         "rosetta",
+        # A customer's sign-in identity: API tokens, linked social
+        # accounts, second factors, email addresses and browser
+        # sessions. Hiding them from the store sidebar is not enough,
+        # because a hidden admin still opens by URL: knox's add form
+        # mints a working token for any customer and shows it, and a
+        # SocialAccount or EmailAddress row lets a store user sign in
+        # as the customer. No store role is granted anything here.
+        "knox",
+        "socialaccount",
+        "mfa",
+        "account",
+        "usersessions",
     }
 )
 

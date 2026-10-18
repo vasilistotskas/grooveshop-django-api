@@ -279,6 +279,20 @@ class TestInlineClasses:
 
 @pytest.mark.django_db
 class TestUserAdmin:
+    def test_a_store_user_cannot_change_a_customers_email(self, admin_request):
+        """The email is how the customer signs in and resets their password,
+        so a store user who could change it could take the account over.
+        It is still entered when a customer is created."""
+        admin = UserAdmin(UserAccount, AdminSite())
+        admin_request.user.is_superuser = False
+        customer = Mock()
+
+        assert "email" in admin.get_readonly_fields(admin_request, customer)
+        assert "email" not in admin.get_readonly_fields(admin_request, None)
+
+        admin_request.user.is_superuser = True
+        assert "email" not in admin.get_readonly_fields(admin_request, customer)
+
     def test_user_admin_configuration(self, admin_request):
         admin = UserAdmin(UserAccount, AdminSite())
 

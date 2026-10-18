@@ -22,7 +22,7 @@ from order.models.order import Order
 from tests.utils.loyalty import loyalty_settings
 from user.factories.account import UserAccountFactory
 
-pytestmark = pytest.mark.django_db
+pytestmark = [pytest.mark.django_db, pytest.mark.assert_english]
 
 SETTING = "LOYALTY_REFUND_ALLOWS_NEGATIVE_BALANCE"
 

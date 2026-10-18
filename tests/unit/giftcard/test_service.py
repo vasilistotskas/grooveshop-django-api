@@ -289,6 +289,7 @@ class TestRefundCredit:
         longer allows only one credit per card per order; what a card is
         owed is read under its row lock (``credit_refund``)."""
         from order.factories.order import OrderFactory
+        from order.models.refund_attempt import RefundAttempt
 
         order = OrderFactory()
         card = GiftCardFactory(initial_value=Money(Decimal(50), "EUR"))
@@ -298,6 +299,12 @@ class TestRefundCredit:
                 kind=GiftCardTransactionKind.REFUND_CREDIT,
                 amount=Decimal(20),
                 order=order,
+                refund_attempt=RefundAttempt.objects.create(
+                    order=order,
+                    charge=None,
+                    kind="STORED_VALUE",
+                    amount=Money(Decimal(20), "EUR"),
+                ),
             )
 
         assert (

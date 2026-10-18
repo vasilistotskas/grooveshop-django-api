@@ -269,7 +269,8 @@ class GiftCardTransaction(TimeStampMixinModel):
     are new ADJUST rows, exactly like loyalty's PointsTransaction.
 
     An order can be refunded onto a card in parts, so it holds any number
-    of REFUND_CREDIT rows per card. What a card is still owed for an order
+    of REFUND_CREDIT rows per card that name their refund attempt (one per
+    card per order that does not: the whole redemption of a cancel). What a card is still owed for an order
     is what it gave (REDEEM) less what came back (REFUND_CREDIT), read and
     written under the card's row lock (``GiftCardService.credit_refund``):
     that, not a unique constraint, is what stops a credit being made twice.
@@ -341,6 +342,19 @@ class GiftCardTransaction(TimeStampMixinModel):
                 fields=["gift_card", "order"],
                 condition=models.Q(kind="REDEEM"),
                 name="unique_giftcard_redeem_per_order",
+            ),
+            # What the previous release's constraint guarded, kept for the
+            # rows it writes: a credit made by the whole-redemption path
+            # (a cancel) names no refund attempt, and one per card per
+            # order is all it ever writes. A credit that names its refund
+            # (a part of a value-based refund) is not limited, because an
+            # order is refunded onto a card in parts.
+            models.UniqueConstraint(
+                fields=["gift_card", "order"],
+                condition=models.Q(
+                    kind="REFUND_CREDIT", refund_attempt__isnull=True
+                ),
+                name="unique_giftcard_whole_refund_per_order",
             ),
         ]
         indexes = [

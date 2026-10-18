@@ -45,6 +45,19 @@ from tests.utils.viva import (
 pytestmark = pytest.mark.django_db
 
 
+def _attempt(order):
+    """A refund attempt for the credit to name: each part of a refund is
+    credited for its own."""
+    from order.models.refund_attempt import RefundAttempt
+
+    return RefundAttempt.objects.create(
+        order=order,
+        charge=None,
+        kind="STORED_VALUE",
+        amount=Money(Decimal("1.00"), "EUR"),
+    )
+
+
 def _credited(order) -> Decimal:
     rows = GiftCardTransaction.objects.filter(
         order=order, kind=GiftCardTransactionKind.REFUND_CREDIT
@@ -160,6 +173,43 @@ class TestAProviderRefundLeavesTheCardAlone:
 
 
 class TestCreditRefund:
+    def test_a_part_needs_the_refund_that_makes_it(
+        self, giftcard_order_settled_with_one_card
+    ):
+        order, _card = giftcard_order_settled_with_one_card
+
+        with pytest.raises(ValueError, match="refund attempt"):
+            GiftCardService.credit_refund(order, Decimal("10.00"))
+
+        assert _credited(order) == 0
+
+    def test_the_database_limits_whole_credits_not_parts(
+        self, giftcard_order_settled_with_one_card
+    ):
+        """What the previous release's constraint guarded stays guarded for
+        the rows that release writes (no refund attempt): one per card per
+        order. A credit that names its refund is a part and is not."""
+        from django.db import IntegrityError, transaction
+
+        order, card = giftcard_order_settled_with_one_card
+
+        def credit(attempt):
+            return GiftCardTransaction.objects.create(
+                gift_card=card,
+                kind=GiftCardTransactionKind.REFUND_CREDIT,
+                amount=Decimal("5.00"),
+                order=order,
+                refund_attempt=attempt,
+            )
+
+        credit(None)
+        with pytest.raises(IntegrityError), transaction.atomic():
+            credit(None)
+        credit(_attempt(order))
+        credit(_attempt(order))
+
+        assert len(_credits(order)) == 3
+
     def test_everything_goes_back_once(
         self, giftcard_order_settled_with_one_card
     ):
@@ -175,12 +225,12 @@ class TestCreditRefund:
     ):
         order, _card = giftcard_order_settled_with_one_card
 
-        assert GiftCardService.credit_refund(order, Decimal("25.00")) == (
-            Decimal("25.00")
-        )
-        assert GiftCardService.credit_refund(order, Decimal("25.00")) == (
-            Decimal("25.00")
-        )
+        assert GiftCardService.credit_refund(
+            order, Decimal("25.00"), refund_attempt=_attempt(order)
+        ) == (Decimal("25.00"))
+        assert GiftCardService.credit_refund(
+            order, Decimal("25.00"), refund_attempt=_attempt(order)
+        ) == (Decimal("25.00"))
 
         assert _credits(order) == [Decimal("25.00"), Decimal("25.00")]
         assert GiftCardService.credit_refund(order) == Decimal("10.00")
@@ -190,10 +240,17 @@ class TestCreditRefund:
     ):
         order, _card = giftcard_order_settled_with_one_card
 
-        credited = GiftCardService.credit_refund(order, Decimal("500.00"))
+        credited = GiftCardService.credit_refund(
+            order, Decimal("500.00"), refund_attempt=_attempt(order)
+        )
 
         assert credited == Decimal("60.00")
-        assert GiftCardService.credit_refund(order, Decimal("1.00")) == 0
+        assert (
+            GiftCardService.credit_refund(
+                order, Decimal("1.00"), refund_attempt=_attempt(order)
+            )
+            == 0
+        )
         assert _credited(order) == Decimal("60.00")
 
     def test_each_credit_names_the_refund_attempt(
@@ -238,7 +295,9 @@ class TestCreditRefund:
     ):
         order, first, second = giftcard_order_settled_with_two_cards
 
-        GiftCardService.credit_refund(order, Decimal("20.00"))
+        GiftCardService.credit_refund(
+            order, Decimal("20.00"), refund_attempt=_attempt(order)
+        )
 
         rows = {
             row.gift_card_id: row.amount
@@ -264,9 +323,9 @@ class TestCreditRefund:
                 order=order,
             )
 
-        assert GiftCardService.credit_refund(order, Decimal("1.00")) == (
-            Decimal("1.00")
-        )
+        assert GiftCardService.credit_refund(
+            order, Decimal("1.00"), refund_attempt=_attempt(order)
+        ) == (Decimal("1.00"))
 
         assert sorted(_credits(order)) == [
             Decimal("0.33"),
@@ -285,7 +344,9 @@ class TestCreditRefund:
         card.expires_at = timezone.now() - timedelta(days=1)
         card.save(update_fields=["expires_at"])
 
-        GiftCardService.credit_refund(order, Decimal("10.00"))
+        GiftCardService.credit_refund(
+            order, Decimal("10.00"), refund_attempt=_attempt(order)
+        )
 
         card.refresh_from_db()
         assert card.expires_at is None or card.expires_at > timezone.now()

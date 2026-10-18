@@ -508,6 +508,13 @@ class GiftCardService:
         from django.db import transaction
         from django.db.models import Sum
 
+        if amount is not None and refund_attempt is None:
+            # The ledger limits a credit that names no refund to one per
+            # card per order (the whole redemption of a cancel); a part is
+            # credited for the refund that makes it.
+            raise ValueError(
+                "A part of a redemption is credited for a refund attempt"
+            )
         with transaction.atomic():
             gave = {
                 row["gift_card_id"]: -row["total"]

@@ -91,6 +91,19 @@ def _order(
     return order, cards
 
 
+def _attempt(order):
+    """A refund attempt for the credit to name: each part of a refund is
+    credited for its own."""
+    from order.models.refund_attempt import RefundAttempt
+
+    return RefundAttempt.objects.create(
+        order=order,
+        charge=None,
+        kind="STORED_VALUE",
+        amount=Money(Decimal("1.00"), "EUR"),
+    )
+
+
 def _status(order) -> str:
     order.refresh_from_db()
     return order.payment_status
@@ -522,7 +535,9 @@ class TestWhatIsReportedIsWhatWentBack:
             kind="STORED_VALUE",
             amount=_eur("25.00"),
         )
-        GiftCardService.credit_refund(order, Decimal("20.00"))
+        GiftCardService.credit_refund(
+            order, Decimal("20.00"), refund_attempt=_attempt(order)
+        )
 
         result = OrderService.refund_order(order, amount=_eur("25.00"))
 
@@ -539,3 +554,49 @@ class TestWhatIsReportedIsWhatWentBack:
 
         assert _restored(order) == 1000
         assert result.stored == _eur("10.00")
+
+
+class TestARefundAfterAChargeback:
+    def test_the_earned_points_still_come_off_when_the_provider_is_all_gone(
+        self,
+    ):
+        """EUR 40 card, EUR 60 gift card. A lost dispute takes EUR 20, staff
+        refund the other EUR 20: the provider's money is all back or gone,
+        the order stays PARTIALLY_REFUNDED (the cards are for staff to
+        decide after a chargeback), and the points it earned are reversed
+        all the same."""
+        from order.enum.payment_transaction import PaymentTransactionKind
+
+        order, _cards = _order()
+        PointsTransaction.objects.create(
+            user=order.user,
+            points=50,
+            transaction_type=TransactionType.EARN,
+            reference_order=order,
+        )
+        charge = order.payment_transactions.get()
+        PaymentLedger.record_chargeback(
+            order, charge=charge, amount=_eur("20.00"), reference="dp_1"
+        )
+
+        with FakeStripeRefunds():
+            result = OrderService.refund_order(order, amount=_eur("20.00"))
+
+        assert result.complete is True
+        assert _status(order) == PaymentStatus.PARTIALLY_REFUNDED
+        assert PaymentLedger.fully_returned(order) is True
+        reversed_points = -sum(
+            PointsTransaction.objects.filter(
+                reference_order=order,
+                transaction_type=TransactionType.ADJUST,
+                points__lt=0,
+            ).values_list("points", flat=True)
+        )
+        assert reversed_points == 50
+        assert not [
+            kind
+            for kind in order.payment_transactions.values_list(
+                "kind", flat=True
+            )
+            if kind == PaymentTransactionKind.REFUND_REVERSAL
+        ]

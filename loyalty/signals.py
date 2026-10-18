@@ -147,8 +147,12 @@ def handle_order_refunded_loyalty(
     full (see :func:`_queue_reversal_if_returned_in_full`); a partial
     refund reverses nothing. A refund that exhausts the provider's money
     but leaves gift cards or points to return is partial: REFUNDED waits
-    for them."""
-    if order.payment_status != PaymentStatus.REFUNDED:
+    for them, except after a lost dispute, which leaves the stored value
+    where it is: the refund that, with the chargeback, returns everything
+    the provider received reverses them (``fully_returned``)."""
+    if order.payment_status != PaymentStatus.REFUNDED and not (
+        PaymentLedger.charged_back(order)
+    ):
         return
     _queue_reversal_if_returned_in_full(order)
 

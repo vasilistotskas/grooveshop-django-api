@@ -3,6 +3,31 @@
 
 
 
+## v3.135.6 (2026-10-18)
+
+### Bug fixes
+
+* fix(admin): no store role can reach a customer's sign-in identity (#248) ([`b1ef687`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b1ef6873f527036f0bafd52e9bc6b44277960683))
+
+* fix(admin): no store role can reach a customer's sign-in identity
+
+The knox, socialaccount, mfa, account and usersessions admins were only
+hidden from the store sidebar; a store role still held permissions on
+them, so by URL any staff user could mint a customer's API token, link
+their own social login to the customer, or change the customer's email
+addresses. They are now platform-only, and a customer's email is
+read-only for store roles once the customer exists.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`b1ef687`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b1ef6873f527036f0bafd52e9bc6b44277960683))
+
+* fix(admin): list a customer's sessions only as platform-only
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`b1ef687`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b1ef6873f527036f0bafd52e9bc6b44277960683))
+
 ## v3.135.5 (2026-10-18)
 
 ### Bug fixes

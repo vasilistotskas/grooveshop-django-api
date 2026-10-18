@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema_view
+from extra_settings.models import Setting
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -122,7 +123,15 @@ class ProductReviewViewSet(BaseModelViewSet):
 
     def perform_create(self, serializer):
         product = serializer.validated_data["product"]
-        if not purchase_items(user=self.request.user, product=product).exists():
+        purchase_required = Setting.get(
+            "PRODUCT_REVIEWS_PURCHASE_REQUIRED", default=True
+        )
+        if (
+            purchase_required
+            and not purchase_items(
+                user=self.request.user, product=product
+            ).exists()
+        ):
             raise ValidationError({"product": _("must_have_purchased")})
         serializer.save(user=self.request.user)
 

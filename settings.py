@@ -1990,6 +1990,16 @@ EXTRA_SETTINGS_DEFAULTS = [
         ),
     },
     {
+        "name": "PRODUCT_REVIEWS_PURCHASE_REQUIRED",
+        "type": "bool",
+        "value": True,
+        "description": (
+            "Only customers who bought a product may review it. Turned "
+            "off, every signed-in customer may; a review from a buyer "
+            "still carries the verified-purchase badge either way."
+        ),
+    },
+    {
         "name": "BLOG_COMMENTS_ENABLED",
         "type": "bool",
         "value": True,

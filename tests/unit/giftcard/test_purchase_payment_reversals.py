@@ -219,6 +219,86 @@ class TestStripeReversals:
         alerts.assert_called_once()
 
 
+class TestRedeliveredEvents:
+    """A provider delivers an event more than once (retries, parallel
+    deliveries): staff are told once and the card is voided once."""
+
+    def _dispute_created(self):
+        handle_stripe_dispute_created(
+            sender=None,
+            event=_event(
+                "charge.dispute.created",
+                {
+                    "id": "dp_1",
+                    "charge": "ch_1",
+                    "payment_intent": INTENT,
+                    "reason": "fraudulent",
+                    "status": "needs_response",
+                },
+            ),
+        )
+
+    def test_a_redelivered_dispute_alerts_staff_once(self, alerts):
+        _stripe_purchase()
+
+        self._dispute_created()
+        self._dispute_created()
+
+        alerts.assert_called_once()
+
+    def test_another_dispute_of_the_same_purchase_alerts_again(self, alerts):
+        purchase, _card = _stripe_purchase()
+
+        self._dispute_created()
+        purchase.refresh_from_db()
+        purchase.dispute_id = "dp_earlier"
+        purchase.save(update_fields=["dispute_id"])
+        self._dispute_created()
+
+        assert alerts.call_count == 2
+
+    def test_a_redelivered_lost_dispute_voids_and_alerts_once(self, alerts):
+        _purchase, card = _stripe_purchase()
+        _spend(card, 15)
+        event = _event(
+            "charge.dispute.closed",
+            {
+                "id": "dp_1",
+                "payment_intent": INTENT,
+                "status": "lost",
+                "amount": 4000,
+                "currency": "eur",
+            },
+        )
+
+        handle_stripe_dispute_closed(sender=None, event=event)
+        handle_stripe_dispute_closed(sender=None, event=event)
+
+        alerts.assert_called_once()
+        assert (
+            card.transactions.filter(
+                kind=GiftCardTransactionKind.ADJUST
+            ).count()
+            == 1
+        )
+
+    def test_viva_reports_one_dispute_through_several_statuses_once(
+        self, alerts
+    ):
+        purchase = _viva_purchase()
+        _paid(purchase)
+        for transaction_id, status_id in (("acct-1", "M"), ("acct-2", "MI")):
+            sale = retrieve_transaction(
+                orderCode=int(ORDER_CODE), statusId=status_id, amount=40.0
+            )
+            with FakeVivaApi(retrieve=(200, sale)):
+                _process_dispute_event_in_tenant(
+                    sale_id=SALE_ID, transaction_id=transaction_id
+                )
+
+        alerts.assert_called_once()
+
+
 class TestVivaReversals:
     def _claim(self, purchase):
         body = reversal_created_event(

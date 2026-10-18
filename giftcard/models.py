@@ -85,6 +85,15 @@ class GiftCardPurchase(TimeStampMixinModel, UUIDModel):
         default="",
         db_default="",
     )
+    # The provider's id of the dispute staff were last told about, so a
+    # redelivered event (or a second status of the same dispute) mails once.
+    dispute_id = models.CharField(
+        _("Dispute ID"),
+        max_length=255,
+        blank=True,
+        default="",
+        db_default="",
+    )
     # Value of the card(s) already spent when the payment was reversed:
     # money the merchant lost that no void can recover. Staff reconcile it.
     unrecovered_amount = models.DecimalField(

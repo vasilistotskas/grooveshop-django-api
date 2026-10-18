@@ -2015,7 +2015,7 @@ def _process_dispute_event_in_tenant(
                 purchase = _viva_gift_card_purchase_for(order_code, sale_id)
                 if purchase is not None:
                     outcome = _follow_gift_card_dispute(
-                        purchase, data.get("raw_status") or ""
+                        purchase, data.get("raw_status") or "", sale_id
                     )
                     if transaction_id and not processed():
                         VivaWebhookEvent.objects.create(
@@ -2103,7 +2103,7 @@ def _viva_gift_card_purchase_for(order_code, sale_id: str):
     )
 
 
-def _follow_gift_card_dispute(purchase, raw_status: str) -> str:
+def _follow_gift_card_dispute(purchase, raw_status: str, sale_id: str) -> str:
     """What a dispute state of a gift-card purchase's sale does to the card.
 
     Opened: nothing is voided yet (the money is still the merchant's to
@@ -2119,8 +2119,12 @@ def _follow_gift_card_dispute(purchase, raw_status: str) -> str:
     )
 
     if raw_status in VIVA_DISPUTE_OPEN_STATUS_IDS:
-        GiftCardService.alert_purchase_disputed(purchase)
-        return VivaWebhookEvent.OUTCOME_PROCESSED
+        told = GiftCardService.alert_purchase_disputed(purchase, sale_id)
+        return (
+            VivaWebhookEvent.OUTCOME_PROCESSED
+            if told
+            else VivaWebhookEvent.OUTCOME_SKIPPED
+        )
     if raw_status == VIVA_DISPUTE_LOST_STATUS_ID:
         return GiftCardService.handle_purchase_reversal(purchase)
     return VivaWebhookEvent.OUTCOME_SKIPPED

@@ -1429,7 +1429,7 @@ def handle_stripe_dispute_created(sender, **kwargs):
             if purchase is not None:
                 from giftcard.services import GiftCardService
 
-                GiftCardService.alert_purchase_disputed(purchase)
+                GiftCardService.alert_purchase_disputed(purchase, dispute_id)
                 return
 
             order = (

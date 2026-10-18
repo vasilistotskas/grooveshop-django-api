@@ -442,11 +442,21 @@ class GiftCardService:
             )
 
     @classmethod
-    def alert_purchase_disputed(cls, purchase) -> None:
-        """Tell staff the payment of a purchase is in dispute. Nothing is
-        voided yet: until the dispute is lost the money is still the
-        merchant's to defend."""
+    def alert_purchase_disputed(cls, purchase, dispute_id: str) -> bool:
+        """Tell staff the payment of a purchase is in dispute, once per
+        dispute. Nothing is voided yet: until the dispute is lost the money
+        is still the merchant's to defend.
+
+        Returns whether staff were told: ``False`` for a dispute already
+        announced (a redelivered event, a later status of the same
+        dispute). The purchase row must be locked by the caller.
+        """
         from shipping.alerts import OpsAlertKind, send_ops_alert
+
+        if purchase.dispute_id == dispute_id:
+            return False
+        purchase.dispute_id = dispute_id
+        purchase.save(update_fields=["dispute_id"])
 
         logger.error(
             "Payment for gift card purchase %s is DISPUTED", purchase.uuid
@@ -467,6 +477,7 @@ class GiftCardService:
                 "Could not send the gift-card dispute alert for %s",
                 purchase.uuid,
             )
+        return True
 
     # ── refunds ────────────────────────────────────────────────────
 

@@ -132,7 +132,9 @@ def test_every_personal_looking_field_is_scrubbed_or_explained():
         rule = rules.resolve(model)
         if isinstance(rule, rules.Delete):
             continue
-        scrubbed = set(rule.fields) if isinstance(rule, rules.Scrub) else set()
+        scrubbed = (
+            rule.handled_fields() if isinstance(rule, rules.Scrub) else set()
+        )
         for field in model._meta.concrete_fields:
             label = f"{model._meta.label}.{field.name}"
             if (

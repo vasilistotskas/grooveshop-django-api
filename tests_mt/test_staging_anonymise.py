@@ -403,3 +403,91 @@ def test_bearer_credentials_valid_on_production_are_replaced(seeded, staging):
             code=old["personal_code"]
         ).exists()
         assert PromotionCode.objects.filter(code=old["public_code"]).exists()
+
+
+def test_every_credential_on_a_tenant_row_is_cleared_even_if_undecryptable(
+    seeded, staging
+):
+    """Production's keys open on staging, so they are cleared; and a token
+    staging's keys cannot open is cleared too, not a reason to stop."""
+    from core.db.encrypted_fields import EncryptedCharField
+    from tenant.models import Tenant
+
+    tenant, _ = seeded
+    encrypted = [
+        f.name
+        for f in Tenant._meta.concrete_fields
+        if isinstance(f, EncryptedCharField)
+    ]
+    assert encrypted
+    with schema_context(get_public_schema_name()):
+        row = Tenant.objects.get(pk=tenant.pk)
+        for name in encrypted:
+            setattr(row, name, f"secret-{name}")
+        row.viva_wallet_merchant_id = "prod-merchant"
+        row.viva_wallet_live_mode = True
+        row.box_now_live_mode = True
+        row.stripe_publishable_key = "pk_live_prod"
+        row.meta_pixel_id = "123456"
+        row.save()
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "UPDATE tenant_tenant SET stripe_secret_key_encrypted = %s "
+            "WHERE id = %s",
+            ["gAAAAA-not-a-token-any-key-opens", tenant.pk],
+        )
+
+    call_command("staging_anonymise")
+
+    with schema_context(get_public_schema_name()):
+        row = Tenant.objects.get(pk=tenant.pk)
+        for name in encrypted:
+            assert getattr(row, name) == "", name
+        assert row.viva_wallet_merchant_id == ""
+        assert row.stripe_publishable_key == ""
+        assert row.meta_pixel_id == ""
+        assert row.viva_wallet_live_mode is False
+        assert row.box_now_live_mode is False
+
+
+def test_a_model_with_an_uncleared_encrypted_column_fails_the_run(
+    seeded, staging, monkeypatch
+):
+    """The run checks every EncryptedCharField column itself, whatever the
+    rules say."""
+    from devtools.anonymise import rules
+    from tenant.models import Tenant
+
+    tenant, _ = seeded
+    with schema_context(get_public_schema_name()):
+        row = Tenant.objects.get(pk=tenant.pk)
+        row.chat_api_key = "llm-key"
+        row.save()
+    scrub = rules.REGISTRY["tenant.Tenant"]
+    monkeypatch.setitem(
+        rules.REGISTRY,
+        "tenant.Tenant",
+        rules.Scrub(fields=scrub.fields, clear=dict),
+    )
+
+    with pytest.raises(CommandError, match="encrypted credentials survive"):
+        call_command("staging_anonymise")
+
+
+def test_stripe_and_oauth_app_secrets_do_not_survive(seeded, staging):
+    from allauth.socialaccount.models import SocialApp
+
+    tenant, _ = seeded
+    with tenant_context(tenant):
+        SocialApp.objects.create(
+            provider="google",
+            name="google",
+            client_id="prod-client-id",
+            secret="prod-oauth-secret",
+        )
+
+    call_command("staging_anonymise")
+
+    with tenant_context(tenant):
+        app = SocialApp.objects.get(provider="google")
+        assert (app.client_id, app.secret, app.key) == ("", "", "")

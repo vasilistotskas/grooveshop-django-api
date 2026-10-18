@@ -202,7 +202,9 @@ class CacheService:
 
         if surface.nuxt_patterns:
             nuxt_result = nuxt_client.request_purge(
-                list(surface.nuxt_patterns), dry_run=dry_run
+                list(surface.nuxt_patterns),
+                dry_run=dry_run,
+                tenant_config=surface.invalidates_tenant_config,
             )
             result.nuxt_matched += nuxt_result.matched
             result.nuxt_deleted += nuxt_result.deleted

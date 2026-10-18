@@ -3,6 +3,19 @@
 
 
 
+## v3.135.5 (2026-10-18)
+
+### Bug fixes
+
+* fix(auth): trust each social provider's own email verification (#246)
+
+Every provider set VERIFIED_EMAIL, so allauth marked any address they
+returned as verified. With email authentication on, adding a customer's
+address, unverified, to a Discord or GitHub account signed its holder
+into that customer's account.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`c59bcd9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c59bcd9b240046acfc4ddaa61ba78dbfdf06f5e4))
+
 ## v3.135.4 (2026-10-18)
 
 ### Bug fixes

@@ -9,6 +9,7 @@ task could swallow another refund's email. The claim is now the insert of a
 
 from __future__ import annotations
 
+import re
 import threading
 from decimal import Decimal
 from unittest.mock import patch
@@ -31,12 +32,13 @@ from tests.utils.stripe_refunds import FakeStripeRefunds
 pytestmark = pytest.mark.django_db
 
 
-def _order():
+def _order(**kwargs):
     order = OrderFactory(
         num_order_items=0,
         status=OrderStatus.DELIVERED,
         payment_status=PaymentStatus.COMPLETED,
         email="customer@example.com",
+        **kwargs,
     )
     PaymentTransactionFactory(order=order, amount=Money("100.00", "EUR"))
     return order
@@ -304,3 +306,63 @@ class TestEachRefundQueuesItsOwnTask:
             [row.pk] for row in rows
         ]
         assert queued.call_count == 2
+
+
+class TestTheEmailStatesTheAmount:
+    """A customer refunded 30 of 100 must be told 30 and that 70 is still
+    to come, not just that "your refund has been processed"."""
+
+    def _bodies(self, message) -> tuple[str, str]:
+        html = message.alternatives[0].content
+        return message.body, html
+
+    def test_a_partial_refund_says_how_much_and_how_much_is_left(self):
+        order = _order(language_code="en")
+        refund = _refund(order, "30.00", "re_1")
+
+        send_refund_confirmation_email(refund.pk)
+
+        [message] = _refund_emails()
+        for body in self._bodies(message):
+            assert "Amount refunded" in body
+            assert re.search(r"30[.,]00", body)
+            assert "Remaining payment on this order" in body
+            assert re.search(r"70[.,]00", body)
+
+    def test_a_full_refund_says_how_much_and_nothing_is_left(self):
+        order = _order(language_code="en")
+        refund = _refund(order, "100.00", "re_1")
+
+        send_refund_confirmation_email(refund.pk)
+
+        [message] = _refund_emails()
+        for body in self._bodies(message):
+            assert "Amount refunded" in body
+            assert re.search(r"100[.,]00", body)
+            assert "Remaining payment on this order" not in body
+
+    def test_each_refund_email_names_its_own_amount(self):
+        order = _order(language_code="en")
+        first = _refund(order, "30.00", "re_1")
+        second = _refund(order, "20.00", "re_2")
+
+        send_refund_confirmation_email(first.pk)
+        send_refund_confirmation_email(second.pk)
+
+        one, two = _refund_emails()
+        assert re.search(r"30[.,]00", one.body)
+        assert re.search(r"20[.,]00", two.body)
+        assert re.search(r"50[.,]00", two.body)
+
+    def test_the_status_update_email_has_no_refund_block(self):
+        """The generic status email (a REFUNDED status) carries no refund
+        row of its own, so it must not print an empty amount."""
+        from django.template.loader import render_to_string
+
+        order = _order(language_code="en")
+        body = render_to_string(
+            "emails/order/order_status_generic.txt",
+            {"order": order, "status": "REFUNDED", "status_display": "R"},
+        )
+
+        assert "Amount refunded" not in body

@@ -349,6 +349,35 @@ class PaymentError(OrderServiceError):
     """
 
 
+class DisputeOpenError(PaymentError):
+    """
+    Raised when a refund is asked for while a cardholder dispute is open on
+    the payment: the provider refuses it until the dispute is decided, so
+    the refund waits.
+    """
+
+
+class RefundOutstandingError(OrderServiceError):
+    """
+    Raised when an order is marked REFUNDED while money paid for it is still
+    refundable: the status says the customer was paid back, the ledger says
+    not, and the loyalty reversal and the status email would follow the
+    status.
+
+    Attributes:
+        refundable (Decimal): What the ledger still holds for the order; 0
+            for a paid order whose capture the ledger never recorded
+    """
+
+    def __init__(self, refundable):
+        self.refundable = refundable
+        super().__init__(
+            f"{refundable} paid for this order has not been refunded yet"
+            if refundable > 0
+            else "The payment for this order has not been refunded yet"
+        )
+
+
 class PaymentNotFoundError(PaymentError):
     """
     Raised when a payment intent doesn't exist.

@@ -4,6 +4,7 @@ from .invoice import Invoice, InvoiceCounter
 from .item import OrderItem
 from .order import Order
 from .payment_transaction import PaymentTransaction
+from .refund_attempt import RefundAttempt
 from .refund_notification import RefundNotification
 from .retail_credit import CreditCounter, RetailCredit
 from .stock_log import StockLog
@@ -20,6 +21,7 @@ __all__ = [
     "OrderItem",
     "OrderItemHistory",
     "PaymentTransaction",
+    "RefundAttempt",
     "RefundNotification",
     "RetailCredit",
     "StockLog",

@@ -23203,3 +23203,95 @@ msgstr "Το δείγμα δεν είναι διαθέσιμο"
 #: order/views/order.py
 msgid "Receipt unavailable"
 msgstr "Η απόδειξη δεν είναι διαθέσιμη"
+
+#: refund integrity
+msgid "This store has no credentials for the payment provider, so the payment cannot be refunded here."
+msgstr "Το κατάστημα δεν έχει διαπιστευτήρια για τον πάροχο πληρωμών, επομένως η πληρωμή δεν μπορεί να επιστραφεί από εδώ."
+
+#: refund integrity
+msgid "A refund of this amount was already sent to the payment provider and its result is not known yet. It is recorded when the provider confirms it; check the provider's dashboard before trying again."
+msgstr "Μια επιστροφή αυτού του ποσού έχει ήδη σταλεί στον πάροχο πληρωμών και το αποτέλεσμά της δεν είναι ακόμη γνωστό. Καταχωρείται όταν την επιβεβαιώσει ο πάροχος· ελέγξτε τον πίνακα ελέγχου του παρόχου πριν δοκιμάσετε ξανά."
+
+#: refund integrity
+msgid "Order %(order_id)s skipped: refund its payment first, %(amount)s can still be refunded."
+msgstr "Η παραγγελία %(order_id)s παραλείφθηκε: επιστρέψτε πρώτα την πληρωμή της, μπορούν ακόμη να επιστραφούν %(amount)s."
+
+#: refund integrity
+msgid "Order %(order_id)s was canceled, but a dispute is open on its payment, so the refund waits until the dispute closes. Refund it then."
+msgstr "Η παραγγελία %(order_id)s ακυρώθηκε, αλλά υπάρχει ανοιχτή αμφισβήτηση στην πληρωμή της, οπότε η επιστροφή χρημάτων περιμένει μέχρι να κλείσει η αμφισβήτηση. Επιστρέψτε τα χρήματα τότε."
+
+#: refund integrity
+msgid "Back in stock"
+msgstr "Επέστρεψε στο απόθεμα"
+
+#: refund integrity
+msgid "Partly back in stock"
+msgstr "Εν μέρει επέστρεψε στο απόθεμα"
+
+#: refund integrity
+msgid "All units back in stock"
+msgstr "Όλα τα τεμάχια επέστρεψαν στο απόθεμα"
+
+#: refund integrity
+msgid "Back in stock (%(refunded)s/%(qty)s)"
+msgstr "Επέστρεψαν στο απόθεμα (%(refunded)s/%(qty)s)"
+
+#: refund integrity
+msgid "Returned units"
+msgstr "Επιστραφέντα τεμάχια"
+
+#: refund integrity
+msgid "Amount refunded"
+msgstr "Ποσό που επιστράφηκε"
+
+#: refund integrity
+msgid "Remaining payment on this order"
+msgstr "Υπόλοιπο πληρωμής της παραγγελίας"
+
+#: refund integrity
+msgid "A refund the provider accepted failed"
+msgstr "Απέτυχε επιστροφή που είχε δεχτεί ο πάροχος"
+
+#: refund integrity
+msgid "Refund Attempt"
+msgstr "Απόπειρα επιστροφής"
+
+#: refund integrity
+msgid "Refund Attempts"
+msgstr "Αποπείρες επιστροφής"
+
+#: refund integrity
+msgid "Settled"
+msgstr "Ολοκληρώθηκε"
+
+#: refund integrity
+msgid "Declined"
+msgstr "Απορρίφθηκε"
+
+#: refund integrity
+msgid "The payment this share is refunded against."
+msgstr "Η πληρωμή από την οποία επιστρέφεται αυτό το μερίδιο."
+
+#: refund integrity
+msgid "Idempotency key"
+msgstr "Κλειδί μοναδικότητας αιτήματος"
+
+#: refund integrity
+msgid "Sent to the provider so a repeat is not a second refund."
+msgstr "Αποστέλλεται στον πάροχο ώστε μια επανάληψη να μην αποτελεί δεύτερη επιστροφή."
+
+#: refund integrity
+msgid "The ledger refund this attempt produced."
+msgstr "Η επιστροφή του καθολικού που παρήγαγε αυτή η απόπειρα."
+
+#: refund integrity
+msgid "Refund attempt %(key)s of %(amount)s"
+msgstr "Απόπειρα επιστροφής %(key)s ποσού %(amount)s"
+
+#: refund integrity
+msgid "Refund reversal"
+msgstr "Αντιστροφή επιστροφής"
+
+#: refund integrity
+msgid "Order %(order_id)s skipped: refund its payment first."
+msgstr "Η παραγγελία %(order_id)s παραλείφθηκε: επιστρέψτε πρώτα την πληρωμή της."

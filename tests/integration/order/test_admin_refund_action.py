@@ -31,6 +31,7 @@ from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import OrderFactory, PaymentTransactionFactory
 from order.models.order import Order
+from order.services import OrderService
 from pay_way.factories import PayWayFactory
 from tests.utils.stripe_refunds import FakeStripeRefunds
 from user.factories import UserAccountFactory
@@ -59,6 +60,12 @@ def _post(staff_user, data):
     request.session = {}
     request._messages = FallbackStorage(request)
     return request
+
+
+def _status(order) -> str:
+    return Order.objects.values_list("payment_status", flat=True).get(
+        pk=order.pk
+    )
 
 
 def _messages(request) -> list[str]:
@@ -109,7 +116,8 @@ class TestRefundAction:
         assert refund.amount == Money(Decimal("30.00"), "EUR")
         assert refund.description == "One item came back"
         assert stripe_api.amounts == [3000]
-        assert stripe_api.keys == [f"order-{order.pk}-refund-1"]
+        [attempt] = order.refund_attempts.all()
+        assert stripe_api.keys == [f"refund-{attempt.idempotency_key}"]
         assert _messages(request) == [f"Order {order.pk} refunded €30.00."]
 
     def test_who_refunded_is_in_the_admin_log(self, order_admin, staff_user):
@@ -160,9 +168,12 @@ class TestRefundAction:
         assert stripe_api.calls == []
         assert not _refunds(order).exists()
 
-    def test_an_order_no_provider_was_paid_through_is_refused_with_the_reason(
+    def test_an_order_no_provider_was_paid_through_is_not_offered_it(
         self, order_admin, staff_user
     ):
+        """Nothing in the ledger can be refunded, so the action is not
+        offered (the service still refuses with a reason, tested in
+        ``test_refund_order_errors``)."""
         order = OrderFactory(
             num_order_items=0,
             status=OrderStatus.DELIVERED,
@@ -170,18 +181,10 @@ class TestRefundAction:
             payment_id="OFFLINE_1",
             pay_way=None,
         )
-        request = _post(staff_user, {"amount": "10.00", "reason": "Return"})
 
-        with FakeStripeRefunds() as stripe_api:
-            order_admin.refund_payment(request, object_id=order.pk)
-
-        assert _messages(request) == [
-            (
-                "This order was not paid through a payment provider, so "
-                "there is nothing to refund here."
-            )
-        ]
-        assert stripe_api.calls == []
+        assert not order_admin.has_refund_permission(
+            _post(staff_user, {}), object_id=order.pk
+        )
 
     def test_a_refund_the_provider_declined_says_where_to_look(
         self, order_admin, staff_user
@@ -303,15 +306,23 @@ class TestTheDialogOffersTheRemainder:
 
 
 class TestWhereTheActionIsOffered:
+    """Wherever the ledger holds money that can still be refunded, whatever
+    the order's status: a return, a goodwill refund, or a canceled order
+    whose automatic refund was declined."""
+
     @pytest.mark.parametrize(
         "order_status",
         [
+            OrderStatus.PENDING,
+            OrderStatus.PROCESSING,
+            OrderStatus.SHIPPED,
             OrderStatus.DELIVERED,
             OrderStatus.COMPLETED,
             OrderStatus.RETURNED,
+            OrderStatus.CANCELED,
         ],
     )
-    def test_staff_handling_a_return_can_refund(
+    def test_it_is_offered_while_money_can_still_be_refunded(
         self, order_admin, staff_user, order_status
     ):
         order = _delivered_order(status=order_status)
@@ -320,29 +331,43 @@ class TestWhereTheActionIsOffered:
             _post(staff_user, {}), object_id=order.pk
         )
 
+    def test_a_canceled_order_whose_refund_was_declined_can_be_refunded(
+        self, order_admin, staff_user
+    ):
+        order = _delivered_order(status=OrderStatus.CANCELED)
+
+        with FakeStripeRefunds() as stripe_api:
+            request = _post(
+                staff_user, {"amount": "100.00", "reason": "declined earlier"}
+            )
+            order_admin.refund_payment(request, object_id=order.pk)
+
+        assert stripe_api.amounts == [10000]
+        assert _status(order) == PaymentStatus.REFUNDED
+
     @pytest.mark.parametrize(
-        "order_status",
-        [
-            OrderStatus.PENDING,
-            OrderStatus.PROCESSING,
-            OrderStatus.SHIPPED,
-            OrderStatus.CANCELED,
-            OrderStatus.REFUNDED,
-        ],
+        "order_status", [OrderStatus.REFUNDED, OrderStatus.COMPLETED]
     )
-    def test_any_other_status_is_not_offered_it(
+    def test_it_is_not_offered_once_nothing_is_left(
         self, order_admin, staff_user, order_status
     ):
         order = _delivered_order(status=order_status)
+        with FakeStripeRefunds():
+            OrderService.refund_order(order)
 
         assert not order_admin.has_refund_permission(
             _post(staff_user, {}), object_id=order.pk
         )
 
-    def test_a_forged_request_for_such_an_order_is_refused(
+    def test_a_forged_request_for_an_order_with_nothing_to_refund_is_refused(
         self, order_admin, staff_user
     ):
-        order = _delivered_order(status=OrderStatus.PROCESSING)
+        order = OrderFactory(
+            num_order_items=0,
+            status=OrderStatus.PROCESSING,
+            pay_way=None,
+            payment_id="",
+        )
 
         with FakeStripeRefunds() as stripe_api, pytest.raises(PermissionDenied):
             order_admin.refund_payment(
@@ -397,7 +422,9 @@ class TestTheOrderPage:
 
         assert "refund_payment" in self._page(client, order)
 
-    def test_it_is_not_offered_before_delivery(self, client):
-        order = _delivered_order("100.00", status=OrderStatus.PROCESSING)
+    def test_it_is_not_offered_when_nothing_is_left_to_refund(self, client):
+        order = _delivered_order("100.00", status=OrderStatus.DELIVERED)
+        with FakeStripeRefunds():
+            OrderService.refund_order(order)
 
         assert "refund_payment" not in self._page(client, order)

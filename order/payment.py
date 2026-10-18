@@ -62,6 +62,12 @@ class PaymentProvider(ABC):
     #: implement ``confirm_delegated_payment``.
     supports_delegated_payment: ClassVar[bool] = False
 
+    #: ``refund_payment`` honours its ``idempotency_key``: asked again with
+    #: the same key it returns the refund it already made. A provider that
+    #: does not is never asked twice for one refund, because an answer that
+    #: was lost cannot be told from a refund that was never made.
+    idempotent_refunds: ClassVar[bool] = False
+
     @classmethod
     def is_configured_for_tenant(cls) -> bool:
         """True when the ACTIVE tenant holds the credentials this PSP needs.
@@ -116,7 +122,9 @@ class PaymentProvider(ABC):
 
         True only for a refund the provider accepted. The data then carries
         ``refund_id`` and ``amount``, the decimal string it paid back; a
-        refusal carries ``error``.
+        refusal carries ``error``. A failure that does not say whether the
+        refund was made (a timeout, a connection error, a 5xx) also carries
+        ``outcome_unknown``: the caller must not treat it as a refusal.
         """
 
     @abstractmethod
@@ -151,6 +159,7 @@ class StripePaymentProvider(PaymentProvider):
     supports_payment_intent: ClassVar[bool] = True
     supports_hosted_checkout: ClassVar[bool] = True
     supports_delegated_payment: ClassVar[bool] = True
+    idempotent_refunds: ClassVar[bool] = True
 
     @classmethod
     def is_configured_for_tenant(cls) -> bool:
@@ -661,13 +670,22 @@ class StripePaymentProvider(PaymentProvider):
                 "Stripe refund failed",
                 extra={"payment_id": payment_id, "error": str(e)},
             )
-            return False, {"error": str(e), "stripe_error": True}
+            return False, {
+                "error": str(e),
+                "stripe_error": True,
+                # Stripe may have made the refund before the connection
+                # dropped or its servers failed; any other error means it
+                # refused.
+                "outcome_unknown": isinstance(
+                    e, stripe.APIConnectionError | stripe.APIError
+                ),
+            }
         except Exception as e:
             logger.exception(
                 "Refund failed",
                 extra={"payment_id": payment_id, "error": str(e)},
             )
-            return False, {"error": str(e)}
+            return False, {"error": str(e), "outcome_unknown": True}
 
     def get_payment_status(
         self, payment_id: str
@@ -1122,6 +1140,20 @@ class VivaWalletPaymentProvider(PaymentProvider):
                     "event_id": data.get("EventId"),
                 }
 
+            if not data.get("TransactionId"):
+                # Accepted, but nothing names the refund: it is booked by
+                # its reversal webhook, never under an id made up here.
+                logger.error(
+                    "Viva Wallet accepted the refund without a TransactionId",
+                    extra={"payment_id": payment_id},
+                )
+                return False, {
+                    "error": "Viva Wallet accepted the refund without "
+                    "naming it.",
+                    "viva_error": True,
+                    "outcome_unknown": True,
+                }
+
             refund_data = {
                 "refund_id": data.get("TransactionId"),
                 "amount": str(refund_amount),
@@ -1150,13 +1182,16 @@ class VivaWalletPaymentProvider(PaymentProvider):
                 "error": str(e),
                 "viva_error": True,
                 "details": error_body,
+                # A 5xx may follow a refund Viva made; a 4xx refused it.
+                "outcome_unknown": e.response is None
+                or e.response.status_code >= 500,
             }
         except Exception as e:
             logger.exception(
                 "Viva Wallet refund failed",
                 extra={"payment_id": payment_id},
             )
-            return False, {"error": str(e)}
+            return False, {"error": str(e), "outcome_unknown": True}
 
     def get_payment_status(
         self, payment_id: str

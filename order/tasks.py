@@ -13,6 +13,7 @@ from django.template.loader import render_to_string
 from django.utils import timezone, translation
 from django.utils.html import strip_tags
 from django.utils.translation import gettext as _
+from djmoney.money import Money
 from extra_settings.models import Setting
 
 from core import celery_app
@@ -35,6 +36,7 @@ from order.models import (
 )
 from order.models.order import AMOUNT_MISMATCH_FLAG
 from order.payment import payment_provider_label
+from order.payment_ledger import PaymentLedger
 from order.services import OrderService
 from pay_way.enum.settlement import PaySettlement
 from tenant.credentials import (
@@ -821,6 +823,18 @@ def send_refund_confirmation_email(self, refund_id: int) -> bool:
             status="REFUNDED",
             status_display=status_label,
             items=order.items.all(),
+        )
+        # What THIS refund paid back and what is still held, so a partial
+        # refund does not read as the whole order refunded.
+        currency = refund.amount.currency
+        still_held = (
+            PaymentLedger.captured(order)
+            - PaymentLedger.refunded(order)
+            - PaymentLedger.charged_back(order)
+        )
+        context["refund_amount"] = refund.amount
+        context["payment_remaining"] = (
+            Money(still_held, currency) if still_held > 0 else None
         )
 
         with translation.override(language):

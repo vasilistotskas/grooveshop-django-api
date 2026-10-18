@@ -55,6 +55,7 @@ class OpsAlertKind(models.TextChoices):
         "payment_after_cancel",
         _("Payment received for a canceled order"),
     )
+    REFUND_FAILED = "refund_failed", _("A refund the provider accepted failed")
     REVIEW_PENDING = "review_pending", _("Review waiting for approval")
 
     @property

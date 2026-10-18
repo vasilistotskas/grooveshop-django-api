@@ -241,6 +241,11 @@ REGISTRY: dict[str, Scrub | Delete] = {
     "order.PaymentTransaction": Scrub(
         order_fk="order", fields={"description": Kind.TEXT}
     ),
+    # The staff-typed reason of a refund: the same text as the ledger row's
+    # description, and it can name the person who sent the goods back.
+    "order.RefundAttempt": Scrub(
+        order_fk="order", fields={"reason": Kind.TEXT}
+    ),
     "order.OrderHistory": Scrub(
         order_fk="order",
         fields={

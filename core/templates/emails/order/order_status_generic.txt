@@ -27,6 +27,11 @@
 {% else %}
 {% trans "Your order status has been updated." %}
 {% endif %}
+{% if refund_amount %}
+{% trans "Refund" %}:
+- {% trans "Amount refunded" %}: {{ refund_amount }}{% if payment_remaining %}
+- {% trans "Remaining payment on this order" %}: {{ payment_remaining }}{% endif %}
+{% endif %}
 
 {% if items %}
 {% trans "Order Items" %}:

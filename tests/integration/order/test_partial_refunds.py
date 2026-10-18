@@ -65,6 +65,14 @@ def _refund_rows(order):
     return order.payment_transactions.filter(kind=REFUND)
 
 
+def _keys(order) -> list[str]:
+    """The idempotency key each refund attempt of *order* sent, in order."""
+    return [
+        f"refund-{attempt.idempotency_key}"
+        for attempt in order.refund_attempts.order_by("id")
+    ]
+
+
 class TestRefundingMoreThanOnce:
     def test_two_partial_refunds_then_the_rest(self, refunded_signals):
         order = _order("100.00")
@@ -99,13 +107,10 @@ class TestRefundingMoreThanOnce:
             "the rest",
         ]
         # What reached Stripe, in minor units, one idempotency key per
-        # refund numbered under the order lock.
+        # refund attempt claimed under the order lock.
         assert stripe_api.amounts == [3000, 2500, 4500]
-        assert stripe_api.keys == [
-            f"order-{order.pk}-refund-1",
-            f"order-{order.pk}-refund-2",
-            f"order-{order.pk}-refund-3",
-        ]
+        assert stripe_api.keys == _keys(order)
+        assert len(set(stripe_api.keys)) == 3
         assert {c["payment_intent"] for c in stripe_api.calls} == {"pi_ledger"}
         # ``order_refunded`` says what each refund paid back.
         assert [r["amount"].amount for r in refunded_signals] == [
@@ -206,19 +211,22 @@ class TestIdempotency:
                 result = OrderService.refund_order(order, amount=_eur("40.00"))
 
         assert result.complete is True
-        assert stripe_api.keys == [f"order-{order.pk}-refund-1"] * 2
-        # Two requests, ONE refund at Stripe, one row in the ledger.
+        [key] = _keys(order)
+        assert stripe_api.keys == [key] * 2
+        # Two requests, ONE attempt, ONE refund at Stripe, one row in the
+        # ledger.
+        assert order.refund_attempts.count() == 1
         assert len(stripe_api.created) == 1
         assert result.refund_ids == ("re_1",)
         assert [r.provider_reference for r in _refund_rows(order)] == ["re_1"]
         assert PaymentLedger.refundable(order) == Decimal("60.00")
 
-    def test_a_key_reused_with_another_amount_is_stripes_error_not_a_refund(
+    def test_another_amount_after_an_unrecorded_refund_is_its_own_refund(
         self,
     ):
         """After an attempt whose outcome is unknown, asking for a
-        DIFFERENT amount under the same key is refused by Stripe (it cannot
-        tell it from the first); nothing is booked."""
+        DIFFERENT amount is not a retry: it gets its own attempt and key,
+        while the first attempt keeps its 40 held back."""
         order = _order("100.00")
 
         with FakeStripeRefunds() as stripe_api:
@@ -230,12 +238,13 @@ class TestIdempotency:
 
             result = OrderService.refund_order(order, amount=_eur("25.00"))
 
-        assert result.complete is False
-        assert result.paid_something is False
-        assert result.declined["stripe_error"] is True
-        assert len(stripe_api.created) == 1
-        assert not _refund_rows(order).exists()
-        assert _status(order) == PaymentStatus.COMPLETED
+        assert result.complete is True
+        assert len(stripe_api.created) == 2
+        assert len(set(stripe_api.keys)) == 2
+        assert [r.amount.amount for r in _refund_rows(order)] == [
+            Decimal("25.00")
+        ]
+        assert PaymentLedger.refundable(order) == Decimal("35.00")
 
     def test_a_recorded_refund_moves_the_next_one_to_a_new_key(self):
         order = _order("100.00")
@@ -371,10 +380,8 @@ class TestAnOrderPaidTwice:
         assert [
             (c["payment_intent"], c["amount"]) for c in stripe_api.calls
         ] == [("pi_ledger", 6000), ("pi_second", 4000)]
-        assert stripe_api.keys == [
-            f"order-{order.pk}-refund-1",
-            f"order-{order.pk}-refund-2",
-        ]
+        assert stripe_api.keys == _keys(order)
+        assert len(set(stripe_api.keys)) == 2
         assert _status(order) == PaymentStatus.REFUNDED
         assert result.refund_ids == ("re_1", "re_2")
         # One signal per refund the ledger took.

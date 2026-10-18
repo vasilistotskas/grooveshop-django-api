@@ -3,6 +3,27 @@
 
 
 
+## v3.135.4 (2026-10-18)
+
+### Bug fixes
+
+* fix(cache): tell the storefront which purges change the tenant config (#244)
+
+The storefront's purge endpoint moves a store's cache epoch and drops its
+tenant config, which must happen only when the purge follows a change to
+what /tenant/resolve serves, not on every auto-invalidation purge
+(products, blog, recommendations).
+
+CacheSurface gains invalidates_tenant_config, set on settings and
+store_pages, the two surfaces whose data feeds TenantConfig.features and
+the resolve payload. request_purge sends tenantConfig: true only for such
+a surface.
+
+
+Claude-Session: https://claude.ai/code/session_01DKyCtCCkFTgcH6VAVK3AJm
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`5297dbf`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5297dbfe68e5834568dda1c2357f6c2292c0687d))
+
 ## v3.135.3 (2026-10-18)
 
 ### Bug fixes

@@ -261,3 +261,62 @@ def test_the_specimen_download_is_throttled(
         *[status.HTTP_200_OK] * rate,
         *[status.HTTP_429_TOO_MANY_REQUESTS] * 2,
     ]
+
+
+@pytest.fixture
+def guest_client():
+    return APIClient()
+
+
+def _guest_order():
+    return issuable(OrderFactory(user=None))
+
+
+def test_a_guest_with_the_orders_uuid_gets_the_specimen(
+    demo_store, guest_client
+) -> None:
+    order = _guest_order()
+
+    with patch("order.invoicing._render_pdf_bytes", return_value=FAKE_PDF):
+        response = guest_client.get(
+            _download_url(order), {"uuid": str(order.uuid)}
+        )
+
+    assert response.status_code == status.HTTP_200_OK
+    assert b"".join(response.streaming_content) == FAKE_PDF
+
+
+@pytest.mark.parametrize("query", [{}, {"uuid": str(uuid4())}])
+def test_a_guest_without_the_right_uuid_is_refused(
+    demo_store, guest_client, query
+) -> None:
+    order = _guest_order()
+
+    with patch("order.invoicing._render_pdf_bytes") as render:
+        response = guest_client.get(_download_url(order), query)
+
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+    render.assert_not_called()
+
+
+def test_a_uuid_does_not_open_an_account_order_to_a_stranger(
+    demo_store, guest_client
+) -> None:
+    order = issuable(OrderFactory(user=UserAccountFactory()))
+
+    response = guest_client.get(_download_url(order), {"uuid": str(order.uuid)})
+
+    assert response.status_code in (
+        status.HTTP_401_UNAUTHORIZED,
+        status.HTTP_403_FORBIDDEN,
+    )
+
+
+def test_a_guest_gets_no_specimen_on_a_store_that_is_not_a_demo_store(
+    real_store, guest_client
+) -> None:
+    order = _guest_order()
+
+    response = guest_client.get(_download_url(order), {"uuid": str(order.uuid)})
+
+    assert response.status_code == status.HTTP_404_NOT_FOUND

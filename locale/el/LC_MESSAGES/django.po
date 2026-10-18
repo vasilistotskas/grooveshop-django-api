@@ -22749,39 +22749,16 @@ msgstr "Λήψη μεταδεδομένων λήψης απόδειξης για
 
 #: .\order\views\order.py
 #, python-brace-format
-msgid ""
-"Return the order's retail receipt metadata and an absolute URL to the "
-"streaming download endpoint (``/order/{id}/invoice/download``). The URL is "
-"gated by the same owner/admin permission check as this metadata endpoint — "
-"no raw storage URLs are exposed to the client. 404 unless the receipt is "
-"registered with AADE (myDATA): none issued yet, pending, rejected or "
-"cancelled, or a store that issues its receipts outside the platform."
-msgstr ""
-"Επιστρέφει τα μεταδεδομένα της απόδειξης λιανικής της παραγγελίας και ένα "
-"απόλυτο URL προς το endpoint λήψης μέσω ροής "
-"(``/order/{id}/invoice/download``). Το URL προστατεύεται από τον ίδιο "
-"έλεγχο δικαιώματος ιδιοκτήτη/διαχειριστή όπως και αυτό το endpoint "
-"μεταδεδομένων — δεν εκτίθενται ακατέργαστα URL αποθήκευσης στον client. 404 "
-"εκτός αν η απόδειξη έχει καταχωριστεί στην ΑΑΔΕ (myDATA): δεν έχει εκδοθεί "
-"ακόμη, εκκρεμεί, απορρίφθηκε ή ακυρώθηκε, ή το κατάστημα εκδίδει τις "
-"αποδείξεις του εκτός της πλατφόρμας."
+msgid "Return the order's retail receipt metadata and an absolute URL to the streaming download endpoint (``/order/{id}/invoice/download``). The URL is gated by the same permission check as this metadata endpoint (the order's owner, store staff, or a guest holding the order's UUID) — no raw storage URLs are exposed to the client. 404 unless the receipt is registered with AADE (myDATA): none issued yet, pending, rejected or cancelled, or a store that issues its receipts outside the platform."
+msgstr "Επιστρέφει τα μεταδεδομένα της απόδειξης λιανικής της παραγγελίας και ένα απόλυτο URL προς το endpoint λήψης μέσω ροής (``/order/{id}/invoice/download``). Το URL προστατεύεται από τον ίδιο έλεγχο πρόσβασης όπως και αυτό το endpoint μεταδεδομένων (ιδιοκτήτης της παραγγελίας, προσωπικό του καταστήματος ή επισκέπτης που έχει το UUID της παραγγελίας) — δεν εκτίθενται ακατέργαστα URL αποθήκευσης στον client. 404 εκτός αν η απόδειξη έχει καταχωριστεί στην ΑΑΔΕ (myDATA): δεν έχει εκδοθεί ακόμη, εκκρεμεί, απορρίφθηκε ή ακυρώθηκε, ή το κατάστημα εκδίδει τις αποδείξεις του εκτός της πλατφόρμας."
 
 #: .\order\views\order.py
 msgid "Download the receipt PDF"
 msgstr "Λήψη PDF απόδειξης"
 
 #: .\order\views\order.py
-msgid ""
-"Streams the retail receipt PDF through Django auth, from the configured "
-"storage (S3 in production, the filesystem in development), so the storage "
-"URL is never exposed to the client. 404 unless the receipt is registered "
-"with AADE (myDATA). Same ownership check as the metadata endpoint."
-msgstr ""
-"Μεταδίδει το PDF της απόδειξης λιανικής μέσω ταυτοποίησης Django, από τον "
-"ρυθμισμένο χώρο αποθήκευσης (S3 σε παραγωγή, σύστημα αρχείων σε ανάπτυξη), "
-"ώστε το URL αποθήκευσης να μην εκτίθεται ποτέ στον client. 404 εκτός αν η "
-"απόδειξη έχει καταχωριστεί στην ΑΑΔΕ (myDATA). Ίδιος έλεγχος ιδιοκτησίας "
-"όπως και το endpoint μεταδεδομένων."
+msgid "Streams the retail receipt PDF through Django auth, from the configured storage (S3 in production, the filesystem in development), so the storage URL is never exposed to the client. 404 unless the receipt is registered with AADE (myDATA). Same access check as the metadata endpoint."
+msgstr "Μεταδίδει το PDF της απόδειξης λιανικής μέσω ταυτοποίησης Django, από τον ρυθμισμένο χώρο αποθήκευσης (S3 σε παραγωγή, σύστημα αρχείων σε ανάπτυξη), ώστε το URL αποθήκευσης να μην εκτίθεται ποτέ στον client. 404 εκτός αν η απόδειξη έχει καταχωριστεί στην ΑΑΔΕ (myDATA). Ίδιος έλεγχος πρόσβασης όπως και το endpoint μεταδεδομένων."
 
 #: .\admin\dashboard\store\widgets.py
 msgid "myDATA is on, but no receipt is issued"
@@ -23208,17 +23185,21 @@ msgid "Download the specimen receipt PDF"
 msgstr "Λήψη του PDF δείγματος απόδειξης"
 
 #: .\order\views\order.py
-msgid "Renders, on demand, a watermarked specimen of the order's retail receipt: the same document with no number, no QR code and no tax standing. Demo stores only, for an order a receipt is issued for (shipped onwards); 404 when no specimen is available. Nothing is stored and nothing is sent to myDATA. Same ownership check as the receipt endpoints."
-msgstr "Δημιουργεί κατά παραγγελία ένα δείγμα της απόδειξης λιανικής της παραγγελίας με υδατογράφημα: το ίδιο έγγραφο χωρίς αριθμό, χωρίς κωδικό QR και χωρίς φορολογική ισχύ. Μόνο για καταστήματα επίδειξης και για παραγγελία για την οποία εκδίδεται απόδειξη (από την αποστολή και μετά). Όταν δεν υπάρχει διαθέσιμο δείγμα επιστρέφει 404. Τίποτα δεν αποθηκεύεται και τίποτα δεν στέλνεται στο myDATA. Ίδιος έλεγχος ιδιοκτησίας με τα endpoints της απόδειξης."
+msgid "Renders, on demand, a watermarked specimen of the order's retail receipt: the same document with no number, no QR code and no tax standing. Demo stores only, for an order a receipt is issued for (shipped onwards); 404 when no specimen is available. Nothing is stored and nothing is sent to myDATA. Open to the order's owner, store staff, and the guest who holds the order's UUID (``?uuid=``)."
+msgstr "Δημιουργεί κατά παραγγελία ένα δείγμα της απόδειξης λιανικής της παραγγελίας με υδατογράφημα: το ίδιο έγγραφο χωρίς αριθμό, χωρίς κωδικό QR και χωρίς φορολογική ισχύ. Μόνο για καταστήματα επίδειξης και για παραγγελία για την οποία εκδίδεται απόδειξη (από την αποστολή και μετά). Όταν δεν υπάρχει διαθέσιμο δείγμα επιστρέφει 404. Τίποτα δεν αποθηκεύεται και τίποτα δεν στέλνεται στο myDATA. Ανοιχτό στον ιδιοκτήτη της παραγγελίας, στο προσωπικό του καταστήματος και στον επισκέπτη που έχει το UUID της παραγγελίας (``?uuid=``)."
 
 #: order/views/order.py
 msgid "This order has no specimen receipt."
 msgstr "Η παραγγελία δεν έχει δείγμα απόδειξης."
 
 #: order/views/order.py
-msgid "Not the order's owner"
-msgstr "Δεν είστε ο ιδιοκτήτης της παραγγελίας"
+msgid "Not the order's owner, and no matching order UUID was given."
+msgstr "Δεν είστε ο ιδιοκτήτης της παραγγελίας και δεν δόθηκε το UUID της."
 
 #: order/views/order.py
 msgid "Specimen unavailable"
 msgstr "Το δείγμα δεν είναι διαθέσιμο"
+
+#: order/views/order.py
+msgid "Receipt unavailable"
+msgstr "Η απόδειξη δεν είναι διαθέσιμη"

@@ -76,8 +76,14 @@ def test_status_transition_follows_the_state_machine(
     from order.signals import order_status_changed
 
     stale = timezone.now() - timedelta(minutes=5)
+    # No provider payment: moving to REFUNDED is refused while money is
+    # still refundable, and the factory otherwise draws a random paid one.
     order = OrderFactory(
-        status=current_status, status_updated_at=stale, num_order_items=0
+        status=current_status,
+        status_updated_at=stale,
+        num_order_items=0,
+        pay_way=None,
+        payment_id="",
     )
     receiver = Mock()
     order_status_changed.connect(receiver)

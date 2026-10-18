@@ -60,6 +60,18 @@ def test_the_change_form_cannot_edit_status():
     assert "status" not in form_class.base_fields
 
 
+@pytest.mark.parametrize("field", ["payment_status", "payment_id"])
+def test_the_change_form_cannot_edit_the_payment(field):
+    """A payment changes only through the ledger and the service paths: a
+    form save wrote COMPLETED (or another intent's id) straight onto the
+    row, with no charge behind it."""
+    order = _order(OrderStatus.PENDING)
+    admin = _admin()
+
+    assert field in admin.get_readonly_fields(_request(), order)
+    assert field not in admin.get_form(_request(), order).base_fields
+
+
 def test_cancel_action_restores_the_stock_the_order_took():
     product = ProductFactory(stock=10, num_images=0, num_reviews=0)
     order = _order(OrderStatus.PROCESSING)

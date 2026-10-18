@@ -12,6 +12,7 @@ from order.payment import (
     get_payment_provider,
     money_from_minor_units,
 )
+from order.payment_binding import PaymentPurpose
 
 
 class PaymentModuleTestCase(TestCase):
@@ -89,7 +90,12 @@ class PaymentModuleTestCase(TestCase):
             )
             order_id = "test_order_id"
 
-            success, payment_data = provider.process_payment(amount, order_id)
+            success, payment_data = provider.process_payment(
+                amount,
+                order_id,
+                purpose=PaymentPurpose.ORDER,
+                subject="order-uuid",
+            )
 
             self.assertTrue(success)
             self.assertEqual(
@@ -143,6 +149,7 @@ class PaymentModuleTestCase(TestCase):
         mock_payment_intent.amount = 10000
         mock_payment_intent.currency = "eur"
         mock_payment_intent.created = 1234567890
+        mock_payment_intent.metadata = {}
 
         mock_retrieve.return_value = mock_payment_intent
         mock_djstripe_pi = mock.Mock()
@@ -286,6 +293,8 @@ class StripePaymentIntentMetadataTestCase(TestCase):
             order_id,
             cart_item_ids=[101, 102, 103],
             customer_email="customer@example.com",
+            purpose=PaymentPurpose.ORDER,
+            subject="order-uuid",
         )
 
         # Verify success
@@ -330,7 +339,11 @@ class StripePaymentIntentMetadataTestCase(TestCase):
 
         # Execute with order_uuid
         success, _payment_data = provider.process_payment(
-            amount, order_id, order_uuid=order_uuid
+            amount,
+            order_id,
+            order_uuid=order_uuid,
+            purpose=PaymentPurpose.ORDER,
+            subject="order-uuid",
         )
 
         # Verify success
@@ -370,7 +383,9 @@ class StripePaymentIntentMetadataTestCase(TestCase):
         order_id = "12345"
 
         # Execute without order_uuid
-        success, _payment_data = provider.process_payment(amount, order_id)
+        success, _payment_data = provider.process_payment(
+            amount, order_id, purpose=PaymentPurpose.ORDER, subject="order-uuid"
+        )
 
         # Verify success
         self.assertTrue(success)
@@ -406,7 +421,11 @@ class StripePaymentIntentMetadataTestCase(TestCase):
 
         # Execute with cart_item_ids as string
         _success, _payment_data = provider.process_payment(
-            amount, order_id, cart_item_ids="101,102,103"
+            amount,
+            order_id,
+            cart_item_ids="101,102,103",
+            purpose=PaymentPurpose.ORDER,
+            subject="order-uuid",
         )
 
         # Verify metadata
@@ -442,7 +461,9 @@ class StripePaymentIntentMetadataTestCase(TestCase):
         order_id = "12345"
 
         # Execute without optional metadata
-        success, _payment_data = provider.process_payment(amount, order_id)
+        success, _payment_data = provider.process_payment(
+            amount, order_id, purpose=PaymentPurpose.ORDER, subject="order-uuid"
+        )
 
         # Verify success
         self.assertTrue(success)
@@ -492,6 +513,8 @@ class StripePaymentIntentMetadataTestCase(TestCase):
             cart_item_ids=[101, 102, 103],
             customer_email="customer@example.com",
             customer_id="cus_test_123",
+            purpose=PaymentPurpose.ORDER,
+            subject="order-uuid",
         )
 
         # Verify success
@@ -540,7 +563,11 @@ class StripePaymentIntentMetadataTestCase(TestCase):
 
         # Execute with empty cart_item_ids list
         success, _payment_data = provider.process_payment(
-            amount, order_id, cart_item_ids=[]
+            amount,
+            order_id,
+            cart_item_ids=[],
+            purpose=PaymentPurpose.ORDER,
+            subject="order-uuid",
         )
 
         # Verify success
@@ -630,7 +657,11 @@ class MinorUnitsTestCase(TestCase):
         ):
             creds.return_value = {"secret_key": "sk_test_dummy"}
             get.return_value = mock.Mock(
-                status="succeeded", amount=500, currency="jpy", created=1
+                status="succeeded",
+                amount=500,
+                currency="jpy",
+                created=1,
+                metadata={},
             )
             _status, data = StripePaymentProvider().get_payment_status("pi_1")
 

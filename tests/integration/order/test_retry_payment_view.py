@@ -23,6 +23,7 @@ from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
 from order.models.history import OrderHistory
 from order.models.order import Order
+from order.payment_binding import PaymentPurpose
 from order.services import OrderService
 from pay_way.factories import PayWayFactory
 from pay_way.services import PayWayService
@@ -113,6 +114,8 @@ class TestRetryPaymentSuccess:
             amount=order.calculate_order_total_amount(),
             order_id=str(order.id),
             payment_method_id="pm_card_visa",
+            purpose=PaymentPurpose.ORDER,
+            subject=str(order.uuid),
         )
         assert order.payment_id == "pi_new_retry"
         assert order.payment_status == PaymentStatus.PENDING

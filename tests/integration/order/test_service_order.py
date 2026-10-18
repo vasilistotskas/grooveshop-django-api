@@ -13,6 +13,7 @@ from order.factories import PaymentTransactionFactory
 from order.factories.order import OrderFactory
 from order.services import OrderService, RefundResult
 from order.stock import StockManager
+from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
 from tests.utils.shipping import enable_rate
@@ -208,14 +209,21 @@ class OrderServiceTestCase(TestCase):
         order = OrderFactory(
             payment_id="test_payment_123",
             payment_status=PaymentStatus.PENDING,
+            status=OrderStatus.PENDING,
             num_order_items=0,
+            pay_way=PayWayFactory(
+                provider_code="stripe", settlement=PaySettlement.ONLINE
+            ),
         )
+        owed = order.calculate_order_total_amount()
         mock_get_provider.return_value.get_payment_status.return_value = (
             PaymentStatus.COMPLETED,
             {
                 "payment_id": "test_payment_123",
                 "raw_status": "succeeded",
                 "provider": "stripe",
+                "amount": float(owed.amount),
+                "currency": str(owed.currency),
             },
         )
 

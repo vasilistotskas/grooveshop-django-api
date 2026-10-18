@@ -6,12 +6,12 @@ from django.db.models import Q, QuerySet
 from django.utils.translation import gettext_lazy as _
 
 from order.enum.status import (
-    SETTLED_PAYMENT_STATUSES,
     PaymentStatus,
 )
 from order.exceptions import OrderChangedDuringPaymentError
 from order.models import Order
 from order.payment import get_payment_provider
+from order.payment_binding import PaymentPurpose
 from pay_way.enum.settlement import PaySettlement
 from pay_way.models import PayWay
 
@@ -276,7 +276,13 @@ class PayWayService:
             # deducted by calculate_order_total_amount().
             amount=order.calculate_order_total_amount(),
             order_id=str(order.id),
-            **kwargs,
+            # Last, so the caller's own ``payment_data`` cannot say what
+            # the intent is for.
+            **{
+                **kwargs,
+                "purpose": PaymentPurpose.ORDER,
+                "subject": str(order.uuid),
+            },
         )
 
         if success:
@@ -323,56 +329,3 @@ class PayWayService:
         order.payment_method = locked.payment_method
         order.payment_status = locked.payment_status
         order.payment_id = locked.payment_id
-
-    @staticmethod
-    def check_payment_status(
-        pay_way: PayWay, order: Order
-    ) -> tuple[PaymentStatus, dict[str, Any]]:
-        if not order.payment_id:
-            return PaymentStatus.PENDING, {
-                "error": _("No payment ID found for order")
-            }
-
-        if PaySettlement(pay_way.settlement) != PaySettlement.ONLINE:
-            return order.payment_status, {
-                "status": order.payment_status,
-                "provider": "offline",
-                "manual_check_required": (
-                    PaySettlement(pay_way.settlement)
-                    == PaySettlement.OFFLINE_TRANSFER
-                ),
-            }
-
-        provider = PayWayService.get_provider_for_pay_way(pay_way)
-        if not provider:
-            return PaymentStatus.PENDING, {
-                "error": _("Payment provider not available")
-            }
-
-        status, status_data = provider.get_payment_status(order.payment_id)
-
-        if status != order.payment_status:
-            if order.payment_status in SETTLED_PAYMENT_STATUSES:
-                # A settled order is final; the provider's view of the
-                # payment is not the order's view of the money (a refund
-                # lives on the charge, so the intent still reads
-                # succeeded). Same rule as OrderService and the webhooks.
-                logger.warning(
-                    "Ignoring polled payment status %s for order %s: "
-                    "payment_status already settled as %s",
-                    status,
-                    order.id,
-                    order.payment_status,
-                )
-                return order.payment_status, status_data
-
-            order.payment_status = status
-            order.save(update_fields=["payment_status"])
-
-            if status == PaymentStatus.COMPLETED:
-                order.mark_as_paid(
-                    payment_id=order.payment_id,
-                    payment_method=order.payment_method,
-                )
-
-        return status, status_data

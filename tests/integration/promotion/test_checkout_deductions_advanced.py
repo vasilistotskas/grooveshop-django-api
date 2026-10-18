@@ -26,7 +26,10 @@ from promotion.factories import PromotionFactory
 from tests.utils.shipping import enable_rate
 from user.factories import UserAccountFactory
 
-pytestmark = pytest.mark.django_db
+pytestmark = [
+    pytest.mark.django_db,
+    pytest.mark.usefixtures("trust_intent_binding"),
+]
 
 
 @pytest.fixture

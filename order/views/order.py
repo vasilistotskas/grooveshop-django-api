@@ -79,6 +79,7 @@ from order.payment import (
     provider_supports,
     registered_provider_codes,
 )
+from order.payment_binding import PaymentPurpose
 from order.serializers.invoice import InvoiceDownloadResponseSerializer
 from order.serializers.order import (
     AddTrackingSerializer,
@@ -1630,6 +1631,8 @@ class OrderViewSet(BaseModelViewSet):
             amount=amount,
             order_id=str(order.id),
             order_uuid=str(order.uuid),
+            purpose=PaymentPurpose.ORDER,
+            subject=str(order.uuid),
             **checkout_params,
         )
 

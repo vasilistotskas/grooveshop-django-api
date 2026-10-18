@@ -57,6 +57,14 @@ class OpsAlertKind(models.TextChoices):
     )
     REFUND_FAILED = "refund_failed", _("A refund the provider accepted failed")
     REVIEW_PENDING = "review_pending", _("Review waiting for approval")
+    GIFT_CARD_REVERSAL = (
+        "gift_card_reversal",
+        _("Gift card whose payment was reversed or disputed"),
+    )
+    PAYMENT_MISMATCH = (
+        "payment_mismatch",
+        _("Payment that does not match its order"),
+    )
 
     @property
     def setting_name(self) -> str:

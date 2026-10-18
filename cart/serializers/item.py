@@ -166,7 +166,7 @@ class CartItemCreateSerializer(serializers.ModelSerializer[CartItem]):
         quantity = attrs.get("quantity", 1)
 
         if product:
-            if not product.active:
+            if not product.is_purchasable:
                 raise serializers.ValidationError(
                     _("Product '{product_name}' is not available.").format(
                         product_name=product.safe_translation_getter(

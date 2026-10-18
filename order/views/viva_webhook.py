@@ -30,7 +30,7 @@ from order.enum.status import (
     PaymentStatus,
 )
 from order.models.history import OrderHistory
-from order.models.order import AMOUNT_MISMATCH_FLAG, Order
+from order.models.order import Order
 from order.tasks import (
     send_order_confirmation_email,
     send_payment_failed_email,
@@ -951,11 +951,13 @@ def _process_gift_card_purchase_event(
     Completion itself is additionally idempotent via the purchase
     status guard in ``GiftCardService.complete_purchase``.
     """
-    from decimal import Decimal as _Decimal
-
     from giftcard.enum import GiftCardPurchaseStatus
     from giftcard.services import GiftCardService
     from order.models.viva_webhook_event import VivaWebhookEvent
+    from order.payment import (
+        VIVA_REFUND_CLAIMED_TRANSACTION_TYPE_IDS,
+        VIVA_REFUND_TRANSACTION_TYPE_IDS,
+    )
 
     if (
         transaction_id
@@ -1006,28 +1008,23 @@ def _process_gift_card_purchase_event(
                             "Viva transaction verification unavailable "
                             f"for gift-card purchase txn {transaction_id}"
                         )
-                    verified_amount_raw = (
-                        verified_data.get("amount")
-                        if isinstance(verified_data, dict)
-                        else None
+                    problem = _gift_card_payment_problem(
+                        purchase, verified_data
                     )
-                    if verified_amount_raw is not None:
-                        verified_amount = _Decimal(str(verified_amount_raw))
-                        expected = _Decimal(str(purchase.amount.amount))
-                        if abs(verified_amount - expected) > _Decimal("0.01"):
-                            logger.error(
-                                "Viva gift-card txn %s amount mismatch: "
-                                "verified=%s expected=%s (purchase %s) — "
-                                "refusing to complete",
-                                transaction_id,
-                                verified_amount,
-                                expected,
-                                purchase.uuid,
-                            )
-                            outcome = VivaWebhookEvent.OUTCOME_SKIPPED
-                            verified_status = None
+                    if problem:
+                        logger.error(
+                            "Viva gift-card txn %s is not purchase %s's "
+                            "payment: %s — refusing to complete",
+                            transaction_id,
+                            purchase.uuid,
+                            problem,
+                        )
+                        outcome = VivaWebhookEvent.OUTCOME_SKIPPED
+                        verified_status = None
                     if verified_status == PaymentStatus.COMPLETED:
-                        GiftCardService.complete_purchase(purchase)
+                        GiftCardService.complete_purchase(
+                            purchase, transaction_id=str(transaction_id)
+                        )
                         logger.info(
                             "Gift card purchase %s completed via Viva "
                             "webhook (txn_hash=%s)",
@@ -1068,11 +1065,21 @@ def _process_gift_card_purchase_event(
                 # this must never run on the event's say-so: the refund has
                 # to be verified AND carry this purchase's own order code.
                 subject = f"gift-card purchase {purchase.uuid}"
-                refunded = _verify_viva_refund(
-                    subject, transaction_id, {str(purchase.payment_id)}
+                verified = _verify_viva_reversal(
+                    subject,
+                    transaction_id,
+                    {str(purchase.payment_id)},
+                    VIVA_REFUND_TRANSACTION_TYPE_IDS
+                    | VIVA_REFUND_CLAIMED_TRANSACTION_TYPE_IDS,
                 )
-                if refunded is None:
+                refunded = None if verified is None else verified[0]
+                if verified is None:
                     outcome = VivaWebhookEvent.OUTCOME_SKIPPED
+                elif verified[1] in VIVA_REFUND_CLAIMED_TRANSACTION_TYPE_IDS:
+                    # A refund claim is the cardholder's bank taking the
+                    # money back: the whole purchase, however much it
+                    # names.
+                    outcome = GiftCardService.handle_purchase_reversal(purchase)
                 else:
                     # The card is the whole purchase: a goodwill refund of
                     # part of it must not void value the buyer still owns,
@@ -1122,6 +1129,38 @@ def _process_gift_card_purchase_event(
         return JsonResponse({"error": "processing failed"}, status=500)
 
     return JsonResponse({"status": "ok"})
+
+
+def _gift_card_payment_problem(purchase, verified_data) -> str | None:
+    """Why the VERIFIED Viva transaction is not the payment of *purchase*;
+    ``None`` when it is.
+
+    The same three-way check the order path makes (``_handle_payment_created``):
+    the transaction must carry THIS purchase's own order code, its currency
+    must be the purchase's, and its amount must be the purchase amount.
+    Currency and amount are required, not optional: a transaction that does
+    not report them proves nothing about what was paid. Without the order
+    code, anyone could post their own real transaction against another
+    payment's order code and mint a card from it.
+
+    An absent order code raises (see ``_transaction_belongs_to_codes``).
+    """
+    if not _transaction_belongs_to_codes(
+        {str(purchase.payment_id)},
+        verified_data,
+        f"gift-card purchase {purchase.uuid}",
+    ):
+        return "it carries another order code"
+    currency = verified_data.get("currency")
+    if currency != purchase.amount.currency.code:
+        return f"its currency is {currency!r}"
+    try:
+        amount = Decimal(str(verified_data.get("amount")))
+    except InvalidOperation:
+        return "it reports no readable amount"
+    if abs(amount - purchase.amount.amount) > Decimal("0.01"):
+        return f"its amount is {amount}, not {purchase.amount.amount}"
+    return None
 
 
 def order_viva_codes(order) -> set[str]:
@@ -1189,18 +1228,18 @@ def _transaction_belongs_to_codes(
 def _flag_amount_mismatch(
     order, transaction_id, verified_amount, expected_amount
 ) -> None:
-    """Record a verified charge whose amount does not match the order."""
-    from django.utils import timezone
+    """Record a verified charge whose amount does not match the order, and
+    page staff (``OrderService.flag_payment_mismatch``)."""
+    from order.payment import VivaWalletPaymentProvider
+    from order.services import OrderService
 
-    if not order.metadata:
-        order.metadata = {}
-    order.metadata[AMOUNT_MISMATCH_FLAG] = {
-        "transaction_id": str(transaction_id),
-        "verified_amount": str(verified_amount),
-        "expected_amount": str(expected_amount),
-        "observed_at": timezone.now().isoformat(),
-    }
-    order.save(update_fields=["metadata"])
+    OrderService.flag_payment_mismatch(
+        order,
+        payment_id=str(transaction_id),
+        provider=VivaWalletPaymentProvider.code,
+        observed=verified_amount,
+        expected=expected_amount,
+    )
 
 
 def _handle_payment_created(order, event_data, transaction_id):
@@ -1332,9 +1371,9 @@ def _handle_payment_created(order, event_data, transaction_id):
         if isinstance(verified_data, dict)
         else None
     )
-    if verified_currency and verified_currency != order_total.currency.code:
+    if verified_currency != order_total.currency.code:
         logger.error(
-            "Viva transaction %s is in %s but order %s is in %s — refusing "
+            "Viva transaction %s is in %r but order %s is in %s — refusing "
             "to mark as paid",
             transaction_id,
             verified_currency,
@@ -1346,39 +1385,47 @@ def _handle_payment_created(order, event_data, transaction_id):
         )
         return VivaWebhookEvent.OUTCOME_SKIPPED
 
-    if verified_amount_raw is not None:
-        try:
-            verified_amount = Decimal(str(verified_amount_raw))
-            expected_amount = order_total.amount
-            # Allow a 1-cent tolerance for any provider-side rounding.
-            if abs(verified_amount - expected_amount) > Decimal("0.01"):
-                logger.error(
-                    "Viva transaction %s amount mismatch: verified=%s "
-                    "expected=%s for order %s — refusing to mark as paid",
-                    transaction_id,
-                    verified_amount,
-                    expected_amount,
-                    order.id,
-                )
-                # Marking it paid would under-charge, so we do not — but
-                # the money HAS left the customer (Viva verified a real
-                # transaction), and the usual cause is a shopper paying
-                # on a stale checkout tab after the total moved. Record
-                # it on the order: without this the order just sat
-                # PENDING and auto_cancel_stuck_pending_orders closed it
-                # a day later with refund_payment=False, leaving a
-                # charged customer, a cancelled order and no alert.
-                _flag_amount_mismatch(
-                    order, transaction_id, verified_amount, expected_amount
-                )
-                return VivaWebhookEvent.OUTCOME_SKIPPED
-        except TypeError, ValueError, AttributeError, InvalidOperation:
-            logger.warning(
-                "Could not parse Viva verified amount %r for order %s — "
-                "proceeding with status-only verification.",
-                verified_amount_raw,
-                order.id,
-            )
+    # The amount is required: a transaction that reports none (or none we
+    # can read) cannot be told from one for a different sum, and status
+    # alone settled the order. Refused like a mismatch: the charge is
+    # flagged for staff rather than dropped.
+    try:
+        verified_amount = Decimal(str(verified_amount_raw))
+    except InvalidOperation:
+        logger.error(
+            "Viva transaction %s reports no readable amount (%r) for order "
+            "%s — refusing to mark as paid",
+            transaction_id,
+            verified_amount_raw,
+            order.id,
+        )
+        _flag_amount_mismatch(
+            order, transaction_id, verified_amount_raw, order_total.amount
+        )
+        return VivaWebhookEvent.OUTCOME_SKIPPED
+    expected_amount = order_total.amount
+    # Allow a 1-cent tolerance for any provider-side rounding.
+    if abs(verified_amount - expected_amount) > Decimal("0.01"):
+        logger.error(
+            "Viva transaction %s amount mismatch: verified=%s "
+            "expected=%s for order %s — refusing to mark as paid",
+            transaction_id,
+            verified_amount,
+            expected_amount,
+            order.id,
+        )
+        # Marking it paid would under-charge, so we do not — but
+        # the money HAS left the customer (Viva verified a real
+        # transaction), and the usual cause is a shopper paying
+        # on a stale checkout tab after the total moved. Record
+        # it on the order: without this the order just sat
+        # PENDING and auto_cancel_stuck_pending_orders closed it
+        # a day later with refund_payment=False, leaving a
+        # charged customer, a cancelled order and no alert.
+        _flag_amount_mismatch(
+            order, transaction_id, verified_amount, expected_amount
+        )
+        return VivaWebhookEvent.OUTCOME_SKIPPED
 
     if verified_status != PaymentStatus.COMPLETED:
         logger.warning(
@@ -1798,6 +1845,7 @@ VIVA_ACCOUNT_TRANSACTION_CREATED = 2054
 def _tenants_holding_sale(tenants, sale_id: str) -> list:
     """The *tenants* whose ledger holds a Viva CHARGE for *sale_id*, or
     whose order was paid by that transaction."""
+    from giftcard.models import GiftCardPurchase
     from order.enum.payment_transaction import PaymentTransactionKind
     from order.models.payment_transaction import PaymentTransaction
     from order.payment import VivaWalletPaymentProvider
@@ -1813,6 +1861,10 @@ def _tenants_holding_sale(tenants, sale_id: str) -> list:
                         provider_reference__iexact=sale_id,
                     ).exists()
                     or Order.objects.filter(payment_id__iexact=sale_id).exists()
+                    or GiftCardPurchase.objects.filter(
+                        provider_code=VivaWalletPaymentProvider.code,
+                        provider_transaction_id__iexact=sale_id,
+                    ).exists()
                 ):
                     holders.append(tenant)
         except Exception:
@@ -1960,6 +2012,21 @@ def _process_dispute_event_in_tenant(
             )
             charge = _viva_charge_for(order, sale_id) if order else None
             if order is None or charge is None:
+                purchase = _viva_gift_card_purchase_for(order_code, sale_id)
+                if purchase is not None:
+                    outcome = _follow_gift_card_dispute(
+                        purchase, data.get("raw_status") or "", sale_id
+                    )
+                    if transaction_id and not processed():
+                        VivaWebhookEvent.objects.create(
+                            transaction_id=transaction_id,
+                            event_type_id=VIVA_ACCOUNT_TRANSACTION_CREATED,
+                            order=None,
+                            order_code=str(order_code),
+                            status_id=(data.get("raw_status") or "")[:4],
+                            outcome=outcome,
+                        )
+                    return JsonResponse({"status": "ok"})
                 logger.info(
                     "Viva dispute event: sale %s matches no order payment — "
                     "ignoring",
@@ -2018,6 +2085,49 @@ def _process_dispute_event_in_tenant(
             status=500,
         )
     return JsonResponse({"status": "ok"})
+
+
+def _viva_gift_card_purchase_for(order_code, sale_id: str):
+    """The gift-card purchase paid by Viva sale *sale_id* under *order_code*
+    (locked), or ``None`` when it is none of this store's purchases."""
+    from giftcard.models import GiftCardPurchase
+
+    return (
+        GiftCardPurchase.objects.select_for_update()
+        .filter(
+            provider_code="viva_wallet",
+            payment_id=str(order_code),
+            provider_transaction_id__iexact=sale_id,
+        )
+        .first()
+    )
+
+
+def _follow_gift_card_dispute(purchase, raw_status: str, sale_id: str) -> str:
+    """What a dispute state of a gift-card purchase's sale does to the card.
+
+    Opened: nothing is voided yet (the money is still the merchant's to
+    defend), staff are told. Lost: the payment is gone, so the card is
+    voided and what was spent is recorded. Won, or any other status: nothing.
+    Returns the ``VivaWebhookEvent`` outcome.
+    """
+    from giftcard.services import GiftCardService
+    from order.models.viva_webhook_event import VivaWebhookEvent
+    from order.payment import (
+        VIVA_DISPUTE_LOST_STATUS_ID,
+        VIVA_DISPUTE_OPEN_STATUS_IDS,
+    )
+
+    if raw_status in VIVA_DISPUTE_OPEN_STATUS_IDS:
+        told = GiftCardService.alert_purchase_disputed(purchase, sale_id)
+        return (
+            VivaWebhookEvent.OUTCOME_PROCESSED
+            if told
+            else VivaWebhookEvent.OUTCOME_SKIPPED
+        )
+    if raw_status == VIVA_DISPUTE_LOST_STATUS_ID:
+        return GiftCardService.handle_purchase_reversal(purchase)
+    return VivaWebhookEvent.OUTCOME_SKIPPED
 
 
 def _note_viva_dispute_opened(order, dispute_id: str, raw_status: str):

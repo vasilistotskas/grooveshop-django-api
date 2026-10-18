@@ -18,6 +18,7 @@ from django.conf import settings
 from djmoney.money import Money
 
 from order.payment import StripePaymentProvider
+from order.payment_binding import PaymentPurpose
 
 
 @pytest.fixture
@@ -55,7 +56,12 @@ class TestProcessPaymentMetadata:
         mock_create.return_value = _stub_stripe_payment_intent()
 
         provider = StripePaymentProvider()
-        provider.process_payment(amount, order_id="order-1")
+        provider.process_payment(
+            amount,
+            order_id="order-1",
+            purpose=PaymentPurpose.ORDER,
+            subject="order-uuid",
+        )
 
         mock_create.assert_called_once()
         metadata = mock_create.call_args.kwargs["metadata"]
@@ -73,7 +79,12 @@ class TestProcessPaymentMetadata:
         mock_create.return_value = _stub_stripe_payment_intent()
 
         provider = StripePaymentProvider()
-        provider.process_payment(amount, order_id="order-2")
+        provider.process_payment(
+            amount,
+            order_id="order-2",
+            purpose=PaymentPurpose.ORDER,
+            subject="order-uuid",
+        )
 
         metadata = mock_create.call_args.kwargs["metadata"]
         assert metadata["tenant_stripe_account"] == "acct_123"
@@ -89,7 +100,12 @@ class TestProcessPaymentMetadata:
         mock_create.return_value = _stub_stripe_payment_intent()
 
         provider = StripePaymentProvider()
-        provider.process_payment(amount, order_id="order-3")
+        provider.process_payment(
+            amount,
+            order_id="order-3",
+            purpose=PaymentPurpose.ORDER,
+            subject="order-uuid",
+        )
 
         metadata = mock_create.call_args.kwargs["metadata"]
         assert "tenant_stripe_account" not in metadata
@@ -119,7 +135,12 @@ class TestProcessPaymentMetadata:
         mock_create.return_value = _stub_stripe_payment_intent()
 
         provider = StripePaymentProvider()
-        provider.process_payment(amount, order_id="order-4")
+        provider.process_payment(
+            amount,
+            order_id="order-4",
+            purpose=PaymentPurpose.ORDER,
+            subject="order-uuid",
+        )
 
         metadata = mock_create.call_args.kwargs["metadata"]
         assert metadata["tenant_schema"] == "public"
@@ -161,6 +182,8 @@ class TestCheckoutSessionMetadata:
             order_id="order-5",
             success_url="https://webside.gr/ok",
             cancel_url="https://webside.gr/cancel",
+            purpose=PaymentPurpose.ORDER,
+            subject="order-uuid",
         )
 
         kwargs = mock_session.call_args.kwargs

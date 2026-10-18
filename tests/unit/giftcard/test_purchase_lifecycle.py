@@ -51,7 +51,9 @@ class TestPurchaseReversal:
         assert card.status == GiftCardStatus.DISABLED
         assert card.balance.amount == Decimal(0)
 
-    def test_spent_card_is_left_for_ops(self, enable_gift_cards):
+    def test_spent_card_is_voided_and_the_spent_part_recorded(
+        self, enable_gift_cards
+    ):
         purchase = GiftCardPurchaseFactory(amount=Money(Decimal(50), "EUR"))
         card = GiftCardService.complete_purchase(purchase, "txn_2")
         GiftCardTransaction.objects.create(
@@ -60,12 +62,17 @@ class TestPurchaseReversal:
             amount=Decimal(-10),
         )
 
-        GiftCardService.handle_purchase_reversal(purchase)
+        with patch("shipping.alerts.send_ops_alert") as alert:
+            GiftCardService.handle_purchase_reversal(purchase)
 
         card.refresh_from_db()
-        # Partially spent — never auto-voided.
-        assert card.status == GiftCardStatus.ACTIVE
-        assert card.balance.amount == Decimal(40)
+        purchase.refresh_from_db()
+        # What is left cannot be spent; what was spent is staff's to
+        # reconcile, so it is recorded and mailed.
+        assert card.status == GiftCardStatus.DISABLED
+        assert card.balance.amount == Decimal(0)
+        assert purchase.unrecovered_amount == Decimal(10)
+        alert.assert_called_once()
 
 
 class TestExpiryReminders:
@@ -165,7 +172,11 @@ class TestVivaPurchaseWebhookBranch:
             "order.views.viva_webhook._verify_transaction",
             return_value=(
                 PaymentStatus.COMPLETED,
-                {"amount": "40.00", "order_code": purchase.payment_id},
+                {
+                    "amount": "40.00",
+                    "currency": "EUR",
+                    "order_code": purchase.payment_id,
+                },
             ),
         ):
             response = self._event(purchase, 1796)
@@ -173,6 +184,7 @@ class TestVivaPurchaseWebhookBranch:
         purchase.refresh_from_db()
         assert response.status_code == 200
         assert purchase.status == GiftCardPurchaseStatus.PAID
+        assert purchase.provider_transaction_id == f"txn-{purchase.pk}-1796"
         assert purchase.gift_cards.count() == 1
 
     def test_amount_mismatch_refuses_completion(self, enable_gift_cards):

@@ -19,6 +19,7 @@ from django.urls import reverse
 
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
+from tests.utils.viva import verified_payment
 
 
 class VivaWebhookMoneyPathTestCase(TestCase):
@@ -104,7 +105,10 @@ class VivaWebhookMoneyPathTestCase(TestCase):
     def test_verified_payment_marks_order_paid(self):
         with patch(
             "order.views.viva_webhook._verify_transaction",
-            return_value=(PaymentStatus.COMPLETED, {"order_code": "OC123"}),
+            return_value=(
+                PaymentStatus.COMPLETED,
+                verified_payment(self.order, "OC123"),
+            ),
         ):
             response = self._post(self._event())
 
@@ -158,7 +162,10 @@ class VivaWebhookMoneyPathTestCase(TestCase):
 
         with patch(
             "order.views.viva_webhook._verify_transaction",
-            return_value=(PaymentStatus.COMPLETED, {"order_code": "OC_OLD"}),
+            return_value=(
+                PaymentStatus.COMPLETED,
+                verified_payment(self.order, "OC_OLD"),
+            ),
         ):
             response = self._post(
                 self._event(OrderCode="OC_OLD", TransactionId="viva-txn-old")

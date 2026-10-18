@@ -56,6 +56,7 @@ from order.exceptions import (
 )
 from order.models import StockReservation
 from order.payment import provider_supports
+from order.payment_binding import PaymentPurpose
 from order.services import OrderService
 from order.stock import StockManager
 from pay_way.enum.settlement import PaySettlement
@@ -1138,11 +1139,8 @@ class CartViewSet(BaseModelViewSet):
             success, payment_data = provider.process_payment(
                 amount=cart_total,
                 order_id=f"cart_{cart.uuid}",  # Temporary ID until order is created
-                metadata={
-                    "cart_id": str(cart.uuid),
-                    "cart_total": str(cart_total.amount),
-                    "currency": cart_total.currency,
-                },
+                purpose=PaymentPurpose.CART,
+                subject=str(cart.uuid),
             )
 
             # NEVER log `payment_data` whole: it carries

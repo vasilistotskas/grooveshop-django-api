@@ -14,14 +14,23 @@ its refund the next time its own owner opened the page.
 
 from __future__ import annotations
 
+from decimal import Decimal
 from unittest.mock import Mock, patch
 
 import pytest
 
-from order.enum.status import SETTLED_PAYMENT_STATUSES, PaymentStatus
+from giftcard.factories import GiftCardPurchaseFactory
+from order.enum.status import (
+    SETTLED_PAYMENT_STATUSES,
+    OrderStatus,
+    PaymentStatus,
+)
 from order.factories.order import OrderFactory
+from order.models.order import AMOUNT_MISMATCH_FLAG
+from order.models.payment_transaction import PaymentTransaction
 from order.services import OrderService
 from pay_way.enum.settlement import PaySettlement
+from pay_way.factories import PayWayFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -66,15 +75,82 @@ def test_refund_survives_the_order_page_poll():
     assert order.payment_status != PaymentStatus.COMPLETED
 
 
-def test_polling_still_advances_an_unsettled_order():
-    """The guard must not freeze the case polling exists for."""
-    order = _order(PaymentStatus.PENDING)
+def _stripe_order(payment_status=PaymentStatus.PENDING):
+    order = OrderFactory(num_order_items=2, status=OrderStatus.PENDING)
+    order.pay_way = PayWayFactory(
+        provider_code="stripe", settlement=PaySettlement.ONLINE
+    )
+    order.payment_status = payment_status
+    order.payment_id = "pi_test_123"
+    order.save(update_fields=["pay_way", "payment_status", "payment_id"])
+    return order
 
-    with _provider_says(PaymentStatus.COMPLETED):
+
+def _stripe_says_paid(order, amount=None):
+    owed = order.calculate_order_total_amount()
+    provider = Mock()
+    provider.get_payment_status.return_value = (
+        PaymentStatus.COMPLETED,
+        {
+            "amount": float(owed.amount if amount is None else amount),
+            "currency": str(owed.currency),
+        },
+    )
+    return patch("order.payment.get_payment_provider", return_value=provider)
+
+
+def test_polling_still_advances_an_unsettled_order():
+    """The guard must not freeze the case polling exists for, and the
+    advance goes through the webhook's handler: the charge is booked."""
+    order = _stripe_order()
+
+    with _stripe_says_paid(order):
         OrderService.get_payment_status(order)
 
     order.refresh_from_db()
     assert order.payment_status == PaymentStatus.COMPLETED
+    assert order.status == OrderStatus.PROCESSING
+    assert PaymentTransaction.objects.filter(
+        order=order, provider_reference="pi_test_123"
+    ).exists()
+
+
+def test_a_poll_never_settles_for_an_amount_that_is_not_the_orders():
+    order = _stripe_order()
+
+    with _stripe_says_paid(order, amount=Decimal("0.50")):
+        OrderService.get_payment_status(order)
+
+    order.refresh_from_db()
+    assert order.payment_status == PaymentStatus.PENDING
+    assert AMOUNT_MISMATCH_FLAG in order.metadata
+
+
+def test_a_poll_never_settles_an_intent_a_gift_card_purchase_holds():
+    """The variant of the one-payment-two-things attack: an order that
+    carries a gift-card intent must not be settled by whoever polls it."""
+    order = _stripe_order()
+    GiftCardPurchaseFactory(payment_id="pi_test_123")
+
+    with _stripe_says_paid(order):
+        OrderService.get_payment_status(order)
+
+    order.refresh_from_db()
+    assert order.payment_status == PaymentStatus.PENDING
+
+
+def test_a_poll_does_not_settle_a_provider_whose_webhook_settles():
+    order = _stripe_order()
+    order.pay_way = PayWayFactory(
+        provider_code="viva_wallet", settlement=PaySettlement.ONLINE
+    )
+    order.save(update_fields=["pay_way"])
+
+    with _stripe_says_paid(order):
+        OrderService.get_payment_status(order)
+
+    order.refresh_from_db()
+    assert order.payment_status == PaymentStatus.PENDING
 
 
 def test_update_order_false_writes_nothing():
@@ -85,47 +161,3 @@ def test_update_order_false_writes_nothing():
 
     order.refresh_from_db()
     assert order.payment_status == PaymentStatus.PENDING
-
-
-class TestPayWayServicePath:
-    """``PayWayService.check_payment_status`` polls the same providers and
-    additionally calls ``mark_as_paid``, so it needs the same guard."""
-
-    def test_settled_order_is_not_reopened(self):
-        from pay_way.services import PayWayService
-
-        order = _order(PaymentStatus.REFUNDED)
-        pay_way = Mock(settlement=PaySettlement.ONLINE)
-        provider = Mock()
-        provider.get_payment_status.return_value = (
-            PaymentStatus.COMPLETED,
-            {},
-        )
-
-        with patch.object(
-            PayWayService, "get_provider_for_pay_way", return_value=provider
-        ):
-            reported, _data = PayWayService.check_payment_status(pay_way, order)
-
-        order.refresh_from_db()
-        assert order.payment_status == PaymentStatus.REFUNDED
-        assert reported == PaymentStatus.REFUNDED
-
-    def test_pending_order_still_settles(self):
-        from pay_way.services import PayWayService
-
-        order = _order(PaymentStatus.PENDING)
-        pay_way = Mock(settlement=PaySettlement.ONLINE)
-        provider = Mock()
-        provider.get_payment_status.return_value = (
-            PaymentStatus.COMPLETED,
-            {},
-        )
-
-        with patch.object(
-            PayWayService, "get_provider_for_pay_way", return_value=provider
-        ):
-            PayWayService.check_payment_status(pay_way, order)
-
-        order.refresh_from_db()
-        assert order.payment_status == PaymentStatus.COMPLETED

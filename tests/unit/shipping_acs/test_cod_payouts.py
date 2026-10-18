@@ -15,6 +15,7 @@ from decimal import Decimal
 from unittest.mock import patch
 
 import pytest
+from djmoney.money import Money
 
 from order.factories.order import OrderFactory
 from shipping_acs.factories import AcsShipmentFactory
@@ -23,6 +24,9 @@ from shipping_acs.services import AcsService
 
 pytestmark = pytest.mark.django_db
 
+
+#: What the payout rows below remit, and so what a matching shipment collects.
+_COD = Money(Decimal("120.30"), "EUR")
 
 _BASE_ROW = {
     "Customer_Code": "2",
@@ -52,7 +56,9 @@ def test_reconcile_matches_shipment_by_pod_voucher():
     order = OrderFactory(
         status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
     )
-    shipment = AcsShipmentFactory(order=order, voucher_no="7227891234")
+    shipment = AcsShipmentFactory(
+        order=order, voucher_no="7227891234", cod_amount=_COD
+    )
 
     result = _reconcile([_BASE_ROW])
 
@@ -79,7 +85,9 @@ def test_reconcile_falls_back_to_customer_ref_order_id():
     order = OrderFactory(
         status=OrderStatus.PROCESSING, payment_status=PaymentStatus.PENDING
     )
-    shipment = AcsShipmentFactory(order=order, voucher_no="7227895678")
+    shipment = AcsShipmentFactory(
+        order=order, voucher_no="7227895678", cod_amount=_COD
+    )
 
     row = {**_BASE_ROW, "POD": "", "Customer_RefNo_1": str(order.id)}
     result = _reconcile([row])
@@ -104,7 +112,9 @@ def test_reconcile_falls_back_to_customer_ref_order_uuid():
     order = OrderFactory(
         status=OrderStatus.PROCESSING, payment_status=PaymentStatus.PENDING
     )
-    shipment = AcsShipmentFactory(order=order, voucher_no="7227899999")
+    shipment = AcsShipmentFactory(
+        order=order, voucher_no="7227899999", cod_amount=_COD
+    )
 
     row = {
         **_BASE_ROW,
@@ -142,7 +152,7 @@ def test_reconcile_is_idempotent_on_voucher_date_pair():
     """Re-running the task with the same row updates rather than
     creates a duplicate — the unique constraint enforces it but
     update_or_create makes the path graceful."""
-    AcsShipmentFactory(voucher_no="7227891234")
+    AcsShipmentFactory(voucher_no="7227891234", cod_amount=_COD)
 
     _reconcile([_BASE_ROW], cod_payment_date=date(2026, 4, 29))
     _reconcile(
@@ -188,7 +198,7 @@ def test_reconcile_fires_order_paid_for_cod_purchase_capi():
     order = OrderFactory(
         status=OrderStatus.PROCESSING, payment_status=PaymentStatus.PENDING
     )
-    AcsShipmentFactory(order=order, voucher_no="7227891234")
+    AcsShipmentFactory(order=order, voucher_no="7227891234", cod_amount=_COD)
 
     received: list[dict] = []
 
@@ -219,7 +229,7 @@ def test_reconcile_does_not_refire_order_paid_when_already_paid():
     order = OrderFactory(
         status=OrderStatus.PROCESSING, payment_status=PaymentStatus.COMPLETED
     )
-    AcsShipmentFactory(order=order, voucher_no="7227891234")
+    AcsShipmentFactory(order=order, voucher_no="7227891234", cod_amount=_COD)
 
     fired: list[int] = []
 
@@ -259,7 +269,7 @@ def test_reconcile_silent_mode_suppresses_completed_notification():
     order = OrderFactory(
         status=OrderStatus.DELIVERED, payment_status=PaymentStatus.PENDING
     )
-    AcsShipmentFactory(order=order, voucher_no="7227891234")
+    AcsShipmentFactory(order=order, voucher_no="7227891234", cod_amount=_COD)
 
     _reconcile([_BASE_ROW], silent_for_customer=True)
 
@@ -332,3 +342,82 @@ def test_the_alert_points_at_the_payout_list_not_the_logs(settings):
     body = mock_mail.call_args.kwargs["message"]
     assert "celery-worker" not in body
     assert "Matches no shipment" in body
+
+
+# ---------------------------------------------------------------------------
+# A payout settles an order only when it is that order's own
+# ---------------------------------------------------------------------------
+
+
+def test_an_unknown_voucher_never_falls_back_to_the_order_pk():
+    """A parcel made by hand in the ACS portal can carry any free-text
+    reference. A readable but unknown voucher must not let that reference
+    pick one of our orders and mark it paid."""
+    from order.enum.status import OrderStatus, PaymentStatus
+
+    order = OrderFactory(
+        status=OrderStatus.PROCESSING, payment_status=PaymentStatus.PENDING
+    )
+    AcsShipmentFactory(order=order, voucher_no="7227895678", cod_amount=_COD)
+
+    row = {**_BASE_ROW, "POD": "9999000111", "Customer_RefNo_1": str(order.id)}
+    result = _reconcile([row])
+
+    assert result["unmatched"] == 1
+    assert result["linked"] == 0
+    order.refresh_from_db()
+    assert order.payment_status == PaymentStatus.PENDING
+    assert AcsCodPayout.objects.get(voucher_no="9999000111").shipment_id is None
+
+
+def test_an_unknown_voucher_never_falls_back_to_the_order_uuid():
+    from order.enum.status import OrderStatus, PaymentStatus
+
+    order = OrderFactory(
+        status=OrderStatus.PROCESSING, payment_status=PaymentStatus.PENDING
+    )
+    AcsShipmentFactory(order=order, voucher_no="7227895678", cod_amount=_COD)
+
+    row = {
+        **_BASE_ROW,
+        "POD": "9999000111",
+        "Customer_RefNo_1": "",
+        "Customer_RefNo_2": str(order.uuid),
+    }
+    _reconcile([row])
+
+    order.refresh_from_db()
+    assert order.payment_status == PaymentStatus.PENDING
+
+
+def test_a_payout_of_another_amount_does_not_settle_the_order():
+    from order.enum.status import OrderStatus, PaymentStatus
+
+    order = OrderFactory(
+        status=OrderStatus.PROCESSING, payment_status=PaymentStatus.PENDING
+    )
+    AcsShipmentFactory(order=order, voucher_no="7227891234", cod_amount=_COD)
+
+    result = _reconcile([{**_BASE_ROW, "Parcel_COD_Amount": 5.00}])
+
+    assert result["unmatched"] == 1
+    assert result["linked"] == 0
+    order.refresh_from_db()
+    assert order.payment_status == PaymentStatus.PENDING
+    payout = AcsCodPayout.objects.get(voucher_no="7227891234")
+    assert payout.shipment_id is None, "left for staff review"
+    assert not order.payment_transactions.exists()
+
+
+def test_a_payout_with_no_readable_amount_does_not_settle_the_order():
+    from order.enum.status import OrderStatus, PaymentStatus
+
+    order = OrderFactory(
+        status=OrderStatus.PROCESSING, payment_status=PaymentStatus.PENDING
+    )
+    AcsShipmentFactory(order=order, voucher_no="7227891234", cod_amount=_COD)
+
+    _reconcile([{**_BASE_ROW, "Parcel_COD_Amount": None}])
+
+    order.refresh_from_db()
+    assert order.payment_status == PaymentStatus.PENDING

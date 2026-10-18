@@ -447,7 +447,11 @@ class TestACaptureTheLedgerNeverRecorded:
     def test_it_is_read_from_stripe_once_and_recorded(self):
         order = self._unrecorded()
         intent = SimpleNamespace(
-            status="succeeded", amount=5000, currency="eur", created=1
+            status="succeeded",
+            amount=5000,
+            currency="eur",
+            created=1,
+            metadata={},
         )
 
         with (
@@ -479,6 +483,7 @@ class TestACaptureTheLedgerNeverRecorded:
             amount=5000,
             currency="eur",
             created=1,
+            metadata={},
         )
 
         with (

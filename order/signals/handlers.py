@@ -33,7 +33,7 @@ from order.notifications import (
 )
 from order.payment import StripePaymentProvider, money_from_minor_units
 from order.payment_ledger import PaymentLedger
-from order.services import OrderService
+from order.services import PAYMENT_AMOUNT_TOLERANCE, OrderService
 from order.signals import (
     order_canceled,
     order_completed,
@@ -828,6 +828,16 @@ def handle_stripe_payment_succeeded(sender, **kwargs):
     if purchase:
         from giftcard.services import GiftCardService
 
+        # One payment, one thing: an intent an order also carries is not
+        # a gift-card payment, whatever created the purchase row.
+        if Order.objects.filter(payment_id=payment_intent_id).exists():
+            logger.error(
+                "Payment intent %s belongs to both gift-card purchase %s "
+                "and an order — not issuing the card",
+                payment_intent_id,
+                purchase.uuid,
+            )
+            return
         GiftCardService.complete_purchase(
             purchase, payment_id=payment_intent_id
         )
@@ -871,8 +881,18 @@ def handle_stripe_payment_succeeded(sender, **kwargs):
         payment_intent_id, captured=captured
     )
 
-    # A stale event, a repeat, or a charge on a canceled order changes
-    # nothing to confirm: no history row, no "order confirmed" email.
+    announce_stripe_payment_applied(outcome, payment_intent_id)
+
+
+def announce_stripe_payment_applied(outcome, payment_intent_id: str) -> None:
+    """What follows a Stripe payment the order service actually applied:
+    the history row, the confirmation email and the live toast.
+
+    Shared by the webhook and by the polled-status path, which settles
+    through the same ``OrderService.handle_payment_succeeded``. A stale
+    event, a repeat, or a charge on a canceled order changes nothing to
+    confirm: no history row, no "order confirmed" email.
+    """
     if outcome and outcome.applied:
         order = outcome.order
         OrderHistory.log_payment_update(
@@ -1073,6 +1093,19 @@ def handle_stripe_payment_requires_action(sender, **kwargs):
         )
 
 
+def _gift_card_purchase_for_intent(payment_intent_id: str):
+    """The gift-card purchase paid by this PaymentIntent (locked), or
+    ``None``. A purchase is not an order: a refund or dispute of its payment
+    has to reach the card, which the order lookups never find."""
+    from giftcard.models import GiftCardPurchase
+
+    return (
+        GiftCardPurchase.objects.select_for_update()
+        .filter(payment_id=payment_intent_id)
+        .first()
+    )
+
+
 @djstripe_receiver("charge.refunded")
 @with_tenant_schema_from_event
 def handle_stripe_charge_refunded(sender, **kwargs):
@@ -1131,6 +1164,21 @@ def handle_stripe_charge_refunded(sender, **kwargs):
         )
 
         with transaction.atomic():
+            purchase = _gift_card_purchase_for_intent(payment_intent_id)
+            if purchase is not None:
+                # A gift card is the whole purchase: it is voided once the
+                # refunds reach the purchase amount (cumulative on the
+                # charge), exactly as for a Viva refund.
+                purchase.refunded_amount = max(
+                    purchase.refunded_amount, refunded_to_date.amount
+                )
+                purchase.save(update_fields=["refunded_amount"])
+                if purchase.refunded_amount >= purchase.amount.amount:
+                    from giftcard.services import GiftCardService
+
+                    GiftCardService.handle_purchase_reversal(purchase)
+                return
+
             order = (
                 Order.objects.select_for_update()
                 .filter(payment_id=payment_intent_id)
@@ -1377,6 +1425,13 @@ def handle_stripe_dispute_created(sender, **kwargs):
         # redeliveries don't (1) overwrite later dispute fields, or
         # (2) re-trigger the staff notification email.
         with transaction.atomic():
+            purchase = _gift_card_purchase_for_intent(payment_intent_id)
+            if purchase is not None:
+                from giftcard.services import GiftCardService
+
+                GiftCardService.alert_purchase_disputed(purchase, dispute_id)
+                return
+
             order = (
                 Order.objects.select_for_update()
                 .filter(payment_id=payment_intent_id)
@@ -1485,6 +1540,14 @@ def handle_stripe_dispute_closed(sender, **kwargs):
             return
 
         with transaction.atomic():
+            purchase = _gift_card_purchase_for_intent(payment_intent_id)
+            if purchase is not None:
+                if dispute_status == "lost":
+                    from giftcard.services import GiftCardService
+
+                    GiftCardService.handle_purchase_reversal(purchase)
+                return
+
             order = (
                 Order.objects.select_for_update()
                 .filter(payment_id=payment_intent_id)
@@ -1711,6 +1774,24 @@ def handle_stripe_checkout_completed(sender, **kwargs):
                 # check instead of re-running this guard (harmless, but
                 # avoids duplicate warning logs on every retry).
                 order.save(update_fields=["metadata"])
+                return
+
+            # What Stripe collected must be what the order is for: a
+            # session paid for another amount settles nothing.
+            expected = order.calculate_order_total_amount()
+            if captured is not None and (
+                captured.currency != expected.currency
+                or abs(captured.amount - expected.amount)
+                > PAYMENT_AMOUNT_TOLERANCE
+            ):
+                OrderService.flag_payment_mismatch(
+                    order,
+                    payment_id=payment_intent_id,
+                    provider=StripePaymentProvider.code,
+                    observed=captured,
+                    expected=expected,
+                )
+                publish_payment_status(order)
                 return
 
             previous_payment_status = order.payment_status

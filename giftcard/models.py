@@ -75,6 +75,34 @@ class GiftCardPurchase(TimeStampMixinModel, UUIDModel):
     payment_id = models.CharField(
         _("Payment ID"), max_length=255, blank=True, default=""
     )
+    # The provider's id of the transaction that paid for the purchase (Viva:
+    # the TransactionId, ``payment_id`` being the order code; Stripe: the
+    # PaymentIntent id again). A later dispute names the payment by it.
+    provider_transaction_id = models.CharField(
+        _("Provider Transaction ID"),
+        max_length=255,
+        blank=True,
+        default="",
+        db_default="",
+    )
+    # The provider's id of the dispute staff were last told about, so a
+    # redelivered event (or a second status of the same dispute) mails once.
+    dispute_id = models.CharField(
+        _("Dispute ID"),
+        max_length=255,
+        blank=True,
+        default="",
+        db_default="",
+    )
+    # Value of the card(s) already spent when the payment was reversed:
+    # money the merchant lost that no void can recover. Staff reconcile it.
+    unrecovered_amount = models.DecimalField(
+        _("Unrecovered Amount"),
+        max_digits=11,
+        decimal_places=2,
+        default=0,
+        db_default=0,
+    )
     # What the provider has refunded of this purchase's payment so far, in
     # the purchase's currency. The card is the whole purchase, so it is
     # voided only once the refunds add up to ``amount``; a part refund

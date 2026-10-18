@@ -8,14 +8,14 @@ from order.factories.order import OrderFactory
 from order.models import OrderHistory
 from order.services import OrderService
 from product.factories import ProductFactory
-from tests.utils.payments import CAPTURED
+from tests.utils.payments import captured_for
 from user.factories import UserAccountFactory
 
 
 def _paid_order(payment_id):
     """The order a success event settled, or None when none matched."""
     outcome = OrderService.handle_payment_succeeded(
-        payment_id, captured=CAPTURED
+        payment_id, captured=captured_for(payment_id)
     )
     return outcome.order if outcome else None
 

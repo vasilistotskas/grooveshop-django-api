@@ -25,6 +25,7 @@ from giftcard.enum import GiftCardPurchaseStatus, GiftCardStatus
 from giftcard.factories import GiftCardFactory, GiftCardPurchaseFactory
 from giftcard.models import GiftCardPurchase
 from order.payment import StripePaymentProvider, VivaWalletPaymentProvider
+from order.payment_binding import PaymentPurpose
 from tenant.models import Tenant
 from user.factories.account import UserAccountFactory
 
@@ -323,6 +324,8 @@ class TestPurchaseStripe:
             order_id=f"giftcard_{purchase.uuid}",
             order_uuid=f"giftcard_{purchase.uuid}",
             customer_email=user.email,
+            purpose=PaymentPurpose.GIFT_CARD,
+            subject=str(purchase.uuid),
         )
         assert purchase.buyer == user
         assert purchase.buyer_email == user.email

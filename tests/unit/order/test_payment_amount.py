@@ -6,6 +6,7 @@ from django.conf import settings
 from djmoney.money import Money
 
 from order.payment import StripePaymentProvider
+from order.payment_binding import PaymentPurpose
 
 
 class StripePaymentAmountTestCase(TestCase):
@@ -42,7 +43,12 @@ class StripePaymentAmountTestCase(TestCase):
         with mock.patch("order.payment.PaymentIntent.sync_from_stripe_data"):
             provider = StripePaymentProvider()
             amount = Money(Decimal("10.50"), settings.DEFAULT_CURRENCY)
-            provider.process_payment(amount, "order_1")
+            provider.process_payment(
+                amount,
+                "order_1",
+                purpose=PaymentPurpose.ORDER,
+                subject="order-uuid",
+            )
 
             call_kwargs = mock_stripe_create.call_args[1]
             self.assertEqual(call_kwargs["amount"], 1050)
@@ -63,7 +69,12 @@ class StripePaymentAmountTestCase(TestCase):
         with mock.patch("order.payment.PaymentIntent.sync_from_stripe_data"):
             provider = StripePaymentProvider()
             amount = Money(Decimal("0.65"), settings.DEFAULT_CURRENCY)
-            success, _data = provider.process_payment(amount, "order_1")
+            success, _data = provider.process_payment(
+                amount,
+                "order_1",
+                purpose=PaymentPurpose.ORDER,
+                subject="order-uuid",
+            )
 
             self.assertTrue(success)
             call_kwargs = mock_stripe_create.call_args[1]
@@ -84,7 +95,12 @@ class StripePaymentAmountTestCase(TestCase):
 
         provider = StripePaymentProvider()
         amount = Money(Decimal("0.25"), settings.DEFAULT_CURRENCY)
-        success, data = provider.process_payment(amount, "order_1")
+        success, data = provider.process_payment(
+            amount,
+            "order_1",
+            purpose=PaymentPurpose.ORDER,
+            subject="order-uuid",
+        )
 
         self.assertFalse(success)
         self.assertIn("error", data)
@@ -112,6 +128,8 @@ class StripePaymentAmountTestCase(TestCase):
             success_url="https://example.com/success",
             cancel_url="https://example.com/cancel",
             shipping_price=shipping,
+            purpose=PaymentPurpose.ORDER,
+            subject="order-uuid",
         )
 
         self.assertTrue(success)
@@ -150,6 +168,8 @@ class StripePaymentAmountTestCase(TestCase):
             success_url="https://example.com/success",
             cancel_url="https://example.com/cancel",
             shipping_price=shipping,
+            purpose=PaymentPurpose.ORDER,
+            subject="order-uuid",
         )
 
         self.assertTrue(success)

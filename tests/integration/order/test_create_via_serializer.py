@@ -32,6 +32,9 @@ from user.factories.account import UserAccountFactory
 User = get_user_model()
 
 
+pytestmark = pytest.mark.usefixtures("trust_intent_binding")
+
+
 @pytest.mark.django_db
 class TestOrderCreateSerializerValidation(APITestCase):
     """OrderCreateFromCartSerializer validates the create payload."""

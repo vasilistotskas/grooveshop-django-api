@@ -1,6 +1,7 @@
 import uuid
 from unittest.mock import patch
 
+import pytest
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import connection
@@ -29,6 +30,9 @@ from tests.utils.shipping import enable_rate
 from user.factories.account import UserAccountFactory
 
 User = get_user_model()
+
+
+pytestmark = pytest.mark.usefixtures("trust_intent_binding")
 
 
 class OrderViewSetTestCase(TestURLFixerMixin, APITestCase):

@@ -15,7 +15,10 @@ from order.services import OrderService
 from shipping.models import ShippingProvider
 from tests.utils.shipping import enable_rate
 
-pytestmark = pytest.mark.django_db
+pytestmark = [
+    pytest.mark.django_db,
+    pytest.mark.usefixtures("trust_intent_binding"),
+]
 
 MONDAY_10_ATHENS = datetime(2026, 10, 5, 7, 0, tzinfo=UTC)
 MONDAY_1530_ATHENS = datetime(2026, 10, 5, 12, 30, tzinfo=UTC)

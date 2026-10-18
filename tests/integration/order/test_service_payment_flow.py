@@ -21,10 +21,13 @@ from order.services import OrderService
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
-from tests.utils.payments import CAPTURED
+from tests.utils.payments import captured_for
 from user.factories.account import UserAccountFactory
 
-pytestmark = pytest.mark.assert_english
+pytestmark = [
+    pytest.mark.assert_english,
+    pytest.mark.usefixtures("trust_intent_binding"),
+]
 
 
 def _eur(amount: str) -> Money:
@@ -318,7 +321,8 @@ class TestHandlePaymentSucceeded:
         )
 
         outcome = OrderService.handle_payment_succeeded(
-            self.payment_intent_id, captured=CAPTURED
+            self.payment_intent_id,
+            captured=captured_for(self.payment_intent_id),
         )
 
         assert outcome.applied is True
@@ -339,7 +343,7 @@ class TestHandlePaymentSucceeded:
     def test_unknown_payment_id_returns_none(self):
         with patch("order.services.logger") as mock_logger:
             result = OrderService.handle_payment_succeeded(
-                "pi_nonexistent", captured=CAPTURED
+                "pi_nonexistent", captured=captured_for("pi_nonexistent")
             )
 
         assert result is None
@@ -352,7 +356,8 @@ class TestHandlePaymentSucceeded:
         self.order.save()
 
         outcome = OrderService.handle_payment_succeeded(
-            self.payment_intent_id, captured=CAPTURED
+            self.payment_intent_id,
+            captured=captured_for(self.payment_intent_id),
         )
 
         assert outcome.applied is True
@@ -361,13 +366,15 @@ class TestHandlePaymentSucceeded:
 
     def test_a_repeated_event_is_idempotent(self):
         OrderService.handle_payment_succeeded(
-            self.payment_intent_id, captured=CAPTURED
+            self.payment_intent_id,
+            captured=captured_for(self.payment_intent_id),
         )
         self.order.refresh_from_db()
         first_updated_at = self.order.status_updated_at
 
         outcome = OrderService.handle_payment_succeeded(
-            self.payment_intent_id, captured=CAPTURED
+            self.payment_intent_id,
+            captured=captured_for(self.payment_intent_id),
         )
 
         # Nothing left to confirm: no second history row or email.
@@ -401,7 +408,7 @@ class TestHandlePaymentSucceeded:
         )
 
         outcome = OrderService.handle_payment_succeeded(
-            "pi_settled", captured=CAPTURED
+            "pi_settled", captured=captured_for("pi_settled")
         )
 
         assert outcome.applied is False

@@ -312,7 +312,10 @@ class GiftCardService:
 
     @classmethod
     def complete_purchase(
-        cls, purchase: GiftCardPurchase, payment_id: str = ""
+        cls,
+        purchase: GiftCardPurchase,
+        payment_id: str = "",
+        transaction_id: str = "",
     ) -> GiftCard | None:
         """Webhook-driven: mint + schedule delivery once payment lands.
 
@@ -325,7 +328,11 @@ class GiftCardService:
         purchase.status = GiftCardPurchaseStatus.PAID
         if payment_id:
             purchase.payment_id = payment_id
-        purchase.save(update_fields=["status", "payment_id"])
+        # Stripe's payment id IS the transaction; Viva's order code is not.
+        purchase.provider_transaction_id = transaction_id or payment_id
+        purchase.save(
+            update_fields=["status", "payment_id", "provider_transaction_id"]
+        )
 
         card = cls.issue(
             purchase.amount,
@@ -353,14 +360,17 @@ class GiftCardService:
 
     @classmethod
     def handle_purchase_reversal(cls, purchase) -> str:
-        """React to a provider-side reversal of a purchase payment.
+        """React to the provider taking a purchase's payment back: a refund
+        that reaches the purchase amount, a refund claim, a chargeback.
 
         Returns ``"processed"`` / ``"skipped"`` (the webhook's
         ``VivaWebhookEvent`` outcome vocabulary). A pending purchase is
-        simply cancelled; a completed one voids the issued card when it
-        is still untouched, and screams for the ops team when the
-        balance has already been spent — clawing back spent value is a
-        human decision, not webhook logic.
+        simply cancelled. A completed one voids what is still on every
+        card it issued, whether or not the card was touched, so the money
+        the provider took back can never be spent. What was already spent
+        is gone for good: it is recorded on the purchase
+        (``unrecovered_amount``), logged as an error and mailed to staff,
+        because clawing back spent value is a human decision.
         """
         if purchase.status == GiftCardPurchaseStatus.PENDING:
             purchase.status = GiftCardPurchaseStatus.CANCELED
@@ -371,42 +381,103 @@ class GiftCardService:
             return "skipped"
 
         purchase.status = GiftCardPurchaseStatus.CANCELED
-        purchase.save(update_fields=["status"])
-        outcome = "processed"
+        unrecovered = Decimal(0)
         for card in purchase.gift_cards.all():
             balance = Decimal(card.balance.amount)
             initial = Decimal(card.initial_value.amount)
-            if balance >= initial:
-                # Untouched card — void it: zero the ledger and
-                # disable, keeping the audit trail append-only.
-                if balance > 0:
-                    GiftCardTransaction.objects.create(
-                        gift_card=card,
-                        kind=GiftCardTransactionKind.ADJUST,
-                        amount=-balance,
-                        description=(
-                            f"Voided — payment reversed "
-                            f"(purchase {purchase.uuid})"
-                        ),
-                    )
-                card.status = GiftCardStatus.DISABLED
-                card.save(update_fields=["status"])
-                logger.warning(
-                    "Gift card %s voided after payment reversal of purchase %s",
-                    card.code,
-                    purchase.uuid,
+            if balance > 0:
+                # Void what is left: zero the ledger and disable, keeping
+                # the audit trail append-only.
+                GiftCardTransaction.objects.create(
+                    gift_card=card,
+                    kind=GiftCardTransactionKind.ADJUST,
+                    amount=-balance,
+                    description=(
+                        f"Voided — payment reversed (purchase {purchase.uuid})"
+                    ),
                 )
-            else:
-                logger.error(
-                    "Payment for gift card purchase %s was REVERSED but "
-                    "card %s already spent %s of %s — manual ops "
-                    "intervention required",
-                    purchase.uuid,
-                    card.code,
-                    initial - balance,
-                    initial,
-                )
-        return outcome
+            card.status = GiftCardStatus.DISABLED
+            card.save(update_fields=["status"])
+            logger.warning(
+                "Gift card %s voided after payment reversal of purchase %s",
+                card.code,
+                purchase.uuid,
+            )
+            if balance < initial:
+                unrecovered += initial - balance
+        purchase.unrecovered_amount = unrecovered
+        purchase.save(update_fields=["status", "unrecovered_amount"])
+        if unrecovered > 0:
+            cls._alert_unrecovered(purchase, unrecovered)
+        return "processed"
+
+    @classmethod
+    def _alert_unrecovered(cls, purchase, unrecovered: Decimal) -> None:
+        from shipping.alerts import OpsAlertKind, send_ops_alert
+
+        logger.error(
+            "Payment for gift card purchase %s was REVERSED but %s of %s was "
+            "already spent — manual ops intervention required",
+            purchase.uuid,
+            unrecovered,
+            purchase.amount,
+        )
+        try:
+            send_ops_alert(
+                kind=OpsAlertKind.GIFT_CARD_REVERSAL,
+                subject="Gift card spent before its payment was reversed",
+                message=(
+                    f"The payment for gift card purchase {purchase.uuid} "
+                    f"({purchase.amount}) was reversed by the provider. The "
+                    "unspent balance was voided, but "
+                    f"{unrecovered} of the card had already been spent and "
+                    "cannot be recovered automatically. Decide how to "
+                    "reconcile it (see the purchase in the admin)."
+                ),
+            )
+        except Exception:
+            logger.exception(
+                "Could not send the gift-card reversal alert for %s",
+                purchase.uuid,
+            )
+
+    @classmethod
+    def alert_purchase_disputed(cls, purchase, dispute_id: str) -> bool:
+        """Tell staff the payment of a purchase is in dispute, once per
+        dispute. Nothing is voided yet: until the dispute is lost the money
+        is still the merchant's to defend.
+
+        Returns whether staff were told: ``False`` for a dispute already
+        announced (a redelivered event, a later status of the same
+        dispute). The purchase row must be locked by the caller.
+        """
+        from shipping.alerts import OpsAlertKind, send_ops_alert
+
+        if purchase.dispute_id == dispute_id:
+            return False
+        purchase.dispute_id = dispute_id
+        purchase.save(update_fields=["dispute_id"])
+
+        logger.error(
+            "Payment for gift card purchase %s is DISPUTED", purchase.uuid
+        )
+        try:
+            send_ops_alert(
+                kind=OpsAlertKind.GIFT_CARD_REVERSAL,
+                subject="Gift card payment disputed",
+                message=(
+                    f"The payment for gift card purchase {purchase.uuid} "
+                    f"({purchase.amount}) is being disputed. The card is "
+                    "voided automatically if the dispute is lost; consider "
+                    "disabling it now."
+                ),
+            )
+        except Exception:
+            logger.exception(
+                "Could not send the gift-card dispute alert for %s",
+                purchase.uuid,
+            )
+        return True
 
     # ── refunds ────────────────────────────────────────────────────
 

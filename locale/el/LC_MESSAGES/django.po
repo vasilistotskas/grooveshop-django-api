@@ -23295,3 +23295,23 @@ msgstr "Αντιστροφή επιστροφής"
 #: refund integrity
 msgid "Order %(order_id)s skipped: refund its payment first."
 msgstr "Η παραγγελία %(order_id)s παραλείφθηκε: επιστρέψτε πρώτα την πληρωμή της."
+
+#: .\giftcard\models.py
+msgid "Provider Transaction ID"
+msgstr "Αναγνωριστικό συναλλαγής παρόχου"
+
+#: .\giftcard\models.py
+msgid "Unrecovered Amount"
+msgstr "Μη ανακτήσιμο ποσό"
+
+#: .\shipping\alerts.py
+msgid "Gift card whose payment was reversed or disputed"
+msgstr "Δωροκάρτα της οποίας η πληρωμή ανατράπηκε ή αμφισβητήθηκε"
+
+#: .\shipping\alerts.py
+msgid "Payment that does not match its order"
+msgstr "Πληρωμή που δεν ταιριάζει με την παραγγελία της"
+
+#: .\order\serializers\order.py
+msgid "This can't change once the order is placed: the shipping cost and VAT were priced for it."
+msgstr "Αυτό δεν μπορεί να αλλάξει μετά την υποβολή της παραγγελίας: τα μεταφορικά και ο ΦΠΑ έχουν υπολογιστεί γι' αυτό."

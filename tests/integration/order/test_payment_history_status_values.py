@@ -21,6 +21,7 @@ from order.signals.handlers import (
     handle_stripe_payment_failed,
     handle_stripe_payment_succeeded,
 )
+from tests.utils.viva import verified_payment
 
 pytestmark = pytest.mark.django_db
 
@@ -125,7 +126,10 @@ class TestVivaWebhookHistory:
         with (
             patch(
                 "order.views.viva_webhook._verify_transaction",
-                return_value=(PaymentStatus.COMPLETED, {"order_code": "OC1"}),
+                return_value=(
+                    PaymentStatus.COMPLETED,
+                    verified_payment(order, "OC1"),
+                ),
             ),
             patch("order.views.viva_webhook.dispatch_on_commit"),
             patch(

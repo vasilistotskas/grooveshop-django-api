@@ -40,7 +40,10 @@ from tests.utils.shipping import enable_rate
 from user.factories import UserAccountFactory
 from vat.factories import VatFactory
 
-pytestmark = pytest.mark.django_db
+pytestmark = [
+    pytest.mark.django_db,
+    pytest.mark.usefixtures("trust_intent_binding"),
+]
 
 D = Decimal
 NS = "{http://www.aade.gr/myDATA/invoice/v1.0}"

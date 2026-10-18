@@ -159,6 +159,20 @@ Two entry points in `order/services.py` (the legacy `OrderService.create_order`
   prices loyalty and gift cards under their own locks). Order of checks
   therefore changed: a cart that cannot be checked out costs one provider
   read first, with no lock.
+- **The intent must be this cart's** (`order/payment_binding.py`,
+  `OrderService._verify_intent_binding`). An intent proves that money moved,
+  not what for, so each intent is tied to its purpose. Every PaymentIntent we create now carries server-set metadata
+  (`purpose` = `cart` / `order` / `giftcard`, `subject` = the cart, order or
+  purchase uuid, `tenant_schema`), written by `StripePaymentProvider`
+  (`process_payment`, `create_checkout_session` and `confirm_delegated_payment`
+  all require it; `PayWayService.process_payment` sets it last, so a
+  caller's `payment_data` cannot). Payment-first creation refuses, as
+  `payment_verification`, an intent whose metadata is not `cart` + this
+  cart's uuid + this tenant, and any intent id a `GiftCardPurchase` holds.
+  The refusal names the key that differs, never the uuid. An intent created
+  before this shipped carries no metadata and is refused too. The webhook
+  side is the mirror: `payment_intent.succeeded` issues no gift card for an
+  intent an order also holds.
 - **Idempotent per payment intent.** `Order.payment_id` is unique
   (`order_payment_id_unique`, a partial unique index over non-empty ids), and
   `_order_created_for_payment` looks the intent up twice: first WITHOUT a lock,
@@ -561,6 +575,25 @@ payment_intent.succeeded → handle_stripe_payment_succeeded
                  └── notify_payment_confirmed_live (on_commit, logged-in users only)
 ```
 
+**The collected amount must be the order's total.** `handle_payment_succeeded`
+(and the `checkout.session.completed` handler) compare what Stripe collected
+with `order.calculate_order_total_amount()` (currency, and amount within
+`PAYMENT_AMOUNT_TOLERANCE`) before `mark_as_paid`. A charge that does not
+match is booked on the ledger (the money moved) but does not pay the order:
+`OrderService.flag_payment_mismatch` stamps `AMOUNT_MISMATCH_FLAG` (which
+also keeps `auto_cancel_stuck_pending_orders` away from it), notes the order
+and mails `OpsAlertKind.PAYMENT_MISMATCH`; the Viva amount/currency refusals
+use the same function.
+
+**A poll never writes `COMPLETED` itself.** `GET /order/{id}/payment_status`
+(`OrderService.get_payment_status`) does not write the provider's status onto
+the row. A polled COMPLETED settles through the same
+`handle_payment_succeeded` (and announces through
+`announce_stripe_payment_applied`, shared with the webhook), only for a Stripe
+intent no gift-card purchase holds; any other provider's payment is settled by
+its webhook alone. `PayWayService.check_payment_status` (a second, caller-less
+polling writer) was removed.
+
 `applied` is False for a stale event against a settled payment, a
 repeat of one already applied, and a charge on a canceled order
 (`record_payment_after_cancel` books it and alerts ops): none of them
@@ -631,6 +664,23 @@ Viva has no dispute webhook, and does not document whether a chargeback arrives 
 
 **The chargeback is capped at what the payment still holds.** `PaymentLedger.record_chargeback` records at most captured minus refunds minus earlier chargebacks (`PaymentLedger.left_on`), whichever provider reports it, and logs a warning when it caps (Stripe's amount should fit; Viva's whole-sale amount does not once the sale was partly refunded). A capped entry says so in the red history line ("Chargeback €70.00 (disputed €100.00, €30.00 already returned)"). When nothing is left no row is written, but the history entry ("Chargeback of €X not recorded: nothing is left on the payment") and the staff email still go out, once (`order.disputes.announce_chargeback`; Viva remembers it in `metadata["dispute_resolved_id"]`, because each wallet movement of a dispute is an event of its own).
 
+#### Gift-card purchases are reversed too
+
+A gift-card purchase is not an order, so the order lookups above do not
+find it. Each reversal of its payment reaches
+`GiftCardService.handle_purchase_reversal`: a Viva refund (once the refunds
+reach the purchase amount) or refund claim (types 13 / 46 / 83 / 90, whatever
+amount it names), a Viva 2054 whose sale reads `ML`, a Stripe `charge.refunded`
+(cumulative; voids once it reaches the purchase amount) and a lost
+`charge.dispute.closed`. It voids what is left on every card the purchase
+issued whether or not the card was touched, disables it, and records what was
+already spent in `GiftCardPurchase.unrecovered_amount` with an ERROR log and a
+`gift_card_reversal` ops alert. An OPENED dispute (Viva `M`/`MA`/`MI`, Stripe
+`charge.dispute.created`) only alerts: the money is still the merchant's to
+defend. The Viva dispute path finds the purchase by `provider_transaction_id`
+(the TransactionId the 1796 completed it with; a purchase completed before
+`giftcard 0008` has none and is not found).
+
 ### 4.3 Viva Wallet online
 
 Webhook handler: `order/views/viva_webhook.py::_handle_payment_created`.
@@ -667,6 +717,13 @@ Differences from the Stripe path that are easy to miss:
   transaction id, before the canceled-order and settled guards. A second
   payment under another of the order's checkout codes is a second CHARGE
   row (`Order.payment_id` still names only the latest).
+
+**Settlement is bound to the thing paid for.** A 1796 settles an order only
+when the verified transaction carries one of the order's own codes, states its
+currency and amount, and both are the order's; a transaction that states
+neither (or whose amount is unreadable) is refused and flagged, not settled on
+status alone. The gift-card branch (`_gift_card_payment_problem`) makes the
+same check against the purchase's own order code, currency and amount.
 
 **Refund webhook (1797, `_handle_reversal_created`).** The event's
 `TransactionId` is the REFUND, a transaction of its own; `ParentId` is the
@@ -766,6 +823,13 @@ success redirect (customer landed on the homepage via the
    can refund, and the merchant pays it back themselves and records how
    (§7.2, §7.3). Until the courier's payout is reconciled the ledger holds
    nothing for the order and there is nothing to refund.
+   A payout row settles an order only when it is that order's own: the
+   shipment is found by `POD`; `Customer_RefNo_1/2` (order pk / uuid) are a
+   fallback ONLY when the voucher could not be read, never when it is readable
+   but unknown (a parcel made by hand in the ACS portal), and a payout that
+   remits a different sum than the shipment's COD amount is left unattributed
+   for staff review (the "payouts that match no shipment" list) instead of
+   being settled at the shipment's amount.
    The status flip and that row are ONE atomic step under the order lock
    (`OrderService.settle_cod_payment`, shared by the ACS reconcile, the
    staff "received outside ACS" action and BoxNow's delivered event): a
@@ -1369,6 +1433,10 @@ the linked memory note or the originating PR's commit message.
 | The default cache fails open on a Redis outage (reads miss, writes no-op — `core/caches.py`), but never for keys under `STRICT_KEY_PREFIXES`: the `strict:` throttle namespace, allauth's rate limits, TOTP replay protection, the IdP's single-use codes and WebSocket tickets. The checkout, payment, coupon and gift-card throttles (`core/api/throttling.py`, `fail_closed = True`) therefore DENY with 429 during an outage, while browsing/search/cart throttles and DRF's default `anon`/`user` budgets allow | `core/api/throttling.py` module docstring |
 | The tenant resolve payload and domain set are invalidated by `Tenant.cache_generation`, never by a Redis delete: it is part of their keys, and `Tenant.save`, every `TenantDomain` write and the folded pay-way / agent-setting writes bump it in the database inside the write's transaction. A delete during an outage is a fail-open no-op, so purge-by-delete left the pre-write payload served for up to its TTL; strict keys would have made the READS raise, and resolve is on every storefront request | `tenant/cache.py` module docstring |
 | The nightly demo reset returns the published demo gift card (`GIFT_CARD_CODE`) to its issued value with one `ADJUST` ledger row, so the ledger sum stays the balance and every guest spend stays on the card's history; only on `is_demo` tenants, and silently (no mail, no dispatch) | `devtools/demo_account.py: _restore_gift_card` |
+| A payment is bound to what it was made for: every PaymentIntent carries server-set `purpose` / `subject` / `tenant_schema` metadata, payment-first order creation refuses an intent that is not `cart` + this cart + this tenant (or that a gift-card purchase holds), and the polled status path settles only through `handle_payment_succeeded` | §3.1, §4.1 |
+| A confirmed charge settles an order only for its own total: Stripe's collected amount and Viva's amount AND currency are compared (a missing one refuses), a mismatch is booked, flagged (`AMOUNT_MISMATCH_FLAG`), alerted and never auto-canceled | §4.1, §4.3 |
+| A reversal of a gift-card purchase's payment (refund, claim, chargeback, Stripe or Viva) voids the unspent card and records the spent part | §4.2.1 |
+| `Order.payment_status` / `payment_id` are read-only in the admin, and the owner PATCH/PUT cannot change a priced order's country or region | §7 |
 | ACS voucher mint uses 3-phase claim → API → persist with 300s TTL | `project_acs_voucher_orphan_prevention.md` |
 | `Order.objects.filter(pk=...).values(...).first()` — NOT `refresh_from_db(fields=...)` | `project_order_state_machine_invariants.md` |
 | `_suppress_customer_status_notifications` on chained transitions | `project_order_state_machine_invariants.md` |

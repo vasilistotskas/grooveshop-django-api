@@ -23193,9 +23193,13 @@ msgid "This order has no specimen receipt."
 msgstr "Η παραγγελία δεν έχει δείγμα απόδειξης."
 
 #: order/views/order.py
-msgid "Not the order's owner or its UUID"
-msgstr "Δεν είστε ο ιδιοκτήτης της παραγγελίας ούτε έχετε το UUID της"
+msgid "Not the order's owner, and no matching order UUID was given."
+msgstr "Δεν είστε ο ιδιοκτήτης της παραγγελίας και δεν δόθηκε το UUID της."
 
 #: order/views/order.py
 msgid "Specimen unavailable"
 msgstr "Το δείγμα δεν είναι διαθέσιμο"
+
+#: order/views/order.py
+msgid "Receipt unavailable"
+msgstr "Η απόδειξη δεν είναι διαθέσιμη"

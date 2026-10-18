@@ -16287,7 +16287,11 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: ''
         '404':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Η απόδειξη δεν είναι διαθέσιμη
         '500':
           content:
             application/json:
@@ -16665,8 +16669,17 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: ''
         '403':
-          description: Δεν είστε ο ιδιοκτήτης της παραγγελίας ούτε έχετε το UUID της
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Δεν είστε ο ιδιοκτήτης της παραγγελίας και δεν δόθηκε το UUID
+            της.
         '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
           description: Το δείγμα δεν είναι διαθέσιμο
         '500':
           content:

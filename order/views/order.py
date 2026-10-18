@@ -294,7 +294,10 @@ serializers_config: SerializersConfig = {
         # ``200: None`` would declare a 200 with no body for a PDF stream.
         responses={
             (200, "application/pdf"): OpenApiTypes.BINARY,
-            404: None,
+            404: OpenApiResponse(
+                response=ErrorResponseSerializer,
+                description=_("Receipt unavailable"),
+            ),
         },
         operation_id="downloadOrderInvoice",
         summary=_("Download the receipt PDF"),
@@ -312,9 +315,15 @@ serializers_config: SerializersConfig = {
         responses={
             (200, "application/pdf"): OpenApiTypes.BINARY,
             403: OpenApiResponse(
-                description=_("Not the order's owner or its UUID"),
+                response=ErrorResponseSerializer,
+                description=_(
+                    "Not the order's owner, and no matching order UUID was given."
+                ),
             ),
-            404: OpenApiResponse(description=_("Specimen unavailable")),
+            404: OpenApiResponse(
+                response=ErrorResponseSerializer,
+                description=_("Specimen unavailable"),
+            ),
         },
         operation_id="downloadOrderSpecimenReceipt",
         summary=_("Download the specimen receipt PDF"),

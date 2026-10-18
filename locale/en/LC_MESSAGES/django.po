@@ -20566,9 +20566,13 @@ msgid "This order has no specimen receipt."
 msgstr ""
 
 #: order/views/order.py
-msgid "Not the order's owner or its UUID"
+msgid "Not the order's owner, and no matching order UUID was given."
 msgstr ""
 
 #: order/views/order.py
 msgid "Specimen unavailable"
+msgstr ""
+
+#: order/views/order.py
+msgid "Receipt unavailable"
 msgstr ""

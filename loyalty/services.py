@@ -377,11 +377,21 @@ class LoyaltyService:
 
         total_reversed = 0
         current_balance = cls.get_user_balance(user)
+        # Points the customer already spent elsewhere cannot be taken
+        # back out of a balance that no longer holds them. On (the
+        # default): the whole earning comes off and the balance goes
+        # negative, later earnings pay it off and a negative balance
+        # blocks redeeming, so earning, spending and then refunding the
+        # order cannot keep the points. Off: the reversal stops at zero and
+        # the spent points survive the refund.
+        allow_negative = bool(
+            Setting.get("LOYALTY_REFUND_ALLOWS_NEGATIVE_BALANCE", default=True)
+        )
 
         for earn_tx in earn_transactions:
             reversal_amount = earn_tx.points
             # Clamp if balance would go negative
-            if current_balance - reversal_amount < 0:
+            if not allow_negative and current_balance - reversal_amount < 0:
                 reversal_amount = current_balance
                 logger.warning(
                     "Clamping reversal for user %s: expected %s, actual %s",
@@ -407,7 +417,11 @@ class LoyaltyService:
         user.save(update_fields=["total_xp"])
 
         for bonus_tx in bonus_transactions:
-            reversal_amount = min(bonus_tx.points, current_balance)
+            reversal_amount = (
+                bonus_tx.points
+                if allow_negative
+                else min(bonus_tx.points, current_balance)
+            )
             if reversal_amount > 0:
                 PointsTransaction.objects.create(
                     user=user,

@@ -2359,6 +2359,18 @@ EXTRA_SETTINGS_DEFAULTS = [
         "value": 1.0,
     },
     {
+        "name": "LOYALTY_REFUND_ALLOWS_NEGATIVE_BALANCE",
+        "type": "bool",
+        "value": True,
+        "description": (
+            "When an order is refunded or canceled, take back ALL the "
+            "points it earned even if the customer has spent them since: "
+            "their balance goes negative, later earnings pay it off and "
+            "they cannot redeem until it is positive. Off: the reversal "
+            "stops at zero and the points already spent stay spent."
+        ),
+    },
+    {
         "name": "LOYALTY_XP_PER_LEVEL",
         "type": "int",
         "value": 1000,

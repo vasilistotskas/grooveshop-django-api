@@ -238,7 +238,11 @@ class TestNewCustomerBonusReversal:
             user=user, points=-120, transaction_type=TransactionType.REDEEM
         )
 
-        with loyalty_settings(**self.BONUS):
+        # The clamp is what the store chose by turning the negative
+        # balance off (``test_refund_negative_balance.py`` covers the rest).
+        with loyalty_settings(
+            LOYALTY_REFUND_ALLOWS_NEGATIVE_BALANCE=False, **self.BONUS
+        ):
             assert LoyaltyService.reverse_order_points(order.id) == 40
 
         assert self._adjustments(order) == [-40]
@@ -296,7 +300,7 @@ class TestRedeemedPointsOnReversal:
             provider_reference="du_test_lost",
         )
 
-        with loyalty_settings():
+        with loyalty_settings(LOYALTY_REFUND_ALLOWS_NEGATIVE_BALANCE=False):
             # Balance 30 earned - 20 spent = 10: the earn reversal is
             # clamped to it, and nothing spent comes back.
             assert LoyaltyService.reverse_order_points(order.id) == 10

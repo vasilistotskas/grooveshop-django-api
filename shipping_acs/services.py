@@ -14,7 +14,7 @@ import json
 import logging
 from collections.abc import Iterable
 from datetime import date, datetime, timedelta
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from io import BytesIO
 from typing import TYPE_CHECKING, Any
 
@@ -1899,7 +1899,10 @@ class AcsService:
         discovered 2026-07-11). ``Customer_RefNo_1`` /
         ``Customer_RefNo_2`` echo the ``Reference_Key1/2`` we send at
         voucher mint (``order.id`` / ``order.uuid``) and serve as
-        fallback match keys when ``POD`` is empty or unknown.
+        fallback match keys when ``POD`` is EMPTY — never when it is
+        readable but unknown, which is a parcel that is not ours. A payout
+        that remits a different sum than the shipment's COD amount is left
+        unattributed for staff, never settled at the shipment's amount.
 
         ``silent_for_customer=True`` suppresses the customer-facing
         COMPLETED email/toast for orders flipped by this run. Both
@@ -1952,21 +1955,45 @@ class AcsService:
                 shipment = AcsShipment.objects.filter(
                     voucher_no=voucher_no
                 ).first()
-            if shipment is None:
+            else:
+                # The reference keys are only a fallback for a row whose
+                # voucher could not be read. A voucher that IS readable
+                # but unknown is somebody else's parcel (one made by hand
+                # in the ACS portal, say): letting its free-text
+                # reference pick one of our orders would mark that order
+                # paid for a payout that is not its own.
                 ref1 = str(row.get("Customer_RefNo_1") or "").strip()
                 if ref1.isdigit():
                     shipment = AcsShipment.objects.filter(
                         order_id=int(ref1)
                     ).first()
-            if shipment is None:
-                ref2 = str(row.get("Customer_RefNo_2") or "").strip()
-                if ref2:
-                    try:
-                        shipment = AcsShipment.objects.filter(
-                            order__uuid=ref2
-                        ).first()
-                    except ValidationError, ValueError:
-                        shipment = None
+                if shipment is None:
+                    ref2 = str(row.get("Customer_RefNo_2") or "").strip()
+                    if ref2:
+                        try:
+                            shipment = AcsShipment.objects.filter(
+                                order__uuid=ref2
+                            ).first()
+                        except ValidationError, ValueError:
+                            shipment = None
+            if shipment is not None and not _payout_matches_cod_amount(
+                row, shipment
+            ):
+                # Remitted a different sum than the shipment collects:
+                # settling at the shipment's amount would book money that
+                # never arrived (or hide money that did). Left unattributed
+                # so it lands in staff review with the other payouts no
+                # shipment explains.
+                logger.error(
+                    "reconcile_cod_payouts: payout for voucher %r pays out "
+                    "%r but shipment %s collects %s — not settling the "
+                    "order, staff review",
+                    voucher_no or shipment.voucher_no,
+                    row.get("Parcel_COD_Amount"),
+                    shipment.pk,
+                    shipment.cod_amount,
+                )
+                shipment = None
             # When a shipment matched, its voucher number is canonical
             # for the payout row — covers both an empty POD (Greek PDF
             # demo shows one) and a POD value we failed to recognise.
@@ -2726,6 +2753,22 @@ _PAYOUT_IDENTITY_COLUMNS = (
     "COD_Amount_CreditCard",
     "COD_Payment_Date",
 )
+
+
+#: What a courier payout may differ from the shipment's COD amount by.
+_PAYOUT_AMOUNT_TOLERANCE = Decimal("0.01")
+
+
+def _payout_matches_cod_amount(row: dict, shipment: AcsShipment) -> bool:
+    """Whether the payout row pays out the COD amount the shipment collects.
+    An unreadable amount does not match."""
+    try:
+        paid_out = Decimal(str(row.get("Parcel_COD_Amount")))
+    except InvalidOperation:
+        return False
+    return (
+        abs(paid_out - shipment.cod_amount.amount) <= _PAYOUT_AMOUNT_TOLERANCE
+    )
 
 
 def _payout_row_fingerprint(

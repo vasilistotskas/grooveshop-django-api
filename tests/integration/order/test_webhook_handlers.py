@@ -7,7 +7,7 @@ from djstripe.models import Event
 
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import OrderFactory
-from order.models import OrderHistory
+from order.models import Order, OrderHistory
 from order.services import PaymentEventOutcome
 from order.signals.handlers import (
     handle_stripe_checkout_completed,
@@ -597,6 +597,13 @@ class TestWebhookHandlerIntegration:
             metadata={},
         )
 
+        # Stripe collected what the order is for
+        total = order.calculate_order_total_amount()
+        mock_djstripe_event.data["object"]["amount_received"] = round(
+            total.amount * 100
+        )
+        mock_djstripe_event.data["object"]["currency"] = "eur"
+
         # Execute
         handle_stripe_payment_succeeded(sender=None, event=mock_djstripe_event)
 
@@ -751,6 +758,10 @@ class TestHandleStripeCheckoutCompleted:
     """
 
     def _checkout_event(self, order_id, *, payment_status="paid"):
+        # What Stripe collected must be what the order is for.
+        collected = Order.objects.get(
+            id=order_id
+        ).calculate_order_total_amount()
         event = Mock(spec=Event)
         event.id = f"evt_cs_{order_id}"
         event.type = "checkout.session.completed"
@@ -759,7 +770,7 @@ class TestHandleStripeCheckoutCompleted:
                 "id": "cs_test_1",
                 "payment_intent": "pi_cs_test_1",
                 "payment_status": payment_status,
-                "amount_total": 5000,
+                "amount_total": round(collected.amount * 100),
                 "currency": "eur",
                 "metadata": {"order_id": str(order_id)},
             }

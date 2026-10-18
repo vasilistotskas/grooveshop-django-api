@@ -25,10 +25,9 @@ import pytest
 
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
-from order.models.order import Order
+from order.models.order import AMOUNT_MISMATCH_FLAG, Order
 from order.models.viva_webhook_event import VivaWebhookEvent
 from order.views.viva_webhook import (
-    AMOUNT_MISMATCH_FLAG,
     _handle_payment_created,
 )
 from pay_way.enum.settlement import PaySettlement
@@ -57,7 +56,10 @@ def _order(total="50.00"):
 def _verified(status, amount, order_code=ORDER_CODE):
     return patch(
         "order.views.viva_webhook._verify_transaction",
-        return_value=(status, {"amount": amount, "order_code": order_code}),
+        return_value=(
+            status,
+            {"amount": amount, "currency": "EUR", "order_code": order_code},
+        ),
     )
 
 
@@ -87,9 +89,9 @@ class TestSkipsAreReportedAsSkips:
 
     def test_an_unparseable_amount_does_not_escape(self):
         """``Decimal('abc')`` raises decimal.InvalidOperation, which is an
-        ArithmeticError, not a ValueError — so the documented fallback
-        never ran and the exception left the view as a 500 that Viva
-        retries on a payload that will never parse."""
+        ArithmeticError, not a ValueError — it must not leave the view as a
+        500 that Viva retries on a payload that will never parse. The amount
+        is required, so the charge is refused and flagged instead."""
         order = _order()
 
         with _verified(PaymentStatus.COMPLETED, "not-a-number"):
@@ -97,10 +99,10 @@ class TestSkipsAreReportedAsSkips:
                 order, {"StatusId": "F"}, "txn-garbage"
             )
 
-        # Falls through to status-only verification and settles.
         order.refresh_from_db()
-        assert order.payment_status == PaymentStatus.COMPLETED
-        assert outcome != VivaWebhookEvent.OUTCOME_SKIPPED
+        assert order.payment_status == PaymentStatus.PENDING
+        assert AMOUNT_MISMATCH_FLAG in order.metadata
+        assert outcome == VivaWebhookEvent.OUTCOME_SKIPPED
 
 
 class TestChargedOrderIsNotAutoCancelled:

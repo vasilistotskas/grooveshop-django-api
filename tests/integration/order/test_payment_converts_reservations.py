@@ -13,6 +13,8 @@ from product.factories import ProductFactory
 from tests.utils.shipping import enable_rate
 from user.factories import UserAccountFactory
 
+pytestmark = pytest.mark.usefixtures("trust_intent_binding")
+
 
 @pytest.mark.django_db
 class TestPaymentConfirmationConvertsReservations:

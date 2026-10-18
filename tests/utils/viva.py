@@ -354,3 +354,18 @@ class FakeVivaApi:
     @staticmethod
     def query(request: requests.PreparedRequest) -> dict[str, list[str]]:
         return parse_qs(urlsplit(request.url or "").query)
+
+
+def verified_payment(
+    order, order_code: str, **overrides: Any
+) -> dict[str, Any]:
+    """What ``_verify_transaction`` reports for a payment of *order*: its
+    order code, and its amount and currency (a payment-created event settles
+    an order only when the transaction states both, and both are right)."""
+    owed = order.calculate_order_total_amount()
+    return {
+        "order_code": order_code,
+        "amount": float(owed.amount),
+        "currency": str(owed.currency),
+        **overrides,
+    }

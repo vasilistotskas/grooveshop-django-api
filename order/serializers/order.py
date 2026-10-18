@@ -1543,12 +1543,35 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
 
         Judged only when the payload changes the address, so editing an
         old order's notes does not demand a fix to an address that
-        predates the rules.
+        predates the rules. The country and region are not editable at
+        all: see ``PRICED_ADDRESS_FIELDS``.
         """
+        locked = {
+            field: [
+                _(
+                    "This can't change once the order is placed: the "
+                    "shipping cost and VAT were priced for it."
+                )
+            ]
+            for field in self.PRICED_ADDRESS_FIELDS
+            if self.instance is not None
+            and field in attrs
+            and attrs[field] != getattr(self.instance, field)
+        }
+        if locked:
+            raise serializers.ValidationError(locked)
         errors = address_rules.address_update_errors(attrs, self.instance)
         if errors:
             raise serializers.ValidationError(errors)
         return attrs
+
+    #: The delivery country and region drive the shipping cost and the VAT,
+    #: both stamped on the order when it was priced (and, for an online
+    #: order, charged). Changing either afterwards moved the destination
+    #: without repricing it, so the amount paid no longer matched what the
+    #: order costs. The rest of the address stays editable: it reprices
+    #: nothing.
+    PRICED_ADDRESS_FIELDS = ("country", "region")
 
     def update(self, instance, validated_data):
         # Order line items are immutable after creation: each carries a

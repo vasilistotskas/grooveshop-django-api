@@ -1,7 +1,7 @@
 import logging
 from abc import ABC, abstractmethod
 from decimal import Decimal
-from typing import Any, ClassVar
+from typing import Any, ClassVar, cast
 
 import moneyed
 import stripe
@@ -13,6 +13,7 @@ from djmoney.money import Money
 from djstripe.models import PaymentIntent, Refund
 
 from order.enum.status import PaymentStatus
+from order.payment_binding import PaymentPurpose, binding_metadata
 
 logger = logging.getLogger(__name__)
 
@@ -210,6 +211,8 @@ class StripePaymentProvider(PaymentProvider):
     def create_checkout_session(
         self, amount: Money, order_id: str, **kwargs
     ) -> tuple[bool, dict[str, Any]]:
+        # Outside the try, as in ``process_payment``.
+        binding = binding_metadata(kwargs["purpose"], kwargs["subject"])
         try:
             logger.info(
                 "Creating Stripe Checkout Session",
@@ -277,11 +280,13 @@ class StripePaymentProvider(PaymentProvider):
                     # can attribute revenue when multiple tenants share
                     # one platform Stripe account.
                     "tenant_schema": tenant_schema,
+                    **binding,
                 },
                 "payment_intent_data": {
                     "metadata": {
                         "order_id": order_id,
                         "tenant_schema": tenant_schema,
+                        **binding,
                     }
                 },
             }
@@ -403,6 +408,7 @@ class StripePaymentProvider(PaymentProvider):
                     "tenant_schema": getattr(
                         _connection, "schema_name", "public"
                     ),
+                    **binding_metadata(PaymentPurpose.ORDER, order_uuid),
                 },
                 # One charge attempt per order — an agent retrying the
                 # same completion must not double-charge the token. The
@@ -443,6 +449,9 @@ class StripePaymentProvider(PaymentProvider):
     def process_payment(
         self, amount: Money, order_id: str, **kwargs
     ) -> tuple[bool, dict[str, Any]]:
+        # Outside the try: a caller that forgets to say what the intent is
+        # for is a bug to see, not a payment failure to report.
+        binding = binding_metadata(kwargs["purpose"], kwargs["subject"])
         try:
             logger.info(
                 "Processing Stripe payment",
@@ -471,6 +480,7 @@ class StripePaymentProvider(PaymentProvider):
                 "order_id": order_id,
                 "source": "django_app",
                 "tenant_schema": tenant_schema,
+                **binding,
             }
             tenant = getattr(_connection, "tenant", None)
             tenant_connect_id = (
@@ -716,6 +726,8 @@ class StripePaymentProvider(PaymentProvider):
                 "currency": stripe_pi.currency.upper(),
                 "created": stripe_pi.created,
                 "last_updated": djstripe_pi.created if djstripe_pi else None,
+                # What the intent was created for (``payment_binding``).
+                "metadata": dict(cast("dict[str, str]", stripe_pi.metadata)),
             }
 
             return status, status_data

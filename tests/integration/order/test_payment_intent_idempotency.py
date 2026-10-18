@@ -40,7 +40,10 @@ from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
 from user.factories.account import UserAccountFactory
 
-pytestmark = pytest.mark.assert_english
+pytestmark = [
+    pytest.mark.assert_english,
+    pytest.mark.usefixtures("trust_intent_binding"),
+]
 
 PAYMENT_INTENT_ID = "pi_dup_123"
 

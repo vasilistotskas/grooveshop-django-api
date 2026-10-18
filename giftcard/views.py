@@ -36,6 +36,7 @@ from giftcard.serializers import (
 )
 from giftcard.services import GiftCardError, GiftCardService
 from order.payment import provider_supports
+from order.payment_binding import PaymentPurpose
 from tenant.permissions import IsGiftCardsEnabled, IsGiftCardsRuntimeEnabled
 
 logger = logging.getLogger(__name__)
@@ -269,6 +270,8 @@ class GiftCardViewSet(BaseModelViewSet):
                 order_id=f"giftcard_{purchase.uuid}",
                 order_uuid=f"giftcard_{purchase.uuid}",
                 customer_email=buyer_email,
+                purpose=PaymentPurpose.GIFT_CARD,
+                subject=str(purchase.uuid),
             )
             if success:
                 purchase.payment_id = payment_data["payment_id"]

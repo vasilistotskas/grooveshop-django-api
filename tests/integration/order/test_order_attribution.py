@@ -39,6 +39,9 @@ INSTAGRAM_UA = (
 )
 
 
+pytestmark = pytest.mark.usefixtures("trust_intent_binding")
+
+
 @pytest.mark.django_db
 @patch(
     "order.services.OrderService.validate_shipping_address",

@@ -58,6 +58,7 @@ from order.payment import (
     provider_supports,
     registered_provider_codes,
 )
+from order.payment_binding import PaymentPurpose, binding_mismatch
 from order.payment_ledger import (
     REPAYMENT_REFERENCE_MAX_LENGTH,
     PaymentLedger,
@@ -76,6 +77,10 @@ if TYPE_CHECKING:
     from cart.models import Cart
 
 logger = logging.getLogger(__name__)
+
+# What a provider may differ from the order's total by (rounding on its side)
+# before a confirmed charge is treated as not matching the order.
+PAYMENT_AMOUNT_TOLERANCE = Decimal("0.01")
 
 # Payment statuses that represent a financially settled (terminal) state.
 # A stale or out-of-order webhook event MUST NOT overwrite any of these.
@@ -631,6 +636,45 @@ class OrderService:
         return payment_status, payment_data
 
     @classmethod
+    def _verify_intent_binding(
+        cls, payment_intent_id: str, payment_data: dict[str, Any], cart
+    ) -> None:
+        """Refuse an intent that was not created to pay for THIS cart.
+
+        An intent proves that money moved, not what for. The server writes
+        the purpose, the cart uuid and the tenant on every intent it
+        creates (``order.payment_binding``), so an intent made for a gift
+        card, for another shopper's cart, for an existing order or for
+        another tenant cannot be presented here: one payment would
+        otherwise buy a gift card AND a paid order.
+
+        An intent id that a gift-card purchase holds is refused outright,
+        whatever its metadata says.
+        """
+        from giftcard.models import GiftCardPurchase
+
+        if GiftCardPurchase.objects.filter(
+            payment_id=payment_intent_id
+        ).exists():
+            raise PaymentVerificationError(
+                payment_intent_id,
+                "payment intent was created for a gift-card purchase",
+            )
+        mismatch = binding_mismatch(
+            payment_data.get("metadata"),
+            purpose=PaymentPurpose.CART,
+            subject=cart.uuid,
+        )
+        if mismatch is not None:
+            logger.warning(
+                "Refusing payment intent %s for cart %s: %s",
+                payment_intent_id,
+                cart.uuid,
+                mismatch,
+            )
+            raise PaymentVerificationError(payment_intent_id, mismatch)
+
+    @classmethod
     def _order_created_for_payment(cls, payment_intent_id: str, cart):
         """The order this payment intent already produced for ``cart``.
 
@@ -769,6 +813,7 @@ class OrderService:
             payment_status, payment_data = cls._retrieve_payment_intent(
                 payment_intent_id, pay_way
             )
+            cls._verify_intent_binding(payment_intent_id, payment_data, cart)
         except InvalidOrderDataError, PaymentVerificationError:
             raise
         except Exception as e:
@@ -2111,8 +2156,8 @@ class OrderService:
                 product.safe_translation_getter("name", any_language=True) or ""
             )
 
-            # Check product is active
-            if product.active is False:
+            # Check product is active and not soft-deleted
+            if not product.is_purchasable:
                 errors.append(
                     _("Product '{product}' is no longer available").format(
                         product=product_display_name
@@ -3579,9 +3624,55 @@ class OrderService:
         )
 
         if update_order and payment_status_enum != order.payment_status:
-            cls._apply_polled_payment_status(order, payment_status_enum)
+            if payment_status_enum == PaymentStatus.COMPLETED:
+                cls._settle_polled_completion(order, status_data)
+            else:
+                cls._apply_polled_payment_status(order, payment_status_enum)
 
         return payment_status_enum, status_data
+
+    @classmethod
+    def _settle_polled_completion(
+        cls, order: Order, status_data: dict[str, Any]
+    ) -> None:
+        """Settle an order the provider reports as paid, through the same
+        handler the webhook uses.
+
+        A poll used to write ``COMPLETED`` straight onto the row: no
+        amount check, no ledger charge, no status advance and no
+        confirmation, and whatever intent the order carried was believed.
+        Now only a Stripe intent that no gift-card purchase holds settles,
+        and it does so through ``handle_payment_succeeded`` (amount
+        compared with the order, charge booked, status advanced), then
+        announces exactly as the webhook does. Any other provider's
+        settlement is its own webhook's.
+        """
+        from giftcard.models import GiftCardPurchase
+        from order.signals.handlers import announce_stripe_payment_applied
+
+        if (
+            order.pay_way.provider_code != StripePaymentProvider.code
+            or GiftCardPurchase.objects.filter(
+                payment_id=order.payment_id
+            ).exists()
+        ):
+            logger.info(
+                "Not settling order %s from a poll: its payment is settled "
+                "by its provider's webhook",
+                order.id,
+            )
+            return
+        amount = status_data.get("amount")
+        currency = status_data.get("currency")
+        if amount is None or not currency:
+            return
+        outcome = cls.handle_payment_succeeded(
+            order.payment_id,
+            captured=Money(Decimal(str(amount)), currency),
+        )
+        announce_stripe_payment_applied(outcome, order.payment_id)
+        if outcome is not None:
+            order.refresh_from_db()
 
     @classmethod
     @transaction.atomic
@@ -4051,6 +4142,73 @@ class OrderService:
             )
 
     @classmethod
+    def flag_payment_mismatch(
+        cls,
+        order: Order,
+        *,
+        payment_id: str,
+        provider: str,
+        observed: object,
+        expected: object,
+    ) -> None:
+        """Record a confirmed charge that does not match the order, and
+        page staff. The order is NOT marked paid.
+
+        The money HAS left the customer (the provider confirmed it), so the
+        flag also keeps ``auto_cancel_stuck_pending_orders`` from closing
+        the order with ``refund_payment=False``; a human reconciles it.
+        Called with the order row locked by the payment handler.
+        """
+        from order.models.history import OrderHistory
+        from order.models.order import AMOUNT_MISMATCH_FLAG
+        from shipping.alerts import OpsAlertKind, send_ops_alert
+
+        if not order.metadata:
+            order.metadata = {}
+        order.metadata[AMOUNT_MISMATCH_FLAG] = {
+            "transaction_id": str(payment_id),
+            "provider": provider,
+            "verified_amount": str(observed),
+            "expected_amount": str(expected),
+            "observed_at": timezone.now().isoformat(),
+        }
+        order.save(update_fields=["metadata"])
+        logger.error(
+            "%s payment %s collected %s but order %s is for %s — NOT "
+            "marking it paid",
+            provider,
+            payment_id,
+            observed,
+            order.id,
+            expected,
+        )
+        OrderHistory.log_note(
+            order=order,
+            note=(
+                f"{provider} payment {payment_id} collected {observed} but "
+                f"the order is for {expected}. It was not marked paid: "
+                "reconcile it with the customer."
+            ),
+        )
+        try:
+            send_ops_alert(
+                kind=OpsAlertKind.PAYMENT_MISMATCH,
+                subject=f"Payment does not match order {order.id}",
+                message=(
+                    f"{provider} payment {payment_id} collected {observed} "
+                    f"for order {order.id}, which is for {expected}. The "
+                    "order was not marked paid and will not be auto-"
+                    "canceled. Refund or reconcile it in the "
+                    f"{provider} dashboard."
+                ),
+            )
+        except Exception:
+            logger.exception(
+                "Could not send the payment-mismatch alert for order %s",
+                order.id,
+            )
+
+    @classmethod
     @transaction.atomic
     def handle_payment_succeeded(
         cls, payment_intent_id: str, *, captured: Money
@@ -4144,6 +4302,21 @@ class OrderService:
                 order.id,
                 order.payment_status,
             )
+            return PaymentEventOutcome(order, previous, applied=False)
+
+        expected = order.calculate_order_total_amount()
+        if (
+            captured.currency != expected.currency
+            or abs(captured.amount - expected.amount) > PAYMENT_AMOUNT_TOLERANCE
+        ):
+            cls.flag_payment_mismatch(
+                order,
+                payment_id=payment_intent_id,
+                provider=StripePaymentProvider.code,
+                observed=captured,
+                expected=expected,
+            )
+            publish_payment_status(order)
             return PaymentEventOutcome(order, previous, applied=False)
 
         order.mark_as_paid(

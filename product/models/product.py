@@ -391,6 +391,12 @@ class Product(
         self.refresh_from_db()
 
     @property
+    def is_purchasable(self) -> bool:
+        """Whether a shopper may add it to a cart and check it out: active
+        and not soft-deleted (deleting leaves ``active`` alone)."""
+        return self.active and not self.is_deleted
+
+    @property
     def _history_user(self):
         return self.changed_by
 

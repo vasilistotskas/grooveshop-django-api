@@ -1,5 +1,6 @@
 from unittest.mock import MagicMock, patch
 
+import pytest
 from django.db import connection
 from django.urls import reverse
 from rest_framework import status
@@ -23,6 +24,9 @@ from tests.utils.shipping import enable_rate
 from user.factories.account import UserAccountFactory
 
 PAYMENT_INTENT_ID = "pi_test_123abc"
+
+
+pytestmark = pytest.mark.usefixtures("trust_intent_binding")
 
 
 class TestPaymentFirstOrderCreation(APITestCase):

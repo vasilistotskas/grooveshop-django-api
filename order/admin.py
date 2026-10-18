@@ -663,6 +663,12 @@ class OrderAdmin(BaseModelAdmin):
         # dropdown never restored stock (prod orders 242 and 213,
         # 2026-09-08). Every action routes through the service.
         "status",
+        # Likewise: a payment is recorded by a provider event or a service
+        # path (the ledger), never typed in. A form save marked an order
+        # COMPLETED, or pointed it at another payment's id, with no charge
+        # behind it.
+        "payment_status",
+        "payment_id",
         "follow_up_note",
         "created_at",
         "updated_at",

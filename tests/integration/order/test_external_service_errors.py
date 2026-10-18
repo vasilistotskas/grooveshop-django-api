@@ -9,6 +9,7 @@ from stripe._error import (
 )
 
 from order.payment import StripePaymentProvider
+from order.payment_binding import PaymentPurpose
 
 
 @pytest.mark.django_db
@@ -44,6 +45,8 @@ class TestExternalServiceErrorsAreLogged:
                 {
                     "amount": Money("100.00", "USD"),
                     "order_id": "order_123",
+                    "purpose": PaymentPurpose.ORDER,
+                    "subject": "order-uuid",
                 },
             ),
             # Stripe refund
@@ -68,6 +71,8 @@ class TestExternalServiceErrorsAreLogged:
                 {
                     "amount": Money("100.00", "USD"),
                     "order_id": "order_checkout_1",
+                    "purpose": PaymentPurpose.ORDER,
+                    "subject": "order-uuid",
                     "success_url": "https://example.com/success",
                     "cancel_url": "https://example.com/cancel",
                 },
@@ -172,7 +177,12 @@ class TestExternalServiceErrorsAreLogged:
         [
             (
                 "process_payment",
-                {"amount": Money("100.00", "USD"), "order_id": "order_123"},
+                {
+                    "amount": Money("100.00", "USD"),
+                    "order_id": "order_123",
+                    "purpose": PaymentPurpose.ORDER,
+                    "subject": "order-uuid",
+                },
             ),
             (
                 "refund_payment",
@@ -241,7 +251,10 @@ class TestExternalServiceErrorsAreLogged:
             stripe.PaymentIntent, "create", side_effect=APIError("Test error")
         ):
             success, error_data = provider.process_payment(
-                Money("100.00", "USD"), "order_test"
+                Money("100.00", "USD"),
+                "order_test",
+                purpose=PaymentPurpose.ORDER,
+                subject="order-uuid",
             )
 
             # Verify: Returns failure
@@ -273,7 +286,12 @@ class TestExternalServiceErrorsAreLogged:
         with patch.object(
             stripe.PaymentIntent, "create", side_effect=APIError("Stripe error")
         ):
-            stripe_provider.process_payment(Money("100.00", "USD"), "order_1")
+            stripe_provider.process_payment(
+                Money("100.00", "USD"),
+                "order_1",
+                purpose=PaymentPurpose.ORDER,
+                subject="order-uuid",
+            )
 
         # Test Stripe refund
         with patch.object(

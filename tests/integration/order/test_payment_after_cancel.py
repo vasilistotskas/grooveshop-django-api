@@ -28,6 +28,7 @@ from order.services import OrderService
 from order.signals.handlers import handle_stripe_checkout_completed
 from order.views.viva_webhook import _handle_payment_created
 from tests.utils.payments import CAPTURED
+from tests.utils.viva import verified_payment
 
 pytestmark = pytest.mark.django_db
 
@@ -50,17 +51,20 @@ def _notes(order):
 
 class TestVivaChargeOnACanceledOrder:
     @staticmethod
-    def _verified():
+    def _verified(order):
         return patch(
             "order.views.viva_webhook._verify_transaction",
-            return_value=(PaymentStatus.COMPLETED, {"order_code": "OC9"}),
+            return_value=(
+                PaymentStatus.COMPLETED,
+                verified_payment(order, "OC9"),
+            ),
         )
 
     def test_books_the_money_alerts_and_ships_nothing(self):
         order = _canceled_order(metadata={"viva_order_codes": ["OC9"]})
 
         with (
-            self._verified(),
+            self._verified(order),
             patch("shipping.alerts.send_ops_alert") as alert,
             patch(
                 "shipping.services.ShippingService.dispatch_create_shipment_task"
@@ -93,7 +97,10 @@ class TestVivaChargeOnACanceledOrder:
     def test_a_redelivered_event_does_not_alert_twice(self):
         order = _canceled_order(metadata={"viva_order_codes": ["OC9"]})
 
-        with self._verified(), patch("shipping.alerts.send_ops_alert") as alert:
+        with (
+            self._verified(order),
+            patch("shipping.alerts.send_ops_alert") as alert,
+        ):
             _handle_payment_created(order, {"StatusId": "F"}, "viva_txn_9")
             order.refresh_from_db()
             _handle_payment_created(order, {"StatusId": "F"}, "viva_txn_9")
@@ -110,7 +117,10 @@ class TestVivaChargeOnACanceledOrder:
             metadata={"viva_order_codes": ["OC9"]},
         )
 
-        with self._verified(), patch("shipping.alerts.send_ops_alert") as alert:
+        with (
+            self._verified(order),
+            patch("shipping.alerts.send_ops_alert") as alert,
+        ):
             _handle_payment_created(order, {"StatusId": "F"}, "viva_txn_9")
 
         order.refresh_from_db()

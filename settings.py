@@ -1871,6 +1871,28 @@ EXTRA_SETTINGS_DEFAULTS = [
         ),
     },
     {
+        "name": "OPS_ALERT_GIFT_CARD_REVERSAL_ENABLED",
+        "type": "bool",
+        "value": True,
+        "description": (
+            "Email when the payment of a gift-card purchase is disputed, "
+            "or was refunded or charged back after part of the card was "
+            "already spent. The unspent balance is voided automatically; "
+            "the spent part is recorded on the purchase."
+        ),
+    },
+    {
+        "name": "OPS_ALERT_PAYMENT_MISMATCH_ENABLED",
+        "type": "bool",
+        "value": True,
+        "description": (
+            "Email when a provider confirms a payment whose amount does "
+            "not match the order, or that cannot be tied to the order it "
+            "arrived for. The order is not marked paid and is never "
+            "auto-canceled; reconcile it by hand."
+        ),
+    },
+    {
         "name": "OPS_ALERT_REVIEW_PENDING_ENABLED",
         "type": "bool",
         "value": True,

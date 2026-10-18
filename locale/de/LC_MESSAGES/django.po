@@ -10528,3 +10528,23 @@ msgstr ""
 #: refund integrity
 msgid "Order %(order_id)s skipped: refund its payment first."
 msgstr ""
+
+#: .\giftcard\models.py
+msgid "Provider Transaction ID"
+msgstr "Transaktions-ID des Anbieters"
+
+#: .\giftcard\models.py
+msgid "Unrecovered Amount"
+msgstr "Nicht einbringbarer Betrag"
+
+#: .\shipping\alerts.py
+msgid "Gift card whose payment was reversed or disputed"
+msgstr "Geschenkkarte, deren Zahlung rückgängig gemacht oder angefochten wurde"
+
+#: .\shipping\alerts.py
+msgid "Payment that does not match its order"
+msgstr "Zahlung, die nicht zur Bestellung passt"
+
+#: .\order\serializers\order.py
+msgid "This can't change once the order is placed: the shipping cost and VAT were priced for it."
+msgstr "Dies kann nach Aufgabe der Bestellung nicht mehr geändert werden: Versandkosten und MwSt. wurden dafür berechnet."

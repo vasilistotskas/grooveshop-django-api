@@ -34,6 +34,8 @@ from shipping_boxnow.models import BoxNowShipment
 from tests.utils.shipping import enable_rate
 from user.factories.account import UserAccountFactory
 
+pytestmark = pytest.mark.usefixtures("trust_intent_binding")
+
 
 @pytest.mark.django_db
 class TestOrderCreateWithBoxNow(APITestCase):

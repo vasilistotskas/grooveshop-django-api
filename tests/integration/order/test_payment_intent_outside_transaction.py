@@ -36,7 +36,10 @@ from product.factories.product import ProductFactory
 from product.models.product import Product
 from user.factories.account import UserAccountFactory
 
-pytestmark = pytest.mark.assert_english
+pytestmark = [
+    pytest.mark.assert_english,
+    pytest.mark.usefixtures("trust_intent_binding"),
+]
 
 
 def _eur(amount: str) -> Money:

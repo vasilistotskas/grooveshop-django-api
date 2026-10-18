@@ -842,3 +842,22 @@ def _retry_meili_connection_errors(attempts: int = 3) -> None:
 
     send_request._retry_wrapped = True  # type: ignore[attr-defined]
     _httprequests.HttpRequests.send_request = send_request
+
+
+@pytest.fixture
+def trust_intent_binding():
+    """Let a test whose mocked provider returns a bare intent create an order.
+
+    ``OrderService.create_order_from_cart`` refuses an intent whose
+    server-set metadata does not name the cart (``order.payment_binding``).
+    Tests about something else (stock, totals, attribution) mock the
+    provider with no metadata; this accepts their intent so they stay about
+    that. The refusal itself is covered, unpatched, in
+    ``tests/integration/order/test_payment_binding.py``.
+    """
+    from unittest.mock import patch
+
+    from order.services import OrderService
+
+    with patch.object(OrderService, "_verify_intent_binding"):
+        yield

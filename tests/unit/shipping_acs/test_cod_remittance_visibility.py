@@ -274,7 +274,11 @@ def test_the_warning_carries_what_identifies_the_row():
 
 def test_a_matched_payout_alerts_nobody():
     order = OrderFactory(payment_status=PaymentStatus.PENDING)
-    AcsShipmentFactory(order=order, voucher_no="2431665832")
+    AcsShipmentFactory(
+        order=order,
+        voucher_no="2431665832",
+        cod_amount=Money(Decimal("24.97"), "EUR"),
+    )
 
     with (
         patch("shipping_acs.services.AcsClient") as client,

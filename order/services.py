@@ -2392,9 +2392,10 @@ class OrderService:
         # REFUNDED says the customer was paid back, and the loyalty
         # reversal and the status email follow the status: not while the
         # ledger still holds money that can be refunded.
-        if new_status == OrderStatus.REFUNDED:
-            if PaymentLedger.refund_open(order):
-                raise RefundOutstandingError(PaymentLedger.refundable(order))
+        if new_status == OrderStatus.REFUNDED and PaymentLedger.refund_open(
+            order
+        ):
+            raise RefundOutstandingError(PaymentLedger.refundable(order))
 
         old_status = order.status
 

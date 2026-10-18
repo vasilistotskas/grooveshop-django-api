@@ -362,7 +362,12 @@ class TestWhereTheActionIsOffered:
     def test_a_forged_request_for_an_order_with_nothing_to_refund_is_refused(
         self, order_admin, staff_user
     ):
-        order = OrderFactory(num_order_items=0, status=OrderStatus.PROCESSING)
+        order = OrderFactory(
+            num_order_items=0,
+            status=OrderStatus.PROCESSING,
+            pay_way=None,
+            payment_id="",
+        )
 
         with FakeStripeRefunds() as stripe_api, pytest.raises(PermissionDenied):
             order_admin.refund_payment(

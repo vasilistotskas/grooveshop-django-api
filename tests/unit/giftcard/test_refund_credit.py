@@ -178,7 +178,11 @@ class TestAnOrderClosedAsRefundedWithNoProviderPayment:
     def _close(self, order):
         from order.services import OrderService
 
-        Order.objects.filter(pk=order.pk).update(status=OrderStatus.RETURNED)
+        # No provider payment, which is the case this receiver serves (a
+        # factory order carries a random provider pay way otherwise).
+        Order.objects.filter(pk=order.pk).update(
+            status=OrderStatus.RETURNED, pay_way=None, payment_id=""
+        )
         order.refresh_from_db()
         OrderService.update_order_status(order, OrderStatus.REFUNDED)
 

@@ -17,7 +17,6 @@ from unittest.mock import patch
 import pytest
 from django.core import mail
 from django.db import IntegrityError, connection, transaction
-from django.utils import translation
 from djmoney.money import Money
 
 from order.enum.payment_transaction import PaymentTransactionKind
@@ -33,12 +32,13 @@ from tests.utils.stripe_refunds import FakeStripeRefunds
 pytestmark = pytest.mark.django_db
 
 
-def _order():
+def _order(**kwargs):
     order = OrderFactory(
         num_order_items=0,
         status=OrderStatus.DELIVERED,
         payment_status=PaymentStatus.COMPLETED,
         email="customer@example.com",
+        **kwargs,
     )
     PaymentTransactionFactory(order=order, amount=Money("100.00", "EUR"))
     return order
@@ -312,17 +312,12 @@ class TestTheEmailStatesTheAmount:
     """A customer refunded 30 of 100 must be told 30 and that 70 is still
     to come, not just that "your refund has been processed"."""
 
-    @pytest.fixture(autouse=True)
-    def _english(self):
-        with translation.override("en"):
-            yield
-
     def _bodies(self, message) -> tuple[str, str]:
         html = message.alternatives[0].content
         return message.body, html
 
     def test_a_partial_refund_says_how_much_and_how_much_is_left(self):
-        order = _order()
+        order = _order(language_code="en")
         refund = _refund(order, "30.00", "re_1")
 
         send_refund_confirmation_email(refund.pk)
@@ -335,7 +330,7 @@ class TestTheEmailStatesTheAmount:
             assert re.search(r"70[.,]00", body)
 
     def test_a_full_refund_says_how_much_and_nothing_is_left(self):
-        order = _order()
+        order = _order(language_code="en")
         refund = _refund(order, "100.00", "re_1")
 
         send_refund_confirmation_email(refund.pk)
@@ -347,7 +342,7 @@ class TestTheEmailStatesTheAmount:
             assert "Still to be refunded" not in body
 
     def test_each_refund_email_names_its_own_amount(self):
-        order = _order()
+        order = _order(language_code="en")
         first = _refund(order, "30.00", "re_1")
         second = _refund(order, "20.00", "re_2")
 
@@ -364,7 +359,7 @@ class TestTheEmailStatesTheAmount:
         row of its own, so it must not print an empty amount."""
         from django.template.loader import render_to_string
 
-        order = _order()
+        order = _order(language_code="en")
         body = render_to_string(
             "emails/order/order_status_generic.txt",
             {"order": order, "status": "REFUNDED", "status_display": "R"},

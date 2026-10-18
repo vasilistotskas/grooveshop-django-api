@@ -648,6 +648,11 @@ SOCIALACCOUNT_EMAIL_AUTHENTICATION = True
 SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT = True
 SOCIALACCOUNT_EMAIL_VERIFICATION = "mandatory"
 SOCIALACCOUNT_REQUESTS_TIMEOUT = 10
+# No provider sets VERIFIED_EMAIL: allauth would then mark EVERY address
+# the provider returns as verified, overriding the provider's own flag,
+# and SOCIALACCOUNT_EMAIL_AUTHENTICATION would sign whoever added a
+# customer's address, unverified, to a Discord or GitHub account into
+# that customer's account. Each provider's own verified flag decides.
 SOCIALACCOUNT_PROVIDERS = {
     "github": {
         "APP": {
@@ -656,7 +661,6 @@ SOCIALACCOUNT_PROVIDERS = {
             "key": "",
         },
         "SCOPE": ["read:user", "user:email"],
-        "VERIFIED_EMAIL": True,
     },
     "google": {
         "APP": {
@@ -666,7 +670,6 @@ SOCIALACCOUNT_PROVIDERS = {
         },
         "SCOPE": ["profile", "email", "openid"],
         "AUTH_PARAMS": {"access_type": "offline" if DEBUG else "online"},
-        "VERIFIED_EMAIL": True,
     },
     "discord": {
         "APP": {
@@ -675,7 +678,6 @@ SOCIALACCOUNT_PROVIDERS = {
             "key": getenv("SOCIALACCOUNT_DISCORD_PUBLIC_KEY", ""),
         },
         "SCOPE": ["email", "identify"],
-        "VERIFIED_EMAIL": True,
     },
     "facebook": {
         "APP": {
@@ -700,7 +702,6 @@ SOCIALACCOUNT_PROVIDERS = {
             "picture",
             "short_name",
         ],
-        "VERIFIED_EMAIL": True,
     },
 }
 SOCIALACCOUNT_FORMS = {

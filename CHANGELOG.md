@@ -3,6 +3,29 @@
 
 
 
+## v3.136.4 (2026-10-18)
+
+### Bug fixes
+
+* fix(orders): free shipping and free payment fee use the same order value (#257)
+
+ShippingRate.free_shipping_threshold and PayWay.free_threshold both mean
+"free above X" to the shopper, but free shipping compared the gross cart
+total while the payment fee compared items plus shipping, so a cart just
+under the threshold could pay shipping and skip the fee.
+
+Both are now compared with OrderService.threshold_value: the products after
+promotion and coupon discounts, excluding shipping and the pay-way fee.
+Every caller of shipping_cost and calculate_payment_method_fee takes it from
+there (the cart payment-intent preview, the payment-first verification and
+both order-creation paths), so the preview and the order agree. The cart
+response reports it as freeThresholdValue.
+
+Admin help text for both threshold fields says so; el/en/de strings,
+docs/order-system.md and schema.yml updated.
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`07f63e4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/07f63e47a4dc8994d6138c8d1f0cea5607e2fd56))
+
 ## v3.136.3 (2026-10-18)
 
 ### Bug fixes

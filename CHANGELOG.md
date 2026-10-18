@@ -3,6 +3,40 @@
 
 
 
+## v3.135.2 (2026-10-18)
+
+### Bug fixes
+
+* fix(tenant): the tenant-resolve cache key covers fields inside nested serializers (#242) ([`ccfba88`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ccfba8875da05d91a01ffbe529db4409071e29a9))
+
+* fix(tenant): the tenant-resolve cache key covers fields inside nested serializers
+
+The key's shape fingerprint hashed only TenantConfigSerializer's top-level
+field names. A field added inside a nested serializer (features,
+shipping_carriers) therefore reused the old key, the cache kept serving
+the pre-release payload, and the storefront, whose generated schema
+requires the new fields, rejected it and answered "Store not found" on
+every route. Three booleans added to features did exactly that to every
+store whose entry had not expired, for about 4.5 minutes, until the
+stale entries were deleted by hand.
+
+The fingerprint now walks the whole field tree: nested serializers and
+list children included.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DKyCtCCkFTgcH6VAVK3AJm ([`ccfba88`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ccfba8875da05d91a01ffbe529db4409071e29a9))
+
+### Testing
+
+* test(tenant): a field inside a list serializer child changes the resolve key
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DKyCtCCkFTgcH6VAVK3AJm
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`ccfba88`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ccfba8875da05d91a01ffbe529db4409071e29a9))
+
 ## v3.135.1 (2026-10-18)
 
 ### Bug fixes

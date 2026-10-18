@@ -401,7 +401,6 @@ class PaymentLedger:
         if attempt is None and created:
             attempt = (
                 RefundAttempt.objects.live()
-                .select_for_update()
                 .filter(charge=charge, amount=amount)
                 .order_by("created_at", "id")
                 .first()

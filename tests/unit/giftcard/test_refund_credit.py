@@ -168,3 +168,68 @@ def test_viva_refunds_return_the_redemption_with_the_last_one(
     order.refresh_from_db()
     assert order.payment_status == PaymentStatus.REFUNDED
     assert _credited(order) == Decimal("60.00")
+
+
+class TestAnOrderClosedAsRefundedWithNoProviderPayment:
+    """Paid entirely with gift cards, an order has no provider payment, so
+    no refund ever fires for it. Closing it as REFUNDED is what returns the
+    cards."""
+
+    def _close(self, order):
+        from order.services import OrderService
+
+        Order.objects.filter(pk=order.pk).update(status=OrderStatus.RETURNED)
+        order.refresh_from_db()
+        OrderService.update_order_status(order, OrderStatus.REFUNDED)
+
+    def test_the_redemption_goes_back(
+        self, giftcard_order_settled_with_one_card
+    ):
+        order, _card = giftcard_order_settled_with_one_card
+        Order.objects.filter(pk=order.pk).update(
+            payment_status=PaymentStatus.COMPLETED
+        )
+
+        self._close(order)
+
+        assert _credited(order) == Decimal("60.00")
+
+    def test_closing_it_again_or_after_the_refund_credits_once(
+        self, giftcard_order_settled_with_one_card
+    ):
+        order, _card = giftcard_order_settled_with_one_card
+        _refund(order, PaymentStatus.REFUNDED, "40.00")
+        assert _credited(order) == Decimal("60.00")
+        # The ledger has nothing left to refund, so the status may close.
+        order.payment_transactions.filter(kind="CHARGE").update(
+            amount=Money(Decimal("40.00"), "EUR")
+        )
+
+        self._close(order)
+
+        assert _credited(order) == Decimal("60.00")
+
+    def test_a_charged_back_order_is_left_alone(
+        self, giftcard_order_settled_with_one_card
+    ):
+        from order.enum.payment_transaction import PaymentTransactionKind
+        from order.factories import PaymentTransactionFactory
+
+        order, _card = giftcard_order_settled_with_one_card
+        charge = PaymentTransactionFactory(
+            order=order, amount=Money(Decimal("40.00"), "EUR")
+        )
+        PaymentTransactionFactory(
+            order=order,
+            charge=charge,
+            kind=PaymentTransactionKind.CHARGEBACK,
+            amount=Money(Decimal("40.00"), "EUR"),
+            provider_reference="dp_lost",
+        )
+        Order.objects.filter(pk=order.pk).update(
+            payment_status=PaymentStatus.COMPLETED
+        )
+
+        self._close(order)
+
+        assert _credited(order) == Decimal(0)

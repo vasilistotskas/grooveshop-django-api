@@ -391,10 +391,12 @@ class OrderItemInline(TabularInline):
 
     @admin.display(description=_("Refund Status"))
     def refund_status(self, obj):
+        # A line's "refunded" quantity is what staff put back on the shelf
+        # (``OrderItem.refund``); it moves no money.
         if obj.is_refunded:
-            return _("Refunded")
+            return _("Back in stock")
         if obj.refunded_quantity > 0:
-            return _("Partial")
+            return _("Partly back in stock")
         return ""
 
 
@@ -2074,7 +2076,7 @@ class OrderItemAdmin(BaseModelAdmin):
             },
         ),
         (
-            _("Refund Information"),
+            _("Returned units"),
             {
                 "fields": (
                     "is_refunded",
@@ -2203,10 +2205,12 @@ class OrderItemAdmin(BaseModelAdmin):
 
     @admin.display(description=_("Refund Status"))
     def refund_status_display(self, obj):
+        # Restocked units, not money: the customer is paid back by the
+        # order's refund, which this does not record.
         if obj.is_refunded:
-            return _("Fully Refunded")
+            return _("All units back in stock")
         if obj.refunded_quantity > 0:
-            return _("Partial (%(refunded)s/%(qty)s)") % {
+            return _("Back in stock (%(refunded)s/%(qty)s)") % {
                 "refunded": obj.refunded_quantity,
                 "qty": obj.quantity,
             }

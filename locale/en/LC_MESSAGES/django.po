@@ -20576,3 +20576,91 @@ msgstr ""
 #: order/views/order.py
 msgid "Receipt unavailable"
 msgstr ""
+
+#: refund integrity
+msgid "This store has no credentials for the payment provider, so the payment cannot be refunded here."
+msgstr ""
+
+#: refund integrity
+msgid "A refund of this amount was already sent to the payment provider and its result is not known yet. It is recorded when the provider confirms it; check the provider's dashboard before trying again."
+msgstr ""
+
+#: refund integrity
+msgid "Order %(order_id)s skipped: refund its payment first, %(amount)s can still be refunded."
+msgstr ""
+
+#: refund integrity
+msgid "Order %(order_id)s was canceled, but a dispute is open on its payment, so the refund waits until the dispute closes. Refund it then."
+msgstr ""
+
+#: refund integrity
+msgid "Back in stock"
+msgstr ""
+
+#: refund integrity
+msgid "Partly back in stock"
+msgstr ""
+
+#: refund integrity
+msgid "All units back in stock"
+msgstr ""
+
+#: refund integrity
+msgid "Back in stock (%(refunded)s/%(qty)s)"
+msgstr ""
+
+#: refund integrity
+msgid "Returned units"
+msgstr ""
+
+#: refund integrity
+msgid "Amount refunded"
+msgstr ""
+
+#: refund integrity
+msgid "Still to be refunded"
+msgstr ""
+
+#: refund integrity
+msgid "A refund the provider accepted failed"
+msgstr ""
+
+#: refund integrity
+msgid "Refund Attempt"
+msgstr ""
+
+#: refund integrity
+msgid "Refund Attempts"
+msgstr ""
+
+#: refund integrity
+msgid "Settled"
+msgstr ""
+
+#: refund integrity
+msgid "Declined"
+msgstr ""
+
+#: refund integrity
+msgid "The payment this share is refunded against."
+msgstr ""
+
+#: refund integrity
+msgid "Idempotency key"
+msgstr ""
+
+#: refund integrity
+msgid "Sent to the provider so a repeat is not a second refund."
+msgstr ""
+
+#: refund integrity
+msgid "The ledger refund this attempt produced."
+msgstr ""
+
+#: refund integrity
+msgid "Refund attempt %(key)s of %(amount)s"
+msgstr ""
+
+#: refund integrity
+msgid "Refund reversal"
+msgstr ""

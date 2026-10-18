@@ -21,12 +21,13 @@ from django.contrib.messages.storage.fallback import FallbackStorage
 from django.test import RequestFactory
 from djmoney.money import Money
 
-from order.admin import OrderAdmin
+from order.admin import OrderAdmin, OrderItemAdmin, OrderItemInline
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import OrderStatus, PaymentStatus
 from order.exceptions import RefundOutstandingError
 from order.factories import OrderFactory, PaymentTransactionFactory
 from order.models.history import OrderHistory
+from order.models.item import OrderItem
 from order.models.order import Order
 from order.services import OrderService
 from pay_way.factories import PayWayFactory
@@ -198,3 +199,32 @@ class TestMarkingAnOrderRefunded:
         assert "100.00" in message
         order.refresh_from_db()
         assert order.status == OrderStatus.RETURNED
+
+
+class TestAnItemLineSaysRestockedNotRefunded:
+    """``OrderItem.refund`` puts units back on the shelf and moves no money,
+    so the admin must not say the customer was refunded."""
+
+    @pytest.fixture
+    def item(self):
+        order = OrderFactory(num_order_items=1)
+        return order.items.get()
+
+    def test_the_item_list_label(self, item):
+        admin = OrderItemAdmin(OrderItem, AdminSite())
+
+        item.is_refunded, item.refunded_quantity = True, item.quantity
+        assert str(admin.refund_status_display(item)) == (
+            "All units back in stock"
+        )
+        item.is_refunded, item.refunded_quantity = False, 1
+        assert "Back in stock (1/" in str(admin.refund_status_display(item))
+        assert "efund" not in str(admin.refund_status_display(item))
+
+    def test_the_inline_label(self, item):
+        inline = OrderItemInline(Order, AdminSite())
+
+        item.is_refunded, item.refunded_quantity = True, item.quantity
+        assert str(inline.refund_status(item)) == "Back in stock"
+        item.is_refunded, item.refunded_quantity = False, 1
+        assert str(inline.refund_status(item)) == "Partly back in stock"

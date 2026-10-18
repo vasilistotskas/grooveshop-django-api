@@ -333,8 +333,15 @@ GitHub Actions (`.github/workflows/ci.yml`) jobs:
 
 ## MCP servers
 
-`.mcp.json` declares only `context7`, because that is the one server every
-teammate can use as-is.
+No `.mcp.json` is committed. Context7 is configured once per machine at user
+scope, with your own key read from the environment:
+
+```bash
+claude mcp add-json --scope user context7 '{"type":"http","url":"https://mcp.context7.com/mcp","headers":{"Authorization":"Bearer ${CONTEXT7_API_KEY}"}}'
+```
+
+A project `.mcp.json` entry with the same name would take precedence over that
+server, which is why none is committed here.
 
 **IDE bridges belong in user scope, not here.** A JetBrains MCP endpoint is a
 machine- and session-specific `http://127.0.0.1:<ephemeral-port>/stream`; a

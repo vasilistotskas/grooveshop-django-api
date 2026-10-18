@@ -87,12 +87,12 @@ REFERENCE_DATA_APP_LABELS: frozenset[str] = frozenset({"country", "region"})
 # own copy and the tenant copy wins on the search path — meaning on a
 # tenant host these admin pages show that store's own rows:
 #   user         -> that store's CUSTOMERS
-#   usersessions -> those customers' sessions
 #   extra_settings -> that store's settings
+# (``usersessions`` is per-schema too, but a customer's sessions are
+# their sign-in identity: it is in PLATFORM_ONLY_APP_LABELS above.)
 STORE_SHARED_APP_LABELS: frozenset[str] = frozenset(
     {
         "user",
-        "usersessions",
         "extra_settings",
     }
 )

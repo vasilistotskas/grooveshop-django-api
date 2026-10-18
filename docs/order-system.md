@@ -889,6 +889,20 @@ accepting Cyprus orders at the Greek flat rate.
   (`ShippingWeightExceededError`); both are used directly by a
   free-shipping promo, which must not let an unavailable or over-weight
   option through just because it charges nothing.
+- **One basis for every "free above X".** `ShippingRate.free_shipping_threshold`
+  and `PayWay.free_threshold` are both compared with
+  `OrderService.threshold_value(cart_total, discount_total)`: the products
+  after promotion and coupon discounts, excluding shipping and the pay-way
+  fee (loyalty points and gift cards are payment, not discounts, and do not
+  move it). Every caller of `OrderService.shipping_cost` and
+  `calculate_payment_method_fee` passes it: both order-creation paths, the
+  payment-first verification step and the cart's create-payment-intent
+  preview, so the preview and the order cannot disagree. The cart response
+  reports it as `freeThresholdValue`, and `/shipping/options` takes it as
+  `orderValueAmount`; a client shows "X more for free" from that number,
+  never from `totalPrice`. (Before, the fee compared items + shipping and
+  free shipping the gross total, so a EUR 39.98 cart with both thresholds at
+  EUR 40 paid shipping but not the fee.)
 - **`ShippingService.quote(...)`** is `assert_available` + pricing:
   the rate's own `free_shipping_threshold` first, then the carrier's
   `live_quote()` hook (ACS's weight-banded `ACS_Price_Calculation`,
@@ -1433,6 +1447,7 @@ the linked memory note or the originating PR's commit message.
 | The default cache fails open on a Redis outage (reads miss, writes no-op — `core/caches.py`), but never for keys under `STRICT_KEY_PREFIXES`: the `strict:` throttle namespace, allauth's rate limits, TOTP replay protection, the IdP's single-use codes and WebSocket tickets. The checkout, payment, coupon and gift-card throttles (`core/api/throttling.py`, `fail_closed = True`) therefore DENY with 429 during an outage, while browsing/search/cart throttles and DRF's default `anon`/`user` budgets allow | `core/api/throttling.py` module docstring |
 | The tenant resolve payload and domain set are invalidated by `Tenant.cache_generation`, never by a Redis delete: it is part of their keys, and `Tenant.save`, every `TenantDomain` write and the folded pay-way / agent-setting writes bump it in the database inside the write's transaction. A delete during an outage is a fail-open no-op, so purge-by-delete left the pre-write payload served for up to its TTL; strict keys would have made the READS raise, and resolve is on every storefront request | `tenant/cache.py` module docstring |
 | The nightly demo reset returns the published demo gift card (`GIFT_CARD_CODE`) to its issued value with one `ADJUST` ledger row, so the ledger sum stays the balance and every guest spend stays on the card's history; only on `is_demo` tenants, and silently (no mail, no dispatch) | `devtools/demo_account.py: _restore_gift_card` |
+| "Free above X" means one value for shipping and for the pay-way fee: the products after discounts, excluding shipping and fees (`OrderService.threshold_value`), passed by every caller of `shipping_cost` and `calculate_payment_method_fee` | §5.0 |
 | A payment is bound to what it was made for: every PaymentIntent carries server-set `purpose` / `subject` / `tenant_schema` metadata, payment-first order creation refuses an intent that is not `cart` + this cart + this tenant (or that a gift-card purchase holds), and the polled status path settles only through `handle_payment_succeeded` | §3.1, §4.1 |
 | A confirmed charge settles an order only for its own total: Stripe's collected amount and Viva's amount AND currency are compared (a missing one refuses), a mismatch is booked, flagged (`AMOUNT_MISMATCH_FLAG`), alerted and never auto-canceled | §4.1, §4.3 |
 | A reversal of a gift-card purchase's payment (refund, claim, chargeback, Stripe or Viva) voids the unspent card and records the spent part | §4.2.1 |

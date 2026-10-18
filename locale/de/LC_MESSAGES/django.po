@@ -6764,9 +6764,9 @@ msgstr ""
 msgid "Filter payment methods that have/don't have configuration"
 msgstr ""
 
-#: .\pay_way\models.py:31
-msgid "Order amount above which this payment method becomes free"
-msgstr ""
+#: .\pay_way\models.py
+msgid "The payment method is free once the products, after discounts and excluding shipping, reach this amount. Free shipping is judged on the same value."
+msgstr "Die Zahlungsart ist kostenlos, sobald die Produkte nach Rabatten und ohne Versand diesen Betrag erreichen. Der kostenlose Versand wird nach demselben Wert beurteilt."
 
 #: .\pay_way\models.py:38
 msgid "Provider Code"
@@ -9751,8 +9751,8 @@ msgid "What the shopper pays for this (provider, country, kind), before ``free_s
 msgstr "Was der Kunde für diese Kombination (Anbieter, Land, Versandart) zahlt, bevor ``free_shipping_threshold`` oder das eigene ``live_quote`` des Versanddienstleisters greift."
 
 #: .\shipping\models\rate.py
-msgid "Cart subtotal above which this combination ships free. Blank means this combination is never free."
-msgstr "Warenkorb-Zwischensumme, ab der diese Kombination kostenlos versendet wird. Leer bedeutet: nie kostenlos."
+msgid "Ships free once the products, after discounts and excluding shipping, reach this amount. The payment-method fee is waived on the same value. Blank means this combination is never free."
+msgstr "Versandkostenfrei, sobald die Produkte nach Rabatten und ohne Versand diesen Betrag erreichen. Die Zahlungsartgebühr entfällt bei demselben Wert. Leer bedeutet: nie kostenlos."
 
 #: .\shipping\models\rate.py
 msgid "Heaviest parcel this combination will carry. Blank means no cap. A cart over the cap still lists the option (flagged ``exceeds_max_weight``) rather than disappearing silently."
@@ -10548,3 +10548,11 @@ msgstr "Zahlung, die nicht zur Bestellung passt"
 #: .\order\serializers\order.py
 msgid "This can't change once the order is placed: the shipping cost and VAT were priced for it."
 msgstr "Dies kann nach Aufgabe der Bestellung nicht mehr geändert werden: Versandkosten und MwSt. wurden dafür berechnet."
+
+#: .\shipping\serializers\option.py
+msgid "The cart's free_threshold_value: the products after discounts, excluding shipping. Free-shipping thresholds are checked against it."
+msgstr "Der free_threshold_value des Warenkorbs: die Produkte nach Rabatten, ohne Versand. Die Grenzen für kostenlosen Versand werden daran geprüft."
+
+#: .\cart\serializers\cart.py
+msgid "The value free shipping and a free payment fee are judged on: the products after promotion and coupon discounts, excluding shipping and fees. Compare a free-above threshold with this, never with total_price."
+msgstr "Der Wert, nach dem kostenloser Versand und eine kostenlose Zahlungsgebühr beurteilt werden: die Produkte nach Aktions- und Gutscheinrabatten, ohne Versand und Gebühren. Vergleichen Sie eine Grenze „kostenlos ab“ damit, nie mit total_price."

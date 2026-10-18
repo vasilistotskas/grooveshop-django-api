@@ -32,7 +32,9 @@ class PayWay(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         decimal_places=2,
         default=0,
         help_text=_(
-            "Order amount above which this payment method becomes free"
+            "The payment method is free once the products, after "
+            "discounts and excluding shipping, reach this amount. "
+            "Free shipping is judged on the same value."
         ),
     )
     icon = ImageAndSvgField(

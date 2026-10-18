@@ -996,8 +996,11 @@ class CartViewSet(BaseModelViewSet):
             (item.product, item.quantity) for item in cart.items.all()
         ) + PromotionEngine.gift_weight_grams(promo_result)
         try:
+            threshold_value = OrderService.threshold_value(
+                cart_total, promo_result.discount_total
+            )
             shipping_cost = OrderService.shipping_cost(
-                order_value=cart_total,
+                order_value=threshold_value,
                 country_id=country_id,
                 region_id=region_id,
                 shipping_provider_code=shipping_provider_code,
@@ -1016,8 +1019,8 @@ class CartViewSet(BaseModelViewSet):
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        # Pay-way fee (and its free_threshold) is computed on the
-        # DISCOUNTED subtotal — the same figure order creation uses.
+        # The pay-way fee is waived on the same value as free shipping
+        # (``threshold_value``), exactly as order creation does.
         order_subtotal = Money(
             cart_total.amount
             - promo_result.discount_total.amount
@@ -1025,7 +1028,7 @@ class CartViewSet(BaseModelViewSet):
             cart_total.currency,
         )
         payment_fee = OrderService.calculate_payment_method_fee(
-            pay_way, order_subtotal
+            pay_way, threshold_value
         )
         cart_total = Money(
             order_subtotal.amount + payment_fee.amount,

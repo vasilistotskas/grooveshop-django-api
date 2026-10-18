@@ -12503,10 +12503,9 @@ msgstr ""
 "στην Κύπρο). Δεν έχει επίδραση χωρίς το ``shippingKind``· αν παραλείπεται "
 "ισχύουν μόνο οι αποκλεισμοί για όλες τις χώρες."
 
-#: .\pay_way\models.py:35
-msgid "Order amount above which this payment method becomes free"
-msgstr ""
-"Ποσό παραγγελίας πάνω από το οποίο αυτή η μέθοδος πληρωμής γίνεται δωρεάν"
+#: .\pay_way\models.py
+msgid "The payment method is free once the products, after discounts and excluding shipping, reach this amount. Free shipping is judged on the same value."
+msgstr "Η μέθοδος πληρωμής είναι δωρεάν όταν τα προϊόντα, μετά τις εκπτώσεις και χωρίς τα μεταφορικά, φτάσουν αυτό το ποσό. Τα δωρεάν μεταφορικά κρίνονται με την ίδια αξία."
 
 #: .\pay_way\models.py:47
 msgid ""
@@ -15662,13 +15661,9 @@ msgstr ""
 msgid "Free Shipping Threshold"
 msgstr "Όριο δωρεάν μεταφορικών"
 
-#: .\shipping\models\rate.py:72
-msgid ""
-"Cart subtotal above which this combination ships free. Blank means this "
-"combination is never free."
-msgstr ""
-"Το υποσύνολο καλαθιού από το οποίο και πάνω αυτός ο συνδυασμός αποστέλλεται "
-"δωρεάν. Κενό σημαίνει ότι δεν γίνεται ποτέ δωρεάν."
+#: .\shipping\models\rate.py
+msgid "Ships free once the products, after discounts and excluding shipping, reach this amount. The payment-method fee is waived on the same value. Blank means this combination is never free."
+msgstr "Αποστέλλεται δωρεάν όταν τα προϊόντα, μετά τις εκπτώσεις και χωρίς τα μεταφορικά, φτάσουν αυτό το ποσό. Το τέλος μεθόδου πληρωμής παραλείπεται με την ίδια αξία. Κενό σημαίνει ότι ο συνδυασμός δεν γίνεται ποτέ δωρεάν."
 
 #: .\shipping\models\rate.py:77
 msgid "Max Weight (grams)"
@@ -15779,10 +15774,9 @@ msgstr ""
 "αποστολής (``ShippingRate``) ορίζεται ανά χώρα, οπότε δεν υπάρχει λίστα "
 "επιλογών ανεξάρτητη από τον προορισμό."
 
-#: .\shipping\serializers\option.py:25
-msgid "Cart subtotal — used for free-shipping threshold checks."
-msgstr ""
-"Υποσύνολο καλαθιού — χρησιμοποιείται για ελέγχους ορίου δωρεάν αποστολής."
+#: .\shipping\serializers\option.py
+msgid "The cart's free_threshold_value: the products after discounts, excluding shipping. Free-shipping thresholds are checked against it."
+msgstr "Το free_threshold_value του καλαθιού: τα προϊόντα μετά τις εκπτώσεις, χωρίς τα μεταφορικά. Τα όρια δωρεάν αποστολής ελέγχονται με αυτό."
 
 #: .\shipping\serializers\option.py:38
 msgid ""
@@ -23315,3 +23309,7 @@ msgstr "Πληρωμή που δεν ταιριάζει με την παραγγ
 #: .\order\serializers\order.py
 msgid "This can't change once the order is placed: the shipping cost and VAT were priced for it."
 msgstr "Αυτό δεν μπορεί να αλλάξει μετά την υποβολή της παραγγελίας: τα μεταφορικά και ο ΦΠΑ έχουν υπολογιστεί γι' αυτό."
+
+#: .\cart\serializers\cart.py
+msgid "The value free shipping and a free payment fee are judged on: the products after promotion and coupon discounts, excluding shipping and fees. Compare a free-above threshold with this, never with total_price."
+msgstr "Η αξία με την οποία κρίνονται τα δωρεάν μεταφορικά και το δωρεάν τέλος πληρωμής: τα προϊόντα μετά τις εκπτώσεις προωθήσεων και κουπονιών, χωρίς μεταφορικά και τέλη. Συγκρίνετε ένα όριο «δωρεάν πάνω από» με αυτήν, ποτέ με το total_price."

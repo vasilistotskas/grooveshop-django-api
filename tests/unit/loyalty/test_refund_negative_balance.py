@@ -57,6 +57,21 @@ class TestWhenTheBalanceMayGoNegative:
         user.refresh_from_db()
         assert user.total_xp == 0
 
+    def test_the_setting_is_declared_on_by_default(self):
+        """The store's own row is seeded from this declaration, so what it
+        says is what a store that never chose gets."""
+        from django.conf import settings
+
+        [declared] = [
+            entry
+            for entry in settings.EXTRA_SETTINGS_DEFAULTS
+            if entry["name"] == SETTING
+        ]
+
+        assert declared["type"] == "bool"
+        assert declared["value"] is True
+        assert declared["description"]
+
     def test_it_is_the_default(self):
         """No row for the setting: a store that never chose is protected."""
         user, order = _earned_then_spent()

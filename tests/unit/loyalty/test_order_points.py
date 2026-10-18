@@ -361,3 +361,124 @@ class TestNothingIsGrantedOnceAReversalIsDue:
             reference_order=order, transaction_type=TransactionType.BONUS
         ).exists()
         assert LoyaltyService.get_user_balance(user) == 0
+
+
+class TestRestoringSpentPointsInParts:
+    """A refund beyond the provider's money gives back the points the
+    customer spent on the order in proportion (``restore_spent_points``);
+    the reversal of a cancel or of the last refund gives back only what is
+    still spent."""
+
+    def _order_with_redemption(self, user, spent=100):
+        order = _completed_order(user)
+        PointsTransaction.objects.create(
+            user=user,
+            points=500,
+            transaction_type=TransactionType.EARN,
+        )
+        PointsTransaction.objects.create(
+            user=user,
+            points=-spent,
+            transaction_type=TransactionType.REDEEM,
+            reference_order=order,
+        )
+        return order
+
+    @staticmethod
+    def _attempt(order):
+        from order.models.refund_attempt import RefundAttempt
+
+        return RefundAttempt.objects.create(
+            order=order,
+            charge=None,
+            kind="STORED_VALUE",
+            amount=Money(Decimal("1.00"), "EUR"),
+        )
+
+    @staticmethod
+    def _restored(order) -> list[int]:
+        return list(
+            PointsTransaction.objects.filter(
+                reference_order=order,
+                transaction_type=TransactionType.ADJUST,
+                points__gt=0,
+            )
+            .order_by("id")
+            .values_list("points", flat=True)
+        )
+
+    def test_a_part_goes_back_and_never_more_than_is_still_spent(self):
+        user = UserAccountFactory(num_addresses=0)
+        order = self._order_with_redemption(user)
+
+        assert LoyaltyService.restore_spent_points(order, 40) == 40
+        assert LoyaltyService.restore_spent_points(order, 40) == 40
+        assert LoyaltyService.restore_spent_points(order, 40) == 20
+        assert LoyaltyService.restore_spent_points(order, 40) == 0
+
+        assert self._restored(order) == [40, 40, 20]
+        assert LoyaltyService.get_user_balance(user) == 500
+
+    def test_nothing_is_restored_for_nothing_asked_or_a_guest_order(self):
+        user = UserAccountFactory(num_addresses=0)
+        order = self._order_with_redemption(user)
+        guest = OrderFactory(user=None, num_order_items=0)
+
+        assert LoyaltyService.restore_spent_points(order, 0) == 0
+        assert LoyaltyService.restore_spent_points(guest, 10) == 0
+        assert self._restored(order) == []
+
+    def test_the_reversal_gives_back_only_the_rest(self):
+        user = UserAccountFactory(num_addresses=0)
+        order = self._order_with_redemption(user)
+        attempt = self._attempt(order)
+        LoyaltyService.restore_spent_points(order, 60, refund_attempt=attempt)
+
+        with loyalty_settings():
+            LoyaltyService.reverse_order_points(order.id)
+
+        assert self._restored(order) == [60, 40]
+
+    def test_a_part_restored_by_a_refund_does_not_block_the_reversal(self):
+        """The earn reversal runs once, and a restore made by a refund is
+        not that reversal."""
+        from order.models.refund_attempt import RefundAttempt
+
+        user = UserAccountFactory(num_addresses=0)
+        order = self._order_with_redemption(user)
+        _line(order, price="10.00", quantity=3)
+        with loyalty_settings():
+            assert LoyaltyService.award_order_points(order.id) == 30
+        attempt = RefundAttempt.objects.create(
+            order=order,
+            charge=None,
+            kind="STORED_VALUE",
+            amount=Money(Decimal("1.00"), "EUR"),
+        )
+        LoyaltyService.restore_spent_points(order, 60, refund_attempt=attempt)
+
+        with loyalty_settings():
+            assert LoyaltyService.reverse_order_points(order.id) == 30
+            assert LoyaltyService.reverse_order_points(order.id) == 0
+
+        assert self._restored(order) == [60, 40]
+
+    def test_a_restore_names_the_refund_that_made_it(self):
+        from order.models.refund_attempt import RefundAttempt
+
+        user = UserAccountFactory(num_addresses=0)
+        order = self._order_with_redemption(user)
+        attempt = RefundAttempt.objects.create(
+            order=order,
+            charge=None,
+            kind="STORED_VALUE",
+            amount=Money(Decimal("1.00"), "EUR"),
+        )
+
+        LoyaltyService.restore_spent_points(order, 10, refund_attempt=attempt)
+
+        row = PointsTransaction.objects.get(
+            reference_order=order,
+            transaction_type=TransactionType.ADJUST,
+        )
+        assert row.refund_attempt == attempt

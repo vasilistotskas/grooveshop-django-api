@@ -266,7 +266,14 @@ class GiftCard(TimeStampMixinModel, UUIDModel):
 
 class GiftCardTransaction(TimeStampMixinModel):
     """Append-only ledger row. Never update or delete — corrections
-    are new ADJUST rows, exactly like loyalty's PointsTransaction."""
+    are new ADJUST rows, exactly like loyalty's PointsTransaction.
+
+    An order can be refunded onto a card in parts, so it holds any number
+    of REFUND_CREDIT rows per card. What a card is still owed for an order
+    is what it gave (REDEEM) less what came back (REFUND_CREDIT), read and
+    written under the card's row lock (``GiftCardService.credit_refund``):
+    that, not a unique constraint, is what stops a credit being made twice.
+    """
 
     id = models.BigAutoField(primary_key=True)
     gift_card = models.ForeignKey(
@@ -297,6 +304,18 @@ class GiftCardTransaction(TimeStampMixinModel):
         on_delete=models.SET_NULL,
         verbose_name=_("Order"),
     )
+    refund_attempt = models.ForeignKey(
+        "order.RefundAttempt",
+        related_name="gift_card_transactions",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        # No index: nothing looks a credit up by the refund that made it,
+        # and building one is a lock on a live ledger.
+        db_index=False,
+        verbose_name=_("Refund attempt"),
+        help_text=_("The refund that returned this credit, when it was one."),
+    )
     created_by = models.ForeignKey(
         "user.UserAccount",
         related_name="gift_card_adjustments_made",
@@ -322,13 +341,6 @@ class GiftCardTransaction(TimeStampMixinModel):
                 fields=["gift_card", "order"],
                 condition=models.Q(kind="REDEEM"),
                 name="unique_giftcard_redeem_per_order",
-            ),
-            # Mirror for the refund side: one credit-back per card per
-            # order, so racing refund tasks cannot double-credit.
-            models.UniqueConstraint(
-                fields=["gift_card", "order"],
-                condition=models.Q(kind="REFUND_CREDIT"),
-                name="unique_giftcard_refund_per_order",
             ),
         ]
         indexes = [

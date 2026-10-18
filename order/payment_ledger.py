@@ -40,7 +40,11 @@ from djmoney.money import Money
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import PaymentStatus
 from order.models.payment_transaction import PaymentTransaction
-from order.models.refund_attempt import RefundAttempt, RefundAttemptStatus
+from order.models.refund_attempt import (
+    RefundAttempt,
+    RefundAttemptKind,
+    RefundAttemptStatus,
+)
 from order.signals import order_charged_back
 
 if TYPE_CHECKING:
@@ -86,6 +90,55 @@ class ChargeBalance(NamedTuple):
 
     charge: PaymentTransaction
     refundable: Decimal
+
+
+class StoredValue(NamedTuple):
+    """What an order paid with gift cards and loyalty points, and how much
+    of it has gone back. All in the order's currency.
+
+    Read from the gift-card and points ledgers, never from a counter, so a
+    credit made by a cancel and one made by a refund add up. ``gift_card_*``
+    is what the cards gave for the order (REDEEM) and what came back
+    (REFUND_CREDIT); ``points_*`` the points spent on it and the points
+    restored, with ``points_value`` the order's loyalty discount that the
+    spent points were worth.
+    """
+
+    gift_card_total: Decimal
+    gift_card_returned: Decimal
+    points_spent: int
+    points_restored: int
+    points_value: Decimal
+
+    @property
+    def gift_card_left(self) -> Decimal:
+        return max(self.gift_card_total - self.gift_card_returned, _ZERO)
+
+    @property
+    def points_left(self) -> int:
+        return max(self.points_spent - self.points_restored, 0)
+
+    @property
+    def points_value_left(self) -> Decimal:
+        if not self.points_spent:
+            return _ZERO
+        return (
+            self.points_value * self.points_left / self.points_spent
+        ).quantize(Decimal("0.01"))
+
+    @property
+    def left(self) -> Decimal:
+        """The value that has not gone back."""
+        return self.gift_card_left + self.points_value_left
+
+    @property
+    def returned(self) -> Decimal:
+        """The value that has."""
+        return self.gift_card_returned + (
+            self.points_value - self.points_value_left
+            if self.points_spent
+            else _ZERO
+        )
 
 
 class ChargebackOutcome(NamedTuple):
@@ -256,7 +309,7 @@ class PaymentLedger:
         # would multiply each other's rows.
         reserved = dict(
             RefundAttempt.objects.live()
-            .filter(order=order)
+            .filter(order=order, kind=RefundAttemptKind.PROVIDER)
             .values_list("charge")
             .annotate(held=Sum("amount", output_field=_AMOUNT))
         )
@@ -277,6 +330,71 @@ class PaymentLedger:
         payment by payment (a refund is made against one payment)."""
         return sum((b.refundable for b in cls.balances(order)), _ZERO)
 
+    @staticmethod
+    def stored_value(order: Order) -> StoredValue:
+        """What *order* paid with gift cards and points, and what has gone
+        back (:class:`StoredValue`)."""
+        from giftcard.enum import GiftCardTransactionKind
+        from giftcard.models import GiftCardTransaction
+        from loyalty.enum import TransactionType
+        from loyalty.models.transaction import PointsTransaction
+
+        def gift_card(kind) -> Decimal:
+            return GiftCardTransaction.objects.filter(
+                order=order, kind=kind
+            ).aggregate(total=Coalesce(Sum("amount"), _ZERO))["total"]
+
+        def points(**filters) -> int:
+            return PointsTransaction.objects.filter(
+                reference_order=order, **filters
+            ).aggregate(total=Coalesce(Sum("points"), 0))["total"]
+
+        # An order that paid with neither has nothing to read: the common
+        # case costs no query.
+        has_gift_card = bool(order.gift_card_amount.amount)
+        has_points = bool(order.loyalty_discount.amount)
+        return StoredValue(
+            gift_card_total=(
+                -gift_card(GiftCardTransactionKind.REDEEM)
+                if has_gift_card
+                else _ZERO
+            ),
+            gift_card_returned=(
+                gift_card(GiftCardTransactionKind.REFUND_CREDIT)
+                if has_gift_card
+                else _ZERO
+            ),
+            points_spent=(
+                -points(transaction_type=TransactionType.REDEEM)
+                if has_points
+                else 0
+            ),
+            points_restored=(
+                points(transaction_type=TransactionType.ADJUST, points__gt=0)
+                if has_points
+                else 0
+            ),
+            points_value=order.loyalty_discount.amount,
+        )
+
+    @classmethod
+    def stored_value_refundable(cls, order: Order) -> Decimal:
+        """What can still go back onto gift cards and points: what has not
+        gone back, less what live stored-value attempts hold."""
+        held = _total(
+            RefundAttempt.objects.live().filter(
+                order=order, kind=RefundAttemptKind.STORED_VALUE
+            )
+        )
+        return max(cls.stored_value(order).left - held, _ZERO)
+
+    @classmethod
+    def refundable_value(cls, order: Order) -> Decimal:
+        """The value that can still be refunded for *order*: the
+        provider's money (:meth:`refundable`) first, then what the order
+        paid with gift cards and points."""
+        return cls.refundable(order) + cls.stored_value_refundable(order)
+
     @classmethod
     def refund_open(cls, order: Order) -> bool:
         """Whether money paid for *order* can still be refunded.
@@ -293,7 +411,7 @@ class PaymentLedger:
         """
         from order.payment import registered_provider_codes
 
-        if cls.refundable(order) > 0:
+        if cls.refundable_value(order) > 0:
             return True
         pay_way = order.pay_way
         return bool(
@@ -308,20 +426,25 @@ class PaymentLedger:
     def refund_status(cls, order: Order) -> PaymentStatus:
         """The payment status of an order that has had a refund.
 
-        REFUNDED means nothing is left to refund: refunds and chargebacks
-        together cover what was received. It is the only state that
-        releases what hangs off the order's total (the gift-card
-        redemption and the loyalty points are returned once, with the last
-        refund, not in slices). Below that the order is PARTIALLY_REFUNDED,
-        and an order whose every refund was reversed (the provider reported
-        them failed) is back to COMPLETED. Derived from the ledger's sums
+        REFUNDED means nothing is left to return: refunds and chargebacks
+        cover what a provider or a courier received, AND what the order paid
+        with gift cards and points has gone back (:meth:`stored_value`). It
+        is the state that releases what hangs off the order's total (the
+        loyalty points it earned are reversed once, with the last refund).
+        Below that the order is PARTIALLY_REFUNDED, and an order whose every
+        refund was reversed (the provider reported them failed) and nothing
+        else returned is back to COMPLETED. Derived from the ledgers' sums
         and nothing else, so it cannot go backwards the way a status
         written by each path could.
         """
         refunded = cls.refunded(order)
-        if refunded <= 0:
+        stored = cls.stored_value(order)
+        if refunded <= 0 and stored.returned <= 0:
             return PaymentStatus.COMPLETED
-        if refunded + cls.charged_back(order) >= cls.captured(order):
+        if (
+            refunded + cls.charged_back(order) >= cls.captured(order)
+            and stored.left <= 0
+        ):
             return PaymentStatus.REFUNDED
         return PaymentStatus.PARTIALLY_REFUNDED
 

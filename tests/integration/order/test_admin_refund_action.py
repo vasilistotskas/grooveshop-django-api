@@ -428,3 +428,66 @@ class TestTheOrderPage:
             OrderService.refund_order(order)
 
         assert "refund_payment" not in self._page(client, order)
+
+
+class TestTheDialogOffersTheValueOfWhatCanComeBack:
+    """The amount is the value the customer returned: the card first, then
+    the gift cards and points the order also paid with."""
+
+    def _paid_with_a_gift_card(self):
+        from giftcard.factories import GiftCardFactory
+        from giftcard.models import GiftCardTransaction, GiftCardTransactionKind
+
+        order = _delivered_order(
+            "40.00", gift_card_amount=Money(Decimal("60.00"), "EUR")
+        )
+        card = GiftCardFactory(initial_value=Money(Decimal("60.00"), "EUR"))
+        GiftCardTransaction.objects.create(
+            gift_card=card,
+            kind=GiftCardTransactionKind.REDEEM,
+            amount=Decimal("-60.00"),
+            order=order,
+        )
+        return order, card
+
+    def test_the_amount_defaults_to_the_card_and_the_stored_value(
+        self, staff_user
+    ):
+        order, _card = self._paid_with_a_gift_card()
+
+        form = RefundOrderForm(_post(staff_user, {}), order.pk)
+
+        assert form.fields["amount"].initial == Decimal("100.00")
+        help_text = str(form.fields["amount"].help_text)
+        assert "€100.00" in help_text
+        assert "through the payment provider" in help_text
+        assert "€40.00" in help_text
+        assert "€60.00" in help_text
+        assert "gift cards" in help_text
+
+    def test_an_order_with_no_stored_value_keeps_the_short_help(
+        self, staff_user
+    ):
+        order = _delivered_order("100.00")
+
+        form = RefundOrderForm(_post(staff_user, {}), order.pk)
+
+        assert str(form.fields["amount"].help_text) == (
+            "Up to €100.00 can still be refunded."
+        )
+
+    def test_the_action_returns_the_value_and_says_how_much(
+        self, order_admin, staff_user
+    ):
+        order, card = self._paid_with_a_gift_card()
+        request = _post(
+            staff_user, {"amount": "70.00", "reason": "Two items back"}
+        )
+
+        with FakeStripeRefunds() as stripe_api:
+            order_admin.refund_payment(request, object_id=order.pk)
+
+        assert stripe_api.amounts == [4000]
+        assert card.balance == Money(Decimal("30.00"), "EUR")
+        assert _messages(request) == [f"Order {order.pk} refunded €70.00."]
+        assert _status(order) == PaymentStatus.PARTIALLY_REFUNDED

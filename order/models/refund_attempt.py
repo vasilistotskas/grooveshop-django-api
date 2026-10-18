@@ -25,6 +25,11 @@ class RefundAttemptStatus(models.TextChoices):
     DECLINED = "DECLINED", _("Declined")
 
 
+class RefundAttemptKind(models.TextChoices):
+    PROVIDER = "PROVIDER", _("Payment provider")
+    STORED_VALUE = "STORED_VALUE", _("Gift cards and points")
+
+
 class RefundAttemptQuerySet(models.QuerySet["RefundAttempt"]):
     def live(self):
         """Attempts that still hold their amount back: not settled, not
@@ -53,6 +58,12 @@ class RefundAttempt(models.Model):
     the provider's webhook books the refund (and settles the attempt it
     matches) or a retry reuses the key. Money facts stay in the ledger:
     this row is only the claim.
+
+    A ``STORED_VALUE`` attempt claims the part of a refund that goes back
+    onto gift cards and points rather than through a provider: it names no
+    charge, calls nobody, and is executed in one transaction after every
+    provider share was made. What it returned is in the gift-card and
+    points ledgers, whose rows name the attempt.
     """
 
     id = models.BigAutoField(primary_key=True)
@@ -62,12 +73,28 @@ class RefundAttempt(models.Model):
         on_delete=models.PROTECT,
         verbose_name=_("Order"),
     )
+    kind = models.CharField(
+        _("Kind"),
+        max_length=16,
+        choices=RefundAttemptKind.choices,
+        default=RefundAttemptKind.PROVIDER,
+        db_default=RefundAttemptKind.PROVIDER,
+        help_text=_(
+            "A share paid back through a payment provider, or the value "
+            "of what the order paid with gift cards and points."
+        ),
+    )
     charge = models.ForeignKey(
         "order.PaymentTransaction",
         related_name="refund_attempts",
+        null=True,
+        blank=True,
         on_delete=models.CASCADE,
         verbose_name=_("Charge"),
-        help_text=_("The payment this share is refunded against."),
+        help_text=_(
+            "The payment this share is refunded against; none for gift "
+            "cards and points."
+        ),
     )
     amount = MoneyField(_("Amount"), max_digits=11, decimal_places=2)
     reason = models.CharField(

@@ -15,6 +15,7 @@ from order.signals import (
     order_completed,
     order_refunded,
     order_status_changed,
+    order_stored_value_returned,
 )
 from tenant.celery import dispatch_on_commit
 from tenant.permissions import IsLoyaltyRuntimeEnabled
@@ -112,8 +113,10 @@ def _queue_reversal_if_returned_in_full(order: Order) -> None:
     """Queue the points reversal once the order's money is back in full.
 
     The one place that decides it, for refunds and chargebacks alike:
-    REFUNDED, or refunds plus chargebacks covering everything received
-    (:meth:`PaymentLedger.fully_returned`). Anything less reverses nothing.
+    REFUNDED (the provider's money AND what the order paid with gift cards
+    and points are back), or refunds plus chargebacks covering everything
+    received (:meth:`PaymentLedger.fully_returned`: a lost dispute leaves
+    the stored value where it is). Anything less reverses nothing.
     The reversal is all-or-nothing and runs once per order (any ADJUST row
     blocks a second run), so taking it on the first slice would never take
     the rest, and taking all of it for a EUR 5 goodwill refund would wipe
@@ -142,7 +145,26 @@ def handle_order_refunded_loyalty(
 ) -> None:
     """Reverse earned points when a refund returns the order's money in
     full (see :func:`_queue_reversal_if_returned_in_full`); a partial
-    refund reverses nothing."""
+    refund reverses nothing. A refund that exhausts the provider's money
+    but leaves gift cards or points to return is partial: REFUNDED waits
+    for them."""
+    if order.payment_status != PaymentStatus.REFUNDED:
+        return
+    _queue_reversal_if_returned_in_full(order)
+
+
+@receiver(
+    order_stored_value_returned,
+    dispatch_uid="loyalty.handle_order_stored_value_returned_loyalty",
+)
+def handle_order_stored_value_returned_loyalty(
+    sender: type[Order], order: Order, **kwargs: Any
+) -> None:
+    """The refund that returns the last of what the order paid with gift
+    cards and points completes it (REFUNDED): reverse the points it
+    earned. Anything less reverses nothing."""
+    if order.payment_status != PaymentStatus.REFUNDED:
+        return
     _queue_reversal_if_returned_in_full(order)
 
 

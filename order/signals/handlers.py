@@ -45,6 +45,7 @@ from order.signals import (
     order_shipment_dispatched,
     order_shipped,
     order_status_changed,
+    order_stored_value_returned,
 )
 from order.signals._tenant import with_tenant_schema_from_event
 from order.tasks import (
@@ -747,6 +748,38 @@ def handle_order_refunded(
 
     except Exception:
         logger.exception("Error handling order_refunded signal")
+
+
+@receiver(
+    order_stored_value_returned,
+    dispatch_uid="order.handle_order_stored_value_returned",
+)
+def handle_order_stored_value_returned(
+    sender: type[Order],
+    order: Order,
+    amount: Money,
+    gift_card: Money,
+    points: int,
+    **kwargs: Any,
+) -> None:
+    """Handle a refund share that went back onto gift cards and points: no
+    provider moved money, so there is no ledger row and no refund email,
+    only the order's history. The refund that returns the last of it
+    completes the order (REFUNDED), and the retail credit document for what
+    the receipt still holds follows, as for any completed refund."""
+    try:
+        OrderHistory.log_note(
+            order=order,
+            note=(
+                f"Returned {amount} of the order's value: {gift_card} back "
+                f"onto gift cards, {points} loyalty points restored. "
+                f"Reason: {kwargs.get('reason') or 'Not specified'}"
+            ),
+        )
+        if order.payment_status == PaymentStatus.REFUNDED:
+            _dispatch_credit_documents(order)
+    except Exception:
+        logger.exception("Error handling order_stored_value_returned signal")
 
 
 @receiver(order_returned, dispatch_uid="order.handle_order_returned")

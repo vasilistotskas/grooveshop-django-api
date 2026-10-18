@@ -271,10 +271,12 @@ class RecentOrdersFilter(DropdownFilter):
 class RefundOrderForm(BaseDialogForm):
     """The "Refund (amount, reason)" dialog of an order.
 
-    The amount is checked against what the payment ledger says can still
-    be refunded by ``OrderService.refund_order`` itself (under the order
-    lock, so a stale dialog cannot overshoot); the dialog only offers the
-    figure.
+    The amount is the VALUE the customer returned. It is checked against
+    what the payment ledger says can still be refunded by
+    ``OrderService.refund_order`` itself (under the order lock, so a stale
+    dialog cannot overshoot); the dialog only offers the figure. The
+    provider's money is paid back first, and what is beyond it goes back
+    onto the gift cards and loyalty points the order paid with.
     """
 
     amount = forms.DecimalField(
@@ -305,15 +307,34 @@ class RefundOrderForm(BaseDialogForm):
     def __init__(self, request, object_id=None, *args, **kwargs):
         super().__init__(request, object_id, *args, **kwargs)
         self.order = Order.objects.get(pk=object_id) if object_id else None
-        refundable = (
+        provider = (
             PaymentLedger.refundable(self.order) if self.order else Decimal(0)
         )
-        if refundable > 0:
+        stored = (
+            PaymentLedger.stored_value_refundable(self.order)
+            if self.order
+            else Decimal(0)
+        )
+        if provider + stored > 0:
             amount = self.fields["amount"]
-            amount.initial = refundable
-            amount.help_text = _(
-                "Up to %(refundable)s can still be refunded."
-            ) % {"refundable": money(refundable)}
+            amount.initial = provider + stored
+            amount.help_text = (
+                _(
+                    "Up to %(refundable)s can still be refunded: "
+                    "%(provider)s through the payment provider, then "
+                    "%(stored)s back onto the gift cards and loyalty "
+                    "points the order paid with. Enter the value of what "
+                    "the customer returned."
+                )
+                % {
+                    "refundable": money(provider + stored),
+                    "provider": money(provider),
+                    "stored": money(stored),
+                }
+                if stored > 0
+                else _("Up to %(refundable)s can still be refunded.")
+                % {"refundable": money(provider)}
+            )
         # Asked only where cash a courier collected can be paid back: there
         # is no provider to refund it, so staff say how they did.
         if not self._has_refundable_cash():
@@ -336,7 +357,11 @@ class RefundOrderForm(BaseDialogForm):
             and any(
                 is_cash_collection(charge)
                 for charge, _share in PaymentLedger.plan_refund(
-                    self.order, Money(amount, self.order.amount_due.currency)
+                    self.order,
+                    Money(
+                        min(amount, PaymentLedger.refundable(self.order)),
+                        self.order.amount_due.currency,
+                    ),
                 )
             )
         ):
@@ -1406,7 +1431,7 @@ class OrderAdmin(BaseModelAdmin):
                 self.log_change(
                     request,
                     order,
-                    f"Refunded {result.refunded} of {amount}: {reason}",
+                    f"Refunded {result.value_returned} of {amount}: {reason}",
                 )
             if result.complete and result.paid_something:
                 self.message_user(
@@ -1414,7 +1439,7 @@ class OrderAdmin(BaseModelAdmin):
                     _("Order %(order_id)s refunded %(amount)s.")
                     % {
                         "order_id": order.id,
-                        "amount": money(result.refunded.amount),
+                        "amount": money(result.value_returned.amount),
                     },
                     messages.SUCCESS,
                 )
@@ -1427,7 +1452,7 @@ class OrderAdmin(BaseModelAdmin):
                     )
                     % {
                         "order_id": order.id,
-                        "refunded": money(result.refunded.amount),
+                        "refunded": money(result.value_returned.amount),
                         "requested": money(amount.amount),
                         "reason": (result.declined or {}).get("error", ""),
                     },

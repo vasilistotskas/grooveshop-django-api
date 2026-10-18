@@ -482,53 +482,105 @@ class GiftCardService:
     # ── refunds ────────────────────────────────────────────────────
 
     @classmethod
-    def credit_refund(cls, order) -> Decimal:
-        """Return the order's whole gift-card redemption to the source card(s).
+    def credit_refund(
+        cls,
+        order,
+        amount: Decimal | None = None,
+        refund_attempt=None,
+    ) -> Decimal:
+        """Return gift-card value to the cards that gave it for *order*:
+        *amount* of it, or everything not back yet when ``amount`` is
+        ``None`` (a cancel). Returns what was credited.
 
-        Called once the order is fully refunded or canceled, never for a
-        slice: a partial refund is paid back by the provider first, and a
-        slice of the redemption on top of it put money on the card that
-        the refund never returned (EUR 60 back for a EUR 5 refund).
-
-        Idempotent per order: the partial unique constraint on
-        (gift_card, order) for REFUND_CREDIT rows makes a racing
-        duplicate insert impossible — the loser skips the card instead of
-        double-crediting it.
+        An order is refunded onto its cards in parts (``OrderService.
+        refund_order`` pays the provider first, then what the order paid
+        with gift cards), so a card can be credited more than once for one
+        order. What a card is owed is what it gave (REDEEM) less what has
+        come back (REFUND_CREDIT), and it is read UNDER THE CARD'S ROW LOCK
+        (cards locked in id order, so two credits cannot deadlock): a second
+        credit that raced the first finds nothing owed and credits nothing,
+        so the cap at what the card gave holds without a unique constraint.
+        *amount* is shared out in proportion to what each card is owed, to
+        the cent, the last cent going to the card that can still take it;
+        an *amount* that is everything owed returns each card its exact
+        remainder. ``refund_attempt`` names the refund that made the credit.
         """
-        from django.db import IntegrityError, transaction
+        from django.db import transaction
+        from django.db.models import Sum
 
-        redeems = GiftCardTransaction.objects.filter(
-            order=order, kind=GiftCardTransactionKind.REDEEM
-        ).select_related("gift_card")
-        already = set(
-            GiftCardTransaction.objects.filter(
-                order=order, kind=GiftCardTransactionKind.REFUND_CREDIT
-            ).values_list("gift_card_id", flat=True)
-        )
-        credited = Decimal(0)
-        for redeem in redeems:
-            if redeem.gift_card_id in already:
-                continue
-            # `redeem.amount` is negative (a debit): this is what the card
-            # actually contributed.
-            share = -redeem.amount
-            if share <= 0:
-                continue
-            try:
-                with transaction.atomic():
-                    GiftCardTransaction.objects.create(
-                        gift_card=redeem.gift_card,
-                        kind=GiftCardTransactionKind.REFUND_CREDIT,
-                        amount=share,
-                        order=order,
-                        description=f"Refund of order #{order.id}",
-                    )
-                    cls._keep_refund_spendable(redeem.gift_card)
-            except IntegrityError:
-                # A concurrent refund task credited this card first.
-                continue
-            credited += share
-        return credited
+        with transaction.atomic():
+            gave = {
+                row["gift_card_id"]: -row["total"]
+                for row in GiftCardTransaction.objects.filter(
+                    order=order, kind=GiftCardTransactionKind.REDEEM
+                )
+                .values("gift_card_id")
+                .annotate(total=Sum("amount"))
+            }
+            if not gave:
+                return Decimal(0)
+            cards = {
+                card.pk: card
+                for card in GiftCard.objects.select_for_update()
+                .filter(pk__in=gave)
+                .order_by("pk")
+            }
+            back = {
+                row["gift_card_id"]: row["total"]
+                for row in GiftCardTransaction.objects.filter(
+                    order=order, kind=GiftCardTransactionKind.REFUND_CREDIT
+                )
+                .values("gift_card_id")
+                .annotate(total=Sum("amount"))
+            }
+            owed = {
+                card_id: gave[card_id] - back.get(card_id, Decimal(0))
+                for card_id in sorted(cards)
+                if gave[card_id] - back.get(card_id, Decimal(0)) > 0
+            }
+            total_owed = sum(owed.values(), Decimal(0))
+            want = total_owed if amount is None else min(amount, total_owed)
+            if want <= 0:
+                return Decimal(0)
+            shares = cls._share_by_owed(owed, want)
+            for card_id, share in shares.items():
+                if share <= 0:
+                    continue
+                GiftCardTransaction.objects.create(
+                    gift_card=cards[card_id],
+                    kind=GiftCardTransactionKind.REFUND_CREDIT,
+                    amount=share,
+                    order=order,
+                    refund_attempt=refund_attempt,
+                    description=f"Refund of order #{order.id}",
+                )
+                cls._keep_refund_spendable(cards[card_id])
+            return sum(shares.values(), Decimal(0))
+
+    @staticmethod
+    def _share_by_owed(
+        owed: dict[int, Decimal], want: Decimal
+    ) -> dict[int, Decimal]:
+        """*want* split over the cards in proportion to what each is owed:
+        each share rounded down to the cent, the cents left over handed
+        out one by one to the cards that can still take them. Everything
+        owed is each card's exact remainder."""
+        total = sum(owed.values(), Decimal(0))
+        if want >= total:
+            return dict(owed)
+        cent = Decimal("0.01")
+        shares = {
+            card_id: (want * due / total).quantize(cent, rounding="ROUND_DOWN")
+            for card_id, due in owed.items()
+        }
+        left = want - sum(shares.values(), Decimal(0))
+        for card_id, due in owed.items():
+            if left <= 0:
+                break
+            give = min(left, due - shares[card_id])
+            shares[card_id] += give
+            left -= give
+        return shares
 
     @classmethod
     def _keep_refund_spendable(cls, card) -> None:

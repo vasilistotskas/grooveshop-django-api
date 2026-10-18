@@ -282,38 +282,28 @@ class TestRefundCredit:
         assert second == Decimal(0)
         assert card.balance.amount == Decimal(50)
 
-    def test_duplicate_refund_credit_blocked_at_db_level(
+    def test_a_card_can_be_credited_in_parts_for_one_order(
         self, enable_gift_cards
     ):
-        # The check-then-act in credit_refund cannot stop two RACING
-        # tasks by itself — the partial unique constraint must. A
-        # direct duplicate insert (what the race loser would attempt)
-        # has to die in the database.
-        from django.db import IntegrityError, transaction
-
+        """An order is refunded onto its cards in parts, so the ledger no
+        longer allows only one credit per card per order; what a card is
+        owed is read under its row lock (``credit_refund``)."""
         from order.factories.order import OrderFactory
 
         order = OrderFactory()
         card = GiftCardFactory(initial_value=Money(Decimal(50), "EUR"))
         for _ in range(2):
-            try:
-                with transaction.atomic():
-                    GiftCardTransaction.objects.create(
-                        gift_card=card,
-                        kind=GiftCardTransactionKind.REFUND_CREDIT,
-                        amount=Decimal(20),
-                        order=order,
-                    )
-            except IntegrityError:
-                duplicate_blocked = True
-            else:
-                duplicate_blocked = False
+            GiftCardTransaction.objects.create(
+                gift_card=card,
+                kind=GiftCardTransactionKind.REFUND_CREDIT,
+                amount=Decimal(20),
+                order=order,
+            )
 
-        assert duplicate_blocked
         assert (
             GiftCardTransaction.objects.filter(
                 order=order,
                 kind=GiftCardTransactionKind.REFUND_CREDIT,
             ).count()
-            == 1
+            == 2
         )

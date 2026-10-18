@@ -183,13 +183,46 @@ class TestAnOrderClosedAsRefundedWithNoProviderPayment:
         Order.objects.filter(pk=order.pk).update(
             status=OrderStatus.RETURNED, pay_way=None, payment_id=""
         )
-        order.refresh_from_db()
+        # A fresh instance, not ``refresh_from_db``: ``Order`` snapshots
+        # its status when it is built (``_original_status``) and decides
+        # from it whether a save is a transition. The factory draws a
+        # random status, and an order drawn as REFUNDED saw no change
+        # when it was closed as REFUNDED, so no ``order_status_changed``
+        # and no credit.
+        order = Order.objects.get(pk=order.pk)
         OrderService.update_order_status(order, OrderStatus.REFUNDED)
 
     def test_the_redemption_goes_back(
         self, giftcard_order_settled_with_one_card
     ):
         order, _card = giftcard_order_settled_with_one_card
+        Order.objects.filter(pk=order.pk).update(
+            payment_status=PaymentStatus.COMPLETED
+        )
+
+        self._close(order)
+
+        assert _credited(order) == Decimal("60.00")
+
+    @pytest.mark.parametrize("built_as", list(OrderStatus))
+    def test_the_status_the_factory_drew_does_not_matter(self, built_as):
+        """``OrderFactory`` draws a random status, and the order is
+        snapshotted with it: whichever it drew, closing the order as
+        REFUNDED is a transition and the card is credited."""
+        from giftcard.factories import GiftCardFactory
+        from order.factories.order import OrderFactory
+
+        order = OrderFactory(
+            status=built_as,
+            gift_card_amount=Money(Decimal("60.00"), "EUR"),
+        )
+        card = GiftCardFactory(initial_value=Money(Decimal("60.00"), "EUR"))
+        GiftCardTransaction.objects.create(
+            gift_card=card,
+            kind=GiftCardTransactionKind.REDEEM,
+            amount=Decimal("-60.00"),
+            order=order,
+        )
         Order.objects.filter(pk=order.pk).update(
             payment_status=PaymentStatus.COMPLETED
         )

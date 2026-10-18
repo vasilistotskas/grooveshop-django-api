@@ -61,6 +61,8 @@ _PERSONAL_NAMES = frozenset(
         "company_name",
         "vat_id",
         "bio",
+        # Free text a member of staff typed about a refund or a return.
+        "reason",
     }
 )
 

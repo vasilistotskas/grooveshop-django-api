@@ -23245,8 +23245,8 @@ msgid "Amount refunded"
 msgstr "Ποσό που επιστράφηκε"
 
 #: refund integrity
-msgid "Still to be refunded"
-msgstr "Απομένει προς επιστροφή"
+msgid "Remaining payment on this order"
+msgstr "Υπόλοιπο πληρωμής της παραγγελίας"
 
 #: refund integrity
 msgid "A refund the provider accepted failed"
@@ -23291,3 +23291,7 @@ msgstr "Απόπειρα επιστροφής %(key)s ποσού %(amount)s"
 #: refund integrity
 msgid "Refund reversal"
 msgstr "Αντιστροφή επιστροφής"
+
+#: refund integrity
+msgid "Order %(order_id)s skipped: refund its payment first."
+msgstr "Η παραγγελία %(order_id)s παραλείφθηκε: επιστρέψτε πρώτα την πληρωμή της."

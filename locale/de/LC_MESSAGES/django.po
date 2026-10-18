@@ -10470,7 +10470,7 @@ msgid "Amount refunded"
 msgstr ""
 
 #: refund integrity
-msgid "Still to be refunded"
+msgid "Remaining payment on this order"
 msgstr ""
 
 #: refund integrity
@@ -10523,4 +10523,8 @@ msgstr ""
 
 #: refund integrity
 msgid "Amount"
+msgstr ""
+
+#: refund integrity
+msgid "Order %(order_id)s skipped: refund its payment first."
 msgstr ""

@@ -22,6 +22,7 @@ returning ``created=False``.
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, NamedTuple
 
@@ -70,6 +71,13 @@ REPAYMENT_REFERENCE_MAX_LENGTH = 100
 #: capture; Stripe keeps a refunded PaymentIntent ``succeeded``.
 _CAPTURED_STATUSES = frozenset(
     {PaymentStatus.COMPLETED, PaymentStatus.REFUNDED}
+)
+
+
+#: Payment statuses of an order money is still held for, and so one whose
+#: capture a refund may have to read from the provider.
+_HELD_PAYMENT_STATUSES = frozenset(
+    {PaymentStatus.COMPLETED, PaymentStatus.PARTIALLY_REFUNDED}
 )
 
 
@@ -210,6 +218,23 @@ class PaymentLedger:
         ).aggregate(total=_taken_out())["total"]
 
     @staticmethod
+    def reversed_after(charge: PaymentTransaction, event_time) -> bool:
+        """Whether a refund on *charge* was reported failed after the
+        provider event stamped *event_time* was raised.
+
+        A cumulative refunded figure from before the failure still counts
+        the failed refund, and bringing the ledger up to it would book the
+        reversed money as refunded again. Providers do not deliver events
+        in order, so such an event is recognised by its own timestamp and
+        ignored. No timestamp, no judgement: ``False``."""
+        if not isinstance(event_time, datetime):
+            return False
+        return charge.refunds.filter(
+            kind=PaymentTransactionKind.REFUND_REVERSAL,
+            created_at__gt=event_time,
+        ).exists()
+
+    @staticmethod
     def reserved_on(charge: PaymentTransaction) -> Decimal:
         """What live refund attempts hold back from this one payment."""
         return _total(charge.refund_attempts.live())
@@ -251,6 +276,33 @@ class PaymentLedger:
         """What can still be refunded for *order*: received minus refunded,
         payment by payment (a refund is made against one payment)."""
         return sum((b.refundable for b in cls.balances(order)), _ZERO)
+
+    @classmethod
+    def refund_open(cls, order: Order) -> bool:
+        """Whether money paid for *order* can still be refunded.
+
+        Either the ledger holds refundable money, or the order was paid
+        through a registered provider whose capture the ledger never
+        recorded: ``OrderService.refund_order`` reads that from the provider
+        once (:meth:`ensure_charge`), so the money is refundable although
+        :meth:`refundable` is 0. A cheap predicate on purpose (no provider
+        call): it decides whether an admin button is drawn and whether an
+        order may be closed as REFUNDED. An order paid without a provider
+        (cash, gift cards, points) is not open: nothing can be refunded
+        through one.
+        """
+        from order.payment import registered_provider_codes
+
+        if cls.refundable(order) > 0:
+            return True
+        pay_way = order.pay_way
+        return bool(
+            order.payment_id
+            and pay_way is not None
+            and pay_way.provider_code in registered_provider_codes()
+            and order.payment_status in _HELD_PAYMENT_STATUSES
+            and not cls.captured(order)
+        )
 
     @classmethod
     def refund_status(cls, order: Order) -> PaymentStatus:
@@ -413,10 +465,19 @@ class PaymentLedger:
     def settle_attempt(
         attempt: RefundAttempt, refund: PaymentTransaction
     ) -> None:
-        """The ledger holds the refund *attempt* was claimed for."""
+        """The ledger holds the refund *attempt* was claimed for. A refund
+        row already answering another attempt is not linked twice: this one
+        is settled without a link."""
         attempt.status = RefundAttemptStatus.SETTLED
-        attempt.refund = refund
-        attempt.save(update_fields=["status", "refund"])
+        fields = ["status"]
+        if (
+            not RefundAttempt.objects.filter(refund=refund)
+            .exclude(pk=attempt.pk)
+            .exists()
+        ):
+            attempt.refund = refund
+            fields.append("refund")
+        attempt.save(update_fields=fields)
 
     @classmethod
     def record_refund_reversal(

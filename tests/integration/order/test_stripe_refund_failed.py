@@ -9,6 +9,7 @@ derived again, and staff are told.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from unittest.mock import Mock, patch
 
@@ -233,3 +234,109 @@ class TestTheLedgerKeepsAddingUpAfterAReversal:
         assert result.refunded == _eur("100.00")
         assert _status(order) == PaymentStatus.REFUNDED
         assert PaymentLedger.refunded(order) == Decimal("100.00")
+
+
+def _charge_refunded(
+    event_id: str, amount_refunded: int, created: datetime | None = None
+) -> None:
+    event = Mock(spec=Event)
+    event.id = event_id
+    event.created = created
+    event.data = {
+        "object": {
+            "id": "ch_x",
+            "payment_intent": "pi_failed",
+            "amount": 10000,
+            "amount_refunded": amount_refunded,
+            "currency": "eur",
+        }
+    }
+    handle_stripe_charge_refunded(sender=None, event=event)
+
+
+def _kinds(order) -> list[str]:
+    return [
+        row.kind
+        for row in order.payment_transactions.exclude(
+            kind=PaymentTransactionKind.CHARGE
+        ).order_by("id")
+    ]
+
+
+class TestChargeRefundedAroundAFailure:
+    """Stripe's ``charge.refunded`` carries the CUMULATIVE ``amount_refunded``
+    and Stripe stops counting a refund once it failed. The ledger brings
+    itself up to that figure, so a failure must neither be re-booked nor
+    leave money counted twice."""
+
+    def test_30_succeeds_20_pending_then_fails_then_the_charge_event(
+        self, alerts
+    ):
+        order = _order()
+        with FakeStripeRefunds() as stripe_api:
+            OrderService.refund_order(order, amount=_eur("30.00"))
+            stripe_api.status = "pending"
+            OrderService.refund_order(order, amount=_eur("20.00"))
+        assert PaymentLedger.refunded(order) == Decimal("50.00")
+        failed = stripe_api.created[1]
+
+        _deliver(_event(failed.id, 2000))
+        _charge_refunded("evt_after_failure", 3000)
+
+        assert PaymentLedger.refunded(order) == Decimal("30.00")
+        assert _kinds(order) == [
+            PaymentTransactionKind.REFUND,
+            PaymentTransactionKind.REFUND,
+            REVERSAL,
+        ]
+        assert _status(order) == PaymentStatus.PARTIALLY_REFUNDED
+        assert PaymentLedger.refundable(order) == Decimal("70.00")
+        assert stripe_api.created[0].id != failed.id
+
+    def test_the_same_sequence_booked_from_dashboard_events(self, alerts):
+        order = _order()
+        _charge_refunded("evt_30", 3000)
+        _charge_refunded("evt_50", 5000)
+        assert PaymentLedger.refunded(order) == Decimal("50.00")
+
+        _deliver(_event("re_failed", 2000))
+        _charge_refunded("evt_after_failure", 3000)
+
+        assert PaymentLedger.refunded(order) == Decimal("30.00")
+        assert _kinds(order) == [
+            PaymentTransactionKind.REFUND,
+            PaymentTransactionKind.REFUND,
+            REVERSAL,
+        ]
+
+    def test_an_older_event_arriving_after_the_failure_adds_nothing(
+        self, alerts
+    ):
+        """The event that reported 50 was raised BEFORE the failure and is
+        delivered after it: its figure still counts the failed refund, so
+        bringing the ledger up to it would book the reversed 20 again."""
+        order = _order()
+        _charge_refunded("evt_30", 3000)
+        raised_before_the_failure = datetime.now(UTC) - timedelta(minutes=5)
+        _charge_refunded("evt_50", 5000, raised_before_the_failure)
+        _deliver(_event("re_failed", 2000))
+
+        _charge_refunded("evt_50_again", 5000, raised_before_the_failure)
+
+        assert PaymentLedger.refunded(order) == Decimal("30.00")
+        assert _kinds(order) == [
+            PaymentTransactionKind.REFUND,
+            PaymentTransactionKind.REFUND,
+            REVERSAL,
+        ]
+
+    def test_a_refund_after_the_failure_is_still_booked(self, alerts):
+        order = _order()
+        _charge_refunded("evt_30", 3000)
+        _charge_refunded("evt_50", 5000)
+        _deliver(_event("re_failed", 2000))
+
+        later = datetime.now(UTC) + timedelta(minutes=5)
+        _charge_refunded("evt_later", 4000, later)
+
+        assert PaymentLedger.refunded(order) == Decimal("40.00")

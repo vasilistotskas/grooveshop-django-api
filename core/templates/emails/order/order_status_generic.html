@@ -82,8 +82,8 @@
 <div class="email-card">
     <h2>{% trans "Refund" %}</h2>
     <p><strong>{% trans "Amount refunded" %}:</strong> {{ refund_amount }}</p>
-    {% if refund_remaining %}
-    <p><strong>{% trans "Still to be refunded" %}:</strong> {{ refund_remaining }}</p>
+    {% if payment_remaining %}
+    <p><strong>{% trans "Remaining payment on this order" %}:</strong> {{ payment_remaining }}</p>
     {% endif %}
 </div>
 {% endif %}

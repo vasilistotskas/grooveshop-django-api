@@ -2393,9 +2393,8 @@ class OrderService:
         # reversal and the status email follow the status: not while the
         # ledger still holds money that can be refunded.
         if new_status == OrderStatus.REFUNDED:
-            refundable = PaymentLedger.refundable(order)
-            if refundable > 0:
-                raise RefundOutstandingError(refundable)
+            if PaymentLedger.refund_open(order):
+                raise RefundOutstandingError(PaymentLedger.refundable(order))
 
         old_status = order.status
 

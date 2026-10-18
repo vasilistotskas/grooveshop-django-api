@@ -1152,6 +1152,17 @@ def handle_stripe_charge_refunded(sender, **kwargs):
                 provider=StripePaymentProvider.code,
                 reference=payment_intent_id,
             )
+            if PaymentLedger.reversed_after(
+                paid, getattr(event, "created", None)
+            ):
+                logger.info(
+                    "charge.refunded %s is older than a refund failure on "
+                    "order %s: its figure still counts the failed refund, "
+                    "so it adds nothing",
+                    event_id,
+                    order.id,
+                )
+                return
             new_refund = refunded_to_date.amount - PaymentLedger.refunded_on(
                 paid
             )

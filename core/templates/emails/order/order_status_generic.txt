@@ -29,8 +29,8 @@
 {% endif %}
 {% if refund_amount %}
 {% trans "Refund" %}:
-- {% trans "Amount refunded" %}: {{ refund_amount }}{% if refund_remaining %}
-- {% trans "Still to be refunded" %}: {{ refund_remaining }}{% endif %}
+- {% trans "Amount refunded" %}: {{ refund_amount }}{% if payment_remaining %}
+- {% trans "Remaining payment on this order" %}: {{ payment_remaining }}{% endif %}
 {% endif %}
 
 {% if items %}

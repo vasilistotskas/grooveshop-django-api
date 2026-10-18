@@ -1446,8 +1446,8 @@ class OrderAdmin(BaseModelAdmin):
         )
 
     def has_refund_permission(self, request, object_id=None):
-        """Money moves from here, so only where the ledger holds money that
-        can still be refunded, whatever the order's status: a return, a
+        """Money moves from here, so only where money can still be refunded
+        (``PaymentLedger.refund_open``), whatever the order's status: a return, a
         goodwill refund, or a canceled order whose automatic refund was
         declined (the "Canceled orders to refund" worklist)."""
         order = (
@@ -1455,7 +1455,7 @@ class OrderAdmin(BaseModelAdmin):
             if object_id is not None
             else None
         )
-        return order is not None and PaymentLedger.refundable(order) > 0
+        return order is not None and PaymentLedger.refund_open(order)
 
     def has_retail_documents_permission(self, request, object_id=None):
         """The "Invoicing & myDATA" actions exist only for a store whose
@@ -1503,7 +1503,12 @@ class OrderAdmin(BaseModelAdmin):
                         "Order %(order_id)s skipped: refund its payment "
                         "first, %(amount)s can still be refunded."
                     )
-                    % {"order_id": order.id, "amount": money(e.refundable)},
+                    % {"order_id": order.id, "amount": money(e.refundable)}
+                    if e.refundable > 0
+                    else _(
+                        "Order %(order_id)s skipped: refund its payment first."
+                    )
+                    % {"order_id": order.id},
                     level="warning",
                 )
             except (ValueError, OrderServiceError) as e:

@@ -326,7 +326,7 @@ class TestTheEmailStatesTheAmount:
         for body in self._bodies(message):
             assert "Amount refunded" in body
             assert re.search(r"30[.,]00", body)
-            assert "Still to be refunded" in body
+            assert "Remaining payment on this order" in body
             assert re.search(r"70[.,]00", body)
 
     def test_a_full_refund_says_how_much_and_nothing_is_left(self):
@@ -339,7 +339,7 @@ class TestTheEmailStatesTheAmount:
         for body in self._bodies(message):
             assert "Amount refunded" in body
             assert re.search(r"100[.,]00", body)
-            assert "Still to be refunded" not in body
+            assert "Remaining payment on this order" not in body
 
     def test_each_refund_email_names_its_own_amount(self):
         order = _order(language_code="en")

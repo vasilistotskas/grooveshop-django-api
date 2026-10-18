@@ -365,13 +365,16 @@ class RefundOutstandingError(OrderServiceError):
     status.
 
     Attributes:
-        refundable (Decimal): What the ledger still holds for the order
+        refundable (Decimal): What the ledger still holds for the order; 0
+            for a paid order whose capture the ledger never recorded
     """
 
     def __init__(self, refundable):
         self.refundable = refundable
         super().__init__(
             f"{refundable} paid for this order has not been refunded yet"
+            if refundable > 0
+            else "The payment for this order has not been refunded yet"
         )
 
 

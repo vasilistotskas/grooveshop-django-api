@@ -13,6 +13,7 @@ be marked REFUNDED.
 from __future__ import annotations
 
 from decimal import Decimal
+from unittest.mock import patch
 
 import pytest
 from django.contrib.admin.sites import AdminSite
@@ -29,6 +30,7 @@ from order.factories import OrderFactory, PaymentTransactionFactory
 from order.models.history import OrderHistory
 from order.models.item import OrderItem
 from order.models.order import Order
+from order.payment_ledger import PaymentLedger
 from order.services import OrderService
 from pay_way.factories import PayWayFactory
 from tests.utils.stripe_refunds import FakeStripeRefunds
@@ -228,3 +230,68 @@ class TestAnItemLineSaysRestockedNotRefunded:
         assert str(inline.refund_status(item)) == "Back in stock"
         item.is_refunded, item.refunded_quantity = False, 1
         assert str(inline.refund_status(item)) == "Partly back in stock"
+
+
+class TestAPaidOrderTheLedgerNeverRecorded:
+    """Settled while the previous release served, say: the order is paid
+    through Stripe but its capture is not on the ledger, so ``refundable``
+    is 0. ``refund_order`` reads the capture from the provider once, so the
+    money is still refundable, and the button and the REFUNDED guard must
+    say so without calling the provider."""
+
+    def _unrecorded(self, **kwargs):
+        kwargs.setdefault("pay_way", PayWayFactory.create_online_payment())
+        kwargs.setdefault("payment_id", "pi_unrecorded")
+        return OrderFactory(
+            num_order_items=0,
+            status=OrderStatus.RETURNED,
+            payment_status=PaymentStatus.COMPLETED,
+            amount_due=_eur("50.00"),
+            **kwargs,
+        )
+
+    def test_the_refund_action_is_offered_without_asking_the_provider(self):
+        order = self._unrecorded()
+        admin = OrderAdmin(Order, AdminSite())
+        request = RequestFactory().post("/admin/order/order/")
+        request.user = UserAccountFactory(is_staff=True, is_superuser=True)
+
+        with patch("order.payment.get_payment_provider") as provider:
+            offered = admin.has_refund_permission(request, object_id=order.pk)
+
+        assert offered is True
+        provider.assert_not_called()
+
+    def test_it_cannot_be_marked_refunded_while_the_money_is_held(self):
+        order = self._unrecorded()
+
+        with pytest.raises(RefundOutstandingError) as excinfo:
+            OrderService.update_order_status(order, OrderStatus.REFUNDED)
+
+        assert excinfo.value.refundable == 0
+
+    def test_the_admin_says_to_refund_it_first(self):
+        order = self._unrecorded()
+        admin = OrderAdmin(Order, AdminSite())
+        request = RequestFactory().post("/admin/order/order/")
+        request.user = UserAccountFactory(is_staff=True, is_superuser=True)
+        request.session = {}
+        request._messages = FallbackStorage(request)
+
+        admin.mark_as_refunded(request, Order.objects.filter(pk=order.pk))
+
+        [message] = [str(m) for m in get_messages(request)]
+        assert message == (
+            f"Order {order.pk} skipped: refund its payment first."
+        )
+
+    def test_an_order_paid_without_a_provider_is_not_open(self):
+        """Paid by gift cards and points, or cash: there is no provider to
+        read a capture from, so closing it as REFUNDED is only a status."""
+        order = self._unrecorded(pay_way=None, payment_id="")
+
+        assert PaymentLedger.refund_open(order) is False
+        OrderService.update_order_status(order, OrderStatus.REFUNDED)
+
+        order.refresh_from_db()
+        assert order.status == OrderStatus.REFUNDED

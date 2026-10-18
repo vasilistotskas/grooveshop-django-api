@@ -833,7 +833,7 @@ def send_refund_confirmation_email(self, refund_id: int) -> bool:
             - PaymentLedger.charged_back(order)
         )
         context["refund_amount"] = refund.amount
-        context["refund_remaining"] = (
+        context["payment_remaining"] = (
             Money(still_held, currency) if still_held > 0 else None
         )
 

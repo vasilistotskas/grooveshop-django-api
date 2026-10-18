@@ -3,6 +3,48 @@
 
 
 
+## v3.135.0 (2026-10-18)
+
+### Bug fixes
+
+* fix(product): hide the rating distribution with the review stats
+
+A store whose reviews are off still served per-rate review counts in the
+product page's ratingDistribution. It now serves one all-zero row per
+rate, without running the query. The purge-on-switch test used
+AGENT_COMMERCE_ENABLED as its "other store setting"; that setting now
+backs chat_widget, so it uses PRODUCT_FEEDS_ENABLED.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DKyCtCCkFTgcH6VAVK3AJm
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`3fda6e3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3fda6e35736172a6c765a6962fb4708938cadfc8))
+
+### Features
+
+* feat(tenant): product alerts, contact attachments and chat widget are store features; hidden reviews hide their stars (#239) ([`3fda6e3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3fda6e35736172a6c765a6962fb4708938cadfc8))
+
+* feat(tenant): serve product alerts, contact attachments and the chat widget as store features
+
+Add product_alerts, contact_attachments and chat_widget to STORE_FEATURES
+and TenantConfig.features (additive). The first two already 404 through
+their permission classes; chat_widget needs agent commerce at both tiers
+plus its own switch (new IsChatWidgetEnabled).
+
+A store whose product reviews are off now also serves no star average and
+no review count: zero on the product serializers (the fields stay
+non-null), null/zero on search hits. feature_on() answers as the
+permission classes do, and the search views decide once per response.
+
+Document every *_ENABLED setting's class, each feature's gates and its
+dependencies in docs/store-features.md. CART_ENABLED and CATALOGUE_ENABLED
+are not gated yet: the agent gateway calls those routes.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DKyCtCCkFTgcH6VAVK3AJm ([`3fda6e3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3fda6e35736172a6c765a6962fb4708938cadfc8))
+
 ## v3.134.0 (2026-10-18)
 
 ### Bug fixes

@@ -43,11 +43,30 @@ cache-invalidated by the rewrite, and `updated_at` keeps its value.
   original, so `cart_uuid` in order metadata and recommendation events still
   matches its cart, and a second run changes nothing. Public promotion codes
   are marketing and stay. The residual scan also searches for the originals.
+- **Production credentials are cleared**, not scrubbed: staging's
+  field-encryption keys open production's ciphertext, so a restored `Tenant`
+  row would hand anyone with staging admin, a shell or a dump the live Stripe,
+  Viva, ACS, BoxNow, myDATA, chat and ACP secrets. `devtools/anonymise/credentials.py`
+  derives the columns from the model: every `EncryptedCharField` whatever its
+  name, every text field that starts with an integration prefix (merchant ids,
+  public keys, analytics ids) and every `*_live_mode` boolean (forced off). It
+  is one `UPDATE` that never decrypts, so a token no key opens is cleared
+  rather than raising. The dj-stripe API key and webhook endpoint rows are
+  wiped and the OAuth app secrets blanked. After clearing, the run checks every
+  `EncryptedCharField` column of every model itself and fails if any holds a
+  value. Staging's own sandbox credentials come from its sealed secrets,
+  written by `scripts/staging-arm-features.py` in the infrastructure repo, through
+  `credentials.arm_credentials`: it reads the `STAGING_TENANT_CREDENTIALS` JSON
+  (`{schema: {field: value}}`), accepts only the credential columns this module
+  derives, and refuses to run unless `SYSTEM_ENV` is `staging`, and refuses a tenant whose primary
+  domain is not exactly `<staging label>.webside.gr` or `.grooveshop.space` or has a live-mode
+  switch on.
 - **Deleted**: sessions, Knox tokens, MFA and WebAuthn authenticators, social
   accounts and tokens, e-mail confirmations, OIDC tokens, GDPR export rows,
   search queries, notifications, stock reservations, admin log entries,
   Conversions API logs, Celery results, and every dj-stripe mirror row except
-  the platform's own Stripe account and endpoint configuration.
+  the platform's own Stripe account (the API key and webhook endpoint rows are
+  wiped, and `manage.py bootstrap_stripe` rebuilds them from a sandbox key).
 - **Kept real**: orders, items, payments, invoices' amounts, products, stock,
   prices, promotions, gift-card balances, loyalty points, translations.
 
@@ -109,6 +128,8 @@ that really is not personal goes in `NOT_PERSONAL_FIELDS` with the reason.
 
 - `tests/unit/devtools/test_anonymise_covers_every_model.py` — the guards.
 - `tests/unit/devtools/test_anonymise_values.py` — fakes, redaction, scanner.
+- `tests/unit/devtools/test_anonymise_credentials.py` — an encrypted field on any
+  model without a clear, a secret-looking plain field left behind.
 - `tests_mt/test_staging_anonymise.py` — two seeded tenant schemas plus the
   public schema: no original value survives in any table (read back
   independently of the command's own scanner), staff and demo logins kept,
@@ -126,10 +147,8 @@ DB_NAME=gs_staging_scrub uv run pytest tests_mt/test_staging_anonymise.py -n0
   `uploads/users` out of the media copy. Contact attachments, invoice PDFs and
   GDPR export bundles live under the private media root, which the refresh
   does not copy.
-- **Credentials that are not bearer values of a customer.** The Stripe API key
-  rows, platform staff tokens and the merchants' encrypted payment and carrier
-  credentials on the `Tenant` row are copied as they are (see the
-  infrastructure repo's `docs/staging.md`).
+- **Platform staff tokens** are copied as they are: they are stored as digests
+  and staging keeps operator logins.
 - **Store contact details.** A store's published contact and sender mailboxes
   stay (`NOT_PERSONAL_FIELDS`); its owner e-mail and carrier notification phone
   are replaced.

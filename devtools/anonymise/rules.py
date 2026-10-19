@@ -20,7 +20,7 @@ finish a run that leaves any scrubbed value behind.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -105,6 +105,15 @@ class Scrub:
     # Restrict the rule to these rows (a personal coupon's code is a
     # bearer secret; a public one is marketing and stays).
     where: Q | None = None
+    # Columns set to a constant on every row, by one UPDATE that never
+    # reads them back (so an encrypted token no key opens cannot stop
+    # the run). Lazy: it reads the model's fields.
+    clear: Callable[[], Mapping[str, object]] | None = None
+
+    def handled_fields(self) -> set[str]:
+        """Every field this rule scrubs or clears."""
+        cleared = set(self.clear()) if self.clear else set()
+        return set(self.fields) | cleared
 
 
 @dataclass(frozen=True)
@@ -116,6 +125,13 @@ class Delete:
     """
 
     tenant_only: bool = False
+
+
+def _credentials(label: str) -> Mapping[str, object]:
+    """The credential columns of ``label``, derived from its fields."""
+    from devtools.anonymise import credentials
+
+    return credentials.cleared_fields(apps.get_model(label))
 
 
 def _scrub_all(**fields: Kind | F) -> Scrub:
@@ -353,11 +369,19 @@ REGISTRY: dict[str, Scrub | Delete] = {
     ),
     "cart.Cart": Scrub(user_fk="user", fields={"uuid": Kind.UUID}),
     # ── platform control plane ──────────────────────────────────────
-    "tenant.Tenant": _scrub_all(
-        owner_email=Kind.EMAIL, box_now_notify_phone=Kind.PHONE
+    # The owner's address is scrubbed; every credential column (every
+    # encrypted field, the integrations' ids and keys, the live-mode
+    # switches) is cleared, and staging re-arms its own sandbox ones.
+    "tenant.Tenant": Scrub(
+        fields={"owner_email": Kind.EMAIL},
+        clear=lambda: _credentials("tenant.Tenant"),
     ),
-    "tenant.HistoricalTenant": _scrub_all(
-        owner_email=Kind.EMAIL, box_now_notify_phone=Kind.PHONE
+    "tenant.HistoricalTenant": Scrub(
+        fields={"owner_email": Kind.EMAIL},
+        clear=lambda: _credentials("tenant.HistoricalTenant"),
+    ),
+    "socialaccount.SocialApp": _scrub_all(
+        client_id=Kind.BLANK, secret=Kind.BLANK, key=Kind.BLANK
     ),
     "djstripe.Account": _scrub_all(stripe_data=Kind.JSON, metadata=Kind.JSON),
     # ── credentials, sessions and logs ──────────────────────────────
@@ -383,9 +407,11 @@ REGISTRY: dict[str, Scrub | Delete] = {
 #: mirrors Stripe objects whose JSON carries billing details, and the Celery
 #: result table keeps task arguments.
 WIPE_APPS: dict[str, frozenset[str]] = {
-    # Account is scrubbed (REGISTRY); APIKey and WebhookEndpoint are the
-    # platform's own Stripe configuration, not a person.
-    "djstripe": frozenset({"Account", "APIKey", "WebhookEndpoint"}),
+    # Account is scrubbed (REGISTRY). APIKey and WebhookEndpoint hold the
+    # production Stripe secret and webhook signing secret, so they go;
+    # ``manage.py bootstrap_stripe`` rebuilds both from the tenant's
+    # sandbox key.
+    "djstripe": frozenset({"Account"}),
     "django_celery_results": frozenset(),
 }
 
@@ -487,10 +513,7 @@ NOT_PERSONAL: dict[str, str] = {
         "loyalty.LoyaltyPause",
         "giftcard.GiftCardPause",
         "extra_settings.Setting",
-        "socialaccount.SocialApp",
         "allauth_idp_oidc.Client",
-        "djstripe.APIKey",
-        "djstripe.WebhookEndpoint",
     ),
     **_exempt(
         "operational record of an order, keyed by an opaque id: amounts, "

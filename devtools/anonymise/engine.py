@@ -67,11 +67,14 @@ class UnknownSchema(RuntimeError):
 class Report:
     scrubbed: Counter[str] = field(default_factory=Counter)
     deleted: Counter[str] = field(default_factory=Counter)
+    cleared: Counter[str] = field(default_factory=Counter)
     kept_users: dict[str, int] = field(default_factory=dict)
 
     def lines(self) -> Iterator[str]:
         for label, count in sorted(self.scrubbed.items()):
             yield f"scrubbed {count:>7}  {label}"
+        for label, count in sorted(self.cleared.items()):
+            yield f"cleared  {count:>7}  {label} credentials"
         for label, count in sorted(self.deleted.items()):
             yield f"deleted  {count:>7}  {label}"
         for schema, count in sorted(self.kept_users.items()):
@@ -421,6 +424,44 @@ def _is_primary_email(row: dict[str, Any], email: str, schema: _Schema) -> bool:
     return owner is not None and str(email).casefold() == owner
 
 
+def _clear_credentials(
+    model: type[Model], rule: rules.Scrub, schema: _Schema, context: _Context
+) -> None:
+    """Set the rule's credential columns to their cleared value.
+
+    One ``UPDATE``; nothing is read back, so a token that no configured
+    key opens is cleared rather than raising ``DecryptionError``.
+    """
+    if rule.clear is None:
+        return
+    cleared = model._base_manager.update(**rule.clear())
+    if cleared:
+        label = model._meta.label
+        context.report.cleared[f"{schema.name}: {label}"] += cleared
+
+
+def _assert_credentials_blank(
+    models_here: list[type[Model]], name: str
+) -> None:
+    """No encrypted column of any model in ``name`` holds a value.
+
+    Derived from the field class, not from the rules: a model that gains
+    an ``EncryptedCharField`` and no ``clear`` fails the run here, however
+    the rules were written.
+    """
+    from devtools.anonymise import credentials
+
+    left = []
+    for model in models_here:
+        for column in credentials.encrypted_fields(model):
+            if model._base_manager.exclude(**{column.name: ""}).exists():
+                left.append(f"{name}.{model._meta.label}.{column.name}")
+    if left:
+        raise ResidueFound(
+            "encrypted credentials survive in: " + ", ".join(sorted(left))
+        )
+
+
 def _delete_all(
     models: list[type[Model]], schema: _Schema, context: _Context
 ) -> None:
@@ -519,11 +560,20 @@ def anonymise_database() -> Report:
                             context.report.scrubbed[f"{name}: {label}"] += (
                                 changed
                             )
+                        _clear_credentials(model, rule, schema, context)
                     elif isinstance(rule, rules.Delete) and not (
                         rule.tenant_only and name == public
                     ):
                         wipe.append(model)
                 _delete_all(wipe, schema, context)
+                _assert_credentials_blank(
+                    [
+                        model
+                        for model in rules.concrete_models()
+                        if _in_schema(model, name, public)
+                    ],
+                    name,
+                )
         context.canaries.discard(context.emitted | context.allowed)
         leaks: Counter[str] = Counter()
         if context.canaries:
